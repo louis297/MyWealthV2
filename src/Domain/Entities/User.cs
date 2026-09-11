@@ -36,6 +36,13 @@ public class User : BaseAuditableEntity
         bool withPassword = true,
         Guid? publicId = null)
     {
+        if (string.IsNullOrWhiteSpace(identityUserId))
+        {
+            throw new DomainException("IdentityUserId is required.");
+        }
+
+        EnsureRoleShape(role, tenantId, adviserId);
+
         var user = new User
         {
             Role = role,
@@ -87,5 +94,21 @@ public class User : BaseAuditableEntity
 
         Status = UserStatus.Active;
         AddDomainEvent(new UserActivated(this));
+    }
+
+    private static void EnsureRoleShape(UserRole role, int? tenantId, int? adviserId)
+    {
+        var valid = role switch
+        {
+            UserRole.SystemAdmin => tenantId is null && adviserId is null,
+            UserRole.TenantAdmin or UserRole.Adviser => tenantId is not null && adviserId is null,
+            UserRole.Customer => tenantId is not null && adviserId is not null,
+            _ => false
+        };
+
+        if (!valid)
+        {
+            throw new DomainException($"Role {role} does not match TenantId/AdviserId shape.");
+        }
     }
 }
