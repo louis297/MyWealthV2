@@ -85,6 +85,16 @@ public class User : BaseAuditableEntity
         AddDomainEvent(new UserActivated(this));
     }
 
+    public void ChangeName(string name)
+    {
+        throw new NotImplementedException();
+    }
+
+    public void RecordPasswordChanged()
+    {
+        throw new NotImplementedException();
+    }
+
     public void Activate()
     {
         if (Status != UserStatus.PendingActivation)
