@@ -1,3 +1,4 @@
+using MyWealthV2.Infrastructure.Data.Schema;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,6 +12,12 @@ builder.AddInfrastructureServices();
 builder.AddWebServices();
 
 var app = builder.Build();
+
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    var applicator = scope.ServiceProvider.GetRequiredService<SchemaApplicator>();
+    await applicator.ApplyAsync(CancellationToken.None);
+}
 
 if (!app.Environment.IsDevelopment())
 {

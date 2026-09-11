@@ -26,6 +26,8 @@ public class User : BaseAuditableEntity
 
     public Guid PublicId { get; private set; }
 
+    public byte[] RowVersion { get; private set; } = null!;
+
     public static User Create(
         UserRole role,
         string name,

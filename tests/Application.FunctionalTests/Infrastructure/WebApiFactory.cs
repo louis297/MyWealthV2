@@ -12,7 +12,7 @@ public class WebApiFactory(string connectionString) : WebApplicationFactory<Prog
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder
-            .UseSetting("ConnectionStrings:MyWealthV2Db", connectionString);
+            .UseSetting("ConnectionStrings:MyWealthDbV2", connectionString);
 
         builder.ConfigureTestServices(services =>
         {

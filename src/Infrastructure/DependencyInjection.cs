@@ -1,6 +1,7 @@
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Interceptors;
+using MyWealthV2.Infrastructure.Data.Schema;
 using MyWealthV2.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -31,12 +32,19 @@ public static class DependencyInjection
 
         builder.Services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
 
+        var schemaDirectory = Path.Combine(AppContext.BaseDirectory, "schema");
+        builder.Services.AddSingleton<ISchemaScriptSource>(_ => new FileSchemaScriptSource(schemaDirectory));
+        builder.Services.AddScoped<ISchemaVersionStore, EfSchemaVersionStore>();
+        builder.Services.AddScoped<ISqlBatchExecutor, EfSqlBatchExecutor>();
+        builder.Services.AddScoped<SchemaApplicator>();
+
         builder.Services.AddAuthorization();
 
         builder.Services
             .AddIdentityCore<ApplicationUser>(options =>
             {
                 options.User.RequireUniqueEmail = false;
+                options.Stores.SchemaVersion = IdentitySchemaVersions.Version2;
             })
             .AddEntityFrameworkStores<ApplicationDbContext>();
 
