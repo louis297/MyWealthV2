@@ -15,6 +15,11 @@ public static class Services
     public const string WebApi = "webapi";
 
     /// <summary>
+    /// Aspire resource name for src/IdentityHost (OpenIddict + hosted login).
+    /// </summary>
+    public const string Identity = "identity";
+
+    /// <summary>
     /// The name of the Database Server service.
     /// This service is responsible for hosting the database server (e.g., PostgreSQL, SQL Server, or SQLite).
     /// </summary>

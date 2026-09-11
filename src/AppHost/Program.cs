@@ -21,5 +21,13 @@ var web = builder.AddProject<Projects.Web>(Services.WebApi)
         url.Url = "/scalar";
     });
 
+var identity = builder.AddProject<Projects.IdentityHost>(Services.Identity)
+    .WithReference(databaseServer)
+    .WaitFor(web)
+    .WithExternalHttpEndpoints()
+    .WithAspNetCoreEnvironment();
+
+web.WithReference(identity);
+
 
 builder.Build().Run();

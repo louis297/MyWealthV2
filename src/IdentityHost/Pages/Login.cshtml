@@ -1,0 +1,28 @@
+@page "/login"
+@model MyWealthV2.IdentityHost.Pages.LoginModel
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Sign in</title>
+</head>
+<body>
+    <h1>Sign in</h1>
+    @if (Model.Error is not null)
+    {
+        <p>@Model.Error</p>
+    }
+    <form method="post">
+        <div>
+            <label>Email <input asp-for="Email" type="email" autocomplete="username" /></label>
+        </div>
+        <div>
+            <label>Password <input asp-for="Password" type="password" autocomplete="current-password" /></label>
+        </div>
+        <div>
+            <label>Tenant code <input asp-for="TenantCode" autocomplete="organization" /></label>
+        </div>
+        <button type="submit">Sign in</button>
+    </form>
+</body>
+</html>
