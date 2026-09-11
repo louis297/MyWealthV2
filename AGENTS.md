@@ -14,3 +14,19 @@ Create a git commit after every discrete step of work. Do not leave completed st
 - Never commit secrets, credentials, `.env` files, or generated artifacts that should stay untracked.
 - If a step produced no file changes, skip the commit.
 - Do not amend, rebase, or rewrite history unless the user explicitly asks.
+
+## Use agentic-friendly TDD for development work
+
+For production code, work test-first. Tests are the executable spec; do not start by writing implementation.
+
+1. **Red** — Write the smallest failing test for one behaviour from the accepted spec. Run it and confirm it fails for the reason you expect.
+2. **Green** — Write the minimum production code to make that test pass. Run the relevant tests. Do not add behaviour the test does not require.
+3. **Refactor** — Clean up only while the suite is green. No new behaviour during refactor.
+
+Treat each of red, green, and refactor as a step: commit after each one that produces a file change.
+
+- One behaviour per cycle. Prefer the lowest test layer that can prove it (domain unit, then application, then functional/integration).
+- Assert outcomes and invariants, not private implementation details.
+- Do not skip the red run. A test that never failed is not a test.
+- Do not make a failing test pass by weakening it unless the spec was wrong.
+- Docs, config, and chores with no testable behaviour are exempt.
