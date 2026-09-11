@@ -1,10 +1,30 @@
 using MyWealthV2.Domain.Enums;
+using MyWealthV2.Domain.Events;
+using MyWealthV2.Domain.Exceptions;
 
 namespace MyWealthV2.Domain.Entities;
 
 public class User : BaseAuditableEntity
 {
+    private User()
+    {
+    }
+
     public UserStatus Status { get; private set; }
+
+    public UserRole Role { get; private set; }
+
+    public string Name { get; private set; } = string.Empty;
+
+    public string Email { get; private set; } = string.Empty;
+
+    public string IdentityUserId { get; private set; } = string.Empty;
+
+    public int? TenantId { get; private set; }
+
+    public int? AdviserId { get; private set; }
+
+    public Guid PublicId { get; private set; }
 
     public static User Create(
         UserRole role,
@@ -16,21 +36,56 @@ public class User : BaseAuditableEntity
         bool withPassword = true,
         Guid? publicId = null)
     {
-        throw new NotImplementedException();
+        var user = new User
+        {
+            Role = role,
+            Name = name,
+            Email = email,
+            IdentityUserId = identityUserId,
+            TenantId = tenantId,
+            AdviserId = adviserId,
+            PublicId = publicId ?? Guid.NewGuid(),
+            Status = withPassword ? UserStatus.Active : UserStatus.PendingActivation
+        };
+
+        if (user.Status == UserStatus.Active)
+        {
+            user.AddDomainEvent(new UserActivated(user));
+        }
+
+        return user;
     }
 
     public void Disable()
     {
-        throw new NotImplementedException();
+        if (Status is not (UserStatus.Active or UserStatus.PendingActivation))
+        {
+            throw new DomainException("Only Active or PendingActivation users can be disabled.");
+        }
+
+        Status = UserStatus.Disabled;
+        AddDomainEvent(new UserDisabled(this));
     }
 
     public void Enable()
     {
-        throw new NotImplementedException();
+        if (Status != UserStatus.Disabled)
+        {
+            throw new DomainException("Only Disabled users can be enabled.");
+        }
+
+        Status = UserStatus.Active;
+        AddDomainEvent(new UserActivated(this));
     }
 
     public void Activate()
     {
-        throw new NotImplementedException();
+        if (Status != UserStatus.PendingActivation)
+        {
+            throw new DomainException("Only PendingActivation users can be activated.");
+        }
+
+        Status = UserStatus.Active;
+        AddDomainEvent(new UserActivated(this));
     }
 }
