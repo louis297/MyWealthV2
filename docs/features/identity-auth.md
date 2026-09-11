@@ -1,6 +1,6 @@
 ---
 title: Identity & Auth
-status: draft
+status: accepted
 phase: 1
 language: en
 owner: ""
@@ -37,7 +37,7 @@ The Adviser Portal redirects to hosted login on `identity` (email + password + t
 - One Phase-1 public client: `adviser-portal` (authorization code + PKCE + refresh; password grant off)
 - Asymmetric signing; JWKS; `webapi` validates via discovery. `UseLocalServer()` is not the default validation path
 - `GET/PUT /users/me`, `PUT /users/me/password` (resource API; does not issue tokens)
-- JWT claims: user PublicId, email, role, tenant PublicId, tenantCode (tenant claims empty for SystemAdmin). No internal ints. Permissions are not expanded into the token
+- JWT claims: `sub` = user PublicId, `email`, `role`, `tenant_id`, `tenant_code` (tenant claims empty for SystemAdmin). No internal ints. Permissions are not expanded into the token
 - Scopes: `openid`, `profile`, `offline_access`, `api`. Role and tenant are claims, not scopes
 - Refresh lives in `OpenIddictTokens`. Logout, password change, person disable, and tenant disable make that subject’s refresh fail
 - Login gate: resolve Domain `User` by `tenantCode + email`, then verify the password on that row’s `IdentityUserId`. Turn off Identity `RequireUniqueEmail`
@@ -68,7 +68,7 @@ The Adviser Portal redirects to hosted login on `identity` (email + password + t
 1. As a TenantAdmin or Adviser I am redirected to `identity` (email + password + tenantCode) so I can call the resource API with access / refresh.
 2. As a SystemAdmin I omit tenantCode so I can manage tenants and TenantAdmins from Scalar.
 3. As any login-capable role I read and update my display name and change my password; old refresh fails after a password change.
-4. As a Customer I can complete the authorization server in tests, but I cannot enter the Adviser Portal or call adviser-management routes.
+4. As a Customer I can complete the authorization server in tests and call `GET /users/me`. Adviser-management HTTP 403 waits for those routes. I cannot enter the Adviser Portal (later client + role gate).
 5. As the platform, refresh for a subject must fail after that person is disabled, that tenant is disabled, the password changes, or the user logs out.
 
 ---
@@ -80,7 +80,7 @@ The Adviser Portal redirects to hosted login on `identity` (email + password + t
 | R1 | Non-SystemAdmin must submit a valid **enabled** tenantCode on hosted login. Compare Code case-insensitively. |
 | R2 | Resolve `tenantCode + email` → one Domain `Users` row → verify the password on that row’s `IdentityUserId`. Do not `UserManager.FindByEmail` across tenants. Do not log in with PublicId + password. |
 | R3 | `Status ≠ Active`, a disabled tenant, or a missing Identity link → authorization does not complete. Until login-failure codes are locked, return a uniform failure and do not enumerate the reason. |
-| R4 | A Customer may obtain tokens. They receive no adviser-management policies. The portal plus a role gate reject entry. |
+| R4 | A Customer may obtain tokens. They receive no adviser-management policies (`RolePermissions`). HTTP 403 on adviser-management routes waits until those routes exist. The portal plus a role gate reject entry (portal is a later slice). |
 | R5 | Access is a short-lived JWT, signed asymmetrically. Refresh is revocable in the OpenIddict store. |
 | R6 | All four roles may call `GET /users/me`. `PUT /users/me` updates `name` only (may include `rowVersion`). Email / Role / TenantId / Status / adviserId cannot change here. |
 | R7 | Password change requires the current password. On success, revoke that subject’s OpenIddict tokens. The caller must run the authorization-code flow again. Do not return tokens. |
@@ -115,7 +115,7 @@ Permissions are not a list in the JWT and there is no `GET /users/me/permissions
 ```text
 Bearer arrives at webapi
   → validate signature / issuer / expiry (JWKS)
-  → read claims: sub = Users.PublicId, role, tenant PublicId, tenantCode
+  → read claims: sub = Users.PublicId, email, role, tenant_id, tenant_code
   → ICurrentUser loads Domain Users by PublicId
   → dual check: row TenantId ↔ tenant claims (both empty for SystemAdmin)
   → endpoint policy, e.g. advisers.manage
@@ -178,15 +178,21 @@ Keep [domain-model.md](../domain-model.md) in the same change when the model mov
 | `AspNetUsers` and Identity user-store siblings | add (no role tables) | Package defaults; `TenantId` int null, no FK |
 | OpenIddict tables (package set) | add | Package defaults. Client row `adviser-portal` |
 | `UserTokens` | add | Unique `TokenHash`; no PublicId / RowVersion; `IdentityUserId` / `TenantId` have no FK |
-| `Users` | consumed here; script is platform schema | One-way `IdentityUserId` → `AspNetUsers`. No people CRUD in this slice |
+| `Tenants` | add; login gate needs `Code` + `IsEnabled` | Unique CI `Code` / `Name` / `PublicId`. **No `ReportingCurrency` column or FK** — currencies slice adds those |
+| `Users` | add so `/users/me` and the SystemAdmin seed have a table | One-way `IdentityUserId` → `AspNetUsers`. No people CRUD in this slice |
+
+This slice does **not** create `Currencies`, `ICurrencyCatalog`, or `GET /currencies`.
 
 Scripts (database-design §9):
 
+- `0001_schema_versions.sql`
 - `0003_identity.sql` — user store + `AspNetUsers.TenantId`
 - `0004_openiddict.sql` — package tables; optional scope / client seed
+- `0005_tenants.sql` — no `ReportingCurrency`
+- `0006_users.sql` — FKs to Tenants and AspNetUsers
 - `0007_user_tokens.sql` — seam table
 
-`0006_users.sql` still applies with the platform set so `/users/me` and the SystemAdmin seed have a table. People-management APIs are not this slice.
+Do not add `0002_currencies.sql` here. Currencies + `Tenants.ReportingCurrency` are later forward-only scripts (`0008+`). People-management APIs are not this slice.
 
 Password seed goes through `UserManager` only.
 
@@ -282,7 +288,7 @@ Adviser Portal:
 - **Do not** host a password form that issues tokens
 - Profile: `/users/me`; change name; change password (current + new). After password change, run login again
 
-Hosted login on `identity` at `/login`: email, password, tenantCode (optional for SystemAdmin). No forgot-password. Markup (Razor Pages vs minimal HTML) may be chosen at implementation; the path is locked.
+Hosted login on `identity` at `/login`: email, password, tenantCode (optional for SystemAdmin). No forgot-password. Markup is **Razor Pages**; the path is `/login`.
 
 SystemAdmin has no portal. Use Scalar and the same authorization flow. Do not build an admin shell.
 
@@ -293,27 +299,29 @@ SystemAdmin has no portal. Use Scalar and the same authorization flow. Do not bu
 | Project | Assert |
 | --- | --- |
 | Domain.UnitTests | Legal `UserStatus` transitions; SystemAdmin / tenant role shape; login-gate function (disabled tenant, non-Active, missing Identity link → reject) |
-| Application.FunctionalTests | Start `identity` and `webapi`. Tenant A’s email must not complete login with tenant B’s code. Refresh fails after password change or disable. Customer who completed the authorization flow: `GET /users/advisers` 403, `GET /users/me` 200. Missing Bearer on `/users/me` → 401, never 302. `RolePermissions.Has` covers four roles × six policies. `PUT /users/me` cannot change email (400). `rowVersion` conflict → 409 |
+| Application.FunctionalTests | Start `identity` and `webapi`. Tenant A’s email must not complete login with tenant B’s code. Refresh fails after password change or disable. Customer who completed the authorization flow: `GET /users/me` 200. Do **not** call `/users/advisers` (that route belongs to the advisers slice; HTTP 403 for adviser-management waits there). Missing Bearer on `/users/me` → 401, never 302. `RolePermissions.Has` covers four roles × six policies. `PUT /users/me` cannot change email (400). `rowVersion` conflict → 409 |
 | Infrastructure.IntegrationTests | After scripts: Identity + OpenIddict + UserTokens exist; no AspNetRoles; `adviser-portal` is discoverable; UserName / Email lookup does not hit another tenant |
 
 Isolation in this slice is the login resolver: wrong tenantCode + correct email must fail.
 
 ---
 
-## 11. Still open
+## 11. Locked in this spec
 
-Lock in this spec when implementing. Do not open a new ADR.
+Do not open a new ADR.
 
-| Item | Tendency (not locked) |
+| Item | Lock |
 | --- | --- |
-| Distinct login failure for Disabled vs bad password | Uniform failure (same hosted-login copy; no dedicated error code) |
+| Login failure for Disabled vs bad password | Uniform failure (same hosted-login copy; no dedicated error code) |
 | Access lifetime | 15 minutes |
-| Refresh lifetime | 14 days absolute; sliding vs absolute to be written back after the OpenIddict option is chosen |
+| Refresh lifetime | 14 days **absolute** (not sliding) |
 | Default list page size | Not this slice |
-| Identity password options | Minimum length 8; other framework defaults unless implementation tightens them |
-| Hosted login markup | Razor Pages or minimal HTML; path `/login` is already locked |
+| Identity password options | Minimum length 8; other framework defaults |
+| Hosted login markup | Razor Pages at `/login` |
+| `AspNetUsers.UserName` | The same string as Domain `Users.PublicId` (R12) |
+| JWT claim names | `sub` = Users.PublicId; `email`; `role`; `tenant_id`; `tenant_code` (empty for SystemAdmin). No permission claims, no internal ints |
 
-Do not invent a second login protocol while these remain open.
+Do not invent a second login protocol.
 
 ---
 

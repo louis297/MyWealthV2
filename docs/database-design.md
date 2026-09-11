@@ -3,7 +3,7 @@ title: Database design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-09-11
+updated: 2026-09-12
 related:
   - README.md
   - glossary.md
@@ -208,12 +208,14 @@ Client seed: SQL insert or startup seed. Both are allowed.
 | PublicId | uniqueidentifier | no | Unique |
 | Name | nvarchar(200) | no | Unique CI |
 | Code | nvarchar(50) | no | Login code, unique CI, `[a-z0-9-]{2,50}` |
-| ReportingCurrency | char(3) | no | FK → `Currencies.Code` |
+| ReportingCurrency | — | — | **Not in identity-auth.** Currencies slice adds `char(3) NOT NULL` + FK → `Currencies.Code` |
 | IsEnabled | bit | no | Default 1 |
 | RowVersion | rowversion | no | |
 | Created / CreatedBy / LastModified / LastModifiedBy | audit | | |
 
 `Code` is treated as immutable after create by the Tenants slice (no update API). The column itself is ordinary.
+
+identity-auth creates `Tenants` **without** `ReportingCurrency`. Login only needs `Code` and `IsEnabled`. The currencies slice adds the catalog table and then `Tenants.ReportingCurrency` as a forward-only script after `0007` (do not back-fill `0002`).
 
 ### 6.6 Users
 
@@ -279,7 +281,7 @@ Why no FK on `IdentityUserId` / `TenantId`: this is a seam table. A reverse or e
 
 | Parent → child | Child column | On delete |
 | --- | --- | --- |
-| `Currencies` → `Tenants` | `ReportingCurrency` | RESTRICT |
+| `Currencies` → `Tenants` | `ReportingCurrency` | RESTRICT (currencies slice; column does not exist in identity-auth) |
 | `Tenants` → `Users` | `TenantId` | RESTRICT |
 | `Users` → `Users` | `AdviserId` | RESTRICT |
 | `AspNetUsers` → `Users` | `IdentityUserId` | RESTRICT |
@@ -309,13 +311,14 @@ Beyond PK / unique constraints already listed:
 
 ```text
 0001_schema_versions.sql
-0002_currencies.sql          -- table + seed
 0003_identity.sql            -- user store only; AspNetUsers.TenantId
 0004_openiddict.sql          -- package tables
-0005_tenants.sql
+0005_tenants.sql             -- no ReportingCurrency
 0006_users.sql               -- FKs to Tenants and AspNetUsers
 0007_user_tokens.sql
 ```
+
+Do **not** add `0002_currencies.sql` in identity-auth. Currencies + `Tenants.ReportingCurrency` are later scripts (`0008+`), not a back-filled `0002`.
 
 OpenIddict client / scope seed may sit in `0004` or in a later seed script / startup. Identity users are **not** inserted as raw password hashes in SQL.
 
@@ -347,10 +350,9 @@ Names already reserved in the glossary and domain model (not a CREATE list): Ins
 
 These stay open in the function plan and do not change tables:
 
-- Identity `UserName` value: `PublicId` vs `{tenantCode}:{email}`
-- Hosted login markup
-- Uniform 401 vs distinct disabled-login codes
-- List page size
+- Default list page size
+
+Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `Users.PublicId` string; hosted login is Razor Pages at `/login`; login failures are uniform; access 15 minutes; refresh 14 days absolute.
 
 ---
 
@@ -359,3 +361,4 @@ These stay open in the function plan and do not change tables:
 | Date | Change |
 | --- | --- |
 | 2026-09-11 | First English draft. Align with function-plan: OpenIddict stores in, custom RefreshTokens out; AspNetUsers.TenantId column no FK; no DomainUserId / Role / DisplayName on Identity; UserTokens seam keyed by hash + optional IdentityUserId, no FK; no ledger tables |
+| 2026-09-12 | identity-auth lands Tenants without ReportingCurrency and does not create Currencies. Catalog + ReportingCurrency FK are the currencies slice (`0008+`). |

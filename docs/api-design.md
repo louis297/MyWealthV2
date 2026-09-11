@@ -3,7 +3,7 @@ title: API design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-09-11
+updated: 2026-09-12
 related:
   - README.md
   - glossary.md
@@ -84,7 +84,7 @@ Success codes:
 
 The login gate is on `identity`: tenant enabled, `UserStatus = Active`, valid Identity link. The resource API then reads JWT claims and applies the dual tenant check.
 
-JWT claims (permissions are not expanded): user PublicId, email, role, tenant PublicId (nullable), tenantCode (nullable). No internal ints. Tenant claims are empty for SystemAdmin.
+JWT claims (permissions are not expanded): `sub` = user PublicId, `email`, `role`, `tenant_id` (nullable), `tenant_code` (nullable). No internal ints. Tenant claims are empty for SystemAdmin.
 
 Protocol scopes (not permissions): `openid`, `profile`, `offline_access`, `api`. Role and tenant are claims, not scopes.
 
@@ -134,7 +134,7 @@ Protocol paths use **OpenIddict defaults. Do not remap.** Portals and `webapi` f
 | Revocation | `POST /connect/revocation` | Revoke refresh on logout (default name is revocation, not revoke) |
 | End session | `GET /connect/logout` | Portal returns to its post-logout redirect |
 | Userinfo | `GET /connect/userinfo` | Library default; Phase 1 portal mainly uses access-token claims |
-| Hosted login | Password page on `identity` | email + password + tenantCode (SystemAdmin omits tenantCode). **Not** a `/connect` protocol endpoint. Page route is not locked |
+| Hosted login | Password page on `identity` | email + password + tenantCode (SystemAdmin omits tenantCode). **Not** a `/connect` protocol endpoint. Razor Pages at `/login` |
 
 **Phase 1 client**
 
@@ -153,7 +153,7 @@ Protocol paths use **OpenIddict defaults. Do not remap.** Portals and `webapi` f
 - A separate identity SQL database
 - Invitation, forgot-password, MFA, external IdP
 
-Access lifetime (minutes), refresh lifetime (days), and the login-page route name are **not locked here**. Put them in the identity-auth Feature Spec.
+Access lifetime is 15 minutes. Refresh lifetime is 14 days absolute. Hosted login is Razor Pages at `/login`. See identity-auth.
 
 ---
 
@@ -283,13 +283,9 @@ When the Phase-2 ledger opens, add ledger policy names and ledger routes only. T
 
 ## 9. Still open in Phase 1
 
-- Identity `UserName`: `PublicId` or `{tenantCode}:{email}`
-- Login failure: uniform failure vs distinct Disabled / bad-credential codes
 - Default list page size
-- Hosted login markup (Razor Pages vs minimal HTML) and that page’s own route (protocol paths are locked to OpenIddict defaults; the login page is not `/connect`)
-- Access / refresh lifetimes
 
-Do not invent defaults for these here. Lock them in the matching Feature Spec when implementing.
+Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; uniform login failure; hosted login is Razor Pages at `/login`; access 15 minutes; refresh 14 days absolute; JWT claims `sub` / `email` / `role` / `tenant_id` / `tenant_code`.
 
 ---
 
@@ -298,3 +294,4 @@ Do not invent defaults for these here. Lock them in the matching Feature Spec wh
 | Date | Change |
 | --- | --- |
 | 2026-09-11 | First English draft. Two HTTP surfaces; OpenIddict default protocol paths; no resource-API token issuer; `/users` namespace for people collections; `/users/me` on `webapi`; Customer may complete the authorization server; no ledger routes in Phase 1. |
+| 2026-09-12 | identity-auth locks: Razor `/login`; JWT claim names; 15 min access / 14 day absolute refresh; UserName = PublicId. |

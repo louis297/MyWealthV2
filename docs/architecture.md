@@ -3,7 +3,7 @@ title: Architecture
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-09-11
+updated: 2026-09-12
 related:
   - README.md
   - glossary.md
@@ -164,13 +164,13 @@ The schema applicator runs **once** (default: `webapi` startup, or an explicit a
 | Redirect | `adviser-portal` callback (local Vite origin + later deployed origin). Register the end-session post-logout redirect with the client |
 | Scopes | `openid`, `profile`, `offline_access`, `api` |
 | Tokens | Short-lived JWT access. Refresh in `OpenIddictTokens`. Absolute / sliding lifetimes belong in the identity-auth Feature Spec |
-| Login page | Razor Pages or minimal UI on `identity`. Validates with `UserManager`, then returns to the authorization-code flow |
-| Claims | User PublicId, email, role, tenant PublicId, tenantCode (tenant claims empty for SystemAdmin) |
+| Login page | Razor Pages at `/login` on `identity`. Validates with `UserManager`, then returns to the authorization-code flow |
+| Claims | `sub` = user PublicId, `email`, `role`, `tenant_id`, `tenant_code` (tenant claims empty for SystemAdmin) |
 | Resource API | `webapi` uses JwtBearer / OpenIddict validation against the `identity` issuer and JWKS. No second symmetric key that mints tokens |
 | Seed | Client row: SQL or startup seed. People and passwords still go through `UserManager` |
 | Revocation | `webapi` handles domain events and writes the shared OpenIddict store through a port. Logout revokes on `identity`. A later identity-database split replaces that port only |
 
-Access lifetime in minutes, refresh lifetime in days, and the login-page route name are not locked here.
+Access lifetime is 15 minutes. Refresh lifetime is 14 days absolute. Hosted login is Razor Pages at `/login`. See identity-auth.
 
 ---
 
@@ -198,7 +198,7 @@ dotnet run --project src/AppHost
 
 EF does **not** generate migrations. `IEntityTypeConfiguration` maps only.
 
-Phase 1 scripts include: SchemaVersions, Currencies, Identity user tables, OpenIddict tables, Tenants, Users, UserTokens. They do not include Instruments, Accounts, Holdings, Transactions, a custom RefreshTokens table, or AspNetRoles.
+identity-auth scripts: SchemaVersions, Identity user tables, OpenIddict tables, Tenants (no ReportingCurrency), Users, UserTokens. Currencies + `Tenants.ReportingCurrency` land in the currencies slice (`0008+`). Phase 1 scripts do not include Instruments, Accounts, Holdings, Transactions, a custom RefreshTokens table, or AspNetRoles.
 
 ---
 
@@ -310,3 +310,4 @@ Locked conclusions follow function-plan §0 and these ADRs. This folder currentl
 | 2026-09-11 | First English draft. Aligns with locked Phase-1 host: `identity` + `webapi` + `adviser-portal`, shared `MyWealthDbV2`, OpenIddict authorization code + PKCE, dual-check tenancy, Phase-1 ports only. |
 | 2026-09-11 | Protocol paths locked to OpenIddict defaults (including `/connect/revocation` and `/connect/logout`); do not remap. |
 | 2026-09-11 | Point HTTP conventions at api-design.md. People APIs use the `/users` namespace. |
+| 2026-09-12 | identity-auth: Razor `/login`; JWT claim names; 15 min / 14 day absolute tokens. Currencies not in the identity-auth script set. |

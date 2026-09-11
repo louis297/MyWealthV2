@@ -37,7 +37,7 @@ The vertical cut stops at people in a firm, the currency catalog, and session. N
 
 | Spec | Status | Who | Ships | Why it stays its own slice |
 | --- | --- | --- | --- | --- |
-| [identity-auth](identity-auth.md) | draft | Login-capable roles | OpenIddict defaults, hosted `/login`, policies, `/users/me`, revocation, UserStatus, `UserTokens` seam | Two processes, one product capability |
+| [identity-auth](identity-auth.md) | accepted | Login-capable roles | OpenIddict defaults, hosted `/login`, policies, `/users/me`, revocation, UserStatus, `UserTokens` seam | Two processes, one product capability |
 | `currencies.md` | not opened | Authenticated (all four roles) | Catalog + `ICurrencyCatalog` + `GET /currencies` (not anonymous) | Own table; HTTP after Bearer validation works |
 | `tenants.md` | not opened | SystemAdmin | `/tenants` | Platform resource; path is not under `/users` |
 | `tenant-admins.md` | not opened | SystemAdmin | `/users/tenant-admins`; dual-write; last-admin disable allowed | Caller and gap belong here |

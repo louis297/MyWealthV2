@@ -3,7 +3,7 @@ title: Function plan
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-09-11
+updated: 2026-09-12
 related:
   - README.md
   - glossary.md
@@ -15,7 +15,7 @@ related:
 
 **Product:** MyWealthV2  
 **Status:** draft  
-**Updated:** 2026-09-11
+**Updated:** 2026-09-12
 
 This document owns **what / who / when**. How for the current phase lives in architecture, domain model, database design, API design, and Feature Specs.
 
@@ -86,7 +86,7 @@ Phase 3+ Other domains, one at a time
 
 | Capability | Notes | UI | Who |
 | --- | --- | --- | --- |
-| Versioned SQL schema | `database/schema/`. Includes Identity, OpenIddict stores, Currencies, Tenants, Users, UserTokens. | None | Engineering |
+| Versioned SQL schema | `database/schema/`. identity-auth: Identity, OpenIddict, Tenants (no ReportingCurrency), Users, UserTokens. Currencies + ReportingCurrency in the currencies slice. | None | Engineering |
 | Apply on startup | `SchemaVersions`. Default path does not drop the database. | None | Engineering |
 | Explicit local reset | drop → scripts → seed (Identity through `UserManager`; OpenIddict clients in SQL or startup seed) | None | Development |
 | Tenant isolation tests | Cross-tenant read/write must fail. From Tenants onward, every business slice. CI gate. | None | Engineering |
@@ -209,12 +209,13 @@ Invitation delivery, Customer Portal, audit query, and custom role tables may ru
 ## 8. Phase 1 slice order
 
 ```text
-schema-and-currencies
-    └── identity-auth          (OpenIddict, hosted login, policies, UserTokens no-op)
-            └── tenants
-                    └── tenant-admins
-                            └── advisers
-                                    └── customers
+schema
+    └── identity-auth          (OpenIddict, hosted login, policies, UserTokens no-op; Tenants+Users tables, no Currencies)
+            └── currencies     (catalog + Tenants.ReportingCurrency)
+                    └── tenants
+                            └── tenant-admins
+                                    └── advisers
+                                            └── customers
 isolation-tests                (add from tenants onward on every business slice)
 ```
 
@@ -222,9 +223,8 @@ isolation-tests                (add from tenants onward on every business slice)
 
 ## 9. Still open in Phase 1
 
-- Identity `UserName`: `PublicId` or `{tenantCode}:{email}`
-- Login failure for Disabled vs wrong credentials: uniform 401 or distinct codes
 - Default page size for lists
-- Hosted login page: Razor Pages or minimal HTML on `identity` (protocol is locked; markup is not)
+
+Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; uniform login failure; hosted login is Razor Pages at `/login`; access 15 minutes; refresh 14 days absolute.
 
 Lock remaining Phase-2 storage shape when that phase opens, not before.

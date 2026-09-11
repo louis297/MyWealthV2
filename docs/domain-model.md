@@ -3,7 +3,7 @@ title: Domain model
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-09-11
+updated: 2026-09-12
 related:
   - README.md
   - glossary.md
@@ -100,7 +100,7 @@ Authorization (named policies, `RolePermissions`, handler scope checks) is not a
 
 - `Tenant.Code` is globally unique, case-insensitive, and used at login. Character class `[a-z0-9-]`, length 2–50 (shape-compatible with a later subdomain label; Phase 1 does not parse Host).
 - `Tenant.Name` is globally unique, CI.
-- `ReportingCurrency` ∈ enabled rows in `Currencies`. Phase 1 may change reporting currency (no ledger balances keyed on it yet). If the ledger phase forbids the change, that spec tightens the rule. Do not invent immutability now and reverse it later.
+- `ReportingCurrency` ∈ enabled rows in `Currencies`. **identity-auth does not create this column.** The currencies slice adds the catalog and then `Tenants.ReportingCurrency`. Until then a Tenant is Code + Name + IsEnabled (plus keys / audit). Phase 1 may change reporting currency once the column exists (no ledger balances keyed on it yet).
 - After `IsEnabled = false`, that Code must not complete login; existing refresh must fail. The check runs in the authorization server / resource pipeline against this invariant.
 - A tenant may be re-enabled. Login with that Code works again only if the person’s `Status` is still `Active`.
 - `RowVersion` conflict → HTTP 409.
@@ -268,3 +268,4 @@ The only Phase-1 field that uses a currency code is `Tenant.ReportingCurrency`.
 | Date | Change |
 | --- | --- |
 | 2026-09-11 | First English draft, aligned with function-plan 2026-09-11: once-not-twice; session outside the domain; full UserStatus machine; Money defined early; ledger as sub-ledgers without locking undecided tables |
+| 2026-09-12 | identity-auth Tenant has no ReportingCurrency; currencies slice adds the catalog and the column. |
