@@ -87,12 +87,17 @@ public class User : BaseAuditableEntity
 
     public void ChangeName(string name)
     {
-        throw new NotImplementedException();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new DomainException("Name is required.");
+        }
+
+        Name = name;
     }
 
     public void RecordPasswordChanged()
     {
-        throw new NotImplementedException();
+        AddDomainEvent(new UserPasswordChanged(this));
     }
 
     public void Activate()
