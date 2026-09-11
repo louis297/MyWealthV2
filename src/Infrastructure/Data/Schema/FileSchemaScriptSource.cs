@@ -1,6 +1,6 @@
 namespace MyWealthV2.Infrastructure.Data.Schema;
 
-public sealed class FileSchemaScriptSource(string directory)
+public sealed class FileSchemaScriptSource(string directory) : ISchemaScriptSource
 {
     public IReadOnlyList<SchemaScript> GetScripts()
     {
