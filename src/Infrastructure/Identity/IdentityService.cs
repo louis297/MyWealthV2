@@ -2,7 +2,6 @@ using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 
 namespace MyWealthV2.Infrastructure.Identity;
 
@@ -42,11 +41,10 @@ public class IdentityService : IIdentityService
         return (result.ToApplicationResult(), user.Id);
     }
 
-    public async Task<bool> IsInRoleAsync(string userId, string role)
+    public Task<bool> IsInRoleAsync(string userId, string role)
     {
-        var user = await _userManager.FindByIdAsync(userId);
-
-        return user != null && await _userManager.IsInRoleAsync(user, role);
+        // Product roles live on Domain Users, not AspNetRoles (ADR 0013).
+        return Task.FromResult(false);
     }
 
     public async Task<bool> AuthorizeAsync(string userId, string policyName)

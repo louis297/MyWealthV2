@@ -1,4 +1,3 @@
-using MyWealthV2.Domain.Constants;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Identity;
 using MediatR;
@@ -37,15 +36,10 @@ public static class TestApp
 
     public static async Task<string> RunAsDefaultUserAsync()
     {
-        return await RunAsUserAsync("test@local", "Testing1234!", []);
+        return await RunAsUserAsync("test@local", "Testing1234!");
     }
 
-    public static async Task<string> RunAsAdministratorAsync()
-    {
-        return await RunAsUserAsync("administrator@local", "Administrator1234!", [Roles.Administrator]);
-    }
-
-    public static async Task<string> RunAsUserAsync(string userName, string password, string[] roles)
+    public static async Task<string> RunAsUserAsync(string userName, string password)
     {
         using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
 
@@ -55,22 +49,10 @@ public static class TestApp
 
         var result = await userManager.CreateAsync(user, password);
 
-        if (roles.Length > 0)
-        {
-            var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-
-            foreach (var role in roles)
-            {
-                await roleManager.CreateAsync(new IdentityRole(role));
-            }
-
-            await userManager.AddToRolesAsync(user, roles);
-        }
-
         if (result.Succeeded)
         {
             _userId = user.Id;
-            _roles = [..roles];
+            _roles = [];
             return _userId;
         }
 
