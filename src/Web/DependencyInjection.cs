@@ -4,7 +4,9 @@ using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Web.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MyWealthV2.Web.Infrastructure;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -20,8 +22,22 @@ public static class DependencyInjection
 
         builder.Services.AddHttpContextAccessor();
 
-        builder.Services.AddAuthorizationBuilder()
-            .AddPolicy(Policies.UsersMe, policy => policy.RequireAuthenticatedUser());
+        var authorization = builder.Services.AddAuthorizationBuilder();
+        foreach (var policy in new[]
+                 {
+                     Policies.TenantsManage,
+                     Policies.TenantAdminsManage,
+                     Policies.AdvisersManage,
+                     Policies.CustomersManage,
+                     Policies.CustomersManageOwn,
+                     Policies.UsersMe
+                 })
+        {
+            var name = policy;
+            authorization.AddPolicy(name, policy => policy.AddRequirements(new PermissionRequirement(name)));
+        }
+
+        builder.Services.AddScoped<IAuthorizationHandler, PermissionHandler>();
 
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
