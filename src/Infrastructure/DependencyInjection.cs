@@ -2,6 +2,7 @@ using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Interceptors;
 using MyWealthV2.Infrastructure.Data.Schema;
+using MyWealthV2.Infrastructure.Email;
 using MyWealthV2.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 
@@ -53,6 +54,7 @@ public static class DependencyInjection
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddTransient<IIdentityService, IdentityService>();
         builder.Services.AddScoped<ITokenRevocation, OpenIddictTokenRevocation>();
+        builder.Services.AddSingleton<IEmailSender, NoOpEmailSender>();
 
         builder.Services.AddOpenIddict()
             .AddCore(options =>
