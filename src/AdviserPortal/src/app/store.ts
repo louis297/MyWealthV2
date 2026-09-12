@@ -1,12 +1,13 @@
 import { configureStore } from "@reduxjs/toolkit";
-
-const shellReducer = () => ({ name: "adviser-portal" as const });
+import { hydrateSession, sessionSlice } from "@/features/session/sessionSlice";
 
 export const store = configureStore({
   reducer: {
-    shell: shellReducer,
+    session: sessionSlice.reducer,
   },
 });
+
+store.dispatch(hydrateSession());
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
