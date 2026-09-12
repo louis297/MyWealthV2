@@ -5,56 +5,64 @@ namespace MyWealthV2.IdentityHost;
 
 public static class OpenIddictSeeder
 {
+    private static readonly string[] RequiredPermissions =
+    [
+        Permissions.Endpoints.Authorization,
+        Permissions.Endpoints.Token,
+        Permissions.Endpoints.Revocation,
+        Permissions.Endpoints.EndSession,
+        Permissions.GrantTypes.AuthorizationCode,
+        Permissions.GrantTypes.RefreshToken,
+        Permissions.ResponseTypes.Code,
+        Permissions.Scopes.Email,
+        Permissions.Scopes.Profile,
+        Permissions.Prefixes.Scope + Scopes.OfflineAccess,
+        Permissions.Prefixes.Scope + "api"
+    ];
+
     public static async Task SeedAsync(IServiceProvider services, CancellationToken cancellationToken)
     {
         var manager = services.GetRequiredService<IOpenIddictApplicationManager>();
+        var configuration = services.GetRequiredService<IConfiguration>();
+        var origins = OpenIddictClientUris.ReadPortalOrigins(configuration);
+        var (redirects, postLogout) = OpenIddictClientUris.FromOrigins(origins);
 
-        if (await manager.FindByClientIdAsync("adviser-portal", cancellationToken) is not null)
+        var existing = await manager.FindByClientIdAsync("adviser-portal", cancellationToken);
+        var descriptor = new OpenIddictApplicationDescriptor();
+        if (existing is not null)
         {
+            await manager.PopulateAsync(descriptor, existing, cancellationToken);
+        }
+
+        descriptor.ClientId = "adviser-portal";
+        descriptor.ClientType = ClientTypes.Public;
+        descriptor.ConsentType = ConsentTypes.Implicit;
+        descriptor.DisplayName = "Adviser Portal";
+        descriptor.Requirements.Add(Requirements.Features.ProofKeyForCodeExchange);
+
+        foreach (var permission in RequiredPermissions)
+        {
+            descriptor.Permissions.Add(permission);
+        }
+
+        descriptor.RedirectUris.Clear();
+        descriptor.PostLogoutRedirectUris.Clear();
+        foreach (var uri in redirects)
+        {
+            descriptor.RedirectUris.Add(uri);
+        }
+
+        foreach (var uri in postLogout)
+        {
+            descriptor.PostLogoutRedirectUris.Add(uri);
+        }
+
+        if (existing is null)
+        {
+            await manager.CreateAsync(descriptor, cancellationToken);
             return;
         }
 
-        var descriptor = new OpenIddictApplicationDescriptor
-        {
-            ClientId = "adviser-portal",
-            ClientType = ClientTypes.Public,
-            ConsentType = ConsentTypes.Implicit,
-            DisplayName = "Adviser Portal",
-            Permissions =
-            {
-                Permissions.Endpoints.Authorization,
-                Permissions.Endpoints.Token,
-                Permissions.Endpoints.Revocation,
-                Permissions.Endpoints.EndSession,
-                Permissions.GrantTypes.AuthorizationCode,
-                Permissions.GrantTypes.RefreshToken,
-                Permissions.ResponseTypes.Code,
-                Permissions.Scopes.Email,
-                Permissions.Scopes.Profile,
-                Permissions.Prefixes.Scope + "api"
-            },
-            Requirements =
-            {
-                Requirements.Features.ProofKeyForCodeExchange
-            }
-        };
-
-        var redirects = services.GetRequiredService<IConfiguration>()
-            .GetSection("Identity:RedirectUris")
-            .Get<string[]>() ?? [];
-
-        foreach (var uri in redirects)
-        {
-            descriptor.RedirectUris.Add(new Uri(uri));
-            descriptor.PostLogoutRedirectUris.Add(new Uri(uri));
-        }
-
-        if (descriptor.RedirectUris.Count == 0)
-        {
-            descriptor.RedirectUris.Add(new Uri("https://localhost/callback"));
-            descriptor.PostLogoutRedirectUris.Add(new Uri("https://localhost/"));
-        }
-
-        await manager.CreateAsync(descriptor, cancellationToken);
+        await manager.UpdateAsync(existing, descriptor, cancellationToken);
     }
 }
