@@ -12,7 +12,7 @@
     {
         <p>@Model.Error</p>
     }
-    <form method="post">
+    <form method="post" asp-route-returnUrl="@Request.Query["ReturnUrl"]">
         <div>
             <label>Email <input asp-for="Email" type="email" autocomplete="username" /></label>
         </div>
