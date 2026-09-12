@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
 namespace MyWealthV2.Application.FunctionalTests.Infrastructure;
 
@@ -46,5 +48,19 @@ internal sealed class JwtBearerBackchannelPostConfigure(string authority, HttpMe
         options.MetadataAddress = authority + "/.well-known/openid-configuration";
         options.RequireHttpsMetadata = false;
         options.BackchannelHttpHandler = handler;
+        options.Backchannel = new HttpClient(handler, disposeHandler: false)
+        {
+            Timeout = options.BackchannelTimeout,
+            MaxResponseContentBufferSize = 1024 * 1024 * 10
+        };
+        options.Backchannel.DefaultRequestHeaders.UserAgent.ParseAdd("Microsoft ASP.NET Core JwtBearer handler");
+        options.ConfigurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(
+            options.MetadataAddress,
+            new OpenIdConnectConfigurationRetriever(),
+            new HttpDocumentRetriever(options.Backchannel) { RequireHttps = false })
+        {
+            RefreshInterval = options.RefreshInterval,
+            AutomaticRefreshInterval = options.AutomaticRefreshInterval
+        };
     }
 }
