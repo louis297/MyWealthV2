@@ -4,6 +4,7 @@ using MyWealthV2.Infrastructure.Data.Interceptors;
 using MyWealthV2.Infrastructure.Data.Schema;
 using MyWealthV2.Infrastructure.Email;
 using MyWealthV2.Infrastructure.Identity;
+using MediatR;
 using Microsoft.AspNetCore.Identity;
 
 using Microsoft.EntityFrameworkCore;
@@ -21,7 +22,11 @@ public static class DependencyInjection
         Guard.Against.Null(connectionString, message: $"Connection string '{Services.Database}' not found.");
 
         builder.Services.AddScoped<ISaveChangesInterceptor, AuditableEntityInterceptor>();
-        builder.Services.AddScoped<ISaveChangesInterceptor, DispatchDomainEventsInterceptor>();
+        // IdentityHost reuses this method without MediatR; Web registers IMediator first.
+        if (builder.Services.Any(descriptor => descriptor.ServiceType == typeof(IMediator)))
+        {
+            builder.Services.AddScoped<ISaveChangesInterceptor, DispatchDomainEventsInterceptor>();
+        }
 
         builder.Services.AddDbContext<ApplicationDbContext>((sp, options) =>
         {
