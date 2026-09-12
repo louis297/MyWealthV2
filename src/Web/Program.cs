@@ -1,4 +1,5 @@
 using MyWealthV2.Infrastructure.Data.Schema;
+using MyWealthV2.Infrastructure.Identity;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,6 +18,11 @@ await using (var scope = app.Services.CreateAsyncScope())
 {
     var applicator = scope.ServiceProvider.GetRequiredService<SchemaApplicator>();
     await applicator.ApplyAsync(CancellationToken.None);
+
+    if (app.Environment.IsDevelopment())
+    {
+        await DevelopmentIdentitySeeder.SeedAsync(scope.ServiceProvider, CancellationToken.None);
+    }
 }
 
 if (!app.Environment.IsDevelopment())
@@ -25,7 +31,10 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseCors(static builder =>
     builder.AllowAnyMethod()
         .AllowAnyHeader()
