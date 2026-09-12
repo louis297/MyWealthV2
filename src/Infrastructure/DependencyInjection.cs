@@ -1,4 +1,5 @@
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Infrastructure.Currencies;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Interceptors;
 using MyWealthV2.Infrastructure.Data.Schema;
@@ -38,6 +39,7 @@ public static class DependencyInjection
         builder.EnrichSqlServerDbContext<ApplicationDbContext>();
 
         builder.Services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
+        builder.Services.AddSingleton<ICurrencyCatalog, CurrencyCatalog>();
 
         var schemaDirectory = Path.Combine(AppContext.BaseDirectory, "schema");
         builder.Services.AddSingleton<ISchemaScriptSource>(_ => new FileSchemaScriptSource(schemaDirectory));

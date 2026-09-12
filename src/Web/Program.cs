@@ -1,3 +1,4 @@
+using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Infrastructure.Data.Schema;
 using MyWealthV2.Infrastructure.Identity;
 using Scalar.AspNetCore;
@@ -18,6 +19,9 @@ await using (var scope = app.Services.CreateAsyncScope())
 {
     var applicator = scope.ServiceProvider.GetRequiredService<SchemaApplicator>();
     await applicator.ApplyAsync(CancellationToken.None);
+
+    var catalog = scope.ServiceProvider.GetRequiredService<ICurrencyCatalog>();
+    await catalog.ReloadAsync(CancellationToken.None);
 
     if (app.Environment.IsDevelopment())
     {
