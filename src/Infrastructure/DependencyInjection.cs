@@ -45,6 +45,7 @@ public static class DependencyInjection
             {
                 options.User.RequireUniqueEmail = false;
                 options.Stores.SchemaVersion = IdentitySchemaVersions.Version2;
+                options.Password.RequiredLength = 8;
             })
             .AddEntityFrameworkStores<ApplicationDbContext>();
 

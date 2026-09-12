@@ -20,6 +20,9 @@ public static class DependencyInjection
 
         builder.Services.AddHttpContextAccessor();
 
+        builder.Services.AddAuthorizationBuilder()
+            .AddPolicy(Policies.UsersMe, policy => policy.RequireAuthenticatedUser());
+
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
