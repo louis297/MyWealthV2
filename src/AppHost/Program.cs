@@ -31,5 +31,14 @@ var identity = builder.AddProject<Projects.IdentityHost>(Services.Identity)
 web.WithReference(identity)
     .WithEnvironment("Identity__Authority", identity.GetEndpoint("https"));
 
+var portal = builder.AddViteApp(Services.AdviserPortal, "../AdviserPortal")
+    .WithExternalHttpEndpoints()
+    .WithEnvironment("VITE_IDENTITY_AUTHORITY", identity.GetEndpoint("https"))
+    .WithEnvironment("VITE_WEBAPI_BASE_URL", web.GetEndpoint("https"))
+    .WithEnvironment("BROWSER", "none")
+    .WaitFor(web)
+    .WaitFor(identity);
+
+identity.WithEnvironment("Identity__PortalOrigin", portal.GetEndpoint("http"));
 
 builder.Build().Run();
