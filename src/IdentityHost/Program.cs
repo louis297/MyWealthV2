@@ -25,11 +25,6 @@ builder.Services
     });
 
 builder.Services.AddOpenIddict()
-    .AddCore(options =>
-    {
-        options.UseEntityFrameworkCore()
-            .UseDbContext<MyWealthV2.Infrastructure.Data.ApplicationDbContext>();
-    })
     .AddServer(options =>
     {
         options.SetAuthorizationEndpointUris("connect/authorize")

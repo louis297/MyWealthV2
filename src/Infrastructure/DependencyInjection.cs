@@ -4,6 +4,7 @@ using MyWealthV2.Infrastructure.Data.Interceptors;
 using MyWealthV2.Infrastructure.Data.Schema;
 using MyWealthV2.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
@@ -51,5 +52,13 @@ public static class DependencyInjection
 
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddTransient<IIdentityService, IdentityService>();
+        builder.Services.AddScoped<ITokenRevocation, OpenIddictTokenRevocation>();
+
+        builder.Services.AddOpenIddict()
+            .AddCore(options =>
+            {
+                options.UseEntityFrameworkCore()
+                    .UseDbContext<ApplicationDbContext>();
+            });
     }
 }

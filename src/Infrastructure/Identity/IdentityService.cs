@@ -76,4 +76,16 @@ public class IdentityService : IIdentityService
 
         return result.ToApplicationResult();
     }
+
+    public async Task<Result> ChangePasswordAsync(string identityUserId, string currentPassword, string newPassword)
+    {
+        var user = await _userManager.FindByIdAsync(identityUserId);
+        if (user is null)
+        {
+            return Result.Failure(["User not found."]);
+        }
+
+        var result = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
+        return result.ToApplicationResult();
+    }
 }

@@ -1,3 +1,5 @@
+using MyWealthV2.Domain.Events;
+
 namespace MyWealthV2.Domain.Entities;
 
 public class Tenant : BaseAuditableEntity
@@ -29,6 +31,12 @@ public class Tenant : BaseAuditableEntity
 
     public void Disable()
     {
+        if (!IsEnabled)
+        {
+            return;
+        }
+
         IsEnabled = false;
+        AddDomainEvent(new TenantDisabled(this));
     }
 }
