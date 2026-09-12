@@ -12,7 +12,9 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 {
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
-    DbSet<User> IApplicationDbContext.Users => Set<User>();
+    public DbSet<User> DomainUsers => Set<User>();
+
+    DbSet<User> IApplicationDbContext.Users => DomainUsers;
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
 
