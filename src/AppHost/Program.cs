@@ -39,6 +39,6 @@ var portal = builder.AddViteApp(Services.AdviserPortal, "../AdviserPortal")
     .WaitFor(web)
     .WaitFor(identity);
 
-identity.WithEnvironment("Identity__PortalOrigin", portal.GetEndpoint("http"));
+identity.WithPortalOrigins(portal, builder);
 
 builder.Build().Run();
