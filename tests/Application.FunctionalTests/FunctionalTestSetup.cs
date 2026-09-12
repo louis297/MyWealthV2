@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Identity;
 
 namespace MyWealthV2.Application.FunctionalTests;
@@ -86,6 +89,18 @@ public class FunctionalTestSetup
     internal static async Task ReseedAsync()
     {
         using var scope = ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO [Currencies] ([Code], [Name], [DecimalPlaces], [IsEnabled]) VALUES
+                ('AUD', N'Australian Dollar', 2, 1),
+                ('EUR', N'Euro', 2, 1),
+                ('GBP', N'Pound Sterling', 2, 1),
+                ('JPY', N'Japanese Yen', 0, 1),
+                ('NZD', N'New Zealand Dollar', 2, 1),
+                ('USD', N'United States Dollar', 2, 1)
+            """);
+        await scope.ServiceProvider.GetRequiredService<ICurrencyCatalog>().ReloadAsync();
         await DevelopmentIdentitySeeder.SeedAsync(scope.ServiceProvider, CancellationToken.None);
     }
 }
