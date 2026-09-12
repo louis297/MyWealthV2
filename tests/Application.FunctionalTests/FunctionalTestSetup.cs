@@ -11,6 +11,7 @@ public class FunctionalTestSetup
     internal static HttpClient WebClient { get; private set; } = null!;
     internal static OpenIdConnectTestClient Oidc { get; private set; } = null!;
     internal static DatabaseResetter? DbResetter { get; private set; }
+    internal static string ConnectionString { get; private set; } = null!;
 
     private static WebApiFactory? _factory;
     private static IdentityFactory? _identityFactory;
@@ -44,6 +45,7 @@ public class FunctionalTestSetup
             Services.Database, cancellationToken);
 
         var connectionString = (await _app.GetConnectionStringAsync(Services.Database))!;
+        ConnectionString = connectionString;
 
         using (var schemaHost = new WebApiFactory(connectionString))
         {

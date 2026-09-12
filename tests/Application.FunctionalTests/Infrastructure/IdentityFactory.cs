@@ -5,11 +5,22 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace MyWealthV2.Application.FunctionalTests.Infrastructure;
 
-public class IdentityFactory(string connectionString) : WebApplicationFactory<IdentityApp::Program>
+public class IdentityFactory(
+    string connectionString,
+    IReadOnlyDictionary<string, string>? extraSettings = null) : WebApplicationFactory<IdentityApp::Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting($"ConnectionStrings:{MyWealthV2.Shared.Services.Database}", connectionString);
         builder.UseEnvironment("Development");
+        if (extraSettings is null)
+        {
+            return;
+        }
+
+        foreach (var (key, value) in extraSettings)
+        {
+            builder.UseSetting(key, value);
+        }
     }
 }
