@@ -14,6 +14,7 @@ var web = builder.AddProject<Projects.Web>(Services.WebApi)
     .WithReference(databaseServer)
     .WaitFor(databaseServer)
     .WithExternalHttpEndpoints()
+    .WithHttpHealthCheck("/health", endpointName: "http")
     .WithAspNetCoreEnvironment()
     .WithUrlForEndpoint("http", url =>
     {
