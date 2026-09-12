@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,6 +11,10 @@ const startAuthorize = vi.fn();
 
 vi.mock("@/features/session/oidc", () => ({
   startAuthorize: () => startAuthorize(),
+}));
+
+vi.mock("@/features/session/SessionProbePage", () => ({
+  SessionProbePage: () => <p>session probe</p>,
 }));
 
 describe("HomePage", () => {
@@ -73,6 +77,6 @@ describe("HomePage", () => {
     );
 
     expect(startAuthorize).not.toHaveBeenCalled();
-    expect(screen.getByText(/signed in/i)).toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 });

@@ -59,9 +59,9 @@ describe("GET /users/me", () => {
     const result = await store.dispatch(api.endpoints.getMe.initiate());
 
     expect(result.data).toEqual(me);
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://webapi.test/users/me");
-    expect(new Headers(init.headers).get("Authorization")).toBe("Bearer access-1");
+    const request = fetchMock.mock.calls[0][0] as Request;
+    expect(request.url).toBe("https://webapi.test/users/me");
+    expect(request.headers.get("Authorization")).toBe("Bearer access-1");
   });
 
   it("refreshes once on 401 and retries", async () => {

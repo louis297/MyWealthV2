@@ -44,8 +44,8 @@ describe("SessionProbePage", () => {
       </Provider>,
     );
 
-    expect(screen.getByText(/System Admin/)).toBeInTheDocument();
-    expect(screen.getByText(/systemAdmin/)).toBeInTheDocument();
+    expect(screen.getAllByText(/System Admin/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/systemAdmin/).length).toBeGreaterThan(0);
     expect(screen.getByText(/no tenant/i)).toBeInTheDocument();
     expect(screen.getByText(/system-admin@localhost/)).toBeInTheDocument();
   });

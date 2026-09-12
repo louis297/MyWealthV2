@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useAppSelector } from "@/app/hooks";
 import { startAuthorize } from "@/features/session/oidc";
+import { SessionProbePage } from "@/features/session/SessionProbePage";
 
 export function HomePage() {
   const accessToken = useAppSelector((state) => state.session.accessToken);
@@ -15,5 +16,5 @@ export function HomePage() {
     return <p>Redirecting to sign in…</p>;
   }
 
-  return <p>Signed in</p>;
+  return <SessionProbePage />;
 }

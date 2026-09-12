@@ -1,4 +1,3 @@
-import { store } from "@/app/store";
 import { challengeS256, randomUrlSafe } from "@/features/session/pkce";
 import {
   PKCE_PENDING_KEY,
@@ -112,6 +111,7 @@ export async function completeCallback(): Promise<void> {
     refresh_token?: string;
   };
 
+  const { store } = await import("@/app/store");
   store.dispatch(
     setTokens({
       accessToken: tokens.access_token,
@@ -121,4 +121,33 @@ export async function completeCallback(): Promise<void> {
   sessionStorage.removeItem(PKCE_VERIFIER_KEY);
   sessionStorage.removeItem(PKCE_STATE_KEY);
   sessionStorage.removeItem(PKCE_PENDING_KEY);
+}
+
+export async function refreshTokens(
+  refreshToken: string,
+): Promise<{ accessToken: string; refreshToken: string | null } | null> {
+  const { token_endpoint } = await discover();
+  const response = await fetch(token_endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+      client_id: CLIENT_ID,
+    }),
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const tokens = (await response.json()) as {
+    access_token: string;
+    refresh_token?: string;
+  };
+
+  return {
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token ?? null,
+  };
 }
