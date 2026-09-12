@@ -38,6 +38,9 @@ app.MapScalarApiReference();
 
 app.UseExceptionHandler(options => { });
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.Map("/", () => Results.Redirect("/scalar"));
 
 app.MapDefaultEndpoints();

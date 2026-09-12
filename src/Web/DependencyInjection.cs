@@ -1,7 +1,9 @@
 using Azure.Identity;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Web.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -12,9 +14,36 @@ public static class DependencyInjection
     {
         builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
-        builder.Services.AddScoped<IUser, CurrentUser>();
+        builder.Services.AddScoped<CurrentUser>();
+        builder.Services.AddScoped<ICurrentUser>(sp => sp.GetRequiredService<CurrentUser>());
+        builder.Services.AddScoped<IUser>(sp => sp.GetRequiredService<CurrentUser>());
 
         builder.Services.AddHttpContextAccessor();
+
+        builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(options =>
+            {
+                var authority = builder.Configuration["Identity:Authority"];
+                if (!string.IsNullOrWhiteSpace(authority))
+                {
+                    options.Authority = authority;
+                    options.RequireHttpsMetadata = authority.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+                }
+
+                options.MapInboundClaims = false;
+                options.TokenValidationParameters.NameClaimType = AuthClaims.Subject;
+                options.TokenValidationParameters.RoleClaimType = AuthClaims.Role;
+                options.TokenValidationParameters.ValidateAudience = false;
+                options.Events = new JwtBearerEvents
+                {
+                    OnChallenge = context =>
+                    {
+                        context.HandleResponse();
+                        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                        return Task.CompletedTask;
+                    }
+                };
+            });
 
         builder.Services.AddExceptionHandler<ProblemDetailsExceptionHandler>();
 

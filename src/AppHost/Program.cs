@@ -27,7 +27,8 @@ var identity = builder.AddProject<Projects.IdentityHost>(Services.Identity)
     .WithExternalHttpEndpoints()
     .WithAspNetCoreEnvironment();
 
-web.WithReference(identity);
+web.WithReference(identity)
+    .WithEnvironment("Identity__Authority", identity.GetEndpoint("https"));
 
 
 builder.Build().Run();
