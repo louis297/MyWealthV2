@@ -297,6 +297,15 @@ FakesAssemblies/
 .ntvs_analysis.dat
 node_modules/
 
+# Frontend (Adviser Portal)
+dist/
+coverage/
+*.local
+.env
+.env.*
+!.env.example
+.vite/
+
 # Visual Studio 6 build log
 *.plg
 
