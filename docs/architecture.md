@@ -186,7 +186,7 @@ dotnet run --project src/AppHost
 | Database | `MyWealthDbV2` | Aspire `AddDatabase` name = SQL name = connection-string name injected into `identity` and `webapi` |
 | Authorization server | `identity` | OpenIddict + hosted login |
 | Web API | `webapi` | Scalar at `/scalar`; Bearer only |
-| Adviser Portal | `adviser-portal` | Vite frontend; OIDC callback |
+| Adviser Portal | `adviser-portal` | Vite frontend. First slice: OIDC callback + session probe. Pages come later. |
 
 **Database lifecycle (ADR 0008)**
 
@@ -198,7 +198,7 @@ dotnet run --project src/AppHost
 
 EF does **not** generate migrations. `IEntityTypeConfiguration` maps only.
 
-identity-auth scripts: SchemaVersions, Identity user tables, OpenIddict tables, Tenants (no ReportingCurrency), Users, UserTokens. Currencies + `Tenants.ReportingCurrency` land in the currencies slice (`0008+`). Phase 1 scripts do not include Instruments, Accounts, Holdings, Transactions, a custom RefreshTokens table, or AspNetRoles.
+identity-auth scripts: SchemaVersions, Identity user tables, OpenIddict tables, Tenants (no ReportingCurrency), Users, UserTokens. Currencies slice adds `0008_currencies.sql` and `0009_tenants_reporting_currency.sql`. Phase 1 scripts do not include Instruments, Accounts, Holdings, Transactions, a custom RefreshTokens table, or AspNetRoles.
 
 ---
 

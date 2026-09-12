@@ -3,7 +3,7 @@ title: Database design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-09-12
+updated: 2026-09-13
 related:
   - README.md
   - glossary.md
@@ -155,8 +155,8 @@ Platform catalog. No audit, no `RowVersion`, no `PublicId`.
 | --- | --- | --- | --- |
 | Code | char(3) | no | PK, ISO 4217 upper case |
 | Name | nvarchar(100) | no | |
-| DecimalPlaces | tinyint | no | JPY = 0, NZD = 2 |
-| IsEnabled | bit | no | Default 1 |
+| DecimalPlaces | tinyint | no | ISO minor units for display / validation (JPY = 0, NZD = 2). Not the Phase-2 money-column scale (`decimal(18,4)`) |
+| IsEnabled | bit | no | Default 1. **Platform** flag. Not per tenant. Disable does not rewrite `Tenants.ReportingCurrency` |
 
 Seed: NZD, AUD, USD, EUR, GBP, JPY.
 
@@ -208,14 +208,14 @@ Client seed: SQL insert or startup seed. Both are allowed.
 | PublicId | uniqueidentifier | no | Unique |
 | Name | nvarchar(200) | no | Unique CI |
 | Code | nvarchar(50) | no | Login code, unique CI, `[a-z0-9-]{2,50}` |
-| ReportingCurrency | — | — | **Not in identity-auth.** Currencies slice adds `char(3) NOT NULL` + FK → `Currencies.Code` |
+| ReportingCurrency | char(3) | no | Added by the currencies slice (`0009`). FK → `Currencies.Code`. No column default after apply |
 | IsEnabled | bit | no | Default 1 |
 | RowVersion | rowversion | no | |
 | Created / CreatedBy / LastModified / LastModifiedBy | audit | | |
 
 `Code` is treated as immutable after create by the Tenants slice (no update API). The column itself is ordinary.
 
-identity-auth creates `Tenants` **without** `ReportingCurrency`. Login only needs `Code` and `IsEnabled`. The currencies slice adds the catalog table and then `Tenants.ReportingCurrency` as a forward-only script after `0007` (do not back-fill `0002`).
+identity-auth created `Tenants` **without** `ReportingCurrency`. Login only needs `Code` and `IsEnabled`. The currencies slice adds the catalog (`0008`) and then `Tenants.ReportingCurrency` (`0009`). Do not back-fill `0002`.
 
 ### 6.6 Users
 
@@ -281,7 +281,7 @@ Why no FK on `IdentityUserId` / `TenantId`: this is a seam table. A reverse or e
 
 | Parent → child | Child column | On delete |
 | --- | --- | --- |
-| `Currencies` → `Tenants` | `ReportingCurrency` | RESTRICT (currencies slice; column does not exist in identity-auth) |
+| `Currencies` → `Tenants` | `ReportingCurrency` | RESTRICT (added in `0009`) |
 | `Tenants` → `Users` | `TenantId` | RESTRICT |
 | `Users` → `Users` | `AdviserId` | RESTRICT |
 | `AspNetUsers` → `Users` | `IdentityUserId` | RESTRICT |
@@ -316,9 +316,11 @@ Beyond PK / unique constraints already listed:
 0005_tenants.sql             -- no ReportingCurrency
 0006_users.sql               -- FKs to Tenants and AspNetUsers
 0007_user_tokens.sql
+0008_currencies.sql          -- platform catalog + seed
+0009_tenants_reporting_currency.sql  -- ALTER Tenants.ReportingCurrency + FK
 ```
 
-Do **not** add `0002_currencies.sql` in identity-auth. Currencies + `Tenants.ReportingCurrency` are later scripts (`0008+`), not a back-filled `0002`.
+Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
 
 OpenIddict client / scope seed may sit in `0004` or in a later seed script / startup. Identity users are **not** inserted as raw password hashes in SQL.
 
@@ -362,3 +364,4 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | --- | --- |
 | 2026-09-11 | First English draft. Align with function-plan: OpenIddict stores in, custom RefreshTokens out; AspNetUsers.TenantId column no FK; no DomainUserId / Role / DisplayName on Identity; UserTokens seam keyed by hash + optional IdentityUserId, no FK; no ledger tables |
 | 2026-09-12 | identity-auth lands Tenants without ReportingCurrency and does not create Currencies. Catalog + ReportingCurrency FK are the currencies slice (`0008+`). |
+| 2026-09-13 | Currencies spec: `0008` + `0009`. `IsEnabled` is platform-wide. `DecimalPlaces` is minor units, not `decimal(18,4)` scale. |

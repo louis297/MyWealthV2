@@ -4,7 +4,7 @@ status: draft
 phase: 1
 language: en
 created: 2026-09-12
-updated: 2026-09-12
+updated: 2026-09-13
 related:
   - README.md
   - frontend-conventions.md
@@ -24,7 +24,7 @@ The portal **does not issue tokens**. Password collection stays on hosted login 
 
 ## Current slice — shell and callback
 
-Ship this before currencies / people UI. Do not start it until `webapi` accepts an access token from `identity` (functional test or Scalar `GET /users/me` returns 200).
+**Landed in repo master (2026-09-13).** Do not rebuild it. Next backend slice is [currencies](../features/currencies.md) (`review`). Portal pages still wait for people APIs.
 
 ### In
 

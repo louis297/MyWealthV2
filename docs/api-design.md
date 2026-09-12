@@ -3,7 +3,7 @@ title: API design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-09-12
+updated: 2026-09-13
 related:
   - README.md
   - glossary.md
@@ -204,9 +204,19 @@ Field rules belong in each Feature Spec. This section only locks the catalog and
 
 ### 7.2 Currencies
 
-`GET /currencies?enabled=true` → `{ code, name, decimalPlaces }[]`
+`GET /currencies` and `GET /currencies?enabledOnly=true|false`.
 
-Any authenticated caller. No write API. No pagination. Seed: NZD, AUD, USD, EUR, GBP, JPY.
+| `enabledOnly` | Behaviour |
+| --- | --- |
+| Omitted or `false` | All rows (including disabled) |
+| `true` | Enabled rows only |
+| Any other value | 400 |
+
+Item: `{ code, name, decimalPlaces, isEnabled }`. Sorted by `code`. No “disabled-only” query. No pagination. No write API. No `GET /currencies/{code}`.
+
+Any authenticated caller (default Authorize; no `currencies.read`). Seed: NZD, AUD, USD, EUR, GBP, JPY.
+
+Field rules and `Money` live in [features/currencies.md](features/currencies.md).
 
 ### 7.3 Tenants
 
@@ -295,3 +305,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | --- | --- |
 | 2026-09-11 | First English draft. Two HTTP surfaces; OpenIddict default protocol paths; no resource-API token issuer; `/users` namespace for people collections; `/users/me` on `webapi`; Customer may complete the authorization server; no ledger routes in Phase 1. |
 | 2026-09-12 | identity-auth locks: Razor `/login`; JWT claim names; 15 min access / 14 day absolute refresh; UserName = PublicId. |
+| 2026-09-13 | Currencies: `enabledOnly` (omit/`false` = all, `true` = enabled only); item includes `isEnabled`. |

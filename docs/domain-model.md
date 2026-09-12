@@ -3,7 +3,7 @@ title: Domain model
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-09-12
+updated: 2026-09-13
 related:
   - README.md
   - glossary.md
@@ -100,7 +100,7 @@ Authorization (named policies, `RolePermissions`, handler scope checks) is not a
 
 - `Tenant.Code` is globally unique, case-insensitive, and used at login. Character class `[a-z0-9-]`, length 2–50 (shape-compatible with a later subdomain label; Phase 1 does not parse Host).
 - `Tenant.Name` is globally unique, CI.
-- `ReportingCurrency` ∈ enabled rows in `Currencies`. **identity-auth does not create this column.** The currencies slice adds the catalog and then `Tenants.ReportingCurrency`. Until then a Tenant is Code + Name + IsEnabled (plus keys / audit). Phase 1 may change reporting currency once the column exists (no ledger balances keyed on it yet).
+- `ReportingCurrency` ∈ enabled rows in `Currencies` when **newly set**. identity-auth created Tenant without this column; the currencies slice adds it. Phase 1 may change reporting currency (no ledger balances keyed on it yet). A later disable of that catalog row does not rewrite this field.
 - After `IsEnabled = false`, that Code must not complete login; existing refresh must fail. The check runs in the authorization server / resource pipeline against this invariant.
 - A tenant may be re-enabled. Login with that Code works again only if the person’s `Status` is still `Active`.
 - `RowVersion` conflict → HTTP 409.
@@ -143,9 +143,12 @@ Disable guards:
 
 ### 4.3 Currency
 
-- Code is ISO 4217, three letters, upper case. `DecimalPlaces` follows the currency (JPY = 0, NZD = 2).
+- Code is ISO 4217, three letters, upper case.
+- `DecimalPlaces` is the ISO minor-unit count for input / display / validation (JPY = 0, NZD = 2). It is not the SQL scale of a money column. Phase-2 amount columns stay `decimal(18,4)` for every currency.
+- `IsEnabled` is a **platform** flag on the catalog row. It is not bound to a tenant. One change is visible to every tenant’s picker; existing `ReportingCurrency` values are left alone.
 - A disabled currency cannot be used as a **new** `ReportingCurrency`. Tenants that already reference it keep the historical value.
 - Phase 1 has no currency write API. The catalog is read-only. Seed: NZD, AUD, USD, EUR, GBP, JPY.
+- `Money` does not look up the catalog and does not round to `DecimalPlaces`.
 
 ### 4.4 Session boundary (not an aggregate)
 
@@ -256,7 +259,7 @@ Lock those when the matching slice opens. Until then, do not paper over them wit
 
 | Object | Rules |
 | --- | --- |
-| `Money` | `Amount` (decimal) + `Currency` (three-letter code). Add/subtract only when currencies match. Cross-currency arithmetic must go through the FX port (no Phase-1 caller). |
+| `Money` | `Amount` (decimal) + `Currency` (three-letter code). Add/subtract only when currencies match. Cross-currency arithmetic must go through the FX port (no Phase-1 caller). The VO does not depend on `ICurrencyCatalog` and does not round to `DecimalPlaces`. Phase 1 has no money column and no Money HTTP. |
 | Currency code | Must resolve in `ICurrencyCatalog`. Entities store the code string, not an enum. |
 
 The only Phase-1 field that uses a currency code is `Tenant.ReportingCurrency`.
@@ -269,3 +272,4 @@ The only Phase-1 field that uses a currency code is `Tenant.ReportingCurrency`.
 | --- | --- |
 | 2026-09-11 | First English draft, aligned with function-plan 2026-09-11: once-not-twice; session outside the domain; full UserStatus machine; Money defined early; ledger as sub-ledgers without locking undecided tables |
 | 2026-09-12 | identity-auth Tenant has no ReportingCurrency; currencies slice adds the catalog and the column. |
+| 2026-09-13 | Currencies spec: platform `IsEnabled`; `DecimalPlaces` = minor units; `Money` in Domain without catalog/rounding. |

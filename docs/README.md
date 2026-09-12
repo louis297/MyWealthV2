@@ -3,7 +3,7 @@ title: Documentation
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-09-11
+updated: 2026-09-12
 ---
 
 # MyWealthV2 documentation
@@ -55,7 +55,7 @@ Behaviour that ships still belongs only in the current phase.
 1. This file — how docs work and what “current” means
 2. [Glossary](glossary.md) — shared words
 3. [Function plan](function-plan.md) — what ships, who uses it, which phase
-4. The Feature Spec for the slice being built
+4. The Feature Spec **or** portal spec for the slice being built
 5. Then only if needed: architecture, domain model, database design, API design, ADRs
 
 Implement **accepted** specs for the current phase only. `draft` and `note` are not build contracts.
@@ -101,5 +101,5 @@ Use the same `status` on every doc front matter:
 - When code and an accepted doc disagree, change the code or the doc in the same change.
 - Feature Spec **In** scope is only what that slice ships. Later-phase words may appear as out-of-scope names, not as tables to create.
 - `api-design.md` is conventions plus a resource catalog. Field rules live in the Feature Spec.
-- File names are kebab-case. Specs: `features/<name>.md`. ADRs: `adr/NNNN-short-title.md`.
+- File names are kebab-case. Specs: `features/<name>.md`. ADRs: `adr/NNNN-short-title.md`. Portal specs: `portals/<name>.md`.
 - Do not create empty spec files for phases that have not opened.

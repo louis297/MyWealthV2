@@ -3,7 +3,7 @@ title: Glossary
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-09-11
+updated: 2026-09-13
 related:
   - function-plan.md
   - domain-model.md
@@ -52,9 +52,11 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | TransactionType | Buy / Sell / TransferIn / TransferOut / Dividend / Interest / Opening / Reversal. | User-defined Category |
 | Category | Optional custom label on a transaction. Not in Phase 1. Not an account type. | Account type |
 | Currency | ISO 4217 three-letter code. One row in the platform catalog. | A C# enum |
-| Currency catalog | `Currencies` table + in-memory `ICurrencyCatalog`. | Joining `Currencies` on every hot path |
-| ReportingCurrency | Tenant currency for aggregated reports. | Account booking currency (may happen to match) |
-| Money | Amount + currency code. Never a bare decimal. | `double` / currency-less `decimal` |
+| Currency catalog | `Currencies` table + in-memory `ICurrencyCatalog`. | Joining `Currencies` on every hot path; a per-tenant allow-list |
+| Currency.IsEnabled | Platform flag: the code may be used as a **new** reference. | A per-tenant switch; rewriting existing `ReportingCurrency` rows |
+| DecimalPlaces | ISO minor units for input / display / validation (JPY = 0, most fiat = 2). | The scale of a money column (`decimal(18,4)` when amounts exist) |
+| ReportingCurrency | Tenant currency for aggregated reports. May remain a later-disabled catalog code. | Account booking currency (may happen to match) |
+| Money | Amount + currency code. Never a bare decimal. Domain VO in Phase 1; no catalog lookup, no rounding to DecimalPlaces. | `double` / currency-less `decimal`; a persisted Phase-1 column |
 | Net worth | Assets minus liabilities at a point in time. Phase 2 returns per-currency arrays; no FX fold. | A single account balance; historical snapshots |
 | Market value | Quantity × price (quote currency), then FX if needed. Phase 2 uses mocked prices. | Cost basis used as if it were net worth |
 | Tenant isolation | A business row belongs to exactly one tenant. Cross-tenant read/write must fail. | Relying only on an easy-to-miss EF global query filter |
@@ -67,6 +69,7 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | Term | Meaning |
 | --- | --- |
 | Adviser Portal | Only frontend in Phase 1. Aspire resource name and OIDC client id: `adviser-portal`. Redirects to the authorization server; does not issue tokens. |
+| Session probe | First portal page after callback: renders `GET /users/me` to prove the handshake. Not a product Dashboard. |
 | Customer Portal | Later public OIDC client (`customer-portal`) on the same authorization server. Not registered in Phase 1. |
 | Back Office | Platform-ops UI. Optional in Phase 1; SystemAdmin uses API / Scalar. |
 | Hosted login | Password page on `identity` (tenantCode + email + password). Shared by all first-party portals. |

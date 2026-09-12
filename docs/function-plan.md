@@ -3,7 +3,7 @@ title: Function plan
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-09-12
+updated: 2026-09-13
 related:
   - README.md
   - glossary.md
@@ -65,7 +65,7 @@ How this file relates to the rest of the tree is in [README.md](README.md). This
 Phase 1  Platform foundation
          schema / currency catalog → OpenIddict + hosted login + policies
          → tenants → TenantAdmin → Adviser → Customer
-         Portal: OIDC callback / shell / Profile / Customers / Advisers
+         Portal: OIDC shell + callback first; Profile / Customers / Advisers after people APIs
 
 Phase 2  Ledger domain (one domain, several slices)
          Instruments first, then account container → cash ledger
@@ -127,7 +127,7 @@ Disabling the last TenantAdmin is allowed in Phase 1 (known gap). After a tenant
 
 | Capability | Notes | UI | Who |
 | --- | --- | --- | --- |
-| Platform currency list | Seed NZD, AUD, USD, EUR, GBP, JPY | None | Authenticated, read-only |
+| Platform currency list | Seed NZD, AUD, USD, EUR, GBP, JPY. `GET /currencies?enabledOnly=` omitted/`false` = all; `true` = enabled only. Item includes `isEnabled`. | None | Authenticated, read-only |
 | References | Phase 1 consumer: `Tenant.ReportingCurrency` | None | Built-in |
 | In-memory catalog | `ICurrencyCatalog`. Hot path does not JOIN. | None | Built-in |
 
@@ -135,15 +135,12 @@ Disabling the last TenantAdmin is allowed in Phase 1 (known gap). After a tenant
 
 ### 4.5 Phase 1 frontend
 
-Adviser Portal only:
+Adviser Portal only. Split in two implementation slices (see [portals/adviser-portal.md](portals/adviser-portal.md)):
 
-- OIDC redirect to the authorization server and callback (no portal-owned password form as the token issuer)
-- Shell (menu filtered by role)
-- Profile
-- Customers: list / detail / create / update / disable
-- Advisers: list / create / update / disable (TenantAdmin only)
+1. **Shell + callback (landed in repo 2026-09-13):** Vite on Aspire `adviser-portal`, authorize redirect, `/callback`, session probe via `GET /users/me`, 401 refresh-once. No password form. SystemAdmin may use the probe (Development seed). OpenIddict redirect URIs upsert from the portal origin, including the Aspire dashboard alias.
+2. **Pages (after people APIs):** role-filtered shell, Profile, Customers, Advisers. Default home = Customers. Customer is then gated off this client. SystemAdmin uses Scalar for tenant work.
 
-**Out:** Accounts, Instruments, Transactions, Dashboard. Customers cannot sign in through this portal. SystemAdmin uses Scalar (or a client-credentials / interactive flow reserved for tools — not a portal).
+**Out:** Accounts, Instruments, Transactions, Dashboard. No Customer Portal client in Phase 1.
 
 ---
 

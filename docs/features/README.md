@@ -3,7 +3,7 @@ title: Feature Specs
 status: draft
 language: en
 created: 2026-09-12
-updated: 2026-09-12
+updated: 2026-09-13
 related:
   - ../function-plan.md
   - ../api-design.md
@@ -26,7 +26,7 @@ Do not add empty files for a phase that has not opened.
 - `note` is discussion only. Do not create tables or routes from a note.
 - From Tenants onward, every tenant-scoped slice includes cross-tenant isolation tests.
 - `/users` is a namespace prefix for people collections, not a parent resource. Do not nest `/users/{id}/advisers`. `/tenants` and `/currencies` stay at the root.
-- The Adviser Portal is not a backend slice. Portal scope belongs under `portals/` when that file exists.
+- The Adviser Portal is not a backend slice. Portal scope lives in [portals/](../portals/README.md).
 - Implementation plans mark suggested git commits. The repository should build after each commit.
 
 ---
@@ -37,8 +37,8 @@ The vertical cut stops at people in a firm, the currency catalog, and session. N
 
 | Spec | Status | Who | Ships | Why it stays its own slice |
 | --- | --- | --- | --- | --- |
-| [identity-auth](identity-auth.md) | accepted | Login-capable roles | OpenIddict defaults, hosted `/login`, policies, `/users/me`, revocation, UserStatus, `UserTokens` seam | Two processes, one product capability |
-| `currencies.md` | not opened | Authenticated (all four roles) | Catalog + `ICurrencyCatalog` + `GET /currencies` (not anonymous) | Own table; HTTP after Bearer validation works |
+| [identity-auth](identity-auth.md) | accepted (landed in repo) | Login-capable roles | OpenIddict defaults, hosted `/login`, policies, `/users/me`, revocation, UserStatus, `UserTokens` seam | Two processes, one product capability |
+| [currencies](currencies.md) | review | Authenticated (all four roles) | Catalog + `ICurrencyCatalog` + `GET /currencies` (`enabledOnly`) + `Tenants.ReportingCurrency` + Domain `Money` | Own table; HTTP after Bearer validation works |
 | `tenants.md` | not opened | SystemAdmin | `/tenants` | Platform resource; path is not under `/users` |
 | `tenant-admins.md` | not opened | SystemAdmin | `/users/tenant-admins`; dual-write; last-admin disable allowed | Caller and gap belong here |
 | `advisers.md` | not opened | TenantAdmin | `/users/advisers`; disable blocked while assigned Customers are not Disabled | Different guard and portal list |
@@ -54,7 +54,7 @@ Not a Feature Spec:
 | Isolation tests | Each business slice from tenants onward |
 | Invitation delivery | Out of identity-auth; table and email port reserved |
 | Ledger policy names | Phase 2 |
-| Adviser Portal pages | `portals/` |
+| Adviser Portal (OIDC shell, later pages) | [portals/](../portals/README.md) |
 | SystemAdmin UI | None — Scalar |
 
 ### Implementation order
@@ -62,15 +62,20 @@ Not a Feature Spec:
 ```text
 schema
     └── identity-auth
-            └── currencies
-                    └── tenants
-                            └── tenant-admins
-                                    └── advisers
-                                            └── customers
+            └── adviser-portal shell + callback   (portals/adviser-portal.md, current slice)
+                    └── currencies
+                            └── tenants
+                                    └── tenant-admins
+                                            └── advisers
+                                                    └── customers
 isolation-tests
 ```
 
-`GET /currencies` is not public. Register no `currencies.read` policy. Use default `.RequireAuthorization()`.
+Repo master (2026-09-13): identity-auth and the adviser-portal **current** slice (Vite resource, PKCE authorize / `/callback`, session probe via `GET /users/me`, 401 refresh-once, OpenIddict redirect upsert including the Aspire dashboard alias) are in the tree. Next backend slice is currencies.
+
+Portal pages (Profile / Customers / Advisers) still wait for those Feature Specs.
+
+`GET /currencies` is not public. Register no `currencies.read` policy. Use default `.RequireAuthorization()`. Query `enabledOnly`: omitted / `false` = all rows; `true` = enabled only. Every item includes `isEnabled`.
 
 ---
 
