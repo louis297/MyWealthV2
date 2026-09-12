@@ -50,7 +50,8 @@ builder.Services.AddOpenIddict()
 
         options.UseAspNetCore()
             .EnableAuthorizationEndpointPassthrough()
-            .EnableEndSessionEndpointPassthrough();
+            .EnableEndSessionEndpointPassthrough()
+            .DisableTransportSecurityRequirement();
     });
 
 var app = builder.Build();
@@ -60,7 +61,10 @@ await using (var scope = app.Services.CreateAsyncScope())
     await OpenIddictSeeder.SeedAsync(scope.ServiceProvider, CancellationToken.None);
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapDefaultEndpoints();
@@ -68,3 +72,5 @@ app.MapRazorPages();
 app.MapControllers();
 
 app.Run();
+
+public partial class Program;
