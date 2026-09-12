@@ -1,4 +1,5 @@
 using MyWealthV2.Domain.Events;
+using MyWealthV2.Domain.Exceptions;
 
 namespace MyWealthV2.Domain.Entities;
 
@@ -14,19 +15,30 @@ public class Tenant : BaseAuditableEntity
 
     public string Code { get; private set; } = string.Empty;
 
+    public string ReportingCurrency { get; private set; } = string.Empty;
+
     public bool IsEnabled { get; private set; }
 
     public byte[] RowVersion { get; private set; } = null!;
 
-    public static Tenant Create(string name, string code, Guid? publicId = null)
+    public static Tenant Create(string name, string code, Currency reportingCurrency, Guid? publicId = null)
     {
+        EnsureReportingCurrency(reportingCurrency);
+
         return new Tenant
         {
             Name = name,
             Code = code,
             PublicId = publicId ?? Guid.NewGuid(),
-            IsEnabled = true
+            IsEnabled = true,
+            ReportingCurrency = reportingCurrency.Code
         };
+    }
+
+    public void SetReportingCurrency(Currency currency)
+    {
+        EnsureReportingCurrency(currency);
+        ReportingCurrency = currency.Code;
     }
 
     public void Disable()
@@ -38,5 +50,18 @@ public class Tenant : BaseAuditableEntity
 
         IsEnabled = false;
         AddDomainEvent(new TenantDisabled(this));
+    }
+
+    private static void EnsureReportingCurrency(Currency currency)
+    {
+        if (currency is null || string.IsNullOrWhiteSpace(currency.Code))
+        {
+            throw new DomainException("Reporting currency is required.");
+        }
+
+        if (!currency.IsEnabled)
+        {
+            throw new DomainException("Reporting currency must be enabled.");
+        }
     }
 }

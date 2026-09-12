@@ -32,7 +32,7 @@ public class CurrentUserDtoTests
     [Test]
     public void TenantAdmin_IncludesTenantPublicIdAndCode()
     {
-        var tenant = Tenant.Create("Acme", "acme");
+        var tenant = Tenant.Create("Acme", "acme", Currency.Create("NZD", "New Zealand Dollar", 2));
         tenant.Id = 10;
         var user = User.Create(
             UserRole.TenantAdmin,
@@ -52,7 +52,7 @@ public class CurrentUserDtoTests
     [Test]
     public void Customer_IncludesAdviserPublicId()
     {
-        var tenant = Tenant.Create("Acme", "acme");
+        var tenant = Tenant.Create("Acme", "acme", Currency.Create("NZD", "New Zealand Dollar", 2));
         tenant.Id = 10;
         var adviser = User.Create(
             UserRole.Adviser,

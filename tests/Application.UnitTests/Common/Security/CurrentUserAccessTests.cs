@@ -47,7 +47,7 @@ public class CurrentUserAccessTests
     [Test]
     public void TenantUser_WithMatchingClaims_Resolves()
     {
-        var tenant = Tenant.Create("Acme", "acme");
+        var tenant = Tenant.Create("Acme", "acme", Currency.Create("NZD", "New Zealand Dollar", 2));
         tenant.Id = 10;
         var user = User.Create(
             UserRole.TenantAdmin,
@@ -69,7 +69,7 @@ public class CurrentUserAccessTests
     [Test]
     public void TenantUser_WithMismatchedTenantIdClaim_IsRejected()
     {
-        var tenant = Tenant.Create("Acme", "acme");
+        var tenant = Tenant.Create("Acme", "acme", Currency.Create("NZD", "New Zealand Dollar", 2));
         tenant.Id = 10;
         var user = User.Create(
             UserRole.TenantAdmin,
@@ -88,7 +88,7 @@ public class CurrentUserAccessTests
     [Test]
     public void TenantUser_WithMismatchedTenantCodeClaim_IsRejected()
     {
-        var tenant = Tenant.Create("Acme", "acme");
+        var tenant = Tenant.Create("Acme", "acme", Currency.Create("NZD", "New Zealand Dollar", 2));
         tenant.Id = 10;
         var user = User.Create(
             UserRole.TenantAdmin,

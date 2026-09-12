@@ -76,7 +76,7 @@ public static class TestApp
 
     public static async Task<Tenant> CreateTenantAsync(string name, string code)
     {
-        var tenant = Tenant.Create(name, code);
+        var tenant = Tenant.Create(name, code, Currency.Create("NZD", "New Zealand Dollar", 2));
         await AddAsync(tenant);
         return tenant;
     }

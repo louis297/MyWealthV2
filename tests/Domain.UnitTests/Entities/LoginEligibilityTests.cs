@@ -119,7 +119,7 @@ public class LoginEligibilityTests
 
     private static Tenant EnabledTenant(int id)
     {
-        var tenant = Tenant.Create("Acme", "acme");
+        var tenant = Tenant.Create("Acme", "acme", Currency.Create("NZD", "New Zealand Dollar", 2));
         tenant.Id = id;
         return tenant;
     }
