@@ -40,6 +40,12 @@ public class ProblemDetailsExceptionHandler : IExceptionHandler
                 Title = "Forbidden",
                 Type = "https://tools.ietf.org/html/rfc9110#section-15.5.4"
             }),
+            ConcurrencyException => (StatusCodes.Status409Conflict, new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Conflict",
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10"
+            }),
             _ => (-1, null)
         };
 

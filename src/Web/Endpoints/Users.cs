@@ -1,5 +1,6 @@
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Users;
+using MyWealthV2.Application.Users.Commands.UpdateCurrentUser;
 using MyWealthV2.Application.Users.Queries.GetCurrentUser;
 using Microsoft.AspNetCore.Http.HttpResults;
 
@@ -12,6 +13,7 @@ public class Users : IEndpointGroup
     public static void Map(RouteGroupBuilder groupBuilder)
     {
         groupBuilder.MapGet(GetMe, "me").RequireAuthorization(Policies.UsersMe);
+        groupBuilder.MapPut(UpdateMe, "me").RequireAuthorization(Policies.UsersMe);
     }
 
     [EndpointSummary("Get the current user")]
@@ -20,5 +22,13 @@ public class Users : IEndpointGroup
     {
         var profile = await sender.Send(new GetCurrentUserQuery());
         return TypedResults.Ok(profile);
+    }
+
+    [EndpointSummary("Update the current user")]
+    [EndpointDescription("Updates the authenticated person's display name only.")]
+    public static async Task<NoContent> UpdateMe(ISender sender, UpdateCurrentUserCommand command)
+    {
+        await sender.Send(command);
+        return TypedResults.NoContent();
     }
 }
