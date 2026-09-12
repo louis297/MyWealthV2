@@ -24,6 +24,20 @@ public sealed class CurrentUserDto
 
     public static CurrentUserDto From(User user, Tenant? tenant, User? adviser)
     {
-        throw new NotImplementedException();
+        return new CurrentUserDto
+        {
+            Id = user.PublicId,
+            Name = user.Name,
+            Email = user.Email,
+            Role = ToCamelCase(user.Role.ToString()),
+            Status = ToCamelCase(user.Status.ToString()),
+            TenantId = tenant?.PublicId,
+            TenantCode = tenant?.Code,
+            AdviserId = adviser?.PublicId,
+            RowVersion = Convert.ToBase64String(user.RowVersion ?? [])
+        };
     }
+
+    private static string ToCamelCase(string value) =>
+        string.IsNullOrEmpty(value) ? value : char.ToLowerInvariant(value[0]) + value[1..];
 }
