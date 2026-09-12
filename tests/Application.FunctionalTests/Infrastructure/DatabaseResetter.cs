@@ -1,5 +1,6 @@
 using Microsoft.Data.SqlClient;
 using Respawn;
+using Respawn.Graph;
 using System.Data.Common;
 
 namespace MyWealthV2.Application.FunctionalTests.Infrastructure;
@@ -20,7 +21,15 @@ internal sealed class DatabaseResetter : IAsyncDisposable
         var connection = new SqlConnection(connectionString);
 
         await connection.OpenAsync();
-        var respawner = await Respawner.CreateAsync(connection);
+        var respawner = await Respawner.CreateAsync(connection, new RespawnerOptions
+        {
+            TablesToIgnore =
+            [
+                new Table("SchemaVersions"),
+                new Table("OpenIddictApplications"),
+                new Table("OpenIddictScopes")
+            ]
+        });
         await connection.CloseAsync();
         return new DatabaseResetter(connection, respawner);
     }

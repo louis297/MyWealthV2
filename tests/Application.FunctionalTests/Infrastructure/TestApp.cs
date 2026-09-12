@@ -1,3 +1,5 @@
+using MyWealthV2.Domain.Entities;
+using MyWealthV2.Domain.Enums;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Identity;
 using MediatR;
@@ -70,6 +72,46 @@ public static class TestApp
 
         _userId = null;
         _roles = null;
+    }
+
+    public static async Task<Tenant> CreateTenantAsync(string name, string code)
+    {
+        var tenant = Tenant.Create(name, code);
+        await AddAsync(tenant);
+        return tenant;
+    }
+
+    public static async Task<User> CreatePersonAsync(
+        UserRole role,
+        string name,
+        string email,
+        string password,
+        int? tenantId = null,
+        int? adviserId = null)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var publicId = Guid.NewGuid();
+        var identityUser = new ApplicationUser
+        {
+            UserName = publicId.ToString(),
+            Email = email,
+            EmailConfirmed = true,
+            TenantId = tenantId
+        };
+
+        var created = await userManager.CreateAsync(identityUser, password);
+        if (!created.Succeeded)
+        {
+            throw new Exception(string.Join(Environment.NewLine, created.ToApplicationResult().Errors));
+        }
+
+        var person = User.Create(role, name, email, identityUser.Id, tenantId, adviserId, publicId: publicId);
+        db.DomainUsers.Add(person);
+        await db.SaveChangesAsync();
+        return person;
     }
 
     public static async Task<TEntity?> FindAsync<TEntity>(params object[] keyValues)

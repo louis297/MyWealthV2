@@ -6,5 +6,6 @@ public abstract class TestBase
     public async Task SetUp()
     {
         await TestApp.ResetState();
+        await FunctionalTestSetup.ReseedAsync();
     }
 }
