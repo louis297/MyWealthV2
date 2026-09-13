@@ -2,6 +2,7 @@ using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Tenants;
 using MyWealthV2.Application.Tenants.Commands.CreateTenant;
+using MyWealthV2.Application.Tenants.Commands.UpdateTenant;
 using MyWealthV2.Application.Tenants.Queries.GetTenantById;
 using MyWealthV2.Application.Tenants.Queries.GetTenants;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -17,6 +18,7 @@ public class Tenants : IEndpointGroup
         groupBuilder.MapGet(GetTenants).RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapGet(GetTenant, "{id}").RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapPost(CreateTenant).RequireAuthorization(Policies.TenantsManage);
+        groupBuilder.MapPut(UpdateTenant, "{id}").RequireAuthorization(Policies.TenantsManage);
     }
 
     [EndpointSummary("List tenants")]
@@ -46,5 +48,14 @@ public class Tenants : IEndpointGroup
     {
         var id = await sender.Send(command);
         return TypedResults.Created($"/tenants/{id}", new CreatedTenantDto(id));
+    }
+
+    [EndpointSummary("Update a tenant")]
+    [EndpointDescription("Renames a tenant and/or changes reporting currency. Code is immutable. SystemAdmin only.")]
+    public static async Task<NoContent> UpdateTenant(ISender sender, Guid id, UpdateTenantCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
     }
 }
