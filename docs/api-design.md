@@ -108,6 +108,7 @@ Password change, disable, and logout revoke that subject’s OpenIddict tokens. 
 | Case | HTTP | Who |
 | --- | --- | --- |
 | Validation / business rule (Adviser still has Customers, duplicate email, illegal reporting currency, …) | 400 | `webapi` |
+| Target exists but is disabled and the caller tries to create / attach / post on it (§4.1) | 400 `disabled` | `webapi` |
 | Missing / invalid Bearer; calling resources after refresh was revoked | 401 | `webapi` |
 | Tenant disabled, Status ≠ Active, bad password, wrong tenant | Authorization does not complete (login failure to the caller; `webapi` returns 401 only if a dead token is presented) | Gate on `identity`; `webapi` only inspects the token |
 | Authenticated but policy fails (including Customer on adviser-management routes) | 403 | `webapi` |
@@ -115,7 +116,43 @@ Password change, disable, and logout revoke that subject’s OpenIddict tokens. 
 | `RowVersion` | 409 | `webapi` |
 | Unhandled | 500 | Either host |
 
-Whether login failures distinguish Disabled from bad credentials is **still open** (§9). Until locked, treat them as a uniform failure and do not enumerate the reason.
+Whether login failures distinguish Disabled from bad credentials is **still open** (§9). Until locked, treat them as a uniform failure and do not enumerate the reason. A disabled tenant or Disabled person at **hosted login** is not §4.1: that is a uniform failure on `identity`, not this JSON.
+
+### 4.1 Target is disabled (shared error)
+
+Tenant, User, and later Account can all be disabled. When the caller writes against a target that **exists but is disabled**, use one shape. Do not invent a new code per slice.
+
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+  "title": "Tenant is disabled",
+  "status": 400,
+  "detail": "Cannot create a TenantAdmin while the tenant is disabled. Enable the tenant first.",
+  "code": "disabled",
+  "target": "tenant",
+  "targetId": "<publicId>"
+}
+```
+
+| Field | Rule |
+| --- | --- |
+| HTTP | 400. Unknown target is still 404. Not 409 / 403. |
+| `code` | Always `disabled` |
+| `target` | `tenant` / `user` / `account`. Phase 1 uses the first two; reserve `account` so Phase 2 does not change the contract |
+| `targetId` | PublicId of the disabled target |
+| `title` | Fixed per target: `Tenant is disabled` / `User is disabled` / `Account is disabled` |
+| `detail` | This action (which command was rejected, what to enable) |
+| `type` | Default RFC9110 400. Do not add a custom type URI namespace |
+
+Phase 1 call site:
+
+- `POST /users/tenant-admins` on a disabled tenant → `target=tenant` ([features/tenant-admins.md](features/tenant-admins.md))
+- Later people slices that create a Customer on a disabled Adviser → `target=user` (detail locked in that spec)
+- Rejecting a disabled catalog currency as a **new** reporting currency stays a plain validation 400 (Currency has no PublicId and is not this lifecycle)
+
+Implement as one Application `TargetDisabled` exception (kind + targetId + detail) mapped once in `webapi`. Do not assemble this JSON in three handlers.
+
+List filters are separate: currencies and people collections use `enabledOnly` (omitted / `false` = all, `true` = enabled / Active only). Do not retrofit landed `GET /tenants?isEnabled=`.
 
 ---
 
@@ -245,7 +282,7 @@ Phase 1 create may set a password and land in `Active` (invitation is not built;
 
 | Resource | Caller | Create required | List scope |
 | --- | --- | --- | --- |
-| `/users/tenant-admins` | SystemAdmin | `tenantId` (PublicId), `name`, `email`, `password` | Optional tenant filter |
+| `/users/tenant-admins` | SystemAdmin | `tenantId` (PublicId), `name`, `email`, `password` | Optional tenant filter. Field rules: [features/tenant-admins.md](features/tenant-admins.md) |
 | `/users/advisers` | TenantAdmin | `name`, `email`, `password` | Current tenant |
 | `/users/customers` | TenantAdmin; Adviser (assigned) | `name`, `email`, `password`, `adviserId` | TenantAdmin: tenant; Adviser: self only |
 
@@ -271,7 +308,7 @@ Rule summary:
 - Customer calling `/users/advisers`, `/users/customers`, `/users/tenant-admins`, or `/tenants` → 403.
 - Disable and password change revoke that person’s OpenIddict tokens.
 
-Default list page size is **not locked** (§9).
+People lists reuse the tenants envelope `{ items, page, pageSize, totalCount }` (page default 1, size default 20, max 100). Currencies and people collections use `enabledOnly` (omit / `false` = all, `true` = enabled / Active only). Each person item includes `status`. Create on a disabled tenant uses §4.1.
 
 ---
 
@@ -294,7 +331,7 @@ When the Phase-2 ledger opens, add ledger policy names and ledger routes only. T
 
 ## 9. Still open in Phase 1
 
-- Default list page size
+List page size is locked: tenants envelope (page 1 / size 20 / max 100), reused by people lists. `enabledOnly` is locked for currencies and people collections.
 
 Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; uniform login failure; hosted login is Razor Pages at `/login`; access 15 minutes; refresh 14 days absolute; JWT claims `sub` / `email` / `role` / `tenant_id` / `tenant_code`.
 
@@ -307,3 +344,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-09-11 | First English draft. Two HTTP surfaces; OpenIddict default protocol paths; no resource-API token issuer; `/users` namespace for people collections; `/users/me` on `webapi`; Customer may complete the authorization server; no ledger routes in Phase 1. |
 | 2026-09-12 | identity-auth locks: Razor `/login`; JWT claim names; 15 min access / 14 day absolute refresh; UserName = PublicId. |
 | 2026-09-13 | Currencies: `enabledOnly` (omit/`false` = all, `true` = enabled only); item includes `isEnabled`. |
+| 2026-09-13 | §4.1 shared disabled error (`code=disabled` + `target`). People lists reuse tenants envelope; `enabledOnly` aligned with currencies. TenantAdmin field rules in [features/tenant-admins.md](features/tenant-admins.md). |

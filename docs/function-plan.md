@@ -220,7 +220,7 @@ isolation-tests                (add from tenants onward on every business slice)
 
 ## 9. Still open in Phase 1
 
-- Default page size for lists
+List page size is locked in tenants and reused by people lists (page 1 / size 20 / max 100). People lists use `enabledOnly` like currencies.
 
 Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; uniform login failure; hosted login is Razor Pages at `/login`; access 15 minutes; refresh 14 days absolute.
 
