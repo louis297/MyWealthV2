@@ -2,6 +2,8 @@ using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Tenants;
 using MyWealthV2.Application.Tenants.Commands.CreateTenant;
+using MyWealthV2.Application.Tenants.Commands.DisableTenant;
+using MyWealthV2.Application.Tenants.Commands.EnableTenant;
 using MyWealthV2.Application.Tenants.Commands.UpdateTenant;
 using MyWealthV2.Application.Tenants.Queries.GetTenantById;
 using MyWealthV2.Application.Tenants.Queries.GetTenants;
@@ -19,6 +21,8 @@ public class Tenants : IEndpointGroup
         groupBuilder.MapGet(GetTenant, "{id}").RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapPost(CreateTenant).RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapPut(UpdateTenant, "{id}").RequireAuthorization(Policies.TenantsManage);
+        groupBuilder.MapPost(DisableTenant, "{id}/disable").RequireAuthorization(Policies.TenantsManage);
+        groupBuilder.MapPost(EnableTenant, "{id}/enable").RequireAuthorization(Policies.TenantsManage);
     }
 
     [EndpointSummary("List tenants")]
@@ -53,6 +57,24 @@ public class Tenants : IEndpointGroup
     [EndpointSummary("Update a tenant")]
     [EndpointDescription("Renames a tenant and/or changes reporting currency. Code is immutable. SystemAdmin only.")]
     public static async Task<NoContent> UpdateTenant(ISender sender, Guid id, UpdateTenantCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Disable a tenant")]
+    [EndpointDescription("Disables a tenant. Idempotent. Does not rewrite person Status. SystemAdmin only.")]
+    public static async Task<NoContent> DisableTenant(ISender sender, Guid id, DisableTenantCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Enable a tenant")]
+    [EndpointDescription("Re-enables a tenant. Idempotent. SystemAdmin only.")]
+    public static async Task<NoContent> EnableTenant(ISender sender, Guid id, EnableTenantCommand command)
     {
         command.Id = id;
         await sender.Send(command);
