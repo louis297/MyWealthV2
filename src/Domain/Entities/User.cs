@@ -67,6 +67,22 @@ public class User : BaseAuditableEntity
         return user;
     }
 
+    public void DisableAdviser(bool hasNonDisabledAssignedCustomers)
+    {
+        if (Role != UserRole.Adviser)
+        {
+            throw new DomainException("Only an Adviser can be disabled with DisableAdviser.");
+        }
+
+        if (hasNonDisabledAssignedCustomers)
+        {
+            throw new DomainException(
+                "Reassign or disable assigned customers before disabling this adviser.");
+        }
+
+        Disable();
+    }
+
     public void Disable()
     {
         if (Status is not (UserStatus.Active or UserStatus.PendingActivation))
