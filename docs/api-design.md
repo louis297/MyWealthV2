@@ -235,6 +235,7 @@ SystemAdmin only (`tenants.manage`).
 - PUT body: `name`, `reportingCurrency`, `rowVersion`
 - `code` is immutable after create (login key). Reporting currency may change in this phase (no ledger balances keyed on it yet).
 - After disable, that Code must not complete login; existing refresh fails. Person `Status` is not bulk-updated.
+- Field rules: [features/tenants.md](features/tenants.md).
 
 ### 7.4 People (TenantAdmin / Adviser / Customer)
 
