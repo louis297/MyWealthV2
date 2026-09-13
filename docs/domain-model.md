@@ -137,7 +137,7 @@ PendingActivation ──disable──► Disabled
 
 Disable guards:
 
-- Disable Adviser: reject while assigned Customers are not Disabled; reassign or disable them first.
+- Disable Adviser: reject while assigned Customers are not Disabled; reassign or disable them first. Method: `User.DisableAdviser(bool hasNonDisabledAssignedCustomers)`. `Disable()` stays for TenantAdmin / Customer.
 - Disable Customer: Phase 1 has no accounts, so no ledger guard. When the ledger exists, the Accounts slice adds “reject if an Account is still open”. Do not create empty Account tables in Phase 1 to enforce that.
 - Disabling the last TenantAdmin is allowed (known gap).
 - Disabling a tenant does **not** bulk-update `User.Status`. Person status is independent; login checks both.

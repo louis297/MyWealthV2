@@ -283,7 +283,7 @@ Phase 1 create may set a password and land in `Active` (invitation is not built;
 | Resource | Caller | Create required | List scope |
 | --- | --- | --- | --- |
 | `/users/tenant-admins` | SystemAdmin | `tenantId` (PublicId), `name`, `email`, `password` | Optional tenant filter. Field rules: [features/tenant-admins.md](features/tenant-admins.md) |
-| `/users/advisers` | TenantAdmin | `name`, `email`, `password` | Current tenant |
+| `/users/advisers` | TenantAdmin | `name`, `email`, `password` | Current tenant. Field rules: [features/advisers.md](features/advisers.md) |
 | `/users/customers` | TenantAdmin; Adviser (assigned) | `name`, `email`, `password`, `adviserId` | TenantAdmin: tenant; Adviser: self only |
 
 Shared actions (`{collection}` = `tenant-admins` / `advisers` / `customers`):
@@ -345,3 +345,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-09-12 | identity-auth locks: Razor `/login`; JWT claim names; 15 min access / 14 day absolute refresh; UserName = PublicId. |
 | 2026-09-13 | Currencies: `enabledOnly` (omit/`false` = all, `true` = enabled only); item includes `isEnabled`. |
 | 2026-09-13 | §4.1 shared disabled error (`code=disabled` + `target`). People lists reuse tenants envelope; `enabledOnly` aligned with currencies. TenantAdmin field rules in [features/tenant-admins.md](features/tenant-admins.md). |
+| 2026-09-14 | Adviser field rules in [features/advisers.md](features/advisers.md). Disable-adviser assigned-customer 400 is ordinary validation, not §4.1. |
