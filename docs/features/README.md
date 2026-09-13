@@ -38,8 +38,8 @@ The vertical cut stops at people in a firm, the currency catalog, and session. N
 | Spec | Status | Who | Ships | Why it stays its own slice |
 | --- | --- | --- | --- | --- |
 | [identity-auth](identity-auth.md) | accepted (landed in repo) | Login-capable roles | OpenIddict defaults, hosted `/login`, policies, `/users/me`, revocation, UserStatus, `UserTokens` seam | Two processes, one product capability |
-| [currencies](currencies.md) | review | Authenticated (all four roles) | Catalog + `ICurrencyCatalog` + `GET /currencies` (`enabledOnly`) + `Tenants.ReportingCurrency` + Domain `Money` | Own table; HTTP after Bearer validation works |
-| `tenants.md` | not opened | SystemAdmin | `/tenants` | Platform resource; path is not under `/users` |
+| [currencies](currencies.md) | review (HTTP landed in repo 2026-09-13) | Authenticated (all four roles) | Catalog + `ICurrencyCatalog` + `GET /currencies` (`enabledOnly`) + `Tenants.ReportingCurrency` + Domain `Money` | Own table; HTTP after Bearer validation works |
+| [tenants](tenants.md) | accepted | SystemAdmin | `/tenants` list / get / create / update / disable / enable | Platform resource; path is not under `/users` |
 | `tenant-admins.md` | not opened | SystemAdmin | `/users/tenant-admins`; dual-write; last-admin disable allowed | Caller and gap belong here |
 | `advisers.md` | not opened | TenantAdmin | `/users/advisers`; disable blocked while assigned Customers are not Disabled | Different guard and portal list |
 | `customers.md` | not opened | TenantAdmin; Adviser (assigned) | `/users/customers`; login principal; no portal; no ledger guard | Assignment scope and rebind |
@@ -71,7 +71,7 @@ schema
 isolation-tests
 ```
 
-Repo master (2026-09-13): identity-auth and the adviser-portal **current** slice (Vite resource, PKCE authorize / `/callback`, session probe via `GET /users/me`, 401 refresh-once, OpenIddict redirect upsert including the Aspire dashboard alias) are in the tree. Next backend slice is currencies.
+Repo master (2026-09-13): identity-auth, the adviser-portal **current** slice (Vite resource, PKCE authorize / `/callback`, session probe via `GET /users/me`, 401 refresh-once, OpenIddict redirect upsert including the Aspire dashboard alias), and `GET /currencies` are in the tree. Currencies Feature Spec is still `review`. [tenants](tenants.md) is accepted (not yet in the tree). Next backend implementation is tenants.
 
 Portal pages (Profile / Customers / Advisers) still wait for those Feature Specs.
 
