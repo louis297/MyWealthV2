@@ -57,6 +57,8 @@ public class User : BaseAuditableEntity
             Status = withPassword ? UserStatus.Active : UserStatus.PendingActivation
         };
 
+        user.AddDomainEvent(new UserCreated(user));
+
         if (user.Status == UserStatus.Active)
         {
             user.AddDomainEvent(new UserActivated(user));
