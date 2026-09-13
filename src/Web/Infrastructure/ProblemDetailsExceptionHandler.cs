@@ -53,6 +53,11 @@ public class ProblemDetailsExceptionHandler : IExceptionHandler
 
         if (problemDetails is null) return false;
 
+        if (problemDetails is ValidationProblemDetails validation)
+        {
+            problemDetails.Extensions["errors"] = validation.Errors;
+        }
+
         httpContext.Response.StatusCode = statusCode;
         await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
         return true;

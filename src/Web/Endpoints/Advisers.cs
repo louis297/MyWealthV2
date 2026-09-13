@@ -2,6 +2,8 @@ using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Users;
 using MyWealthV2.Application.Users.Commands.CreateAdviser;
+using MyWealthV2.Application.Users.Commands.DisableAdviser;
+using MyWealthV2.Application.Users.Commands.EnableAdviser;
 using MyWealthV2.Application.Users.Commands.UpdateAdviser;
 using MyWealthV2.Application.Users.Queries.GetAdviserById;
 using MyWealthV2.Application.Users.Queries.GetAdvisers;
@@ -19,6 +21,8 @@ public class Advisers : IEndpointGroup
         groupBuilder.MapGet(GetAdviser, "{id}").RequireAuthorization(Policies.AdvisersManage);
         groupBuilder.MapPost(CreateAdviser).RequireAuthorization(Policies.AdvisersManage);
         groupBuilder.MapPut(UpdateAdviser, "{id}").RequireAuthorization(Policies.AdvisersManage);
+        groupBuilder.MapPost(DisableAdviser, "{id}/disable").RequireAuthorization(Policies.AdvisersManage);
+        groupBuilder.MapPost(EnableAdviser, "{id}/enable").RequireAuthorization(Policies.AdvisersManage);
     }
 
     [EndpointSummary("List advisers")]
@@ -58,6 +62,30 @@ public class Advisers : IEndpointGroup
         ISender sender,
         Guid id,
         UpdateAdviserCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Disable an adviser")]
+    [EndpointDescription("Disables an Adviser. Idempotent. Assigned non-disabled customers must be handled first.")]
+    public static async Task<NoContent> DisableAdviser(
+        ISender sender,
+        Guid id,
+        DisableAdviserCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Enable an adviser")]
+    [EndpointDescription("Re-enables an Adviser. Idempotent. TenantAdmin only.")]
+    public static async Task<NoContent> EnableAdviser(
+        ISender sender,
+        Guid id,
+        EnableAdviserCommand command)
     {
         command.Id = id;
         await sender.Send(command);

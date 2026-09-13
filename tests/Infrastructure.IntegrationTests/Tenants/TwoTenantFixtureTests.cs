@@ -45,6 +45,28 @@ public class TwoTenantFixtureTests
         onlyA.ShouldNotContain(adminB.PublicId);
     }
 
+    [Test]
+    public async Task Advisers_TenantADoesNotIncludeB()
+    {
+        await using var db = OpenDb();
+        var (tenantA, tenantB) = await TwoTenantFixture.InsertAsync(db);
+        var (adviserA, adviserB) = await TwoTenantFixture.InsertAdvisersAsync(db, tenantA, tenantB);
+
+        var onlyA = await db.DomainUsers.AsNoTracking()
+            .Where(person => person.Role == UserRole.Adviser && person.TenantId == tenantA.Id)
+            .Select(person => person.PublicId)
+            .ToListAsync();
+        onlyA.ShouldBe([adviserA.PublicId]);
+        onlyA.ShouldNotContain(adviserB.PublicId);
+
+        var otherTenant = await db.DomainUsers.AsNoTracking()
+            .SingleOrDefaultAsync(person =>
+                person.PublicId == adviserB.PublicId
+                && person.Role == UserRole.Adviser
+                && person.TenantId == tenantA.Id);
+        otherTenant.ShouldBeNull();
+    }
+
     private static ApplicationDbContext OpenDb()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()

@@ -32,9 +32,29 @@ public static class TwoTenantFixture
         return (adminA, adminB);
     }
 
+    public static async Task<(User AdviserA, User AdviserB)> InsertAdvisersAsync(
+        ApplicationDbContext db,
+        Tenant tenantA,
+        Tenant tenantB)
+    {
+        var adviserA = await InsertPersonAsync(
+            db, tenantA, UserRole.Adviser, "Sam A", "sam@a.example");
+        var adviserB = await InsertPersonAsync(
+            db, tenantB, UserRole.Adviser, "Sam B", "sam@b.example");
+        return (adviserA, adviserB);
+    }
+
     private static async Task<User> InsertTenantAdminAsync(
         ApplicationDbContext db,
         Tenant tenant,
+        string name,
+        string email) =>
+        await InsertPersonAsync(db, tenant, UserRole.TenantAdmin, name, email);
+
+    private static async Task<User> InsertPersonAsync(
+        ApplicationDbContext db,
+        Tenant tenant,
+        UserRole role,
         string name,
         string email)
     {
@@ -50,7 +70,7 @@ public static class TwoTenantFixture
         await db.SaveChangesAsync();
 
         var person = User.Create(
-            UserRole.TenantAdmin,
+            role,
             name,
             email,
             identity.Id,
