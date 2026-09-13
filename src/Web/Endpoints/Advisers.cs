@@ -2,6 +2,7 @@ using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Users;
 using MyWealthV2.Application.Users.Commands.CreateAdviser;
+using MyWealthV2.Application.Users.Commands.UpdateAdviser;
 using MyWealthV2.Application.Users.Queries.GetAdviserById;
 using MyWealthV2.Application.Users.Queries.GetAdvisers;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -17,6 +18,7 @@ public class Advisers : IEndpointGroup
         groupBuilder.MapGet(GetAdvisers).RequireAuthorization(Policies.AdvisersManage);
         groupBuilder.MapGet(GetAdviser, "{id}").RequireAuthorization(Policies.AdvisersManage);
         groupBuilder.MapPost(CreateAdviser).RequireAuthorization(Policies.AdvisersManage);
+        groupBuilder.MapPut(UpdateAdviser, "{id}").RequireAuthorization(Policies.AdvisersManage);
     }
 
     [EndpointSummary("List advisers")]
@@ -48,5 +50,17 @@ public class Advisers : IEndpointGroup
     {
         var id = await sender.Send(command);
         return TypedResults.Created($"/users/advisers/{id}", new CreatedAdviserDto(id));
+    }
+
+    [EndpointSummary("Update an adviser")]
+    [EndpointDescription("Renames an Adviser. Email, tenant, and role cannot change. TenantAdmin only.")]
+    public static async Task<NoContent> UpdateAdviser(
+        ISender sender,
+        Guid id,
+        UpdateAdviserCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
     }
 }
