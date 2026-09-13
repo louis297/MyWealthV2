@@ -1,4 +1,7 @@
 using System.Reflection;
+using FluentValidation.Results;
+using Microsoft.Data.SqlClient;
+using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Infrastructure.Data.Entities;
@@ -20,10 +23,27 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<UserToken> UserTokenSeams => Set<UserToken>();
 
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
+        {
+            throw new ValidationException([
+                new ValidationFailure(string.Empty, "A unique constraint was violated.")
+            ]);
+        }
+    }
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
         builder.UseOpenIddict();
         builder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
     }
+
+    private static bool IsUniqueConstraintViolation(DbUpdateException exception) =>
+        exception.InnerException is SqlException sql && sql.Number is 2601 or 2627;
 }
