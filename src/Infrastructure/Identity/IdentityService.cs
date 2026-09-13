@@ -41,6 +41,25 @@ public class IdentityService : IIdentityService
         return (result.ToApplicationResult(), user.Id);
     }
 
+    public async Task<(Result Result, string UserId)> CreateLoginAsync(
+        string userName,
+        string email,
+        string password,
+        int? tenantId)
+    {
+        var user = new ApplicationUser
+        {
+            UserName = userName,
+            Email = email,
+            EmailConfirmed = true,
+            TenantId = tenantId
+        };
+
+        var result = await _userManager.CreateAsync(user, password);
+
+        return (result.ToApplicationResult(), user.Id);
+    }
+
     public Task<bool> IsInRoleAsync(string userId, string role)
     {
         // Product roles live on Domain Users, not AspNetRoles (ADR 0013).

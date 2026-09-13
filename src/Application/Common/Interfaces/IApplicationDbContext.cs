@@ -9,4 +9,6 @@ public interface IApplicationDbContext
     DbSet<Tenant> Tenants { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
+
+    Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken cancellationToken);
 }

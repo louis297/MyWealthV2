@@ -12,6 +12,12 @@ public interface IIdentityService
 
     Task<(Result Result, string UserId)> CreateUserAsync(string userName, string password);
 
+    Task<(Result Result, string UserId)> CreateLoginAsync(
+        string userName,
+        string email,
+        string password,
+        int? tenantId);
+
     Task<Result> DeleteUserAsync(string userId);
 
     Task<Result> ChangePasswordAsync(string identityUserId, string currentPassword, string newPassword);

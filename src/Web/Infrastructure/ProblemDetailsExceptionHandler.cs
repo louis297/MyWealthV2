@@ -47,6 +47,7 @@ public class ProblemDetailsExceptionHandler : IExceptionHandler
                 Title = "Conflict",
                 Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10"
             }),
+            TargetDisabledException tde => (StatusCodes.Status400BadRequest, DisabledProblem(tde)),
             _ => (-1, null)
         };
 
@@ -55,5 +56,20 @@ public class ProblemDetailsExceptionHandler : IExceptionHandler
         httpContext.Response.StatusCode = statusCode;
         await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
         return true;
+    }
+
+    private static ProblemDetails DisabledProblem(TargetDisabledException exception)
+    {
+        var problem = new ProblemDetails
+        {
+            Status = StatusCodes.Status400BadRequest,
+            Type = "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+            Title = exception.Title,
+            Detail = exception.Detail
+        };
+        problem.Extensions["code"] = exception.Code;
+        problem.Extensions["target"] = exception.Target;
+        problem.Extensions["targetId"] = exception.TargetId;
+        return problem;
     }
 }
