@@ -104,6 +104,7 @@ Authorization (named policies, `RolePermissions`, handler scope checks) is not a
 - After `IsEnabled = false`, that Code must not complete login; existing refresh must fail. The check runs in the authorization server / resource pipeline against this invariant.
 - A tenant may be re-enabled. Login with that Code works again only if the person’s `Status` is still `Active`.
 - `RowVersion` conflict → HTTP 409.
+- `Rename` changes `Name` (non-empty; uniqueness is application). `Enable` / `Disable` flip `IsEnabled` and raise `TenantEnabled` / `TenantDisabled` only when the flag actually changes. `Create` raises `TenantCreated`.
 
 ### 4.2 Person
 

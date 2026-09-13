@@ -9,6 +9,74 @@ namespace MyWealthV2.Domain.UnitTests.Entities;
 public class TenantTests
 {
     [Test]
+    public void Create_RaisesTenantCreated()
+    {
+        var tenant = Tenant.Create("Acme", "acme", Nzd());
+
+        tenant.DomainEvents.OfType<TenantCreated>().ShouldHaveSingleItem();
+        tenant.IsEnabled.ShouldBeTrue();
+    }
+
+    [Test]
+    public void Rename_RejectsBlank()
+    {
+        var tenant = Tenant.Create("Acme", "acme", Nzd());
+
+        Should.Throw<DomainException>(() => tenant.Rename(""));
+        Should.Throw<DomainException>(() => tenant.Rename(" "));
+        tenant.Name.ShouldBe("Acme");
+    }
+
+    [Test]
+    public void Rename_SetsName()
+    {
+        var tenant = Tenant.Create("Acme", "acme", Nzd());
+
+        tenant.Rename("Acme Advisory");
+
+        tenant.Name.ShouldBe("Acme Advisory");
+        tenant.Code.ShouldBe("acme");
+    }
+
+    [Test]
+    public void Enable_FlipsAndRaisesTenantEnabledOnce()
+    {
+        var tenant = Tenant.Create("Acme", "acme", Nzd());
+        tenant.Disable();
+        tenant.ClearDomainEvents();
+
+        tenant.Enable();
+
+        tenant.IsEnabled.ShouldBeTrue();
+        tenant.DomainEvents.OfType<TenantEnabled>().ShouldHaveSingleItem();
+    }
+
+    [Test]
+    public void Enable_WhenAlreadyEnabled_IsNoOp()
+    {
+        var tenant = Tenant.Create("Acme", "acme", Nzd());
+        tenant.ClearDomainEvents();
+
+        tenant.Enable();
+
+        tenant.IsEnabled.ShouldBeTrue();
+        tenant.DomainEvents.ShouldBeEmpty();
+    }
+
+    [Test]
+    public void Disable_WhenAlreadyDisabled_IsNoOp()
+    {
+        var tenant = Tenant.Create("Acme", "acme", Nzd());
+        tenant.Disable();
+        tenant.ClearDomainEvents();
+
+        tenant.Disable();
+
+        tenant.IsEnabled.ShouldBeFalse();
+        tenant.DomainEvents.ShouldBeEmpty();
+    }
+
+    [Test]
     public void Disable_RaisesTenantDisabled()
     {
         var tenant = Tenant.Create("Acme", "acme", Nzd());

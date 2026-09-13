@@ -25,7 +25,7 @@ public class Tenant : BaseAuditableEntity
     {
         EnsureReportingCurrency(reportingCurrency);
 
-        return new Tenant
+        var tenant = new Tenant
         {
             Name = name,
             Code = code,
@@ -33,12 +33,35 @@ public class Tenant : BaseAuditableEntity
             IsEnabled = true,
             ReportingCurrency = reportingCurrency.Code
         };
+        tenant.AddDomainEvent(new TenantCreated(tenant));
+        return tenant;
+    }
+
+    public void Rename(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new DomainException("Name is required.");
+        }
+
+        Name = name;
     }
 
     public void SetReportingCurrency(Currency currency)
     {
         EnsureReportingCurrency(currency);
         ReportingCurrency = currency.Code;
+    }
+
+    public void Enable()
+    {
+        if (IsEnabled)
+        {
+            return;
+        }
+
+        IsEnabled = true;
+        AddDomainEvent(new TenantEnabled(this));
     }
 
     public void Disable()
