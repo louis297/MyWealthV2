@@ -7,44 +7,20 @@ namespace MyWealthV2.Infrastructure.Data.Interceptors;
 
 public class DispatchDomainEventsInterceptor : SaveChangesInterceptor
 {
-    private readonly IMediator _mediator;
-
-    public DispatchDomainEventsInterceptor(IMediator mediator)
+    public static async Task PublishAfterCommitAsync(DbContext context, IMediator mediator, CancellationToken cancellationToken)
     {
-        _mediator = mediator;
-    }
-
-    public override InterceptionResult<int> SavingChanges(DbContextEventData eventData, InterceptionResult<int> result)
-    {
-        DispatchDomainEvents(eventData.Context).GetAwaiter().GetResult();
-
-        return base.SavingChanges(eventData, result);
-
-    }
-
-    public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
-    {
-        await DispatchDomainEvents(eventData.Context);
-
-        return await base.SavingChangesAsync(eventData, result, cancellationToken);
-    }
-
-    public async Task DispatchDomainEvents(DbContext? context)
-    {
-        if (context == null) return;
-
         var entities = context.ChangeTracker
             .Entries<BaseEntity>()
-            .Where(e => e.Entity.DomainEvents.Any())
-            .Select(e => e.Entity);
-
-        var domainEvents = entities
-            .SelectMany(e => e.DomainEvents)
+            .Where(entry => entry.Entity.DomainEvents.Any())
+            .Select(entry => entry.Entity)
             .ToList();
 
-        entities.ToList().ForEach(e => e.ClearDomainEvents());
+        var domainEvents = entities.SelectMany(entity => entity.DomainEvents).ToList();
+        entities.ForEach(entity => entity.ClearDomainEvents());
 
         foreach (var domainEvent in domainEvents)
-            await _mediator.Publish(domainEvent);
+        {
+            await mediator.Publish(domainEvent, cancellationToken);
+        }
     }
 }
