@@ -2,6 +2,8 @@ using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Users;
 using MyWealthV2.Application.Users.Commands.CreateTenantAdmin;
+using MyWealthV2.Application.Users.Commands.DisableTenantAdmin;
+using MyWealthV2.Application.Users.Commands.EnableTenantAdmin;
 using MyWealthV2.Application.Users.Commands.UpdateTenantAdmin;
 using MyWealthV2.Application.Users.Queries.GetTenantAdminById;
 using MyWealthV2.Application.Users.Queries.GetTenantAdmins;
@@ -19,6 +21,8 @@ public class TenantAdmins : IEndpointGroup
         groupBuilder.MapGet(GetTenantAdmin, "{id}").RequireAuthorization(Policies.TenantAdminsManage);
         groupBuilder.MapPost(CreateTenantAdmin).RequireAuthorization(Policies.TenantAdminsManage);
         groupBuilder.MapPut(UpdateTenantAdmin, "{id}").RequireAuthorization(Policies.TenantAdminsManage);
+        groupBuilder.MapPost(DisableTenantAdmin, "{id}/disable").RequireAuthorization(Policies.TenantAdminsManage);
+        groupBuilder.MapPost(EnableTenantAdmin, "{id}/enable").RequireAuthorization(Policies.TenantAdminsManage);
     }
 
     [EndpointSummary("List tenant admins")]
@@ -59,6 +63,30 @@ public class TenantAdmins : IEndpointGroup
         ISender sender,
         Guid id,
         UpdateTenantAdminCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Disable a tenant admin")]
+    [EndpointDescription("Disables a TenantAdmin. Idempotent. Last TenantAdmin may be disabled. SystemAdmin only.")]
+    public static async Task<NoContent> DisableTenantAdmin(
+        ISender sender,
+        Guid id,
+        DisableTenantAdminCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Enable a tenant admin")]
+    [EndpointDescription("Re-enables a TenantAdmin. Idempotent. SystemAdmin only.")]
+    public static async Task<NoContent> EnableTenantAdmin(
+        ISender sender,
+        Guid id,
+        EnableTenantAdminCommand command)
     {
         command.Id = id;
         await sender.Send(command);
