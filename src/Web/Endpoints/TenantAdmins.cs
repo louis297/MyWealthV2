@@ -2,6 +2,7 @@ using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Users;
 using MyWealthV2.Application.Users.Commands.CreateTenantAdmin;
+using MyWealthV2.Application.Users.Commands.UpdateTenantAdmin;
 using MyWealthV2.Application.Users.Queries.GetTenantAdminById;
 using MyWealthV2.Application.Users.Queries.GetTenantAdmins;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -17,6 +18,7 @@ public class TenantAdmins : IEndpointGroup
         groupBuilder.MapGet(GetTenantAdmins).RequireAuthorization(Policies.TenantAdminsManage);
         groupBuilder.MapGet(GetTenantAdmin, "{id}").RequireAuthorization(Policies.TenantAdminsManage);
         groupBuilder.MapPost(CreateTenantAdmin).RequireAuthorization(Policies.TenantAdminsManage);
+        groupBuilder.MapPut(UpdateTenantAdmin, "{id}").RequireAuthorization(Policies.TenantAdminsManage);
     }
 
     [EndpointSummary("List tenant admins")]
@@ -49,5 +51,17 @@ public class TenantAdmins : IEndpointGroup
     {
         var id = await sender.Send(command);
         return TypedResults.Created($"/users/tenant-admins/{id}", new CreatedTenantAdminDto(id));
+    }
+
+    [EndpointSummary("Update a tenant admin")]
+    [EndpointDescription("Renames a TenantAdmin. Email, tenant, and role cannot change. SystemAdmin only.")]
+    public static async Task<NoContent> UpdateTenantAdmin(
+        ISender sender,
+        Guid id,
+        UpdateTenantAdminCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
     }
 }
