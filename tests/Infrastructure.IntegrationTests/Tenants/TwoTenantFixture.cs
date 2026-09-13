@@ -1,5 +1,7 @@
 using MyWealthV2.Domain.Entities;
+using MyWealthV2.Domain.Enums;
 using MyWealthV2.Infrastructure.Data;
+using MyWealthV2.Infrastructure.Identity;
 
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
@@ -18,5 +20,44 @@ public static class TwoTenantFixture
         db.Tenants.AddRange(tenantA, tenantB);
         await db.SaveChangesAsync();
         return (tenantA, tenantB);
+    }
+
+    public static async Task<(User AdminA, User AdminB)> InsertTenantAdminsAsync(
+        ApplicationDbContext db,
+        Tenant tenantA,
+        Tenant tenantB)
+    {
+        var adminA = await InsertTenantAdminAsync(db, tenantA, "Alex A", "alex@a.example");
+        var adminB = await InsertTenantAdminAsync(db, tenantB, "Blair B", "blair@b.example");
+        return (adminA, adminB);
+    }
+
+    private static async Task<User> InsertTenantAdminAsync(
+        ApplicationDbContext db,
+        Tenant tenant,
+        string name,
+        string email)
+    {
+        var publicId = Guid.NewGuid();
+        var identity = new ApplicationUser
+        {
+            UserName = publicId.ToString(),
+            Email = email,
+            EmailConfirmed = true,
+            TenantId = tenant.Id
+        };
+        db.Users.Add(identity);
+        await db.SaveChangesAsync();
+
+        var person = User.Create(
+            UserRole.TenantAdmin,
+            name,
+            email,
+            identity.Id,
+            tenant.Id,
+            publicId: publicId);
+        db.DomainUsers.Add(person);
+        await db.SaveChangesAsync();
+        return person;
     }
 }

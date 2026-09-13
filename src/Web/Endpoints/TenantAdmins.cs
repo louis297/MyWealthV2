@@ -1,6 +1,9 @@
+using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Users;
 using MyWealthV2.Application.Users.Commands.CreateTenantAdmin;
+using MyWealthV2.Application.Users.Queries.GetTenantAdminById;
+using MyWealthV2.Application.Users.Queries.GetTenantAdmins;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace MyWealthV2.Web.Endpoints;
@@ -11,7 +14,31 @@ public class TenantAdmins : IEndpointGroup
 
     public static void Map(RouteGroupBuilder groupBuilder)
     {
+        groupBuilder.MapGet(GetTenantAdmins).RequireAuthorization(Policies.TenantAdminsManage);
+        groupBuilder.MapGet(GetTenantAdmin, "{id}").RequireAuthorization(Policies.TenantAdminsManage);
         groupBuilder.MapPost(CreateTenantAdmin).RequireAuthorization(Policies.TenantAdminsManage);
+    }
+
+    [EndpointSummary("List tenant admins")]
+    [EndpointDescription("Returns a paged list of TenantAdmins. SystemAdmin only.")]
+    public static async Task<Ok<PagedList<TenantAdminDto>>> GetTenantAdmins(
+        ISender sender,
+        int page = 1,
+        int pageSize = 20,
+        string? tenantId = null,
+        string? enabledOnly = null,
+        string? search = null)
+    {
+        var result = await sender.Send(new GetTenantAdminsQuery(page, pageSize, tenantId, enabledOnly, search));
+        return TypedResults.Ok(result);
+    }
+
+    [EndpointSummary("Get a tenant admin")]
+    [EndpointDescription("Returns one TenantAdmin by PublicId. SystemAdmin only.")]
+    public static async Task<Ok<TenantAdminDto>> GetTenantAdmin(ISender sender, Guid id)
+    {
+        var item = await sender.Send(new GetTenantAdminByIdQuery(id));
+        return TypedResults.Ok(item);
     }
 
     [EndpointSummary("Create a tenant admin")]
