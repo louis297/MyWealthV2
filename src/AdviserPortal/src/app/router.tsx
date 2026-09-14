@@ -2,6 +2,7 @@ import { createBrowserRouter, type RouteObject } from "react-router";
 import { CreateCustomerPage } from "@/features/customers/CreateCustomerPage";
 import { CustomerDetailPage } from "@/features/customers/CustomerDetailPage";
 import { CustomersListPage } from "@/features/customers/CustomersListPage";
+import { EditCustomerPage } from "@/features/customers/EditCustomerPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
 import { CallbackPage } from "@/features/session/CallbackPage";
 import { ForbiddenPage } from "@/features/session/ForbiddenPage";
@@ -38,7 +39,7 @@ export const appRoutes: RouteObject[] = [
               { index: true, element: <CustomersListPage /> },
               { path: "new", element: <CreateCustomerPage /> },
               { path: ":id", element: <CustomerDetailPage /> },
-              { path: ":id/edit", element: <p>edit customer</p> },
+              { path: ":id/edit", element: <EditCustomerPage /> },
             ],
           },
           {

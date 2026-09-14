@@ -148,12 +148,12 @@ describe("EditCustomerPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(await screen.findByText("customer detail")).toBeInTheDocument();
-    expect(puts).toEqual([
-      JSON.stringify({
+    expect(puts.map((body) => JSON.parse(body))).toEqual([
+      {
         name: "Jordan Updated",
         adviserId: otherAdviserId,
         rowVersion: "AAAA",
-      }),
+      },
     ]);
   });
 
@@ -216,12 +216,12 @@ describe("EditCustomerPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(await screen.findByText(/reload/i)).toBeInTheDocument();
-    expect(puts).toEqual([
-      JSON.stringify({
+    expect(puts.map((body) => JSON.parse(body))).toEqual([
+      {
         name: "Jordan Updated",
         adviserId,
         rowVersion: "AAAA",
-      }),
+      },
     ]);
   });
 });
