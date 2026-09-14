@@ -41,7 +41,7 @@ Browser
 
 The portal (`adviser-portal`) does not issue tokens. It redirects to `identity`, stores access / refresh after the callback, and calls `webapi` with Bearer.
 
-Phase 1 registers one public OIDC client: `adviser-portal`. A Customer may obtain tokens from the authorization server (tests / reserved). They cannot enter the Adviser Portal. Adviser-management resource routes stay 403. Customer Portal is a later second client; it is not registered in Phase 1.
+Phase 1 registers one public OIDC client: `adviser-portal`. IdentityHost allows SystemAdmin, TenantAdmin, and Adviser on that client. A Customer with a correct password does not receive an authorization code for it. Customer Portal is a later second client; it is not registered in Phase 1. Adviser-management resource routes stay 403 for Customer.
 
 ---
 
@@ -90,10 +90,10 @@ Protocol scopes (not permissions): `openid`, `profile`, `offline_access`, `api`.
 
 | Role | How tokens are obtained | Phase 1 resource scope |
 | --- | --- | --- |
-| SystemAdmin | Hosted login, no tenantCode | `/tenants`, `/users/tenant-admins`, `/users/me`, `/currencies` |
-| TenantAdmin | Hosted login + tenantCode | `/users/advisers`, tenant `/users/customers`, `/users/me`, `/currencies` |
-| Adviser | Hosted login + tenantCode | Assigned `/users/customers`, `/users/me`, `/currencies` |
-| Customer | May complete the authorization server (tests / reserved); no portal client | `/users/me` and `/currencies` only. `/users/advisers`, `/users/customers`, `/users/tenant-admins` → 403 |
+| SystemAdmin | Hosted login on `adviser-portal` (and later Back Office), no tenantCode | `/tenants` manage + `GET /tenants/by-code/{code}`, `/users/tenant-admins`, `/users/me`, `/currencies` |
+| TenantAdmin | Hosted login on `adviser-portal` + tenantCode | `/users/advisers`, tenant `/users/customers`, `GET /tenants/by-code/{own}`, `/users/me`, `/currencies` |
+| Adviser | Hosted login on `adviser-portal` + tenantCode | Assigned `/users/customers`, `GET /tenants/by-code/{own}`, `/users/me`, `/currencies` |
+| Customer | Login principal; `adviser-portal` issues no code. Tokens wait for `customer-portal` | `/users/me` and `/currencies` only, on a client that allows Customer. `/users/advisers`, `/users/customers`, `/users/tenant-admins`, `/tenants` including by-code → 403 |
 
 Disable / enable for people: `POST /{id}/disable`, `POST /{id}/enable` (`Disabled` ↔ `Active`). Not a physical delete. Disabling an Adviser requires assigned non-disabled Customers to be handled first. Disabling the last TenantAdmin is allowed in Phase 1 (known gap).
 
@@ -257,16 +257,19 @@ Field rules and `Money` live in [features/currencies.md](features/currencies.md)
 
 ### 7.3 Tenants
 
-SystemAdmin only (`tenants.manage`).
+Manage verbs: SystemAdmin only (`tenants.manage`).
 
-| Method | Route | Success |
-| --- | --- | --- |
-| GET | `/tenants` | 200 paged list |
-| GET | `/tenants/{id}` | 200 |
-| POST | `/tenants` | 201 `{ id }` |
-| PUT | `/tenants/{id}` | 204 |
-| POST | `/tenants/{id}/disable` | 204 |
-| POST | `/tenants/{id}/enable` | 204 |
+Lookup: `GET /tenants/by-code/{code}` uses `tenants.read` (SystemAdmin, TenantAdmin, Adviser). TenantAdmin / Adviser may read only their own code (else 404). Customer → 403.
+
+| Method | Route | Policy | Success |
+| --- | --- | --- | --- |
+| GET | `/tenants/by-code/{code}` | `tenants.read` | 200 item |
+| GET | `/tenants` | `tenants.manage` | 200 paged list |
+| GET | `/tenants/{id}` | `tenants.manage` | 200 |
+| POST | `/tenants` | `tenants.manage` | 201 `{ id }` |
+| PUT | `/tenants/{id}` | `tenants.manage` | 204 |
+| POST | `/tenants/{id}/disable` | `tenants.manage` | 204 |
+| POST | `/tenants/{id}/enable` | `tenants.manage` | 204 |
 
 - POST body: `name`, `code`, `reportingCurrency`
 - PUT body: `name`, `reportingCurrency`, `rowVersion`
@@ -346,3 +349,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-09-13 | Currencies: `enabledOnly` (omit/`false` = all, `true` = enabled only); item includes `isEnabled`. |
 | 2026-09-13 | §4.1 shared disabled error (`code=disabled` + `target`). People lists reuse tenants envelope; `enabledOnly` aligned with currencies. TenantAdmin field rules in [features/tenant-admins.md](features/tenant-admins.md). |
 | 2026-09-14 | Adviser field rules in [features/advisers.md](features/advisers.md). Disable-adviser assigned-customer 400 is ordinary validation, not §4.1. |
+| 2026-09-14 | Customer field rules in [features/customers.md](features/customers.md). Client allow-list: `adviser-portal` issues no Customer code. `GET /tenants/by-code/{code}` + `tenants.read`. |

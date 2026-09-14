@@ -74,7 +74,7 @@ Implement **accepted** specs for the current phase only. `draft` and `note` are 
 | [api-design.md](api-design.md) | HTTP conventions and the resource catalog | Full request/response per action |
 | [features/](features/README.md) | One vertical slice: commands, rules, endpoints, tests | Other slices’ APIs |
 | [adr/](adr/README.md) | A decision that must not be re-litigated in place | Feature scope |
-| [portals/](portals/) | Adviser Portal scope and UI conventions | Backend handlers |
+| [portals/](portals/) | Adviser Portal scope, UI conventions, page construction notes | Backend handlers |
 
 Schema truth is the versioned SQL under `database/schema/`, applied by the schema applicator. Do not treat `EnsureCreated` / `EnsureDeleted` as the normal boot path.
 

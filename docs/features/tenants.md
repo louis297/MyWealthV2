@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-13
-last_updated: 2026-09-13
+last_updated: 2026-09-14
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -31,7 +31,7 @@ Chinese discussion draft: `v2draft/features/tenants.md`.
 
 ## 1. Summary
 
-SystemAdmin onboards a firm with `name`, `code`, and an enabled `reportingCurrency`. Code is the hosted-login key and does not change. Disable leaves person `Status` alone, raises `TenantDisabled`, and revokes every subject in that tenant (handler already in identity-auth). Re-enable restores login for people who are still `Active`. TenantAdmin / Adviser / Customer receive 403. There is no portal page.
+SystemAdmin onboards a firm with `name`, `code`, and an enabled `reportingCurrency`. Code is the hosted-login key and does not change. Disable leaves person `Status` alone, raises `TenantDisabled`, and revokes every subject in that tenant (handler already in identity-auth). Re-enable restores login for people who are still `Active`. Manage verbs stay SystemAdmin. TenantAdmin / Adviser may **read** their own firm by code (`tenants.read`). There is no portal manage page.
 
 ---
 
@@ -40,8 +40,9 @@ SystemAdmin onboards a firm with `name`, `code`, and an enabled `reportingCurren
 **In**
 
 - Domain: `Rename`, `Enable`, `TenantCreated`, `TenantEnabled` (Create / `SetReportingCurrency` / `Disable` / `TenantDisabled` already exist)
-- Application: `CreateTenant`, `UpdateTenant`, `DisableTenant`, `EnableTenant`, `GetTenants`, `GetTenantById`
-- `webapi` routes under `/tenants` with policy `tenants.manage` (already registered)
+- Application: `CreateTenant`, `UpdateTenant`, `DisableTenant`, `EnableTenant`, `GetTenants`, `GetTenantById`, `GetTenantByCode`
+- `webapi` manage routes under `/tenants` with policy `tenants.manage`
+- `GET /tenants/by-code/{code}` with policy `tenants.read` (registered in identity-auth / ADR 0013 amendment 2026-09-14)
 - Reporting-currency checks through `ICurrencyCatalog` (no JOIN, no `GET /currencies` from the handler)
 - Unique CI `Name` / `Code` at the application layer (indexes already exist)
 - List pagination envelope used later by people lists
@@ -56,8 +57,8 @@ SystemAdmin onboards a firm with `name`, `code`, and an enabled `reportingCurren
 - SystemAdmin “enter this tenant” / header switching / subdomain routing
 - Quotas, billing, branding, per-tenant currency allow-lists
 - `/users/tenant-admins` and later people routes
-- An Adviser Portal tenants page (SystemAdmin uses Scalar)
-- Registering a new policy name (use `tenants.manage`)
+- An Adviser Portal tenants **manage** page (SystemAdmin uses Scalar / a later Back Office client)
+- Opening `tenants.manage` to TenantAdmin or Adviser
 - Bulk-updating person `Status` when the tenant flag changes
 
 ---
@@ -69,7 +70,9 @@ SystemAdmin onboards a firm with `name`, `code`, and an enabled `reportingCurren
 3. As a SystemAdmin I rename a tenant or change its reporting currency without touching Code.
 4. As a SystemAdmin I disable a tenant so that Code cannot complete hosted login and existing refresh fails, without rewriting people rows.
 5. As a SystemAdmin I re-enable a tenant so Active people in that firm can sign in again.
-6. As a TenantAdmin, Adviser, or Customer I receive 403 on every `/tenants` verb so the platform catalog is not a firm-operator surface.
+6. As a TenantAdmin or Adviser I may read **my** firm with `GET /tenants/by-code/{code}` so the Adviser Portal shell can show the Name. Another firm’s code is 404.
+7. As a Customer I receive 403 on `tenants.read` and on every `tenants.manage` verb.
+8. As a TenantAdmin, Adviser, or Customer I receive 403 on list / get-by-id / create / update / disable / enable.
 
 ---
 
@@ -77,7 +80,8 @@ SystemAdmin onboards a firm with `name`, `code`, and an enabled `reportingCurren
 
 | ID | Rule |
 | --- | --- |
-| R1 | Every verb requires policy `tenants.manage`. Missing / dead Bearer → 401, never 302. Other authenticated roles → 403. Unknown `PublicId` → 404. |
+| R1 | Manage verbs (list / get-by-id / create / update / disable / enable) require `tenants.manage`. Missing / dead Bearer → 401, never 302. Other authenticated roles → 403. Unknown `PublicId` → 404. |
+| R1a | `GET /tenants/by-code/{code}` requires `tenants.read`. Customer → 403. TenantAdmin / Adviser: `{code}` must match the caller’s tenant (CI); any other value or unknown code → **404**. SystemAdmin may read any code; unknown → 404. Anonymous → 401. Path is `/tenants/by-code/{code}` so it does not collide with `GET /tenants/{id}`. |
 | R2 | Path `{id}` and JSON `id` are `PublicId`. Internal `int` never appears. Create returns `201 { "id": "<publicId>" }` only. |
 | R3 | `Name` required, 1–200, globally unique CI. Trim. Preserve caller casing. |
 | R4 | `Code` required, length 2–50, character class `[a-z0-9-]`, globally unique CI. Writes normalise to **lower case**. Compare CI. Immutable after create (no field on PUT). |
@@ -154,8 +158,9 @@ Uniqueness races: unique indexes + map SqlException 2601/2627 → 400.
 | Command | `EnableTenant` | none | Load by PublicId or 404; `rowVersion`; `Enable()` |
 | Query | `GetTenants` | paged envelope | R15; no tenant-scope filter |
 | Query | `GetTenantById` | item | PublicId or 404 |
+| Query | `GetTenantByCode` | item | R1a; `{code}` CI; same item shape as get-by-id |
 
-Handlers run under `tenants.manage`. Do not inject a tenant filter for SystemAdmin.
+Manage handlers run under `tenants.manage`. `GetTenantByCode` runs under `tenants.read`. Do not inject a tenant filter for SystemAdmin manage verbs.
 
 ---
 
@@ -166,6 +171,7 @@ Root path. `{id}` = PublicId.
 | Method | Route | Policy | Success | Failure |
 | --- | --- | --- | --- | --- |
 | GET | `/tenants` | `tenants.manage` | 200 envelope | 400 query / 401 / 403 |
+| GET | `/tenants/by-code/{code}` | `tenants.read` | 200 item | 401 / 403 / 404 |
 | GET | `/tenants/{id}` | `tenants.manage` | 200 item | 401 / 403 / 404 |
 | POST | `/tenants` | `tenants.manage` | 201 `{ id }` | 400 / 401 / 403 |
 | PUT | `/tenants/{id}` | `tenants.manage` | 204 | 400 / 401 / 403 / 404 / 409 |
@@ -255,7 +261,7 @@ Keep [api-design.md](../api-design.md) §7.3 pointing at this file for field rul
 
 None — API / Scalar only.
 
-Do not add a tenants page to the Adviser Portal. SystemAdmin is not a portal role.
+Do not add a tenants **manage** page to the Adviser Portal. SystemAdmin uses Scalar. The portal shell may call `GET /tenants/by-code/{code}` only.
 
 ---
 
@@ -264,21 +270,41 @@ Do not add a tenants page to the Adviser Portal. SystemAdmin is not a portal rol
 | Project | Assert |
 | --- | --- |
 | Domain.UnitTests | `Rename` rejects blank; `Enable` flips and raises `TenantEnabled` once; second `Enable` / `Disable` is a no-op and raises nothing; `Create` still raises `TenantCreated` |
-| Application.FunctionalTests | No Bearer → 401 not 302; TenantAdmin / Adviser / Customer → 403 on every verb; SystemAdmin create → 201 `{ id }` and get matches normalised code + upper currency; duplicate name / code (different case) → 400; disabled / unknown currency on create → 400; PUT same historical disabled currency (omit or equal) → 204; PUT new disabled currency → 400; PUT with `code` in body → 400; disable → tenant `isEnabled=false`, users in that tenant stay `Active`, refresh for those subjects fails; enable → 204; bad / stale `rowVersion` → 409; missing PublicId → 404; list default paging; `isEnabled=true` omits disabled; `search` hits name and code |
+| Application.FunctionalTests | No Bearer → 401 not 302; TenantAdmin / Adviser / Customer → 403 on every **manage** verb; Customer → 403 on `GET /tenants/by-code/{code}`; TenantAdmin / Adviser → 200 for their own code, 404 for another tenant’s code or an unknown code; SystemAdmin → 200 for any existing code, 404 if missing; SystemAdmin create → 201 `{ id }` and get matches normalised code + upper currency; duplicate name / code (different case) → 400; disabled / unknown currency on create → 400; PUT same historical disabled currency (omit or equal) → 204; PUT new disabled currency → 400; PUT with `code` in body → 400; disable → tenant `isEnabled=false`, users in that tenant stay `Active`, refresh for those subjects fails; enable → 204; bad / stale `rowVersion` → 409; missing PublicId → 404; list default paging; `isEnabled=true` omits disabled; `search` hits name and code |
 | Infrastructure.IntegrationTests | No new script. Two-tenant fixture: insert A and B; disable A leaves B enabled. Later slices reuse this fixture for cross-tenant 404 |
 
 `TenantDisabled` revocation is already covered by identity-auth. This slice asserts the event still fires on a real disable HTTP call (refresh for a seeded person in that tenant fails). Creating that person in the test is allowed (Domain `User.Create` + `UserManager`) without shipping `/users/tenant-admins`.
+
+### Acceptance (amendment B)
+
+No new script. Item JSON matches get-by-id (`id`, `name`, `code`, `reportingCurrency`, `isEnabled`; `rowVersion` / `created` may be present but the portal must not PUT through this route).
+
+| Id | Given | When | Then |
+| --- | --- | --- | --- |
+| B1 | No Bearer | `GET /tenants/by-code/{any}` | 401, never 302. |
+| B2 | Customer Bearer | `GET /tenants/by-code/{that customer’s tenant code}` | 403. |
+| B3 | TenantAdmin Bearer, tenant `north-advisory` | `GET /tenants/by-code/north-advisory` (any case) | 200. `code` is the stored lower-case value. `name` is the firm Name. |
+| B4 | Same TenantAdmin | `GET /tenants/by-code/{other tenant’s code}` | 404. Not 403. |
+| B5 | Same TenantAdmin | `GET /tenants/by-code/does-not-exist` | 404. |
+| B6 | Adviser Bearer in `north-advisory` | Own code | 200, same item as B3. Other tenant / unknown | 404. |
+| B7 | SystemAdmin Bearer | Existing code of any tenant | 200. Unknown code | 404. |
+| B8 | TenantAdmin / Adviser / Customer Bearer | `GET /tenants`, `GET /tenants/{id}`, POST/PUT/disable/enable | 403 (manage verbs unchanged). |
+| B9 | Route | `GET /tenants/by-code/{code}` vs `GET /tenants/{id}` | A PublicId in `{id}` still hits get-by-id (`tenants.manage`). A code such as `north-advisory` on `/tenants/by-code/…` does not bind as `{id}`. |
+| B10 | Policy | Endpoint metadata | `tenants.read`, not `tenants.manage`, not anonymous, not default `[Authorize]` alone. |
+| B11 | Two-tenant fixture | Admin of A calls B’s code; admin of B calls A’s code | Both 404. Lists still do not leak the other firm. |
+
+Do not ship `GET /tenants/{code}` without `by-code`. Do not open `tenants.manage` to TenantAdmin.
 
 ---
 
 ## 11. Locked in this spec
 
-Do not open a new ADR (0005 / 0007 / 0013 already cover isolation, PublicId, and `tenants.manage`).
+Do not open a new ADR (0005 / 0007 / 0013 already cover isolation, PublicId, and policies). Amendment 2026-09-14 adds `tenants.read` + by-code.
 
 | Item | Lock |
 | --- | --- |
 | Scripts | None |
-| Policy | Existing `tenants.manage` |
+| Policy | Manage: `tenants.manage`. Lookup: `tenants.read` |
 | Create people | Not this slice |
 | Code | Lower-case store; immutable; 400 if PUT body includes `code` |
 | Reporting currency | Catalog + enabled on **new** value only |

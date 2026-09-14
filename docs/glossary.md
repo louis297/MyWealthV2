@@ -33,7 +33,7 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | SystemAdmin | Platform-level operator. Not bound to a tenant. | TenantAdmin |
 | TenantAdmin | Highest authority inside one tenant. | SystemAdmin |
 | Adviser | Tenant operator who manages assigned customers (and, from Phase 2, their ledger). | Customer |
-| Customer | Account holder. Can obtain tokens from the authorization server. Phase 1 has no Customer Portal client. | A business row with no login principal |
+| Customer | Account holder. Login principal. Phase 1 client `adviser-portal` issues no code. No Customer Portal client yet. | A business row with no login principal |
 | ApplicationUser / Identity user | ASP.NET Identity user in Infrastructure. All four roles share this table set. | Domain `User` |
 | Permission / Policy | Named capability on an endpoint (for example `accounts.close`). Role → permission is mapped in code. | Per-tenant custom role tables; `AspNetRoles` |
 | UserStatus | `PendingActivation` / `Active` / `Disabled`. | A single boolean `IsEnabled` with no activation state |

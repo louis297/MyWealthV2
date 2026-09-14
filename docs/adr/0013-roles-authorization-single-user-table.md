@@ -3,7 +3,7 @@ title: "ADR 0013: Four roles, code-mapped policies, one table per layer"
 status: accepted
 language: en
 date: 2026-09-01
-updated: 2026-09-12
+updated: 2026-09-14
 related:
   - 0005-shared-database-tenantid-isolation.md
   - 0006-email-password-jwt-authentication.md
@@ -28,7 +28,9 @@ Jobs stay the four product-defined roles. Tenants cannot invent roles. The quest
 3. **Scope checks stay in the handler** (this tenant; an Adviser only touches assigned Customers).
 4. **All four roles share one Domain `Users` table and one `ApplicationUser` type.** Credentials are one layer; the business person is another. Phase 1 does not split `CustomerProfiles`.
 5. Role cannot change after create. A Customer who can obtain a token does not receive adviser-management or ledger policies.
-6. **Phase 1 registers only:** `tenants.manage`, `tenant-admins.manage`, `advisers.manage`, `customers.manage`, `customers.manage-own`, `users.me`. Ledger policy names are registered in Phase 2. Do not hang empty names in Phase 1.
+6. **Phase 1 registers:** `tenants.manage`, `tenants.read`, `tenant-admins.manage`, `advisers.manage`, `customers.manage`, `customers.manage-own`, `users.me`. Ledger policy names are registered in Phase 2. Do not hang empty ledger names in Phase 1.
+
+Amendment 2026-09-14: `tenants.read` is the shell / lookup read of a tenant. It is not tenant management. `tenants.manage` stays SystemAdmin-only.
 
 ### Two layers
 
@@ -51,6 +53,7 @@ Creating any login-capable role: same transaction, `AspNetUsers` first, then `Us
 | Permission | SystemAdmin | TenantAdmin | Adviser | Customer |
 | --- | --- | --- | --- | --- |
 | `tenants.manage` | ✓ | | | |
+| `tenants.read` | ✓ | ✓ | ✓ | |
 | `tenant-admins.manage` | ✓ | | | |
 | `advisers.manage` | | ✓ | | |
 | `customers.manage` | | ✓ | | |

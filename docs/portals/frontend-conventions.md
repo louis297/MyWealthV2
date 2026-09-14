@@ -1,9 +1,9 @@
 ---
 title: Frontend conventions
-status: draft
+status: review
 language: en
 created: 2026-09-12
-updated: 2026-09-12
+updated: 2026-09-14
 related:
   - README.md
   - adviser-portal.md
@@ -23,14 +23,14 @@ ADR 0003: React + Redux Toolkit + TypeScript + Vite + Tailwind + React Router.
 ```text
 src/
 ├── app/          store, hooks, router, providers
-├── features/     session (this slice); later customers, advisers, profile
+├── features/     session, profile, customers, advisers
 ├── shared/       api, components, hooks, types, utils
 ├── layouts/
 ├── App.tsx
 └── main.tsx
 ```
 
-Feature code lives under `features/<name>/`. Do not introduce a global `pages/` tree.
+Feature code lives under `features/<name>/` (`session`, then `profile`, `customers`, `advisers`). Do not introduce a global `pages/` tree.
 
 ## Naming
 
@@ -40,8 +40,9 @@ Feature code lives under `features/<name>/`. Do not introduce a global `pages/` 
 ## Session
 
 - Access token, refresh token, and the last `/users/me` payload live in Redux. Persist tokens in `sessionStorage` (not `localStorage`).
+- After `me`, if `tenantCode` is set, load `GET /tenants/by-code/{tenantCode}` into the store for the shell Name. Do not expect `tenantName` on `/users/me`.
 - Resource ids in the UI are PublicId values only.
-- Do not put a password field on this app.
+- Do not put a password field on this app that **issues tokens**. Create-person and profile-change password fields are allowed.
 
 ## API
 

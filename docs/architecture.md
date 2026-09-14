@@ -108,7 +108,7 @@ Hosted in `src/IdentityHost` (ADR 0014). Aspire resource name: `identity`.
 | Refresh | OpenIddict token store. Revoked on logout, password change, and disable. No custom `RefreshTokens` table |
 | Scopes | `openid`, `profile`, `offline_access`, `api`. Role and tenant are JWT claims, not scopes. Permissions are not expanded into the token |
 
-The login gate on the authorization server reads domain invariants: tenant enabled, `UserStatus = Active`, valid Identity link. A Customer may complete the authorization-server flow (tests / reserved). They cannot enter the Adviser Portal (client + role gate). Adviser-management resource policies stay 403.
+The login gate on the authorization server reads domain invariants: tenant enabled, `UserStatus = Active`, valid Identity link, then the client × role allow-list. `adviser-portal` does not issue a code to Customer. Adviser-management resource policies stay 403.
 
 The portal only: redirect → callback → store tokens → call the resource API. It does not own a password form that issues tokens.
 

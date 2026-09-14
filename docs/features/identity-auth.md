@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-12
-last_updated: 2026-09-12
+last_updated: 2026-09-14
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -25,7 +25,9 @@ Session protocol, login gate, current user, and authorization policies. Tokens a
 
 ## 1. Summary
 
-The Adviser Portal redirects to hosted login on `identity` (email + password + tenantCode; SystemAdmin omits tenantCode) and completes authorization code + PKCE + revocable refresh. `webapi` validates Bearer tokens via discovery / JWKS and exposes `/users/me` plus password change. Only `UserStatus = Active` and an enabled tenant (when the person has one) may complete login. A Customer may finish the authorization-server flow in tests; adviser-management routes stay 403; they cannot enter the Adviser Portal.
+The Adviser Portal redirects to hosted login on `identity` (email + password + tenantCode; SystemAdmin omits tenantCode) and completes authorization code + PKCE + revocable refresh. `webapi` validates Bearer tokens via discovery / JWKS and exposes `/users/me` plus password change. Only `UserStatus = Active` and an enabled tenant (when the person has one) may complete login.
+
+A person may complete authorization only for a client that allows that `Users.Role`. After the password check succeeds and before IdentityHost issues an authorization code, the host reads `client_id` from the current authorize request and applies the allow-list. `adviser-portal` allows SystemAdmin, TenantAdmin, and Adviser. A Customer with a correct password does **not** receive a code for that client. Failure copy stays uniform (R3). Customer remains a login principal; tokens for that role wait for client `customer-portal`. Adviser-management routes stay 403 for Customer.
 
 ---
 
@@ -43,7 +45,7 @@ The Adviser Portal redirects to hosted login on `identity` (email + password + t
 - Login gate: resolve Domain `User` by `tenantCode + email`, then verify the password on that row’s `IdentityUserId`. Turn off Identity `RequireUniqueEmail`
 - Full `UserStatus` machine (Phase 1 create may set a password and land in Active; invite transition has no entry)
 - Table `UserTokens` (hash only; no write API) + no-op `IEmailSender`
-- Register Phase-1 named policies: `tenants.manage`, `tenant-admins.manage`, `advisers.manage`, `customers.manage`, `customers.manage-own`, `users.me`
+- Register Phase-1 named policies: `tenants.manage`, `tenants.read`, `tenant-admins.manage`, `advisers.manage`, `customers.manage`, `customers.manage-own`, `users.me`
 - `PermissionHandler` + `RolePermissions` in code (ADR 0013)
 - Current-user port (claims → Domain User + dual tenant check)
 - Revocation port: `webapi` handles domain events and writes the shared OpenIddict store
@@ -68,7 +70,7 @@ The Adviser Portal redirects to hosted login on `identity` (email + password + t
 1. As a TenantAdmin or Adviser I am redirected to `identity` (email + password + tenantCode) so I can call the resource API with access / refresh.
 2. As a SystemAdmin I omit tenantCode so I can manage tenants and TenantAdmins from Scalar.
 3. As any login-capable role I read and update my display name and change my password; old refresh fails after a password change.
-4. As a Customer I can complete the authorization server in tests and call `GET /users/me`. Adviser-management HTTP 403 waits for those routes. I cannot enter the Adviser Portal (later client + role gate).
+4. As a Customer I remain a login principal (password + Identity). Completing `adviser-portal` hosted login fails even with a correct password. `GET /users/me` as that Customer waits for client `customer-portal`. Adviser-management HTTP stays 403.
 5. As the platform, refresh for a subject must fail after that person is disabled, that tenant is disabled, the password changes, or the user logs out.
 
 ---
@@ -80,7 +82,7 @@ The Adviser Portal redirects to hosted login on `identity` (email + password + t
 | R1 | Non-SystemAdmin must submit a valid **enabled** tenantCode on hosted login. Compare Code case-insensitively. |
 | R2 | Resolve `tenantCode + email` → one Domain `Users` row → verify the password on that row’s `IdentityUserId`. Do not `UserManager.FindByEmail` across tenants. Do not log in with PublicId + password. |
 | R3 | `Status ≠ Active`, a disabled tenant, or a missing Identity link → authorization does not complete. Until login-failure codes are locked, return a uniform failure and do not enumerate the reason. |
-| R4 | A Customer may obtain tokens. They receive no adviser-management policies (`RolePermissions`). HTTP 403 on adviser-management routes waits until those routes exist. The portal plus a role gate reject entry (portal is a later slice). |
+| R4 | A person may obtain tokens only from a client that allows that role. IdentityHost applies the allow-list **after** the password check and **before** it issues an authorization code. `client_id` comes from the current `/connect/authorize` request. Do not invent a parallel `?portal=` query. A Customer receives no adviser-management policies (`RolePermissions`). HTTP 403 on adviser-management routes stays. The portal `/forbidden` page is a second line only. |
 | R5 | Access is a short-lived JWT, signed asymmetrically. Refresh is revocable in the OpenIddict store. |
 | R6 | All four roles may call `GET /users/me`. `PUT /users/me` updates `name` only (may include `rowVersion`). Email / Role / TenantId / Status / adviserId cannot change here. |
 | R7 | Password change requires the current password. On success, revoke that subject’s OpenIddict tokens. The caller must run the authorization-code flow again. Do not return tokens. |
@@ -93,15 +95,17 @@ The Adviser Portal redirects to hosted login on `identity` (email + password + t
 | R14 | `UserTokens` is created in Phase 1 with no write API and no domain behaviour. `IEmailSender` is a no-op. |
 | R15 | `webapi` returns 401 on auth failure. It must **never** 302 to hosted login. Login-page cookies stay on the `identity` origin. |
 | R16 | The schema applicator runs once (default: `webapi` startup). `identity` must not run a second applicator. Both hosts share `MyWealthDbV2` and the same Infrastructure mappings. |
-| R17 | Phase 1 registers only the six named policies below. `GET /currencies` uses default `.RequireAuthorization()`. Do not register `currencies.read`. |
+| R17 | Phase 1 named policies are the seven names below. `GET /currencies` uses default `.RequireAuthorization()`. Do not register `currencies.read`. |
 | R18 | Password change, person disable, tenant disable, and logout revoke tokens. The User aggregate does not hold tokens; domain events plus an application port do. |
 | R19 | Identity may keep its `Email` column (framework). Uniqueness lives on Domain `Users`. |
+| R20 | Client allow-list (Phase 1 implements the first row only): `adviser-portal` → SystemAdmin, TenantAdmin, Adviser. Reserved, do not register the clients: `customer-portal` → Customer; Back Office (name unlocked) → SystemAdmin. Wrong role → no code, uniform failure. Do not say “no identity”. |
 
 `RolePermissions` (ADR 0013). This slice registers the map. Customer APIs ship later.
 
 | Permission | SystemAdmin | TenantAdmin | Adviser | Customer |
 | --- | --- | --- | --- | --- |
 | `tenants.manage` | ✓ | | | |
+| `tenants.read` | ✓ | ✓ | ✓ | |
 | `tenant-admins.manage` | ✓ | | | |
 | `advisers.manage` | | ✓ | | |
 | `customers.manage` | | ✓ | | |
@@ -299,7 +303,7 @@ SystemAdmin has no portal. Use Scalar and the same authorization flow. Do not bu
 | Project | Assert |
 | --- | --- |
 | Domain.UnitTests | Legal `UserStatus` transitions; SystemAdmin / tenant role shape; login-gate function (disabled tenant, non-Active, missing Identity link → reject) |
-| Application.FunctionalTests | Start `identity` and `webapi`. Tenant A’s email must not complete login with tenant B’s code. Refresh fails after password change or disable. Customer who completed the authorization flow: `GET /users/me` 200. Do **not** call `/users/advisers` (that route belongs to the advisers slice; HTTP 403 for adviser-management waits there). Missing Bearer on `/users/me` → 401, never 302. `RolePermissions.Has` covers four roles × six policies. `PUT /users/me` cannot change email (400). `rowVersion` conflict → 409 |
+| Application.FunctionalTests | Start `identity` and `webapi`. Tenant A’s email must not complete login with tenant B’s code. Refresh fails after password change or disable. Customer + correct password on client `adviser-portal` → **no authorization code** (uniform failure). TenantAdmin / Adviser / SystemAdmin on `adviser-portal` still complete the flow. Do **not** call `/users/advisers` from this slice. Missing Bearer on `/users/me` → 401, never 302. `RolePermissions.Has` covers four roles × seven policies (includes `tenants.read`). `PUT /users/me` cannot change email (400). `rowVersion` conflict → 409 |
 | Infrastructure.IntegrationTests | After scripts: Identity + OpenIddict + UserTokens exist; no AspNetRoles; `adviser-portal` is discoverable; UserName / Email lookup does not hit another tenant |
 
 Isolation in this slice is the login resolver: wrong tenantCode + correct email must fail.
@@ -322,6 +326,34 @@ Do not open a new ADR.
 | JWT claim names | `sub` = Users.PublicId; `email`; `role`; `tenant_id`; `tenant_code` (empty for SystemAdmin). No permission claims, no internal ints |
 
 Do not invent a second login protocol.
+
+### Amendment 2026-09-14
+
+Client × role allow-list (R4, R20). `tenants.read` added to the Phase-1 policy map (ADR 0013). Customer hosted-login success against `adviser-portal` is withdrawn; [customers.md](customers.md) smoke follows.
+
+Suggested extra commits (do not mix with portal pages):
+
+1. Allow-list on IdentityHost + uniform failure tests (Customer + `adviser-portal` issues no code; TenantAdmin still does)
+2. Register `tenants.read` in `RolePermissions` (endpoint ships in the tenants amendment)
+
+### Acceptance (amendment A)
+
+Gate: password check has already succeeded. Client id is the `client_id` on the current `/connect/authorize` request. Do not add `?portal=`.
+
+| Id | Given | When | Then |
+| --- | --- | --- | --- |
+| A1 | Active Customer, enabled tenant, correct email + password + tenantCode, client `adviser-portal` | POST hosted `/login` that resumes authorize | No authorization code. Same hosted-login failure copy as a bad password (R3). Response is not 200 with a `code` query. |
+| A2 | Same person as A1 | Identity `CheckPassword` (or test helper) on that `AspNetUsers` row | Succeeds. Failure in A1 is the allow-list, not a bad hash. |
+| A3 | Active TenantAdmin, same tenant, correct password, client `adviser-portal` | Hosted login + authorize | Code issued. Token exchange works. `GET /users/me` 200, `role=tenantAdmin`. |
+| A4 | Active Adviser, same setup as A3 | Hosted login + authorize | Code issued. `GET /users/me` 200, `role=adviser`. |
+| A5 | Seed SystemAdmin, empty tenantCode, correct password, client `adviser-portal` | Hosted login + authorize | Code issued. `GET /users/me` 200, `role=systemAdmin`, tenant claims empty. |
+| A6 | Active Customer, correct password, client `adviser-portal` | Compare the HTML/text of the login failure with a wrong-password attempt for an Active TenantAdmin | Copy matches. No string such as “no identity”, “wrong role”, or “customer cannot use this app”. |
+| A7 | Active Customer after A1 | `GET {webapi}/users/me` with no token obtained from A1 | 401. Do not assert `/users/me` 200 for Customer on this client. |
+| A8 | Clients `customer-portal` and Back Office | Discovery / OpenIddict client store | Those ClientId rows are **not** registered in Phase 1. Allow-list table exists in code for `adviser-portal` only; reserved rows are comments or a map with no seed client. |
+| A9 | `RolePermissions` | `Has(TenantAdmin, tenants.read)` / `Has(Adviser, tenants.read)` / `Has(SystemAdmin, tenants.read)` / `Has(Customer, tenants.read)` | true, true, true, **false**. `tenants.manage` still SystemAdmin only. |
+| A10 | Existing isolation | Tenant A email + tenant B code | Still fails before the allow-list (wrong tenant). Do not weaken R1–R3. |
+
+Customers create smoke ([customers.md](customers.md) §10) must use A1 + A2, not “hosted login succeeds”.
 
 ---
 

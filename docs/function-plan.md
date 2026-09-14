@@ -3,7 +3,7 @@ title: Function plan
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-09-13
+updated: 2026-09-14
 related:
   - README.md
   - glossary.md
@@ -52,10 +52,10 @@ How this file relates to the rest of the tree is in [README.md](README.md). This
 
 | Role | Can log in | Phase 1 UI | Notes |
 | --- | --- | --- | --- |
-| SystemAdmin | Yes, no tenantCode | None (Scalar / API) | Platform-level. No TenantId. |
+| SystemAdmin | Yes, no tenantCode | None (Scalar / API). `adviser-portal` allow-list yes (probe). | Platform-level. No TenantId. Tenant manage is not the Adviser Portal. |
 | TenantAdmin | Yes + tenantCode | Adviser Portal | Highest authority inside the tenant. |
 | Adviser | Yes + tenantCode | Adviser Portal | Manages assigned Customers. No ledger yet in Phase 1. |
-| Customer | Yes + tenantCode | None | Has a login principal. Cannot enter the Adviser Portal. No portal client yet. |
+| Customer | Yes + tenantCode | None | Login principal. `adviser-portal` issues no code. No Customer Portal client yet. |
 
 ---
 
@@ -106,7 +106,7 @@ Phase 1 scripts **do not** include Instruments, Accounts, Holdings, or Transacti
 | `/users/me` | Resource API under the `/users` namespace. Read/update non-password profile. Password change requires the current password. | Profile page | Authenticated |
 | UserStatus | `PendingActivation` / `Active` / `Disabled`. Non-Active cannot complete login. | None | Built-in |
 | Activation seams | `UserTokens` + no-op `IEmailSender` | None | Reserved |
-| Customer tokens | Customer may complete the authorization server flow in tests. No portal client. Adviser-management routes stay 403. | None | Customer |
+| Customer tokens | Login principal remains. `adviser-portal` issues no code. Tokens wait for `customer-portal`. Adviser-management routes stay 403. | None | Customer |
 
 Scopes in Phase 1: `openid`, `profile`, `offline_access`, `api`. Roles and tenant claims are JWT claims, not scopes. Permissions are not expanded into the token (ADR 0013, ADR 0014).
 
@@ -138,7 +138,7 @@ Disabling the last TenantAdmin is allowed in Phase 1 (known gap). After a tenant
 Adviser Portal only. Split in two implementation slices (see [portals/adviser-portal.md](portals/adviser-portal.md)):
 
 1. **Shell + callback (landed in repo 2026-09-13):** Vite on Aspire `adviser-portal`, authorize redirect, `/callback`, session probe via `GET /users/me`, 401 refresh-once. No password form. SystemAdmin may use the probe (Development seed). OpenIddict redirect URIs upsert from the portal origin, including the Aspire dashboard alias.
-2. **Pages (after people APIs):** role-filtered shell, Profile, Customers, Advisers. Default home = Customers. Customer is then gated off this client. SystemAdmin uses Scalar for tenant work.
+2. **Pages (after people APIs + amendments A/B):** role-filtered shell, Profile, Customers, Advisers. Default home = Customers. IdentityHost refuses Customer on this client. SystemAdmin uses Scalar for tenant manage. Shell name from `GET /tenants/by-code/{code}`. Construction: [portals/frontend-implementation-notes.md](portals/frontend-implementation-notes.md).
 
 **Out:** Accounts, Instruments, Transactions, Dashboard. No Customer Portal client in Phase 1.
 

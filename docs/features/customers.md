@@ -307,10 +307,10 @@ None in this slice. The Adviser Portal Customers list / form belongs to the late
 | Project | Assert |
 | --- | --- |
 | Domain.UnitTests | `Create(Customer)` sets TenantId and AdviserId, password path → Active + `UserActivated` + `UserCreated`, and does **not** raise `CustomerAdviserReassigned`; `ReassignAdviser` writes the new id and raises the event once (customer + tenant + previous + new); same id → no event; non-Customer `ReassignAdviser` throws; `Disable()` on a Customer matches TenantAdmin |
-| Application.FunctionalTests | No Bearer → 401 not 302; SystemAdmin / Customer → 403 on every verb; TenantAdmin create → 201, get `status=active` and the expected `adviserId`, hosted login (that tenant code + email + password) succeeds; Adviser omit `adviserId` → 201 assigned to self; Adviser passes another `adviserId` → 400; duplicate email in the same tenant → 400; same email in two tenants → 201; `tenantId` in body → 400; create after current tenant disabled → 400 `disabled`/`tenant`; target Adviser Disabled → 400 `disabled`/`user`; unknown `adviserId` → 404; PUT with `email` → 400; Adviser PUT with `adviserId` → 400; TenantAdmin reassign to another Active Adviser in the tenant → 204; reassign to a Disabled Adviser → 400 `disabled`/`user`; GET this collection with an Adviser or TenantAdmin PublicId → 404; TenantAdmin of A GET/PUT/disable of B’s Customer → 404; Adviser B GET of Adviser A’s Customer → 404; disable → 204 and that subject’s refresh fails; enable → 204; stale `rowVersion` → 409; default paging; omitted `enabledOnly` includes disabled; `enabledOnly=true` is Active only; TenantAdmin `adviserId=` filters; Adviser `adviserId=` of someone else → 400 |
+| Application.FunctionalTests | No Bearer → 401 not 302; SystemAdmin / Customer → 403 on every verb; TenantAdmin create → 201, get `status=active` and the expected `adviserId`; hosted login against client `adviser-portal` with that tenant code + email + password **fails** (allow-list; Identity `CheckPassword` still succeeds); Adviser omit `adviserId` → 201 assigned to self; Adviser passes another `adviserId` → 400; duplicate email in the same tenant → 400; same email in two tenants → 201; `tenantId` in body → 400; create after current tenant disabled → 400 `disabled`/`tenant`; target Adviser Disabled → 400 `disabled`/`user`; unknown `adviserId` → 404; PUT with `email` → 400; Adviser PUT with `adviserId` → 400; TenantAdmin reassign to another Active Adviser in the tenant → 204; reassign to a Disabled Adviser → 400 `disabled`/`user`; GET this collection with an Adviser or TenantAdmin PublicId → 404; TenantAdmin of A GET/PUT/disable of B’s Customer → 404; Adviser B GET of Adviser A’s Customer → 404; disable → 204 and that subject’s refresh fails; enable → 204; stale `rowVersion` → 409; default paging; omitted `enabledOnly` includes disabled; `enabledOnly=true` is Active only; TenantAdmin `adviserId=` filters; Adviser `adviserId=` of someone else → 400 |
 | Infrastructure.IntegrationTests | No new script. Two-tenant fixture: A and B each have an Adviser + Customer; A’s list does not include B; A requesting B’s Customer id → 404; two Advisers in one tenant, A does not see B’s assigned row |
 
-Post-create login uses hosted login on `identity`. Do not invent a token endpoint on `webapi`. After that Customer completes login, `/users/customers` is still 403 and `/users/me` is 200.
+Post-create password is verified with Identity `CheckPassword` (or equivalent). Do not invent a token endpoint on `webapi`. Hosted login on client `adviser-portal` for that Customer must **not** issue a code. `/users/me` as that Customer is not asserted on this client. Amendment 2026-09-14 (identity-auth R4 / R20).
 
 ---
 
@@ -330,7 +330,7 @@ No new ADR.
 | Disable guard | None (ledger in Phase 2) |
 | List | Reused envelope; `enabledOnly`; item includes `status` + `adviserId`; TenantAdmin may pass `adviserId=` |
 | Portal | No page in this slice |
-| Customer login | Authorization server allowed; no portal client; this collection 403 |
+| Customer login | Login principal remains; `adviser-portal` issues no code; this collection 403 |
 
 Still open, not this slice:
 
