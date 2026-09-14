@@ -58,7 +58,41 @@ export const customersApi = api.injectEndpoints({
       }),
       invalidatesTags: ["Customer"],
     }),
+    updateCustomer: builder.mutation<
+      void,
+      { id: string; name: string; rowVersion: string; adviserId?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/users/customers/${id}`,
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Customer", id: arg.id }, "Customer"],
+    }),
+    disableCustomer: builder.mutation<void, { id: string; rowVersion: string }>({
+      query: ({ id, rowVersion }) => ({
+        url: `/users/customers/${id}/disable`,
+        method: "POST",
+        body: { rowVersion },
+      }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Customer", id: arg.id }, "Customer"],
+    }),
+    enableCustomer: builder.mutation<void, { id: string; rowVersion: string }>({
+      query: ({ id, rowVersion }) => ({
+        url: `/users/customers/${id}/enable`,
+        method: "POST",
+        body: { rowVersion },
+      }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Customer", id: arg.id }, "Customer"],
+    }),
   }),
 });
 
-export const { useGetCustomersQuery, useGetCustomerQuery, useCreateCustomerMutation } = customersApi;
+export const {
+  useGetCustomersQuery,
+  useGetCustomerQuery,
+  useCreateCustomerMutation,
+  useUpdateCustomerMutation,
+  useDisableCustomerMutation,
+  useEnableCustomerMutation,
+} = customersApi;
