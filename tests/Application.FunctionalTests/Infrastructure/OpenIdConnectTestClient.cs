@@ -11,9 +11,32 @@ public sealed class OpenIdConnectTestClient(Func<HttpClient> createClient)
     private const string RedirectUri = "https://localhost/callback";
     private const string ClientId = "adviser-portal";
 
+    public HttpClient CreateSessionClient() => CreateClient();
+
+    public string AuthorizeUrl() =>
+        "/connect/authorize?" + string.Join("&",
+        [
+            "client_id=" + Uri.EscapeDataString(ClientId),
+            "redirect_uri=" + Uri.EscapeDataString(RedirectUri),
+            "response_type=code",
+            "scope=" + Uri.EscapeDataString("openid profile offline_access api"),
+            "code_challenge=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+            "code_challenge_method=S256",
+            "state=" + Base64Url(RandomNumberGenerator.GetBytes(16))
+        ]);
+
     public async Task<TokenResponse> SignInAsync(string email, string password, string? tenantCode)
     {
         using var identityClient = CreateClient();
+        return await SignInAsync(identityClient, email, password, tenantCode);
+    }
+
+    public async Task<TokenResponse> SignInAsync(
+        HttpClient identityClient,
+        string email,
+        string password,
+        string? tenantCode)
+    {
         var verifier = Base64Url(RandomNumberGenerator.GetBytes(32));
         var challenge = Base64Url(SHA256.HashData(Encoding.ASCII.GetBytes(verifier)));
         var state = Base64Url(RandomNumberGenerator.GetBytes(16));
@@ -70,6 +93,34 @@ public sealed class OpenIdConnectTestClient(Func<HttpClient> createClient)
             document.RootElement.TryGetProperty("refresh_token", out var refresh)
                 ? refresh.GetString()
                 : null);
+    }
+
+    public async Task<HttpResponseMessage> EndSessionAsync(
+        HttpClient identityClient,
+        string postLogoutRedirectUri)
+    {
+        var url = "/connect/logout?" + string.Join("&",
+        [
+            "client_id=" + Uri.EscapeDataString(ClientId),
+            "post_logout_redirect_uri=" + Uri.EscapeDataString(postLogoutRedirectUri)
+        ]);
+        var response = await identityClient.GetAsync(url);
+        await response.Content.LoadIntoBufferAsync();
+        return response;
+    }
+
+    public async Task<HttpResponseMessage> RevokeRefreshAsync(string refreshToken)
+    {
+        using var identityClient = CreateClient();
+        using var request = new FormUrlEncodedContent(new Dictionary<string, string?>
+        {
+            ["token"] = refreshToken,
+            ["token_type_hint"] = "refresh_token",
+            ["client_id"] = ClientId
+        });
+        var response = await identityClient.PostAsync("/connect/revocation", request);
+        await response.Content.LoadIntoBufferAsync();
+        return response;
     }
 
     public async Task<HttpResponseMessage> RefreshAsync(string refreshToken)
