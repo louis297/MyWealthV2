@@ -74,4 +74,81 @@ describe("advisers API", () => {
     expect(url.searchParams.get("enabledOnly")).toBe("true");
     expect(request.headers.get("Authorization")).toBe("Bearer access-1");
   });
+
+  it("creates, gets, updates, disables, and enables an adviser", async () => {
+    const fetchMock = vi.mocked(fetch);
+    const item = envelope.items[0];
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ id: item.id }), {
+          status: 201,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(item), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    const store = createStore();
+    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
+
+    const created = await store.dispatch(
+      advisersApi.endpoints.createAdviser.initiate({
+        name: "Sam Reed",
+        email: "sam@north.example",
+        password: "Passw0rd!",
+      }),
+    );
+    expect(created.data).toEqual({ id: item.id });
+
+    const got = await store.dispatch(advisersApi.endpoints.getAdviser.initiate(item.id));
+    expect(got.data).toEqual(item);
+
+    await store.dispatch(
+      advisersApi.endpoints.updateAdviser.initiate({
+        id: item.id,
+        name: "Samantha Reed",
+        rowVersion: "AAAA",
+      }),
+    );
+    await store.dispatch(
+      advisersApi.endpoints.disableAdviser.initiate({ id: item.id, rowVersion: "AAAA" }),
+    );
+    await store.dispatch(
+      advisersApi.endpoints.enableAdviser.initiate({ id: item.id, rowVersion: "BBBB" }),
+    );
+
+    const createReq = fetchMock.mock.calls[0][0] as Request;
+    expect(createReq.url).toBe("https://webapi.test/users/advisers");
+    expect(createReq.method).toBe("POST");
+    expect(JSON.parse(await createReq.text())).toEqual({
+      name: "Sam Reed",
+      email: "sam@north.example",
+      password: "Passw0rd!",
+    });
+
+    const getReq = fetchMock.mock.calls[1][0] as Request;
+    expect(getReq.url).toBe(`https://webapi.test/users/advisers/${item.id}`);
+
+    const putReq = fetchMock.mock.calls[2][0] as Request;
+    expect(putReq.method).toBe("PUT");
+    expect(JSON.parse(await putReq.text())).toEqual({
+      name: "Samantha Reed",
+      rowVersion: "AAAA",
+    });
+
+    const disableReq = fetchMock.mock.calls[3][0] as Request;
+    expect(disableReq.url).toBe(`https://webapi.test/users/advisers/${item.id}/disable`);
+    expect(JSON.parse(await disableReq.text())).toEqual({ rowVersion: "AAAA" });
+
+    const enableReq = fetchMock.mock.calls[4][0] as Request;
+    expect(enableReq.url).toBe(`https://webapi.test/users/advisers/${item.id}/enable`);
+    expect(JSON.parse(await enableReq.text())).toEqual({ rowVersion: "BBBB" });
+  });
 });
