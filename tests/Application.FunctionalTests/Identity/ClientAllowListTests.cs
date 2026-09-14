@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Domain.Enums;
+using OpenIddict.Abstractions;
 
 namespace MyWealthV2.Application.FunctionalTests.Identity;
 
@@ -45,6 +47,17 @@ public class ClientAllowListTests : TestBase
         FailureCopy(customer.Body).ShouldBe("Invalid login.");
         AssertNoRoleLeak(customer.Body);
         AssertNoRoleLeak(wrongPassword.Body);
+    }
+
+    [Test]
+    public async Task ReservedClients_AreNotRegistered()
+    {
+        using var scope = FunctionalTestSetup.Identity.Services.CreateScope();
+        var manager = scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
+
+        (await manager.FindByClientIdAsync("adviser-portal")).ShouldNotBeNull();
+        (await manager.FindByClientIdAsync("customer-portal")).ShouldBeNull();
+        (await manager.FindByClientIdAsync("back-office")).ShouldBeNull();
     }
 
     private static string FailureCopy(string html)

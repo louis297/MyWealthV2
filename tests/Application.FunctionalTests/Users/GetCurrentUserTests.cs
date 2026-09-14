@@ -112,7 +112,7 @@ public class GetCurrentUserTests : TestBase
     }
 
     [Test]
-    public async Task Customer_CanReadOwnProfile()
+    public async Task Customer_AdviserPortalLogin_DoesNotIssueTokenForMe()
     {
         var tenant = await TestApp.CreateTenantAsync("Firm C", "firmc");
         var adviser = await TestApp.CreatePersonAsync(
@@ -120,12 +120,12 @@ public class GetCurrentUserTests : TestBase
         await TestApp.CreatePersonAsync(
             UserRole.Customer, "Dee", "dee@firmc", "Password1!", tenant.Id, adviser.Id);
 
-        var tokens = await FunctionalTestSetup.Oidc.SignInAsync("dee@firmc", "Password1!", "firmc");
-        var response = await SendAuthorized(HttpMethod.Get, "/users/me", tokens.AccessToken);
+        var login = await FunctionalTestSetup.Oidc.SubmitLoginAsync("dee@firmc", "Password1!", "firmc");
+        login.Code.ShouldBeNull();
 
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        json.RootElement.GetProperty("role").GetString().ShouldBe("customer");
+        var response = await FunctionalTestSetup.WebClient.GetAsync("/users/me");
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        response.Headers.Location.ShouldBeNull();
     }
 
     private static async Task<HttpResponseMessage> SendAuthorized(

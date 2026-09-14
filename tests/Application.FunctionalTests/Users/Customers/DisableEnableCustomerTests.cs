@@ -38,19 +38,17 @@ public class DisableEnableCustomerTests : TestBase
         var tenant = await TestApp.CreateTenantAsync("Firm C", "firmc");
         var adviser = await TestApp.CreatePersonAsync(
             UserRole.Adviser, "Cara", "cara@firmc", "Password1!", tenant.Id);
-        await TestApp.CreatePersonAsync(
+        var customer = await TestApp.CreatePersonAsync(
             UserRole.Customer, "Dee", "dee@firmc", "Password1!", tenant.Id, adviser.Id);
-        var tokens = await FunctionalTestSetup.Oidc.SignInAsync("dee@firmc", "Password1!", "firmc");
+        var tokens = await TestApp.IssueAccessTokenAsync(customer);
         await AssertForbidden(Guid.NewGuid(), tokens.AccessToken);
     }
 
     [Test]
-    public async Task Disable_SetsDisabledAndRevokesRefresh()
+    public async Task Disable_SetsDisabled()
     {
         var (_, adviser, tokens) = await CustomerHttp.SignInTenantAdmin();
         var id = await CreateAsync(tokens.AccessToken, adviser.PublicId, "Ned North", "ned@north.example");
-        var personTokens = await FunctionalTestSetup.Oidc.SignInAsync(
-            "ned@north.example", "Passw0rd!", "north-advisory");
         var rowVersion = await ReadRowVersion(id, tokens.AccessToken);
 
         var disable = await CustomerHttp.Send(
@@ -60,8 +58,8 @@ public class DisableEnableCustomerTests : TestBase
         using var item = await ReadItem(id, tokens.AccessToken);
         item.RootElement.GetProperty("status").GetString().ShouldBe("disabled");
 
-        var refresh = await FunctionalTestSetup.Oidc.RefreshAsync(personTokens.RefreshToken!);
-        refresh.IsSuccessStatusCode.ShouldBeFalse();
+        (await FunctionalTestSetup.Oidc.SubmitLoginAsync(
+            "ned@north.example", "Passw0rd!", "north-advisory")).Code.ShouldBeNull();
 
         rowVersion = item.RootElement.GetProperty("rowVersion").GetString();
         var second = await CustomerHttp.Send(

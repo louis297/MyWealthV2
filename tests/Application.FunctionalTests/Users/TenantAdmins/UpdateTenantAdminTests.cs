@@ -63,9 +63,9 @@ public class UpdateTenantAdminTests : TestBase
         var tenant = await TestApp.CreateTenantAsync("Firm C", "firmc");
         var adviser = await TestApp.CreatePersonAsync(
             UserRole.Adviser, "Cara", "cara@firmc", "Password1!", tenant.Id);
-        await TestApp.CreatePersonAsync(
+        var customer = await TestApp.CreatePersonAsync(
             UserRole.Customer, "Dee", "dee@firmc", "Password1!", tenant.Id, adviser.Id);
-        var tokens = await FunctionalTestSetup.Oidc.SignInAsync("dee@firmc", "Password1!", "firmc");
+        var tokens = await TestApp.IssueAccessTokenAsync(customer);
 
         var response = await TenantAdminHttp.Send(
             HttpMethod.Put, $"/users/tenant-admins/{Guid.NewGuid()}", tokens.AccessToken, new

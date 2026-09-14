@@ -1,3 +1,6 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Infrastructure.Data;
@@ -6,6 +9,9 @@ using MediatR;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using OpenIddict.Server;
 
 namespace MyWealthV2.Application.FunctionalTests.Infrastructure;
 
@@ -177,4 +183,41 @@ public static class TestApp
         var identityUser = await userManager.FindByIdAsync(person.IdentityUserId);
         return identityUser is not null && await userManager.CheckPasswordAsync(identityUser, password);
     }
+
+    public static async Task<TokenResponse> IssueAccessTokenAsync(User person)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Tenant? tenant = null;
+        if (person.TenantId is not null)
+        {
+            tenant = await db.Tenants.AsNoTracking().SingleAsync(row => row.Id == person.TenantId);
+        }
+
+        var signing = FunctionalTestSetup.Identity.Services
+            .GetRequiredService<IOptions<OpenIddictServerOptions>>()
+            .Value.SigningCredentials[0];
+        var issuer = FunctionalTestSetup.Identity.ClientOptions.BaseAddress!.ToString();
+
+        var identity = new ClaimsIdentity("Bearer");
+        identity.AddClaim(new Claim(AuthClaims.Subject, person.PublicId.ToString()));
+        identity.AddClaim(new Claim(AuthClaims.Email, person.Email));
+        identity.AddClaim(new Claim(AuthClaims.Role, ToCamelCase(person.Role.ToString())));
+        identity.AddClaim(new Claim(AuthClaims.TenantId, tenant?.PublicId.ToString() ?? string.Empty));
+        identity.AddClaim(new Claim(AuthClaims.TenantCode, tenant?.Code ?? string.Empty));
+
+        var accessToken = new JwtSecurityTokenHandler().CreateEncodedJwt(new SecurityTokenDescriptor
+        {
+            Issuer = issuer,
+            TokenType = "at+jwt",
+            Subject = identity,
+            Expires = DateTime.UtcNow.AddMinutes(15),
+            SigningCredentials = signing
+        });
+
+        return new TokenResponse(accessToken, null);
+    }
+
+    private static string ToCamelCase(string value) =>
+        string.IsNullOrEmpty(value) ? value : char.ToLowerInvariant(value[0]) + value[1..];
 }

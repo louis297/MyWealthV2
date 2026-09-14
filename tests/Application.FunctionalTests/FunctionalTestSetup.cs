@@ -13,6 +13,7 @@ public class FunctionalTestSetup
     internal static IServiceScopeFactory ScopeFactory { get; private set; } = null!;
     internal static HttpClient WebClient { get; private set; } = null!;
     internal static OpenIdConnectTestClient Oidc { get; private set; } = null!;
+    internal static IdentityFactory Identity { get; private set; } = null!;
     internal static DatabaseResetter? DbResetter { get; private set; }
     internal static string ConnectionString { get; private set; } = null!;
 
@@ -57,6 +58,7 @@ public class FunctionalTestSetup
 
         var identityFactory = new IdentityFactory(connectionString);
         _identityFactory = identityFactory;
+        Identity = identityFactory;
         var identityHandler = identityFactory.Server.CreateHandler();
         var identityAuthority = identityFactory.ClientOptions.BaseAddress!.ToString().TrimEnd('/');
 
