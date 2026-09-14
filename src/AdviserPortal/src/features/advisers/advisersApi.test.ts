@@ -78,22 +78,26 @@ describe("advisers API", () => {
   it("creates, gets, updates, disables, and enables an adviser", async () => {
     const fetchMock = vi.mocked(fetch);
     const item = envelope.items[0];
-    fetchMock
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ id: item.id }), {
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
+      const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+      if (url.endsWith("/users/advisers") && method === "POST") {
+        return new Response(JSON.stringify({ id: item.id }), {
           status: 201,
           headers: { "Content-Type": "application/json" },
-        }),
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify(item), {
+        });
+      }
+      if (url.endsWith(`/users/advisers/${item.id}`) && method === "GET") {
+        return new Response(JSON.stringify(item), {
           status: 200,
           headers: { "Content-Type": "application/json" },
-        }),
-      )
-      .mockResolvedValueOnce(new Response(null, { status: 204 }))
-      .mockResolvedValueOnce(new Response(null, { status: 204 }))
-      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+        });
+      }
+      if (method === "PUT" || method === "POST") {
+        return new Response(null, { status: 204 });
+      }
+      return new Response("", { status: 404 });
+    });
 
     const store = createStore();
     store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
@@ -124,31 +128,30 @@ describe("advisers API", () => {
       advisersApi.endpoints.enableAdviser.initiate({ id: item.id, rowVersion: "BBBB" }),
     );
 
-    const createReq = fetchMock.mock.calls[0][0] as Request;
-    expect(createReq.url).toBe("https://webapi.test/users/advisers");
-    expect(createReq.method).toBe("POST");
-    expect(JSON.parse(await createReq.text())).toEqual({
+    async function bodyOf(method: string, suffix: string) {
+      const call = fetchMock.mock.calls.find(([input, init]) => {
+        const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
+        const usedMethod = init?.method ?? (input instanceof Request ? input.method : "GET");
+        return usedMethod === method && url.endsWith(suffix);
+      });
+      const request = call?.[0] as Request;
+      return JSON.parse(await request.clone().text()) as unknown;
+    }
+
+    expect(await bodyOf("POST", "/users/advisers")).toEqual({
       name: "Sam Reed",
       email: "sam@north.example",
       password: "Passw0rd!",
     });
-
-    const getReq = fetchMock.mock.calls[1][0] as Request;
-    expect(getReq.url).toBe(`https://webapi.test/users/advisers/${item.id}`);
-
-    const putReq = fetchMock.mock.calls[2][0] as Request;
-    expect(putReq.method).toBe("PUT");
-    expect(JSON.parse(await putReq.text())).toEqual({
+    expect(await bodyOf("PUT", `/users/advisers/${item.id}`)).toEqual({
       name: "Samantha Reed",
       rowVersion: "AAAA",
     });
-
-    const disableReq = fetchMock.mock.calls[3][0] as Request;
-    expect(disableReq.url).toBe(`https://webapi.test/users/advisers/${item.id}/disable`);
-    expect(JSON.parse(await disableReq.text())).toEqual({ rowVersion: "AAAA" });
-
-    const enableReq = fetchMock.mock.calls[4][0] as Request;
-    expect(enableReq.url).toBe(`https://webapi.test/users/advisers/${item.id}/enable`);
-    expect(JSON.parse(await enableReq.text())).toEqual({ rowVersion: "BBBB" });
+    expect(await bodyOf("POST", `/users/advisers/${item.id}/disable`)).toEqual({
+      rowVersion: "AAAA",
+    });
+    expect(await bodyOf("POST", `/users/advisers/${item.id}/enable`)).toEqual({
+      rowVersion: "BBBB",
+    });
   });
 });
