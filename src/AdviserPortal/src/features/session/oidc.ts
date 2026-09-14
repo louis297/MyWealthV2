@@ -4,7 +4,7 @@ import {
   PKCE_STATE_KEY,
   PKCE_VERIFIER_KEY,
 } from "@/features/session/oidcStorage";
-import { setTokens } from "@/features/session/sessionSlice";
+import { clearSession, setTokens } from "@/features/session/sessionSlice";
 
 export const CLIENT_ID = "adviser-portal";
 export const SCOPE = "openid profile offline_access api";
@@ -12,6 +12,7 @@ export const SCOPE = "openid profile offline_access api";
 type DiscoveryDocument = {
   authorization_endpoint: string;
   token_endpoint: string;
+  end_session_endpoint?: string;
 };
 
 export function redirectUri(): string {
@@ -121,6 +122,21 @@ export async function completeCallback(): Promise<void> {
   sessionStorage.removeItem(PKCE_VERIFIER_KEY);
   sessionStorage.removeItem(PKCE_STATE_KEY);
   sessionStorage.removeItem(PKCE_PENDING_KEY);
+}
+
+export async function startEndSession(): Promise<void> {
+  const { store } = await import("@/app/store");
+  store.dispatch(clearSession());
+
+  const { end_session_endpoint } = await discover();
+  if (!end_session_endpoint) {
+    return;
+  }
+
+  const url = new URL(end_session_endpoint);
+  url.searchParams.set("client_id", CLIENT_ID);
+  url.searchParams.set("post_logout_redirect_uri", `${window.location.origin}/`);
+  window.location.assign(url.toString());
 }
 
 export async function refreshTokens(
