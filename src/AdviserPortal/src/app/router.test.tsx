@@ -110,7 +110,7 @@ describe("app routes", () => {
   it("allows TenantAdmin on /advisers", async () => {
     renderApp(user(), "/advisers");
 
-    expect(await screen.findByText("advisers")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Advisers" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
   });
 });

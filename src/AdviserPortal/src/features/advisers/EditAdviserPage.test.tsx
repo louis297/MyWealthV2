@@ -93,7 +93,10 @@ describe("EditAdviserPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(await screen.findByText("adviser detail")).toBeInTheDocument();
-    const put = fetchMock.mock.calls.find(([, init]) => (init?.method ?? "") === "PUT")?.[0] as Request;
+    const put = fetchMock.mock.calls.find(([input, init]) => {
+      const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+      return method === "PUT";
+    })?.[0] as Request;
     expect(JSON.parse(await put.clone().text())).toEqual({
       name: "Samantha Reed",
       rowVersion: "AAAA",

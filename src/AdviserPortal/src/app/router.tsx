@@ -1,4 +1,8 @@
 import { createBrowserRouter, type RouteObject } from "react-router";
+import { AdviserDetailPage } from "@/features/advisers/AdviserDetailPage";
+import { AdvisersListPage } from "@/features/advisers/AdvisersListPage";
+import { CreateAdviserPage } from "@/features/advisers/CreateAdviserPage";
+import { EditAdviserPage } from "@/features/advisers/EditAdviserPage";
 import { CreateCustomerPage } from "@/features/customers/CreateCustomerPage";
 import { CustomerDetailPage } from "@/features/customers/CustomerDetailPage";
 import { CustomersListPage } from "@/features/customers/CustomersListPage";
@@ -46,10 +50,10 @@ export const appRoutes: RouteObject[] = [
             path: "/advisers",
             element: <RoleGate allow={[roles.tenantAdmin]} />,
             children: [
-              { index: true, element: <p>advisers</p> },
-              { path: "new", element: <p>new adviser</p> },
-              { path: ":id", element: <p>adviser detail</p> },
-              { path: ":id/edit", element: <p>edit adviser</p> },
+              { index: true, element: <AdvisersListPage /> },
+              { path: "new", element: <CreateAdviserPage /> },
+              { path: ":id", element: <AdviserDetailPage /> },
+              { path: ":id/edit", element: <EditAdviserPage /> },
             ],
           },
         ],
