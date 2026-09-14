@@ -58,13 +58,24 @@ public class AuthorizationBehaviour<TRequest, TResponse> : IPipelineBehavior<TRe
                 }
             }
 
-            // Policy-based authorization
+            // Policy-based authorization. Comma-separated names in one attribute are OR;
+            // multiple [Authorize] attributes stay AND.
             var authorizeAttributesWithPolicies = authorizeAttributes.Where(a => !string.IsNullOrWhiteSpace(a.Policy));
             if (authorizeAttributesWithPolicies.Any())
             {
-                foreach (var policy in authorizeAttributesWithPolicies.Select(a => a.Policy))
+                foreach (var attribute in authorizeAttributesWithPolicies)
                 {
-                    var authorized = await _identityService.AuthorizeAsync(_user.Id, policy);
+                    var policies = attribute.Policy.Split(
+                        ',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                    var authorized = false;
+                    foreach (var policy in policies)
+                    {
+                        if (await _identityService.AuthorizeAsync(_user.Id, policy))
+                        {
+                            authorized = true;
+                            break;
+                        }
+                    }
 
                     if (!authorized)
                     {

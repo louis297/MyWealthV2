@@ -38,6 +38,7 @@ public static class DependencyInjection
         }
 
         builder.Services.AddScoped<IAuthorizationHandler, PermissionHandler>();
+        builder.Services.AddScoped<IAuthorizationHandler, AnyPermissionHandler>();
 
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
