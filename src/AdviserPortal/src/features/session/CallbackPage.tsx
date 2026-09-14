@@ -8,7 +8,7 @@ export function CallbackPage() {
 
   useEffect(() => {
     void completeCallback()
-      .then(() => navigate("/", { replace: true }))
+      .then((path) => navigate(path, { replace: true }))
       .catch((reason: unknown) => {
         setError(reason instanceof Error ? reason.message : "Sign-in failed.");
       });
