@@ -156,4 +156,101 @@ describe("OIDC authorize and callback", () => {
       "http://localhost:5173/",
     );
   });
+
+  it("stores the current in-app path before authorize", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify(discovery), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const assign = vi.fn();
+    vi.stubGlobal("location", {
+      origin: "http://localhost:5173",
+      href: "http://localhost:5173/customers/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      pathname: "/customers/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      search: "",
+      assign,
+    });
+
+    await startAuthorize();
+
+    expect(sessionStorage.getItem("adviser-portal.returnTo")).toBe(
+      "/customers/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    );
+  });
+
+  it("returns the stored in-app path after callback", async () => {
+    sessionStorage.setItem(PKCE_VERIFIER_KEY, "verifier-1");
+    sessionStorage.setItem(PKCE_STATE_KEY, "state-1");
+    sessionStorage.setItem(
+      "adviser-portal.returnTo",
+      "/customers/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    );
+
+    const fetchMock = vi.mocked(fetch);
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(discovery), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            access_token: "access-token",
+            refresh_token: "refresh-token",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+    vi.stubGlobal("location", {
+      origin: "http://localhost:5173",
+      href: "http://localhost:5173/callback?code=abc&state=state-1",
+      search: "?code=abc&state=state-1",
+    });
+
+    const path = await completeCallback();
+
+    expect(path).toBe("/customers/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    expect(sessionStorage.getItem("adviser-portal.returnTo")).toBeNull();
+  });
+
+  it("ignores a stored return path that is not in-app", async () => {
+    sessionStorage.setItem(PKCE_VERIFIER_KEY, "verifier-1");
+    sessionStorage.setItem(PKCE_STATE_KEY, "state-1");
+    sessionStorage.setItem("adviser-portal.returnTo", "https://evil.example/");
+
+    const fetchMock = vi.mocked(fetch);
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(discovery), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            access_token: "access-token",
+            refresh_token: "refresh-token",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+    vi.stubGlobal("location", {
+      origin: "http://localhost:5173",
+      href: "http://localhost:5173/callback?code=abc&state=state-1",
+      search: "?code=abc&state=state-1",
+    });
+
+    const path = await completeCallback();
+
+    expect(path).toBe("/");
+  });
 });
