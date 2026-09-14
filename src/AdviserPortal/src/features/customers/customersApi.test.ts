@@ -82,4 +82,37 @@ describe("customers API", () => {
     expect(url.searchParams.get("adviserId")).toBe("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     expect(request.headers.get("Authorization")).toBe("Bearer access-1");
   });
+
+  it("POSTs /users/customers and returns the created id", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ id: "cccccccccccccccc-cccc-cccc-cccc-cccccccccccc" }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const store = createStore();
+    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
+
+    const result = await store.dispatch(
+      customersApi.endpoints.createCustomer.initiate({
+        name: "Jordan Lee",
+        email: "jordan@north.example",
+        password: "Passw0rd!",
+        adviserId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      }),
+    );
+
+    expect(result.data).toEqual({ id: "cccccccccccccccc-cccc-cccc-cccc-cccccccccccc" });
+    const request = fetchMock.mock.calls[0][0] as Request;
+    expect(request.url).toBe("https://webapi.test/users/customers");
+    expect(request.method).toBe("POST");
+    expect(JSON.parse(await request.text())).toEqual({
+      name: "Jordan Lee",
+      email: "jordan@north.example",
+      password: "Passw0rd!",
+      adviserId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    });
+  });
 });
