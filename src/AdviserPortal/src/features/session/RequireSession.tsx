@@ -8,6 +8,7 @@ import { useGetMeQuery, useGetTenantByCodeQuery } from "@/shared/api/api";
 
 export function RequireSession() {
   const accessToken = useAppSelector((state) => state.session.accessToken);
+  const currentUser = useAppSelector((state) => state.session.currentUser);
   const dispatch = useAppDispatch();
   const location = useLocation();
   const { data: me, isLoading, isError } = useGetMeQuery(undefined, { skip: !accessToken });
@@ -46,6 +47,10 @@ export function RequireSession() {
       return <Outlet />;
     }
     return <Navigate to="/forbidden" replace />;
+  }
+
+  if (!currentUser) {
+    return <p>Loading session…</p>;
   }
 
   return <Outlet />;
