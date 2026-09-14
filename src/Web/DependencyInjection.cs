@@ -26,6 +26,7 @@ public static class DependencyInjection
         foreach (var policy in new[]
                  {
                      Policies.TenantsManage,
+                     Policies.TenantsRead,
                      Policies.TenantAdminsManage,
                      Policies.AdvisersManage,
                      Policies.CustomersManage,
