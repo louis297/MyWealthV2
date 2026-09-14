@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { buildAuthorizeUrl, completeCallback, startAuthorize } from "@/features/session/oidc";
+import { buildAuthorizeUrl, completeCallback, startAuthorize, startEndSession } from "@/features/session/oidc";
 import { store } from "@/app/store";
-import { PKCE_STATE_KEY, PKCE_VERIFIER_KEY } from "@/features/session/oidcStorage";
+import { setTokens } from "@/features/session/sessionSlice";
+import {
+  ACCESS_TOKEN_KEY,
+  PKCE_STATE_KEY,
+  PKCE_VERIFIER_KEY,
+  REFRESH_TOKEN_KEY,
+} from "@/features/session/oidcStorage";
 
 const authority = "https://identity.test";
 const discovery = {
@@ -107,5 +113,47 @@ describe("OIDC authorize and callback", () => {
 
     expect(store.getState().session.accessToken).toBe("access-token");
     expect(store.getState().session.refreshToken).toBe("refresh-token");
+  });
+
+  it("clears the portal session and redirects to discovery end-session", async () => {
+    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
+
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          ...discovery,
+          end_session_endpoint: "https://identity.test/connect/logout",
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+
+    const assign = vi.fn();
+    vi.stubGlobal("location", {
+      origin: "http://localhost:5173",
+      href: "http://localhost:5173/customers",
+      assign,
+    });
+
+    await startEndSession();
+
+    expect(store.getState().session.accessToken).toBeNull();
+    expect(store.getState().session.refreshToken).toBeNull();
+    expect(sessionStorage.getItem(ACCESS_TOKEN_KEY)).toBeNull();
+    expect(sessionStorage.getItem(REFRESH_TOKEN_KEY)).toBeNull();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://identity.test/.well-known/openid-configuration",
+    );
+    expect(assign).toHaveBeenCalledOnce();
+    const redirected = new URL(assign.mock.calls[0][0] as string);
+    expect(redirected.origin + redirected.pathname).toBe("https://identity.test/connect/logout");
+    expect(redirected.searchParams.get("client_id")).toBe("adviser-portal");
+    expect(redirected.searchParams.get("post_logout_redirect_uri")).toBe(
+      "http://localhost:5173/",
+    );
   });
 });
