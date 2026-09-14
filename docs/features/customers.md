@@ -1,6 +1,6 @@
 ---
 title: Customers
-status: review
+status: accepted
 phase: 1
 language: en
 owner: ""
@@ -27,6 +27,8 @@ TenantAdmin / Adviser Customer HTTP: list / get / create (Identity dual-write) /
 Unlike advisers: TenantAdmin sees the current tenant; an Adviser sees, creates, and edits only assigned Customers. Disable Customer has no ledger guard in Phase 1. Creating or reassigning onto a disabled Adviser uses api-design §4.1 `target=user` (the call site advisers reserved). The portal Customers page is not this slice (later portals work).
 
 Chinese discussion draft: `v2draft/features/customers.md`.
+
+Landed in GitHub master 2026-09-14 (`b16d059`, hosted-login smoke after create).
 
 ---
 
