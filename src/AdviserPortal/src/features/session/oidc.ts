@@ -3,6 +3,7 @@ import {
   PKCE_PENDING_KEY,
   PKCE_STATE_KEY,
   PKCE_VERIFIER_KEY,
+  RETURN_TO_KEY,
 } from "@/features/session/oidcStorage";
 import { clearSession, setTokens } from "@/features/session/sessionSlice";
 
@@ -17,6 +18,24 @@ type DiscoveryDocument = {
 
 export function redirectUri(): string {
   return `${window.location.origin}/callback`;
+}
+
+export function isInAppPath(path: string | null | undefined): path is string {
+  if (!path || !path.startsWith("/") || path.startsWith("//")) {
+    return false;
+  }
+
+  const pathname = path.split("?")[0] ?? "";
+  return (
+    pathname === "/"
+    || pathname === "/profile"
+    || pathname === "/session"
+    || pathname === "/forbidden"
+    || pathname === "/customers"
+    || pathname.startsWith("/customers/")
+    || pathname === "/advisers"
+    || pathname.startsWith("/advisers/")
+  );
 }
 
 function authority(): string {
@@ -56,6 +75,13 @@ export async function startAuthorize(): Promise<void> {
 
   sessionStorage.setItem(PKCE_PENDING_KEY, "1");
   try {
+    const pathname = window.location.pathname || "/";
+    const search = window.location.search || "";
+    const returnTo = `${pathname}${search}`;
+    if (isInAppPath(returnTo) && pathname !== "/callback") {
+      sessionStorage.setItem(RETURN_TO_KEY, returnTo);
+    }
+
     const verifier = randomUrlSafe();
     const state = randomUrlSafe(16);
     const challenge = await challengeS256(verifier);
@@ -77,12 +103,13 @@ export async function startAuthorize(): Promise<void> {
   }
 }
 
-export async function completeCallback(): Promise<void> {
+export async function completeCallback(): Promise<string> {
   const params = new URLSearchParams(window.location.search);
   const code = params.get("code");
   const state = params.get("state");
   const expectedState = sessionStorage.getItem(PKCE_STATE_KEY);
   const verifier = sessionStorage.getItem(PKCE_VERIFIER_KEY);
+  const returnTo = sessionStorage.getItem(RETURN_TO_KEY);
 
   if (!code || !state || !verifier || state !== expectedState) {
     throw new Error("Sign-in callback was invalid.");
@@ -122,6 +149,9 @@ export async function completeCallback(): Promise<void> {
   sessionStorage.removeItem(PKCE_VERIFIER_KEY);
   sessionStorage.removeItem(PKCE_STATE_KEY);
   sessionStorage.removeItem(PKCE_PENDING_KEY);
+  sessionStorage.removeItem(RETURN_TO_KEY);
+
+  return isInAppPath(returnTo) ? returnTo : "/";
 }
 
 export async function startEndSession(): Promise<void> {
