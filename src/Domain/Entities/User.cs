@@ -67,6 +67,28 @@ public class User : BaseAuditableEntity
         return user;
     }
 
+    public void ReassignAdviser(int newAdviserId)
+    {
+        if (Role != UserRole.Customer)
+        {
+            throw new DomainException("Only a Customer can be reassigned with ReassignAdviser.");
+        }
+
+        if (newAdviserId == 0)
+        {
+            throw new DomainException("AdviserId is required.");
+        }
+
+        if (AdviserId == newAdviserId)
+        {
+            return;
+        }
+
+        var previousAdviserId = AdviserId!.Value;
+        AdviserId = newAdviserId;
+        AddDomainEvent(new CustomerAdviserReassigned(Id, TenantId!.Value, previousAdviserId, newAdviserId));
+    }
+
     public void DisableAdviser(bool hasNonDisabledAssignedCustomers)
     {
         if (Role != UserRole.Adviser)
