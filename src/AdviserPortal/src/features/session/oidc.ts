@@ -4,6 +4,7 @@ import {
   PKCE_STATE_KEY,
   PKCE_VERIFIER_KEY,
   RETURN_TO_KEY,
+  SIGN_OUT_IN_PROGRESS_KEY,
 } from "@/features/session/oidcStorage";
 import { clearSession, setTokens } from "@/features/session/sessionSlice";
 
@@ -13,8 +14,17 @@ export const SCOPE = "openid profile offline_access api";
 type DiscoveryDocument = {
   authorization_endpoint: string;
   token_endpoint: string;
+  revocation_endpoint?: string;
   end_session_endpoint?: string;
 };
+
+let callbackFlight: Promise<string> | null = null;
+
+sessionStorage.removeItem(SIGN_OUT_IN_PROGRESS_KEY);
+
+export function isSignOutInProgress(): boolean {
+  return sessionStorage.getItem(SIGN_OUT_IN_PROGRESS_KEY) === "1";
+}
 
 export function redirectUri(): string {
   return `${window.location.origin}/callback`;
@@ -69,6 +79,10 @@ export async function discover(): Promise<DiscoveryDocument> {
 }
 
 export async function startAuthorize(): Promise<void> {
+  if (isSignOutInProgress()) {
+    return;
+  }
+
   if (sessionStorage.getItem(PKCE_PENDING_KEY) === "1") {
     return;
   }
@@ -103,7 +117,17 @@ export async function startAuthorize(): Promise<void> {
   }
 }
 
-export async function completeCallback(): Promise<string> {
+export function completeCallback(): Promise<string> {
+  if (!callbackFlight) {
+    callbackFlight = redeemCallback().finally(() => {
+      callbackFlight = null;
+    });
+  }
+
+  return callbackFlight;
+}
+
+async function redeemCallback(): Promise<string> {
   const params = new URLSearchParams(window.location.search);
   const code = params.get("code");
   const state = params.get("state");
@@ -114,6 +138,10 @@ export async function completeCallback(): Promise<string> {
   if (!code || !state || !verifier || state !== expectedState) {
     throw new Error("Sign-in callback was invalid.");
   }
+
+  const current = new URL(window.location.href);
+  current.searchParams.delete("code");
+  window.history.replaceState(null, "", `${current.pathname}${current.search}${current.hash}`);
 
   const { token_endpoint } = await discover();
   const body = new URLSearchParams({
@@ -155,15 +183,37 @@ export async function completeCallback(): Promise<string> {
 }
 
 export async function startEndSession(): Promise<void> {
+  sessionStorage.setItem(SIGN_OUT_IN_PROGRESS_KEY, "1");
   const { store } = await import("@/app/store");
-  store.dispatch(clearSession());
+  const refreshToken = store.getState().session.refreshToken;
 
-  const { end_session_endpoint } = await discover();
-  if (!end_session_endpoint) {
+  let discovery: DiscoveryDocument | null = null;
+  try {
+    discovery = await discover();
+    if (refreshToken && discovery.revocation_endpoint) {
+      try {
+        await fetch(discovery.revocation_endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            token: refreshToken,
+            token_type_hint: "refresh_token",
+            client_id: CLIENT_ID,
+          }),
+        });
+      } catch {
+        // Still end the local session and hosted login cookie.
+      }
+    }
+  } finally {
+    store.dispatch(clearSession());
+  }
+
+  if (!discovery?.end_session_endpoint) {
     return;
   }
 
-  const url = new URL(end_session_endpoint);
+  const url = new URL(discovery.end_session_endpoint);
   url.searchParams.set("client_id", CLIENT_ID);
   url.searchParams.set("post_logout_redirect_uri", `${window.location.origin}/`);
   window.location.assign(url.toString());

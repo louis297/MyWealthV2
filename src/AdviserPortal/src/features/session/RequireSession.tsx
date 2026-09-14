@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Navigate, Outlet, useLocation } from "react-router";
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
-import { startAuthorize } from "@/features/session/oidc";
+import { isSignOutInProgress, startAuthorize } from "@/features/session/oidc";
 import { roles, shouldLoadTenant } from "@/features/session/roles";
 import { setCurrentUser, setTenant } from "@/features/session/sessionSlice";
 import { useGetMeQuery, useGetTenantByCodeQuery } from "@/shared/api/api";
@@ -29,7 +29,7 @@ export function RequireSession() {
   }, [tenant, dispatch]);
 
   useEffect(() => {
-    if (!accessToken) {
+    if (!accessToken && !isSignOutInProgress()) {
       void startAuthorize();
     }
   }, [accessToken]);

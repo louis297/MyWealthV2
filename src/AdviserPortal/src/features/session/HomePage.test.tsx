@@ -10,9 +10,13 @@ import { api } from "@/shared/api/api";
 
 const startAuthorize = vi.fn();
 
-vi.mock("@/features/session/oidc", () => ({
-  startAuthorize: () => startAuthorize(),
-}));
+vi.mock("@/features/session/oidc", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/features/session/oidc")>();
+  return {
+    ...actual,
+    startAuthorize: () => startAuthorize(),
+  };
+});
 
 vi.mock("@/features/session/SessionProbePage", () => ({
   SessionProbePage: () => <p>session probe</p>,

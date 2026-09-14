@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Navigate } from "react-router";
 import { useAppSelector } from "@/app/hooks";
-import { startAuthorize } from "@/features/session/oidc";
+import { isSignOutInProgress, startAuthorize } from "@/features/session/oidc";
 import { canAccessCustomers } from "@/features/session/roles";
 
 export function HomePage() {
@@ -9,7 +9,7 @@ export function HomePage() {
   const role = useAppSelector((state) => state.session.currentUser?.role);
 
   useEffect(() => {
-    if (!accessToken) {
+    if (!accessToken && !isSignOutInProgress()) {
       void startAuthorize();
     }
   }, [accessToken]);

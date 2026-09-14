@@ -1,7 +1,7 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import type { RootState } from "@/app/store";
-import { refreshTokens, startAuthorize } from "@/features/session/oidc";
+import { isSignOutInProgress, refreshTokens, startAuthorize } from "@/features/session/oidc";
 import { clearSession, setTokens, type CurrentUser } from "@/features/session/sessionSlice";
 import type { Tenant } from "@/shared/types/tenant";
 
@@ -39,7 +39,9 @@ const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
   }
 
   api.dispatch(clearSession());
-  await startAuthorize();
+  if (!isSignOutInProgress()) {
+    await startAuthorize();
+  }
   return result;
 };
 
