@@ -38,9 +38,9 @@ public class SchemaDatabaseSetup
             .WaitAsync(cancellationToken);
 
         await _app.ResourceNotifications.WaitForResourceHealthyAsync(
-            Services.Database, cancellationToken);
+            Services.TestDatabase, cancellationToken);
 
-        ConnectionString = (await _app.GetConnectionStringAsync(Services.Database))!;
+        ConnectionString = (await _app.GetConnectionStringAsync(Services.TestDatabase))!;
 
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlServer(ConnectionString)
