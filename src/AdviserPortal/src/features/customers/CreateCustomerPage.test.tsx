@@ -117,7 +117,8 @@ describe("CreateCustomerPage", () => {
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "jordan@north.example" } });
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "Passw0rd!" } });
     fireEvent.change(screen.getByLabelText("Confirm password"), { target: { value: "Passw0rd!" } });
-    fireEvent.change(await screen.findByLabelText("Adviser"), { target: { value: adviserId } });
+    await screen.findByRole("option", { name: "Sam Reed" });
+    fireEvent.change(screen.getByLabelText("Adviser"), { target: { value: adviserId } });
     fireEvent.click(screen.getByRole("button", { name: "Create customer" }));
 
     expect(await screen.findByText("customer detail")).toBeInTheDocument();
