@@ -5,6 +5,7 @@ using MyWealthV2.Application.Tenants.Commands.CreateTenant;
 using MyWealthV2.Application.Tenants.Commands.DisableTenant;
 using MyWealthV2.Application.Tenants.Commands.EnableTenant;
 using MyWealthV2.Application.Tenants.Commands.UpdateTenant;
+using MyWealthV2.Application.Tenants.Queries.GetTenantByCode;
 using MyWealthV2.Application.Tenants.Queries.GetTenantById;
 using MyWealthV2.Application.Tenants.Queries.GetTenants;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -18,6 +19,7 @@ public class Tenants : IEndpointGroup
     public static void Map(RouteGroupBuilder groupBuilder)
     {
         groupBuilder.MapGet(GetTenants).RequireAuthorization(Policies.TenantsManage);
+        groupBuilder.MapGet(GetTenantByCode, "by-code/{code}").RequireAuthorization(Policies.TenantsRead);
         groupBuilder.MapGet(GetTenant, "{id}").RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapPost(CreateTenant).RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapPut(UpdateTenant, "{id}").RequireAuthorization(Policies.TenantsManage);
@@ -36,6 +38,14 @@ public class Tenants : IEndpointGroup
     {
         var result = await sender.Send(new GetTenantsQuery(page, pageSize, isEnabled, search));
         return TypedResults.Ok(result);
+    }
+
+    [EndpointSummary("Get a tenant by code")]
+    [EndpointDescription("Returns one tenant by Code. TenantAdmin and Adviser may read only their own code.")]
+    public static async Task<Ok<TenantDto>> GetTenantByCode(ISender sender, string code)
+    {
+        var item = await sender.Send(new GetTenantByCodeQuery(code));
+        return TypedResults.Ok(item);
     }
 
     [EndpointSummary("Get a tenant")]
