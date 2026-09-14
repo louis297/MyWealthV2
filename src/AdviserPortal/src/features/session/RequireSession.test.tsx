@@ -7,11 +7,13 @@ import { RequireSession } from "@/features/session/RequireSession";
 import { sessionSlice, setTokens, type CurrentUser } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
 
+const startAuthorize = vi.fn();
+
 vi.mock("@/features/session/oidc", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/features/session/oidc")>();
   return {
     ...actual,
-    startAuthorize: vi.fn(),
+    startAuthorize: () => startAuthorize(),
   };
 });
 
@@ -104,6 +106,7 @@ function requestedUrls(fetchMock: ReturnType<typeof vi.mocked<typeof fetch>>) {
 
 describe("RequireSession", () => {
   beforeEach(() => {
+    startAuthorize.mockReset();
     sessionStorage.clear();
     vi.stubEnv("VITE_WEBAPI_BASE_URL", "https://webapi.test");
     vi.stubGlobal("fetch", vi.fn());
@@ -145,6 +148,36 @@ describe("RequireSession", () => {
     expect(requestedUrls(fetchMock).some((url) => url.includes("/tenants/by-code/"))).toBe(
       false,
     );
+  });
+
+  it("starts authorize when there is no access token", () => {
+    const store = configureStore({
+      reducer: {
+        session: sessionSlice.reducer,
+        [api.reducerPath]: api.reducer,
+      },
+      middleware: (getDefault) => getDefault().concat(api.middleware),
+    });
+
+    const router = createMemoryRouter(
+      [
+        {
+          element: <RequireSession />,
+          children: [{ path: "/customers", element: <p>customers</p> }],
+        },
+      ],
+      { initialEntries: ["/customers"] },
+    );
+
+    render(
+      <Provider store={store}>
+        <RouterProvider router={router} />
+      </Provider>,
+    );
+
+    expect(startAuthorize).toHaveBeenCalledOnce();
+    expect(screen.queryByText("customers")).not.toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
   it("sends a leftover Customer session to /forbidden and does not call by-code", async () => {
