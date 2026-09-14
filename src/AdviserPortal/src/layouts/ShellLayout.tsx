@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { NavLink, Outlet } from "react-router";
 import { useAppSelector } from "@/app/hooks";
+import { startEndSession } from "@/features/session/oidc";
 import {
   canAccessAdvisers,
   canAccessCustomers,
@@ -21,7 +22,7 @@ export function ShellLayout({ children }: { children?: ReactNode }) {
         {me?.tenantCode ? <span className="text-slate-500">{me.tenantCode}</span> : null}
         {me?.name ? <span>{me.name}</span> : null}
         {me?.role ? <span>{me.role}</span> : null}
-        <button type="button" className="ml-auto">
+        <button type="button" className="ml-auto" onClick={() => void startEndSession()}>
           Sign out
         </button>
       </header>
