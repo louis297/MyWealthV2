@@ -46,6 +46,10 @@ export const customersApi = api.injectEndpoints({
       },
       providesTags: ["Customer"],
     }),
+    getCustomer: builder.query<Customer, string>({
+      query: (id) => `/users/customers/${id}`,
+      providesTags: (_result, _error, id) => [{ type: "Customer", id }],
+    }),
     createCustomer: builder.mutation<{ id: string }, CreateCustomerBody>({
       query: (body) => ({
         url: "/users/customers",
@@ -57,4 +61,4 @@ export const customersApi = api.injectEndpoints({
   }),
 });
 
-export const { useGetCustomersQuery, useCreateCustomerMutation } = customersApi;
+export const { useGetCustomersQuery, useGetCustomerQuery, useCreateCustomerMutation } = customersApi;
