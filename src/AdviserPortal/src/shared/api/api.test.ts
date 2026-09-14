@@ -128,3 +128,45 @@ describe("GET /users/me", () => {
     expect(startAuthorize).toHaveBeenCalledOnce();
   });
 });
+
+const tenant = {
+  id: "22222222-2222-2222-2222-222222222222",
+  name: "North Advisory",
+  code: "north-advisory",
+  reportingCurrency: "GBP",
+  isEnabled: true,
+  rowVersion: "AAAA",
+  created: "2026-09-14T00:00:00+00:00",
+};
+
+describe("GET /tenants/by-code/{code}", () => {
+  beforeEach(() => {
+    startAuthorize.mockReset();
+    sessionStorage.clear();
+    vi.stubEnv("VITE_WEBAPI_BASE_URL", "https://webapi.test");
+    vi.stubEnv("VITE_IDENTITY_AUTHORITY", "https://identity.test");
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  it("sends the access token and returns the tenant", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify(tenant), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const store = createStore();
+    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
+
+    const result = await store.dispatch(
+      api.endpoints.getTenantByCode.initiate("north-advisory"),
+    );
+
+    expect(result.data).toEqual(tenant);
+    const request = fetchMock.mock.calls[0][0] as Request;
+    expect(request.url).toBe("https://webapi.test/tenants/by-code/north-advisory");
+    expect(request.headers.get("Authorization")).toBe("Bearer access-1");
+  });
+});

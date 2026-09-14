@@ -3,6 +3,7 @@ import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from "@reduxjs/toolk
 import type { RootState } from "@/app/store";
 import { refreshTokens, startAuthorize } from "@/features/session/oidc";
 import { clearSession, setTokens, type CurrentUser } from "@/features/session/sessionSlice";
+import type { Tenant } from "@/shared/types/tenant";
 
 const rawBaseQuery = fetchBaseQuery({
   prepareHeaders: (headers, { getState }) => {
@@ -49,7 +50,10 @@ export const api = createApi({
     getMe: builder.query<CurrentUser, void>({
       query: () => "/users/me",
     }),
+    getTenantByCode: builder.query<Tenant, string>({
+      query: (code) => `/tenants/${encodeURIComponent(code)}`,
+    }),
   }),
 });
 
-export const { useGetMeQuery } = api;
+export const { useGetMeQuery, useGetTenantByCodeQuery } = api;
