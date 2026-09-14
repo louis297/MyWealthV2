@@ -1,8 +1,24 @@
 # Agent rules
 
+This file is for agents working in the **MyWealthV2 repository**. Design lives in `docs/`. Do not copy Feature Specs or ADRs into this file.
+
 ## `draft/` is off-limits
 
 Do not read, list, search, edit, create, delete, move, or otherwise touch anything under `draft/`. Treat that directory as if it does not exist. Work from `docs/` and the rest of the repo instead.
+
+## What to implement
+
+- Implement only **`accepted`** specs for the **current phase** (`docs/README.md`, `docs/function-plan.md`, the slice Feature Spec or portal spec).
+- `draft`, `review`, and `note` are not build contracts. Do not create tables, routes, or handlers from them.
+- Do not add Phase-2 ledger tables, routes, or empty spec files (instruments, accounts, holdings, transactions, net worth) until that phase is opened.
+- Schema truth is `database/schema/NNNN_*.sql`, applied by the schema applicator. Do not add EF migrations. Do not use `EnsureDeleted` / `EnsureCreated` as the normal boot path.
+- HTTP ids are `PublicId`. Internal ints never appear on the wire.
+- From Tenants onward, every tenant-scoped slice includes cross-tenant isolation tests (two-tenant fixture; other tenant’s id → 404, not 403).
+- When code and an accepted doc disagree, change the code or the doc in the **same** change.
+- New glossary terms land in `docs/glossary.md` in the same change.
+- Portal UI belongs under `docs/portals/`. Do not invent backend routes from a portal page note.
+
+Read order: `docs/README.md` → glossary → function-plan → the slice spec → architecture / domain / database / api-design / ADRs only if needed.
 
 ## Always commit each step
 
@@ -10,10 +26,12 @@ Create a git commit after every discrete step of work. Do not leave completed st
 
 - Commit as soon as the step is done and verified, before starting the next step.
 - Stage only the files that belong to that step; leave unrelated changes unstaged.
-- Use a short, factual commit message that describes what the step did.
+- Use a short, factual commit message that describes what the step did (repo style: `Add failing tests for …` then `Add …`).
 - Never commit secrets, credentials, `.env` files, or generated artifacts that should stay untracked.
 - If a step produced no file changes, skip the commit.
 - Do not amend, rebase, or rewrite history unless the user explicitly asks.
+
+A Feature Spec §12 lists **behaviour** commits. Split each behaviour into red then green (and refactor if it produced a file change). The tree must build after every commit.
 
 ## Use agentic-friendly TDD for development work
 
@@ -58,7 +76,6 @@ still the same variant. Stop.
 ### Handoff report (use this shape)
 
 ```
-
 ## Stopped
 
 - Task / slice:
@@ -89,5 +106,4 @@ still the same variant. Stop.
 - Files that may change:
 - Conditions that must hold together (if two changes are required, say so):
 - First command to run:
-
 ```
