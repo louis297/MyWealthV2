@@ -1,6 +1,6 @@
 ---
 title: Currencies
-status: review
+status: accepted
 phase: 1
 language: en
 owner: ""

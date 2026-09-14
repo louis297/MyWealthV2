@@ -37,9 +37,9 @@ The vertical cut stops at people in a firm, the currency catalog, and session. N
 
 | Spec | Status | Who | Ships | Why it stays its own slice |
 | --- | --- | --- | --- | --- |
-| [identity-auth](identity-auth.md) | accepted (landed; amendment 2026-09-14 not in code) | Login-capable roles | OpenIddict defaults, hosted `/login`, policies including `tenants.read`, `/users/me`, revocation, UserStatus, `UserTokens` seam, **client × role allow-list** | Two processes, one product capability |
+| [identity-auth](identity-auth.md) | accepted (landed in repo 2026-09-14) | Login-capable roles | OpenIddict defaults, hosted `/login`, policies including `tenants.read`, `/users/me`, revocation, UserStatus, `UserTokens` seam, **client × role allow-list** | Two processes, one product capability |
 | [currencies](currencies.md) | review (HTTP landed in repo 2026-09-13) | Authenticated (all four roles) | Catalog + `ICurrencyCatalog` + `GET /currencies` (`enabledOnly`) + `Tenants.ReportingCurrency` + Domain `Money` | Own table; HTTP after Bearer validation works |
-| [tenants](tenants.md) | accepted (landed; amendment 2026-09-14 not in code) | SystemAdmin manage; TenantAdmin / Adviser read-own | `/tenants` manage + `GET /tenants/by-code/{code}` (`tenants.read`) | Platform resource; path is not under `/users` |
+| [tenants](tenants.md) | accepted (landed in repo 2026-09-14) | SystemAdmin manage; TenantAdmin / Adviser read-own | `/tenants` manage + `GET /tenants/by-code/{code}` (`tenants.read`) | Platform resource; path is not under `/users` |
 | [tenant-admins](tenant-admins.md) | accepted (landed in repo 2026-09-13) | SystemAdmin | `/users/tenant-admins`; dual-write; last-admin disable allowed; disabled tenant → 400 `disabled`/`tenant` | Caller and gap belong here |
 | [advisers](advisers.md) | accepted (landed in repo 2026-09-14 `8e5568c`) | TenantAdmin | `/users/advisers`; current tenant; cross-tenant 404; `DisableAdviser(bool)` guard | Different guard and portal list |
 | [customers](customers.md) | accepted (landed in repo 2026-09-14 `b16d059`) | TenantAdmin; Adviser (assigned) | `/users/customers`; login principal; reassign + `CustomerAdviserReassigned`; no portal; no ledger guard | Assignment scope and rebind |
