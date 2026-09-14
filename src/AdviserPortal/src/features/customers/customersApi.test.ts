@@ -115,4 +115,26 @@ describe("customers API", () => {
       adviserId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
     });
   });
+
+  it("GETs /users/customers/{id}", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify(envelope.items[0]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const store = createStore();
+    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
+
+    const result = await store.dispatch(
+      customersApi.endpoints.getCustomer.initiate(envelope.items[0].id),
+    );
+
+    expect(result.data).toEqual(envelope.items[0]);
+    const request = fetchMock.mock.calls[0][0] as Request;
+    expect(request.url).toBe(`https://webapi.test/users/customers/${envelope.items[0].id}`);
+    expect(request.method).toBe("GET");
+  });
 });
