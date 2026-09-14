@@ -108,6 +108,15 @@ public class AuthorizationController(
         return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
+    [HttpGet("~/connect/logout")]
+    [HttpPost("~/connect/logout")]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> Logout()
+    {
+        await signInManager.SignOutAsync();
+        return SignOut(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+    }
+
     private static string ToCamelCase(string value) =>
         string.IsNullOrEmpty(value) ? value : char.ToLowerInvariant(value[0]) + value[1..];
 }
