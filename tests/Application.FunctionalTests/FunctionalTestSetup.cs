@@ -11,6 +11,7 @@ namespace MyWealthV2.Application.FunctionalTests;
 public class FunctionalTestSetup
 {
     internal static IServiceScopeFactory ScopeFactory { get; private set; } = null!;
+    internal static IServiceProvider WebApiServices => _factory!.Services;
     internal static HttpClient WebClient { get; private set; } = null!;
     internal static OpenIdConnectTestClient Oidc { get; private set; } = null!;
     internal static IdentityFactory Identity { get; private set; } = null!;
