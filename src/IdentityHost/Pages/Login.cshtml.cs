@@ -1,4 +1,5 @@
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Infrastructure.Identity;
@@ -6,6 +7,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace MyWealthV2.IdentityHost.Pages;
@@ -48,6 +50,13 @@ public class LoginModel(
             return Page();
         }
 
+        var clientId = ClientIdFromReturnUrl(returnUrl);
+        if (clientId is not null && !ClientRoleAllowList.Allows(clientId, user.Role))
+        {
+            Error = UniformFailure;
+            return Page();
+        }
+
         await signInManager.SignInAsync(identityUser, isPersistent: false);
 
         if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
@@ -84,6 +93,23 @@ public class LoginModel(
         return await db.Users.SingleOrDefaultAsync(
             person => person.TenantId == tenant.Id && person.Email == Email,
             cancellationToken);
+    }
+
+    private static string? ClientIdFromReturnUrl(string? returnUrl)
+    {
+        if (string.IsNullOrWhiteSpace(returnUrl))
+        {
+            return null;
+        }
+
+        var queryIndex = returnUrl.IndexOf('?');
+        if (queryIndex < 0 || queryIndex == returnUrl.Length - 1)
+        {
+            return null;
+        }
+
+        var query = QueryHelpers.ParseQuery(returnUrl[queryIndex..]);
+        return query.TryGetValue("client_id", out var values) ? values.ToString() : null;
     }
 
     private async Task<Tenant?> ResolveTenantAsync(User user, CancellationToken cancellationToken)

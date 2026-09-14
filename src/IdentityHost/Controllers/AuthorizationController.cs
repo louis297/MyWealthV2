@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Infrastructure.Identity;
 using Microsoft.AspNetCore;
@@ -62,6 +63,12 @@ public class AuthorizationController(
         }
 
         if (!LoginEligibility.CanComplete(person, tenant))
+        {
+            await signInManager.SignOutAsync();
+            return Challenge(IdentityConstants.ApplicationScheme);
+        }
+
+        if (!ClientRoleAllowList.Allows(request.ClientId, person.Role))
         {
             await signInManager.SignOutAsync();
             return Challenge(IdentityConstants.ApplicationScheme);
