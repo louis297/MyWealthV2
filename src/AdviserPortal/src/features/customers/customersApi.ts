@@ -19,6 +19,13 @@ export type CustomerListArgs = {
   adviserId?: string;
 };
 
+export type CreateCustomerBody = {
+  name: string;
+  email: string;
+  password: string;
+  adviserId?: string;
+};
+
 export const customersApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getCustomers: builder.query<PagedList<Customer>, CustomerListArgs | void>({
@@ -39,7 +46,15 @@ export const customersApi = api.injectEndpoints({
       },
       providesTags: ["Customer"],
     }),
+    createCustomer: builder.mutation<{ id: string }, CreateCustomerBody>({
+      query: (body) => ({
+        url: "/users/customers",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Customer"],
+    }),
   }),
 });
 
-export const { useGetCustomersQuery } = customersApi;
+export const { useGetCustomersQuery, useCreateCustomerMutation } = customersApi;
