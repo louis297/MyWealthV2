@@ -17,3 +17,15 @@ export function isRole(value: string | null | undefined): value is Role {
 export function shouldLoadTenant(role: string | null | undefined, tenantCode: string | null | undefined) {
   return Boolean(tenantCode) && (role === roles.tenantAdmin || role === roles.adviser);
 }
+
+export function canAccessCustomers(role: string | null | undefined) {
+  return role === roles.tenantAdmin || role === roles.adviser;
+}
+
+export function canAccessAdvisers(role: string | null | undefined) {
+  return role === roles.tenantAdmin;
+}
+
+export function canAccessProfile(role: string | null | undefined) {
+  return role === roles.tenantAdmin || role === roles.adviser || role === roles.systemAdmin;
+}

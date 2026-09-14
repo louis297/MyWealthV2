@@ -6,6 +6,7 @@ import { configureStore } from "@reduxjs/toolkit";
 import { HomePage } from "@/features/session/HomePage";
 import { sessionSlice } from "@/features/session/sessionSlice";
 import { ShellLayout } from "@/layouts/ShellLayout";
+import { api } from "@/shared/api/api";
 
 const startAuthorize = vi.fn();
 
@@ -24,7 +25,13 @@ describe("HomePage", () => {
   });
 
   it("starts authorize when there is no access token", () => {
-    const store = configureStore({ reducer: { session: sessionSlice.reducer } });
+    const store = configureStore({
+      reducer: {
+        session: sessionSlice.reducer,
+        [api.reducerPath]: api.reducer,
+      },
+      middleware: (getDefault) => getDefault().concat(api.middleware),
+    });
     const router = createMemoryRouter(
       [
         {
@@ -51,9 +58,18 @@ describe("HomePage", () => {
 
   it("does not start authorize when signed in", () => {
     const store = configureStore({
-      reducer: { session: sessionSlice.reducer },
+      reducer: {
+        session: sessionSlice.reducer,
+        [api.reducerPath]: api.reducer,
+      },
+      middleware: (getDefault) => getDefault().concat(api.middleware),
       preloadedState: {
-        session: { accessToken: "access", refreshToken: "refresh", currentUser: null },
+        session: {
+          accessToken: "access",
+          refreshToken: "refresh",
+          currentUser: null,
+          tenant: null,
+        },
       },
     });
     const router = createMemoryRouter(

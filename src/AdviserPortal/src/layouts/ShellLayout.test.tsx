@@ -3,7 +3,12 @@ import { render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
-import { sessionSlice, setCurrentUser, type CurrentUser } from "@/features/session/sessionSlice";
+import {
+  sessionSlice,
+  setCurrentUser,
+  setTenant,
+  type CurrentUser,
+} from "@/features/session/sessionSlice";
 import { ShellLayout } from "@/layouts/ShellLayout";
 import { api } from "@/shared/api/api";
 import type { Tenant } from "@/shared/types/tenant";
@@ -43,7 +48,7 @@ function renderShell(me: CurrentUser, withTenant = true) {
   });
   store.dispatch(setCurrentUser(me));
   if (withTenant && me.tenantCode) {
-    store.dispatch(api.util.upsertQueryData("getTenantByCode", me.tenantCode, tenant));
+    store.dispatch(setTenant(tenant));
   }
 
   const router = createMemoryRouter(

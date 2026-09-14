@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Navigate, Outlet, useLocation } from "react-router";
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
 import { roles, shouldLoadTenant } from "@/features/session/roles";
-import { setCurrentUser } from "@/features/session/sessionSlice";
+import { setCurrentUser, setTenant } from "@/features/session/sessionSlice";
 import { useGetMeQuery, useGetTenantByCodeQuery } from "@/shared/api/api";
 
 export function RequireSession() {
@@ -18,7 +18,13 @@ export function RequireSession() {
   }, [me, dispatch]);
 
   const loadTenant = shouldLoadTenant(me?.role, me?.tenantCode);
-  useGetTenantByCodeQuery(me?.tenantCode ?? "", { skip: !loadTenant });
+  const { data: tenant } = useGetTenantByCodeQuery(me?.tenantCode ?? "", { skip: !loadTenant });
+
+  useEffect(() => {
+    if (tenant) {
+      dispatch(setTenant(tenant));
+    }
+  }, [tenant, dispatch]);
 
   if (!accessToken || isLoading) {
     return <p>Loading session…</p>;

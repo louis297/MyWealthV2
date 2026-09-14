@@ -1,5 +1,6 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from "@/features/session/oidcStorage";
+import type { Tenant } from "@/shared/types/tenant";
 
 export type CurrentUser = {
   id: string;
@@ -17,12 +18,14 @@ export type SessionState = {
   accessToken: string | null;
   refreshToken: string | null;
   currentUser: CurrentUser | null;
+  tenant: Tenant | null;
 };
 
 const initialState: SessionState = {
   accessToken: null,
   refreshToken: null,
   currentUser: null,
+  tenant: null,
 };
 
 export const sessionSlice = createSlice({
@@ -49,14 +52,19 @@ export const sessionSlice = createSlice({
     setCurrentUser(state, action: PayloadAction<CurrentUser | null>) {
       state.currentUser = action.payload;
     },
+    setTenant(state, action: PayloadAction<Tenant | null>) {
+      state.tenant = action.payload;
+    },
     clearSession(state) {
       state.accessToken = null;
       state.refreshToken = null;
       state.currentUser = null;
+      state.tenant = null;
       sessionStorage.removeItem(ACCESS_TOKEN_KEY);
       sessionStorage.removeItem(REFRESH_TOKEN_KEY);
     },
   },
 });
 
-export const { setTokens, hydrateSession, setCurrentUser, clearSession } = sessionSlice.actions;
+export const { setTokens, hydrateSession, setCurrentUser, setTenant, clearSession } =
+  sessionSlice.actions;
