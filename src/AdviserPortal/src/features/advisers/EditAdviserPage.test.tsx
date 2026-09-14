@@ -53,7 +53,6 @@ describe("EditAdviserPage", () => {
   it("renames an adviser and does not send email or tenantId", async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockImplementation(async (input, init) => {
-      const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
       const method = init?.method ?? (input instanceof Request ? input.method : "GET");
       if (method === "GET") {
         return new Response(JSON.stringify(adviser), {

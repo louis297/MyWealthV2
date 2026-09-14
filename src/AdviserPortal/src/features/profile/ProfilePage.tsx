@@ -17,9 +17,11 @@ export function ProfilePage() {
     return <p>Loading session…</p>;
   }
 
+  const profile = me;
+
   async function onSaveName(event: FormEvent) {
     event.preventDefault();
-    await updateMe({ name: name.trim(), rowVersion: me.rowVersion }).unwrap();
+    await updateMe({ name: name.trim(), rowVersion: profile.rowVersion }).unwrap();
   }
 
   async function onChangePassword(event: FormEvent) {
@@ -35,23 +37,23 @@ export function ProfilePage() {
       <dl className="space-y-2 text-sm">
         <div>
           <dt className="text-slate-500">Email</dt>
-          <dd>{me.email}</dd>
+          <dd>{profile.email}</dd>
         </div>
         <div>
           <dt className="text-slate-500">Role</dt>
-          <dd>{me.role}</dd>
+          <dd>{profile.role}</dd>
         </div>
         <div>
           <dt className="text-slate-500">Status</dt>
-          <dd>{me.status}</dd>
+          <dd>{profile.status}</dd>
         </div>
         <div>
           <dt className="text-slate-500">Tenant</dt>
-          <dd>{me.tenantCode ?? "—"}</dd>
+          <dd>{profile.tenantCode ?? "—"}</dd>
         </div>
         <div>
           <dt className="text-slate-500">Id</dt>
-          <dd>{me.id}</dd>
+          <dd>{profile.id}</dd>
         </div>
       </dl>
       <form className="space-y-3" onSubmit={(event) => void onSaveName(event)}>
