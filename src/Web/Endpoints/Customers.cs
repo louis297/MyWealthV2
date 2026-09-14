@@ -2,6 +2,7 @@ using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Users;
 using MyWealthV2.Application.Users.Commands.CreateCustomer;
+using MyWealthV2.Application.Users.Commands.UpdateCustomer;
 using MyWealthV2.Application.Users.Queries.GetCustomerById;
 using MyWealthV2.Application.Users.Queries.GetCustomers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -25,6 +26,7 @@ public class Customers : IEndpointGroup
         groupBuilder.MapGet(GetCustomers).RequireAuthorization(ManageOrOwn);
         groupBuilder.MapGet(GetCustomer, "{id}").RequireAuthorization(ManageOrOwn);
         groupBuilder.MapPost(CreateCustomer).RequireAuthorization(ManageOrOwn);
+        groupBuilder.MapPut(UpdateCustomer, "{id}").RequireAuthorization(ManageOrOwn);
     }
 
     [EndpointSummary("List customers")]
@@ -57,5 +59,17 @@ public class Customers : IEndpointGroup
     {
         var id = await sender.Send(command);
         return TypedResults.Created($"/users/customers/{id}", new CreatedCustomerDto(id));
+    }
+
+    [EndpointSummary("Update a customer")]
+    [EndpointDescription("Renames a Customer. TenantAdmin may also reassign adviserId.")]
+    public static async Task<NoContent> UpdateCustomer(
+        ISender sender,
+        Guid id,
+        UpdateCustomerCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
     }
 }
