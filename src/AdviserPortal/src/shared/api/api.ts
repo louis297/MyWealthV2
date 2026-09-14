@@ -46,12 +46,15 @@ const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
 export const api = createApi({
   reducerPath: "api",
   baseQuery,
+  tagTypes: ["Me", "Tenant", "Customer", "Adviser"],
   endpoints: (builder) => ({
     getMe: builder.query<CurrentUser, void>({
       query: () => "/users/me",
+      providesTags: ["Me"],
     }),
     getTenantByCode: builder.query<Tenant, string>({
-      query: (code) => `/tenants/${encodeURIComponent(code)}`,
+      query: (code) => `/tenants/by-code/${encodeURIComponent(code)}`,
+      providesTags: ["Tenant"],
     }),
   }),
 });
