@@ -3,7 +3,7 @@ title: Domain model
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-09-13
+updated: 2026-09-14
 related:
   - README.md
   - glossary.md
@@ -119,7 +119,7 @@ Uniqueness and immutability:
 
 - Email is unique inside a tenant (filtered unique where `TenantId IS NOT NULL`). Login resolves Domain `User` by `tenantCode + email`, then verifies the password.
 - `Role`, `TenantId`, and `Email` cannot change. `Name` can.
-- A Customer’s `AdviserId` may be reassigned to another non-disabled Adviser in the same tenant.
+- A Customer’s `AdviserId` may be reassigned to another non-disabled Adviser in the same tenant. Method: `User.ReassignAdviser`. Pointer change raises `CustomerAdviserReassigned`. Same id is a no-op. Create does not raise that event.
 
 Status machine (written once):
 
@@ -184,7 +184,7 @@ Raise even if there is no subscriber yet. The application uses these events to r
 | `UserActivated` | Entered Active (create-as-Active, invite activation, or re-enable from Disabled) |
 | `UserDisabled` | Entered Disabled |
 | `UserPasswordChanged` | Resource-API password change succeeded (revoke tokens for the subject) |
-| `CustomerAdviserReassigned` | `Customer.AdviserId` changed |
+| `CustomerAdviserReassigned` | `ReassignAdviser` actually changed the pointer. Payload: `CustomerId`, `TenantId`, `PreviousAdviserId`, `NewAdviserId`. No handler in the customers slice |
 
 Do not model OpenIddict token revocation itself as a domain event.
 

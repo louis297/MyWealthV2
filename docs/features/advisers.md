@@ -1,6 +1,6 @@
 ---
 title: Advisers
-status: review
+status: accepted
 phase: 1
 language: en
 owner: ""
@@ -26,6 +26,8 @@ TenantAdmin Adviser HTTP: list / get / create (Identity dual-write) / rename / d
 Unlike tenant-admins: caller and scope are the current tenant; disable is blocked while assigned Customers are not Disabled. The portal Advisers page is not this slice (later portals work).
 
 Chinese discussion draft: `v2draft/features/advisers.md`.
+
+Landed in GitHub master 2026-09-14 (`8e5568c`, hosted-login smoke after create).
 
 ---
 

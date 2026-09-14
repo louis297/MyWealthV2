@@ -3,7 +3,7 @@ title: Feature Specs
 status: draft
 language: en
 created: 2026-09-12
-updated: 2026-09-13
+updated: 2026-09-14
 related:
   - ../function-plan.md
   - ../api-design.md
@@ -41,8 +41,8 @@ The vertical cut stops at people in a firm, the currency catalog, and session. N
 | [currencies](currencies.md) | review (HTTP landed in repo 2026-09-13) | Authenticated (all four roles) | Catalog + `ICurrencyCatalog` + `GET /currencies` (`enabledOnly`) + `Tenants.ReportingCurrency` + Domain `Money` | Own table; HTTP after Bearer validation works |
 | [tenants](tenants.md) | accepted (landed in repo 2026-09-13) | SystemAdmin | `/tenants` list / get / create / update / disable / enable | Platform resource; path is not under `/users` |
 | [tenant-admins](tenant-admins.md) | accepted (landed in repo 2026-09-13) | SystemAdmin | `/users/tenant-admins`; dual-write; last-admin disable allowed; disabled tenant → 400 `disabled`/`tenant` | Caller and gap belong here |
-| [advisers](advisers.md) | review | TenantAdmin | `/users/advisers`; current tenant; cross-tenant 404; `DisableAdviser(bool)` guard | Different guard and portal list |
-| `customers.md` | not opened | TenantAdmin; Adviser (assigned) | `/users/customers`; login principal; no portal; no ledger guard | Assignment scope and rebind |
+| [advisers](advisers.md) | accepted (landed in repo 2026-09-14 `8e5568c`) | TenantAdmin | `/users/advisers`; current tenant; cross-tenant 404; `DisableAdviser(bool)` guard | Different guard and portal list |
+| [customers](customers.md) | review | TenantAdmin; Adviser (assigned) | `/users/customers`; login principal; reassign + `CustomerAdviserReassigned`; no portal; no ledger guard | Assignment scope and rebind |
 
 Do not merge the three people slices into `users.md`.
 
@@ -71,7 +71,7 @@ schema
 isolation-tests
 ```
 
-Repo master (2026-09-13, `676d797`): identity-auth, the adviser-portal **current** slice (Vite resource, PKCE authorize / `/callback`, session probe via `GET /users/me`, 401 refresh-once, OpenIddict redirect upsert including the Aspire dashboard alias), `GET /currencies`, [tenants](tenants.md), and [tenant-admins](tenant-admins.md) are in the tree. Currencies Feature Spec is still `review`. Next backend slice is [advisers](advisers.md) (`review`; not in the tree yet).
+Repo master (2026-09-14, `8e5568c`): identity-auth, the adviser-portal **current** slice (Vite resource, PKCE authorize / `/callback`, session probe via `GET /users/me`, 401 refresh-once, OpenIddict redirect upsert including the Aspire dashboard alias), `GET /currencies`, [tenants](tenants.md), [tenant-admins](tenant-admins.md), and [advisers](advisers.md) are in the tree. Currencies Feature Spec is still `review`. Next backend slice is [customers](customers.md) (`review`; not in the repo yet).
 
 Portal pages (Profile / Customers / Advisers) still wait for those Feature Specs.
 

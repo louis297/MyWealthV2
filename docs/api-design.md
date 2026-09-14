@@ -3,7 +3,7 @@ title: API design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-09-13
+updated: 2026-09-14
 related:
   - README.md
   - glossary.md
@@ -147,7 +147,7 @@ Tenant, User, and later Account can all be disabled. When the caller writes agai
 Phase 1 call site:
 
 - `POST /users/tenant-admins` on a disabled tenant → `target=tenant` ([features/tenant-admins.md](features/tenant-admins.md))
-- Later people slices that create a Customer on a disabled Adviser → `target=user` (detail locked in that spec)
+- Create or reassign a Customer onto a disabled Adviser → `target=user` (detail in [features/customers.md](features/customers.md))
 - Rejecting a disabled catalog currency as a **new** reporting currency stays a plain validation 400 (Currency has no PublicId and is not this lifecycle)
 
 Implement as one Application `TargetDisabled` exception (kind + targetId + detail) mapped once in `webapi`. Do not assemble this JSON in three handlers.
@@ -284,7 +284,7 @@ Phase 1 create may set a password and land in `Active` (invitation is not built;
 | --- | --- | --- | --- |
 | `/users/tenant-admins` | SystemAdmin | `tenantId` (PublicId), `name`, `email`, `password` | Optional tenant filter. Field rules: [features/tenant-admins.md](features/tenant-admins.md) |
 | `/users/advisers` | TenantAdmin | `name`, `email`, `password` | Current tenant. Field rules: [features/advisers.md](features/advisers.md) |
-| `/users/customers` | TenantAdmin; Adviser (assigned) | `name`, `email`, `password`, `adviserId` | TenantAdmin: tenant; Adviser: self only |
+| `/users/customers` | TenantAdmin; Adviser (assigned) | `name`, `email`, `password`, `adviserId` | TenantAdmin: tenant; Adviser: self only. Field rules: [features/customers.md](features/customers.md) |
 
 Shared actions (`{collection}` = `tenant-admins` / `advisers` / `customers`):
 
