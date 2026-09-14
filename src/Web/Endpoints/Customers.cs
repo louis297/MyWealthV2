@@ -2,6 +2,8 @@ using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Users;
 using MyWealthV2.Application.Users.Commands.CreateCustomer;
+using MyWealthV2.Application.Users.Commands.DisableCustomer;
+using MyWealthV2.Application.Users.Commands.EnableCustomer;
 using MyWealthV2.Application.Users.Commands.UpdateCustomer;
 using MyWealthV2.Application.Users.Queries.GetCustomerById;
 using MyWealthV2.Application.Users.Queries.GetCustomers;
@@ -27,6 +29,8 @@ public class Customers : IEndpointGroup
         groupBuilder.MapGet(GetCustomer, "{id}").RequireAuthorization(ManageOrOwn);
         groupBuilder.MapPost(CreateCustomer).RequireAuthorization(ManageOrOwn);
         groupBuilder.MapPut(UpdateCustomer, "{id}").RequireAuthorization(ManageOrOwn);
+        groupBuilder.MapPost(DisableCustomer, "{id}/disable").RequireAuthorization(ManageOrOwn);
+        groupBuilder.MapPost(EnableCustomer, "{id}/enable").RequireAuthorization(ManageOrOwn);
     }
 
     [EndpointSummary("List customers")]
@@ -67,6 +71,30 @@ public class Customers : IEndpointGroup
         ISender sender,
         Guid id,
         UpdateCustomerCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Disable a customer")]
+    [EndpointDescription("Disables a Customer. Idempotent. Phase 1 has no account guard.")]
+    public static async Task<NoContent> DisableCustomer(
+        ISender sender,
+        Guid id,
+        DisableCustomerCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Enable a customer")]
+    [EndpointDescription("Re-enables a Customer. Idempotent. TenantAdmin or the assigned Adviser.")]
+    public static async Task<NoContent> EnableCustomer(
+        ISender sender,
+        Guid id,
+        EnableCustomerCommand command)
     {
         command.Id = id;
         await sender.Send(command);
