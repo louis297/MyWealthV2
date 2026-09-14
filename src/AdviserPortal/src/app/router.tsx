@@ -1,4 +1,5 @@
 import { createBrowserRouter, type RouteObject } from "react-router";
+import { ProfilePage } from "@/features/profile/ProfilePage";
 import { CallbackPage } from "@/features/session/CallbackPage";
 import { ForbiddenPage } from "@/features/session/ForbiddenPage";
 import { HomePage } from "@/features/session/HomePage";
@@ -25,7 +26,7 @@ export const appRoutes: RouteObject[] = [
           {
             path: "/profile",
             element: <RoleGate allow={[roles.tenantAdmin, roles.adviser, roles.systemAdmin]} />,
-            children: [{ index: true, element: <p>profile</p> }],
+            children: [{ index: true, element: <ProfilePage /> }],
           },
           {
             path: "/customers",
