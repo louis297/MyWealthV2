@@ -8,8 +8,8 @@ public class Program
     {
         var builder = DistributedApplication.CreateBuilder(args);
 
-        builder.AddSqlServer(Services.DatabaseServer)
-            .AddDatabase(Services.Database);
+        builder.AddSqlServer(Services.TestDatabaseServer)
+            .AddDatabase(Services.TestDatabase);
 
         builder.Build().Run();
     }
