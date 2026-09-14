@@ -1,5 +1,6 @@
 import { createBrowserRouter, type RouteObject } from "react-router";
 import { CreateCustomerPage } from "@/features/customers/CreateCustomerPage";
+import { CustomerDetailPage } from "@/features/customers/CustomerDetailPage";
 import { CustomersListPage } from "@/features/customers/CustomersListPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
 import { CallbackPage } from "@/features/session/CallbackPage";
@@ -36,7 +37,7 @@ export const appRoutes: RouteObject[] = [
             children: [
               { index: true, element: <CustomersListPage /> },
               { path: "new", element: <CreateCustomerPage /> },
-              { path: ":id", element: <p>customer detail</p> },
+              { path: ":id", element: <CustomerDetailPage /> },
               { path: ":id/edit", element: <p>edit customer</p> },
             ],
           },
