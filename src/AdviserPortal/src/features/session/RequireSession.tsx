@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Navigate, Outlet, useLocation } from "react-router";
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
+import { startAuthorize } from "@/features/session/oidc";
 import { roles, shouldLoadTenant } from "@/features/session/roles";
 import { setCurrentUser, setTenant } from "@/features/session/sessionSlice";
 import { useGetMeQuery, useGetTenantByCodeQuery } from "@/shared/api/api";
@@ -25,6 +26,12 @@ export function RequireSession() {
       dispatch(setTenant(tenant));
     }
   }, [tenant, dispatch]);
+
+  useEffect(() => {
+    if (!accessToken) {
+      void startAuthorize();
+    }
+  }, [accessToken]);
 
   if (!accessToken || isLoading) {
     return <p>Loading session…</p>;
