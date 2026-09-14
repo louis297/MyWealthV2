@@ -1,8 +1,14 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const startEndSession = vi.fn();
+
+vi.mock("@/features/session/oidc", () => ({
+  startEndSession: () => startEndSession(),
+}));
 import {
   sessionSlice,
   setCurrentUser,
@@ -77,6 +83,7 @@ function renderShell(me: CurrentUser, withTenant = true) {
 describe("ShellLayout", () => {
   beforeEach(() => {
     sessionStorage.clear();
+    startEndSession.mockReset();
   });
 
   it("shows the firm Name from by-code and tenantCode as secondary for TenantAdmin", () => {
@@ -117,5 +124,13 @@ describe("ShellLayout", () => {
     expect(screen.getByRole("link", { name: "Profile" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Customers" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Advisers" })).not.toBeInTheDocument();
+  });
+
+  it("starts end-session when Sign out is clicked", () => {
+    renderShell(user());
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+
+    expect(startEndSession).toHaveBeenCalledOnce();
   });
 });
