@@ -161,7 +161,7 @@ The schema applicator runs **once** (default: `webapi` startup, or an explicit a
 | Issuer | Base URL of `identity` (Aspire service discovery in Development; a stable HTTPS name in production) |
 | Keys | Asymmetric signing. Development certificate is allowed. Production certificate; private key is not committed. APIs validate via JWKS. `UseLocalServer()` is not the default validation path |
 | Client | One `OpenIddictApplications` row: `ClientId = adviser-portal`, public + PKCE, password grant off |
-| Redirect | `adviser-portal` callback (local Vite origin + later deployed origin). Register the end-session post-logout redirect with the client |
+| Redirect | `{portalOrigin}/callback`. Post-logout `{portalOrigin}/`. Both must be upserted on the OpenIddict client (local Vite origin + Aspire dashboard alias) |
 | Scopes | `openid`, `profile`, `offline_access`, `api` |
 | Tokens | Short-lived JWT access. Refresh in `OpenIddictTokens`. Absolute / sliding lifetimes belong in the identity-auth Feature Spec |
 | Login page | Razor Pages at `/login` on `identity`. Validates with `UserManager`, then returns to the authorization-code flow |
@@ -264,7 +264,7 @@ A Customer completing the authorization-server flow must have a test. Adviser-ma
 
 - Client id and Aspire resource name: `adviser-portal`.
 - Login: redirect to hosted login on `identity`. The portal does not own a token-issuing password form.
-- Session: access + refresh. Refresh hits the token endpoint on `identity`. Logout is end session + revoke.
+- Session: access + refresh. Refresh hits the token endpoint on `identity`. Logout is end session (`/connect/logout` action on IdentityHost, identity-auth R21) plus `POST /connect/revocation`. The portal redeems an authorization code once.
 - Menu filtered by role. A Customer must not enter this client.
 - Phase 1 pages: shell, Profile, Customers, Advisers. Default home is Customers. No Accounts, Instruments, Transactions, or Dashboard.
 - People resource APIs use the `/users` namespace (`/users/me`, `/users/advisers`, `/users/customers`, `/users/tenant-admins`). Tenants and currencies stay at the root.
@@ -309,5 +309,6 @@ Locked conclusions follow function-plan §0 and these ADRs. This folder currentl
 | --- | --- |
 | 2026-09-11 | First English draft. Aligns with locked Phase-1 host: `identity` + `webapi` + `adviser-portal`, shared `MyWealthDbV2`, OpenIddict authorization code + PKCE, dual-check tenancy, Phase-1 ports only. |
 | 2026-09-11 | Protocol paths locked to OpenIddict defaults (including `/connect/revocation` and `/connect/logout`); do not remap. |
+| 2026-09-14 | End-session passthrough requires an IdentityHost SignOut action (identity-auth R21). Portal revokes refresh then redirects; authorization codes redeem once. |
 | 2026-09-11 | Point HTTP conventions at api-design.md. People APIs use the `/users` namespace. |
 | 2026-09-12 | identity-auth: Razor `/login`; JWT claim names; 15 min / 14 day absolute tokens. Currencies not in the identity-auth script set. |

@@ -48,7 +48,9 @@ Feature code lives under `features/<name>/` (`session`, then `profile`, `custome
 
 - One client in `shared/api`. Base URL from Aspire / env (`webapi`).
 - `Authorization: Bearer <access>`.
-- On 401, try refresh once against identity `/connect/token`; if that fails, clear the session and restart authorize.
+- On 401, try refresh once against identity `/connect/token`; if that fails, clear the session and restart authorize unless sign-out is already in progress.
+- `/callback` redeems a given authorization code once. Keep React StrictMode.
+- Sign out revokes refresh at `/connect/revocation`, then identity `/connect/logout`. No portal `/auth/logout`.
 - Do not treat a cross-tenant 404 as 403.
 
 ## Style

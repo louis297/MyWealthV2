@@ -169,7 +169,7 @@ Protocol paths use **OpenIddict defaults. Do not remap.** Portals and `webapi` f
 | Authorize | `GET /connect/authorize` | Authorization code + PKCE. Unauthenticated callers hit hosted login |
 | Token | `POST /connect/token` | Exchange for access / refresh; also used to refresh. No password grant |
 | Revocation | `POST /connect/revocation` | Revoke refresh on logout (default name is revocation, not revoke) |
-| End session | `GET /connect/logout` | Portal returns to its post-logout redirect |
+| End session | `GET/POST /connect/logout` | Portal returns to registered `{portalOrigin}/`. IdentityHost passthrough requires the SignOut action in identity-auth R21 |
 | Userinfo | `GET /connect/userinfo` | Library default; Phase 1 portal mainly uses access-token claims |
 | Hosted login | Password page on `identity` | email + password + tenantCode (SystemAdmin omits tenantCode). **Not** a `/connect` protocol endpoint. Razor Pages at `/login` |
 
@@ -180,7 +180,8 @@ Protocol paths use **OpenIddict defaults. Do not remap.** Portals and `webapi` f
 | ClientId | `adviser-portal` |
 | Type | Public client + PKCE |
 | Grant | Authorization code + refresh. Password grant off |
-| Redirect | Portal callback (local Vite origin + later deployed origin) |
+| Redirect | `{portalOrigin}/callback` |
+| Post-logout | `{portalOrigin}/` |
 
 **Out (authorization server)**
 

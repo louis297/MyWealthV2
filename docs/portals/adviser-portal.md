@@ -38,7 +38,7 @@ Vite on Aspire, discovery + PKCE authorize, `/callback`, session probe via `GET 
 | Path | Behaviour (landed) |
 | --- | --- |
 | `/` | No access token → authorize. Signed in → session probe. |
-| `/callback` | PKCE exchange, then `/`. |
+| `/callback` | PKCE exchange **once per code**, then the return path. Concurrent mounts must not POST `/connect/token` twice (no OpenIddict `ID2010`). |
 
 ---
 
@@ -83,7 +83,7 @@ Do not start until A and B have landed.
 
 | Path | Who | Behaviour |
 | --- | --- | --- |
-| `/callback` | Protocol | Exchange, then return path. |
+| `/callback` | Protocol | Exchange a given `code` once, then return path. |
 | `/` | Allowed roles | Redirect `/customers`. |
 | `/customers` | TenantAdmin, Adviser | List. |
 | `/customers/new` | Same | Create. |
@@ -108,6 +108,7 @@ Do not start until A and B have landed.
 | Post-logout | `{portalOrigin}/` |
 | Token store | Redux + `sessionStorage` |
 | Allow-list (after A) | SystemAdmin, TenantAdmin, Adviser |
+| Sign out | Clear store + `sessionStorage`; `POST /connect/revocation` with the refresh token; redirect to discovery `end_session_endpoint` with `client_id` and `post_logout_redirect_uri={origin}/`. While that is in flight, `RequireSession`, `HomePage`, and the 401 handler must **not** call `startAuthorize`. |
 
 ### Acceptance (cut C)
 
@@ -127,7 +128,7 @@ Requires A and B in the running hosts. Do not re-test A1–A10 or B1–B11 here 
 | C10 | TenantAdmin | Disable / enable customer with current `rowVersion` | 204. Stale `rowVersion` → page tells the user to reload; it does not replay the old version. |
 | C11 | TenantAdmin | Create / rename / disable adviser | Same route split as customers. Disable while assigned customers are Active → ordinary 400 sentence + link to `/customers?adviserId=`. Not painted as `code=disabled`. |
 | C12 | TenantAdmin | `PUT /users/me` and `PUT /users/me/password` | Name updates. Password 204 then the app clears tokens and starts authorize again. |
-| C13 | Any allowed role | Sign out | Portal session cleared (`sessionStorage` empty). Next visit hits hosted login (end-session draft default). |
+| C13 | Any allowed role | Sign out | Portal session cleared (`sessionStorage` empty). Refresh revoked at `/connect/revocation`. IdentityHost end-session clears the hosted-login cookie (R21). Next visit is hosted `/login`, not a silent authorize. Same authorization `code` is not exchanged twice. |
 | C14 | Deep link `/customers/{id}` while signed out | After callback | Returns to that path when it is an in-app path (draft default 13.6). |
 | C15 | Cross-tenant or unassigned customer id | Open `/customers/{id}` | “Not found” on that URL. Not 403. Not a bounce to the list before the message. |
 

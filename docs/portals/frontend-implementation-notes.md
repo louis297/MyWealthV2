@@ -61,7 +61,7 @@ A  identity-auth — client × role allow-list
 Locked behaviour:
 
 - Unauthenticated visit → discovery → `/connect/authorize` (PKCE S256 + `offline_access`)
-- `/callback` exchanges the code; tokens live in Redux + `sessionStorage` (not `localStorage`)
+- `/callback` exchanges the code **once**; tokens live in Redux + `sessionStorage` (not `localStorage`)
 - Then `GET {webapi}/users/me`
 - 401 → refresh **once** at the identity token endpoint; on failure clear session and authorize again
 - No React password login page
@@ -210,7 +210,7 @@ Order:
 | Profile | ✓ | ✓ | ✓ | |
 | Session probe | not in menu | not in menu | URL only | |
 
-Sign-out draft default: clear Redux + `sessionStorage`, then discovery end-session (`/connect/logout`), return `{portalOrigin}/`.
+Sign out (locked with C13 / identity-auth R21): clear Redux + `sessionStorage`, `POST /connect/revocation` for the refresh token, then discovery end-session (`/connect/logout`) with `client_id` and `post_logout_redirect_uri={portalOrigin}/`. Do not call `startAuthorize` from `RequireSession`, `HomePage`, or the 401 handler while end-session is running. `completeCallback` must be single-flight so React StrictMode cannot redeem the same code twice (`ID2010`). Keep StrictMode enabled.
 
 No tenant switcher. No greyed Phase-2 ledger items.
 
@@ -343,13 +343,13 @@ Repository must build after each commit. Do not mix IdentityHost or `tenants.rea
 | 13.9 | Client-side join from `GET /users/advisers`. No `adviserName` on the customers item. |
 | 13.12 | Read-only detail + `/…/:id/edit`. Disable / enable stay on detail. |
 | 13.18 | Firm **Name** on the shell. `GET /tenants/by-code/{code}` + `tenants.read`. Do not put `tenantName` on `/users/me`. TenantAdmin / Adviser: own code only (else 404). Customer 403. SystemAdmin any code. Separate backend amendment B. Path must be `by-code` so it does not collide with `GET /tenants/{id}`. |
+| 13.2 | Sign out = clear portal + revoke refresh + IdentityHost end-session (identity-auth R21). `/callback` redeems a given authorization code once. Keep React StrictMode. No `/auth/logout`. |
 
 ### Still draft defaults (not accepted)
 
 | Id | Default |
 | --- | --- |
 | 13.1 | UI copy in English |
-| 13.2 | Sign out = clear portal + end-session |
 | 13.3 | Keep probe at `/session`, out of the menu |
 | 13.4 | SystemAdmin: Profile + `/session`; product collections `/forbidden` |
 | 13.6 | In-app `returnTo` after callback |

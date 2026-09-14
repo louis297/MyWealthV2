@@ -96,9 +96,10 @@ A person may complete authorization only for a client that allows that `Users.Ro
 | R15 | `webapi` returns 401 on auth failure. It must **never** 302 to hosted login. Login-page cookies stay on the `identity` origin. |
 | R16 | The schema applicator runs once (default: `webapi` startup). `identity` must not run a second applicator. Both hosts share `MyWealthDbV2` and the same Infrastructure mappings. |
 | R17 | Phase 1 named policies are the seven names below. `GET /currencies` uses default `.RequireAuthorization()`. Do not register `currencies.read`. |
-| R18 | Password change, person disable, tenant disable, and logout revoke tokens. The User aggregate does not hold tokens; domain events plus an application port do. |
+| R18 | Password change, person disable, tenant disable, and logout revoke tokens. Disable / password change use domain events plus `ITokenRevocation`. Logout revokes on `identity` (R21). The User aggregate does not hold tokens. |
 | R19 | Identity may keep its `Email` column (framework). Uniqueness lives on Domain `Users`. |
 | R20 | Client allow-list (Phase 1 implements the first row only): `adviser-portal` → SystemAdmin, TenantAdmin, Adviser. Reserved, do not register the clients: `customer-portal` → Customer; Back Office (name unlocked) → SystemAdmin. Wrong role → no code, uniform failure. Do not say “no identity”. |
+| R21 | End session is OpenIddict `GET/POST /connect/logout`. While `EnableEndSessionEndpointPassthrough` is on, IdentityHost **must** expose a matching action: `SignInManager.SignOutAsync()` then `SignOut(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme)`. That clears the hosted-login cookie. The portal sends `client_id` and `post_logout_redirect_uri` (registered `{portalOrigin}/`). Revoke the refresh token at `POST /connect/revocation` (`token_type_hint=refresh_token`) before that redirect, or revoke the subject inside the action. Do **not** add `/auth/logout`. Do not remap the path. |
 
 `RolePermissions` (ADR 0013). This slice registers the map. Customer APIs ship later.
 
@@ -233,7 +234,7 @@ Protocol surface: [api-design.md](../api-design.md) §5. Default paths, do not r
 | Authorize | `GET /connect/authorize` | Unauthenticated → `/login` | 302 / code | Uniform login failure |
 | Token | `POST /connect/token` | Client + PKCE | access / refresh | 400; revoked refresh fails |
 | Revocation | `POST /connect/revocation` | Protocol | 200 | |
-| End session | `GET /connect/logout` | Session | Portal post-logout redirect | |
+| End session | `GET/POST /connect/logout` | Identity cookie | 302 to registered `post_logout_redirect_uri` | 400 if that URI is not registered (OpenIddict `ID2052`) |
 | Userinfo | `GET /connect/userinfo` | Access | 200 | 401 |
 | Hosted login | `GET/POST /login` on `identity` | Public page | Resume `/connect/authorize` | Uniform failure |
 
@@ -276,7 +277,8 @@ Phase 1 client:
 | ClientId | `adviser-portal` |
 | Type | Public + PKCE |
 | Grant | Authorization code + refresh |
-| Redirect | Portal callback (local Vite origin + later deployed origin) |
+| Redirect | `{portalOrigin}/callback` |
+| Post-logout | `{portalOrigin}/` — must be on the OpenIddict client `PostLogoutRedirectUris` |
 
 Keep [api-design.md](../api-design.md) in the same change when the catalog moves.
 
@@ -288,7 +290,7 @@ Adviser Portal:
 
 - Unauthenticated protected route → redirect to `identity` `/connect/authorize` (then `/login`)
 - Callback stores access / refresh; later calls use Bearer only
-- Logout: end session + revocation; clear local tokens
+- Logout: portal clears local tokens, revokes refresh at `/connect/revocation`, then discovery end-session. IdentityHost R21 must sign out the hosted-login cookie so the next visit is `/login`, not a silent code. `/callback` redeems a given authorization code **once** (React StrictMode must not produce OpenIddict `ID2010`). |
 - **Do not** host a password form that issues tokens
 - Profile: `/users/me`; change name; change password (current + new). After password change, run login again
 
@@ -303,7 +305,7 @@ SystemAdmin has no portal. Use Scalar and the same authorization flow. Do not bu
 | Project | Assert |
 | --- | --- |
 | Domain.UnitTests | Legal `UserStatus` transitions; SystemAdmin / tenant role shape; login-gate function (disabled tenant, non-Active, missing Identity link → reject) |
-| Application.FunctionalTests | Start `identity` and `webapi`. Tenant A’s email must not complete login with tenant B’s code. Refresh fails after password change or disable. Customer + correct password on client `adviser-portal` → **no authorization code** (uniform failure). TenantAdmin / Adviser / SystemAdmin on `adviser-portal` still complete the flow. Do **not** call `/users/advisers` from this slice. Missing Bearer on `/users/me` → 401, never 302. `RolePermissions.Has` covers four roles × seven policies (includes `tenants.read`). `PUT /users/me` cannot change email (400). `rowVersion` conflict → 409 |
+| Application.FunctionalTests | Start `identity` and `webapi`. Tenant A’s email must not complete login with tenant B’s code. Refresh fails after password change or disable. Customer + correct password on client `adviser-portal` → **no authorization code** (uniform failure). TenantAdmin / Adviser / SystemAdmin on `adviser-portal` still complete the flow. Do **not** call `/users/advisers` from this slice. Missing Bearer on `/users/me` → 401, never 302. `RolePermissions.Has` covers four roles × seven policies (includes `tenants.read`). `PUT /users/me` cannot change email (400). `rowVersion` conflict → 409. `GET /connect/logout` with `client_id=adviser-portal` and a registered `post_logout_redirect_uri` → 302 to that URI, never 400 when the URI is registered |
 | Infrastructure.IntegrationTests | After scripts: Identity + OpenIddict + UserTokens exist; no AspNetRoles; `adviser-portal` is discoverable; UserName / Email lookup does not hit another tenant |
 
 Isolation in this slice is the login resolver: wrong tenantCode + correct email must fail.
@@ -354,6 +356,16 @@ Gate: password check has already succeeded. Client id is the `client_id` on the 
 | A10 | Existing isolation | Tenant A email + tenant B code | Still fails before the allow-list (wrong tenant). Do not weaken R1–R3. |
 
 Customers create smoke ([customers.md](customers.md) §10) must use A1 + A2, not “hosted login succeeds”.
+
+### Amendment 2026-09-14 (R21 — end session)
+
+Passthrough without an action left `/connect/logout` unhandled. Manual Sign out then bounced through `/callback` and OpenIddict returned `invalid_grant` / `ID2010` (authorization code redeemed twice). No new ADR. No `/auth/logout`.
+
+| Id | Given | When | Then |
+| --- | --- | --- | --- |
+| A11 | `adviser-portal` client, registered `{origin}/` post-logout URI | `GET /connect/logout?client_id=adviser-portal&post_logout_redirect_uri={origin}/` | 302 to that URI. Not 400. Hosted-login cookie is gone after the action. |
+| A12 | Same as A11 but `post_logout_redirect_uri` is an unregistered origin | GET `/connect/logout` | 400 `invalid_request` (OpenIddict `ID2052`). |
+| A13 | Active Adviser (or TenantAdmin) with a refresh token | Portal Sign out | Refresh fails at `/connect/token`. Next portal visit shows hosted `/login`, not a silent code. |
 
 ---
 
