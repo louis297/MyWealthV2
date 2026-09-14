@@ -137,4 +137,57 @@ describe("customers API", () => {
     expect(request.url).toBe(`https://webapi.test/users/customers/${envelope.items[0].id}`);
     expect(request.method).toBe("GET");
   });
+
+  it("PUTs /users/customers/{id} with name, adviserId, and rowVersion", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    const store = createStore();
+    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
+
+    await store.dispatch(
+      customersApi.endpoints.updateCustomer.initiate({
+        id: envelope.items[0].id,
+        name: "Jordan Lee",
+        adviserId: envelope.items[0].adviserId,
+        rowVersion: "AAAA",
+      }),
+    );
+
+    const request = fetchMock.mock.calls[0][0] as Request;
+    expect(request.url).toBe(`https://webapi.test/users/customers/${envelope.items[0].id}`);
+    expect(request.method).toBe("PUT");
+    expect(JSON.parse(await request.text())).toEqual({
+      name: "Jordan Lee",
+      adviserId: envelope.items[0].adviserId,
+      rowVersion: "AAAA",
+    });
+  });
+
+  it("POSTs disable and enable with the current rowVersion", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    const store = createStore();
+    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
+    const id = envelope.items[0].id;
+
+    await store.dispatch(
+      customersApi.endpoints.disableCustomer.initiate({ id, rowVersion: "AAAA" }),
+    );
+    await store.dispatch(
+      customersApi.endpoints.enableCustomer.initiate({ id, rowVersion: "BBBB" }),
+    );
+
+    const disable = fetchMock.mock.calls[0][0] as Request;
+    expect(disable.url).toBe(`https://webapi.test/users/customers/${id}/disable`);
+    expect(disable.method).toBe("POST");
+    expect(JSON.parse(await disable.text())).toEqual({ rowVersion: "AAAA" });
+
+    const enable = fetchMock.mock.calls[1][0] as Request;
+    expect(enable.url).toBe(`https://webapi.test/users/customers/${id}/enable`);
+    expect(JSON.parse(await enable.text())).toEqual({ rowVersion: "BBBB" });
+  });
 });
