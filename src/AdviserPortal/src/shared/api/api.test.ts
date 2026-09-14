@@ -1,5 +1,6 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { startEndSession } from "@/features/session/oidc";
 import { sessionSlice, setTokens } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
 
@@ -126,6 +127,49 @@ describe("GET /users/me", () => {
 
     expect(store.getState().session.accessToken).toBeNull();
     expect(startAuthorize).toHaveBeenCalledOnce();
+  });
+
+  it("does not start authorize from 401 while end-session is in progress", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(async (input) => {
+      const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
+      if (url.includes("openid-configuration")) {
+        return new Response(
+          JSON.stringify({
+            authorization_endpoint: "https://identity.test/connect/authorize",
+            token_endpoint: "https://identity.test/connect/token",
+            revocation_endpoint: "https://identity.test/connect/revocation",
+            end_session_endpoint: "https://identity.test/connect/logout",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (url.includes("/connect/revocation")) {
+        return new Response("", { status: 200 });
+      }
+      if (url.endsWith("/users/me")) {
+        return new Response("", { status: 401 });
+      }
+      if (url.includes("/connect/token")) {
+        return new Response("", { status: 400 });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    const assign = vi.fn();
+    vi.stubGlobal("location", {
+      origin: "http://localhost:5173",
+      href: "http://localhost:5173/customers",
+      assign,
+    });
+
+    const store = createStore();
+    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
+
+    await startEndSession();
+    await store.dispatch(api.endpoints.getMe.initiate());
+
+    expect(startAuthorize).not.toHaveBeenCalled();
   });
 });
 
