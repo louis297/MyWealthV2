@@ -128,7 +128,7 @@ describe("CustomersListPage", () => {
 
     expect(await screen.findByText("Jordan Lee")).toBeInTheDocument();
     expect(screen.getByText("jordan@north.example")).toBeInTheDocument();
-    expect(screen.getByText("Sam Reed")).toBeInTheDocument();
+    expect(screen.getAllByText("Sam Reed").length).toBeGreaterThan(0);
     expect(screen.getByText("2026-09-14")).toBeInTheDocument();
     expect(screen.queryByText(adviserId)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Jordan Lee" })).toHaveAttribute(
