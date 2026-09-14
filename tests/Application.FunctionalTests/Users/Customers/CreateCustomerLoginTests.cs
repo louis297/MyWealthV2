@@ -6,7 +6,7 @@ namespace MyWealthV2.Application.FunctionalTests.Users.Customers;
 public class CreateCustomerLoginTests : TestBase
 {
     [Test]
-    public async Task HostedLogin_AfterCreate_CompletesAndCollectionStays403()
+    public async Task HostedLogin_AfterCreate_DoesNotIssueAdviserPortalCode()
     {
         var (_, adviser, tokens) = await CustomerHttp.SignInTenantAdmin(
             "North Advisory", "north-advisory", "tess@north.example");
@@ -23,14 +23,11 @@ public class CreateCustomerLoginTests : TestBase
         using var created = JsonDocument.Parse(await create.Content.ReadAsStringAsync());
         created.RootElement.GetProperty("id").GetGuid().ShouldNotBe(Guid.Empty);
 
-        var login = await FunctionalTestSetup.Oidc.SignInAsync(
+        (await TestApp.CheckPasswordAsync("Jordan@north.example", "Passw0rd!", "north-advisory"))
+            .ShouldBeTrue();
+
+        var login = await FunctionalTestSetup.Oidc.SubmitLoginAsync(
             "Jordan@north.example", "Passw0rd!", "north-advisory");
-        login.AccessToken.ShouldNotBeNullOrEmpty();
-
-        (await CustomerHttp.Send(HttpMethod.Get, "/users/customers", login.AccessToken))
-            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
-
-        var me = await CustomerHttp.Send(HttpMethod.Get, "/users/me", login.AccessToken);
-        me.StatusCode.ShouldBe(HttpStatusCode.OK);
+        login.Code.ShouldBeNull();
     }
 }

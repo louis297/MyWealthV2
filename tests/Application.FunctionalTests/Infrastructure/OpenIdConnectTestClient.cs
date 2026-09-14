@@ -99,6 +99,71 @@ public sealed class OpenIdConnectTestClient(Func<HttpClient> createClient)
         }
     }
 
+    public async Task<HostedLoginResult> SubmitLoginAsync(string email, string password, string? tenantCode)
+    {
+        using var identityClient = CreateClient();
+        var challenge = Base64Url(SHA256.HashData(Encoding.ASCII.GetBytes(Base64Url(RandomNumberGenerator.GetBytes(32)))));
+        var authorize = "/connect/authorize?" + string.Join("&",
+        [
+            "client_id=" + Uri.EscapeDataString(ClientId),
+            "redirect_uri=" + Uri.EscapeDataString(RedirectUri),
+            "response_type=code",
+            "scope=" + Uri.EscapeDataString("openid profile offline_access api"),
+            "code_challenge=" + challenge,
+            "code_challenge_method=S256",
+            "state=" + Base64Url(RandomNumberGenerator.GetBytes(16))
+        ]);
+
+        var location = await FollowToLoginAsync(identityClient, authorize);
+        var loginHtml = await (await identityClient.GetAsync(location)).Content.ReadAsStringAsync();
+        var token = Regex.Match(loginHtml, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"").Groups[1].Value;
+        if (string.IsNullOrEmpty(token))
+        {
+            token = Regex.Match(loginHtml, "value=\"([^\"]+)\"[^>]*name=\"__RequestVerificationToken\"").Groups[1].Value;
+        }
+
+        using var login = new FormUrlEncodedContent(new Dictionary<string, string?>
+        {
+            ["Email"] = email,
+            ["Password"] = password,
+            ["TenantCode"] = tenantCode ?? "",
+            ["__RequestVerificationToken"] = token
+        });
+
+        var afterLogin = await identityClient.PostAsync(location, login);
+        return await CollectLoginResultAsync(identityClient, afterLogin);
+    }
+
+    private static async Task<HostedLoginResult> CollectLoginResultAsync(
+        HttpClient client,
+        HttpResponseMessage response)
+    {
+        for (var i = 0; i < 8; i++)
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            if (response.Headers.Location is { } location)
+            {
+                var target = location.IsAbsoluteUri ? location : new Uri(client.BaseAddress!, location);
+                if (target.AbsoluteUri.StartsWith(RedirectUri, StringComparison.OrdinalIgnoreCase))
+                {
+                    return new HostedLoginResult(
+                        (int)response.StatusCode,
+                        body,
+                        target,
+                        HttpUtility.ParseQueryString(target.Query)["code"]);
+                }
+
+                response.Dispose();
+                response = await client.GetAsync(location);
+                continue;
+            }
+
+            return new HostedLoginResult((int)response.StatusCode, body, Location: null, Code: null);
+        }
+
+        return new HostedLoginResult((int)response.StatusCode, await response.Content.ReadAsStringAsync(), response.Headers.Location, Code: null);
+    }
+
     private HttpClient CreateClient()
     {
         var identityClient = createClient();
@@ -162,3 +227,5 @@ public sealed class OpenIdConnectTestClient(Func<HttpClient> createClient)
 }
 
 public sealed record TokenResponse(string AccessToken, string? RefreshToken);
+
+public sealed record HostedLoginResult(int StatusCode, string Body, Uri? Location, string? Code);

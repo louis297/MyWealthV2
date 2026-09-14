@@ -144,4 +144,37 @@ public static class TestApp
 
         return await context.Set<TEntity>().CountAsync();
     }
+
+    public static async Task<bool> CheckPasswordAsync(string email, string password, string? tenantCode)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+        User? person;
+        if (string.IsNullOrWhiteSpace(tenantCode))
+        {
+            person = await db.DomainUsers.SingleOrDefaultAsync(
+                row => row.Role == UserRole.SystemAdmin && row.Email == email);
+        }
+        else
+        {
+            var tenant = await db.Tenants.SingleOrDefaultAsync(row => row.Code == tenantCode);
+            if (tenant is null)
+            {
+                return false;
+            }
+
+            person = await db.DomainUsers.SingleOrDefaultAsync(
+                row => row.TenantId == tenant.Id && row.Email == email);
+        }
+
+        if (person is null)
+        {
+            return false;
+        }
+
+        var identityUser = await userManager.FindByIdAsync(person.IdentityUserId);
+        return identityUser is not null && await userManager.CheckPasswordAsync(identityUser, password);
+    }
 }
