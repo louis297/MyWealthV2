@@ -12,4 +12,7 @@ public static class Policies
     public const string InstrumentsRead = "instruments.read";
     public const string InstrumentsCreate = "instruments.create";
     public const string InstrumentsManage = "instruments.manage";
+    public const string AccountsRead = "accounts.read";
+    public const string AccountsCreate = "accounts.create";
+    public const string AccountsManage = "accounts.manage";
 }

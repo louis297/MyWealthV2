@@ -56,4 +56,21 @@ public class RolePermissionsTests
     {
         RolePermissions.Has(role, policy).ShouldBe(expected);
     }
+
+    [TestCase(UserRole.SystemAdmin, Policies.AccountsRead, true)]
+    [TestCase(UserRole.SystemAdmin, Policies.AccountsCreate, true)]
+    [TestCase(UserRole.SystemAdmin, Policies.AccountsManage, true)]
+    [TestCase(UserRole.TenantAdmin, Policies.AccountsRead, true)]
+    [TestCase(UserRole.TenantAdmin, Policies.AccountsCreate, true)]
+    [TestCase(UserRole.TenantAdmin, Policies.AccountsManage, true)]
+    [TestCase(UserRole.Adviser, Policies.AccountsRead, true)]
+    [TestCase(UserRole.Adviser, Policies.AccountsCreate, true)]
+    [TestCase(UserRole.Adviser, Policies.AccountsManage, true)]
+    [TestCase(UserRole.Customer, Policies.AccountsRead, false)]
+    [TestCase(UserRole.Customer, Policies.AccountsCreate, false)]
+    [TestCase(UserRole.Customer, Policies.AccountsManage, false)]
+    public void Has_MatchesAccountsMap(UserRole role, string policy, bool expected)
+    {
+        RolePermissions.Has(role, policy).ShouldBe(expected);
+    }
 }
