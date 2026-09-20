@@ -1,8 +1,10 @@
+using FluentValidation.Results;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Domain.Enums;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
+using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationException;
 
 namespace MyWealthV2.Application.Users.Commands.DisableCustomer;
 
@@ -45,6 +47,15 @@ public class DisableCustomerCommandHandler(IApplicationDbContext db, ICurrentUse
         if (person.Status == UserStatus.Disabled)
         {
             return;
+        }
+
+        if (await db.Accounts.AnyAsync(
+                account => account.CustomerId == person.Id && account.IsActive, cancellationToken))
+        {
+            throw new ValidationException([
+                new ValidationFailure(string.Empty,
+                    "Cannot disable a customer who still has an active account.")
+            ]);
         }
 
         person.Disable();

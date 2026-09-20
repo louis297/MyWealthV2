@@ -1,6 +1,7 @@
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
+using MyWealthV2.Domain.Enums;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 
 namespace MyWealthV2.Application.Accounts.Commands.ReopenAccount;
@@ -34,6 +35,17 @@ public class ReopenAccountCommandHandler(IApplicationDbContext db, ICurrentUser 
         if (!string.Equals(expected, request.RowVersion, StringComparison.Ordinal))
         {
             throw new ConcurrencyException();
+        }
+
+        var customer = await db.Users.SingleAsync(
+            row => row.Id == account.CustomerId, cancellationToken);
+        if (customer.Status == UserStatus.Disabled)
+        {
+            throw new TargetDisabledException(
+                "user",
+                customer.PublicId,
+                "User is disabled",
+                "Cannot reopen an account while the customer is disabled. Enable the customer first.");
         }
 
         account.Reopen();
