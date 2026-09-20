@@ -12,6 +12,8 @@ public class User : BaseAuditableEntity
 
     public UserStatus Status { get; private set; }
 
+    public bool IsActive { get; private set; }
+
     public UserRole Role { get; private set; }
 
     public string Name { get; private set; } = string.Empty;

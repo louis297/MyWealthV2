@@ -19,6 +19,8 @@ public class Tenant : BaseAuditableEntity
 
     public bool IsEnabled { get; private set; }
 
+    public bool IsActive { get; private set; }
+
     public byte[] RowVersion { get; private set; } = null!;
 
     public static Tenant Create(string name, string code, Currency reportingCurrency, Guid? publicId = null)

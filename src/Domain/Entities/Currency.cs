@@ -16,6 +16,8 @@ public class Currency
 
     public bool IsEnabled { get; private set; }
 
+    public bool IsActive { get; private set; }
+
     public static Currency Create(string code, string name, int decimalPlaces, bool isEnabled = true)
     {
         if (string.IsNullOrWhiteSpace(code) || code.Trim().Length != 3 || !code.Trim().All(char.IsAsciiLetter))

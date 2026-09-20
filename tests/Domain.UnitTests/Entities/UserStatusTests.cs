@@ -20,6 +20,7 @@ public class UserStatusTests
             withPassword: true);
 
         user.Status.ShouldBe(UserStatus.Active);
+        user.IsActive.ShouldBeTrue();
         user.DomainEvents.OfType<UserActivated>().ShouldHaveSingleItem();
     }
 
@@ -34,6 +35,7 @@ public class UserStatusTests
             withPassword: false);
 
         user.Status.ShouldBe(UserStatus.PendingActivation);
+        user.IsActive.ShouldBeFalse();
         user.DomainEvents.OfType<UserActivated>().ShouldBeEmpty();
     }
 
@@ -45,6 +47,7 @@ public class UserStatusTests
         user.Disable();
 
         user.Status.ShouldBe(UserStatus.Disabled);
+        user.IsActive.ShouldBeFalse();
         user.DomainEvents.OfType<UserDisabled>().ShouldHaveSingleItem();
     }
 
@@ -61,6 +64,7 @@ public class UserStatusTests
         user.Disable();
 
         user.Status.ShouldBe(UserStatus.Disabled);
+        user.IsActive.ShouldBeFalse();
         user.DomainEvents.OfType<UserDisabled>().ShouldHaveSingleItem();
     }
 
@@ -74,6 +78,7 @@ public class UserStatusTests
         user.Enable();
 
         user.Status.ShouldBe(UserStatus.Active);
+        user.IsActive.ShouldBeTrue();
         user.DomainEvents.OfType<UserActivated>().ShouldHaveSingleItem();
     }
 
@@ -90,6 +95,7 @@ public class UserStatusTests
         user.Activate();
 
         user.Status.ShouldBe(UserStatus.Active);
+        user.IsActive.ShouldBeTrue();
         user.DomainEvents.OfType<UserActivated>().ShouldHaveSingleItem();
     }
 

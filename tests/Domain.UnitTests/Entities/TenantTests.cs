@@ -14,7 +14,7 @@ public class TenantTests
         var tenant = Tenant.Create("Acme", "acme", Nzd());
 
         tenant.DomainEvents.OfType<TenantCreated>().ShouldHaveSingleItem();
-        tenant.IsEnabled.ShouldBeTrue();
+        tenant.IsActive.ShouldBeTrue();
     }
 
     [Test]
@@ -47,7 +47,7 @@ public class TenantTests
 
         tenant.Enable();
 
-        tenant.IsEnabled.ShouldBeTrue();
+        tenant.IsActive.ShouldBeTrue();
         tenant.DomainEvents.OfType<TenantEnabled>().ShouldHaveSingleItem();
     }
 
@@ -59,7 +59,7 @@ public class TenantTests
 
         tenant.Enable();
 
-        tenant.IsEnabled.ShouldBeTrue();
+        tenant.IsActive.ShouldBeTrue();
         tenant.DomainEvents.ShouldBeEmpty();
     }
 
@@ -72,7 +72,7 @@ public class TenantTests
 
         tenant.Disable();
 
-        tenant.IsEnabled.ShouldBeFalse();
+        tenant.IsActive.ShouldBeFalse();
         tenant.DomainEvents.ShouldBeEmpty();
     }
 
@@ -83,7 +83,7 @@ public class TenantTests
 
         tenant.Disable();
 
-        tenant.IsEnabled.ShouldBeFalse();
+        tenant.IsActive.ShouldBeFalse();
         tenant.DomainEvents.OfType<TenantDisabled>().ShouldHaveSingleItem();
     }
 

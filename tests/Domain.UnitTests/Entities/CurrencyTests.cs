@@ -15,7 +15,7 @@ public class CurrencyTests
         currency.Code.ShouldBe("NZD");
         currency.Name.ShouldBe("New Zealand Dollar");
         currency.DecimalPlaces.ShouldBe(2);
-        currency.IsEnabled.ShouldBeTrue();
+        currency.IsActive.ShouldBeTrue();
     }
 
     [Test]
@@ -39,7 +39,7 @@ public class CurrencyTests
     {
         var currency = Currency.Create("JPY", "Japanese Yen", 0, isEnabled: false);
 
-        currency.IsEnabled.ShouldBeFalse();
+        currency.IsActive.ShouldBeFalse();
         currency.DecimalPlaces.ShouldBe(0);
     }
 }

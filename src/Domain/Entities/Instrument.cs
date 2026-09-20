@@ -18,6 +18,8 @@ public class Instrument : BaseAuditableEntity
 
     public bool IsEnabled { get; private set; }
 
+    public bool IsActive { get; private set; }
+
     public byte[] RowVersion { get; private set; } = null!;
 
     public static Instrument Create(

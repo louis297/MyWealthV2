@@ -22,7 +22,7 @@ public class InstrumentTests
         var instrument = Instrument.Create(1, "VTI", "Vanguard", Usd());
 
         instrument.DomainEvents.OfType<InstrumentCreated>().ShouldHaveSingleItem();
-        instrument.IsEnabled.ShouldBeTrue();
+        instrument.IsActive.ShouldBeTrue();
         instrument.TenantId.ShouldBe(1);
         instrument.Name.ShouldBe("Vanguard");
         instrument.QuoteCurrency.ShouldBe("USD");
@@ -75,7 +75,7 @@ public class InstrumentTests
 
         instrument.Disable();
 
-        instrument.IsEnabled.ShouldBeFalse();
+        instrument.IsActive.ShouldBeFalse();
         instrument.DomainEvents.OfType<InstrumentDisabled>().ShouldHaveSingleItem();
     }
 
@@ -88,7 +88,7 @@ public class InstrumentTests
 
         instrument.Disable();
 
-        instrument.IsEnabled.ShouldBeFalse();
+        instrument.IsActive.ShouldBeFalse();
         instrument.DomainEvents.ShouldBeEmpty();
     }
 
@@ -101,7 +101,7 @@ public class InstrumentTests
 
         instrument.Enable();
 
-        instrument.IsEnabled.ShouldBeTrue();
+        instrument.IsActive.ShouldBeTrue();
         instrument.DomainEvents.OfType<InstrumentEnabled>().ShouldHaveSingleItem();
     }
 
@@ -113,7 +113,7 @@ public class InstrumentTests
 
         instrument.Enable();
 
-        instrument.IsEnabled.ShouldBeTrue();
+        instrument.IsActive.ShouldBeTrue();
         instrument.DomainEvents.ShouldBeEmpty();
     }
 
