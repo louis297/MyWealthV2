@@ -27,4 +27,36 @@ public class Account : BaseAuditableEntity
     }
 
     public byte[] RowVersion { get; private set; } = null!;
+
+    public static Account Create(
+        int tenantId,
+        int customerId,
+        string name,
+        AccountType type,
+        Currency currency,
+        Guid? publicId = null)
+    {
+        return new Account
+        {
+            TenantId = tenantId,
+            CustomerId = customerId,
+            Name = name,
+            Type = type,
+            Currency = currency.Code,
+            PublicId = publicId ?? Guid.NewGuid(),
+            Status = AccountStatus.Open
+        };
+    }
+
+    public void Rename(string name)
+    {
+    }
+
+    public void Close()
+    {
+    }
+
+    public void Reopen()
+    {
+    }
 }
