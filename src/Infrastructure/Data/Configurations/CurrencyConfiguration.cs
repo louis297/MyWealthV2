@@ -13,6 +13,6 @@ public class CurrencyConfiguration : IEntityTypeConfiguration<Currency>
         builder.Property(currency => currency.Code).HasColumnType("char(3)").IsFixedLength().IsRequired();
         builder.Property(currency => currency.Name).HasMaxLength(100).IsRequired();
         builder.Property(currency => currency.DecimalPlaces).HasConversion<byte>().IsRequired();
-        builder.Property(currency => currency.IsEnabled).IsRequired();
+        builder.Property(currency => currency.IsEnabled).HasColumnName("IsActive").IsRequired();
     }
 }

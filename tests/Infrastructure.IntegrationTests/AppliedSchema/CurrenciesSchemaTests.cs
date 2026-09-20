@@ -23,7 +23,7 @@ public class CurrenciesSchemaTests
         ]);
     }
 
-    private static async Task<IReadOnlyList<(string Code, string Name, int DecimalPlaces, bool IsEnabled)>> QueryCurrencies()
+    private static async Task<IReadOnlyList<(string Code, string Name, int DecimalPlaces, bool IsActive)>> QueryCurrencies()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlServer(SchemaDatabaseSetup.ConnectionString)
@@ -33,12 +33,12 @@ public class CurrenciesSchemaTests
         await db.Database.OpenConnectionAsync();
         await using var command = db.Database.GetDbConnection().CreateCommand();
         command.CommandText = """
-            SELECT RTRIM([Code]), [Name], [DecimalPlaces], [IsEnabled]
+            SELECT RTRIM([Code]), [Name], [DecimalPlaces], [IsActive]
             FROM [Currencies]
             ORDER BY [Code]
             """;
 
-        var rows = new List<(string Code, string Name, int DecimalPlaces, bool IsEnabled)>();
+        var rows = new List<(string Code, string Name, int DecimalPlaces, bool IsActive)>();
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {

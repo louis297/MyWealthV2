@@ -34,7 +34,7 @@ public class InstrumentsSchemaTests
         }
 
         columns.Select(column => column.Name).ShouldBe([
-            "Id", "PublicId", "TenantId", "Symbol", "Name", "QuoteCurrency", "IsEnabled",
+            "Id", "PublicId", "TenantId", "Symbol", "Name", "QuoteCurrency", "IsActive",
             "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion"
         ]);
 
@@ -58,8 +58,8 @@ public class InstrumentsSchemaTests
             column => column.Type.ShouldBe("char"),
             column => column.Length.ShouldBe(3),
             column => column.Nullable.ShouldBe("NO"));
-        Column(columns, "IsEnabled").Type.ShouldBe("bit");
-        Column(columns, "IsEnabled").Nullable.ShouldBe("NO");
+        Column(columns, "IsActive").Type.ShouldBe("bit");
+        Column(columns, "IsActive").Nullable.ShouldBe("NO");
         Column(columns, "Created").Type.ShouldBe("datetimeoffset");
         Column(columns, "Created").Nullable.ShouldBe("NO");
         Column(columns, "CreatedBy").ShouldSatisfyAllConditions(
@@ -165,7 +165,7 @@ public class InstrumentsSchemaTests
         await using var command = db.Database.GetDbConnection().CreateCommand();
         command.CommandText = """
             INSERT INTO [Instruments]
-                ([PublicId], [TenantId], [Symbol], [Name], [QuoteCurrency], [IsEnabled], [Created], [CreatedBy])
+                ([PublicId], [TenantId], [Symbol], [Name], [QuoteCurrency], [IsActive], [Created], [CreatedBy])
             VALUES
                 (NEWID(), @tenantId, @symbol, N'Test', 'NZD', 1, SYSDATETIMEOFFSET(), N'system')
             """;

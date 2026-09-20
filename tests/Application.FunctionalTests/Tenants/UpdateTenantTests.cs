@@ -209,7 +209,7 @@ public class UpdateTenantTests : TestBase
         using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         await db.Database.ExecuteSqlRawAsync(
-            "UPDATE [Currencies] SET [IsEnabled] = 0 WHERE [Code] = {0}", code);
+            "UPDATE [Currencies] SET [IsActive] = 0 WHERE [Code] = {0}", code);
         await scope.ServiceProvider.GetRequiredService<ICurrencyCatalog>().ReloadAsync();
     }
 
@@ -219,7 +219,7 @@ public class UpdateTenantTests : TestBase
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         await db.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO [Currencies] ([Code], [Name], [DecimalPlaces], [IsEnabled])
+            INSERT INTO [Currencies] ([Code], [Name], [DecimalPlaces], [IsActive])
             VALUES ('XXX', N'Test Disabled', 2, 0)
             """);
         await scope.ServiceProvider.GetRequiredService<ICurrencyCatalog>().ReloadAsync();

@@ -128,7 +128,7 @@ public class GetCurrenciesTests : TestBase
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         await db.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO [Currencies] ([Code], [Name], [DecimalPlaces], [IsEnabled])
+            INSERT INTO [Currencies] ([Code], [Name], [DecimalPlaces], [IsActive])
             VALUES ('XXX', N'Test Disabled', 2, 0)
             """);
         await scope.ServiceProvider.GetRequiredService<ICurrencyCatalog>().ReloadAsync();

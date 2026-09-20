@@ -95,7 +95,7 @@ public class FunctionalTestSetup
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         await db.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO [Currencies] ([Code], [Name], [DecimalPlaces], [IsEnabled]) VALUES
+            INSERT INTO [Currencies] ([Code], [Name], [DecimalPlaces], [IsActive]) VALUES
                 ('AUD', N'Australian Dollar', 2, 1),
                 ('EUR', N'Euro', 2, 1),
                 ('GBP', N'Pound Sterling', 2, 1),
