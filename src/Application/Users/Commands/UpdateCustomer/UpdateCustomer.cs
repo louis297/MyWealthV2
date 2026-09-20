@@ -24,6 +24,8 @@ public class UpdateCustomerCommand : IRequest
     public string? Role { get; init; }
 
     public string? Password { get; init; }
+
+    public bool? IsActive { get; init; }
 }
 
 public class UpdateCustomerCommandValidator : AbstractValidator<UpdateCustomerCommand>
@@ -46,6 +48,9 @@ public class UpdateCustomerCommandValidator : AbstractValidator<UpdateCustomerCo
         RuleFor(command => command.Password)
             .Must(password => password is null)
             .WithMessage("Password cannot be changed.");
+        RuleFor(command => command.IsActive)
+            .Must(isActive => isActive is null)
+            .WithMessage("IsActive cannot be changed.");
         When(_ => !CustomerScope.ManagesTenant(currentUser), () =>
         {
             RuleFor(command => command.AdviserId)

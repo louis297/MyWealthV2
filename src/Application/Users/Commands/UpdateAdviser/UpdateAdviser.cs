@@ -24,6 +24,8 @@ public class UpdateAdviserCommand : IRequest
     public string? Password { get; init; }
 
     public Guid? AdviserId { get; init; }
+
+    public bool? IsActive { get; init; }
 }
 
 public class UpdateAdviserCommandValidator : AbstractValidator<UpdateAdviserCommand>
@@ -49,6 +51,9 @@ public class UpdateAdviserCommandValidator : AbstractValidator<UpdateAdviserComm
         RuleFor(command => command.AdviserId)
             .Must(adviserId => adviserId is null)
             .WithMessage("AdviserId cannot be changed.");
+        RuleFor(command => command.IsActive)
+            .Must(isActive => isActive is null)
+            .WithMessage("IsActive cannot be changed.");
     }
 }
 

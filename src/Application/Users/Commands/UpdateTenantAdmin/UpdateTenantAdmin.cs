@@ -23,6 +23,8 @@ public class UpdateTenantAdminCommand : IRequest
     public string? Role { get; init; }
 
     public string? Password { get; init; }
+
+    public bool? IsActive { get; init; }
 }
 
 public class UpdateTenantAdminCommandValidator : AbstractValidator<UpdateTenantAdminCommand>
@@ -45,6 +47,9 @@ public class UpdateTenantAdminCommandValidator : AbstractValidator<UpdateTenantA
         RuleFor(command => command.Password)
             .Must(password => password is null)
             .WithMessage("Password cannot be changed.");
+        RuleFor(command => command.IsActive)
+            .Must(isActive => isActive is null)
+            .WithMessage("IsActive cannot be changed.");
     }
 }
 

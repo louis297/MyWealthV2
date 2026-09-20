@@ -23,6 +23,8 @@ public class CreateCustomerCommand : IRequest<Guid>
     public Guid? TenantId { get; init; }
 
     public string? Role { get; init; }
+
+    public bool? IsActive { get; init; }
 }
 
 public class CreateCustomerCommandValidator : AbstractValidator<CreateCustomerCommand>
@@ -44,6 +46,9 @@ public class CreateCustomerCommandValidator : AbstractValidator<CreateCustomerCo
         RuleFor(command => command.Role)
             .Must(role => role is null)
             .WithMessage("Role cannot be set.");
+        RuleFor(command => command.IsActive)
+            .Must(isActive => isActive is null)
+            .WithMessage("IsActive cannot be set.");
 
         When(_ => currentUser.Role is { } role && RolePermissions.Has(role, Policies.CustomersManage), () =>
         {

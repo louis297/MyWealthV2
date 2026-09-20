@@ -24,7 +24,7 @@ public class UpdateInstrumentCommand : IRequest
 
     public Guid? TenantId { get; init; }
 
-    public bool? IsEnabled { get; init; }
+    public bool? IsActive { get; init; }
 }
 
 public class UpdateInstrumentCommandValidator : AbstractValidator<UpdateInstrumentCommand>
@@ -40,9 +40,9 @@ public class UpdateInstrumentCommandValidator : AbstractValidator<UpdateInstrume
         RuleFor(command => command.TenantId)
             .Must(tenantId => tenantId is null)
             .WithMessage("TenantId cannot be changed.");
-        RuleFor(command => command.IsEnabled)
-            .Must(isEnabled => isEnabled is null)
-            .WithMessage("IsEnabled cannot be changed.");
+        RuleFor(command => command.IsActive)
+            .Must(isActive => isActive is null)
+            .WithMessage("IsActive cannot be changed.");
         RuleFor(command => command.Name)
             .Must(name => name is null || (!string.IsNullOrWhiteSpace(name) && name.Trim().Length is >= 1 and <= 200))
             .WithMessage("Name must be 1 to 200 characters.");

@@ -75,7 +75,7 @@ public class GetCustomersQueryHandler(IApplicationDbContext db, ICurrentUser cur
 
         if (bool.TryParse(request.EnabledOnly, out var enabledOnly) && enabledOnly)
         {
-            query = query.Where(row => row.user.Status == UserStatus.Active);
+            query = query.Where(row => row.user.IsActive);
         }
 
         var search = request.Search?.Trim();

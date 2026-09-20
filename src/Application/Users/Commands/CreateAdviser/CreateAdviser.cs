@@ -23,6 +23,8 @@ public class CreateAdviserCommand : IRequest<Guid>
     public string? Role { get; init; }
 
     public Guid? AdviserId { get; init; }
+
+    public bool? IsActive { get; init; }
 }
 
 public class CreateAdviserCommandValidator : AbstractValidator<CreateAdviserCommand>
@@ -47,6 +49,9 @@ public class CreateAdviserCommandValidator : AbstractValidator<CreateAdviserComm
         RuleFor(command => command.AdviserId)
             .Must(adviserId => adviserId is null)
             .WithMessage("AdviserId cannot be set.");
+        RuleFor(command => command.IsActive)
+            .Must(isActive => isActive is null)
+            .WithMessage("IsActive cannot be set.");
     }
 }
 

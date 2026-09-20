@@ -20,6 +20,8 @@ public class CreateTenantAdminCommand : IRequest<Guid>
     public required string Email { get; init; }
 
     public required string Password { get; init; }
+
+    public bool? IsActive { get; init; }
 }
 
 public class CreateTenantAdminCommandValidator : AbstractValidator<CreateTenantAdminCommand>
@@ -36,6 +38,9 @@ public class CreateTenantAdminCommandValidator : AbstractValidator<CreateTenantA
             .EmailAddress()
             .WithMessage("Email must look like an email.");
         RuleFor(command => command.Password).NotEmpty().MinimumLength(8);
+        RuleFor(command => command.IsActive)
+            .Must(isActive => isActive is null)
+            .WithMessage("IsActive cannot be set.");
     }
 }
 

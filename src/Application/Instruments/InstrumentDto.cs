@@ -14,7 +14,7 @@ public sealed class InstrumentDto
 
     public required string QuoteCurrency { get; init; }
 
-    public required bool IsEnabled { get; init; }
+    public required bool IsActive { get; init; }
 
     public required string RowVersion { get; init; }
 
@@ -25,7 +25,7 @@ public sealed class InstrumentDto
         Symbol = instrument.Symbol,
         Name = instrument.Name,
         QuoteCurrency = instrument.QuoteCurrency,
-        IsEnabled = instrument.IsActive,
+        IsActive = instrument.IsActive,
         RowVersion = Convert.ToBase64String(instrument.RowVersion ?? [])
     };
 }

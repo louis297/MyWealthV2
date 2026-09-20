@@ -16,6 +16,8 @@ public sealed class CustomerDto
 
     public required string Status { get; init; }
 
+    public required bool IsActive { get; init; }
+
     public required string RowVersion { get; init; }
 
     public required DateTimeOffset Created { get; init; }
@@ -28,6 +30,7 @@ public sealed class CustomerDto
         Name = user.Name,
         Email = user.Email,
         Status = ToCamelCase(user.Status.ToString()),
+        IsActive = user.IsActive,
         RowVersion = Convert.ToBase64String(user.RowVersion ?? []),
         Created = user.Created
     };
