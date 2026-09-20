@@ -37,7 +37,7 @@ public class AuditableEntityInterceptor(IServiceProvider services, TimeProvider 
                 var utcNow = dateTime.GetUtcNow();
                 if (entry.State == EntityState.Added)
                 {
-                    entry.Entity.CreatedBy = user.Id;
+                    entry.Entity.CreatedBy = user.Id ?? entry.Entity.CreatedBy;
                     entry.Entity.Created = utcNow;
                 }
                 entry.Entity.LastModifiedBy = user.Id;
