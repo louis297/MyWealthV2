@@ -28,17 +28,17 @@ public class TestSeedInstrumentsTests
         var vti = first.Single(row => row.Symbol == "VTI");
         vti.Name.ShouldBe("Vanguard Total Stock Market ETF");
         vti.QuoteCurrency.ShouldBe("USD");
-        vti.IsEnabled.ShouldBeTrue();
+        vti.IsActive.ShouldBeTrue();
 
         var aia = first.Single(row => row.Symbol == "AIA");
         aia.Name.ShouldBe("Auckland International Airport");
         aia.QuoteCurrency.ShouldBe("NZD");
-        aia.IsEnabled.ShouldBeTrue();
+        aia.IsActive.ShouldBeTrue();
 
         var cash = first.Single(row => row.Symbol == "NZD-CASH");
         cash.Name.ShouldBe("Demo disabled cash proxy");
         cash.QuoteCurrency.ShouldBe("NZD");
-        cash.IsEnabled.ShouldBeFalse();
+        cash.IsActive.ShouldBeFalse();
 
         prices.TryGetPrice(vti.Id).ShouldNotBeNull();
         prices.TryGetPrice(vti.Id)!.Currency.ShouldBe("USD");

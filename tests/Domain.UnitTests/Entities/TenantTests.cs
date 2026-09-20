@@ -96,7 +96,7 @@ public class TenantTests
     [Test]
     public void Create_RejectsDisabledReportingCurrency()
     {
-        var disabled = Currency.Create("JPY", "Japanese Yen", 0, isEnabled: false);
+        var disabled = Currency.Create("JPY", "Japanese Yen", 0, isActive: false);
 
         Should.Throw<DomainException>(() => Tenant.Create("Acme", "acme", disabled));
     }
@@ -113,7 +113,7 @@ public class TenantTests
     public void SetReportingCurrency_RejectsDisabledCode()
     {
         var tenant = Tenant.Create("Acme", "acme", Nzd());
-        var disabled = Currency.Create("JPY", "Japanese Yen", 0, isEnabled: false);
+        var disabled = Currency.Create("JPY", "Japanese Yen", 0, isActive: false);
 
         Should.Throw<DomainException>(() => tenant.SetReportingCurrency(disabled));
         tenant.ReportingCurrency.ShouldBe("NZD");

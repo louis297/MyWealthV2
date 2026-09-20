@@ -14,11 +14,9 @@ public class Currency
 
     public int DecimalPlaces { get; private set; }
 
-    public bool IsEnabled { get; private set; }
-
     public bool IsActive { get; private set; }
 
-    public static Currency Create(string code, string name, int decimalPlaces, bool isEnabled = true)
+    public static Currency Create(string code, string name, int decimalPlaces, bool isActive = true)
     {
         if (string.IsNullOrWhiteSpace(code) || code.Trim().Length != 3 || !code.Trim().All(char.IsAsciiLetter))
         {
@@ -40,7 +38,7 @@ public class Currency
             Code = code.Trim().ToUpperInvariant(),
             Name = name.Trim(),
             DecimalPlaces = decimalPlaces,
-            IsEnabled = isEnabled
+            IsActive = isActive
         };
     }
 }

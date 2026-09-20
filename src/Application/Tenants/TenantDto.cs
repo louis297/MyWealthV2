@@ -24,7 +24,7 @@ public sealed class TenantDto
         Name = tenant.Name,
         Code = tenant.Code,
         ReportingCurrency = tenant.ReportingCurrency,
-        IsEnabled = tenant.IsEnabled,
+        IsEnabled = tenant.IsActive,
         RowVersion = Convert.ToBase64String(tenant.RowVersion ?? []),
         Created = tenant.Created
     };

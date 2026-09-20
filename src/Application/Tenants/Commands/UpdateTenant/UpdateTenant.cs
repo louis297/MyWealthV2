@@ -74,7 +74,7 @@ public class UpdateTenantCommandHandler(IApplicationDbContext db, ICurrencyCatal
             if (!string.Equals(incoming, tenant.ReportingCurrency, StringComparison.OrdinalIgnoreCase))
             {
                 var currency = catalog.TryGet(incoming);
-                if (currency is null || !currency.IsEnabled)
+                if (currency is null || !currency.IsActive)
                 {
                     throw new ValidationException([
                         new ValidationFailure(nameof(UpdateTenantCommand.ReportingCurrency),

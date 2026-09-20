@@ -17,8 +17,6 @@ public class Tenant : BaseAuditableEntity
 
     public string ReportingCurrency { get; private set; } = string.Empty;
 
-    public bool IsEnabled { get; private set; }
-
     public bool IsActive { get; private set; }
 
     public byte[] RowVersion { get; private set; } = null!;
@@ -32,7 +30,7 @@ public class Tenant : BaseAuditableEntity
             Name = name,
             Code = code,
             PublicId = publicId ?? Guid.NewGuid(),
-            IsEnabled = true,
+            IsActive = true,
             ReportingCurrency = reportingCurrency.Code
         };
         tenant.AddDomainEvent(new TenantCreated(tenant));
@@ -57,23 +55,23 @@ public class Tenant : BaseAuditableEntity
 
     public void Enable()
     {
-        if (IsEnabled)
+        if (IsActive)
         {
             return;
         }
 
-        IsEnabled = true;
+        IsActive = true;
         AddDomainEvent(new TenantEnabled(this));
     }
 
     public void Disable()
     {
-        if (!IsEnabled)
+        if (!IsActive)
         {
             return;
         }
 
-        IsEnabled = false;
+        IsActive = false;
         AddDomainEvent(new TenantDisabled(this));
     }
 
@@ -84,7 +82,7 @@ public class Tenant : BaseAuditableEntity
             throw new DomainException("Reporting currency is required.");
         }
 
-        if (!currency.IsEnabled)
+        if (!currency.IsActive)
         {
             throw new DomainException("Reporting currency must be enabled.");
         }

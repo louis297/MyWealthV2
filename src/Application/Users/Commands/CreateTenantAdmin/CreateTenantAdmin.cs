@@ -51,7 +51,7 @@ public class CreateTenantAdminCommandHandler(IApplicationDbContext db, IIdentity
                          row => row.PublicId == request.TenantId, cancellationToken)
                      ?? throw new NotFoundException("Tenant", request.TenantId);
 
-        if (!tenant.IsEnabled)
+        if (!tenant.IsActive)
         {
             throw new TargetDisabledException(
                 "tenant",

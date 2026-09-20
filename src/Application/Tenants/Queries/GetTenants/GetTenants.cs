@@ -33,7 +33,7 @@ public class GetTenantsQueryHandler(IApplicationDbContext db)
 
         if (bool.TryParse(request.IsEnabled, out var isEnabled))
         {
-            query = query.Where(tenant => tenant.IsEnabled == isEnabled);
+            query = query.Where(tenant => tenant.IsActive == isEnabled);
         }
 
         var search = request.Search?.Trim();

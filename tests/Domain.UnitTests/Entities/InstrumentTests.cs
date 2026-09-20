@@ -136,7 +136,7 @@ public class InstrumentTests
     [Test]
     public void Create_RejectsDisabledQuoteCurrency()
     {
-        var disabled = Currency.Create("JPY", "Japanese Yen", 0, isEnabled: false);
+        var disabled = Currency.Create("JPY", "Japanese Yen", 0, isActive: false);
 
         Should.Throw<DomainException>(() => Instrument.Create(1, "VTI", "Vanguard", disabled));
     }

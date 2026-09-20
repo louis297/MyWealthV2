@@ -37,7 +37,7 @@ public class CurrencyTests
     [Test]
     public void Create_CanBeDisabled()
     {
-        var currency = Currency.Create("JPY", "Japanese Yen", 0, isEnabled: false);
+        var currency = Currency.Create("JPY", "Japanese Yen", 0, isActive: false);
 
         currency.IsActive.ShouldBeFalse();
         currency.DecimalPlaces.ShouldBe(0);

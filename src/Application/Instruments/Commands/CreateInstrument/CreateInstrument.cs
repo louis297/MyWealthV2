@@ -65,7 +65,7 @@ public class CreateInstrumentCommandHandler(
     {
         var tenant = await ResolveTenantAsync(request.TenantId, cancellationToken);
 
-        if (!tenant.IsEnabled)
+        if (!tenant.IsActive)
         {
             throw new TargetDisabledException(
                 "tenant",
@@ -75,7 +75,7 @@ public class CreateInstrumentCommandHandler(
         }
 
         var currency = catalog.TryGet(request.QuoteCurrency);
-        if (currency is null || !currency.IsEnabled)
+        if (currency is null || !currency.IsActive)
         {
             throw new ValidationException([
                 new ValidationFailure(nameof(CreateInstrumentCommand.QuoteCurrency),

@@ -16,8 +16,6 @@ public class Instrument : BaseAuditableEntity
 
     public string QuoteCurrency { get; private set; } = string.Empty;
 
-    public bool IsEnabled { get; private set; }
-
     public bool IsActive { get; private set; }
 
     public byte[] RowVersion { get; private set; } = null!;
@@ -38,7 +36,7 @@ public class Instrument : BaseAuditableEntity
             Name = NormaliseName(name),
             QuoteCurrency = quoteCurrency.Code,
             PublicId = publicId ?? Guid.NewGuid(),
-            IsEnabled = true
+            IsActive = true
         };
         instrument.AddDomainEvent(new InstrumentCreated(instrument));
         return instrument;
@@ -59,23 +57,23 @@ public class Instrument : BaseAuditableEntity
 
     public void Disable()
     {
-        if (!IsEnabled)
+        if (!IsActive)
         {
             return;
         }
 
-        IsEnabled = false;
+        IsActive = false;
         AddDomainEvent(new InstrumentDisabled(this));
     }
 
     public void Enable()
     {
-        if (IsEnabled)
+        if (IsActive)
         {
             return;
         }
 
-        IsEnabled = true;
+        IsActive = true;
         AddDomainEvent(new InstrumentEnabled(this));
     }
 
@@ -109,7 +107,7 @@ public class Instrument : BaseAuditableEntity
             throw new DomainException("Quote currency is required.");
         }
 
-        if (!currency.IsEnabled)
+        if (!currency.IsActive)
         {
             throw new DomainException("Quote currency must be enabled.");
         }

@@ -80,7 +80,7 @@ public class CreateCustomerCommandHandler(
         var tenant = await db.Tenants.SingleOrDefaultAsync(row => row.Id == tenantId, cancellationToken)
                      ?? throw new NotFoundException("Tenant", tenantId);
 
-        if (!tenant.IsEnabled)
+        if (!tenant.IsActive)
         {
             throw new TargetDisabledException(
                 "tenant",

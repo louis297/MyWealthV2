@@ -25,7 +25,7 @@ public sealed class InstrumentDto
         Symbol = instrument.Symbol,
         Name = instrument.Name,
         QuoteCurrency = instrument.QuoteCurrency,
-        IsEnabled = instrument.IsEnabled,
+        IsEnabled = instrument.IsActive,
         RowVersion = Convert.ToBase64String(instrument.RowVersion ?? [])
     };
 }

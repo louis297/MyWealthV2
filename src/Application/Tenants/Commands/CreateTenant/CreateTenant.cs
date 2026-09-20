@@ -47,7 +47,7 @@ public class CreateTenantCommandHandler(IApplicationDbContext db, ICurrencyCatal
         var code = request.Code.Trim().ToLowerInvariant();
 
         var currency = catalog.TryGet(request.ReportingCurrency);
-        if (currency is null || !currency.IsEnabled)
+        if (currency is null || !currency.IsActive)
         {
             throw new ValidationException([
                 new ValidationFailure(nameof(CreateTenantCommand.ReportingCurrency),

@@ -13,7 +13,7 @@ public class InstrumentConfiguration : IEntityTypeConfiguration<Instrument>
         builder.Property(instrument => instrument.Name).HasMaxLength(200).IsRequired();
         builder.Property(instrument => instrument.PublicId).IsRequired();
         builder.Property(instrument => instrument.QuoteCurrency).HasColumnType("char(3)").IsFixedLength().IsRequired();
-        builder.Property(instrument => instrument.IsEnabled).HasColumnName("IsActive").IsRequired();
+        builder.Property(instrument => instrument.IsActive).IsRequired();
         builder.Property(instrument => instrument.CreatedBy).HasMaxLength(450).IsRequired();
         builder.Property(instrument => instrument.RowVersion).IsRowVersion();
         builder.HasIndex(instrument => instrument.PublicId).IsUnique();

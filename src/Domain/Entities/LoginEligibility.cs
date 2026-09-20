@@ -21,7 +21,7 @@ public static class LoginEligibility
             return tenant is null && user.TenantId is null;
         }
 
-        if (tenant is null || !tenant.IsEnabled)
+        if (tenant is null || !tenant.IsActive)
         {
             return false;
         }

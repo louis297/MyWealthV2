@@ -12,7 +12,7 @@ public class User : BaseAuditableEntity
 
     public UserStatus Status { get; private set; }
 
-    public bool IsActive { get; private set; }
+    public bool IsActive => Status == UserStatus.Active;
 
     public UserRole Role { get; private set; }
 

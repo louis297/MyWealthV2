@@ -18,9 +18,9 @@ public class TwoTenantFixtureTests
         await db.SaveChangesAsync();
 
         (await db.Tenants.AsNoTracking().SingleAsync(row => row.Id == tenantA.Id))
-            .IsEnabled.ShouldBeFalse();
+            .IsActive.ShouldBeFalse();
         (await db.Tenants.AsNoTracking().SingleAsync(row => row.Id == tenantB.Id))
-            .IsEnabled.ShouldBeTrue();
+            .IsActive.ShouldBeTrue();
     }
 
     [Test]

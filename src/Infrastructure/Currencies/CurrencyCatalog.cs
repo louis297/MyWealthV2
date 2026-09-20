@@ -36,13 +36,13 @@ public sealed class CurrencyCatalog(IServiceScopeFactory scopes) : ICurrencyCata
         IEnumerable<Currency> rows = snapshot;
         if (enabledOnly)
         {
-            rows = rows.Where(currency => currency.IsEnabled);
+            rows = rows.Where(currency => currency.IsActive);
         }
 
         return rows.OrderBy(currency => currency.Code, StringComparer.Ordinal).ToList();
     }
 
-    public bool IsEnabled(string code) => TryGet(code)?.IsEnabled == true;
+    public bool IsEnabled(string code) => TryGet(code)?.IsActive == true;
 
     public async Task ReloadAsync(CancellationToken cancellationToken = default)
     {

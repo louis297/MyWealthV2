@@ -68,7 +68,7 @@ public class GetInstrumentsQueryHandler(IApplicationDbContext db, ICurrentUser c
 
         if (bool.TryParse(request.EnabledOnly, out var enabledOnly) && enabledOnly)
         {
-            query = query.Where(row => row.instrument.IsEnabled);
+            query = query.Where(row => row.instrument.IsActive);
         }
 
         var search = request.Search?.Trim();
