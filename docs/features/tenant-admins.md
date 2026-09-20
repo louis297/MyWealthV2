@@ -25,8 +25,6 @@ SystemAdmin TenantAdmin HTTP: list / get / create (Identity dual-write) / rename
 
 Creating a TenantAdmin is the first Phase-1 dual-write that lands in `Active` with a password. No invite. No `PendingActivation` entry. Adviser and Customer dual-write belong to the next two slices.
 
-Chinese discussion draft: `v2draft/features/tenant-admins.md`.
-
 ---
 
 ## 1. Summary

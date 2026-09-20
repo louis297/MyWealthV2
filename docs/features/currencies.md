@@ -24,8 +24,6 @@ Platform currency catalog, in-process `ICurrencyCatalog`, read-only `GET /curren
 
 This is not a tenant-scoped resource. No cross-tenant isolation tests. People CRUD, tenant HTTP, and portal pages are out.
 
-Chinese discussion draft: `v2draft/features/currencies.md`.
-
 ---
 
 ## 1. Summary

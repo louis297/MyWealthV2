@@ -3,7 +3,7 @@ title: "ADR 0013: Four roles, code-mapped policies, one table per layer"
 status: accepted
 language: en
 date: 2026-09-01
-updated: 2026-09-14
+updated: 2026-09-20
 related:
   - 0005-shared-database-tenantid-isolation.md
   - 0006-email-password-jwt-authentication.md
@@ -59,6 +59,18 @@ Creating any login-capable role: same transaction, `AspNetUsers` first, then `Us
 | `customers.manage` | | ✓ | | |
 | `customers.manage-own` | | | ✓ | |
 | `users.me` | ✓ | ✓ | ✓ | ✓ |
+
+### Phase 2 permissions (instruments)
+
+Ledger names were not registered in Phase 1. The instruments slice adds:
+
+| Permission | SystemAdmin | TenantAdmin | Adviser | Customer |
+| --- | --- | --- | --- | --- |
+| `instruments.read` | ✓ | ✓ | ✓ | |
+| `instruments.create` | ✓ | ✓ | ✓ | |
+| `instruments.manage` | ✓ | ✓ | | |
+
+SystemAdmin has no `TenantId`. List and create take the target tenant PublicId. Field rules: [features/instruments.md](../features/instruments.md). Phase 1 people routes do not gain SystemAdmin verbs in this amendment.
 
 The `/users` HTTP namespace (`/users/advisers` and so on) is an API convention. It is not this ADR’s authorization model.
 

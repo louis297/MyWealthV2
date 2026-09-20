@@ -3,7 +3,7 @@ title: Domain model
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-09-14
+updated: 2026-09-20
 related:
   - README.md
   - glossary.md
@@ -194,11 +194,12 @@ Do not model OpenIddict token revocation itself as a domain event.
 
 Do not create entities, tables, or empty aggregate roots for:
 
-- Instrument, Account, Holding, CashEntry, Journal, Transaction
+- Account, Holding, CashEntry, Journal, Transaction
 - Household / KYC / an invitation domain service (`UserTokens` table may exist with no behaviour)
 - Account balances, holding quantities, net worth
-- `IMarketData` / `IFxRate` (port surface not locked; introduce with Instruments)
 - Refresh tokens, OIDC clients, authorization codes
+
+`Instrument`, `IMarketData`, and `IFxRate` ship with the instruments slice (§8.4).
 
 The `Money` value object **does** live in the Domain assembly, even with no balance column in Phase 1.
 
@@ -217,8 +218,9 @@ Session stack, four roles, and User / Tenant invariants do not change in Phase 2
 - **Booked postings are not `UPDATE` / `DELETE`.** Correction tends to be a full opposite posting that points at the original (reversal).
 - **After a posting, cash must not go negative on non-Credit accounts. Credit may be negative** (liability).
 - **Day-to-day holding quantity and cost are not edited by hand.** The only entry that may write quantity and cost directly is Opening — lock the shape when that slice opens; keep the name.
-- Instruments are a **tenant catalog**. Adviser may create; update / disable is TenantAdmin only. `QuoteCurrency` locks after create. Cost currency = quote currency.
-- An Account is a value container under a Customer. `Account.Currency` is the cash-ledger booking currency and is immutable after open. Reserved types: Bank / Cash / Brokerage / Property / Credit / Other. Type does **not** replace the cash ledger: balance comes from cash postings, not from summing rows because `AccountType == Bank`.
+- Instruments are a **tenant catalog**. Adviser may create and read; update / disable is TenantAdmin or SystemAdmin. `QuoteCurrency` locks after create. Cost currency = quote currency.
+- An Account is a value container under a Customer. `Account.Currency` is the cash-ledger booking currency and is immutable after open. `Account.Type` is immutable after open. Openable in Phase 2: Bank / Cash / Brokerage / Other. Reserved, not selectable in Phase 2: Property / Credit. Type does **not** replace the cash ledger: balance comes from cash postings, not from summing rows because `AccountType == Bank`.
+- Bank, Cash, and Credit accounts must not hold Instruments. Brokerage, Property, and Other may. “No holdings” is any Instrument, not only listed equities. Phase 2 must not open Property or Credit.
 - Credit counts as a liability in net worth. Closed accounts are excluded. Net worth returns per-currency arrays; no FX fold into one number.
 - Market data and FX go through ports + mocks. Introduce `IMarketData` / `IFxRate` at the start of the ledger domain, with Instruments. Same currency = 1. Cross-currency is never silently 1.
 
@@ -252,7 +254,26 @@ Lock those when the matching slice opens. Until then, do not paper over them wit
 
 - An Account belongs to a Customer, and through that Customer to a Tenant. Adviser visibility stays the `AdviserId` scope. Do not add a second adviser FK on Account unless a slice proves it needs one.
 - Disable Customer: reject if an Account is still open (guard added in Phase 2).
-- A Customer who can obtain tokens does not receive `ledger.post`. Ledger write policies stay TenantAdmin / Adviser.
+- A Customer who can obtain tokens does not receive ledger-write policies. TenantAdmin and SystemAdmin receive manage policies; Adviser receives create/read where the spec says so.
+
+### 8.4 Instrument (accepted — instruments slice)
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `Instrument` | Aggregate | Tenant catalog row. Not a holding. |
+| `InstrumentCreated` / `InstrumentDisabled` / `InstrumentEnabled` | Event | Rename raises nothing. |
+
+Invariants:
+
+- `TenantId` required. No platform row.
+- `Symbol` is the instrument code: upper case, unique CI per tenant including disabled.
+- `Name` is the display name. Duplicates allowed.
+- `QuoteCurrency` set on create from an enabled `ICurrencyCatalog` code, then immutable.
+- Cost currency = quote currency. No second currency field.
+- `IsEnabled` only. Not a `UserStatus` machine.
+- No ISIN / Exchange / Kind / price on the aggregate. Price is `IMarketData.TryGetPrice`. FX is `IFxRate.GetRate` (same currency = 1; missing cross pair fails).
+
+Field rules: [features/instruments.md](features/instruments.md).
 
 ---
 
@@ -263,7 +284,7 @@ Lock those when the matching slice opens. Until then, do not paper over them wit
 | `Money` | `Amount` (decimal) + `Currency` (three-letter code). Add/subtract only when currencies match. Cross-currency arithmetic must go through the FX port (no Phase-1 caller). The VO does not depend on `ICurrencyCatalog` and does not round to `DecimalPlaces`. Phase 1 has no money column and no Money HTTP. |
 | Currency code | Must resolve in `ICurrencyCatalog`. Entities store the code string, not an enum. |
 
-The only Phase-1 field that uses a currency code is `Tenant.ReportingCurrency`.
+Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on Instrument: `QuoteCurrency`.
 
 ---
 
@@ -274,3 +295,5 @@ The only Phase-1 field that uses a currency code is `Tenant.ReportingCurrency`.
 | 2026-09-11 | First English draft, aligned with function-plan 2026-09-11: once-not-twice; session outside the domain; full UserStatus machine; Money defined early; ledger as sub-ledgers without locking undecided tables |
 | 2026-09-12 | identity-auth Tenant has no ReportingCurrency; currencies slice adds the catalog and the column. |
 | 2026-09-13 | Currencies spec: platform `IsEnabled`; `DecimalPlaces` = minor units; `Money` in Domain without catalog/rounding. |
+| 2026-09-17 | Account.Type immutable after open; Bank / Cash / Credit must not hold Instruments. Property / Credit reserved, not Phase-2 selectable. |
+| 2026-09-20 | Instrument aggregate accepted (instruments slice). SystemAdmin may manage tenant catalog rows. Ports `IMarketData` / `IFxRate` locked. |

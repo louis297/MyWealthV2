@@ -23,9 +23,7 @@ related:
 
 TenantAdmin Adviser HTTP: list / get / create (Identity dual-write) / rename / disable / enable. Tables, `User` factory, dual-write, `TargetDisabled`, policy `advisers.manage`, and `UserDisabled` revocation already exist (identity-auth + tenant-admins). This slice does not add a script or a new policy name.
 
-Unlike tenant-admins: caller and scope are the current tenant; disable is blocked while assigned Customers are not Disabled. The portal Advisers page is not this slice (later portals work).
-
-Chinese discussion draft: `v2draft/features/advisers.md`.
+Unlike tenant-admins: caller and scope are the current tenant; disable is blocked while assigned Customers are not Disabled. The portal Advisers page is not this slice (see [adviser-portal](../portals/adviser-portal.md)).
 
 Landed in GitHub master 2026-09-14 (`8e5568c`, hosted-login smoke after create).
 

@@ -3,7 +3,7 @@ title: Architecture
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-09-12
+updated: 2026-09-20
 related:
   - README.md
   - glossary.md
@@ -22,7 +22,7 @@ This document owns **hosts, layers, ports, and cross-cutting behaviour**. Scope 
 
 Same rule as the function plan: if a later phase will use it and today’s design would have to change, ship the final infrastructure now. If later use or shape is not decided, wait.
 
-Phase 1 closes the platform base: tenants, session, four roles, people, currency catalog, Adviser Portal shell. The ledger is a Phase-2 domain. Phase 1 does not create ledger tables or register ledger policies — not because they lack a caller, but because storage and port surfaces are not locked.
+Phase 1 closes the platform base: tenants, session, four roles, people, currency catalog, Adviser Portal shell. The ledger is a Phase-2 domain. The first accepted ledger slice is Instruments (`0010_instruments.sql`, `/instruments`, mocked `IMarketData` / `IFxRate`). Other ledger tables wait for their specs.
 
 ---
 
@@ -198,7 +198,7 @@ dotnet run --project src/AppHost
 
 EF does **not** generate migrations. `IEntityTypeConfiguration` maps only.
 
-identity-auth scripts: SchemaVersions, Identity user tables, OpenIddict tables, Tenants (no ReportingCurrency), Users, UserTokens. Currencies slice adds `0008_currencies.sql` and `0009_tenants_reporting_currency.sql`. Phase 1 scripts do not include Instruments, Accounts, Holdings, Transactions, a custom RefreshTokens table, or AspNetRoles.
+identity-auth scripts: SchemaVersions, Identity user tables, OpenIddict tables, Tenants (no ReportingCurrency), Users, UserTokens. Currencies slice adds `0008_currencies.sql` and `0009_tenants_reporting_currency.sql`. Instruments slice adds `0010_instruments.sql`. Phase 1 scripts do not include Accounts, Holdings, Transactions, a custom RefreshTokens table, or AspNetRoles.
 
 ---
 
@@ -211,7 +211,7 @@ identity-auth scripts: SchemaVersions, Identity user tables, OpenIddict tables, 
 | Authorization | Named policies + code Role → permission; scope in the handler | `webapi` endpoints + Application (ADR 0013) |
 | Tenancy | Shared database + row `TenantId` + **database FK** + application dual check + EF filter + isolation tests | Everywhere. No SQL RLS, database-per-tenant, schema-per-tenant, or subdomain in Phase 1 |
 | Currency | `Currencies` catalog + in-memory `ICurrencyCatalog` | Domain rules + Infrastructure |
-| Instruments / market / FX | **Phase 2**. Not built: table and port surfaces are not locked | — |
+| Instruments / market / FX | Phase 2 instruments slice. Tenant table + mocked ports | [features/instruments.md](features/instruments.md) |
 | Keys | Internal `int` identity; HTTP uses `PublicId` UUID | Domain / database / API |
 | Money | `Money` value object in Domain; no balance column in Phase 1 | Domain |
 | Validation | FluentValidation + database constraints + entity invariants | Use case + SQL + Domain |
@@ -229,17 +229,17 @@ Password change, disable, and logout revoke that subject’s OpenIddict tokens. 
 
 ---
 
-## 6. Ports (Phase 1)
+## 6. Ports
 
-| Port | Phase 1 | Notes |
+| Port | Ships | Notes |
 | --- | --- | --- |
-| `IApplicationDbContext` | Yes | EF entry |
-| `ICurrencyCatalog` | Yes | In-memory catalog. Hot path does not JOIN `Currencies` |
-| `IEmailSender` | Yes, no-op | Invite / reset seam. No send use case this phase |
-| `IIdentityService` (or equivalent) | Yes | Create / verify / change-password for Identity users. OpenIddict protocol stays out of Domain |
-| Token-revocation port | Yes | `webapi` writes the shared OpenIddict store today. Replace the adapter if the identity database splits later |
-| `IMarketData` | No | Introduce with Instruments in Phase 2 |
-| `IFxRate` | No | Same. Same currency = 1. Cross-currency is never silently 1 |
+| `IApplicationDbContext` | Phase 1 | EF entry |
+| `ICurrencyCatalog` | Phase 1 | In-memory catalog. Hot path does not JOIN `Currencies` |
+| `IEmailSender` | Phase 1, no-op | Invite / reset seam. No send use case this phase |
+| `IIdentityService` (or equivalent) | Phase 1 | Create / verify / change-password for Identity users. OpenIddict protocol stays out of Domain |
+| Token-revocation port | Phase 1 | `webapi` writes the shared OpenIddict store today. Replace the adapter if the identity database splits later |
+| `IMarketData` | Phase 2 instruments | `TryGetPrice(instrumentId, asOf?) → Money?`. Mock. Missing → empty, not 0 |
+| `IFxRate` | Phase 2 instruments | `GetRate(from, to, asOf?)`. Same currency = 1. Missing cross pair fails |
 
 Do not add a port whose surface is still open. Do add a port (or value object) when later use is certain and omitting it would force a Phase-1 redesign (`Money`, `ICurrencyCatalog`, no-op `IEmailSender`).
 
@@ -249,7 +249,7 @@ Do not add a port whose surface is still open. Do add a port (or value object) w
 
 | Project | Purpose |
 | --- | --- |
-| `Domain.UnitTests` | Phase 1: User / Tenant invariants, currency Code, `Money`. Ledger invariants wait for Phase 2 |
+| `Domain.UnitTests` | Phase 1: User / Tenant invariants, currency Code, `Money`. Phase 2: `Instrument` |
 | `Application.UnitTests` | Pure application helpers, policy map |
 | `Infrastructure.IntegrationTests` | Real database: scripts + EF mapping + FK + applicator |
 | `Application.FunctionalTests` | HTTP + TestAppHost (**starts `identity` and `webapi`**). Cross-tenant read / write must fail. Login gate is on `identity` (disabled / Pending / wrong tenant → no session) |
@@ -274,6 +274,10 @@ A Customer completing the authorization-server flow must have a test. Adviser-ma
 ## 9. Where Phase 2 attaches
 
 The session stack, four roles, User / Tenant invariants, and `identity` as the authorization server **do not change**. Phase 2 adds ledger policy names, ledger aggregates, and `IMarketData` / `IFxRate`.
+
+SystemAdmin receives Phase-2 ledger policies and calls `webapi` from Scalar (later Back Office). List / create take a tenant PublicId. Adviser Portal does not grow SystemAdmin ledger screens. Phase 1 people routes stay as they are.
+
+Each Phase-2 slice adds Development / TestAppHost `TestSeed` rows. Not schema scripts. Not Production.
 
 The ledger is one domain with internal slices. Storage shape is not locked; Phase 1 does not create Journal or CashLedger tables. Tendencies: [domain-model.md](domain-model.md) §8 and [function-plan.md](function-plan.md) §5.
 

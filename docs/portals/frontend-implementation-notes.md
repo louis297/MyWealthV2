@@ -4,7 +4,7 @@ status: review
 phase: 1
 language: en
 created: 2026-09-14
-updated: 2026-09-14
+updated: 2026-09-15
 related:
   - README.md
   - adviser-portal.md
@@ -29,9 +29,7 @@ Page-by-page construction notes for the Adviser Portal **pages** cut. Not a back
 
 If this file disagrees with an accepted spec, change this file.
 
-Status is `review`. Locked rows in §13 are build contracts. Unmarked §13 rows stay draft defaults. Do not start the pages commits until backend amendments A and B have landed (see [adviser-portal.md](adviser-portal.md)). Acceptance for this cut is in [adviser-portal.md](adviser-portal.md) § Acceptance (cut C).
-
-Chinese discussion draft: `v2draft/frontend-implementation-notes.md`.
+Status is `review`. Locked rows in §13 are build contracts. Unmarked §13 rows stay draft defaults. Pages cut C and amendments A/B have landed; A1–A10 and B1–B11 passed. Acceptance for this cut is in [adviser-portal.md](adviser-portal.md) § Acceptance (cut C).
 
 ---
 

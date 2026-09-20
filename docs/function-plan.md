@@ -3,7 +3,7 @@ title: Function plan
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-09-14
+updated: 2026-09-20
 related:
   - README.md
   - glossary.md
@@ -15,7 +15,7 @@ related:
 
 **Product:** MyWealthV2  
 **Status:** draft  
-**Updated:** 2026-09-12
+**Updated:** 2026-09-20
 
 This document owns **what / who / when**. How for the current phase lives in architecture, domain model, database design, API design, and Feature Specs.
 
@@ -138,37 +138,73 @@ Disabling the last TenantAdmin is allowed in Phase 1 (known gap). After a tenant
 Adviser Portal only. Split in two implementation slices (see [portals/adviser-portal.md](portals/adviser-portal.md)):
 
 1. **Shell + callback (landed in repo 2026-09-13):** Vite on Aspire `adviser-portal`, authorize redirect, `/callback`, session probe via `GET /users/me`, 401 refresh-once. No password form. SystemAdmin may use the probe (Development seed). OpenIddict redirect URIs upsert from the portal origin, including the Aspire dashboard alias.
-2. **Pages (after people APIs + amendments A/B):** role-filtered shell, Profile, Customers, Advisers. Default home = Customers. IdentityHost refuses Customer on this client. SystemAdmin uses Scalar for tenant manage. Shell name from `GET /tenants/by-code/{code}`. Construction: [portals/frontend-implementation-notes.md](portals/frontend-implementation-notes.md).
+2. **Pages (cut C, accepted, landed 2026-09-14):** role-filtered shell, Profile, Customers, Advisers. Default home = Customers. IdentityHost refuses Customer on this client. SystemAdmin uses Scalar for tenant manage. Shell name from `GET /tenants/by-code/{code}`. Construction notes (`review`): [portals/frontend-implementation-notes.md](portals/frontend-implementation-notes.md).
 
 **Out:** Accounts, Instruments, Transactions, Dashboard. No Customer Portal client in Phase 1.
 
 ---
 
-## 5. Phase 2 — ledger domain (discussed only; do not invent)
+## 5. Phase 2 — ledger domain (feature map; not a table contract)
 
-One domain. Write Feature Specs when the phase opens. Suggested internal slice order (not a locked table design):
+One domain. Feature Specs come after this map. Suggested internal slice order (not a locked table design):
 
-1. Instruments (tenant catalog; Adviser may create; update/disable is TenantAdmin only)
+1. Instruments (tenant catalog; Adviser may create and read; update/disable is TenantAdmin or SystemAdmin)
 2. Account container
 3. Cash sub-ledger
 4. Holdings / securities ledger
-5. Posting and reversal
-6. Net-worth read model
+5. Posting, reversal, and Opening
+6. Net-worth read model + Adviser Portal Dashboard
 
 Session, OpenIddict, and the Adviser Portal client do not change in this phase. Add ledger policy names only.
 
-**Tendencies for the Phase-2 kickoff (not Phase-1 invariants):**
+### 5.1 In scope (agreed 2026-09-17)
+
+- Tenant instrument catalog + mocked `IMarketData` / `IFxRate`.
+- Account container under a Customer.
+- **Phase 2 may open:** Bank, Cash, Brokerage, Other.
+- **Reserved names, not selectable in Phase 2:** Property, Credit (personal loans, cards, real property). Keep the names and the capability matrix so a later phase can add them without reshaping Account.
+- Cash sub-ledger. Holdings. Posting with cash and/or security legs. Full reversal. Opening (initial cash and initial holdings).
+- Net worth as a per-currency array (no FX fold). Adviser Portal pages: Dashboard, Accounts, holdings, activity/postings, Instruments.
+
+**Account type is a capability gate, not a separate product module.** Do not use Other as a stand-in for Property or Credit.
+
+| Type | Phase 2 | Means | Cash book | Holdings (any Instrument) | Net worth |
+| --- | --- | --- | --- | --- | --- |
+| Bank | Open | Deposit-style cash at a bank (current / savings and similar). Not “the bank as an institution”. | Yes | Forbidden | Asset = cash |
+| Cash | Open | Physical or not-yet-banked cash | Yes | Forbidden | Asset = cash |
+| Brokerage | Open | Equities, funds, ETFs, and similar | Yes | Allowed | Asset = cash + holding market value |
+| Other | Open | Catch-all. Not a substitute for Property or Credit. | Yes | Allowed | Asset = cash + holding market value |
+| Property | Reserved | Real property held as instruments in this account | Yes | Allowed | Asset = cash + holding market value |
+| Credit | Reserved | Cards and loans | Yes; may be negative | Forbidden | Liability = cash |
+
+- “No holdings” means **no Holding of any Instrument** — not only listed equities.
+- `Account.Type` is immutable after open.
+- `Account.Currency` remains the cash-book currency and is immutable after open.
+- Non-cash value lives only on holdings. Do not add a hand-edited account-level `CurrentValue`.
+- Phase 2 has no Credit accounts, so posted cash must not go negative. The Credit exception stays written for the reserved type; do not invent a second cash rule later.
+
+### 5.2 Locked way of thinking (still not columns)
 
 - Do not ship one `Type` row that pretends to be both cash and securities. Think cash legs and security legs.
-- Do not create Journal or standalone CashLedger tables in Phase 1: storage shape is not locked.
 - Booked rows are not `UPDATE`/`DELETE`. Correction tends to be a full reversal posting.
-- After a posting, cash must not go negative on non-Credit accounts. Credit may be negative.
-- Day-to-day holding quantity and cost are not edited by hand.
+- After a posting, cash must not go negative on non-Credit accounts. Credit may be negative when that type is opened in a later phase. Phase 2 selectable types are all non-Credit.
+- Day-to-day holding quantity and cost are not edited by hand. Opening is the only direct write of quantity and cost.
 - Splits / scrip issues need scrip-only postings (cash 0, total cost unchanged). Do not fake them with manual holding edits. Not built until that slice exists.
-- Market data and FX go through ports + mocks.
-- `IMarketData` / `IFxRate` are introduced at the start of Phase 2 with Instruments. Phase 1 does not add them: the port surface is not locked (adding them later does not rewrite Phase 1).
+- Same-currency FX is 1. Cross-currency is never treated as 1.
+- Customer has no ledger-write policy. Disable Customer rejects while an account is still open.
 
-**Not discussed — keep out of the model for now:** whether a journal needs a header row, whether a buy/sell is two physical rows, the final shape of Opening, close-and-liquidate, daily snapshots.
+### 5.3 Phase 2 conventions (agreed 2026-09-20)
+
+- **SystemAdmin on ledger APIs.** Phase 2 resource APIs grant SystemAdmin the same write surface as TenantAdmin (and read). The caller has no `TenantId`; list and create take the target tenant’s PublicId. Get / update / disable by resource PublicId may cross tenants. Cross-tenant 404 applies to TenantAdmin / Adviser only. Adviser Portal still has no SystemAdmin ledger screens — Scalar now, Back Office later. Do not reopen Phase 1 people routes (`/users/advisers`, `/users/customers`) for SystemAdmin in this phase.
+- **Test seed per slice.** Each Phase 2 Feature Spec adds rows to a dedicated Development / TestAppHost seeder (`TestSeed`). Not a schema script. Not production. Idempotent on natural keys. Functional tests still create their own isolation data; the seeder is for local Scalar / host smoke.
+
+### 5.4 Not locked (do not invent tables from this list)
+
+Journal header; one vs two physical rows for a buy; Opening column list; whether close forces liquidation; daily snapshots; Dashboard widget list.
+
+### 5.5 Out of Phase 2
+
+Live market data / live FX, Customer Portal, invitation delivery, KYC, households, advice documents, custody, fees, model portfolios, rebalancing. Opening Property or Credit accounts. Property address / appraisal workflow, credit limits / billing cycles, linking a loan to a property.
 
 Invitation delivery, Customer Portal, audit query, and custom role tables may run in parallel with the ledger or later. They are not prerequisites of the ledger domain.
 
@@ -213,15 +249,16 @@ schema
                             └── tenant-admins
                                     └── advisers
                                             └── customers
+                                                    └── A allow-list / B tenants.read / C portal pages  (landed)
 isolation-tests                (add from tenants onward on every business slice)
 ```
 
 ---
 
-## 9. Still open in Phase 1
+## 9. Locked from Phase 1 / open in Phase 2
 
 List page size is locked in tenants and reused by people lists (page 1 / size 20 / max 100). People lists use `enabledOnly` like currencies.
 
 Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; uniform login failure; hosted login is Razor Pages at `/login`; access 15 minutes; refresh 14 days absolute.
 
-Lock remaining Phase-2 storage shape when that phase opens, not before.
+Phase 1 platform slices are accepted and tested (A1–A10, B1–B11, C1–C15). Phase 2 is open. Feature map in §5 is agreed. Instruments is accepted. Write the next Feature Specs one slice at a time. Do not invent table shape outside the spec that owns it.

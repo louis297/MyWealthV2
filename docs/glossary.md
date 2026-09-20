@@ -3,7 +3,7 @@ title: Glossary
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-09-13
+updated: 2026-09-17
 related:
   - function-plan.md
   - domain-model.md
@@ -44,6 +44,7 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | Cash ledger | Cash entries and balance in the account’s booking currency. Phase 2. | Holding quantity |
 | Holding | Position of one instrument inside an account (quantity + cost). Phase 2. | A single transaction |
 | Instrument | Holdable object from an in-database catalog. Phase 2. | A free-text name stored on Holding |
+| Symbol | Instrument code on the tenant catalog (ticker-style unique key inside one tenant). | Display `Name`; ISIN |
 | QuoteCurrency | Currency used for the instrument’s price, market data, and cost accumulation. | Account booking currency |
 | CostBasis | Holding cost as `Money`. Currency must equal the instrument quote currency. | Market value |
 | Opening / initial holding | The only entry that may write quantity and cost directly. Phase 2. | Day-to-day holding edits |
@@ -112,12 +113,12 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 
 | Value | Notes |
 | --- | --- |
-| Bank | Current / savings and similar. |
-| Cash | Physical or not-yet-banked cash. |
-| Brokerage | Equities, funds, ETFs, and similar positions. |
-| Property | Real property. |
-| Credit | Cards and loans. Counts as a liability in net worth. |
-| Other | Catch-all. |
+| Bank | Deposit-style cash at a bank: current / savings and similar. Not the bank as an institution. Phase 2 openable; cash book only; no holdings. |
+| Cash | Physical or not-yet-banked cash. Phase 2 openable; cash book only; no holdings. |
+| Brokerage | Equities, funds, ETFs, and similar positions. Phase 2 openable; may hold instruments. |
+| Property | Real property held as instruments in this account. Reserved name; not selectable in Phase 2. |
+| Credit | Cards and loans. Counts as a liability in net worth. Reserved name; not selectable in Phase 2. |
+| Other | Catch-all. Phase 2 openable; may hold instruments. Not a substitute for Property or Credit. |
 
 Account type does **not** replace the cash ledger. Cash balance comes from cash postings. Do not infer cash by branching on `AccountType == Bank` and summing transactions.
 

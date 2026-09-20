@@ -24,9 +24,7 @@ related:
 
 TenantAdmin / Adviser Customer HTTP: list / get / create (Identity dual-write) / rename / reassign adviser / disable / enable. Tables, `User` factory (including the Customer shape), dual-write, `TargetDisabled`, policies `customers.manage` / `customers.manage-own`, and `UserDisabled` revocation already exist (identity-auth + tenant-admins + advisers). This slice does not add a script or a new policy name.
 
-Unlike advisers: TenantAdmin sees the current tenant; an Adviser sees, creates, and edits only assigned Customers. Disable Customer has no ledger guard in Phase 1. Creating or reassigning onto a disabled Adviser uses api-design §4.1 `target=user` (the call site advisers reserved). The portal Customers page is not this slice (later portals work).
-
-Chinese discussion draft: `v2draft/features/customers.md`.
+Unlike advisers: TenantAdmin sees the current tenant; an Adviser sees, creates, and edits only assigned Customers. Disable Customer has no ledger guard in Phase 1. Creating or reassigning onto a disabled Adviser uses api-design §4.1 `target=user` (the call site advisers reserved). The portal Customers page is not this slice (see [adviser-portal](../portals/adviser-portal.md)).
 
 Landed in GitHub master 2026-09-14 (`b16d059`, hosted-login smoke after create).
 

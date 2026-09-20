@@ -1,10 +1,10 @@
 ---
 title: Adviser Portal
-status: review
+status: accepted
 phase: 1
 language: en
 created: 2026-09-12
-updated: 2026-09-14
+updated: 2026-09-15
 related:
   - README.md
   - frontend-conventions.md
@@ -44,22 +44,20 @@ Vite on Aspire, discovery + PKCE authorize, `/callback`, session probe via `GET 
 
 ## Backend prerequisites (not this file)
 
-People HTTP has landed. Two accepted-spec **amendments** must land before pages:
+People HTTP, amendment A, and amendment B have landed in repo master (`09dc6ec`). A1–A10 and B1–B11 passed. Do not reopen the contracts.
 
 | Step | Spec | Ships |
 | --- | --- | --- |
-| A | [identity-auth](../features/identity-auth.md) | Client × role allow-list on IdentityHost: after password, before the authorization code. `adviser-portal` allows SystemAdmin, TenantAdmin, Adviser. A Customer with a correct password does **not** get a code. Uniform login failure. Customers hosted-login smoke changes to expect failure on this client. |
+| A | [identity-auth](../features/identity-auth.md) | Client × role allow-list on IdentityHost: after password, before the authorization code. `adviser-portal` allows SystemAdmin, TenantAdmin, Adviser. A Customer with a correct password does **not** get a code. Uniform login failure. Customers hosted-login smoke expects failure on this client. |
 | B | [tenants](../features/tenants.md) + [ADR 0013](../adr/0013-roles-authorization-single-user-table.md) | `GET /tenants/by-code/{code}`, policy `tenants.read`. Own-tenant 200 for TenantAdmin / Adviser; other codes 404; Customer 403. |
-
-Do not mix A or B into portal page commits.
 
 Reserved, not registered in Phase 1: client `customer-portal` (Customer) and a Back Office client (SystemAdmin only).
 
 ---
 
-## Current slice — pages
+## Pages (cut C) — accepted
 
-Do not start until A and B have landed.
+Landed in repo master 2026-09-14. Do not rebuild the OIDC shell to ship these pages.
 
 ### In
 
@@ -107,7 +105,7 @@ Do not start until A and B have landed.
 | Redirect | `{portalOrigin}/callback` |
 | Post-logout | `{portalOrigin}/` |
 | Token store | Redux + `sessionStorage` |
-| Allow-list (after A) | SystemAdmin, TenantAdmin, Adviser |
+| Allow-list | SystemAdmin, TenantAdmin, Adviser |
 | Sign out | Clear store + `sessionStorage`; `POST /connect/revocation` with the refresh token; redirect to discovery `end_session_endpoint` with `client_id` and `post_logout_redirect_uri={origin}/`. While that is in flight, `RequireSession`, `HomePage`, and the 401 handler must **not** call `startAuthorize`. |
 
 ### Acceptance (cut C)

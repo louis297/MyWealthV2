@@ -3,7 +3,7 @@ title: API design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-09-14
+updated: 2026-09-20
 related:
   - README.md
   - glossary.md
@@ -20,7 +20,7 @@ This document owns **HTTP conventions and the resource catalog**. Field-level co
 
 **Product:** MyWealthV2.
 
-Phase 1 closes the platform base: Adviser Portal + Scalar + the authorization-server hosted login. Ledger routes do not exist in this phase.
+Phase 1 closes the platform base: Adviser Portal + Scalar + the authorization-server hosted login. Phase 2 accepted so far: `/instruments`. Other ledger routes wait for their specs.
 
 ---
 
@@ -216,10 +216,11 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Customers | `/users/customers` | same | `customers.manage` or `customers.manage-own` |
 | Currencies | `/currencies` | GET | Authenticated |
 | Tenants | `/tenants` | list / get / create / update / disable / enable | `tenants.manage` |
+| Instruments | `/instruments` | list / get / create / update / disable / enable | `instruments.read` / `instruments.create` / `instruments.manage` |
 
 Path `{id}` is always PublicId.
 
-Phase 1 has **no** `/auth/*`, `/instruments`, `/accounts`, `/holdings`, `/transactions`, `/dashboard`, invitation, or forgot-password. Do not register ledger policy names in Phase 1.
+Phase 1 has **no** `/auth/*`, `/accounts`, `/holdings`, `/transactions`, `/dashboard`, invitation, or forgot-password. `/instruments` is the first Phase-2 ledger route.
 
 ---
 
@@ -312,7 +313,26 @@ Rule summary:
 - Customer calling `/users/advisers`, `/users/customers`, `/users/tenant-admins`, or `/tenants` → 403.
 - Disable and password change revoke that person’s OpenIddict tokens.
 
-People lists reuse the tenants envelope `{ items, page, pageSize, totalCount }` (page default 1, size default 20, max 100). Currencies and people collections use `enabledOnly` (omit / `false` = all, `true` = enabled / Active only). Each person item includes `status`. Create on a disabled tenant uses §4.1.
+People lists reuse the tenants envelope `{ items, page, pageSize, totalCount }` (page default 1, size default 20, max 100). Currencies, people collections, and instruments use `enabledOnly` (omit / `false` = all, `true` = enabled / Active only). Each person item includes `status`. Create on a disabled tenant uses §4.1.
+
+### 7.5 Instruments
+
+Field rules: [features/instruments.md](features/instruments.md).
+
+| Method | Route | Policy | Success |
+| --- | --- | --- | --- |
+| GET | `/instruments` | `instruments.read` | 200 envelope |
+| GET | `/instruments/{id}` | `instruments.read` | 200 item |
+| POST | `/instruments` | `instruments.create` | 201 `{ id }` |
+| PUT | `/instruments/{id}` | `instruments.manage` | 204 |
+| POST | `/instruments/{id}/disable` | `instruments.manage` | 204 |
+| POST | `/instruments/{id}/enable` | `instruments.manage` | 204 |
+
+- TenantAdmin / Adviser: current tenant. Body / list query must omit `tenantId`.
+- SystemAdmin: list and create require tenant PublicId. Get / PUT / disable / enable may cross tenants.
+- Customer → 403.
+- Item includes `id`, `tenantId`, `symbol`, `name`, `quoteCurrency`, `isEnabled`, `rowVersion`. No price.
+- Create on a disabled tenant → §4.1 `target=tenant`.
 
 ---
 
@@ -322,14 +342,14 @@ People lists reuse the tenants envelope `{ items, page, pageSize, totalCount }` 
 - Password grant
 - A second OIDC client in Phase 1
 - Currency write APIs, per-tenant currency allow-lists, FX
-- `/instruments`, `/accounts`, `/holdings`, `/transactions`, `/dashboard`
+- `/accounts`, `/holdings`, `/transactions`, `/dashboard`
 - Invitation, forgot-password, self-registration, MFA, external IdP
 - Subdomain tenant resolution; Header-based SystemAdmin tenant switching
 - Internal `int` ids in routes or JSON
 - A catch-all `GET/POST /users`; fake children such as `/users/{id}/advisers`
 - Putting `/tenants`, `/currencies`, or ledger routes under `/users`
 
-When the Phase-2 ledger opens, add ledger policy names and ledger routes only. The session stack and these conventions stay.
+Further ledger routes wait for their Feature Specs. The session stack and these conventions stay.
 
 ---
 
@@ -351,3 +371,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-09-13 | §4.1 shared disabled error (`code=disabled` + `target`). People lists reuse tenants envelope; `enabledOnly` aligned with currencies. TenantAdmin field rules in [features/tenant-admins.md](features/tenant-admins.md). |
 | 2026-09-14 | Adviser field rules in [features/advisers.md](features/advisers.md). Disable-adviser assigned-customer 400 is ordinary validation, not §4.1. |
 | 2026-09-14 | Customer field rules in [features/customers.md](features/customers.md). Client allow-list: `adviser-portal` issues no Customer code. `GET /tenants/by-code/{code}` + `tenants.read`. |
+| 2026-09-20 | `/instruments` catalog + §7.5. SystemAdmin list/create take tenant PublicId. Field rules in [features/instruments.md](features/instruments.md). |

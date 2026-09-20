@@ -25,8 +25,6 @@ Platform Tenant HTTP for SystemAdmin: list / get / create / rename+reporting-cur
 
 Creating a Tenant does **not** create a TenantAdmin or any Identity user. People dual-write is the next slice.
 
-Chinese discussion draft: `v2draft/features/tenants.md`.
-
 ---
 
 ## 1. Summary

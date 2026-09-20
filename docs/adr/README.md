@@ -3,7 +3,7 @@ title: Architecture decision records
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-09-12
+updated: 2026-09-20
 ---
 
 # Architecture decision records
@@ -25,10 +25,10 @@ Write an ADR when the choice would surprise a later reader: host, identity, sche
 | [0007](0007-baseentity-primary-key-int.md) | Internal int PK + external PublicId | accepted |
 | [0008](0008-schema-sql-as-source-of-truth.md) | Versioned SQL is schema truth | accepted |
 | [0009](0009-currencies-catalog.md) | Platform currency catalog | accepted |
-| [0010](0010-instrument-catalog.md) | Instrument catalog (Phase 2 direction) | accepted |
+| [0010](0010-instrument-catalog.md) | Instrument catalog (expanded with instruments spec) | accepted |
 | [0011](0011-ledger-cash-holdings-reversal.md) | Ledger direction and reversals (Phase 2) | accepted |
 | [0012](0012-user-activation-invite-deferred.md) | UserStatus machine; invitation deferred | accepted |
 | [0013](0013-roles-authorization-single-user-table.md) | Four roles, named policies, one table per layer | accepted |
 | [0014](0014-openiddict-authorization-code-pkce.md) | OpenIddict in Aspire `identity`; authorization code + PKCE | accepted |
 
-0010–0011 are accepted as Phase-2 *direction*. Reopen and expand them when that phase starts. Do not implement them in Phase 1.
+0010 is accepted and expanded with [features/instruments.md](../features/instruments.md). 0011 remains Phase-2 *direction* until the cash / holdings / posting specs land.

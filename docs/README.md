@@ -3,14 +3,14 @@ title: Documentation
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-09-12
+updated: 2026-09-20
 ---
 
 # MyWealthV2 documentation
 
 This folder is the design source of truth for MyWealthV2.
 
-Write English only. Use the terms in [glossary.md](glossary.md). If a new word appears in a spec, add it to the glossary in the same change.
+Write English only. Use the terms in [glossary.md](glossary.md). If a new word appears in a spec, add it to the glossary in the same change. Do not add a parallel Chinese draft tree or `v2draft/` pointers.
 
 Coding and commit rules for agents belong in the repository-root `AGENTS.md`, not here.
 
@@ -18,9 +18,24 @@ Coding and commit rules for agents belong in the repository-root `AGENTS.md`, no
 
 ## Current phase
 
-**Phase 1 — platform foundation.** Tenants, identity/session (OpenIddict), four roles, people, currency catalog, Adviser Portal shell.
+**Phase 2 — ledger domain.** Opened 2026-09-15. One domain, several slices.
 
-Do not add Phase-2 ledger tables, routes, or handlers (instruments, accounts, holdings, transactions, net worth) until that phase is opened.
+Phase 1 platform contracts stay accepted. Do not reopen them. Do not ship a single `Transactions` table that pretends to be both cash and securities.
+
+**Feature map:** [function-plan.md](function-plan.md) §5. First accepted slice: [features/instruments.md](features/instruments.md). Write Feature Specs one slice at a time. Do not lock columns outside the spec that owns them.
+
+Suggested internal order (tendency, not a locked backlog): instruments → account container → cash ledger → securities / holdings → posting / reversal / Opening → net-worth read model + Dashboard.
+
+### Phase 2 working mode
+
+Phase 1 production code was largely written by the build CLI. Phase 2 is not that loop.
+
+1. **Discuss features** (high aspect first). Do not implement from a chat summary.
+2. **Write docs** here (`docs/function-plan.md`, then Feature Specs / ADR expansions). `draft` / `review` are not build contracts. `accepted` is.
+3. **CLI writes tests** in the implementation repo from the accepted spec (red).
+4. **Human writes most production code.** An agent implements a slice only when asked.
+
+Table and port shape is locked in that slice’s Feature Spec, not in ADR 0010 / 0011 alone. Those ADRs are direction; reopen and expand them when the spec is written.
 
 ---
 
