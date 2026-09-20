@@ -14,6 +14,10 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(user => user.Email).HasMaxLength(256).IsRequired();
         builder.Property(user => user.IdentityUserId).HasMaxLength(450).IsRequired();
         builder.Property(user => user.PublicId).IsRequired();
+        builder.Property(user => user.IsActive)
+            .HasComputedColumnSql(
+                "ISNULL(CAST(CASE WHEN [Status] = 1 THEN 1 ELSE 0 END AS bit), 0)",
+                stored: true);
         builder.Property(user => user.RowVersion).IsRowVersion();
 
         builder.HasIndex(user => user.PublicId).IsUnique();

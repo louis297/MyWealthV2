@@ -8,8 +8,6 @@ public interface ICurrencyCatalog
 
     IReadOnlyList<Currency> List(bool enabledOnly = false);
 
-    bool IsEnabled(string code);
-
     bool IsActive(string code);
 
     Task ReloadAsync(CancellationToken cancellationToken = default);

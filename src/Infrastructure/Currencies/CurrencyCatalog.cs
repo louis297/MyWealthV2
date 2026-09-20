@@ -42,9 +42,7 @@ public sealed class CurrencyCatalog(IServiceScopeFactory scopes) : ICurrencyCata
         return rows.OrderBy(currency => currency.Code, StringComparer.Ordinal).ToList();
     }
 
-    public bool IsEnabled(string code) => TryGet(code)?.IsActive == true;
-
-    public bool IsActive(string code) => false;
+    public bool IsActive(string code) => TryGet(code)?.IsActive == true;
 
     public async Task ReloadAsync(CancellationToken cancellationToken = default)
     {
