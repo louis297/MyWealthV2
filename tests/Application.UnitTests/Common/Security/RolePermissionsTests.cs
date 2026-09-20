@@ -39,4 +39,21 @@ public class RolePermissionsTests
     {
         RolePermissions.Has(role, policy).ShouldBe(expected);
     }
+
+    [TestCase(UserRole.SystemAdmin, Policies.InstrumentsRead, true)]
+    [TestCase(UserRole.SystemAdmin, Policies.InstrumentsCreate, true)]
+    [TestCase(UserRole.SystemAdmin, Policies.InstrumentsManage, true)]
+    [TestCase(UserRole.TenantAdmin, Policies.InstrumentsRead, true)]
+    [TestCase(UserRole.TenantAdmin, Policies.InstrumentsCreate, true)]
+    [TestCase(UserRole.TenantAdmin, Policies.InstrumentsManage, true)]
+    [TestCase(UserRole.Adviser, Policies.InstrumentsRead, true)]
+    [TestCase(UserRole.Adviser, Policies.InstrumentsCreate, true)]
+    [TestCase(UserRole.Adviser, Policies.InstrumentsManage, false)]
+    [TestCase(UserRole.Customer, Policies.InstrumentsRead, false)]
+    [TestCase(UserRole.Customer, Policies.InstrumentsCreate, false)]
+    [TestCase(UserRole.Customer, Policies.InstrumentsManage, false)]
+    public void Has_MatchesInstrumentsMap(UserRole role, string policy, bool expected)
+    {
+        RolePermissions.Has(role, policy).ShouldBe(expected);
+    }
 }

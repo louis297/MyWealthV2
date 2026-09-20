@@ -9,4 +9,7 @@ public static class Policies
     public const string CustomersManage = "customers.manage";
     public const string CustomersManageOwn = "customers.manage-own";
     public const string UsersMe = "users.me";
+    public const string InstrumentsRead = "instruments.read";
+    public const string InstrumentsCreate = "instruments.create";
+    public const string InstrumentsManage = "instruments.manage";
 }
