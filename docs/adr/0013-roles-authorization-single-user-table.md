@@ -70,7 +70,7 @@ Ledger names were not registered in Phase 1. The instruments slice adds:
 | `instruments.create` | ✓ | ✓ | ✓ | |
 | `instruments.manage` | ✓ | ✓ | | |
 
-SystemAdmin has no `TenantId`. List and create take the target tenant PublicId. Field rules: [features/instruments.md](../features/instruments.md). Phase 1 people routes do not gain SystemAdmin verbs in this amendment.
+SystemAdmin has no `TenantId`. List and create take the target tenant PublicId. Field rules: [features/instruments.md](../features/instruments.md). Landed in repo 2026-09-20 `9ea2f2a`. Phase 1 people routes do not gain SystemAdmin verbs in this amendment.
 
 The `/users` HTTP namespace (`/users/advisers` and so on) is an API convention. It is not this ADR’s authorization model.
 

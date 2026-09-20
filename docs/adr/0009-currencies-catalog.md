@@ -22,7 +22,7 @@ Phase 1 already needs a supported-currency list, and later account / quote / rep
 
 ## Decision
 
-- Platform table `Currencies` (`Code` PK, `Name`, `DecimalPlaces`, `IsEnabled`). No PublicId. No RowVersion.
+- Platform table `Currencies` (`Code` PK, `Name`, `DecimalPlaces`, `IsActive`). No PublicId. No RowVersion. Shipped as `IsEnabled`; script `0011` renames.
 - Currency columns are `char(3)` with an **FK** to `Currencies.Code`. The only Phase-1 consumer is `Tenants.ReportingCurrency`.
 - In-process `ICurrencyCatalog`. The hot path does not JOIN.
 - Phase 1: read-only `GET /currencies`. No per-tenant allow-list, no FX, no `IFxRate` port.

@@ -3,7 +3,7 @@ title: Feature Specs
 status: draft
 language: en
 created: 2026-09-12
-updated: 2026-09-18
+updated: 2026-09-21
 related:
   - ../function-plan.md
   - ../api-design.md
@@ -78,7 +78,7 @@ Repo master (2026-09-14, `09dc6ec`): people collections, currencies HTTP, amendm
 
 Acceptance: [identity-auth](identity-auth.md) amendment A (A1–A10), [tenants](tenants.md) amendment B (B1–B11), [adviser-portal](../portals/adviser-portal.md) cut C (C1–C15). Construction notes (`review`): [portals/frontend-implementation-notes.md](../portals/frontend-implementation-notes.md).
 
-`GET /currencies` is not public. Register no `currencies.read` policy. Use default `.RequireAuthorization()`. Query `enabledOnly`: omitted / `false` = all rows; `true` = enabled only. Every item includes `isEnabled`.
+`GET /currencies` is not public. Register no `currencies.read` policy. Use default `.RequireAuthorization()`. Query `enabledOnly`: omitted / `false` = all rows; `true` = enabled only. Every item includes `isActive`.
 
 ---
 
@@ -92,7 +92,7 @@ Lock table and port shape in the Feature Spec. Do not implement from ADR 0010 / 
 
 | Spec | Status | Who | Ships | Why it stays its own slice |
 | --- | --- | --- | --- | --- |
-| [instruments](instruments.md) | accepted | TenantAdmin; Adviser (create + read); SystemAdmin (all verbs, Scalar) | Tenant catalog, `/instruments`, mocked `IMarketData` / `IFxRate`, TestSeed | Holdings store `InstrumentId` only; catalog must exist first |
+| [instruments](instruments.md) | accepted (landed in repo 2026-09-20 `9ea2f2a`) | TenantAdmin; Adviser (create + read); SystemAdmin (all verbs, Scalar) | Tenant catalog, `/instruments`, mocked `IMarketData` / `IFxRate`, TestSeed | Holdings store `InstrumentId` only; catalog must exist first |
 
 Suggested order (tendency, not a locked backlog):
 

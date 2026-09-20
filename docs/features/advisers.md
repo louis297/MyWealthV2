@@ -31,7 +31,7 @@ Landed in GitHub master 2026-09-14 (`8e5568c`, hosted-login smoke after create).
 
 ## 1. Summary
 
-A TenantAdmin creates an Adviser in **their** tenant (`name`, `email`, `password`). `tenantId` comes from the current user, not the body. Same-transaction dual write Identity → Domain, lands in `Active`. Email is unique CI inside the tenant. Role / TenantId / Email cannot change. Create while the current tenant is disabled → 400 `disabled` / `target=tenant` (leftover access-token window). Disable while any assigned Customer is not Disabled → 400 ordinary validation, not §4.1. Cross-tenant ids → 404. SystemAdmin / Adviser / Customer → 403. Every list item includes `status`; `enabledOnly` matches currencies.
+A TenantAdmin creates an Adviser in **their** tenant (`name`, `email`, `password`). `tenantId` comes from the current user, not the body. Same-transaction dual write Identity → Domain, lands in `Active`. Email is unique CI inside the tenant. Role / TenantId / Email cannot change. Create while the current tenant is disabled → 400 `disabled` / `target=tenant` (leftover access-token window). Disable while any assigned Customer is not Disabled → 400 ordinary validation, not §4.1. Cross-tenant ids → 404. SystemAdmin / Adviser / Customer → 403. Every list item includes `status` and `isActive`; `enabledOnly` matches currencies (`true` = `IsActive = 1`).
 
 ---
 
@@ -82,17 +82,17 @@ A TenantAdmin creates an Adviser in **their** tenant (`name`, `email`, `password
 | R3 | `Name` required, 1–200, trim, preserve caller casing. |
 | R4 | `Email` required, trim, preserve casing, compare CI, must look like an email. Unique inside the tenant (collision with a TenantAdmin or Customer is also 400). Repeatable across tenants. |
 | R5 | Create requires `password` (minimum 8). Lands `Active`, raises `UserActivated` + `UserCreated`. No password-less create. |
-| R6 | Create does **not** take `tenantId`. Tenant = current user’s TenantId. Missing current tenant (should not happen) → 404. Current tenant `IsEnabled = false` → 400, `TargetDisabledException("tenant", tenant.PublicId, "Tenant is disabled", "Cannot create an Adviser while the tenant is disabled. Enable the tenant first.")`. List / get / PUT / disable / enable do not reject because the tenant is disabled. |
+| R6 | Create does **not** take `tenantId`. Tenant = current user’s TenantId. Missing current tenant (should not happen) → 404. Current tenant `IsActive = false` → 400, `TargetDisabledException("tenant", tenant.PublicId, "Tenant is disabled", "Cannot create an Adviser while the tenant is disabled. Enable the tenant first.")`. List / get / PUT / disable / enable do not reject because the tenant is disabled. |
 | R7 | Dual-write order matches tenant-admins: Identity first (`UserName` = person PublicId, `TenantId` projection), then `Users`. Same transaction. Responses never include the password. |
 | R8 | Role / TenantId / Email cannot change. PUT updates `name` only. Body includes `email` / `tenantId` / `role` / `password` / `adviserId` → 400. |
-| R9 | Status is not on PUT. Disable / enable are `POST …/disable` and `POST …/enable`. |
+| R9 | Status and `isActive` are not on PUT or create bodies. Disable / enable are `POST …/disable` and `POST …/enable`. |
 | R10 | HTTP idempotent: already Disabled + disable, or already Active + enable → 204, no second event. Application inspects Status first; domain throw semantics stay. |
 | R11 | Disable goes through `User.DisableAdviser(hasNonDisabledAssignedCustomers)`. Application only counts rows `AdviserId = this person AND Role = Customer AND Status != Disabled` and passes the bool. `true` → `DomainException`, HTTP **400** ordinary `errors`, fixed copy: `Reassign or disable assigned customers before disabling this adviser.` Do **not** use `code=disabled` / `target=user` (the Adviser is still Active). `false` (no customers, or all Disabled) → existing `Disable()`, raises `UserDisabled`. Tests may insert Customer rows without the customers slice. |
 | R12 | Revocation stays on the existing `UserDisabled` handler. Do not route TenantAdmin / Customer disable through `DisableAdviser`. |
 | R13 | `Enable()` raises `UserActivated`. Login still requires an enabled tenant and Active. |
 | R14 | PUT / disable / enable require `rowVersion`. Conflict 409. Missing 400. Same encoding as `/users/me`. |
 | R15 | No physical delete. |
-| R16 | List is current tenant, `Role=Adviser` only. Every item includes `status`. `enabledOnly` omitted/`false` = every Status; `true` = Active only; any other value 400. `page` default 1, `pageSize` default 20 max 100. Optional `search`: Name / Email contains (CI) or person PublicId exact. Sort name then email. No `tenantId=` or `status=` query. |
+| R16 | List is current tenant, `Role=Adviser` only. Every item includes `status` and `isActive`. `enabledOnly` omitted/`false` = every Status; `true` = `IsActive = 1`; any other value 400. `page` default 1, `pageSize` default 20 max 100. Optional `search`: Name / Email contains (CI) or person PublicId exact. Sort name then email. No `tenantId=` or `status=` query. |
 | R17 | **Cross-tenant 404**: another tenant’s Adviser PublicId → GET/PUT/disable/enable 404, same as missing. Same-tenant PublicId whose Role is not Adviser (TenantAdmin / Customer) → 404. Two-tenant fixture required. |
 | R18 | Do not seed a demo Adviser. Tests create people. |
 

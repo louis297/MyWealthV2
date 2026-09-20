@@ -4,7 +4,7 @@ status: accepted
 phase: 2
 language: en
 date: 2026-08-31
-updated: 2026-09-12
+updated: 2026-09-21
 related:
   - 0010-instrument-catalog.md
   - ../function-plan.md
@@ -19,7 +19,7 @@ Status: accepted (Phase 2 direction)
 
 Storage shape (journal header, one row vs two for a buy, Opening columns, close-and-clear, daily snapshot) is reviewed and locked when the phase opens. This ADR only locks the *way of thinking*, so Phase 1 does not ship a single-row `Transactions` table that Phase 2 would have to throw away.
 
-When Phase 2 opens, reopen this ADR and write Feature Specs. Do not implement from this file alone.
+Phase 2 is open. Instruments is accepted and landed. Do not implement accounts from this file. Reopen the Consequences / Decision bullets that the accepted accounts spec locks (Customer parent, immutable type + currency, `IsOpen`). Posting storage stays direction.
 
 ## Context
 
@@ -47,4 +47,4 @@ A single `Type` column that pretends to be both cash and security, plus hand-edi
 
 ## Consequences
 
-Phase-1 Domain defines `Money` and does not define ledger aggregates. When Phase 2 opens, write formal specs in this order: instruments → account container → cash book → holdings → posting and reversal → net worth.
+Phase-1 Domain defines `Money` and does not define ledger aggregates. Instruments shipped first. Next formal spec: account container (`draft`). Then cash book → holdings → posting and reversal → net worth.

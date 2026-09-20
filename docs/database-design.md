@@ -3,7 +3,7 @@ title: Database design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-09-20
+updated: 2026-09-21
 related:
   - README.md
   - glossary.md
@@ -14,7 +14,7 @@ related:
 
 # Database design
 
-This document owns **accepted tables, keys, indexes, constraints, and script order**. Scripts themselves live in `database/schema/`. Aggregates and invariants live in [domain-model.md](domain-model.md). Scope lives in [function-plan.md](function-plan.md). Field rules for Instruments live in [features/instruments.md](features/instruments.md).
+This document owns **accepted tables, keys, indexes, constraints, and script order**. Scripts themselves live in `database/schema/`. Aggregates and invariants live in [domain-model.md](domain-model.md). Scope lives in [function-plan.md](function-plan.md). Field rules for Instruments live in [features/instruments.md](features/instruments.md). Boolean catalog flags are `IsActive` (naming amendment 2026-09-21, script `0011`).
 
 **Product:** MyWealthV2.
 
@@ -58,10 +58,11 @@ Identity password seed goes through `UserManager`. OpenIddict clients may be ins
 | Tenancy | Business tables carry `TenantId`. Null only on `Users` for SystemAdmin. FK `Users.TenantId` → `Tenants`. |
 | Audit | `Created datetimeoffset`, `CreatedBy nvarchar(450)`, `LastModified datetimeoffset`, `LastModifiedBy nvarchar(450)` on `Tenants`, `Users`, and `Instruments`. `CreatedBy` stores the actor’s Identity id or a system name. |
 | Concurrency | `RowVersion rowversion` on `Tenants`, `Users`, and `Instruments`. HTTP 409 on conflict. |
-| Soft delete | Not used. People use `Status`. |
+| Soft delete | Not used. |
+| Status + IsActive | Rows that have a **status machine** store both: `Status` (source of truth) and `IsActive` (filter bit). `IsActive` is **derived**, never written by HTTP. Preferred SQL: persisted computed column from `Status`. Catalog rows (Tenant, Currency, Instrument) have `IsActive` only — no status machine. Never `IsEnabled`. |
 | Money | No money columns in Phase 1. When the ledger exists: `decimal(18,4)` + `char(3)` FK to `Currencies`. |
 | Strings | `nvarchar` + explicit max length. Email / Name / Code uniqueness is case-insensitive (`SQL_Latin1_General_CP1_CI_AS` or an equivalent CI collation). |
-| Enums | `int` on `Users.Role`, `Users.Status`, `UserTokens.Purpose`. |
+| Enums | `int` on `Users.Role`, `Users.Status`, `UserTokens.Purpose`, later `Accounts.Status`. |
 | Delete | `RESTRICT` (no cascade) on Phase-1 business FKs. |
 
 ---
@@ -103,7 +104,7 @@ erDiagram
     char Code PK
     nvarchar Name
     tinyint DecimalPlaces
-    bit IsEnabled
+    bit IsActive
   }
   Tenants {
     int Id PK
@@ -111,7 +112,7 @@ erDiagram
     nvarchar Name
     nvarchar Code
     char ReportingCurrency FK
-    bit IsEnabled
+    bit IsActive
   }
   Users {
     int Id PK
@@ -121,6 +122,7 @@ erDiagram
     nvarchar Email
     int Role
     int Status
+    bit IsActive
     int AdviserId FK "null except Customer"
     nvarchar IdentityUserId FK
   }
@@ -157,7 +159,7 @@ Platform catalog. No audit, no `RowVersion`, no `PublicId`.
 | Code | char(3) | no | PK, ISO 4217 upper case |
 | Name | nvarchar(100) | no | |
 | DecimalPlaces | tinyint | no | ISO minor units for display / validation (JPY = 0, NZD = 2). Not the Phase-2 money-column scale (`decimal(18,4)`) |
-| IsEnabled | bit | no | Default 1. **Platform** flag. Not per tenant. Disable does not rewrite `Tenants.ReportingCurrency` |
+| IsActive | bit | no | Default 1. **Platform** flag. Not per tenant. Disable does not rewrite `Tenants.ReportingCurrency`. Renamed from `IsEnabled` in `0011`. |
 
 Seed: NZD, AUD, USD, EUR, GBP, JPY.
 
@@ -210,13 +212,13 @@ Client seed: SQL insert or startup seed. Both are allowed.
 | Name | nvarchar(200) | no | Unique CI |
 | Code | nvarchar(50) | no | Login code, unique CI, `[a-z0-9-]{2,50}` |
 | ReportingCurrency | char(3) | no | Added by the currencies slice (`0009`). FK → `Currencies.Code`. No column default after apply |
-| IsEnabled | bit | no | Default 1 |
+| IsActive | bit | no | Default 1. Renamed from `IsEnabled` in `0011`. |
 | RowVersion | rowversion | no | |
 | Created / CreatedBy / LastModified / LastModifiedBy | audit | | |
 
 `Code` is treated as immutable after create by the Tenants slice (no update API). The column itself is ordinary.
 
-identity-auth created `Tenants` **without** `ReportingCurrency`. Login only needs `Code` and `IsEnabled`. The currencies slice adds the catalog (`0008`) and then `Tenants.ReportingCurrency` (`0009`). Do not back-fill `0002`.
+identity-auth created `Tenants` **without** `ReportingCurrency`. Login only needs `Code` and the active flag. The currencies slice adds the catalog (`0008`) and then `Tenants.ReportingCurrency` (`0009`). `0011` renames `IsEnabled` → `IsActive` on `Currencies`, `Tenants`, and `Instruments`. Do not back-fill `0002` / `0005` / `0008` / `0010`.
 
 ### 6.6 Users
 
@@ -230,7 +232,8 @@ One table for all four roles. Credentials live on `AspNetUsers`.
 | Name | nvarchar(200) | no | |
 | Email | nvarchar(256) | no | Unique inside a tenant; SystemAdmin unique globally |
 | Role | int | no | 0 SystemAdmin, 1 TenantAdmin, 2 Adviser, 3 Customer |
-| Status | int | no | 0 PendingActivation, 1 Active, 2 Disabled |
+| Status | int | no | 0 PendingActivation, 1 Active, 2 Disabled. Source of truth |
+| IsActive | bit | no | Derived. `1` iff `Status = Active`. Added by `0011` as persisted computed (preferred) or CHECK-paired bit |
 | AdviserId | int | yes | Required for Customer. FK → `Users.Id` |
 | IdentityUserId | nvarchar(450) | no | FK → `AspNetUsers.Id`. Unique. One-to-one |
 | RowVersion | rowversion | no | |
@@ -303,11 +306,11 @@ No FK:
 
 Beyond PK / unique constraints already listed:
 
-- `Tenants(Code)`, `Tenants(Name)`, `Tenants(PublicId)`, `Tenants(IsEnabled)`
-- `Users(TenantId, Email)`, `Users(TenantId, Role)`, `Users(AdviserId)`, `Users(PublicId)`, `Users(IdentityUserId)`, `Users(Status)`
+- `Tenants(Code)`, `Tenants(Name)`, `Tenants(PublicId)`, `Tenants(IsActive)`
+- `Users(TenantId, Email)`, `Users(TenantId, Role)`, `Users(AdviserId)`, `Users(PublicId)`, `Users(IdentityUserId)`, `Users(Status)`, `Users(TenantId, IsActive)`
 - `UserTokens(TokenHash)`, `UserTokens(TenantId, Email)`, `UserTokens(IdentityUserId)`
 - OpenIddict / Identity: keep package indexes
-- `Instruments(PublicId)`, `Instruments(TenantId, Symbol)` CI unique, `Instruments(TenantId, IsEnabled)`
+- `Instruments(PublicId)`, `Instruments(TenantId, Symbol)` CI unique, `Instruments(TenantId, IsActive)`
 
 ---
 
@@ -322,7 +325,9 @@ Beyond PK / unique constraints already listed:
 0007_user_tokens.sql
 0008_currencies.sql          -- platform catalog + seed
 0009_tenants_reporting_currency.sql  -- ALTER Tenants.ReportingCurrency + FK
-0010_instruments.sql         -- tenant catalog; no demo rows
+0010_instruments.sql         -- tenant catalog; no demo rows; shipped as IsEnabled
+0011_rename_is_enabled_to_is_active.sql  -- catalog IsEnabled → IsActive; add Users.IsActive derived from Status
+0012_accounts.sql            -- Account container (when accounts spec is accepted)
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -351,9 +356,28 @@ Name, Role, Status, AdviserId change only on `Users`. After password change, dis
 
 Script `0010_instruments.sql`. Columns and uniqueness: [features/instruments.md](features/instruments.md) §6. No ISIN / Exchange / Kind / price. No seed in the script — `TestSeed` only.
 
-### 11.2 Not yet accepted
+### 11.2 Naming amendment `IsEnabled` → `IsActive` + Users derived bit
 
-Do not create empty tables. Names reserved: Account, Holding, cash posting, security posting, Reversal, Opening.
+Script `0011_rename_is_enabled_to_is_active.sql`. Forward ALTER only. Do not edit `0005` / `0006` / `0008` / `0010`.
+
+| Table | Change |
+| --- | --- |
+| `Currencies` | `IsEnabled` → `IsActive` |
+| `Tenants` | `IsEnabled` → `IsActive`; index `Tenants(IsActive)` |
+| `Instruments` | `IsEnabled` → `IsActive`; index `(TenantId, IsActive)` |
+| `Users` | add `IsActive` derived from `Status`: `Active` → 1; `PendingActivation` and `Disabled` → 0. Prefer persisted computed column. Index `(TenantId, IsActive)` |
+
+`IsActive` on Users is a filter projection. Login and disable still use `UserStatus`. HTTP disable / enable do not accept `isActive` in the body.
+
+People list items may include `isActive` alongside `status` after `0011`. Filter stays `enabledOnly` (true = `IsActive = 1`).
+
+### 11.3 Accounts (draft)
+
+Proposed script `0012_accounts.sql`. `Status` (Open / Closed) plus derived `IsActive`. Do **not** apply this script until that Feature Spec is `accepted`.
+
+### 11.4 Not yet accepted
+
+Do not create empty tables. Names reserved: Holding, cash posting, security posting, Reversal, Opening.
 
 ---
 
@@ -374,4 +398,5 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-09-11 | First English draft. Align with function-plan: OpenIddict stores in, custom RefreshTokens out; AspNetUsers.TenantId column no FK; no DomainUserId / Role / DisplayName on Identity; UserTokens seam keyed by hash + optional IdentityUserId, no FK; no ledger tables |
 | 2026-09-12 | identity-auth lands Tenants without ReportingCurrency and does not create Currencies. Catalog + ReportingCurrency FK are the currencies slice (`0008+`). |
 | 2026-09-13 | Currencies spec: `0008` + `0009`. `IsEnabled` is platform-wide. `DecimalPlaces` is minor units, not `decimal(18,4)` scale. |
-| 2026-09-20 | `Instruments` (`0010`). Tenant catalog. Unique `(TenantId, Symbol)`. FK QuoteCurrency → Currencies. |
+| 2026-09-20 | `Instruments` (`0010`). Tenant catalog. Unique `(TenantId, Symbol)`. FK QuoteCurrency → Currencies. Landed in repo `9ea2f2a`. |
+| 2026-09-21 | Boolean flags unified to `IsActive`. Script `0011` renames catalog `IsEnabled` and adds `Users.IsActive` derived from `Status`. Accounts draft: `Status` + derived `IsActive`. |

@@ -3,7 +3,7 @@ title: Architecture decision records
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-09-20
+updated: 2026-09-21
 ---
 
 # Architecture decision records
@@ -31,4 +31,4 @@ Write an ADR when the choice would surprise a later reader: host, identity, sche
 | [0013](0013-roles-authorization-single-user-table.md) | Four roles, named policies, one table per layer | accepted |
 | [0014](0014-openiddict-authorization-code-pkce.md) | OpenIddict in Aspire `identity`; authorization code + PKCE | accepted |
 
-0010 is accepted and expanded with [features/instruments.md](../features/instruments.md). 0011 remains Phase-2 *direction* until the cash / holdings / posting specs land.
+0010 is accepted and expanded with [features/instruments.md](../features/instruments.md) (landed `9ea2f2a`). 0011 remains Phase-2 *direction* until the cash / holdings / posting specs land.

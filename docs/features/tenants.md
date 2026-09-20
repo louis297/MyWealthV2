@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-13
-last_updated: 2026-09-14
+last_updated: 2026-09-21
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -21,7 +21,9 @@ related:
 
 # Tenants
 
-Platform Tenant HTTP for SystemAdmin: list / get / create / rename+reporting-currency / disable / enable. The table, `PublicId`, `Code`, `IsEnabled`, audit, `RowVersion`, and `ReportingCurrency` already exist (identity-auth `0005`, currencies `0009`). This slice does not add a script.
+Platform Tenant HTTP for SystemAdmin: list / get / create / rename+reporting-currency / disable / enable. The table, `PublicId`, `Code`, active flag, audit, `RowVersion`, and `ReportingCurrency` already exist (identity-auth `0005`, currencies `0009`). This slice does not add a script.
+
+**Naming amendment 2026-09-21:** column and JSON field are `IsActive` / `isActive` (shipped as `IsEnabled` / `isEnabled` on `0005`). Forward script `0011_rename_is_enabled_to_is_active.sql`. HTTP verbs stay `POST …/disable` and `POST …/enable`. Domain methods stay `Disable` / `Enable`. Landed list query `isEnabled` still filters the bit (do not add a second tenants filter). Do not leave an `IsEnabled` column. Examples below that still say `isEnabled` mean `isActive`.
 
 Creating a Tenant does **not** create a TenantAdmin or any Identity user. People dual-write is the next slice.
 
@@ -86,7 +88,7 @@ SystemAdmin onboards a firm with `name`, `code`, and an enabled `reportingCurren
 | R5 | Create does not create Identity or Domain users. |
 | R6 | Create `reportingCurrency` must exist in `ICurrencyCatalog` and be **enabled**. Unknown or disabled → 400. Store the upper-case catalog code. |
 | R7 | PUT may change `name` and/or `reportingCurrency`. If `reportingCurrency` is omitted or equals the current value, do **not** call `SetReportingCurrency` (a later-disabled historical code may stay). A **new** code must be enabled. |
-| R8 | `IsEnabled` is not on PUT. Disable / enable are `POST …/disable` and `POST …/enable`. |
+| R8 | `IsActive` is not on PUT. Disable / enable are `POST …/disable` and `POST …/enable`. |
 | R9 | Disable / enable are idempotent: already in the target state → 204, no second domain event. |
 | R10 | Disable does **not** UPDATE `Users.Status`. Login already requires an enabled tenant **and** `Status = Active`. |
 | R11 | `Disable()` raises `TenantDisabled`. identity-auth `RevokeTokensOnTenantDisabled` revokes every Domain user in that tenant (`sub` = user PublicId). This slice does not rewrite that handler. |
@@ -108,7 +110,7 @@ SystemAdmin onboards a firm with `name`, `code`, and an enabled `reportingCurren
 | `TenantDisabled` | Event | Already raised from `Disable`. Consumed by identity-auth revocation. |
 | `TenantEnabled` | Event | Raised from `Enable` when the flag actually flips. |
 
-Current factory (currencies slice): `Tenant.Create(name, code, Currency reportingCurrency, Guid? publicId = null)` — starts `IsEnabled = true`, stores `reportingCurrency.Code`. Keep that signature. Application normalises name/code **before** `Create`.
+Current factory (currencies slice): `Tenant.Create(name, code, Currency reportingCurrency, Guid? publicId = null)` — starts `IsActive = true`, stores `reportingCurrency.Code`. Keep that signature. Application normalises name/code **before** `Create`.
 
 Add:
 
@@ -138,7 +140,7 @@ No new script. Final contract is [database-design.md](../database-design.md) §6
 
 | Table | Change | Indexes / FK |
 | --- | --- | --- |
-| `Tenants` | none | Already: PK `Id`; unique CI `PublicId` / `Name` / `Code`; `IX_Tenants_IsEnabled`; `ReportingCurrency` FK → `Currencies.Code` RESTRICT; `CK_Tenants_Code` length 2–50 |
+| `Tenants` | none | Already: PK `Id`; unique CI `PublicId` / `Name` / `Code`; `IX_Tenants_IsActive` (renamed from `IX_Tenants_IsEnabled` in `0011`); `ReportingCurrency` FK → `Currencies.Code` RESTRICT; `CK_Tenants_Code` length 2–50 |
 
 Character class for `Code` is **not** a CHECK today (length only). Keep it in the Application validator. Do not add `0010_…` just to tighten the CHECK.
 
@@ -184,7 +186,7 @@ Root path. `{id}` = PublicId.
   "name": "North Advisory",
   "code": "north-advisory",
   "reportingCurrency": "NZD",
-  "isEnabled": true,
+  "isActive": true,
   "rowVersion": "<opaque>",
   "created": "2026-09-13T00:00:00+00:00"
 }
@@ -268,14 +270,14 @@ Do not add a tenants **manage** page to the Adviser Portal. SystemAdmin uses Sca
 | Project | Assert |
 | --- | --- |
 | Domain.UnitTests | `Rename` rejects blank; `Enable` flips and raises `TenantEnabled` once; second `Enable` / `Disable` is a no-op and raises nothing; `Create` still raises `TenantCreated` |
-| Application.FunctionalTests | No Bearer → 401 not 302; TenantAdmin / Adviser / Customer → 403 on every **manage** verb; Customer → 403 on `GET /tenants/by-code/{code}`; TenantAdmin / Adviser → 200 for their own code, 404 for another tenant’s code or an unknown code; SystemAdmin → 200 for any existing code, 404 if missing; SystemAdmin create → 201 `{ id }` and get matches normalised code + upper currency; duplicate name / code (different case) → 400; disabled / unknown currency on create → 400; PUT same historical disabled currency (omit or equal) → 204; PUT new disabled currency → 400; PUT with `code` in body → 400; disable → tenant `isEnabled=false`, users in that tenant stay `Active`, refresh for those subjects fails; enable → 204; bad / stale `rowVersion` → 409; missing PublicId → 404; list default paging; `isEnabled=true` omits disabled; `search` hits name and code |
+| Application.FunctionalTests | No Bearer → 401 not 302; TenantAdmin / Adviser / Customer → 403 on every **manage** verb; Customer → 403 on `GET /tenants/by-code/{code}`; TenantAdmin / Adviser → 200 for their own code, 404 for another tenant’s code or an unknown code; SystemAdmin → 200 for any existing code, 404 if missing; SystemAdmin create → 201 `{ id }` and get matches normalised code + upper currency; duplicate name / code (different case) → 400; disabled / unknown currency on create → 400; PUT same historical disabled currency (omit or equal) → 204; PUT new disabled currency → 400; PUT with `code` in body → 400; disable → tenant `isActive=false`, users in that tenant stay `Active`, refresh for those subjects fails; enable → 204; bad / stale `rowVersion` → 409; missing PublicId → 404; list default paging; `isEnabled=true` omits disabled; `search` hits name and code |
 | Infrastructure.IntegrationTests | No new script. Two-tenant fixture: insert A and B; disable A leaves B enabled. Later slices reuse this fixture for cross-tenant 404 |
 
 `TenantDisabled` revocation is already covered by identity-auth. This slice asserts the event still fires on a real disable HTTP call (refresh for a seeded person in that tenant fails). Creating that person in the test is allowed (Domain `User.Create` + `UserManager`) without shipping `/users/tenant-admins`.
 
 ### Acceptance (amendment B)
 
-No new script. Item JSON matches get-by-id (`id`, `name`, `code`, `reportingCurrency`, `isEnabled`; `rowVersion` / `created` may be present but the portal must not PUT through this route).
+No new script. Item JSON matches get-by-id (`id`, `name`, `code`, `reportingCurrency`, `isActive`; `rowVersion` / `created` may be present but the portal must not PUT through this route).
 
 | Id | Given | When | Then |
 | --- | --- | --- | --- |

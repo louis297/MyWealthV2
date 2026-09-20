@@ -3,7 +3,7 @@ title: Glossary
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-09-17
+updated: 2026-09-21
 related:
   - function-plan.md
   - domain-model.md
@@ -36,11 +36,15 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | Customer | Account holder. Login principal. Phase 1 client `adviser-portal` issues no code. No Customer Portal client yet. | A business row with no login principal |
 | ApplicationUser / Identity user | ASP.NET Identity user in Infrastructure. All four roles share this table set. | Domain `User` |
 | Permission / Policy | Named capability on an endpoint (for example `accounts.close`). Role → permission is mapped in code. | Per-tenant custom role tables; `AspNetRoles` |
-| UserStatus | `PendingActivation` / `Active` / `Disabled`. | A single boolean `IsEnabled` with no activation state |
+| UserStatus | `PendingActivation` / `Active` / `Disabled`. Source of truth for a person. | Writing `IsActive` by itself |
+| User.IsActive | Derived filter bit. `1` only when `Status = Active`. `PendingActivation` and `Disabled` are `0`. | A second writable switch; replacing `UserStatus` |
 | Invitation | Admin does not set a password. Invitee sets a password via a one-time link. | Passing a password on the create API (Phase-1 transition path) |
 | UserToken | One-time credential for invite / reset (hash only stored). Phase 1 reserves the table; no invite flow. | JWT access token |
 | Account | Value container under a Customer (bank, cash, brokerage, property, liability, …). Phase 2. | An Identity login |
 | Account.Currency | Currency of that account’s cash ledger. Immutable after open. | Instrument quote currency; tenant reporting currency |
+| Account.Type | Capability gate on the container. Immutable after open. Phase 2 selectable: Bank, Cash, Brokerage, Other. | A product module; a stand-in that uses Other for Property or Credit |
+| AccountStatus | `Open` / `Closed`. Source of truth for an account. HTTP close / reopen. | Instrument disable; `UserStatus` |
+| Account.IsActive | Derived filter bit. `1` iff `Status = Open`. Inactive accounts drop out of later net worth. | A writable body field; `IsEnabled` |
 | Cash ledger | Cash entries and balance in the account’s booking currency. Phase 2. | Holding quantity |
 | Holding | Position of one instrument inside an account (quantity + cost). Phase 2. | A single transaction |
 | Instrument | Holdable object from an in-database catalog. Phase 2. | A free-text name stored on Holding |
@@ -54,7 +58,8 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | Category | Optional custom label on a transaction. Not in Phase 1. Not an account type. | Account type |
 | Currency | ISO 4217 three-letter code. One row in the platform catalog. | A C# enum |
 | Currency catalog | `Currencies` table + in-memory `ICurrencyCatalog`. | Joining `Currencies` on every hot path; a per-tenant allow-list |
-| Currency.IsEnabled | Platform flag: the code may be used as a **new** reference. | A per-tenant switch; rewriting existing `ReportingCurrency` rows |
+| Currency.IsActive | Platform flag: the code may be used as a **new** reference. Column was `IsEnabled` until script `0011`. | A per-tenant switch; rewriting existing `ReportingCurrency` rows |
+| IsActive | Filter bit. Catalogs (Tenant, Currency, Instrument): the only flag. Users and Accounts: derived from `Status`. | `IsEnabled`; an independently writable second machine |
 | DecimalPlaces | ISO minor units for input / display / validation (JPY = 0, most fiat = 2). | The scale of a money column (`decimal(18,4)` when amounts exist) |
 | ReportingCurrency | Tenant currency for aggregated reports. May remain a later-disabled catalog code. | Account booking currency (may happen to match) |
 | Money | Amount + currency code. Never a bare decimal. Domain VO in Phase 1; no catalog lookup, no rounding to DecimalPlaces. | `double` / currency-less `decimal`; a persisted Phase-1 column |

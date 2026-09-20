@@ -22,7 +22,7 @@ Coding and commit rules for agents belong in the repository-root `AGENTS.md`, no
 
 Phase 1 platform contracts stay accepted. Do not reopen them. Do not ship a single `Transactions` table that pretends to be both cash and securities.
 
-**Feature map:** [function-plan.md](function-plan.md) §5. First accepted slice: [features/instruments.md](features/instruments.md). Write Feature Specs one slice at a time. Do not lock columns outside the spec that owns them.
+**Feature map:** [function-plan.md](function-plan.md) §5. First accepted slice: [features/instruments.md](features/instruments.md) (landed in repo 2026-09-20 `9ea2f2a`). Write Feature Specs one slice at a time. Do not lock columns outside the spec that owns them.
 
 Suggested internal order (tendency, not a locked backlog): instruments → account container → cash ledger → securities / holdings → posting / reversal / Opening → net-worth read model + Dashboard.
 
@@ -58,8 +58,8 @@ Wait (use or shape not locked):
 
 - A second OIDC client and Customer Portal — the server shape is already final; registering the client is that slice
 - A separate identity SQL database — a database split is not decided
-- `IMarketData` / `IFxRate` and ledger tables — Phase 2 will need them, but port and storage shapes are not locked
-- Empty Journal / CashLedger tables
+- Account / cash / holdings / posting table shape — ports `IMarketData` / `IFxRate` are locked with instruments; other ledger tables wait for their spec
+- Empty Journal / CashLedger / Accounts tables before that spec is `accepted`
 
 Behaviour that ships still belongs only in the current phase.
 

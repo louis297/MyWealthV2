@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-18
-last_updated: 2026-09-20
+last_updated: 2026-09-21
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -26,7 +26,11 @@ Tenant instrument catalog on `webapi`: list / get / create / rename / disable / 
 
 Holdings, accounts, and posting are out. This slice does not persist a price. Later slices store `InstrumentId` only.
 
-**Status is `accepted`.** Implementation follows this file. Expand [ADR 0010](../adr/0010-instrument-catalog.md) in the same change.
+**Status is `accepted`.** Implementation follows this file.
+
+Landed in GitHub `louis297/MyWealthV2` master 2026-09-20, last slice commit `9ea2f2a`. Slice commits `e1475ca` … `9ea2f2a` match §12.
+
+**Naming amendment 2026-09-21:** column and JSON field are `IsActive` / `isActive`. Script `0010` shipped `IsEnabled`; `0011_rename_is_enabled_to_is_active.sql` renames it. HTTP verbs stay `POST …/disable` and `POST …/enable`. List query stays `enabledOnly` (filters `IsActive`). Do not leave an `IsEnabled` column.
 
 ---
 
@@ -74,7 +78,7 @@ The catalog is firm-wide, not per-Adviser. Customer receives 403. TenantAdmin / 
 
 1. As an Adviser I create an instrument in my firm (`symbol`, `name`, `quoteCurrency`) so holdings can point at an id instead of free text.
 2. As a TenantAdmin I create the same way, and I rename or disable an instrument the firm should no longer pick.
-3. As an Adviser I list and open instruments in my firm (default = all rows, each item has `isEnabled`; `enabledOnly=true` for enabled only).
+3. As an Adviser I list and open instruments in my firm (default = all rows, each item has `isActive`; `enabledOnly=true` for active only).
 4. As an Adviser I cannot PUT / disable / enable (403).
 5. As a TenantAdmin in another firm I receive 404 for someone else’s instrument id.
 6. As a SystemAdmin I list / create / rename / disable instruments for a chosen tenant on Scalar (and later Back Office), not on Adviser Portal.
@@ -98,13 +102,13 @@ The catalog is firm-wide, not per-Adviser. Customer receives 403. TenantAdmin / 
 | R8 | `QuoteCurrency` required on create. Must exist in `ICurrencyCatalog` and be **enabled**. Stored upper-case `char(3)`. Immutable after create. Body on PUT that includes `quoteCurrency` → 400. |
 | R9 | Cost currency = quote currency. No `CostCurrency` column. |
 | R10 | A later disable of that catalog currency does not rewrite `QuoteCurrency`. New creates still require an enabled code. |
-| R11 | Status is `IsEnabled` (bit), not a `UserStatus` machine. Disable / enable are `POST …/disable` and `POST …/enable`. Not a field on PUT. |
+| R11 | Status is `IsActive` (bit), not a `UserStatus` machine. Disable / enable are `POST …/disable` and `POST …/enable`. Not a field on PUT. Never an `IsEnabled` column. |
 | R12 | HTTP idempotent: already disabled + disable, or already enabled + enable → 204, no second event. |
 | R13 | PUT / disable / enable require `rowVersion`. Conflict 409. Missing 400. Same encoding as people. |
 | R14 | PUT updates `name` and/or `symbol` only. Other fields in the body → 400. |
 | R15 | No physical delete. Disable is the only way to take a row out of pickers. |
 | R16 | This slice does **not** block disable because holdings exist (no holdings table). The holdings slice adds: new holding of a disabled instrument → 400; existing holdings unchanged. |
-| R17 | List is one tenant. TenantAdmin / Adviser: current tenant. SystemAdmin: `tenantId` query. Every item includes `isEnabled` and `tenantId`. `enabledOnly` omitted/`false` = all; `true` = enabled only; any other value 400. `page` default 1, `pageSize` default 20 max 100. Optional `search`: Symbol / Name contains (CI) or PublicId exact. Sort symbol then name. |
+| R17 | List is one tenant. TenantAdmin / Adviser: current tenant. SystemAdmin: `tenantId` query. Every item includes `isActive` and `tenantId`. `enabledOnly` omitted/`false` = all; `true` = `IsActive` only; any other value 400. `page` default 1, `pageSize` default 20 max 100. Optional `search`: Symbol / Name contains (CI) or PublicId exact. Sort symbol then name. |
 | R18 | Customer has no instrument policy → 403 on every verb. SystemAdmin has `instruments.read`, `instruments.create`, and `instruments.manage`. Adviser Portal does not add SystemAdmin ledger nav. |
 | R19 | Same-currency FX is 1. Cross-currency is never treated as 1. Ports are mocked. No live call. |
 | R20 | Catalog HTTP does not return a price. Callers that need a price use `IMarketData` on the server in a later slice. |
@@ -133,13 +137,13 @@ Invariants:
 - `TenantId` required. No platform row.
 - `QuoteCurrency` set on create, then immutable.
 - `Symbol` unique CI per tenant (including disabled).
-- Enable / disable only flip `IsEnabled`.
+- Enable / disable only flip `IsActive`.
 
 ```text
 Create(tenantId, symbol, name, quoteCurrency)
   normalise symbol upper
   quoteCurrency must be supplied by the application as an enabled catalog code
-  IsEnabled = true
+  IsActive = true
   raise InstrumentCreated
 
 Rename(name and/or symbol)
@@ -147,11 +151,11 @@ Rename(name and/or symbol)
 
 Disable()
   already disabled → no-op
-  else IsEnabled = false, raise InstrumentDisabled
+  else IsActive = false, raise InstrumentDisabled
 
 Enable()
   already enabled → no-op
-  else IsEnabled = true, raise InstrumentEnabled
+  else IsActive = true, raise InstrumentEnabled
 ```
 
 The entity does not call `ICurrencyCatalog` or the market ports. Application looks up the currency, then calls `Create`.
@@ -180,7 +184,7 @@ Phase 1 ends at `0009`. Do not back-fill. Do not add EF migrations.
 | Symbol | nvarchar(32) | no | Upper case. Unique per tenant CI |
 | Name | nvarchar(200) | no | |
 | QuoteCurrency | char(3) | no | FK Currencies. Immutable in Domain |
-| IsEnabled | bit | no | Default 1 |
+| IsActive | bit | no | Default 1. Shipped as `IsEnabled`; `0011` renames. |
 | Created | datetimeoffset | no | |
 | CreatedBy | nvarchar(450) | no | |
 | LastModified | datetimeoffset | yes | |
@@ -286,7 +290,7 @@ List / get item:
   "symbol": "VTI",
   "name": "Vanguard Total Stock Market ETF",
   "quoteCurrency": "USD",
-  "isEnabled": true,
+  "isActive": true,
   "rowVersion": "<base64>"
 }
 ```
@@ -321,7 +325,7 @@ Contribute to host `TestSeed` (Development and TestAppHost only). Not `0010_inst
 
 Target: the existing Development demo tenant (Phase 1 people seed). CreatedBy = system name.
 
-| Symbol | Name | QuoteCurrency | IsEnabled |
+| Symbol | Name | QuoteCurrency | IsActive |
 | --- | --- | --- | --- |
 | VTI | Vanguard Total Stock Market ETF | USD | true |
 | AIA | Auckland International Airport | NZD | true |

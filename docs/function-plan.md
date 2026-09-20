@@ -3,7 +3,7 @@ title: Function plan
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-09-20
+updated: 2026-09-21
 related:
   - README.md
   - glossary.md
@@ -116,7 +116,7 @@ Scopes in Phase 1: `openid`, `profile`, `offline_access`, `api`. Roles and tenan
 
 | Capability | Notes | UI | Who |
 | --- | --- | --- | --- |
-| Tenant CRUD / enable-disable | `/tenants`. Name, Code, ReportingCurrency, IsEnabled | API / Scalar | SystemAdmin |
+| Tenant CRUD / enable-disable | `/tenants`. Name, Code, ReportingCurrency, IsActive | API / Scalar | SystemAdmin |
 | TenantAdmin CRUD / disable | `/users/tenant-admins`. May set a password and land in Active. Email unique inside the tenant. | API / Scalar | SystemAdmin |
 | Adviser CRUD / disable | `/users/advisers`. Same password path. Assigned Customers must be handled before disable. | Adviser list | TenantAdmin |
 | Customer CRUD / disable | `/users/customers`. `AdviserId` required. An Adviser caller may only assign self. Create also creates Identity. | Customer list / detail | TenantAdmin, Adviser (assigned) |
@@ -127,7 +127,7 @@ Disabling the last TenantAdmin is allowed in Phase 1 (known gap). After a tenant
 
 | Capability | Notes | UI | Who |
 | --- | --- | --- | --- |
-| Platform currency list | Seed NZD, AUD, USD, EUR, GBP, JPY. `GET /currencies?enabledOnly=` omitted/`false` = all; `true` = enabled only. Item includes `isEnabled`. | None | Authenticated, read-only |
+| Platform currency list | Seed NZD, AUD, USD, EUR, GBP, JPY. `GET /currencies?enabledOnly=` omitted/`false` = all; `true` = enabled only. Item includes `isActive`. | None | Authenticated, read-only |
 | References | Phase 1 consumer: `Tenant.ReportingCurrency` | None | Built-in |
 | In-memory catalog | `ICurrencyCatalog`. Hot path does not JOIN. | None | Built-in |
 
@@ -148,7 +148,7 @@ Adviser Portal only. Split in two implementation slices (see [portals/adviser-po
 
 One domain. Feature Specs come after this map. Suggested internal slice order (not a locked table design):
 
-1. Instruments (tenant catalog; Adviser may create and read; update/disable is TenantAdmin or SystemAdmin)
+1. Instruments (accepted, landed 2026-09-20 `9ea2f2a`)
 2. Account container
 3. Cash sub-ledger
 4. Holdings / securities ledger
@@ -159,7 +159,7 @@ Session, OpenIddict, and the Adviser Portal client do not change in this phase. 
 
 ### 5.1 In scope (agreed 2026-09-17)
 
-- Tenant instrument catalog + mocked `IMarketData` / `IFxRate`.
+- Tenant instrument catalog + mocked `IMarketData` / `IFxRate` (accepted, landed `9ea2f2a`).
 - Account container under a Customer.
 - **Phase 2 may open:** Bank, Cash, Brokerage, Other.
 - **Reserved names, not selectable in Phase 2:** Property, Credit (personal loans, cards, real property). Keep the names and the capability matrix so a later phase can add them without reshaping Account.
@@ -261,4 +261,4 @@ List page size is locked in tenants and reused by people lists (page 1 / size 20
 
 Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; uniform login failure; hosted login is Razor Pages at `/login`; access 15 minutes; refresh 14 days absolute.
 
-Phase 1 platform slices are accepted and tested (A1–A10, B1–B11, C1–C15). Phase 2 is open. Feature map in §5 is agreed. Instruments is accepted. Write the next Feature Specs one slice at a time. Do not invent table shape outside the spec that owns it.
+Phase 1 platform slices are accepted and tested (A1–A10, B1–B11, C1–C15). Phase 2 is open. Feature map in §5 is agreed. Instruments is accepted and landed in repo 2026-09-20 (`9ea2f2a`). Write the next Feature Specs one slice at a time. Do not invent table shape outside the spec that owns it. Do not implement accounts from this file or from ADR 0011.

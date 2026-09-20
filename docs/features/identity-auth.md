@@ -183,7 +183,7 @@ Keep [domain-model.md](../domain-model.md) in the same change when the model mov
 | `AspNetUsers` and Identity user-store siblings | add (no role tables) | Package defaults; `TenantId` int null, no FK |
 | OpenIddict tables (package set) | add | Package defaults. Client row `adviser-portal` |
 | `UserTokens` | add | Unique `TokenHash`; no PublicId / RowVersion; `IdentityUserId` / `TenantId` have no FK |
-| `Tenants` | add; login gate needs `Code` + `IsEnabled` | Unique CI `Code` / `Name` / `PublicId`. **No `ReportingCurrency` column or FK** — currencies slice adds those |
+| `Tenants` | add; login gate needs `Code` + active flag | Unique CI `Code` / `Name` / `PublicId`. Shipped as `IsEnabled`; `0011` renames to `IsActive`. **No `ReportingCurrency` column or FK** — currencies slice adds those |
 | `Users` | add so `/users/me` and the SystemAdmin seed have a table | One-way `IdentityUserId` → `AspNetUsers`. No people CRUD in this slice |
 
 This slice does **not** create `Currencies`, `ICurrencyCatalog`, or `GET /currencies`.

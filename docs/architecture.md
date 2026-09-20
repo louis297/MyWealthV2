@@ -3,7 +3,7 @@ title: Architecture
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-09-20
+updated: 2026-09-21
 related:
   - README.md
   - glossary.md
@@ -22,7 +22,7 @@ This document owns **hosts, layers, ports, and cross-cutting behaviour**. Scope 
 
 Same rule as the function plan: if a later phase will use it and today’s design would have to change, ship the final infrastructure now. If later use or shape is not decided, wait.
 
-Phase 1 closes the platform base: tenants, session, four roles, people, currency catalog, Adviser Portal shell. The ledger is a Phase-2 domain. The first accepted ledger slice is Instruments (`0010_instruments.sql`, `/instruments`, mocked `IMarketData` / `IFxRate`). Other ledger tables wait for their specs.
+Phase 1 closes the platform base: tenants, session, four roles, people, currency catalog, Adviser Portal shell. The ledger is a Phase-2 domain. The first accepted ledger slice is Instruments (`0010_instruments.sql`, `/instruments`, mocked `IMarketData` / `IFxRate`), landed in repo 2026-09-20 `9ea2f2a`. Other ledger tables wait for their specs.
 
 ---
 
@@ -249,7 +249,7 @@ Do not add a port whose surface is still open. Do add a port (or value object) w
 
 | Project | Purpose |
 | --- | --- |
-| `Domain.UnitTests` | Phase 1: User / Tenant invariants, currency Code, `Money`. Phase 2: `Instrument` |
+| `Domain.UnitTests` | Phase 1: User / Tenant invariants, currency Code, `Money`. Phase 2: `Instrument` (landed). `Account` after the accounts spec is accepted |
 | `Application.UnitTests` | Pure application helpers, policy map |
 | `Infrastructure.IntegrationTests` | Real database: scripts + EF mapping + FK + applicator |
 | `Application.FunctionalTests` | HTTP + TestAppHost (**starts `identity` and `webapi`**). Cross-tenant read / write must fail. Login gate is on `identity` (disabled / Pending / wrong tenant → no session) |
@@ -279,7 +279,7 @@ SystemAdmin receives Phase-2 ledger policies and calls `webapi` from Scalar (lat
 
 Each Phase-2 slice adds Development / TestAppHost `TestSeed` rows. Not schema scripts. Not Production.
 
-The ledger is one domain with internal slices. Storage shape is not locked; Phase 1 does not create Journal or CashLedger tables. Tendencies: [domain-model.md](domain-model.md) §8 and [function-plan.md](function-plan.md) §5.
+The ledger is one domain with internal slices. Instruments storage is locked. Account / cash / holdings / posting storage waits for the accepted spec. Phase 1 does not create Journal or CashLedger tables. Tendencies: [domain-model.md](domain-model.md) §8 and [function-plan.md](function-plan.md) §5.
 
 If the identity **database** splits later, replace the revocation / login-principal port implementation. Do not change the protocol or the Aspire resource name `identity`.
 
@@ -316,3 +316,5 @@ Locked conclusions follow function-plan §0 and these ADRs. This folder currentl
 | 2026-09-14 | End-session passthrough requires an IdentityHost SignOut action (identity-auth R21). Portal revokes refresh then redirects; authorization codes redeem once. |
 | 2026-09-11 | Point HTTP conventions at api-design.md. People APIs use the `/users` namespace. |
 | 2026-09-12 | identity-auth: Razor `/login`; JWT claim names; 15 min / 14 day absolute tokens. Currencies not in the identity-auth script set. |
+| 2026-09-20 | Instruments ports + `/instruments`. SystemAdmin ledger policies on Scalar. |
+| 2026-09-21 | Instruments landed `9ea2f2a`. Accounts Feature Spec opened as `draft`. |

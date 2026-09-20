@@ -3,7 +3,7 @@ title: Domain model
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-09-20
+updated: 2026-09-21
 related:
   - README.md
   - glossary.md
@@ -45,7 +45,7 @@ classDiagram
   class Tenant {
     string Name
     string Code
-    bool IsEnabled
+    bool IsActive
     string ReportingCurrency
   }
   class User {
@@ -54,6 +54,7 @@ classDiagram
     string Email
     UserRole Role
     UserStatus Status
+    bool IsActive
     int? AdviserId
     string IdentityUserId
   }
@@ -61,7 +62,7 @@ classDiagram
     string Code
     string Name
     int DecimalPlaces
-    bool IsEnabled
+    bool IsActive
   }
   class Money {
     decimal Amount
@@ -101,10 +102,10 @@ Authorization (named policies, `RolePermissions`, handler scope checks) is not a
 - `Tenant.Code` is globally unique, case-insensitive, and used at login. Character class `[a-z0-9-]`, length 2–50 (shape-compatible with a later subdomain label; Phase 1 does not parse Host).
 - `Tenant.Name` is globally unique, CI.
 - `ReportingCurrency` ∈ enabled rows in `Currencies` when **newly set**. identity-auth created Tenant without this column; the currencies slice adds it. Phase 1 may change reporting currency (no ledger balances keyed on it yet). A later disable of that catalog row does not rewrite this field.
-- After `IsEnabled = false`, that Code must not complete login; existing refresh must fail. The check runs in the authorization server / resource pipeline against this invariant.
+- After `IsActive = false`, that Code must not complete login; existing refresh must fail. The check runs in the authorization server / resource pipeline against this invariant.
 - A tenant may be re-enabled. Login with that Code works again only if the person’s `Status` is still `Active`.
 - `RowVersion` conflict → HTTP 409.
-- `Rename` changes `Name` (non-empty; uniqueness is application). `Enable` / `Disable` flip `IsEnabled` and raise `TenantEnabled` / `TenantDisabled` only when the flag actually changes. `Create` raises `TenantCreated`.
+- `Rename` changes `Name` (non-empty; uniqueness is application). `Enable` / `Disable` flip `IsActive` and raise `TenantEnabled` / `TenantDisabled` only when the flag actually changes. `Create` raises `TenantCreated`.
 
 ### 4.2 Person
 
@@ -132,6 +133,7 @@ PendingActivation ──disable──► Disabled
 ```
 
 - Only `Active` may complete authorization-server login. `PendingActivation` and `Disabled` may not.
+- `Users.IsActive` is derived from that machine (`Active` → 1; otherwise 0). List `enabledOnly=true` uses the bit. Login still reads `Status`, not the bit alone.
 - Phase 1 admin APIs may create with a password and land in `Active` (invitation delivery is not built; that is not an excuse to collapse the machine to a boolean).
 - Disable, re-enable, and password change run on the resource API. The authorization server reads Status and tenant enabled at login. Password change / disable / logout revoke that subject’s OpenIddict tokens — an application consequence driven by domain events. The User aggregate does not hold tokens.
 
@@ -146,7 +148,7 @@ Disable guards:
 
 - Code is ISO 4217, three letters, upper case.
 - `DecimalPlaces` is the ISO minor-unit count for input / display / validation (JPY = 0, NZD = 2). It is not the SQL scale of a money column. Phase-2 amount columns stay `decimal(18,4)` for every currency.
-- `IsEnabled` is a **platform** flag on the catalog row. It is not bound to a tenant. One change is visible to every tenant’s picker; existing `ReportingCurrency` values are left alone.
+- `IsActive` is a **platform** flag on the catalog row. It is not bound to a tenant. One change is visible to every tenant’s picker; existing `ReportingCurrency` values are left alone.
 - A disabled currency cannot be used as a **new** `ReportingCurrency`. Tenants that already reference it keep the historical value.
 - Phase 1 has no currency write API. The catalog is read-only. Seed: NZD, AUD, USD, EUR, GBP, JPY.
 - `Money` does not look up the catalog and does not round to `DecimalPlaces`.
@@ -270,10 +272,16 @@ Invariants:
 - `Name` is the display name. Duplicates allowed.
 - `QuoteCurrency` set on create from an enabled `ICurrencyCatalog` code, then immutable.
 - Cost currency = quote currency. No second currency field.
-- `IsEnabled` only. Not a `UserStatus` machine.
+- `IsActive` only. Not a `UserStatus` machine. HTTP disable / enable flip the bit.
 - No ISIN / Exchange / Kind / price on the aggregate. Price is `IMarketData.TryGetPrice`. FX is `IFxRate.GetRate` (same currency = 1; missing cross pair fails).
 
-Field rules: [features/instruments.md](features/instruments.md).
+Field rules: [features/instruments.md](features/instruments.md). Landed in repo 2026-09-20 `9ea2f2a`.
+
+### 8.5 Account container (draft)
+
+Not accepted. Do not create the table or register policies from this paragraph.
+
+Direction already agreed in §8.1, to be locked by that spec when accepted: container under a Customer; no second adviser FK; `Type` and `Currency` immutable; Phase 2 selectable Bank / Cash / Brokerage / Other; `Status` Open / Closed plus derived `IsActive`; HTTP close / reopen; Disable Customer rejects while an account is active.
 
 ---
 
@@ -297,3 +305,4 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-09-13 | Currencies spec: platform `IsEnabled`; `DecimalPlaces` = minor units; `Money` in Domain without catalog/rounding. |
 | 2026-09-17 | Account.Type immutable after open; Bank / Cash / Credit must not hold Instruments. Property / Credit reserved, not Phase-2 selectable. |
 | 2026-09-20 | Instrument aggregate accepted (instruments slice). SystemAdmin may manage tenant catalog rows. Ports `IMarketData` / `IFxRate` locked. |
+| 2026-09-21 | Instruments landed in repo `9ea2f2a`. Account container Feature Spec opened as `draft`. Boolean flags unified to `IsActive` (script `0011`). |

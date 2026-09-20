@@ -29,7 +29,7 @@ Creating a TenantAdmin is the first Phase-1 dual-write that lands in `Active` wi
 
 ## 1. Summary
 
-SystemAdmin adds a TenantAdmin to an **enabled** tenant (`tenantId`, `name`, `email`, `password`). Same transaction: `AspNetUsers` first (`UserName` = the person’s PublicId, `TenantId` projection), then `Users.IdentityUserId`. Email is unique CI inside the tenant. Role / TenantId / Email cannot change after create. Create on a disabled tenant → 400 shared `disabled` error (`target=tenant`). Disabling the last TenantAdmin is allowed in Phase 1 (known gap). Disable raises `UserDisabled`; the existing identity-auth handler revokes that subject. Every list item includes `status`. TenantAdmin / Adviser / Customer receive 403. There is no portal page.
+SystemAdmin adds a TenantAdmin to an **enabled** tenant (`tenantId`, `name`, `email`, `password`). Same transaction: `AspNetUsers` first (`UserName` = the person’s PublicId, `TenantId` projection), then `Users.IdentityUserId`. Email is unique CI inside the tenant. Role / TenantId / Email cannot change after create. Create on a disabled tenant → 400 shared `disabled` error (`target=tenant`). Disabling the last TenantAdmin is allowed in Phase 1 (known gap). Disable raises `UserDisabled`; the existing identity-auth handler revokes that subject. Every list item includes `status` and `isActive`. TenantAdmin / Adviser / Customer receive 403. There is no portal page.
 
 ---
 
@@ -82,17 +82,17 @@ SystemAdmin adds a TenantAdmin to an **enabled** tenant (`tenantId`, `name`, `em
 | R3 | `Name` required, 1–200, trim, preserve caller casing. |
 | R4 | `Email` required, trim, preserve caller casing, compare CI. Must look like an email. Unique inside the same `TenantId`. The same email may exist in two tenants. Collision with a SystemAdmin’s global email is allowed (different login key: tenantCode present or not). |
 | R5 | Create requires `password`. Identity password options apply (identity-auth: minimum length 8). Lands in `Status = Active` and raises `UserActivated`. No password-less create. |
-| R6 | Create requires `tenantId` (tenant PublicId). Unknown tenant → 404. Tenant exists and `IsEnabled = false` → **400**, shared disabled error ([api-design.md](../api-design.md) §4.1 and §8.4): `code=disabled`, `target=tenant`. Not 404 (the tenant exists). Not 409. List / get / PUT / disable / enable do not reject because the tenant is disabled. Person `Status` and the tenant flag stay independent. |
+| R6 | Create requires `tenantId` (tenant PublicId). Unknown tenant → 404. Tenant exists and `IsActive = false` → **400**, shared disabled error ([api-design.md](../api-design.md) §4.1 and §8.4): `code=disabled`, `target=tenant`. Not 404 (the tenant exists). Not 409. List / get / PUT / disable / enable do not reject because the tenant is disabled. Person `Status` and the tenant flag stay independent. |
 | R7 | Dual-write order is fixed: `AspNetUsers` first (`UserName` = the person’s PublicId string, `Email` copied from Domain, `TenantId` = tenant internal int), then `Users.IdentityUserId`. Same transaction; an Identity row must not remain if `Users` fails. Responses never include the password. |
 | R8 | `Role` / `TenantId` / `Email` cannot change after create. PUT updates `name` only. Body includes `email` / `tenantId` / `role` / `password` → 400. |
-| R9 | `Status` is not on PUT. Disable / enable are `POST …/disable` and `POST …/enable`. |
+| R9 | `Status` and `isActive` are not on PUT or create bodies. Disable / enable are `POST …/disable` and `POST …/enable`. |
 | R10 | HTTP-layer idempotent: already Disabled + disable, or already Active + enable → 204, no second domain event. Do not change the throw semantics of `User.Disable()` / `Enable()`. Application inspects Status first. |
 | R11 | Disabling the last TenantAdmin in that tenant → 204 (known gap; do not count, do not 400). |
 | R12 | `Disable()` raises `UserDisabled`. identity-auth `RevokeTokensOnUserDisabled` revokes by `sub` = person PublicId. This slice does not rewrite that handler. |
 | R13 | `Enable()` raises `UserActivated`. No extra session action in Phase 1. Login still requires an enabled tenant and `Status = Active`. |
 | R14 | PUT / disable / enable require `rowVersion`. Conflict → 409. Missing → 400. List / get encode `rowVersion` the same way as `/users/me` (Base64). |
 | R15 | No physical delete. `Users.TenantId` → Tenants RESTRICT; `Users.IdentityUserId` → AspNetUsers RESTRICT. |
-| R16 | List contains `Role = TenantAdmin` only. **Every item includes `status`** (same encoding as `/users/me`). Query aligned with currencies: `enabledOnly` omitted / `false` = every Status; `true` = `Active` only (excludes `Disabled` and `PendingActivation`); any other string → 400. Also `page` (1-based, default 1), `pageSize` (default 20, max 100), optional `tenantId` (tenant PublicId), optional `search`. `search` matches Name or Email contains (CI) or the person’s PublicId exact. Sort: `name` ascending, then `email`. Do not add a `status=` query parameter. |
+| R16 | List contains `Role = TenantAdmin` only. **Every item includes `status` and `isActive`** (same encoding as `/users/me`). Query aligned with currencies: `enabledOnly` omitted / `false` = every Status; `true` = `IsActive = 1` (excludes `Disabled` and `PendingActivation`); any other string → 400. Also `page` (1-based, default 1), `pageSize` (default 20, max 100), optional `tenantId` (tenant PublicId), optional `search`. `search` matches Name or Email contains (CI) or the person’s PublicId exact. Sort: `name` ascending, then `email`. Do not add a `status=` query parameter. |
 | R17 | This collection’s gate is policy 403, not “other tenant → 404”. SystemAdmin has no TenantId and can see TenantAdmins in every firm. Cross-tenant 404 starts on advisers / customers for in-tenant callers. The two-tenant fixture on this slice asserts: unfiltered list includes A and B; `tenantId=A` returns only A. |
 | R18 | Do not seed a demo TenantAdmin in Development. Tests create people. The SystemAdmin seed stays identity-auth. |
 
@@ -143,7 +143,7 @@ Uniqueness races: filtered unique index + map SqlException 2601/2627 → 400.
 
 | Kind | Name | Returns | Checks |
 | --- | --- | --- | --- |
-| Command | `CreateTenantAdmin` | PublicId | R3–R7; load tenant by PublicId or 404; `IsEnabled = false` → 400 `disabled` / `tenant`; `UserManager.CreateAsync`; `User.Create`; raise `UserCreated` |
+| Command | `CreateTenantAdmin` | PublicId | R3–R7; load tenant by PublicId or 404; `IsActive = false` → 400 `disabled` / `tenant`; `UserManager.CreateAsync`; `User.Create`; raise `UserCreated` |
 | Command | `UpdateTenantAdmin` | none | Load by person PublicId with Role=TenantAdmin or 404; `rowVersion`; R3 / R8 |
 | Command | `DisableTenantAdmin` | none | Same load; `rowVersion`; already Disabled → 204, skip domain; else `Disable()` |
 | Command | `EnableTenantAdmin` | none | Same load; `rowVersion`; already Active → 204, skip domain; else `Enable()` |

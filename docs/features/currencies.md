@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-13
-last_updated: 2026-09-13
+last_updated: 2026-09-21
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -23,6 +23,8 @@ related:
 Platform currency catalog, in-process `ICurrencyCatalog`, read-only `GET /currencies`, and the `Tenants.ReportingCurrency` column / FK. Same slice places `Money` in the Domain assembly (ADR 0004: no balance column yet, the type still ships).
 
 This is not a tenant-scoped resource. No cross-tenant isolation tests. People CRUD, tenant HTTP, and portal pages are out.
+
+**Naming amendment 2026-09-21:** column and JSON field are `IsActive` / `isActive`. Script `0008` shipped `IsEnabled`; `0011_rename_is_enabled_to_is_active.sql` renames it. List query stays `enabledOnly` (filters `IsActive`). Port method follows the column: `ICurrencyCatalog.IsActive`. Do not leave an `IsEnabled` column.
 
 ---
 
@@ -77,9 +79,9 @@ Every authenticated role may read the platform currency list. The table is platf
 | R3 | `DecimalPlaces` is the ISO minor-unit count for **input / display / validation**, not the SQL scale. Seed: JPY = 0; NZD / AUD / USD / EUR / GBP = 2. When money columns exist (Phase 2), storage is `decimal(18,4)` for every currency (ADR 0004). This slice does not persist amounts. |
 | R4 | `GET /currencies` requires a valid Bearer. Missing / dead token → 401. **Never** 302 to hosted login. All four roles get 200. |
 | R5 | Do not register `currencies.read`. Use default `.RequireAuthorization()` / `[Authorize]`. |
-| R6 | Query name is **`enabledOnly`** (not `isEnabled`: that name collides with the item field and reads as “false = disabled rows only”). Boolean only. Omitted or `false` = **all rows**. `true` = **enabled rows only**. No “disabled-only” filter. No pagination. No search. |
-| R7 | Every item includes `isEnabled`: `{ code, name, decimalPlaces, isEnabled }`. The full list uses that field to tell a new reporting-currency picker what is still allowed. |
-| R8 | `Currencies.IsEnabled` is **platform-wide**, not per tenant. Disabling a code does not UPDATE tenant rows. A disabled code cannot be a **new** `ReportingCurrency`. Existing tenants keep the historical value. `SetReportingCurrency` rejects a disabled code. |
+| R6 | Query name is **`enabledOnly`** (not `isActive`: that name collides with the item field and reads as “false = disabled rows only”). Boolean only. Omitted or `false` = **all rows**. `true` = **enabled rows only**. No “disabled-only” filter. No pagination. No search. |
+| R7 | Every item includes `isActive`: `{ code, name, decimalPlaces, isActive }`. The full list uses that field to tell a new reporting-currency picker what is still allowed. |
+| R8 | `Currencies.IsActive` is **platform-wide**, not per tenant. Disabling a code does not UPDATE tenant rows. An inactive code cannot be a **new** `ReportingCurrency`. Existing tenants keep the historical value. `SetReportingCurrency` rejects an inactive code. |
 | R9 | Phase 1 may change a tenant’s reporting currency (no ledger balances are keyed on it yet). The HTTP for that change is the tenants slice. This slice only supplies the domain method and the catalog. |
 | R10 | The hot path does not JOIN `Currencies`. Lookups go through `ICurrencyCatalog` or the `char(3)` already on the row. |
 | R11 | `Money` equality is code + amount. Cross-currency add/subtract is forbidden. No balance column in Phase 1; the VO still lives in Domain. The VO does **not** depend on `ICurrencyCatalog` and does **not** round to `DecimalPlaces`. |
@@ -93,7 +95,7 @@ Every authenticated role may read the platform currency list. The table is platf
 
 | Type | Kind | Notes |
 | --- | --- | --- |
-| `Currency` | Platform entity | `Code` / `Name` / `DecimalPlaces` / `IsEnabled`. No tenant. Not a workflow aggregate. |
+| `Currency` | Platform entity | `Code` / `Name` / `DecimalPlaces` / `IsActive`. No tenant. Not a workflow aggregate. |
 | `Money` | Value object | `decimal Amount` + `string Currency` (three-letter code). No catalog dependency. |
 | `Tenant` | Aggregate (column added) | `ReportingCurrency`. `Create` requires an enabled code. `SetReportingCurrency` checks the catalog. |
 | `ICurrencyCatalog` | Port | In-process read. Not a Domain entity. |
@@ -139,11 +141,11 @@ Do not invent `0002`. identity-auth already shipped `0001` and `0003`–`0007`.
 | Code | char(3) | no | PK, ISO upper case |
 | Name | nvarchar(100) | no | |
 | DecimalPlaces | tinyint | no | Minor units. Not the money-column scale |
-| IsEnabled | bit | no | Default 1. Platform flag |
+| IsActive | bit | no | Default 1. Platform flag. Shipped as `IsEnabled`; `0011` renames. |
 
 No `NumericCode` (ADR 0009).
 
-Seed (`IsEnabled = 1`):
+Seed (`IsActive = 1`):
 
 | Code | Name | DecimalPlaces |
 | --- | --- | --- |
@@ -174,10 +176,10 @@ Keep [database-design.md](../database-design.md) §9 in the same change.
 
 | Kind | Name | Returns | Checks |
 | --- | --- | --- | --- |
-| Query | `GetCurrencies` | `{ code, name, decimalPlaces, isEnabled }[]` | Valid Bearer; `enabledOnly=true` keeps enabled rows; omitted / `false` returns all; stable `Code` sort |
+| Query | `GetCurrencies` | `{ code, name, decimalPlaces, isActive }[]` | Valid Bearer; `enabledOnly=true` keeps enabled rows; omitted / `false` returns all; stable `Code` sort |
 | Port | `ICurrencyCatalog.Get` / `TryGet` | One row or empty | Normalise code to upper case; missing → empty, do not throw |
 | Port | `ICurrencyCatalog.List` | Read-only list | Optional enabled-only; loaded at startup |
-| Port | `ICurrencyCatalog.IsEnabled` | bool | Missing code = false |
+| Port | `ICurrencyCatalog.IsActive` | bool | Missing code = false |
 | Port | `ICurrencyCatalog.Reload` | void | Tests / startup. No write API in Phase 1; production hot path does not depend on Reload |
 | Domain | `Money.Create` / add / subtract | `Money` | Same currency only |
 | Domain | `Tenant.Create` / `SetReportingCurrency` | Tenant | New code must be enabled. Application looks up the catalog; do not inject the port into the entity |
@@ -204,10 +206,10 @@ One resource route. Root path, not under `/users`.
 | --- | --- |
 | Omitted | Same as `false`: all rows, including disabled |
 | `false` | All rows |
-| `true` | Only `isEnabled = true` |
+| `true` | Only `isActive = true` |
 | Any other string | 400 |
 
-No “disabled-only” query. Callers that need disabled rows use the default list and filter on item `isEnabled`.
+No “disabled-only” query. Callers that need disabled rows use the default list and filter on item `isActive`.
 
 200 example (default / `enabledOnly=false`; seed rows are all enabled):
 
@@ -217,20 +219,20 @@ No “disabled-only” query. Callers that need disabled rows use the default li
     "code": "AUD",
     "name": "Australian Dollar",
     "decimalPlaces": 2,
-    "isEnabled": true
+    "isActive": true
   },
   {
     "code": "JPY",
     "name": "Japanese Yen",
     "decimalPlaces": 0,
-    "isEnabled": true
+    "isActive": true
   }
 ]
 ```
 
 - Array sorted by `code` ascending.
-- Every item has `isEnabled`.
-- No write. No `GET /currencies/{code}` (the list is small; historical codes use the full list + `isEnabled`, or `ICurrencyCatalog.Get` on the server).
+- Every item has `isActive`.
+- No write. No `GET /currencies/{code}` (the list is small; historical codes use the full list + `isActive`, or `ICurrencyCatalog.Get` on the server).
 - Customer / SystemAdmin / TenantAdmin / Adviser all 200, never 403.
 - Missing Bearer → 401, not 404.
 
@@ -251,7 +253,7 @@ The Adviser Portal current slice has already landed (session probe). Do not add 
 | Project | Assert |
 | --- | --- |
 | Domain.UnitTests | `Money` same-currency add/subtract, cross-currency fails, equality; `Tenant.Create` rejects an empty code; `SetReportingCurrency` rejects a disabled code and accepts an enabled code |
-| Application.FunctionalTests | No Bearer → 401 and not 302; 200 for each of the four roles; default list contains the six seed rows and every item has `isEnabled`; `enabledOnly=true` omits a disabled row (test inserts one via SQL and Reloads); `enabledOnly=false` matches omit and includes the disabled row; illegal value → 400; sort by `code` |
+| Application.FunctionalTests | No Bearer → 401 and not 302; 200 for each of the four roles; default list contains the six seed rows and every item has `isActive`; `enabledOnly=true` omits a disabled row (test inserts one via SQL and Reloads); `enabledOnly=false` matches omit and includes the disabled row; illegal value → 400; sort by `code` |
 | Infrastructure.IntegrationTests | After 0008/0009: table exists, six seed rows, `Tenants.ReportingCurrency` exists, FK exists, no `0002` file |
 
 No cross-tenant isolation tests (platform table, no TenantId). Isolation starts at the tenants slice.
@@ -267,8 +269,8 @@ Do not open a new ADR (0004 and 0009 are accepted).
 | Script numbers | `0008` table + seed, `0009` ALTER reporting currency. Do not back-fill 0002 |
 | HTTP auth | Default Authorize. No `currencies.read` |
 | Query | `enabledOnly` (bool). Omitted / `false` = all; `true` = enabled only. No disabled-only list |
-| Response | `{ code, name, decimalPlaces, isEnabled }` per row |
-| `IsEnabled` | Platform catalog flag. Not a tenant column. Disable does not rewrite tenant rows |
+| Response | `{ code, name, decimalPlaces, isActive }` per row |
+| `IsActive` | Platform catalog flag. Not a tenant column. Disable does not rewrite tenant rows |
 | `DecimalPlaces` | Minor units for UI / validation. Not `decimal(18,4)` scale |
 | `Money` | Domain VO + unit tests only. No table, no EF converter, no HTTP, no catalog dependency |
 | Seed English names | Table in §6 |
