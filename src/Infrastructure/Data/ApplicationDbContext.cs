@@ -36,6 +36,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<Instrument> Instruments => Set<Instrument>();
 
+    public DbSet<Account> Accounts => Set<Account>();
+
     public DbSet<UserToken> UserTokenSeams => Set<UserToken>();
 
     public async Task ExecuteInTransactionAsync(

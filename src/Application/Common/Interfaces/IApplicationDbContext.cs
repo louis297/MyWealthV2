@@ -10,6 +10,8 @@ public interface IApplicationDbContext
 
     DbSet<Instrument> Instruments { get; }
 
+    DbSet<Account> Accounts { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 
     Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken cancellationToken);
