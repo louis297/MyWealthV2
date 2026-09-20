@@ -5,6 +5,7 @@ using MyWealthV2.Infrastructure.Data.Interceptors;
 using MyWealthV2.Infrastructure.Data.Schema;
 using MyWealthV2.Infrastructure.Email;
 using MyWealthV2.Infrastructure.Identity;
+using MyWealthV2.Infrastructure.MarketData;
 using MediatR;
 using Microsoft.AspNetCore.Identity;
 
@@ -40,6 +41,10 @@ public static class DependencyInjection
 
         builder.Services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
         builder.Services.AddSingleton<ICurrencyCatalog, CurrencyCatalog>();
+        builder.Services.AddSingleton<MarketDataMock>();
+        builder.Services.AddSingleton<IMarketData>(sp => sp.GetRequiredService<MarketDataMock>());
+        builder.Services.AddSingleton<FxRateMock>();
+        builder.Services.AddSingleton<IFxRate>(sp => sp.GetRequiredService<FxRateMock>());
 
         var schemaDirectory = Path.Combine(AppContext.BaseDirectory, "schema");
         builder.Services.AddSingleton<ISchemaScriptSource>(_ => new FileSchemaScriptSource(schemaDirectory));

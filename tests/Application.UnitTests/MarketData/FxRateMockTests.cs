@@ -20,6 +20,16 @@ public class FxRateMockTests
     {
         var fx = new FxRateMock();
 
-        Should.Throw<InvalidOperationException>(() => fx.GetRate("USD", "NZD"));
+        Should.Throw<InvalidOperationException>(() => fx.GetRate("USD", "NZD"))
+            .Message.ShouldNotBeNull();
+    }
+
+    [Test]
+    public void GetRate_SeededCrossPair_ReturnsRate()
+    {
+        var fx = new FxRateMock();
+        fx.SetRate("USD", "NZD", 1.6m);
+
+        fx.GetRate("usd", "nzd").ShouldBe(1.6m);
     }
 }
