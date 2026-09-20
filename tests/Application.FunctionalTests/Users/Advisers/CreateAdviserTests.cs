@@ -171,6 +171,23 @@ public class CreateAdviserTests : TestBase
     }
 
     [Test]
+    public async Task CreateWithIsActive_Returns400()
+    {
+        var (_, tokens) = await AdviserHttp.SignInTenantAdmin();
+
+        var response = await AdviserHttp.Send(
+            HttpMethod.Post, "/users/advisers", tokens.AccessToken, new
+            {
+                name = "Sam Reed",
+                email = "sam@north.example",
+                password = "Passw0rd!",
+                isActive = false
+            });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
     public async Task DisabledTenant_Returns400DisabledTarget()
     {
         var (tenant, tokens) = await AdviserHttp.SignInTenantAdmin();

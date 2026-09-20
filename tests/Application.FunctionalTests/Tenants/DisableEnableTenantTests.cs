@@ -69,7 +69,7 @@ public class DisableEnableTenantTests : TestBase
         disable.StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
         using var item = await ReadTenant(tenant.PublicId, admin.AccessToken);
-        item.RootElement.GetProperty("isEnabled").GetBoolean().ShouldBeFalse();
+        item.RootElement.GetProperty("isActive").GetBoolean().ShouldBeFalse();
 
         var loaded = await TestApp.FindAsync<User>(person.Id);
         loaded!.Status.ShouldBe(UserStatus.Active);
@@ -104,7 +104,7 @@ public class DisableEnableTenantTests : TestBase
             .StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
         using var enabled = await ReadTenant(tenant.PublicId, admin.AccessToken);
-        enabled.RootElement.GetProperty("isEnabled").GetBoolean().ShouldBeTrue();
+        enabled.RootElement.GetProperty("isActive").GetBoolean().ShouldBeTrue();
 
         var oldRefresh = await FunctionalTestSetup.Oidc.RefreshAsync(personTokens.RefreshToken!);
         oldRefresh.IsSuccessStatusCode.ShouldBeFalse();

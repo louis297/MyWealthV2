@@ -103,7 +103,7 @@ public class UpdateInstrumentTests : TestBase
     }
 
     [Test]
-    public async Task PutWithIsEnabled_Returns400()
+    public async Task PutWithIsActive_Returns400()
     {
         var (_, tokens) = await InstrumentHttp.SignInTenantAdmin();
         var id = await CreateAsync(tokens.AccessToken);
@@ -113,7 +113,7 @@ public class UpdateInstrumentTests : TestBase
             HttpMethod.Put, $"/instruments/{id}", tokens.AccessToken, new
             {
                 name = "Renamed",
-                isEnabled = false,
+                isActive = false,
                 rowVersion
             });
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);

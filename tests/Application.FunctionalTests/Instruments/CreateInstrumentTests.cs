@@ -59,7 +59,7 @@ public class CreateInstrumentTests : TestBase
         item.RootElement.GetProperty("symbol").GetString().ShouldBe("VTI");
         item.RootElement.GetProperty("name").GetString().ShouldBe("Vanguard Total Stock Market ETF");
         item.RootElement.GetProperty("quoteCurrency").GetString().ShouldBe("USD");
-        item.RootElement.GetProperty("isEnabled").GetBoolean().ShouldBeTrue();
+        item.RootElement.GetProperty("isActive").GetBoolean().ShouldBeTrue();
         item.RootElement.GetProperty("rowVersion").GetString().ShouldNotBeNullOrEmpty();
         item.RootElement.TryGetProperty("price", out _).ShouldBeFalse();
     }

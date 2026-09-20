@@ -130,6 +130,23 @@ public class UpdateCustomerTests : TestBase
     }
 
     [Test]
+    public async Task PutWithIsActive_Returns400()
+    {
+        var (_, adviser, tokens) = await CustomerHttp.SignInTenantAdmin();
+        var id = await CreateAsync(tokens.AccessToken, adviser.PublicId);
+        var rowVersion = await ReadRowVersion(id, tokens.AccessToken);
+
+        var response = await CustomerHttp.Send(
+            HttpMethod.Put, $"/users/customers/{id}", tokens.AccessToken, new
+            {
+                name = "Jordan Lee Ltd",
+                isActive = false,
+                rowVersion
+            });
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
     public async Task PutWithEmail_Returns400()
     {
         var (_, adviser, tokens) = await CustomerHttp.SignInTenantAdmin();

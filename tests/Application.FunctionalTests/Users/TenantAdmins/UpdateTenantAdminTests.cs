@@ -99,6 +99,24 @@ public class UpdateTenantAdminTests : TestBase
     }
 
     [Test]
+    public async Task PutWithIsActive_Returns400()
+    {
+        var tenant = await TestApp.CreateTenantAsync("North Advisory", "north-advisory");
+        var tokens = await TenantAdminHttp.SignInSystemAdmin();
+        var id = await CreateAsync(tenant.PublicId, tokens.AccessToken);
+        var rowVersion = await ReadRowVersion(id, tokens.AccessToken);
+
+        var response = await TenantAdminHttp.Send(
+            HttpMethod.Put, $"/users/tenant-admins/{id}", tokens.AccessToken, new
+            {
+                name = "Alexandra Chen",
+                isActive = false,
+                rowVersion
+            });
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
     public async Task PutWithEmail_Returns400()
     {
         var tenant = await TestApp.CreateTenantAsync("North Advisory", "north-advisory");

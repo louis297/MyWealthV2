@@ -95,6 +95,23 @@ public class UpdateAdviserTests : TestBase
     }
 
     [Test]
+    public async Task PutWithIsActive_Returns400()
+    {
+        var (_, tokens) = await AdviserHttp.SignInTenantAdmin();
+        var id = await CreateAsync(tokens.AccessToken);
+        var rowVersion = await ReadRowVersion(id, tokens.AccessToken);
+
+        var response = await AdviserHttp.Send(
+            HttpMethod.Put, $"/users/advisers/{id}", tokens.AccessToken, new
+            {
+                name = "Samantha Reed",
+                isActive = false,
+                rowVersion
+            });
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
     public async Task PutWithEmail_Returns400()
     {
         var (_, tokens) = await AdviserHttp.SignInTenantAdmin();

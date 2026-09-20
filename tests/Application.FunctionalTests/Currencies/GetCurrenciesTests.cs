@@ -71,7 +71,7 @@ public class GetCurrenciesTests : TestBase
     }
 
     [Test]
-    public async Task DefaultList_ContainsSixSeedRowsWithIsEnabledSortedByCode()
+    public async Task DefaultList_ContainsSixSeedRowsWithIsActiveSortedByCode()
     {
         var tokens = await SignInSystemAdmin();
         var response = await SendAuthorized("/currencies", tokens.AccessToken);
@@ -83,7 +83,8 @@ public class GetCurrenciesTests : TestBase
         ]);
         foreach (var item in items)
         {
-            item.TryGetProperty("isEnabled", out _).ShouldBeTrue();
+            item.TryGetProperty("isActive", out _).ShouldBeTrue();
+            item.TryGetProperty("isEnabled", out _).ShouldBeFalse();
             item.TryGetProperty("name", out _).ShouldBeTrue();
             item.TryGetProperty("decimalPlaces", out _).ShouldBeTrue();
         }

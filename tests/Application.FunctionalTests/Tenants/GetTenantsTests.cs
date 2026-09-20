@@ -87,7 +87,7 @@ public class GetTenantsTests : TestBase
         first.GetProperty("code").GetString().ShouldBe("north-advisory");
         first.GetProperty("id").GetGuid().ShouldBe(north.PublicId);
         first.GetProperty("reportingCurrency").GetString().ShouldBe("NZD");
-        first.GetProperty("isEnabled").GetBoolean().ShouldBeTrue();
+        first.GetProperty("isActive").GetBoolean().ShouldBeTrue();
         first.GetProperty("rowVersion").GetString().ShouldNotBeNullOrEmpty();
         first.TryGetProperty("created", out _).ShouldBeTrue();
         first.TryGetProperty("createdBy", out _).ShouldBeFalse();
@@ -146,7 +146,7 @@ public class GetTenantsTests : TestBase
         json.RootElement.GetProperty("name").GetString().ShouldBe("North Advisory");
         json.RootElement.GetProperty("code").GetString().ShouldBe("north-advisory");
         json.RootElement.GetProperty("reportingCurrency").GetString().ShouldBe("NZD");
-        json.RootElement.GetProperty("isEnabled").GetBoolean().ShouldBeTrue();
+        json.RootElement.GetProperty("isActive").GetBoolean().ShouldBeTrue();
         json.RootElement.GetProperty("rowVersion").GetString().ShouldNotBeNullOrEmpty();
         json.RootElement.TryGetProperty("created", out _).ShouldBeTrue();
     }

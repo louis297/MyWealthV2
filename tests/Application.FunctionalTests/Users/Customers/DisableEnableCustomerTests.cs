@@ -57,6 +57,7 @@ public class DisableEnableCustomerTests : TestBase
 
         using var item = await ReadItem(id, tokens.AccessToken);
         item.RootElement.GetProperty("status").GetString().ShouldBe("disabled");
+        item.RootElement.GetProperty("isActive").GetBoolean().ShouldBeFalse();
 
         (await FunctionalTestSetup.Oidc.SubmitLoginAsync(
             "ned@north.example", "Passw0rd!", "north-advisory")).Code.ShouldBeNull();
@@ -86,6 +87,7 @@ public class DisableEnableCustomerTests : TestBase
 
         using var enabled = await ReadItem(id, tokens.AccessToken);
         enabled.RootElement.GetProperty("status").GetString().ShouldBe("active");
+        enabled.RootElement.GetProperty("isActive").GetBoolean().ShouldBeTrue();
 
         var alreadyActive = await CustomerHttp.Send(
             HttpMethod.Post, $"/users/customers/{id}/enable", tokens.AccessToken,

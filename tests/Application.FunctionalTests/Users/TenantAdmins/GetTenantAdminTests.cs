@@ -87,6 +87,7 @@ public class GetTenantAdminTests : TestBase
         json.RootElement.GetProperty("name").GetString().ShouldBe("Alex Chen");
         json.RootElement.GetProperty("email").GetString().ShouldBe("Alex@north.example");
         json.RootElement.GetProperty("status").GetString().ShouldBe("active");
+        json.RootElement.GetProperty("isActive").GetBoolean().ShouldBeTrue();
         json.RootElement.GetProperty("rowVersion").GetString().ShouldNotBeNullOrEmpty();
         json.RootElement.TryGetProperty("created", out _).ShouldBeTrue();
         json.RootElement.TryGetProperty("role", out _).ShouldBeFalse();
@@ -138,6 +139,7 @@ public class GetTenantAdminTests : TestBase
         first.GetProperty("name").GetString().ShouldBe("Alex Chen");
         first.GetProperty("id").GetGuid().ShouldBe(alexId);
         first.GetProperty("status").GetString().ShouldBe("active");
+        first.GetProperty("isActive").GetBoolean().ShouldBeTrue();
         first.GetProperty("tenantId").GetGuid().ShouldBe(north.PublicId);
         first.TryGetProperty("role", out _).ShouldBeFalse();
     }

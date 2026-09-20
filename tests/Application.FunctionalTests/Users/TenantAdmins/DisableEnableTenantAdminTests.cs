@@ -73,6 +73,7 @@ public class DisableEnableTenantAdminTests : TestBase
 
         using var item = await ReadItem(id, tokens.AccessToken);
         item.RootElement.GetProperty("status").GetString().ShouldBe("disabled");
+        item.RootElement.GetProperty("isActive").GetBoolean().ShouldBeFalse();
 
         var refresh = await FunctionalTestSetup.Oidc.RefreshAsync(personTokens.RefreshToken!);
         refresh.IsSuccessStatusCode.ShouldBeFalse();
@@ -103,6 +104,7 @@ public class DisableEnableTenantAdminTests : TestBase
 
         using var enabled = await ReadItem(id, tokens.AccessToken);
         enabled.RootElement.GetProperty("status").GetString().ShouldBe("active");
+        enabled.RootElement.GetProperty("isActive").GetBoolean().ShouldBeTrue();
 
         var alreadyActive = await TenantAdminHttp.Send(
             HttpMethod.Post, $"/users/tenant-admins/{id}/enable", tokens.AccessToken,

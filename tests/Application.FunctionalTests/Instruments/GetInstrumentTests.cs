@@ -103,7 +103,7 @@ public class GetInstrumentTests : TestBase
         first.GetProperty("symbol").GetString().ShouldBe("AIA");
         first.GetProperty("name").GetString().ShouldBe("Auckland Airport");
         first.GetProperty("tenantId").GetGuid().ShouldBe(north.PublicId);
-        first.GetProperty("isEnabled").GetBoolean().ShouldBeTrue();
+        first.GetProperty("isActive").GetBoolean().ShouldBeTrue();
         first.GetProperty("rowVersion").GetString().ShouldNotBeNullOrEmpty();
         first.TryGetProperty("price", out _).ShouldBeFalse();
     }

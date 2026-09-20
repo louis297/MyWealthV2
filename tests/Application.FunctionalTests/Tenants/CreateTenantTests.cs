@@ -88,7 +88,7 @@ public class CreateTenantTests : TestBase
         item.RootElement.GetProperty("name").GetString().ShouldBe("North Advisory");
         item.RootElement.GetProperty("code").GetString().ShouldBe("north-advisory");
         item.RootElement.GetProperty("reportingCurrency").GetString().ShouldBe("NZD");
-        item.RootElement.GetProperty("isEnabled").GetBoolean().ShouldBeTrue();
+        item.RootElement.GetProperty("isActive").GetBoolean().ShouldBeTrue();
 
         (await TestApp.CountAsync<ApplicationUser>()).ShouldBe(usersBefore);
         (await TestApp.CountAsync<Domain.Entities.User>()).ShouldBe(peopleBefore);

@@ -239,7 +239,7 @@ public class GetTenantByCodeTests : TestBase
         json.RootElement.GetProperty("name").GetString().ShouldBe(name);
         json.RootElement.GetProperty("code").GetString().ShouldBe(code);
         json.RootElement.GetProperty("reportingCurrency").GetString().ShouldBe("NZD");
-        json.RootElement.GetProperty("isEnabled").GetBoolean().ShouldBeTrue();
+        json.RootElement.GetProperty("isActive").GetBoolean().ShouldBeTrue();
         json.RootElement.GetProperty("rowVersion").GetString().ShouldNotBeNullOrEmpty();
         json.RootElement.TryGetProperty("created", out _).ShouldBeTrue();
     }

@@ -54,7 +54,7 @@ public class DisableEnableInstrumentTests : TestBase
         disable.StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
         using var disabled = await ReadItem(id, tokens.AccessToken);
-        disabled.RootElement.GetProperty("isEnabled").GetBoolean().ShouldBeFalse();
+        disabled.RootElement.GetProperty("isActive").GetBoolean().ShouldBeFalse();
 
         var secondDisable = await InstrumentHttp.Send(
             HttpMethod.Post, $"/instruments/{id}/disable", tokens.AccessToken,
@@ -68,7 +68,7 @@ public class DisableEnableInstrumentTests : TestBase
         enable.StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
         using var enabled = await ReadItem(id, tokens.AccessToken);
-        enabled.RootElement.GetProperty("isEnabled").GetBoolean().ShouldBeTrue();
+        enabled.RootElement.GetProperty("isActive").GetBoolean().ShouldBeTrue();
 
         var secondEnable = await InstrumentHttp.Send(
             HttpMethod.Post, $"/instruments/{id}/enable", tokens.AccessToken,
