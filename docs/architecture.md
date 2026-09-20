@@ -22,7 +22,7 @@ This document owns **hosts, layers, ports, and cross-cutting behaviour**. Scope 
 
 Same rule as the function plan: if a later phase will use it and today’s design would have to change, ship the final infrastructure now. If later use or shape is not decided, wait.
 
-Phase 1 closes the platform base: tenants, session, four roles, people, currency catalog, Adviser Portal shell. The ledger is a Phase-2 domain. The first accepted ledger slice is Instruments (`0010_instruments.sql`, `/instruments`, mocked `IMarketData` / `IFxRate`), landed `9ea2f2a`. The second accepted slice is Accounts (`0012_accounts.sql`, `/accounts`) — not landed until that slice ships. Other ledger tables wait for their specs.
+Phase 1 closes the platform base: tenants, session, four roles, people, currency catalog, Adviser Portal shell. The ledger is a Phase-2 domain. The first accepted ledger slice is Instruments (`0010_instruments.sql`, `/instruments`, mocked `IMarketData` / `IFxRate`), landed `9ea2f2a`. The second accepted slice is Accounts (`0012_accounts.sql`, `/accounts`), landed 2026-09-21. Other ledger tables wait for their specs.
 
 ---
 
@@ -198,7 +198,7 @@ dotnet run --project src/AppHost
 
 EF does **not** generate migrations. `IEntityTypeConfiguration` maps only.
 
-identity-auth scripts: SchemaVersions, Identity user tables, OpenIddict tables, Tenants (no ReportingCurrency), Users, UserTokens. Currencies slice adds `0008_currencies.sql` and `0009_tenants_reporting_currency.sql`. Instruments slice adds `0010_instruments.sql`. Phase 1 scripts do not include Accounts, Holdings, Transactions, a custom RefreshTokens table, or AspNetRoles.
+identity-auth scripts: SchemaVersions, Identity user tables, OpenIddict tables, Tenants (no ReportingCurrency), Users, UserTokens. Currencies slice adds `0008_currencies.sql` and `0009_tenants_reporting_currency.sql`. Instruments slice adds `0010_instruments.sql`. Accounts slice adds `0012_accounts.sql`. Phase 1 scripts do not include Holdings, Transactions, a custom RefreshTokens table, or AspNetRoles.
 
 ---
 
@@ -249,7 +249,7 @@ Do not add a port whose surface is still open. Do add a port (or value object) w
 
 | Project | Purpose |
 | --- | --- |
-| `Domain.UnitTests` | Phase 1: User / Tenant invariants, currency Code, `Money`. Phase 2: `Instrument` (landed). `Account` after the accounts spec is accepted |
+| `Domain.UnitTests` | Phase 1: User / Tenant invariants, currency Code, `Money`. Phase 2: `Instrument` (landed). `Account` (landed) |
 | `Application.UnitTests` | Pure application helpers, policy map |
 | `Infrastructure.IntegrationTests` | Real database: scripts + EF mapping + FK + applicator |
 | `Application.FunctionalTests` | HTTP + TestAppHost (**starts `identity` and `webapi`**). Cross-tenant read / write must fail. Login gate is on `identity` (disabled / Pending / wrong tenant → no session) |
@@ -279,7 +279,7 @@ SystemAdmin receives Phase-2 ledger policies and calls `webapi` from Scalar (lat
 
 Each Phase-2 slice adds Development / TestAppHost `TestSeed` rows. Not schema scripts. Not Production.
 
-The ledger is one domain with internal slices. Instruments storage is locked. Account / cash / holdings / posting storage waits for the accepted spec. Phase 1 does not create Journal or CashLedger tables. Tendencies: [domain-model.md](domain-model.md) §8 and [function-plan.md](function-plan.md) §5.
+The ledger is one domain with internal slices. Instruments and Accounts storage is locked. Cash / holdings / posting storage waits for the accepted spec. Phase 1 does not create Journal or CashLedger tables. Tendencies: [domain-model.md](domain-model.md) §8 and [function-plan.md](function-plan.md) §5.
 
 If the identity **database** splits later, replace the revocation / login-principal port implementation. Do not change the protocol or the Aspire resource name `identity`.
 
@@ -318,3 +318,4 @@ Locked conclusions follow function-plan §0 and these ADRs. This folder currentl
 | 2026-09-12 | identity-auth: Razor `/login`; JWT claim names; 15 min / 14 day absolute tokens. Currencies not in the identity-auth script set. |
 | 2026-09-20 | Instruments ports + `/instruments`. SystemAdmin ledger policies on Scalar. |
 | 2026-09-21 | Instruments landed `9ea2f2a`. Accounts Feature Spec opened as `draft`. |
+| 2026-09-21 | Accounts landed (`0012_accounts.sql`, `/accounts`, Disable-Customer guard, TestSeed). |

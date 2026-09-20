@@ -31,4 +31,4 @@ Write an ADR when the choice would surprise a later reader: host, identity, sche
 | [0013](0013-roles-authorization-single-user-table.md) | Four roles, named policies, one table per layer | accepted |
 | [0014](0014-openiddict-authorization-code-pkce.md) | OpenIddict in Aspire `identity`; authorization code + PKCE | accepted |
 
-0010 is accepted and expanded with [features/instruments.md](../features/instruments.md) (landed `9ea2f2a`). 0011 stays direction for cash / holdings / posting; the account container is locked in [features/accounts.md](../features/accounts.md) (accepted).
+0010 is accepted and expanded with [features/instruments.md](../features/instruments.md) (landed `9ea2f2a`). 0011 stays direction for cash / holdings / posting; the account container is locked in [features/accounts.md](../features/accounts.md) (accepted, landed).

@@ -14,11 +14,11 @@ related:
 
 # Database design
 
-This document owns **accepted tables, keys, indexes, constraints, and script order**. Scripts themselves live in `database/schema/`. Aggregates and invariants live in [domain-model.md](domain-model.md). Scope lives in [function-plan.md](function-plan.md). Field rules for Instruments live in [features/instruments.md](features/instruments.md). Boolean catalog flags are `IsActive` (naming amendment 2026-09-21, script `0011`).
+This document owns **accepted tables, keys, indexes, constraints, and script order**. Scripts themselves live in `database/schema/`. Aggregates and invariants live in [domain-model.md](domain-model.md). Scope lives in [function-plan.md](function-plan.md). Field rules for Instruments live in [features/instruments.md](features/instruments.md). Field rules for Accounts live in [features/accounts.md](features/accounts.md). Boolean catalog flags are `IsActive` (naming amendment 2026-09-21, script `0011`).
 
 **Product:** MyWealthV2.
 
-Phase 1 scripts create the platform base. Phase 2 accepted so far: `Instruments` (`0010_instruments.sql`). Do **not** create Accounts, Holdings, Transactions, Journal, or CashLedger until those specs are accepted. There is no custom `RefreshTokens` table; refresh lives in the OpenIddict token store. Demo instruments are `TestSeed`, not the schema script.
+Phase 1 scripts create the platform base. Phase 2 accepted so far: `Instruments` (`0010_instruments.sql`) and `Accounts` (`0012_accounts.sql`). Do **not** create Holdings, Transactions, Journal, or CashLedger until those specs are accepted. There is no custom `RefreshTokens` table; refresh lives in the OpenIddict token store. Demo instruments and accounts are `TestSeed`, not the schema script.
 
 ---
 
@@ -53,16 +53,16 @@ Identity password seed goes through `UserManager`. OpenIddict clients may be ins
 | --- | --- |
 | Primary key | `Id int` identity, clustered. Internal only. |
 | Public id | `PublicId uniqueidentifier NOT NULL` unique on resources that appear in HTTP. Default `NEWSEQUENTIALID()` or an app-generated UUID. Not the PK. |
-| Tables with PublicId | `Tenants`, `Users`, `Instruments` |
+| Tables with PublicId | `Tenants`, `Users`, `Instruments`, `Accounts` |
 | Tables without PublicId | `Currencies` (natural key `Code`), `SchemaVersions`, `UserTokens` (caller holds the raw token; store stores the hash), Identity string keys, OpenIddict package keys |
 | Tenancy | Business tables carry `TenantId`. Null only on `Users` for SystemAdmin. FK `Users.TenantId` → `Tenants`. |
-| Audit | `Created datetimeoffset`, `CreatedBy nvarchar(450)`, `LastModified datetimeoffset`, `LastModifiedBy nvarchar(450)` on `Tenants`, `Users`, and `Instruments`. `CreatedBy` stores the actor’s Identity id or a system name. |
-| Concurrency | `RowVersion rowversion` on `Tenants`, `Users`, and `Instruments`. HTTP 409 on conflict. |
+| Audit | `Created datetimeoffset`, `CreatedBy nvarchar(450)`, `LastModified datetimeoffset`, `LastModifiedBy nvarchar(450)` on `Tenants`, `Users`, `Instruments`, and `Accounts`. `CreatedBy` stores the actor’s Identity id or a system name. |
+| Concurrency | `RowVersion rowversion` on `Tenants`, `Users`, `Instruments`, and `Accounts`. HTTP 409 on conflict. |
 | Soft delete | Not used. |
 | Status + IsActive | Rows that have a **status machine** store both: `Status` (source of truth) and `IsActive` (filter bit). `IsActive` is **derived**, never written by HTTP. Preferred SQL: persisted computed column from `Status`. Catalog rows (Tenant, Currency, Instrument) have `IsActive` only — no status machine. Never `IsEnabled`. |
 | Money | No money columns in Phase 1. When the ledger exists: `decimal(18,4)` + `char(3)` FK to `Currencies`. |
 | Strings | `nvarchar` + explicit max length. Email / Name / Code uniqueness is case-insensitive (`SQL_Latin1_General_CP1_CI_AS` or an equivalent CI collation). |
-| Enums | `int` on `Users.Role`, `Users.Status`, `UserTokens.Purpose`, later `Accounts.Status`. |
+| Enums | `int` on `Users.Role`, `Users.Status`, `UserTokens.Purpose`, `Accounts.Type`, `Accounts.Status`. |
 | Delete | `RESTRICT` (no cascade) on Phase-1 business FKs. |
 
 ---
@@ -311,6 +311,7 @@ Beyond PK / unique constraints already listed:
 - `UserTokens(TokenHash)`, `UserTokens(TenantId, Email)`, `UserTokens(IdentityUserId)`
 - OpenIddict / Identity: keep package indexes
 - `Instruments(PublicId)`, `Instruments(TenantId, Symbol)` CI unique, `Instruments(TenantId, IsActive)`
+- `Accounts(PublicId)`, `Accounts(TenantId, CustomerId)`, `Accounts(TenantId, IsActive)`
 
 ---
 
@@ -327,7 +328,7 @@ Beyond PK / unique constraints already listed:
 0009_tenants_reporting_currency.sql  -- ALTER Tenants.ReportingCurrency + FK
 0010_instruments.sql         -- tenant catalog; no demo rows; shipped as IsEnabled
 0011_rename_is_enabled_to_is_active.sql  -- catalog IsEnabled → IsActive; add Users.IsActive derived from Status
-0012_accounts.sql            -- Account container (accepted spec; not landed until the slice ships)
+0012_accounts.sql            -- Account container; no demo rows; Status + derived IsActive
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -380,7 +381,7 @@ People list items may include `isActive` alongside `status` after `0011`. Filter
 
 ### 11.3 Accounts (accepted)
 
-Script `0012_accounts.sql`. Columns: [features/accounts.md](features/accounts.md) §6. `Status` Open=0 / Closed=1. `IsActive` persisted computed (`Status = 0` → 1). No balance or institution columns. Not landed in the repo until the slice ships.
+Script `0012_accounts.sql`. Columns: [features/accounts.md](features/accounts.md) §6. `Status` Open=0 / Closed=1. `IsActive` persisted computed (`Status = 0` → 1). No balance or institution columns. Landed in the repo 2026-09-21. No seed in the script — `TestSeed` only.
 
 ### 11.4 Not yet accepted
 
@@ -406,4 +407,5 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-09-12 | identity-auth lands Tenants without ReportingCurrency and does not create Currencies. Catalog + ReportingCurrency FK are the currencies slice (`0008+`). |
 | 2026-09-13 | Currencies spec: `0008` + `0009`. `IsEnabled` is platform-wide. `DecimalPlaces` is minor units, not `decimal(18,4)` scale. |
 | 2026-09-20 | `Instruments` (`0010`). Tenant catalog. Unique `(TenantId, Symbol)`. FK QuoteCurrency → Currencies. Landed in repo `9ea2f2a`. |
-| 2026-09-21 | Boolean flags unified to `IsActive`. Script `0011` landed `bbd0f26`. Accounts spec accepted (`0012`, not landed). |
+| 2026-09-21 | Boolean flags unified to `IsActive`. Script `0011` landed `bbd0f26`. Accounts spec accepted. |
+| 2026-09-21 | `Accounts` (`0012`). Container under a Customer. Derived `IsActive`. Landed in the repo. |

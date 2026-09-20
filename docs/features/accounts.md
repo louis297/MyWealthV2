@@ -28,7 +28,7 @@ Cash postings, holdings, Opening, reversals, and net worth are out. This slice d
 
 **Status is `accepted`.** Implementation follows this file. Expand [ADR 0011](../adr/0011-ledger-cash-holdings-reversal.md) for the container only — posting storage stays direction.
 
-Depends on accepted [instruments](instruments.md) (landed `9ea2f2a`) and the IsActive rename (`bbd0f26`, `0011`) only as prior slices. Accounts do not reference `InstrumentId`.
+Landed in the repo 2026-09-21 (`0012_accounts.sql`, `/accounts`, Disable-Customer guard, TestSeed). Depends on accepted [instruments](instruments.md) (landed `9ea2f2a`) and the IsActive rename (`bbd0f26`, `0011`) only as prior slices. Accounts do not reference `InstrumentId`.
 
 ---
 

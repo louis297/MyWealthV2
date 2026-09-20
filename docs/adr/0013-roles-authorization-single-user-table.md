@@ -80,7 +80,7 @@ SystemAdmin has no `TenantId`. List and create take the target tenant PublicId. 
 | `accounts.create` | ✓ | ✓ | ✓ | |
 | `accounts.manage` | ✓ | ✓ | ✓ | |
 
-Adviser account scope is assigned Customers in the handler. Field rules: [features/accounts.md](../features/accounts.md).
+Adviser account scope is assigned Customers in the handler. Field rules: [features/accounts.md](../features/accounts.md). Landed in the repo 2026-09-21.
 
 The `/users` HTTP namespace (`/users/advisers` and so on) is an API convention. It is not this ADR’s authorization model.
 

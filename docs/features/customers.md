@@ -60,7 +60,7 @@ A Customer may complete authorization-server login (tests / reserved). There is 
 - Changing Email / Role / TenantId
 - Physical delete
 - “Cannot disable the last Customer”
-- Ledger / open-Account guard (owned by accepted [accounts](accounts.md); this slice does not create Account tables)
+- Ledger / open-Account guard (owned by landed [accounts](accounts.md); this slice does not create Account tables)
 - Customer Portal client; Adviser Portal Customers page (portals)
 - SystemAdmin managing Customers (Scalar is not that surface)
 - A Customer calling this collection (403; profile is `/users/me`)
@@ -76,7 +76,7 @@ A Customer may complete authorization-server login (tests / reserved). There is 
 4. As an Adviser my list and get show only assigned Customers; anyone else’s id is 404.
 5. As a TenantAdmin I rename a Customer, or reassign them to another non-disabled Adviser in the firm.
 6. As an Adviser I rename an assigned Customer; I cannot reassign.
-7. As a TenantAdmin or the assigned Adviser I disable a Customer so they cannot complete login and existing refresh fails; Phase 1 has no accounts, so disable is not blocked by holdings.
+7. As a TenantAdmin or the assigned Adviser I disable a Customer so they cannot complete login and existing refresh fails; [accounts](accounts.md) rejects disable while any account is still active.
 8. As a TenantAdmin or the assigned Adviser I re-enable a disabled Customer.
 9. As a SystemAdmin or a Customer I receive 403 on every `/users/customers` verb.
 
@@ -96,7 +96,7 @@ A Customer may complete authorization-server login (tests / reserved). There is 
 | R8 | Role / TenantId / Email cannot change. PUT updates `name`. A TenantAdmin PUT may also update `adviserId`. Body includes `email` / `tenantId` / `role` / `password` → 400. An Adviser PUT that includes `adviserId` → 400. |
 | R9 | Status and `isActive` are not on PUT or create bodies. Disable / enable are `POST …/disable` and `POST …/enable`. |
 | R10 | HTTP idempotent: already Disabled + disable, or already Active + enable → 204, no second event. Application inspects Status first; domain throw semantics stay. |
-| R11 | Disable goes through existing `User.Disable()`. Phase 1 does not look at accounts. Raises `UserDisabled`; the identity-auth revocation handler stays. Do not route through `DisableAdviser`. |
+| R11 | Disable goes through existing `User.Disable()`. [accounts](accounts.md) adds an application guard: any `IsActive` account → 400 ordinary `errors`. Closed-only may disable. Raises `UserDisabled`; the identity-auth revocation handler stays. Do not route through `DisableAdviser`. |
 | R12 | `Enable()` raises `UserActivated`. Login still requires an enabled tenant and Active. |
 | R13 | PUT / disable / enable require `rowVersion`. Conflict 409. Missing 400. Same encoding as `/users/me`. |
 | R14 | No physical delete. |

@@ -93,7 +93,7 @@ Lock table and port shape in the Feature Spec. Do not implement from ADR 0010 / 
 | Spec | Status | Who | Ships | Why it stays its own slice |
 | --- | --- | --- | --- | --- |
 | [instruments](instruments.md) | accepted (landed in repo 2026-09-20 `9ea2f2a`; IsActive rename `bbd0f26`) | TenantAdmin; Adviser (create + read); SystemAdmin (all verbs, Scalar) | Tenant catalog, `/instruments`, mocked `IMarketData` / `IFxRate`, TestSeed | Holdings store `InstrumentId` only; catalog must exist first |
-| [accounts](accounts.md) | accepted | TenantAdmin; Adviser (assigned Customers); SystemAdmin (all verbs, Scalar) | Account container under a Customer, `/accounts`, close/reopen, `Status` + derived `IsActive`, Disable-Customer guard, TestSeed | Cash / holdings / Opening need a container first |
+| [accounts](accounts.md) | accepted (landed in repo 2026-09-21) | TenantAdmin; Adviser (assigned Customers); SystemAdmin (all verbs, Scalar) | Account container under a Customer, `/accounts`, close/reopen, `Status` + derived `IsActive`, Disable-Customer guard, TestSeed | Cash / holdings / Opening need a container first |
 
 Suggested order (tendency, not a locked backlog):
 

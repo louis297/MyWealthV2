@@ -140,7 +140,7 @@ PendingActivation ──disable──► Disabled
 Disable guards:
 
 - Disable Adviser: reject while assigned Customers are not Disabled; reassign or disable them first. Method: `User.DisableAdviser(bool hasNonDisabledAssignedCustomers)`. `Disable()` stays for TenantAdmin / Customer.
-- Disable Customer: Phase 1 has no accounts, so no ledger guard. When the ledger exists, the Accounts slice adds “reject if an Account is still open”. Do not create empty Account tables in Phase 1 to enforce that.
+- Disable Customer: reject while any Account for that person is still active (`IsActive`). Closed-only Customers may be disabled. Do not bulk-close. Guard lives on `DisableCustomer`, not on `User.Disable()`.
 - Disabling the last TenantAdmin is allowed (known gap).
 - Disabling a tenant does **not** bulk-update `User.Status`. Person status is independent; login checks both.
 
@@ -277,7 +277,7 @@ Invariants:
 
 Field rules: [features/instruments.md](features/instruments.md). Landed in repo 2026-09-20 `9ea2f2a`.
 
-### 8.5 Account (accepted — accounts slice)
+### 8.5 Account (accepted, landed)
 
 | Type | Kind | Notes |
 | --- | --- | --- |
@@ -295,7 +295,7 @@ Invariants:
 - HTTP close / reopen. No physical delete.
 - Disable Customer rejects while any account is active.
 
-Field rules: [features/accounts.md](features/accounts.md).
+Field rules: [features/accounts.md](features/accounts.md). Landed in the repo 2026-09-21.
 
 ---
 
@@ -320,3 +320,4 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-09-17 | Account.Type immutable after open; Bank / Cash / Credit must not hold Instruments. Property / Credit reserved, not Phase-2 selectable. |
 | 2026-09-20 | Instrument aggregate accepted (instruments slice). SystemAdmin may manage tenant catalog rows. Ports `IMarketData` / `IFxRate` locked. |
 | 2026-09-21 | Instruments landed in repo `9ea2f2a`. Account container Feature Spec opened as `draft`. Boolean flags unified to `IsActive` (script `0011`). |
+| 2026-09-21 | Account aggregate landed. Disable Customer rejects while any account is active. |

@@ -221,7 +221,7 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 
 Path `{id}` is always PublicId.
 
-Phase 1 has **no** `/auth/*`, `/holdings`, `/transactions`, `/dashboard`, invitation, or forgot-password. `/instruments` is the first Phase-2 ledger route (landed). `/accounts` is the second (accepted; not landed until the accounts slice ships).
+Phase 1 has **no** `/auth/*`, `/holdings`, `/transactions`, `/dashboard`, invitation, or forgot-password. `/instruments` is the first Phase-2 ledger route (landed). `/accounts` is the second (landed).
 
 ---
 
