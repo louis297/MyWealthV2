@@ -27,26 +27,89 @@ public class Instrument : BaseAuditableEntity
         Currency quoteCurrency,
         Guid? publicId = null)
     {
-        return new Instrument
+        EnsureQuoteCurrency(quoteCurrency);
+
+        var instrument = new Instrument
         {
             TenantId = tenantId,
-            Symbol = symbol,
-            Name = name,
+            Symbol = NormaliseSymbol(symbol),
+            Name = NormaliseName(name),
             QuoteCurrency = quoteCurrency.Code,
             PublicId = publicId ?? Guid.NewGuid(),
             IsEnabled = true
         };
+        instrument.AddDomainEvent(new InstrumentCreated(instrument));
+        return instrument;
     }
 
     public void Rename(string? name, string? symbol)
     {
+        if (name is not null)
+        {
+            Name = NormaliseName(name);
+        }
+
+        if (symbol is not null)
+        {
+            Symbol = NormaliseSymbol(symbol);
+        }
     }
 
     public void Disable()
     {
+        if (!IsEnabled)
+        {
+            return;
+        }
+
+        IsEnabled = false;
+        AddDomainEvent(new InstrumentDisabled(this));
     }
 
     public void Enable()
     {
+        if (IsEnabled)
+        {
+            return;
+        }
+
+        IsEnabled = true;
+        AddDomainEvent(new InstrumentEnabled(this));
+    }
+
+    private static string NormaliseSymbol(string symbol)
+    {
+        var normalised = symbol?.Trim().ToUpperInvariant();
+        if (string.IsNullOrEmpty(normalised) || normalised.Length > 32
+            || normalised.Any(ch => !char.IsAsciiLetterUpper(ch) && !char.IsAsciiDigit(ch) && ch is not '.' and not '-'))
+        {
+            throw new DomainException("Symbol must be 1 to 32 characters in [A-Z0-9.-].");
+        }
+
+        return normalised;
+    }
+
+    private static string NormaliseName(string name)
+    {
+        var trimmed = name?.Trim() ?? string.Empty;
+        if (trimmed.Length is < 1 or > 200)
+        {
+            throw new DomainException("Name is required.");
+        }
+
+        return trimmed;
+    }
+
+    private static void EnsureQuoteCurrency(Currency currency)
+    {
+        if (currency is null || string.IsNullOrWhiteSpace(currency.Code))
+        {
+            throw new DomainException("Quote currency is required.");
+        }
+
+        if (!currency.IsEnabled)
+        {
+            throw new DomainException("Quote currency must be enabled.");
+        }
     }
 }
