@@ -44,6 +44,8 @@ public sealed class CurrencyCatalog(IServiceScopeFactory scopes) : ICurrencyCata
 
     public bool IsEnabled(string code) => TryGet(code)?.IsActive == true;
 
+    public bool IsActive(string code) => false;
+
     public async Task ReloadAsync(CancellationToken cancellationToken = default)
     {
         using var scope = scopes.CreateScope();

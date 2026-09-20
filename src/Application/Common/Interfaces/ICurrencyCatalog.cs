@@ -10,5 +10,7 @@ public interface ICurrencyCatalog
 
     bool IsEnabled(string code);
 
+    bool IsActive(string code);
+
     Task ReloadAsync(CancellationToken cancellationToken = default);
 }

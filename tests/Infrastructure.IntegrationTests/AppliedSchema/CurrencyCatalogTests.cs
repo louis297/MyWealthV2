@@ -17,8 +17,8 @@ public class CurrencyCatalogTests
 
         catalog.TryGet("nzd")!.Code.ShouldBe("NZD");
         catalog.TryGet("XXX").ShouldBeNull();
-        catalog.IsEnabled("nzd").ShouldBeTrue();
-        catalog.IsEnabled("XXX").ShouldBeFalse();
+        catalog.IsActive("nzd").ShouldBeTrue();
+        catalog.IsActive("XXX").ShouldBeFalse();
     }
 
     [Test]
@@ -38,7 +38,7 @@ public class CurrencyCatalogTests
 
             catalog.List(enabledOnly: true).Select(row => row.Code).ShouldNotContain("XXX");
             catalog.List(enabledOnly: false).Select(row => row.Code).ShouldContain("XXX");
-            catalog.IsEnabled("XXX").ShouldBeFalse();
+            catalog.IsActive("XXX").ShouldBeFalse();
         }
         finally
         {
