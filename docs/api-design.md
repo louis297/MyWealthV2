@@ -217,10 +217,11 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Currencies | `/currencies` | GET | Authenticated |
 | Tenants | `/tenants` | list / get / create / update / disable / enable | `tenants.manage` |
 | Instruments | `/instruments` | list / get / create / update / disable / enable | `instruments.read` / `instruments.create` / `instruments.manage` |
+| Accounts | `/accounts` | list / get / create / update / close / reopen | `accounts.read` / `accounts.create` / `accounts.manage` |
 
 Path `{id}` is always PublicId.
 
-Phase 1 has **no** `/auth/*`, `/holdings`, `/transactions`, `/dashboard`, invitation, or forgot-password. `/instruments` is the first Phase-2 ledger route (landed). Do not add `/accounts` until that Feature Spec is accepted.
+Phase 1 has **no** `/auth/*`, `/holdings`, `/transactions`, `/dashboard`, invitation, or forgot-password. `/instruments` is the first Phase-2 ledger route (landed). `/accounts` is the second (accepted; not landed until the accounts slice ships).
 
 ---
 
@@ -334,6 +335,25 @@ Field rules: [features/instruments.md](features/instruments.md).
 - Item includes `id`, `tenantId`, `symbol`, `name`, `quoteCurrency`, `isActive`, `rowVersion`. No price.
 - Create on a disabled tenant → §4.1 `target=tenant`.
 
+### 7.6 Accounts
+
+Field rules: [features/accounts.md](features/accounts.md).
+
+| Method | Route | Policy | Success |
+| --- | --- | --- | --- |
+| GET | `/accounts` | `accounts.read` | 200 envelope |
+| GET | `/accounts/{id}` | `accounts.read` | 200 item |
+| POST | `/accounts` | `accounts.create` | 201 `{ id }` |
+| PUT | `/accounts/{id}` | `accounts.manage` | 204 |
+| POST | `/accounts/{id}/close` | `accounts.manage` | 204 |
+| POST | `/accounts/{id}/reopen` | `accounts.manage` | 204 |
+
+- TenantAdmin / Adviser: current tenant. Body / list query must omit `tenantId`. Adviser: assigned Customers only.
+- SystemAdmin: list and create require tenant PublicId. Get / PUT / close / reopen may cross tenants.
+- Customer → 403.
+- Item includes `id`, `tenantId`, `customerId`, `name`, `type`, `currency`, `status`, `isActive`, `rowVersion`. No balance.
+- Create on a disabled tenant → §4.1 `target=tenant`. Create or reopen on a Disabled Customer → §4.1 `target=user`.
+
 ---
 
 ## 8. Explicitly out (until a later phase promotes them)
@@ -342,7 +362,7 @@ Field rules: [features/instruments.md](features/instruments.md).
 - Password grant
 - A second OIDC client in Phase 1
 - Currency write APIs, per-tenant currency allow-lists, FX
-- `/accounts` until that Feature Spec is accepted; `/holdings`, `/transactions`, `/dashboard`
+- `/holdings`, `/transactions`, `/dashboard`
 - Invitation, forgot-password, self-registration, MFA, external IdP
 - Subdomain tenant resolution; Header-based SystemAdmin tenant switching
 - Internal `int` ids in routes or JSON

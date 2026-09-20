@@ -24,7 +24,7 @@ Platform currency catalog, in-process `ICurrencyCatalog`, read-only `GET /curren
 
 This is not a tenant-scoped resource. No cross-tenant isolation tests. People CRUD, tenant HTTP, and portal pages are out.
 
-**Naming amendment 2026-09-21:** column and JSON field are `IsActive` / `isActive`. Script `0008` shipped `IsEnabled`; `0011_rename_is_enabled_to_is_active.sql` renames it. List query stays `enabledOnly` (filters `IsActive`). Port method follows the column: `ICurrencyCatalog.IsActive`. Do not leave an `IsEnabled` column.
+**Naming amendment 2026-09-21, landed** in GitHub master `bbd0f26`. Column and JSON field are `IsActive` / `isActive`. Script `0008` shipped `IsEnabled`; `0011_rename_is_enabled_to_is_active.sql` renames it. List query stays `enabledOnly` (filters `IsActive`). Port method follows the column: `ICurrencyCatalog.IsActive`. Do not leave an `IsEnabled` column.
 
 ---
 

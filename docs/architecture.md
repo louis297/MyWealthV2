@@ -22,7 +22,7 @@ This document owns **hosts, layers, ports, and cross-cutting behaviour**. Scope 
 
 Same rule as the function plan: if a later phase will use it and today’s design would have to change, ship the final infrastructure now. If later use or shape is not decided, wait.
 
-Phase 1 closes the platform base: tenants, session, four roles, people, currency catalog, Adviser Portal shell. The ledger is a Phase-2 domain. The first accepted ledger slice is Instruments (`0010_instruments.sql`, `/instruments`, mocked `IMarketData` / `IFxRate`), landed in repo 2026-09-20 `9ea2f2a`. Other ledger tables wait for their specs.
+Phase 1 closes the platform base: tenants, session, four roles, people, currency catalog, Adviser Portal shell. The ledger is a Phase-2 domain. The first accepted ledger slice is Instruments (`0010_instruments.sql`, `/instruments`, mocked `IMarketData` / `IFxRate`), landed `9ea2f2a`. The second accepted slice is Accounts (`0012_accounts.sql`, `/accounts`) — not landed until that slice ships. Other ledger tables wait for their specs.
 
 ---
 

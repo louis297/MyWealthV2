@@ -149,7 +149,7 @@ Adviser Portal only. Split in two implementation slices (see [portals/adviser-po
 One domain. Feature Specs come after this map. Suggested internal slice order (not a locked table design):
 
 1. Instruments (accepted, landed 2026-09-20 `9ea2f2a`)
-2. Account container
+2. Account container (accepted: [features/accounts.md](features/accounts.md))
 3. Cash sub-ledger
 4. Holdings / securities ledger
 5. Posting, reversal, and Opening
@@ -261,4 +261,4 @@ List page size is locked in tenants and reused by people lists (page 1 / size 20
 
 Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; uniform login failure; hosted login is Razor Pages at `/login`; access 15 minutes; refresh 14 days absolute.
 
-Phase 1 platform slices are accepted and tested (A1–A10, B1–B11, C1–C15). Phase 2 is open. Feature map in §5 is agreed. Instruments is accepted and landed in repo 2026-09-20 (`9ea2f2a`). Write the next Feature Specs one slice at a time. Do not invent table shape outside the spec that owns it. Do not implement accounts from this file or from ADR 0011.
+Phase 1 platform slices are accepted and tested (A1–A10, B1–B11, C1–C15). Phase 2 is open. Feature map in §5 is agreed. Instruments is accepted and landed (`9ea2f2a`). IsActive rename + `Users.IsActive` landed (`bbd0f26`, `0011`). Accounts spec is accepted (`0012`, not landed). Implement accounts from [features/accounts.md](features/accounts.md), not from ADR 0011. Do not invent table shape outside the spec that owns it.

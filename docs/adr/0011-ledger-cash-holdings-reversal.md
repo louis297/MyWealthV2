@@ -19,7 +19,7 @@ Status: accepted (Phase 2 direction)
 
 Storage shape (journal header, one row vs two for a buy, Opening columns, close-and-clear, daily snapshot) is reviewed and locked when the phase opens. This ADR only locks the *way of thinking*, so Phase 1 does not ship a single-row `Transactions` table that Phase 2 would have to throw away.
 
-Phase 2 is open. Instruments is accepted and landed. Do not implement accounts from this file. Reopen the Consequences / Decision bullets that the accepted accounts spec locks (Customer parent, immutable type + currency, `IsOpen`). Posting storage stays direction.
+Phase 2 is open. Instruments is accepted and landed. Account container is accepted: [features/accounts.md](../features/accounts.md). Implement accounts from that spec, not from this ADR. Posting storage stays direction.
 
 ## Context
 
@@ -32,7 +32,7 @@ A single `Type` column that pretends to be both cash and security, plus hand-edi
 3. A posted entry is not `UPDATE`d or `DELETE`d. Correction tends toward a **full reversal**: a new posting points at the original. Reversal is not a separate Feature slice; it lives in the posting domain.
 4. After posting: non-Credit cash must not go negative. Credit cash may be negative (liability).
 5. Day-to-day quantity / cost edits are forbidden. The only direct write of quantity and cost is called Opening (shape not locked).
-6. An account is a container under a Customer. `Account.Currency` is the cash-book currency and is immutable after open. Account type does not replace the cash book.
+6. An account is a container under a Customer. `Account.Currency` is the cash-book currency and is immutable after open. `Account.Type` is immutable after open. Phase 2 selectable types: Bank, Cash, Brokerage, Other. `Status` is Open / Closed; `IsActive` is derived (`Open` → 1). HTTP close / reopen. Type does not replace the cash book. Field rules: [features/accounts.md](../features/accounts.md).
 7. Net worth is an array per currency. Do not FX-fold to one number. Closed accounts are excluded. Credit is a liability.
 8. A Customer who can obtain a token still has no ledger-write policy.
 
@@ -47,4 +47,4 @@ A single `Type` column that pretends to be both cash and security, plus hand-edi
 
 ## Consequences
 
-Phase-1 Domain defines `Money` and does not define ledger aggregates. Instruments shipped first. Next formal spec: account container (`draft`). Then cash book → holdings → posting and reversal → net worth.
+Phase-1 Domain defines `Money` and does not define ledger aggregates. Instruments shipped first. Account container is accepted. Next: cash book → holdings → posting and reversal → net worth.

@@ -60,7 +60,7 @@ A Customer may complete authorization-server login (tests / reserved). There is 
 - Changing Email / Role / TenantId
 - Physical delete
 - “Cannot disable the last Customer”
-- Ledger / open-Account guard (Accounts slice in Phase 2; do not create empty Account tables now)
+- Ledger / open-Account guard (owned by accepted [accounts](accounts.md); this slice does not create Account tables)
 - Customer Portal client; Adviser Portal Customers page (portals)
 - SystemAdmin managing Customers (Scalar is not that surface)
 - A Customer calling this collection (403; profile is `/users/me`)

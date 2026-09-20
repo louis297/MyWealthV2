@@ -23,7 +23,7 @@ related:
 
 Platform Tenant HTTP for SystemAdmin: list / get / create / rename+reporting-currency / disable / enable. The table, `PublicId`, `Code`, active flag, audit, `RowVersion`, and `ReportingCurrency` already exist (identity-auth `0005`, currencies `0009`). This slice does not add a script.
 
-**Naming amendment 2026-09-21:** column and JSON field are `IsActive` / `isActive` (shipped as `IsEnabled` / `isEnabled` on `0005`). Forward script `0011_rename_is_enabled_to_is_active.sql`. HTTP verbs stay `POST …/disable` and `POST …/enable`. Domain methods stay `Disable` / `Enable`. Landed list query `isEnabled` still filters the bit (do not add a second tenants filter). Do not leave an `IsEnabled` column. Examples below that still say `isEnabled` mean `isActive`.
+**Naming amendment 2026-09-21, landed** in GitHub master `bbd0f26`. Column and JSON field are `IsActive` / `isActive` (shipped as `IsEnabled` / `isEnabled` on `0005`). Forward script `0011_rename_is_enabled_to_is_active.sql`. HTTP verbs stay `POST …/disable` and `POST …/enable`. Domain methods stay `Disable` / `Enable`. Landed list query `isEnabled` still filters the bit (do not add a second tenants filter). Do not leave an `IsEnabled` column. Examples below that still say `isEnabled` mean `isActive`.
 
 Creating a Tenant does **not** create a TenantAdmin or any Identity user. People dual-write is the next slice.
 

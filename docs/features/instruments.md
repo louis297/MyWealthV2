@@ -30,7 +30,7 @@ Holdings, accounts, and posting are out. This slice does not persist a price. La
 
 Landed in GitHub `louis297/MyWealthV2` master 2026-09-20, last slice commit `9ea2f2a`. Slice commits `e1475ca` … `9ea2f2a` match §12.
 
-**Naming amendment 2026-09-21:** column and JSON field are `IsActive` / `isActive`. Script `0010` shipped `IsEnabled`; `0011_rename_is_enabled_to_is_active.sql` renames it. HTTP verbs stay `POST …/disable` and `POST …/enable`. List query stays `enabledOnly` (filters `IsActive`). Do not leave an `IsEnabled` column.
+**Naming amendment 2026-09-21, landed** in GitHub master `bbd0f26` (slice `ad2d8b53` … `bbd0f26`). Column and JSON field are `IsActive` / `isActive`. Script `0010` shipped `IsEnabled`; `0011_rename_is_enabled_to_is_active.sql` renames it. HTTP verbs stay `POST …/disable` and `POST …/enable`. List query stays `enabledOnly` (filters `IsActive`). Do not leave an `IsEnabled` column.
 
 ---
 

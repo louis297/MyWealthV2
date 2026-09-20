@@ -72,6 +72,16 @@ Ledger names were not registered in Phase 1. The instruments slice adds:
 
 SystemAdmin has no `TenantId`. List and create take the target tenant PublicId. Field rules: [features/instruments.md](../features/instruments.md). Landed in repo 2026-09-20 `9ea2f2a`. Phase 1 people routes do not gain SystemAdmin verbs in this amendment.
 
+### Phase 2 permissions (accounts)
+
+| Permission | SystemAdmin | TenantAdmin | Adviser | Customer |
+| --- | --- | --- | --- | --- |
+| `accounts.read` | ✓ | ✓ | ✓ | |
+| `accounts.create` | ✓ | ✓ | ✓ | |
+| `accounts.manage` | ✓ | ✓ | ✓ | |
+
+Adviser account scope is assigned Customers in the handler. Field rules: [features/accounts.md](../features/accounts.md).
+
 The `/users` HTTP namespace (`/users/advisers` and so on) is an API convention. It is not this ADR’s authorization model.
 
 ## Alternatives considered

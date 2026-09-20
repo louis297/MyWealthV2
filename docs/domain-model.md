@@ -277,11 +277,25 @@ Invariants:
 
 Field rules: [features/instruments.md](features/instruments.md). Landed in repo 2026-09-20 `9ea2f2a`.
 
-### 8.5 Account container (draft)
+### 8.5 Account (accepted — accounts slice)
 
-Not accepted. Do not create the table or register policies from this paragraph.
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `Account` | Aggregate | Container under a Customer. Not a cash row. |
+| `AccountStatus` | Enum | `Open`, `Closed` |
+| `AccountType` | Enum | `Bank`, `Cash`, `Brokerage`, `Other`, `Property`, `Credit` |
+| `AccountOpened` / `AccountClosed` / `AccountReopened` | Event | Rename raises nothing. |
 
-Direction already agreed in §8.1, to be locked by that spec when accepted: container under a Customer; no second adviser FK; `Type` and `Currency` immutable; Phase 2 selectable Bank / Cash / Brokerage / Other; `Status` Open / Closed plus derived `IsActive`; HTTP close / reopen; Disable Customer rejects while an account is active.
+Invariants:
+
+- `TenantId` and `CustomerId` required. No second adviser FK.
+- `Type` and `Currency` immutable after create.
+- Phase 2 create may select Bank / Cash / Brokerage / Other only.
+- `Status` is the machine. `IsActive` is derived (`Open` → 1, `Closed` → 0), persisted computed.
+- HTTP close / reopen. No physical delete.
+- Disable Customer rejects while any account is active.
+
+Field rules: [features/accounts.md](features/accounts.md).
 
 ---
 

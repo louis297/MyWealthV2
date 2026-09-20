@@ -233,7 +233,7 @@ One table for all four roles. Credentials live on `AspNetUsers`.
 | Email | nvarchar(256) | no | Unique inside a tenant; SystemAdmin unique globally |
 | Role | int | no | 0 SystemAdmin, 1 TenantAdmin, 2 Adviser, 3 Customer |
 | Status | int | no | 0 PendingActivation, 1 Active, 2 Disabled. Source of truth |
-| IsActive | bit | no | Derived. `1` iff `Status = Active`. Added by `0011` as persisted computed (preferred) or CHECK-paired bit |
+| IsActive | bit | no | Derived. `1` iff `Status = Active`. `0011` persisted computed column (landed `bbd0f26`) |
 | AdviserId | int | yes | Required for Customer. FK → `Users.Id` |
 | IdentityUserId | nvarchar(450) | no | FK → `AspNetUsers.Id`. Unique. One-to-one |
 | RowVersion | rowversion | no | |
@@ -327,7 +327,7 @@ Beyond PK / unique constraints already listed:
 0009_tenants_reporting_currency.sql  -- ALTER Tenants.ReportingCurrency + FK
 0010_instruments.sql         -- tenant catalog; no demo rows; shipped as IsEnabled
 0011_rename_is_enabled_to_is_active.sql  -- catalog IsEnabled → IsActive; add Users.IsActive derived from Status
-0012_accounts.sql            -- Account container (when accounts spec is accepted)
+0012_accounts.sql            -- Account container (accepted spec; not landed until the slice ships)
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -358,7 +358,14 @@ Script `0010_instruments.sql`. Columns and uniqueness: [features/instruments.md]
 
 ### 11.2 Naming amendment `IsEnabled` → `IsActive` + Users derived bit
 
-Script `0011_rename_is_enabled_to_is_active.sql`. Forward ALTER only. Do not edit `0005` / `0006` / `0008` / `0010`.
+Script `0011_rename_is_enabled_to_is_active.sql`. **Landed** in GitHub master `bbd0f26` (2026-09-20). Forward ALTER only. Do not edit `0005` / `0006` / `0008` / `0010`.
+
+As shipped: `sp_rename` on `Currencies` / `Tenants` / `Instruments` columns, defaults, and indexes. `Users.IsActive` is a persisted computed column:
+
+```sql
+ALTER TABLE [Users] ADD [IsActive] AS ISNULL(CAST(CASE WHEN [Status] = 1 THEN 1 ELSE 0 END AS bit), 0) PERSISTED;
+CREATE INDEX [IX_Users_TenantId_IsActive] ON [Users] ([TenantId], [IsActive]);
+```
 
 | Table | Change |
 | --- | --- |
@@ -371,9 +378,9 @@ Script `0011_rename_is_enabled_to_is_active.sql`. Forward ALTER only. Do not edi
 
 People list items may include `isActive` alongside `status` after `0011`. Filter stays `enabledOnly` (true = `IsActive = 1`).
 
-### 11.3 Accounts (draft)
+### 11.3 Accounts (accepted)
 
-Proposed script `0012_accounts.sql`. `Status` (Open / Closed) plus derived `IsActive`. Do **not** apply this script until that Feature Spec is `accepted`.
+Script `0012_accounts.sql`. Columns: [features/accounts.md](features/accounts.md) §6. `Status` Open=0 / Closed=1. `IsActive` persisted computed (`Status = 0` → 1). No balance or institution columns. Not landed in the repo until the slice ships.
 
 ### 11.4 Not yet accepted
 
@@ -399,4 +406,4 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-09-12 | identity-auth lands Tenants without ReportingCurrency and does not create Currencies. Catalog + ReportingCurrency FK are the currencies slice (`0008+`). |
 | 2026-09-13 | Currencies spec: `0008` + `0009`. `IsEnabled` is platform-wide. `DecimalPlaces` is minor units, not `decimal(18,4)` scale. |
 | 2026-09-20 | `Instruments` (`0010`). Tenant catalog. Unique `(TenantId, Symbol)`. FK QuoteCurrency → Currencies. Landed in repo `9ea2f2a`. |
-| 2026-09-21 | Boolean flags unified to `IsActive`. Script `0011` renames catalog `IsEnabled` and adds `Users.IsActive` derived from `Status`. Accounts draft: `Status` + derived `IsActive`. |
+| 2026-09-21 | Boolean flags unified to `IsActive`. Script `0011` landed `bbd0f26`. Accounts spec accepted (`0012`, not landed). |
