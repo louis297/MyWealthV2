@@ -31,7 +31,10 @@ public static class DependencyInjection
                      Policies.AdvisersManage,
                      Policies.CustomersManage,
                      Policies.CustomersManageOwn,
-                     Policies.UsersMe
+                     Policies.UsersMe,
+                     Policies.InstrumentsRead,
+                     Policies.InstrumentsCreate,
+                     Policies.InstrumentsManage
                  })
         {
             var name = policy;
