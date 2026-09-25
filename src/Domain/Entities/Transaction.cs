@@ -1,3 +1,5 @@
+using MyWealthV2.Domain.ValueObjects;
+
 namespace MyWealthV2.Domain.Entities;
 
 public class Transaction : BaseAuditableEntity
@@ -38,7 +40,21 @@ public class Transaction : BaseAuditableEntity
         decimal currentCashSum,
         int existingTransactionCount)
     {
-        _ = (tenantId, accountId, type, amount, accountCurrency, bookedAt, memo, reference, currentCashSum, existingTransactionCount);
-        throw new DomainException("Not posted.");
+        var currency = Money.Create(0m, accountCurrency).Currency;
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            AccountId = accountId,
+            Type = type,
+            BookedAt = bookedAt,
+            Memo = memo,
+            Reference = reference,
+            PublicId = Guid.NewGuid(),
+            CashLeg = TransactionCashLeg.Create(amount, currency)
+        };
+        _ = currentCashSum;
+        _ = existingTransactionCount;
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
     }
 }
