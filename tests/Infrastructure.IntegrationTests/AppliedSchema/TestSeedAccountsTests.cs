@@ -58,6 +58,35 @@ public class TestSeedAccountsTests
         closed.IsActive.ShouldBeFalse();
     }
 
+    [Test]
+    public async Task Seed_AddsOneTransferInOnTheDemoEverydayBank()
+    {
+        await using var db = OpenDb();
+        var tenant = await EnsureDemoTenantAsync(db);
+        var adviser = await EnsurePersonAsync(
+            db, tenant, UserRole.Adviser, "Demo Adviser", DevelopmentIdentitySeeder.AdviserEmail);
+        await EnsurePersonAsync(
+            db, tenant, UserRole.Customer, "Demo Customer", "customer@localhost", adviser.Id);
+        var prices = new MarketDataMock();
+
+        await TestSeed.SeedAsync(db, prices, CancellationToken.None);
+        await TestSeed.SeedAsync(db, prices, CancellationToken.None);
+
+        var bank = await db.Accounts.SingleAsync(row => row.TenantId == tenant.Id && row.Name == "Demo everyday bank");
+        var rows = await (
+            from transaction in db.Transactions
+            join leg in db.TransactionCashLegs on transaction.Id equals leg.TransactionId
+            where transaction.AccountId == bank.Id
+                  && transaction.Reference == "TestSeed-DemoEverydayBank-OpeningTransfer"
+            select new { transaction.Type, transaction.CreatedBy, leg.Amount, leg.Currency }).ToListAsync();
+
+        rows.Count.ShouldBe(1);
+        rows[0].Type.ShouldBe(TransactionType.TransferIn);
+        rows[0].Amount.ShouldBe(100m);
+        rows[0].Currency.ShouldBe("NZD");
+        rows[0].CreatedBy.ShouldBe(TestSeed.CreatedBy);
+    }
+
     private static async Task<Tenant> EnsureDemoTenantAsync(ApplicationDbContext db)
     {
         var existing = await db.Tenants.SingleOrDefaultAsync(
