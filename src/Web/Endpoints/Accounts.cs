@@ -4,6 +4,7 @@ using MyWealthV2.Application.Accounts.Commands.CreateAccount;
 using MyWealthV2.Application.Accounts.Commands.ReopenAccount;
 using MyWealthV2.Application.Accounts.Commands.UpdateAccount;
 using MyWealthV2.Application.Accounts.Queries.GetAccountById;
+using MyWealthV2.Application.Accounts.Queries.GetAccountCashBalance;
 using MyWealthV2.Application.Accounts.Queries.GetAccounts;
 using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
@@ -18,6 +19,7 @@ public class Accounts : IEndpointGroup
     public static void Map(RouteGroupBuilder groupBuilder)
     {
         groupBuilder.MapGet(GetAccounts).RequireAuthorization(Policies.AccountsRead);
+        groupBuilder.MapGet(GetCashBalance, "{id}/cash-balance").RequireAuthorization(Policies.AccountsRead);
         groupBuilder.MapGet(GetAccount, "{id}").RequireAuthorization(Policies.AccountsRead);
         groupBuilder.MapPost(CreateAccount).RequireAuthorization(Policies.AccountsCreate);
         groupBuilder.MapPut(UpdateAccount, "{id}").RequireAuthorization(Policies.AccountsManage);
@@ -40,6 +42,14 @@ public class Accounts : IEndpointGroup
         var result = await sender.Send(
             new GetAccountsQuery(page, pageSize, enabledOnly, search, tenantId, customerId, type));
         return TypedResults.Ok(result);
+    }
+
+    [EndpointSummary("Get an account cash balance")]
+    [EndpointDescription("Returns the computed cash sum for one account.")]
+    public static async Task<Ok<AccountCashBalanceDto>> GetCashBalance(ISender sender, Guid id)
+    {
+        var item = await sender.Send(new GetAccountCashBalanceQuery(id));
+        return TypedResults.Ok(item);
     }
 
     [EndpointSummary("Get an account")]

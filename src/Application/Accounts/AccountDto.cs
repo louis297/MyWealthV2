@@ -16,13 +16,15 @@ public sealed class AccountDto
 
     public required string Currency { get; init; }
 
+    public required decimal CashBalance { get; init; }
+
     public required string Status { get; init; }
 
     public required bool IsActive { get; init; }
 
     public required string RowVersion { get; init; }
 
-    public static AccountDto From(Account account, Tenant tenant, User customer) => new()
+    public static AccountDto From(Account account, Tenant tenant, User customer, decimal cashBalance) => new()
     {
         Id = account.PublicId,
         TenantId = tenant.PublicId,
@@ -30,6 +32,7 @@ public sealed class AccountDto
         Name = account.Name,
         Type = account.Type.ToString(),
         Currency = account.Currency,
+        CashBalance = cashBalance,
         Status = account.Status.ToString(),
         IsActive = account.IsActive,
         RowVersion = Convert.ToBase64String(account.RowVersion ?? [])

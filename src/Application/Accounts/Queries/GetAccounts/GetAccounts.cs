@@ -1,6 +1,7 @@
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
+using MyWealthV2.Application.Transactions;
 using MyWealthV2.Domain.Enums;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 
@@ -112,9 +113,25 @@ public class GetAccountsQueryHandler(IApplicationDbContext db, ICurrentUser curr
             .Take(request.PageSize)
             .ToListAsync(cancellationToken);
 
+        var accountIds = items.Select(row => row.account.Id).Distinct().ToList();
+        var cashBalances = accountIds.Count == 0
+            ? new Dictionary<int, decimal>()
+            : await (
+                from leg in db.TransactionCashLegs.AsNoTracking()
+                join transaction in db.Transactions.AsNoTracking() on leg.TransactionId equals transaction.Id
+                where accountIds.Contains(transaction.AccountId)
+                group leg by transaction.AccountId
+                into grouped
+                select new { AccountId = grouped.Key, Sum = grouped.Sum(leg => leg.Amount) }
+            ).ToDictionaryAsync(row => row.AccountId, row => row.Sum, cancellationToken);
+
         return new PagedList<AccountDto>
         {
-            Items = items.Select(row => AccountDto.From(row.account, row.tenant, row.customer)).ToList(),
+            Items = items.Select(row => AccountDto.From(
+                row.account,
+                row.tenant,
+                row.customer,
+                cashBalances.GetValueOrDefault(row.account.Id))).ToList(),
             Page = request.Page,
             PageSize = request.PageSize,
             TotalCount = totalCount
