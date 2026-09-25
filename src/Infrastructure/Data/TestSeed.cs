@@ -176,6 +176,51 @@ public static class TestSeed
         await EnsureAccountAsync(
             db, tenant.Id, customer.Id, "Demo closed other", AccountType.Other, nzd, closed: true,
             cancellationToken);
+        await EnsureDemoEverydayTransferAsync(db, tenant.Id, customer.Id, cancellationToken);
+    }
+
+    private const string DemoEverydayBankTransferReference = "TestSeed-DemoEverydayBank-OpeningTransfer";
+
+    private static async Task EnsureDemoEverydayTransferAsync(
+        ApplicationDbContext db,
+        int tenantId,
+        int customerId,
+        CancellationToken cancellationToken)
+    {
+        var account = await db.Accounts.SingleOrDefaultAsync(
+            row => row.CustomerId == customerId && row.Name == "Demo everyday bank", cancellationToken);
+        if (account is null)
+        {
+            return;
+        }
+
+        var exists = await db.Transactions.AnyAsync(
+            row => row.AccountId == account.Id && row.Reference == DemoEverydayBankTransferReference,
+            cancellationToken);
+        if (exists)
+        {
+            return;
+        }
+
+        var bookedAt = new DateTimeOffset(2026, 1, 15, 9, 0, 0, TimeSpan.FromHours(13));
+        var transaction = Transaction.Post(
+            tenantId,
+            account.Id,
+            TransactionType.TransferIn,
+            100m,
+            account.Currency,
+            bookedAt,
+            "Demo opening transfer",
+            DemoEverydayBankTransferReference,
+            currentCashSum: 0m,
+            existingTransactionCount: 0);
+        var created = TimeProvider.System.GetUtcNow();
+        transaction.Created = created;
+        transaction.CreatedBy = CreatedBy;
+        transaction.CashLeg!.Created = created;
+        transaction.CashLeg.CreatedBy = CreatedBy;
+        db.Transactions.Add(transaction);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private static async Task EnsureAccountAsync(
