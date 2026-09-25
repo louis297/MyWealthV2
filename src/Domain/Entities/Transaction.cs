@@ -67,7 +67,7 @@ public class Transaction : BaseAuditableEntity
             TransactionType.TransferIn or TransactionType.Opening => amount <= 0,
             TransactionType.TransferOut or TransactionType.CloseOut => amount >= 0,
             TransactionType.Interest => amount == 0,
-            _ => false
+            _ => true
         };
 
         if (invalid)
