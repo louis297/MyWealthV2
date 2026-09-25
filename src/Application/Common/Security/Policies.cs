@@ -15,4 +15,6 @@ public static class Policies
     public const string AccountsRead = "accounts.read";
     public const string AccountsCreate = "accounts.create";
     public const string AccountsManage = "accounts.manage";
+    public const string TransactionsRead = "transactions.read";
+    public const string TransactionsCreate = "transactions.create";
 }

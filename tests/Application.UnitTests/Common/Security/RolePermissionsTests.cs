@@ -73,4 +73,17 @@ public class RolePermissionsTests
     {
         RolePermissions.Has(role, policy).ShouldBe(expected);
     }
+
+    [TestCase(UserRole.SystemAdmin, Policies.TransactionsRead, true)]
+    [TestCase(UserRole.SystemAdmin, Policies.TransactionsCreate, true)]
+    [TestCase(UserRole.TenantAdmin, Policies.TransactionsRead, true)]
+    [TestCase(UserRole.TenantAdmin, Policies.TransactionsCreate, true)]
+    [TestCase(UserRole.Adviser, Policies.TransactionsRead, true)]
+    [TestCase(UserRole.Adviser, Policies.TransactionsCreate, true)]
+    [TestCase(UserRole.Customer, Policies.TransactionsRead, false)]
+    [TestCase(UserRole.Customer, Policies.TransactionsCreate, false)]
+    public void Has_MatchesTransactionsMap(UserRole role, string policy, bool expected)
+    {
+        RolePermissions.Has(role, policy).ShouldBe(expected);
+    }
 }
