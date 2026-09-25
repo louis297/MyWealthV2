@@ -54,6 +54,15 @@ public class TransactionTests
         Should.Throw<DomainException>(() => Post(type, amount, currentCashSum: 100m, existingTransactionCount: 0));
     }
 
+    [TestCase(TransactionType.Dividend, 10)]
+    [TestCase(TransactionType.Buy, -10)]
+    [TestCase(TransactionType.Sell, 10)]
+    [TestCase(TransactionType.Reversal, -10)]
+    public void Post_RejectsTypesOutsideTheCashIncrement(TransactionType type, decimal amount)
+    {
+        Should.Throw<DomainException>(() => Post(type, amount, currentCashSum: 100m, existingTransactionCount: 0));
+    }
+
     [Test]
     public void Post_TransferOut_StoresNegativeAmount()
     {
