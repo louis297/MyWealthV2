@@ -209,14 +209,14 @@ The `Money` value object **does** live in the Domain assembly, even with no bala
 
 ## 8. Phase 2 ledger — conceptual model (tendencies; invariants when that phase opens)
 
-The ledger is **one domain, several slices**, not an extension of a throwaway Phase-1 transaction table. Slice order (function plan): Instruments → Account container → cash sub-ledger → holdings / securities → posting and reversal → net-worth read model.
+The ledger is **one domain, several slices**, not an extension of a throwaway Phase-1 transaction table. Slice order (function plan): Instruments → Account container → posting (`Transaction` + cash legs) → holdings / securities → net-worth read model.
 
 Session stack, four roles, and User / Tenant invariants do not change in Phase 2. Add ledger policy names and ledger invariants only.
 
 ### 8.1 Locked way of thinking
 
 - **Cash and securities are two legs, not two values of one `Type` column.** A buy/sell has a cash leg and a security leg. Transfer / interest / dividend may be cash-only. Split / scrip is a security leg, cash 0, total cost unchanged. Do not ship a single-row catch-all `Transactions` table and split it later.
-- **Do not create ledger tables while storage shape is still open.** No Journal header or standalone CashLedger table until that slice writes them.
+- **Do not create ledger tables while storage shape is still open.** `Transaction` + `TransactionCashLeg` are locked in [features/posting.md](features/posting.md). No standalone Journal / CashLedger table. Holdings and security legs wait for their spec.
 - **Booked postings are not `UPDATE` / `DELETE`.** Correction tends to be a full opposite posting that points at the original (reversal).
 - **After a posting, cash must not go negative on non-Credit accounts. Credit may be negative** (liability).
 - **Day-to-day holding quantity and cost are not edited by hand.** The only entry that may write quantity and cost directly is Opening — lock the shape when that slice opens; keep the name.
@@ -232,25 +232,22 @@ Session stack, four roles, and User / Tenant invariants do not change in Phase 2
 Tenant
   └── Customer (User)
         └── Account                    container: type, booking currency, status
-              ├── Cash sub-ledger      cash legs and balance in that booking currency
-              └── Holding              per instrument: quantity + CostBasis(Money)
+              ├── Transaction          business-event header (append-only)
+              │     └── Cash leg       signed amount in Account.Currency
+              └── Holding              per instrument: quantity + CostBasis(Money) — later
                     └── Instrument     tenant catalog; quote currency
-
-Posting
-  points at Account
-  may include a cash leg and/or a security leg
-  original row is immutable; Reversal is a new posting that points at the original
 ```
+
+A Transaction may later grow a security leg on the same header (buy/sell = both; scrip = security only). Reversal is a new Transaction that points at the original.
 
 Not decided — **do not turn these into entity fields now**:
 
-- Whether a posting needs a journal header row
-- Whether a buy/sell is one physical row or two
-- Final Opening columns and whether negative quantity is allowed
-- Whether close forces liquidation
+- Security-leg columns and holdings table
+- Final Opening-of-quantity columns and whether negative quantity is allowed
+- Whether close also requires no holdings
 - Whether a daily snapshot is stored
 
-Lock those when the matching slice opens. Until then, do not paper over them with a temporary single table.
+Lock those when the matching slice opens.
 
 ### 8.3 Join to Phase-1 people (said now so Phase 2 does not reshape User)
 
@@ -297,6 +294,28 @@ Invariants:
 
 Field rules: [features/accounts.md](features/accounts.md). Landed in the repo 2026-09-21.
 
+Close requires cash `SUM = 0` once posting is implemented ([features/posting.md](features/posting.md)).
+
+### 8.6 Transaction (accepted — posting slice; not yet landed)
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `Transaction` | Aggregate | Business-event header under an Account. Not a capture row that later copies into a journal. |
+| `TransactionCashLeg` | Entity | One cash accounting line per header in this increment. |
+| `TransactionType` | Enum | Full list reserved. First increment accepts TransferIn / TransferOut / Interest / CloseOut / Opening / Reversal. |
+| `TransactionPosted` / `TransactionReversed` | Event | Side effects only. Must not write the books. |
+
+Invariants:
+
+- `TenantId` and `AccountId` required. Write = posted. No `Created` / draft status.
+- Cash `SUM` of legs is the account cash balance. Not stored on `Account`.
+- After insert, `SUM ≥ 0` for Phase 2 openable types.
+- Posted header and legs are not `UPDATE`d / `DELETE`d. Reversal is a new row.
+- Cash `Opening`: at most one per account; only while no other transaction exists; `amount > 0`.
+- Closed account rejects new transactions. `Account.Close()` does not write cash.
+
+Field rules: [features/posting.md](features/posting.md). Accepted 2026-09-25.
+
 ---
 
 ## 9. Value objects (Domain assembly; may exist in Phase 1)
@@ -321,3 +340,4 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-09-20 | Instrument aggregate accepted (instruments slice). SystemAdmin may manage tenant catalog rows. Ports `IMarketData` / `IFxRate` locked. |
 | 2026-09-21 | Instruments landed in repo `9ea2f2a`. Account container Feature Spec opened as `draft`. Boolean flags unified to `IsActive` (script `0011`). |
 | 2026-09-21 | Account aggregate landed. Disable Customer rejects while any account is active. |
+| 2026-09-25 | Transaction + cash leg accepted (posting spec). Close requires cash SUM = 0. No capture/journal two-step. |

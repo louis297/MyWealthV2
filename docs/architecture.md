@@ -22,7 +22,7 @@ This document owns **hosts, layers, ports, and cross-cutting behaviour**. Scope 
 
 Same rule as the function plan: if a later phase will use it and today’s design would have to change, ship the final infrastructure now. If later use or shape is not decided, wait.
 
-Phase 1 closes the platform base: tenants, session, four roles, people, currency catalog, Adviser Portal shell. The ledger is a Phase-2 domain. The first accepted ledger slice is Instruments (`0010_instruments.sql`, `/instruments`, mocked `IMarketData` / `IFxRate`), landed `9ea2f2a`. The second accepted slice is Accounts (`0012_accounts.sql`, `/accounts`), landed 2026-09-21. Other ledger tables wait for their specs.
+Phase 1 closes the platform base: tenants, session, four roles, people, currency catalog, Adviser Portal shell. The ledger is a Phase-2 domain. Accepted ledger slices: Instruments (`0010`, landed `9ea2f2a`), Accounts (`0012`, landed `3e8b8f3`), posting / `/transactions` (`0013_transactions.sql`, spec accepted 2026-09-25, not yet landed). Holdings wait for their spec.
 
 ---
 
@@ -249,7 +249,7 @@ Do not add a port whose surface is still open. Do add a port (or value object) w
 
 | Project | Purpose |
 | --- | --- |
-| `Domain.UnitTests` | Phase 1: User / Tenant invariants, currency Code, `Money`. Phase 2: `Instrument` (landed). `Account` (landed) |
+| `Domain.UnitTests` | Phase 1: User / Tenant invariants, currency Code, `Money`. Phase 2: `Instrument` (landed). `Account` (landed). `Transaction` (spec accepted) |
 | `Application.UnitTests` | Pure application helpers, policy map |
 | `Infrastructure.IntegrationTests` | Real database: scripts + EF mapping + FK + applicator |
 | `Application.FunctionalTests` | HTTP + TestAppHost (**starts `identity` and `webapi`**). Cross-tenant read / write must fail. Login gate is on `identity` (disabled / Pending / wrong tenant → no session) |
@@ -279,7 +279,7 @@ SystemAdmin receives Phase-2 ledger policies and calls `webapi` from Scalar (lat
 
 Each Phase-2 slice adds Development / TestAppHost `TestSeed` rows. Not schema scripts. Not Production.
 
-The ledger is one domain with internal slices. Instruments and Accounts storage is locked. Cash / holdings / posting storage waits for the accepted spec. Phase 1 does not create Journal or CashLedger tables. Tendencies: [domain-model.md](domain-model.md) §8 and [function-plan.md](function-plan.md) §5.
+The ledger is one domain with internal slices. Instruments, Accounts, and Transaction + cash-leg storage are locked in their Feature Specs. Holdings / security legs wait. There is no separate Journal / CashLedger table. Tendencies: [domain-model.md](domain-model.md) §8 and [function-plan.md](function-plan.md) §5.
 
 If the identity **database** splits later, replace the revocation / login-principal port implementation. Do not change the protocol or the Aspire resource name `identity`.
 
@@ -300,10 +300,11 @@ Locked conclusions follow function-plan §0 and these ADRs. This folder currentl
 | 0007 | Internal int PK; external PublicId |
 | 0008 | Versioned SQL is schema truth; applicator; `EnsureDeleted` is not the default boot path |
 | 0010 | Instrument catalog — Phase 2 |
-| 0011 | Ledger tendencies — Phase 2 |
+| 0011 | Ledger tendencies — Phase 2; cash booking locked in posting spec |
 | 0012 | `UserStatus` + `UserTokens` / email-port seams; invitation not built |
 | 0013 | Four roles, one table per layer, named policies + code map |
 | 0014 | OpenIddict in Aspire `identity`; authorization code + PKCE; hosted login; one client; same `MyWealthDbV2` |
+| 0015 | `Idempotency-Key` on mutating creates; first consumer `/transactions` |
 
 ---
 

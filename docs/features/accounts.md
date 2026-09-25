@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-21
-last_updated: 2026-09-21
+last_updated: 2026-09-25
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -18,17 +18,18 @@ related:
   - ../adr/0013-roles-authorization-single-user-table.md
   - instruments.md
   - customers.md
+  - posting.md
 ---
 
 # Accounts
 
 Account container on `webapi`: list / get / open / rename / close / reopen. Second Phase-2 ledger slice. Adds script `0012_accounts.sql`, policies `accounts.read` / `accounts.create` / `accounts.manage`, aggregate `Account`, and the Disable-Customer open-account guard.
 
-Cash postings, holdings, Opening, reversals, and net worth are out. This slice does not persist a balance. Later slices store `AccountId` only.
+This slice does not persist a balance column. [posting.md](posting.md) (accepted 2026-09-25) computes `cashBalance` on list/get and adds `GET /accounts/{id}/cash-balance`. Close is now rejected while that `SUM ≠ 0` (R16 amended). Holdings, Opening of quantity, and net worth stay out.
 
-**Status is `accepted`.** Implementation follows this file. Expand [ADR 0011](../adr/0011-ledger-cash-holdings-reversal.md) for the container only — posting storage stays direction.
+**Status is `accepted`.** Implementation follows this file. Container storage landed in GitHub master `3e8b8f3`. Close-zero and `cashBalance` wait on posting implementation.
 
-Landed in the repo 2026-09-21 (`0012_accounts.sql`, `/accounts`, Disable-Customer guard, TestSeed). Depends on accepted [instruments](instruments.md) (landed `9ea2f2a`) and the IsActive rename (`bbd0f26`, `0011`) only as prior slices. Accounts do not reference `InstrumentId`.
+Landed in GitHub `louis297/MyWealthV2` master 2026-09-21, last slice commit `3e8b8f3`. Slice commits `1b7f4af` … `3e8b8f3` (`0012_accounts.sql`, `/accounts`, Disable-Customer guard, TestSeed). Depends on accepted [instruments](instruments.md) (landed `9ea2f2a`) and the IsActive rename (`bbd0f26`, `0011`) only as prior slices. Accounts do not reference `InstrumentId`.
 
 ---
 
@@ -110,7 +111,7 @@ Confirmed 2026-09-21: (1) Adviser may read / open / rename / close / reopen acco
 | R13 | PUT / close / reopen require `rowVersion`. Conflict 409. Missing 400. Same encoding as people / instruments. |
 | R14 | PUT updates `name` only. Other fields in the body → 400. |
 | R15 | No physical delete. Close is the only way to take a row out of “open” pickers. |
-| R16 | This slice does **not** block close because cash ≠ 0 or holdings exist (no those tables). Later slices may add a close guard; they must not change close to `UPDATE` a posting. |
+| R16 | **Amended 2026-09-25 by [posting.md](posting.md).** `CloseAccount` rejects while cash `SUM ≠ 0` (400 ordinary `errors`). `SUM = 0` (including never booked) may close. Closed accounts reject new transactions. Do not write cash inside `Account.Close()`. Holdings still do not block close (no holdings table). |
 | R17 | List is one tenant. TenantAdmin: current tenant, every Customer. Adviser: current tenant, assigned Customers only. SystemAdmin: `tenantId` query. Every item includes `status`, `isActive`, `tenantId`, `customerId`, `type`, `currency`. `enabledOnly` omitted/`false` = all; `true` = `IsActive` only; any other value 400. Optional `customerId` (Customer PublicId). Optional `type` (exact enum name). `page` default 1, `pageSize` default 20 max 100. Optional `search`: Name contains (CI) or PublicId exact. Sort name then type. |
 | R18 | Customer has no account policy → 403 on every verb. SystemAdmin has all three account policies. Adviser Portal does not add SystemAdmin ledger nav. |
 | R19 | Disable Customer (existing people route): if any Account for that Customer has `IsActive = true` → 400 ordinary `errors` (not §4.1). Closed-only Customers may be disabled. Do not bulk-close on disable. |
@@ -308,11 +309,12 @@ List / get item:
   "currency": "NZD",
   "status": "Open",
   "isActive": true,
+  "cashBalance": 0.00,
   "rowVersion": "<base64>"
 }
 ```
 
-GET list does not include a balance.
+`cashBalance` is computed (`SUM` of posted cash legs). Added by [posting.md](posting.md); not a column on `Accounts`. Also `GET /accounts/{id}/cash-balance`.
 
 `GET /accounts` for SystemAdmin requires `?tenantId=`. TenantAdmin / Adviser must omit it.
 

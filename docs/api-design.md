@@ -20,7 +20,7 @@ This document owns **HTTP conventions and the resource catalog**. Field-level co
 
 **Product:** MyWealthV2.
 
-Phase 1 closes the platform base: Adviser Portal + Scalar + the authorization-server hosted login. Phase 2 accepted so far: `/instruments`. Other ledger routes wait for their specs.
+Phase 1 closes the platform base: Adviser Portal + Scalar + the authorization-server hosted login. Phase 2 accepted: `/instruments`, `/accounts`, `/transactions` (posting spec 2026-09-25, not yet landed).
 
 ---
 
@@ -217,11 +217,12 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Currencies | `/currencies` | GET | Authenticated |
 | Tenants | `/tenants` | list / get / create / update / disable / enable | `tenants.manage` |
 | Instruments | `/instruments` | list / get / create / update / disable / enable | `instruments.read` / `instruments.create` / `instruments.manage` |
-| Accounts | `/accounts` | list / get / create / update / close / reopen | `accounts.read` / `accounts.create` / `accounts.manage` |
+| Accounts | `/accounts` | list / get / create / update / close / reopen; `GET …/cash-balance` | `accounts.read` / `accounts.create` / `accounts.manage` |
+| Transactions | `/transactions` | list / get / create / reverse | `transactions.read` / `transactions.create` |
 
 Path `{id}` is always PublicId.
 
-Phase 1 has **no** `/auth/*`, `/holdings`, `/transactions`, `/dashboard`, invitation, or forgot-password. `/instruments` is the first Phase-2 ledger route (landed). `/accounts` is the second (landed).
+Phase 1 has **no** `/auth/*`, `/holdings`, `/dashboard`, invitation, or forgot-password. `/instruments` and `/accounts` are landed. `/transactions` is accepted (not yet landed).
 
 ---
 
@@ -351,8 +352,26 @@ Field rules: [features/accounts.md](features/accounts.md).
 - TenantAdmin / Adviser: current tenant. Body / list query must omit `tenantId`. Adviser: assigned Customers only.
 - SystemAdmin: list and create require tenant PublicId. Get / PUT / close / reopen may cross tenants.
 - Customer → 403.
-- Item includes `id`, `tenantId`, `customerId`, `name`, `type`, `currency`, `status`, `isActive`, `rowVersion`. No balance.
+- Item includes `id`, `tenantId`, `customerId`, `name`, `type`, `currency`, `status`, `isActive`, `cashBalance`, `rowVersion`. `cashBalance` is computed; added by [features/posting.md](features/posting.md).
+- Close rejected while cash `SUM ≠ 0` (posting amendment).
+- `GET /accounts/{id}/cash-balance` → `{ accountId, currency, cashBalance }` (`accounts.read`).
 - Create on a disabled tenant → §4.1 `target=tenant`. Create or reopen on a Disabled Customer → §4.1 `target=user`.
+
+### 7.7 Transactions
+
+Field rules: [features/posting.md](features/posting.md). Accepted 2026-09-25; not yet landed.
+
+| Method | Route | Policy | Success |
+| --- | --- | --- | --- |
+| GET | `/transactions` | `transactions.read` | 200 envelope |
+| GET | `/transactions/{id}` | `transactions.read` | 200 item |
+| POST | `/transactions` | `transactions.create` | 201 `{ id }` |
+| POST | `/transactions/{id}/reverse` | `transactions.create` | 201 `{ id }` |
+
+- Create and reverse require `Idempotency-Key` ([ADR 0015](adr/0015-idempotency-keys.md)).
+- TenantAdmin / Adviser omit `tenantId`. SystemAdmin list/create require tenant PublicId.
+- Customer → 403.
+- Optional list filters: `accountId`, `customerId`.
 
 ---
 
@@ -362,7 +381,7 @@ Field rules: [features/accounts.md](features/accounts.md).
 - Password grant
 - A second OIDC client in Phase 1
 - Currency write APIs, per-tenant currency allow-lists, FX
-- `/holdings`, `/transactions`, `/dashboard`
+- `/holdings`, `/dashboard`
 - Invitation, forgot-password, self-registration, MFA, external IdP
 - Subdomain tenant resolution; Header-based SystemAdmin tenant switching
 - Internal `int` ids in routes or JSON
@@ -393,3 +412,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-09-14 | Customer field rules in [features/customers.md](features/customers.md). Client allow-list: `adviser-portal` issues no Customer code. `GET /tenants/by-code/{code}` + `tenants.read`. |
 | 2026-09-20 | `/instruments` catalog + §7.5. SystemAdmin list/create take tenant PublicId. Field rules in [features/instruments.md](features/instruments.md). Landed `9ea2f2a`. |
 | 2026-09-21 | Catalog JSON `isEnabled` → `isActive`. Column rename script `0011`. People list/get JSON adds `isActive`. |
+| 2026-09-25 | `/transactions` + account `cashBalance` / `/cash-balance`. Close-zero guard. Field rules in [features/posting.md](features/posting.md). |

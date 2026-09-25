@@ -3,7 +3,7 @@ title: Architecture decision records
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-09-21
+updated: 2026-09-25
 ---
 
 # Architecture decision records
@@ -30,5 +30,6 @@ Write an ADR when the choice would surprise a later reader: host, identity, sche
 | [0012](0012-user-activation-invite-deferred.md) | UserStatus machine; invitation deferred | accepted |
 | [0013](0013-roles-authorization-single-user-table.md) | Four roles, named policies, one table per layer | accepted |
 | [0014](0014-openiddict-authorization-code-pkce.md) | OpenIddict in Aspire `identity`; authorization code + PKCE | accepted |
+| [0015](0015-idempotency-keys.md) | `Idempotency-Key` on mutating creates (first consumer: `/transactions`) | accepted |
 
-0010 is accepted and expanded with [features/instruments.md](../features/instruments.md) (landed `9ea2f2a`). 0011 stays direction for cash / holdings / posting; the account container is locked in [features/accounts.md](../features/accounts.md) (accepted, landed).
+0010 is accepted and expanded with [features/instruments.md](../features/instruments.md) (landed `9ea2f2a`). Account container: [features/accounts.md](../features/accounts.md) (landed). Posting / cash book: [features/posting.md](../features/posting.md) (`accepted` 2026-09-25, not landed). Idempotency: ADR 0015 (`accepted`). 0011 remains direction for holdings / security legs.

@@ -3,7 +3,7 @@ title: Glossary
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-09-21
+updated: 2026-09-25
 related:
   - function-plan.md
   - domain-model.md
@@ -45,15 +45,19 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | Account.Type | Capability gate on the container. Immutable after open. Phase 2 selectable: Bank, Cash, Brokerage, Other. | A product module; a stand-in that uses Other for Property or Credit |
 | AccountStatus | `Open` / `Closed`. Source of truth for an account. HTTP close / reopen. | Instrument disable; `UserStatus` |
 | Account.IsActive | Derived filter bit. `1` iff `Status = Open`. Inactive accounts drop out of later net worth. | A writable body field; `IsEnabled` |
-| Cash ledger | Cash entries and balance in the account’s booking currency. Phase 2. | Holding quantity |
+| Cash ledger | Cash entries and balance in the account’s booking currency. Phase 2. Owned by the posting spec, not a separate Feature Spec. | Holding quantity |
+| Cash balance | `SUM` of posted cash-leg signed amounts on one Account. Computed. Not a column on `Accounts`. | A persisted `Account.Balance`; net worth |
 | Holding | Position of one instrument inside an account (quantity + cost). Phase 2. | A single transaction |
 | Instrument | Holdable object from an in-database catalog. Phase 2. | A free-text name stored on Holding |
 | Symbol | Instrument code on the tenant catalog (ticker-style unique key inside one tenant). | Display `Name`; ISIN |
 | QuoteCurrency | Currency used for the instrument’s price, market data, and cost accumulation. | Account booking currency |
 | CostBasis | Holding cost as `Money`. Currency must equal the instrument quote currency. | Market value |
 | Opening / initial holding | The only entry that may write quantity and cost directly. Phase 2. | Day-to-day holding edits |
-| Transaction | A cash or trade posting on an account. Append-only. Phase 2. | EF `SaveChanges` |
-| Reversal | A new opposite posting against a booked transaction (`Type = Reversal`). Original row is not updated or deleted. Phase 2. | `UPDATE`/`DELETE` of the original; an adjustment that does not point at the original |
+| Transaction | Booked business event on an Account (type, bookedAt, memo). Public aggregate and `/transactions` resource. Write = posted in the current draft. Header + legs in one command. Not a pre-accounting capture row. | A Created row that an event handler later copies into a journal; EF `SaveChanges` |
+| Leg (cash / security) | Accounting line that hits one book. This increment: one cash leg per Transaction. Later: a security leg on the **same** Transaction. Buy/sell = both. Split/scrip/bonus = security only, cash 0 or omitted, total cost unchanged. | A second HTTP resource; “posting means cash only”; a wide row that holds both cash and stock columns |
+| Journal | Older discussion word for the Transaction header. Prefer *Transaction* in new text. | A second table beside Transactions |
+| Signed book amount | Stored signed decimal on a leg, from **that container’s book**. `+` increases that book; `−` decreases it. Balance / quantity is `SUM` of those signs. Read models may flip a sign for display (Credit as liability in net worth). | Debit/credit columns; a new sign rule per Feature Spec; storing outflows as positive and inferring direction from `Type` |
+| Reversal | A new opposite Transaction (`Type = Reversal`) pointing at the original. Original row is not updated or deleted. Cash leg = arithmetic negation of the original signed amount. Phase 2. | `UPDATE`/`DELETE` of the original; an adjustment that does not point at the original |
 | TransactionType | Buy / Sell / TransferIn / TransferOut / Dividend / Interest / Opening / Reversal. | User-defined Category |
 | Category | Optional custom label on a transaction. Not in Phase 1. Not an account type. | Account type |
 | Currency | ISO 4217 three-letter code. One row in the platform catalog. | A C# enum |
@@ -62,7 +66,7 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | IsActive | Filter bit. Catalogs (Tenant, Currency, Instrument): the only flag. Users and Accounts: derived from `Status`. | `IsEnabled`; an independently writable second machine |
 | DecimalPlaces | ISO minor units for input / display / validation (JPY = 0, most fiat = 2). | The scale of a money column (`decimal(18,4)` when amounts exist) |
 | ReportingCurrency | Tenant currency for aggregated reports. May remain a later-disabled catalog code. | Account booking currency (may happen to match) |
-| Money | Amount + currency code. Never a bare decimal. Domain VO in Phase 1; no catalog lookup, no rounding to DecimalPlaces. | `double` / currency-less `decimal`; a persisted Phase-1 column |
+| Money | Amount + currency code. Never a bare decimal. Domain VO in Phase 1; no catalog lookup, no rounding to DecimalPlaces. Ledger **direction** lives on the signed book amount of a leg, not inside `Money`. | `double` / currency-less `decimal`; a persisted Phase-1 column |
 | Net worth | Assets minus liabilities at a point in time. Phase 2 returns per-currency arrays; no FX fold. | A single account balance; historical snapshots |
 | Market value | Quantity × price (quote currency), then FX if needed. Phase 2 uses mocked prices. | Cost basis used as if it were net worth |
 | Tenant isolation | A business row belongs to exactly one tenant. Cross-tenant read/write must fail. | Relying only on an easy-to-miss EF global query filter |

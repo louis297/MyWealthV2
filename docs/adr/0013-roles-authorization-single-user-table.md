@@ -82,6 +82,15 @@ SystemAdmin has no `TenantId`. List and create take the target tenant PublicId. 
 
 Adviser account scope is assigned Customers in the handler. Field rules: [features/accounts.md](../features/accounts.md). Landed in the repo 2026-09-21.
 
+### Phase 2 permissions (transactions)
+
+| Permission | SystemAdmin | TenantAdmin | Adviser | Customer |
+| --- | --- | --- | --- | --- |
+| `transactions.read` | ✓ | ✓ | ✓ | |
+| `transactions.create` | ✓ | ✓ | ✓ | |
+
+Adviser scope is assigned Customers of the transaction’s Account. Reverse uses `transactions.create`. Field rules: [features/posting.md](../features/posting.md). Accepted 2026-09-25; not yet landed.
+
 The `/users` HTTP namespace (`/users/advisers` and so on) is an API convention. It is not this ADR’s authorization model.
 
 ## Alternatives considered
