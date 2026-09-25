@@ -41,6 +41,20 @@ public class Transaction : BaseAuditableEntity
         int existingTransactionCount)
     {
         EnsureSign(type, amount);
+        if (type == TransactionType.Opening && existingTransactionCount != 0)
+        {
+            throw new DomainException("Opening is allowed only while the account has no other transaction.");
+        }
+
+        if (type == TransactionType.CloseOut && amount != -currentCashSum)
+        {
+            throw new DomainException("CloseOut must bring the cash balance to zero.");
+        }
+
+        if (currentCashSum + amount < 0)
+        {
+            throw new DomainException("Cash balance cannot become negative.");
+        }
 
         var currency = Money.Create(0m, accountCurrency).Currency;
         var transaction = new Transaction
@@ -54,8 +68,6 @@ public class Transaction : BaseAuditableEntity
             PublicId = Guid.NewGuid(),
             CashLeg = TransactionCashLeg.Create(amount, currency)
         };
-        _ = currentCashSum;
-        _ = existingTransactionCount;
         transaction.AddDomainEvent(new TransactionPosted(transaction));
         return transaction;
     }
