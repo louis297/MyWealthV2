@@ -10,19 +10,22 @@ public static class RolePermissions
         [
             Policies.TenantsManage, Policies.TenantsRead, Policies.TenantAdminsManage, Policies.UsersMe,
             Policies.InstrumentsRead, Policies.InstrumentsCreate, Policies.InstrumentsManage,
-            Policies.AccountsRead, Policies.AccountsCreate, Policies.AccountsManage
+            Policies.AccountsRead, Policies.AccountsCreate, Policies.AccountsManage,
+            Policies.TransactionsRead, Policies.TransactionsCreate
         ],
         [UserRole.TenantAdmin] =
         [
             Policies.TenantsRead, Policies.AdvisersManage, Policies.CustomersManage, Policies.UsersMe,
             Policies.InstrumentsRead, Policies.InstrumentsCreate, Policies.InstrumentsManage,
-            Policies.AccountsRead, Policies.AccountsCreate, Policies.AccountsManage
+            Policies.AccountsRead, Policies.AccountsCreate, Policies.AccountsManage,
+            Policies.TransactionsRead, Policies.TransactionsCreate
         ],
         [UserRole.Adviser] =
         [
             Policies.TenantsRead, Policies.CustomersManageOwn, Policies.UsersMe,
             Policies.InstrumentsRead, Policies.InstrumentsCreate,
-            Policies.AccountsRead, Policies.AccountsCreate, Policies.AccountsManage
+            Policies.AccountsRead, Policies.AccountsCreate, Policies.AccountsManage,
+            Policies.TransactionsRead, Policies.TransactionsCreate
         ],
         [UserRole.Customer] = [Policies.UsersMe]
     };
