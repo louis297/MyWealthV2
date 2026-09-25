@@ -74,12 +74,34 @@ public class Transaction : BaseAuditableEntity
 
     public Transaction Reverse(DateTimeOffset bookedAt, decimal currentCashSum)
     {
-        return new Transaction
+        if (Type == TransactionType.Reversal)
         {
+            throw new DomainException("A reversal cannot be reversed.");
+        }
+
+        if (CashLeg is null)
+        {
+            throw new DomainException("A transaction has no cash leg to reverse.");
+        }
+
+        var opposite = -CashLeg.Amount;
+        if (currentCashSum + opposite < 0)
+        {
+            throw new DomainException("Cash balance cannot become negative.");
+        }
+
+        var reversal = new Transaction
+        {
+            TenantId = TenantId,
+            AccountId = AccountId,
+            Type = TransactionType.Reversal,
             BookedAt = bookedAt,
             PublicId = Guid.NewGuid(),
-            Reference = currentCashSum.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            OriginalTransactionId = Id,
+            CashLeg = TransactionCashLeg.Create(opposite, CashLeg.Currency)
         };
+        reversal.AddDomainEvent(new TransactionReversed(reversal));
+        return reversal;
     }
 
     private static void EnsureSign(TransactionType type, decimal amount)
