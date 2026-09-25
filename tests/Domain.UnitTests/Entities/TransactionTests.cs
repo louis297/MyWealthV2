@@ -107,6 +107,34 @@ public class TransactionTests
     }
 
     [Test]
+    public void Post_TrimsMemoAndClearsBlankReference()
+    {
+        var transaction = Transaction.Post(
+            tenantId: 1,
+            accountId: 2,
+            type: TransactionType.TransferIn,
+            amount: 10m,
+            accountCurrency: "nzd",
+            bookedAt: new DateTimeOffset(2026, 9, 24, 9, 0, 0, TimeSpan.FromHours(12)),
+            memo: "  Salary  ",
+            reference: "   ",
+            currentCashSum: 0m,
+            existingTransactionCount: 0);
+
+        transaction.Memo.ShouldBe("Salary");
+        transaction.Reference.ShouldBeNull();
+        transaction.CashLeg!.Currency.ShouldBe("NZD");
+    }
+
+    [Test]
+    public void Post_RejectsEmptyOrTooLongMemoAndTooLongReference()
+    {
+        Should.Throw<DomainException>(() => PostWithText(memo: " ", reference: null));
+        Should.Throw<DomainException>(() => PostWithText(memo: new string('a', 201), reference: null));
+        Should.Throw<DomainException>(() => PostWithText(memo: null, reference: new string('b', 101)));
+    }
+
+    [Test]
     public void Reverse_CreatesOppositeTransactionAndLeavesOriginalUntouched()
     {
         var original = Post(TransactionType.TransferIn, 100m, currentCashSum: 0m, existingTransactionCount: 0);
@@ -157,6 +185,19 @@ public class TransactionTests
             new DateTimeOffset(2026, 9, 25, 10, 0, 0, TimeSpan.Zero),
             currentCashSum: 20m));
     }
+
+    private static Transaction PostWithText(string? memo, string? reference) =>
+        Transaction.Post(
+            tenantId: 1,
+            accountId: 2,
+            type: TransactionType.TransferIn,
+            amount: 10m,
+            accountCurrency: "NZD",
+            bookedAt: new DateTimeOffset(2026, 9, 24, 9, 0, 0, TimeSpan.FromHours(12)),
+            memo: memo,
+            reference: reference,
+            currentCashSum: 0m,
+            existingTransactionCount: 0);
 
     private static Transaction Post(
         TransactionType type,
