@@ -1,7 +1,9 @@
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Transactions;
 using MyWealthV2.Application.Transactions.Commands.CreateTransaction;
+using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Transactions.Queries.GetTransactionById;
+using MyWealthV2.Application.Transactions.Queries.GetTransactions;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace MyWealthV2.Web.Endpoints;
@@ -19,8 +21,17 @@ public class Transactions : IEndpointGroup
 
     [EndpointSummary("List transactions")]
     [EndpointDescription("Returns a paged list of transactions in one tenant.")]
-    public static Task<IResult> GetTransactions() =>
-        throw new NotImplementedException();
+    public static async Task<Ok<PagedList<TransactionDto>>> GetTransactions(
+        ISender sender,
+        int page = 1,
+        int pageSize = 20,
+        Guid? tenantId = null,
+        Guid? accountId = null,
+        Guid? customerId = null)
+    {
+        var result = await sender.Send(new GetTransactionsQuery(page, pageSize, tenantId, accountId, customerId));
+        return TypedResults.Ok(result);
+    }
 
     [EndpointSummary("Get a transaction")]
     [EndpointDescription("Returns one transaction by PublicId.")]
