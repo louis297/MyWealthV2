@@ -1,6 +1,7 @@
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Events;
+using MyWealthV2.Domain.Exceptions;
 using NUnit.Framework;
 using Shouldly;
 
@@ -38,4 +39,54 @@ public class TransactionTests
         transaction.CashLeg.Currency.ShouldBe("NZD");
         transaction.DomainEvents.OfType<TransactionPosted>().ShouldHaveSingleItem();
     }
+
+    [TestCase(TransactionType.TransferIn, 0)]
+    [TestCase(TransactionType.TransferIn, -1)]
+    [TestCase(TransactionType.Opening, 0)]
+    [TestCase(TransactionType.Opening, -5)]
+    [TestCase(TransactionType.TransferOut, 0)]
+    [TestCase(TransactionType.TransferOut, 20)]
+    [TestCase(TransactionType.CloseOut, 0)]
+    [TestCase(TransactionType.CloseOut, 20)]
+    [TestCase(TransactionType.Interest, 0)]
+    public void Post_RejectsAmountWithTheWrongSign(TransactionType type, decimal amount)
+    {
+        Should.Throw<DomainException>(() => Post(type, amount, currentCashSum: 100m, existingTransactionCount: 0));
+    }
+
+    [Test]
+    public void Post_TransferOut_StoresNegativeAmount()
+    {
+        var transaction = Post(TransactionType.TransferOut, -40m, currentCashSum: 40m, existingTransactionCount: 0);
+
+        transaction.CashLeg!.Amount.ShouldBe(-40m);
+        transaction.Type.ShouldBe(TransactionType.TransferOut);
+    }
+
+    [TestCase(-2.5)]
+    [TestCase(2.5)]
+    public void Post_Interest_AllowsEitherSign(decimal amount)
+    {
+        var transaction = Post(TransactionType.Interest, amount, currentCashSum: 10m, existingTransactionCount: 1);
+
+        transaction.CashLeg!.Amount.ShouldBe(amount);
+        transaction.Type.ShouldBe(TransactionType.Interest);
+    }
+
+    private static Transaction Post(
+        TransactionType type,
+        decimal amount,
+        decimal currentCashSum,
+        int existingTransactionCount) =>
+        Transaction.Post(
+            tenantId: 1,
+            accountId: 2,
+            type: type,
+            amount: amount,
+            accountCurrency: "NZD",
+            bookedAt: new DateTimeOffset(2026, 9, 24, 9, 0, 0, TimeSpan.FromHours(12)),
+            memo: null,
+            reference: null,
+            currentCashSum: currentCashSum,
+            existingTransactionCount: existingTransactionCount);
 }
