@@ -1,3 +1,4 @@
+using System.Data;
 using System.Reflection;
 using FluentValidation.Results;
 using MediatR;
@@ -11,6 +12,7 @@ using MyWealthV2.Infrastructure.Data.Interceptors;
 using MyWealthV2.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace MyWealthV2.Infrastructure.Data;
 
@@ -65,6 +67,24 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
                 throw;
             }
         });
+    }
+
+    public async Task LockAccountAsync(int accountId, CancellationToken cancellationToken)
+    {
+        var connection = Database.GetDbConnection();
+        if (connection.State != ConnectionState.Open)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        await using var command = connection.CreateCommand();
+        command.Transaction = Database.CurrentTransaction?.GetDbTransaction();
+        command.CommandText = "SELECT 1 FROM [Accounts] WITH (UPDLOCK, ROWLOCK) WHERE [Id] = @id";
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "@id";
+        parameter.Value = accountId;
+        command.Parameters.Add(parameter);
+        await command.ExecuteScalarAsync(cancellationToken);
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

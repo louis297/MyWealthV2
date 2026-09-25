@@ -47,6 +47,13 @@ public class ProblemDetailsExceptionHandler : IExceptionHandler
                 Title = "Conflict",
                 Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10"
             }),
+            IdempotencyConflictException => (StatusCodes.Status409Conflict, new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Conflict",
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+                Detail = "This Idempotency-Key was already used for a different request."
+            }),
             TargetDisabledException tde => (StatusCodes.Status400BadRequest, DisabledProblem(tde)),
             _ => (-1, null)
         };

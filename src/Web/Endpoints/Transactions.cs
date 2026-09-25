@@ -1,4 +1,8 @@
 using MyWealthV2.Application.Common.Security;
+using MyWealthV2.Application.Transactions;
+using MyWealthV2.Application.Transactions.Commands.CreateTransaction;
+using MyWealthV2.Application.Transactions.Queries.GetTransactionById;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace MyWealthV2.Web.Endpoints;
 
@@ -20,14 +24,24 @@ public class Transactions : IEndpointGroup
 
     [EndpointSummary("Get a transaction")]
     [EndpointDescription("Returns one transaction by PublicId.")]
-    public static Task<IResult> GetTransaction(Guid id)
+    public static async Task<Ok<TransactionDto>> GetTransaction(ISender sender, Guid id)
     {
-        _ = id;
-        throw new NotImplementedException();
+        var item = await sender.Send(new GetTransactionByIdQuery(id));
+        return TypedResults.Ok(item);
     }
 
     [EndpointSummary("Create a transaction")]
-    [EndpointDescription("Posts a cash transaction on an open account.")]
-    public static Task<IResult> CreateTransaction() =>
-        throw new NotImplementedException();
+    [EndpointDescription("Posts a cash transaction on an open account. Requires Idempotency-Key.")]
+    public static async Task<IResult> CreateTransaction(
+        ISender sender,
+        HttpRequest httpRequest,
+        CreateTransactionCommand command)
+    {
+        var key = httpRequest.Headers["Idempotency-Key"].ToString();
+        command.IdempotencyKey = string.IsNullOrWhiteSpace(key) ? null : key;
+        command.RequestMethod = httpRequest.Method;
+        command.RequestPath = httpRequest.Path.Value ?? "/transactions";
+        var result = await sender.Send(command);
+        return Results.Content(result.Body, "application/json", statusCode: result.StatusCode);
+    }
 }

@@ -21,4 +21,6 @@ public interface IApplicationDbContext
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 
     Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken cancellationToken);
+
+    Task LockAccountAsync(int accountId, CancellationToken cancellationToken);
 }

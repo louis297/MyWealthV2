@@ -23,4 +23,25 @@ public sealed class IdempotencyRecord
     public string ResponseBody { get; private set; } = string.Empty;
 
     public DateTimeOffset Created { get; private set; }
+
+    public static IdempotencyRecord Create(
+        int tenantId,
+        Guid key,
+        string method,
+        string path,
+        string requestHash,
+        int responseStatus,
+        string responseBody,
+        DateTimeOffset created) =>
+        new()
+        {
+            TenantId = tenantId,
+            Key = key,
+            Method = method,
+            Path = path,
+            RequestHash = requestHash,
+            ResponseStatus = responseStatus,
+            ResponseBody = responseBody,
+            Created = created
+        };
 }
