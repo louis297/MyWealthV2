@@ -1,7 +1,10 @@
+using FluentValidation.Results;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
+using MyWealthV2.Application.Transactions;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
+using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationException;
 
 namespace MyWealthV2.Application.Accounts.Commands.CloseAccount;
 
@@ -36,7 +39,19 @@ public class CloseAccountCommandHandler(IApplicationDbContext db, ICurrentUser c
             throw new ConcurrencyException();
         }
 
-        account.Close();
-        await db.SaveChangesAsync(cancellationToken);
+        await db.ExecuteInTransactionAsync(async token =>
+        {
+            await db.LockAccountAsync(account.Id, token);
+            var cashSum = await TransactionCash.SumAsync(db, account.Id, token);
+            if (cashSum != 0m)
+            {
+                throw new ValidationException([
+                    new ValidationFailure(string.Empty, "Cannot close an account while the cash balance is not zero.")
+                ]);
+            }
+
+            account.Close();
+            await db.SaveChangesAsync(token);
+        }, cancellationToken);
     }
 }
