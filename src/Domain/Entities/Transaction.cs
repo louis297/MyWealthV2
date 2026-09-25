@@ -63,8 +63,8 @@ public class Transaction : BaseAuditableEntity
             AccountId = accountId,
             Type = type,
             BookedAt = bookedAt,
-            Memo = memo,
-            Reference = reference,
+            Memo = NormaliseMemo(memo),
+            Reference = NormaliseReference(reference),
             PublicId = Guid.NewGuid(),
             CashLeg = TransactionCashLeg.Create(amount, currency)
         };
@@ -102,6 +102,38 @@ public class Transaction : BaseAuditableEntity
         };
         reversal.AddDomainEvent(new TransactionReversed(reversal));
         return reversal;
+    }
+
+    private static string? NormaliseMemo(string? memo)
+    {
+        if (memo is null)
+        {
+            return null;
+        }
+
+        var trimmed = memo.Trim();
+        if (trimmed.Length is < 1 or > 200)
+        {
+            throw new DomainException("Memo must be 1 to 200 characters.");
+        }
+
+        return trimmed;
+    }
+
+    private static string? NormaliseReference(string? reference)
+    {
+        if (string.IsNullOrWhiteSpace(reference))
+        {
+            return null;
+        }
+
+        var trimmed = reference.Trim();
+        if (trimmed.Length > 100)
+        {
+            throw new DomainException("Reference must be at most 100 characters.");
+        }
+
+        return trimmed;
     }
 
     private static void EnsureSign(TransactionType type, decimal amount)
