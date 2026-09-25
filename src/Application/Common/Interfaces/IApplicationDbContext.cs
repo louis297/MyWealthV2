@@ -12,6 +12,12 @@ public interface IApplicationDbContext
 
     DbSet<Account> Accounts { get; }
 
+    DbSet<Transaction> Transactions { get; }
+
+    DbSet<TransactionCashLeg> TransactionCashLegs { get; }
+
+    DbSet<IdempotencyRecord> IdempotencyRecords { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 
     Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken cancellationToken);

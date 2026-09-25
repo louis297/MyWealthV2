@@ -199,6 +199,16 @@ public class TransactionsSchemaTests
     }
 
     [Test]
+    public async Task Model_CanQueryTransactionTables()
+    {
+        await using var db = OpenDb();
+
+        (await db.Transactions.CountAsync()).ShouldBe(0);
+        (await db.TransactionCashLegs.CountAsync()).ShouldBe(0);
+        (await db.IdempotencyRecords.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
     public async Task Apply_AddsTypeCheck()
     {
         await using var db = OpenDb();

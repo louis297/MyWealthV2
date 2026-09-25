@@ -38,6 +38,12 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<Account> Accounts => Set<Account>();
 
+    public DbSet<Transaction> Transactions => Set<Transaction>();
+
+    public DbSet<TransactionCashLeg> TransactionCashLegs => Set<TransactionCashLeg>();
+
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
+
     public DbSet<UserToken> UserTokenSeams => Set<UserToken>();
 
     public async Task ExecuteInTransactionAsync(
