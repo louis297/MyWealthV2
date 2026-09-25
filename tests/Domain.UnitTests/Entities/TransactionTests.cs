@@ -72,6 +72,30 @@ public class TransactionTests
         transaction.Type.ShouldBe(TransactionType.TransferOut);
     }
 
+    [Test]
+    public void Post_Opening_RejectsWhenTheAccountAlreadyHasTransactions()
+    {
+        Should.Throw<DomainException>(() => Post(TransactionType.Opening, 100m, currentCashSum: 0m, existingTransactionCount: 1));
+    }
+
+    [Test]
+    public void Post_CloseOut_RequiresTheAmountToZeroTheCashSum()
+    {
+        Should.Throw<DomainException>(() => Post(TransactionType.CloseOut, -40m, currentCashSum: 100m, existingTransactionCount: 1));
+
+        var transaction = Post(TransactionType.CloseOut, -100m, currentCashSum: 100m, existingTransactionCount: 1);
+
+        transaction.CashLeg!.Amount.ShouldBe(-100m);
+        transaction.Type.ShouldBe(TransactionType.CloseOut);
+    }
+
+    [Test]
+    public void Post_RejectsWhenCashSumWouldBecomeNegative()
+    {
+        Should.Throw<DomainException>(() => Post(TransactionType.TransferOut, -20m, currentCashSum: 10m, existingTransactionCount: 1));
+        Should.Throw<DomainException>(() => Post(TransactionType.Interest, -15m, currentCashSum: 10m, existingTransactionCount: 1));
+    }
+
     [TestCase(-2.5)]
     [TestCase(2.5)]
     public void Post_Interest_AllowsEitherSign(decimal amount)
