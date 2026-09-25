@@ -23,4 +23,6 @@ public interface IApplicationDbContext
     Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken cancellationToken);
 
     Task LockAccountAsync(int accountId, CancellationToken cancellationToken);
+
+    Task LoadCashLegAsync(Transaction transaction, CancellationToken cancellationToken);
 }

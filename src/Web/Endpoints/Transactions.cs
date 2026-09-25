@@ -1,6 +1,7 @@
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Transactions;
 using MyWealthV2.Application.Transactions.Commands.CreateTransaction;
+using MyWealthV2.Application.Transactions.Commands.ReverseTransaction;
 using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Transactions.Queries.GetTransactionById;
 using MyWealthV2.Application.Transactions.Queries.GetTransactions;
@@ -17,6 +18,7 @@ public class Transactions : IEndpointGroup
         groupBuilder.MapGet(GetTransactions).RequireAuthorization(Policies.TransactionsRead);
         groupBuilder.MapGet(GetTransaction, "{id}").RequireAuthorization(Policies.TransactionsRead);
         groupBuilder.MapPost(CreateTransaction).RequireAuthorization(Policies.TransactionsCreate);
+        groupBuilder.MapPost(ReverseTransaction, "{id}/reverse").RequireAuthorization(Policies.TransactionsCreate);
     }
 
     [EndpointSummary("List transactions")]
@@ -53,6 +55,21 @@ public class Transactions : IEndpointGroup
         command.RequestMethod = httpRequest.Method;
         command.RequestPath = httpRequest.Path.Value ?? "/transactions";
         var result = await sender.Send(command);
+        return Results.Content(result.Body, "application/json", statusCode: result.StatusCode);
+    }
+
+    [EndpointSummary("Reverse a transaction")]
+    [EndpointDescription("Posts an opposite cash transaction. Requires Idempotency-Key. Does not change the original row.")]
+    public static async Task<IResult> ReverseTransaction(ISender sender, HttpRequest httpRequest, Guid id)
+    {
+        var key = httpRequest.Headers["Idempotency-Key"].ToString();
+        var result = await sender.Send(new ReverseTransactionCommand
+        {
+            Id = id,
+            IdempotencyKey = string.IsNullOrWhiteSpace(key) ? null : key,
+            RequestMethod = httpRequest.Method,
+            RequestPath = httpRequest.Path.Value ?? $"/transactions/{id}/reverse"
+        });
         return Results.Content(result.Body, "application/json", statusCode: result.StatusCode);
     }
 }

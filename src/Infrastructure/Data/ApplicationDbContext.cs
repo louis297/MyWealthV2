@@ -87,6 +87,9 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
         await command.ExecuteScalarAsync(cancellationToken);
     }
 
+    public Task LoadCashLegAsync(Transaction transaction, CancellationToken cancellationToken) =>
+        Entry(transaction).Reference(row => row.CashLeg).LoadAsync(cancellationToken);
+
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         try
