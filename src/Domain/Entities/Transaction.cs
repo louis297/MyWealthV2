@@ -25,4 +25,20 @@ public class Transaction : BaseAuditableEntity
     public byte[] RowVersion { get; private set; } = null!;
 
     public TransactionCashLeg? CashLeg { get; private set; }
+
+    public static Transaction Post(
+        int tenantId,
+        int accountId,
+        TransactionType type,
+        decimal amount,
+        string accountCurrency,
+        DateTimeOffset bookedAt,
+        string? memo,
+        string? reference,
+        decimal currentCashSum,
+        int existingTransactionCount)
+    {
+        _ = (tenantId, accountId, type, amount, accountCurrency, bookedAt, memo, reference, currentCashSum, existingTransactionCount);
+        throw new DomainException("Not posted.");
+    }
 }
