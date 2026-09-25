@@ -1,3 +1,4 @@
+using System.Reflection;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Events;
@@ -135,6 +136,24 @@ public class TransactionTests
     }
 
     [Test]
+    public void PostedHeader_ExposesNoMutator()
+    {
+        var original = Post(TransactionType.TransferIn, 100m, currentCashSum: 0m, existingTransactionCount: 0);
+        var bookedAt = original.BookedAt;
+        original.Reverse(bookedAt.AddDays(1), currentCashSum: 100m);
+
+        original.Type.ShouldBe(TransactionType.TransferIn);
+        original.AccountId.ShouldBe(2);
+        original.BookedAt.ShouldBe(bookedAt);
+        original.CashLeg!.Amount.ShouldBe(100m);
+
+        PublicInstanceMethods(typeof(Transaction)).ShouldBe(["Reverse"]);
+        PublicInstanceMethods(typeof(TransactionCashLeg)).ShouldBeEmpty();
+        PublicSetters(typeof(Transaction)).ShouldBeEmpty();
+        PublicSetters(typeof(TransactionCashLeg)).ShouldBeEmpty();
+    }
+
+    [Test]
     public void Reverse_CreatesOppositeTransactionAndLeavesOriginalUntouched()
     {
         var original = Post(TransactionType.TransferIn, 100m, currentCashSum: 0m, existingTransactionCount: 0);
@@ -185,6 +204,20 @@ public class TransactionTests
             new DateTimeOffset(2026, 9, 25, 10, 0, 0, TimeSpan.Zero),
             currentCashSum: 20m));
     }
+
+    private static List<string> PublicInstanceMethods(Type type) =>
+        type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
+            .Select(method => method.Name)
+            .Where(name => !name.StartsWith("get_", StringComparison.Ordinal) && !name.StartsWith("set_", StringComparison.Ordinal))
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
+
+    private static List<string> PublicSetters(Type type) =>
+        type.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
+            .Where(property => property.SetMethod is { IsPublic: true })
+            .Select(property => property.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
 
     private static Transaction PostWithText(string? memo, string? reference) =>
         Transaction.Post(
