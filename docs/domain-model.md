@@ -296,7 +296,7 @@ Field rules: [features/accounts.md](features/accounts.md). Landed in the repo 20
 
 Close requires cash `SUM = 0` once posting is implemented ([features/posting.md](features/posting.md)).
 
-### 8.6 Transaction (accepted — posting slice; not yet landed)
+### 8.6 Transaction (accepted — posting slice; landed)
 
 | Type | Kind | Notes |
 | --- | --- | --- |
@@ -341,3 +341,4 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-09-21 | Instruments landed in repo `9ea2f2a`. Account container Feature Spec opened as `draft`. Boolean flags unified to `IsActive` (script `0011`). |
 | 2026-09-21 | Account aggregate landed. Disable Customer rejects while any account is active. |
 | 2026-09-25 | Transaction + cash leg accepted (posting spec). Close requires cash SUM = 0. No capture/journal two-step. |
+| 2026-09-26 | Transaction + cash leg landed. Events do not write the books. |

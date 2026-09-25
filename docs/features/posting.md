@@ -28,7 +28,7 @@ Write model for booked activity on `webapi`. Public name is **Transaction** (bus
 
 There is **no separate cash-ledger Feature Spec.** Cash legs live here. There is **no capture `Transactions` row that is later copied into a `Journals` table.** Security legs, holdings, and Opening-of-quantity stay out of this increment. If this file becomes too large, split holdings / securities into their own spec; do not split cash back out.
 
-**Status is `accepted`.** Implementation follows this file. Not yet landed in GitHub `louis297/MyWealthV2`. Script `0013_transactions.sql`, routes `/transactions`, policies `transactions.read` / `transactions.create`. Amends [accounts.md](accounts.md) R16 (close requires cash `SUM = 0`) and account JSON (`cashBalance`). Expand [ADR 0011](../adr/0011-ledger-cash-holdings-reversal.md). Idempotency: [ADR 0015](../adr/0015-idempotency-keys.md).
+**Status is `accepted`.** Implementation follows this file. Landed in the repo. Script `0013_transactions.sql`, routes `/transactions`, policies `transactions.read` / `transactions.create`. Amends [accounts.md](accounts.md) R16 (close requires cash `SUM = 0`) and account JSON (`cashBalance`). Expand [ADR 0011](../adr/0011-ledger-cash-holdings-reversal.md). Idempotency: [ADR 0015](../adr/0015-idempotency-keys.md).
 
 ---
 
@@ -68,7 +68,7 @@ Customer receives 403. No Adviser Portal activity page in this increment.
 - `webapi` `/transactions` (root, not under `/users`)
 - `GET /accounts/{id}` and `GET /accounts` gain computed `cashBalance` + `currency`; `GET /accounts/{id}/cash-balance` returns the same `SUM`
 - List envelope + isolation tests
-- `Idempotency-Key` on create and reverse ([ADR 0015](../adr/0015-idempotency-keys.md), proposed)
+- `Idempotency-Key` on create and reverse ([ADR 0015](../adr/0015-idempotency-keys.md), accepted)
 - Development / TestAppHost `TestSeed` rows (not the schema script, not Production)
 
 **Out**
@@ -214,7 +214,25 @@ Script (when accepted): `database/schema/0013_transactions.sql`.
 
 Last applied schema in the repo at Accounts landing is `0012`. Do not back-fill. Do not add EF migrations.
 
-Idempotency **rules** are [ADR 0015](../adr/0015-idempotency-keys.md) (`proposed`). ADR 0013 / 0014 are roles and OpenIddict — not schema files. Next *schema* script after `0012_accounts.sql` is `0013_transactions.sql`. Create the idempotency table **in that same `0013` script** so this slice cannot boot without it. Do not invent an ADR 0013/0014 for the table.
+Idempotency **rules** are [ADR 0015](../adr/0015-idempotency-keys.md) (accepted). ADR 0013 / 0014 are roles and OpenIddict — not schema files. Next *schema* script after `0012_accounts.sql` is `0013_transactions.sql`. Create the idempotency table **in that same `0013` script** so this slice cannot boot without it. Do not invent an ADR 0013/0014 for the table.
+
+`TransactionType` ints, CHECK `0–8`: `TransferIn` 0, `TransferOut` 1, `Interest` 2, `CloseOut` 3, `Opening` 4, `Reversal` 5, `Dividend` 6, `Buy` 7, `Sell` 8.
+
+`IdempotencyRecords` (no `PublicId`, no demo rows, keys do not expire):
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| Id | int identity PK | |
+| TenantId | int NOT NULL | FK `Tenants` RESTRICT |
+| Key | uniqueidentifier NOT NULL | `Idempotency-Key` header |
+| Method | nvarchar(10) NOT NULL | |
+| Path | nvarchar(200) NOT NULL | |
+| RequestHash | nvarchar(64) NOT NULL | SHA-256 hex of method + path + business body |
+| ResponseStatus | int NOT NULL | |
+| ResponseBody | nvarchar(max) NOT NULL | original success JSON |
+| Created | datetimeoffset NOT NULL | |
+
+Unique `(TenantId, Key)`.
 
 | Table | Change | Index / FK |
 | --- | --- | --- |
@@ -335,7 +353,7 @@ TestSeed (Development / TestAppHost only): one `TransferIn` on “Demo everyday 
 
 ## 11. Locked in this spec (discussion, 2026-09-25)
 
-Idempotency: [ADR 0015](../adr/0015-idempotency-keys.md) (`proposed`). Expand [ADR 0011](../adr/0011-ledger-cash-holdings-reversal.md) when this file becomes `accepted`.
+Idempotency: [ADR 0015](../adr/0015-idempotency-keys.md) (accepted). [ADR 0011](../adr/0011-ledger-cash-holdings-reversal.md) points at this spec for cash booking. Holdings stay out.
 
 | Item | Lock |
 | --- | --- |

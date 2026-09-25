@@ -20,7 +20,7 @@ This document owns **HTTP conventions and the resource catalog**. Field-level co
 
 **Product:** MyWealthV2.
 
-Phase 1 closes the platform base: Adviser Portal + Scalar + the authorization-server hosted login. Phase 2 accepted: `/instruments`, `/accounts`, `/transactions` (posting spec 2026-09-25, not yet landed).
+Phase 1 closes the platform base: Adviser Portal + Scalar + the authorization-server hosted login. Phase 2 accepted: `/instruments`, `/accounts`, `/transactions` (posting spec 2026-09-25, landed).
 
 ---
 
@@ -222,7 +222,7 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 
 Path `{id}` is always PublicId.
 
-Phase 1 has **no** `/auth/*`, `/holdings`, `/dashboard`, invitation, or forgot-password. `/instruments` and `/accounts` are landed. `/transactions` is accepted (not yet landed).
+Phase 1 has **no** `/auth/*`, `/holdings`, `/dashboard`, invitation, or forgot-password. `/instruments`, `/accounts`, and `/transactions` are landed.
 
 ---
 
@@ -359,7 +359,7 @@ Field rules: [features/accounts.md](features/accounts.md).
 
 ### 7.7 Transactions
 
-Field rules: [features/posting.md](features/posting.md). Accepted 2026-09-25; not yet landed.
+Field rules: [features/posting.md](features/posting.md). Accepted 2026-09-25; landed.
 
 | Method | Route | Policy | Success |
 | --- | --- | --- | --- |
@@ -413,3 +413,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-09-20 | `/instruments` catalog + §7.5. SystemAdmin list/create take tenant PublicId. Field rules in [features/instruments.md](features/instruments.md). Landed `9ea2f2a`. |
 | 2026-09-21 | Catalog JSON `isEnabled` → `isActive`. Column rename script `0011`. People list/get JSON adds `isActive`. |
 | 2026-09-25 | `/transactions` + account `cashBalance` / `/cash-balance`. Close-zero guard. Field rules in [features/posting.md](features/posting.md). |
+| 2026-09-26 | `/transactions` landed. Create and reverse require `Idempotency-Key`. |

@@ -22,7 +22,7 @@ This document owns **hosts, layers, ports, and cross-cutting behaviour**. Scope 
 
 Same rule as the function plan: if a later phase will use it and today’s design would have to change, ship the final infrastructure now. If later use or shape is not decided, wait.
 
-Phase 1 closes the platform base: tenants, session, four roles, people, currency catalog, Adviser Portal shell. The ledger is a Phase-2 domain. Accepted ledger slices: Instruments (`0010`, landed `9ea2f2a`), Accounts (`0012`, landed `3e8b8f3`), posting / `/transactions` (`0013_transactions.sql`, spec accepted 2026-09-25, not yet landed). Holdings wait for their spec.
+Phase 1 closes the platform base: tenants, session, four roles, people, currency catalog, Adviser Portal shell. The ledger is a Phase-2 domain. Accepted ledger slices: Instruments (`0010`, landed `9ea2f2a`), Accounts (`0012`, landed `3e8b8f3`), posting / `/transactions` (`0013_transactions.sql`, spec accepted 2026-09-25, landed). Holdings wait for their spec.
 
 ---
 

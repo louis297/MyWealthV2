@@ -94,7 +94,7 @@ Lock table and port shape in the Feature Spec. Do not implement from ADR 0010 / 
 | --- | --- | --- | --- | --- |
 | [instruments](instruments.md) | accepted (landed in repo 2026-09-20 `9ea2f2a`; IsActive rename `bbd0f26`) | TenantAdmin; Adviser (create + read); SystemAdmin (all verbs, Scalar) | Tenant catalog, `/instruments`, mocked `IMarketData` / `IFxRate`, TestSeed | Holdings store `InstrumentId` only; catalog must exist first |
 | [accounts](accounts.md) | accepted (landed in repo 2026-09-21 `3e8b8f3`) | TenantAdmin; Adviser (assigned Customers); SystemAdmin (all verbs, Scalar) | Account container under a Customer, `/accounts`, close/reopen, `Status` + derived `IsActive`, Disable-Customer guard, TestSeed | Cash / holdings / Opening need a container first |
-| [posting](posting.md) | accepted (2026-09-25; not yet landed) | TenantAdmin; Adviser (assigned Customers); SystemAdmin (Scalar) | `/transactions` + cash legs; `0013_transactions.sql`; close amends accounts R16; `cashBalance` | Write model for booked activity; holdings / securities may amend this file or split later |
+| [posting](posting.md) | accepted (2026-09-25; landed) | TenantAdmin; Adviser (assigned Customers); SystemAdmin (Scalar) | `/transactions` + cash legs; `0013_transactions.sql`; close amends accounts R16; `cashBalance` | Write model for booked activity; holdings / securities may amend this file or split later |
 
 Suggested order (tendency, not a locked backlog). Cash is not its own spec; it lives in posting:
 

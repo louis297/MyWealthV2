@@ -19,7 +19,7 @@ Status: accepted (Phase 2 direction)
 
 Storage shape for **holdings / security legs / Opening of quantity** is still reviewed when that slice opens. Cash booking is locked in [features/posting.md](../features/posting.md) (accepted 2026-09-25): `Transaction` header + `TransactionCashLeg`, not a wide row that is both cash and security.
 
-Phase 2 is open. Instruments and Accounts are landed. Posting is accepted, not yet landed.
+Phase 2 is open. Instruments, Accounts, and posting are landed.
 
 ## Context
 

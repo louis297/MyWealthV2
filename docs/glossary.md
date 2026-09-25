@@ -53,12 +53,12 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | QuoteCurrency | Currency used for the instrument’s price, market data, and cost accumulation. | Account booking currency |
 | CostBasis | Holding cost as `Money`. Currency must equal the instrument quote currency. | Market value |
 | Opening / initial holding | The only entry that may write quantity and cost directly. Phase 2. | Day-to-day holding edits |
-| Transaction | Booked business event on an Account (type, bookedAt, memo). Public aggregate and `/transactions` resource. Write = posted in the current draft. Header + legs in one command. Not a pre-accounting capture row. | A Created row that an event handler later copies into a journal; EF `SaveChanges` |
+| Transaction | Booked business event on an Account (type, bookedAt, memo). Public aggregate and `/transactions` resource. Write = posted. Header + legs in one command. Not a pre-accounting capture row. | A Created row that an event handler later copies into a journal; EF `SaveChanges` |
 | Leg (cash / security) | Accounting line that hits one book. This increment: one cash leg per Transaction. Later: a security leg on the **same** Transaction. Buy/sell = both. Split/scrip/bonus = security only, cash 0 or omitted, total cost unchanged. | A second HTTP resource; “posting means cash only”; a wide row that holds both cash and stock columns |
 | Journal | Older discussion word for the Transaction header. Prefer *Transaction* in new text. | A second table beside Transactions |
 | Signed book amount | Stored signed decimal on a leg, from **that container’s book**. `+` increases that book; `−` decreases it. Balance / quantity is `SUM` of those signs. Read models may flip a sign for display (Credit as liability in net worth). | Debit/credit columns; a new sign rule per Feature Spec; storing outflows as positive and inferring direction from `Type` |
 | Reversal | A new opposite Transaction (`Type = Reversal`) pointing at the original. Original row is not updated or deleted. Cash leg = arithmetic negation of the original signed amount. Phase 2. | `UPDATE`/`DELETE` of the original; an adjustment that does not point at the original |
-| TransactionType | Buy / Sell / TransferIn / TransferOut / Dividend / Interest / Opening / Reversal. | User-defined Category |
+| TransactionType | TransferIn / TransferOut / Interest / CloseOut / Opening / Reversal / Dividend / Buy / Sell. Cash increment posts the first six. | User-defined Category |
 | Category | Optional custom label on a transaction. Not in Phase 1. Not an account type. | Account type |
 | Currency | ISO 4217 three-letter code. One row in the platform catalog. | A C# enum |
 | Currency catalog | `Currencies` table + in-memory `ICurrencyCatalog`. | Joining `Currencies` on every hot path; a per-tenant allow-list |

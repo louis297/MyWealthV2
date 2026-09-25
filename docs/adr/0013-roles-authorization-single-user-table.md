@@ -89,7 +89,7 @@ Adviser account scope is assigned Customers in the handler. Field rules: [featur
 | `transactions.read` | ✓ | ✓ | ✓ | |
 | `transactions.create` | ✓ | ✓ | ✓ | |
 
-Adviser scope is assigned Customers of the transaction’s Account. Reverse uses `transactions.create`. Field rules: [features/posting.md](../features/posting.md). Accepted 2026-09-25; not yet landed.
+Adviser scope is assigned Customers of the transaction’s Account. Reverse uses `transactions.create`. Field rules: [features/posting.md](../features/posting.md). Accepted 2026-09-25; landed.
 
 The `/users` HTTP namespace (`/users/advisers` and so on) is an API convention. It is not this ADR’s authorization model.
 

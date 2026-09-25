@@ -51,7 +51,7 @@ Request hash covers the business body (and the path / method). Header order and 
 
 ## Consequences
 
-Posting (and later opted-in creates) need the table in the same schema train as their first script, or an immediately following script. Functional tests must cover replay and hash mismatch.
+Posting stores keys in `IdempotencyRecords`, created by `0013_transactions.sql` with the business tables. Later opted-in creates reuse that table. Functional tests cover replay and hash mismatch.
 
 Portal and Scalar callers must send the header. Construction notes should show a generated UUID per user submit, reused only on retry of that submit.
 

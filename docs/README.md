@@ -22,7 +22,7 @@ Coding and commit rules for agents belong in the repository-root `AGENTS.md`, no
 
 Phase 1 platform contracts stay accepted. Do not reopen them. Do not ship a single `Transactions` table that pretends to be both cash and securities.
 
-**Feature map:** [function-plan.md](function-plan.md) §5. Instruments: [features/instruments.md](features/instruments.md) (landed `9ea2f2a`; IsActive rename `bbd0f26`). Accounts: [features/accounts.md](features/accounts.md) (`accepted`, landed `3e8b8f3`). Posting: [features/posting.md](features/posting.md) (`accepted` 2026-09-25, not yet landed). Write Feature Specs one slice at a time. Do not lock columns outside the spec that owns them.
+**Feature map:** [function-plan.md](function-plan.md) §5. Instruments: [features/instruments.md](features/instruments.md) (landed `9ea2f2a`; IsActive rename `bbd0f26`). Accounts: [features/accounts.md](features/accounts.md) (`accepted`, landed `3e8b8f3`). Posting: [features/posting.md](features/posting.md) (`accepted` 2026-09-25, landed). Write Feature Specs one slice at a time. Do not lock columns outside the spec that owns them.
 
 Suggested internal order (tendency, not a locked backlog): instruments → account container → posting (`/transactions` + cash legs) → securities / holdings / Opening holdings → net-worth read model + Dashboard.
 

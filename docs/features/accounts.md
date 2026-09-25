@@ -27,7 +27,7 @@ Account container on `webapi`: list / get / open / rename / close / reopen. Seco
 
 This slice does not persist a balance column. [posting.md](posting.md) (accepted 2026-09-25) computes `cashBalance` on list/get and adds `GET /accounts/{id}/cash-balance`. Close is now rejected while that `SUM ≠ 0` (R16 amended). Holdings, Opening of quantity, and net worth stay out.
 
-**Status is `accepted`.** Implementation follows this file. Container storage landed in GitHub master `3e8b8f3`. Close-zero and `cashBalance` wait on posting implementation.
+**Status is `accepted`.** Implementation follows this file. Container storage landed in GitHub master `3e8b8f3`. Close-zero and `cashBalance` landed with posting.
 
 Landed in GitHub `louis297/MyWealthV2` master 2026-09-21, last slice commit `3e8b8f3`. Slice commits `1b7f4af` … `3e8b8f3` (`0012_accounts.sql`, `/accounts`, Disable-Customer guard, TestSeed). Depends on accepted [instruments](instruments.md) (landed `9ea2f2a`) and the IsActive rename (`bbd0f26`, `0011`) only as prior slices. Accounts do not reference `InstrumentId`.
 

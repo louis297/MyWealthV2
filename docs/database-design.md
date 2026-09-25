@@ -18,7 +18,7 @@ This document owns **accepted tables, keys, indexes, constraints, and script ord
 
 **Product:** MyWealthV2.
 
-Phase 1 scripts create the platform base. Phase 2 accepted: `Instruments` (`0010`), `Accounts` (`0012`), posting (`0013_transactions.sql` — spec accepted 2026-09-25, not yet landed). Do **not** create Holdings or a second Journal / CashLedger table. There is no custom `RefreshTokens` table; refresh lives in the OpenIddict token store. Demo rows are `TestSeed`, not the schema script.
+Phase 1 scripts create the platform base. Phase 2 accepted: `Instruments` (`0010`), `Accounts` (`0012`), posting (`0013_transactions.sql` — spec accepted 2026-09-25, landed). Do **not** create Holdings or a second Journal / CashLedger table. There is no custom `RefreshTokens` table; refresh lives in the OpenIddict token store. Demo rows are `TestSeed`, not the schema script.
 
 ---
 
@@ -385,9 +385,9 @@ People list items may include `isActive` alongside `status` after `0011`. Filter
 
 Script `0012_accounts.sql`. Columns: [features/accounts.md](features/accounts.md) §6. `Status` Open=0 / Closed=1. `IsActive` persisted computed (`Status = 0` → 1). No balance or institution columns. Landed in the repo 2026-09-21. No seed in the script — `TestSeed` only.
 
-### 11.4 Transactions (accepted spec; not yet landed)
+### 11.4 Transactions (landed)
 
-Script `0013_transactions.sql`. Columns and rules: [features/posting.md](features/posting.md) §6. Header `Transactions` plus child `TransactionCashLegs` (one cash leg per header this increment). Idempotency table in the same script ([ADR 0015](adr/0015-idempotency-keys.md)). No `Accounts.Balance`. No seed in the script — `TestSeed` only.
+Script `0013_transactions.sql`. Columns and rules: [features/posting.md](features/posting.md) §6. Header `Transactions` plus child `TransactionCashLegs` (one cash leg per header this increment). `IdempotencyRecords` is in the same script ([ADR 0015](adr/0015-idempotency-keys.md)). `TransactionType` CHECK is 0–8. No `Accounts.Balance`. No seed in the script — `TestSeed` only.
 
 ### 11.5 Not yet accepted
 
@@ -416,3 +416,4 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-09-21 | Boolean flags unified to `IsActive`. Script `0011` landed `bbd0f26`. Accounts spec accepted. |
 | 2026-09-21 | `Accounts` (`0012`). Container under a Customer. Derived `IsActive`. Landed in the repo. |
 | 2026-09-25 | `Transactions` + `TransactionCashLegs` + idempotency table (`0013`). Spec accepted. Not yet landed. |
+| 2026-09-26 | `0013_transactions.sql` landed. `IdempotencyRecords`. No `Accounts.Balance`. |
