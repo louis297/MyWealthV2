@@ -106,6 +106,58 @@ public class TransactionTests
         transaction.Type.ShouldBe(TransactionType.Interest);
     }
 
+    [Test]
+    public void Reverse_CreatesOppositeTransactionAndLeavesOriginalUntouched()
+    {
+        var original = Post(TransactionType.TransferIn, 100m, currentCashSum: 0m, existingTransactionCount: 0);
+        original.Id = 7;
+        original.ClearDomainEvents();
+        var bookedAt = new DateTimeOffset(2026, 9, 25, 10, 0, 0, TimeSpan.Zero);
+
+        var reversal = original.Reverse(bookedAt, currentCashSum: 100m);
+
+        original.Type.ShouldBe(TransactionType.TransferIn);
+        original.CashLeg!.Amount.ShouldBe(100m);
+        original.DomainEvents.ShouldBeEmpty();
+        reversal.ShouldNotBeSameAs(original);
+        reversal.PublicId.ShouldNotBe(original.PublicId);
+        reversal.Type.ShouldBe(TransactionType.Reversal);
+        reversal.TenantId.ShouldBe(original.TenantId);
+        reversal.AccountId.ShouldBe(original.AccountId);
+        reversal.BookedAt.ShouldBe(bookedAt);
+        reversal.OriginalTransactionId.ShouldBe(7);
+        reversal.Memo.ShouldBeNull();
+        reversal.Reference.ShouldBeNull();
+        reversal.CashLeg!.Amount.ShouldBe(-100m);
+        reversal.CashLeg.Currency.ShouldBe("NZD");
+        reversal.DomainEvents.OfType<TransactionReversed>().ShouldHaveSingleItem();
+        reversal.DomainEvents.OfType<TransactionPosted>().ShouldBeEmpty();
+    }
+
+    [Test]
+    public void Reverse_RejectsReversalOfAReversal()
+    {
+        var original = Post(TransactionType.TransferIn, 100m, currentCashSum: 0m, existingTransactionCount: 0);
+        original.Id = 7;
+        var reversal = original.Reverse(
+            new DateTimeOffset(2026, 9, 25, 10, 0, 0, TimeSpan.Zero),
+            currentCashSum: 100m);
+
+        Should.Throw<DomainException>(() => reversal.Reverse(
+            new DateTimeOffset(2026, 9, 25, 11, 0, 0, TimeSpan.Zero),
+            currentCashSum: 0m));
+    }
+
+    [Test]
+    public void Reverse_RejectsWhenCashSumWouldBecomeNegative()
+    {
+        var original = Post(TransactionType.TransferIn, 100m, currentCashSum: 0m, existingTransactionCount: 0);
+
+        Should.Throw<DomainException>(() => original.Reverse(
+            new DateTimeOffset(2026, 9, 25, 10, 0, 0, TimeSpan.Zero),
+            currentCashSum: 20m));
+    }
+
     private static Transaction Post(
         TransactionType type,
         decimal amount,

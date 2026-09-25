@@ -72,6 +72,16 @@ public class Transaction : BaseAuditableEntity
         return transaction;
     }
 
+    public Transaction Reverse(DateTimeOffset bookedAt, decimal currentCashSum)
+    {
+        return new Transaction
+        {
+            BookedAt = bookedAt,
+            PublicId = Guid.NewGuid(),
+            Reference = currentCashSum.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        };
+    }
+
     private static void EnsureSign(TransactionType type, decimal amount)
     {
         var invalid = type switch
