@@ -9,6 +9,7 @@ public class Transactions : IEndpointGroup
     public static void Map(RouteGroupBuilder groupBuilder)
     {
         groupBuilder.MapGet(GetTransactions).RequireAuthorization(Policies.TransactionsRead);
+        groupBuilder.MapGet(GetTransaction, "{id}").RequireAuthorization(Policies.TransactionsRead);
         groupBuilder.MapPost(CreateTransaction).RequireAuthorization(Policies.TransactionsCreate);
     }
 
@@ -16,6 +17,14 @@ public class Transactions : IEndpointGroup
     [EndpointDescription("Returns a paged list of transactions in one tenant.")]
     public static Task<IResult> GetTransactions() =>
         throw new NotImplementedException();
+
+    [EndpointSummary("Get a transaction")]
+    [EndpointDescription("Returns one transaction by PublicId.")]
+    public static Task<IResult> GetTransaction(Guid id)
+    {
+        _ = id;
+        throw new NotImplementedException();
+    }
 
     [EndpointSummary("Create a transaction")]
     [EndpointDescription("Posts a cash transaction on an open account.")]
