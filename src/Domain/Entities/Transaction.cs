@@ -40,6 +40,8 @@ public class Transaction : BaseAuditableEntity
         decimal currentCashSum,
         int existingTransactionCount)
     {
+        EnsureSign(type, amount);
+
         var currency = Money.Create(0m, accountCurrency).Currency;
         var transaction = new Transaction
         {
@@ -56,5 +58,21 @@ public class Transaction : BaseAuditableEntity
         _ = existingTransactionCount;
         transaction.AddDomainEvent(new TransactionPosted(transaction));
         return transaction;
+    }
+
+    private static void EnsureSign(TransactionType type, decimal amount)
+    {
+        var invalid = type switch
+        {
+            TransactionType.TransferIn or TransactionType.Opening => amount <= 0,
+            TransactionType.TransferOut or TransactionType.CloseOut => amount >= 0,
+            TransactionType.Interest => amount == 0,
+            _ => false
+        };
+
+        if (invalid)
+        {
+            throw new DomainException("Amount sign is not valid for this transaction type.");
+        }
     }
 }
