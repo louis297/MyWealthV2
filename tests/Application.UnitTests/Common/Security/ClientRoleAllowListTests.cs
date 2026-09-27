@@ -16,6 +16,15 @@ public class ClientRoleAllowListTests
         ClientRoleAllowList.Allows("adviser-portal", role).ShouldBe(expected);
     }
 
+    [TestCase(UserRole.SystemAdmin, true)]
+    [TestCase(UserRole.TenantAdmin, true)]
+    [TestCase(UserRole.Adviser, true)]
+    [TestCase(UserRole.Customer, false)]
+    public void AdviserPortalAngular_AllowsStaffNotCustomer(UserRole role, bool expected)
+    {
+        ClientRoleAllowList.Allows("adviser-portal-angular", role).ShouldBe(expected);
+    }
+
     [TestCase(null)]
     [TestCase("")]
     [TestCase("customer-portal")]
