@@ -1,0 +1,28 @@
+<mat-toolbar>
+  <span>Adviser Portal</span>
+  @if (session.tenantName()) {
+    <span>{{ session.tenantName() }}</span>
+  }
+  @if (session.currentUser(); as me) {
+    <span>{{ me.name }}</span>
+    <span>{{ me.role }}</span>
+  }
+</mat-toolbar>
+<mat-sidenav-container>
+  <mat-sidenav mode="side" opened>
+    <nav>
+      @if (canAccessCustomers(session.currentUser()?.role)) {
+        <a routerLink="/customers">Customers</a>
+      }
+      @if (canAccessAdvisers(session.currentUser()?.role)) {
+        <a routerLink="/advisers">Advisers</a>
+      }
+      @if (canAccessProfile(session.currentUser()?.role)) {
+        <a routerLink="/profile">Profile</a>
+      }
+    </nav>
+  </mat-sidenav>
+  <mat-sidenav-content>
+    <router-outlet />
+  </mat-sidenav-content>
+</mat-sidenav-container>

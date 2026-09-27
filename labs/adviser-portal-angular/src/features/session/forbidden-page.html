@@ -1,0 +1,5 @@
+<h1>Forbidden</h1>
+<p>You do not have access to this page.</p>
+@if (session.accessToken()) {
+  <p>A token is present, but this page is not allowed.</p>
+}
