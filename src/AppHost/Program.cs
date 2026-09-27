@@ -41,7 +41,7 @@ var portal = builder.AddViteApp(Services.AdviserPortal, "../AdviserPortal")
 
 identity.WithPortalOrigins(portal, builder);
 
-var angularPortal = builder.AddJavaScriptApp(Services.AdviserPortalAngular, "../labs/adviser-portal-angular", "start")
+var angularPortal = builder.AddJavaScriptApp(Services.AdviserPortalAngular, "../../labs/adviser-portal-angular", "start")
     .WithHttpEndpoint(env: "PORT")
     .WithExternalHttpEndpoints()
     .WithEnvironment("WEBAPI_BASE_URL", web.GetEndpoint("https"))

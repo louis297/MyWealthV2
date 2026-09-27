@@ -22,7 +22,7 @@ writeFileSync(
 const port = process.env.PORT || '4200';
 const child = spawn(
   'npx',
-  ['ng', 'serve', '--host', '0.0.0.0', '--port', String(port), '--disable-host-check'],
+  ['ng', 'serve', '--host', '0.0.0.0', '--port', String(port)],
   { cwd: root, stdio: 'inherit', shell: true },
 );
 
