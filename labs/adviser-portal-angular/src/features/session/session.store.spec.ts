@@ -12,7 +12,7 @@ describe('SessionStore', () => {
     TestBed.resetTestingModule();
   });
 
-  function store(): SessionStore {
+  function store(): InstanceType<typeof SessionStore> {
     TestBed.configureTestingModule({});
     return TestBed.inject(SessionStore);
   }
