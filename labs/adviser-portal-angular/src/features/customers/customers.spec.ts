@@ -50,9 +50,12 @@ describe('customers', () => {
     });
     harness.detectChanges();
     expect(harness.fixture.nativeElement.textContent).toContain('Cara');
+  });
 
+  it('shows the caller name for an adviser without requesting advisers', async () => {
     signIn(person('adviser', { id: 'adv-1', name: 'Cara', adviserId: 'adv-1' }));
-    await harness.navigateByUrl('/customers');
+    const harness = await RouterTestingHarness.create('/customers');
+    const http = TestBed.inject(HttpTestingController);
     http.expectOne('http://api.test/users/customers?page=1&pageSize=20').flush({
       items: [customer],
       page: 1,
@@ -149,9 +152,13 @@ describe('customers', () => {
     const update = http.expectOne('http://api.test/users/customers/cust-1');
     expect(update.request.method).toBe('PUT');
     expect(update.request.body).toEqual({ name: 'Jordan Lee', adviserId: 'adv-2', rowVersion: 'rv-1' });
+    update.flush(null);
+  });
 
+  it('hides the adviser control when an adviser edits a customer', async () => {
     signIn(person('adviser', { id: 'adv-1', adviserId: 'adv-1' }));
-    await harness.navigateByUrl('/customers/cust-1/edit');
+    const harness = await RouterTestingHarness.create('/customers/cust-1/edit');
+    const http = TestBed.inject(HttpTestingController);
     http.expectOne('http://api.test/users/customers/cust-1').flush(customer);
     harness.detectChanges();
     expect(harness.fixture.nativeElement.querySelector('#edit-customer-adviser')).toBeNull();

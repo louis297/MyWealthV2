@@ -1,6 +1,10 @@
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
+import { authInterceptor } from '../shared/auth/auth.interceptor';
+import { RUNTIME_CONFIG } from '../shared/api/runtime-config';
 import { routes } from './app.routes';
 import { SessionStore } from '../features/session/session.store';
 import { CurrentUser } from '../features/session/session.models';
@@ -10,8 +14,21 @@ describe('role shell', () => {
     sessionStorage.clear();
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
-      providers: [provideRouter(routes)],
+      providers: [
+        provideRouter(routes),
+        provideHttpClient(withInterceptors([authInterceptor])),
+        provideHttpClientTesting(),
+        {
+          provide: RUNTIME_CONFIG,
+          useValue: { webApiBaseUrl: 'http://api.test', identityAuthority: 'http://identity.test' },
+        },
+      ],
     });
+  });
+
+  afterEach(() => {
+    flushPeople();
+    TestBed.inject(HttpTestingController).verify();
   });
 
   it('sends a signed-out visit to /customers to the session page', async () => {
@@ -65,6 +82,13 @@ describe('role shell', () => {
     expect(text).toContain('A token is present, but this page is not allowed.');
   });
 });
+
+function flushPeople(): void {
+  const http = TestBed.inject(HttpTestingController);
+  for (const request of http.match((candidate) => candidate.url.includes('/users/'))) {
+    request.flush({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+  }
+}
 
 function signIn(user: CurrentUser, tenantName: string | null = null): void {
   const session = TestBed.inject(SessionStore);

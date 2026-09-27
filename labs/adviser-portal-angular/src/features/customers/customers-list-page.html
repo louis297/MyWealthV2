@@ -1,0 +1,21 @@
+<h1>Customers</h1>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Email</th>
+      <th>Status</th>
+      <th>Adviser</th>
+    </tr>
+  </thead>
+  <tbody>
+    @for (item of customers(); track item.id) {
+      <tr>
+        <td><a [routerLink]="['/customers', item.id]">{{ item.name }}</a></td>
+        <td>{{ item.email }}</td>
+        <td>{{ item.status }}</td>
+        <td>{{ adviserName(item.adviserId) }}</td>
+      </tr>
+    }
+  </tbody>
+</table>

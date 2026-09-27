@@ -26,6 +26,11 @@ describe('session return and sign out', () => {
   });
 
   afterEach(() => {
+    const http = TestBed.inject(HttpTestingController);
+    for (const request of http.match((candidate) => candidate.url.includes('/users/'))) {
+      request.flush({ items: [], page: 1, pageSize: 20, totalCount: 0, id: 'cust-1', name: 'Jordan' });
+    }
+    http.verify();
     vi.unstubAllGlobals();
   });
 

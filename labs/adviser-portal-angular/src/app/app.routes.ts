@@ -1,6 +1,8 @@
 import { Routes } from '@angular/router';
 import { AdvisersListPage } from '../features/advisers/advisers-list-page';
+import { CustomerCreatePage } from '../features/customers/customer-create-page';
 import { CustomerDetailPage } from '../features/customers/customer-detail-page';
+import { CustomerEditPage } from '../features/customers/customer-edit-page';
 import { CustomersListPage } from '../features/customers/customers-list-page';
 import { ProfilePage } from '../features/profile/profile-page';
 import { ForbiddenPage } from '../features/session/forbidden-page';
@@ -27,6 +29,8 @@ export const routes: Routes = [
         canActivate: [allowRoles([roles.tenantAdmin, roles.adviser])],
         children: [
           { path: '', component: CustomersListPage },
+          { path: 'new', component: CustomerCreatePage },
+          { path: ':id/edit', component: CustomerEditPage },
           { path: ':id', component: CustomerDetailPage },
         ],
       },
