@@ -29,16 +29,14 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
       const refreshToken = session.refreshToken();
       if (!refreshToken || req.context.get(RETRIED)) {
-        session.clear();
-        void router.navigate(['/session']);
+        endSession(session, router);
         return throwError(() => error);
       }
 
       return from(refreshOnce(config.identityAuthority, refreshToken, session)).pipe(
         switchMap((refreshed) => {
           if (!refreshed) {
-            session.clear();
-            void router.navigate(['/session']);
+            endSession(session, router);
             return throwError(() => error);
           }
 
@@ -49,8 +47,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
           return next(retry).pipe(
             catchError((retryError: unknown) => {
               if (retryError instanceof HttpErrorResponse && retryError.status === 401) {
-                session.clear();
-                void router.navigate(['/session']);
+                endSession(session, router);
               }
               return throwError(() => retryError);
             }),
@@ -60,6 +57,13 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     }),
   );
 };
+
+function endSession(session: InstanceType<typeof SessionStore>, router: Router): void {
+  session.clear();
+  if (!router.url.startsWith('/session')) {
+    void router.navigate(['/session']);
+  }
+}
 
 function refreshOnce(
   authority: string,
