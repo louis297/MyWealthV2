@@ -1,0 +1,27 @@
+<h1>Profile</h1>
+@if (session.currentUser(); as user) {
+  <dl>
+    <dt>Email</dt>
+    <dd>{{ user.email }}</dd>
+    <dt>Role</dt>
+    <dd>{{ user.role }}</dd>
+  </dl>
+  <form (ngSubmit)="saveName(nameField.value)">
+    <mat-form-field>
+      <mat-label>Name</mat-label>
+      <input #nameField id="profile-name" matInput name="name" [value]="user.name" />
+    </mat-form-field>
+    <button matButton="filled" type="submit">Save name</button>
+  </form>
+  <form (ngSubmit)="savePassword(currentField.value, nextField.value)">
+    <mat-form-field>
+      <mat-label>Current password</mat-label>
+      <input #currentField id="profile-current-password" matInput type="password" name="currentPassword" />
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>New password</mat-label>
+      <input #nextField id="profile-new-password" matInput type="password" name="newPassword" />
+    </mat-form-field>
+    <button matButton="filled" type="submit">Change password</button>
+  </form>
+}
