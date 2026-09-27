@@ -1,0 +1,12 @@
+@if (notFound()) {
+  <p>Not found</p>
+} @else if (adviser(); as row) {
+  <h1>Edit adviser</h1>
+  <form (ngSubmit)="submit(row, nameField.value)">
+    <mat-form-field>
+      <mat-label>Name</mat-label>
+      <input #nameField id="edit-adviser-name" matInput name="name" [value]="row.name" required />
+    </mat-form-field>
+    <button matButton="filled" type="submit">Save</button>
+  </form>
+}

@@ -1,0 +1,22 @@
+@if (notFound()) {
+  <p>Not found</p>
+} @else if (adviser(); as row) {
+  <h1>{{ row.name }}</h1>
+  @if (conflict()) {
+    <p>This row changed. Reload and try again.</p>
+  }
+  @if (guardMessage()) {
+    <p>
+      {{ guardMessage() }}
+      <a [routerLink]="['/customers']" [queryParams]="{ adviserId: row.id }">View assigned customers</a>
+    </p>
+  }
+  <dl>
+    <dt>Email</dt>
+    <dd>{{ row.email }}</dd>
+    <dt>Status</dt>
+    <dd>{{ row.status }}</dd>
+  </dl>
+  <a [routerLink]="['/advisers', row.id, 'edit']">Edit</a>
+  <button type="button" (click)="changeStatus(row)">{{ row.status === 'disabled' ? 'Enable' : 'Disable' }}</button>
+}

@@ -1,0 +1,13 @@
+<h1>Advisers</h1>
+<a routerLink="/advisers/new">New adviser</a>
+<table>
+  <tbody>
+    @for (item of advisers(); track item.id) {
+      <tr>
+        <td><a [routerLink]="['/advisers', item.id]">{{ item.name }}</a></td>
+        <td>{{ item.email }}</td>
+        <td>{{ item.status }}</td>
+      </tr>
+    }
+  </tbody>
+</table>

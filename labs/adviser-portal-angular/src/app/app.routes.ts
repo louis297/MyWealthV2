@@ -1,4 +1,7 @@
 import { Routes } from '@angular/router';
+import { AdviserCreatePage } from '../features/advisers/adviser-create-page';
+import { AdviserDetailPage } from '../features/advisers/adviser-detail-page';
+import { AdviserEditPage } from '../features/advisers/adviser-edit-page';
 import { AdvisersListPage } from '../features/advisers/advisers-list-page';
 import { CustomerCreatePage } from '../features/customers/customer-create-page';
 import { CustomerDetailPage } from '../features/customers/customer-detail-page';
@@ -39,7 +42,9 @@ export const routes: Routes = [
         canActivate: [allowRoles([roles.tenantAdmin])],
         children: [
           { path: '', component: AdvisersListPage },
-          { path: 'new', component: AdvisersListPage },
+          { path: 'new', component: AdviserCreatePage },
+          { path: ':id/edit', component: AdviserEditPage },
+          { path: ':id', component: AdviserDetailPage },
         ],
       },
     ],
