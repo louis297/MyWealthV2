@@ -1,5 +1,9 @@
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import {
+  HttpTestingController,
+  provideHttpClientTesting,
+  type TestRequest,
+} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -76,7 +80,7 @@ describe('authInterceptor', () => {
     expect(String(init.body)).toContain('client_id=adviser-portal');
     expect(String(init.body)).not.toContain('adviser-portal-angular');
 
-    const retry = http.expectOne('http://api.test/users/me');
+    const retry = await pendingRequest(http);
     expect(retry.request.headers.get('Authorization')).toBe('Bearer new-access');
     retry.flush({ id: 'user-1' });
     await pending;
@@ -100,7 +104,7 @@ describe('authInterceptor', () => {
     const http = TestBed.inject(HttpTestingController);
     http.expectOne('http://api.test/users/me').flush(null, { status: 401, statusText: 'Unauthorized' });
     await vi.waitUntil(() => fetchMock.mock.calls.length === 1);
-    http.expectOne('http://api.test/users/me').flush(null, { status: 401, statusText: 'Unauthorized' });
+    (await pendingRequest(http)).flush(null, { status: 401, statusText: 'Unauthorized' });
 
     await expect(pending).rejects.toBeTruthy();
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -108,3 +112,13 @@ describe('authInterceptor', () => {
     expect(sessionStorage.length).toBe(0);
   });
 });
+
+async function pendingRequest(http: HttpTestingController): Promise<TestRequest> {
+  let request: TestRequest | undefined;
+  await vi.waitFor(() => {
+    const matches = http.match('http://api.test/users/me');
+    expect(matches.length).toBe(1);
+    request = matches[0];
+  });
+  return request!;
+}
