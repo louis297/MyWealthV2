@@ -24,3 +24,5 @@ Phase 1 has one frontend: [adviser-portal.md](adviser-portal.md). Do not add `cu
 | [frontend-implementation-notes.md](frontend-implementation-notes.md) | Page-by-page construction for the current pages cut |
 
 [adviser-portal.md](adviser-portal.md) is **accepted** (shell + pages cut C). Conventions and construction notes stay `review`. Do not add `customer-portal` or a Back Office file until that slice opens.
+
+A parallel Angular UI, if present, lives under `labs/` and is not a portal spec in this folder. Product portal work does not open `labs/`.

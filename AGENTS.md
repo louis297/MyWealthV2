@@ -2,6 +2,8 @@
 
 This file is for agents working in the **MyWealthV2 repository**. Design lives in `docs/`. Do not copy Feature Specs or ADRs into this file.
 
+Default work is product (`docs/`, `src/`, including React adviser-portal). Do not read or edit `labs/` unless the user explicitly names a lab task or the Angular Adviser Portal lab. Lab docs are not accepted product contracts.
+
 ## `draft/` is off-limits
 
 Do not read, list, search, edit, create, delete, move, or otherwise touch anything under `draft/`. Treat that directory as if it does not exist. Work from `docs/` and the rest of the repo instead.
