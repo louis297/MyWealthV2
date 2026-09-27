@@ -1,5 +1,6 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
+import { isInAppPath } from './session.paths';
 import { SessionStore } from './session.store';
 import { roles } from './roles';
 
@@ -7,6 +8,9 @@ export const requireSession: CanActivateFn = (_route, state) => {
   const session = inject(SessionStore);
   const router = inject(Router);
   if (!session.accessToken()) {
+    if (isInAppPath(state.url) && !state.url.startsWith('/session')) {
+      session.setReturnTo(state.url);
+    }
     return router.createUrlTree(['/session']);
   }
 
