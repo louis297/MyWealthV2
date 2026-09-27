@@ -18,17 +18,22 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<SignInManager<ApplicationUser>>();
 
 var portalOrigins = OpenIddictClientUris.ReadPortalOrigins(builder.Configuration);
+var angularOrigins = OpenIddictClientUris.ReadAdviserPortalAngularOrigins(builder.Configuration);
+var corsOrigins = portalOrigins
+    .Concat(angularOrigins)
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        if (portalOrigins.Count == 0)
+        if (corsOrigins.Length == 0)
         {
             policy.SetIsOriginAllowed(_ => false);
             return;
         }
 
-        policy.WithOrigins(portalOrigins.ToArray())
+        policy.WithOrigins(corsOrigins)
             .WithMethods("GET", "POST", "OPTIONS")
             .WithHeaders("Content-Type");
     });

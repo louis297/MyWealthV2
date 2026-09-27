@@ -25,6 +25,11 @@ public static class Services
     public const string AdviserPortal = "adviser-portal";
 
     /// <summary>
+    /// Aspire resource name and OIDC client id for the Angular Adviser Portal lab.
+    /// </summary>
+    public const string AdviserPortalAngular = "adviser-portal-angular";
+
+    /// <summary>
     /// The name of the Database Server service.
     /// This service is responsible for hosting the database server (e.g., PostgreSQL, SQL Server, or SQLite).
     /// </summary>

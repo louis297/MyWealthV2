@@ -9,7 +9,8 @@ public static class ClientRoleAllowList
 
     private static readonly Dictionary<string, HashSet<UserRole>> Allowed = new(StringComparer.Ordinal)
     {
-        ["adviser-portal"] = [UserRole.SystemAdmin, UserRole.TenantAdmin, UserRole.Adviser]
+        ["adviser-portal"] = [UserRole.SystemAdmin, UserRole.TenantAdmin, UserRole.Adviser],
+        ["adviser-portal-angular"] = [UserRole.SystemAdmin, UserRole.TenantAdmin, UserRole.Adviser]
     };
 
     public static bool Allows(string? clientId, UserRole role) =>

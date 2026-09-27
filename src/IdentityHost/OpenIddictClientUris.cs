@@ -27,6 +27,21 @@ public static class OpenIddictClientUris
             .ToArray();
     }
 
+    public static IReadOnlyList<string> ReadAdviserPortalAngularOrigins(IConfiguration configuration)
+    {
+        var many = configuration.GetSection("Identity:AdviserPortalAngularOrigins").Get<string[]>();
+        if (many is null)
+        {
+            return [];
+        }
+
+        return many
+            .Select(NormalizeOrigin)
+            .OfType<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     public static (IReadOnlyList<Uri> Redirects, IReadOnlyList<Uri> PostLogout) FromOrigins(IEnumerable<string> origins)
     {
         var normalized = origins

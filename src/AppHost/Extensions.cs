@@ -33,6 +33,27 @@ internal static class AspireExtensions
         return identity;
     }
 
+    public static IResourceBuilder<T> WithAdviserPortalAngularOrigins<T>(
+        this IResourceBuilder<T> identity,
+        IResourceBuilder<IResourceWithEndpoints> portal,
+        IDistributedApplicationBuilder app)
+        where T : IResourceWithEnvironment
+    {
+        var endpoint = portal.GetEndpoint("http");
+        identity.WithEnvironment("Identity__AdviserPortalAngularOrigins__0", endpoint);
+
+        var dashboardHost = GetDevLocalhostHost(app);
+        if (!string.IsNullOrWhiteSpace(dashboardHost))
+        {
+            identity.WithEnvironment(
+                "Identity__AdviserPortalAngularOrigins__1",
+                ReferenceExpression.Create(
+                    $"{endpoint.Property(EndpointProperty.Scheme)}://{portal.Resource.Name}-{dashboardHost}:{endpoint.Property(EndpointProperty.Port)}"));
+        }
+
+        return identity;
+    }
+
     private static string? GetDevLocalhostHost(IDistributedApplicationBuilder app)
     {
         foreach (var key in new[] { "ASPNETCORE_URLS", "applicationUrl" })
