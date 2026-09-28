@@ -3,6 +3,8 @@ import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { MatSidenav, MatSidenavContainer, MatSidenavContent } from '@angular/material/sidenav';
 import { MatToolbar } from '@angular/material/toolbar';
 import { PeopleApi } from '../shared/api/people-api';
+import { RUNTIME_CONFIG } from '../shared/api/runtime-config';
+import { startEndSession } from '../features/session/oidc';
 import { canAccessAdvisers, canAccessCustomers, canAccessProfile, roles } from '../features/session/roles';
 import { SessionStore } from '../features/session/session.store';
 
@@ -14,6 +16,7 @@ import { SessionStore } from '../features/session/session.store';
 export class ShellLayout implements OnInit {
   private readonly router = inject(Router);
   private readonly people = inject(PeopleApi);
+  private readonly config = inject(RUNTIME_CONFIG);
   protected readonly session = inject(SessionStore);
   protected readonly canAccessCustomers = canAccessCustomers;
   protected readonly canAccessAdvisers = canAccessAdvisers;
@@ -40,7 +43,6 @@ export class ShellLayout implements OnInit {
   }
 
   signOut(): void {
-    this.session.clear();
-    void this.router.navigate(['/session']);
+    void startEndSession(this.session, this.config.identityAuthority);
   }
 }

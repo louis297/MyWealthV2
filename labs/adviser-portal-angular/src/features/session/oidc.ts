@@ -159,8 +159,43 @@ async function redeemCallback(
 }
 
 export async function startEndSession(
-  _session: { refreshToken(): string | null; clear(): void },
-  _authority: string,
+  session: { refreshToken(): string | null; clear(): void },
+  authority: string,
 ): Promise<void> {
-  return;
+  sessionStorage.setItem(SIGN_OUT_IN_PROGRESS_KEY, '1');
+  const refreshToken = session.refreshToken();
+  let discovered: DiscoveryDocument | null = null;
+  try {
+    discovered = await discover(authority);
+    if (refreshToken && discovered.revocation_endpoint) {
+      try {
+        await fetch(discovered.revocation_endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            token: refreshToken,
+            token_type_hint: 'refresh_token',
+            client_id: CLIENT_ID,
+          }),
+        });
+      } catch {
+        // Still end the local session and the hosted login cookie.
+      }
+    }
+  } finally {
+    session.clear();
+    sessionStorage.removeItem(PKCE_VERIFIER_KEY);
+    sessionStorage.removeItem(PKCE_STATE_KEY);
+    sessionStorage.removeItem(PKCE_PENDING_KEY);
+    sessionStorage.setItem(SIGN_OUT_IN_PROGRESS_KEY, '1');
+  }
+
+  if (!discovered?.end_session_endpoint) {
+    return;
+  }
+
+  const url = new URL(discovered.end_session_endpoint);
+  url.searchParams.set('client_id', CLIENT_ID);
+  url.searchParams.set('post_logout_redirect_uri', `${window.location.origin}/`);
+  window.location.assign(url.toString());
 }

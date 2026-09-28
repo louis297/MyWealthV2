@@ -97,10 +97,19 @@ describe('session return and sign out', () => {
     });
   });
 
-  it('sign out clears tokens and returns to the sign-in redirect', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ authorization_endpoint: 'https://identity.test/connect/authorize' }),
+  it('sign out revokes the refresh token and redirects to identity', async () => {
+    const fetchMock = vi.fn().mockImplementation(async (input: string) => {
+      if (String(input).includes('openid-configuration')) {
+        return {
+          ok: true,
+          json: async () => ({
+            authorization_endpoint: 'https://identity.test/connect/authorize',
+            revocation_endpoint: 'https://identity.test/connect/revocation',
+            end_session_endpoint: 'https://identity.test/connect/logout',
+          }),
+        };
+      }
+      return { ok: true, json: async () => ({}) };
     });
     vi.stubGlobal('fetch', fetchMock);
     const assign = vi.fn();
@@ -130,12 +139,14 @@ describe('session return and sign out', () => {
     ) as HTMLButtonElement;
 
     button.click();
-    await harness.fixture.whenStable();
     await vi.waitUntil(() => assign.mock.calls.length === 1);
 
     expect(session.accessToken()).toBeNull();
     expect(session.refreshToken()).toBeNull();
-    expect(TestBed.inject(Router).url).toBe('/session');
-    expect(fetchMock).toHaveBeenCalledWith('http://identity.test/.well-known/openid-configuration');
+    expect(TestBed.inject(Router).url).toBe('/customers');
+    expect(fetchMock.mock.calls.map(([url]) => url)).toContain('https://identity.test/connect/revocation');
+    const redirected = new URL(assign.mock.calls[0][0] as string);
+    expect(redirected.origin + redirected.pathname).toBe('https://identity.test/connect/logout');
+    expect(redirected.searchParams.get('post_logout_redirect_uri')).toBe('http://localhost:4200/');
   });
 });
