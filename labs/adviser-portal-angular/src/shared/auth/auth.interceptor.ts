@@ -1,19 +1,17 @@
 import { HttpContextToken, HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { Router } from '@angular/router';
 import { catchError, from, switchMap, throwError } from 'rxjs';
+import { isSignOutInProgress, refreshTokens, startAuthorize } from '../../features/session/oidc';
 import { SessionStore } from '../../features/session/session.store';
 import { RUNTIME_CONFIG } from '../api/runtime-config';
 
 const RETRIED = new HttpContextToken<boolean>(() => false);
-const PRODUCT_CLIENT_ID = 'adviser-portal';
 
 let refreshInFlight: Promise<boolean> | null = null;
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const config = inject(RUNTIME_CONFIG);
   const session = inject(SessionStore);
-  const router = inject(Router);
   const url = /^https?:\/\//.test(req.url) ? req.url : `${config.webApiBaseUrl}${req.url}`;
   const accessToken = session.accessToken();
   const authed = req.clone({
@@ -29,14 +27,14 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
       const refreshToken = session.refreshToken();
       if (!refreshToken || req.context.get(RETRIED)) {
-        endSession(session, router);
+        endSession(session, config.identityAuthority);
         return throwError(() => error);
       }
 
       return from(refreshOnce(config.identityAuthority, refreshToken, session)).pipe(
         switchMap((refreshed) => {
           if (!refreshed) {
-            endSession(session, router);
+            endSession(session, config.identityAuthority);
             return throwError(() => error);
           }
 
@@ -47,7 +45,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
           return next(retry).pipe(
             catchError((retryError: unknown) => {
               if (retryError instanceof HttpErrorResponse && retryError.status === 401) {
-                endSession(session, router);
+                endSession(session, config.identityAuthority);
               }
               return throwError(() => retryError);
             }),
@@ -58,10 +56,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   );
 };
 
-function endSession(session: InstanceType<typeof SessionStore>, router: Router): void {
+function endSession(session: InstanceType<typeof SessionStore>, authority: string): void {
   session.clear();
-  if (!router.url.startsWith('/session')) {
-    void router.navigate(['/session']);
+  if (!isSignOutInProgress()) {
+    void startAuthorize(authority);
   }
 }
 
@@ -70,39 +68,22 @@ function refreshOnce(
   refreshToken: string,
   session: InstanceType<typeof SessionStore>,
 ): Promise<boolean> {
-  refreshInFlight ??= refreshTokens(authority, refreshToken, session).finally(() => {
+  refreshInFlight ??= applyRefresh(authority, refreshToken, session).finally(() => {
     refreshInFlight = null;
   });
   return refreshInFlight;
 }
 
-async function refreshTokens(
+async function applyRefresh(
   authority: string,
   refreshToken: string,
   session: InstanceType<typeof SessionStore>,
 ): Promise<boolean> {
-  try {
-    const response = await fetch(`${authority.replace(/\/$/, '')}/connect/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: refreshToken,
-        client_id: PRODUCT_CLIENT_ID,
-      }),
-    });
-    if (!response.ok) {
-      return false;
-    }
-
-    const body = (await response.json()) as { access_token?: string; refresh_token?: string };
-    if (!body.access_token) {
-      return false;
-    }
-
-    session.setTokens(body.access_token, body.refresh_token ?? refreshToken);
-    return true;
-  } catch {
+  const tokens = await refreshTokens(authority, refreshToken);
+  if (!tokens) {
     return false;
   }
+
+  session.setTokens(tokens.accessToken, tokens.refreshToken);
+  return true;
 }

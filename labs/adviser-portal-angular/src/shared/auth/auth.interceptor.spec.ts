@@ -80,7 +80,7 @@ describe('authInterceptor', () => {
     http.expectOne('http://api.test/users/me').flush(null, { status: 401, statusText: 'Unauthorized' });
 
     await vi.waitUntil(() => fetchMock.mock.calls.length === 2);
-    expect(fetchMock.mock.calls[0][0]).toBe('https://identity.test/.well-known/openid-configuration');
+    expect(fetchMock.mock.calls[0][0]).toBe('http://identity.test/.well-known/openid-configuration');
     expect(fetchMock.mock.calls[1][0]).toBe('https://identity.test/connect/token');
     const body = String((fetchMock.mock.calls[1][1] as RequestInit).body);
     expect(body).toContain('grant_type=refresh_token');

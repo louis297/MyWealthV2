@@ -28,6 +28,36 @@ export function redirectUri(): string {
   return `${window.location.origin}/callback`;
 }
 
+export async function refreshTokens(
+  authority: string,
+  refreshToken: string,
+): Promise<{ accessToken: string; refreshToken: string | null } | null> {
+  try {
+    const { token_endpoint } = await discover(authority);
+    const response = await fetch(token_endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+        client_id: CLIENT_ID,
+      }),
+    });
+    if (!response.ok) {
+      return null;
+    }
+
+    const body = (await response.json()) as { access_token?: string; refresh_token?: string };
+    if (!body.access_token) {
+      return null;
+    }
+
+    return { accessToken: body.access_token, refreshToken: body.refresh_token ?? null };
+  } catch {
+    return null;
+  }
+}
+
 export async function discover(authority: string): Promise<DiscoveryDocument> {
   const response = await fetch(`${authority.replace(/\/$/, '')}/.well-known/openid-configuration`);
   if (!response.ok) {
