@@ -29,17 +29,38 @@ export class ShellLayout implements OnInit {
 
     this.people.me().subscribe((user) => {
       this.session.setCurrentUser(user);
-      if (user.role === roles.customer) {
-        void this.router.navigate(['/forbidden']);
-        return;
-      }
-      if (!user.tenantCode) {
+      this.land(user.role);
+      if (!user.tenantCode || user.role === roles.customer) {
         return;
       }
       this.people.tenantByCode(user.tenantCode).subscribe((tenant) => {
         this.session.setTenantName(tenant.name);
       });
     });
+  }
+
+  private land(role: string): void {
+    const path = this.router.url.split('?')[0] || '/';
+    if (role === roles.customer) {
+      if (path !== '/forbidden') {
+        void this.router.navigate(['/forbidden']);
+      }
+      return;
+    }
+
+    if (path === '/') {
+      void this.router.navigate(role === roles.systemAdmin ? ['/profile'] : ['/customers']);
+      return;
+    }
+
+    const allowed =
+      path === '/forbidden' ||
+      (path === '/profile' && canAccessProfile(role)) ||
+      (path.startsWith('/customers') && canAccessCustomers(role)) ||
+      (path.startsWith('/advisers') && canAccessAdvisers(role));
+    if (!allowed) {
+      void this.router.navigate(['/forbidden']);
+    }
   }
 
   signOut(): void {

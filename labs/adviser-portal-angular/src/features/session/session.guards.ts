@@ -22,7 +22,12 @@ export const requireSession: CanActivateFn = (_route, state) => {
 };
 
 export const homeRedirect: CanActivateFn = () => {
-  const role = inject(SessionStore).currentUser()?.role;
+  const session = inject(SessionStore);
+  const role = session.currentUser()?.role;
+  if (!role) {
+    return true;
+  }
+
   const router = inject(Router);
   if (role === roles.tenantAdmin || role === roles.adviser) {
     return router.createUrlTree(['/customers']);
@@ -35,7 +40,11 @@ export const homeRedirect: CanActivateFn = () => {
 
 export function allowRoles(allowed: readonly string[]): CanActivateFn {
   return () => {
-    const role = inject(SessionStore).currentUser()?.role;
+    const session = inject(SessionStore);
+    const role = session.currentUser()?.role;
+    if (!role && session.accessToken()) {
+      return true;
+    }
     if (role && allowed.includes(role)) {
       return true;
     }
