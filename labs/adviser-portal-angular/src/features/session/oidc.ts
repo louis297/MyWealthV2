@@ -1,5 +1,5 @@
 import { challengeS256, randomUrlSafe } from './pkce';
-import { isInAppPath } from './session.paths';
+import { isReturnPath } from './session.paths';
 import {
   PKCE_PENDING_KEY,
   PKCE_STATE_KEY,
@@ -98,7 +98,7 @@ export async function startAuthorize(authority: string): Promise<void> {
     const pathname = window.location.pathname || '/';
     const search = window.location.search || '';
     const returnTo = `${pathname}${search}`;
-    if (isInAppPath(returnTo) && pathname !== '/callback') {
+    if (isReturnPath(returnTo)) {
       sessionStorage.setItem(RETURN_TO_KEY, returnTo);
     }
 
@@ -185,7 +185,7 @@ async function redeemCallback(
   sessionStorage.removeItem(PKCE_PENDING_KEY);
   sessionStorage.removeItem(RETURN_TO_KEY);
 
-  return isInAppPath(returnTo) ? returnTo : '/';
+  return isReturnPath(returnTo) ? returnTo : '/';
 }
 
 export async function startEndSession(
