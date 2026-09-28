@@ -92,3 +92,9 @@ export async function startAuthorize(authority: string): Promise<void> {
     throw error;
   }
 }
+
+export function completeCallback(_session: {
+  setTokens(accessToken: string, refreshToken: string | null): void;
+}): Promise<string> {
+  return Promise.resolve(sessionStorage.getItem(RETURN_TO_KEY) ?? '/');
+}
