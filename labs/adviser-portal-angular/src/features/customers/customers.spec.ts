@@ -87,6 +87,31 @@ describe('customers', () => {
     expect(harness.fixture.nativeElement.textContent).toContain('Cara');
   });
 
+  it('requires an adviser when a tenant admin creates a customer', async () => {
+    signIn(person('tenantAdmin'));
+    const harness = await RouterTestingHarness.create('/customers/new');
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne('http://api.test/users/advisers?page=1&pageSize=100&enabledOnly=true').flush({
+      items: [adviserOption('adv-1', 'Cara')],
+      page: 1,
+      pageSize: 100,
+      totalCount: 1,
+    });
+    harness.detectChanges();
+    const element = harness.fixture.nativeElement as HTMLElement;
+    const select = element.querySelector('#customer-adviser') as HTMLSelectElement;
+    expect(select.value).toBe('');
+    expect(select.options[0]?.textContent).toContain('Select an adviser');
+    setValue(element, '#customer-name', 'Jordan');
+    setValue(element, '#customer-email', 'jordan@firm');
+    setValue(element, '#customer-password', 'Secret-pass-1');
+    setValue(element, '#customer-confirm', 'Secret-pass-1');
+    element.querySelector('form')!.dispatchEvent(new Event('submit'));
+    harness.detectChanges();
+    http.expectNone('http://api.test/users/customers');
+    expect(element.textContent).toContain('Select an adviser.');
+  });
+
   it('sends adviserId when a tenant admin creates a customer and omits it for an adviser', async () => {
     signIn(person('tenantAdmin'));
     const harness = await RouterTestingHarness.create('/customers/new');
@@ -210,6 +235,18 @@ describe('customers', () => {
     expect(harness.fixture.nativeElement.textContent).toContain('Not found');
   });
 });
+
+function adviserOption(id: string, name: string) {
+  return {
+    id,
+    name,
+    email: `${name.toLowerCase()}@firm`,
+    status: 'active',
+    rowVersion: 'rv',
+    tenantId: 'tenant-1',
+    created: '2026-01-01',
+  };
+}
 
 const customer = {
   id: 'cust-1',
