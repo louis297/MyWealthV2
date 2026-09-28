@@ -250,6 +250,29 @@ describe('customers', () => {
     expect(harness.fixture.nativeElement.querySelector('#edit-customer-adviser')).toBeNull();
   });
 
+  it('tells the user to reload when an edit row version is stale', async () => {
+    signIn(person('tenantAdmin'));
+    const harness = await RouterTestingHarness.create('/customers/cust-1/edit');
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne('http://api.test/users/customers/cust-1').flush(customer);
+    http.expectOne('http://api.test/users/advisers?page=1&pageSize=100&enabledOnly=true').flush({
+      items: [adviserOption('adv-1', 'Cara')],
+      page: 1,
+      pageSize: 100,
+      totalCount: 1,
+    });
+    harness.detectChanges();
+    const edit = harness.fixture.nativeElement as HTMLElement;
+    setValue(edit, '#edit-customer-name', 'Jordan Lee');
+    edit.querySelector('form')!.dispatchEvent(new Event('submit'));
+    const update = http.expectOne('http://api.test/users/customers/cust-1');
+    update.flush({ title: 'Conflict' }, { status: 409, statusText: 'Conflict' });
+    harness.detectChanges();
+    expect(edit.textContent).toContain('This row changed. Reload and try again.');
+    expect(TestBed.inject(Router).url).toBe('/customers/cust-1/edit');
+    http.expectNone('http://api.test/users/customers/cust-1');
+  });
+
   it('sends the current row version and tells the user to reload when it is stale', async () => {
     signIn(person('tenantAdmin'));
     const harness = await RouterTestingHarness.create('/customers/cust-1');
