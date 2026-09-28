@@ -21,7 +21,8 @@
   </mat-form-field>
   @if (isTenantAdmin) {
     <label for="customer-adviser">Adviser</label>
-    <select id="customer-adviser" name="adviserId" required (change)="adviserId = selectValue($event)">
+    <select id="customer-adviser" name="adviserId" required [value]="adviserId" (change)="adviserId = selectValue($event)">
+      <option value="">Select an adviser</option>
       @for (adviser of advisers(); track adviser.id) {
         <option [value]="adviser.id">{{ adviser.name }}</option>
       }

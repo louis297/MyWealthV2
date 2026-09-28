@@ -43,6 +43,11 @@ export class CustomerCreatePage implements OnInit {
       return;
     }
 
+    if (this.isTenantAdmin && !this.adviserId) {
+      this.error.set('Select an adviser.');
+      return;
+    }
+
     const body: { name: string; email: string; password: string; adviserId?: string } = {
       name: name.trim(),
       email: email.trim(),
