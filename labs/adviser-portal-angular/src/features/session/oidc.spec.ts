@@ -1,11 +1,12 @@
 import { challengeS256 } from './pkce';
-import { completeCallback, startAuthorize } from './oidc';
+import { completeCallback, isSignOutInProgress, startAuthorize, startEndSession } from './oidc';
 import {
   ACCESS_TOKEN_KEY,
   PKCE_STATE_KEY,
   PKCE_VERIFIER_KEY,
   REFRESH_TOKEN_KEY,
   RETURN_TO_KEY,
+  SIGN_OUT_IN_PROGRESS_KEY,
 } from './session.storage';
 
 const discovery = {
@@ -161,7 +162,103 @@ describe('authorize', () => {
 
     await expect(completeCallback(tokenSession())).resolves.toBe('/');
   });
+
+  it('revokes the refresh token and redirects to end-session', async () => {
+    sessionStorage.setItem(ACCESS_TOKEN_KEY, 'access-1');
+    sessionStorage.setItem(REFRESH_TOKEN_KEY, 'refresh-1');
+    const fetchMock = discoveryFetch({
+      revocation_endpoint: 'https://identity.test/connect/revocation',
+      end_session_endpoint: 'https://identity.test/connect/logout',
+    });
+    const assign = stubAssign();
+
+    await startEndSession(endSessionTarget(), 'https://identity.test');
+
+    expect(sessionStorage.getItem(ACCESS_TOKEN_KEY)).toBeNull();
+    expect(sessionStorage.getItem(REFRESH_TOKEN_KEY)).toBeNull();
+    expect(fetchMock.mock.calls[0][0]).toBe('https://identity.test/.well-known/openid-configuration');
+    expect(fetchMock.mock.calls[1][0]).toBe('https://identity.test/connect/revocation');
+    const revokeBody = new URLSearchParams(fetchMock.mock.calls[1][1].body as string);
+    expect(revokeBody.get('token')).toBe('refresh-1');
+    expect(revokeBody.get('token_type_hint')).toBe('refresh_token');
+    expect(revokeBody.get('client_id')).toBe('adviser-portal-angular');
+    expect(isSignOutInProgress()).toBe(true);
+    expect(assign).toHaveBeenCalledOnce();
+    const redirected = new URL(assign.mock.calls[0][0] as string);
+    expect(redirected.origin + redirected.pathname).toBe('https://identity.test/connect/logout');
+    expect(redirected.searchParams.get('client_id')).toBe('adviser-portal-angular');
+    expect(redirected.searchParams.get('post_logout_redirect_uri')).toBe('http://localhost:4200/');
+  });
+
+  it('still redirects to end-session when revocation fails', async () => {
+    sessionStorage.setItem(REFRESH_TOKEN_KEY, 'refresh-1');
+    const fetchMock = vi.fn().mockImplementation(async (input: string) => {
+      if (String(input).includes('openid-configuration')) {
+        return {
+          ok: true,
+          json: async () => ({
+            ...discovery,
+            revocation_endpoint: 'https://identity.test/connect/revocation',
+            end_session_endpoint: 'https://identity.test/connect/logout',
+          }),
+        };
+      }
+      throw new Error('network');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const assign = stubAssign();
+
+    await startEndSession(endSessionTarget(), 'https://identity.test');
+
+    expect(sessionStorage.getItem(REFRESH_TOKEN_KEY)).toBeNull();
+    expect(assign).toHaveBeenCalledOnce();
+  });
+
+  it('clears the session without assigning when end-session is missing', async () => {
+    sessionStorage.setItem(ACCESS_TOKEN_KEY, 'access-1');
+    discoveryFetch({});
+    const assign = stubAssign();
+
+    await startEndSession(endSessionTarget(), 'https://identity.test');
+
+    expect(sessionStorage.getItem(ACCESS_TOKEN_KEY)).toBeNull();
+    expect(assign).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem(SIGN_OUT_IN_PROGRESS_KEY)).toBe('1');
+  });
 });
+
+function discoveryFetch(extra: Record<string, string>) {
+  const fetchMock = vi.fn().mockImplementation(async (input: string) => {
+    if (String(input).includes('openid-configuration')) {
+      return { ok: true, json: async () => ({ ...discovery, ...extra }) };
+    }
+    return { ok: true, json: async () => ({}) };
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
+function stubAssign() {
+  const assign = vi.fn();
+  vi.stubGlobal('location', {
+    origin: 'http://localhost:4200',
+    href: 'http://localhost:4200/customers',
+    pathname: '/customers',
+    search: '',
+    assign,
+  });
+  return assign;
+}
+
+function endSessionTarget() {
+  return {
+    refreshToken: () => sessionStorage.getItem(REFRESH_TOKEN_KEY),
+    clear: () => {
+      sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+      sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+    },
+  };
+}
 
 function tokenSession() {
   return {

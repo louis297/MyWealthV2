@@ -157,3 +157,10 @@ async function redeemCallback(
 
   return isInAppPath(returnTo) ? returnTo : '/';
 }
+
+export async function startEndSession(
+  _session: { refreshToken(): string | null; clear(): void },
+  _authority: string,
+): Promise<void> {
+  return;
+}
