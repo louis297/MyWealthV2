@@ -8,6 +8,7 @@ import { CustomerDetailPage } from '../features/customers/customer-detail-page';
 import { CustomerEditPage } from '../features/customers/customer-edit-page';
 import { CustomersListPage } from '../features/customers/customers-list-page';
 import { ProfilePage } from '../features/profile/profile-page';
+import { CallbackPage } from '../features/session/callback-page';
 import { ForbiddenPage } from '../features/session/forbidden-page';
 import { allowRoles, homeRedirect, requireSession } from '../features/session/session.guards';
 import { HomePage } from '../features/session/home-page';
@@ -17,7 +18,7 @@ import { ShellLayout } from '../layouts/shell-layout';
 
 export const routes: Routes = [
   { path: 'session', component: SessionPage },
-  { path: 'callback', redirectTo: 'session' },
+  { path: 'callback', component: CallbackPage },
   { path: 'login', redirectTo: 'session' },
   {
     path: '',

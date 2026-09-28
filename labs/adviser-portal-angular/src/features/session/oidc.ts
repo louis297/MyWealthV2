@@ -93,8 +93,67 @@ export async function startAuthorize(authority: string): Promise<void> {
   }
 }
 
-export function completeCallback(_session: {
-  setTokens(accessToken: string, refreshToken: string | null): void;
-}): Promise<string> {
-  return Promise.resolve(sessionStorage.getItem(RETURN_TO_KEY) ?? '/');
+let callbackFlight: Promise<string> | null = null;
+
+export function completeCallback(
+  session: { setTokens(accessToken: string, refreshToken: string | null): void },
+  authority = '',
+): Promise<string> {
+  if (!callbackFlight) {
+    callbackFlight = redeemCallback(session, authority).finally(() => {
+      callbackFlight = null;
+    });
+  }
+
+  return callbackFlight;
+}
+
+async function redeemCallback(
+  session: { setTokens(accessToken: string, refreshToken: string | null): void },
+  authority: string,
+): Promise<string> {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const state = params.get('state');
+  const expectedState = sessionStorage.getItem(PKCE_STATE_KEY);
+  const verifier = sessionStorage.getItem(PKCE_VERIFIER_KEY);
+  const returnTo = sessionStorage.getItem(RETURN_TO_KEY);
+
+  if (!code || !state || !verifier || state !== expectedState) {
+    throw new Error('Sign-in callback was invalid.');
+  }
+
+  const current = new URL(window.location.href);
+  current.searchParams.delete('code');
+  window.history.replaceState(null, '', `${current.pathname}${current.search}${current.hash}`);
+
+  const { token_endpoint } = await discover(authority);
+  const response = await fetch(token_endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      code,
+      code_verifier: verifier,
+      redirect_uri: redirectUri(),
+      client_id: CLIENT_ID,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Token exchange failed.');
+  }
+
+  const tokens = (await response.json()) as { access_token?: string; refresh_token?: string };
+  if (!tokens.access_token) {
+    throw new Error('Token exchange failed.');
+  }
+
+  session.setTokens(tokens.access_token, tokens.refresh_token ?? null);
+  sessionStorage.removeItem(PKCE_VERIFIER_KEY);
+  sessionStorage.removeItem(PKCE_STATE_KEY);
+  sessionStorage.removeItem(PKCE_PENDING_KEY);
+  sessionStorage.removeItem(RETURN_TO_KEY);
+
+  return isInAppPath(returnTo) ? returnTo : '/';
 }

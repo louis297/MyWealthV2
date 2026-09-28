@@ -86,11 +86,15 @@ describe('session return and sign out', () => {
     expect(harness.fixture.nativeElement.textContent).toContain('Redirecting to sign in');
   });
 
-  it('sends callback and login to the session page', async () => {
-    const harness = await RouterTestingHarness.create('/callback');
+  it('sends login to the session page and keeps an invalid callback on its own url', async () => {
+    const harness = await RouterTestingHarness.create('/login');
     expect(TestBed.inject(Router).url).toBe('/session');
-    await harness.navigateByUrl('/login');
-    expect(TestBed.inject(Router).url).toBe('/session');
+    await harness.navigateByUrl('/callback');
+    expect(TestBed.inject(Router).url).toBe('/callback');
+    await vi.waitUntil(() => {
+      harness.detectChanges();
+      return (harness.fixture.nativeElement.textContent as string).includes('Sign-in callback was invalid.');
+    });
   });
 
   it('sign out clears tokens and returns to the sign-in redirect', async () => {
