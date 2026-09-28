@@ -77,6 +77,37 @@ describe('authorize', () => {
     expect(sessionStorage.getItem(RETURN_TO_KEY)).toBeNull();
   });
 
+  it('keeps the original return path when authorize starts from the sign-in page', async () => {
+    sessionStorage.setItem(RETURN_TO_KEY, '/customers/cust-1');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => discovery }));
+    vi.stubGlobal('location', {
+      origin: 'http://localhost:4200',
+      href: 'http://localhost:4200/session',
+      pathname: '/session',
+      search: '',
+      assign: vi.fn(),
+    });
+
+    await startAuthorize('https://identity.test');
+
+    expect(sessionStorage.getItem(RETURN_TO_KEY)).toBe('/customers/cust-1');
+  });
+
+  it('does not return to the sign-in page after the callback', async () => {
+    sessionStorage.setItem(PKCE_VERIFIER_KEY, 'verifier-1');
+    sessionStorage.setItem(PKCE_STATE_KEY, 'state-1');
+    sessionStorage.setItem(RETURN_TO_KEY, '/session');
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => discovery })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: 'access-token', refresh_token: 'refresh-token' }),
+      }));
+    stubCallbackLocation(new URL('http://localhost:4200/callback?code=abc&state=state-1'));
+
+    await expect(completeCallback(tokenSession())).resolves.toBe('/');
+  });
+
   it('exchanges the callback code and stores the tokens', async () => {
     sessionStorage.setItem(PKCE_VERIFIER_KEY, 'verifier-1');
     sessionStorage.setItem(PKCE_STATE_KEY, 'state-1');

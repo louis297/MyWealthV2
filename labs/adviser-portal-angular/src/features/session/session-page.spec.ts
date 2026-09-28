@@ -1,8 +1,9 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { SessionPage } from './session-page';
+import { SessionStore } from './session.store';
 import { RUNTIME_CONFIG } from '../../shared/api/runtime-config';
 import { authInterceptor } from '../../shared/auth/auth.interceptor';
 
@@ -54,5 +55,28 @@ describe('SessionPage', () => {
     expect(new URL(assign.mock.calls[0][0] as string).searchParams.get('client_id')).toBe(
       'adviser-portal-angular',
     );
+  });
+
+  it('continues into the app when a token is already stored', async () => {
+    const assign = vi.fn();
+    vi.stubGlobal('fetch', vi.fn());
+    vi.stubGlobal('location', {
+      origin: 'http://localhost:4200',
+      href: 'http://localhost:4200/session',
+      pathname: '/session',
+      search: '',
+      assign,
+    });
+    const session = TestBed.inject(SessionStore);
+    session.setTokens('access-1', 'refresh-1');
+    session.setReturnTo('/session');
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+
+    const fixture = TestBed.createComponent(SessionPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(assign).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledWith('/');
   });
 });
