@@ -90,6 +90,35 @@ describe('role shell', () => {
     expect(TestBed.inject(Router).url).toBe('/session');
   });
 
+  it('loads the user and firm name from a stored token', async () => {
+    const session = TestBed.inject(SessionStore);
+    session.setTokens('access-1', null);
+    const harness = await RouterTestingHarness.create('/customers');
+    const http = TestBed.inject(HttpTestingController);
+
+    const me = http.expectOne('http://api.test/users/me');
+    expect(me.request.headers.get('Authorization')).toBe('Bearer access-1');
+    me.flush(tenantAdmin());
+    http.expectOne('http://api.test/tenants/by-code/firm').flush({ id: 'tenant-1', name: 'Northwind', code: 'firm' });
+    harness.detectChanges();
+
+    expect(session.currentUser()?.name).toBe('Ada');
+    expect(session.tenantName()).toBe('Northwind');
+    expect(harness.fixture.nativeElement.textContent).toContain('Northwind');
+
+    await harness.navigateByUrl('/profile');
+    http.expectNone('http://api.test/users/me');
+  });
+
+  it('sends a stored customer token to forbidden after the probe', async () => {
+    TestBed.inject(SessionStore).setTokens('access-1', null);
+    const harness = await RouterTestingHarness.create('/customers');
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne('http://api.test/users/me').flush(customer());
+    await harness.fixture.whenStable();
+    expect(TestBed.inject(Router).url).toBe('/forbidden');
+  });
+
   it('sends a customer token to the forbidden page', async () => {
     signIn(customer());
     const harness = await RouterTestingHarness.create('/customers');
