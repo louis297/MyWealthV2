@@ -1,1 +1,137 @@
-/* You can add global styles to this file, and also import other style files */
+html,
+body,
+app-root {
+  height: 100%;
+}
+
+app-root {
+  display: block;
+}
+
+app-shell-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+app-shell-layout mat-sidenav-container {
+  flex: 1;
+}
+
+mat-toolbar {
+  gap: 16px;
+}
+
+mat-toolbar button {
+  margin-left: auto;
+}
+
+mat-sidenav {
+  width: 200px;
+  padding: 12px;
+  border-right: 1px solid var(--mat-sys-outline-variant);
+}
+
+mat-sidenav nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+mat-sidenav nav a {
+  display: block;
+  padding: 8px 12px;
+  border-radius: 4px;
+  color: inherit;
+  text-decoration: none;
+}
+
+mat-sidenav nav a:hover {
+  background: var(--mat-sys-surface-container);
+}
+
+mat-sidenav-content {
+  padding: 24px;
+}
+
+app-session-page,
+app-callback-page {
+  display: block;
+  padding: 24px;
+}
+
+h1 {
+  margin: 0 0 16px;
+  font: var(--mat-sys-headline-small);
+}
+
+p {
+  margin: 0 0 12px;
+}
+
+h1 + a {
+  display: inline-block;
+  margin-bottom: 16px;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  max-width: 28rem;
+  margin-bottom: 24px;
+}
+
+form mat-form-field {
+  width: 100%;
+}
+
+form label {
+  margin-top: 8px;
+}
+
+form select {
+  min-width: 16rem;
+  margin-bottom: 8px;
+  padding: 8px;
+}
+
+form button {
+  margin-top: 8px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+th {
+  font-weight: 500;
+}
+
+dl {
+  display: grid;
+  grid-template-columns: 8rem 1fr;
+  gap: 8px 16px;
+  margin: 0 0 16px;
+}
+
+dt {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+dd {
+  margin: 0;
+}
+
+a + button {
+  margin-left: 12px;
+}
