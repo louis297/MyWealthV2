@@ -21,8 +21,8 @@ This is a lab task: read `labs/LAB_AGENTS.md` first. Repo-root `AGENTS.md` still
 - Product Vite app and its packages
 - `docs/portals/adviser-portal.md`, ADR 0003, accepted Feature Specs (except you may add `labs/` copies)
 - ClientIds `customer-portal` and Back Office
-- Password grant; custom `/auth/login` on `webapi`
-- Hosted-login HTML, `/connect/authorize` start from this app, `/callback` token redeem, end-session from this app
+- Password grant; custom `/auth/login` on `webapi`; a password form in this app
+- Hard-coded `/connect/*` paths, or using client `adviser-portal` for this app’s tokens
 - New people / ledger HTTP, schema scripts, policies
 - NgRx global Store / Effects
 - Tailwind in the lab app
@@ -54,11 +54,11 @@ Do not put the Angular project under `src/`.
 
 ### Session
 
-Lab bearer panel at `/session`. Operator pastes access token (optional refresh). Probe `GET /users/me`. No field on this app issues tokens.
+Authorization code + PKCE. Unsigned visits redirect to identity. `/callback` stores the tokens and probes `GET /users/me`. No field on this app issues tokens.
 
-401: refresh once only when a refresh token is present; otherwise clear session and go to `/session`.
+401: refresh once only when a refresh token is present, as client `adviser-portal-angular`; otherwise clear the session and start authorize, unless sign-out is in progress.
 
-Sign out: clear store + `sessionStorage` only. Do not call `/connect/revocation` or `/connect/logout` in this cut.
+Sign out: revoke the refresh token, clear the store, and redirect to the discovery end-session endpoint.
 
 ### Host (Development only)
 
@@ -80,8 +80,8 @@ SystemAdmin: no Customers workspace on `/`. Customer token → `/forbidden`.
 
 1. `labs/` README + docs copied from this brief’s spec
 2. `ng new` Angular app in `labs/adviser-portal-angular` + Material + SignalStore wiring
-3. Aspire resource + CORS + OpenIddict seed row (no authorize from the app)
-4. Session panel + `GET /users/me` + role shell
+3. Aspire resource + CORS + OpenIddict seed row
+4. Authorize, callback, end-session, and `GET /users/me` + role shell
 5. Customers pages (list / new / detail / edit / disable / enable)
 6. Advisers pages (TenantAdmin)
 7. Profile + sign out

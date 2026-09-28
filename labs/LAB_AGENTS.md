@@ -37,7 +37,7 @@ Still: one behaviour per commit, tree builds after every commit, stop after 3 va
 | State | NgRx SignalStore only (`@ngrx/signals`) |
 | Shell | standalone + `provideRouter` + `provideHttpClient` |
 | Tokens | SignalStore + `sessionStorage` |
-| Session this cut | `/session` bearer paste → `GET /users/me`. No hosted login |
+| Session this cut | Authorization code + PKCE against `identity`, client `adviser-portal-angular`. No password form in this app |
 
 Do **not** apply ADR 0003, product `docs/portals/frontend-conventions.md`, Redux, RTK Query, or Tailwind inside `labs/`.
 
@@ -49,7 +49,7 @@ Do **not** apply ADR 0003, product `docs/portals/frontend-conventions.md`, Redux
 - Accepted product specs except a pointer that `labs/` exists (already in discussion `docs/README.md`)
 - ClientIds `customer-portal` and Back Office
 - Password grant; any lab field that issues tokens
-- `/connect/authorize`, `/callback` redeem, `/connect/revocation`, `/connect/logout` from this app (this cut)
+- Hard-coded `/connect/*` paths. Discover them. Do not authorize, refresh, revoke, or end session as client `adviser-portal`
 - New `webapi` routes, policies, or schema scripts
 - NgRx global Store / Effects / ComponentStore
 - SSR / Universal
@@ -66,4 +66,4 @@ Allowed Development-only host edits on a lab task: CORS origin for the lab, Open
 3. `labs/ADVISER_PORTAL_ANGULAR_CLI_BRIEF.md` when the implementer is the build CLI
 4. Product people specs only for HTTP shapes (`customers`, `advisers`, `identity-auth` `/users/me`, `tenants` by-code)
 
-Do not implement the lab from `docs/portals/adviser-portal.md` alone. That file is the React product cut, including hosted login.
+Use `docs/portals/adviser-portal.md` as the behaviour reference for authorize, callback, and end-session. This lab file wins for client id, folder layout, and the Angular session.
