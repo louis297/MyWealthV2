@@ -2,6 +2,9 @@
   <p>Not found</p>
 } @else if (customer(); as row) {
   <h1>Edit customer</h1>
+  @if (conflict()) {
+    <p>This row changed. Reload and try again.</p>
+  }
   <form (ngSubmit)="submit(row, nameField.value)">
     <mat-form-field>
       <mat-label>Name</mat-label>

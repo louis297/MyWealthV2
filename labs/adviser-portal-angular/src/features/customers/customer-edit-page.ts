@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -23,6 +24,7 @@ export class CustomerEditPage implements OnInit {
   protected readonly customer = signal<Customer | null>(null);
   protected readonly advisers = signal<AdviserOption[]>([]);
   protected readonly notFound = signal(false);
+  protected readonly conflict = signal(false);
   protected readonly isTenantAdmin = this.session.currentUser()?.role === roles.tenantAdmin;
   protected adviserId = '';
 
@@ -52,8 +54,15 @@ export class CustomerEditPage implements OnInit {
     if (this.isTenantAdmin) {
       body.adviserId = this.adviserId;
     }
-    this.api.update(customer.id, body).subscribe(() => {
-      void this.router.navigate(['/customers', customer.id]);
+    this.api.update(customer.id, body).subscribe({
+      next: () => {
+        void this.router.navigate(['/customers', customer.id]);
+      },
+      error: (error: unknown) => {
+        if (error instanceof HttpErrorResponse && error.status === 409) {
+          this.conflict.set(true);
+        }
+      },
     });
   }
 }
