@@ -200,6 +200,45 @@ describe('customers', () => {
     update.flush(null);
   });
 
+  it('returns to the customer after a saved edit', async () => {
+    signIn(person('tenantAdmin'));
+    const harness = await RouterTestingHarness.create('/customers/cust-1/edit');
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne('http://api.test/users/customers/cust-1').flush(customer);
+    http.expectOne('http://api.test/users/advisers?page=1&pageSize=100&enabledOnly=true').flush({
+      items: [adviserOption('adv-1', 'Cara'), adviserOption('adv-2', 'Ned')],
+      page: 1,
+      pageSize: 100,
+      totalCount: 2,
+    });
+    harness.detectChanges();
+    const edit = harness.fixture.nativeElement as HTMLElement;
+    setValue(edit, '#edit-customer-name', 'Jordan Lee');
+    setValue(edit, '#edit-customer-adviser', 'adv-2');
+    edit.querySelector('form')!.dispatchEvent(new Event('submit'));
+    const update = http.expectOne('http://api.test/users/customers/cust-1');
+    expect(update.request.body).toEqual({ name: 'Jordan Lee', adviserId: 'adv-2', rowVersion: 'rv-1' });
+    update.flush(null);
+    await harness.fixture.whenStable();
+    expect(TestBed.inject(Router).url).toBe('/customers/cust-1');
+    http.expectOne('http://api.test/users/customers/cust-1').flush(customer);
+
+    signIn(person('adviser', { id: 'adv-1', adviserId: 'adv-1' }));
+    await harness.navigateByUrl('/customers/cust-1/edit');
+    http.expectOne('http://api.test/users/customers/cust-1').flush(customer);
+    harness.detectChanges();
+    const adviserEdit = harness.fixture.nativeElement as HTMLElement;
+    setValue(adviserEdit, '#edit-customer-name', 'Pat Lee');
+    adviserEdit.querySelector('form')!.dispatchEvent(new Event('submit'));
+    const adviserUpdate = http.expectOne('http://api.test/users/customers/cust-1');
+    expect(adviserUpdate.request.body).toEqual({ name: 'Pat Lee', rowVersion: 'rv-1' });
+    expect(adviserUpdate.request.body).not.toHaveProperty('adviserId');
+    adviserUpdate.flush(null);
+    await harness.fixture.whenStable();
+    expect(TestBed.inject(Router).url).toBe('/customers/cust-1');
+    http.expectOne('http://api.test/users/customers/cust-1').flush(customer);
+  });
+
   it('hides the adviser control when an adviser edits a customer', async () => {
     signIn(person('adviser', { id: 'adv-1', adviserId: 'adv-1' }));
     const harness = await RouterTestingHarness.create('/customers/cust-1/edit');
