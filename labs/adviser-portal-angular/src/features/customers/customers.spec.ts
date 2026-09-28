@@ -198,6 +198,8 @@ describe('customers', () => {
     expect(update.request.method).toBe('PUT');
     expect(update.request.body).toEqual({ name: 'Jordan Lee', adviserId: 'adv-2', rowVersion: 'rv-1' });
     update.flush(null);
+    await harness.fixture.whenStable();
+    http.expectOne('http://api.test/users/customers/cust-1').flush(customer);
   });
 
   it('returns to the customer after a saved edit', async () => {
