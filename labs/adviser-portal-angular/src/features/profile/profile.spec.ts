@@ -9,6 +9,8 @@ import { authInterceptor } from '../../shared/auth/auth.interceptor';
 import { SessionStore } from '../session/session.store';
 
 describe('profile', () => {
+  let assign: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     sessionStorage.clear();
     TestBed.resetTestingModule();
@@ -30,12 +32,13 @@ describe('profile', () => {
         json: async () => ({ authorization_endpoint: 'https://identity.test/connect/authorize' }),
       }),
     );
+    assign = vi.fn();
     vi.stubGlobal('location', {
       origin: 'http://localhost:4200',
       href: 'http://localhost:4200/profile',
       pathname: '/profile',
       search: '',
-      assign: vi.fn(),
+      assign,
     });
   });
 
@@ -84,6 +87,10 @@ describe('profile', () => {
 
     expect(session.accessToken()).toBeNull();
     expect(session.refreshToken()).toBeNull();
-    expect(TestBed.inject(Router).url).toBe('/session');
+    expect(TestBed.inject(Router).url).toBe('/profile');
+    await vi.waitUntil(() => assign.mock.calls.length === 1);
+    expect(new URL(assign.mock.calls[0][0] as string).searchParams.get('client_id')).toBe(
+      'adviser-portal-angular',
+    );
   });
 });

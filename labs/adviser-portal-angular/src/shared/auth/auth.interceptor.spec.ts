@@ -5,7 +5,7 @@ import {
   type TestRequest,
 } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
+import { provideRouter } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { SessionStore } from '../../features/session/session.store';
 import { RUNTIME_CONFIG } from '../api/runtime-config';
@@ -46,39 +46,46 @@ describe('authInterceptor', () => {
     await pending;
   });
 
-  it('clears the session and opens /session on 401 when no refresh token is stored', async () => {
+  it('starts authorize on 401 when no refresh token is stored', async () => {
     const session = TestBed.inject(SessionStore);
     session.setTokens('access-1', null);
-    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    const assign = stubIdentity();
     const pending = firstValueFrom(TestBed.inject(HttpClient).get('/users/me'));
     TestBed.inject(HttpTestingController)
       .expectOne('http://api.test/users/me')
       .flush(null, { status: 401, statusText: 'Unauthorized' });
 
     await expect(pending).rejects.toBeTruthy();
+    await vi.waitUntil(() => assign.mock.calls.length === 1);
     expect(session.accessToken()).toBeNull();
-    expect(sessionStorage.length).toBe(0);
-    expect(navigate).toHaveBeenCalledWith(['/session']);
+    expect(new URL(assign.mock.calls[0][0] as string).searchParams.get('client_id')).toBe(
+      'adviser-portal-angular',
+    );
   });
 
-  it('refreshes once and retries with the new access token', async () => {
+  it('refreshes once at the discovered token endpoint for this client', async () => {
     const session = TestBed.inject(SessionStore);
     session.setTokens('old-access', 'refresh-1');
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ access_token: 'new-access', refresh_token: 'refresh-2' }),
-    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => discovered })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: 'new-access', refresh_token: 'refresh-2' }),
+      });
     vi.stubGlobal('fetch', fetchMock);
 
     const pending = firstValueFrom(TestBed.inject(HttpClient).get('/users/me'));
     const http = TestBed.inject(HttpTestingController);
     http.expectOne('http://api.test/users/me').flush(null, { status: 401, statusText: 'Unauthorized' });
 
-    await vi.waitUntil(() => fetchMock.mock.calls.length === 1);
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(String(init.body)).toContain('grant_type=refresh_token');
-    expect(String(init.body)).toContain('client_id=adviser-portal');
-    expect(String(init.body)).not.toContain('adviser-portal-angular');
+    await vi.waitUntil(() => fetchMock.mock.calls.length === 2);
+    expect(fetchMock.mock.calls[0][0]).toBe('https://identity.test/.well-known/openid-configuration');
+    expect(fetchMock.mock.calls[1][0]).toBe('https://identity.test/connect/token');
+    const body = String((fetchMock.mock.calls[1][1] as RequestInit).body);
+    expect(body).toContain('grant_type=refresh_token');
+    expect(body).toContain('client_id=adviser-portal-angular');
+    expect(body).not.toContain('client_id=adviser-portal&');
 
     const retry = await pendingRequest(http);
     expect(retry.request.headers.get('Authorization')).toBe('Bearer new-access');
@@ -87,31 +94,89 @@ describe('authInterceptor', () => {
 
     expect(session.accessToken()).toBe('new-access');
     expect(session.refreshToken()).toBe('refresh-2');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls.filter(([url]) => url === 'https://identity.test/connect/token')).toHaveLength(1);
+  });
+
+  it('starts authorize when refresh fails and does not authorize during sign-out', async () => {
+    const session = TestBed.inject(SessionStore);
+    session.setTokens('old-access', 'refresh-1');
+    const assign = stubIdentity();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (input: string) => {
+        if (String(input).includes('openid-configuration')) {
+          return { ok: true, json: async () => discovered };
+        }
+        return { ok: false, json: async () => ({}) };
+      }),
+    );
+
+    const pending = firstValueFrom(TestBed.inject(HttpClient).get('/users/me'));
+    TestBed.inject(HttpTestingController)
+      .expectOne('http://api.test/users/me')
+      .flush(null, { status: 401, statusText: 'Unauthorized' });
+
+    await expect(pending).rejects.toBeTruthy();
+    await vi.waitUntil(() => assign.mock.calls.length === 1);
+    expect(session.accessToken()).toBeNull();
+
+    sessionStorage.clear();
+    sessionStorage.setItem('adviser-portal-angular.signOutInProgress', '1');
+    session.setTokens('old-access', 'refresh-1');
+    assign.mockClear();
+    const duringSignOut = firstValueFrom(TestBed.inject(HttpClient).get('/users/me'));
+    TestBed.inject(HttpTestingController)
+      .expectOne('http://api.test/users/me')
+      .flush(null, { status: 401, statusText: 'Unauthorized' });
+    await expect(duringSignOut).rejects.toBeTruthy();
+    await Promise.resolve();
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it('does not refresh a second time when the retry is also 401', async () => {
     const session = TestBed.inject(SessionStore);
     session.setTokens('old-access', 'refresh-1');
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ access_token: 'new-access', refresh_token: 'refresh-2' }),
-    });
+    const assign = stubIdentity();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => discovered })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: 'new-access', refresh_token: 'refresh-2' }),
+      })
+      .mockResolvedValue({ ok: true, json: async () => discovered });
     vi.stubGlobal('fetch', fetchMock);
-    vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
 
     const pending = firstValueFrom(TestBed.inject(HttpClient).get('/users/me'));
     const http = TestBed.inject(HttpTestingController);
     http.expectOne('http://api.test/users/me').flush(null, { status: 401, statusText: 'Unauthorized' });
-    await vi.waitUntil(() => fetchMock.mock.calls.length === 1);
+    await vi.waitUntil(() => fetchMock.mock.calls.length === 2);
     (await pendingRequest(http)).flush(null, { status: 401, statusText: 'Unauthorized' });
 
     await expect(pending).rejects.toBeTruthy();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.waitUntil(() => assign.mock.calls.length === 1);
+    expect(fetchMock.mock.calls.filter(([url]) => url === 'https://identity.test/connect/token')).toHaveLength(1);
     expect(session.accessToken()).toBeNull();
-    expect(sessionStorage.length).toBe(0);
   });
 });
+
+const discovered = {
+  authorization_endpoint: 'https://identity.test/connect/authorize',
+  token_endpoint: 'https://identity.test/connect/token',
+};
+
+function stubIdentity() {
+  const assign = vi.fn();
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => discovered }));
+  vi.stubGlobal('location', {
+    origin: 'http://localhost:4200',
+    href: 'http://localhost:4200/customers',
+    pathname: '/customers',
+    search: '',
+    assign,
+  });
+  return assign;
+}
 
 async function pendingRequest(http: HttpTestingController): Promise<TestRequest> {
   let request: TestRequest | undefined;
