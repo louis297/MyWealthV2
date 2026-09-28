@@ -43,6 +43,7 @@ describe('customers', () => {
     );
 
     signIn(person('adviser', { id: 'adv-1', name: 'Cara', adviserId: 'adv-1' }));
+    await harness.navigateByUrl('/profile');
     await harness.navigateByUrl('/customers');
     flushCustomerList(http, false);
     harness.detectChanges();
