@@ -90,6 +90,37 @@ describe('role shell', () => {
     expect(TestBed.inject(Router).url).toBe('/session');
   });
 
+  it('does not show forbidden before a tenant admin token is probed', async () => {
+    const session = TestBed.inject(SessionStore);
+    session.setTokens('access-1', null);
+    const harness = await RouterTestingHarness.create('/customers');
+
+    expect(TestBed.inject(Router).url).toBe('/customers');
+    expect(harness.fixture.nativeElement.textContent).not.toContain('You do not have access to this page.');
+
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne('http://api.test/users/me').flush(tenantAdmin());
+    http.expectOne('http://api.test/tenants/by-code/firm').flush({ id: 'tenant-1', name: 'Northwind', code: 'firm' });
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+
+    expect(TestBed.inject(Router).url).toBe('/customers');
+    expect(harness.fixture.nativeElement.textContent).not.toContain('You do not have access to this page.');
+  });
+
+  it('opens customers after probing a tenant admin token from the home page', async () => {
+    TestBed.inject(SessionStore).setTokens('access-1', null);
+    const harness = await RouterTestingHarness.create('/');
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne('http://api.test/users/me').flush(tenantAdmin());
+    http.expectOne('http://api.test/tenants/by-code/firm').flush({ id: 'tenant-1', name: 'Northwind', code: 'firm' });
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+
+    expect(TestBed.inject(Router).url).toBe('/customers');
+    expect(harness.fixture.nativeElement.textContent).not.toContain('You do not have access to this page.');
+  });
+
   it('loads the user and firm name from a stored token', async () => {
     const session = TestBed.inject(SessionStore);
     session.setTokens('access-1', null);
