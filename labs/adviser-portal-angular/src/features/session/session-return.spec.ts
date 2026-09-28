@@ -34,6 +34,41 @@ describe('session return and sign out', () => {
     vi.unstubAllGlobals();
   });
 
+  it('starts authorize instead of asking for a pasted token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        authorization_endpoint: 'https://identity.test/connect/authorize',
+        token_endpoint: 'https://identity.test/connect/token',
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const assign = vi.fn();
+    vi.stubGlobal('location', {
+      origin: 'http://localhost:4200',
+      href: 'http://localhost:4200/customers/cust-1',
+      pathname: '/customers/cust-1',
+      search: '',
+      assign,
+    });
+
+    const harness = await RouterTestingHarness.create('/customers/cust-1');
+    const element = harness.fixture.nativeElement as HTMLElement;
+
+    expect(TestBed.inject(Router).url).toBe('/session');
+    expect(TestBed.inject(SessionStore).returnTo()).toBe('/customers/cust-1');
+    expect(element.textContent).toContain('Redirecting to sign in');
+    expect(element.querySelector('#access-token')).toBeNull();
+    expect(element.querySelector('#refresh-token')).toBeNull();
+    expect(element.querySelector('input[type="password"]')).toBeNull();
+    await vi.waitUntil(() => assign.mock.calls.length === 1);
+    const redirected = new URL(assign.mock.calls[0][0] as string);
+    expect(redirected.searchParams.get('client_id')).toBe('adviser-portal-angular');
+
+    await harness.navigateByUrl('/login');
+    expect(harness.fixture.nativeElement.textContent).toContain('Redirecting to sign in');
+  });
+
   it('sends callback and login to the session page', async () => {
     const harness = await RouterTestingHarness.create('/callback');
     expect(TestBed.inject(Router).url).toBe('/session');
