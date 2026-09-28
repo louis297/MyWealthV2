@@ -23,10 +23,25 @@ describe('profile', () => {
         },
       ],
     });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ authorization_endpoint: 'https://identity.test/connect/authorize' }),
+      }),
+    );
+    vi.stubGlobal('location', {
+      origin: 'http://localhost:4200',
+      href: 'http://localhost:4200/profile',
+      pathname: '/profile',
+      search: '',
+      assign: vi.fn(),
+    });
   });
 
   afterEach(() => {
     TestBed.inject(HttpTestingController).verify();
+    vi.unstubAllGlobals();
   });
 
   it('updates the name and clears the session after a password change', async () => {
@@ -67,7 +82,8 @@ describe('profile', () => {
     password.flush(null, { status: 204, statusText: 'No Content' });
     await harness.fixture.whenStable();
 
-    expect(sessionStorage.length).toBe(0);
+    expect(session.accessToken()).toBeNull();
+    expect(session.refreshToken()).toBeNull();
     expect(TestBed.inject(Router).url).toBe('/session');
   });
 });

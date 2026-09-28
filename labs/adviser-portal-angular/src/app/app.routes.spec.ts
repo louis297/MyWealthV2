@@ -24,17 +24,33 @@ describe('role shell', () => {
         },
       ],
     });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ authorization_endpoint: 'https://identity.test/connect/authorize' }),
+      }),
+    );
+    vi.stubGlobal('location', {
+      origin: 'http://localhost:4200',
+      href: 'http://localhost:4200/',
+      pathname: '/',
+      search: '',
+      assign: vi.fn(),
+    });
   });
 
   afterEach(() => {
     flushPeople();
     TestBed.inject(HttpTestingController).verify();
+    vi.unstubAllGlobals();
   });
 
   it('sends a signed-out visit to /customers to the session page', async () => {
     const harness = await RouterTestingHarness.create('/customers');
     expect(TestBed.inject(Router).url).toBe('/session');
-    expect(harness.fixture.nativeElement.querySelector('#access-token')).toBeTruthy();
+    expect(harness.fixture.nativeElement.textContent).toContain('Redirecting to sign in');
+    expect(harness.fixture.nativeElement.querySelector('#access-token')).toBeNull();
   });
 
   it('shows the firm name and staff navigation for a tenant admin', async () => {

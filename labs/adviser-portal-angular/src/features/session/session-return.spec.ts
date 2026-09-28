@@ -23,6 +23,23 @@ describe('session return and sign out', () => {
         },
       ],
     });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          authorization_endpoint: 'https://identity.test/connect/authorize',
+          token_endpoint: 'https://identity.test/connect/token',
+        }),
+      }),
+    );
+    vi.stubGlobal('location', {
+      origin: 'http://localhost:4200',
+      href: 'http://localhost:4200/',
+      pathname: '/',
+      search: '',
+      assign: vi.fn(),
+    });
   });
 
   afterEach(() => {
@@ -76,37 +93,20 @@ describe('session return and sign out', () => {
     expect(TestBed.inject(Router).url).toBe('/session');
   });
 
-  it('returns to the signed-out customer link after a successful probe', async () => {
-    const harness = await RouterTestingHarness.create('/customers/cust-1');
-    expect(TestBed.inject(Router).url).toBe('/session');
-    expect(TestBed.inject(SessionStore).returnTo()).toBe('/customers/cust-1');
-
-    const element = harness.fixture.nativeElement as HTMLElement;
-    const access = element.querySelector('#access-token') as HTMLTextAreaElement;
-    access.value = 'access-1';
-    element.querySelector('form')!.dispatchEvent(new Event('submit'));
-
-    TestBed.inject(HttpTestingController)
-      .expectOne('http://api.test/users/me')
-      .flush({
-        id: 'user-1',
-        name: 'Ada',
-        email: 'ada@firm',
-        role: 'tenantAdmin',
-        status: 'active',
-        tenantId: 'tenant-1',
-        tenantCode: null,
-        adviserId: null,
-        rowVersion: 'rv',
-      });
-    await harness.fixture.whenStable();
-
-    expect(TestBed.inject(Router).url).toBe('/customers/cust-1');
-  });
-
-  it('sign out clears sessionStorage and does not call identity', async () => {
-    const fetchMock = vi.fn();
+  it('sign out clears tokens and returns to the sign-in redirect', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ authorization_endpoint: 'https://identity.test/connect/authorize' }),
+    });
     vi.stubGlobal('fetch', fetchMock);
+    const assign = vi.fn();
+    vi.stubGlobal('location', {
+      origin: 'http://localhost:4200',
+      href: 'http://localhost:4200/customers',
+      pathname: '/customers',
+      search: '',
+      assign,
+    });
     const session = TestBed.inject(SessionStore);
     session.setTokens('access-1', 'refresh-1');
     session.setCurrentUser({
@@ -127,9 +127,11 @@ describe('session return and sign out', () => {
 
     button.click();
     await harness.fixture.whenStable();
+    await vi.waitUntil(() => assign.mock.calls.length === 1);
 
-    expect(sessionStorage.length).toBe(0);
+    expect(session.accessToken()).toBeNull();
+    expect(session.refreshToken()).toBeNull();
     expect(TestBed.inject(Router).url).toBe('/session');
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith('http://identity.test/.well-known/openid-configuration');
   });
 });
