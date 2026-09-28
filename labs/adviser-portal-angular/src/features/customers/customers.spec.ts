@@ -32,6 +32,25 @@ describe('customers', () => {
     vi.restoreAllMocks();
   });
 
+  it('links tenant admins and advisers to a new customer', async () => {
+    signIn(person('tenantAdmin'));
+    const harness = await RouterTestingHarness.create('/customers');
+    const http = TestBed.inject(HttpTestingController);
+    flushCustomerList(http, true);
+    harness.detectChanges();
+    expect(anchor(harness.fixture.nativeElement as HTMLElement, 'New customer')?.getAttribute('href')).toBe(
+      '/customers/new',
+    );
+
+    signIn(person('adviser', { id: 'adv-1', name: 'Cara', adviserId: 'adv-1' }));
+    await harness.navigateByUrl('/customers');
+    flushCustomerList(http, false);
+    harness.detectChanges();
+    expect(anchor(harness.fixture.nativeElement as HTMLElement, 'New customer')?.getAttribute('href')).toBe(
+      '/customers/new',
+    );
+  });
+
   it('joins adviser names for a tenant admin and does not ask for them as an adviser', async () => {
     signIn(person('tenantAdmin'));
     const harness = await RouterTestingHarness.create('/customers');
@@ -222,6 +241,29 @@ function person(role: string, extra: Partial<CurrentUser> = {}): CurrentUser {
     rowVersion: 'rv',
     ...extra,
   };
+}
+
+function flushCustomerList(http: HttpTestingController, tenantAdmin: boolean): void {
+  http.expectOne('http://api.test/users/customers?page=1&pageSize=20').flush({
+    items: [],
+    page: 1,
+    pageSize: 20,
+    totalCount: 0,
+  });
+  if (tenantAdmin) {
+    http.expectOne('http://api.test/users/advisers?page=1&pageSize=100').flush({
+      items: [],
+      page: 1,
+      pageSize: 100,
+      totalCount: 0,
+    });
+  } else {
+    http.expectNone('http://api.test/users/advisers?page=1&pageSize=100');
+  }
+}
+
+function anchor(element: HTMLElement, label: string): HTMLAnchorElement | undefined {
+  return [...element.querySelectorAll('a')].find((item) => item.textContent?.trim() === label);
 }
 
 function setValue(element: HTMLElement, selector: string, value: string): void {
