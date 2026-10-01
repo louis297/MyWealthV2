@@ -24,6 +24,7 @@
       <PackageReference Include="Shouldly" />
       <PackageReference Include="Aspire.Hosting.Testing" />
       <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+      <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
     </ItemGroup>
 
     <ItemGroup>
@@ -39,6 +40,9 @@
         </ProjectReference>
         <ProjectReference Include="..\..\src\IdentityHost\IdentityHost.csproj">
           <Aliases>IdentityApp</Aliases>
+        </ProjectReference>
+        <ProjectReference Include="..\..\src\BffAdviserPortal\BffAdviserPortal.csproj">
+          <Aliases>BffHost</Aliases>
         </ProjectReference>
         <ProjectReference Include="..\TestAppHost\TestAppHost.csproj" />
     </ItemGroup>
