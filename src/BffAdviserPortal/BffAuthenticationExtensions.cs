@@ -15,6 +15,13 @@ public static class BffAuthenticationExtensions
 
         builder.Services.AddAuthorization();
         builder.Services.AddSingleton<AuthorizationCodeGate>();
+        builder.Services.AddHttpForwarderWithServiceDiscovery();
+        var apiBaseAddress = builder.Configuration["Api:BaseAddress"] ?? "https+http://webapi";
+        builder.Services.AddHttpClient("bff-webapi", client =>
+        {
+            client.BaseAddress = new Uri(apiBaseAddress);
+        });
+        builder.Services.AddSingleton<IWebApiTransport, WebApiTransport>();
         builder.Services
             .AddAuthentication(options =>
             {

@@ -13,6 +13,8 @@ app.UseBffSecurityHeaders();
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapBffApi();
+
 app.MapGet("/bff/login", (string? returnUrl) =>
 {
     if (!ReturnUrls.IsAllowed(returnUrl))
