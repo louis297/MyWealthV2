@@ -21,8 +21,14 @@ public static class Services
 
     /// <summary>
     /// Aspire resource name and OIDC client id for the Adviser Portal.
+    /// The client id stays here. The Aspire resource that holds it is <see cref="BffAdviserPortal"/>.
     /// </summary>
     public const string AdviserPortal = "adviser-portal";
+
+    /// <summary>
+    /// Aspire resource name for the Adviser Portal BFF (src/BffAdviserPortal).
+    /// </summary>
+    public const string BffAdviserPortal = "bff-adviser-portal";
 
     /// <summary>
     /// The name of the Database Server service.

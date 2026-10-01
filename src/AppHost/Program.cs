@@ -31,6 +31,22 @@ var identity = builder.AddProject<Projects.IdentityHost>(Services.Identity)
 web.WithReference(identity)
     .WithEnvironment("Identity__Authority", identity.GetEndpoint("https"));
 
+var adviserPortalClientSecret = builder.AddParameter("adviser-portal-client-secret", secret: true);
+
+identity.WithEnvironment("Identity__AdviserPortalClientSecret", adviserPortalClientSecret);
+
+builder.AddProject<Projects.BffAdviserPortal>(Services.BffAdviserPortal)
+    .WithReference(web)
+    .WithReference(identity)
+    .WaitFor(web)
+    .WaitFor(identity)
+    .WithExternalHttpEndpoints()
+    .WithHttpHealthCheck("/health", endpointName: "http")
+    .WithAspNetCoreEnvironment()
+    .WithEnvironment("Authentication__Authority", identity.GetEndpoint("https"))
+    .WithEnvironment("Authentication__ClientSecret", adviserPortalClientSecret)
+    .WithEnvironment("Api__BaseAddress", "https+http://webapi");
+
 var portal = builder.AddViteApp(Services.AdviserPortal, "../AdviserPortal")
     .WithExternalHttpEndpoints()
     .WithEnvironment("VITE_IDENTITY_AUTHORITY", identity.GetEndpoint("https"))
