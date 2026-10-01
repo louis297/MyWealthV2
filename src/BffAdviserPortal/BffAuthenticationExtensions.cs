@@ -14,6 +14,7 @@ public static class BffAuthenticationExtensions
         var authority = builder.Configuration["Authentication:Authority"];
 
         builder.Services.AddAuthorization();
+        builder.Services.AddSingleton<AuthorizationCodeGate>();
         builder.Services
             .AddAuthentication(options =>
             {
@@ -87,8 +88,68 @@ public static class BffAuthenticationExtensions
                 options.Scope.Add("api");
                 options.TokenValidationParameters.NameClaimType = "name";
                 options.TokenValidationParameters.RoleClaimType = "role";
+                options.Events = new OpenIdConnectEvents
+                {
+                    OnAuthorizationCodeReceived = OnAuthorizationCodeReceivedAsync,
+                    OnTokenResponseReceived = context =>
+                    {
+                        CompleteOwner(context.HttpContext, context.TokenEndpointResponse);
+                        return Task.CompletedTask;
+                    },
+                    OnRemoteFailure = context =>
+                    {
+                        CompleteOwner(context.HttpContext, message: null);
+                        return Task.CompletedTask;
+                    }
+                };
             });
 
         return builder;
+    }
+
+    private static async Task OnAuthorizationCodeReceivedAsync(AuthorizationCodeReceivedContext context)
+    {
+        var code = context.ProtocolMessage.Code;
+        if (string.IsNullOrEmpty(code))
+        {
+            return;
+        }
+
+        var gate = context.HttpContext.RequestServices.GetRequiredService<AuthorizationCodeGate>();
+        var lease = await gate.EnterAsync(code, context.HttpContext.RequestAborted);
+        if (lease.IsOwner)
+        {
+            context.HttpContext.Items[AuthorizationCodeGate.OwnerItem] = code;
+            return;
+        }
+
+        var snapshot = lease.Snapshot;
+        if (snapshot is null || string.IsNullOrEmpty(snapshot.Value.IdToken))
+        {
+            context.Fail("The authorization code was already redeemed.");
+            return;
+        }
+
+        context.HandleCodeRedemption(new OpenIdConnectMessage
+        {
+            AccessToken = snapshot.Value.AccessToken,
+            IdToken = snapshot.Value.IdToken,
+            RefreshToken = snapshot.Value.RefreshToken,
+            TokenType = "Bearer"
+        });
+    }
+
+    private static void CompleteOwner(HttpContext http, OpenIdConnectMessage? message)
+    {
+        if (http.Items[AuthorizationCodeGate.OwnerItem] is not string code)
+        {
+            return;
+        }
+
+        http.Items.Remove(AuthorizationCodeGate.OwnerItem);
+        var snapshot = message is null
+            ? (AuthorizationCodeGate.Snapshot?)null
+            : new AuthorizationCodeGate.Snapshot(message.AccessToken, message.IdToken, message.RefreshToken);
+        http.RequestServices.GetRequiredService<AuthorizationCodeGate>().Complete(code, snapshot);
     }
 }

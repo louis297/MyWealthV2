@@ -8,8 +8,9 @@ namespace MyWealthV2.Application.FunctionalTests.Infrastructure;
 
 public sealed class OpenIdConnectTestClient(Func<HttpClient> createClient)
 {
-    private const string RedirectUri = "https://localhost/callback";
+    private const string RedirectUri = "https://localhost/signin-oidc";
     private const string ClientId = "adviser-portal";
+    private const string ClientSecret = AdviserPortalTestSecret.Value;
 
     public HttpClient CreateSessionClient() => CreateClient();
 
@@ -75,6 +76,7 @@ public sealed class OpenIdConnectTestClient(Func<HttpClient> createClient)
         {
             ["grant_type"] = "authorization_code",
             ["client_id"] = ClientId,
+            ["client_secret"] = ClientSecret,
             ["redirect_uri"] = RedirectUri,
             ["code"] = code,
             ["code_verifier"] = verifier
@@ -116,7 +118,8 @@ public sealed class OpenIdConnectTestClient(Func<HttpClient> createClient)
         {
             ["token"] = refreshToken,
             ["token_type_hint"] = "refresh_token",
-            ["client_id"] = ClientId
+            ["client_id"] = ClientId,
+            ["client_secret"] = ClientSecret
         });
         var response = await identityClient.PostAsync("/connect/revocation", request);
         await response.Content.LoadIntoBufferAsync();
@@ -130,6 +133,7 @@ public sealed class OpenIdConnectTestClient(Func<HttpClient> createClient)
         {
             ["grant_type"] = "refresh_token",
             ["client_id"] = ClientId,
+            ["client_secret"] = ClientSecret,
             ["refresh_token"] = refreshToken
         });
         var response = await identityClient.PostAsync("/connect/token", tokenRequest);

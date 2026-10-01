@@ -4,7 +4,9 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Web;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Infrastructure.Identity;
+using OpenIddict.Abstractions;
 
 namespace MyWealthV2.Application.FunctionalTests.Bff;
 
@@ -18,7 +20,7 @@ public class BffCallbackTests
     private HttpClient _identity = null!;
 
     [OneTimeSetUp]
-    public void Start()
+    public async Task Start()
     {
         using var probe = FunctionalTestSetup.Identity.CreateClient();
         var authority = probe.BaseAddress!;
@@ -29,10 +31,12 @@ public class BffCallbackTests
             AllowAutoRedirect = false,
             HandleCookies = false
         });
-        _identity = new HttpClient(FunctionalTestSetup.Identity.Server.CreateHandler())
+        _identity = FunctionalTestSetup.Identity.CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = authority
-        };
+            AllowAutoRedirect = false,
+            HandleCookies = true
+        });
+        await RegisterBffOriginAsync();
     }
 
     [OneTimeTearDown]
@@ -80,14 +84,44 @@ public class BffCallbackTests
             }
         }
 
-        var session = responses
+        var sessionCookies = responses
             .SelectMany(response => response.Headers.TryGetValues("Set-Cookie", out var values) ? values : [])
-            .Single(value => value.StartsWith(SessionCookieName + "=", StringComparison.Ordinal));
-        session.Contains("domain=", StringComparison.OrdinalIgnoreCase).ShouldBeFalse();
-        session.Contains("expires=", StringComparison.OrdinalIgnoreCase).ShouldBeFalse();
-        session.Contains("max-age=", StringComparison.OrdinalIgnoreCase).ShouldBeFalse();
+            .Where(value => value.StartsWith(SessionCookieName + "=", StringComparison.Ordinal))
+            .ToArray();
+        sessionCookies.Length.ShouldBeGreaterThan(0);
+        foreach (var session in sessionCookies)
+        {
+            session.Contains("domain=", StringComparison.OrdinalIgnoreCase).ShouldBeFalse();
+            session.Contains("expires=", StringComparison.OrdinalIgnoreCase).ShouldBeFalse();
+            session.Contains("max-age=", StringComparison.OrdinalIgnoreCase).ShouldBeFalse();
+        }
 
         responses.Any(response => response.StatusCode == HttpStatusCode.Redirect).ShouldBeTrue();
+    }
+
+    private async Task RegisterBffOriginAsync()
+    {
+        using var scope = FunctionalTestSetup.Identity.Services.CreateScope();
+        var manager = scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
+        var application = await manager.FindByClientIdAsync(Services.AdviserPortal)
+            ?? throw new InvalidOperationException("adviser-portal is not registered.");
+        var descriptor = new OpenIddictApplicationDescriptor();
+        await manager.PopulateAsync(descriptor, application);
+        descriptor.ClientSecret = AdviserPortalTestSecret.Value;
+        var origin = _bff.BaseAddress!.ToString().TrimEnd('/');
+        var redirect = new Uri(origin + "/signin-oidc");
+        var postLogout = new Uri(origin + "/");
+        if (!descriptor.RedirectUris.Contains(redirect))
+        {
+            descriptor.RedirectUris.Add(redirect);
+        }
+
+        if (!descriptor.PostLogoutRedirectUris.Contains(postLogout))
+        {
+            descriptor.PostLogoutRedirectUris.Add(postLogout);
+        }
+
+        await manager.UpdateAsync(application, descriptor);
     }
 
     private async Task<Uri> SignInUntilCallbackAsync(Uri authorize)

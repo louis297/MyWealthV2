@@ -13,6 +13,7 @@ public class IdentityFactory(
     {
         builder.UseSetting($"ConnectionStrings:{MyWealthV2.Shared.Services.Database}", connectionString);
         builder.UseEnvironment("Development");
+        builder.UseSetting("Identity:AdviserPortalClientSecret", AdviserPortalTestSecret.Value);
         if (extraSettings is null)
         {
             return;

@@ -21,11 +21,11 @@ public class OpenIddictPortalOriginTests
         });
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var accepted = await client.GetAsync(Authorize("https://portal.test/callback"));
+        var accepted = await client.GetAsync(Authorize("https://portal.test/signin-oidc"));
         accepted.StatusCode.ShouldBe(HttpStatusCode.Redirect);
         accepted.Headers.Location!.ToString().Contains("/login", StringComparison.OrdinalIgnoreCase).ShouldBeTrue();
 
-        var rejected = await client.GetAsync(Authorize("https://localhost/callback"));
+        var rejected = await client.GetAsync(Authorize("https://localhost/signin-oidc"));
         rejected.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
@@ -39,9 +39,9 @@ public class OpenIddictPortalOriginTests
         });
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        (await client.GetAsync(Authorize("http://127.0.0.1:5173/callback")))
+        (await client.GetAsync(Authorize("http://127.0.0.1:5173/signin-oidc")))
             .StatusCode.ShouldBe(HttpStatusCode.Redirect);
-        (await client.GetAsync(Authorize("https://127.0.0.1:5173/callback")))
+        (await client.GetAsync(Authorize("https://127.0.0.1:5173/signin-oidc")))
             .StatusCode.ShouldBe(HttpStatusCode.Redirect);
     }
 

@@ -2,7 +2,7 @@ namespace MyWealthV2.IdentityHost;
 
 public static class OpenIddictClientUris
 {
-    public static readonly Uri FallbackRedirect = new("https://localhost/callback");
+    public static readonly Uri FallbackRedirect = new("https://localhost/signin-oidc");
     public static readonly Uri FallbackPostLogout = new("https://localhost/");
 
     public static IReadOnlyList<string> ReadPortalOrigins(IConfiguration configuration)
@@ -41,7 +41,7 @@ public static class OpenIddictClientUris
         }
 
         return (
-            normalized.Select(origin => new Uri(origin + "/callback")).ToArray(),
+            normalized.Select(origin => new Uri(origin + "/signin-oidc")).ToArray(),
             normalized.Select(origin => new Uri(origin + "/")).ToArray());
     }
 

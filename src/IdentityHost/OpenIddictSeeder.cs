@@ -27,6 +27,12 @@ public static class OpenIddictSeeder
         var origins = OpenIddictClientUris.ReadPortalOrigins(configuration);
         var (redirects, postLogout) = OpenIddictClientUris.FromOrigins(origins);
 
+        var secret = configuration["Identity:AdviserPortalClientSecret"];
+        if (string.IsNullOrWhiteSpace(secret))
+        {
+            throw new InvalidOperationException("Identity:AdviserPortalClientSecret is required.");
+        }
+
         var existing = await manager.FindByClientIdAsync("adviser-portal", cancellationToken);
         var descriptor = new OpenIddictApplicationDescriptor();
         if (existing is not null)
@@ -35,7 +41,8 @@ public static class OpenIddictSeeder
         }
 
         descriptor.ClientId = "adviser-portal";
-        descriptor.ClientType = ClientTypes.Public;
+        descriptor.ClientType = ClientTypes.Confidential;
+        descriptor.ClientSecret = secret;
         descriptor.ConsentType = ConsentTypes.Implicit;
         descriptor.DisplayName = "Adviser Portal";
         descriptor.Requirements.Add(Requirements.Features.ProofKeyForCodeExchange);
