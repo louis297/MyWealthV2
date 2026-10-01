@@ -11,6 +11,8 @@ public sealed class RecordingWebApi : IWebApiTransport
 
     public Dictionary<string, (HttpStatusCode Status, string Body)> Scripts { get; } = [];
 
+    public Queue<(HttpStatusCode Status, string Body)> Next { get; } = new();
+
     public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         Calls.Add(new CapturedCall(
@@ -23,6 +25,12 @@ public sealed class RecordingWebApi : IWebApiTransport
             request.Content?.Headers.ContentType?.ToString()));
 
         var path = request.RequestUri?.AbsolutePath ?? "";
+        if (Next.Count > 0)
+        {
+            var next = Next.Dequeue();
+            return Task.FromResult(Json(next.Status, next.Body));
+        }
+
         if (Scripts.TryGetValue(path, out var script))
         {
             return Task.FromResult(new HttpResponseMessage(script.Status)
@@ -31,11 +39,14 @@ public sealed class RecordingWebApi : IWebApiTransport
             });
         }
 
-        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json")
-        });
+        return Task.FromResult(Json(HttpStatusCode.OK, "{}"));
     }
+
+    private static HttpResponseMessage Json(HttpStatusCode status, string body) =>
+        new(status)
+        {
+            Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json")
+        };
 }
 
 public sealed record CapturedCall(
