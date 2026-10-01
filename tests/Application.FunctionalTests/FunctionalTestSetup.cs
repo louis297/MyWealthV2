@@ -13,6 +13,7 @@ public class FunctionalTestSetup
     internal static IServiceScopeFactory ScopeFactory { get; private set; } = null!;
     internal static IServiceProvider WebApiServices => _factory!.Services;
     internal static HttpClient WebClient { get; private set; } = null!;
+    internal static HttpMessageHandler WebApiHandler { get; private set; } = null!;
     internal static OpenIdConnectTestClient Oidc { get; private set; } = null!;
     internal static IdentityFactory Identity { get; private set; } = null!;
     internal static DatabaseResetter? DbResetter { get; private set; }
@@ -67,6 +68,7 @@ public class FunctionalTestSetup
         ScopeFactory = _factory.Services.GetRequiredService<IServiceScopeFactory>();
         DbResetter = await DatabaseResetter.CreateAsync(connectionString);
 
+        WebApiHandler = _factory.Server.CreateHandler();
         WebClient = _factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false
@@ -83,6 +85,7 @@ public class FunctionalTestSetup
     public async Task OneTimeTearDown()
     {
         WebClient?.Dispose();
+        WebApiHandler?.Dispose();
         if (DbResetter is not null) await DbResetter.DisposeAsync();
         if (_factory is not null) await _factory.DisposeAsync();
         if (_identityFactory is not null) await _identityFactory.DisposeAsync();
