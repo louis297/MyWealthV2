@@ -19,19 +19,22 @@ public sealed class BffFactory : WebApplicationFactory<BffHost::Program>
     private readonly string _environment;
     private readonly IWebApiTransport? _api;
     private readonly string? _apiBaseAddress;
+    private readonly string? _spaDevServerUrl;
 
     public BffFactory(
         string authority,
         HttpMessageHandler identityHandler,
         string environment = "Development",
         IWebApiTransport? api = null,
-        string? apiBaseAddress = null)
+        string? apiBaseAddress = null,
+        string? spaDevServerUrl = null)
     {
         _authority = authority.TrimEnd('/');
         _identityHandler = identityHandler;
         _environment = environment;
         _api = api;
         _apiBaseAddress = apiBaseAddress;
+        _spaDevServerUrl = spaDevServerUrl;
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -42,6 +45,11 @@ public sealed class BffFactory : WebApplicationFactory<BffHost::Program>
         if (!string.IsNullOrWhiteSpace(_apiBaseAddress))
         {
             builder.UseSetting("Api:BaseAddress", _apiBaseAddress);
+        }
+
+        if (!string.IsNullOrWhiteSpace(_spaDevServerUrl))
+        {
+            builder.UseSetting("Spa:DevServerUrl", _spaDevServerUrl);
         }
 
         builder.ConfigureTestServices(services =>
