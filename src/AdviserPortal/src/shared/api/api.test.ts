@@ -1,7 +1,7 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { customersApi } from "@/features/customers/customersApi";
-import { sessionSlice, setTokens } from "@/features/session/sessionSlice";
+import { sessionSlice } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
 
 const me = {
@@ -53,7 +53,6 @@ describe("BFF API client", () => {
     );
 
     const store = createStore();
-    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
     const result = await store.dispatch(api.endpoints.getMe.initiate());
 
     expect(result.data).toEqual(me);
@@ -76,7 +75,6 @@ describe("BFF API client", () => {
     );
 
     const store = createStore();
-    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
     await store.dispatch(
       customersApi.endpoints.createCustomer.initiate({
         name: "Ada",
@@ -109,7 +107,6 @@ describe("BFF API client", () => {
     });
 
     const store = createStore();
-    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
     await store.dispatch(api.endpoints.getMe.initiate());
 
     expect(fetchMock).toHaveBeenCalledOnce();

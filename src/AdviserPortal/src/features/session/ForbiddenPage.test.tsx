@@ -4,7 +4,7 @@ import { ForbiddenPage } from "@/features/session/ForbiddenPage";
 
 const startEndSession = vi.fn();
 
-vi.mock("@/features/session/oidc", () => ({
+vi.mock("@/features/session/session", () => ({
   startEndSession: () => startEndSession(),
 }));
 

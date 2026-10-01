@@ -8,7 +8,6 @@ import { CustomerDetailPage } from "@/features/customers/CustomerDetailPage";
 import { CustomersListPage } from "@/features/customers/CustomersListPage";
 import { EditCustomerPage } from "@/features/customers/EditCustomerPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
-import { CallbackPage } from "@/features/session/CallbackPage";
 import { ForbiddenPage } from "@/features/session/ForbiddenPage";
 import { HomePage } from "@/features/session/HomePage";
 import { RequireSession } from "@/features/session/RequireSession";
@@ -18,10 +17,6 @@ import { SessionProbePage } from "@/features/session/SessionProbePage";
 import { ShellLayout } from "@/layouts/ShellLayout";
 
 export const appRoutes: RouteObject[] = [
-  {
-    path: "/callback",
-    element: <CallbackPage />,
-  },
   {
     element: <RequireSession />,
     children: [

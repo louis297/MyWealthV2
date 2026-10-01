@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const startEndSession = vi.fn();
 
-vi.mock("@/features/session/oidc", () => ({
+vi.mock("@/features/session/session", () => ({
   startEndSession: () => startEndSession(),
 }));
 import {

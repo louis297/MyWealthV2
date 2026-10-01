@@ -4,17 +4,16 @@ import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ProfilePage } from "@/features/profile/ProfilePage";
-import { sessionSlice, setCurrentUser, setTokens, type CurrentUser } from "@/features/session/sessionSlice";
-import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from "@/features/session/oidcStorage";
+import { sessionSlice, setCurrentUser, type CurrentUser } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
 
-const startAuthorize = vi.fn();
+const startLogin = vi.fn();
 
-vi.mock("@/features/session/oidc", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/features/session/oidc")>();
+vi.mock("@/features/session/session", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/features/session/session")>();
   return {
     ...actual,
-    startAuthorize: () => startAuthorize(),
+    startLogin: () => startLogin(),
   };
 });
 
@@ -41,7 +40,6 @@ function renderProfile(me: CurrentUser) {
     },
     middleware: (getDefault) => getDefault().concat(api.middleware),
   });
-  store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
   store.dispatch(setCurrentUser(me));
 
   const router = createMemoryRouter(
@@ -60,9 +58,8 @@ function renderProfile(me: CurrentUser) {
 
 describe("ProfilePage", () => {
   beforeEach(() => {
-    startAuthorize.mockReset();
+    startLogin.mockReset();
     sessionStorage.clear();
-    vi.stubEnv("VITE_WEBAPI_BASE_URL", "https://webapi.test");
     vi.stubGlobal("fetch", vi.fn());
   });
 
@@ -85,7 +82,7 @@ describe("ProfilePage", () => {
     await waitFor(async () => {
       expect(fetchMock).toHaveBeenCalled();
       const request = fetchMock.mock.calls[0][0] as Request;
-      expect(request.url).toBe("https://webapi.test/users/me");
+      expect(request.url).toBe("http://localhost:3000/api/users/me");
       expect(request.method).toBe("PUT");
       expect(JSON.parse(await request.clone().text())).toEqual({
         name: "Pat Updated",
@@ -109,14 +106,12 @@ describe("ProfilePage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Change password" }));
 
     await waitFor(() => {
-      expect(store.getState().session.accessToken).toBeNull();
-      expect(sessionStorage.getItem(ACCESS_TOKEN_KEY)).toBeNull();
-      expect(sessionStorage.getItem(REFRESH_TOKEN_KEY)).toBeNull();
-      expect(startAuthorize).toHaveBeenCalledOnce();
+      expect(store.getState().session.currentUser).toBeNull();
+      expect(startLogin).toHaveBeenCalledOnce();
     });
 
     const request = fetchMock.mock.calls[0][0] as Request;
-    expect(request.url).toBe("https://webapi.test/users/me/password");
+    expect(request.url).toBe("http://localhost:3000/api/users/me/password");
     expect(JSON.parse(await request.clone().text())).toEqual({
       currentPassword: "old-pass-1",
       newPassword: "new-pass-12",

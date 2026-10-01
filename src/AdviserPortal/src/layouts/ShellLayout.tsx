@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { NavLink, Outlet } from "react-router";
 import { useAppSelector } from "@/app/hooks";
-import { startEndSession } from "@/features/session/oidc";
+import { startEndSession } from "@/features/session/session";
 import {
   canAccessAdvisers,
   canAccessCustomers,

@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from "react";
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
 import { useUpdateMeMutation, useUpdateMePasswordMutation } from "@/features/profile/profileApi";
-import { startAuthorize } from "@/features/session/oidc";
+import { startLogin } from "@/features/session/session";
 import { clearSession } from "@/features/session/sessionSlice";
 
 export function ProfilePage() {
@@ -28,7 +28,7 @@ export function ProfilePage() {
     event.preventDefault();
     await updateMePassword({ currentPassword, newPassword }).unwrap();
     dispatch(clearSession());
-    await startAuthorize();
+    startLogin();
   }
 
   return (

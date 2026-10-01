@@ -1,47 +1,34 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  clearSession,
-  hydrateSession,
-  sessionSlice,
-  setTokens,
-} from "@/features/session/sessionSlice";
-
-const storageKey = {
-  access: "adviser-portal.accessToken",
-  refresh: "adviser-portal.refreshToken",
-};
+import { clearSession, sessionSlice, setCurrentUser } from "@/features/session/sessionSlice";
 
 describe("session slice", () => {
   beforeEach(() => {
     sessionStorage.clear();
   });
 
-  it("persists tokens to sessionStorage and hydrates them", () => {
-    const withTokens = sessionSlice.reducer(
+  it("does not store access or refresh tokens", () => {
+    const state = sessionSlice.reducer(
       sessionSlice.getInitialState(),
-      setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }),
+      setCurrentUser({
+        id: "1",
+        name: "Pat",
+        email: "pat@firm.example",
+        role: "tenantAdmin",
+        status: "active",
+        tenantId: null,
+        tenantCode: "firm",
+        adviserId: null,
+        rowVersion: "AAAA",
+      }),
     );
 
-    expect(withTokens.accessToken).toBe("access-1");
-    expect(withTokens.refreshToken).toBe("refresh-1");
-    expect(sessionStorage.getItem(storageKey.access)).toBe("access-1");
-    expect(sessionStorage.getItem(storageKey.refresh)).toBe("refresh-1");
+    expect(state.currentUser?.name).toBe("Pat");
+    expect(sessionStorage.getItem("adviser-portal.accessToken")).toBeNull();
+    expect(sessionStorage.getItem("adviser-portal.refreshToken")).toBeNull();
+    expect("accessToken" in state).toBe(false);
+    expect("refreshToken" in state).toBe(false);
 
-    const hydrated = sessionSlice.reducer(sessionSlice.getInitialState(), hydrateSession());
-    expect(hydrated.accessToken).toBe("access-1");
-    expect(hydrated.refreshToken).toBe("refresh-1");
-  });
-
-  it("clears tokens from redux and sessionStorage", () => {
-    sessionSlice.reducer(
-      sessionSlice.getInitialState(),
-      setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }),
-    );
-
-    const cleared = sessionSlice.reducer(sessionSlice.getInitialState(), clearSession());
-    expect(cleared.accessToken).toBeNull();
-    expect(cleared.refreshToken).toBeNull();
-    expect(sessionStorage.getItem(storageKey.access)).toBeNull();
-    expect(sessionStorage.getItem(storageKey.refresh)).toBeNull();
+    const cleared = sessionSlice.reducer(state, clearSession());
+    expect(cleared.currentUser).toBeNull();
   });
 });

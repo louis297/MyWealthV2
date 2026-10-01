@@ -21,6 +21,10 @@ related:
 
 # Frontend implementation notes
 
+## BFF cut
+
+The browser talks only to `bff-adviser-portal`. The session cookie is `__Host-bff-adviser-portal`. API calls use base `/api` with `credentials: 'include'` and no `Authorization` header. Mutations and sign-out send `X-MyWealth-Request: 1`. Signed-out navigation goes to `GET /bff/login?returnUrl=`. Sign-out is `POST /bff/logout` with that header, then `GET /bff/logout/continue`. There is no SPA `/callback` and no token in `sessionStorage`. The notes below describe the earlier public-client shell.
+
 Page-by-page construction notes for the Adviser Portal **pages** cut. Not a backend Feature Spec.
 
 - Inventory, role gate, acceptance → [adviser-portal.md](adviser-portal.md)

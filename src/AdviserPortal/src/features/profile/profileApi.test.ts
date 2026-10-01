@@ -1,16 +1,16 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { profileApi } from "@/features/profile/profileApi";
-import { sessionSlice, setTokens } from "@/features/session/sessionSlice";
+import { sessionSlice } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
 
-const startAuthorize = vi.fn();
+const startLogin = vi.fn();
 
-vi.mock("@/features/session/oidc", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/features/session/oidc")>();
+vi.mock("@/features/session/session", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/features/session/session")>();
   return {
     ...actual,
-    startAuthorize: () => startAuthorize(),
+    startLogin: () => startLogin(),
   };
 });
 
@@ -26,9 +26,8 @@ function createStore() {
 
 describe("profile API", () => {
   beforeEach(() => {
-    startAuthorize.mockReset();
+    startLogin.mockReset();
     sessionStorage.clear();
-    vi.stubEnv("VITE_WEBAPI_BASE_URL", "https://webapi.test");
     vi.stubGlobal("fetch", vi.fn());
   });
 
@@ -37,16 +36,16 @@ describe("profile API", () => {
     fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
 
     const store = createStore();
-    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
 
     await store.dispatch(
       profileApi.endpoints.updateMe.initiate({ name: "Pat Updated", rowVersion: "AAAA" }),
     );
 
     const request = fetchMock.mock.calls[0][0] as Request;
-    expect(request.url).toBe("https://webapi.test/users/me");
+    expect(request.url).toBe("http://localhost:3000/api/users/me");
     expect(request.method).toBe("PUT");
-    expect(request.headers.get("Authorization")).toBe("Bearer access-1");
+    expect(request.headers.get("Authorization")).toBeNull();
+    expect(request.credentials).toBe("include");
     expect(JSON.parse(await request.text())).toEqual({
       name: "Pat Updated",
       rowVersion: "AAAA",
@@ -58,7 +57,6 @@ describe("profile API", () => {
     fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
 
     const store = createStore();
-    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
 
     await store.dispatch(
       profileApi.endpoints.updateMePassword.initiate({
@@ -68,7 +66,7 @@ describe("profile API", () => {
     );
 
     const request = fetchMock.mock.calls[0][0] as Request;
-    expect(request.url).toBe("https://webapi.test/users/me/password");
+    expect(request.url).toBe("http://localhost:3000/api/users/me/password");
     expect(request.method).toBe("PUT");
     expect(JSON.parse(await request.text())).toEqual({
       currentPassword: "old-pass-1",

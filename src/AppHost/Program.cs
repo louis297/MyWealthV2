@@ -47,13 +47,11 @@ var bff = builder.AddProject<Projects.BffAdviserPortal>(Services.BffAdviserPorta
     .WithEnvironment("Authentication__ClientSecret", adviserPortalClientSecret)
     .WithEnvironment("Api__BaseAddress", "https+http://webapi");
 
-builder.AddViteApp(Services.AdviserPortal, "../AdviserPortal")
+var portal = builder.AddViteApp(Services.AdviserPortal, "../AdviserPortal")
     .WithExternalHttpEndpoints()
-    .WithEnvironment("VITE_IDENTITY_AUTHORITY", identity.GetEndpoint("https"))
-    .WithEnvironment("VITE_WEBAPI_BASE_URL", web.GetEndpoint("https"))
-    .WithEnvironment("BROWSER", "none")
-    .WaitFor(web)
-    .WaitFor(identity);
+    .WithEnvironment("BROWSER", "none");
+
+bff.WithEnvironment("Spa__DevServerUrl", portal.GetEndpoint("http"));
 
 identity.WithPortalOrigins(bff, builder);
 

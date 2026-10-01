@@ -1,4 +1,4 @@
-import { startEndSession } from "@/features/session/oidc";
+import { startEndSession } from "@/features/session/session";
 
 export function ForbiddenPage() {
   return (

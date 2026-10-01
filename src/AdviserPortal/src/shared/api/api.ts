@@ -1,15 +1,15 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from "@reduxjs/toolkit/query";
-import type { RootState } from "@/app/store";
-import { isSignOutInProgress, refreshTokens, startAuthorize } from "@/features/session/oidc";
-import { clearSession, setTokens, type CurrentUser } from "@/features/session/sessionSlice";
+import { isSignOutInProgress, startLogin } from "@/features/session/session";
+import { clearSession, type CurrentUser } from "@/features/session/sessionSlice";
 import type { Tenant } from "@/shared/types/tenant";
 
 const rawBaseQuery = fetchBaseQuery({
-  prepareHeaders: (headers, { getState }) => {
-    const accessToken = (getState() as RootState).session.accessToken;
-    if (accessToken) {
-      headers.set("Authorization", `Bearer ${accessToken}`);
+  baseUrl: `${typeof window === "undefined" ? "" : window.location.origin}/api`,
+  credentials: "include",
+  prepareHeaders: (headers, { type }) => {
+    if (type === "mutation") {
+      headers.set("X-MyWealth-Request", "1");
     }
     return headers;
   },
@@ -20,27 +20,15 @@ const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
   api,
   extraOptions,
 ) => {
-  const baseUrl = (import.meta.env.VITE_WEBAPI_BASE_URL ?? "").replace(/\/$/, "");
-  const adjusted: string | FetchArgs =
-    typeof args === "string" ? `${baseUrl}${args}` : { ...args, url: `${baseUrl}${args.url}` };
-
-  let result = await rawBaseQuery(adjusted, api, extraOptions);
+  const result = await rawBaseQuery(args, api, extraOptions);
   if (result.error?.status !== 401) {
     return result;
   }
 
-  const refreshToken = (api.getState() as RootState).session.refreshToken;
-  if (refreshToken) {
-    const tokens = await refreshTokens(refreshToken);
-    if (tokens) {
-      api.dispatch(setTokens(tokens));
-      return rawBaseQuery(adjusted, api, extraOptions);
-    }
-  }
-
   api.dispatch(clearSession());
   if (!isSignOutInProgress()) {
-    await startAuthorize();
+    const path = `${window.location.pathname || "/"}${window.location.search || ""}`;
+    startLogin(path);
   }
   return result;
 };

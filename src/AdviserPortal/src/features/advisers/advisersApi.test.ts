@@ -1,16 +1,16 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { advisersApi } from "@/features/advisers/advisersApi";
-import { sessionSlice, setTokens } from "@/features/session/sessionSlice";
+import { sessionSlice } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
 
-const startAuthorize = vi.fn();
+const startLogin = vi.fn();
 
-vi.mock("@/features/session/oidc", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/features/session/oidc")>();
+vi.mock("@/features/session/session", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/features/session/session")>();
   return {
     ...actual,
-    startAuthorize: () => startAuthorize(),
+    startLogin: () => startLogin(),
   };
 });
 
@@ -43,9 +43,8 @@ function createStore() {
 
 describe("advisers API", () => {
   beforeEach(() => {
-    startAuthorize.mockReset();
+    startLogin.mockReset();
     sessionStorage.clear();
-    vi.stubEnv("VITE_WEBAPI_BASE_URL", "https://webapi.test");
     vi.stubGlobal("fetch", vi.fn());
   });
 
@@ -59,7 +58,6 @@ describe("advisers API", () => {
     );
 
     const store = createStore();
-    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
 
     const result = await store.dispatch(
       advisersApi.endpoints.getAdvisers.initiate({ page: 1, enabledOnly: true }),
@@ -68,11 +66,12 @@ describe("advisers API", () => {
     expect(result.data).toEqual(envelope);
     const request = fetchMock.mock.calls[0][0] as Request;
     const url = new URL(request.url);
-    expect(url.origin + url.pathname).toBe("https://webapi.test/users/advisers");
+    expect(url.origin + url.pathname).toBe("http://localhost:3000/api/users/advisers");
     expect(url.searchParams.get("page")).toBe("1");
     expect(url.searchParams.get("pageSize")).toBe("20");
     expect(url.searchParams.get("enabledOnly")).toBe("true");
-    expect(request.headers.get("Authorization")).toBe("Bearer access-1");
+    expect(request.headers.get("Authorization")).toBeNull();
+    expect(request.credentials).toBe("include");
   });
 
   it("creates, gets, updates, disables, and enables an adviser", async () => {
@@ -100,7 +99,6 @@ describe("advisers API", () => {
     });
 
     const store = createStore();
-    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
 
     const created = await store.dispatch(
       advisersApi.endpoints.createAdviser.initiate({

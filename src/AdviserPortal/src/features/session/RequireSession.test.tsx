@@ -4,16 +4,16 @@ import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RequireSession } from "@/features/session/RequireSession";
-import { sessionSlice, setTokens, type CurrentUser } from "@/features/session/sessionSlice";
+import { sessionSlice, type CurrentUser } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
 
-const startAuthorize = vi.fn();
+const startLogin = vi.fn();
 
-vi.mock("@/features/session/oidc", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/features/session/oidc")>();
+vi.mock("@/features/session/session", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/features/session/session")>();
   return {
     ...actual,
-    startAuthorize: () => startAuthorize(),
+    startLogin: () => startLogin(),
   };
 });
 
@@ -50,7 +50,6 @@ function renderSession(me: CurrentUser, path = "/") {
     },
     middleware: (getDefault) => getDefault().concat(api.middleware),
   });
-  store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
 
   const fetchMock = vi.mocked(fetch);
   fetchMock.mockImplementation(async (input) => {
@@ -106,9 +105,8 @@ function requestedUrls(fetchMock: ReturnType<typeof vi.mocked<typeof fetch>>) {
 
 describe("RequireSession", () => {
   beforeEach(() => {
-    startAuthorize.mockReset();
+    startLogin.mockReset();
     sessionStorage.clear();
-    vi.stubEnv("VITE_WEBAPI_BASE_URL", "https://webapi.test");
     vi.stubGlobal("fetch", vi.fn());
   });
 
@@ -118,7 +116,7 @@ describe("RequireSession", () => {
     expect(await screen.findByText("home")).toBeInTheDocument();
     await waitFor(() => {
       expect(requestedUrls(fetchMock)).toContain(
-        "https://webapi.test/tenants/by-code/north-advisory",
+        "http://localhost:3000/api/tenants/by-code/north-advisory",
       );
     });
   });
@@ -129,7 +127,7 @@ describe("RequireSession", () => {
     expect(await screen.findByText("home")).toBeInTheDocument();
     await waitFor(() => {
       expect(requestedUrls(fetchMock)).toContain(
-        "https://webapi.test/tenants/by-code/north-advisory",
+        "http://localhost:3000/api/tenants/by-code/north-advisory",
       );
     });
   });
@@ -150,7 +148,7 @@ describe("RequireSession", () => {
     );
   });
 
-  it("starts authorize when there is no access token", () => {
+  it("starts authorize when there is no access token", async () => {
     const store = configureStore({
       reducer: {
         session: sessionSlice.reducer,
@@ -169,13 +167,18 @@ describe("RequireSession", () => {
       { initialEntries: ["/customers"] },
     );
 
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("", { status: 401 })),
+    );
+
     render(
       <Provider store={store}>
         <RouterProvider router={router} />
       </Provider>,
     );
 
-    expect(startAuthorize).toHaveBeenCalledOnce();
+    await waitFor(() => expect(startLogin).toHaveBeenCalled());
     expect(screen.queryByText("customers")).not.toBeInTheDocument();
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });

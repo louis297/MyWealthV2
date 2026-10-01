@@ -8,13 +8,13 @@ import { sessionSlice, type CurrentUser } from "@/features/session/sessionSlice"
 import { ShellLayout } from "@/layouts/ShellLayout";
 import { api } from "@/shared/api/api";
 
-const startAuthorize = vi.fn();
+const startLogin = vi.fn();
 
-vi.mock("@/features/session/oidc", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/features/session/oidc")>();
+vi.mock("@/features/session/session", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/features/session/session")>();
   return {
     ...actual,
-    startAuthorize: () => startAuthorize(),
+    startLogin: () => startLogin(),
   };
 });
 
@@ -24,7 +24,7 @@ vi.mock("@/features/session/SessionProbePage", () => ({
 
 describe("HomePage", () => {
   beforeEach(() => {
-    startAuthorize.mockReset();
+    startLogin.mockReset();
     sessionStorage.clear();
   });
 
@@ -56,7 +56,8 @@ describe("HomePage", () => {
       </Provider>,
     );
 
-    expect(startAuthorize).toHaveBeenCalledOnce();
+    expect(screen.getByText("Loading session…")).toBeInTheDocument();
+    expect(startLogin).not.toHaveBeenCalled();
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
@@ -69,8 +70,6 @@ describe("HomePage", () => {
       middleware: (getDefault) => getDefault().concat(api.middleware),
       preloadedState: {
         session: {
-          accessToken: "access",
-          refreshToken: "refresh",
           currentUser: null,
           tenant: null,
         },
@@ -96,7 +95,7 @@ describe("HomePage", () => {
       </Provider>,
     );
 
-    expect(startAuthorize).not.toHaveBeenCalled();
+    expect(startLogin).not.toHaveBeenCalled();
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
@@ -120,8 +119,6 @@ describe("HomePage", () => {
       middleware: (getDefault) => getDefault().concat(api.middleware),
       preloadedState: {
         session: {
-          accessToken: "access",
-          refreshToken: "refresh",
           currentUser: me,
           tenant: null,
         },
@@ -144,7 +141,7 @@ describe("HomePage", () => {
 
     expect(screen.getByText("customers workspace")).toBeInTheDocument();
     expect(screen.queryByText("session probe")).not.toBeInTheDocument();
-    expect(startAuthorize).not.toHaveBeenCalled();
+    expect(startLogin).not.toHaveBeenCalled();
   });
 
   it("sends SystemAdmin to /profile instead of a Customers workspace", () => {
@@ -167,8 +164,6 @@ describe("HomePage", () => {
       middleware: (getDefault) => getDefault().concat(api.middleware),
       preloadedState: {
         session: {
-          accessToken: "access",
-          refreshToken: "refresh",
           currentUser: me,
           tenant: null,
         },

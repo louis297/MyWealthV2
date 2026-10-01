@@ -1,17 +1,15 @@
 import { useEffect } from "react";
 import { Navigate, Outlet, useLocation } from "react-router";
-import { useAppDispatch, useAppSelector } from "@/app/hooks";
-import { isSignOutInProgress, startAuthorize } from "@/features/session/oidc";
+import { useAppDispatch } from "@/app/hooks";
+import { isSignOutInProgress, startLogin } from "@/features/session/session";
 import { roles, shouldLoadTenant } from "@/features/session/roles";
 import { setCurrentUser, setTenant } from "@/features/session/sessionSlice";
 import { useGetMeQuery, useGetTenantByCodeQuery } from "@/shared/api/api";
 
 export function RequireSession() {
-  const accessToken = useAppSelector((state) => state.session.accessToken);
-  const currentUser = useAppSelector((state) => state.session.currentUser);
   const dispatch = useAppDispatch();
   const location = useLocation();
-  const { data: me, isLoading, isError } = useGetMeQuery(undefined, { skip: !accessToken });
+  const { data: me, isLoading, isError } = useGetMeQuery();
 
   useEffect(() => {
     if (me) {
@@ -29,17 +27,18 @@ export function RequireSession() {
   }, [tenant, dispatch]);
 
   useEffect(() => {
-    if (!accessToken && !isSignOutInProgress()) {
-      void startAuthorize();
+    if (isError && !isSignOutInProgress()) {
+      const path = `${location.pathname}${location.search}`;
+      startLogin(path);
     }
-  }, [accessToken]);
+  }, [isError, location.pathname, location.search]);
 
-  if (!accessToken || isLoading) {
+  if (isLoading) {
     return <p>Loading session…</p>;
   }
 
   if (isError || !me) {
-    return <p>Could not load session.</p>;
+    return <p>Loading session…</p>;
   }
 
   if (me.role === roles.customer) {
@@ -47,10 +46,6 @@ export function RequireSession() {
       return <Outlet />;
     }
     return <Navigate to="/forbidden" replace />;
-  }
-
-  if (!currentUser) {
-    return <p>Loading session…</p>;
   }
 
   return <Outlet />;

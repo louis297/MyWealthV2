@@ -1,16 +1,16 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { customersApi } from "@/features/customers/customersApi";
-import { sessionSlice, setTokens } from "@/features/session/sessionSlice";
+import { sessionSlice } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
 
-const startAuthorize = vi.fn();
+const startLogin = vi.fn();
 
-vi.mock("@/features/session/oidc", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/features/session/oidc")>();
+vi.mock("@/features/session/session", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/features/session/session")>();
   return {
     ...actual,
-    startAuthorize: () => startAuthorize(),
+    startLogin: () => startLogin(),
   };
 });
 
@@ -44,9 +44,8 @@ function createStore() {
 
 describe("customers API", () => {
   beforeEach(() => {
-    startAuthorize.mockReset();
+    startLogin.mockReset();
     sessionStorage.clear();
-    vi.stubEnv("VITE_WEBAPI_BASE_URL", "https://webapi.test");
     vi.stubGlobal("fetch", vi.fn());
   });
 
@@ -60,7 +59,6 @@ describe("customers API", () => {
     );
 
     const store = createStore();
-    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
 
     const result = await store.dispatch(
       customersApi.endpoints.getCustomers.initiate({
@@ -74,13 +72,14 @@ describe("customers API", () => {
     expect(result.data).toEqual(envelope);
     const request = fetchMock.mock.calls[0][0] as Request;
     const url = new URL(request.url);
-    expect(url.origin + url.pathname).toBe("https://webapi.test/users/customers");
+    expect(url.origin + url.pathname).toBe("http://localhost:3000/api/users/customers");
     expect(url.searchParams.get("page")).toBe("2");
     expect(url.searchParams.get("pageSize")).toBe("20");
     expect(url.searchParams.get("search")).toBe("jordan");
     expect(url.searchParams.get("enabledOnly")).toBe("true");
     expect(url.searchParams.get("adviserId")).toBe("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
-    expect(request.headers.get("Authorization")).toBe("Bearer access-1");
+    expect(request.headers.get("Authorization")).toBeNull();
+    expect(request.credentials).toBe("include");
   });
 
   it("POSTs /users/customers and returns the created id", async () => {
@@ -93,7 +92,6 @@ describe("customers API", () => {
     );
 
     const store = createStore();
-    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
 
     const result = await store.dispatch(
       customersApi.endpoints.createCustomer.initiate({
@@ -106,7 +104,7 @@ describe("customers API", () => {
 
     expect(result.data).toEqual({ id: "cccccccccccccccc-cccc-cccc-cccc-cccccccccccc" });
     const request = fetchMock.mock.calls[0][0] as Request;
-    expect(request.url).toBe("https://webapi.test/users/customers");
+    expect(request.url).toBe("http://localhost:3000/api/users/customers");
     expect(request.method).toBe("POST");
     expect(JSON.parse(await request.text())).toEqual({
       name: "Jordan Lee",
@@ -126,7 +124,6 @@ describe("customers API", () => {
     );
 
     const store = createStore();
-    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
 
     const result = await store.dispatch(
       customersApi.endpoints.getCustomer.initiate(envelope.items[0].id),
@@ -134,7 +131,7 @@ describe("customers API", () => {
 
     expect(result.data).toEqual(envelope.items[0]);
     const request = fetchMock.mock.calls[0][0] as Request;
-    expect(request.url).toBe(`https://webapi.test/users/customers/${envelope.items[0].id}`);
+    expect(request.url).toBe(`http://localhost:3000/api/users/customers/${envelope.items[0].id}`);
     expect(request.method).toBe("GET");
   });
 
@@ -143,7 +140,6 @@ describe("customers API", () => {
     fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
 
     const store = createStore();
-    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
 
     await store.dispatch(
       customersApi.endpoints.updateCustomer.initiate({
@@ -155,7 +151,7 @@ describe("customers API", () => {
     );
 
     const request = fetchMock.mock.calls[0][0] as Request;
-    expect(request.url).toBe(`https://webapi.test/users/customers/${envelope.items[0].id}`);
+    expect(request.url).toBe(`http://localhost:3000/api/users/customers/${envelope.items[0].id}`);
     expect(request.method).toBe("PUT");
     expect(JSON.parse(await request.text())).toEqual({
       name: "Jordan Lee",
@@ -171,7 +167,6 @@ describe("customers API", () => {
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
 
     const store = createStore();
-    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
     const id = envelope.items[0].id;
 
     await store.dispatch(
@@ -182,12 +177,12 @@ describe("customers API", () => {
     );
 
     const disable = fetchMock.mock.calls[0][0] as Request;
-    expect(disable.url).toBe(`https://webapi.test/users/customers/${id}/disable`);
+    expect(disable.url).toBe(`http://localhost:3000/api/users/customers/${id}/disable`);
     expect(disable.method).toBe("POST");
     expect(JSON.parse(await disable.text())).toEqual({ rowVersion: "AAAA" });
 
     const enable = fetchMock.mock.calls[1][0] as Request;
-    expect(enable.url).toBe(`https://webapi.test/users/customers/${id}/enable`);
+    expect(enable.url).toBe(`http://localhost:3000/api/users/customers/${id}/enable`);
     expect(JSON.parse(await enable.text())).toEqual({ rowVersion: "BBBB" });
   });
 });

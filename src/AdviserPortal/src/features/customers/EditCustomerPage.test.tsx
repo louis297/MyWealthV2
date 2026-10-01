@@ -4,16 +4,16 @@ import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EditCustomerPage } from "@/features/customers/EditCustomerPage";
-import { sessionSlice, setCurrentUser, setTokens, type CurrentUser } from "@/features/session/sessionSlice";
+import { sessionSlice, setCurrentUser, type CurrentUser } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
 
-const startAuthorize = vi.fn();
+const startLogin = vi.fn();
 
-vi.mock("@/features/session/oidc", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/features/session/oidc")>();
+vi.mock("@/features/session/session", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/features/session/session")>();
   return {
     ...actual,
-    startAuthorize: () => startAuthorize(),
+    startLogin: () => startLogin(),
   };
 });
 
@@ -79,7 +79,6 @@ function renderEdit(
     },
     middleware: (getDefault) => getDefault().concat(api.middleware),
   });
-  store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
   store.dispatch(setCurrentUser(me));
 
   const fetchMock = vi.mocked(fetch);
@@ -114,9 +113,8 @@ function renderEdit(
 
 describe("EditCustomerPage", () => {
   beforeEach(() => {
-    startAuthorize.mockReset();
+    startLogin.mockReset();
     sessionStorage.clear();
-    vi.stubEnv("VITE_WEBAPI_BASE_URL", "https://webapi.test");
     vi.stubGlobal("fetch", vi.fn());
   });
 
