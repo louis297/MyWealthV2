@@ -88,7 +88,6 @@ public static class DependencyInjection
             options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
         });
 
-        builder.Services.AddCors();
     }
 
     public static void AddKeyVaultIfConfigured(this IHostApplicationBuilder builder)

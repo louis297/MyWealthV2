@@ -41,11 +41,6 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
 }
-app.UseCors(static builder =>
-    builder.AllowAnyMethod()
-        .AllowAnyHeader()
-        .AllowAnyOrigin());
-
 app.UseFileServer();
 
 app.MapOpenApi();
