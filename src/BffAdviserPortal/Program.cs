@@ -14,6 +14,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapBffApi();
+app.MapBffLogout();
 
 app.MapGet("/bff/login", (string? returnUrl) =>
 {
