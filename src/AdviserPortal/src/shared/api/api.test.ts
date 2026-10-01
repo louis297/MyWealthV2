@@ -1,18 +1,8 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { startEndSession } from "@/features/session/oidc";
+import { customersApi } from "@/features/customers/customersApi";
 import { sessionSlice, setTokens } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
-
-const startAuthorize = vi.fn();
-
-vi.mock("@/features/session/oidc", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/features/session/oidc")>();
-  return {
-    ...actual,
-    startAuthorize: () => startAuthorize(),
-  };
-});
 
 const me = {
   id: "11111111-1111-1111-1111-111111111111",
@@ -36,16 +26,24 @@ function createStore() {
   });
 }
 
-describe("GET /users/me", () => {
+function requestOf(call: unknown): Request {
+  return call as Request;
+}
+
+describe("BFF API client", () => {
   beforeEach(() => {
-    startAuthorize.mockReset();
     sessionStorage.clear();
-    vi.stubEnv("VITE_WEBAPI_BASE_URL", "https://webapi.test");
-    vi.stubEnv("VITE_IDENTITY_AUTHORITY", "https://identity.test");
     vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal("location", {
+      origin: "http://localhost:3000",
+      pathname: "/customers/abc",
+      search: "",
+      href: "http://localhost:3000/customers/abc",
+      assign: vi.fn(),
+    });
   });
 
-  it("sends the access token and returns the profile", async () => {
+  it("loads the profile from /api with credentials and no Authorization", async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockResolvedValueOnce(
       new Response(JSON.stringify(me), {
@@ -56,161 +54,66 @@ describe("GET /users/me", () => {
 
     const store = createStore();
     store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
-
     const result = await store.dispatch(api.endpoints.getMe.initiate());
 
     expect(result.data).toEqual(me);
-    const request = fetchMock.mock.calls[0][0] as Request;
-    expect(request.url).toBe("https://webapi.test/users/me");
-    expect(request.headers.get("Authorization")).toBe("Bearer access-1");
+    const request = requestOf(fetchMock.mock.calls[0][0]);
+    expect(request.url).toBe("http://localhost:3000/api/users/me");
+    expect(request.credentials).toBe("include");
+    expect(request.headers.get("Authorization")).toBeNull();
+    expect(request.headers.get("X-MyWealth-Request")).toBeNull();
+    expect(sessionStorage.getItem("adviser-portal.accessToken")).toBeNull();
+    expect(sessionStorage.getItem("adviser-portal.refreshToken")).toBeNull();
   });
 
-  it("refreshes once on 401 and retries", async () => {
-    const fetchMock = vi.mocked(fetch);
-    fetchMock
-      .mockResolvedValueOnce(new Response("", { status: 401 }))
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            authorization_endpoint: "https://identity.test/connect/authorize",
-            token_endpoint: "https://identity.test/connect/token",
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({ access_token: "access-2", refresh_token: "refresh-2" }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify(me), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
-
-    const store = createStore();
-    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
-
-    const result = await store.dispatch(api.endpoints.getMe.initiate());
-
-    expect(result.data).toEqual(me);
-    expect(store.getState().session.accessToken).toBe("access-2");
-    expect(fetchMock.mock.calls[2][0]).toBe("https://identity.test/connect/token");
-    const refreshBody = new URLSearchParams(fetchMock.mock.calls[2][1]?.body as string);
-    expect(refreshBody.get("grant_type")).toBe("refresh_token");
-    expect(refreshBody.get("refresh_token")).toBe("refresh-1");
-    expect(startAuthorize).not.toHaveBeenCalled();
-  });
-
-  it("clears the session and re-authorizes when refresh fails", async () => {
-    const fetchMock = vi.mocked(fetch);
-    fetchMock
-      .mockResolvedValueOnce(new Response("", { status: 401 }))
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            authorization_endpoint: "https://identity.test/connect/authorize",
-            token_endpoint: "https://identity.test/connect/token",
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
-      )
-      .mockResolvedValueOnce(new Response("", { status: 400 }));
-
-    const store = createStore();
-    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
-
-    await store.dispatch(api.endpoints.getMe.initiate());
-
-    expect(store.getState().session.accessToken).toBeNull();
-    expect(startAuthorize).toHaveBeenCalledOnce();
-  });
-
-  it("does not start authorize from 401 while end-session is in progress", async () => {
-    const fetchMock = vi.mocked(fetch);
-    fetchMock.mockImplementation(async (input) => {
-      const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
-      if (url.includes("openid-configuration")) {
-        return new Response(
-          JSON.stringify({
-            authorization_endpoint: "https://identity.test/connect/authorize",
-            token_endpoint: "https://identity.test/connect/token",
-            revocation_endpoint: "https://identity.test/connect/revocation",
-            end_session_endpoint: "https://identity.test/connect/logout",
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        );
-      }
-      if (url.includes("/connect/revocation")) {
-        return new Response("", { status: 200 });
-      }
-      if (url.endsWith("/users/me")) {
-        return new Response("", { status: 401 });
-      }
-      if (url.includes("/connect/token")) {
-        return new Response("", { status: 400 });
-      }
-      return new Response("", { status: 404 });
-    });
-
-    const assign = vi.fn();
-    vi.stubGlobal("location", {
-      origin: "http://localhost:5173",
-      href: "http://localhost:5173/customers",
-      assign,
-    });
-
-    const store = createStore();
-    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
-
-    await startEndSession();
-    await store.dispatch(api.endpoints.getMe.initiate());
-
-    expect(startAuthorize).not.toHaveBeenCalled();
-  });
-});
-
-const tenant = {
-  id: "22222222-2222-2222-2222-222222222222",
-  name: "North Advisory",
-  code: "north-advisory",
-  reportingCurrency: "GBP",
-  isEnabled: true,
-  rowVersion: "AAAA",
-  created: "2026-09-14T00:00:00+00:00",
-};
-
-describe("GET /tenants/by-code/{code}", () => {
-  beforeEach(() => {
-    startAuthorize.mockReset();
-    sessionStorage.clear();
-    vi.stubEnv("VITE_WEBAPI_BASE_URL", "https://webapi.test");
-    vi.stubEnv("VITE_IDENTITY_AUTHORITY", "https://identity.test");
-    vi.stubGlobal("fetch", vi.fn());
-  });
-
-  it("sends the access token and returns the tenant", async () => {
+  it("sends X-MyWealth-Request on a mutation and does not call identity", async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockResolvedValueOnce(
-      new Response(JSON.stringify(tenant), {
-        status: 200,
+      new Response(JSON.stringify({ id: "cust" }), {
+        status: 201,
         headers: { "Content-Type": "application/json" },
       }),
     );
 
     const store = createStore();
     store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
-
-    const result = await store.dispatch(
-      api.endpoints.getTenantByCode.initiate("north-advisory"),
+    await store.dispatch(
+      customersApi.endpoints.createCustomer.initiate({
+        name: "Ada",
+        email: "ada@firm.example",
+        password: "Password1!",
+      }),
     );
 
-    expect(result.data).toEqual(tenant);
-    const request = fetchMock.mock.calls[0][0] as Request;
-    expect(request.url).toBe("https://webapi.test/tenants/by-code/north-advisory");
-    expect(request.headers.get("Authorization")).toBe("Bearer access-1");
+    const request = requestOf(fetchMock.mock.calls[0][0]);
+    expect(request.url).toBe("http://localhost:3000/api/users/customers");
+    expect(request.method).toBe("POST");
+    expect(request.credentials).toBe("include");
+    expect(request.headers.get("X-MyWealth-Request")).toBe("1");
+    expect(request.headers.get("Authorization")).toBeNull();
+    expect(fetchMock.mock.calls.some((call) => String(requestOf(call[0]).url).includes("/connect/"))).toBe(
+      false,
+    );
+  });
+
+  it("on 401 sends the browser to /bff/login and does not refresh", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(new Response("", { status: 401 }));
+    const assign = vi.fn();
+    vi.stubGlobal("location", {
+      origin: "http://localhost:3000",
+      pathname: "/customers/abc",
+      search: "",
+      href: "http://localhost:3000/customers/abc",
+      assign,
+    });
+
+    const store = createStore();
+    store.dispatch(setTokens({ accessToken: "access-1", refreshToken: "refresh-1" }));
+    await store.dispatch(api.endpoints.getMe.initiate());
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(assign).toHaveBeenCalledWith("/bff/login?returnUrl=%2Fcustomers%2Fabc");
+    expect(sessionStorage.getItem("adviser-portal.accessToken")).toBeNull();
   });
 });
