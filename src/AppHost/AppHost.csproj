@@ -4,6 +4,7 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>MyWealthV2.AppHost</RootNamespace>
     <AssemblyName>MyWealthV2.AppHost</AssemblyName>
+    <UserSecretsId>65140ff7-5cd7-47a7-9a1a-60c37aadd6e7</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
