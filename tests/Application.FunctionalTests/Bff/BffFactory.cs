@@ -1,6 +1,7 @@
 extern alias BffHost;
 
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using BffHost::MyWealthV2.BffAdviserPortal;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -16,12 +17,21 @@ public sealed class BffFactory : WebApplicationFactory<BffHost::Program>
     private readonly string _authority;
     private readonly HttpMessageHandler _identityHandler;
     private readonly string _environment;
+    private readonly IWebApiTransport? _api;
+    private readonly string? _apiBaseAddress;
 
-    public BffFactory(string authority, HttpMessageHandler identityHandler, string environment = "Development")
+    public BffFactory(
+        string authority,
+        HttpMessageHandler identityHandler,
+        string environment = "Development",
+        IWebApiTransport? api = null,
+        string? apiBaseAddress = null)
     {
         _authority = authority.TrimEnd('/');
         _identityHandler = identityHandler;
         _environment = environment;
+        _api = api;
+        _apiBaseAddress = apiBaseAddress;
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -29,10 +39,19 @@ public sealed class BffFactory : WebApplicationFactory<BffHost::Program>
         builder.UseEnvironment(_environment);
         builder.UseSetting("Authentication:Authority", _authority);
         builder.UseSetting("Authentication:ClientSecret", AdviserPortalTestSecret.Value);
+        if (!string.IsNullOrWhiteSpace(_apiBaseAddress))
+        {
+            builder.UseSetting("Api:BaseAddress", _apiBaseAddress);
+        }
+
         builder.ConfigureTestServices(services =>
         {
             services.AddSingleton<IPostConfigureOptions<OpenIdConnectOptions>>(
                 new OidcBackchannelPostConfigure(_authority, _identityHandler));
+            if (_api is not null)
+            {
+                services.AddSingleton(_api);
+            }
         });
     }
 
