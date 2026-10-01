@@ -24,6 +24,19 @@ export function isInAppPath(path: string | null | undefined): path is string {
   );
 }
 
+function configuredBffOrigin(): string | null {
+  const configured = import.meta.env.VITE_BFF_HTTP;
+  if (typeof configured !== "string" || configured.trim() === "") {
+    return null;
+  }
+
+  try {
+    return new URL(configured).origin;
+  } catch {
+    return null;
+  }
+}
+
 export function startLogin(returnUrl?: string): void {
   if (isSignOutInProgress()) {
     return;
@@ -31,6 +44,13 @@ export function startLogin(returnUrl?: string): void {
 
   const path = returnUrl ?? `${window.location.pathname || "/"}${window.location.search || ""}`;
   const safe = isInAppPath(path) ? path : "/";
+  const bffOrigin = configuredBffOrigin();
+  // Vite has no /bff/login route. Land on the BFF document first.
+  if (bffOrigin && window.location.origin !== bffOrigin) {
+    window.location.assign(`${bffOrigin}${safe}`);
+    return;
+  }
+
   window.location.assign(`/bff/login?returnUrl=${encodeURIComponent(safe)}`);
 }
 

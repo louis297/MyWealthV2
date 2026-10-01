@@ -45,11 +45,24 @@ var bff = builder.AddProject<Projects.BffAdviserPortal>(Services.BffAdviserPorta
     .WithAspNetCoreEnvironment()
     .WithEnvironment("Authentication__Authority", identity.GetEndpoint("https"))
     .WithEnvironment("Authentication__ClientSecret", adviserPortalClientSecret)
-    .WithEnvironment("Api__BaseAddress", "https+http://webapi");
+    .WithEnvironment("Api__BaseAddress", "https+http://webapi")
+    .WithUrlForEndpoint("http", url =>
+    {
+        url.DisplayText = "Adviser Portal";
+        url.Url = "/";
+    });
 
 var portal = builder.AddViteApp(Services.AdviserPortal, "../AdviserPortal")
     .WithExternalHttpEndpoints()
-    .WithEnvironment("BROWSER", "none");
+    .WithEnvironment("BROWSER", "none")
+    .WithEnvironment("VITE_BFF_HTTP", bff.GetEndpoint("http"))
+    .WithUrls(context =>
+    {
+        foreach (var url in context.Urls)
+        {
+            url.DisplayLocation = UrlDisplayLocation.DetailsOnly;
+        }
+    });
 
 bff.WithEnvironment("Spa__DevServerUrl", portal.GetEndpoint("http"));
 
