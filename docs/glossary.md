@@ -53,12 +53,12 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | QuoteCurrency | Currency used for the instrument’s price, market data, and cost accumulation. | Account booking currency |
 | CostBasis | Holding cost as `Money`. Currency must equal the instrument quote currency. | Market value |
 | Opening / initial holding | The only entry that may write quantity and cost directly. Phase 2. | Day-to-day holding edits |
-| Transaction | Booked business event on an Account (type, bookedAt, memo). Public aggregate and `/transactions` resource. Write = posted. Header + legs in one command. Not a pre-accounting capture row. | A Created row that an event handler later copies into a journal; EF `SaveChanges` |
+| Transaction | Booked business event on an Account (type, bookedAt, memo). Public aggregate and `/transactions` resource. Write = posted in the current draft. Header + legs in one command. Not a pre-accounting capture row. | A Created row that an event handler later copies into a journal; EF `SaveChanges` |
 | Leg (cash / security) | Accounting line that hits one book. This increment: one cash leg per Transaction. Later: a security leg on the **same** Transaction. Buy/sell = both. Split/scrip/bonus = security only, cash 0 or omitted, total cost unchanged. | A second HTTP resource; “posting means cash only”; a wide row that holds both cash and stock columns |
 | Journal | Older discussion word for the Transaction header. Prefer *Transaction* in new text. | A second table beside Transactions |
 | Signed book amount | Stored signed decimal on a leg, from **that container’s book**. `+` increases that book; `−` decreases it. Balance / quantity is `SUM` of those signs. Read models may flip a sign for display (Credit as liability in net worth). | Debit/credit columns; a new sign rule per Feature Spec; storing outflows as positive and inferring direction from `Type` |
 | Reversal | A new opposite Transaction (`Type = Reversal`) pointing at the original. Original row is not updated or deleted. Cash leg = arithmetic negation of the original signed amount. Phase 2. | `UPDATE`/`DELETE` of the original; an adjustment that does not point at the original |
-| TransactionType | TransferIn / TransferOut / Interest / CloseOut / Opening / Reversal / Dividend / Buy / Sell. Cash increment posts the first six. | User-defined Category |
+| TransactionType | Buy / Sell / TransferIn / TransferOut / Dividend / Interest / Opening / Reversal. | User-defined Category |
 | Category | Optional custom label on a transaction. Not in Phase 1. Not an account type. | Account type |
 | Currency | ISO 4217 three-letter code. One row in the platform catalog. | A C# enum |
 | Currency catalog | `Currencies` table + in-memory `ICurrencyCatalog`. | Joining `Currencies` on every hot path; a per-tenant allow-list |
@@ -78,11 +78,28 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 
 | Term | Meaning |
 | --- | --- |
-| Adviser Portal | Only frontend in Phase 1. Aspire resource name and OIDC client id: `adviser-portal`. Redirects to the authorization server; does not issue tokens. |
+| Adviser Portal | Only frontend in Phase 1. Aspire SPA resource and OIDC `ClientId`: `adviser-portal`. Does not issue tokens. Browser talks to `bff-adviser-portal`, not to `identity` / `webapi` (ADR 0016). |
 | Session probe | First portal page after callback: renders `GET /users/me` to prove the handshake. Not a product Dashboard. |
-| Customer Portal | Later public OIDC client (`customer-portal`) on the same authorization server. Not registered in Phase 1. |
+| Customer Portal | Later second client (`customer-portal`) on the same authorization server. Not registered. Expected shape is a second BFF + client (`bff-customer-portal`), not a public SPA token stack. |
 | Back Office | Platform-ops UI. Optional in Phase 1; SystemAdmin uses API / Scalar. |
 | Hosted login | Password page on `identity` (tenantCode + email + password). Shared by all first-party portals. |
+
+---
+
+## Host codes
+
+One row per process. Aspire resource names are the words used in docs and service discovery. Project names are the C# / folder names. Do not invent a second spelling.
+
+`bff` is always the first token on a BFF resource, project, and feature-spec file. The other three keep the names already in the tree. OIDC `ClientId` is not a host code: it stays `adviser-portal` when the holder moves to the BFF.
+
+| Host | Aspire resource | Project | Path | Spec file |
+| --- | --- | --- | --- | --- |
+| Authorization server | `identity` | `IdentityHost` | `src/IdentityHost` | [features/identity-auth.md](features/identity-auth.md) |
+| Resource API | `webapi` | `Web` | `src/Web` | Feature specs in `features/` (unprefixed) |
+| Adviser Portal SPA | `adviser-portal` | `AdviserPortal` | `src/AdviserPortal` | [portals/adviser-portal.md](portals/adviser-portal.md) |
+| Adviser Portal BFF | `bff-adviser-portal` | `BffAdviserPortal` | `src/BffAdviserPortal` | [features/bff-adviser-portal.md](features/bff-adviser-portal.md) (accepted) |
+
+Later portals copy the last row: `bff-customer-portal`, `BffCustomerPortal`, `src/BffCustomerPortal`, `features/bff-customer-portal.md`. Do not create that file until the slice opens. Do not use `adviser-portal-bff` or `AdviserPortalBff`.
 
 ---
 
@@ -92,7 +109,8 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | --- | --- | --- |
 | AppHost | `src/AppHost`. Aspire orchestration. | — |
 | webapi | Aspire resource name for `src/Web`. Resource API only. | Generic name `Web` / `Frontend`; the authorization server |
-| identity | Aspire resource name for `src/IdentityHost`. OpenIddict + hosted login. | A second SQL database; OpenIddict inside `webapi` |
+| identity | Aspire resource name for `src/IdentityHost`. OpenIddict + hosted login. | A second SQL database; OpenIddict inside `webapi`; the portal BFF |
+| adviser-portal-bff | Do not use. Superseded spelling. | Resource is `bff-adviser-portal` |
 | MyWealthDbV2 | SQL Server database name and Aspire connection-string name. | `MyWealthDb` (old name) |
 | SchemaVersions | Record of applied SQL scripts. Schema-source-of-truth migration ledger. | EF Core `__EFMigrationsHistory` as the schema source of truth |
 | Schema applicator | On startup, runs scripts that have not been applied. Does not `EnsureDeleted` in the normal path. | `EnsureCreated` / `EnsureDeleted` as daily boot |
@@ -106,10 +124,11 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | IEmailSender | Invite / reset mail. Phase 1 is no-op or log-only. | Built-in SMTP in Domain |
 | Authorization server | Issues and revokes tokens, exposes discovery and JWKS. Hosted in Aspire `identity` via OpenIddict. | A custom resource-API `/auth/login` that mints JWTs; OpenIddict inside `webapi` |
 | OpenIddict | The authorization-server library. Tables replace a custom refresh store. Protocol paths stay on library defaults (`/connect/*`, well-known discovery / JWKS); do not remap. | Duende IdentityServer; an external CIAM tenant; a custom `/auth` token issuer |
-| OIDC client | Registered application that runs authorization code + PKCE. Phase 1: `adviser-portal` only. | A second token issuer per portal |
-| Authorization code + PKCE | Portal redirect grant. The Phase-1 and later-portal session protocol. | Resource Owner Password Credentials grant |
-| JWT / access token | Short-lived bearer issued by OpenIddict. Not the only session source of truth. | Long-lived access token with no refresh; tokens minted by a resource endpoint |
-| Refresh token | Stored by OpenIddict. Revoked on password change, disable, and logout. | A custom `RefreshTokens` table; refresh kept only in the browser |
+| OIDC client | Registered application that runs authorization code + PKCE. Client id `adviser-portal` is confidential and held by `bff-adviser-portal`, not by the browser. | A second token issuer per portal |
+| Authorization code + PKCE | Redirect grant. First-party session protocol. BFF uses PKCE with a client secret. | Resource Owner Password Credentials grant |
+| JWT / access token | Short-lived bearer issued by OpenIddict. The portal browser must not store it. | Long-lived access token with no refresh; tokens minted by a resource endpoint or by the BFF |
+| Refresh token | Stored by OpenIddict. Revoked on password change, disable, and logout. Rotated when the BFF presents it. Only the BFF holds the handle. | A custom `RefreshTokens` table |
+| BFF | Backend for Frontend. First-party portal edge. Resource and project names put `bff` first. `bff-adviser-portal` is accepted. | Putting cookie auth on `webapi`; Duende.BFF; `adviser-portal-bff` |
 | RowVersion | Conflict detection on key tables. HTTP 409. | Last-write-wins with no check |
 | Isolation test | Cross-tenant assertion. CI gate from the Tenants slice onward. | A single shared happy-path test |
 | PublicId | UUID column used by API and UI. | Clustered primary key; login short code `TenantCode` |

@@ -3,7 +3,7 @@ title: Portals
 status: review
 language: en
 created: 2026-09-12
-updated: 2026-09-15
+updated: 2026-10-01
 related:
   - ../README.md
   - ../function-plan.md
@@ -19,7 +19,8 @@ Phase 1 has one frontend: [adviser-portal.md](adviser-portal.md). Do not add `cu
 
 | Doc | Owns |
 | --- | --- |
-| [adviser-portal.md](adviser-portal.md) | Aspire resource, OIDC client wiring, routes, page slices |
+| [adviser-portal.md](adviser-portal.md) | Aspire SPA resource, routes, page slices. OIDC client is held by the BFF |
+| [../features/bff-adviser-portal.md](../features/bff-adviser-portal.md) | Session edge (accepted). Not a page spec |
 | [frontend-conventions.md](frontend-conventions.md) | Folder layout, naming, session state, API client |
 | [frontend-implementation-notes.md](frontend-implementation-notes.md) | Page-by-page construction for the current pages cut |
 

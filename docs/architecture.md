@@ -22,7 +22,7 @@ This document owns **hosts, layers, ports, and cross-cutting behaviour**. Scope 
 
 Same rule as the function plan: if a later phase will use it and today’s design would have to change, ship the final infrastructure now. If later use or shape is not decided, wait.
 
-Phase 1 closes the platform base: tenants, session, four roles, people, currency catalog, Adviser Portal shell. The ledger is a Phase-2 domain. Accepted ledger slices: Instruments (`0010`, landed `9ea2f2a`), Accounts (`0012`, landed `3e8b8f3`), posting / `/transactions` (`0013_transactions.sql`, spec accepted 2026-09-25, landed). Holdings wait for their spec.
+Phase 1 closes the platform base: tenants, session, four roles, people, currency catalog, Adviser Portal shell. The ledger is a Phase-2 domain. Accepted ledger slices: Instruments (`0010`, landed `9ea2f2a`), Accounts (`0012`, landed `3e8b8f3`), posting / `/transactions` (`0013_transactions.sql`, landed `79129eb`). Holdings wait for their spec.
 
 ---
 
@@ -32,10 +32,11 @@ Clean Architecture + CQRS (MediatR), hosted by .NET Aspire.
 
 ```mermaid
 flowchart LR
-  Browser[Browser] --> Portal[adviser-portal]
+  Browser[Browser] --> Bff[bff-adviser-portal]
   Browser --> Scalar[Scalar]
-  Portal -->|OIDC redirect / callback| Id[src/IdentityHost identity]
-  Portal -->|Bearer resource API| Web[src/Web webapi]
+  Bff -->|HTML /api cookie| Portal[adviser-portal]
+  Bff -->|OIDC code + refresh| Id[src/IdentityHost identity]
+  Bff -->|Bearer resource API| Web[src/Web webapi]
   Scalar --> Web
   Web --> App[src/Application]
   App --> Domain[src/Domain]
@@ -46,6 +47,7 @@ flowchart LR
   AppHost[src/AppHost] -.-> Id
   AppHost -.-> Web
   AppHost -.-> Sql
+  AppHost -.-> Bff
   AppHost -.-> Portal
 ```
 
@@ -58,15 +60,15 @@ Rules that stay true:
 - `IdentityHost` (`identity`) is the authorization-server composition root: OpenIddict + hosted login.
 - New write / read use cases are scaffolded with `dotnet new ca-usecase`.
 
-The frontend is an independent React application (React + Redux Toolkit + TypeScript + Vite + Tailwind). Portals **do not issue tokens**. They redirect to `identity`, receive access and refresh tokens, and call `webapi` with Bearer.
+The frontend is an independent React application (React + Redux Toolkit + TypeScript + Vite + Tailwind). Portals **do not issue tokens**. The browser talks to `bff-adviser-portal`. That host redirects to `identity`, holds access and refresh tokens, and calls `webapi` with Bearer (ADR 0016).
 
 Portals:
 
-- **Adviser Portal** — only frontend and only public OIDC client in Phase 1
-- Customer Portal — later second client on the same authorization server; not registered in Phase 1
-- Back Office — optional; SystemAdmin uses Scalar / API in Phase 1
+- **Adviser Portal** — only frontend in Phase 1. OIDC client id `adviser-portal` is held by `bff-adviser-portal`, not by the browser.
+- Customer Portal — later second BFF + client on the same authorization server; not registered
+- Back Office — optional; SystemAdmin uses Scalar / API in Phase 1. SystemAdmin may still complete `adviser-portal` login (no tenantCode); firm pages stay forbidden.
 
-Aspire resource names must not be generic (`Frontend`, `Web`). Phase 1 hosts `identity`, `webapi`, and `adviser-portal`. Reserved names: `customer-portal`, `back-office`. Phase 1 does **not** split a separate identity **database**.
+Aspire resource names must not be generic (`Frontend`, `Web`). Hosts: `identity`, `webapi`, `adviser-portal`, `bff-adviser-portal`. Reserved names: `customer-portal`, `bff-customer-portal`, `back-office`. Phase 1 does **not** split a separate identity **database**.
 
 One AppHost orchestrates every resource. Separate projects are separate processes. Each ASP.NET project has its own Kestrel and port. Aspire does not merge two projects onto one Kestrel.
 
@@ -76,7 +78,7 @@ One AppHost orchestrates every resource. Separate projects are separate processe
 
 | Project | Path | Responsibility |
 | --- | --- | --- |
-| AppHost | `src/AppHost` | Aspire graph: `dbserver`, `MyWealthDbV2`, `identity`, `webapi`, `adviser-portal` |
+| AppHost | `src/AppHost` | Aspire graph: `dbserver`, `MyWealthDbV2`, `identity`, `webapi`, `adviser-portal`, `bff-adviser-portal` |
 | IdentityHost | `src/IdentityHost` | Authorization-server composition root; OpenIddict; hosted login |
 | Web | `src/Web` | Resource-API composition root; Minimal API; OpenAPI / Scalar; CORS; Bearer validation |
 | Application | `src/Application` | Commands / queries, validation, pipeline, DTOs, named-policy map, port interfaces |
@@ -84,16 +86,17 @@ One AppHost orchestrates every resource. Separate projects are separate processe
 | Infrastructure | `src/Infrastructure` | EF mapping, Identity user store, OpenIddict EF stores, interceptors, schema applicator, port adapters |
 | Shared | `src/Shared` | Aspire resource-name constants |
 | ServiceDefaults | `src/ServiceDefaults` | Health, OpenTelemetry, service discovery |
-| AdviserPortal | Independent frontend | Only frontend in Phase 1; OIDC client id `adviser-portal` |
+| BffAdviserPortal | `src/BffAdviserPortal` | Adviser Portal session edge. Confidential client holder. Cookie + OIDC + YARP |
+| AdviserPortal | Independent frontend | Vite SPA. No tokens. OIDC client id `adviser-portal` is not held here |
 | Tests | `tests/*` | Domain unit, application unit, infrastructure integration, functional |
 
 `ApplicationDbContext` includes the Identity **user** store and the OpenIddict EF stores. **Both hosts share the same mappings and the same database.** Do not use `IdentityRole` / `AspNetRoles`.
 
 ---
 
-## 3. Two request paths
+## 3. Request paths
 
-Two processes, two surfaces. Do not add a custom `POST /auth/login` that issues tokens.
+Three processes for a portal session, plus the resource API. Do not add a custom `POST /auth/login` that issues tokens.
 
 ### 3.1 Authorization server (OpenIddict, process `identity`)
 
@@ -103,14 +106,14 @@ Hosted in `src/IdentityHost` (ADR 0014). Aspire resource name: `identity`.
 | --- | --- |
 | Protocol | OpenIddict **defaults, do not remap**: `/.well-known/openid-configuration`, `/.well-known/jwks`, `/connect/authorize`, `/connect/token`, `/connect/revocation`, `/connect/logout` (plus default `/connect/userinfo`). Callers follow discovery; do not hard-code |
 | Hosted login | Password page on `identity`: email + password + tenantCode (SystemAdmin omits tenantCode) |
-| Client | One public client in Phase 1: `adviser-portal`. Authorization code + PKCE + refresh. No password grant |
+| Client | One confidential client: `adviser-portal`, held by `bff-adviser-portal`. Authorization code + PKCE + refresh. No password grant |
 | Access | Short-lived JWT. **Asymmetric** signing. Public keys on JWKS |
-| Refresh | OpenIddict token store. Revoked on logout, password change, and disable. No custom `RefreshTokens` table |
+| Refresh | OpenIddict token store. Revoked on logout, password change, and disable. Rotated when presented. No custom `RefreshTokens` table |
 | Scopes | `openid`, `profile`, `offline_access`, `api`. Role and tenant are JWT claims, not scopes. Permissions are not expanded into the token |
 
-The login gate on the authorization server reads domain invariants: tenant enabled, `UserStatus = Active`, valid Identity link, then the client × role allow-list. `adviser-portal` does not issue a code to Customer. Adviser-management resource policies stay 403.
+The login gate on the authorization server reads domain invariants: tenant enabled, `UserStatus = Active`, valid Identity link, then the client × role allow-list. `adviser-portal` does not issue a code to Customer. SystemAdmin may complete login with no tenantCode. Adviser-management resource policies stay 403.
 
-The portal only: redirect → callback → store tokens → call the resource API. It does not own a password form that issues tokens.
+The BFF redeems the code and stores tokens. The SPA does not. It does not own a password form that issues tokens. Contract: [features/bff-adviser-portal.md](features/bff-adviser-portal.md).
 
 ### 3.2 Resource API (`webapi`)
 
@@ -142,14 +145,16 @@ AppHost
     └── hosted login          email + password + tenantCode
   webapi                      src/Web
     └── resource API          MediatR + Bearer
-  adviser-portal              public OIDC client (browser)
+  bff-adviser-portal          src/BffAdviserPortal
+    └── cookie + OIDC + /api proxy
+  adviser-portal              Vite SPA (no tokens)
 ```
 
 Aspire does three things for the session stack:
 
-1. Injects the `MyWealthDbV2` connection string into **both** hosts.
-2. Publishes service-discovery URLs for `identity` (issuer), `webapi`, and `adviser-portal`, so redirect URIs, CORS, and OIDC authority match.
-3. In Development, adds the portal callback origin and the Scalar origin to CORS / client redirects.
+1. Injects the `MyWealthDbV2` connection string into `identity` and `webapi`. The BFF does not run the applicator.
+2. Publishes service-discovery URLs for `identity` (issuer), `webapi`, `bff-adviser-portal`, and `adviser-portal`, so redirect URIs and the OIDC authority match.
+3. In Development, adds the BFF callback origin and the Scalar origin to client redirects. The browser does not call `webapi` for the product path.
 
 The schema applicator runs **once** (default: `webapi` startup, or an explicit apply step). `identity` must not run a second applicator concurrently.
 
@@ -160,8 +165,8 @@ The schema applicator runs **once** (default: `webapi` startup, or an explicit a
 | Packages | OpenIddict ASP.NET Core + official EF store (follow the package tables; do not invent `RefreshTokens`) |
 | Issuer | Base URL of `identity` (Aspire service discovery in Development; a stable HTTPS name in production) |
 | Keys | Asymmetric signing. Development certificate is allowed. Production certificate; private key is not committed. APIs validate via JWKS. `UseLocalServer()` is not the default validation path |
-| Client | One `OpenIddictApplications` row: `ClientId = adviser-portal`, public + PKCE, password grant off |
-| Redirect | `{portalOrigin}/callback`. Post-logout `{portalOrigin}/`. Both must be upserted on the OpenIddict client (local Vite origin + Aspire dashboard alias) |
+| Client | One `OpenIddictApplications` row: `ClientId = adviser-portal`, confidential + PKCE, password grant off. Secret in Aspire config, not in git |
+| Redirect | `{bffOrigin}/signin-oidc`. Post-logout `{bffOrigin}/`. Development upsert includes the Aspire dashboard alias for the BFF, not a wildcard |
 | Scopes | `openid`, `profile`, `offline_access`, `api` |
 | Tokens | Short-lived JWT access. Refresh in `OpenIddictTokens`. Absolute / sliding lifetimes belong in the identity-auth Feature Spec |
 | Login page | Razor Pages at `/login` on `identity`. Validates with `UserManager`, then returns to the authorization-code flow |
@@ -186,7 +191,8 @@ dotnet run --project src/AppHost
 | Database | `MyWealthDbV2` | Aspire `AddDatabase` name = SQL name = connection-string name injected into `identity` and `webapi` |
 | Authorization server | `identity` | OpenIddict + hosted login |
 | Web API | `webapi` | Scalar at `/scalar`; Bearer only |
-| Adviser Portal | `adviser-portal` | Vite frontend. First slice: OIDC callback + session probe. Pages come later. |
+| Adviser Portal | `adviser-portal` | Vite frontend. No OIDC client in the browser |
+| Adviser Portal BFF | `bff-adviser-portal` | `src/BffAdviserPortal`. Cookie session, code exchange, `/api` proxy |
 
 **Database lifecycle (ADR 0008)**
 

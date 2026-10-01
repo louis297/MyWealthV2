@@ -30,13 +30,14 @@ How this file relates to the rest of the tree is in [README.md](README.md). This
 - Stack: Aspire + Clean Architecture + React / Redux / TypeScript + .NET 10 + EF Core + SQL Server.
 - Schema: versioned SQL scripts are the source of truth. Do not use `EnsureDeleted` as the normal boot path.
 - Tenancy: shared database + dual check + isolation tests. Login carries **tenantCode** (no subdomain). Email is unique inside a tenant.
-- Identity: ASP.NET Identity stores users and password hashes. **OpenIddict** lives in Aspire resource `identity` (`src/IdentityHost`). Authorization code + PKCE + revocable refresh. No custom `/auth/login` token issuer. Invitation and forgot-password are not in Phase 1. Keep `UserStatus`, `UserTokens`, and the email port. Phase 1 uses one database (`MyWealthDbV2`); not a separate identity SQL database.
+- Identity: ASP.NET Identity stores users and password hashes. **OpenIddict** lives in Aspire resource `identity` (`src/IdentityHost`). Authorization code + PKCE + revocable refresh. The Adviser Portal client is confidential and held by `bff-adviser-portal` (ADR 0016). No custom `/auth/login` token issuer. Invitation and forgot-password are not in Phase 1. Keep `UserStatus`, `UserTokens`, and the email port. One database (`MyWealthDbV2`); not a separate identity SQL database.
 - Customer: may obtain tokens through the authorization server. No Customer Portal client in Phase 1.
 - Roles: four. One Domain `Users` table and one `ApplicationUser` table hold all four. Named endpoint policies, code-mapped role → permission, handler scope checks (ADR 0013).
 - Identity link: only `Users.IdentityUserId` → `AspNetUsers`. No reverse database FK.
 - Keys: internal `int` identity, external `PublicId` UUID.
 - Currency: platform `Currencies` table, not an enum. Ships in Phase 1.
 - Instrument catalog, accounts, holdings, transactions, and net worth are the **Phase-2 ledger domain**. Phase 1 does not create those tables or expose those APIs.
+- Product frontend is the React Adviser Portal only.
 
 ---
 
@@ -44,7 +45,7 @@ How this file relates to the rest of the tree is in [README.md](README.md). This
 
 - **Phase 1:** platform foundation. The vertical cut stops at “people in a firm + currency catalog”. Session uses the same OIDC shape a second portal will reuse.
 - **Phase 2:** ledger domain (instrument catalog first, then account container, cash ledger, securities / holdings, posting and reversal, read models). One domain, several slices. Model it as real sub-ledgers. Do not ship a throwaway single-row `Transactions` design that pretends to be both cash and securities.
-- **Phase 3+:** one domain at a time (Customer Portal as a second OIDC client, KYC, household groups, advice documents, and so on).
+- **Phase 3+:** one domain at a time (Customer Portal as a second BFF + OIDC client, KYC, household groups, advice documents, and so on).
 
 ---
 
@@ -71,10 +72,10 @@ Phase 2  Ledger domain (one domain, several slices)
          Instruments first, then account container → cash ledger
          → securities / holdings → posting and reversal → net-worth read model
          Tendencies in §5. Table shape is locked when that phase opens.
-         Session stack does not change.
+         Session stack: portal browser talks to `bff-adviser-portal` (ADR 0016). Resource API session does not change.
 
 Phase 3+ Other domains, one at a time
-         Customer Portal = second public OIDC client on the same authorization server
+         Customer Portal = second BFF + client on the same authorization server
          Invitation delivery, KYC, households, advice documents, custody, tax, …
 ```
 
@@ -99,7 +100,7 @@ Phase 1 scripts **do not** include Instruments, Accounts, Holdings, or Transacti
 | Capability | Notes | UI | Who |
 | --- | --- | --- | --- |
 | Authorization server | OpenIddict in `identity`. Library default paths, do not remap: discovery, JWKS, `/connect/authorize`, `/connect/token`, `/connect/revocation`, `/connect/logout`. | Hosted login page on `identity` | Engineering |
-| OIDC client | One public client: `adviser-portal`. Authorization code + PKCE + refresh. | Portal redirect / callback | Adviser Portal |
+| OIDC client | `adviser-portal`, confidential, held by `bff-adviser-portal`. Authorization code + PKCE + refresh. | Portal cookie; no tokens in the browser | Adviser Portal |
 | Login | Hosted page: email + password + tenantCode (SystemAdmin omits tenantCode). | Hosted login | Login-capable roles |
 | Logout | End session + revoke refresh. | Global | Authenticated |
 | Refresh | OpenIddict token endpoint. Invalidated on password change, disable, logout. | None | Authenticated |
@@ -154,7 +155,7 @@ One domain. Feature Specs come after this map. Suggested internal slice order (n
 4. Holdings / securities ledger / Opening of holdings
 5. Net-worth read model + Adviser Portal Dashboard
 
-Session, OpenIddict, and the Adviser Portal client do not change in this phase. Add ledger policy names only.
+Session edge is [features/bff-adviser-portal.md](features/bff-adviser-portal.md) (accepted 2026-10-01, not landed). Resource API auth does not change. Add ledger policy names only.
 
 ### 5.1 In scope (agreed 2026-09-17)
 
@@ -199,7 +200,7 @@ Session, OpenIddict, and the Adviser Portal client do not change in this phase. 
 
 ### 5.4 Not locked (do not invent tables from this list)
 
-Transaction header + cash-leg shape: [features/posting.md](features/posting.md) (accepted). Still open: Opening holdings columns; buy / scrip security-leg shape; daily snapshots; Dashboard widget list. Close-with-cash-zero amends accounts R16.
+Transaction header + cash-leg shape: [features/posting.md](features/posting.md) (accepted). Holdings draft: [features/holdings.md](features/holdings.md) (questions only). Still open: Opening holdings columns; buy / scrip security-leg shape; whether a Holdings projection exists; daily snapshots; Dashboard widget list. Close-with-cash-zero amends accounts R16.
 
 ### 5.5 Out of Phase 2
 
@@ -260,4 +261,4 @@ List page size is locked in tenants and reused by people lists (page 1 / size 20
 
 Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; uniform login failure; hosted login is Razor Pages at `/login`; access 15 minutes; refresh 14 days absolute.
 
-Phase 1 platform slices are accepted and tested (A1–A10, B1–B11, C1–C15). Phase 2 is open. Feature map in §5 is agreed. Instruments is accepted and landed (`9ea2f2a`). IsActive rename + `Users.IsActive` landed (`bbd0f26`, `0011`). Accounts is accepted and landed (`3e8b8f3`, `0012_accounts.sql`, `/accounts`). Posting is accepted 2026-09-25 and landed (`docs/features/posting.md`, script `0013_transactions.sql`, `/transactions`). Implement from that Feature Spec, not from ADR 0011 alone. Do not invent table shape outside the spec that owns it.
+Phase 1 platform slices are accepted and tested (A1–A10, B1–B11, C1–C15). Phase 2 is open. Feature map in §5 is agreed. Instruments is accepted and landed (`9ea2f2a`). IsActive rename + `Users.IsActive` landed (`bbd0f26`, `0011`). Accounts is accepted and landed (`3e8b8f3`, `0012_accounts.sql`, `/accounts`). Posting is accepted and landed 2026-09-25 (`docs/features/posting.md`, script `0013_transactions.sql`, `/transactions`, master `79129eb`). Implement further ledger slices from a new Feature Spec, not from ADR 0011 alone. Do not invent table shape outside the spec that owns it.

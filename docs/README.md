@@ -117,4 +117,5 @@ Use the same `status` on every doc front matter:
 - Feature Spec **In** scope is only what that slice ships. Later-phase words may appear as out-of-scope names, not as tables to create.
 - `api-design.md` is conventions plus a resource catalog. Field rules live in the Feature Spec.
 - File names are kebab-case. Specs: `features/<name>.md`. ADRs: `adr/NNNN-short-title.md`. Portal specs: `portals/<name>.md`.
+- Host codes live in [glossary.md](glossary.md). Resource specs stay unprefixed (`accounts.md`). A BFF spec is `features/bff-<portal>.md` (`bff-adviser-portal.md`). Do not rename an accepted spec to add a prefix.
 - Do not create empty spec files for phases that have not opened.

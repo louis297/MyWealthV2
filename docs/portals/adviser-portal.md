@@ -4,7 +4,7 @@ status: accepted
 phase: 1
 language: en
 created: 2026-09-12
-updated: 2026-09-15
+updated: 2026-10-01
 related:
   - README.md
   - frontend-conventions.md
@@ -23,7 +23,7 @@ related:
 
 Only Phase-1 frontend and only public OIDC client. Aspire resource name and ClientId are both `adviser-portal`.
 
-The portal **does not issue tokens**. Password collection stays on hosted login (`identity`). This file is not a backend Feature Spec. Construction detail lives in [frontend-implementation-notes.md](frontend-implementation-notes.md).
+The portal **does not issue tokens** and **does not hold them**. Password collection stays on hosted login (`identity`). Session edge is [bff-adviser-portal.md](../features/bff-adviser-portal.md) (accepted). This file is not a backend Feature Spec. Construction detail lives in [frontend-implementation-notes.md](frontend-implementation-notes.md).
 
 Tenant **management** (create / rename / reporting currency / disable) is not this app. That is `tenants.manage` on Scalar, or a later Back Office client. The shell may **read** the current firm’s name through `GET /tenants/by-code/{code}` (`tenants.read`).
 
@@ -82,7 +82,7 @@ Landed in repo master 2026-09-14. Do not rebuild the OIDC shell to ship these pa
 | Path | Who | Behaviour |
 | --- | --- | --- |
 | `/callback` | Protocol | Exchange a given `code` once, then return path. |
-| `/` | Allowed roles | Redirect `/customers`. |
+| `/` | Allowed roles | Redirect `/customers`. SystemAdmin does not land on a Customers workspace (C4). |
 | `/customers` | TenantAdmin, Adviser | List. |
 | `/customers/new` | Same | Create. |
 | `/customers/:id` | Same | Read-only detail. |
@@ -100,13 +100,14 @@ Landed in repo master 2026-09-14. Do not rebuild the OIDC shell to ship these pa
 | Item | Value |
 | --- | --- |
 | ClientId | `adviser-portal` |
-| Type | Public + PKCE. No client secret. Password grant off. |
+| Holder | `bff-adviser-portal` (`src/BffAdviserPortal`). Not the browser |
+| Type | Confidential + PKCE. Secret in Aspire config. Password grant off |
 | Scopes | `openid`, `profile`, `offline_access`, `api` |
-| Redirect | `{portalOrigin}/callback` |
-| Post-logout | `{portalOrigin}/` |
-| Token store | Redux + `sessionStorage` |
+| Redirect | `{bffOrigin}/signin-oidc` |
+| Post-logout | `{bffOrigin}/` |
+| Token store | Encrypted BFF cookie. Browser: `__Host-bff-adviser-portal` only |
 | Allow-list | SystemAdmin, TenantAdmin, Adviser |
-| Sign out | Clear store + `sessionStorage`; `POST /connect/revocation` with the refresh token; redirect to discovery `end_session_endpoint` with `client_id` and `post_logout_redirect_uri={origin}/`. While that is in flight, `RequireSession`, `HomePage`, and the 401 handler must **not** call `startAuthorize`. |
+| Sign out | `POST /bff/logout` with `X-MyWealth-Request: 1`. BFF revokes refresh, then identity end-session. SPA must not call `startAuthorize` while that is in flight. |
 
 ### Acceptance (cut C)
 
@@ -117,7 +118,7 @@ Requires A and B in the running hosts. Do not re-test A1–A10 or B1–B11 here 
 | C1 | TenantAdmin, no session | Open `/customers` | Authorize → hosted login → callback → land on `/customers`. No React password page. |
 | C2 | Same session as C1 | Shell | Firm **Name** from `GET /tenants/by-code/{tenantCode}`. Code may appear as secondary. Nav: Customers, Advisers, Profile. |
 | C3 | Adviser session | Shell and `/advisers` | Nav has Customers + Profile, no Advisers. `/advisers` and `/advisers/new` render `/forbidden`, not a fake 404. |
-| C4 | SystemAdmin session | `/`, `/customers`, `/profile`, `/session` | `/` does not show a Customers workspace. `/customers` and `/advisers` are `/forbidden`. `/profile` and `/session` allowed. No tenant manage screens. |
+| C4 | SystemAdmin session | `/`, `/customers`, `/profile`, `/session` | Cookie is set. `/` does not show a Customers workspace. `/customers` and `/advisers` are `/forbidden`. `/profile` and `/session` allowed. No tenant manage screens. BFF does not refuse the cookie. |
 | C5 | Customer + correct password | Hosted login for this client | Covered by A1. Portal never stores a Customer session. If a leftover token appears, `/forbidden`. |
 | C6 | TenantAdmin | Create customer (`name`, `email`, `password`, `adviserId` of an Active adviser) | `POST /users/customers` includes `adviserId`. 201 → `/customers/{id}`. Password is not shown again. |
 | C7 | Adviser | Create customer | Body **omits** `adviserId`. New row’s `adviserId` is the caller. |
@@ -126,11 +127,13 @@ Requires A and B in the running hosts. Do not re-test A1–A10 or B1–B11 here 
 | C10 | TenantAdmin | Disable / enable customer with current `rowVersion` | 204. Stale `rowVersion` → page tells the user to reload; it does not replay the old version. |
 | C11 | TenantAdmin | Create / rename / disable adviser | Same route split as customers. Disable while assigned customers are Active → ordinary 400 sentence + link to `/customers?adviserId=`. Not painted as `code=disabled`. |
 | C12 | TenantAdmin | `PUT /users/me` and `PUT /users/me/password` | Name updates. Password 204 then the app clears tokens and starts authorize again. |
-| C13 | Any allowed role | Sign out | Portal session cleared (`sessionStorage` empty). Refresh revoked at `/connect/revocation`. IdentityHost end-session clears the hosted-login cookie (R21). Next visit is hosted `/login`, not a silent authorize. Same authorization `code` is not exchanged twice. |
+| C13 | Any allowed role | Sign out | BFF cookie cleared. Refresh revoked. IdentityHost end-session clears the hosted-login cookie. Next visit is hosted `/login`, not a silent authorize. No token keys in `sessionStorage`. |
 | C14 | Deep link `/customers/{id}` while signed out | After callback | Returns to that path when it is an in-app path (draft default 13.6). |
 | C15 | Cross-tenant or unassigned customer id | Open `/customers/{id}` | “Not found” on that URL. Not 403. Not a bounce to the list before the message. |
 
 Out of this cut: Dashboard, ledger pages, `/currencies` UI, tenant CRUD, a password field that issues tokens.
+
+Session plumbing after ADR 0016: browser does not redeem `/callback`. C1’s “callback” is `bff-adviser-portal` `/signin-oidc`. API calls from these pages go to `/api`. Construction notes (`review`) still describe the landed public-client shell until that cut is rewritten.
 
 Suggested commits: [frontend-implementation-notes.md](frontend-implementation-notes.md) §12.
 

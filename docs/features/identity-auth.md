@@ -25,7 +25,7 @@ Session protocol, login gate, current user, and authorization policies. Tokens a
 
 ## 1. Summary
 
-The Adviser Portal redirects to hosted login on `identity` (email + password + tenantCode; SystemAdmin omits tenantCode) and completes authorization code + PKCE + revocable refresh. `webapi` validates Bearer tokens via discovery / JWKS and exposes `/users/me` plus password change. Only `UserStatus = Active` and an enabled tenant (when the person has one) may complete login.
+The Adviser Portal session is completed by `bff-adviser-portal` (ADR 0016, accepted). This file still owns the issuer, the login gate, policies, and `/users/me`. Who redeems the code is the amendment below, not the Phase 1 public-client sentences.
 
 A person may complete authorization only for a client that allows that `Users.Role`. After the password check succeeds and before IdentityHost issues an authorization code, the host reads `client_id` from the current authorize request and applies the allow-list. `adviser-portal` allows SystemAdmin, TenantAdmin, and Adviser. A Customer with a correct password does **not** receive a code for that client. Failure copy stays uniform (R3). Customer remains a login principal; tokens for that role wait for client `customer-portal`. Adviser-management routes stay 403 for Customer.
 
@@ -36,7 +36,7 @@ A person may complete authorization only for a client that allows that `Users.Ro
 **In**
 
 - Aspire resource `identity` (`src/IdentityHost`): OpenIddict **default protocol paths, do not remap**, plus hosted login
-- One Phase-1 public client: `adviser-portal` (authorization code + PKCE + refresh; password grant off)
+- One Phase-1 client: `adviser-portal` (authorization code + PKCE + refresh; password grant off). Holder is `bff-adviser-portal` (amendment 2026-10-01). Phase 1 landed it as a public browser client.
 - Asymmetric signing; JWKS; `webapi` validates via discovery. `UseLocalServer()` is not the default validation path
 - `GET/PUT /users/me`, `PUT /users/me/password` (resource API; does not issue tokens)
 - JWT claims: `sub` = user PublicId, `email`, `role`, `tenant_id`, `tenant_code` (tenant claims empty for SystemAdmin). No internal ints. Permissions are not expanded into the token
@@ -356,6 +356,17 @@ Gate: password check has already succeeded. Client id is the `client_id` on the 
 | A10 | Existing isolation | Tenant A email + tenant B code | Still fails before the allow-list (wrong tenant). Do not weaken R1–R3. |
 
 Customers create smoke ([customers.md](customers.md) §10) must use A1 + A2, not “hosted login succeeds”.
+
+### Amendment 2026-10-01 (BFF holder + refresh rotation)
+
+Accepted with [bff-adviser-portal.md](bff-adviser-portal.md) and ADR 0016. Do not rewrite R1–R21 in place. Phase 1 public-client sentences above describe what landed; this amendment supersedes the holder.
+
+- `adviser-portal` is confidential. Secret in Aspire config. PKCE stays. The BFF exchanges the code at `/connect/token`. The browser does not.
+- Redirect `{bffOrigin}/signin-oidc`. Post-logout `{bffOrigin}/`.
+- R21 still owns the identity end-session action. The caller of revocation + end-session is the BFF.
+- Access lifetime stays 15 minutes. Refresh stays 14 days absolute. Issuing a new refresh revokes the refresh that was presented.
+- Allow-list unchanged. SystemAdmin still receives a code. Customer still does not.
+- No new table. No new ADR beyond 0016.
 
 ### Amendment 2026-09-14 (R21 — end session)
 

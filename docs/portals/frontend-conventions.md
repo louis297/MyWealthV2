@@ -3,11 +3,13 @@ title: Frontend conventions
 status: review
 language: en
 created: 2026-09-12
-updated: 2026-09-14
+updated: 2026-10-01
 related:
   - README.md
   - adviser-portal.md
+  - ../features/bff-adviser-portal.md
   - ../adr/0003-react-redux-typescript-vite-tailwind-frontend.md
+  - ../adr/0016-bff-for-first-party-portals.md
 ---
 
 # Frontend conventions
@@ -35,22 +37,22 @@ Feature code lives under `features/<name>/` (`session`, then `profile`, `custome
 ## Naming
 
 - Components PascalCase; file name matches the component.
-- One async style for the repo: RTK Query for REST; a small session slice for tokens and the current user.
+- One async style for the repo: RTK Query for REST; a small session slice for the current user. Do not store tokens in that slice.
 
 ## Session
 
-- Access token, refresh token, and the last `/users/me` payload live in Redux. Persist tokens in `sessionStorage` (not `localStorage`).
-- After `me`, if `tenantCode` is set, load `GET /tenants/by-code/{tenantCode}` into the store for the shell Name. Do not expect `tenantName` on `/users/me`.
+- The browser holds the BFF session cookie only. Access and refresh tokens must not live in Redux, `sessionStorage`, or `localStorage`.
+- After `me`, if `tenantCode` is set, load `GET /api/tenants/by-code/{tenantCode}` into the store for the shell Name. Do not expect `tenantName` on `/users/me`. SystemAdmin has no tenantCode; do not call that route.
 - Resource ids in the UI are PublicId values only.
 - Do not put a password field on this app that **issues tokens**. Create-person and profile-change password fields are allowed.
 
 ## API
 
-- One client in `shared/api`. Base URL from Aspire / env (`webapi`).
-- `Authorization: Bearer <access>`.
-- On 401, try refresh once against identity `/connect/token`; if that fails, clear the session and restart authorize unless sign-out is already in progress.
-- `/callback` redeems a given authorization code once. Keep React StrictMode.
-- Sign out revokes refresh at `/connect/revocation`, then identity `/connect/logout`. No portal `/auth/logout`.
+- One client in `shared/api`. Base URL `/api` on the BFF origin. `credentials: 'include'`.
+- Do not set `Authorization`. Mutating calls send `X-MyWealth-Request: 1`.
+- On 401, do not call `identity`. The BFF already refreshed once. Clear local user state and send the browser to `/bff/login` unless sign-out is already in progress.
+- No SPA `/callback`. Keep React StrictMode.
+- Sign out is `POST /bff/logout` with `X-MyWealth-Request: 1`. No portal `/auth/logout`. No SPA call to `/connect/revocation`.
 - Do not treat a cross-tenant 404 as 403.
 
 ## Style
