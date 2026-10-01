@@ -1,7 +1,13 @@
+using System.Net;
 using System.Net.Http.Headers;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
+using MyWealthV2.Shared;
 
 namespace MyWealthV2.BffAdviserPortal;
 
@@ -72,9 +78,48 @@ public static class ApiProxy
         var baseAddress = http.RequestServices.GetRequiredService<IConfiguration>()["Api:BaseAddress"]
             ?? "https+http://webapi";
         var target = baseAddress.TrimEnd('/') + path + http.Request.QueryString;
-        using var outbound = new HttpRequestMessage(new HttpMethod(http.Request.Method), target);
-
         http.Request.EnableBuffering();
+        var accessToken = await http.GetTokenAsync("access_token");
+        var inbound = await SendAsync(http, transport, target, accessToken);
+        if (inbound.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            inbound.Dispose();
+            var refreshed = await TryRefreshAsync(http);
+            if (refreshed is null)
+            {
+                await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                await WriteProblem(http, StatusCodes.Status401Unauthorized, "Unauthorized",
+                    "https://tools.ietf.org/html/rfc9110#section-15.5.2");
+                return;
+            }
+
+            if (http.Request.Body.CanSeek)
+            {
+                http.Request.Body.Position = 0;
+            }
+
+            inbound = await SendAsync(http, transport, target, refreshed);
+        }
+
+        using (inbound)
+        {
+            http.Response.StatusCode = (int)inbound.StatusCode;
+            if (inbound.Content.Headers.ContentType is { } contentType)
+            {
+                http.Response.ContentType = contentType.ToString();
+            }
+
+            await inbound.Content.CopyToAsync(http.Response.Body, http.RequestAborted);
+        }
+    }
+
+    private static async Task<HttpResponseMessage> SendAsync(
+        HttpContext http,
+        IWebApiTransport transport,
+        string target,
+        string? accessToken)
+    {
+        var outbound = new HttpRequestMessage(new HttpMethod(http.Request.Method), target);
         if (http.Request.ContentLength is > 0 || http.Request.Headers.ContainsKey("Transfer-Encoding"))
         {
             outbound.Content = new StreamContent(http.Request.Body);
@@ -95,20 +140,75 @@ public static class ApiProxy
             outbound.Headers.TryAddWithoutValidation("Idempotency-Key", idempotencyKey.ToArray());
         }
 
-        var accessToken = await http.GetTokenAsync("access_token");
         if (!string.IsNullOrEmpty(accessToken))
         {
             outbound.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         }
 
-        using var inbound = await transport.SendAsync(outbound, http.RequestAborted);
-        http.Response.StatusCode = (int)inbound.StatusCode;
-        if (inbound.Content.Headers.ContentType is { } contentType)
+        return await transport.SendAsync(outbound, http.RequestAborted);
+    }
+
+    private static async Task<string?> TryRefreshAsync(HttpContext http)
+    {
+        var refreshToken = await http.GetTokenAsync("refresh_token");
+        if (string.IsNullOrEmpty(refreshToken))
         {
-            http.Response.ContentType = contentType.ToString();
+            return null;
         }
 
-        await inbound.Content.CopyToAsync(http.Response.Body, http.RequestAborted);
+        var configuration = http.RequestServices.GetRequiredService<IConfiguration>();
+        var oidc = http.RequestServices.GetRequiredService<IOptionsMonitor<OpenIdConnectOptions>>()
+            .Get(OpenIdConnectDefaults.AuthenticationScheme);
+        var authority = (configuration["Authentication:Authority"] ?? oidc.Authority ?? "").TrimEnd('/');
+        using var message = new HttpRequestMessage(HttpMethod.Post, authority + "/connect/token")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string?>
+            {
+                ["grant_type"] = "refresh_token",
+                ["refresh_token"] = refreshToken,
+                ["client_id"] = Services.AdviserPortal,
+                ["client_secret"] = configuration["Authentication:ClientSecret"]
+            })
+        };
+
+        using var response = await oidc.Backchannel.SendAsync(message, http.RequestAborted);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(http.RequestAborted));
+        var accessToken = json.RootElement.GetProperty("access_token").GetString();
+        var nextRefresh = json.RootElement.TryGetProperty("refresh_token", out var refresh)
+            ? refresh.GetString()
+            : refreshToken;
+        var idToken = json.RootElement.TryGetProperty("id_token", out var id)
+            ? id.GetString()
+            : await http.GetTokenAsync("id_token");
+        var expiresIn = json.RootElement.TryGetProperty("expires_in", out var expires) && expires.TryGetInt32(out var seconds)
+            ? seconds
+            : 900;
+
+        var authenticated = await http.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        if (authenticated.Principal is null || authenticated.Properties is null || string.IsNullOrEmpty(accessToken))
+        {
+            return null;
+        }
+
+        authenticated.Properties.StoreTokens(
+        [
+            new AuthenticationToken { Name = "access_token", Value = accessToken },
+            new AuthenticationToken { Name = "refresh_token", Value = nextRefresh ?? refreshToken },
+            new AuthenticationToken { Name = "id_token", Value = idToken ?? "" },
+            new AuthenticationToken { Name = "token_type", Value = "Bearer" },
+            new AuthenticationToken { Name = "expires_at", Value = DateTimeOffset.UtcNow.AddSeconds(expiresIn).ToString("o") }
+        ]);
+        authenticated.Properties.IsPersistent = false;
+        await http.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            authenticated.Principal,
+            authenticated.Properties);
+        return accessToken;
     }
 
     private static Task WriteProblem(HttpContext http, int status, string title, string type)
