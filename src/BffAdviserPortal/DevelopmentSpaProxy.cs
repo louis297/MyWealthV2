@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.Extensions.Primitives;
 
 namespace MyWealthV2.BffAdviserPortal;
@@ -20,10 +21,13 @@ public static class DevelopmentSpaProxy
         var client = new HttpClient(new SocketsHttpHandler
         {
             AllowAutoRedirect = false,
-            UseCookies = false
+            UseCookies = false,
+            PooledConnectionLifetime = TimeSpan.Zero
         })
         {
-            BaseAddress = spaBase
+            BaseAddress = spaBase,
+            DefaultRequestVersion = HttpVersion.Version11,
+            DefaultVersionPolicy = HttpVersionPolicy.RequestVersionExact
         };
         app.Lifetime.ApplicationStopping.Register(client.Dispose);
 
@@ -56,8 +60,16 @@ public static class DevelopmentSpaProxy
 
     private static async Task ForwardAsync(HttpContext http, HttpClient spaClient, Uri spaBase)
     {
+        if (http.WebSockets.IsWebSocketRequest)
+        {
+            http.Response.StatusCode = StatusCodes.Status400BadRequest;
+            return;
+        }
+
         var target = new Uri(spaBase, http.Request.Path + http.Request.QueryString);
         using var outbound = new HttpRequestMessage(new HttpMethod(http.Request.Method), target);
+        outbound.Version = HttpVersion.Version11;
+        outbound.VersionPolicy = HttpVersionPolicy.RequestVersionExact;
         // Vite uses Host to resolve dev modules. This is the dev server endpoint.
         outbound.Headers.Host = spaBase.Authority;
         if (http.Request.Headers.TryGetValue("Accept", out var accept) && !StringValues.IsNullOrEmpty(accept))
@@ -65,7 +77,10 @@ public static class DevelopmentSpaProxy
             outbound.Headers.TryAddWithoutValidation("Accept", accept.ToArray());
         }
 
-        using var inbound = await spaClient.SendAsync(outbound, http.RequestAborted);
+        using var inbound = await spaClient.SendAsync(
+            outbound,
+            HttpCompletionOption.ResponseHeadersRead,
+            http.RequestAborted);
         http.Response.StatusCode = (int)inbound.StatusCode;
         if (inbound.Content.Headers.ContentType is { } contentType)
         {
