@@ -77,16 +77,26 @@ public static class DevelopmentSpaProxy
             outbound.Headers.TryAddWithoutValidation("Accept", accept.ToArray());
         }
 
-        using var inbound = await spaClient.SendAsync(
-            outbound,
-            HttpCompletionOption.ResponseHeadersRead,
-            http.RequestAborted);
-        http.Response.StatusCode = (int)inbound.StatusCode;
-        if (inbound.Content.Headers.ContentType is { } contentType)
+        try
         {
-            http.Response.ContentType = contentType.ToString();
-        }
+            using var inbound = await spaClient.SendAsync(
+                outbound,
+                HttpCompletionOption.ResponseHeadersRead,
+                http.RequestAborted);
+            http.Response.StatusCode = (int)inbound.StatusCode;
+            if (inbound.Content.Headers.ContentType is { } contentType)
+            {
+                http.Response.ContentType = contentType.ToString();
+            }
 
-        await inbound.Content.CopyToAsync(http.Response.Body, http.RequestAborted);
+            await inbound.Content.CopyToAsync(http.Response.Body, http.RequestAborted);
+        }
+        catch (Exception) when (http.RequestAborted.IsCancellationRequested)
+        {
+        }
+        catch (HttpRequestException) when (!http.Response.HasStarted)
+        {
+            http.Response.StatusCode = StatusCodes.Status502BadGateway;
+        }
     }
 }
