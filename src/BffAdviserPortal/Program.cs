@@ -12,10 +12,11 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    // The Aspire dev proxy is not always a loopback address.
+    // The Aspire dev proxy is not always a loopback address, so trust X-Forwarded-Proto.
+    // Do not apply X-Forwarded-Host: it rewrites the https://localhost:7190 entry to another name.
     var forwardedHeaders = new ForwardedHeadersOptions
     {
-        ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost
+        ForwardedHeaders = ForwardedHeaders.XForwardedProto
     };
     forwardedHeaders.KnownIPNetworks.Clear();
     forwardedHeaders.KnownProxies.Clear();

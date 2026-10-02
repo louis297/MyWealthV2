@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace MyWealthV2.Application.FunctionalTests.Bff;
@@ -110,15 +111,56 @@ public class BffLoginTests
         var response = await _client.SendAsync(request);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Redirect);
-        var query = HttpUtility.ParseQueryString(response.Headers.Location!.Query);
-        query["redirect_uri"].ShouldBe(
-            "https://bff-adviser-portal-mywealthv2.dev.localhost:7190/signin-oidc");
+        var redirect = HttpUtility.ParseQueryString(response.Headers.Location!.Query)["redirect_uri"];
+        redirect.ShouldNotBeNull();
+        redirect.ShouldStartWith("https://");
+        redirect.ShouldEndWith("/signin-oidc");
+        redirect.ShouldNotContain("dev.localhost");
+        redirect.ShouldNotContain(":5290");
 
         var correlation = response.Headers.GetValues("Set-Cookie").Single(cookie =>
             cookie.StartsWith(".AspNetCore.Correlation.", StringComparison.Ordinal));
         correlation.Contains("secure", StringComparison.OrdinalIgnoreCase).ShouldBeTrue();
         correlation.Contains("domain=", StringComparison.OrdinalIgnoreCase).ShouldBeFalse();
         AssertSessionCookieAbsent(response);
+    }
+
+    [Test]
+    public async Task PublicOrigin_LoginAndPostLogoutUseTheHttpsEntry()
+    {
+        const string entry = "https://localhost:7190";
+        var logs = new ChallengeLog();
+        using var factory = CreateFactory(publicOrigin: entry, logs: logs);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+        using var login = new HttpRequestMessage(HttpMethod.Get, "/bff/login?returnUrl=/customers");
+        login.Headers.TryAddWithoutValidation("X-Forwarded-Proto", "https");
+        login.Headers.TryAddWithoutValidation(
+            "X-Forwarded-Host",
+            "bff-adviser-portal-mywealthv2.dev.localhost:7190");
+
+        var response = await client.SendAsync(login);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Redirect);
+        HttpUtility.ParseQueryString(response.Headers.Location!.Query)["redirect_uri"]
+            .ShouldBe(entry + "/signin-oidc");
+        var mismatch = logs.Messages.Single(message => message.Contains("registered redirects", StringComparison.Ordinal));
+        var challenge = mismatch.Split(" differs ", 2)[0];
+        challenge.ShouldContain("/signin-oidc");
+        challenge.ShouldNotContain(entry + "/signin-oidc");
+        mismatch.ShouldContain(entry + "/signin-oidc");
+
+        var session = SessionCookie(factory);
+        session.Cookie.Name.ShouldBe("__Host-bff-adviser-portal");
+        session.Cookie.SameSite.ShouldBe(SameSiteMode.Lax);
+        session.Cookie.Domain.ShouldBeNull();
+
+        var logout = await client.GetAsync("/bff/logout/continue");
+        logout.StatusCode.ShouldBe(HttpStatusCode.Redirect);
+        HttpUtility.ParseQueryString(logout.Headers.Location!.Query)["post_logout_redirect_uri"]
+            .ShouldBe(entry + "/");
     }
 
     [Test]
@@ -159,12 +201,49 @@ public class BffLoginTests
         AssertSecurityHeaders(response);
     }
 
-    private static BffFactory CreateFactory(string environment = "Development")
+    private static BffFactory CreateFactory(
+        string environment = "Development",
+        string? publicOrigin = null,
+        ILoggerProvider? logs = null)
     {
         using var identity = FunctionalTestSetup.Identity.CreateClient();
         var authority = identity.BaseAddress!.ToString();
         var handler = FunctionalTestSetup.Identity.Server.CreateHandler();
-        return new BffFactory(authority, handler, environment);
+        return new BffFactory(authority, handler, environment, publicOrigin: publicOrigin, logs: logs);
+    }
+
+    private sealed class ChallengeLog : ILoggerProvider, ILogger
+    {
+        public List<string> Messages { get; } = [];
+
+        public ILogger CreateLogger(string categoryName) => this;
+
+        public void Dispose()
+        {
+        }
+
+        public IDisposable BeginScope<TState>(TState state) where TState : notnull => NullScope.Instance;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Messages.Add(formatter(state, exception));
+        }
+
+        private sealed class NullScope : IDisposable
+        {
+            public static readonly NullScope Instance = new();
+
+            public void Dispose()
+            {
+            }
+        }
     }
 
     private static CookieAuthenticationOptions SessionCookie(BffFactory factory) =>

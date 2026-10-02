@@ -14,45 +14,12 @@ internal static class AspireExtensions
 
     public static IResourceBuilder<T> WithPortalOrigins<T>(
         this IResourceBuilder<T> identity,
-        IResourceBuilder<IResourceWithEndpoints> portal,
-        IDistributedApplicationBuilder app)
+        IResourceBuilder<IResourceWithEndpoints> portal)
         where T : IResourceWithEnvironment
     {
-        var endpoint = portal.GetEndpoint("https");
-        identity.WithEnvironment("Identity__PortalOrigins__0", endpoint);
-
-        var dashboardHost = GetDevLocalhostHost(app);
-        if (!string.IsNullOrWhiteSpace(dashboardHost))
-        {
-            identity.WithEnvironment(
-                "Identity__PortalOrigins__1",
-                ReferenceExpression.Create(
-                    $"{endpoint.Property(EndpointProperty.Scheme)}://{portal.Resource.Name}-{dashboardHost}:{endpoint.Property(EndpointProperty.Port)}"));
-        }
-
+        // The browser entry is the https endpoint (https://localhost:7190). Do not invent a
+        // *.dev.localhost alias, and do not register the http endpoint.
+        identity.WithEnvironment("Identity__PortalOrigins__0", portal.GetEndpoint("https"));
         return identity;
-    }
-
-    private static string? GetDevLocalhostHost(IDistributedApplicationBuilder app)
-    {
-        foreach (var key in new[] { "ASPNETCORE_URLS", "applicationUrl" })
-        {
-            var value = app.Configuration[key];
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                continue;
-            }
-
-            foreach (var part in value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            {
-                if (Uri.TryCreate(part, UriKind.Absolute, out var uri) &&
-                    uri.Host.EndsWith(".dev.localhost", StringComparison.OrdinalIgnoreCase))
-                {
-                    return uri.Host;
-                }
-            }
-        }
-
-        return "mywealthv2.dev.localhost";
     }
 }

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
@@ -20,6 +21,8 @@ public sealed class BffFactory : WebApplicationFactory<BffHost::Program>
     private readonly IWebApiTransport? _api;
     private readonly string? _apiBaseAddress;
     private readonly string? _spaDevServerUrl;
+    private readonly string? _publicOrigin;
+    private readonly ILoggerProvider? _logs;
 
     public BffFactory(
         string authority,
@@ -27,7 +30,9 @@ public sealed class BffFactory : WebApplicationFactory<BffHost::Program>
         string environment = "Development",
         IWebApiTransport? api = null,
         string? apiBaseAddress = null,
-        string? spaDevServerUrl = null)
+        string? spaDevServerUrl = null,
+        string? publicOrigin = null,
+        ILoggerProvider? logs = null)
     {
         _authority = authority.TrimEnd('/');
         _identityHandler = identityHandler;
@@ -35,6 +40,8 @@ public sealed class BffFactory : WebApplicationFactory<BffHost::Program>
         _api = api;
         _apiBaseAddress = apiBaseAddress;
         _spaDevServerUrl = spaDevServerUrl;
+        _publicOrigin = publicOrigin;
+        _logs = logs;
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -50,6 +57,16 @@ public sealed class BffFactory : WebApplicationFactory<BffHost::Program>
         if (!string.IsNullOrWhiteSpace(_spaDevServerUrl))
         {
             builder.UseSetting("Spa:DevServerUrl", _spaDevServerUrl);
+        }
+
+        if (!string.IsNullOrWhiteSpace(_publicOrigin))
+        {
+            builder.UseSetting("Authentication:PublicOrigin", _publicOrigin);
+        }
+
+        if (_logs is not null)
+        {
+            builder.ConfigureLogging(logging => logging.AddProvider(_logs));
         }
 
         builder.ConfigureTestServices(services =>

@@ -166,7 +166,7 @@ The schema applicator runs **once** (default: `webapi` startup, or an explicit a
 | Issuer | Base URL of `identity` (Aspire service discovery in Development; a stable HTTPS name in production) |
 | Keys | Asymmetric signing. Development certificate is allowed. Production certificate; private key is not committed. APIs validate via JWKS. `UseLocalServer()` is not the default validation path |
 | Client | One `OpenIddictApplications` row: `ClientId = adviser-portal`, confidential + PKCE, password grant off. Secret in Aspire config, not in git |
-| Redirect | `{bffOrigin}/signin-oidc`. Post-logout `{bffOrigin}/`. Development upsert includes the Aspire dashboard alias for the BFF, not a wildcard |
+| Redirect | `{bffOrigin}/signin-oidc`. Post-logout `{bffOrigin}/`. `{bffOrigin}` is the BFF https browser entry. A `*.dev.localhost` alias is upserted only when that host is a browser entry |
 | Scopes | `openid`, `profile`, `offline_access`, `api` |
 | Tokens | Short-lived JWT access. Refresh in `OpenIddictTokens`. Absolute / sliding lifetimes belong in the identity-auth Feature Spec |
 | Login page | Razor Pages at `/login` on `identity`. Validates with `UserManager`, then returns to the authorization-code flow |

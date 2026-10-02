@@ -4,6 +4,7 @@ using MyWealthV2.IdentityHost.Services;
 using MyWealthV2.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 using OpenIddict.Abstractions;
+using OpenIddict.Server;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -70,6 +71,8 @@ builder.Services.AddOpenIddict()
             .EnableAuthorizationEndpointPassthrough()
             .EnableEndSessionEndpointPassthrough()
             .DisableTransportSecurityRequirement();
+
+        options.AddEventHandler(RedirectUriMismatchLogger.Descriptor);
     });
 
 var app = builder.Build();

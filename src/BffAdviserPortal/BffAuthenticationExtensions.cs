@@ -97,6 +97,7 @@ public static class BffAuthenticationExtensions
                 options.TokenValidationParameters.RoleClaimType = "role";
                 options.Events = new OpenIdConnectEvents
                 {
+                    OnRedirectToIdentityProvider = OnRedirectToIdentityProviderAsync,
                     OnAuthorizationCodeReceived = OnAuthorizationCodeReceivedAsync,
                     OnTokenResponseReceived = context =>
                     {
@@ -112,6 +113,32 @@ public static class BffAuthenticationExtensions
             });
 
         return builder;
+    }
+
+    private static Task OnRedirectToIdentityProviderAsync(RedirectContext context)
+    {
+        var origin = BffPublicOrigin.Read(context.HttpContext.RequestServices.GetRequiredService<IConfiguration>());
+        if (origin is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        var registered = origin + "/signin-oidc";
+        var challenge = context.ProtocolMessage.RedirectUri;
+        if (string.Equals(challenge, registered, StringComparison.Ordinal))
+        {
+            return Task.CompletedTask;
+        }
+
+        var logger = context.HttpContext.RequestServices
+            .GetRequiredService<ILoggerFactory>()
+            .CreateLogger("MyWealthV2.BffAdviserPortal.OidcChallenge");
+        logger.LogWarning(
+            "OIDC challenge redirect_uri {RedirectUri} differs from registered redirects {RegisteredRedirects}.",
+            challenge,
+            registered);
+        context.ProtocolMessage.RedirectUri = registered;
+        return Task.CompletedTask;
     }
 
     private static async Task OnAuthorizationCodeReceivedAsync(AuthorizationCodeReceivedContext context)

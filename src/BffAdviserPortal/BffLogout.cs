@@ -55,7 +55,8 @@ public static class BffLogout
 
     private static string EndSessionUrl(HttpContext http)
     {
-        var origin = $"{http.Request.Scheme}://{http.Request.Host}{http.Request.PathBase}".TrimEnd('/');
+        var origin = BffPublicOrigin.Read(http.RequestServices.GetRequiredService<IConfiguration>())
+            ?? $"{http.Request.Scheme}://{http.Request.Host}{http.Request.PathBase}".TrimEnd('/');
         return QueryHelpers.AddQueryString(Authority(http) + "/connect/logout", new Dictionary<string, string?>
         {
             ["client_id"] = Services.AdviserPortal,

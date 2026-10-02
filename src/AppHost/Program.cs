@@ -59,7 +59,7 @@ var bff = builder.AddProject<Projects.BffAdviserPortal>(Services.BffAdviserPorta
 var portal = builder.AddViteApp(Services.AdviserPortal, "../AdviserPortal")
     .WithExternalHttpEndpoints()
     .WithEnvironment("BROWSER", "none")
-    .WithEnvironment("VITE_BFF_HTTP", bff.GetEndpoint("http"))
+    .WithEnvironment("VITE_BFF_HTTP", bff.GetEndpoint("https"))
     .WithUrls(context =>
     {
         foreach (var url in context.Urls)
@@ -69,7 +69,8 @@ var portal = builder.AddViteApp(Services.AdviserPortal, "../AdviserPortal")
     });
 
 bff.WithEnvironment("Spa__DevServerUrl", portal.GetEndpoint("http"));
+bff.WithEnvironment("Authentication__PublicOrigin", bff.GetEndpoint("https"));
 
-identity.WithPortalOrigins(bff, builder);
+identity.WithPortalOrigins(bff);
 
 builder.Build().Run();
