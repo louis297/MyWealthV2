@@ -96,7 +96,7 @@ Lock table and port shape in the Feature Spec. Do not implement from ADR 0010 / 
 | [accounts](accounts.md) | accepted (landed in repo 2026-09-21 `3e8b8f3`) | TenantAdmin; Adviser (assigned Customers); SystemAdmin (all verbs, Scalar) | Account container under a Customer, `/accounts`, close/reopen, `Status` + derived `IsActive`, Disable-Customer guard, TestSeed | Cash / holdings / Opening need a container first |
 | [posting](posting.md) | accepted (2026-09-25; landed) | TenantAdmin; Adviser (assigned Customers); SystemAdmin (Scalar) | `/transactions` + cash legs; `0013_transactions.sql`; close amends accounts R16; `cashBalance` | Write model for booked activity; holdings / securities may amend this file or split later |
 | [holdings](holdings.md) | draft (2026-09-28) | TenantAdmin; Adviser (assigned Customers); SystemAdmin (Scalar) | Not a build contract. Security legs + holdings read + Opening of holdings; portal pages out | Next design slice after posting. Open questions in that file §8 |
-| [bff-adviser-portal](bff-adviser-portal.md) | accepted (2026-10-01; not landed) | Adviser Portal session | Aspire `bff-adviser-portal`; confidential client; cookie + OIDC + YARP; tokens out of the browser | Platform session increment, not a ledger slice. ADR 0016 accepted |
+| [bff-adviser-portal](bff-adviser-portal.md) | accepted (2026-10-01; landed `5e85e9c`) | Adviser Portal session | Aspire `bff-adviser-portal`; confidential client; cookie + OIDC + HttpClient proxy; tokens out of the browser | Platform session increment, not a ledger slice. ADR 0016 accepted. Portal cut: [adviser-portal-bff-cut.md](../portals/adviser-portal-bff-cut.md) |
 
 Suggested order (tendency, not a locked backlog). Cash is not its own spec; it lives in posting:
 

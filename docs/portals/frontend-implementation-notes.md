@@ -4,7 +4,7 @@ status: review
 phase: 1
 language: en
 created: 2026-09-14
-updated: 2026-09-15
+updated: 2026-10-02
 related:
   - README.md
   - adviser-portal.md
@@ -21,11 +21,11 @@ related:
 
 # Frontend implementation notes
 
+Page-by-page construction notes for the Adviser Portal **pages** cut. Not a backend Feature Spec.
+
 ## BFF cut
 
-The browser talks only to `bff-adviser-portal`. The session cookie is `__Host-bff-adviser-portal`. API calls use base `/api` with `credentials: 'include'` and no `Authorization` header. Mutations and sign-out send `X-MyWealth-Request: 1`. Signed-out navigation goes to `GET /bff/login?returnUrl=`. Sign-out is `POST /bff/logout` with that header, then `GET /bff/logout/continue`. There is no SPA `/callback` and no token in `sessionStorage`. The notes below describe the earlier public-client shell.
-
-Page-by-page construction notes for the Adviser Portal **pages** cut. Not a backend Feature Spec.
+Landed `6aae5c7`. The browser talks only to `bff-adviser-portal`. The session cookie is `__Host-bff-adviser-portal`. API calls use base `/api` with `credentials: 'include'` and no `Authorization` header. Mutations and sign-out send `X-MyWealth-Request: 1`. Signed-out navigation goes to `GET /bff/login?returnUrl=`. Sign-out is `POST /bff/logout` with that header, then `GET /bff/logout/continue`. There is no SPA `/callback` and no token in `sessionStorage`. `sessionStorage` may hold the sign-out-in-progress flag only (`adviser-portal.signOutInProgress`). The notes below describe the earlier public-client shell. Do not implement from them. Cut record: [adviser-portal-bff-cut.md](adviser-portal-bff-cut.md).
 
 - Inventory, role gate, acceptance → [adviser-portal.md](adviser-portal.md)
 - Folder layout, naming, session, API client → [frontend-conventions.md](frontend-conventions.md)
@@ -41,7 +41,7 @@ Status is `review`. Locked rows in §13 are build contracts. Unmarked §13 rows 
 
 | Cut | Status |
 | --- | --- |
-| Shell + callback + session probe | **Landed** (2026-09-13). Do not rebuild OIDC / PKCE / probe. |
+| Shell + BFF session | **Landed** (`6aae5c7`). Do not rebuild the public OIDC client. |
 | Pages: role shell, Profile, Customers, Advisers | **Not started.** People APIs have landed. Identity allow-list and `GET /tenants/by-code/{code}` have not. |
 
 Default home = Customers.
@@ -58,7 +58,7 @@ A  identity-auth — client × role allow-list
 
 ## 1. Already landed — do not touch
 
-`src/AdviserPortal` already has `features/session/*`, a one-line `ShellLayout`, `/` = probe, `/callback`, and `shared/api` with 401 refresh-once.
+`src/AdviserPortal` already has `features/session/*`, a one-line `ShellLayout`, `/` = probe, and `shared/api`. The public-client `/callback` and browser refresh-once are retired (`6aae5c7`).
 
 Locked behaviour:
 

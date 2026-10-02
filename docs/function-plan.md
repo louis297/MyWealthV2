@@ -155,7 +155,7 @@ One domain. Feature Specs come after this map. Suggested internal slice order (n
 4. Holdings / securities ledger / Opening of holdings
 5. Net-worth read model + Adviser Portal Dashboard
 
-Session edge is [features/bff-adviser-portal.md](features/bff-adviser-portal.md) (accepted 2026-10-01, not landed). Resource API auth does not change. Add ledger policy names only.
+Session edge is [features/bff-adviser-portal.md](features/bff-adviser-portal.md) (accepted 2026-10-01, landed `5e85e9c`). Resource API auth does not change. Add ledger policy names only.
 
 ### 5.1 In scope (agreed 2026-09-17)
 

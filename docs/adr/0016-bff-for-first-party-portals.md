@@ -84,7 +84,7 @@ Locks this ADR **replaces** when accepted:
 **Cost / follow-up**
 
 - Aspire grows a fourth product process (`identity`, `webapi`, `adviser-portal`, `bff-adviser-portal`). Vite is reached through the BFF origin in the product path.
-- OpenIddict application row becomes confidential; secret and redirect URIs are upserted for the BFF https browser entry. A `*.dev.localhost` alias is included only when that host is a browser entry.
+- OpenIddict application row becomes confidential; secret and redirect URIs are upserted for the BFF https browser entry. A `*.dev.localhost` alias is included only when that host is a browser entry. Do not treat a launchSettings port such as `https://localhost:7190` as the product origin.
 - Functional tests that boot the portal session start the BFF. Identity-auth A1–A10 stay; do not re-prove allow-list here except “Customer still gets no session on this client”.
 - Production multi-instance BFF needs shared Data Protection keys. Development single instance does not lock that store.
 - Companion docs when this ADR is accepted: architecture host map, function-plan §0 session bullet, glossary OIDC-client rows, identity-auth amendment (client type + who redeems the code), [adviser-portal.md](../portals/adviser-portal.md) client table, [frontend-conventions.md](../portals/frontend-conventions.md).

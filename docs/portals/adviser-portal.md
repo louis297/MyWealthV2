@@ -4,7 +4,7 @@ status: accepted
 phase: 1
 language: en
 created: 2026-09-12
-updated: 2026-10-01
+updated: 2026-10-02
 related:
   - README.md
   - frontend-conventions.md
@@ -29,16 +29,19 @@ Tenant **management** (create / rename / reporting currency / disable) is not th
 
 ---
 
-## Landed — shell and callback
+## Landed — shell and BFF session
 
-**In repo master (2026-09-13).** Do not rebuild it.
+**In repo master.** Shell 2026-09-13. BFF cut `6aae5c7` (slice head `5e85e9c`). Do not rebuild the public-client shell.
 
-Vite on Aspire, discovery + PKCE authorize, `/callback`, session probe via `GET /users/me`, 401 refresh-once, OpenIddict redirect upsert including the Aspire dashboard alias. No React password page. SystemAdmin may use the probe (Development seed).
+Vite stays an Aspire resource. Product origin is `bff-adviser-portal`. The SPA is not an OIDC client. No `/callback`. Session probe is `GET /api/users/me` with credentials. 401 does not refresh in the browser. No React password page. SystemAdmin may use the probe (Development seed).
 
 | Path | Behaviour (landed) |
 | --- | --- |
-| `/` | No access token → authorize. Signed in → session probe. |
-| `/callback` | PKCE exchange **once per code**, then the return path. Concurrent mounts must not POST `/connect/token` twice (no OpenIddict `ID2010`). |
+| `/` | No BFF cookie → `GET /bff/login?returnUrl=`. Signed in → session probe. |
+| `/bff/login` | On the BFF, not a React route. Challenges `identity`. Callback is BFF `/signin-oidc`. |
+| `/callback` | Retired (`6aae5c7`). Do not add it back. |
+
+Cut record: [adviser-portal-bff-cut.md](adviser-portal-bff-cut.md).
 
 ---
 
@@ -71,7 +74,7 @@ Landed in repo master 2026-09-14. Do not rebuild the OIDC shell to ship these pa
 
 ### Out
 
-- Rebuilding the landed OIDC cut.
+- Rebuilding the retired public OIDC client or SPA `/callback`.
 - React password login page.
 - Tenant CRUD pages. TenantAdmin pages. Currency pages.
 - Dashboard, Accounts, Transactions, Instruments.
@@ -81,7 +84,7 @@ Landed in repo master 2026-09-14. Do not rebuild the OIDC shell to ship these pa
 
 | Path | Who | Behaviour |
 | --- | --- | --- |
-| `/callback` | Protocol | Exchange a given `code` once, then return path. |
+| `/bff/login` | BFF, not React | Challenge. `returnUrl` is an in-app path. |
 | `/` | Allowed roles | Redirect `/customers`. SystemAdmin does not land on a Customers workspace (C4). |
 | `/customers` | TenantAdmin, Adviser | List. |
 | `/customers/new` | Same | Create. |
@@ -101,7 +104,7 @@ Landed in repo master 2026-09-14. Do not rebuild the OIDC shell to ship these pa
 | --- | --- |
 | ClientId | `adviser-portal` |
 | Holder | `bff-adviser-portal` (`src/BffAdviserPortal`). Not the browser |
-| Type | Confidential + PKCE. Secret in Aspire config. Password grant off |
+| Type | Confidential + PKCE. Aspire parameter `adviser-portal-client-secret`. Password grant off |
 | Scopes | `openid`, `profile`, `offline_access`, `api` |
 | Redirect | `{bffOrigin}/signin-oidc` |
 | Post-logout | `{bffOrigin}/` |
@@ -133,7 +136,7 @@ Requires A and B in the running hosts. Do not re-test A1–A10 or B1–B11 here 
 
 Out of this cut: Dashboard, ledger pages, `/currencies` UI, tenant CRUD, a password field that issues tokens.
 
-Session plumbing after ADR 0016: browser does not redeem `/callback`. C1’s “callback” is `bff-adviser-portal` `/signin-oidc`. API calls from these pages go to `/api`. Construction notes (`review`) still describe the landed public-client shell until that cut is rewritten.
+Session plumbing after ADR 0016, landed `6aae5c7`: browser does not redeem `/callback`. C1’s “callback” is `bff-adviser-portal` `/signin-oidc`. API calls from these pages go to `/api`. Construction notes below the BFF banner in [frontend-implementation-notes.md](frontend-implementation-notes.md) are the earlier public-client shell; do not implement from them.
 
 Suggested commits: [frontend-implementation-notes.md](frontend-implementation-notes.md) §12.
 

@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-01
-last_updated: 2026-10-01
+last_updated: 2026-10-02
 related:
   - ../function-plan.md
   - ../architecture.md
@@ -23,7 +23,7 @@ related:
 
 Session edge for the Adviser Portal. The SPA stops being the OIDC client. Aspire resource `bff-adviser-portal` (`src/BffAdviserPortal`) runs cookie auth, the OpenID Connect handler against `identity`, and a reverse proxy to `webapi`. Tokens never enter the browser. Pages, fields, and resource HTTP stay in [adviser-portal.md](../portals/adviser-portal.md) and the Feature Specs that own those routes.
 
-This file is a build contract. ADR 0016 is accepted. Do not implement from a chat summary; implement from this file.
+This file is a build contract. ADR 0016 is accepted. Landed on repo master `5e85e9c` (2026-10-01, `78d7eb4`…`5e85e9c`). Do not implement from a chat summary; implement from this file.
 
 Not a ledger slice. Platform session increment during Phase 2. Do not reopen identity-auth R1–R21 except the amendment in §11 (who holds `ClientId` `adviser-portal`).
 
@@ -90,13 +90,13 @@ The Adviser Portal browser talks only to the BFF origin: login/logout on the BFF
 | R8 | Logout order: sign out the BFF cookie → `POST identity /connect/revocation` (`token_type_hint=refresh_token`) → OpenIddict end-session (`/connect/logout` with `client_id` and `post_logout_redirect_uri`). Do not add `/auth/logout`. identity-auth R21 still owns the identity action. |
 | R9 | `ClientId` remains `adviser-portal`. Allow-list unchanged: SystemAdmin, TenantAdmin, Adviser. Customer + correct password → no code, uniform failure (identity-auth R4 / R20). |
 | R10 | Client is confidential. Secret only in Aspire / host configuration. Authorization code + PKCE stay on. No password grant. |
-| R11 | Redirect registered on the client: `{bffOrigin}/signin-oidc`. Post-logout: `{bffOrigin}/`. `{bffOrigin}` is the BFF https browser entry (the Aspire dashboard link). Upsert a `*.dev.localhost` alias only when that host is itself a browser entry. Do not replace the https entry with the alias. Do not register the BFF http endpoint or the Vite origin. |
+| R11 | Redirect registered on the client: `{bffOrigin}/signin-oidc`. Post-logout: `{bffOrigin}/`. `{bffOrigin}` is the BFF https browser entry (the Aspire dashboard link), not a launchSettings port. Development currently shows `https://localhost:7190/`; that port is not the product origin. Upsert a `*.dev.localhost` alias only when that host is itself a browser entry. Do not replace the https entry with the alias. Do not register the BFF http endpoint or the Vite origin. |
 | R12 | Protocol paths on `identity` stay OpenIddict defaults. Callers follow discovery. Do not remap `/connect/*`. BFF paths in §8 are this host, not the issuer. |
 | R13 | Cookie name `__Host-bff-adviser-portal`. HttpOnly, `Path=/`, no `Domain` attribute. `Secure` outside Development. `SameSite=Lax`. No `Expires` / `Max-Age` (browser session). Not readable by JS. This cookie is the only browser credential for `/api` and `/bff/*`. |
 | R14 | SPA `fetch` / RTK Query uses `credentials: 'include'` and base URL `/api`. It does not set `Authorization`. Mutating calls send `X-MyWealth-Request: 1` (R18). |
 | R15 | Cross-origin browser calls to `webapi` are not part of the product path after this slice. Scalar may keep calling `webapi` directly with Bearer. The BFF does not enable credentialed CORS for a foreign `Origin`. |
 | R16 | The BFF does not run the schema applicator and does not reference `Application` handlers. |
-| R17 | `/callback` on the SPA is retired. OIDC callback is `/signin-oidc` on the BFF. Deep-link return uses the OIDC handler `state`, still only in-app paths (adviser-portal C14). `returnUrl` must be a relative path: starts with `/`, must not start with `//` or `/\`, must not contain `\`. Redirect URIs registered on the client are exact. A `*.dev.localhost` alias may be upserted only when that host is a browser entry. Do not register a wildcard, the BFF http endpoint, or the Vite origin. |
+| R17 | `/callback` on the SPA is retired. OIDC callback is `/signin-oidc` on the BFF. Deep-link return uses the OIDC handler `state`, still only in-app paths (adviser-portal C14). `returnUrl` must be a relative path: starts with `/`, must not start with `//` or `/\`, must not contain `\`. Redirect URIs registered on the client are exact. A `*.dev.localhost` alias may be upserted only when that host is a browser entry. Do not register a wildcard, the BFF http endpoint, or the Vite origin. `https://localhost:7190` is the current Development dashboard link, not a locked port. |
 | R18 | Mutating browser calls (`POST` / `PUT` / `PATCH` / `DELETE` under `/api`, and `POST /bff/logout`) require header `X-MyWealth-Request: 1`. Missing header → **400**, do not proxy. GET does not require it. This is not a second CSRF token. SameSite=Lax stays. |
 | R19 | Do not proxy `/connect/*` to the browser. The SPA has no identity origin in env for protocol calls. |
 | R20 | Proxy only these `webapi` prefixes: `/users`, `/tenants`, `/currencies`, `/accounts`, `/instruments`, `/transactions`. Any other `/api/*` path → **404**, not forwarded. Do not forward `/scalar`, `/openapi`, `/health`, `/connect`. Destination is Aspire `webapi` only. |
@@ -223,8 +223,9 @@ Forward: `Idempotency-Key`, `Content-Type`, `Accept`. Drop browser `Cookie` and 
 | SPA resource | `adviser-portal` (Vite) remains; product origin is the BFF |
 | ClientId | `adviser-portal` |
 | Type | Confidential + PKCE. Secret in Aspire config. Password grant off |
+| Aspire parameter | `adviser-portal-client-secret` (`AddParameter`, `secret: true`). Not in git. Same value to Identity and the BFF |
 | Scopes | `openid`, `profile`, `offline_access`, `api` |
-| Redirect | `{bffOrigin}/signin-oidc` |
+| Redirect | `{bffOrigin}/signin-oidc`. Development dashboard link is currently `https://localhost:7190/`; do not lock that port |
 | Post-logout | `{bffOrigin}/` |
 | Token store | Encrypted authentication cookie this slice (R22). Not a table. `SessionStore` seam left open |
 | Cookie | `__Host-bff-adviser-portal` (R13) |
@@ -273,7 +274,7 @@ New ADR: [adr/0016-bff-for-first-party-portals.md](../adr/0016-bff-for-first-par
 | Project / resource | `src/BffAdviserPortal`, Aspire `bff-adviser-portal` |
 | Client | `adviser-portal`, confidential + PKCE |
 | Tokens in browser | Forbidden |
-| Library | ASP.NET Cookie + OpenIdConnect + YARP. Not Duende.BFF |
+| Library | ASP.NET Cookie + OpenIdConnect + hand-rolled `HttpClient` proxy (`ApiProxy`). Not Duende.BFF. Not YARP (landed deviation; see §12) |
 | Cookie | `__Host-bff-adviser-portal`, session, no Domain |
 | CSRF | `X-MyWealth-Request: 1` on mutating calls. Not a second token |
 | Proxy | Prefix allow-list (R20). Drop browser Cookie and Authorization |
@@ -281,27 +282,41 @@ New ADR: [adr/0016-bff-for-first-party-portals.md](../adr/0016-bff-for-first-par
 
 Amendment to [identity-auth.md](identity-auth.md) is written (2026-10-01). Do not rewrite R1–R21 in place.
 
-Companion edits done in the accept change: architecture, function-plan, glossary, adviser-portal client table, frontend-conventions, adr/README, features/README. Repo code is not landed.
+Companion edits done in the accept change: architecture, function-plan, glossary, adviser-portal client table, frontend-conventions, adr/README, features/README. Repo code landed `78d7eb4`…`5e85e9c` (2026-10-01). Head `5e85e9c`.
+
+Development only, not a product rule:
+
+- The dashboard https link is the browser entry. On this machine that is `https://localhost:7190/` from launchSettings. Do not write that port into the redirect contract.
+- Ignore `X-Forwarded-Host` in Development so a proxy cannot rewrite that entry to another host. Production must not depend on this.
+- `DevelopmentSpaProxy` may catch a Vite connection close (`ResponseEnded`) and return 502 without failing the BFF resource. That catch does not apply to `/api` or login. HMR over this proxy is not supported.
 
 Still open, not this slice:
 
 - Production Data Protection key store for a multi-instance BFF (a table does not remove this)
-- Exact YARP package version and destination discover name spelling (`webapi` via Aspire service discovery)
-- Whether Development still exposes raw Vite on a second port for HMR (product auth origin remains the BFF; if that origin differs, R18 still applies, do not switch the cookie to `SameSite=None`)
+- Development still runs raw Vite on its own port. Product auth origin is the BFF (`MapFallback` to `Spa:DevServerUrl`). Do not switch the cookie to `SameSite=None` if those origins differ (R18). HMR through the BFF fallback is not a second OIDC client.
 - Customer Portal BFF (`bff-customer-portal`) — later slice, own file, not a suffix on this one
 - `script-src` CSP after the Vite same-origin path is fixed
 - `BffSessions` table + `ITicketStore` — later amendment of this file, not a new feature file
 
 ---
 
-## 12. Suggested commits
+## 12. Landed commits
 
-The repository should build after each commit. Agents split each line into red then green.
+Repo master `5e85e9c` (2026-10-01). Agents must not replay this list.
 
-1. Empty `src/BffAdviserPortal` + Aspire resource `bff-adviser-portal` + service discovery to `identity` and `webapi` (no auth yet).
-2. Cookie + OpenID Connect handler: `/bff/login`, `/signin-oidc`, confidential client upsert, PKCE, tests for single-flight callback and no tokens in the browser-facing body.
-3. YARP prefix allow-list + Bearer attach + drop browser Cookie / Authorization + 401 refresh-once; reject missing `X-MyWealth-Request` on mutating calls; forward `Idempotency-Key`.
-4. `POST /bff/logout` + revocation + end-session; Customer allow-list smoke through this client.
-5. Point Vite / SPA at the BFF origin; delete SPA `/callback`, `sessionStorage` tokens, and Bearer injection; send `X-MyWealth-Request` on mutating calls; fix C1/C13/C14 tests.
-6. CORS: drop portal-origin on `webapi` if no browser still calls it; keep Scalar. BFF does not add credentialed CORS.
+| Commit | What landed |
+| --- | --- |
+| `78d7eb4` | Empty `src/BffAdviserPortal` + Aspire resource `bff-adviser-portal` |
+| `447fb80` | Cookie + OpenID Connect: `/bff/login`, `/signin-oidc`, confidential upsert, PKCE |
+| `76a0f17` | Authorization code redeemed once on the BFF |
+| `99f321a` | Prefix allow-list proxy to `webapi` (hand-rolled `HttpClient`, not YARP) |
+| `b85b56a` | Proxied 401 refresh-once and refresh rotation |
+| `5f229f6` | Revoke refresh token and end-session |
+| `eeeb6b0` | Customer and SystemAdmin allow-list smoke |
+| `6aae5c7` | Adviser Portal pointed at the BFF (no SPA `/callback`, no token persist, `/api` + credentials, `X-MyWealth-Request` on mutations) |
+| `5e85e9c` | Portal CORS removed from `webapi` (`AddCors` / `UseCors` gone). Scalar stays on `webapi` and does not need a portal origin |
+
+Aspire parameter `adviser-portal-client-secret` (`secret: true`, not in git) feeds `Identity:AdviserPortalClientSecret` and `Authentication:ClientSecret`. First AppHost run prompts; user-secrets key is `Parameters:adviser-portal-client-secret`. Portal adaptation record: [adviser-portal-bff-cut.md](../portals/adviser-portal-bff-cut.md).
+
+Landed deviation: §11 named YARP. The tree uses `ApiProxy` + `IWebApiTransport`. Do not add YARP unless a later amendment says so. Allow-list prefixes in code: `/users`, `/tenants`, `/currencies`, `/accounts`, `/instruments`, `/transactions`.
 ---

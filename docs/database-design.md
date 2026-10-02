@@ -194,7 +194,7 @@ Default tables:
 
 | Table | Holds |
 | --- | --- |
-| `OpenIddictApplications` | Clients. `adviser-portal` is confidential after the Adviser Portal BFF slice. The secret is not stored in git |
+| `OpenIddictApplications` | Clients. Phase 1 row: public client `adviser-portal` |
 | `OpenIddictAuthorizations` | Grants |
 | `OpenIddictScopes` | `openid`, `profile`, `offline_access`, `api` |
 | `OpenIddictTokens` | Authorization codes, access tokens, **refresh tokens** |

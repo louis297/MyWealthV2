@@ -359,7 +359,7 @@ Customers create smoke ([customers.md](customers.md) §10) must use A1 + A2, not
 
 ### Amendment 2026-10-01 (BFF holder + refresh rotation)
 
-Accepted with [bff-adviser-portal.md](bff-adviser-portal.md) and ADR 0016. Do not rewrite R1–R21 in place. Phase 1 public-client sentences above describe what landed; this amendment supersedes the holder.
+Accepted with [bff-adviser-portal.md](bff-adviser-portal.md) and ADR 0016. Landed with the BFF slice (`5e85e9c`): `OpenIddictSeeder` upserts `adviser-portal` as confidential from `Identity:AdviserPortalClientSecret`. Do not rewrite R1–R21 in place. Phase 1 public-client sentences above are historical; this amendment supersedes the holder.
 
 - `adviser-portal` is confidential. Secret in Aspire config. PKCE stays. The BFF exchanges the code at `/connect/token`. The browser does not.
 - Redirect `{bffOrigin}/signin-oidc`. Post-logout `{bffOrigin}/`.

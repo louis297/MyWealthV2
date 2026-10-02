@@ -80,7 +80,7 @@ One AppHost orchestrates every resource. Separate projects are separate processe
 | --- | --- | --- |
 | AppHost | `src/AppHost` | Aspire graph: `dbserver`, `MyWealthDbV2`, `identity`, `webapi`, `adviser-portal`, `bff-adviser-portal` |
 | IdentityHost | `src/IdentityHost` | Authorization-server composition root; OpenIddict; hosted login |
-| Web | `src/Web` | Resource-API composition root; Minimal API; OpenAPI / Scalar; CORS; Bearer validation |
+| Web | `src/Web` | Resource-API composition root; Minimal API; OpenAPI / Scalar; Bearer validation. Portal CORS removed (`5e85e9c`); browser does not call `webapi` |
 | Application | `src/Application` | Commands / queries, validation, pipeline, DTOs, named-policy map, port interfaces |
 | Domain | `src/Domain` | Entities, value objects (including `Money`), events, enumerations. No session-protocol types |
 | Infrastructure | `src/Infrastructure` | EF mapping, Identity user store, OpenIddict EF stores, interceptors, schema applicator, port adapters |
@@ -166,7 +166,7 @@ The schema applicator runs **once** (default: `webapi` startup, or an explicit a
 | Issuer | Base URL of `identity` (Aspire service discovery in Development; a stable HTTPS name in production) |
 | Keys | Asymmetric signing. Development certificate is allowed. Production certificate; private key is not committed. APIs validate via JWKS. `UseLocalServer()` is not the default validation path |
 | Client | One `OpenIddictApplications` row: `ClientId = adviser-portal`, confidential + PKCE, password grant off. Secret in Aspire config, not in git |
-| Redirect | `{bffOrigin}/signin-oidc`. Post-logout `{bffOrigin}/`. `{bffOrigin}` is the BFF https browser entry. A `*.dev.localhost` alias is upserted only when that host is a browser entry |
+| Redirect | `{bffOrigin}/signin-oidc`. Post-logout `{bffOrigin}/`. `{bffOrigin}` is the BFF https browser entry. A `*.dev.localhost` alias is upserted only when that host is a browser entry. Do not lock the Development launchSettings port |
 | Scopes | `openid`, `profile`, `offline_access`, `api` |
 | Tokens | Short-lived JWT access. Refresh in `OpenIddictTokens`. Absolute / sliding lifetimes belong in the identity-auth Feature Spec |
 | Login page | Razor Pages at `/login` on `identity`. Validates with `UserManager`, then returns to the authorization-code flow |
@@ -224,7 +224,7 @@ identity-auth scripts: SchemaVersions, Identity user tables, OpenIddict tables, 
 | Mapping | AutoMapper (may keep) | Application |
 | Errors | Rule / validation 400; unauthenticated or cannot complete login 401; policy 403; invisible / cross-tenant 404; concurrency 409 | `webapi` |
 | Observability | Aspire / OpenTelemetry defaults | ServiceDefaults |
-| CORS | Loose in Development; tighten in production without blocking Phase 1 | `webapi` (and `identity` as needed for the login origin) |
+| CORS | No portal CORS on `webapi` (`5e85e9c`). BFF does not add credentialed CORS. Scalar stays on the `webapi` origin | `webapi` |
 | Ports | See §6 | Defined in Application, implemented in Infrastructure |
 
 Tenant resolution: login requires tenantCode except for SystemAdmin. The JWT carries tenant PublicId and `tenantCode` (empty for SystemAdmin). Request handling must **not** trust only an easy-to-miss global filter. Repositories / handlers tighten to the current tenant again (dual check). Isolation tests are a CI gate.
