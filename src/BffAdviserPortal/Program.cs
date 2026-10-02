@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.HttpOverrides;
 using MyWealthV2.BffAdviserPortal;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,6 +9,18 @@ builder.AddServiceDefaults();
 builder.AddBffAuthentication();
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    // The Aspire dev proxy is not always a loopback address.
+    var forwardedHeaders = new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost
+    };
+    forwardedHeaders.KnownIPNetworks.Clear();
+    forwardedHeaders.KnownProxies.Clear();
+    app.UseForwardedHeaders(forwardedHeaders);
+}
 
 app.UseBffSecurityHeaders();
 app.UseAuthentication();

@@ -99,6 +99,52 @@ public class BffLoginTests
     }
 
     [Test]
+    public async Task Login_ForwardedHttpsHost_IsAuthorizeRedirectAndCorrelationCookie()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/bff/login?returnUrl=/customers");
+        request.Headers.TryAddWithoutValidation("X-Forwarded-Proto", "https");
+        request.Headers.TryAddWithoutValidation(
+            "X-Forwarded-Host",
+            "bff-adviser-portal-mywealthv2.dev.localhost:7190");
+
+        var response = await _client.SendAsync(request);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Redirect);
+        var query = HttpUtility.ParseQueryString(response.Headers.Location!.Query);
+        query["redirect_uri"].ShouldBe(
+            "https://bff-adviser-portal-mywealthv2.dev.localhost:7190/signin-oidc");
+
+        var correlation = response.Headers.GetValues("Set-Cookie").Single(cookie =>
+            cookie.StartsWith(".AspNetCore.Correlation.", StringComparison.Ordinal));
+        correlation.Contains("secure", StringComparison.OrdinalIgnoreCase).ShouldBeTrue();
+        correlation.Contains("domain=", StringComparison.OrdinalIgnoreCase).ShouldBeFalse();
+        AssertSessionCookieAbsent(response);
+    }
+
+    [Test]
+    public async Task Production_IgnoresForwardedHttpsHost()
+    {
+        using var factory = CreateFactory("Production");
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/bff/login");
+        request.Headers.TryAddWithoutValidation("X-Forwarded-Proto", "https");
+        request.Headers.TryAddWithoutValidation(
+            "X-Forwarded-Host",
+            "bff-adviser-portal-mywealthv2.dev.localhost:7190");
+
+        var response = await client.SendAsync(request);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Redirect);
+        var redirect = HttpUtility.ParseQueryString(response.Headers.Location!.Query)["redirect_uri"];
+        redirect.ShouldNotBeNull();
+        redirect!.Contains("dev.localhost", StringComparison.OrdinalIgnoreCase).ShouldBeFalse();
+        redirect.StartsWith("https://", StringComparison.OrdinalIgnoreCase).ShouldBeFalse();
+    }
+
+    [Test]
     public async Task ProductionCookie_IsSecure()
     {
         using var factory = CreateFactory("Production");

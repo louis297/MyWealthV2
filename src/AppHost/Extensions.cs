@@ -18,7 +18,7 @@ internal static class AspireExtensions
         IDistributedApplicationBuilder app)
         where T : IResourceWithEnvironment
     {
-        var endpoint = portal.GetEndpoint("http");
+        var endpoint = portal.GetEndpoint("https");
         identity.WithEnvironment("Identity__PortalOrigins__0", endpoint);
 
         var dashboardHost = GetDevLocalhostHost(app);

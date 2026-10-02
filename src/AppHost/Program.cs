@@ -46,10 +46,14 @@ var bff = builder.AddProject<Projects.BffAdviserPortal>(Services.BffAdviserPorta
     .WithEnvironment("Authentication__Authority", identity.GetEndpoint("https"))
     .WithEnvironment("Authentication__ClientSecret", adviserPortalClientSecret)
     .WithEnvironment("Api__BaseAddress", "https+http://webapi")
-    .WithUrlForEndpoint("http", url =>
+    .WithUrlForEndpoint("https", url =>
     {
         url.DisplayText = "Adviser Portal";
         url.Url = "/";
+    })
+    .WithUrlForEndpoint("http", url =>
+    {
+        url.DisplayLocation = UrlDisplayLocation.DetailsOnly;
     });
 
 var portal = builder.AddViteApp(Services.AdviserPortal, "../AdviserPortal")
