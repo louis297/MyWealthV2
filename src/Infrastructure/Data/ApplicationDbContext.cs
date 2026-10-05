@@ -44,6 +44,10 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<TransactionCashLeg> TransactionCashLegs => Set<TransactionCashLeg>();
 
+    public DbSet<TransactionSecurityLeg> TransactionSecurityLegs => Set<TransactionSecurityLeg>();
+
+    public DbSet<Holding> Holdings => Set<Holding>();
+
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     public DbSet<UserToken> UserTokenSeams => Set<UserToken>();

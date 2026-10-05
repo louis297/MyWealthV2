@@ -16,6 +16,10 @@ public interface IApplicationDbContext
 
     DbSet<TransactionCashLeg> TransactionCashLegs { get; }
 
+    DbSet<TransactionSecurityLeg> TransactionSecurityLegs { get; }
+
+    DbSet<Holding> Holdings { get; }
+
     DbSet<IdempotencyRecord> IdempotencyRecords { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
