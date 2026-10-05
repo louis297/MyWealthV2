@@ -200,7 +200,7 @@ Session edge is [features/bff-adviser-portal.md](features/bff-adviser-portal.md)
 
 ### 5.4 Not locked (do not invent tables from this list)
 
-Transaction header + cash-leg shape: [features/posting.md](features/posting.md) (accepted). Holdings draft: [features/holdings.md](features/holdings.md) (questions only). Still open: Opening holdings columns; buy / scrip security-leg shape; whether a Holdings projection exists; daily snapshots; Dashboard widget list. Close-with-cash-zero amends accounts R16.
+Transaction header + cash-leg shape: [features/posting.md](features/posting.md) (accepted). Holdings Opening: [features/holdings.md](features/holdings.md) (accepted 2026-10-05). Still open: Buy / Sell HTTP, scrip security-leg behaviour beyond the reserved shape, daily snapshots, Dashboard widget list. Close requires cash zero and no holdings.
 
 ### 5.5 Out of Phase 2
 

@@ -1,11 +1,11 @@
 ---
 title: Holdings
-status: draft
+status: accepted
 phase: 2
 language: en
 owner: ""
 created: 2026-09-28
-last_updated: 2026-09-28
+last_updated: 2026-10-05
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -24,319 +24,152 @@ related:
 
 # Holdings
 
-Draft only. Not a build contract. Do not create tables, routes, or policies from this file until status is `accepted`.
+Security legs, holdings projection, and Opening of holdings on `webapi`. Public write stays `POST /transactions`. Adds script `0014_holdings.sql`. Amends [posting.md](posting.md) with type `OpeningHoldings` and amends [accounts.md](accounts.md) R16 so close also requires a flat holdings book.
 
-Next Phase-2 design slice after posting: **security legs**, a **holdings read**, and **Opening of holdings**. Public write stays the existing Transaction aggregate (`POST /transactions`). Adviser Portal Accounts / activity / holdings pages wait for a later portal cut. Net worth and Dashboard wait for their own slice.
+Buy, Sell, split / scrip / bonus, and no-cash stock in/out are the next feature on these same tables. Dividend is an ordinary cash type and is not this file. No portal page.
 
-This file records inherited locks, a lean (not locked) shape so the open list is concrete, and the questions that still need a decision. If a sentence here disagrees with an accepted spec, the accepted spec wins.
+**Status is `accepted`.** Implementation follows this file. Do not implement from ADR 0011 alone.
 
 ---
 
 ## 1. Summary
 
-A TenantAdmin or Adviser books security activity on an **Open** Brokerage or Other account of an assigned / same-tenant Customer. SystemAdmin does the same on Scalar for a chosen tenant. Customer receives 403. Bank and Cash refuse every security leg.
+A TenantAdmin or Adviser records `OpeningHoldings` on an **Open** Brokerage or Other account of an assigned / same-tenant Customer. SystemAdmin does the same on Scalar for a chosen tenant. Customer receives 403. Bank and Cash refuse every security leg.
 
-Quantity of one instrument in one account is the `SUM` of signed security-leg quantities — same idea as cash `SUM`. Day-to-day quantity and cost are not hand-edited. Opening of holdings is the only command that may set quantity and cost directly. Buy / sell / scrip (if this increment accepts them) go through the same header + legs write as cash.
+The header is the existing Transaction. Security legs are the activity. `Holdings` is a projection upserted in the same command, not a second trade book and not a hand edit. Quantity is the `SUM` of signed security-leg quantities. Cost is average cost in the instrument quote currency. This increment only adds cost.
 
-No portal page in this increment.
+Cash position stays the `SUM` of cash legs. An `OpeningHoldings` header has no cash leg.
 
 ---
 
 ## 2. Scope
 
-**In (proposed for this increment — not locked; see Q1)**
+**In**
 
-- Domain: security leg on the existing `Transaction` aggregate; holdings read (computed or projected)
-- Application: extend `CreateTransaction` / `ReverseTransaction` for security types; list / get holdings
-- Schema script after `0013_transactions.sql` (likely `0014_…`)
-- Isolation tests + Development / TestAppHost `TestSeed` rows
-- Amend [posting.md](posting.md) type table and item JSON when accepted
-- Amend [accounts.md](accounts.md) close rule if holdings must be flat before close
+- Domain: `TransactionSecurityLeg`; `Holding` projection; type `OpeningHoldings`
+- Application: extend `CreateTransaction` / `ReverseTransaction` for `OpeningHoldings`; `GetAccountHoldings`; amend `CloseAccount`
+- Script `database/schema/0014_holdings.sql` + EF mapping
+- No new write policy. Writes reuse `transactions.create`. Read uses `accounts.read`
+- `GET /accounts/{id}/holdings`
+- Isolation tests + Development / TestAppHost `TestSeed`
+- Amend posting type table and accounts R16 in the same accept change
 
-**Out (this increment, unless a question below pulls one in)**
+**Out**
 
-- Adviser Portal Accounts / holdings / activity pages
-- Net-worth read model, daily snapshots, Dashboard, live `IMarketData` HTTP
-- Cross-account transfer of cash or stock
-- Live FX / treating a cross pair as rate 1
-- Property / Credit selectable; Credit negative-cash exception
-- Lot / tax-lot tracking, wash sales, realized-gain reports
-- Fees as their own leg, corporate actions beyond a simple ratio split / bonus / scrip
-- Short positions (negative quantity) unless Q8 says otherwise
-- Customer ledger-write; Customer Portal
-- SystemAdmin ledger screens on `adviser-portal`
-- Empty tables “for later” without an accepted spec
-- Seeding from the schema script or in Production
-- A second POST collection beside `/transactions`
+- Buy / Sell / split / scrip / bonus HTTP. Same tables later. Those types stay 400 here
+- No-cash stock in/out. Buy/Sell slice, not tax
+- Dividend HTTP. Ordinary cash, no instrument id. Not this file
+- DRIP and corporate-action dividend
+- Adviser Portal pages
+- Net worth, snapshots, Dashboard, price on the holdings read
+- Cross-account transfer
+- Live vendor market data / live FX
+- Property / Credit selectable
+- Lots, wash sales, realized-gain reports, fees
+- Short positions
+- Customer ledger-write
+- A second POST collection
 - `UPDATE` / `DELETE` of a posted transaction
 - Hand-edited holding quantity or cost
+- CloseOut-of-stock
+- Seeding from the schema script or in Production
 
 ---
 
-## 3. Stories (draft)
+## 3. Stories
 
-1. As an Adviser I record an Opening of holdings on a Customer’s Brokerage account so quantity and cost exist without inventing a buy.
-2. As an Adviser I cannot book a security leg on a Bank or Cash account (400).
-3. As an Adviser I cannot pick a disabled instrument for a **new** security leg (400). Existing legs that already point at it stay.
-4. As an Adviser I list holdings for an account and see quantity + cost per instrument (not market value — that is net worth).
-5. As an Adviser I reverse a posted security transaction; the original rows stay; quantity / cost move by the opposite legs.
-6. As an Adviser I cannot close an account while holdings remain (if Q11 locks that).
-7. As a Customer I receive 403 on every new holdings / security verb.
-8. As a later increment I add Buy / Sell / scrip on the same header if this increment deferred them.
+1. As an Adviser I record `OpeningHoldings` on a Brokerage account so quantity and cost exist without a buy.
+2. As an Adviser I open another instrument with another `OpeningHoldings`. The same instrument twice → 400.
+3. As an Adviser I cannot book a security leg on Bank or Cash (400).
+4. As an Adviser I cannot pick a disabled instrument for a new leg (400). Existing legs stay.
+5. As an Adviser I list holdings and see quantity and cost, not market value.
+6. As an Adviser I reverse `OpeningHoldings`. The original row stays.
+7. As an Adviser I cannot close while cash `SUM ≠ 0` or any quantity remains. Close does not liquidate.
+8. As a Customer I receive 403.
 
 ---
 
-## 4. Inherited locks (do not reopen here)
+## 4. Rules
 
-From [posting.md](posting.md), [accounts.md](accounts.md), [instruments.md](instruments.md), ADR 0011, function-plan §5:
-
-| Item | Lock |
+| ID | Rule |
 | --- | --- |
-| Write model | One Transaction header + legs in one command. Write = posted. No capture table. No `Created` + event auto-approve. |
-| Cash | `TransactionCashLeg`. Balance = `SUM` of signed cash amounts. No `Account.Balance`. |
-| Public route | `/transactions`, policies `transactions.read` / `transactions.create`. Ledger routes stay off `/users`. |
-| Sign | Glossary **Signed book amount**: `+` increases that container’s book. |
-| Reversal | New `Type = Reversal` pointing at the original. Original not updated. One reversal per original this phase. Reverse of a reversal out. Closed account rejects create and reverse. |
-| Cash Opening | `amount > 0`. At most one cash Opening per account. Allowed only while the account has **no** other transaction. New account starts at cash `SUM = 0` with no auto row. |
-| Close (cash) | Reject while cash `SUM ≠ 0`. `CloseOut` zeroes cash to an off-books counterparty. `Account.Close()` does not write books. |
-| Types reserved | Buy / Sell / Dividend / split / scrip / bonus named, not accepted on HTTP yet. |
-| Account types | Bank / Cash forbid holdings. Brokerage / Other may hold. Type and cash currency immutable. |
-| Instrument | Holding stores `InstrumentId` only. `QuoteCurrency` immutable. Cost currency = quote currency. Disabled instrument: no **new** holding; existing ids stay. |
-| FX | Same currency = 1. Cross-currency is never treated as 1. Ports mocked. No live vendor. |
-| Customer | No ledger-write policy. |
-| SystemAdmin | `tenantId` on list/create. Scalar now. |
-| Portal | No Accounts / activity / holdings page in this increment. |
-| Idempotency | `Idempotency-Key` on posting writes (ADR 0015 proposed). Reuse, do not invent a second scheme. |
-| Concurrency | Server locks the Account row on post. Client does not send Account `rowVersion` on create / reverse. |
+| R1 | Missing / dead Bearer → 401, never 302. Policy fail → 403. TenantAdmin / Adviser: other-tenant, unassigned Customer, missing id → 404. SystemAdmin: missing id → 404; another tenant’s id is allowed. |
+| R2 | Path and JSON `id` are `PublicId`. Internal ints never appear. Create / reverse return `201 { "id" }` of the Transaction. |
+| R3 | Writes stay `POST /transactions` and `POST /transactions/{id}/reverse`. Holdings read is `GET /accounts/{id}/holdings`. Not under `/users`. |
+| R4 | TenantAdmin / Adviser omit `tenantId` (400 if present). SystemAdmin create requires `tenantId`, same as posting. Holdings read uses the account PublicId only. |
+| R5 | Account must be Open, same tenant, and visible to the caller. Closed → 400. Disabled Customer on create / reverse → 400 `disabled` / `target=user`. |
+| R6 | Account type must be Brokerage or Other. Bank or Cash → 400. Property and Credit are not selectable. |
+| R7 | Each security leg stores `InstrumentId` only. Instrument must exist in the same tenant. Disabled instrument on a new leg → 400. Reverse of an existing leg is allowed. Disable instrument is still allowed while holdings exist. |
+| R8 | Type on create in this increment: `OpeningHoldings` only. Buy / Sell / Dividend / split / scrip / bonus / unknown → 400. Cash `Opening` rules in posting R19 are unchanged. |
+| R9 | `security` is an array of 1..n legs. Each leg: `instrumentId`, `quantity` `> 0`, `cost` `≥ 0`. Duplicate instrument in the array → 400. No `amount` and no `cash` on this type → 400 if present. |
+| R10 | Cost currency is the instrument quote currency. Body must not send a currency. A later-disabled catalog currency does not rewrite stored cost currency. |
+| R11 | At most one `OpeningHoldings` per `(Account, Instrument)`, including a reversed one until the product says otherwise: a second header that names an instrument already opened → 400. `OpeningHoldings` must be the first security activity for that instrument. |
+| R12 | No auto zero row. Create Account does not insert a holding. |
+| R13 | After insert, quantity `SUM` per `(Account, Instrument)` `≥ 0`. Stored quantity is `decimal(18,8)`. Cost amount is `decimal(18,4)`. |
+| R14 | Projection upsert in the same Account-locked command. Callers never PUT a holding. Quantity 0 deletes the projection row. Tests assert projection quantity = `SUM` of security-leg quantities. |
+| R15 | Posted rows are not updated or deleted. Reverse copies the opposite security quantity and cost. One reversal per original. No client `rowVersion`. Account Open. Result must stay `≥ 0`. |
+| R16 | `CloseAccount` rejects unless cash `SUM = 0` and no `Holdings` row remains for that account. Amends accounts R16. `Account.Close()` writes neither cash nor holdings. |
+| R17 | `Idempotency-Key` required on create and reverse, same as posting. |
+| R18 | `bookedAt` required `datetimeoffset`. Memo optional 1–200. Reference optional, stored, no uniqueness. |
+| R19 | Customer has no ledger-write policy → 403. Holdings read is `accounts.read`, so a caller who can see the account can see its positions. No `holdings.create`. |
+| R20 | Account list and item do not embed holdings. |
+
+Policies: no new names. `transactions.create` for Opening and reverse. `accounts.read` for the holdings read.
 
 ---
 
-## 5. Lean (discussion default — **not** a spec lock)
-
-Use these as the starting answer for each question in §8. Accept, reject, or replace in discussion. Do not implement from this section.
-
-1. **Packaging.** New Feature Spec `holdings.md` owns holdings read + security-leg storage + Opening-of-quantity rules. It **amends** posting (allowed types, item JSON, reverse of mixed legs). It does not add `/journals` or a second write resource.
-2. **Legs.** `TransactionSecurityLeg` (name open — Q3) on the same header. Buy / sell = cash leg + security leg. Scrip / split / bonus = security only (cash omitted or 0, **total cost unchanged**). Opening of holdings = security leg with explicit cost; cash omitted unless the same header is also the account’s cash Opening (Q6).
-3. **Quantity.** Signed decimal on the security leg. `+` increases that instrument’s quantity in that account. Position quantity = `SUM` of posted security-leg quantities for `(AccountId, InstrumentId)`. No hand edit.
-4. **Holdings row.** Either no table (read = `SUM` + cost rule) or a projection upserted in the **same command** as the legs. Not a second write path. Unique `(AccountId, InstrumentId)`. No lots in this increment.
-5. **Cost.** Average cost in instrument `QuoteCurrency`. Opening and buys add cost; sells release average cost × quantity sold; scrip / split / bonus do not change total cost. Realized P/L is not a product read in this increment (may be implied by the cost release).
-6. **Types this increment.** At minimum: Opening-of-holdings + Reversal of those rows + holdings read + Bank/Cash guard + disabled-instrument guard + (likely) close-requires-flat-holdings. Buy / Sell / Dividend / split in the **same** increment only if Q1 says the first capability batch includes them. Function-plan already grouped Opening of holdings with the securities ledger.
-7. **No shorts.** After insert, quantity `SUM` for that `(Account, Instrument)` must be `≥ 0`. Phase 2 has no Credit accounts and no short book.
-8. **HTTP.** Writes stay `POST /transactions` with a `security` object (and `cash` when both exist). Reads: `GET /accounts/{id}/holdings` and/or `GET /holdings?accountId=&customerId=`. Item JSON stops flattening only `amount` once a security leg exists (posting §8.1 already warned this).
-9. **Policies.** Writes reuse `transactions.create`. Holdings list uses `accounts.read` or `transactions.read` (Q14) — do not invent `holdings.create`.
-10. **Market value.** Out. List returns quantity + cost (+ currency). Price stays on `IMarketData` for the net-worth slice.
-
----
-
-## 6. Domain (proposed names only)
+## 5. Domain
 
 | Type | Kind | Notes |
 | --- | --- | --- |
-| `Transaction` | Aggregate (existing) | Grows optional security legs. Still one write. |
-| `TransactionSecurityLeg` | Entity (proposed) | Hits one instrument book inside one account. |
-| `Holding` | Read model or projection | Per `(Account, Instrument)`: quantity + cost. Not a hand-edited aggregate. |
-| `TransactionType` | Enum (existing) | May add names if cash `Opening` cannot carry holdings (Q6). |
+| `Transaction` | Aggregate (existing) | Grows security legs. Still one write. |
+| `TransactionSecurityLeg` | Entity | One instrument on one header. Several per header allowed. |
+| `Holding` | Projection | Per `(Account, Instrument)`: quantity + cost. `PublicId`. |
+| `TransactionType` | Enum | Add `OpeningHoldings`. Cash `Opening` unchanged. |
 
-Invariants to lock when accepted:
+`OpeningHoldings` has security legs only. Buy / Sell later add a cash leg on this same header. Split later is security only, total cost unchanged. Those types are not accepted here.
 
-- Tenant of the header, account, and instrument match.
-- Account type allows holdings.
-- Instrument is enabled for a **new** security direction (reversal of an existing id still allowed).
-- Security-leg cost currency = instrument quote currency.
-- Quantity `SUM ≥ 0` after insert (if Q8).
-- Posted rows immutable; correction = reversal of **all** legs of the original.
+Average cost is the rule the projection uses. This increment only adds cost (Opening). Sell release is specified so the next feature does not add a second cost column: cost out = average × quantity, server-computed.
+
+Buy / Sell, when that feature opens, must not trust client price, cost, or cash amount. Server calls `IMarketData.TryGetPrice(instrumentId, bookedAt)`. Missing price → 400. Cross currency uses `IFxRate`; missing pair → 400, never 1. Price is not stored on the leg. That HTTP is not this increment.
 
 ---
 
-## 7. Database / HTTP (not locked)
+## 6. Database
 
-Do not create these objects from a draft.
+Script: `database/schema/0014_holdings.sql`. Do not back-fill. Do not add EF migrations.
 
-Likely script: `database/schema/0014_….sql` (name follows the accepted scope).
+| Table | Change | Index / FK |
+| --- | --- | --- |
+| `TransactionSecurityLegs` | add | PK `Id`. FK `TransactionId` → `Transactions` RESTRICT. Unique `(TransactionId, InstrumentId)`. FK instrument and tenant consistent with the header. Quantity `decimal(18,8)`. Cost `decimal(18,4)` + `char(3)` quote currency. Audit + `RowVersion`. |
+| `Holdings` | add | PK `Id`. Unique `PublicId`. Unique `(AccountId, InstrumentId)`. Quantity `decimal(18,8)`. Cost + cost currency. Audit + `RowVersion`. |
 
-Candidates to decide in Q3 / Q4:
-
-- `TransactionSecurityLegs` — one row per instrument on a header? unique `(TransactionId, InstrumentId)`?
-- `Holdings` — projection `(AccountId, InstrumentId)` with Quantity + CostAmount + CostCurrency, or omit the table
-- Audit + `RowVersion` on new rows, same pair as cash legs
-- No quantity / cost columns on `Accounts`
-- No free-text symbol on a holding
-
-HTTP candidates: §5 lean item 8. Create still returns `201 { "id" }` (transaction PublicId). Holdings rows may use instrument id + account id as the natural key and need no PublicId — that is Q15.
+No quantity or cost column on `Accounts`. No free-text symbol. No price column. Leg `Id` and leg `RowVersion` are not client tokens. HTTP addresses Transaction `PublicId` and Holding `PublicId`.
 
 ---
 
-## 8. Open questions
+## 7. Application use cases
 
-Answer these before moving the spec to `review`. A short “accept lean / reject lean” is enough; do not invent extra product surface to close a question.
+| Kind | Name | Returns | Checks |
+| --- | --- | --- | --- |
+| Command | `CreateTransaction` | new Transaction PublicId | R1–R14, R17–R19 for `OpeningHoldings` |
+| Command | `ReverseTransaction` | new Transaction PublicId | R15, R5, R17 |
+| Command | `CloseAccount` (existing) | 204 | add R16 |
+| Query | `GetAccountHoldings` | list of positions | `accounts.read`, R1, R20 |
 
-### A. Slice packaging
+---
 
-**Q1. What ships in this increment?**
+## 8. API
 
-Options:
+| Method | Route | Policy | Success | Failure |
+| --- | --- | --- | --- | --- |
+| POST | `/transactions` | `transactions.create` | 201 `{ "id" }` | 400 / 401 / 403 / 404 / 409 |
+| POST | `/transactions/{id}/reverse` | `transactions.create` | 201 `{ "id" }` | 400 / 401 / 403 / 404 / 409 |
+| GET | `/accounts/{id}/holdings` | `accounts.read` | 200 `{ "items": [ ... ] }` | 401 / 403 / 404 |
 
-- **A1 (lean, thin):** security-leg table + Opening of holdings + holdings read + reverse of those + type/instrument guards + close-flat-holdings. Defer Buy / Sell / Dividend / split / scrip HTTP.
-- **A2 (function-plan batch):** A1 + Buy / Sell + security-only scrip / split / bonus.
-- **A3:** A2 + cash Dividend on an instrument (still no DRIP).
+Create and reverse require `Idempotency-Key`.
 
-Why it matters: Buy forces cash+security in one command, cost-release on sell, and the item JSON break. Opening-only is smaller and still proves the leg model. Function-plan §5 grouped “holdings / securities ledger / Opening of holdings” as one step, not three.
-
-**Q2. Does this file stay the owner, or does posting.md absorb security legs?**
-
-Posting already says holdings may split out when that file gets large. Lean: this file owns holdings + Opening-of-quantity; posting keeps the header / cash / reverse machine and is amended. Rejecting lean means one growing posting spec.
-
-### B. Storage and cost
-
-**Q3. Physical security-leg row?**
-
-Lean: yes, `TransactionSecurityLegs`, not extra columns on `Transactions` or on `TransactionCashLegs`. One instrument per security-leg row.
-
-Open inside Q3:
-
-- May one header carry **several** security legs (one Opening booking many instruments)?
-- Unique `(TransactionId)` (one instrument per ticket) vs `(TransactionId, InstrumentId)`?
-
-**Q4. Is there a `Holdings` table?**
-
-Cash chose “no projection, read = `SUM`”. Cost is not a plain `SUM` of signed cost amounts once sells release **average** cost rather than the ticket’s raw cash.
-
-Options:
-
-- **H1:** No table. Read recomputes quantity `SUM` and walks legs for average cost. Simple, matches cash, can get slow and easy to get wrong on sell.
-- **H2 (lean):** Projection table, upserted in the same Account-locked command as the legs. Read is cheap. Still not a hand-edit path. Close / tests assert projection == `SUM` of quantities.
-- **H3:** Lots table now. Reject for this increment unless we explicitly want tax lots.
-
-**Q5. Cost method?**
-
-Lean: **average cost** in quote currency. Opening / buy increase total cost; sell decreases total cost by average × qty sold; scrip / split / bonus: quantity changes, total cost unchanged.
-
-Alternatives: explicit cost on every sell body; FIFO lots. FIFO is “once, not twice” only if we are sure Phase 3 tax needs lots **and** average would be deleted. If unsure, wait (lots).
-
-Also: is realized gain a stored field, a computed field on the sell transaction, or out until net worth / activity reports?
-
-### C. Opening of holdings vs cash Opening
-
-**Q6. Type name and how many Openings?**
-
-Cash already took `TransactionType.Opening` with R19: at most **one per account**, and **only while the account has no other transaction**.
-
-That rule cannot host “open AAPL this week, open MSFT next month” if Opening remains a single account-level event.
-
-Options:
-
-- **O1:** New type `OpeningHoldings` (name open). Cash `Opening` rules unchanged. Per `(Account, Instrument)` at most one holdings Opening. Holdings Opening allowed after cash activity. Cash Opening still cannot follow any other header, including a holdings Opening — so cash Opening must come first, or the book never gets a cash Opening (cash stays 0 + later TransferIn).
-- **O2:** Same type `Opening`. Relax R19 so an Opening header may be cash-only, security-only, or both; allow **multiple** Opening headers per account as long as each instrument (and cash) is opened at most once.
-- **O3:** One Opening header per account that may list many security legs + optional cash. After that header, further instruments enter only via Buy / TransferIn-of-stock. Matches “one Opening event” but is clumsy for a book that grows over years.
-
-Lean leaning **O1**: do not silently break posting R19. Call holdings Opening a distinct type. Document the cash-Opening ordering trap.
-
-**Q7. Holdings Opening payload and guards?**
-
-To lock:
-
-- Quantity `> 0`? (lean: yes)
-- Cost `> 0`, or cost `≥ 0` allowed (gift / zero-cost spin)? (lean: cost `≥ 0`, quantity `> 0`)
-- Cost currency omitted and taken from instrument quote? (lean: yes; body must not send a different currency)
-- At most one holdings Opening per `(Account, Instrument)`?
-- Allowed when that instrument already has a Buy / scrip? (lean: no — Opening is first activity **for that instrument**, other types allowed first **for other instruments** and for cash)
-- Allowed after a cash Opening / TransferIn? (lean: yes under O1)
-- Cash amount on a holdings Opening header? (lean: omit; do not smuggle a deposit into OpeningHoldings)
-- Auto zero-quantity Opening? (lean: no, same as cash)
-
-### D. Quantity, close, reverse
-
-**Q8. Negative quantity?**
-
-Lean: no. After every insert, `SUM(qty) ≥ 0` per `(Account, Instrument)`. Sell / reverse that would go short → 400.
-
-**Q9. Quantity scale?**
-
-Cash / money is `decimal(18,4)`. Units are not money.
-
-Options: `(18,4)` same as money; `(18,8)` for fractional ETFs / crypto-later; integer shares only.
-
-Lean: `decimal(18,8)` stored, application does not invent a per-instrument DecimalPlaces in this increment (catalog has no such column). Confirm we will not add Instrument.QuantityScale later in a way that rewrites the column.
-
-**Q10. Reverse of a mixed / security transaction?**
-
-Posting reverse already copies the opposite cash amount. Extend:
-
-- Opposite security quantity and opposite cost movement (not “recompute average from scratch on the reversal row”).
-- Still one reversal per original.
-- Reverse of OpeningHoldings allowed while the account is Open and the result stays non-short.
-- Reverse does not require rowVersion (already locked).
-
-Any extra rule when later legs exist on the same instrument (e.g. cannot reverse Opening after a Sell)? Lean: **no extra rule** if quantity stays ≥ 0; the original Opening row stays as history.
-
-**Q11. Close account while holdings remain?**
-
-Accounts R16 only guards cash `SUM = 0`. Holdings “still do not block close (no holdings table)”.
-
-Lean: amend R16 — close rejected unless cash `SUM = 0` **and** every instrument quantity `SUM = 0`. Cost should then be 0 if the cost rule is consistent. No bulk-liquidate inside `Account.Close()`.
-
-**Q12. Holdings analog of `CloseOut`?**
-
-Cash CloseOut sends leftover cash off-books. For stock:
-
-- **C1:** No CloseOut-of-stock. Caller must Sell, TransferOut-of-stock, or reverse until flat, then close.
-- **C2:** `CloseOut` may include security legs that zero each remaining quantity and write cost to 0 (off-books). Dangerous if it looks like a sale with no cash.
-
-Lean: **C1** this increment. Name the deferral like posting §13.
-
-**Q13. Security TransferIn / TransferOut (stock in/out, no cash)?**
-
-Needed for inherited portfolios moved without a taxable buy, and for flattening before close if Q12 is C1.
-
-Lean: **defer** unless Q1 picks A2 and we explicitly want a no-cash stock movement other than Opening. Opening already covers “I already hold this”. Out-of-account stock movement waits with cross-account transfer.
-
-### E. Types if this increment goes past Opening
-
-Only answer if Q1 is A2 or A3.
-
-**Q16. Buy / Sell signs and price?**
-
-Lean:
-
-- Buy: cash `amount < 0` in **account** currency; security qty `> 0`; cost `> 0` in quote currency.
-- Sell: cash `amount > 0`; security qty `< 0`; cost movement = −(average × |qty|) computed by the server (client does not send cost-out).
-- Price is not stored. Not inferred as a required column. Memo/reference optional as today.
-
-Open: when quote currency ≠ account currency, what is the cash amount? Options: reject the pair until live FX (strict, matches “never treat cross as 1”); allow cash in account currency and cost in quote (two numbers, no implied rate stored); require an explicit rate field (probably wait).
-
-**Q17. Split / scrip / bonus?**
-
-Direction already: security only, cash 0 / omitted, total cost unchanged.
-
-Open: ratio vs explicit new quantity? One instrument only? Reverse of a split in scope?
-
-**Q18. Dividend?**
-
-Cash-only, tied to an instrument id (new optional header field or a security leg with qty 0)? DRIP = Buy + cash Dividend, not a third model. Lean: **defer Dividend HTTP** unless Q1 is A3. Instrument id on a cash-only dividend is still a holdings concern (must be an instrument the account may hold; not necessarily one it currently holds).
-
-### F. HTTP, policies, seed
-
-**Q14. Read API and policy?**
-
-Options:
-
-- `GET /accounts/{id}/holdings` under `accounts.read` (mirrors `/cash-balance`)
-- `GET /holdings?accountId=&customerId=` under `transactions.read` or a new `holdings.read`
-- Both
-
-Lean: account-nested read for the obvious screen; collection list only if we already know the portal will want a firm-wide holdings grid. Policy: do **not** add `holdings.create`. Prefer `accounts.read` for the nested read so a caller who can see the account can see its positions.
-
-Does account list/item grow a `holdingsCount` or embedded array? Lean: **no** embed on list; nested resource only.
-
-**Q15. Holding identity?**
-
-Projection without PublicId (key = account + instrument public ids) vs Holdings.PublicId for a future `/holdings/{id}`.
-
-Lean: no PublicId until a write or a deep link needs it. Reads return `accountId`, `instrumentId`, `symbol`, `name`, `quantity`, `cost`, `costCurrency`.
-
-**Q19. Create body shape?**
-
-Posting item today flattens cash as `amount` / `currency`. Lean for create:
+### 8.1 Bodies
 
 ```json
 {
@@ -345,81 +178,86 @@ Posting item today flattens cash as `amount` / `currency`. Lean for create:
   "bookedAt": "2026-09-27T09:00:00+12:00",
   "memo": null,
   "reference": null,
-  "security": {
-    "instrumentId": "<instrument publicId>",
-    "quantity": 100,
-    "cost": 1500.00
-  }
+  "security": [
+    {
+      "instrumentId": "<instrument publicId>",
+      "quantity": 100,
+      "cost": 1500.00
+    }
+  ]
 }
 ```
 
-Cash types keep today’s flat `amount` for one more increment **or** immediately wrap as `"cash": { "amount", "currency?" }` so Buy does not invent a third shape. Prefer one wrap when the first security type ships, and keep a compatibility note on cash-only items.
+SystemAdmin create adds `tenantId`. TenantAdmin / Adviser omit it.
 
-**Q20. TestSeed?**
+Holdings item:
 
-Lean: on Demo brokerage (USD, already seeded) + an existing TestSeed instrument in that tenant, insert one holdings Opening (quantity + cost). Do not seed a Buy that looks like a live trade if Buy is out of increment. Functional tests still create their own rows.
+```json
+{
+  "id": "<holding publicId>",
+  "accountId": "<account publicId>",
+  "instrumentId": "<instrument publicId>",
+  "symbol": "VTI",
+  "name": "Vanguard Total Stock Market ETF",
+  "quantity": 100,
+  "cost": 1500.00,
+  "costCurrency": "USD"
+}
+```
 
-**Q21. Disable instrument / disable customer / closed account?**
+Transaction item gains a `security` array when a security leg exists. Landed cash items keep flat `amount` / `currency`. A later Buy sends `"cash": { "amount", "currency?" }` plus `security`. Do not change landed cash JSON in this increment.
 
-Already inherited. Confirm only:
+### 8.2 Errors
 
-- New security leg of a disabled instrument → 400; reversal of an existing one → allowed.
-- Closed account → 400 on create/reverse (posting R6).
-- Disabled Customer → 400 on create/reverse (posting R7).
-- Does disable-instrument stay allowed while holdings exist? Instruments R16 left that to this slice. Lean: **yes, disable still allowed** (picker drops it; positions remain).
-
-### G. Cross-cutting — confirm still deferred
-
-Not questions to design now; confirm they stay out so they do not sneak into the first holdings PR:
-
-- Portal Accounts / activity / holdings pages
-- Net worth, snapshots, Dashboard widgets
-- Cross-account stock or cash transfer
-- Live FX and stored trade FX rate
-- Fees, withholding, corporate-action pipelines
-- Lots / CGT
-- Property / Credit
-- Idempotency redesign (reuse ADR 0015)
+Ordinary validation stays in `errors`: Bank/Cash, disabled instrument, second Opening for the same instrument, cash field present, quantity not `> 0`, cost `< 0`, close while holdings remain. Disabled Customer uses `code=disabled` / `target=user`. Cross-tenant or wrong-collection id → 404.
 
 ---
 
 ## 9. UI
 
-None in this increment. Pages live in [docs/portals/](../portals/). Scalar is enough for SystemAdmin and local smoke.
+None. Pages live in [docs/portals/](../portals/). Scalar is enough.
 
 ---
 
-## 10. Tests (only after `accepted`)
+## 10. Tests
 
-Sketch so the question list stays honest. Not a CLI brief.
-
-| Project | Assert (expected once locked) |
+| Project | Assert |
 | --- | --- |
-| Domain.UnitTests | Quantity sign; cost rule; no mutate posted header; Opening-of-holdings guards; Bank/Cash refuse security |
-| Application.FunctionalTests | 401 / Customer 403; OpeningHoldings happy path; second Opening same instrument 400; disabled instrument 400; Bank account 400; reverse; close rejected while qty ≠ 0 |
-| Infrastructure.IntegrationTests | Other tenant 404; Adviser unassigned 404; no quantity column on `Accounts`; no free-text symbol on a holding |
+| Domain.UnitTests | Quantity sign; Bank/Cash refuse security; cost `≥ 0`; cannot mutate posted header |
+| Application.FunctionalTests | 401; Customer 403; OpeningHoldings happy path; second instrument allowed; same instrument 400; disabled instrument 400; Bank 400; cash field 400; reverse; close rejected while quantity remains; holdings read includes `id` |
+| Infrastructure.IntegrationTests | Other tenant 404; Adviser unassigned 404; no quantity column on `Accounts`; no free-text symbol; `PublicId` on `Holdings` |
+
+TestSeed (Development / TestAppHost only): one `OpeningHoldings` on Demo brokerage for an existing TestSeed instrument. Not a Buy. Functional tests create their own rows.
 
 ---
 
-## 11. What this draft does **not** lock
+## 11. Locked
 
-Column lists, script number, policy names beyond the lean, Buy/Sell HTTP, `Holdings` table yes/no, Opening type name, close-flat-holdings, quantity scale.
+| Item | Lock |
+| --- | --- |
+| Increment | A1. Opening only. Buy/Sell/split next, same tables |
+| Write path | Transaction + legs. Holdings is a projection |
+| Legs | Several per header. Unique `(TransactionId, InstrumentId)` |
+| Opening | Type `OpeningHoldings`. Many per account. One per `(Account, Instrument)`. No cash leg. Quantity `> 0`. Cost `≥ 0`. First security activity for that instrument |
+| Scale | Quantity `decimal(18,8)`. Cost `decimal(18,4)` |
+| Shorts | Forbidden |
+| Reverse | Allowed, including Opening. Opposite legs |
+| Close | Cash `SUM = 0` and no holdings rows. No CloseOut-of-stock |
+| Read | `GET /accounts/{id}/holdings`, `accounts.read`, `PublicId` |
+| Buy/Sell price | Next feature. Server `IMarketData` only. Not this HTTP |
+| Dividend | Ordinary cash. No instrument. Not this file |
+| Stock in/out | Buy/Sell slice. Not tax |
 
-ADR 0011 stays direction until this spec is accepted and 0011 is expanded.
+Still out of this increment: portal pages, net worth, live FX, lots.
 
 ---
 
-## 12. Suggested discussion order
+## 12. Suggested commits
 
-Resolve in this order; later questions collapse once early ones land:
+Only after this file is `accepted`. Tree must build after each commit.
 
-1. Q1 increment contents
-2. Q6 Opening type vs cash R19
-3. Q4 / Q5 Holdings table + cost method
-4. Q11 / Q12 close and CloseOut-of-stock
-5. Q8 / Q9 quantity sign and scale
-6. Q14 / Q15 / Q19 HTTP
-7. Q16–Q18 only if Q1 includes those types
-8. Q20 TestSeed
-
-Then rewrite this file toward `review` (rules table, domain commands, script name, item JSON) and amend posting / accounts / glossary / ADR 0011 in the same accept change.
+1. `0014_holdings.sql` + EF mapping + integration test that security legs and `Holdings` exist and `Accounts` has no quantity column.
+2. Domain security leg + `OpeningHoldings` guards + unit tests.
+3. `CreateTransaction` for `OpeningHoldings` + policies reused + functional tests.
+4. Reverse of `OpeningHoldings` + projection upsert / delete-at-zero.
+5. Close-flat guard + `GET /accounts/{id}/holdings` + TestSeed.

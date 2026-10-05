@@ -17,7 +17,7 @@ Status: accepted (Phase 2 direction)
 
 **Phase 2 ledger discussion.** Phase 1 does not implement this, create tables, or register ledger policies.
 
-Storage shape for **holdings / security legs / Opening of quantity** is still reviewed when that slice opens. Cash booking is locked in [features/posting.md](../features/posting.md) (accepted 2026-09-25): `Transaction` header + `TransactionCashLeg`, not a wide row that is both cash and security.
+Storage shape for holdings / security legs / Opening of quantity is locked in [features/holdings.md](../features/holdings.md) (accepted 2026-10-05): `TransactionSecurityLegs` + `Holdings` projection, type `OpeningHoldings`, no cash leg on that type. Buy / Sell HTTP is the next feature on those tables. Cash booking stays [features/posting.md](../features/posting.md).
 
 Phase 2 is open. Instruments, Accounts, and posting (`/transactions`, `0013`) are landed. Holdings wait for their spec.
 
