@@ -90,6 +90,66 @@ public class OpeningHoldingsTests
         transaction.SecurityLegs.Select(leg => leg.InstrumentId).ShouldBe([11, 12]);
     }
 
+    [Test]
+    public void PostOpeningHoldings_RejectsAnEmptyLegList()
+    {
+        Should.Throw<DomainException>(() => Post(AccountType.Brokerage));
+    }
+
+    [TestCase(AccountType.Property)]
+    [TestCase(AccountType.Credit)]
+    public void PostOpeningHoldings_RejectsPropertyAndCredit(AccountType accountType)
+    {
+        Should.Throw<DomainException>(() => Post(accountType, (11, 1m, 10m, "USD")));
+    }
+
+    [TestCase(0)]
+    [TestCase(-1)]
+    public void OpeningSecurityLeg_RejectsANonPositiveInstrumentId(int instrumentId)
+    {
+        Should.Throw<DomainException>(() => OpeningSecurityLeg.Create(instrumentId, 1m, 10m, "USD"));
+    }
+
+    [Test]
+    public void OpeningSecurityLeg_StoresQuoteCurrencyInUpperCaseAndRejectsAShortOrEmptyCode()
+    {
+        OpeningSecurityLeg leg = OpeningSecurityLeg.Create(11, 1m, 10m, "usd");
+        leg.QuoteCurrency.ShouldBe("USD");
+
+        Transaction posted = Post(AccountType.Brokerage, (11, 1m, 10m, "usd"));
+        posted.SecurityLegs.Single().CostCurrency.ShouldBe("USD");
+
+        Should.Throw<DomainException>(() => OpeningSecurityLeg.Create(11, 1m, 10m, "US"));
+        Should.Throw<DomainException>(() => OpeningSecurityLeg.Create(11, 1m, 10m, ""));
+    }
+
+    [Test]
+    public void PostOpeningHoldings_StoresATrimmedMemoOf200CharactersAndClearsBlankReference()
+    {
+        var memo = new string('m', 200);
+
+        var transaction = Transaction.PostOpeningHoldings(
+            tenantId: 1,
+            accountId: 2,
+            accountType: AccountType.Brokerage,
+            bookedAt: BookedAt,
+            memo: $"  {memo}  ",
+            reference: "   ",
+            securityLegs: [OpeningSecurityLeg.Create(11, 1m, 10m, "USD")]);
+
+        transaction.Memo.ShouldBe(memo);
+        transaction.Reference.ShouldBeNull();
+
+        Should.Throw<DomainException>(() => Transaction.PostOpeningHoldings(
+            tenantId: 1,
+            accountId: 2,
+            accountType: AccountType.Brokerage,
+            bookedAt: BookedAt,
+            memo: new string('m', 201),
+            reference: null,
+            securityLegs: [OpeningSecurityLeg.Create(11, 1m, 10m, "USD")]));
+    }
+
     private static Transaction Post(
         AccountType accountType,
         params (int InstrumentId, decimal Quantity, decimal Cost, string QuoteCurrency)[] legs) =>
