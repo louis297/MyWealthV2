@@ -2,6 +2,7 @@ using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Events;
 using MyWealthV2.Domain.Exceptions;
+using MyWealthV2.Domain.ValueObjects;
 using NUnit.Framework;
 using Shouldly;
 
@@ -99,5 +100,5 @@ public class OpeningHoldingsTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
-            legs: legs);
+            securityLegs: legs.Select(t => OpeningSecurityLeg.Create(t.InstrumentId, t.Quantity, t.Cost, t.QuoteCurrency)));
 }

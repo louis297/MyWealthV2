@@ -17,4 +17,15 @@ public class TransactionSecurityLeg : BaseAuditableEntity
     public string CostCurrency { get; private set; } = string.Empty;
 
     public byte[] RowVersion { get; private set; } = null!;
+
+    internal static TransactionSecurityLeg Create(
+        int instrumentId,
+        decimal quantity,
+        decimal costAmount,
+        string costCurrency
+    ) =>
+        new()
+        {
+            InstrumentId = instrumentId, Quantity = quantity, CostAmount = costAmount, CostCurrency = costCurrency
+        };
 }

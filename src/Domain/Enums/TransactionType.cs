@@ -10,5 +10,6 @@ public enum TransactionType
     Reversal = 5,
     Dividend = 6,
     Buy = 7,
-    Sell = 8
+    Sell = 8,
+    OpeningHoldings = 9
 }

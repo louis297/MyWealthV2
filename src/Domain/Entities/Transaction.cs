@@ -28,6 +28,8 @@ public class Transaction : BaseAuditableEntity
 
     public TransactionCashLeg? CashLeg { get; private set; }
 
+    public List<TransactionSecurityLeg> SecurityLegs { get; private set; } = new List<TransactionSecurityLeg>();
+
     public static Transaction Post(
         int tenantId,
         int accountId,
@@ -67,6 +69,43 @@ public class Transaction : BaseAuditableEntity
             Reference = NormaliseReference(reference),
             PublicId = Guid.NewGuid(),
             CashLeg = TransactionCashLeg.Create(amount, currency)
+        };
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
+    }
+
+    public static Transaction PostOpeningHoldings(
+        int tenantId,
+        int accountId,
+        AccountType accountType,
+        DateTimeOffset bookedAt,
+        string? memo,
+        string? reference,
+        IEnumerable<OpeningSecurityLeg> securityLegs)
+    {
+        if (accountType is AccountType.Cash or AccountType.Bank)
+        {
+            throw new DomainException($"Account type {accountType.ToString()} is not allowed for holding securities.");
+        }
+
+        IEnumerable<OpeningSecurityLeg> openingSecurityLegs = securityLegs.ToList();
+        if (openingSecurityLegs.Select(t => t.InstrumentId).Distinct().Count() != openingSecurityLegs.Count())
+        {
+            throw new DomainException("Duplicated instruments in OpeningHolding transaction.");
+        }
+
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            AccountId = accountId,
+            Type = TransactionType.OpeningHoldings,
+            BookedAt = bookedAt,
+            Memo = NormaliseMemo(memo),
+            Reference = NormaliseReference(reference),
+            PublicId = Guid.NewGuid(),
+            SecurityLegs = openingSecurityLegs.Select(t => TransactionSecurityLeg.Create(
+                    t.InstrumentId, t.Quantity, t.Cost, t.QuoteCurrency
+                    )).ToList()
         };
         transaction.AddDomainEvent(new TransactionPosted(transaction));
         return transaction;
