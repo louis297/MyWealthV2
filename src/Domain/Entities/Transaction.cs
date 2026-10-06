@@ -28,7 +28,7 @@ public class Transaction : BaseAuditableEntity
 
     public TransactionCashLeg? CashLeg { get; private set; }
 
-    public List<TransactionSecurityLeg> SecurityLegs { get; private set; } = new List<TransactionSecurityLeg>();
+    public List<TransactionSecurityLeg> SecurityLegs { get; private set; } = [];
 
     public static Transaction Post(
         int tenantId,
@@ -83,12 +83,17 @@ public class Transaction : BaseAuditableEntity
         string? reference,
         IEnumerable<OpeningSecurityLeg> securityLegs)
     {
-        if (accountType is AccountType.Cash or AccountType.Bank)
+        if (accountType is not AccountType.Brokerage and not AccountType.Other)
         {
             throw new DomainException($"Account type {accountType.ToString()} is not allowed for holding securities.");
         }
 
         IEnumerable<OpeningSecurityLeg> openingSecurityLegs = securityLegs.ToList();
+        if (!openingSecurityLegs.Any())
+        {
+            throw new DomainException("Empty security legs when creating OpeningHolding transaction");
+        }
+
         if (openingSecurityLegs.Select(t => t.InstrumentId).Distinct().Count() != openingSecurityLegs.Count())
         {
             throw new DomainException("Duplicated instruments in OpeningHolding transaction.");
