@@ -9,6 +9,7 @@ using MyWealthV2.Application.Accounts.Queries.GetAccounts;
 using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using Microsoft.AspNetCore.Http.HttpResults;
+using MyWealthV2.Application.Accounts.Queries.GetAccountHoldings;
 
 namespace MyWealthV2.Web.Endpoints;
 
@@ -25,6 +26,7 @@ public class Accounts : IEndpointGroup
         groupBuilder.MapPut(UpdateAccount, "{id}").RequireAuthorization(Policies.AccountsManage);
         groupBuilder.MapPost(CloseAccount, "{id}/close").RequireAuthorization(Policies.AccountsManage);
         groupBuilder.MapPost(ReopenAccount, "{id}/reopen").RequireAuthorization(Policies.AccountsManage);
+        groupBuilder.MapGet(GetHoldings, "{id}/holdings").RequireAuthorization(Policies.AccountsRead);
     }
 
     [EndpointSummary("List accounts")]
@@ -95,5 +97,16 @@ public class Accounts : IEndpointGroup
         command.Id = id;
         await sender.Send(command);
         return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Get all holdings")]
+    [EndpointDescription("Get all holdings for an account")]
+    public static async Task<Ok<IReadOnlyList<AccountHoldingDto>>> GetHoldings(
+        ISender sender,
+        Guid id
+        )
+    {
+        var items = await sender.Send(new GetAccountHoldingsQuery(id));
+        return TypedResults.Ok(items);
     }
 }
