@@ -130,7 +130,8 @@ public class Transaction : BaseAuditableEntity
         string? reference,
         decimal currentCashSum)
     {
-        _ = (accountType, currentCashSum);
+        EnsureSecurityAccount(accountType);
+        _ = currentCashSum;
         var cost = RoundMoney(quantity * price.Amount);
         var cash = -RoundMoney(cost * fxRate);
         var currency = Money.Create(0m, accountCurrency).Currency;
@@ -169,7 +170,8 @@ public class Transaction : BaseAuditableEntity
         decimal currentQuantity,
         decimal currentCost)
     {
-        _ = (accountType, currentCashSum);
+        EnsureSecurityAccount(accountType);
+        _ = currentCashSum;
         EnsureCanRelease(quantity, currentQuantity);
         var released = ReleaseCost(currentCost, quantity, currentQuantity);
         var cash = RoundMoney(quantity * price.Amount * fxRate);
@@ -205,7 +207,7 @@ public class Transaction : BaseAuditableEntity
         string? memo,
         string? reference)
     {
-        _ = accountType;
+        EnsureSecurityAccount(accountType);
         if (cost < 0)
         {
             throw new DomainException("Cost must be greater than or equal to 0.");
@@ -243,7 +245,7 @@ public class Transaction : BaseAuditableEntity
         decimal currentQuantity,
         decimal currentCost)
     {
-        _ = accountType;
+        EnsureSecurityAccount(accountType);
         EnsureCanRelease(quantity, currentQuantity);
         var released = ReleaseCost(currentCost, quantity, currentQuantity);
         var currency = Money.Create(0m, quoteCurrency).Currency;
@@ -377,6 +379,14 @@ public class Transaction : BaseAuditableEntity
         sellQuantity == oldQuantity
             ? oldCost
             : RoundMoney(oldCost * sellQuantity / oldQuantity);
+
+    private static void EnsureSecurityAccount(AccountType accountType)
+    {
+        if (accountType is not AccountType.Brokerage and not AccountType.Other)
+        {
+            throw new DomainException($"Account type {accountType} is not allowed for holding securities.");
+        }
+    }
 
     private static void EnsureCanRelease(decimal quantity, decimal currentQuantity)
     {
