@@ -116,22 +116,57 @@ public class Transaction : BaseAuditableEntity
         return transaction;
     }
 
-    public Transaction Reverse(DateTimeOffset bookedAt, decimal currentCashSum)
+    public Transaction Reverse(
+        DateTimeOffset bookedAt,
+        decimal currentCashSum,
+        IReadOnlyDictionary<int, decimal>? currentQuantityByInstrument = null)
     {
         if (Type == TransactionType.Reversal)
         {
             throw new DomainException("A reversal cannot be reversed.");
         }
 
-        if (CashLeg is null)
+        if (CashLeg is not null)
+        {
+            var opposite = -CashLeg.Amount;
+            if (currentCashSum + opposite < 0)
+            {
+                throw new DomainException("Cash balance cannot become negative.");
+            }
+
+            var cashReversal = new Transaction
+            {
+                TenantId = TenantId,
+                AccountId = AccountId,
+                Type = TransactionType.Reversal,
+                BookedAt = bookedAt,
+                PublicId = Guid.NewGuid(),
+                OriginalTransactionId = Id,
+                CashLeg = TransactionCashLeg.Create(opposite, CashLeg.Currency)
+            };
+            cashReversal.AddDomainEvent(new TransactionReversed(cashReversal));
+            return cashReversal;
+        }
+
+        if (SecurityLegs.Count == 0)
         {
             throw new DomainException("A transaction has no cash leg to reverse.");
         }
 
-        var opposite = -CashLeg.Amount;
-        if (currentCashSum + opposite < 0)
+        var reversalLegs = new List<TransactionSecurityLeg>(SecurityLegs.Count);
+        foreach (var leg in SecurityLegs)
         {
-            throw new DomainException("Cash balance cannot become negative.");
+            if (currentQuantityByInstrument is not null
+                && !currentQuantityByInstrument.ContainsKey(leg.InstrumentId))
+            {
+                throw new DomainException("Holding quantity is required to reverse a security leg.");
+            }
+
+            reversalLegs.Add(TransactionSecurityLeg.Create(
+                leg.InstrumentId,
+                -leg.Quantity,
+                -leg.CostAmount,
+                leg.CostCurrency));
         }
 
         var reversal = new Transaction
@@ -142,7 +177,7 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt,
             PublicId = Guid.NewGuid(),
             OriginalTransactionId = Id,
-            CashLeg = TransactionCashLeg.Create(opposite, CashLeg.Currency)
+            SecurityLegs = reversalLegs
         };
         reversal.AddDomainEvent(new TransactionReversed(reversal));
         return reversal;
