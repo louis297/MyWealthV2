@@ -344,6 +344,38 @@ public class BuySellTests
             currentCost: 50m));
     }
 
+    [Test]
+    public void Reverse_BuyCopiesOppositeCashAndSecurityAndLeavesTheOriginal()
+    {
+        var original = PostBuy(quantity: 2m, price: 250m, priceCurrency: "USD", accountCurrency: "USD", fxRate: 1m);
+        var originalCash = original.CashLeg!.Amount;
+        var originalLeg = original.SecurityLegs.Single();
+        var originalQuantity = originalLeg.Quantity;
+        var originalCost = originalLeg.CostAmount;
+
+        var reversal = original.Reverse(
+            BookedAt.AddDays(1),
+            currentCashSum: 500m,
+            currentQuantityByInstrument: new Dictionary<int, decimal> { [11] = 2m });
+
+        original.Type.ShouldBe(TransactionType.Buy);
+        original.CashLeg.Amount.ShouldBe(originalCash);
+        original.SecurityLegs.Single().Quantity.ShouldBe(originalQuantity);
+        original.SecurityLegs.Single().CostAmount.ShouldBe(originalCost);
+
+        reversal.Type.ShouldBe(TransactionType.Reversal);
+        reversal.OriginalTransactionId.ShouldBe(original.Id);
+        reversal.CashLeg.ShouldNotBeNull();
+        reversal.CashLeg!.Amount.ShouldBe(-originalCash);
+        reversal.CashLeg.Currency.ShouldBe("USD");
+        var leg = reversal.SecurityLegs.Single();
+        leg.InstrumentId.ShouldBe(11);
+        leg.Quantity.ShouldBe(-originalQuantity);
+        leg.CostAmount.ShouldBe(-originalCost);
+        leg.CostCurrency.ShouldBe("USD");
+        reversal.DomainEvents.OfType<TransactionReversed>().ShouldHaveSingleItem();
+    }
+
     private static Transaction PostBuy(
         decimal quantity,
         decimal price,
