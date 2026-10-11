@@ -47,4 +47,4 @@ A single `Type` column that pretends to be both cash and security, plus hand-edi
 
 ## Consequences
 
-Phase-1 Domain defines `Money`. Instruments, Accounts, posting, holdings Opening, and Buy / Sell / StockIn / StockOut have landed (`821c715`). Next design: split / bonus / scrip ([features/split.md](../features/split.md), draft), then net worth.
+Phase-1 Domain defines `Money`. Instruments, Accounts, posting, holdings Opening, Buy / Sell / StockIn / StockOut (`821c715`), and Split / Bonus / Scrip ([features/split.md](../features/split.md), `0017_transaction_type_split.sql`) have landed. Next design: net worth.

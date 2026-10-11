@@ -234,11 +234,11 @@ Tenant
         └── Account                    container: type, booking currency, status
               ├── Transaction          business-event header (append-only)
               │     ├── Cash leg       signed amount in Account.Currency
-              │     └── Security leg   OpeningHoldings; Buy/Sell/StockIn/StockOut accepted
+              │     └── Security leg   OpeningHoldings; Buy/Sell/StockIn/StockOut; Split/Bonus/Scrip accepted
               └── Holding              projection per (Account, Instrument)
 ```
 
-A Transaction may carry security legs on the same header. `OpeningHoldings` / `StockIn` / `StockOut` are security only. `Buy` / `Sell` are cash plus security ([features/buy-sell.md](features/buy-sell.md)). Reversal is a new Transaction that points at the original. Quantity 0 deletes the `Holdings` row.
+A Transaction may carry security legs on the same header. `OpeningHoldings` / `StockIn` / `StockOut` are security only. `Buy` / `Sell` are cash plus security ([features/buy-sell.md](features/buy-sell.md)). `Split` / `Bonus` / `Scrip` are security only: the client sends the new total quantity, the leg stores the signed delta at cost `0`, and holding total cost does not move ([features/split.md](features/split.md)). Reversal is a new Transaction that points at the original. Quantity 0 deletes the `Holdings` row. A split reverse that would leave quantity `≤ 0` is rejected.
 
 Locked in [features/holdings.md](features/holdings.md), landed `676e77a`:
 
@@ -304,8 +304,9 @@ Close requires cash `SUM = 0` and no `Holdings` rows ([features/holdings.md](fea
 | Type | Kind | Notes |
 | --- | --- | --- |
 | `Transaction` | Aggregate | Business-event header under an Account. Not a capture row that later copies into a journal. |
-| `TransactionCashLeg` | Entity | One cash accounting line per header in this increment. |
-| `TransactionType` | Enum | Full list reserved. First increment accepts TransferIn / TransferOut / Interest / CloseOut / Opening / Reversal. |
+| `TransactionCashLeg` | Entity | One cash accounting line on a cash header, and on `Buy` / `Sell`. Absent on `OpeningHoldings`, `StockIn`, `StockOut`, `Split`, `Bonus`, and `Scrip`. |
+| `TransactionSecurityLeg` | Entity | Exactly one on `Buy`, `Sell`, `StockIn`, `StockOut`, `Split`, `Bonus`, and `Scrip`. Quantity is signed. |
+| `TransactionType` | Enum | Cash set plus `OpeningHoldings`, `Buy`, `Sell`, `StockIn` (10), `StockOut` (11), `Split` (12), `Bonus` (13), `Scrip` (14), and `Reversal`. |
 | `TransactionPosted` / `TransactionReversed` | Event | Side effects only. Must not write the books. |
 
 Invariants:
@@ -313,11 +314,15 @@ Invariants:
 - `TenantId` and `AccountId` required. Write = posted. No `Created` / draft status.
 - Cash `SUM` of legs is the account cash balance. Not stored on `Account`.
 - After insert, `SUM ≥ 0` for Phase 2 openable types.
-- Posted header and legs are not `UPDATE`d / `DELETE`d. Reversal is a new row.
+- Posted header and legs are not `UPDATE`d / `DELETE`d. Reversal is a new row with the opposite cash amount and the opposite security quantity and cost.
+- `Buy` security cost is `quantity × price` in the quote currency. Cash is that cost times FX, negative, in the account currency.
+- `Sell` and `StockOut` store the released average cost on the security leg (`Round(oldCost × qty / oldQty, 4, AwayFromZero)`; the full quantity releases the whole cost). `Sell` cash is `quantity × price × FX`, positive. `StockOut` has no cash leg.
+- `StockIn` stores the client cost and has no cash leg.
+- `Split`, `Bonus`, and `Scrip` store the signed quantity delta and cost `0`. Holding total cost is unchanged. They do not call average-cost release and they do not create a holding.
 - Cash `Opening`: at most one per account; only while no other transaction exists; `amount > 0`.
 - Closed account rejects new transactions. `Account.Close()` does not write cash.
 
-Field rules: [features/posting.md](features/posting.md). Accepted 2026-09-25.
+Field rules: [features/posting.md](features/posting.md), [features/holdings.md](features/holdings.md), [features/buy-sell.md](features/buy-sell.md), and [features/split.md](features/split.md).
 
 ---
 

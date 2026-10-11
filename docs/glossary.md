@@ -58,7 +58,7 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | Journal | Older discussion word for the Transaction header. Prefer *Transaction* in new text. | A second table beside Transactions |
 | Signed book amount | Stored signed decimal on a leg, from **that container’s book**. `+` increases that book; `−` decreases it. Balance / quantity is `SUM` of those signs. Read models may flip a sign for display (Credit as liability in net worth). | Debit/credit columns; a new sign rule per Feature Spec; storing outflows as positive and inferring direction from `Type` |
 | Reversal | A new opposite Transaction (`Type = Reversal`) pointing at the original. Original row is not updated or deleted. Cash leg = arithmetic negation of the original signed amount. Phase 2. | `UPDATE`/`DELETE` of the original; an adjustment that does not point at the original |
-| TransactionType | TransferIn / TransferOut / Interest / Opening / OpeningHoldings / Buy / Sell / StockIn / StockOut / CloseOut / Reversal. Dividend reserved. Split / Bonus / Scrip drafted in [features/split.md](features/split.md). | User-defined Category |
+| TransactionType | TransferIn / TransferOut / Interest / Opening / OpeningHoldings / Buy / Sell / StockIn / StockOut / Split / Bonus / Scrip / CloseOut / Reversal. Dividend reserved. Split / Bonus / Scrip are accepted in [features/split.md](features/split.md). | User-defined Category |
 | Category | Optional custom label on a transaction. Not in Phase 1. Not an account type. | Account type |
 | Currency | ISO 4217 three-letter code. One row in the platform catalog. | A C# enum |
 | Currency catalog | `Currencies` table + in-memory `ICurrencyCatalog`. | Joining `Currencies` on every hot path; a per-tenant allow-list |

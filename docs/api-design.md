@@ -359,7 +359,7 @@ Field rules: [features/accounts.md](features/accounts.md).
 
 ### 7.7 Transactions
 
-Field rules: [features/posting.md](features/posting.md). Accepted and landed 2026-09-25.
+Field rules: [features/posting.md](features/posting.md) for cash types, [features/holdings.md](features/holdings.md) for `OpeningHoldings`, [features/buy-sell.md](features/buy-sell.md) for `Buy` / `Sell` / `StockIn` / `StockOut`, and [features/split.md](features/split.md) for `Split` / `Bonus` / `Scrip`. The transaction item is optional `cash: { amount, currency }` plus optional `security`. There is no flat `amount` on the item. Create body for a cash type still sends `amount`. `Split` / `Bonus` / `Scrip` send the new total quantity and omit cash.
 
 | Method | Route | Policy | Success |
 | --- | --- | --- | --- |
@@ -414,4 +414,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-09-21 | Catalog JSON `isEnabled` → `isActive`. Column rename script `0011`. People list/get JSON adds `isActive`. |
 | 2026-09-25 | `/transactions` + account `cashBalance` / `/cash-balance`. Close-zero guard. Field rules in [features/posting.md](features/posting.md). |
 | 2026-10-11 | Buy / Sell / StockIn / StockOut and transaction item shape (`cash` + `security`). Field rules in [features/buy-sell.md](features/buy-sell.md). |
-| 2026-10-12 | Split / Bonus / Scrip draft. New total quantity, no cash, total cost unchanged. Field rules in [features/split.md](features/split.md). |
+| 2026-10-12 | Split / Bonus / Scrip accepted. New total quantity, no cash, total cost unchanged. Field rules in [features/split.md](features/split.md). |

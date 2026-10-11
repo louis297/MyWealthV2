@@ -129,7 +129,7 @@ Customer receives 403. No Adviser Portal activity page in this increment.
 | R13 | Closed accounts stay readable. Net worth (later) excludes them. Balance APIs still return the `SUM` (expected 0 after a successful close). |
 | R14 | List envelope `{ items, page, pageSize, totalCount }`; page default 1, size default 20, max 100. Optional `accountId`, optional `customerId`. Neither set → tenant scope (Adviser = assigned Customers). Sort `bookedAt` then id. |
 | R15 | Customer has no transaction policy → 403 on every verb. |
-| R16 | Type on create: only the increment’s allowed cash set (§5). `Buy` / `Sell` / `StockIn` / `StockOut` / `Dividend` / split / unknown → 400 here even though later specs accept some of them. |
+| R16 | Type on create: only the increment’s allowed cash set (§5). `Buy` / `Sell` / `StockIn` / `StockOut` / `Split` / `Bonus` / `Scrip` / `Dividend` / unknown → 400 here even though later specs accept some of them. |
 | R17 | `CloseOut`: cash leaves to an off-books counterparty. Signed amount must be `< 0` and equal in magnitude to the current `SUM`, so after this row `SUM = 0`. Not a cross-account transfer. Not a holdings liquidation. Amount `0` not allowed; already zero → just `Close`. |
 | R18 | Do not treat a pair of unlinked `TransferOut` + `TransferIn` on two accounts as a transfer. Cross-account transfer is out (§13). |
 | R19 | Cash `Opening`: `amount > 0`. At most one per account. Allowed only while the account has **no** other transaction. After any non-Opening row exists, `Opening` → 400. Create Account does not insert a row; a new book’s `SUM` is already 0. |
@@ -175,7 +175,7 @@ Adviser scope is **assigned Customers** of the transaction’s Account (404 if n
 | `Dividend` | no | cash | Wait until an instrument is in scope |
 | `Buy` / `Sell` | no | cash + security | Accepted in [buy-sell.md](buy-sell.md). Not this increment's cash set |
 | `StockIn` / `StockOut` | no | security | Accepted in [buy-sell.md](buy-sell.md). No cash leg |
-| `Split` / `Bonus` / `Scrip` | no | security only | Draft: [split.md](split.md). No cash. Total cost unchanged. Client sends the new total quantity. |
+| `Split` / `Bonus` / `Scrip` | no | security only | Accepted in [split.md](split.md). No cash. Total cost unchanged. Client sends the new total quantity. Not `StockIn` / `StockOut`. |
 
 Invariants:
 
@@ -286,8 +286,7 @@ Item:
   "accountId": "<account publicId>",
   "customerId": "<customer publicId>",
   "type": "TransferIn",
-  "amount": 100.00,
-  "currency": "NZD",
+  "cash": { "amount": 100.00, "currency": "NZD" },
   "bookedAt": "2026-09-24T09:00:00+12:00",
   "memo": "Salary",
   "reference": null,
@@ -296,7 +295,7 @@ Item:
 }
 ```
 
-This increment flattened the single cash leg onto the item (`amount`, `currency`). [buy-sell.md](buy-sell.md) (accepted) moves every transaction item to optional `cash: { amount, currency }` + optional `security`. Do not keep a parallel flat `amount` on the item.
+The transaction item is optional `cash: { amount, currency }` plus optional `security` ([buy-sell.md](buy-sell.md)). `Split` / `Bonus` / `Scrip` omit `cash` ([split.md](split.md)). Do not keep a parallel flat `amount` on the item.
 
 Account item and account list (amendment when accepted):
 

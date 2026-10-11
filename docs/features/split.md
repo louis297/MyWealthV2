@@ -27,7 +27,7 @@ Security-only legs on the existing Transaction aggregate. Public write stays `PO
 
 Do not model these as `StockIn` / `StockOut`. No cash leg. No portal page. No price call.
 
-**Status is `draft`.** Not a build contract.
+**Status is `accepted`.** Implementation follows this file. `Split` = 12, `Bonus` = 13, `Scrip` = 14. Script `0017_transaction_type_split.sql` widens `CK_Transactions_Type` to 0–14.
 
 ---
 
@@ -113,7 +113,7 @@ Policies: no new names. `transactions.create` for the three types and reverse.
 | `Transaction` | Aggregate (existing) | One security leg, no cash leg. Still one write. |
 | `TransactionSecurityLeg` | Entity (existing) | Exactly one instrument. Quantity = signed delta. Cost `0`. |
 | `Holding` | Projection (existing) | Quantity changes. Total cost unchanged. Quantity `0` is not a valid result here. |
-| `TransactionType` | Enum | Add `Split`, `Bonus`, `Scrip`. |
+| `TransactionType` | Enum | Add `Split` (12), `Bonus` (13), `Scrip` (14). |
 
 Invariants:
 
@@ -134,7 +134,7 @@ No new table and no new column. Tables stay those in [holdings.md](holdings.md).
 
 `CK_Transactions_Type` is 0–11 after `0016`. New enum values need a wider check.
 
-Script: `database/schema/0017_transaction_type_split.sql` — drop and re-add the check so `Type` covers the new values (`Split` / `Bonus` / `Scrip`).
+Script: `database/schema/0017_transaction_type_split.sql` — drop and re-add the check so `Type` is 0–14 (`Split` 12, `Bonus` 13, `Scrip` 14).
 
 ---
 

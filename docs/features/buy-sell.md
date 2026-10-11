@@ -27,9 +27,9 @@ related:
 
 Cash + security legs on the existing Transaction aggregate. Public write stays `POST /transactions`. No new table (tables from `0014_holdings.sql`). `0016_transaction_type_stock_in_out.sql` widens the type check so StockIn and StockOut can be stored. Server prices Buy / Sell via the existing mocked `IMarketData` / `IFxRate`. Stock in/out has no cash leg. Amends the type tables in [posting.md](posting.md) and [holdings.md](holdings.md), and the transaction item shape.
 
-Split / Bonus / Scrip are a later slice ([split.md](split.md)). No portal page. No price on the holdings read.
+Split / Bonus / Scrip are accepted in [split.md](split.md). No portal page. No price on the holdings read.
 
-**Status is `accepted` and landed** on repo master `821c715` (2026-10-12). Script `0016_transaction_type_stock_in_out.sql` (`CK_Transactions_Type` widened to 0–11). TestSeed has one `Buy` and one `StockIn` on the demo brokerage. Split / scrip / bonus is the next feature on these same tables.
+**Status is `accepted` and landed** on repo master `821c715` (2026-10-12). Script `0016_transaction_type_stock_in_out.sql` (`CK_Transactions_Type` widened to 0–11). TestSeed has one `Buy` and one `StockIn` on the demo brokerage. Split / Bonus / Scrip are the next accepted slice on these same tables ([split.md](split.md)).
 
 ---
 
@@ -94,7 +94,7 @@ The header is the existing Transaction. Each of these types has exactly one secu
 | R5 | Account must be Open, same tenant, and visible to the caller. Closed → 400. Disabled Customer on create / reverse → 400 `disabled` / `target=user`. |
 | R6 | Account type must be Brokerage or Other. Bank / Cash → 400. |
 | R7 | Instrument must exist, same tenant, and `IsActive`. Disabled or missing → 400. |
-| R8 | Type on create in this increment: `Buy`, `Sell`, `StockIn`, `StockOut` (plus the already-accepted cash set and `OpeningHoldings`). Split / scrip / bonus / unknown → 400. |
+| R8 | Type on create in this increment: `Buy`, `Sell`, `StockIn`, `StockOut` (plus the already-accepted cash set and `OpeningHoldings`). `Split` / `Bonus` / `Scrip` are accepted in [split.md](split.md). Unknown → 400. |
 | R9 | Body `security` is an array of exactly one leg. `Buy` / `Sell` leg fields: `instrumentId`, `quantity` `> 0`. No `cost`, no `price`, no `amount`, no `cash` on that create body → 400 if present. `StockIn` also requires `cost` `≥ 0` (client-supplied, quote currency). `StockOut` is `instrumentId` + `quantity` `> 0` only. |
 | R10 | `Buy` / `Sell` only: server calls `IMarketData.TryGetPrice(instrumentId, bookedAt)`. Missing or empty price → 400. Price is not stored on the leg. Ports stay mocked. |
 | R11 | `Buy` / `Sell` cost on the security leg is `quantity × price` in the instrument quote currency. Body must not send a currency. `StockIn` cost is the client amount, same quote currency. |
@@ -262,7 +262,7 @@ No new ADR. Decisions 2026-10-11.
 | --- | --- |
 | Scripts / policy | No new table or policy. Reuse `transactions.create`. Tables from holdings (`0014_holdings.sql`). `0016_transaction_type_stock_in_out.sql` widens `CK_Transactions_Type` to 0–11 so `StockIn` (10) and `StockOut` (11) can be stored. |
 | Caller | TenantAdmin; Adviser (assigned); SystemAdmin (Scalar, `tenantId` on create). Customer 403. |
-| Types | `Buy`, `Sell`, `StockIn`, `StockOut`. Split / scrip / bonus stay out. |
+| Types | `Buy`, `Sell`, `StockIn`, `StockOut`. `Split` / `Bonus` / `Scrip` are accepted in [split.md](split.md), not as `StockIn` / `StockOut`. |
 | Legs | Exactly one security leg. `Buy` / `Sell`: exactly one cash leg. `StockIn` / `StockOut`: no cash leg. |
 | Price | `Buy` / `Sell` only. `IMarketData.TryGetPrice(instrumentId, bookedAt)`. Mocked. Missing → 400. Not stored. |
 | FX | `Buy` / `Sell` only, when quote ≠ account currency. Missing pair → 400, never 1. |
@@ -280,7 +280,7 @@ Open questions: none that block review.
 
 ## 12. Out / later
 
-- **Split / Bonus / Scrip.** Not this slice. Draft: [split.md](split.md). Same tables, same `POST /transactions`, security-only, **total cost unchanged**. Client sends the new total quantity, not a ratio. Do not model them as `StockIn` / `StockOut`.
+- **Split / Bonus / Scrip.** Accepted in [split.md](split.md). Not this slice. Same tables, same `POST /transactions`, security-only, **total cost unchanged**. Client sends the new total quantity, not a ratio. Do not model them as `StockIn` / `StockOut`.
 - Price or market value on `GET /accounts/{id}/holdings`. Net worth. Dashboard. Daily snapshots.
 - Fees, lots, wash sales, realized-gain reports, short positions.
 - Live vendor market data / live FX (ports stay mocked).

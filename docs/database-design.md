@@ -18,7 +18,7 @@ This document owns **accepted tables, keys, indexes, constraints, and script ord
 
 **Product:** MyWealthV2.
 
-Phase 1 scripts create the platform base. Phase 2 accepted and landed: `Instruments` (`0010`), `Accounts` (`0012`), posting (`0013_transactions.sql`, `79129eb`). Do **not** create Holdings or a second Journal / CashLedger table. There is no custom `RefreshTokens` table; refresh lives in the OpenIddict token store. Demo rows are `TestSeed`, not the schema script.
+Phase 1 scripts create the platform base. Phase 2 accepted and landed: `Instruments` (`0010`), `Accounts` (`0012`), posting (`0013_transactions.sql`, `79129eb`), holdings (`0014`, `0015`), the StockIn / StockOut type check (`0016`), and the Split / Bonus / Scrip type check (`0017`). Do **not** create a second Journal / CashLedger table. There is no custom `RefreshTokens` table; refresh lives in the OpenIddict token store. Demo rows are `TestSeed`, not the schema script.
 
 ---
 
@@ -331,6 +331,10 @@ Beyond PK / unique constraints already listed:
 0011_rename_is_enabled_to_is_active.sql  -- catalog IsEnabled → IsActive; add Users.IsActive derived from Status
 0012_accounts.sql            -- Account container; no demo rows; Status + derived IsActive
 0013_transactions.sql        -- Transactions + TransactionCashLegs + IdempotencyRecords; no demo rows
+0014_holdings.sql            -- TransactionSecurityLegs + Holdings
+0015_transaction_type_opening_holdings.sql  -- CK_Transactions_Type widened to 0–9
+0016_transaction_type_stock_in_out.sql      -- CK_Transactions_Type widened to 0–11
+0017_transaction_type_split.sql             -- CK_Transactions_Type widened to 0–14
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -389,9 +393,9 @@ Script `0012_accounts.sql`. Columns: [features/accounts.md](features/accounts.md
 
 Script `0013_transactions.sql`. Columns and rules: [features/posting.md](features/posting.md) §6. Header `Transactions` plus child `TransactionCashLegs` (one cash leg per header this increment). Idempotency table in the same script ([ADR 0015](adr/0015-idempotency-keys.md)). No `Accounts.Balance`. No seed in the script — `TestSeed` only.
 
-### 11.5 Not yet accepted
+### 11.5 Holdings (accepted, landed)
 
-Do not create empty tables. Names reserved: Holding, security leg.
+Scripts `0014_holdings.sql` and `0015_transaction_type_opening_holdings.sql`. Columns: [features/holdings.md](features/holdings.md) §6. `0016_transaction_type_stock_in_out.sql` widens `CK_Transactions_Type` to 0–11 for `StockIn` (10) and `StockOut` (11). `0017_transaction_type_split.sql` widens that check to 0–14 for `Split` (12), `Bonus` (13), and `Scrip` (14). No new column. No seed in the scripts — `TestSeed` only.
 
 ---
 
@@ -416,3 +420,5 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-09-21 | Boolean flags unified to `IsActive`. Script `0011` landed `bbd0f26`. Accounts spec accepted. |
 | 2026-09-21 | `Accounts` (`0012`). Container under a Customer. Derived `IsActive`. Landed in the repo. |
 | 2026-09-25 | `Transactions` + `TransactionCashLegs` + idempotency table (`0013`). Spec accepted and landed (`79129eb`). |
+| 2026-10-11 | Holdings (`0014`, `0015`) and `CK_Transactions_Type` widened to 0–11 (`0016`) for StockIn / StockOut. |
+| 2026-10-12 | `CK_Transactions_Type` widened to 0–14 (`0017`) for Split / Bonus / Scrip. No new table. |

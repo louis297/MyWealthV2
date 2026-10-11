@@ -154,7 +154,8 @@ One domain. Feature Specs come after this map. Suggested internal slice order (n
 3. Posting (accepted 2026-09-25, landed: `/transactions` + cash legs; no standalone cash Feature Spec — [features/posting.md](features/posting.md))
 4. Holdings / securities ledger / Opening of holdings (accepted, landed 2026-10-11 `676e77a`)
 5. Buy / Sell / StockIn / StockOut (accepted 2026-10-11, landed `821c715`: [features/buy-sell.md](features/buy-sell.md))
-6. Net-worth read model + Adviser Portal Dashboard
+6. Split / Bonus / Scrip (accepted 2026-10-12: [features/split.md](features/split.md), `0017_transaction_type_split.sql`)
+7. Net-worth read model + Adviser Portal Dashboard
 
 Session edge is [features/bff-adviser-portal.md](features/bff-adviser-portal.md) (accepted 2026-10-01, landed `5e85e9c`). Resource API auth does not change. Add ledger policy names only.
 
@@ -190,7 +191,7 @@ Session edge is [features/bff-adviser-portal.md](features/bff-adviser-portal.md)
 - Booked rows are not `UPDATE`/`DELETE`. Correction tends to be a full reversal posting.
 - After a posting, cash must not go negative on non-Credit accounts. Credit may be negative when that type is opened in a later phase. Phase 2 selectable types are all non-Credit.
 - Day-to-day holding quantity and cost are not edited by hand. Opening is the only direct write of quantity and cost.
-- Splits / bonus / scrip need security-only postings (no cash, total cost unchanged). Client sends the new total quantity. Do not fake them with manual holding edits or with `StockIn` / `StockOut`. Draft: [features/split.md](features/split.md).
+- Splits / bonus / scrip are security-only postings (no cash, total cost unchanged). Client sends the new total quantity. Do not fake them with manual holding edits or with `StockIn` / `StockOut`. Accepted: [features/split.md](features/split.md).
 - Same-currency FX is 1. Cross-currency is never treated as 1.
 - Customer has no ledger-write policy. Disable Customer rejects while an account is still open.
 
@@ -201,7 +202,7 @@ Session edge is [features/bff-adviser-portal.md](features/bff-adviser-portal.md)
 
 ### 5.4 Not locked (do not invent tables from this list)
 
-Transaction header + cash-leg shape: [features/posting.md](features/posting.md) (accepted, landed). Holdings Opening: [features/holdings.md](features/holdings.md) (accepted, landed 2026-10-11 `676e77a`). Buy / Sell / StockIn / StockOut: [features/buy-sell.md](features/buy-sell.md) (accepted, landed 2026-10-12 `821c715`, `0016_transaction_type_stock_in_out.sql`). Split / Bonus / Scrip: [features/split.md](features/split.md) (draft 2026-10-12; new total quantity, total cost unchanged, no ratio on this write). Still open: daily snapshots, Dashboard widget list. Close requires cash zero and no holdings.
+Transaction header + cash-leg shape: [features/posting.md](features/posting.md) (accepted, landed). Holdings Opening: [features/holdings.md](features/holdings.md) (accepted, landed 2026-10-11 `676e77a`). Buy / Sell / StockIn / StockOut: [features/buy-sell.md](features/buy-sell.md) (accepted, landed 2026-10-12 `821c715`, `0016_transaction_type_stock_in_out.sql`). Split / Bonus / Scrip: [features/split.md](features/split.md) (accepted 2026-10-12; new total quantity, total cost unchanged, no ratio on this write, `0017_transaction_type_split.sql`). Still open: daily snapshots, Dashboard widget list. Close requires cash zero and no holdings.
 
 ### 5.5 Out of Phase 2
 
@@ -262,4 +263,4 @@ List page size is locked in tenants and reused by people lists (page 1 / size 20
 
 Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; uniform login failure; hosted login is Razor Pages at `/login`; access 15 minutes; refresh 14 days absolute.
 
-Phase 1 platform slices are accepted and tested (A1–A10, B1–B11, C1–C15). Phase 2 is open. Feature map in §5 is agreed. Instruments is accepted and landed (`9ea2f2a`). IsActive rename + `Users.IsActive` landed (`bbd0f26`, `0011`). Accounts is accepted and landed (`3e8b8f3`, `0012_accounts.sql`, `/accounts`). Posting is accepted and landed 2026-09-25 (`docs/features/posting.md`, script `0013_transactions.sql`, `/transactions`, master `79129eb`). Holdings Opening is accepted and landed 2026-10-11 (`docs/features/holdings.md`, `0014_holdings.sql`, `0015_transaction_type_opening_holdings.sql`, `GET /accounts/{id}/holdings`, master `676e77a`). Buy / Sell / StockIn / StockOut accepted and landed 2026-10-12 (`docs/features/buy-sell.md`, `0016_transaction_type_stock_in_out.sql`, master `821c715`). Split / scrip / bonus draft: `docs/features/split.md`. Next after that: net worth. Implement further ledger slices from a new Feature Spec, not from ADR 0011 alone.
+Phase 1 platform slices are accepted and tested (A1–A10, B1–B11, C1–C15). Phase 2 is open. Feature map in §5 is agreed. Instruments is accepted and landed (`9ea2f2a`). IsActive rename + `Users.IsActive` landed (`bbd0f26`, `0011`). Accounts is accepted and landed (`3e8b8f3`, `0012_accounts.sql`, `/accounts`). Posting is accepted and landed 2026-09-25 (`docs/features/posting.md`, script `0013_transactions.sql`, `/transactions`, master `79129eb`). Holdings Opening is accepted and landed 2026-10-11 (`docs/features/holdings.md`, `0014_holdings.sql`, `0015_transaction_type_opening_holdings.sql`, `GET /accounts/{id}/holdings`, master `676e77a`). Buy / Sell / StockIn / StockOut accepted and landed 2026-10-12 (`docs/features/buy-sell.md`, `0016_transaction_type_stock_in_out.sql`, master `821c715`). Split / Bonus / Scrip accepted 2026-10-12 (`docs/features/split.md`, `0017_transaction_type_split.sql`). Next: net worth. Implement further ledger slices from a new Feature Spec, not from ADR 0011 alone.
