@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-28
-last_updated: 2026-10-05
+last_updated: 2026-10-11
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -26,9 +26,9 @@ related:
 
 Security legs, holdings projection, and Opening of holdings on `webapi`. Public write stays `POST /transactions`. Adds script `0014_holdings.sql`. Amends [posting.md](posting.md) with type `OpeningHoldings` and amends [accounts.md](accounts.md) R16 so close also requires a flat holdings book.
 
-Buy, Sell, split / scrip / bonus, and no-cash stock in/out are the next feature on these same tables. Dividend is an ordinary cash type and is not this file. No portal page.
+Buy / Sell / StockIn / StockOut are accepted in [buy-sell.md](buy-sell.md). Split / scrip / bonus are the next feature on these same tables. Dividend is an ordinary cash type and is not this file. No portal page.
 
-**Status is `accepted`.** Implementation follows this file. Do not implement from ADR 0011 alone.
+**Status is `accepted` and landed** on repo master `676e77a` (PR #1, 2026-10-11). Scripts `0014_holdings.sql` and `0015_transaction_type_opening_holdings.sql` (`CK_Transactions_Type` widened to 0–9). `GET /accounts/{id}/holdings` returns `{ "items": [...] }`, not a paged list. TestSeed has one `OpeningHoldings` on the demo brokerage. Buy / Sell is the next feature on these same tables.
 
 ---
 
@@ -205,7 +205,7 @@ Holdings item:
 }
 ```
 
-Transaction item gains a `security` array when a security leg exists. Landed cash items keep flat `amount` / `currency`. A later Buy sends `"cash": { "amount", "currency?" }` plus `security`. Do not change landed cash JSON in this increment.
+Transaction item shape is owned by [buy-sell.md](buy-sell.md): optional `cash` object + optional `security` array. This increment did not change landed cash JSON.
 
 ### 8.2 Errors
 
@@ -235,7 +235,7 @@ TestSeed (Development / TestAppHost only): one `OpeningHoldings` on Demo brokera
 
 | Item | Lock |
 | --- | --- |
-| Increment | A1. Opening only. Buy/Sell/split next, same tables |
+| Increment | A1. Opening only. Buy/Sell/StockIn/StockOut accepted in [buy-sell.md](buy-sell.md). Split next |
 | Write path | Transaction + legs. Holdings is a projection |
 | Legs | Several per header. Unique `(TransactionId, InstrumentId)` |
 | Opening | Type `OpeningHoldings`. Many per account. One per `(Account, Instrument)`. No cash leg. Quantity `> 0`. Cost `≥ 0`. First security activity for that instrument |
@@ -244,9 +244,9 @@ TestSeed (Development / TestAppHost only): one `OpeningHoldings` on Demo brokera
 | Reverse | Allowed, including Opening. Opposite legs |
 | Close | Cash `SUM = 0` and no holdings rows. No CloseOut-of-stock |
 | Read | `GET /accounts/{id}/holdings`, `accounts.read`, `PublicId` |
-| Buy/Sell price | Next feature. Server `IMarketData` only. Not this HTTP |
+| Buy/Sell price | Accepted in [buy-sell.md](buy-sell.md). Server `IMarketData` only |
 | Dividend | Ordinary cash. No instrument. Not this file |
-| Stock in/out | Buy/Sell slice. Not tax |
+| Stock in/out | Accepted in [buy-sell.md](buy-sell.md). Not tax |
 
 Still out of this increment: portal pages, net worth, live FX, lots.
 

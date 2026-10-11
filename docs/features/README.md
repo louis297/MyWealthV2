@@ -3,7 +3,7 @@ title: Feature Specs
 status: draft
 language: en
 created: 2026-09-12
-updated: 2026-09-21
+updated: 2026-10-11
 related:
   - ../function-plan.md
   - ../api-design.md
@@ -95,7 +95,8 @@ Lock table and port shape in the Feature Spec. Do not implement from ADR 0010 / 
 | [instruments](instruments.md) | accepted (landed in repo 2026-09-20 `9ea2f2a`; IsActive rename `bbd0f26`) | TenantAdmin; Adviser (create + read); SystemAdmin (all verbs, Scalar) | Tenant catalog, `/instruments`, mocked `IMarketData` / `IFxRate`, TestSeed | Holdings store `InstrumentId` only; catalog must exist first |
 | [accounts](accounts.md) | accepted (landed in repo 2026-09-21 `3e8b8f3`) | TenantAdmin; Adviser (assigned Customers); SystemAdmin (all verbs, Scalar) | Account container under a Customer, `/accounts`, close/reopen, `Status` + derived `IsActive`, Disable-Customer guard, TestSeed | Cash / holdings / Opening need a container first |
 | [posting](posting.md) | accepted (2026-09-25; landed) | TenantAdmin; Adviser (assigned Customers); SystemAdmin (Scalar) | `/transactions` + cash legs; `0013_transactions.sql`; close amends accounts R16; `cashBalance` | Write model for booked activity; holdings / securities may amend this file or split later |
-| [holdings](holdings.md) | accepted (2026-10-05) | TenantAdmin; Adviser (assigned Customers); SystemAdmin (Scalar) | `OpeningHoldings`, security legs, `Holdings` projection, `0014_holdings.sql`, `GET /accounts/{id}/holdings`. Buy/Sell next. Portal out | Opening of holdings. Posting keeps the header and cash leg |
+| [holdings](holdings.md) | accepted (landed in repo 2026-10-11 `676e77a`) | TenantAdmin; Adviser (assigned Customers); SystemAdmin (Scalar) | `OpeningHoldings`, security legs, `Holdings` projection, `0014_holdings.sql`, `0015_transaction_type_opening_holdings.sql`, `GET /accounts/{id}/holdings`. Portal out | Opening of holdings. Posting keeps the header and cash leg |
+| [buy-sell](buy-sell.md) | accepted (2026-10-11) | TenantAdmin; Adviser (assigned Customers); SystemAdmin (Scalar) | `Buy` / `Sell` / `StockIn` / `StockOut` on the same Transaction; server price on Buy/Sell; client cost on StockIn; average-cost release. Item shape `cash` + `security`. No new script. Portal out | Security activity after Opening. Split / scrip later. |
 | [bff-adviser-portal](bff-adviser-portal.md) | accepted (2026-10-01; landed `5e85e9c`) | Adviser Portal session | Aspire `bff-adviser-portal`; confidential client; cookie + OIDC + HttpClient proxy; tokens out of the browser | Platform session increment, not a ledger slice. ADR 0016 accepted. Portal cut: [adviser-portal-bff-cut.md](../portals/adviser-portal-bff-cut.md) |
 
 Suggested order (tendency, not a locked backlog). Cash is not its own spec; it lives in posting:
@@ -105,5 +106,7 @@ instruments
     └── account container
             └── posting (journal + cash legs; first increment)
                     └── securities / holdings / Opening holdings
-                            └── net-worth read model + Dashboard
+                            └── Buy / Sell / StockIn / StockOut
+                                    └── split / scrip / bonus
+                                            └── net-worth read model + Dashboard
 ```

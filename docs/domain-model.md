@@ -216,7 +216,7 @@ Session stack, four roles, and User / Tenant invariants do not change in Phase 2
 ### 8.1 Locked way of thinking
 
 - **Cash and securities are two legs, not two values of one `Type` column.** A buy/sell has a cash leg and a security leg. Transfer / interest / dividend may be cash-only. Split / scrip is a security leg, cash 0, total cost unchanged. Do not ship a single-row catch-all `Transactions` table and split it later.
-- **Do not create ledger tables while storage shape is still open.** `Transaction` + `TransactionCashLeg` are locked in [features/posting.md](features/posting.md). No standalone Journal / CashLedger table. Holdings and security legs wait for their spec.
+- **Do not create ledger tables while storage shape is still open.** `Transaction` + `TransactionCashLeg` are locked in [features/posting.md](features/posting.md). Holdings and security legs are locked in [features/holdings.md](features/holdings.md). No standalone Journal / CashLedger table.
 - **Booked postings are not `UPDATE` / `DELETE`.** Correction tends to be a full opposite posting that points at the original (reversal).
 - **After a posting, cash must not go negative on non-Credit accounts. Credit may be negative** (liability).
 - **Day-to-day holding quantity and cost are not edited by hand.** The only entry that may write quantity and cost directly is Opening — lock the shape when that slice opens; keep the name.
@@ -233,18 +233,21 @@ Tenant
   └── Customer (User)
         └── Account                    container: type, booking currency, status
               ├── Transaction          business-event header (append-only)
-              │     └── Cash leg       signed amount in Account.Currency
-              └── Holding              per instrument: quantity + CostBasis(Money) — later
-                    └── Instrument     tenant catalog; quote currency
+              │     ├── Cash leg       signed amount in Account.Currency
+              │     └── Security leg   OpeningHoldings; Buy/Sell/StockIn/StockOut accepted
+              └── Holding              projection per (Account, Instrument)
 ```
 
-A Transaction may later grow a security leg on the same header (buy/sell = both; scrip = security only). Reversal is a new Transaction that points at the original.
+A Transaction may carry security legs on the same header. `OpeningHoldings` / `StockIn` / `StockOut` are security only. `Buy` / `Sell` are cash plus security ([features/buy-sell.md](features/buy-sell.md)). Reversal is a new Transaction that points at the original. Quantity 0 deletes the `Holdings` row.
 
-Not decided — **do not turn these into entity fields now**:
+Locked in [features/holdings.md](features/holdings.md), landed `676e77a`:
 
-- Security-leg columns and holdings table
-- Final Opening-of-quantity columns and whether negative quantity is allowed
-- Whether close also requires no holdings
+- `TransactionSecurityLegs` and `Holdings`
+- `OpeningHoldings`: quantity `> 0`, cost `≥ 0`, no cash leg, one per `(Account, Instrument)`
+- Close also requires no holdings rows
+
+Still not decided — do not turn these into entity fields now:
+
 - Whether a daily snapshot is stored
 
 Lock those when the matching slice opens.
@@ -294,7 +297,7 @@ Invariants:
 
 Field rules: [features/accounts.md](features/accounts.md). Landed in the repo 2026-09-21.
 
-Close requires cash `SUM = 0` once posting is implemented ([features/posting.md](features/posting.md)).
+Close requires cash `SUM = 0` and no `Holdings` rows ([features/holdings.md](features/holdings.md)).
 
 ### 8.6 Transaction (accepted — posting slice; landed)
 

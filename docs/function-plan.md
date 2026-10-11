@@ -3,7 +3,7 @@ title: Function plan
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-09-21
+updated: 2026-10-11
 related:
   - README.md
   - glossary.md
@@ -152,8 +152,9 @@ One domain. Feature Specs come after this map. Suggested internal slice order (n
 1. Instruments (accepted, landed 2026-09-20 `9ea2f2a`)
 2. Account container (accepted, landed `3e8b8f3`: [features/accounts.md](features/accounts.md))
 3. Posting (accepted 2026-09-25, landed: `/transactions` + cash legs; no standalone cash Feature Spec — [features/posting.md](features/posting.md))
-4. Holdings / securities ledger / Opening of holdings
-5. Net-worth read model + Adviser Portal Dashboard
+4. Holdings / securities ledger / Opening of holdings (accepted, landed 2026-10-11 `676e77a`)
+5. Buy / Sell / StockIn / StockOut (accepted 2026-10-11: [features/buy-sell.md](features/buy-sell.md))
+6. Net-worth read model + Adviser Portal Dashboard
 
 Session edge is [features/bff-adviser-portal.md](features/bff-adviser-portal.md) (accepted 2026-10-01, landed `5e85e9c`). Resource API auth does not change. Add ledger policy names only.
 
@@ -200,7 +201,7 @@ Session edge is [features/bff-adviser-portal.md](features/bff-adviser-portal.md)
 
 ### 5.4 Not locked (do not invent tables from this list)
 
-Transaction header + cash-leg shape: [features/posting.md](features/posting.md) (accepted). Holdings Opening: [features/holdings.md](features/holdings.md) (accepted 2026-10-05). Still open: Buy / Sell HTTP, scrip security-leg behaviour beyond the reserved shape, daily snapshots, Dashboard widget list. Close requires cash zero and no holdings.
+Transaction header + cash-leg shape: [features/posting.md](features/posting.md) (accepted, landed). Holdings Opening: [features/holdings.md](features/holdings.md) (accepted, landed 2026-10-11 `676e77a`). Buy / Sell / StockIn / StockOut: [features/buy-sell.md](features/buy-sell.md) (accepted 2026-10-11). Still open: split / scrip / bonus (own spec; total cost unchanged), daily snapshots, Dashboard widget list. Close requires cash zero and no holdings.
 
 ### 5.5 Out of Phase 2
 
@@ -261,4 +262,4 @@ List page size is locked in tenants and reused by people lists (page 1 / size 20
 
 Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; uniform login failure; hosted login is Razor Pages at `/login`; access 15 minutes; refresh 14 days absolute.
 
-Phase 1 platform slices are accepted and tested (A1–A10, B1–B11, C1–C15). Phase 2 is open. Feature map in §5 is agreed. Instruments is accepted and landed (`9ea2f2a`). IsActive rename + `Users.IsActive` landed (`bbd0f26`, `0011`). Accounts is accepted and landed (`3e8b8f3`, `0012_accounts.sql`, `/accounts`). Posting is accepted and landed 2026-09-25 (`docs/features/posting.md`, script `0013_transactions.sql`, `/transactions`, master `79129eb`). Implement further ledger slices from a new Feature Spec, not from ADR 0011 alone. Do not invent table shape outside the spec that owns it.
+Phase 1 platform slices are accepted and tested (A1–A10, B1–B11, C1–C15). Phase 2 is open. Feature map in §5 is agreed. Instruments is accepted and landed (`9ea2f2a`). IsActive rename + `Users.IsActive` landed (`bbd0f26`, `0011`). Accounts is accepted and landed (`3e8b8f3`, `0012_accounts.sql`, `/accounts`). Posting is accepted and landed 2026-09-25 (`docs/features/posting.md`, script `0013_transactions.sql`, `/transactions`, master `79129eb`). Holdings Opening is accepted and landed 2026-10-11 (`docs/features/holdings.md`, `0014_holdings.sql`, `0015_transaction_type_opening_holdings.sql`, `GET /accounts/{id}/holdings`, master `676e77a`). Buy / Sell / StockIn / StockOut accepted 2026-10-11 (`docs/features/buy-sell.md`). Next: split / scrip / bonus, then net worth. Implement further ledger slices from a new Feature Spec, not from ADR 0011 alone.
