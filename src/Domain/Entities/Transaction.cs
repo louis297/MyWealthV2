@@ -272,6 +272,46 @@ public class Transaction : BaseAuditableEntity
         return transaction;
     }
 
+    public static Transaction PostSplit(
+        int tenantId,
+        int accountId,
+        AccountType accountType,
+        TransactionType type,
+        int instrumentId,
+        decimal newQuantity,
+        string quoteCurrency,
+        DateTimeOffset bookedAt,
+        string? memo,
+        string? reference,
+        decimal currentQuantity,
+        decimal currentCost)
+    {
+        EnsureSecurityAccount(accountType);
+        if (type != TransactionType.Split)
+        {
+            throw new DomainException("Type must be Split, Bonus, or Scrip.");
+        }
+
+        _ = currentCost;
+        var currency = Money.Create(0m, quoteCurrency).Currency;
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            AccountId = accountId,
+            Type = type,
+            BookedAt = bookedAt,
+            Memo = NormaliseMemo(memo),
+            Reference = NormaliseReference(reference),
+            PublicId = Guid.NewGuid(),
+            SecurityLegs =
+            [
+                TransactionSecurityLeg.Create(instrumentId, newQuantity - currentQuantity, 0m, currency)
+            ]
+        };
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
+    }
+
     public Transaction Reverse(
         DateTimeOffset bookedAt,
         decimal currentCashSum,

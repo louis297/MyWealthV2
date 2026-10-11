@@ -13,5 +13,6 @@ public enum TransactionType
     Sell = 8,
     OpeningHoldings = 9,
     StockIn = 10,
-    StockOut = 11
+    StockOut = 11,
+    Split = 12
 }
