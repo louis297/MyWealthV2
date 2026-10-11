@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace MyWealthV2.Application.Transactions;
 
 public sealed class TransactionDto
@@ -12,9 +14,9 @@ public sealed class TransactionDto
 
     public required string Type { get; init; }
 
-    public required decimal Amount { get; init; }
+    public decimal? Amount { get; init; }
 
-    public required string Currency { get; init; }
+    public string? Currency { get; init; }
 
     public required string BookedAt { get; init; }
 
@@ -26,6 +28,20 @@ public sealed class TransactionDto
 
     public required string RowVersion { get; init; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<TransactionSecurityDto>? Security { get; init; }
+
     public static string FormatBookedAt(DateTimeOffset bookedAt) =>
         bookedAt.ToString("yyyy-MM-ddTHH:mm:sszzz");
+}
+
+public sealed class TransactionSecurityDto
+{
+    public required Guid InstrumentId { get; init; }
+
+    public required decimal Quantity { get; init; }
+
+    public required decimal Cost { get; init; }
+
+    public required string QuoteCurrency { get; init; }
 }

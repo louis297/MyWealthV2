@@ -177,6 +177,63 @@ public static class TestSeed
             db, tenant.Id, customer.Id, "Demo closed other", AccountType.Other, nzd, closed: true,
             cancellationToken);
         await EnsureDemoEverydayTransferAsync(db, tenant.Id, customer.Id, cancellationToken);
+        await EnsureDemoBrokerageOpeningAsync(db, tenant.Id, customer.Id, cancellationToken);
+    }
+
+    private const string DemoBrokerageOpeningReference = "TestSeed-DemoBrokerage-OpeningHoldings";
+
+    private static async Task EnsureDemoBrokerageOpeningAsync(
+        ApplicationDbContext db,
+        int tenantId,
+        int customerId,
+        CancellationToken cancellationToken)
+    {
+        var account = await db.Accounts.SingleOrDefaultAsync(
+            row => row.CustomerId == customerId && row.Name == "Demo brokerage", cancellationToken);
+        if (account is null)
+        {
+            return;
+        }
+
+        var exists = await db.Transactions.AnyAsync(
+            row => row.AccountId == account.Id && row.Reference == DemoBrokerageOpeningReference,
+            cancellationToken);
+        if (exists)
+        {
+            return;
+        }
+
+        var vti = await db.Instruments.SingleOrDefaultAsync(
+            row => row.TenantId == tenantId && row.Symbol == "VTI", cancellationToken);
+        if (vti is null)
+        {
+            return;
+        }
+
+        var bookedAt = new DateTimeOffset(2026, 1, 15, 9, 30, 0, TimeSpan.FromHours(13));
+        var transaction = Transaction.PostOpeningHoldings(
+            tenantId,
+            account.Id,
+            account.Type,
+            bookedAt,
+            "Demo opening holdings",
+            DemoBrokerageOpeningReference,
+            [OpeningSecurityLeg.Create(vti.Id, 10m, 2500.00m, vti.QuoteCurrency)]);
+        var holding = Holding.Create(tenantId, account.Id, vti.Id, 10m, 2500.00m, vti.QuoteCurrency);
+        var created = TimeProvider.System.GetUtcNow();
+        transaction.Created = created;
+        transaction.CreatedBy = CreatedBy;
+        holding.Created = created;
+        holding.CreatedBy = CreatedBy;
+        foreach (var leg in transaction.SecurityLegs)
+        {
+            leg.Created = created;
+            leg.CreatedBy = CreatedBy;
+        }
+
+        db.Transactions.Add(transaction);
+        db.Holdings.Add(holding);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private const string DemoEverydayBankTransferReference = "TestSeed-DemoEverydayBank-OpeningTransfer";

@@ -44,6 +44,10 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<TransactionCashLeg> TransactionCashLegs => Set<TransactionCashLeg>();
 
+    public DbSet<TransactionSecurityLeg> TransactionSecurityLegs => Set<TransactionSecurityLeg>();
+
+    public DbSet<Holding> Holdings => Set<Holding>();
+
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     public DbSet<UserToken> UserTokenSeams => Set<UserToken>();
@@ -89,6 +93,9 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public Task LoadCashLegAsync(Transaction transaction, CancellationToken cancellationToken) =>
         Entry(transaction).Reference(row => row.CashLeg).LoadAsync(cancellationToken);
+
+    public Task LoadSecurityLegsAsync(Transaction transaction, CancellationToken cancellationToken) =>
+        Entry(transaction).Collection(row => row.SecurityLegs).LoadAsync(cancellationToken);
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {

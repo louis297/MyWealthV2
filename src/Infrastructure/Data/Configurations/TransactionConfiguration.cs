@@ -32,5 +32,9 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
             .WithOne()
             .HasForeignKey<TransactionCashLeg>(leg => leg.TransactionId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasMany(transaction => transaction.SecurityLegs)
+            .WithOne()
+            .HasForeignKey(leg => leg.TransactionId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

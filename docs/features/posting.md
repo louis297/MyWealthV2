@@ -169,11 +169,12 @@ Adviser scope is **assigned Customers** of the transaction’s Account (404 if n
 | `TransferOut` | yes | cash − | External withdrawal from this account |
 | `Interest` | yes | cash + or − | Only extra rule is `SUM ≥ 0` after insert |
 | `CloseOut` | yes | cash − equal to current `SUM` | Off-books empty before close |
-| `Opening` | yes (cash only) | cash + | Initial inbound. See R19 |
+| `Opening` | yes (cash only) | cash + | Initial inbound. See R19. Not holdings |
+| `OpeningHoldings` | no | security | Accepted in [holdings.md](holdings.md). Not this increment's cash set |
 | `Reversal` | yes | opposite cash leg | `POST /transactions/{id}/reverse` |
 | `Dividend` | no | cash | Wait until an instrument is in scope |
 | `Buy` / `Sell` | no | cash + security | Same aggregate, later increment |
-| Split / scrip / bonus | no | security only | Same aggregate, later increment; cash 0 or omitted; total cost unchanged |
+| Split / scrip / bonus | no | security only | Same aggregate, later increment; cash 0 or omitted; total cost unchanged. Shape: [holdings.md](holdings.md) |
 
 Invariants:
 

@@ -16,6 +16,10 @@ public interface IApplicationDbContext
 
     DbSet<TransactionCashLeg> TransactionCashLegs { get; }
 
+    DbSet<TransactionSecurityLeg> TransactionSecurityLegs { get; }
+
+    DbSet<Holding> Holdings { get; }
+
     DbSet<IdempotencyRecord> IdempotencyRecords { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
@@ -25,4 +29,6 @@ public interface IApplicationDbContext
     Task LockAccountAsync(int accountId, CancellationToken cancellationToken);
 
     Task LoadCashLegAsync(Transaction transaction, CancellationToken cancellationToken);
+
+    Task LoadSecurityLegsAsync(Transaction transaction, CancellationToken cancellationToken);
 }

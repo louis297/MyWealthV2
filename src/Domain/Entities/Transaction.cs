@@ -28,6 +28,8 @@ public class Transaction : BaseAuditableEntity
 
     public TransactionCashLeg? CashLeg { get; private set; }
 
+    public List<TransactionSecurityLeg> SecurityLegs { get; private set; } = [];
+
     public static Transaction Post(
         int tenantId,
         int accountId,
@@ -72,22 +74,105 @@ public class Transaction : BaseAuditableEntity
         return transaction;
     }
 
-    public Transaction Reverse(DateTimeOffset bookedAt, decimal currentCashSum)
+    public static Transaction PostOpeningHoldings(
+        int tenantId,
+        int accountId,
+        AccountType accountType,
+        DateTimeOffset bookedAt,
+        string? memo,
+        string? reference,
+        IEnumerable<OpeningSecurityLeg> securityLegs)
+    {
+        if (accountType is not AccountType.Brokerage and not AccountType.Other)
+        {
+            throw new DomainException($"Account type {accountType.ToString()} is not allowed for holding securities.");
+        }
+
+        IEnumerable<OpeningSecurityLeg> openingSecurityLegs = securityLegs.ToList();
+        if (!openingSecurityLegs.Any())
+        {
+            throw new DomainException("Empty security legs when creating OpeningHolding transaction");
+        }
+
+        if (openingSecurityLegs.Select(t => t.InstrumentId).Distinct().Count() != openingSecurityLegs.Count())
+        {
+            throw new DomainException("Duplicated instruments in OpeningHolding transaction.");
+        }
+
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            AccountId = accountId,
+            Type = TransactionType.OpeningHoldings,
+            BookedAt = bookedAt,
+            Memo = NormaliseMemo(memo),
+            Reference = NormaliseReference(reference),
+            PublicId = Guid.NewGuid(),
+            SecurityLegs = openingSecurityLegs.Select(t => TransactionSecurityLeg.Create(
+                    t.InstrumentId, t.Quantity, t.Cost, t.QuoteCurrency
+                    )).ToList()
+        };
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
+    }
+
+    public Transaction Reverse(
+        DateTimeOffset bookedAt,
+        decimal currentCashSum,
+        IReadOnlyDictionary<int, decimal>? currentQuantityByInstrument = null)
     {
         if (Type == TransactionType.Reversal)
         {
             throw new DomainException("A reversal cannot be reversed.");
         }
 
-        if (CashLeg is null)
+        if (CashLeg is not null)
+        {
+            var opposite = -CashLeg.Amount;
+            if (currentCashSum + opposite < 0)
+            {
+                throw new DomainException("Cash balance cannot become negative.");
+            }
+
+            var cashReversal = new Transaction
+            {
+                TenantId = TenantId,
+                AccountId = AccountId,
+                Type = TransactionType.Reversal,
+                BookedAt = bookedAt,
+                PublicId = Guid.NewGuid(),
+                OriginalTransactionId = Id,
+                CashLeg = TransactionCashLeg.Create(opposite, CashLeg.Currency)
+            };
+            cashReversal.AddDomainEvent(new TransactionReversed(cashReversal));
+            return cashReversal;
+        }
+
+        if (SecurityLegs.Count == 0)
         {
             throw new DomainException("A transaction has no cash leg to reverse.");
         }
 
-        var opposite = -CashLeg.Amount;
-        if (currentCashSum + opposite < 0)
+        var reversalLegs = new List<TransactionSecurityLeg>(SecurityLegs.Count);
+        foreach (var leg in SecurityLegs)
         {
-            throw new DomainException("Cash balance cannot become negative.");
+            var current = leg.Quantity;
+            if (currentQuantityByInstrument is not null
+                && !currentQuantityByInstrument.TryGetValue(leg.InstrumentId, out current))
+            {
+                throw new DomainException("Holding quantity is required to reverse a security leg.");
+            }
+
+            if (current - leg.Quantity < 0)
+            {
+                throw new DomainException("Holding quantity cannot become negative.");
+            }
+
+            reversalLegs.Add(TransactionSecurityLeg.Create(
+                leg.InstrumentId,
+                -leg.Quantity,
+                -leg.CostAmount,
+                leg.CostCurrency));
         }
 
         var reversal = new Transaction
@@ -98,7 +183,7 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt,
             PublicId = Guid.NewGuid(),
             OriginalTransactionId = Id,
-            CashLeg = TransactionCashLeg.Create(opposite, CashLeg.Currency)
+            SecurityLegs = reversalLegs
         };
         reversal.AddDomainEvent(new TransactionReversed(reversal));
         return reversal;
