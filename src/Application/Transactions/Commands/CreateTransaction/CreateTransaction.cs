@@ -40,6 +40,8 @@ public class CreateTransactionCommand : IRequest<IdempotentResult>
     
     public List<OpeningHoldingSecurity>? Security { get; init; }
 
+    public OpeningHoldingsCash? Cash { get; init; }
+
     public sealed class OpeningHoldingSecurity
     {
         public Guid InstrumentId { get; init; }
@@ -47,6 +49,13 @@ public class CreateTransactionCommand : IRequest<IdempotentResult>
         public decimal Quantity { get; init; }
 
         public decimal Cost { get; init; }
+    }
+
+    public sealed class OpeningHoldingsCash
+    {
+        public decimal? Amount { get; init; }
+
+        public string? Currency { get; init; }
     }
 }
 
@@ -60,7 +69,7 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
         RuleFor(command => command.AccountId).NotEmpty();
         RuleFor(command => command.Type)
             .Must(type => type is not null && AllowedTypes.Contains(type))
-            .WithMessage("Type must be TransferIn, TransferOut, Interest, CloseOut, or Opening.");
+            .WithMessage("Type must be TransferIn, TransferOut, Interest, CloseOut, Opening, or OpeningHoldings.");
         RuleFor(command => command.BookedAt).NotNull();
         RuleFor(command => command.Memo)
             .Must(memo => memo is null || memo.Trim().Length is >= 1 and <= 200)
@@ -83,6 +92,9 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
             RuleFor(command => command.Currency)
                 .Null()
                 .WithMessage("Currency cannot be set on OpeningHoldings.");
+            RuleFor(command => command.Cash)
+                .Null()
+                .WithMessage("Cash cannot be set on OpeningHoldings.");
             RuleForEach(command => command.Security).ChildRules(leg =>
             {
                 leg.RuleFor(item => item.InstrumentId).NotEmpty();
@@ -243,7 +255,23 @@ public class CreateTransactionCommandHandler(IApplicationDbContext db, ICurrentU
                     }
 
                     legs.Add(OpeningSecurityLeg.Create(
-                        instrument.Id, item.Quantity, item.Cost, instrument.QuoteCurrency));
+                        instrument.Id, item.Quantity, item.Cost, instrument.QuoteCurrency.Trim()));
+                }
+
+                var instrumentIds = legs.Select(leg => leg.InstrumentId).ToList();
+                var alreadyOpened = await (
+                    from securityLeg in db.TransactionSecurityLegs
+                    join prior in db.Transactions on securityLeg.TransactionId equals prior.Id
+                    where prior.AccountId == loaded.Account.Id
+                          && instrumentIds.Contains(securityLeg.InstrumentId)
+                    select securityLeg.Id).AnyAsync(cancellationToken);
+                if (alreadyOpened)
+                {
+                    throw new ValidationException([
+                        new ValidationFailure(
+                            nameof(CreateTransactionCommand.Security),
+                            "OpeningHoldings must be the first security activity for that instrument.")
+                    ]);
                 }
 
                 transaction = Domain.Entities.Transaction.PostOpeningHoldings(

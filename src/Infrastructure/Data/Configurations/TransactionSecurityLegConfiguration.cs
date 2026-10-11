@@ -15,10 +15,6 @@ public class TransactionSecurityLegConfiguration : IEntityTypeConfiguration<Tran
         builder.Property(leg => leg.CreatedBy).HasMaxLength(450).IsRequired();
         builder.Property(leg => leg.RowVersion).IsRowVersion();
         builder.HasIndex(leg => new { leg.TransactionId, leg.InstrumentId }).IsUnique();
-        builder.HasOne<Transaction>()
-            .WithMany()
-            .HasForeignKey(leg => leg.TransactionId)
-            .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Instrument>()
             .WithMany()
             .HasForeignKey(leg => leg.InstrumentId)
