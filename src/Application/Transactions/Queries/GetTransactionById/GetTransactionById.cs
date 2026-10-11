@@ -44,7 +44,7 @@ public class GetTransactionByIdQueryHandler(IApplicationDbContext db, ICurrentUs
                 InstrumentId = instrument.PublicId,
                 Quantity = leg.Quantity,
                 Cost = leg.CostAmount,
-                QuoteCurrency = leg.CostCurrency.Trim()
+                CostCurrency = leg.CostCurrency.Trim()
             }).ToListAsync(cancellationToken);
 
         Guid? originalPublicId = null;
@@ -63,8 +63,9 @@ public class GetTransactionByIdQueryHandler(IApplicationDbContext db, ICurrentUs
             AccountId = row.account.PublicId,
             CustomerId = row.customer.PublicId,
             Type = row.transaction.Type.ToString(),
-            Amount = cashLeg == null ? null : cashLeg.Amount,
-            Currency = cashLeg?.Currency,
+            Cash = cashLeg is null
+                ? null
+                : new TransactionCashDto { Amount = cashLeg.Amount, Currency = cashLeg.Currency.Trim() },
             BookedAt = TransactionDto.FormatBookedAt(row.transaction.BookedAt),
             Memo = row.transaction.Memo,
             Reference = row.transaction.Reference,

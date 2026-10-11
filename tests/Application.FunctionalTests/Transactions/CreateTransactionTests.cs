@@ -83,8 +83,10 @@ public class CreateTransactionTests : TestBase
         item.RootElement.GetProperty("accountId").GetGuid().ShouldBe(accountId);
         item.RootElement.GetProperty("customerId").GetGuid().ShouldBe(customer.PublicId);
         item.RootElement.GetProperty("type").GetString().ShouldBe("TransferIn");
-        item.RootElement.GetProperty("amount").GetDecimal().ShouldBe(100.00m);
-        item.RootElement.GetProperty("currency").GetString().ShouldBe("NZD");
+        item.RootElement.TryGetProperty("amount", out _).ShouldBeFalse();
+        item.RootElement.GetProperty("cash").GetProperty("amount").GetDecimal().ShouldBe(100.00m);
+        item.RootElement.GetProperty("cash").GetProperty("currency").GetString().ShouldBe("NZD");
+        item.RootElement.TryGetProperty("security", out _).ShouldBeFalse();
         item.RootElement.GetProperty("bookedAt").GetString().ShouldBe(bookedAt);
         item.RootElement.GetProperty("memo").GetString().ShouldBe("Salary");
         item.RootElement.GetProperty("reference").ValueKind.ShouldBe(JsonValueKind.Null);

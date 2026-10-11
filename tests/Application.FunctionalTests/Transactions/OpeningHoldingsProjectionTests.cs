@@ -75,7 +75,7 @@ public class OpeningHoldingsProjectionTests : TestBase
         var reversalLegs = SecurityByInstrument(reversal.RootElement);
         reversalLegs[vti].GetProperty("quantity").GetDecimal().ShouldBe(-100m);
         reversalLegs[vti].GetProperty("cost").GetDecimal().ShouldBe(-1500.00m);
-        reversalLegs[vti].GetProperty("quoteCurrency").GetString().ShouldBe("USD");
+        reversalLegs[vti].GetProperty("costCurrency").GetString().ShouldBe("USD");
         reversalLegs[bnd].GetProperty("quantity").GetDecimal().ShouldBe(-2m);
         reversalLegs[bnd].GetProperty("cost").GetDecimal().ShouldBe(0m);
 

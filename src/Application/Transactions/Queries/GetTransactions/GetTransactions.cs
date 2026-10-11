@@ -61,13 +61,12 @@ public class GetTransactionsQueryHandler(IApplicationDbContext db, ICurrentUser 
         var assignedAdviserId = AccountScope.AssignedAdviserInternalId(currentUser);
         var query =
             from transaction in db.Transactions.AsNoTracking()
-            join leg in db.TransactionCashLegs.AsNoTracking() on transaction.Id equals leg.TransactionId
             join account in db.Accounts.AsNoTracking() on transaction.AccountId equals account.Id
             join customer in db.Users.AsNoTracking() on account.CustomerId equals customer.Id
             join tenant in db.Tenants.AsNoTracking() on transaction.TenantId equals tenant.Id
             where transaction.TenantId == tenantId
                   && (assignedAdviserId == null || customer.AdviserId == assignedAdviserId)
-            select new { transaction, leg, account, customer, tenant };
+            select new { transaction, account, customer, tenant };
 
         if (request.AccountId is { } accountPublicId)
         {
@@ -87,6 +86,35 @@ public class GetTransactionsQueryHandler(IApplicationDbContext db, ICurrentUser 
             .Take(request.PageSize)
             .ToListAsync(cancellationToken);
 
+        var transactionIds = rows.Select(row => row.transaction.Id).ToList();
+        var cashLegs = await db.TransactionCashLegs.AsNoTracking()
+            .Where(leg => transactionIds.Contains(leg.TransactionId))
+            .ToDictionaryAsync(leg => leg.TransactionId, cancellationToken);
+        var securityRows = await (
+            from leg in db.TransactionSecurityLegs.AsNoTracking()
+            join instrument in db.Instruments.AsNoTracking() on leg.InstrumentId equals instrument.Id
+            where transactionIds.Contains(leg.TransactionId)
+            orderby leg.Id
+            select new
+            {
+                leg.TransactionId,
+                InstrumentId = instrument.PublicId,
+                leg.Quantity,
+                leg.CostAmount,
+                leg.CostCurrency
+            }).ToListAsync(cancellationToken);
+        var securityByTransaction = securityRows
+            .GroupBy(row => row.TransactionId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<TransactionSecurityDto>)group.Select(row => new TransactionSecurityDto
+                {
+                    InstrumentId = row.InstrumentId,
+                    Quantity = row.Quantity,
+                    Cost = row.CostAmount,
+                    CostCurrency = row.CostCurrency.Trim()
+                }).ToList());
+
         var originalIds = rows
             .Where(row => row.transaction.OriginalTransactionId is not null)
             .Select(row => row.transaction.OriginalTransactionId!.Value)
@@ -100,23 +128,30 @@ public class GetTransactionsQueryHandler(IApplicationDbContext db, ICurrentUser 
 
         return new PagedList<TransactionDto>
         {
-            Items = rows.Select(row => new TransactionDto
+            Items = rows.Select(row =>
             {
-                Id = row.transaction.PublicId,
-                TenantId = row.tenant.PublicId,
-                AccountId = row.account.PublicId,
-                CustomerId = row.customer.PublicId,
-                Type = row.transaction.Type.ToString(),
-                Amount = row.leg.Amount,
-                Currency = row.leg.Currency,
-                BookedAt = TransactionDto.FormatBookedAt(row.transaction.BookedAt),
-                Memo = row.transaction.Memo,
-                Reference = row.transaction.Reference,
-                OriginalTransactionId = row.transaction.OriginalTransactionId is int originalId
-                    && originalPublicIds.TryGetValue(originalId, out var originalPublicId)
-                    ? originalPublicId
-                    : null,
-                RowVersion = Convert.ToBase64String(row.transaction.RowVersion ?? [])
+                cashLegs.TryGetValue(row.transaction.Id, out var cashLeg);
+                securityByTransaction.TryGetValue(row.transaction.Id, out var security);
+                return new TransactionDto
+                {
+                    Id = row.transaction.PublicId,
+                    TenantId = row.tenant.PublicId,
+                    AccountId = row.account.PublicId,
+                    CustomerId = row.customer.PublicId,
+                    Type = row.transaction.Type.ToString(),
+                    Cash = cashLeg is null
+                        ? null
+                        : new TransactionCashDto { Amount = cashLeg.Amount, Currency = cashLeg.Currency.Trim() },
+                    BookedAt = TransactionDto.FormatBookedAt(row.transaction.BookedAt),
+                    Memo = row.transaction.Memo,
+                    Reference = row.transaction.Reference,
+                    OriginalTransactionId = row.transaction.OriginalTransactionId is int originalId
+                        && originalPublicIds.TryGetValue(originalId, out var originalPublicId)
+                        ? originalPublicId
+                        : null,
+                    RowVersion = Convert.ToBase64String(row.transaction.RowVersion ?? []),
+                    Security = security is { Count: > 0 } ? security : null
+                };
             }).ToList(),
             Page = request.Page,
             PageSize = request.PageSize,

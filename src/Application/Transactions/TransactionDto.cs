@@ -14,9 +14,8 @@ public sealed class TransactionDto
 
     public required string Type { get; init; }
 
-    public decimal? Amount { get; init; }
-
-    public string? Currency { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TransactionCashDto? Cash { get; init; }
 
     public required string BookedAt { get; init; }
 
@@ -35,6 +34,13 @@ public sealed class TransactionDto
         bookedAt.ToString("yyyy-MM-ddTHH:mm:sszzz");
 }
 
+public sealed class TransactionCashDto
+{
+    public required decimal Amount { get; init; }
+
+    public required string Currency { get; init; }
+}
+
 public sealed class TransactionSecurityDto
 {
     public required Guid InstrumentId { get; init; }
@@ -43,5 +49,5 @@ public sealed class TransactionSecurityDto
 
     public required decimal Cost { get; init; }
 
-    public required string QuoteCurrency { get; init; }
+    public required string CostCurrency { get; init; }
 }

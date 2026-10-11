@@ -34,7 +34,7 @@ public class OpeningHoldingsTests : TestBase
         leg.GetProperty("instrumentId").GetGuid().ShouldBe(instrumentId);
         leg.GetProperty("quantity").GetDecimal().ShouldBe(100m);
         leg.GetProperty("cost").GetDecimal().ShouldBe(1500.00m);
-        leg.GetProperty("quoteCurrency").GetString().ShouldBe("USD");
+        leg.GetProperty("costCurrency").GetString().ShouldBe("USD");
     }
 
     [Test]
@@ -71,10 +71,10 @@ public class OpeningHoldingsTests : TestBase
         legs.Count.ShouldBe(2);
         legs[first].GetProperty("quantity").GetDecimal().ShouldBe(100m);
         legs[first].GetProperty("cost").GetDecimal().ShouldBe(1500.00m);
-        legs[first].GetProperty("quoteCurrency").GetString().ShouldBe("USD");
+        legs[first].GetProperty("costCurrency").GetString().ShouldBe("USD");
         legs[second].GetProperty("quantity").GetDecimal().ShouldBe(2m);
         legs[second].GetProperty("cost").GetDecimal().ShouldBe(0m);
-        legs[second].GetProperty("quoteCurrency").GetString().ShouldBe("USD");
+        legs[second].GetProperty("costCurrency").GetString().ShouldBe("USD");
     }
 
     [Test]
