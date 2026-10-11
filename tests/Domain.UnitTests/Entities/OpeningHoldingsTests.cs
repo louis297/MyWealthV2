@@ -150,6 +150,61 @@ public class OpeningHoldingsTests
             securityLegs: [OpeningSecurityLeg.Create(11, 1m, 10m, "USD")]));
     }
 
+    [Test]
+    public void Reverse_CopiesOppositeSecurityLegsAndLeavesTheOriginalUntouched()
+    {
+        var original = Transaction.PostOpeningHoldings(
+            tenantId: 1,
+            accountId: 2,
+            accountType: AccountType.Brokerage,
+            bookedAt: BookedAt,
+            memo: "Open VTI",
+            reference: "ref",
+            securityLegs:
+            [
+                OpeningSecurityLeg.Create(11, 100m, 1500.00m, "USD"),
+                OpeningSecurityLeg.Create(12, 2m, 0m, "USD")
+            ]);
+        original.Id = 7;
+        original.ClearDomainEvents();
+        var reverseAt = BookedAt.AddDays(1);
+
+        var reversal = original.Reverse(reverseAt, currentCashSum: 0m);
+
+        original.Type.ShouldBe(TransactionType.OpeningHoldings);
+        original.Memo.ShouldBe("Open VTI");
+        original.Reference.ShouldBe("ref");
+        original.CashLeg.ShouldBeNull();
+        original.DomainEvents.ShouldBeEmpty();
+        original.SecurityLegs.Select(leg => (leg.InstrumentId, leg.Quantity, leg.CostAmount, leg.CostCurrency))
+            .ShouldBe([(11, 100m, 1500.00m, "USD"), (12, 2m, 0m, "USD")]);
+
+        reversal.ShouldNotBeSameAs(original);
+        reversal.PublicId.ShouldNotBe(original.PublicId);
+        reversal.Type.ShouldBe(TransactionType.Reversal);
+        reversal.TenantId.ShouldBe(1);
+        reversal.AccountId.ShouldBe(2);
+        reversal.BookedAt.ShouldBe(reverseAt);
+        reversal.OriginalTransactionId.ShouldBe(7);
+        reversal.Memo.ShouldBeNull();
+        reversal.Reference.ShouldBeNull();
+        reversal.CashLeg.ShouldBeNull();
+        reversal.SecurityLegs.Select(leg => (leg.InstrumentId, leg.Quantity, leg.CostAmount, leg.CostCurrency))
+            .ShouldBe([(11, -100m, -1500.00m, "USD"), (12, -2m, 0m, "USD")]);
+        reversal.DomainEvents.OfType<TransactionReversed>().ShouldHaveSingleItem();
+        reversal.DomainEvents.OfType<TransactionPosted>().ShouldBeEmpty();
+    }
+
+    [Test]
+    public void Reverse_RejectsReversalOfAnOpeningHoldingsReversal()
+    {
+        var original = Post(AccountType.Brokerage, (11, 100m, 1500m, "USD"));
+        original.Id = 7;
+        var reversal = original.Reverse(BookedAt.AddDays(1), currentCashSum: 0m);
+
+        Should.Throw<DomainException>(() => reversal.Reverse(BookedAt.AddDays(2), currentCashSum: 0m));
+    }
+
     private static Transaction Post(
         AccountType accountType,
         params (int InstrumentId, decimal Quantity, decimal Cost, string QuoteCurrency)[] legs) =>
