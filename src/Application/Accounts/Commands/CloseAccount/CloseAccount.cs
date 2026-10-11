@@ -50,6 +50,13 @@ public class CloseAccountCommandHandler(IApplicationDbContext db, ICurrentUser c
                 ]);
             }
 
+            if (await db.Holdings.AnyAsync(row => row.AccountId == account.Id, token))
+            {
+                throw new ValidationException([
+                    new ValidationFailure(string.Empty, "Cannot close an account while a holding remains.")
+                ]);
+            }
+
             account.Close();
             await db.SaveChangesAsync(token);
         }, cancellationToken);
