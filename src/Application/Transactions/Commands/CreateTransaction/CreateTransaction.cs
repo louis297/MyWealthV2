@@ -42,6 +42,8 @@ public class CreateTransactionCommand : IRequest<IdempotentResult>
 
     public OpeningHoldingsCash? Cash { get; init; }
 
+    public decimal? Ratio { get; init; }
+
     public sealed class OpeningHoldingSecurity
     {
         public Guid InstrumentId { get; init; }
@@ -51,6 +53,8 @@ public class CreateTransactionCommand : IRequest<IdempotentResult>
         public decimal? Cost { get; init; }
 
         public decimal? Price { get; init; }
+
+        public decimal? Ratio { get; init; }
     }
 
     public sealed class OpeningHoldingsCash
@@ -68,7 +72,7 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
     private static readonly string[] AllowedTypes =
     [
         "TransferIn", "TransferOut", "Interest", "CloseOut", "Opening", "OpeningHoldings",
-        "Buy", "Sell", "StockIn", "StockOut"
+        "Buy", "Sell", "StockIn", "StockOut", "Split", "Bonus", "Scrip"
     ];
 
     public CreateTransactionCommandValidator(ICurrentUser currentUser)
@@ -76,7 +80,7 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
         RuleFor(command => command.AccountId).NotEmpty();
         RuleFor(command => command.Type)
             .Must(type => type is not null && AllowedTypes.Contains(type))
-            .WithMessage("Type must be TransferIn, TransferOut, Interest, CloseOut, Opening, OpeningHoldings, Buy, Sell, StockIn, or StockOut.");
+            .WithMessage("Type must be TransferIn, TransferOut, Interest, CloseOut, Opening, OpeningHoldings, Buy, Sell, StockIn, StockOut, Split, Bonus, or Scrip.");
         RuleFor(command => command.BookedAt).NotNull();
         RuleFor(command => command.Memo)
             .Must(memo => memo is null || memo.Trim().Length is >= 1 and <= 200)
@@ -156,6 +160,25 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
                 leg.RuleFor(item => item.Cost).Null().WithMessage("Cost cannot be set on a stock out."));
         });
 
+        When(command => command.Type is "Split" or "Bonus" or "Scrip", () =>
+        {
+            RuleFor(command => command.Amount).Null().WithMessage("Amount cannot be set on a split, bonus, or scrip.");
+            RuleFor(command => command.Currency).Null().WithMessage("Currency cannot be set on a split, bonus, or scrip.");
+            RuleFor(command => command.Cash).Null().WithMessage("Cash cannot be set on a split, bonus, or scrip.");
+            RuleFor(command => command.Ratio).Null().WithMessage("Ratio cannot be set on a split, bonus, or scrip.");
+            RuleFor(command => command.Security)
+                .Must(security => security is { Count: 1 })
+                .WithMessage("Security must contain exactly one leg.");
+            RuleForEach(command => command.Security).ChildRules(leg =>
+            {
+                leg.RuleFor(item => item.InstrumentId).NotEmpty();
+                leg.RuleFor(item => item.Quantity).GreaterThan(0);
+                leg.RuleFor(item => item.Cost).Null().WithMessage("Cost cannot be set on a split, bonus, or scrip.");
+                leg.RuleFor(item => item.Price).Null().WithMessage("Price cannot be set on a split, bonus, or scrip.");
+                leg.RuleFor(item => item.Ratio).Null().WithMessage("Ratio cannot be set on a split, bonus, or scrip.");
+            });
+        });
+
         When(command => CashTypes.Contains(command.Type ?? ""), () =>
         {
             RuleFor(command => command.Amount).NotNull();
@@ -203,12 +226,14 @@ public class CreateTransactionCommandHandler(
                 reference = request.Reference,
                 currency = request.Currency,
                 tenantId = request.TenantId,
+                ratio = request.Ratio,
                 security = request.Security?.Select(leg => new
                 {
                     instrumentId = leg.InstrumentId,
                     quantity = leg.Quantity,
                     cost = leg.Cost,
-                    price = leg.Price
+                    price = leg.Price,
+                    ratio = leg.Ratio
                 })
             });
 
@@ -350,6 +375,10 @@ public class CreateTransactionCommandHandler(
             {
                 transaction = await PostStockAsync(request, tenant, loaded, type, cancellationToken);
             }
+            else if (type is TransactionType.Split or TransactionType.Bonus or TransactionType.Scrip)
+            {
+                transaction = await PostSplitAsync(request, tenant, loaded, type, cancellationToken);
+            }
             else
             {
                 transaction = Domain.Entities.Transaction.Post(
@@ -386,7 +415,8 @@ public class CreateTransactionCommandHandler(
         await db.SaveChangesAsync(cancellationToken);
 
         if (type is TransactionType.OpeningHoldings or TransactionType.Buy or TransactionType.Sell
-            or TransactionType.StockIn or TransactionType.StockOut)
+            or TransactionType.StockIn or TransactionType.StockOut
+            or TransactionType.Split or TransactionType.Bonus or TransactionType.Scrip)
         {
             try
             {
@@ -540,6 +570,35 @@ public class CreateTransactionCommandHandler(
             instrument.Id,
             item.Quantity,
             quote,
+            request.BookedAt!.Value,
+            request.Memo,
+            request.Reference,
+            holding?.Quantity ?? 0m,
+            holding?.CostAmount ?? 0m);
+    }
+
+    private async Task<Domain.Entities.Transaction> PostSplitAsync(
+        CreateTransactionCommand request,
+        Tenant tenant,
+        (Account Account, User Customer) loaded,
+        TransactionType type,
+        CancellationToken cancellationToken)
+    {
+        var item = request.Security!.Single();
+        var instrument = await db.Instruments.SingleOrDefaultAsync(
+            row => row.PublicId == item.InstrumentId && row.TenantId == tenant.Id,
+            cancellationToken) ?? throw new NotFoundException("Instrument", item.InstrumentId);
+        var holding = await db.Holdings.SingleOrDefaultAsync(
+            row => row.AccountId == loaded.Account.Id && row.InstrumentId == instrument.Id,
+            cancellationToken);
+        return Domain.Entities.Transaction.PostSplit(
+            tenant.Id,
+            loaded.Account.Id,
+            loaded.Account.Type,
+            type,
+            instrument.Id,
+            item.Quantity,
+            instrument.QuoteCurrency,
             request.BookedAt!.Value,
             request.Memo,
             request.Reference,
