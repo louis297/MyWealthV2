@@ -169,8 +169,27 @@ public class Transaction : BaseAuditableEntity
         decimal currentQuantity,
         decimal currentCost)
     {
-        _ = (tenantId, accountId, accountType, accountCurrency, instrumentId, quantity, price, fxRate, bookedAt, memo, reference, currentCashSum, currentQuantity, currentCost);
-        throw new DomainException("Sell is not posted.");
+        _ = (accountType, currentCashSum);
+        var released = ReleaseCost(currentCost, quantity, currentQuantity);
+        var cash = RoundMoney(quantity * price.Amount * fxRate);
+        var currency = Money.Create(0m, accountCurrency).Currency;
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            AccountId = accountId,
+            Type = TransactionType.Sell,
+            BookedAt = bookedAt,
+            Memo = NormaliseMemo(memo),
+            Reference = NormaliseReference(reference),
+            PublicId = Guid.NewGuid(),
+            CashLeg = TransactionCashLeg.Create(cash, currency),
+            SecurityLegs =
+            [
+                TransactionSecurityLeg.Create(instrumentId, -quantity, -released, price.Currency)
+            ]
+        };
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
     }
 
     public Transaction Reverse(
@@ -280,6 +299,11 @@ public class Transaction : BaseAuditableEntity
 
     private static decimal RoundMoney(decimal amount) =>
         decimal.Round(amount, 4, MidpointRounding.AwayFromZero);
+
+    private static decimal ReleaseCost(decimal oldCost, decimal sellQuantity, decimal oldQuantity) =>
+        sellQuantity == oldQuantity
+            ? oldCost
+            : RoundMoney(oldCost * sellQuantity / oldQuantity);
 
     private static void EnsureSign(TransactionType type, decimal amount)
     {
