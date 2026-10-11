@@ -2,12 +2,42 @@ using System.Net;
 using System.Text.Json;
 using MyWealthV2.Application.FunctionalTests.Accounts;
 using MyWealthV2.Application.FunctionalTests.Instruments;
+using MyWealthV2.Domain.Enums;
 
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
 public class SplitTests : TestBase
 {
     private const string BookedAt = "2026-10-12T10:00:00+13:00";
+
+    [Test]
+    public async Task WithoutBearer_Returns401WithoutRedirect()
+    {
+        var post = await TransactionHttp.Send(HttpMethod.Post, "/transactions", accessToken: null, new
+        {
+            accountId = Guid.NewGuid(),
+            type = "Split",
+            bookedAt = BookedAt,
+            security = new[] { new { instrumentId = Guid.NewGuid(), quantity = 2m } }
+        });
+
+        post.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        post.Headers.Location.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task Customer_Returns403()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm Split", "firmsplit");
+        var adviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Cara", "cara@firmsplit", "Password1!", tenant.Id);
+        var customer = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Dee", "dee@firmsplit", "Password1!", tenant.Id, adviser.Id);
+        var tokens = await TestApp.IssueAccessTokenAsync(customer);
+
+        var post = await PostSplitAsync(tokens.AccessToken, Guid.NewGuid(), "Split", Guid.NewGuid(), 2m);
+        post.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
 
     [Test]
     public async Task Split_DoublesQuantityAndLeavesTotalCostUnchanged()
@@ -36,6 +66,24 @@ public class SplitTests : TestBase
         leg.GetProperty("quantity").GetDecimal().ShouldBe(100m);
         leg.GetProperty("cost").GetDecimal().ShouldBe(0m);
         leg.GetProperty("costCurrency").GetString().ShouldBe("USD");
+    }
+
+    [TestCase("Bonus", 115)]
+    [TestCase("Scrip", 110)]
+    public async Task BonusAndScrip_ChangeQuantityAndLeaveTotalCostUnchanged(string type, decimal newQuantity)
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Other", "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, type, "USD");
+        (await PostOpeningAsync(tokens.AccessToken, accountId, instrumentId, 100m, 800m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+
+        (await PostSplitAsync(tokens.AccessToken, accountId, type, instrumentId, newQuantity)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+
+        var holding = await HoldingAsync(tokens.AccessToken, accountId, instrumentId);
+        holding.Quantity.ShouldBe(newQuantity);
+        holding.Cost.ShouldBe(800m);
     }
 
     private static async Task<JsonDocument> GetItemAsync(string accessToken, Guid id)
