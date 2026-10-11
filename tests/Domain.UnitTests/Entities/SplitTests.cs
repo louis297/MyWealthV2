@@ -44,4 +44,30 @@ public class SplitTests
         leg.CostAmount.ShouldBe(0m);
         leg.CostCurrency.ShouldBe("USD");
     }
+
+    [TestCase(TransactionType.Bonus)]
+    [TestCase(TransactionType.Scrip)]
+    public void PostSplit_BonusAndScripUseTheSameBookRule(TransactionType type)
+    {
+        var transaction = Transaction.PostSplit(
+            tenantId: 1,
+            accountId: 2,
+            accountType: AccountType.Brokerage,
+            type: type,
+            instrumentId: 11,
+            newQuantity: 115m,
+            quoteCurrency: "USD",
+            bookedAt: BookedAt,
+            memo: null,
+            reference: null,
+            currentQuantity: 100m,
+            currentCost: 800m);
+
+        transaction.Type.ShouldBe(type);
+        transaction.CashLeg.ShouldBeNull();
+        var leg = transaction.SecurityLegs.Single();
+        leg.Quantity.ShouldBe(15m);
+        leg.CostAmount.ShouldBe(0m);
+        leg.CostCurrency.ShouldBe("USD");
+    }
 }
