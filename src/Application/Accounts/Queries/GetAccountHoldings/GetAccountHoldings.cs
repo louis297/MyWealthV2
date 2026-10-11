@@ -1,49 +1,48 @@
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Domain.Enums;
+using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 
 namespace MyWealthV2.Application.Accounts.Queries.GetAccountHoldings;
 
 [Authorize(Policy = Policies.AccountsRead)]
-public record GetAccountHoldingsQuery(Guid AccountId) : IRequest<IReadOnlyList<AccountHoldingDto>>
+public record GetAccountHoldingsQuery(Guid AccountId) : IRequest<AccountHoldingsDto>
 {
 }
 
 public class GetAccountHoldingsQueryHandler(IApplicationDbContext db, ICurrentUser currentUser)
-    : IRequestHandler<GetAccountHoldingsQuery, IReadOnlyList<AccountHoldingDto>>
+    : IRequestHandler<GetAccountHoldingsQuery, AccountHoldingsDto>
 {
-    public async Task<IReadOnlyList<AccountHoldingDto>> Handle(GetAccountHoldingsQuery request, CancellationToken cancellationToken)
+    public async Task<AccountHoldingsDto> Handle(GetAccountHoldingsQuery request, CancellationToken cancellationToken)
     {
         var assignedAdviserId = AccountScope.AssignedAdviserInternalId(currentUser);
-        int tenantId;
-        if (currentUser.Role == UserRole.SystemAdmin)
-        {
-            var tenant = await db.Accounts.AsNoTracking()
-                                .SingleOrDefaultAsync(a => a.PublicId == request.AccountId, cancellationToken)
-                         ?? throw new NotFoundException("Tenant", request.AccountId.ToString());
-            tenantId = tenant.Id;
-        }
-        else
-        {
-            tenantId = currentUser.TenantId
-                       ?? throw new NotFoundException("Tenant", "current");
-        }
-
-        var query = from holding in db.Holdings.AsNoTracking()
-            join account in db.Accounts.AsNoTracking() on holding.AccountId equals account.Id
+        var accounts =
+            from account in db.Accounts.AsNoTracking()
             join customer in db.Users.AsNoTracking() on account.CustomerId equals customer.Id
-            join tenant in db.Tenants.AsNoTracking() on account.TenantId equals tenant.Id
-            join instrument in db.Instruments.AsNoTracking() on holding.InstrumentId equals instrument.Id
-            where request.AccountId == account.PublicId
-                  && account.TenantId == tenantId
+            where account.PublicId == request.AccountId
                   && (assignedAdviserId == null || customer.AdviserId == assignedAdviserId)
-            select new {account, holding, instrument};
+            select account;
 
-        //var results = query.Select(AccountHoldingDto.From);
-        //IReadOnlyList<AccountHoldingDto> items = await query.Select(AccountHoldingDto.From).ToListAsync(cancellationToken);
-        
-        var rows = await query.ToListAsync(cancellationToken);
-        
-        return [.. rows.Select(row => AccountHoldingDto.From(row.account, row.holding, row.instrument))];
+        if (currentUser.Role != UserRole.SystemAdmin)
+        {
+            var tenantId = currentUser.TenantId
+                           ?? throw new NotFoundException("Tenant", "current");
+            accounts = accounts.Where(account => account.TenantId == tenantId);
+        }
+
+        var accountRow = await accounts.SingleOrDefaultAsync(cancellationToken)
+                         ?? throw new NotFoundException("Account", request.AccountId);
+
+        var rows = await (
+            from holding in db.Holdings.AsNoTracking()
+            join instrument in db.Instruments.AsNoTracking() on holding.InstrumentId equals instrument.Id
+            where holding.AccountId == accountRow.Id
+            orderby instrument.Symbol
+            select new { holding, instrument }).ToListAsync(cancellationToken);
+
+        return new AccountHoldingsDto
+        {
+            Items = rows.Select(row => AccountHoldingDto.From(accountRow, row.holding, row.instrument)).ToList()
+        };
     }
 }

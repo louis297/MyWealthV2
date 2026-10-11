@@ -101,12 +101,9 @@ public class Accounts : IEndpointGroup
 
     [EndpointSummary("Get all holdings")]
     [EndpointDescription("Get all holdings for an account")]
-    public static async Task<Ok<IReadOnlyList<AccountHoldingDto>>> GetHoldings(
-        ISender sender,
-        Guid id
-        )
+    public static async Task<Ok<AccountHoldingsDto>> GetHoldings(ISender sender, Guid id)
     {
-        var items = await sender.Send(new GetAccountHoldingsQuery(id));
-        return TypedResults.Ok(items);
+        var result = await sender.Send(new GetAccountHoldingsQuery(id));
+        return TypedResults.Ok(result);
     }
 }
