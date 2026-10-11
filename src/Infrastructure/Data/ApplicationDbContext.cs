@@ -94,6 +94,9 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
     public Task LoadCashLegAsync(Transaction transaction, CancellationToken cancellationToken) =>
         Entry(transaction).Reference(row => row.CashLeg).LoadAsync(cancellationToken);
 
+    public Task LoadSecurityLegsAsync(Transaction transaction, CancellationToken cancellationToken) =>
+        Entry(transaction).Collection(row => row.SecurityLegs).LoadAsync(cancellationToken);
+
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         try

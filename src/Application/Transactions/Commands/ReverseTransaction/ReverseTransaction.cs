@@ -112,10 +112,11 @@ public class ReverseTransactionCommandHandler(
 
         await db.LockAccountAsync(loaded.Account.Id, cancellationToken);
         var currentSum = await TransactionCash.SumAsync(db, loaded.Account.Id, cancellationToken);
+        var currentQuantities = await CurrentQuantitiesAsync(loaded, cancellationToken);
         Domain.Entities.Transaction reversal;
         try
         {
-            reversal = loaded.Transaction.Reverse(time.GetUtcNow(), currentSum);
+            reversal = loaded.Transaction.Reverse(time.GetUtcNow(), currentSum, currentQuantities);
         }
         catch (DomainException exception)
         {
@@ -136,6 +137,26 @@ public class ReverseTransactionCommandHandler(
             body,
             time.GetUtcNow()));
         await db.SaveChangesAsync(cancellationToken);
+
+        if (reversal.SecurityLegs.Count > 0)
+        {
+            try
+            {
+                await HoldingProjection.SyncAsync(
+                    db,
+                    loaded.Transaction.TenantId,
+                    loaded.Account.Id,
+                    reversal.SecurityLegs.Select(leg => leg.InstrumentId),
+                    cancellationToken);
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DomainException exception)
+            {
+                throw new ValidationException([
+                    new ValidationFailure(string.Empty, exception.Message)
+                ]);
+            }
+        }
 
         var postedSum = await TransactionCash.SumAsync(db, loaded.Account.Id, cancellationToken);
         if (postedSum < 0)
@@ -167,7 +188,29 @@ public class ReverseTransactionCommandHandler(
         var row = await query.SingleOrDefaultAsync(cancellationToken)
                   ?? throw new NotFoundException("Transaction", publicId);
         await db.LoadCashLegAsync(row.transaction, cancellationToken);
+        await db.LoadSecurityLegsAsync(row.transaction, cancellationToken);
         return new LoadedTransaction(row.transaction, row.account, row.customer);
+    }
+
+    private async Task<IReadOnlyDictionary<int, decimal>?> CurrentQuantitiesAsync(
+        LoadedTransaction loaded,
+        CancellationToken cancellationToken)
+    {
+        if (loaded.Transaction.CashLeg is not null || loaded.Transaction.SecurityLegs.Count == 0)
+        {
+            return null;
+        }
+
+        var quantities = new Dictionary<int, decimal>();
+        foreach (var leg in loaded.Transaction.SecurityLegs)
+        {
+            var holding = await db.Holdings.AsNoTracking().SingleOrDefaultAsync(
+                row => row.AccountId == loaded.Account.Id && row.InstrumentId == leg.InstrumentId,
+                cancellationToken);
+            quantities[leg.InstrumentId] = holding?.Quantity ?? 0m;
+        }
+
+        return quantities;
     }
 
     private Task<IdempotencyRecord?> FindRecordAsync(int tenantId, Guid key, CancellationToken cancellationToken) =>
