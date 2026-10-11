@@ -112,7 +112,7 @@ public class TestSeedAccountsTests
         first.Quantity.ShouldBe(10m);
         first.CostAmount.ShouldBe(2500.00m);
         first.CostCurrency.Trim().ShouldBe("USD");
-        first.HoldingQuantity.ShouldBe(16m);
+        first.HoldingQuantity.ShouldBe(32m);
         first.HoldingCostAmount.ShouldBe(3800.00m);
         first.HoldingCostCurrency.Trim().ShouldBe("USD");
         first.CreatedBy.ShouldBe(TestSeed.CreatedBy);
@@ -158,6 +158,46 @@ public class TestSeedAccountsTests
 
         var holding = await db.Holdings.SingleAsync(row => row.AccountId == account.Id && row.InstrumentId == vti.Id);
         holding.Quantity.ShouldBe(16m);
+        holding.CostAmount.ShouldBe(3800m);
+    }
+
+    [Test]
+    public async Task Seed_AddsOneSplitOnTheDemoBrokerageHolding()
+    {
+        await using var db = OpenDb();
+        var tenant = await EnsureDemoTenantAsync(db);
+        var adviser = await EnsurePersonAsync(
+            db, tenant, UserRole.Adviser, "Demo Adviser", DevelopmentIdentitySeeder.AdviserEmail);
+        await EnsurePersonAsync(
+            db, tenant, UserRole.Customer, "Demo Customer", "customer@localhost", adviser.Id);
+        var prices = new MarketDataMock();
+
+        await TestSeed.SeedAsync(db, prices, CancellationToken.None);
+        var account = await db.Accounts.SingleAsync(row => row.TenantId == tenant.Id && row.Name == "Demo brokerage");
+        var first = await LoadSecurityAsync(db, account.Id, "TestSeed-DemoBrokerage-Split");
+        var firstId = await db.Transactions
+            .Where(row => row.AccountId == account.Id && row.Reference == "TestSeed-DemoBrokerage-Split")
+            .Select(row => row.PublicId)
+            .SingleAsync();
+
+        await TestSeed.SeedAsync(db, prices, CancellationToken.None);
+        var second = await LoadSecurityAsync(db, account.Id, "TestSeed-DemoBrokerage-Split");
+        var secondId = await db.Transactions
+            .Where(row => row.AccountId == account.Id && row.Reference == "TestSeed-DemoBrokerage-Split")
+            .Select(row => row.PublicId)
+            .SingleAsync();
+
+        first.Count.ShouldBe(1);
+        first[0].Type.ShouldBe(TransactionType.Split);
+        first[0].CashCount.ShouldBe(0);
+        first[0].Quantity.ShouldBe(16m);
+        first[0].CostAmount.ShouldBe(0m);
+        second.Count.ShouldBe(1);
+        secondId.ShouldBe(firstId);
+
+        var vti = await db.Instruments.SingleAsync(row => row.TenantId == tenant.Id && row.Symbol == "VTI");
+        var holding = await db.Holdings.SingleAsync(row => row.AccountId == account.Id && row.InstrumentId == vti.Id);
+        holding.Quantity.ShouldBe(32m);
         holding.CostAmount.ShouldBe(3800m);
     }
 
