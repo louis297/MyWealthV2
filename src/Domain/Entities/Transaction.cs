@@ -192,6 +192,43 @@ public class Transaction : BaseAuditableEntity
         return transaction;
     }
 
+    public static Transaction PostStockIn(
+        int tenantId,
+        int accountId,
+        AccountType accountType,
+        int instrumentId,
+        decimal quantity,
+        decimal cost,
+        string quoteCurrency,
+        DateTimeOffset bookedAt,
+        string? memo,
+        string? reference)
+    {
+        _ = accountType;
+        if (cost < 0)
+        {
+            throw new DomainException("Cost must be greater than or equal to 0.");
+        }
+
+        var currency = Money.Create(0m, quoteCurrency).Currency;
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            AccountId = accountId,
+            Type = TransactionType.StockIn,
+            BookedAt = bookedAt,
+            Memo = NormaliseMemo(memo),
+            Reference = NormaliseReference(reference),
+            PublicId = Guid.NewGuid(),
+            SecurityLegs =
+            [
+                TransactionSecurityLeg.Create(instrumentId, quantity, cost, currency)
+            ]
+        };
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
+    }
+
     public Transaction Reverse(
         DateTimeOffset bookedAt,
         decimal currentCashSum,

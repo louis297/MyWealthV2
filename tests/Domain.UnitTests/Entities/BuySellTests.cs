@@ -1,6 +1,7 @@
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Events;
+using MyWealthV2.Domain.Exceptions;
 using MyWealthV2.Domain.ValueObjects;
 using NUnit.Framework;
 using Shouldly;
@@ -123,6 +124,57 @@ public class BuySellTests
         fullLeg.Quantity.ShouldBe(-2m);
         fullLeg.CostAmount.ShouldBe(-500.0001m);
         fullLeg.CostCurrency.ShouldBe("USD");
+    }
+
+    [Test]
+    public void PostStockIn_StoresClientCostWithoutACashLeg()
+    {
+        var transaction = Transaction.PostStockIn(
+            tenantId: 1,
+            accountId: 2,
+            accountType: AccountType.Brokerage,
+            instrumentId: 11,
+            quantity: 20m,
+            cost: 300.00m,
+            quoteCurrency: "usd",
+            bookedAt: BookedAt,
+            memo: null,
+            reference: null);
+
+        transaction.Type.ShouldBe(TransactionType.StockIn);
+        transaction.CashLeg.ShouldBeNull();
+        var leg = transaction.SecurityLegs.Single();
+        leg.InstrumentId.ShouldBe(11);
+        leg.Quantity.ShouldBe(20m);
+        leg.CostAmount.ShouldBe(300.00m);
+        leg.CostCurrency.ShouldBe("USD");
+        transaction.DomainEvents.OfType<TransactionPosted>().ShouldHaveSingleItem();
+
+        var zero = Transaction.PostStockIn(
+            tenantId: 1,
+            accountId: 2,
+            accountType: AccountType.Other,
+            instrumentId: 12,
+            quantity: 1m,
+            cost: 0m,
+            quoteCurrency: "NZD",
+            bookedAt: BookedAt,
+            memo: null,
+            reference: null);
+        zero.CashLeg.ShouldBeNull();
+        zero.SecurityLegs.Single().CostAmount.ShouldBe(0m);
+
+        Should.Throw<DomainException>(() => Transaction.PostStockIn(
+            tenantId: 1,
+            accountId: 2,
+            accountType: AccountType.Brokerage,
+            instrumentId: 11,
+            quantity: 1m,
+            cost: -0.01m,
+            quoteCurrency: "USD",
+            bookedAt: BookedAt,
+            memo: null,
+            reference: null));
     }
 
     private static Transaction PostBuy(
