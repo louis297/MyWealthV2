@@ -293,6 +293,16 @@ public class Transaction : BaseAuditableEntity
         }
 
         _ = currentCost;
+        if (currentQuantity <= 0)
+        {
+            throw new DomainException("A holding must already exist.");
+        }
+
+        if (newQuantity <= 0)
+        {
+            throw new DomainException("Quantity must be greater than 0.");
+        }
+
         if (newQuantity == currentQuantity)
         {
             throw new DomainException("New quantity must differ from the current quantity.");
