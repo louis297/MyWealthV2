@@ -151,6 +151,66 @@ public class SplitTests : TestBase
         holding.Cost.ShouldBe(2500m);
     }
 
+    [Test]
+    public async Task CashAmountRatioCostAndPrice_Return400()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+        (await PostOpeningAsync(tokens.AccessToken, accountId, instrumentId, 100m, 2500m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+
+        (await PostBodyAsync(tokens.AccessToken, new
+        {
+            accountId,
+            type = "Split",
+            bookedAt = BookedAt,
+            amount = 10m,
+            security = new[] { new { instrumentId, quantity = 200m } }
+        })).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await PostBodyAsync(tokens.AccessToken, new
+        {
+            accountId,
+            type = "Split",
+            bookedAt = BookedAt,
+            cash = new { amount = 10m, currency = "USD" },
+            security = new[] { new { instrumentId, quantity = 200m } }
+        })).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await PostBodyAsync(tokens.AccessToken, new
+        {
+            accountId,
+            type = "Bonus",
+            bookedAt = BookedAt,
+            ratio = 2m,
+            security = new[] { new { instrumentId, quantity = 200m } }
+        })).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await PostBodyAsync(tokens.AccessToken, new
+        {
+            accountId,
+            type = "Scrip",
+            bookedAt = BookedAt,
+            security = new[] { new { instrumentId, quantity = 200m, ratio = 2m } }
+        })).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await PostBodyAsync(tokens.AccessToken, new
+        {
+            accountId,
+            type = "Split",
+            bookedAt = BookedAt,
+            security = new[] { new { instrumentId, quantity = 200m, cost = 1m } }
+        })).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await PostBodyAsync(tokens.AccessToken, new
+        {
+            accountId,
+            type = "Split",
+            bookedAt = BookedAt,
+            security = new[] { new { instrumentId, quantity = 200m, price = 1m } }
+        })).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var holding = await HoldingAsync(tokens.AccessToken, accountId, instrumentId);
+        holding.Quantity.ShouldBe(100m);
+        holding.Cost.ShouldBe(2500m);
+    }
+
     private static async Task<Guid> ReadId(HttpResponseMessage response)
     {
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
@@ -199,6 +259,9 @@ public class SplitTests : TestBase
             bookedAt = BookedAt,
             security = new[] { new { instrumentId, quantity, cost } }
         }, Guid.NewGuid());
+
+    private static Task<HttpResponseMessage> PostBodyAsync(string accessToken, object body) =>
+        TransactionHttp.Send(HttpMethod.Post, "/transactions", accessToken, body, Guid.NewGuid());
 
     private static Task<HttpResponseMessage> PostSplitAsync(
         string accessToken,
