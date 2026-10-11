@@ -155,4 +155,43 @@ public class SplitTests
             currentQuantity: 100m,
             currentCost: 2500m));
     }
+
+    [Test]
+    public void Reverse_CopiesTheOppositeSplitQuantityAndLeavesTheOriginalUntouched()
+    {
+        var original = Transaction.PostSplit(
+            tenantId: 1,
+            accountId: 2,
+            accountType: AccountType.Brokerage,
+            type: TransactionType.Split,
+            instrumentId: 11,
+            newQuantity: 200m,
+            quoteCurrency: "USD",
+            bookedAt: BookedAt,
+            memo: null,
+            reference: null,
+            currentQuantity: 100m,
+            currentCost: 2500m);
+        var originalQuantity = original.SecurityLegs.Single().Quantity;
+
+        var reversal = original.Reverse(
+            BookedAt.AddDays(1),
+            currentCashSum: 0m,
+            currentQuantityByInstrument: new Dictionary<int, decimal> { [11] = 200m });
+
+        original.Type.ShouldBe(TransactionType.Split);
+        original.CashLeg.ShouldBeNull();
+        original.SecurityLegs.Single().Quantity.ShouldBe(originalQuantity);
+        original.SecurityLegs.Single().CostAmount.ShouldBe(0m);
+
+        reversal.Type.ShouldBe(TransactionType.Reversal);
+        reversal.CashLeg.ShouldBeNull();
+        reversal.OriginalTransactionId.ShouldBe(original.Id);
+        reversal.DomainEvents.OfType<TransactionReversed>().ShouldHaveSingleItem();
+        var leg = reversal.SecurityLegs.Single();
+        leg.InstrumentId.ShouldBe(11);
+        leg.Quantity.ShouldBe(-originalQuantity);
+        leg.CostAmount.ShouldBe(0m);
+        leg.CostCurrency.ShouldBe("USD");
+    }
 }
