@@ -116,6 +116,24 @@ public class Transaction : BaseAuditableEntity
         return transaction;
     }
 
+    public static Transaction PostBuy(
+        int tenantId,
+        int accountId,
+        AccountType accountType,
+        string accountCurrency,
+        int instrumentId,
+        decimal quantity,
+        Money price,
+        decimal fxRate,
+        DateTimeOffset bookedAt,
+        string? memo,
+        string? reference,
+        decimal currentCashSum)
+    {
+        _ = (tenantId, accountId, accountType, accountCurrency, instrumentId, quantity, price, fxRate, bookedAt, memo, reference, currentCashSum);
+        throw new DomainException("Buy is not posted.");
+    }
+
     public Transaction Reverse(
         DateTimeOffset bookedAt,
         decimal currentCashSum,
