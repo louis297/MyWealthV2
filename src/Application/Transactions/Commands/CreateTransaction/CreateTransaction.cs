@@ -22,7 +22,7 @@ public class CreateTransactionCommand : IRequest<IdempotentResult>
 
     public string? Type { get; init; }
 
-    public decimal Amount { get; init; }
+    public decimal? Amount { get; init; }
 
     public DateTimeOffset? BookedAt { get; init; }
 
@@ -37,11 +37,23 @@ public class CreateTransactionCommand : IRequest<IdempotentResult>
     public string? RequestMethod { get; set; }
 
     public string? RequestPath { get; set; }
+    
+    public List<OpeningHoldingSecurity>? Security { get; init; }
+
+    public sealed class OpeningHoldingSecurity
+    {
+        public Guid InstrumentId { get; init; }
+
+        public decimal Quantity { get; init; }
+
+        public decimal Cost { get; init; }
+    }
 }
 
 public class CreateTransactionCommandValidator : AbstractValidator<CreateTransactionCommand>
 {
-    private static readonly string[] AllowedTypes = ["TransferIn", "TransferOut", "Interest", "CloseOut", "Opening"];
+    private static readonly string[] CashTypes = ["TransferIn", "TransferOut", "Interest", "CloseOut", "Opening"];
+    private static readonly string[] AllowedTypes = ["TransferIn", "TransferOut", "Interest", "CloseOut", "Opening", "OpeningHoldings"];
 
     public CreateTransactionCommandValidator(ICurrentUser currentUser)
     {
@@ -59,6 +71,33 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
         RuleFor(command => command.IdempotencyKey)
             .Must(key => Guid.TryParse(key, out _))
             .WithMessage("Idempotency-Key is required and must be a UUID.");
+        
+        When(command => command.Type == "OpeningHoldings", () =>
+        {
+            RuleFor(command => command.Security)
+                .NotEmpty()
+                .WithMessage("Security must contain at least one leg.");
+            RuleFor(command => command.Amount)
+                .Null()
+                .WithMessage("Amount cannot be set on OpeningHoldings.");
+            RuleFor(command => command.Currency)
+                .Null()
+                .WithMessage("Currency cannot be set on OpeningHoldings.");
+            RuleForEach(command => command.Security).ChildRules(leg =>
+            {
+                leg.RuleFor(item => item.InstrumentId).NotEmpty();
+                leg.RuleFor(item => item.Quantity).GreaterThan(0);
+                leg.RuleFor(item => item.Cost).GreaterThanOrEqualTo(0);
+            });
+        });
+
+        When(command => CashTypes.Contains(command.Type ?? ""), () =>
+        {
+            RuleFor(command => command.Amount).NotNull();
+            RuleFor(command => command.Security)
+                .Must(security => security is null || security.Count == 0)
+                .WithMessage("Security cannot be set on a cash transaction.");
+        });
 
         When(_ => currentUser.Role == UserRole.SystemAdmin, () =>
         {
@@ -94,7 +133,13 @@ public class CreateTransactionCommandHandler(IApplicationDbContext db, ICurrentU
                 memo = request.Memo,
                 reference = request.Reference,
                 currency = request.Currency,
-                tenantId = request.TenantId
+                tenantId = request.TenantId,
+                security = request.Security?.Select(leg => new
+                {
+                    instrumentId = leg.InstrumentId,
+                    quantity = leg.Quantity,
+                    cost = leg.Cost
+                })
             });
 
         IdempotentResult? result = null;
@@ -181,17 +226,49 @@ public class CreateTransactionCommandHandler(IApplicationDbContext db, ICurrentU
         Domain.Entities.Transaction transaction;
         try
         {
-            transaction = Domain.Entities.Transaction.Post(
-                tenant.Id,
-                loaded.Account.Id,
-                type,
-                request.Amount,
-                currency,
-                request.BookedAt!.Value,
-                request.Memo,
-                request.Reference,
-                currentSum,
-                existingCount);
+            if (type == TransactionType.OpeningHoldings)
+            {
+                var legs = new List<OpeningSecurityLeg>();
+                foreach (var item in request.Security!)
+                {
+                    var instrument = await db.Instruments.SingleOrDefaultAsync(
+                        row => row.PublicId == item.InstrumentId && row.TenantId == tenant.Id,
+                        cancellationToken) ?? throw new NotFoundException("Instrument", item.InstrumentId);
+
+                    if (!instrument.IsActive)
+                    {
+                        throw new ValidationException([
+                            new ValidationFailure(nameof(CreateTransactionCommand.Security), "Instrument is disabled.")
+                        ]);
+                    }
+
+                    legs.Add(OpeningSecurityLeg.Create(
+                        instrument.Id, item.Quantity, item.Cost, instrument.QuoteCurrency));
+                }
+
+                transaction = Domain.Entities.Transaction.PostOpeningHoldings(
+                    tenant.Id,
+                    loaded.Account.Id,
+                    loaded.Account.Type,
+                    request.BookedAt!.Value,
+                    request.Memo,
+                    request.Reference,
+                    legs);
+            }
+            else
+            {
+                transaction = Domain.Entities.Transaction.Post(
+                    tenant.Id,
+                    loaded.Account.Id,
+                    type,
+                    request.Amount!.Value,
+                    currency,
+                    request.BookedAt!.Value,
+                    request.Memo,
+                    request.Reference,
+                    currentSum,
+                    existingCount);
+            }
         }
         catch (DomainException exception)
         {
