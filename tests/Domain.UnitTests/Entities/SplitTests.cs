@@ -1,6 +1,7 @@
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Events;
+using MyWealthV2.Domain.Exceptions;
 using NUnit.Framework;
 using Shouldly;
 
@@ -93,5 +94,23 @@ public class SplitTests
         leg.Quantity.ShouldBe(-50m);
         leg.CostAmount.ShouldBe(0m);
         leg.CostCurrency.ShouldBe("USD");
+    }
+
+    [Test]
+    public void PostSplit_RejectsANewQuantityEqualToTheCurrentQuantity()
+    {
+        Should.Throw<DomainException>(() => Transaction.PostSplit(
+            tenantId: 1,
+            accountId: 2,
+            accountType: AccountType.Brokerage,
+            type: TransactionType.Split,
+            instrumentId: 11,
+            newQuantity: 100m,
+            quoteCurrency: "USD",
+            bookedAt: BookedAt,
+            memo: null,
+            reference: null,
+            currentQuantity: 100m,
+            currentCost: 2500m));
     }
 }
