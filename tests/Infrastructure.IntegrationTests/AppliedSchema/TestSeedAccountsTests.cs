@@ -119,6 +119,80 @@ public class TestSeedAccountsTests
         first.CashLegCount.ShouldBe(0);
     }
 
+    [Test]
+    public async Task Seed_AddsFundingBuyAndStockInOnTheDemoBrokerage()
+    {
+        await using var db = OpenDb();
+        var tenant = await EnsureDemoTenantAsync(db);
+        var adviser = await EnsurePersonAsync(
+            db, tenant, UserRole.Adviser, "Demo Adviser", DevelopmentIdentitySeeder.AdviserEmail);
+        await EnsurePersonAsync(
+            db, tenant, UserRole.Customer, "Demo Customer", "customer@localhost", adviser.Id);
+        var prices = new MarketDataMock();
+
+        await TestSeed.SeedAsync(db, prices, CancellationToken.None);
+        await TestSeed.SeedAsync(db, prices, CancellationToken.None);
+
+        var account = await db.Accounts.SingleAsync(row => row.TenantId == tenant.Id && row.Name == "Demo brokerage");
+        var vti = await db.Instruments.SingleAsync(row => row.TenantId == tenant.Id && row.Symbol == "VTI");
+
+        var funding = await LoadCashAsync(db, account.Id, "TestSeed-DemoBrokerage-Funding");
+        funding.Count.ShouldBe(1);
+        funding[0].Type.ShouldBe(TransactionType.TransferIn);
+        funding[0].Amount.ShouldBe(1000m);
+        funding[0].Currency.Trim().ShouldBe("USD");
+
+        var buy = await LoadSecurityAsync(db, account.Id, "TestSeed-DemoBrokerage-Buy");
+        buy.Count.ShouldBe(1);
+        buy[0].Type.ShouldBe(TransactionType.Buy);
+        buy[0].CashAmount.ShouldBe(-500m);
+        buy[0].Quantity.ShouldBe(2m);
+        buy[0].CostAmount.ShouldBe(500m);
+
+        var stockIn = await LoadSecurityAsync(db, account.Id, "TestSeed-DemoBrokerage-StockIn");
+        stockIn.Count.ShouldBe(1);
+        stockIn[0].Type.ShouldBe(TransactionType.StockIn);
+        stockIn[0].CashCount.ShouldBe(0);
+        stockIn[0].Quantity.ShouldBe(4m);
+        stockIn[0].CostAmount.ShouldBe(800m);
+
+        var holding = await db.Holdings.SingleAsync(row => row.AccountId == account.Id && row.InstrumentId == vti.Id);
+        holding.Quantity.ShouldBe(16m);
+        holding.CostAmount.ShouldBe(3800m);
+    }
+
+    private static async Task<List<(TransactionType Type, decimal Amount, string Currency)>> LoadCashAsync(
+        ApplicationDbContext db,
+        int accountId,
+        string reference)
+    {
+        var rows = await (
+            from transaction in db.Transactions
+            join leg in db.TransactionCashLegs on transaction.Id equals leg.TransactionId
+            where transaction.AccountId == accountId && transaction.Reference == reference
+            select new { transaction.Type, leg.Amount, leg.Currency }).ToListAsync();
+        return rows.Select(row => (row.Type, row.Amount, row.Currency)).ToList();
+    }
+
+    private static async Task<List<(TransactionType Type, decimal? CashAmount, int CashCount, decimal Quantity, decimal CostAmount)>> LoadSecurityAsync(
+        ApplicationDbContext db,
+        int accountId,
+        string reference)
+    {
+        var transactions = await db.Transactions
+            .Where(row => row.AccountId == accountId && row.Reference == reference)
+            .ToListAsync();
+        var result = new List<(TransactionType, decimal?, int, decimal, decimal)>();
+        foreach (var transaction in transactions)
+        {
+            var cash = await db.TransactionCashLegs.Where(row => row.TransactionId == transaction.Id).ToListAsync();
+            var security = await db.TransactionSecurityLegs.SingleAsync(row => row.TransactionId == transaction.Id);
+            result.Add((transaction.Type, cash.SingleOrDefault()?.Amount, cash.Count, security.Quantity, security.CostAmount));
+        }
+
+        return result;
+    }
+
     private static async Task<SeededOpening> LoadOpeningAsync(ApplicationDbContext db, int tenantId)
     {
         var account = await db.Accounts.SingleAsync(
