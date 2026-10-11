@@ -1,0 +1,120 @@
+using System.Net;
+using System.Text.Json;
+using MyWealthV2.Application.FunctionalTests.Accounts;
+using MyWealthV2.Application.FunctionalTests.Instruments;
+
+namespace MyWealthV2.Application.FunctionalTests.Transactions;
+
+public class SplitTests : TestBase
+{
+    private const string BookedAt = "2026-10-12T10:00:00+13:00";
+
+    [Test]
+    public async Task Split_DoublesQuantityAndLeavesTotalCostUnchanged()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+        (await PostOpeningAsync(tokens.AccessToken, accountId, instrumentId, 100m, 2500m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+
+        var created = await PostSplitAsync(tokens.AccessToken, accountId, "Split", instrumentId, 200m);
+        created.StatusCode.ShouldBe(HttpStatusCode.Created);
+        using var body = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+        body.RootElement.EnumerateObject().Select(property => property.Name).ShouldBe(["id"]);
+        var id = body.RootElement.GetProperty("id").GetGuid();
+
+        var holding = await HoldingAsync(tokens.AccessToken, accountId, instrumentId);
+        holding.Quantity.ShouldBe(200m);
+        holding.Cost.ShouldBe(2500m);
+
+        using var item = await GetItemAsync(tokens.AccessToken, id);
+        item.RootElement.GetProperty("type").GetString().ShouldBe("Split");
+        item.RootElement.TryGetProperty("cash", out _).ShouldBeFalse();
+        var leg = item.RootElement.GetProperty("security").EnumerateArray().Single();
+        leg.GetProperty("instrumentId").GetGuid().ShouldBe(instrumentId);
+        leg.GetProperty("quantity").GetDecimal().ShouldBe(100m);
+        leg.GetProperty("cost").GetDecimal().ShouldBe(0m);
+        leg.GetProperty("costCurrency").GetString().ShouldBe("USD");
+    }
+
+    private static async Task<JsonDocument> GetItemAsync(string accessToken, Guid id)
+    {
+        var response = await TransactionHttp.Send(HttpMethod.Get, $"/transactions/{id}", accessToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        return JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+    }
+
+    private static async Task<(decimal Quantity, decimal Cost)> HoldingAsync(
+        string accessToken,
+        Guid accountId,
+        Guid instrumentId)
+    {
+        var response = await AccountHttp.Send(HttpMethod.Get, $"/accounts/{accountId}/holdings", accessToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var item = json.RootElement.GetProperty("items").EnumerateArray()
+            .Single(row => row.GetProperty("instrumentId").GetGuid() == instrumentId);
+        return (item.GetProperty("quantity").GetDecimal(), item.GetProperty("cost").GetDecimal());
+    }
+
+    private static Task<HttpResponseMessage> PostOpeningAsync(
+        string accessToken,
+        Guid accountId,
+        Guid instrumentId,
+        decimal quantity,
+        decimal cost) =>
+        TransactionHttp.Send(HttpMethod.Post, "/transactions", accessToken, new
+        {
+            accountId,
+            type = "OpeningHoldings",
+            bookedAt = BookedAt,
+            security = new[] { new { instrumentId, quantity, cost } }
+        }, Guid.NewGuid());
+
+    private static Task<HttpResponseMessage> PostSplitAsync(
+        string accessToken,
+        Guid accountId,
+        string type,
+        Guid instrumentId,
+        decimal quantity,
+        Guid? key = null) =>
+        TransactionHttp.Send(HttpMethod.Post, "/transactions", accessToken, new
+        {
+            accountId,
+            type,
+            bookedAt = BookedAt,
+            security = new[] { new { instrumentId, quantity } }
+        }, key ?? Guid.NewGuid());
+
+    private static async Task<Guid> OpenAccountAsync(
+        string accessToken,
+        Guid customerId,
+        string type,
+        string currency)
+    {
+        var response = await AccountHttp.Send(HttpMethod.Post, "/accounts", accessToken, new
+        {
+            customerId,
+            name = type + " " + currency + " " + Guid.NewGuid().ToString("N")[..8],
+            type,
+            currency
+        });
+        response.StatusCode.ShouldBe(HttpStatusCode.Created);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return json.RootElement.GetProperty("id").GetGuid();
+    }
+
+    private static async Task<Guid> CreateInstrumentAsync(string accessToken, string symbol, string quoteCurrency)
+    {
+        var response = await InstrumentHttp.Send(HttpMethod.Post, "/instruments", accessToken, new
+        {
+            symbol,
+            name = symbol + " fund",
+            quoteCurrency
+        });
+        response.StatusCode.ShouldBe(HttpStatusCode.Created);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return json.RootElement.GetProperty("id").GetGuid();
+    }
+}
