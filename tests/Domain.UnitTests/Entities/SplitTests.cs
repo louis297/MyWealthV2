@@ -194,4 +194,32 @@ public class SplitTests
         leg.CostAmount.ShouldBe(0m);
         leg.CostCurrency.ShouldBe("USD");
     }
+
+    [Test]
+    public void Reverse_RejectsASplitThatWouldLeaveNoQuantityAndLeavesTheOriginal()
+    {
+        var original = Transaction.PostSplit(
+            tenantId: 1,
+            accountId: 2,
+            accountType: AccountType.Brokerage,
+            type: TransactionType.Split,
+            instrumentId: 11,
+            newQuantity: 200m,
+            quoteCurrency: "USD",
+            bookedAt: BookedAt,
+            memo: null,
+            reference: null,
+            currentQuantity: 100m,
+            currentCost: 2500m);
+        var originalQuantity = original.SecurityLegs.Single().Quantity;
+
+        Should.Throw<DomainException>(() => original.Reverse(
+            BookedAt.AddDays(1),
+            currentCashSum: 0m,
+            currentQuantityByInstrument: new Dictionary<int, decimal> { [11] = 100m }));
+
+        original.Type.ShouldBe(TransactionType.Split);
+        original.SecurityLegs.Single().Quantity.ShouldBe(originalQuantity);
+        original.SecurityLegs.Single().CostAmount.ShouldBe(0m);
+    }
 }
