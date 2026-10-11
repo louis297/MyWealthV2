@@ -318,6 +318,26 @@ public class CreateTransactionCommandHandler(IApplicationDbContext db, ICurrentU
             DateTimeOffset.UtcNow));
         await db.SaveChangesAsync(cancellationToken);
 
+        if (type == TransactionType.OpeningHoldings)
+        {
+            try
+            {
+                await HoldingProjection.SyncAsync(
+                    db,
+                    tenant.Id,
+                    loaded.Account.Id,
+                    transaction.SecurityLegs.Select(leg => leg.InstrumentId),
+                    cancellationToken);
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DomainException exception)
+            {
+                throw new ValidationException([
+                    new ValidationFailure(string.Empty, exception.Message)
+                ]);
+            }
+        }
+
         var postedSum = await TransactionCash.SumAsync(db, loaded.Account.Id, cancellationToken);
         if (postedSum < 0 || (type == TransactionType.CloseOut && postedSum != 0))
         {
