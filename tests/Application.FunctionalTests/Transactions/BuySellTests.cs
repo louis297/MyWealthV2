@@ -133,6 +133,210 @@ public class BuySellTests : TestBase
         (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(0m);
     }
 
+    [Test]
+    public async Task MissingPrice_Returns400()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+        (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 100m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+
+        var buy = await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 1m);
+        buy.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(100m);
+        (await HoldingCountAsync(tokens.AccessToken, accountId)).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task MissingFxPair_Returns400_AndAQuotedPairSetsTheCashAmount()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var jpy = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "JPY");
+        var eur = await CreateInstrumentAsync(tokens.AccessToken, "EZU", "EUR");
+        await SetPriceAsync(eur, 12m, "EUR");
+        (await PostCashAsync(tokens.AccessToken, jpy, "TransferIn", 1000m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+        (await PostSecurityAsync(tokens.AccessToken, jpy, "Buy", eur, 1m)).StatusCode
+            .ShouldBe(HttpStatusCode.BadRequest);
+        (await CashBalanceAsync(tokens.AccessToken, jpy)).ShouldBe(1000m);
+
+        var nzd = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Other", "NZD");
+        var vti = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+        await SetPriceAsync(vti, 10m, "USD");
+        SetRate("USD", "NZD", 1.6m);
+        (await PostCashAsync(tokens.AccessToken, nzd, "TransferIn", 100m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+        (await PostSecurityAsync(tokens.AccessToken, nzd, "Buy", vti, 2m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+        (await CashBalanceAsync(tokens.AccessToken, nzd)).ShouldBe(68.0000m);
+        var holding = await HoldingAsync(tokens.AccessToken, nzd, vti);
+        holding.Quantity.ShouldBe(2m);
+        holding.Cost.ShouldBe(20.0000m);
+    }
+
+    [Test]
+    public async Task SellAndStockOut_AboveTheHolding_Return400()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+        await SetPriceAsync(instrumentId, 10m, "USD");
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "Sell", instrumentId, 1m)).StatusCode
+            .ShouldBe(HttpStatusCode.BadRequest);
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "StockOut", instrumentId, 1m)).StatusCode
+            .ShouldBe(HttpStatusCode.BadRequest);
+
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "StockIn", instrumentId, 1m, 10m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "Sell", instrumentId, 2m)).StatusCode
+            .ShouldBe(HttpStatusCode.BadRequest);
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "StockOut", instrumentId, 2m)).StatusCode
+            .ShouldBe(HttpStatusCode.BadRequest);
+        var holding = await HoldingAsync(tokens.AccessToken, accountId, instrumentId);
+        holding.Quantity.ShouldBe(1m);
+        holding.Cost.ShouldBe(10m);
+    }
+
+    [Test]
+    public async Task Buy_ThatWouldMakeCashNegative_Returns400()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+        await SetPriceAsync(instrumentId, 10m, "USD");
+        (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 10m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 2m)).StatusCode
+            .ShouldBe(HttpStatusCode.BadRequest);
+        (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(10m);
+        (await HoldingCountAsync(tokens.AccessToken, accountId)).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task DisabledInstrument_Returns400()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInTenantAdmin();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+        await SetPriceAsync(instrumentId, 10m, "USD");
+        await DisableInstrumentAsync(instrumentId, tokens.AccessToken);
+        (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 100m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 1m)).StatusCode
+            .ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [TestCase("Bank")]
+    [TestCase("Cash")]
+    public async Task BankAndCash_Return400(string accountType)
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, accountType, "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+        await SetPriceAsync(instrumentId, 10m, "USD");
+        (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 100m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 1m)).StatusCode
+            .ShouldBe(HttpStatusCode.BadRequest);
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "StockIn", instrumentId, 1m, 10m)).StatusCode
+            .ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
+    public async Task ForbiddenPriceCostAndCashFields_Return400()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+        await SetPriceAsync(instrumentId, 10m, "USD");
+        (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 100m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+
+        (await PostBodyAsync(tokens.AccessToken, new
+        {
+            accountId,
+            type = "Buy",
+            bookedAt = BookedAt,
+            security = new[] { new { instrumentId, quantity = 1m, cost = 10m } }
+        })).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await PostBodyAsync(tokens.AccessToken, new
+        {
+            accountId,
+            type = "Buy",
+            bookedAt = BookedAt,
+            security = new[] { new { instrumentId, quantity = 1m, price = 10m } }
+        })).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await PostBodyAsync(tokens.AccessToken, new
+        {
+            accountId,
+            type = "StockIn",
+            bookedAt = BookedAt,
+            amount = 10m,
+            security = new[] { new { instrumentId, quantity = 1m, cost = 10m } }
+        })).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await PostBodyAsync(tokens.AccessToken, new
+        {
+            accountId,
+            type = "StockIn",
+            bookedAt = BookedAt,
+            cash = new { amount = 10m, currency = "USD" },
+            security = new[] { new { instrumentId, quantity = 1m, cost = 10m } }
+        })).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "StockIn", instrumentId, 1m)).StatusCode
+            .ShouldBe(HttpStatusCode.BadRequest);
+        (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(100m);
+        (await HoldingCountAsync(tokens.AccessToken, accountId)).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task IdempotencyKey_ReplaysTheBuyAndRejectsADifferentQuantity()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+        await SetPriceAsync(instrumentId, 10m, "USD");
+        (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 100m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+        var key = Guid.NewGuid();
+
+        var id = await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 1m, key: key));
+        var replay = await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 1m, key: key);
+        replay.StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await ReadId(replay)).ShouldBe(id);
+
+        var mismatch = await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 2m, key: key);
+        mismatch.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(90m);
+    }
+
+    [Test]
+    public async Task OtherTenantAccountOrInstrument_Returns404()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+        await SetPriceAsync(instrumentId, 10m, "USD");
+        (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 100m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+
+        var (_, _, southCustomer, southTokens) = await AccountHttp.SignInTenantAdmin(
+            "South Advisory", "south-advisory", "tess@south.example", adviserEmail: "ann@south.example",
+            customerEmail: "ned@south.example");
+        var southAccount = await OpenAccountAsync(southTokens.AccessToken, southCustomer.PublicId, "Brokerage", "USD");
+        var southInstrument = await CreateInstrumentAsync(southTokens.AccessToken, "AIA", "USD");
+        await SetPriceAsync(southInstrument, 8m, "USD");
+
+        (await PostSecurityAsync(tokens.AccessToken, southAccount, "Buy", instrumentId, 1m)).StatusCode
+            .ShouldBe(HttpStatusCode.NotFound);
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", southInstrument, 1m)).StatusCode
+            .ShouldBe(HttpStatusCode.NotFound);
+        (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(100m);
+    }
+
     private static async Task<Guid> ReadId(HttpResponseMessage response)
     {
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
@@ -189,7 +393,8 @@ public class BuySellTests : TestBase
         string type,
         Guid instrumentId,
         decimal quantity,
-        decimal? cost = null) =>
+        decimal? cost = null,
+        Guid? key = null) =>
         TransactionHttp.Send(HttpMethod.Post, "/transactions", accessToken, new
         {
             accountId,
@@ -201,7 +406,32 @@ public class BuySellTests : TestBase
                     ? (object)new { instrumentId, quantity }
                     : new { instrumentId, quantity, cost }
             }
-        }, Guid.NewGuid());
+        }, key ?? Guid.NewGuid());
+
+    private static Task<HttpResponseMessage> PostBodyAsync(string accessToken, object body) =>
+        TransactionHttp.Send(HttpMethod.Post, "/transactions", accessToken, body, Guid.NewGuid());
+
+    private static void SetRate(string from, string to, decimal rate) =>
+        FunctionalTestSetup.WebApiServices.GetRequiredService<FxRateMock>().SetRate(from, to, rate);
+
+    private static async Task<int> HoldingCountAsync(string accessToken, Guid accountId)
+    {
+        var response = await AccountHttp.Send(HttpMethod.Get, $"/accounts/{accountId}/holdings", accessToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return json.RootElement.GetProperty("items").GetArrayLength();
+    }
+
+    private static async Task DisableInstrumentAsync(Guid instrumentId, string accessToken)
+    {
+        var get = await InstrumentHttp.Send(HttpMethod.Get, $"/instruments/{instrumentId}", accessToken);
+        get.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await get.Content.ReadAsStringAsync());
+        var rowVersion = json.RootElement.GetProperty("rowVersion").GetString();
+        var disable = await InstrumentHttp.Send(
+            HttpMethod.Post, $"/instruments/{instrumentId}/disable", accessToken, new { rowVersion });
+        disable.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+    }
 
     private static async Task<Guid> OpenAccountAsync(
         string accessToken,
