@@ -337,6 +337,57 @@ public class BuySellTests : TestBase
         (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(100m);
     }
 
+    [Test]
+    public async Task ItemShape_UsesCashAndSecurityAndListsAStockIn()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "NZD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+        await SetPriceAsync(instrumentId, 15m, "USD");
+        SetRate("USD", "NZD", 5m / 3m);
+        (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 2000m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+        var buyId = await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 50m));
+        var stockInId = await ReadId(await PostSecurityAsync(
+            tokens.AccessToken, accountId, "StockIn", instrumentId, 4m, 800m));
+
+        using var buy = await GetItemAsync(tokens.AccessToken, buyId);
+        buy.RootElement.TryGetProperty("amount", out _).ShouldBeFalse();
+        buy.RootElement.TryGetProperty("currency", out _).ShouldBeFalse();
+        buy.RootElement.GetProperty("cash").GetProperty("amount").GetDecimal().ShouldBe(-1250.0000m);
+        buy.RootElement.GetProperty("cash").GetProperty("currency").GetString().ShouldBe("NZD");
+        var buyLeg = buy.RootElement.GetProperty("security").EnumerateArray().Single();
+        buyLeg.GetProperty("quantity").GetDecimal().ShouldBe(50m);
+        buyLeg.GetProperty("cost").GetDecimal().ShouldBe(750.0000m);
+        buyLeg.GetProperty("costCurrency").GetString().ShouldBe("USD");
+
+        using var stockIn = await GetItemAsync(tokens.AccessToken, stockInId);
+        stockIn.RootElement.TryGetProperty("cash", out _).ShouldBeFalse();
+        stockIn.RootElement.GetProperty("security").EnumerateArray().Single()
+            .GetProperty("costCurrency").GetString().ShouldBe("USD");
+
+        var list = await TransactionHttp.Send(
+            HttpMethod.Get, $"/transactions?accountId={accountId}", tokens.AccessToken);
+        list.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await list.Content.ReadAsStringAsync());
+        var ids = json.RootElement.GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("id").GetGuid())
+            .ToList();
+        ids.ShouldContain(stockInId);
+        var listedBuy = json.RootElement.GetProperty("items").EnumerateArray()
+            .Single(item => item.GetProperty("id").GetGuid() == buyId);
+        listedBuy.GetProperty("cash").GetProperty("amount").GetDecimal().ShouldBe(-1250.0000m);
+        listedBuy.TryGetProperty("security", out var listedSecurity).ShouldBeTrue();
+        listedSecurity.EnumerateArray().Single().GetProperty("costCurrency").GetString().ShouldBe("USD");
+    }
+
+    private static async Task<JsonDocument> GetItemAsync(string accessToken, Guid id)
+    {
+        var response = await TransactionHttp.Send(HttpMethod.Get, $"/transactions/{id}", accessToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        return JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+    }
+
     private static async Task<Guid> ReadId(HttpResponseMessage response)
     {
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
