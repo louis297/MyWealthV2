@@ -70,4 +70,28 @@ public class SplitTests
         leg.CostAmount.ShouldBe(0m);
         leg.CostCurrency.ShouldBe("USD");
     }
+
+    [Test]
+    public void PostSplit_SmallerQuantityStoresANegativeDeltaAndZeroCost()
+    {
+        var transaction = Transaction.PostSplit(
+            tenantId: 1,
+            accountId: 2,
+            accountType: AccountType.Brokerage,
+            type: TransactionType.Split,
+            instrumentId: 11,
+            newQuantity: 50m,
+            quoteCurrency: "USD",
+            bookedAt: BookedAt,
+            memo: null,
+            reference: null,
+            currentQuantity: 100m,
+            currentCost: 2500m);
+
+        transaction.CashLeg.ShouldBeNull();
+        var leg = transaction.SecurityLegs.Single();
+        leg.Quantity.ShouldBe(-50m);
+        leg.CostAmount.ShouldBe(0m);
+        leg.CostCurrency.ShouldBe("USD");
+    }
 }
