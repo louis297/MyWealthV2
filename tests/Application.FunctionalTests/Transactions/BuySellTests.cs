@@ -63,6 +63,83 @@ public class BuySellTests : TestBase
         afterOut.Cost.ShouldBe(6.6667m);
     }
 
+    [Test]
+    public async Task ReverseBuy_RestoresCashAndDeletesTheHolding()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+        await SetPriceAsync(instrumentId, 10m, "USD");
+        (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 100m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+        var buyId = await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 2m));
+
+        var reversal = await TransactionHttp.Send(
+            HttpMethod.Post, $"/transactions/{buyId}/reverse", tokens.AccessToken, idempotencyKey: Guid.NewGuid());
+        reversal.StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(100m);
+        (await AccountHttp.Send(HttpMethod.Get, $"/accounts/{accountId}/holdings", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var holdings = JsonDocument.Parse(await (await AccountHttp.Send(
+            HttpMethod.Get, $"/accounts/{accountId}/holdings", tokens.AccessToken)).Content.ReadAsStringAsync());
+        holdings.RootElement.GetProperty("items").GetArrayLength().ShouldBe(0);
+
+        var original = await TransactionHttp.Send(HttpMethod.Get, $"/transactions/{buyId}", tokens.AccessToken);
+        original.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Test]
+    public async Task ReverseBuy_Returns400WhenQuantityWouldGoNegative()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+        await SetPriceAsync(instrumentId, 10m, "USD");
+        (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 100m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+        var buyId = await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 2m));
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "Sell", instrumentId, 1m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+
+        var reversal = await TransactionHttp.Send(
+            HttpMethod.Post, $"/transactions/{buyId}/reverse", tokens.AccessToken, idempotencyKey: Guid.NewGuid());
+        reversal.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(90m);
+        var holding = await HoldingAsync(tokens.AccessToken, accountId, instrumentId);
+        holding.Quantity.ShouldBe(1m);
+        holding.Cost.ShouldBe(10m);
+    }
+
+    [Test]
+    public async Task ReverseSell_Returns400WhenCashWouldGoNegative()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+        await SetPriceAsync(instrumentId, 10m, "USD");
+        (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 100m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 2m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+        var sellId = await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Sell", instrumentId, 2m));
+        (await PostCashAsync(tokens.AccessToken, accountId, "TransferOut", -100m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+
+        var reversal = await TransactionHttp.Send(
+            HttpMethod.Post, $"/transactions/{sellId}/reverse", tokens.AccessToken, idempotencyKey: Guid.NewGuid());
+        reversal.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(0m);
+    }
+
+    private static async Task<Guid> ReadId(HttpResponseMessage response)
+    {
+        response.StatusCode.ShouldBe(HttpStatusCode.Created);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return json.RootElement.GetProperty("id").GetGuid();
+    }
+
     private static async Task SetPriceAsync(Guid instrumentPublicId, decimal amount, string currency)
     {
         using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();

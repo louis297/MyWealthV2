@@ -196,7 +196,7 @@ public class ReverseTransactionCommandHandler(
         LoadedTransaction loaded,
         CancellationToken cancellationToken)
     {
-        if (loaded.Transaction.CashLeg is not null || loaded.Transaction.SecurityLegs.Count == 0)
+        if (loaded.Transaction.SecurityLegs.Count == 0)
         {
             return null;
         }
