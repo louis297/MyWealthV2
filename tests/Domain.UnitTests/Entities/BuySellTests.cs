@@ -317,6 +317,33 @@ public class BuySellTests
             currentCost: 50m));
     }
 
+    [TestCase(0)]
+    [TestCase(-0.01)]
+    public void PostBuyAndPostSell_RejectAnEmptyPrice(decimal price)
+    {
+        Should.Throw<DomainException>(() => PostBuy(
+            quantity: 1m,
+            price: price,
+            priceCurrency: "USD",
+            accountCurrency: "USD",
+            fxRate: 1m));
+        Should.Throw<DomainException>(() => Transaction.PostSell(
+            tenantId: 1,
+            accountId: 2,
+            accountType: AccountType.Brokerage,
+            accountCurrency: "USD",
+            instrumentId: 11,
+            quantity: 1m,
+            price: Money.Create(price, "USD"),
+            fxRate: 1m,
+            bookedAt: BookedAt,
+            memo: null,
+            reference: null,
+            currentCashSum: 0m,
+            currentQuantity: 5m,
+            currentCost: 50m));
+    }
+
     private static Transaction PostBuy(
         decimal quantity,
         decimal price,
