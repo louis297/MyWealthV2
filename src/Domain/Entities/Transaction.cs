@@ -287,7 +287,7 @@ public class Transaction : BaseAuditableEntity
         decimal currentCost)
     {
         EnsureSecurityAccount(accountType);
-        if (type != TransactionType.Split)
+        if (type is not TransactionType.Split and not TransactionType.Bonus and not TransactionType.Scrip)
         {
             throw new DomainException("Type must be Split, Bonus, or Scrip.");
         }
