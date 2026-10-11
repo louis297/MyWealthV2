@@ -362,7 +362,15 @@ public class Transaction : BaseAuditableEntity
                     throw new DomainException("Holding quantity is required to reverse a security leg.");
                 }
 
-                if (current - leg.Quantity < 0)
+                var result = current - leg.Quantity;
+                if (Type is TransactionType.Split or TransactionType.Bonus or TransactionType.Scrip)
+                {
+                    if (result <= 0)
+                    {
+                        throw new DomainException("Holding quantity must stay greater than zero.");
+                    }
+                }
+                else if (result < 0)
                 {
                     throw new DomainException("Holding quantity cannot become negative.");
                 }
