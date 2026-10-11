@@ -229,6 +229,53 @@ public class SplitTests : TestBase
         holding.Cost.ShouldBe(2500m);
     }
 
+    [Test]
+    public async Task IdempotencyKey_ReplaysTheSplitAndRejectsADifferentQuantity()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+        (await PostOpeningAsync(tokens.AccessToken, accountId, instrumentId, 100m, 2500m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+        var key = Guid.NewGuid();
+
+        var id = await ReadId(await PostSplitAsync(tokens.AccessToken, accountId, "Split", instrumentId, 200m, key));
+        var replay = await PostSplitAsync(tokens.AccessToken, accountId, "Split", instrumentId, 200m, key);
+        replay.StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await ReadId(replay)).ShouldBe(id);
+
+        var mismatch = await PostSplitAsync(tokens.AccessToken, accountId, "Split", instrumentId, 300m, key);
+        mismatch.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        var holding = await HoldingAsync(tokens.AccessToken, accountId, instrumentId);
+        holding.Quantity.ShouldBe(200m);
+        holding.Cost.ShouldBe(2500m);
+    }
+
+    [Test]
+    public async Task OtherTenantAccountOrInstrument_Returns404()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+        (await PostOpeningAsync(tokens.AccessToken, accountId, instrumentId, 100m, 2500m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+
+        var (_, _, southCustomer, southTokens) = await AccountHttp.SignInTenantAdmin(
+            "South Advisory", "south-advisory", "tess@south.example", adviserEmail: "ann@south.example",
+            customerEmail: "ned@south.example");
+        var southAccount = await OpenAccountAsync(southTokens.AccessToken, southCustomer.PublicId, "Brokerage", "USD");
+        var southInstrument = await CreateInstrumentAsync(southTokens.AccessToken, "AIA", "USD");
+
+        (await PostSplitAsync(tokens.AccessToken, southAccount, "Split", instrumentId, 200m)).StatusCode
+            .ShouldBe(HttpStatusCode.NotFound);
+        (await PostSplitAsync(tokens.AccessToken, accountId, "Split", southInstrument, 200m)).StatusCode
+            .ShouldBe(HttpStatusCode.NotFound);
+
+        var holding = await HoldingAsync(tokens.AccessToken, accountId, instrumentId);
+        holding.Quantity.ShouldBe(100m);
+        holding.Cost.ShouldBe(2500m);
+    }
+
     private static async Task<Guid> ReadId(HttpResponseMessage response)
     {
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
