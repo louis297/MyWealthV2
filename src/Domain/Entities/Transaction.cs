@@ -131,6 +131,7 @@ public class Transaction : BaseAuditableEntity
         decimal currentCashSum)
     {
         EnsureSecurityAccount(accountType);
+        EnsurePriced(price);
         _ = currentCashSum;
         var cost = RoundMoney(quantity * price.Amount);
         var cash = -RoundMoney(cost * fxRate);
@@ -171,6 +172,7 @@ public class Transaction : BaseAuditableEntity
         decimal currentCost)
     {
         EnsureSecurityAccount(accountType);
+        EnsurePriced(price);
         _ = currentCashSum;
         EnsureCanRelease(quantity, currentQuantity);
         var released = ReleaseCost(currentCost, quantity, currentQuantity);
@@ -379,6 +381,14 @@ public class Transaction : BaseAuditableEntity
         sellQuantity == oldQuantity
             ? oldCost
             : RoundMoney(oldCost * sellQuantity / oldQuantity);
+
+    private static void EnsurePriced(Money price)
+    {
+        if (price.Amount <= 0)
+        {
+            throw new DomainException("Price must be greater than 0.");
+        }
+    }
 
     private static void EnsureSecurityAccount(AccountType accountType)
     {
