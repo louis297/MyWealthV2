@@ -71,6 +71,60 @@ public class BuySellTests
         transaction.CashLeg!.Amount.ShouldBe(-10.0001m);
     }
 
+    [Test]
+    public void PostSell_ReleasesAverageCostAndIncreasesCash()
+    {
+        var partial = Transaction.PostSell(
+            tenantId: 1,
+            accountId: 2,
+            accountType: AccountType.Brokerage,
+            accountCurrency: "USD",
+            instrumentId: 11,
+            quantity: 1m,
+            price: Money.Create(15m, "USD"),
+            fxRate: 1m,
+            bookedAt: BookedAt,
+            memo: null,
+            reference: null,
+            currentCashSum: 0m,
+            currentQuantity: 3m,
+            currentCost: 10m);
+
+        partial.Type.ShouldBe(TransactionType.Sell);
+        partial.CashLeg.ShouldNotBeNull();
+        partial.CashLeg!.Amount.ShouldBe(15.0000m);
+        partial.CashLeg.Currency.ShouldBe("USD");
+        var partialLeg = partial.SecurityLegs.Single();
+        partialLeg.Quantity.ShouldBe(-1m);
+        partialLeg.CostAmount.ShouldBe(-3.3333m);
+        partialLeg.CostCurrency.ShouldBe("USD");
+        partial.DomainEvents.OfType<TransactionPosted>().ShouldHaveSingleItem();
+
+        var full = Transaction.PostSell(
+            tenantId: 1,
+            accountId: 2,
+            accountType: AccountType.Other,
+            accountCurrency: "NZD",
+            instrumentId: 11,
+            quantity: 2m,
+            price: Money.Create(250m, "USD"),
+            fxRate: 1.6m,
+            bookedAt: BookedAt,
+            memo: null,
+            reference: " ",
+            currentCashSum: 10m,
+            currentQuantity: 2m,
+            currentCost: 500.0001m);
+
+        full.Reference.ShouldBeNull();
+        full.CashLeg!.Amount.ShouldBe(800.0000m);
+        full.CashLeg.Currency.ShouldBe("NZD");
+        var fullLeg = full.SecurityLegs.Single();
+        fullLeg.Quantity.ShouldBe(-2m);
+        fullLeg.CostAmount.ShouldBe(-500.0001m);
+        fullLeg.CostCurrency.ShouldBe("USD");
+    }
+
     private static Transaction PostBuy(
         decimal quantity,
         decimal price,
