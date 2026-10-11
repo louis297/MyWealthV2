@@ -86,6 +86,86 @@ public class SplitTests : TestBase
         holding.Cost.ShouldBe(800m);
     }
 
+    [Test]
+    public async Task ReverseSplit_ReducesQuantityAndLeavesTotalCostUnchanged()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+        (await PostOpeningAsync(tokens.AccessToken, accountId, instrumentId, 100m, 2500m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+
+        (await PostSplitAsync(tokens.AccessToken, accountId, "Split", instrumentId, 50m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+
+        var holding = await HoldingAsync(tokens.AccessToken, accountId, instrumentId);
+        holding.Quantity.ShouldBe(50m);
+        holding.Cost.ShouldBe(2500m);
+    }
+
+    [Test]
+    public async Task Reverse_RestoresQuantityAndCost()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+        (await PostOpeningAsync(tokens.AccessToken, accountId, instrumentId, 100m, 2500m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+        var splitId = await ReadId(await PostSplitAsync(tokens.AccessToken, accountId, "Split", instrumentId, 200m));
+
+        var reverse = await TransactionHttp.Send(
+            HttpMethod.Post, $"/transactions/{splitId}/reverse", tokens.AccessToken, idempotencyKey: Guid.NewGuid());
+        reverse.StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var holding = await HoldingAsync(tokens.AccessToken, accountId, instrumentId);
+        holding.Quantity.ShouldBe(100m);
+        holding.Cost.ShouldBe(2500m);
+    }
+
+    [Test]
+    public async Task NoHolding_Returns400()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+
+        (await PostSplitAsync(tokens.AccessToken, accountId, "Split", instrumentId, 200m)).StatusCode
+            .ShouldBe(HttpStatusCode.BadRequest);
+        (await HoldingCountAsync(tokens.AccessToken, accountId)).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task QuantityEqualToCurrent_Returns400()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+        (await PostOpeningAsync(tokens.AccessToken, accountId, instrumentId, 100m, 2500m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+
+        (await PostSplitAsync(tokens.AccessToken, accountId, "Bonus", instrumentId, 100m)).StatusCode
+            .ShouldBe(HttpStatusCode.BadRequest);
+
+        var holding = await HoldingAsync(tokens.AccessToken, accountId, instrumentId);
+        holding.Quantity.ShouldBe(100m);
+        holding.Cost.ShouldBe(2500m);
+    }
+
+    private static async Task<Guid> ReadId(HttpResponseMessage response)
+    {
+        response.StatusCode.ShouldBe(HttpStatusCode.Created);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return json.RootElement.GetProperty("id").GetGuid();
+    }
+
+    private static async Task<int> HoldingCountAsync(string accessToken, Guid accountId)
+    {
+        var response = await AccountHttp.Send(HttpMethod.Get, $"/accounts/{accountId}/holdings", accessToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return json.RootElement.GetProperty("items").GetArrayLength();
+    }
+
     private static async Task<JsonDocument> GetItemAsync(string accessToken, Guid id)
     {
         var response = await TransactionHttp.Send(HttpMethod.Get, $"/transactions/{id}", accessToken);
