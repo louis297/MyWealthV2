@@ -293,6 +293,11 @@ public class Transaction : BaseAuditableEntity
         }
 
         _ = currentCost;
+        if (newQuantity == currentQuantity)
+        {
+            throw new DomainException("New quantity must differ from the current quantity.");
+        }
+
         var currency = Money.Create(0m, quoteCurrency).Currency;
         var transaction = new Transaction
         {
