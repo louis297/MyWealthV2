@@ -48,7 +48,9 @@ public class CreateTransactionCommand : IRequest<IdempotentResult>
 
         public decimal Quantity { get; init; }
 
-        public decimal Cost { get; init; }
+        public decimal? Cost { get; init; }
+
+        public decimal? Price { get; init; }
     }
 
     public sealed class OpeningHoldingsCash
@@ -62,14 +64,18 @@ public class CreateTransactionCommand : IRequest<IdempotentResult>
 public class CreateTransactionCommandValidator : AbstractValidator<CreateTransactionCommand>
 {
     private static readonly string[] CashTypes = ["TransferIn", "TransferOut", "Interest", "CloseOut", "Opening"];
-    private static readonly string[] AllowedTypes = ["TransferIn", "TransferOut", "Interest", "CloseOut", "Opening", "OpeningHoldings"];
+    private static readonly string[] PricedTypes = ["Buy", "Sell"];
+    private static readonly string[] AllowedTypes =
+    [
+        "TransferIn", "TransferOut", "Interest", "CloseOut", "Opening", "OpeningHoldings", "Buy", "Sell"
+    ];
 
     public CreateTransactionCommandValidator(ICurrentUser currentUser)
     {
         RuleFor(command => command.AccountId).NotEmpty();
         RuleFor(command => command.Type)
             .Must(type => type is not null && AllowedTypes.Contains(type))
-            .WithMessage("Type must be TransferIn, TransferOut, Interest, CloseOut, Opening, or OpeningHoldings.");
+            .WithMessage("Type must be TransferIn, TransferOut, Interest, CloseOut, Opening, OpeningHoldings, Buy, or Sell.");
         RuleFor(command => command.BookedAt).NotNull();
         RuleFor(command => command.Memo)
             .Must(memo => memo is null || memo.Trim().Length is >= 1 and <= 200)
@@ -99,7 +105,25 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
             {
                 leg.RuleFor(item => item.InstrumentId).NotEmpty();
                 leg.RuleFor(item => item.Quantity).GreaterThan(0);
-                leg.RuleFor(item => item.Cost).GreaterThanOrEqualTo(0);
+                leg.RuleFor(item => item.Cost).NotNull().GreaterThanOrEqualTo(0);
+                leg.RuleFor(item => item.Price).Null();
+            });
+        });
+
+        When(command => PricedTypes.Contains(command.Type ?? ""), () =>
+        {
+            RuleFor(command => command.Amount).Null().WithMessage("Amount cannot be set on a buy or sell.");
+            RuleFor(command => command.Currency).Null().WithMessage("Currency cannot be set on a buy or sell.");
+            RuleFor(command => command.Cash).Null().WithMessage("Cash cannot be set on a buy or sell.");
+            RuleFor(command => command.Security)
+                .Must(security => security is { Count: 1 })
+                .WithMessage("Security must contain exactly one leg.");
+            RuleForEach(command => command.Security).ChildRules(leg =>
+            {
+                leg.RuleFor(item => item.InstrumentId).NotEmpty();
+                leg.RuleFor(item => item.Quantity).GreaterThan(0);
+                leg.RuleFor(item => item.Cost).Null().WithMessage("Cost cannot be set on a buy or sell.");
+                leg.RuleFor(item => item.Price).Null().WithMessage("Price cannot be set on a buy or sell.");
             });
         });
 
@@ -126,7 +150,11 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
     }
 }
 
-public class CreateTransactionCommandHandler(IApplicationDbContext db, ICurrentUser currentUser)
+public class CreateTransactionCommandHandler(
+    IApplicationDbContext db,
+    ICurrentUser currentUser,
+    IMarketData marketData,
+    IFxRate fxRates)
     : IRequestHandler<CreateTransactionCommand, IdempotentResult>
 {
     public async Task<IdempotentResult> Handle(CreateTransactionCommand request, CancellationToken cancellationToken)
@@ -150,7 +178,8 @@ public class CreateTransactionCommandHandler(IApplicationDbContext db, ICurrentU
                 {
                     instrumentId = leg.InstrumentId,
                     quantity = leg.Quantity,
-                    cost = leg.Cost
+                    cost = leg.Cost,
+                    price = leg.Price
                 })
             });
 
@@ -255,7 +284,7 @@ public class CreateTransactionCommandHandler(IApplicationDbContext db, ICurrentU
                     }
 
                     legs.Add(OpeningSecurityLeg.Create(
-                        instrument.Id, item.Quantity, item.Cost, instrument.QuoteCurrency.Trim()));
+                        instrument.Id, item.Quantity, item.Cost!.Value, instrument.QuoteCurrency.Trim()));
                 }
 
                 var instrumentIds = legs.Select(leg => leg.InstrumentId).ToList();
@@ -282,6 +311,11 @@ public class CreateTransactionCommandHandler(IApplicationDbContext db, ICurrentU
                     request.Memo,
                     request.Reference,
                     legs);
+            }
+            else if (type is TransactionType.Buy or TransactionType.Sell)
+            {
+                transaction = await PostPricedAsync(
+                    request, tenant, loaded, type, currency, currentSum, cancellationToken);
             }
             else
             {
@@ -318,7 +352,7 @@ public class CreateTransactionCommandHandler(IApplicationDbContext db, ICurrentU
             DateTimeOffset.UtcNow));
         await db.SaveChangesAsync(cancellationToken);
 
-        if (type == TransactionType.OpeningHoldings)
+        if (type is TransactionType.OpeningHoldings or TransactionType.Buy or TransactionType.Sell)
         {
             try
             {
@@ -347,6 +381,85 @@ public class CreateTransactionCommandHandler(IApplicationDbContext db, ICurrentU
         }
 
         return new IdempotentResult(201, body);
+    }
+
+    private async Task<Domain.Entities.Transaction> PostPricedAsync(
+        CreateTransactionCommand request,
+        Tenant tenant,
+        (Account Account, User Customer) loaded,
+        TransactionType type,
+        string accountCurrency,
+        decimal currentCashSum,
+        CancellationToken cancellationToken)
+    {
+        var item = request.Security!.Single();
+        var instrument = await db.Instruments.SingleOrDefaultAsync(
+            row => row.PublicId == item.InstrumentId && row.TenantId == tenant.Id,
+            cancellationToken) ?? throw new NotFoundException("Instrument", item.InstrumentId);
+        if (!instrument.IsActive)
+        {
+            throw new ValidationException([
+                new ValidationFailure(nameof(CreateTransactionCommand.Security), "Instrument is disabled.")
+            ]);
+        }
+
+        var price = marketData.TryGetPrice(instrument.Id, request.BookedAt);
+        var quote = instrument.QuoteCurrency.Trim().ToUpperInvariant();
+        if (price is null || price.Amount <= 0 || !string.Equals(price.Currency, quote, StringComparison.Ordinal))
+        {
+            throw new ValidationException([
+                new ValidationFailure(nameof(CreateTransactionCommand.Security), "Price is not available.")
+            ]);
+        }
+
+        var bookingCurrency = Money.Create(0m, accountCurrency).Currency;
+        decimal fxRate = 1m;
+        if (!string.Equals(quote, bookingCurrency, StringComparison.Ordinal))
+        {
+            try
+            {
+                fxRate = fxRates.GetRate(quote, bookingCurrency, request.BookedAt);
+            }
+            catch (InvalidOperationException)
+            {
+                throw new ValidationException([
+                    new ValidationFailure(nameof(CreateTransactionCommand.Security), "FX rate is not available.")
+                ]);
+            }
+        }
+
+        var holding = await db.Holdings.SingleOrDefaultAsync(
+            row => row.AccountId == loaded.Account.Id && row.InstrumentId == instrument.Id,
+            cancellationToken);
+        return type == TransactionType.Buy
+            ? Domain.Entities.Transaction.PostBuy(
+                tenant.Id,
+                loaded.Account.Id,
+                loaded.Account.Type,
+                bookingCurrency,
+                instrument.Id,
+                item.Quantity,
+                price,
+                fxRate,
+                request.BookedAt!.Value,
+                request.Memo,
+                request.Reference,
+                currentCashSum)
+            : Domain.Entities.Transaction.PostSell(
+                tenant.Id,
+                loaded.Account.Id,
+                loaded.Account.Type,
+                bookingCurrency,
+                instrument.Id,
+                item.Quantity,
+                price,
+                fxRate,
+                request.BookedAt!.Value,
+                request.Memo,
+                request.Reference,
+                currentCashSum,
+                holding?.Quantity ?? 0m,
+                holding?.CostAmount ?? 0m);
     }
 
     private async Task<IdempotentResult?> FindReplayAsync(
