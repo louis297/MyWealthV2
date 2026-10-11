@@ -205,6 +205,22 @@ public class OpeningHoldingsTests
         Should.Throw<DomainException>(() => reversal.Reverse(BookedAt.AddDays(2), currentCashSum: 0m));
     }
 
+    [Test]
+    public void Reverse_RejectsWhenHoldingQuantityWouldBecomeNegative()
+    {
+        var original = Post(AccountType.Brokerage, (11, 100m, 1500m, "USD"), (12, 2m, 0m, "USD"));
+        original.Id = 7;
+
+        Should.Throw<DomainException>(() => original.Reverse(
+            BookedAt.AddDays(1),
+            currentCashSum: 0m,
+            currentQuantityByInstrument: new Dictionary<int, decimal>
+            {
+                [11] = 100m,
+                [12] = 1m
+            }));
+    }
+
     private static Transaction Post(
         AccountType accountType,
         params (int InstrumentId, decimal Quantity, decimal Cost, string QuoteCurrency)[] legs) =>
