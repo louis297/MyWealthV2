@@ -87,6 +87,79 @@ public class TestSeedAccountsTests
         rows[0].CreatedBy.ShouldBe(TestSeed.CreatedBy);
     }
 
+    [Test]
+    public async Task Seed_AddsOneOpeningHoldingsOnTheDemoBrokerageForVti()
+    {
+        await using var db = OpenDb();
+        var tenant = await EnsureDemoTenantAsync(db);
+        var adviser = await EnsurePersonAsync(
+            db, tenant, UserRole.Adviser, "Demo Adviser", DevelopmentIdentitySeeder.AdviserEmail);
+        await EnsurePersonAsync(
+            db, tenant, UserRole.Customer, "Demo Customer", "customer@localhost", adviser.Id);
+        var prices = new MarketDataMock();
+
+        await TestSeed.SeedAsync(db, prices, CancellationToken.None);
+        var first = await LoadOpeningAsync(db, tenant.Id);
+        await TestSeed.SeedAsync(db, prices, CancellationToken.None);
+        var second = await LoadOpeningAsync(db, tenant.Id);
+
+        first.TransactionPublicId.ShouldNotBe(Guid.Empty);
+        second.TransactionPublicId.ShouldBe(first.TransactionPublicId);
+        second.HoldingPublicId.ShouldBe(first.HoldingPublicId);
+
+        first.Type.ShouldBe(TransactionType.OpeningHoldings);
+        first.Symbol.ShouldBe("VTI");
+        first.Quantity.ShouldBe(10m);
+        first.CostAmount.ShouldBe(2500.00m);
+        first.CostCurrency.Trim().ShouldBe("USD");
+        first.HoldingQuantity.ShouldBe(10m);
+        first.HoldingCostAmount.ShouldBe(2500.00m);
+        first.HoldingCostCurrency.Trim().ShouldBe("USD");
+        first.CreatedBy.ShouldBe(TestSeed.CreatedBy);
+        first.CashLegCount.ShouldBe(0);
+    }
+
+    private static async Task<SeededOpening> LoadOpeningAsync(ApplicationDbContext db, int tenantId)
+    {
+        var account = await db.Accounts.SingleAsync(
+            row => row.TenantId == tenantId && row.Name == "Demo brokerage");
+        var transaction = await db.Transactions.SingleAsync(
+            row => row.AccountId == account.Id && row.Reference == "TestSeed-DemoBrokerage-OpeningHoldings");
+        var leg = await db.TransactionSecurityLegs.SingleAsync(row => row.TransactionId == transaction.Id);
+        var instrument = await db.Instruments.SingleAsync(row => row.Id == leg.InstrumentId);
+        var holding = await db.Holdings.SingleAsync(
+            row => row.AccountId == account.Id && row.InstrumentId == instrument.Id);
+        var cashLegCount = await db.TransactionCashLegs.CountAsync(row => row.TransactionId == transaction.Id);
+
+        return new SeededOpening(
+            transaction.PublicId,
+            transaction.Type,
+            transaction.CreatedBy,
+            instrument.Symbol,
+            leg.Quantity,
+            leg.CostAmount,
+            leg.CostCurrency,
+            holding.PublicId,
+            holding.Quantity,
+            holding.CostAmount,
+            holding.CostCurrency,
+            cashLegCount);
+    }
+
+    private sealed record SeededOpening(
+        Guid TransactionPublicId,
+        TransactionType Type,
+        string? CreatedBy,
+        string Symbol,
+        decimal Quantity,
+        decimal CostAmount,
+        string CostCurrency,
+        Guid HoldingPublicId,
+        decimal HoldingQuantity,
+        decimal HoldingCostAmount,
+        string HoldingCostCurrency,
+        int CashLegCount);
+
     private static async Task<Tenant> EnsureDemoTenantAsync(ApplicationDbContext db)
     {
         var existing = await db.Tenants.SingleOrDefaultAsync(
