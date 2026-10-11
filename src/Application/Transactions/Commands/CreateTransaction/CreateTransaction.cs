@@ -67,7 +67,8 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
     private static readonly string[] PricedTypes = ["Buy", "Sell"];
     private static readonly string[] AllowedTypes =
     [
-        "TransferIn", "TransferOut", "Interest", "CloseOut", "Opening", "OpeningHoldings", "Buy", "Sell"
+        "TransferIn", "TransferOut", "Interest", "CloseOut", "Opening", "OpeningHoldings",
+        "Buy", "Sell", "StockIn", "StockOut"
     ];
 
     public CreateTransactionCommandValidator(ICurrentUser currentUser)
@@ -75,7 +76,7 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
         RuleFor(command => command.AccountId).NotEmpty();
         RuleFor(command => command.Type)
             .Must(type => type is not null && AllowedTypes.Contains(type))
-            .WithMessage("Type must be TransferIn, TransferOut, Interest, CloseOut, Opening, OpeningHoldings, Buy, or Sell.");
+            .WithMessage("Type must be TransferIn, TransferOut, Interest, CloseOut, Opening, OpeningHoldings, Buy, Sell, StockIn, or StockOut.");
         RuleFor(command => command.BookedAt).NotNull();
         RuleFor(command => command.Memo)
             .Must(memo => memo is null || memo.Trim().Length is >= 1 and <= 200)
@@ -125,6 +126,34 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
                 leg.RuleFor(item => item.Cost).Null().WithMessage("Cost cannot be set on a buy or sell.");
                 leg.RuleFor(item => item.Price).Null().WithMessage("Price cannot be set on a buy or sell.");
             });
+        });
+
+        When(command => command.Type is "StockIn" or "StockOut", () =>
+        {
+            RuleFor(command => command.Amount).Null().WithMessage("Amount cannot be set on a stock movement.");
+            RuleFor(command => command.Currency).Null().WithMessage("Currency cannot be set on a stock movement.");
+            RuleFor(command => command.Cash).Null().WithMessage("Cash cannot be set on a stock movement.");
+            RuleFor(command => command.Security)
+                .Must(security => security is { Count: 1 })
+                .WithMessage("Security must contain exactly one leg.");
+            RuleForEach(command => command.Security).ChildRules(leg =>
+            {
+                leg.RuleFor(item => item.InstrumentId).NotEmpty();
+                leg.RuleFor(item => item.Quantity).GreaterThan(0);
+                leg.RuleFor(item => item.Price).Null().WithMessage("Price cannot be set on a stock movement.");
+            });
+        });
+
+        When(command => command.Type == "StockIn", () =>
+        {
+            RuleForEach(command => command.Security).ChildRules(leg =>
+                leg.RuleFor(item => item.Cost).NotNull().GreaterThanOrEqualTo(0));
+        });
+
+        When(command => command.Type == "StockOut", () =>
+        {
+            RuleForEach(command => command.Security).ChildRules(leg =>
+                leg.RuleFor(item => item.Cost).Null().WithMessage("Cost cannot be set on a stock out."));
         });
 
         When(command => CashTypes.Contains(command.Type ?? ""), () =>
@@ -317,6 +346,10 @@ public class CreateTransactionCommandHandler(
                 transaction = await PostPricedAsync(
                     request, tenant, loaded, type, currency, currentSum, cancellationToken);
             }
+            else if (type is TransactionType.StockIn or TransactionType.StockOut)
+            {
+                transaction = await PostStockAsync(request, tenant, loaded, type, cancellationToken);
+            }
             else
             {
                 transaction = Domain.Entities.Transaction.Post(
@@ -352,7 +385,8 @@ public class CreateTransactionCommandHandler(
             DateTimeOffset.UtcNow));
         await db.SaveChangesAsync(cancellationToken);
 
-        if (type is TransactionType.OpeningHoldings or TransactionType.Buy or TransactionType.Sell)
+        if (type is TransactionType.OpeningHoldings or TransactionType.Buy or TransactionType.Sell
+            or TransactionType.StockIn or TransactionType.StockOut)
         {
             try
             {
@@ -460,6 +494,57 @@ public class CreateTransactionCommandHandler(
                 currentCashSum,
                 holding?.Quantity ?? 0m,
                 holding?.CostAmount ?? 0m);
+    }
+
+    private async Task<Domain.Entities.Transaction> PostStockAsync(
+        CreateTransactionCommand request,
+        Tenant tenant,
+        (Account Account, User Customer) loaded,
+        TransactionType type,
+        CancellationToken cancellationToken)
+    {
+        var item = request.Security!.Single();
+        var instrument = await db.Instruments.SingleOrDefaultAsync(
+            row => row.PublicId == item.InstrumentId && row.TenantId == tenant.Id,
+            cancellationToken) ?? throw new NotFoundException("Instrument", item.InstrumentId);
+        if (!instrument.IsActive)
+        {
+            throw new ValidationException([
+                new ValidationFailure(nameof(CreateTransactionCommand.Security), "Instrument is disabled.")
+            ]);
+        }
+
+        var quote = instrument.QuoteCurrency.Trim();
+        if (type == TransactionType.StockIn)
+        {
+            return Domain.Entities.Transaction.PostStockIn(
+                tenant.Id,
+                loaded.Account.Id,
+                loaded.Account.Type,
+                instrument.Id,
+                item.Quantity,
+                item.Cost!.Value,
+                quote,
+                request.BookedAt!.Value,
+                request.Memo,
+                request.Reference);
+        }
+
+        var holding = await db.Holdings.SingleOrDefaultAsync(
+            row => row.AccountId == loaded.Account.Id && row.InstrumentId == instrument.Id,
+            cancellationToken);
+        return Domain.Entities.Transaction.PostStockOut(
+            tenant.Id,
+            loaded.Account.Id,
+            loaded.Account.Type,
+            instrument.Id,
+            item.Quantity,
+            quote,
+            request.BookedAt!.Value,
+            request.Memo,
+            request.Reference,
+            holding?.Quantity ?? 0m,
+            holding?.CostAmount ?? 0m);
     }
 
     private async Task<IdempotentResult?> FindReplayAsync(
