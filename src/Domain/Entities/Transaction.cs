@@ -229,6 +229,23 @@ public class Transaction : BaseAuditableEntity
         return transaction;
     }
 
+    public static Transaction PostStockOut(
+        int tenantId,
+        int accountId,
+        AccountType accountType,
+        int instrumentId,
+        decimal quantity,
+        string quoteCurrency,
+        DateTimeOffset bookedAt,
+        string? memo,
+        string? reference,
+        decimal currentQuantity,
+        decimal currentCost)
+    {
+        _ = (tenantId, accountId, accountType, instrumentId, quantity, quoteCurrency, bookedAt, memo, reference, currentQuantity, currentCost);
+        throw new DomainException("StockOut is not posted.");
+    }
+
     public Transaction Reverse(
         DateTimeOffset bookedAt,
         decimal currentCashSum,

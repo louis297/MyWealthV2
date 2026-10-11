@@ -177,6 +177,87 @@ public class BuySellTests
             reference: null));
     }
 
+    [Test]
+    public void PostStockOut_ReleasesAverageCostWithoutCashAndRejectsOversell()
+    {
+        var partial = Transaction.PostStockOut(
+            tenantId: 1,
+            accountId: 2,
+            accountType: AccountType.Brokerage,
+            instrumentId: 11,
+            quantity: 1m,
+            quoteCurrency: "usd",
+            bookedAt: BookedAt,
+            memo: null,
+            reference: null,
+            currentQuantity: 3m,
+            currentCost: 10m);
+
+        partial.Type.ShouldBe(TransactionType.StockOut);
+        partial.CashLeg.ShouldBeNull();
+        partial.DomainEvents.OfType<TransactionPosted>().ShouldHaveSingleItem();
+        var partialLeg = partial.SecurityLegs.Single();
+        partialLeg.Quantity.ShouldBe(-1m);
+        partialLeg.CostAmount.ShouldBe(-3.3333m);
+        partialLeg.CostCurrency.ShouldBe("USD");
+
+        var full = Transaction.PostStockOut(
+            tenantId: 1,
+            accountId: 2,
+            accountType: AccountType.Other,
+            instrumentId: 11,
+            quantity: 2m,
+            quoteCurrency: "USD",
+            bookedAt: BookedAt,
+            memo: null,
+            reference: null,
+            currentQuantity: 2m,
+            currentCost: 500.0001m);
+        full.CashLeg.ShouldBeNull();
+        full.SecurityLegs.Single().Quantity.ShouldBe(-2m);
+        full.SecurityLegs.Single().CostAmount.ShouldBe(-500.0001m);
+
+        Should.Throw<DomainException>(() => Transaction.PostStockOut(
+            tenantId: 1,
+            accountId: 2,
+            accountType: AccountType.Brokerage,
+            instrumentId: 11,
+            quantity: 1m,
+            quoteCurrency: "USD",
+            bookedAt: BookedAt,
+            memo: null,
+            reference: null,
+            currentQuantity: 0m,
+            currentCost: 0m));
+        Should.Throw<DomainException>(() => Transaction.PostStockOut(
+            tenantId: 1,
+            accountId: 2,
+            accountType: AccountType.Brokerage,
+            instrumentId: 11,
+            quantity: 4m,
+            quoteCurrency: "USD",
+            bookedAt: BookedAt,
+            memo: null,
+            reference: null,
+            currentQuantity: 3m,
+            currentCost: 10m));
+        Should.Throw<DomainException>(() => Transaction.PostSell(
+            tenantId: 1,
+            accountId: 2,
+            accountType: AccountType.Brokerage,
+            accountCurrency: "USD",
+            instrumentId: 11,
+            quantity: 4m,
+            price: Money.Create(15m, "USD"),
+            fxRate: 1m,
+            bookedAt: BookedAt,
+            memo: null,
+            reference: null,
+            currentCashSum: 0m,
+            currentQuantity: 3m,
+            currentCost: 10m));
+    }
+
     private static Transaction PostBuy(
         decimal quantity,
         decimal price,
