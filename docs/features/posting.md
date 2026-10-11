@@ -45,7 +45,7 @@ POST /transactions
   → raise TransactionPosted (no handler required)
 ```
 
-The header is the business event (`type`, `bookedAt`, `memo`, which Account). The cash leg is the accounting line that the cash `SUM` reads. Application code picks the legs from `type`. This increment always builds exactly one cash leg. Later Buy / Sell add a security leg on the **same** header; split / scrip / bonus are the same model with a security leg only (cash omitted or 0, total cost unchanged).
+The header is the business event (`type`, `bookedAt`, `memo`, which Account). The cash leg is the accounting line that the cash `SUM` reads. Application code picks the legs from `type`. This increment always builds exactly one cash leg. Later Buy / Sell add a security leg on the **same** header. Split / Bonus / Scrip are the same model with a security leg only (no cash, total cost unchanged): [split.md](split.md).
 
 Write = posted. No `Created` status. No event handler that “approves” or copies into another table. Future maker-checker is a status on this same row plus an approve command — not a second resource and not a swapped subscriber.
 
@@ -77,7 +77,7 @@ Customer receives 403. No Adviser Portal activity page in this increment.
 - `Created` / `PendingApproval` status; event-handler auto-approve
 - Security / holding legs, Holdings table, quantity and cost edits
 - Opening of holdings (quantity + cost). Cash `Opening` is in this increment
-- Buy / Sell / Split / scrip (same aggregate later; not this increment)
+- Buy / Sell / StockIn / StockOut ([buy-sell.md](buy-sell.md)). Split / Bonus / Scrip ([split.md](split.md)). Same aggregate, not this increment
 - Cross-account transfer — deferred on purpose; see §13
 - Live FX / cross-currency legs (same currency = 1; never treat a cross pair as 1)
 - Net-worth read model, daily snapshots, Dashboard
@@ -175,7 +175,7 @@ Adviser scope is **assigned Customers** of the transaction’s Account (404 if n
 | `Dividend` | no | cash | Wait until an instrument is in scope |
 | `Buy` / `Sell` | no | cash + security | Accepted in [buy-sell.md](buy-sell.md). Not this increment's cash set |
 | `StockIn` / `StockOut` | no | security | Accepted in [buy-sell.md](buy-sell.md). No cash leg |
-| Split / scrip / bonus | no | security only | Own spec after buy-sell. Cash 0 or omitted; total cost unchanged |
+| `Split` / `Bonus` / `Scrip` | no | security only | Draft: [split.md](split.md). No cash. Total cost unchanged. Client sends the new total quantity. |
 
 Invariants:
 
@@ -277,7 +277,7 @@ Create:
 
 SystemAdmin create adds `tenantId`. TenantAdmin / Adviser must omit it.
 
-Create body for a cash type stays `amount` (and optional `currency`). The transaction **item** is the shape in [buy-sell.md](buy-sell.md): optional `cash: { amount, currency }` and optional `security`. A pure-cash item has `cash` and omits `security`. Do not keep a parallel flat `amount` on the item.
+Item:
 
 ```json
 {
@@ -286,7 +286,8 @@ Create body for a cash type stays `amount` (and optional `currency`). The transa
   "accountId": "<account publicId>",
   "customerId": "<customer publicId>",
   "type": "TransferIn",
-  "cash": { "amount": 100.00, "currency": "NZD" },
+  "amount": 100.00,
+  "currency": "NZD",
   "bookedAt": "2026-09-24T09:00:00+12:00",
   "memo": "Salary",
   "reference": null,
@@ -294,6 +295,8 @@ Create body for a cash type stays `amount` (and optional `currency`). The transa
   "rowVersion": "<base64>"
 }
 ```
+
+This increment flattened the single cash leg onto the item (`amount`, `currency`). [buy-sell.md](buy-sell.md) (accepted) moves every transaction item to optional `cash: { amount, currency }` + optional `security`. Do not keep a parallel flat `amount` on the item.
 
 Account item and account list (amendment when accepted):
 

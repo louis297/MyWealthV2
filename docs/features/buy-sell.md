@@ -27,9 +27,9 @@ related:
 
 Cash + security legs on the existing Transaction aggregate. Public write stays `POST /transactions`. No new table (tables from `0014_holdings.sql`). `0016_transaction_type_stock_in_out.sql` widens the type check so StockIn and StockOut can be stored. Server prices Buy / Sell via the existing mocked `IMarketData` / `IFxRate`. Stock in/out has no cash leg. Amends the type tables in [posting.md](posting.md) and [holdings.md](holdings.md), and the transaction item shape.
 
-Split / scrip / bonus stay out (own spec after this slice). No portal page. No price on the holdings read.
+Split / Bonus / Scrip are a later slice ([split.md](split.md)). No portal page. No price on the holdings read.
 
-**Status is `accepted`.** Implementation follows this file. Do not implement from ADR 0011 alone.
+**Status is `accepted` and landed** on repo master `821c715` (2026-10-12). Script `0016_transaction_type_stock_in_out.sql` (`CK_Transactions_Type` widened to 0–11). TestSeed has one `Buy` and one `StockIn` on the demo brokerage. Split / scrip / bonus is the next feature on these same tables.
 
 ---
 
@@ -54,7 +54,7 @@ The header is the existing Transaction. Each of these types has exactly one secu
 
 **Out**
 
-- Split / scrip / bonus (security-only leg, cash omitted or 0, total cost unchanged). Same tables later.
+- Split / Bonus / Scrip ([split.md](split.md)). Security-only, total cost unchanged, client sends the new total quantity.
 - Dividend (ordinary cash type; no instrument).
 - Adviser Portal pages.
 - Price or market value on `GET /accounts/{id}/holdings`. Net worth, snapshots, Dashboard.
@@ -280,7 +280,7 @@ Open questions: none that block review.
 
 ## 12. Out / later
 
-- **Split / scrip / bonus.** Not this slice. Own Feature Spec after Buy / Sell / StockIn / StockOut is accepted. Same tables, same `POST /transactions`, security-only leg, **total cost unchanged** (average is diluted, cost is not added or released). Do not model them as `StockIn` / `StockOut`. Reserved shape: [ADR 0011](../adr/0011-ledger-cash-holdings-reversal.md), [holdings.md](holdings.md).
+- **Split / Bonus / Scrip.** Not this slice. Draft: [split.md](split.md). Same tables, same `POST /transactions`, security-only, **total cost unchanged**. Client sends the new total quantity, not a ratio. Do not model them as `StockIn` / `StockOut`.
 - Price or market value on `GET /accounts/{id}/holdings`. Net worth. Dashboard. Daily snapshots.
 - Fees, lots, wash sales, realized-gain reports, short positions.
 - Live vendor market data / live FX (ports stay mocked).

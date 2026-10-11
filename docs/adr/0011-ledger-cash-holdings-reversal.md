@@ -17,7 +17,7 @@ Status: accepted (Phase 2 direction)
 
 **Phase 2 ledger discussion.** Phase 1 does not implement this, create tables, or register ledger policies.
 
-Storage shape for holdings / security legs / Opening of quantity is locked in [features/holdings.md](../features/holdings.md) and landed on master `676e77a` (2026-10-11): `TransactionSecurityLegs` + `Holdings` projection, type `OpeningHoldings`, no cash leg on that type. Scripts `0014_holdings.sql` and `0015_transaction_type_opening_holdings.sql`. Buy / Sell / StockIn / StockOut are accepted in [features/buy-sell.md](../features/buy-sell.md). Cash booking stays [features/posting.md](../features/posting.md).
+Storage shape for holdings / security legs / Opening of quantity is locked in [features/holdings.md](../features/holdings.md) and landed on master `676e77a` (2026-10-11): `TransactionSecurityLegs` + `Holdings` projection, type `OpeningHoldings`, no cash leg on that type. Scripts `0014_holdings.sql` and `0015_transaction_type_opening_holdings.sql`. Buy / Sell / StockIn / StockOut are accepted and landed (`821c715`, `0016_transaction_type_stock_in_out.sql`) in [features/buy-sell.md](../features/buy-sell.md). Cash booking stays [features/posting.md](../features/posting.md).
 
 Phase 2 is open. Instruments, Accounts, posting (`/transactions`, `0013`), and holdings Opening are landed.
 
@@ -27,7 +27,7 @@ A single `Type` column that pretends to be both cash and security, plus hand-edi
 
 ## Decision (direction, not a Phase-1 invariant)
 
-1. Cash and security are **two legs**, not two values of one `Type` column. A buy/sell has a cash leg and a security leg. Transfer / interest / dividend may be cash-only. Split / bonus is security-only: cash 0, total cost unchanged.
+1. Cash and security are **two legs**, not two values of one `Type` column. A buy/sell has a cash leg and a security leg. Transfer / interest / dividend may be cash-only. Split / Bonus / Scrip is security-only: no cash, total cost unchanged, client sends the new total quantity ([features/split.md](../features/split.md)).
 2. Holdings and security-leg tables shipped with the holdings spec (`0014_holdings.sql`). `Transactions` + `TransactionCashLegs` + the idempotency table shipped with posting (`0013_transactions.sql`). There is no separate Journal / CashLedger table.
 3. A posted entry is not `UPDATE`d or `DELETE`d. Correction tends toward a **full reversal**: a new posting points at the original. Reversal is not a separate Feature slice; it lives in the posting domain.
 4. After posting: non-Credit cash must not go negative. Credit cash may be negative (liability).
@@ -47,4 +47,4 @@ A single `Type` column that pretends to be both cash and security, plus hand-edi
 
 ## Consequences
 
-Phase-1 Domain defines `Money`. Instruments, Accounts, posting, holdings Opening, and Buy / Sell / StockIn / StockOut have a spec (Buy/Sell accepted 2026-10-11). Next design: split / scrip / bonus, then net worth.
+Phase-1 Domain defines `Money`. Instruments, Accounts, posting, holdings Opening, and Buy / Sell / StockIn / StockOut have landed (`821c715`). Next design: split / bonus / scrip ([features/split.md](../features/split.md), draft), then net worth.

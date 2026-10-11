@@ -215,7 +215,7 @@ Session stack, four roles, and User / Tenant invariants do not change in Phase 2
 
 ### 8.1 Locked way of thinking
 
-- **Cash and securities are two legs, not two values of one `Type` column.** A buy/sell has a cash leg and a security leg. Transfer / interest / dividend may be cash-only. Split / scrip is a security leg, cash 0, total cost unchanged. Do not ship a single-row catch-all `Transactions` table and split it later.
+- **Cash and securities are two legs, not two values of one `Type` column.** A buy/sell has a cash leg and a security leg. Transfer / interest / dividend may be cash-only. Split / Bonus / Scrip is a security leg, no cash, total cost unchanged; the write takes the new total quantity ([features/split.md](features/split.md)). Do not ship a single-row catch-all `Transactions` table and split it later.
 - **Do not create ledger tables while storage shape is still open.** `Transaction` + `TransactionCashLeg` are locked in [features/posting.md](features/posting.md). Holdings and security legs are locked in [features/holdings.md](features/holdings.md). No standalone Journal / CashLedger table.
 - **Booked postings are not `UPDATE` / `DELETE`.** Correction tends to be a full opposite posting that points at the original (reversal).
 - **After a posting, cash must not go negative on non-Credit accounts. Credit may be negative** (liability).
@@ -304,9 +304,8 @@ Close requires cash `SUM = 0` and no `Holdings` rows ([features/holdings.md](fea
 | Type | Kind | Notes |
 | --- | --- | --- |
 | `Transaction` | Aggregate | Business-event header under an Account. Not a capture row that later copies into a journal. |
-| `TransactionCashLeg` | Entity | One cash accounting line on a cash header, and on `Buy` / `Sell`. Absent on `OpeningHoldings`, `StockIn`, and `StockOut`. |
-| `TransactionSecurityLeg` | Entity | Exactly one on `Buy`, `Sell`, `StockIn`, and `StockOut`. Quantity is signed. |
-| `TransactionType` | Enum | Cash set plus `OpeningHoldings`, `Buy`, `Sell`, `StockIn` (10), `StockOut` (11), and `Reversal`. |
+| `TransactionCashLeg` | Entity | One cash accounting line per header in this increment. |
+| `TransactionType` | Enum | Full list reserved. First increment accepts TransferIn / TransferOut / Interest / CloseOut / Opening / Reversal. |
 | `TransactionPosted` / `TransactionReversed` | Event | Side effects only. Must not write the books. |
 
 Invariants:
@@ -314,10 +313,7 @@ Invariants:
 - `TenantId` and `AccountId` required. Write = posted. No `Created` / draft status.
 - Cash `SUM` of legs is the account cash balance. Not stored on `Account`.
 - After insert, `SUM ≥ 0` for Phase 2 openable types.
-- Posted header and legs are not `UPDATE`d / `DELETE`d. Reversal is a new row with the opposite cash amount and the opposite security quantity and cost.
-- `Buy` security cost is `quantity × price` in the quote currency. Cash is that cost times FX, negative, in the account currency.
-- `Sell` and `StockOut` store the released average cost on the security leg (`Round(oldCost × qty / oldQty, 4, AwayFromZero)`; the full quantity releases the whole cost). `Sell` cash is `quantity × price × FX`, positive. `StockOut` has no cash leg.
-- `StockIn` stores the client cost and has no cash leg.
+- Posted header and legs are not `UPDATE`d / `DELETE`d. Reversal is a new row.
 - Cash `Opening`: at most one per account; only while no other transaction exists; `amount > 0`.
 - Closed account rejects new transactions. `Account.Close()` does not write cash.
 

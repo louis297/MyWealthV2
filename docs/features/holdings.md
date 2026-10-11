@@ -26,9 +26,9 @@ related:
 
 Security legs, holdings projection, and Opening of holdings on `webapi`. Public write stays `POST /transactions`. Adds script `0014_holdings.sql`. Amends [posting.md](posting.md) with type `OpeningHoldings` and amends [accounts.md](accounts.md) R16 so close also requires a flat holdings book.
 
-Buy / Sell / StockIn / StockOut are implemented from [buy-sell.md](buy-sell.md) on these same tables. Split / scrip / bonus are the next feature. Dividend is an ordinary cash type and is not this file. No portal page.
+Buy / Sell / StockIn / StockOut are accepted in [buy-sell.md](buy-sell.md). Split / Bonus / Scrip are drafted in [split.md](split.md). Dividend is an ordinary cash type and is not this file. No portal page.
 
-**Status is `accepted` and landed** on repo master `676e77a` (PR #1, 2026-10-11). Scripts `0014_holdings.sql` and `0015_transaction_type_opening_holdings.sql` (`CK_Transactions_Type` widened to 0–9; `0016` widens it again to 0–11). `GET /accounts/{id}/holdings` returns `{ "items": [...] }`, not a paged list. TestSeed has one `OpeningHoldings` on the demo brokerage, plus a funding transfer, a Buy, and a StockIn from [buy-sell.md](buy-sell.md).
+**Status is `accepted` and landed** on repo master `676e77a` (PR #1, 2026-10-11). Scripts `0014_holdings.sql` and `0015_transaction_type_opening_holdings.sql` (`CK_Transactions_Type` widened to 0–9). `GET /accounts/{id}/holdings` returns `{ "items": [...] }`, not a paged list. TestSeed has one `OpeningHoldings` on the demo brokerage. Buy / Sell is the next feature on these same tables.
 
 ---
 
@@ -56,8 +56,8 @@ Cash position stays the `SUM` of cash legs. An `OpeningHoldings` header has no c
 
 **Out**
 
-- Split / scrip / bonus HTTP. Same tables later. Those types stay 400
-- Buy / Sell / StockIn / StockOut. Accepted and implemented in [buy-sell.md](buy-sell.md)
+- Buy / Sell / split / scrip / bonus HTTP. Same tables later. Those types stay 400 here
+- No-cash stock in/out. Buy/Sell slice, not tax
 - Dividend HTTP. Ordinary cash, no instrument id. Not this file
 - DRIP and corporate-action dividend
 - Adviser Portal pages
@@ -100,7 +100,7 @@ Cash position stays the `SUM` of cash legs. An `OpeningHoldings` header has no c
 | R5 | Account must be Open, same tenant, and visible to the caller. Closed → 400. Disabled Customer on create / reverse → 400 `disabled` / `target=user`. |
 | R6 | Account type must be Brokerage or Other. Bank or Cash → 400. Property and Credit are not selectable. |
 | R7 | Each security leg stores `InstrumentId` only. Instrument must exist in the same tenant. Disabled instrument on a new leg → 400. Reverse of an existing leg is allowed. Disable instrument is still allowed while holdings exist. |
-| R8 | This increment accepts `OpeningHoldings` only. `Buy` / `Sell` / `StockIn` / `StockOut` are [buy-sell.md](buy-sell.md). Dividend / split / scrip / bonus / unknown → 400. Cash `Opening` rules in posting R19 are unchanged. |
+| R8 | Type on create in this increment: `OpeningHoldings` only. Buy / Sell / Dividend / split / scrip / bonus / unknown → 400. Cash `Opening` rules in posting R19 are unchanged. |
 | R9 | `security` is an array of 1..n legs. Each leg: `instrumentId`, `quantity` `> 0`, `cost` `≥ 0`. Duplicate instrument in the array → 400. No `amount` and no `cash` on this type → 400 if present. |
 | R10 | Cost currency is the instrument quote currency. Body must not send a currency. A later-disabled catalog currency does not rewrite stored cost currency. |
 | R11 | At most one `OpeningHoldings` per `(Account, Instrument)`, including a reversed one until the product says otherwise: a second header that names an instrument already opened → 400. `OpeningHoldings` must be the first security activity for that instrument. |
@@ -127,7 +127,7 @@ Policies: no new names. `transactions.create` for Opening and reverse. `accounts
 | `Holding` | Projection | Per `(Account, Instrument)`: quantity + cost. `PublicId`. |
 | `TransactionType` | Enum | Add `OpeningHoldings`. Cash `Opening` unchanged. |
 
-`OpeningHoldings` has security legs only. Buy / Sell later add a cash leg on this same header. Split later is security only, total cost unchanged. Those types are not accepted here.
+`OpeningHoldings` has security legs only. Buy / Sell add a cash leg on this same header ([buy-sell.md](buy-sell.md)). Split / Bonus / Scrip are security only, total cost unchanged, new total quantity ([split.md](split.md)). Those types are not accepted here.
 
 Average cost is the rule the projection uses. This increment only adds cost (Opening). Sell release is specified so the next feature does not add a second cost column: cost out = average × quantity, server-computed.
 
@@ -235,7 +235,7 @@ TestSeed (Development / TestAppHost only): one `OpeningHoldings` on Demo brokera
 
 | Item | Lock |
 | --- | --- |
-| Increment | A1. Opening only. Buy/Sell/StockIn/StockOut accepted in [buy-sell.md](buy-sell.md). Split next |
+| Increment | A1. Opening only. Buy/Sell/StockIn/StockOut accepted in [buy-sell.md](buy-sell.md). Split / Bonus / Scrip drafted in [split.md](split.md) |
 | Write path | Transaction + legs. Holdings is a projection |
 | Legs | Several per header. Unique `(TransactionId, InstrumentId)` |
 | Opening | Type `OpeningHoldings`. Many per account. One per `(Account, Instrument)`. No cash leg. Quantity `> 0`. Cost `≥ 0`. First security activity for that instrument |
