@@ -113,4 +113,27 @@ public class SplitTests
             currentQuantity: 100m,
             currentCost: 2500m));
     }
+
+    [TestCase(0, 10)]
+    [TestCase(-1, 10)]
+    [TestCase(100, 0)]
+    [TestCase(100, -5)]
+    public void PostSplit_RejectsWhenThereIsNoHoldingOrTheNewQuantityIsNotPositive(
+        decimal currentQuantity,
+        decimal newQuantity)
+    {
+        Should.Throw<DomainException>(() => Transaction.PostSplit(
+            tenantId: 1,
+            accountId: 2,
+            accountType: AccountType.Brokerage,
+            type: TransactionType.Bonus,
+            instrumentId: 11,
+            newQuantity: newQuantity,
+            quoteCurrency: "USD",
+            bookedAt: BookedAt,
+            memo: null,
+            reference: null,
+            currentQuantity: currentQuantity,
+            currentCost: 2500m));
+    }
 }
