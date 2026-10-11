@@ -132,9 +132,12 @@ public class Transaction : BaseAuditableEntity
     {
         EnsureSecurityAccount(accountType);
         EnsurePriced(price);
-        _ = currentCashSum;
         var cost = RoundMoney(quantity * price.Amount);
         var cash = -RoundMoney(cost * fxRate);
+        if (currentCashSum + cash < 0)
+        {
+            throw new DomainException("Cash balance cannot become negative.");
+        }
         var currency = Money.Create(0m, accountCurrency).Currency;
         var transaction = new Transaction
         {
