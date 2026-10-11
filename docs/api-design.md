@@ -359,7 +359,7 @@ Field rules: [features/accounts.md](features/accounts.md).
 
 ### 7.7 Transactions
 
-Field rules: [features/posting.md](features/posting.md). Accepted and landed 2026-09-25.
+Field rules: [features/posting.md](features/posting.md) for cash types, [features/holdings.md](features/holdings.md) for `OpeningHoldings`, and [features/buy-sell.md](features/buy-sell.md) for `Buy` / `Sell` / `StockIn` / `StockOut`. The transaction item is optional `cash: { amount, currency }` plus optional `security`. There is no flat `amount` on the item. Create body for a cash type still sends `amount`.
 
 | Method | Route | Policy | Success |
 | --- | --- | --- | --- |

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using MyWealthV2.Domain.Common;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.ValueObjects;
@@ -23,7 +24,7 @@ public static class TestSeed
         var prices = services.GetRequiredService<MarketDataMock>();
         await SeedAsync(db, prices, cancellationToken);
         await EnsureDemoCustomerAsync(services, db, cancellationToken);
-        await EnsureDemoAccountsAsync(db, cancellationToken);
+        await EnsureDemoAccountsAsync(db, prices, cancellationToken);
     }
 
     public static async Task SeedAsync(
@@ -51,7 +52,7 @@ public static class TestSeed
         prices.SetPrice(vti.Id, Money.Create(250m, "USD"));
         prices.SetPrice(aia.Id, Money.Create(8.50m, "NZD"));
 
-        await EnsureDemoAccountsAsync(db, cancellationToken);
+        await EnsureDemoAccountsAsync(db, prices, cancellationToken);
     }
 
     private static async Task<Instrument> EnsureInstrumentAsync(
@@ -145,6 +146,7 @@ public static class TestSeed
 
     private static async Task EnsureDemoAccountsAsync(
         ApplicationDbContext db,
+        MarketDataMock prices,
         CancellationToken cancellationToken)
     {
         var tenant = await db.Tenants.SingleOrDefaultAsync(
@@ -178,6 +180,10 @@ public static class TestSeed
             cancellationToken);
         await EnsureDemoEverydayTransferAsync(db, tenant.Id, customer.Id, cancellationToken);
         await EnsureDemoBrokerageOpeningAsync(db, tenant.Id, customer.Id, cancellationToken);
+        await EnsureDemoBrokerageFundingAsync(db, tenant.Id, customer.Id, cancellationToken);
+        await EnsureDemoBrokerageBuyAsync(db, prices, tenant.Id, customer.Id, cancellationToken);
+        await EnsureDemoBrokerageStockInAsync(db, tenant.Id, customer.Id, cancellationToken);
+        await SyncDemoBrokerageHoldingAsync(db, tenant.Id, customer.Id, cancellationToken);
     }
 
     private const string DemoBrokerageOpeningReference = "TestSeed-DemoBrokerage-OpeningHoldings";
@@ -234,6 +240,214 @@ public static class TestSeed
         db.Transactions.Add(transaction);
         db.Holdings.Add(holding);
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private const string DemoBrokerageFundingReference = "TestSeed-DemoBrokerage-Funding";
+    private const string DemoBrokerageBuyReference = "TestSeed-DemoBrokerage-Buy";
+    private const string DemoBrokerageStockInReference = "TestSeed-DemoBrokerage-StockIn";
+
+    private static async Task EnsureDemoBrokerageFundingAsync(
+        ApplicationDbContext db,
+        int tenantId,
+        int customerId,
+        CancellationToken cancellationToken)
+    {
+        var account = await DemoBrokerageAsync(db, customerId, cancellationToken);
+        if (account is null || await ReferenceExistsAsync(db, account.Id, DemoBrokerageFundingReference, cancellationToken))
+        {
+            return;
+        }
+
+        var bookedAt = new DateTimeOffset(2026, 1, 15, 10, 0, 0, TimeSpan.FromHours(13));
+        var transaction = Transaction.Post(
+            tenantId,
+            account.Id,
+            TransactionType.TransferIn,
+            1000m,
+            account.Currency,
+            bookedAt,
+            "Demo brokerage funding",
+            DemoBrokerageFundingReference,
+            currentCashSum: await CashSumAsync(db, account.Id, cancellationToken),
+            existingTransactionCount: 1);
+        Stamp(transaction, transaction.CashLeg!);
+        db.Transactions.Add(transaction);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task EnsureDemoBrokerageBuyAsync(
+        ApplicationDbContext db,
+        MarketDataMock prices,
+        int tenantId,
+        int customerId,
+        CancellationToken cancellationToken)
+    {
+        var account = await DemoBrokerageAsync(db, customerId, cancellationToken);
+        if (account is null || await ReferenceExistsAsync(db, account.Id, DemoBrokerageBuyReference, cancellationToken))
+        {
+            return;
+        }
+
+        var vti = await db.Instruments.SingleOrDefaultAsync(
+            row => row.TenantId == tenantId && row.Symbol == "VTI", cancellationToken);
+        var price = vti is null ? null : prices.TryGetPrice(vti.Id);
+        if (vti is null || price is null)
+        {
+            return;
+        }
+
+        var quote = vti.QuoteCurrency.Trim();
+        if (!string.Equals(quote, account.Currency.Trim(), StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(price.Currency, quote, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var bookedAt = new DateTimeOffset(2026, 1, 15, 10, 30, 0, TimeSpan.FromHours(13));
+        var transaction = Transaction.PostBuy(
+            tenantId,
+            account.Id,
+            account.Type,
+            account.Currency,
+            vti.Id,
+            quantity: 2m,
+            price,
+            fxRate: 1m,
+            bookedAt,
+            memo: "Demo brokerage buy",
+            reference: DemoBrokerageBuyReference,
+            currentCashSum: await CashSumAsync(db, account.Id, cancellationToken));
+        Stamp(transaction, transaction.CashLeg!);
+        foreach (var leg in transaction.SecurityLegs)
+        {
+            Stamp(leg);
+        }
+
+        db.Transactions.Add(transaction);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task EnsureDemoBrokerageStockInAsync(
+        ApplicationDbContext db,
+        int tenantId,
+        int customerId,
+        CancellationToken cancellationToken)
+    {
+        var account = await DemoBrokerageAsync(db, customerId, cancellationToken);
+        if (account is null || await ReferenceExistsAsync(db, account.Id, DemoBrokerageStockInReference, cancellationToken))
+        {
+            return;
+        }
+
+        var vti = await db.Instruments.SingleOrDefaultAsync(
+            row => row.TenantId == tenantId && row.Symbol == "VTI", cancellationToken);
+        if (vti is null)
+        {
+            return;
+        }
+
+        var bookedAt = new DateTimeOffset(2026, 1, 15, 11, 0, 0, TimeSpan.FromHours(13));
+        var transaction = Transaction.PostStockIn(
+            tenantId,
+            account.Id,
+            account.Type,
+            vti.Id,
+            quantity: 4m,
+            cost: 800m,
+            quoteCurrency: vti.QuoteCurrency,
+            bookedAt,
+            memo: "Demo brokerage stock in",
+            reference: DemoBrokerageStockInReference);
+        Stamp(transaction);
+        foreach (var leg in transaction.SecurityLegs)
+        {
+            Stamp(leg);
+        }
+
+        db.Transactions.Add(transaction);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task SyncDemoBrokerageHoldingAsync(
+        ApplicationDbContext db,
+        int tenantId,
+        int customerId,
+        CancellationToken cancellationToken)
+    {
+        var account = await DemoBrokerageAsync(db, customerId, cancellationToken);
+        if (account is null)
+        {
+            return;
+        }
+
+        var vti = await db.Instruments.SingleOrDefaultAsync(
+            row => row.TenantId == tenantId && row.Symbol == "VTI", cancellationToken);
+        if (vti is null)
+        {
+            return;
+        }
+
+        var legs = await (
+            from leg in db.TransactionSecurityLegs
+            join transaction in db.Transactions on leg.TransactionId equals transaction.Id
+            where transaction.AccountId == account.Id && leg.InstrumentId == vti.Id
+            select new { leg.Quantity, leg.CostAmount, leg.CostCurrency }).ToListAsync(cancellationToken);
+        if (legs.Count == 0)
+        {
+            return;
+        }
+
+        var quantity = legs.Sum(leg => leg.Quantity);
+        var cost = legs.Sum(leg => leg.CostAmount);
+        var currency = legs[0].CostCurrency;
+        var holding = await db.Holdings.SingleOrDefaultAsync(
+            row => row.AccountId == account.Id && row.InstrumentId == vti.Id, cancellationToken);
+        if (holding is null)
+        {
+            holding = Holding.Create(tenantId, account.Id, vti.Id, quantity, cost, currency);
+            Stamp(holding);
+            db.Holdings.Add(holding);
+        }
+        else if (holding.ReplaceTotals(quantity, cost, currency))
+        {
+            db.Holdings.Remove(holding);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static Task<Account?> DemoBrokerageAsync(
+        ApplicationDbContext db,
+        int customerId,
+        CancellationToken cancellationToken) =>
+        db.Accounts.SingleOrDefaultAsync(
+            row => row.CustomerId == customerId && row.Name == "Demo brokerage", cancellationToken);
+
+    private static Task<bool> ReferenceExistsAsync(
+        ApplicationDbContext db,
+        int accountId,
+        string reference,
+        CancellationToken cancellationToken) =>
+        db.Transactions.AnyAsync(
+            row => row.AccountId == accountId && row.Reference == reference, cancellationToken);
+
+    private static Task<decimal> CashSumAsync(
+        ApplicationDbContext db,
+        int accountId,
+        CancellationToken cancellationToken) =>
+        (from leg in db.TransactionCashLegs
+         join transaction in db.Transactions on leg.TransactionId equals transaction.Id
+         where transaction.AccountId == accountId
+         select leg.Amount).SumAsync(cancellationToken);
+
+    private static void Stamp(params BaseAuditableEntity[] entities)
+    {
+        var created = TimeProvider.System.GetUtcNow();
+        foreach (var entity in entities)
+        {
+            entity.Created = created;
+            entity.CreatedBy = CreatedBy;
+        }
     }
 
     private const string DemoEverydayBankTransferReference = "TestSeed-DemoEverydayBank-OpeningTransfer";

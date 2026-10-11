@@ -112,8 +112,8 @@ public class TestSeedAccountsTests
         first.Quantity.ShouldBe(10m);
         first.CostAmount.ShouldBe(2500.00m);
         first.CostCurrency.Trim().ShouldBe("USD");
-        first.HoldingQuantity.ShouldBe(10m);
-        first.HoldingCostAmount.ShouldBe(2500.00m);
+        first.HoldingQuantity.ShouldBe(16m);
+        first.HoldingCostAmount.ShouldBe(3800.00m);
         first.HoldingCostCurrency.Trim().ShouldBe("USD");
         first.CreatedBy.ShouldBe(TestSeed.CreatedBy);
         first.CashLegCount.ShouldBe(0);

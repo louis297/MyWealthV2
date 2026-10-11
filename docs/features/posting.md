@@ -277,7 +277,7 @@ Create:
 
 SystemAdmin create adds `tenantId`. TenantAdmin / Adviser must omit it.
 
-Item:
+Create body for a cash type stays `amount` (and optional `currency`). The transaction **item** is the shape in [buy-sell.md](buy-sell.md): optional `cash: { amount, currency }` and optional `security`. A pure-cash item has `cash` and omits `security`. Do not keep a parallel flat `amount` on the item.
 
 ```json
 {
@@ -286,8 +286,7 @@ Item:
   "accountId": "<account publicId>",
   "customerId": "<customer publicId>",
   "type": "TransferIn",
-  "amount": 100.00,
-  "currency": "NZD",
+  "cash": { "amount": 100.00, "currency": "NZD" },
   "bookedAt": "2026-09-24T09:00:00+12:00",
   "memo": "Salary",
   "reference": null,
@@ -295,8 +294,6 @@ Item:
   "rowVersion": "<base64>"
 }
 ```
-
-This increment flattened the single cash leg onto the item (`amount`, `currency`). [buy-sell.md](buy-sell.md) (accepted) moves every transaction item to optional `cash: { amount, currency }` + optional `security`. Do not keep a parallel flat `amount` on the item.
 
 Account item and account list (amendment when accepted):
 
