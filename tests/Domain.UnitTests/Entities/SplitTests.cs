@@ -136,4 +136,23 @@ public class SplitTests
             currentQuantity: currentQuantity,
             currentCost: 2500m));
     }
+
+    [TestCase(AccountType.Bank)]
+    [TestCase(AccountType.Cash)]
+    public void PostSplit_RejectsBankAndCash(AccountType accountType)
+    {
+        Should.Throw<DomainException>(() => Transaction.PostSplit(
+            tenantId: 1,
+            accountId: 2,
+            accountType: accountType,
+            type: TransactionType.Scrip,
+            instrumentId: 11,
+            newQuantity: 200m,
+            quoteCurrency: "USD",
+            bookedAt: BookedAt,
+            memo: null,
+            reference: null,
+            currentQuantity: 100m,
+            currentCost: 2500m));
+    }
 }
