@@ -588,6 +588,13 @@ public class CreateTransactionCommandHandler(
         var instrument = await db.Instruments.SingleOrDefaultAsync(
             row => row.PublicId == item.InstrumentId && row.TenantId == tenant.Id,
             cancellationToken) ?? throw new NotFoundException("Instrument", item.InstrumentId);
+        if (!instrument.IsActive)
+        {
+            throw new ValidationException([
+                new ValidationFailure(nameof(CreateTransactionCommand.Security), "Instrument is disabled.")
+            ]);
+        }
+
         var holding = await db.Holdings.SingleOrDefaultAsync(
             row => row.AccountId == loaded.Account.Id && row.InstrumentId == instrument.Id,
             cancellationToken);
