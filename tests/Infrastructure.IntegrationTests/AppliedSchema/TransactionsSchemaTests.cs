@@ -231,7 +231,7 @@ public class TransactionsSchemaTests
         var type = rows.Single(row => row.Name == "CK_Transactions_Type");
         type.Definition.ShouldContain("[Type]", Case.Insensitive);
         type.Definition.ShouldContain("0");
-        type.Definition.ShouldContain("8");
+        type.Definition.ShouldContain("11");
     }
 
     [Test]

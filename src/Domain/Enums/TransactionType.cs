@@ -11,5 +11,7 @@ public enum TransactionType
     Dividend = 6,
     Buy = 7,
     Sell = 8,
-    OpeningHoldings = 9
+    OpeningHoldings = 9,
+    StockIn = 10,
+    StockOut = 11
 }

@@ -25,7 +25,7 @@ related:
 
 # Buy / Sell / Stock in-out
 
-Cash + security legs on the existing Transaction aggregate. Public write stays `POST /transactions`. No new script (tables from `0014_holdings.sql`). Server prices Buy / Sell via the existing mocked `IMarketData` / `IFxRate`. Stock in/out has no cash leg. Amends the type tables in [posting.md](posting.md) and [holdings.md](holdings.md), and the transaction item shape.
+Cash + security legs on the existing Transaction aggregate. Public write stays `POST /transactions`. No new table (tables from `0014_holdings.sql`). `0016_transaction_type_stock_in_out.sql` widens the type check so StockIn and StockOut can be stored. Server prices Buy / Sell via the existing mocked `IMarketData` / `IFxRate`. Stock in/out has no cash leg. Amends the type tables in [posting.md](posting.md) and [holdings.md](holdings.md), and the transaction item shape.
 
 Split / scrip / bonus stay out (own spec after this slice). No portal page. No price on the holdings read.
 
@@ -47,7 +47,7 @@ The header is the existing Transaction. Each of these types has exactly one secu
 
 - Domain: types `Buy`, `Sell`, `StockIn`, `StockOut` on the existing `Transaction` aggregate. Exactly one security leg. `Buy` / `Sell` also have exactly one cash leg. Average-cost update on the existing `Holding` projection.
 - Application: extend `CreateTransaction` / `ReverseTransaction` for the four types. Reuse mocked `IMarketData.TryGetPrice` and `IFxRate` for `Buy` / `Sell` only.
-- No new script. Tables and columns from [holdings.md](holdings.md) (`0014_holdings.sql`).
+- No new table or column. Tables and columns from [holdings.md](holdings.md) (`0014_holdings.sql`). Script `0016_transaction_type_stock_in_out.sql` only widens `CK_Transactions_Type` to 0–11.
 - No new policy. Writes reuse `transactions.create`. Holdings read stays `accounts.read`.
 - Isolation tests + Development / TestAppHost `TestSeed` (one `Buy` and one `StockIn` on an existing demo brokerage).
 - Amend the type tables in [posting.md](posting.md) and [holdings.md](holdings.md) in the same accept change.
@@ -140,9 +140,9 @@ Update [domain-model.md](../domain-model.md) in the same accept change.
 
 ## 6. Database
 
-Script: **none**. Tables from `0014_holdings.sql`. Do not add EF migrations.
+No new table and no new column. Tables stay those in [holdings.md](holdings.md) (`0014_holdings.sql`). Do not add EF migrations. Price is not stored. Cash amount and security cost are written by the application from the server price.
 
-No new column. Price is not stored. Cash amount and security cost are written by the application from the server price.
+`Buy` (7) and `Sell` (8) already fit `CK_Transactions_Type`. `StockIn` (10) and `StockOut` (11) do not. Script `database/schema/0016_transaction_type_stock_in_out.sql` drops and re-adds that check so `Type` is 0–11.
 
 ---
 
@@ -260,7 +260,7 @@ No new ADR. Decisions 2026-10-11.
 
 | Item | Lock |
 | --- | --- |
-| Scripts / policy | None. Reuse `transactions.create`. Tables from holdings (`0014_holdings.sql`). |
+| Scripts / policy | No new table or policy. Reuse `transactions.create`. Tables from holdings (`0014_holdings.sql`). `0016_transaction_type_stock_in_out.sql` widens `CK_Transactions_Type` to 0–11 so `StockIn` (10) and `StockOut` (11) can be stored. |
 | Caller | TenantAdmin; Adviser (assigned); SystemAdmin (Scalar, `tenantId` on create). Customer 403. |
 | Types | `Buy`, `Sell`, `StockIn`, `StockOut`. Split / scrip / bonus stay out. |
 | Legs | Exactly one security leg. `Buy` / `Sell`: exactly one cash leg. `StockIn` / `StockOut`: no cash leg. |
