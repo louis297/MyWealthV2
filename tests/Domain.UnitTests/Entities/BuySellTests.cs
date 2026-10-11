@@ -376,6 +376,54 @@ public class BuySellTests
         reversal.DomainEvents.OfType<TransactionReversed>().ShouldHaveSingleItem();
     }
 
+    [Test]
+    public void PostBuy_RejectsWhenCashWouldGoNegative()
+    {
+        Should.Throw<DomainException>(() => PostBuy(
+            quantity: 2m,
+            price: 250m,
+            priceCurrency: "USD",
+            accountCurrency: "USD",
+            fxRate: 1m,
+            currentCashSum: 100m));
+    }
+
+    [Test]
+    public void Reverse_RejectsWhenCashOrQuantityWouldGoNegative()
+    {
+        var sell = Transaction.PostSell(
+            tenantId: 1,
+            accountId: 2,
+            accountType: AccountType.Brokerage,
+            accountCurrency: "USD",
+            instrumentId: 11,
+            quantity: 1m,
+            price: Money.Create(15m, "USD"),
+            fxRate: 1m,
+            bookedAt: BookedAt,
+            memo: null,
+            reference: null,
+            currentCashSum: 0m,
+            currentQuantity: 3m,
+            currentCost: 10m);
+        var sellCash = sell.CashLeg!.Amount;
+        Should.Throw<DomainException>(() => sell.Reverse(
+            BookedAt,
+            currentCashSum: 10m,
+            currentQuantityByInstrument: new Dictionary<int, decimal> { [11] = 2m }));
+        sell.Type.ShouldBe(TransactionType.Sell);
+        sell.CashLeg.Amount.ShouldBe(sellCash);
+
+        var buy = PostBuy(quantity: 2m, price: 10m, priceCurrency: "USD", accountCurrency: "USD", fxRate: 1m);
+        var buyQuantity = buy.SecurityLegs.Single().Quantity;
+        Should.Throw<DomainException>(() => buy.Reverse(
+            BookedAt,
+            currentCashSum: 1000m,
+            currentQuantityByInstrument: new Dictionary<int, decimal> { [11] = 1m }));
+        buy.Type.ShouldBe(TransactionType.Buy);
+        buy.SecurityLegs.Single().Quantity.ShouldBe(buyQuantity);
+    }
+
     private static Transaction PostBuy(
         decimal quantity,
         decimal price,
