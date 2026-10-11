@@ -258,6 +258,65 @@ public class BuySellTests
             currentCost: 10m));
     }
 
+    [TestCase(AccountType.Bank)]
+    [TestCase(AccountType.Cash)]
+    [TestCase(AccountType.Property)]
+    [TestCase(AccountType.Credit)]
+    public void SecurityPosts_RejectBankCashPropertyAndCredit(AccountType accountType)
+    {
+        Should.Throw<DomainException>(() => Transaction.PostBuy(
+            tenantId: 1,
+            accountId: 2,
+            accountType: accountType,
+            accountCurrency: "USD",
+            instrumentId: 11,
+            quantity: 1m,
+            price: Money.Create(10m, "USD"),
+            fxRate: 1m,
+            bookedAt: BookedAt,
+            memo: null,
+            reference: null,
+            currentCashSum: 100m));
+        Should.Throw<DomainException>(() => Transaction.PostSell(
+            tenantId: 1,
+            accountId: 2,
+            accountType: accountType,
+            accountCurrency: "USD",
+            instrumentId: 11,
+            quantity: 1m,
+            price: Money.Create(10m, "USD"),
+            fxRate: 1m,
+            bookedAt: BookedAt,
+            memo: null,
+            reference: null,
+            currentCashSum: 0m,
+            currentQuantity: 5m,
+            currentCost: 50m));
+        Should.Throw<DomainException>(() => Transaction.PostStockIn(
+            tenantId: 1,
+            accountId: 2,
+            accountType: accountType,
+            instrumentId: 11,
+            quantity: 1m,
+            cost: 10m,
+            quoteCurrency: "USD",
+            bookedAt: BookedAt,
+            memo: null,
+            reference: null));
+        Should.Throw<DomainException>(() => Transaction.PostStockOut(
+            tenantId: 1,
+            accountId: 2,
+            accountType: accountType,
+            instrumentId: 11,
+            quantity: 1m,
+            quoteCurrency: "USD",
+            bookedAt: BookedAt,
+            memo: null,
+            reference: null,
+            currentQuantity: 5m,
+            currentCost: 50m));
+    }
+
     private static Transaction PostBuy(
         decimal quantity,
         decimal price,
