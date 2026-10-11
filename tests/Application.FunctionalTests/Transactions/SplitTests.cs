@@ -211,6 +211,24 @@ public class SplitTests : TestBase
         holding.Cost.ShouldBe(2500m);
     }
 
+    [Test]
+    public async Task DisabledInstrument_Returns400()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInTenantAdmin();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+        (await PostOpeningAsync(tokens.AccessToken, accountId, instrumentId, 100m, 2500m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+        await DisableInstrumentAsync(instrumentId, tokens.AccessToken);
+
+        (await PostSplitAsync(tokens.AccessToken, accountId, "Split", instrumentId, 200m)).StatusCode
+            .ShouldBe(HttpStatusCode.BadRequest);
+
+        var holding = await HoldingAsync(tokens.AccessToken, accountId, instrumentId);
+        holding.Quantity.ShouldBe(100m);
+        holding.Cost.ShouldBe(2500m);
+    }
+
     private static async Task<Guid> ReadId(HttpResponseMessage response)
     {
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
@@ -294,6 +312,17 @@ public class SplitTests : TestBase
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         return json.RootElement.GetProperty("id").GetGuid();
+    }
+
+    private static async Task DisableInstrumentAsync(Guid instrumentId, string accessToken)
+    {
+        var get = await InstrumentHttp.Send(HttpMethod.Get, $"/instruments/{instrumentId}", accessToken);
+        get.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await get.Content.ReadAsStringAsync());
+        var rowVersion = json.RootElement.GetProperty("rowVersion").GetString();
+        var disable = await InstrumentHttp.Send(
+            HttpMethod.Post, $"/instruments/{instrumentId}/disable", accessToken, new { rowVersion });
+        disable.StatusCode.ShouldBe(HttpStatusCode.NoContent);
     }
 
     private static async Task<Guid> CreateInstrumentAsync(string accessToken, string symbol, string quoteCurrency)
