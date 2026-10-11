@@ -41,6 +41,28 @@ public class BuySellTests : TestBase
         afterSell.Cost.ShouldBe(6.6667m);
     }
 
+    [Test]
+    public async Task StockInThenStockOut_MovesQuantityAndCostWithoutCash()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Other", "NZD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "AIA", "USD");
+
+        var stockIn = await PostSecurityAsync(tokens.AccessToken, accountId, "StockIn", instrumentId, 3m, 10m);
+        stockIn.StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(0m);
+        var afterIn = await HoldingAsync(tokens.AccessToken, accountId, instrumentId);
+        afterIn.Quantity.ShouldBe(3m);
+        afterIn.Cost.ShouldBe(10.0000m);
+
+        var stockOut = await PostSecurityAsync(tokens.AccessToken, accountId, "StockOut", instrumentId, 1m);
+        stockOut.StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(0m);
+        var afterOut = await HoldingAsync(tokens.AccessToken, accountId, instrumentId);
+        afterOut.Quantity.ShouldBe(2m);
+        afterOut.Cost.ShouldBe(6.6667m);
+    }
+
     private static async Task SetPriceAsync(Guid instrumentPublicId, decimal amount, string currency)
     {
         using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
