@@ -251,6 +251,23 @@ public class TransactionsSchemaTests
         definition.ShouldContain("11");
     }
 
+    [Test]
+    public async Task Apply_AllowsSplitBonusAndScripTypes()
+    {
+        await using var db = OpenDb();
+        await db.Database.OpenConnectionAsync();
+        await using var command = db.Database.GetDbConnection().CreateCommand();
+        command.CommandText = """
+            SELECT cc.definition
+            FROM sys.check_constraints cc
+            WHERE cc.parent_object_id = OBJECT_ID(N'Transactions')
+              AND cc.name = N'CK_Transactions_Type'
+            """;
+
+        var definition = (string)(await command.ExecuteScalarAsync())!;
+        definition.ShouldContain("14");
+    }
+
     private static async Task<List<(string Name, string Type, int? Length, int? Precision, int? Scale, string Nullable, int Identity)>> LoadColumns(
         string tableName)
     {
