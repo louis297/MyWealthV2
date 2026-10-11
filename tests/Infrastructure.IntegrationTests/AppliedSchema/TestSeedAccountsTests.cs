@@ -157,7 +157,7 @@ public class TestSeedAccountsTests
         stockIn[0].CostAmount.ShouldBe(800m);
 
         var holding = await db.Holdings.SingleAsync(row => row.AccountId == account.Id && row.InstrumentId == vti.Id);
-        holding.Quantity.ShouldBe(16m);
+        holding.Quantity.ShouldBe(32m);
         holding.CostAmount.ShouldBe(3800m);
     }
 

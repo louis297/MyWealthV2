@@ -183,6 +183,7 @@ public static class TestSeed
         await EnsureDemoBrokerageFundingAsync(db, tenant.Id, customer.Id, cancellationToken);
         await EnsureDemoBrokerageBuyAsync(db, prices, tenant.Id, customer.Id, cancellationToken);
         await EnsureDemoBrokerageStockInAsync(db, tenant.Id, customer.Id, cancellationToken);
+        await EnsureDemoBrokerageSplitAsync(db, tenant.Id, customer.Id, cancellationToken);
         await SyncDemoBrokerageHoldingAsync(db, tenant.Id, customer.Id, cancellationToken);
     }
 
@@ -245,6 +246,7 @@ public static class TestSeed
     private const string DemoBrokerageFundingReference = "TestSeed-DemoBrokerage-Funding";
     private const string DemoBrokerageBuyReference = "TestSeed-DemoBrokerage-Buy";
     private const string DemoBrokerageStockInReference = "TestSeed-DemoBrokerage-StockIn";
+    private const string DemoBrokerageSplitReference = "TestSeed-DemoBrokerage-Split";
 
     private static async Task EnsureDemoBrokerageFundingAsync(
         ApplicationDbContext db,
@@ -365,6 +367,61 @@ public static class TestSeed
         }
 
         db.Transactions.Add(transaction);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task EnsureDemoBrokerageSplitAsync(
+        ApplicationDbContext db,
+        int tenantId,
+        int customerId,
+        CancellationToken cancellationToken)
+    {
+        var account = await DemoBrokerageAsync(db, customerId, cancellationToken);
+        if (account is null || await ReferenceExistsAsync(db, account.Id, DemoBrokerageSplitReference, cancellationToken))
+        {
+            return;
+        }
+
+        var vti = await db.Instruments.SingleOrDefaultAsync(
+            row => row.TenantId == tenantId && row.Symbol == "VTI", cancellationToken);
+        if (vti is null)
+        {
+            return;
+        }
+
+        var legs = await (
+            from leg in db.TransactionSecurityLegs
+            join transaction in db.Transactions on leg.TransactionId equals transaction.Id
+            where transaction.AccountId == account.Id && leg.InstrumentId == vti.Id
+            select new { leg.Quantity, leg.CostAmount }).ToListAsync(cancellationToken);
+        if (legs.Count == 0)
+        {
+            return;
+        }
+
+        var quantity = legs.Sum(leg => leg.Quantity);
+        var cost = legs.Sum(leg => leg.CostAmount);
+        var bookedAt = new DateTimeOffset(2026, 1, 15, 11, 30, 0, TimeSpan.FromHours(13));
+        var split = Transaction.PostSplit(
+            tenantId,
+            account.Id,
+            account.Type,
+            TransactionType.Split,
+            vti.Id,
+            newQuantity: quantity * 2m,
+            quoteCurrency: vti.QuoteCurrency,
+            bookedAt,
+            memo: "Demo brokerage split",
+            reference: DemoBrokerageSplitReference,
+            currentQuantity: quantity,
+            currentCost: cost);
+        Stamp(split);
+        foreach (var leg in split.SecurityLegs)
+        {
+            Stamp(leg);
+        }
+
+        db.Transactions.Add(split);
         await db.SaveChangesAsync(cancellationToken);
     }
 
