@@ -170,6 +170,7 @@ public class Transaction : BaseAuditableEntity
         decimal currentCost)
     {
         _ = (accountType, currentCashSum);
+        EnsureCanRelease(quantity, currentQuantity);
         var released = ReleaseCost(currentCost, quantity, currentQuantity);
         var cash = RoundMoney(quantity * price.Amount * fxRate);
         var currency = Money.Create(0m, accountCurrency).Currency;
@@ -242,8 +243,26 @@ public class Transaction : BaseAuditableEntity
         decimal currentQuantity,
         decimal currentCost)
     {
-        _ = (tenantId, accountId, accountType, instrumentId, quantity, quoteCurrency, bookedAt, memo, reference, currentQuantity, currentCost);
-        throw new DomainException("StockOut is not posted.");
+        _ = accountType;
+        EnsureCanRelease(quantity, currentQuantity);
+        var released = ReleaseCost(currentCost, quantity, currentQuantity);
+        var currency = Money.Create(0m, quoteCurrency).Currency;
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            AccountId = accountId,
+            Type = TransactionType.StockOut,
+            BookedAt = bookedAt,
+            Memo = NormaliseMemo(memo),
+            Reference = NormaliseReference(reference),
+            PublicId = Guid.NewGuid(),
+            SecurityLegs =
+            [
+                TransactionSecurityLeg.Create(instrumentId, -quantity, -released, currency)
+            ]
+        };
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
     }
 
     public Transaction Reverse(
@@ -358,6 +377,14 @@ public class Transaction : BaseAuditableEntity
         sellQuantity == oldQuantity
             ? oldCost
             : RoundMoney(oldCost * sellQuantity / oldQuantity);
+
+    private static void EnsureCanRelease(decimal quantity, decimal currentQuantity)
+    {
+        if (currentQuantity <= 0 || quantity > currentQuantity)
+        {
+            throw new DomainException("Quantity cannot exceed the holding quantity.");
+        }
+    }
 
     private static void EnsureSign(TransactionType type, decimal amount)
     {
