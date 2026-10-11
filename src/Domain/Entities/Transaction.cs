@@ -156,10 +156,16 @@ public class Transaction : BaseAuditableEntity
         var reversalLegs = new List<TransactionSecurityLeg>(SecurityLegs.Count);
         foreach (var leg in SecurityLegs)
         {
+            var current = leg.Quantity;
             if (currentQuantityByInstrument is not null
-                && !currentQuantityByInstrument.ContainsKey(leg.InstrumentId))
+                && !currentQuantityByInstrument.TryGetValue(leg.InstrumentId, out current))
             {
                 throw new DomainException("Holding quantity is required to reverse a security leg.");
+            }
+
+            if (current - leg.Quantity < 0)
+            {
+                throw new DomainException("Holding quantity cannot become negative.");
             }
 
             reversalLegs.Add(TransactionSecurityLeg.Create(
