@@ -497,4 +497,41 @@ describe("CreateTransactionPage", () => {
     expect(body).not.toHaveProperty("reference");
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
+
+  it("posts a TransferOut with a negative amount and no security leg", async () => {
+    const { fetchMock, router } = renderForm(
+      user(),
+      201,
+      "Price is not available.",
+      {},
+      "errors",
+      "?type=TransferOut",
+    );
+
+    expect(await screen.findByRole("option", { name: "TransferOut" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Instrument")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "-40.25" } });
+    fireEvent.change(screen.getByLabelText("Booked at"), {
+      target: { value: "2026-10-12T09:30:00+13:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(await screen.findByText("account detail")).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/accounts/${accountId}`);
+    const body = await postedBody(fetchMock);
+    expect(body).toEqual({
+      accountId,
+      type: "TransferOut",
+      amount: -40.25,
+      bookedAt: "2026-10-12T09:30:00+13:00",
+      memo: null,
+    });
+    expect(body).not.toHaveProperty("security");
+    expect(body).not.toHaveProperty("instrumentId");
+    expect(body).not.toHaveProperty("price");
+    expect(body).not.toHaveProperty("cost");
+    expect(body).not.toHaveProperty("currency");
+    expect(body).not.toHaveProperty("tenantId");
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
 });
