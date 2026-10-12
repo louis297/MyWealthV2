@@ -1,10 +1,17 @@
 import { type FormEvent, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useGetAccountHoldingsQuery, useGetAccountQuery } from "@/features/accounts/accountsApi";
 import { useGetInstrumentsQuery } from "@/features/instruments/instrumentsApi";
 import { useCreateTransactionMutation } from "@/features/transactions/transactionsApi";
 
 const types = ["Buy", "Sell", "StockIn", "StockOut", "Split", "Bonus", "Scrip"] as const;
+
+function initialType(value: string | null) {
+  if (value !== null && types.includes(value as (typeof types)[number])) {
+    return value;
+  }
+  return "Buy";
+}
 
 function problemMessages(error: unknown): string[] {
   if (typeof error !== "object" || error === null || !("data" in error)) {
@@ -19,9 +26,10 @@ function problemMessages(error: unknown): string[] {
 
 export function CreateTransactionPage() {
   const { id: accountId } = useParams();
+  const [params] = useSearchParams();
   const navigate = useNavigate();
   const [idempotencyKey] = useState(() => crypto.randomUUID());
-  const [type, setType] = useState("Buy");
+  const [type, setType] = useState(() => initialType(params.get("type")));
   const [instrumentId, setInstrumentId] = useState("");
   const [quantity, setQuantity] = useState("");
   const [bookedAt, setBookedAt] = useState("");
