@@ -327,6 +327,22 @@ describe("app routes", () => {
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
+  it("sends a Customer opening TransferIn to /forbidden", async () => {
+    renderApp(
+      user({ role: "customer", name: "Jordan Lee" }),
+      "/accounts/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/transactions/new?type=TransferIn",
+    );
+
+    expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "New transaction" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Amount")).not.toBeInTheDocument();
+    const post = vi.mocked(fetch).mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.method === "POST");
+    expect(post).toBeUndefined();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
   it("sends SystemAdmin on / to Profile and not a Customers workspace", async () => {
     renderApp(
       user({
