@@ -32,6 +32,7 @@ export function CreateTransactionPage() {
   const [type, setType] = useState(() => initialType(params.get("type")));
   const [instrumentId, setInstrumentId] = useState("");
   const [quantity, setQuantity] = useState("");
+  const [cost, setCost] = useState("");
   const [bookedAt, setBookedAt] = useState("");
   const [messages, setMessages] = useState<string[]>([]);
   const account = useGetAccountQuery(accountId ?? "", { skip: !accountId });
@@ -54,7 +55,13 @@ export function CreateTransactionPage() {
           bookedAt,
           memo: null,
           reference: null,
-          security: [{ instrumentId, quantity: Number(quantity) }],
+          security: [
+            {
+              instrumentId,
+              quantity: Number(quantity),
+              ...(type === "StockIn" ? { cost: Number(cost) } : {}),
+            },
+          ],
         },
       }).unwrap();
       void navigate(`/accounts/${accountId}`);
@@ -118,7 +125,7 @@ export function CreateTransactionPage() {
         </div>
         <div>
           <label htmlFor="transaction-quantity" className="block text-sm">
-            Quantity
+            {type === "Split" || type === "Bonus" || type === "Scrip" ? "New total quantity" : "Quantity"}
           </label>
           <input
             id="transaction-quantity"
@@ -128,6 +135,20 @@ export function CreateTransactionPage() {
             required
           />
         </div>
+        {type === "StockIn" ? (
+          <div>
+            <label htmlFor="transaction-cost" className="block text-sm">
+              Cost
+            </label>
+            <input
+              id="transaction-cost"
+              className="mt-1 w-full border border-slate-300 px-2 py-1"
+              value={cost}
+              onChange={(event) => setCost(event.target.value)}
+              required
+            />
+          </div>
+        ) : null}
         <div>
           <label htmlFor="transaction-booked-at" className="block text-sm">
             Booked at
