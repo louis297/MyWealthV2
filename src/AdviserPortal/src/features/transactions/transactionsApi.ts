@@ -34,6 +34,15 @@ export type TransactionListArgs = {
   customerId?: string;
 };
 
+export type CreateTransactionBody = {
+  accountId: string;
+  type: string;
+  bookedAt: string;
+  memo: string | null;
+  reference: string | null;
+  security: { instrumentId: string; quantity: number; cost?: number }[];
+};
+
 export const transactionsApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getTransactions: builder.query<PagedList<Transaction>, TransactionListArgs | void>({
@@ -51,7 +60,19 @@ export const transactionsApi = api.injectEndpoints({
       },
       providesTags: ["Transaction"],
     }),
+    createTransaction: builder.mutation<
+      { id: string },
+      { body: CreateTransactionBody; idempotencyKey: string }
+    >({
+      query: ({ body, idempotencyKey }) => ({
+        url: "/transactions",
+        method: "POST",
+        body,
+        headers: { "Idempotency-Key": idempotencyKey },
+      }),
+      invalidatesTags: ["Transaction", "Account"],
+    }),
   }),
 });
 
-export const { useGetTransactionsQuery } = transactionsApi;
+export const { useGetTransactionsQuery, useCreateTransactionMutation } = transactionsApi;
