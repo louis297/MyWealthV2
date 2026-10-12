@@ -34,7 +34,7 @@ export type TransactionListArgs = {
   customerId?: string;
 };
 
-export type CreateTransactionBody = {
+export type CreateSecurityTransactionBody = {
   accountId: string;
   type: string;
   bookedAt: string;
@@ -42,6 +42,16 @@ export type CreateTransactionBody = {
   reference: string | null;
   security: { instrumentId: string; quantity: number; cost?: number }[];
 };
+
+export type CreateCashTransactionBody = {
+  accountId: string;
+  type: "TransferIn" | "TransferOut";
+  amount: number;
+  bookedAt: string;
+  memo: string | null;
+};
+
+export type CreateTransactionBody = CreateSecurityTransactionBody | CreateCashTransactionBody;
 
 export const transactionsApi = api.injectEndpoints({
   endpoints: (builder) => ({
