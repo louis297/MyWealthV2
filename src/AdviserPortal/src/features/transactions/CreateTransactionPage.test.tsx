@@ -534,4 +534,36 @@ describe("CreateTransactionPage", () => {
     expect(body).not.toHaveProperty("tenantId");
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
+
+  it.each([
+    ["TransferIn", "0"],
+    ["TransferIn", "-10"],
+    ["TransferOut", "0"],
+    ["TransferOut", "40"],
+  ])("rejects a %s amount of %s before posting", async (type, amount) => {
+    const { fetchMock, router } = renderForm(
+      user(),
+      201,
+      "Price is not available.",
+      {},
+      "errors",
+      `?type=${type}`,
+    );
+
+    await screen.findByRole("option", { name: type });
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: amount } });
+    fireEvent.change(screen.getByLabelText("Booked at"), {
+      target: { value: "2026-10-12T09:00:00+13:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(await screen.findByText("Amount sign is not valid for this transaction type.")).toBeInTheDocument();
+    expect(screen.queryByText("account detail")).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/accounts/${accountId}/transactions/new`);
+    const post = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.method === "POST");
+    expect(post).toBeUndefined();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
 });
