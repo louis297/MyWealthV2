@@ -17,11 +17,14 @@ function problemMessages(error: unknown): string[] {
   if (typeof error !== "object" || error === null || !("data" in error)) {
     return [];
   }
-  const data = (error as { data?: { errors?: Record<string, string[]> } }).data;
-  if (!data?.errors) {
-    return [];
+  const data = (error as { data?: { errors?: Record<string, string[]>; detail?: string } }).data;
+  if (data?.errors) {
+    return Object.values(data.errors).flat();
   }
-  return Object.values(data.errors).flat();
+  if (data?.detail) {
+    return [data.detail];
+  }
+  return [];
 }
 
 export function CreateTransactionPage() {
@@ -70,6 +73,11 @@ export function CreateTransactionPage() {
     }
   }
 
+  const offerSecurity = !account.data
+    || (account.data.status === "Open"
+      && (account.data.type === "Brokerage" || account.data.type === "Other"));
+  const offeredTypes = offerSecurity ? types : [];
+
   return (
     <div className="max-w-lg space-y-4">
       <h1 className="text-xl font-medium">New transaction</h1>
@@ -97,7 +105,7 @@ export function CreateTransactionPage() {
             value={type}
             onChange={(event) => setType(event.target.value)}
           >
-            {types.map((item) => (
+            {offeredTypes.map((item) => (
               <option key={item} value={item}>
                 {item}
               </option>
