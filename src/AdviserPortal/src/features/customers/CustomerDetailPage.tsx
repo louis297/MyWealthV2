@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router";
+import { useGetAccountsQuery } from "@/features/accounts/accountsApi";
 import {
   useDisableCustomerMutation,
   useEnableCustomerMutation,
@@ -7,6 +8,7 @@ import {
 } from "@/features/customers/customersApi";
 import { useGetCustomerNetWorthQuery } from "@/features/dashboard/dashboardApi";
 import { NetWorthView } from "@/features/dashboard/NetWorthView";
+import { Pager } from "@/shared/components/Pager";
 
 function isStatus(error: unknown, status: number) {
   return typeof error === "object" && error !== null && "status" in error && error.status === status;
@@ -14,7 +16,12 @@ function isStatus(error: unknown, status: number) {
 
 export function CustomerDetailPage() {
   const { id } = useParams();
+  const [accountsPage, setAccountsPage] = useState(1);
   const { data, error, isLoading, refetch } = useGetCustomerQuery(id ?? "", { skip: !id });
+  const accounts = useGetAccountsQuery(
+    { page: accountsPage, customerId: id },
+    { skip: !id },
+  );
   const netWorth = useGetCustomerNetWorthQuery(id ?? "", { skip: !id || !data });
   const [disableCustomer] = useDisableCustomerMutation();
   const [enableCustomer] = useEnableCustomerMutation();
@@ -53,7 +60,7 @@ export function CustomerDetailPage() {
   }
 
   return (
-    <div className="max-w-lg space-y-4">
+    <div className="space-y-4">
       <h1 className="text-xl font-medium">{data.name}</h1>
       {conflict ? <p>This row changed. Reload and try again.</p> : null}
       <dl className="space-y-2 text-sm">
@@ -74,6 +81,49 @@ export function CustomerDetailPage() {
           <dd>{data.id}</dd>
         </div>
       </dl>
+      {accounts.data ? (
+        <section className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-base font-medium">Accounts</h2>
+            <Link
+              to={`/customers/${data.id}/accounts/new`}
+              className="border border-slate-300 bg-white px-3 py-1 text-sm"
+            >
+              New account
+            </Link>
+          </div>
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-slate-200">
+                <th className="py-2">Name</th>
+                <th>Type</th>
+                <th>Currency</th>
+                <th>Cash balance</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {accounts.data.items.map((item) => (
+                <tr key={item.id} className="border-b border-slate-100">
+                  <td className="py-2">
+                    <Link to={`/accounts/${item.id}`}>{item.name}</Link>
+                  </td>
+                  <td>{item.type}</td>
+                  <td>{item.currency}</td>
+                  <td>{item.cashBalance}</td>
+                  <td>{item.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <Pager
+            page={accountsPage}
+            pageSize={20}
+            totalCount={accounts.data.totalCount}
+            onPage={setAccountsPage}
+          />
+        </section>
+      ) : null}
       {netWorth.data || isStatus(netWorth.error, 404) ? (
         <section className="space-y-2">
           <h2 className="text-base font-medium">Net worth</h2>

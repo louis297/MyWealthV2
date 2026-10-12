@@ -16,6 +16,7 @@ export type Account = {
 
 export type AccountListArgs = {
   page?: number;
+  customerId?: string;
 };
 
 export type AccountHolding = {
@@ -36,6 +37,9 @@ export const accountsApi = api.injectEndpoints({
         const params = new URLSearchParams();
         params.set("page", String(args?.page ?? 1));
         params.set("pageSize", "20");
+        if (args?.customerId) {
+          params.set("customerId", args.customerId);
+        }
         return `/accounts?${params.toString()}`;
       },
       providesTags: ["Account"],
