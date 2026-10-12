@@ -20,6 +20,8 @@ export function isInAppPath(path: string | null | undefined): path is string {
     || pathname === "/dashboard"
     || pathname === "/customers"
     || pathname.startsWith("/customers/")
+    || pathname === "/accounts"
+    || pathname.startsWith("/accounts/")
     || pathname === "/advisers"
     || pathname.startsWith("/advisers/")
   );
