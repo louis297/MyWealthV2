@@ -93,6 +93,7 @@ describe("ShellLayout", () => {
     expect(screen.getByText("north-advisory")).toBeInTheDocument();
     expect(screen.getByText("Pat Admin")).toBeInTheDocument();
     expect(screen.getByText("tenantAdmin")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/dashboard");
     expect(screen.getByRole("link", { name: "Customers" })).toHaveAttribute("href", "/customers");
     expect(screen.getByRole("link", { name: "Advisers" })).toHaveAttribute("href", "/advisers");
     expect(screen.getByRole("link", { name: "Profile" })).toHaveAttribute("href", "/profile");
@@ -104,6 +105,7 @@ describe("ShellLayout", () => {
     renderShell(user({ role: "adviser", name: "Sam Reed" }));
 
     expect(screen.getByText("North Advisory")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/dashboard");
     expect(screen.getByRole("link", { name: "Customers" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Profile" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Advisers" })).not.toBeInTheDocument();
@@ -122,6 +124,7 @@ describe("ShellLayout", () => {
 
     expect(screen.getByText("Platform")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Profile" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Dashboard" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Customers" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Advisers" })).not.toBeInTheDocument();
   });
