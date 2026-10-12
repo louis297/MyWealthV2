@@ -108,6 +108,44 @@ public class GetNetWorthTests : TestBase
             .StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
+    [Test]
+    public async Task Adviser_OmitsUnassignedAndOtherTenantCustomers()
+    {
+        var (tenant, _, customer, adviserTokens) = await AccountHttp.SignInAdviser();
+        var own = await OpenAccountAsync(adviserTokens.AccessToken, customer.PublicId, "Everyday", "Bank", "NZD");
+        (await PostCashAsync(adviserTokens.AccessToken, own, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var otherAdviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Blair", "blair@north.example", "Password1!", tenant.Id);
+        var otherCustomer = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Pat", "pat@north.example", "Password1!", tenant.Id, otherAdviser.Id);
+        await TestApp.CreatePersonAsync(
+            UserRole.TenantAdmin, "Tess", "tess@north.example", "Password1!", tenant.Id);
+        var adminTokens = await FunctionalTestSetup.Oidc.SignInAsync(
+            "tess@north.example", "Password1!", "north-advisory");
+        var unassigned = await OpenAccountAsync(adminTokens.AccessToken, otherCustomer.PublicId, "Pat bank", "Bank", "NZD");
+        (await PostCashAsync(adminTokens.AccessToken, unassigned, 999m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var (_, _, southCustomer, southTokens) = await AccountHttp.SignInAdviser(
+            "South Co", "south-co", "ann@south.example", customerEmail: "ned@south.example");
+        var south = await OpenAccountAsync(southTokens.AccessToken, southCustomer.PublicId, "South bank", "Bank", "NZD");
+        (await PostCashAsync(southTokens.AccessToken, south, 40m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var firm = await AccountHttp.Send(HttpMethod.Get, "/net-worth", adviserTokens.AccessToken);
+        firm.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await firm.Content.ReadAsStringAsync());
+        var currencies = json.RootElement.GetProperty("currencies").EnumerateArray().ToList();
+        currencies.Count.ShouldBe(1);
+        AssertCurrency(currencies[0], "NZD", cash: 100m, holdings: 0m);
+
+        (await AccountHttp.Send(
+            HttpMethod.Get, $"/users/customers/{otherCustomer.PublicId}/net-worth", adviserTokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await AccountHttp.Send(
+            HttpMethod.Get, $"/users/customers/{southCustomer.PublicId}/net-worth", adviserTokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
     private static void AssertCurrency(JsonElement row, string currency, decimal cash, decimal holdings)
     {
         row.EnumerateObject().Select(property => property.Name).ShouldBe([
