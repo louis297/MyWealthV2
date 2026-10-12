@@ -18,6 +18,17 @@ export type AccountListArgs = {
   page?: number;
 };
 
+export type AccountHolding = {
+  id: string;
+  accountId: string;
+  instrumentId: string;
+  symbol: string;
+  name: string;
+  quantity: number;
+  cost: number;
+  costCurrency: string;
+};
+
 export const accountsApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getAccounts: builder.query<PagedList<Account>, AccountListArgs | void>({
@@ -29,7 +40,15 @@ export const accountsApi = api.injectEndpoints({
       },
       providesTags: ["Account"],
     }),
+    getAccount: builder.query<Account, string>({
+      query: (id) => `/accounts/${id}`,
+      providesTags: (_result, _error, id) => [{ type: "Account", id }],
+    }),
+    getAccountHoldings: builder.query<{ items: AccountHolding[] }, string>({
+      query: (id) => `/accounts/${id}/holdings`,
+      providesTags: (_result, _error, id) => [{ type: "Account", id }],
+    }),
   }),
 });
 
-export const { useGetAccountsQuery } = accountsApi;
+export const { useGetAccountsQuery, useGetAccountQuery, useGetAccountHoldingsQuery } = accountsApi;
