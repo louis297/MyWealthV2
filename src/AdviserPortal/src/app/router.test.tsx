@@ -272,6 +272,50 @@ describe("app routes", () => {
     expect(screen.queryByRole("heading", { name: "New transaction" })).not.toBeInTheDocument();
   });
 
+  it("lets TenantAdmin open a transaction", async () => {
+    renderApp(user(), "/transactions/dddddddd-dddd-dddd-dddd-dddddddddddd");
+
+    expect(await screen.findByRole("heading", { name: /^Transaction$/ })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("lets an Adviser open a transaction", async () => {
+    renderApp(
+      user({ role: "adviser", name: "Sam Reed" }),
+      "/transactions/dddddddd-dddd-dddd-dddd-dddddddddddd",
+    );
+
+    expect(await screen.findByRole("heading", { name: /^Transaction$/ })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
+  });
+
+  it("sends SystemAdmin on a transaction to /forbidden", async () => {
+    renderApp(
+      user({
+        role: "systemAdmin",
+        name: "System Admin",
+        tenantId: null,
+        tenantCode: null,
+      }),
+      "/transactions/dddddddd-dddd-dddd-dddd-dddddddddddd",
+    );
+
+    expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /^Transaction$/ })).not.toBeInTheDocument();
+  });
+
+  it("sends a Customer on a transaction to /forbidden", async () => {
+    renderApp(
+      user({ role: "customer", name: "Jordan Lee" }),
+      "/transactions/dddddddd-dddd-dddd-dddd-dddddddddddd",
+    );
+
+    expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /^Transaction$/ })).not.toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
   it("sends a Customer on a new transaction form to /forbidden", async () => {
     renderApp(
       user({ role: "customer", name: "Jordan Lee" }),
