@@ -5,6 +5,7 @@ import { startEndSession } from "@/features/session/session";
 import {
   canAccessAdvisers,
   canAccessCustomers,
+  canAccessDashboard,
   canAccessProfile,
   roles,
 } from "@/features/session/roles";
@@ -29,6 +30,11 @@ export function ShellLayout({ children }: { children?: ReactNode }) {
       <div className="flex min-h-[calc(100vh-2.75rem)]">
         <nav className="w-48 border-r border-slate-200 bg-white p-4 text-sm">
           <ul className="space-y-2">
+            {canAccessDashboard(me?.role) ? (
+              <li>
+                <NavLink to="/dashboard">Dashboard</NavLink>
+              </li>
+            ) : null}
             {canAccessCustomers(me?.role) ? (
               <li>
                 <NavLink to="/customers">Customers</NavLink>
