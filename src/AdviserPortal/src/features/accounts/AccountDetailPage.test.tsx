@@ -409,6 +409,60 @@ describe("AccountDetailPage", () => {
     expect(screen.getByText("No holdings.")).toBeInTheDocument();
   });
 
+  it.each(["Bank", "Cash", "Brokerage", "Other"] as const)(
+    "links an open %s account to TransferIn and TransferOut",
+    async (type) => {
+      renderDetail((url, method) => {
+        if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+          return json({ items: [] });
+        }
+        if (url.includes("/transactions") && method === "GET") {
+          return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+        }
+        if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+          return json({ ...account, type, status: "Open" });
+        }
+        return new Response("", { status: 404 });
+      });
+
+      expect(await screen.findByRole("heading", { name: "Everyday spending" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "TransferIn" })).toHaveAttribute(
+        "href",
+        `/accounts/${accountId}/transactions/new?type=TransferIn`,
+      );
+      expect(screen.getByRole("link", { name: "TransferOut" })).toHaveAttribute(
+        "href",
+        `/accounts/${accountId}/transactions/new?type=TransferOut`,
+      );
+      if (type === "Bank" || type === "Cash") {
+        expect(screen.queryByRole("link", { name: "Buy" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("link", { name: "Sell" })).not.toBeInTheDocument();
+      }
+      expect(document.querySelector('input[type="password"]')).toBeNull();
+    },
+  );
+
+  it("hides transfer actions when the account is closed", async () => {
+    renderDetail((url, method) => {
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json({ ...account, type: "Bank", status: "Closed" });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByRole("heading", { name: "Everyday spending" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "TransferIn" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "TransferOut" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Buy" })).not.toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
   it("stays on the URL and shows Not found for a missing account", async () => {
     const { router } = renderDetail(() => new Response("", { status: 404 }));
 
