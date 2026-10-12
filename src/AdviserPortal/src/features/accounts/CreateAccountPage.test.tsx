@@ -30,7 +30,7 @@ function user(overrides: Partial<CurrentUser> = {}): CurrentUser {
   };
 }
 
-function renderCreate(me: CurrentUser) {
+function renderCreate(me: CurrentUser, postResponse?: Response) {
   const store = configureStore({
     reducer: {
       session: sessionSlice.reducer,
@@ -51,10 +51,13 @@ function renderCreate(me: CurrentUser) {
       });
     }
     if (url.includes("/accounts") && method === "POST") {
-      return new Response(JSON.stringify({ id: accountId }), {
-        status: 201,
-        headers: { "Content-Type": "application/json" },
-      });
+      return (
+        postResponse ??
+        new Response(JSON.stringify({ id: accountId }), {
+          status: 201,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
     }
     return new Response("", { status: 404 });
   });
@@ -161,5 +164,43 @@ describe("CreateAccountPage", () => {
       currency: "NZD",
     });
     expect(body).not.toHaveProperty("tenantId");
+  });
+
+  it("shows a validation error and stays on the form", async () => {
+    renderCreate(
+      user(),
+      new Response(
+        JSON.stringify({ errors: { Currency: ["Currency must be an enabled catalog code."] } }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    await fillAndSubmit();
+
+    expect(await screen.findByText("Currency must be an enabled catalog code.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "New account" })).toBeInTheDocument();
+    expect(screen.queryByText("account detail")).not.toBeInTheDocument();
+  });
+
+  it("shows a disabled-customer detail and stays on the form", async () => {
+    renderCreate(
+      user(),
+      new Response(
+        JSON.stringify({
+          detail: "Cannot create an account while the customer is disabled. Enable the customer first.",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    await fillAndSubmit();
+
+    expect(
+      await screen.findByText(
+        "Cannot create an account while the customer is disabled. Enable the customer first.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "New account" })).toBeInTheDocument();
+    expect(screen.queryByText("account detail")).not.toBeInTheDocument();
   });
 });
