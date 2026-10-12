@@ -4,6 +4,7 @@ import {
   useCloseAccountMutation,
   useGetAccountHoldingsQuery,
   useGetAccountQuery,
+  useReopenAccountMutation,
 } from "@/features/accounts/accountsApi";
 import { useGetTransactionsQuery } from "@/features/transactions/transactionsApi";
 
@@ -49,6 +50,7 @@ export function AccountDetailPage() {
     { skip: !id || !account.data },
   );
   const [closeAccount] = useCloseAccountMutation();
+  const [reopenAccount] = useReopenAccountMutation();
   const [messages, setMessages] = useState<string[]>([]);
   const [conflict, setConflict] = useState(false);
 
@@ -71,6 +73,14 @@ export function AccountDetailPage() {
       setConflict(false);
       setMessages(problemMessages(error));
     }
+  }
+
+  async function onReopen() {
+    const current = account.data;
+    if (!current || current.status !== "Closed" || !window.confirm("Reopen this account?")) {
+      return;
+    }
+    await reopenAccount({ id: current.id, rowVersion: current.rowVersion }).unwrap();
   }
 
   if (isNotFound(account.error)) {
@@ -112,7 +122,15 @@ export function AccountDetailPage() {
         >
           Close
         </button>
-      ) : null}
+      ) : (
+        <button
+          type="button"
+          className="border border-slate-300 bg-white px-3 py-1 text-sm"
+          onClick={() => void onReopen()}
+        >
+          Reopen
+        </button>
+      )}
       <dl className="space-y-2 text-sm">
         <div>
           <dt className="text-slate-500">Type</dt>
