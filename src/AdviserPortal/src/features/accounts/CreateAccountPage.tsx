@@ -5,12 +5,27 @@ import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
 
 const accountTypes = ["Bank", "Cash", "Brokerage", "Other"] as const;
 
+function problemMessages(error: unknown): string[] {
+  if (typeof error !== "object" || error === null || !("data" in error)) {
+    return [];
+  }
+  const data = (error as { data?: { errors?: Record<string, string[]>; detail?: string } }).data;
+  if (data?.errors) {
+    return Object.values(data.errors).flat();
+  }
+  if (data?.detail) {
+    return [data.detail];
+  }
+  return [];
+}
+
 export function CreateAccountPage() {
   const { id: customerId } = useParams();
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [type, setType] = useState<string>(accountTypes[0]);
   const [currency, setCurrency] = useState("");
+  const [messages, setMessages] = useState<string[]>([]);
   const [createAccount] = useCreateAccountMutation();
   const { data: currencies } = useGetCurrenciesQuery();
 
@@ -20,18 +35,25 @@ export function CreateAccountPage() {
       return;
     }
 
-    const created = await createAccount({
-      customerId,
-      name: name.trim(),
-      type,
-      currency,
-    }).unwrap();
-    void navigate(`/accounts/${created.id}`);
+    try {
+      const created = await createAccount({
+        customerId,
+        name: name.trim(),
+        type,
+        currency,
+      }).unwrap();
+      void navigate(`/accounts/${created.id}`);
+    } catch (error: unknown) {
+      setMessages(problemMessages(error));
+    }
   }
 
   return (
     <div className="max-w-lg space-y-4">
       <h1 className="text-xl font-medium">New account</h1>
+      {messages.map((message) => (
+        <p key={message}>{message}</p>
+      ))}
       <form className="space-y-3" onSubmit={(event) => void onSubmit(event)}>
         <div>
           <label htmlFor="account-name" className="block text-sm">
