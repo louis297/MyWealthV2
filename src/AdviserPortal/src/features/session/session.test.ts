@@ -62,6 +62,24 @@ describe("startLogin host", () => {
     expect(window.location.assign).toHaveBeenCalledWith("/bff/login?returnUrl=%2Fdashboard");
   });
 
+  it("keeps /accounts as the login return path", () => {
+    vi.stubEnv("VITE_BFF_HTTP", "");
+
+    startLogin("/accounts");
+
+    expect(window.location.assign).toHaveBeenCalledWith("/bff/login?returnUrl=%2Faccounts");
+  });
+
+  it("keeps an account detail path as the login return path", () => {
+    vi.stubEnv("VITE_BFF_HTTP", "");
+
+    startLogin("/accounts/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+
+    expect(window.location.assign).toHaveBeenCalledWith(
+      "/bff/login?returnUrl=%2Faccounts%2Fbbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+    );
+  });
+
   it("does not leave the Vite host while sign-out is in progress", () => {
     vi.stubEnv("VITE_BFF_HTTP", bffOrigin);
     sessionStorage.setItem(SIGN_OUT_IN_PROGRESS_KEY, "1");
