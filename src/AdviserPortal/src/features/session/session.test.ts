@@ -80,6 +80,24 @@ describe("startLogin host", () => {
     );
   });
 
+  it("keeps /transactions as the login return path", () => {
+    vi.stubEnv("VITE_BFF_HTTP", "");
+
+    startLogin("/transactions");
+
+    expect(window.location.assign).toHaveBeenCalledWith("/bff/login?returnUrl=%2Ftransactions");
+  });
+
+  it("keeps a filtered transactions path as the login return path", () => {
+    vi.stubEnv("VITE_BFF_HTTP", "");
+
+    startLogin("/transactions?accountId=bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+
+    expect(window.location.assign).toHaveBeenCalledWith(
+      "/bff/login?returnUrl=%2Ftransactions%3FaccountId%3Dbbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+    );
+  });
+
   it("does not leave the Vite host while sign-out is in progress", () => {
     vi.stubEnv("VITE_BFF_HTTP", bffOrigin);
     sessionStorage.setItem(SIGN_OUT_IN_PROGRESS_KEY, "1");
