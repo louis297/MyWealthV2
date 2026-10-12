@@ -1,5 +1,7 @@
 using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
+using MyWealthV2.Application.NetWorth;
+using MyWealthV2.Application.NetWorth.Queries.GetCustomerNetWorth;
 using MyWealthV2.Application.Users;
 using MyWealthV2.Application.Users.Commands.CreateCustomer;
 using MyWealthV2.Application.Users.Commands.DisableCustomer;
@@ -27,6 +29,7 @@ public class Customers : IEndpointGroup
     {
         groupBuilder.MapGet(GetCustomers).RequireAuthorization(ManageOrOwn);
         groupBuilder.MapGet(GetCustomer, "{id}").RequireAuthorization(ManageOrOwn);
+        groupBuilder.MapGet(GetCustomerNetWorth, "{id}/net-worth").RequireAuthorization(Policies.AccountsRead);
         groupBuilder.MapPost(CreateCustomer).RequireAuthorization(ManageOrOwn);
         groupBuilder.MapPut(UpdateCustomer, "{id}").RequireAuthorization(ManageOrOwn);
         groupBuilder.MapPost(DisableCustomer, "{id}/disable").RequireAuthorization(ManageOrOwn);
@@ -52,6 +55,14 @@ public class Customers : IEndpointGroup
     public static async Task<Ok<CustomerDto>> GetCustomer(ISender sender, Guid id)
     {
         var item = await sender.Send(new GetCustomerByIdQuery(id));
+        return TypedResults.Ok(item);
+    }
+
+    [EndpointSummary("Get a customer’s current net worth")]
+    [EndpointDescription("Returns the current per-currency net worth for one Customer. Open accounts only.")]
+    public static async Task<Ok<NetWorthDto>> GetCustomerNetWorth(ISender sender, Guid id)
+    {
+        var item = await sender.Send(new GetCustomerNetWorthQuery(id));
         return TypedResults.Ok(item);
     }
 
