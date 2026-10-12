@@ -3,7 +3,7 @@ title: API design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-09-21
+updated: 2026-10-12
 related:
   - README.md
   - glossary.md
@@ -219,6 +219,7 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Instruments | `/instruments` | list / get / create / update / disable / enable | `instruments.read` / `instruments.create` / `instruments.manage` |
 | Accounts | `/accounts` | list / get / create / update / close / reopen; `GET …/cash-balance` | `accounts.read` / `accounts.create` / `accounts.manage` |
 | Transactions | `/transactions` | list / get / create / reverse | `transactions.read` / `transactions.create` |
+| Net worth | `/net-worth`, `/users/customers/{id}/net-worth` | GET | `accounts.read` |
 
 Path `{id}` is always PublicId.
 
@@ -415,3 +416,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-09-25 | `/transactions` + account `cashBalance` / `/cash-balance`. Close-zero guard. Field rules in [features/posting.md](features/posting.md). |
 | 2026-10-11 | Buy / Sell / StockIn / StockOut and transaction item shape (`cash` + `security`). Field rules in [features/buy-sell.md](features/buy-sell.md). |
 | 2026-10-12 | Split / Bonus / Scrip accepted. New total quantity, no cash, total cost unchanged. Field rules in [features/split.md](features/split.md). |
+| 2026-10-12 | Net-worth read model accepted. `GET /net-worth` and `GET /users/customers/{id}/net-worth`. Current point-in-time, per-currency arrays, breakdowns. Field rules in [features/net-worth.md](features/net-worth.md). |

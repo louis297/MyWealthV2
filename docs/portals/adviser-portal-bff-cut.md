@@ -88,7 +88,7 @@ This is not gated on a later portal cut. The portal never reads the secret.
 
 ## 5. Not in this cut
 
-- Do not add YARP. The landed proxy is `ApiProxy` (`/users`, `/tenants`, `/currencies`, `/accounts`, `/instruments`, `/transactions`).
+- Do not add YARP. The landed proxy is `ApiProxy` (`/users`, `/tenants`, `/currencies`, `/accounts`, `/instruments`, `/transactions`). Net-worth adds `/net-worth`; Customer net-worth reuses `/users`.
 - Do not put tokens back in the SPA to “finish” HMR.
 - Do not register the raw Vite origin as an OIDC redirect.
 - Customer Portal BFF is a later file (`bff-customer-portal`).

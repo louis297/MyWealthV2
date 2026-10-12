@@ -3,7 +3,7 @@ title: Function plan
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-10-11
+updated: 2026-10-12
 related:
   - README.md
   - glossary.md
@@ -155,7 +155,7 @@ One domain. Feature Specs come after this map. Suggested internal slice order (n
 4. Holdings / securities ledger / Opening of holdings (accepted, landed 2026-10-11 `676e77a`)
 5. Buy / Sell / StockIn / StockOut (accepted 2026-10-11, landed `821c715`: [features/buy-sell.md](features/buy-sell.md))
 6. Split / Bonus / Scrip (accepted 2026-10-12: [features/split.md](features/split.md), `0017_transaction_type_split.sql`)
-7. Net-worth read model + Adviser Portal Dashboard
+7. Net-worth read model (accepted 2026-10-12: [features/net-worth.md](features/net-worth.md); `GET /net-worth` + `GET /users/customers/{id}/net-worth`; Adviser Portal Dashboard later)
 
 Session edge is [features/bff-adviser-portal.md](features/bff-adviser-portal.md) (accepted 2026-10-01, landed `5e85e9c`). Resource API auth does not change. Add ledger policy names only.
 
@@ -202,7 +202,7 @@ Session edge is [features/bff-adviser-portal.md](features/bff-adviser-portal.md)
 
 ### 5.4 Not locked (do not invent tables from this list)
 
-Transaction header + cash-leg shape: [features/posting.md](features/posting.md) (accepted, landed). Holdings Opening: [features/holdings.md](features/holdings.md) (accepted, landed 2026-10-11 `676e77a`). Buy / Sell / StockIn / StockOut: [features/buy-sell.md](features/buy-sell.md) (accepted, landed 2026-10-12 `821c715`, `0016_transaction_type_stock_in_out.sql`). Split / Bonus / Scrip: [features/split.md](features/split.md) (accepted 2026-10-12; new total quantity, total cost unchanged, no ratio on this write, `0017_transaction_type_split.sql`). Still open: daily snapshots, Dashboard widget list. Close requires cash zero and no holdings.
+Transaction header + cash-leg shape: [features/posting.md](features/posting.md) (accepted, landed). Holdings Opening: [features/holdings.md](features/holdings.md) (accepted, landed 2026-10-11 `676e77a`). Buy / Sell / StockIn / StockOut: [features/buy-sell.md](features/buy-sell.md) (accepted, landed 2026-10-12 `821c715`, `0016_transaction_type_stock_in_out.sql`). Split / Bonus / Scrip: [features/split.md](features/split.md) (accepted 2026-10-12; new total quantity, total cost unchanged, no ratio on this write, `0017_transaction_type_split.sql`). Net-worth read model: [features/net-worth.md](features/net-worth.md) (accepted 2026-10-12; current point-in-time, per-currency arrays, no script). Still open: daily snapshots, Dashboard widget list and portal pages. Close requires cash zero and no holdings.
 
 ### 5.5 Out of Phase 2
 

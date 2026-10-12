@@ -318,5 +318,5 @@ Repo master `5e85e9c` (2026-10-01). Agents must not replay this list.
 
 Aspire parameter `adviser-portal-client-secret` (`secret: true`, not in git) feeds `Identity:AdviserPortalClientSecret` and `Authentication:ClientSecret`. First AppHost run prompts; user-secrets key is `Parameters:adviser-portal-client-secret`. Portal adaptation record: [adviser-portal-bff-cut.md](../portals/adviser-portal-bff-cut.md).
 
-Landed deviation: §11 named YARP. The tree uses `ApiProxy` + `IWebApiTransport`. Do not add YARP unless a later amendment says so. Allow-list prefixes in code: `/users`, `/tenants`, `/currencies`, `/accounts`, `/instruments`, `/transactions`.
+Landed deviation: §11 named YARP. The tree uses `ApiProxy` + `IWebApiTransport`. Do not add YARP unless a later amendment says so. Allow-list prefixes in code: `/users`, `/tenants`, `/currencies`, `/accounts`, `/instruments`, `/transactions`. Net-worth read model (accepted 2026-10-12) adds prefix `/net-worth` for `GET /net-worth`; the Customer read reuses `/users` (`GET /users/customers/{id}/net-worth`).
 ---
