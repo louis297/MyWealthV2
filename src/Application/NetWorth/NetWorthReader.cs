@@ -9,12 +9,19 @@ internal static class NetWorthReader
         IMarketData marketData,
         TimeProvider time,
         int tenantId,
+        int? customerId,
+        int? assignedAdviserId,
         CancellationToken cancellationToken)
     {
-        var accounts = await db.Accounts.AsNoTracking()
-            .Where(account => account.TenantId == tenantId && account.IsActive)
-            .Select(account => new AccountRow(account.Id, account.Currency))
-            .ToListAsync(cancellationToken);
+        var accounts = await (
+            from account in db.Accounts.AsNoTracking()
+            join customer in db.Users.AsNoTracking() on account.CustomerId equals customer.Id
+            where account.TenantId == tenantId
+                  && account.IsActive
+                  && (customerId == null || account.CustomerId == customerId)
+                  && (assignedAdviserId == null || customer.AdviserId == assignedAdviserId)
+            select new AccountRow(account.Id, account.Currency)
+        ).ToListAsync(cancellationToken);
 
         if (accounts.Count == 0)
         {
