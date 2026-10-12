@@ -67,7 +67,22 @@ function requestUrl(input: RequestInfo | URL) {
   return String(input);
 }
 
-function renderForm(me: CurrentUser = user(), postStatus = 201) {
+const holding = {
+  id: "hhhhhhhh-hhhh-hhhh-hhhh-hhhhhhhhhhhh",
+  accountId,
+  instrumentId,
+  symbol: "DEMO",
+  name: "Demo Fund",
+  quantity: 100,
+  cost: 5000,
+  costCurrency: "NZD",
+};
+
+function renderForm(
+  me: CurrentUser = user(),
+  postStatus = 201,
+  problem = "Price is not available.",
+) {
   const store = configureStore({
     reducer: {
       session: sessionSlice.reducer,
@@ -84,6 +99,9 @@ function renderForm(me: CurrentUser = user(), postStatus = 201) {
     if (url.includes("/instruments") && method === "GET") {
       return json({ items: [instrument], page: 1, pageSize: 100, totalCount: 1 });
     }
+    if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+      return json({ items: [holding] });
+    }
     if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
       return json(account);
     }
@@ -93,7 +111,7 @@ function renderForm(me: CurrentUser = user(), postStatus = 201) {
           type: "https://tools.ietf.org/html/rfc9110#section-15.5.1",
           title: "One or more validation errors occurred.",
           status: 400,
-          errors: { Security: ["Price is not available."] },
+          errors: { "": [problem] },
         }, 400);
       }
       return json({ id: createdId }, 201);
@@ -200,6 +218,28 @@ describe("CreateTransactionPage", () => {
 
     expect(await screen.findByText("Price is not available.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "New transaction" })).toBeInTheDocument();
+    expect(screen.queryByText("account detail")).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/accounts/${accountId}/transactions/new`);
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("keeps the original cash and quantity when a Sell is rejected", async () => {
+    const { router } = renderForm(user(), 400, "Quantity cannot exceed the holding quantity.");
+
+    expect(await screen.findByText("1250.5")).toBeInTheDocument();
+    expect(screen.getByText("100")).toBeInTheDocument();
+    await screen.findByRole("option", { name: "DEMO Demo Fund" });
+    fireEvent.change(screen.getByLabelText("Type"), { target: { value: "Sell" } });
+    fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+    fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "200" } });
+    fireEvent.change(screen.getByLabelText("Booked at"), {
+      target: { value: "2026-10-11T10:00:00+13:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(await screen.findByText("Quantity cannot exceed the holding quantity.")).toBeInTheDocument();
+    expect(screen.getByText("1250.5")).toBeInTheDocument();
+    expect(screen.getByText("100")).toBeInTheDocument();
     expect(screen.queryByText("account detail")).not.toBeInTheDocument();
     expect(router.state.location.pathname).toBe(`/accounts/${accountId}/transactions/new`);
     expect(document.querySelector('input[type="password"]')).toBeNull();
