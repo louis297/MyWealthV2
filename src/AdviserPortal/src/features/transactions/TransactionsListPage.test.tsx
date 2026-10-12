@@ -186,6 +186,51 @@ describe("TransactionsListPage", () => {
     expect(refetched?.searchParams.has("tenantId")).toBe(false);
   });
 
+  it("offers Reverse on a posted Buy and not on a reversal", async () => {
+    const reversalId = "99999999-9999-9999-9999-999999999999";
+    const store = configureStore({
+      reducer: {
+        session: sessionSlice.reducer,
+        [api.reducerPath]: api.reducer,
+      },
+      middleware: (getDefault) => getDefault().concat(api.middleware),
+    });
+    store.dispatch(setCurrentUser(user()));
+    vi.mocked(fetch).mockImplementation(async () =>
+      new Response(
+        JSON.stringify({
+          items: [
+            transaction,
+            {
+              ...transaction,
+              id: reversalId,
+              type: "Reversal",
+              originalTransactionId: transactionId,
+            },
+          ],
+          page: 1,
+          pageSize: 20,
+          totalCount: 2,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    const router = createMemoryRouter(
+      [{ path: "/transactions", element: <TransactionsListPage /> }],
+      { initialEntries: ["/transactions"] },
+    );
+    render(
+      <Provider store={store}>
+        <RouterProvider router={router} />
+      </Provider>,
+    );
+
+    expect(await screen.findByRole("button", { name: "Reverse" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Reverse" })).toHaveLength(1);
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
   it("stays on /transactions when the filtered list is not found", async () => {
     const { router } = renderList(user(), `/transactions?accountId=${accountId}`, 404);
 
