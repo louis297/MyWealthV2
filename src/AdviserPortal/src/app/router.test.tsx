@@ -239,6 +239,50 @@ describe("app routes", () => {
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
+  it("lets TenantAdmin open a new transaction form", async () => {
+    renderApp(user(), "/accounts/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/transactions/new");
+
+    expect(await screen.findByRole("heading", { name: "New transaction" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("lets an Adviser open a new transaction form", async () => {
+    renderApp(
+      user({ role: "adviser", name: "Sam Reed" }),
+      "/accounts/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/transactions/new",
+    );
+
+    expect(await screen.findByRole("heading", { name: "New transaction" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
+  });
+
+  it("sends SystemAdmin on a new transaction form to /forbidden", async () => {
+    renderApp(
+      user({
+        role: "systemAdmin",
+        name: "System Admin",
+        tenantId: null,
+        tenantCode: null,
+      }),
+      "/accounts/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/transactions/new",
+    );
+
+    expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "New transaction" })).not.toBeInTheDocument();
+  });
+
+  it("sends a Customer on a new transaction form to /forbidden", async () => {
+    renderApp(
+      user({ role: "customer", name: "Jordan Lee" }),
+      "/accounts/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/transactions/new",
+    );
+
+    expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "New transaction" })).not.toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
   it("sends SystemAdmin on / to Profile and not a Customers workspace", async () => {
     renderApp(
       user({
