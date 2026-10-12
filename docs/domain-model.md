@@ -223,7 +223,7 @@ Session stack, four roles, and User / Tenant invariants do not change in Phase 2
 - Instruments are a **tenant catalog**. Adviser may create and read; update / disable is TenantAdmin or SystemAdmin. `QuoteCurrency` locks after create. Cost currency = quote currency.
 - An Account is a value container under a Customer. `Account.Currency` is the cash-ledger booking currency and is immutable after open. `Account.Type` is immutable after open. Openable in Phase 2: Bank / Cash / Brokerage / Other. Reserved, not selectable in Phase 2: Property / Credit. Type does **not** replace the cash ledger: balance comes from cash postings, not from summing rows because `AccountType == Bank`.
 - Bank, Cash, and Credit accounts must not hold Instruments. Brokerage, Property, and Other may. “No holdings” is any Instrument, not only listed equities. Phase 2 must not open Property or Credit.
-- Credit counts as a liability in net worth. Closed accounts are excluded. Net worth returns per-currency arrays; no FX fold into one number. Current point-in-time read model accepted in [features/net-worth.md](features/net-worth.md) (`GET /net-worth`, `GET /users/customers/{id}/net-worth`).
+- Credit counts as a liability in net worth. Closed accounts are excluded. Net worth returns per-currency arrays; no FX fold into one number. Current point-in-time read model accepted and landed in [features/net-worth.md](features/net-worth.md) (`GET /net-worth`, `GET /users/customers/{id}/net-worth`, `af422c2`).
 - Market data and FX go through ports + mocks. Introduce `IMarketData` / `IFxRate` at the start of the ledger domain, with Instruments. Same currency = 1. Cross-currency is never silently 1.
 
 ### 8.2 Conceptual objects (not a table design)
@@ -349,4 +349,4 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-09-21 | Instruments landed in repo `9ea2f2a`. Account container Feature Spec opened as `draft`. Boolean flags unified to `IsActive` (script `0011`). |
 | 2026-09-21 | Account aggregate landed. Disable Customer rejects while any account is active. |
 | 2026-09-25 | Transaction + cash leg accepted (posting spec). Close requires cash SUM = 0. No capture/journal two-step. |
-| 2026-10-12 | Net-worth current point-in-time read model accepted. Per-currency arrays. No new Domain types. [features/net-worth.md](features/net-worth.md). |
+| 2026-10-12 | Net-worth current point-in-time read model accepted and landed (`af422c2`). Per-currency arrays. No new Domain types. [features/net-worth.md](features/net-worth.md). |

@@ -67,7 +67,7 @@ The catalog is firm-wide, not per-Adviser. Customer receives 403. TenantAdmin / 
 - Changing `QuoteCurrency` after create
 - A second cost-currency column
 - Customer Portal or ledger-write for Customer
-- Adviser Portal Instruments page (portal cut later)
+- Adviser Portal Instruments page. Catalog management stays on Scalar / later Back Office.
 - SystemAdmin ledger screens on `adviser-portal`
 - Empty Account / Holding / Journal tables “for later”
 - Seeding instruments from `0010_instruments.sql` or in Production
@@ -315,7 +315,7 @@ Keep the resource catalog in [api-design.md](../api-design.md) pointing here for
 
 None in this slice.
 
-Adviser Portal Instruments page is a later portal cut. Do not invent nav or form layout here.
+Adviser Portal has no Instruments page. The catalog is consumed only as a picker on Buy / Sell / StockIn / StockOut / Split forms (`GET /instruments?enabledOnly=true`). Create / rename / disable stay on Scalar (and later Back Office). Do not add an Instruments nav item.
 
 Development mock prices are not a UI. SystemAdmin uses Scalar (and later Back Office), not this portal.
 

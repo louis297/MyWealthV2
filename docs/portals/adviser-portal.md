@@ -4,7 +4,7 @@ status: accepted
 phase: 1
 language: en
 created: 2026-09-12
-updated: 2026-10-02
+updated: 2026-10-12
 related:
   - README.md
   - frontend-conventions.md
@@ -145,3 +145,5 @@ Suggested commits: [frontend-implementation-notes.md](frontend-implementation-no
 ## Still out of Phase 1
 
 Dashboard, Accounts, Transactions, Instruments, Customer Portal, Back Office UI, SystemAdmin tenant screens (Scalar).
+
+Phase 2 Dashboard and ledger pages (including Buy / Sell / Split / Reverse) live in [adviser-portal-dashboard.md](adviser-portal-dashboard.md) (accepted).

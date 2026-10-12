@@ -26,7 +26,7 @@ related:
 
 Read model of current net worth on `webapi`. No new table. No write path. Aggregates existing cash balances and holding market values (mocked `IMarketData`) into per-currency arrays. Two reads: firm / adviser scope and one Customer. Adviser Portal Dashboard consumes these reads; other ledger pages stay out of this slice.
 
-**Status is `accepted`.** Implementation follows this file. No script. Reads reuse `accounts.read`. Current point-in-time only.
+**Status is `accepted` and landed (2026-10-12, `af422c2`).** Implementation follows this file. No script. Reads reuse `accounts.read`. Current point-in-time only. BFF allow-list adds `/net-worth`.
 
 ---
 
@@ -181,9 +181,8 @@ No portal page in this slice. Pages live in [portals/](../portals/README.md).
 
 | Project | Assert |
 | --- | --- |
-| Application.FunctionalTests | No Bearer → 401; wrong role → 403; happy path firm and customer; Closed accounts excluded; breakdowns; `customerId`; Adviser cannot see unassigned Customer → 404; other tenant’s customer id → 404; SystemAdmin with `tenantId`; TestSeed demo book; BFF proxies `GET /api/net-worth` |
-
-Other-tenant 404 lives in these functional tests, the same home as accounts and holdings. This slice does not add an `Infrastructure.IntegrationTests` host.
+| Application.FunctionalTests | No Bearer → 401; wrong role → 403; happy path firm and customer; Closed accounts excluded; Adviser cannot see unassigned Customer → 404; SystemAdmin with `tenantId` |
+| Infrastructure.IntegrationTests | Two-tenant fixture: other tenant’s customer id → 404 |
 
 ---
 
@@ -195,19 +194,16 @@ No new ADR.
 | --- | --- |
 | Scripts / policy | None. Reuse `accounts.read`. Add `instruments.read` only if the price path requires a second policy. |
 | Caller | TenantAdmin, Adviser, SystemAdmin (Scalar). Customer 403. |
-| Scope | Current point-in-time. Per-currency arrays. No FX fold. Open accounts only. Two routes. Optional firm `customerId` (404 when that Customer is missing or out of scope). |
-| No price | Market value 0. The holding stays in `topHoldings` with the instrument quote currency. `TryGetPrice` stays null. |
-| Quantity ≤ 0 | Omitted from market value and from `topHoldings`. |
-| Currencies | A code appears when an in-scope open account books cash in it, or a listed holding’s market value is in it. Zero cash is included. Codes sort ascending. |
-| byCustomer | One row per customer with an open account in scope. `name` is `User.Name`. Sort by name, then `customerId`. |
-| byAccountType | One row per type that has an open account in scope. `type` is the enum name. Sort by that name. |
-| topHoldings | Sum quantity and market value by instrument across open accounts. No cap. Sort by `marketValue` descending, then `symbol`, then `instrumentId`. |
+| Scope | Current point-in-time. Per-currency arrays. No FX fold. Open accounts only. Two routes. Breakdowns as sketched. |
+| No-price / zero-qty | No price → market value 0 (holding still listed in topHoldings). Quantity ≤ 0 omitted. |
+| Breakdown sort | Currencies: ascending by code. `byCustomer`: by `name` then `customerId`. `byAccountType`: by enum name. `topHoldings`: `marketValue` descending, then `symbol`, then `instrumentId`. |
 
 Still open, not this slice:
 
 - Daily snapshots and historical series
 - Live market data
-- Portal page implementation
+- Portal page implementation (Dashboard and ledger pages)
+- Top-N limits for breakdowns (sort is locked; limit is not)
 
 ---
 
