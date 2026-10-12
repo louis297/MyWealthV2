@@ -91,6 +91,7 @@ public class CreateTransactionTests : TestBase
         item.RootElement.GetProperty("memo").GetString().ShouldBe("Salary");
         item.RootElement.GetProperty("reference").ValueKind.ShouldBe(JsonValueKind.Null);
         item.RootElement.GetProperty("originalTransactionId").ValueKind.ShouldBe(JsonValueKind.Null);
+        item.RootElement.GetProperty("reversedByTransactionId").ValueKind.ShouldBe(JsonValueKind.Null);
         item.RootElement.GetProperty("rowVersion").GetString().ShouldNotBeNullOrEmpty();
     }
 

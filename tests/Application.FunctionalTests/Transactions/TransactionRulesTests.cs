@@ -220,9 +220,9 @@ public class TransactionRulesTests : TestBase
         json.RootElement.GetProperty("page").GetInt32().ShouldBe(1);
         json.RootElement.GetProperty("pageSize").GetInt32().ShouldBe(20);
         json.RootElement.GetProperty("totalCount").GetInt32().ShouldBe(2);
-        json.RootElement.GetProperty("items").EnumerateArray()
-            .Select(item => item.GetProperty("id").GetGuid())
-            .ShouldBe([earlier, later]);
+        var items = json.RootElement.GetProperty("items").EnumerateArray().ToList();
+        items.Select(item => item.GetProperty("id").GetGuid()).ShouldBe([earlier, later]);
+        items.ShouldAllBe(item => item.GetProperty("reversedByTransactionId").ValueKind == JsonValueKind.Null);
 
         var filtered = await TransactionHttp.Send(
             HttpMethod.Get, $"/transactions?accountId={secondAccount}&customerId={customer.PublicId}", tokens.AccessToken);

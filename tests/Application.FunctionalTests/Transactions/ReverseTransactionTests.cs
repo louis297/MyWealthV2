@@ -39,6 +39,35 @@ public class ReverseTransactionTests : TestBase
     }
 
     [Test]
+    public async Task List_ReturnsReversedByTransactionIdOnTheOriginalAndNullOnTheReversal()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId);
+        var originalId = await ReadId(await PostAsync(tokens.AccessToken, accountId, "TransferIn", 100m));
+        var unreversedId = await ReadId(await PostAsync(
+            tokens.AccessToken, accountId, "TransferIn", 15m, "2026-09-24T10:00:00+12:00"));
+        var reversalId = await ReadId(await ReverseAsync(tokens.AccessToken, originalId));
+
+        var response = await TransactionHttp.Send(
+            HttpMethod.Get, $"/transactions?accountId={accountId}", tokens.AccessToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var items = json.RootElement.GetProperty("items").EnumerateArray().ToList();
+
+        var original = items.Single(item => item.GetProperty("id").GetGuid() == originalId);
+        original.GetProperty("originalTransactionId").ValueKind.ShouldBe(JsonValueKind.Null);
+        original.GetProperty("reversedByTransactionId").GetGuid().ShouldBe(reversalId);
+
+        var reversal = items.Single(item => item.GetProperty("id").GetGuid() == reversalId);
+        reversal.GetProperty("originalTransactionId").GetGuid().ShouldBe(originalId);
+        reversal.GetProperty("reversedByTransactionId").ValueKind.ShouldBe(JsonValueKind.Null);
+
+        var unreversed = items.Single(item => item.GetProperty("id").GetGuid() == unreversedId);
+        unreversed.GetProperty("originalTransactionId").ValueKind.ShouldBe(JsonValueKind.Null);
+        unreversed.GetProperty("reversedByTransactionId").ValueKind.ShouldBe(JsonValueKind.Null);
+    }
+
+    [Test]
     public async Task Reverse_RequiresAKeyAndReplaysTheSameRequest()
     {
         var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
