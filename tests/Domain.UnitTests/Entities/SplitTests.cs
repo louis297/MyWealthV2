@@ -187,6 +187,7 @@ public class SplitTests
         reversal.Type.ShouldBe(TransactionType.Reversal);
         reversal.CashLeg.ShouldBeNull();
         reversal.OriginalTransactionId.ShouldBe(original.Id);
+        reversal.ReversedByTransactionId.ShouldBeNull();
         reversal.DomainEvents.OfType<TransactionReversed>().ShouldHaveSingleItem();
         var leg = reversal.SecurityLegs.Single();
         leg.InstrumentId.ShouldBe(11);

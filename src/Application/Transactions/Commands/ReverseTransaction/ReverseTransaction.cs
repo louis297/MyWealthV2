@@ -101,16 +101,17 @@ public class ReverseTransactionCommandHandler(
                 "Cannot reverse a transaction while the customer is disabled. Enable the customer first.");
         }
 
-        if (loaded.Transaction.Type == TransactionType.Reversal
-            || await db.Transactions.AnyAsync(
-                row => row.OriginalTransactionId == loaded.Transaction.Id, cancellationToken))
+        await db.LockAccountAsync(loaded.Account.Id, cancellationToken);
+        var header = await db.Transactions.AsNoTracking()
+            .Where(row => row.Id == loaded.Transaction.Id)
+            .Select(row => new { row.Type, row.ReversedByTransactionId })
+            .SingleAsync(cancellationToken);
+        if (header.Type == TransactionType.Reversal || header.ReversedByTransactionId is not null)
         {
             throw new ValidationException([
                 new ValidationFailure(string.Empty, "This transaction has already been reversed.")
             ]);
         }
-
-        await db.LockAccountAsync(loaded.Account.Id, cancellationToken);
         var currentSum = await TransactionCash.SumAsync(db, loaded.Account.Id, cancellationToken);
         var currentQuantities = await CurrentQuantitiesAsync(loaded, cancellationToken);
         Domain.Entities.Transaction reversal;

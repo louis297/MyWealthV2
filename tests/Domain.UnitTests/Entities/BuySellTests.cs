@@ -365,6 +365,7 @@ public class BuySellTests
 
         reversal.Type.ShouldBe(TransactionType.Reversal);
         reversal.OriginalTransactionId.ShouldBe(original.Id);
+        reversal.ReversedByTransactionId.ShouldBeNull();
         reversal.CashLeg.ShouldNotBeNull();
         reversal.CashLeg!.Amount.ShouldBe(-originalCash);
         reversal.CashLeg.Currency.ShouldBe("USD");

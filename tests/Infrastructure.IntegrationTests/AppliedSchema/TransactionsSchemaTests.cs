@@ -13,7 +13,8 @@ public class TransactionsSchemaTests
 
         columns.Select(column => column.Name).ShouldBe([
             "Id", "PublicId", "TenantId", "AccountId", "Type", "BookedAt", "Memo", "Reference",
-            "OriginalTransactionId", "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion"
+            "OriginalTransactionId", "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion",
+            "ReversedByTransactionId"
         ]);
 
         Column(columns, "Id").ShouldSatisfyAllConditions(
@@ -60,6 +61,10 @@ public class TransactionsSchemaTests
         Column(columns, "RowVersion").ShouldSatisfyAllConditions(
             column => column.Type.ShouldBe("timestamp"),
             column => column.Nullable.ShouldBe("NO"));
+        Column(columns, "ReversedByTransactionId").ShouldSatisfyAllConditions(
+            column => column.Type.ShouldBe("int"),
+            column => column.Nullable.ShouldBe("YES"),
+            column => column.Identity.ShouldBe(0));
     }
 
     [Test]
@@ -179,6 +184,12 @@ public class TransactionsSchemaTests
 
         (await IndexColumns("Transactions", "IX_Transactions_TenantId_AccountId_BookedAt"))
             .ShouldBe(["TenantId", "AccountId", "BookedAt"]);
+        (await IndexColumns("Transactions", "IX_Transactions_ReversedByTransactionId"))
+            .ShouldBe(["ReversedByTransactionId"]);
+        (await FilteredUniqueIndex("Transactions", "IX_Transactions_ReversedByTransactionId"))
+            .ShouldContain("ReversedByTransactionId");
+        (await FilteredUniqueIndex("Transactions", "IX_Transactions_ReversedByTransactionId"))
+            .ShouldContain("IS NOT NULL");
     }
 
     [Test]
@@ -187,7 +198,8 @@ public class TransactionsSchemaTests
         (await ForeignKeys("Transactions")).ShouldBe([
             ("FK_Transactions_Accounts_AccountId", "Accounts", "Id", (byte)0),
             ("FK_Transactions_Tenants_TenantId", "Tenants", "Id", (byte)0),
-            ("FK_Transactions_Transactions_OriginalTransactionId", "Transactions", "Id", (byte)0)
+            ("FK_Transactions_Transactions_OriginalTransactionId", "Transactions", "Id", (byte)0),
+            ("FK_Transactions_Transactions_ReversedByTransactionId", "Transactions", "Id", (byte)0)
         ]);
         (await ForeignKeys("TransactionCashLegs")).ShouldBe([
             ("FK_TransactionCashLegs_Currencies_Currency", "Currencies", "Code", (byte)0),
@@ -359,6 +371,31 @@ public class TransactionsSchemaTests
         }
 
         return columns;
+    }
+
+    private static async Task<string> FilteredUniqueIndex(string tableName, string indexName)
+    {
+        await using var db = OpenDb();
+        await db.Database.OpenConnectionAsync();
+        await using var command = db.Database.GetDbConnection().CreateCommand();
+        command.CommandText = """
+            SELECT i.is_unique, i.filter_definition
+            FROM sys.indexes i
+            WHERE i.object_id = OBJECT_ID(@tableName) AND i.name = @name
+            """;
+        var table = command.CreateParameter();
+        table.ParameterName = "@tableName";
+        table.Value = tableName;
+        command.Parameters.Add(table);
+        var name = command.CreateParameter();
+        name.ParameterName = "@name";
+        name.Value = indexName;
+        command.Parameters.Add(name);
+
+        await using var reader = await command.ExecuteReaderAsync();
+        (await reader.ReadAsync()).ShouldBeTrue();
+        reader.GetBoolean(0).ShouldBeTrue();
+        return reader.GetString(1);
     }
 
     private static async Task<List<(string Name, string Referenced, string Column, byte DeleteAction)>> ForeignKeys(

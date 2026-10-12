@@ -24,6 +24,10 @@ public class Transaction : BaseAuditableEntity
 
     public int? OriginalTransactionId { get; private set; }
 
+    public int? ReversedByTransactionId { get; private set; }
+
+    private Transaction? ReversedBy { get; set; }
+
     public byte[] RowVersion { get; private set; } = null!;
 
     public TransactionCashLeg? CashLeg { get; private set; }
@@ -337,6 +341,11 @@ public class Transaction : BaseAuditableEntity
             throw new DomainException("A reversal cannot be reversed.");
         }
 
+        if (ReversedByTransactionId is not null || ReversedBy is not null)
+        {
+            throw new DomainException("This transaction has already been reversed.");
+        }
+
         TransactionCashLeg? cashLeg = null;
         if (CashLeg is not null)
         {
@@ -399,6 +408,7 @@ public class Transaction : BaseAuditableEntity
             CashLeg = cashLeg,
             SecurityLegs = reversalLegs ?? []
         };
+        ReversedBy = reversal;
         reversal.AddDomainEvent(new TransactionReversed(reversal));
         return reversal;
     }

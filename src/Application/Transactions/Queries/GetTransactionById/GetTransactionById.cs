@@ -56,6 +56,15 @@ public class GetTransactionByIdQueryHandler(IApplicationDbContext db, ICurrentUs
                 .SingleOrDefaultAsync(cancellationToken);
         }
 
+        Guid? reversedByPublicId = null;
+        if (row.transaction.ReversedByTransactionId is int reversedById)
+        {
+            reversedByPublicId = await db.Transactions.AsNoTracking()
+                .Where(transaction => transaction.Id == reversedById)
+                .Select(transaction => (Guid?)transaction.PublicId)
+                .SingleOrDefaultAsync(cancellationToken);
+        }
+
         return new TransactionDto
         {
             Id = row.transaction.PublicId,
@@ -70,6 +79,7 @@ public class GetTransactionByIdQueryHandler(IApplicationDbContext db, ICurrentUs
             Memo = row.transaction.Memo,
             Reference = row.transaction.Reference,
             OriginalTransactionId = originalPublicId,
+            ReversedByTransactionId = reversedByPublicId,
             RowVersion = Convert.ToBase64String(row.transaction.RowVersion ?? []),
             Security = security.Count == 0 ? null : security
         };

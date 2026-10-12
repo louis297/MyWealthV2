@@ -25,6 +25,8 @@ public sealed class TransactionDto
 
     public Guid? OriginalTransactionId { get; init; }
 
+    public Guid? ReversedByTransactionId { get; init; }
+
     public required string RowVersion { get; init; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

@@ -28,6 +28,13 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
             .WithMany()
             .HasForeignKey(transaction => transaction.OriginalTransactionId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Transaction>("ReversedBy")
+            .WithMany()
+            .HasForeignKey(transaction => transaction.ReversedByTransactionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(transaction => transaction.ReversedByTransactionId)
+            .IsUnique()
+            .HasFilter("[ReversedByTransactionId] IS NOT NULL");
         builder.HasOne(transaction => transaction.CashLeg)
             .WithOne()
             .HasForeignKey<TransactionCashLeg>(leg => leg.TransactionId)

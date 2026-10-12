@@ -173,12 +173,17 @@ public class TransactionTests
         reversal.AccountId.ShouldBe(original.AccountId);
         reversal.BookedAt.ShouldBe(bookedAt);
         reversal.OriginalTransactionId.ShouldBe(7);
+        reversal.ReversedByTransactionId.ShouldBeNull();
         reversal.Memo.ShouldBeNull();
         reversal.Reference.ShouldBeNull();
         reversal.CashLeg!.Amount.ShouldBe(-100m);
         reversal.CashLeg.Currency.ShouldBe("NZD");
         reversal.DomainEvents.OfType<TransactionReversed>().ShouldHaveSingleItem();
         reversal.DomainEvents.OfType<TransactionPosted>().ShouldBeEmpty();
+
+        Should.Throw<DomainException>(() => original.Reverse(
+            bookedAt.AddMinutes(1),
+            currentCashSum: 100m));
     }
 
     [Test]
