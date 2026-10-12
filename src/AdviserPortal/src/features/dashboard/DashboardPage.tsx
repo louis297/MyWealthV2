@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { useGetNetWorthQuery, type NetWorth } from "@/features/dashboard/dashboardApi";
 
 export function DashboardPage() {
@@ -18,11 +19,30 @@ export function DashboardPage() {
           <section className="space-y-2">
             <h2 className="text-base font-medium">By customer</h2>
             {byCustomer.length === 0 ? <p>None.</p> : (
-              <ul>
-                {byCustomer.map((row) => (
-                  <li key={row.customerId}>{row.name}</li>
-                ))}
-              </ul>
+              <table className="border-collapse text-sm">
+                <thead>
+                  <tr>
+                    <th className="border border-slate-200 px-2 py-1 text-left">Name</th>
+                    <th className="border border-slate-200 px-2 py-1 text-left">Net</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {byCustomer.map((row) => (
+                    <tr key={row.customerId}>
+                      <td className="border border-slate-200 px-2 py-1">
+                        <Link to={`/customers/${row.customerId}`}>{row.name}</Link>
+                      </td>
+                      <td className="border border-slate-200 px-2 py-1">
+                        {row.currencies.map((currency) => (
+                          <span key={currency.currency} className="mr-3">
+                            <span>{currency.currency}</span> <span>{currency.net}</span>
+                          </span>
+                        ))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </section>
           <section className="space-y-2">
