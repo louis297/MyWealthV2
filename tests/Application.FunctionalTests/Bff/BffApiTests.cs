@@ -138,6 +138,27 @@ public class BffApiTests
         _api.Calls.ShouldContain(call => call.Path == "/currencies");
     }
 
+    [Test]
+    public async Task Session_ProxiesNetWorthAndCustomerNetWorth()
+    {
+        var customerId = Guid.NewGuid();
+        _api.Scripts["/net-worth"] = (HttpStatusCode.OK, """{"currencies":[]}""");
+        _api.Scripts[$"/users/customers/{customerId}/net-worth"] = (HttpStatusCode.OK, """{"currencies":[]}""");
+
+        using var firm = new HttpRequestMessage(HttpMethod.Get, "/api/net-worth");
+        firm.Headers.TryAddWithoutValidation("Cookie", _sessionCookie);
+        var firmResponse = await _bff.SendAsync(firm);
+        firmResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await firmResponse.Content.ReadAsStringAsync()).ShouldBe("""{"currencies":[]}""");
+        _api.Calls.ShouldContain(call => call.Path == "/net-worth");
+
+        using var one = new HttpRequestMessage(HttpMethod.Get, $"/api/users/customers/{customerId}/net-worth");
+        one.Headers.TryAddWithoutValidation("Cookie", _sessionCookie);
+        var oneResponse = await _bff.SendAsync(one);
+        oneResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        _api.Calls.ShouldContain(call => call.Path == $"/users/customers/{customerId}/net-worth");
+    }
+
     [TestCase("/api/health")]
     [TestCase("/api/scalar")]
     public async Task UnknownApiPrefix_Is404AndNotForwarded(string path)
