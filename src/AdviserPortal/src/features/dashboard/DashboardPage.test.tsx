@@ -24,21 +24,58 @@ const netWorth = {
     },
   ],
   breakdowns: {
+    byCustomer: [],
+    byAccountType: [],
+    topHoldings: [],
+  },
+};
+
+const customerId = "cccccccccccccccc-cccc-cccc-cccc-cccccccccccc";
+
+const withBreakdowns = {
+  ...netWorth,
+  breakdowns: {
     byCustomer: [
       {
-        customerId: "cccccccccccccccc-cccc-cccc-cccc-cccccccccccc",
-        name: "Hidden Customer",
-        currencies: [],
+        customerId,
+        name: "Amy Able",
+        currencies: [
+          {
+            currency: "NZD",
+            assets: { cash: 1000, holdings: 5000, total: 6000 },
+            liabilities: { total: 0 },
+            net: 6000,
+          },
+        ],
       },
     ],
-    byAccountType: [{ type: "Brokerage", currencies: [] }],
+    byAccountType: [
+      {
+        type: "Brokerage",
+        currencies: [
+          {
+            currency: "NZD",
+            assets: { cash: 1000, holdings: 5000, total: 6000 },
+            liabilities: { total: 0 },
+            net: 6000,
+          },
+        ],
+      },
+    ],
     topHoldings: [
       {
         instrumentId: "dddddddd-dddd-dddd-dddd-dddddddddddd",
-        symbol: "SECRET",
-        quantity: 10,
+        symbol: "DEMO",
+        quantity: 100,
         marketValue: 5000,
         currency: "NZD",
+      },
+      {
+        instrumentId: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+        symbol: "SMALL",
+        quantity: 2,
+        marketValue: 40,
+        currency: "USD",
       },
     ],
   },
@@ -119,13 +156,39 @@ describe("DashboardPage", () => {
     expect(within(usd).getByText("0")).toBeInTheDocument();
 
     expect(screen.getByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
-    expect(screen.queryByText("Hidden Customer")).not.toBeInTheDocument();
-    expect(screen.queryByText("SECRET")).not.toBeInTheDocument();
-    expect(screen.queryByText("Brokerage")).not.toBeInTheDocument();
     expect(screen.queryByRole("row", { name: /account/i })).not.toBeInTheDocument();
 
     const urls = requestedUrls(fetchMock);
     expect(urls).toEqual(["http://localhost:3000/api/net-worth"]);
+    const request = fetchMock.mock.calls[0][0] as Request;
+    expect(request.headers.get("Authorization")).toBeNull();
+    expect(request.credentials).toBe("include");
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("renders by customer, by account type, and top holdings in API order", async () => {
+    const { fetchMock } = renderDashboard(withBreakdowns);
+
+    expect(await screen.findByRole("heading", { name: "By customer" })).toBeInTheDocument();
+    expect(screen.getByText("Amy Able")).toBeInTheDocument();
+
+    expect(screen.getByRole("heading", { name: "By account type" })).toBeInTheDocument();
+    expect(screen.getByText("Brokerage")).toBeInTheDocument();
+
+    const holdings = screen.getByRole("table", { name: "Top holdings" });
+    const symbols = within(holdings)
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => within(row).getAllByRole("cell")[0]?.textContent);
+    expect(symbols).toEqual(["DEMO", "SMALL"]);
+    expect(within(holdings).getByText("5000")).toBeInTheDocument();
+    expect(within(holdings).getByText("40")).toBeInTheDocument();
+
+    expect(requestedUrls(fetchMock)).toEqual(["http://localhost:3000/api/net-worth"]);
+    const request = fetchMock.mock.calls[0][0] as Request;
+    expect(request.headers.get("Authorization")).toBeNull();
+    expect(request.credentials).toBe("include");
+    expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
   it("shows no balances when the read has no currencies", async () => {
