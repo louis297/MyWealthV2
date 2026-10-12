@@ -146,6 +146,47 @@ public class GetNetWorthTests : TestBase
             .StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
+    [Test]
+    public async Task SystemAdmin_RequiresTenantId_AndMayReadAnotherTenantsCustomer()
+    {
+        var (north, _, northCustomer, northTokens) = await AccountHttp.SignInAdviser();
+        var northBank = await OpenAccountAsync(northTokens.AccessToken, northCustomer.PublicId, "North bank", "Bank", "NZD");
+        (await PostCashAsync(northTokens.AccessToken, northBank, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var (_, _, southCustomer, southTokens) = await AccountHttp.SignInAdviser(
+            "South Co", "south-co", "ann@south.example", customerEmail: "ned@south.example");
+        var southBank = await OpenAccountAsync(southTokens.AccessToken, southCustomer.PublicId, "South bank", "Bank", "NZD");
+        (await PostCashAsync(southTokens.AccessToken, southBank, 40m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var system = await AccountHttp.SignInSystemAdmin();
+        (await AccountHttp.Send(HttpMethod.Get, "/net-worth", system.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await AccountHttp.Send(HttpMethod.Get, $"/net-worth?tenantId={Guid.NewGuid()}", system.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NotFound);
+
+        var northRead = await AccountHttp.Send(
+            HttpMethod.Get, $"/net-worth?tenantId={north.PublicId}", system.AccessToken);
+        northRead.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var northJson = JsonDocument.Parse(await northRead.Content.ReadAsStringAsync());
+        var northCurrencies = northJson.RootElement.GetProperty("currencies").EnumerateArray().ToList();
+        northCurrencies.Count.ShouldBe(1);
+        AssertCurrency(northCurrencies[0], "NZD", cash: 100m, holdings: 0m);
+
+        var cross = await AccountHttp.Send(
+            HttpMethod.Get, $"/users/customers/{southCustomer.PublicId}/net-worth", system.AccessToken);
+        cross.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var crossJson = JsonDocument.Parse(await cross.Content.ReadAsStringAsync());
+        var crossCurrencies = crossJson.RootElement.GetProperty("currencies").EnumerateArray().ToList();
+        crossCurrencies.Count.ShouldBe(1);
+        AssertCurrency(crossCurrencies[0], "NZD", cash: 40m, holdings: 0m);
+
+        var (_, _, _, tenantAdmin) = await AccountHttp.SignInTenantAdmin(
+            "West Co", "west-co", "tess@west.example", adviserEmail: "ann@west.example", customerEmail: "ned@west.example");
+        (await AccountHttp.Send(
+            HttpMethod.Get, $"/net-worth?tenantId={north.PublicId}", tenantAdmin.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
     private static void AssertCurrency(JsonElement row, string currency, decimal cash, decimal holdings)
     {
         row.EnumerateObject().Select(property => property.Name).ShouldBe([
