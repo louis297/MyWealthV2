@@ -4,7 +4,10 @@ import type { Role } from "@/features/session/roles";
 
 export function RoleGate({ allow }: { allow: Role[] }) {
   const role = useAppSelector((state) => state.session.currentUser?.role);
-  if (!role || !allow.includes(role as Role)) {
+  if (!role) {
+    return null;
+  }
+  if (!allow.includes(role as Role)) {
     return <Navigate to="/forbidden" replace />;
   }
 

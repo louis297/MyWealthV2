@@ -7,6 +7,7 @@ import { CreateCustomerPage } from "@/features/customers/CreateCustomerPage";
 import { CustomerDetailPage } from "@/features/customers/CustomerDetailPage";
 import { CustomersListPage } from "@/features/customers/CustomersListPage";
 import { EditCustomerPage } from "@/features/customers/EditCustomerPage";
+import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
 import { ForbiddenPage } from "@/features/session/ForbiddenPage";
 import { HomePage } from "@/features/session/HomePage";
@@ -24,6 +25,11 @@ export const appRoutes: RouteObject[] = [
         element: <ShellLayout />,
         children: [
           { path: "/", element: <HomePage /> },
+          {
+            path: "/dashboard",
+            element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
+            children: [{ index: true, element: <DashboardPage /> }],
+          },
           { path: "/session", element: <SessionProbePage /> },
           { path: "/forbidden", element: <ForbiddenPage /> },
           {
