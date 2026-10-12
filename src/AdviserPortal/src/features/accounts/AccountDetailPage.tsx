@@ -54,34 +54,25 @@ export function AccountDetailPage() {
   const [messages, setMessages] = useState<string[]>([]);
   const [conflict, setConflict] = useState(false);
 
-  async function onClose() {
+  async function onLifecycle(action: "close" | "reopen") {
     const current = account.data;
-    if (!current || current.status !== "Open" || !window.confirm("Close this account?")) {
+    if (!current) {
+      return;
+    }
+    const closing = action === "close";
+    if (current.status !== (closing ? "Open" : "Closed")) {
+      return;
+    }
+    if (!window.confirm(closing ? "Close this account?" : "Reopen this account?")) {
       return;
     }
     try {
-      await closeAccount({ id: current.id, rowVersion: current.rowVersion }).unwrap();
-      setMessages([]);
-      setConflict(false);
-    } catch (error: unknown) {
-      if (isStatus(error, 409)) {
-        setConflict(true);
-        setMessages([]);
-        void account.refetch();
-        return;
+      const body = { id: current.id, rowVersion: current.rowVersion };
+      if (closing) {
+        await closeAccount(body).unwrap();
+      } else {
+        await reopenAccount(body).unwrap();
       }
-      setConflict(false);
-      setMessages(problemMessages(error));
-    }
-  }
-
-  async function onReopen() {
-    const current = account.data;
-    if (!current || current.status !== "Closed" || !window.confirm("Reopen this account?")) {
-      return;
-    }
-    try {
-      await reopenAccount({ id: current.id, rowVersion: current.rowVersion }).unwrap();
       setMessages([]);
       setConflict(false);
     } catch (error: unknown) {
@@ -131,7 +122,7 @@ export function AccountDetailPage() {
         <button
           type="button"
           className="border border-slate-300 bg-white px-3 py-1 text-sm"
-          onClick={() => void onClose()}
+          onClick={() => void onLifecycle("close")}
         >
           Close
         </button>
@@ -139,7 +130,7 @@ export function AccountDetailPage() {
         <button
           type="button"
           className="border border-slate-300 bg-white px-3 py-1 text-sm"
-          onClick={() => void onReopen()}
+          onClick={() => void onLifecycle("reopen")}
         >
           Reopen
         </button>
