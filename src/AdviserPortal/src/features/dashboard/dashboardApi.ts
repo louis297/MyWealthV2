@@ -42,7 +42,11 @@ export const dashboardApi = api.injectEndpoints({
       query: () => "/net-worth",
       providesTags: ["NetWorth"],
     }),
+    getCustomerNetWorth: builder.query<NetWorth, string>({
+      query: (id) => `/users/customers/${id}/net-worth`,
+      providesTags: (_result, _error, id) => [{ type: "NetWorth", id }],
+    }),
   }),
 });
 
-export const { useGetNetWorthQuery } = dashboardApi;
+export const { useGetNetWorthQuery, useGetCustomerNetWorthQuery } = dashboardApi;

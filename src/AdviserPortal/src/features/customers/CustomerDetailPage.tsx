@@ -5,14 +5,17 @@ import {
   useEnableCustomerMutation,
   useGetCustomerQuery,
 } from "@/features/customers/customersApi";
+import { useGetCustomerNetWorthQuery } from "@/features/dashboard/dashboardApi";
+import { NetWorthView } from "@/features/dashboard/NetWorthView";
 
-function isConflict(error: unknown) {
-  return typeof error === "object" && error !== null && "status" in error && error.status === 409;
+function isStatus(error: unknown, status: number) {
+  return typeof error === "object" && error !== null && "status" in error && error.status === status;
 }
 
 export function CustomerDetailPage() {
   const { id } = useParams();
   const { data, error, isLoading, refetch } = useGetCustomerQuery(id ?? "", { skip: !id });
+  const netWorth = useGetCustomerNetWorthQuery(id ?? "", { skip: !id || !data });
   const [disableCustomer] = useDisableCustomerMutation();
   const [enableCustomer] = useEnableCustomerMutation();
   const [conflict, setConflict] = useState(false);
@@ -34,14 +37,14 @@ export function CustomerDetailPage() {
       }
       setConflict(false);
     } catch (reason: unknown) {
-      if (isConflict(reason)) {
+      if (isStatus(reason, 409)) {
         setConflict(true);
         void refetch();
       }
     }
   }
 
-  if (error && "status" in error && error.status === 404) {
+  if (isStatus(error, 404)) {
     return <p>Not found</p>;
   }
 
@@ -71,6 +74,13 @@ export function CustomerDetailPage() {
           <dd>{data.id}</dd>
         </div>
       </dl>
+      {netWorth.data || isStatus(netWorth.error, 404) ? (
+        <section className="space-y-2">
+          <h2 className="text-base font-medium">Net worth</h2>
+          {isStatus(netWorth.error, 404) ? <p>Not found</p> : null}
+          {netWorth.data ? <NetWorthView data={netWorth.data} /> : null}
+        </section>
+      ) : null}
       <div className="flex gap-2 text-sm">
         <Link to={`/customers/${data.id}/edit`} className="border border-slate-300 bg-white px-3 py-1">
           Edit
