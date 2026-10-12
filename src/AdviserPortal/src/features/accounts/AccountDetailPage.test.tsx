@@ -571,6 +571,7 @@ describe("AccountDetailPage", () => {
     expect(screen.queryByRole("link", { name: "TransferOut" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Buy" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reopen" })).toBeInTheDocument();
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
@@ -604,6 +605,7 @@ describe("AccountDetailPage", () => {
 
     expect(await screen.findByText("Closed")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reopen" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "TransferIn" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Buy" })).not.toBeInTheDocument();
     expect(posted).toEqual([JSON.stringify({ rowVersion: "AAAA" })]);
@@ -705,6 +707,80 @@ describe("AccountDetailPage", () => {
     });
     expect(posted).toEqual([JSON.stringify({ rowVersion: "AAAA" })]);
     expect(screen.getByText("Open")).toBeInTheDocument();
+  });
+
+  it("reopens a closed account with the current rowVersion and shows Open", async () => {
+    const posted: string[] = [];
+    let opened = false;
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { fetchMock } = renderDetail((url, method, body) => {
+      if (url.endsWith(`/accounts/${accountId}/reopen`) && method === "POST") {
+        posted.push(body ?? "");
+        opened = true;
+        return new Response(null, { status: 204 });
+      }
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json({
+          ...account,
+          status: opened ? "Open" : "Closed",
+          isActive: opened,
+        });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByRole("button", { name: "Reopen" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reopen" }));
+
+    expect(await screen.findByText("Open")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reopen" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "TransferIn" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Buy" })).toBeInTheDocument();
+    expect(posted).toEqual([JSON.stringify({ rowVersion: "AAAA" })]);
+    expect(window.confirm).toHaveBeenCalledWith("Reopen this account?");
+
+    const post = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.method === "POST");
+    expect(post?.url).toBe(`http://localhost:3000/api/accounts/${accountId}/reopen`);
+    expect(post?.credentials).toBe("include");
+    expect(post?.headers.get("Authorization")).toBeNull();
+    expect(post?.headers.get("X-MyWealth-Request")).toBe("1");
+    expect(new URL(post?.url ?? "").searchParams.has("tenantId")).toBe(false);
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("does not reopen the account when confirm is dismissed", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    const { fetchMock } = renderDetail((url, method) => {
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json({ ...account, status: "Closed", isActive: false });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reopen" }));
+
+    expect(screen.getByText("Closed")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
+    const posts = fetchMock.mock.calls
+      .map(([input]) => input)
+      .filter((input): input is Request => input instanceof Request && input.method === "POST");
+    expect(posts).toEqual([]);
   });
 
   it("stays on the URL and shows Not found for a missing account", async () => {
