@@ -44,7 +44,7 @@ Session remains the BFF cookie. All API calls go through `/api`. Do not re-intro
 
 - Dashboard as the new default home (replaces `/customers` as the landing page for TenantAdmin / Adviser).
 - Per-currency net-worth totals and the three breakdowns from `GET /net-worth`.
-- Customer list with net-worth summary (click-through to existing customer detail, which may show the single-customer net-worth read).
+- Customer list with net-worth summary (click-through to the customer detail). The detail shows the person and that customer's accounts. Firm breakdowns stay on the dashboard.
 - Recent activity widget (reuse `GET /transactions` or the existing list shape).
 - Accounts list / detail (read-only first; open / close deferred or minimal).
 - Holdings list on an account (`GET /accounts/{id}/holdings`).
@@ -78,7 +78,7 @@ Session remains the BFF cookie. All API calls go through `/api`. Do not re-intro
 | --- | --- | --- |
 | `/` | TenantAdmin, Adviser | Redirect to `/dashboard`. SystemAdmin still does not land on a workspace (C4 from Phase 1). |
 | `/dashboard` | TenantAdmin, Adviser | Firm / adviser net-worth. Widgets: per-currency totals, byCustomer, byAccountType, topHoldings, recent activity. |
-| `/customers/:id` | Same as Phase 1 | Existing detail. Lists that customer's accounts and may show `GET /users/customers/{id}/net-worth`. |
+| `/customers/:id` | Same as Phase 1 | Person fields and that customer's accounts, with New account. No firm net-worth breakdowns. |
 | `/customers/:id/accounts/new` | TenantAdmin, Adviser | New account for that customer. `POST /accounts` with `customerId`, name, type, and currency. Omit `tenantId`. |
 | `/accounts` | TenantAdmin, Adviser (assigned) | List of accounts the caller can see. |
 | `/accounts/:id` | Same | Detail: cash balance, holdings list, recent activity, action buttons (Buy / Sell / StockIn / StockOut / Split / Reverse / Close). |
@@ -105,7 +105,7 @@ Unchanged from the BFF cut. Probe is still `GET /api/users/me`. 401 does not ref
 | D2 | Dashboard loads `GET /net-worth` and renders per-currency assets / liabilities / net. Closed accounts do not appear. |
 | D3 | Breakdowns render: by customer (name), by account type, top holdings (market value descending). |
 | D4 | Customer list on Dashboard (or existing `/customers`) shows a net-worth summary per customer; click navigates to `/customers/:id`. |
-| D5 | `/customers/:id` may call `GET /users/customers/{id}/net-worth` and show the same shape. Unassigned / other-tenant id remains 404. |
+| D5 | `/customers/:id` shows the person and that customer's accounts. It does not render by customer, by account type, or top holdings. Unassigned / other-tenant customer id remains 404. |
 | D6 | `/accounts` and `/accounts/:id` list and show cash balance + holdings. Adviser sees only assigned customers’ accounts. |
 | D7 | `/transactions` shows activity; filters by account or customer work with existing endpoints. |
 | D8 | No React password page. All calls go through the BFF `/api` prefix. Customer still receives no session. |
