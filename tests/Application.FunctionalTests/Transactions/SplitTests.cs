@@ -112,14 +112,36 @@ public class SplitTests : TestBase
         (await PostOpeningAsync(tokens.AccessToken, accountId, instrumentId, 100m, 2500m)).StatusCode
             .ShouldBe(HttpStatusCode.Created);
         var splitId = await ReadId(await PostSplitAsync(tokens.AccessToken, accountId, "Split", instrumentId, 200m));
+        decimal quantity;
+        decimal cost;
+        using (var before = await GetItemAsync(tokens.AccessToken, splitId))
+        {
+            var leg = before.RootElement.GetProperty("security").EnumerateArray().Single();
+            quantity = leg.GetProperty("quantity").GetDecimal();
+            cost = leg.GetProperty("cost").GetDecimal();
+        }
 
-        var reverse = await TransactionHttp.Send(
-            HttpMethod.Post, $"/transactions/{splitId}/reverse", tokens.AccessToken, idempotencyKey: Guid.NewGuid());
-        reverse.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var reversalId = await ReadId(await TransactionHttp.Send(
+            HttpMethod.Post, $"/transactions/{splitId}/reverse", tokens.AccessToken, idempotencyKey: Guid.NewGuid()));
 
         var holding = await HoldingAsync(tokens.AccessToken, accountId, instrumentId);
         holding.Quantity.ShouldBe(100m);
         holding.Cost.ShouldBe(2500m);
+
+        using var original = await GetItemAsync(tokens.AccessToken, splitId);
+        var originalLeg = original.RootElement.GetProperty("security").EnumerateArray().Single();
+        originalLeg.GetProperty("quantity").GetDecimal().ShouldBe(quantity);
+        originalLeg.GetProperty("cost").GetDecimal().ShouldBe(cost);
+        original.RootElement.GetProperty("originalTransactionId").ValueKind.ShouldBe(JsonValueKind.Null);
+        original.RootElement.GetProperty("reversedByTransactionId").GetGuid().ShouldBe(reversalId);
+
+        using var reversal = await GetItemAsync(tokens.AccessToken, reversalId);
+        reversal.RootElement.GetProperty("type").GetString().ShouldBe("Reversal");
+        var reversalLeg = reversal.RootElement.GetProperty("security").EnumerateArray().Single();
+        reversalLeg.GetProperty("quantity").GetDecimal().ShouldBe(-quantity);
+        reversalLeg.GetProperty("cost").GetDecimal().ShouldBe(0m);
+        reversal.RootElement.GetProperty("originalTransactionId").GetGuid().ShouldBe(splitId);
+        reversal.RootElement.GetProperty("reversedByTransactionId").ValueKind.ShouldBe(JsonValueKind.Null);
     }
 
     [Test]

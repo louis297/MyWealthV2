@@ -27,12 +27,14 @@ public class ReverseTransactionTests : TestBase
         original.GetProperty("type").GetString().ShouldBe("TransferIn");
         original.GetProperty("cash").GetProperty("amount").GetDecimal().ShouldBe(100m);
         original.GetProperty("originalTransactionId").ValueKind.ShouldBe(JsonValueKind.Null);
+        original.GetProperty("reversedByTransactionId").GetGuid().ShouldBe(reversalId);
 
         var reversal = await ReadItem(tokens.AccessToken, reversalId);
         reversal.GetProperty("type").GetString().ShouldBe("Reversal");
         reversal.GetProperty("cash").GetProperty("amount").GetDecimal().ShouldBe(-100m);
         reversal.GetProperty("accountId").GetGuid().ShouldBe(accountId);
         reversal.GetProperty("originalTransactionId").GetGuid().ShouldBe(originalId);
+        reversal.GetProperty("reversedByTransactionId").ValueKind.ShouldBe(JsonValueKind.Null);
         (await CountTransactionsAsync(accountId)).ShouldBe(2);
     }
 

@@ -73,10 +73,12 @@ public class BuySellTests : TestBase
         (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 100m)).StatusCode
             .ShouldBe(HttpStatusCode.Created);
         var buyId = await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 2m));
+        var (cash, quantity, cost) = await ReadEconomicLegsAsync(tokens.AccessToken, buyId);
 
         var reversal = await TransactionHttp.Send(
             HttpMethod.Post, $"/transactions/{buyId}/reverse", tokens.AccessToken, idempotencyKey: Guid.NewGuid());
         reversal.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var reversalId = await ReadId(reversal);
 
         (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(100m);
         (await AccountHttp.Send(HttpMethod.Get, $"/accounts/{accountId}/holdings", tokens.AccessToken))
@@ -85,8 +87,30 @@ public class BuySellTests : TestBase
             HttpMethod.Get, $"/accounts/{accountId}/holdings", tokens.AccessToken)).Content.ReadAsStringAsync());
         holdings.RootElement.GetProperty("items").GetArrayLength().ShouldBe(0);
 
-        var original = await TransactionHttp.Send(HttpMethod.Get, $"/transactions/{buyId}", tokens.AccessToken);
-        original.StatusCode.ShouldBe(HttpStatusCode.OK);
+        await AssertReverseLinkAsync(tokens.AccessToken, buyId, reversalId, cash, quantity, cost);
+    }
+
+    [Test]
+    public async Task ReverseSell_RestoresTheHoldingAndLinksTheOriginal()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
+        await SetPriceAsync(instrumentId, 10m, "USD");
+        (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 100m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 2m)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+        var sellId = await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Sell", instrumentId, 1m));
+        var (cash, quantity, cost) = await ReadEconomicLegsAsync(tokens.AccessToken, sellId);
+
+        var reversalId = await ReadId(await TransactionHttp.Send(
+            HttpMethod.Post, $"/transactions/{sellId}/reverse", tokens.AccessToken, idempotencyKey: Guid.NewGuid()));
+
+        var holding = await HoldingAsync(tokens.AccessToken, accountId, instrumentId);
+        holding.Quantity.ShouldBe(2m);
+        holding.Cost.ShouldBe(20m);
+        await AssertReverseLinkAsync(tokens.AccessToken, sellId, reversalId, cash, quantity, cost);
     }
 
     [Test]
@@ -379,6 +403,44 @@ public class BuySellTests : TestBase
         listedBuy.GetProperty("cash").GetProperty("amount").GetDecimal().ShouldBe(-1250.0000m);
         listedBuy.TryGetProperty("security", out var listedSecurity).ShouldBeTrue();
         listedSecurity.EnumerateArray().Single().GetProperty("costCurrency").GetString().ShouldBe("USD");
+    }
+
+    private static async Task<(decimal Cash, decimal Quantity, decimal Cost)> ReadEconomicLegsAsync(
+        string accessToken,
+        Guid id)
+    {
+        using var item = await GetItemAsync(accessToken, id);
+        var security = item.RootElement.GetProperty("security").EnumerateArray().Single();
+        return (
+            item.RootElement.GetProperty("cash").GetProperty("amount").GetDecimal(),
+            security.GetProperty("quantity").GetDecimal(),
+            security.GetProperty("cost").GetDecimal());
+    }
+
+    private static async Task AssertReverseLinkAsync(
+        string accessToken,
+        Guid originalId,
+        Guid reversalId,
+        decimal cash,
+        decimal quantity,
+        decimal cost)
+    {
+        using var original = await GetItemAsync(accessToken, originalId);
+        original.RootElement.GetProperty("cash").GetProperty("amount").GetDecimal().ShouldBe(cash);
+        var originalLeg = original.RootElement.GetProperty("security").EnumerateArray().Single();
+        originalLeg.GetProperty("quantity").GetDecimal().ShouldBe(quantity);
+        originalLeg.GetProperty("cost").GetDecimal().ShouldBe(cost);
+        original.RootElement.GetProperty("originalTransactionId").ValueKind.ShouldBe(JsonValueKind.Null);
+        original.RootElement.GetProperty("reversedByTransactionId").GetGuid().ShouldBe(reversalId);
+
+        using var reversal = await GetItemAsync(accessToken, reversalId);
+        reversal.RootElement.GetProperty("type").GetString().ShouldBe("Reversal");
+        reversal.RootElement.GetProperty("cash").GetProperty("amount").GetDecimal().ShouldBe(-cash);
+        var reversalLeg = reversal.RootElement.GetProperty("security").EnumerateArray().Single();
+        reversalLeg.GetProperty("quantity").GetDecimal().ShouldBe(-quantity);
+        reversalLeg.GetProperty("cost").GetDecimal().ShouldBe(-cost);
+        reversal.RootElement.GetProperty("originalTransactionId").GetGuid().ShouldBe(originalId);
+        reversal.RootElement.GetProperty("reversedByTransactionId").ValueKind.ShouldBe(JsonValueKind.Null);
     }
 
     private static async Task<JsonDocument> GetItemAsync(string accessToken, Guid id)
