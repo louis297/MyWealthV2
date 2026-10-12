@@ -645,4 +645,63 @@ describe("CreateTransactionPage", () => {
     expect(router.state.location.pathname).toBe(`/accounts/${accountId}/transactions/new`);
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
+
+  it("offers only cash transfers on an open Bank account", async () => {
+    renderForm(user(), 201, "Price is not available.", { type: "Bank" }, "errors", "?type=TransferIn");
+
+    expect(await screen.findByRole("option", { name: "TransferIn" })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole("option", { name: "Buy" })).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole("option", { name: "TransferOut" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Instrument")).not.toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("shows a closed-account rejection on a transfer", async () => {
+    const { router } = renderForm(
+      user(),
+      400,
+      "Cannot post a transaction while the account is closed. Reopen the account first.",
+      { status: "Closed" },
+      "errors",
+      "?type=TransferOut",
+    );
+
+    fireEvent.change(await screen.findByLabelText("Amount"), { target: { value: "-10" } });
+    fireEvent.change(screen.getByLabelText("Booked at"), {
+      target: { value: "2026-10-12T09:30:00+13:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(
+      await screen.findByText("Cannot post a transaction while the account is closed. Reopen the account first."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("account detail")).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/accounts/${accountId}/transactions/new`);
+  });
+
+  it("shows a disabled customer on a transfer", async () => {
+    const { router } = renderForm(
+      user(),
+      400,
+      "Cannot create a transaction while the customer is disabled. Enable the customer first.",
+      {},
+      "disabled",
+      "?type=TransferIn",
+    );
+
+    fireEvent.change(await screen.findByLabelText("Amount"), { target: { value: "10" } });
+    fireEvent.change(screen.getByLabelText("Booked at"), {
+      target: { value: "2026-10-12T09:00:00+13:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(
+      await screen.findByText("Cannot create a transaction while the customer is disabled. Enable the customer first."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("account detail")).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/accounts/${accountId}/transactions/new`);
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
 });

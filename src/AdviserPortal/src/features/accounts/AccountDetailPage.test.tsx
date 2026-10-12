@@ -442,6 +442,110 @@ describe("AccountDetailPage", () => {
     },
   );
 
+  it("posts a TransferIn from an open Bank account and shows it in activity", async () => {
+    const createdId = "99999999-9999-9999-9999-999999999999";
+    let posted = false;
+
+    const store = configureStore({
+      reducer: {
+        session: sessionSlice.reducer,
+        [api.reducerPath]: api.reducer,
+      },
+      middleware: (getDefault) => getDefault().concat(api.middleware),
+    });
+    store.dispatch(setCurrentUser(user({ role: "adviser", name: "Sam Reed" })));
+
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
+      const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+      if (url.endsWith("/transactions") && method === "POST") {
+        posted = true;
+        return json({ id: createdId }, 201);
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({
+          items: posted
+            ? [{
+              id: createdId,
+              tenantId: account.tenantId,
+              accountId,
+              customerId,
+              type: "TransferIn",
+              cash: { amount: 80, currency: "NZD" },
+              bookedAt: "2026-10-12T09:00:00+13:00",
+              memo: "Salary",
+              reference: null,
+              originalTransactionId: null,
+              rowVersion: "BBBB",
+            }]
+            : [],
+          page: 1,
+          pageSize: 20,
+          totalCount: posted ? 1 : 0,
+        });
+      }
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json({ ...account, type: "Bank", cashBalance: posted ? 1330.5 : 1250.5 });
+      }
+      if (url.includes("/instruments") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 100, totalCount: 0 });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    const router = createMemoryRouter(
+      [
+        { path: "/accounts/:id", element: <AccountDetailPage /> },
+        { path: "/accounts/:id/transactions/new", element: <CreateTransactionPage /> },
+      ],
+      { initialEntries: [`/accounts/${accountId}`] },
+    );
+
+    render(
+      <Provider store={store}>
+        <RouterProvider router={router} />
+      </Provider>,
+    );
+
+    fireEvent.click(await screen.findByRole("link", { name: "TransferIn" }));
+    fireEvent.change(await screen.findByLabelText("Amount"), { target: { value: "80" } });
+    fireEvent.change(screen.getByLabelText("Memo"), { target: { value: "Salary" } });
+    fireEvent.change(screen.getByLabelText("Booked at"), {
+      target: { value: "2026-10-12T09:00:00+13:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(await screen.findByRole("heading", { name: "Everyday spending" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: createdId })).toHaveAttribute(
+      "href",
+      `/transactions/${createdId}`,
+    );
+    expect(screen.getByText("1330.5")).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/accounts/${accountId}`);
+
+    const post = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.method === "POST");
+    const body = JSON.parse(await post!.clone().text()) as Record<string, unknown>;
+    expect(body).toEqual({
+      accountId,
+      type: "TransferIn",
+      amount: 80,
+      bookedAt: "2026-10-12T09:00:00+13:00",
+      memo: "Salary",
+    });
+    expect(post?.headers.get("Idempotency-Key")).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    );
+    expect(body).not.toHaveProperty("security");
+    expect(body).not.toHaveProperty("tenantId");
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
   it("hides transfer actions when the account is closed", async () => {
     renderDetail((url, method) => {
       if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
