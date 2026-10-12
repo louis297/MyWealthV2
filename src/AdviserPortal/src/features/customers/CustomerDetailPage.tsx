@@ -6,8 +6,6 @@ import {
   useEnableCustomerMutation,
   useGetCustomerQuery,
 } from "@/features/customers/customersApi";
-import { useGetCustomerNetWorthQuery } from "@/features/dashboard/dashboardApi";
-import { NetWorthView } from "@/features/dashboard/NetWorthView";
 import { Pager } from "@/shared/components/Pager";
 
 function isStatus(error: unknown, status: number) {
@@ -22,7 +20,6 @@ export function CustomerDetailPage() {
     { page: accountsPage, customerId: id },
     { skip: !id },
   );
-  const netWorth = useGetCustomerNetWorthQuery(id ?? "", { skip: !id || !data });
   const [disableCustomer] = useDisableCustomerMutation();
   const [enableCustomer] = useEnableCustomerMutation();
   const [conflict, setConflict] = useState(false);
@@ -122,13 +119,6 @@ export function CustomerDetailPage() {
             totalCount={accounts.data.totalCount}
             onPage={setAccountsPage}
           />
-        </section>
-      ) : null}
-      {netWorth.data || isStatus(netWorth.error, 404) ? (
-        <section className="space-y-2">
-          <h2 className="text-base font-medium">Net worth</h2>
-          {isStatus(netWorth.error, 404) ? <p>Not found</p> : null}
-          {netWorth.data ? <NetWorthView data={netWorth.data} /> : null}
         </section>
       ) : null}
       <div className="flex gap-2 text-sm">
