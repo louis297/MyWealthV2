@@ -81,13 +81,15 @@ Session remains the BFF cookie. All API calls go through `/api`. Do not re-intro
 | `/customers/:id` | Same as Phase 1 | Person fields and that customer's accounts, with New account. No firm net-worth breakdowns. |
 | `/customers/:id/accounts/new` | TenantAdmin, Adviser | New account for that customer. `POST /accounts` with `customerId`, name, type, and currency. Omit `tenantId`. |
 | `/accounts` | TenantAdmin, Adviser (assigned) | List of accounts the caller can see. |
-| `/accounts/:id` | Same | Detail: cash balance, holdings list, recent activity, action buttons (Buy / Sell / StockIn / StockOut / Split / Reverse / Close). |
+| `/accounts/:id` | Same | Detail: cash balance, holdings list, recent activity, action buttons (TransferIn / TransferOut on an Open account; Buy / Sell / StockIn / StockOut / Split / Reverse / Close). |
 | `/accounts/:id/holdings` | Same | Holdings projection for the account. |
 | `/accounts/:id/transactions/new` | Same | Create form. Type selector drives the body shape from the Feature Specs. Requires `Idempotency-Key`. |
 | `/transactions` | Same | Activity list. Optional `accountId` / `customerId` filters. Reverse action on a row. |
 | `/transactions/:id` | Same | Read-only detail + Reverse button when the row is not already reversed. |
 | `/profile` | Unchanged | |
 | `/customers`, `/advisers` | Unchanged | Still available; no longer the default home. |
+
+TransferIn and TransferOut reuse `/accounts/:id/transactions/new`. The route set does not change for external cash in and cash out.
 
 ---
 
