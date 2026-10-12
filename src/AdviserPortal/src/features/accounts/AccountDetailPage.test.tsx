@@ -817,6 +817,44 @@ describe("AccountDetailPage", () => {
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
+  it("asks the user to reload when reopen hits a stale rowVersion", async () => {
+    const posted: string[] = [];
+    let gets = 0;
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderDetail((url, method, body) => {
+      if (url.endsWith(`/accounts/${accountId}/reopen`) && method === "POST") {
+        posted.push(body ?? "");
+        return new Response("", { status: 409 });
+      }
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        gets += 1;
+        return json({
+          ...account,
+          status: "Closed",
+          isActive: false,
+          rowVersion: gets === 1 ? "AAAA" : "BBBB",
+        });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reopen" }));
+
+    expect(await screen.findByText("This row changed. Reload and try again.")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(gets).toBeGreaterThan(1);
+    });
+    expect(posted).toEqual([JSON.stringify({ rowVersion: "AAAA" })]);
+    expect(screen.getByText("Closed")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reopen" })).toBeInTheDocument();
+  });
+
   it("stays on the URL and shows Not found for a missing account", async () => {
     const { router } = renderDetail(() => new Response("", { status: 404 }));
 
