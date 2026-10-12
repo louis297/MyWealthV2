@@ -4,7 +4,7 @@ status: accepted
 phase: 2
 language: en
 created: 2026-10-12
-updated: 2026-10-12
+updated: 2026-10-13
 related:
   - README.md
   - frontend-conventions.md
@@ -84,8 +84,8 @@ Session remains the BFF cookie. All API calls go through `/api`. Do not re-intro
 | `/accounts/:id` | Same | Detail: cash balance, holdings list, recent activity, action buttons (TransferIn / TransferOut on an Open account; Buy / Sell / StockIn / StockOut / Split / Reverse / Close). |
 | `/accounts/:id/holdings` | Same | Holdings projection for the account. |
 | `/accounts/:id/transactions/new` | Same | Create form. Type selector drives the body shape from the Feature Specs. Requires `Idempotency-Key`. |
-| `/transactions` | Same | Activity list. Optional `accountId` / `customerId` filters. Reverse action on a row. |
-| `/transactions/:id` | Same | Read-only detail + Reverse button when the row is not already reversed. |
+| `/transactions` | Same | Activity list. Optional `accountId` / `customerId` filters. Reverse action on a row, hidden when `reversedByTransactionId` is not null or `type` is `Reversal`. |
+| `/transactions/:id` | Same | Read-only detail. Reverse button is hidden when `reversedByTransactionId` is not null or `type` is `Reversal`. |
 | `/profile` | Unchanged | |
 | `/customers`, `/advisers` | Unchanged | Still available; no longer the default home. |
 
@@ -115,7 +115,7 @@ Unchanged from the BFF cut. Probe is still `GET /api/users/me`. 401 does not ref
 | D10 | Adviser posts a Buy on an Open Brokerage account. Server prices the security leg; cash and quantity update. Missing mock price → form shows the 400. |
 | D11 | Adviser posts a Sell that would take quantity or cash negative → 400; original stays. Successful Sell reduces quantity at average cost and increases cash. |
 | D12 | Adviser posts StockIn / StockOut (no cash) and Split / Bonus / Scrip (new total quantity, cost unchanged). Wrong body fields → 400. |
-| D13 | Adviser reverses a posted Buy / Sell / Split. Original remains; new reverse transaction appears. Already reversed → 400. Idempotency-Key required; replay returns the same id. |
+| D13 | Adviser reverses a posted Buy / Sell / Split. Original remains; new reverse transaction appears. The Reverse button is hidden when `reversedByTransactionId` is not null or `type` is `Reversal`. Already reversed → 400. Idempotency-Key required; replay returns the same id. |
 | D14 | Forms omit `tenantId` for TenantAdmin / Adviser. Closed account or Disabled Customer on create / reverse → 400. Bank / Cash refuse security types. |
 
 ---
