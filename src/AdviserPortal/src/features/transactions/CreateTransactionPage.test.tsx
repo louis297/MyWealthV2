@@ -1,5 +1,5 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -82,6 +82,8 @@ function renderForm(
   me: CurrentUser = user(),
   postStatus = 201,
   problem = "Price is not available.",
+  accountOverride: Partial<typeof account> = {},
+  problemShape: "errors" | "disabled" = "errors",
 ) {
   const store = configureStore({
     reducer: {
@@ -103,9 +105,20 @@ function renderForm(
       return json({ items: [holding] });
     }
     if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
-      return json(account);
+      return json({ ...account, ...accountOverride });
     }
     if (url.endsWith("/transactions") && method === "POST") {
+      if (postStatus === 400 && problemShape === "disabled") {
+        return json({
+          type: "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+          title: "User is disabled",
+          status: 400,
+          detail: problem,
+          code: "disabled",
+          target: "user",
+          targetId: account.customerId,
+        }, 400);
+      }
       if (postStatus === 400) {
         return json({
           type: "https://tools.ietf.org/html/rfc9110#section-15.5.1",
@@ -358,4 +371,81 @@ describe("CreateTransactionPage", () => {
       expect(document.querySelector('input[type="password"]')).toBeNull();
     },
   );
+
+  it("omits tenantId for a TenantAdmin", async () => {
+    const { fetchMock } = renderForm(user({ role: "tenantAdmin", name: "Pat Admin", adviserId: null }));
+
+    await screen.findByRole("option", { name: "DEMO Demo Fund" });
+    fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+    fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
+    fireEvent.change(screen.getByLabelText("Booked at"), {
+      target: { value: "2026-10-11T10:00:00+13:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(await screen.findByText("account detail")).toBeInTheDocument();
+    const body = await postedBody(fetchMock);
+    expect(body).not.toHaveProperty("tenantId");
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it.each(["Bank", "Cash"])("does not offer security types on a %s account", async (type) => {
+    renderForm(user(), 201, "Price is not available.", { type });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("option", { name: "Buy" })).not.toBeInTheDocument();
+    });
+    for (const securityType of ["Sell", "StockIn", "StockOut", "Split", "Bonus", "Scrip"]) {
+      expect(screen.queryByRole("option", { name: securityType })).not.toBeInTheDocument();
+    }
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("shows a closed-account rejection on the form", async () => {
+    const { router } = renderForm(
+      user(),
+      400,
+      "Cannot post a transaction while the account is closed. Reopen the account first.",
+      { status: "Closed" },
+    );
+
+    await screen.findByRole("option", { name: "DEMO Demo Fund" });
+    fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+    fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
+    fireEvent.change(screen.getByLabelText("Booked at"), {
+      target: { value: "2026-10-11T10:00:00+13:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(
+      await screen.findByText("Cannot post a transaction while the account is closed. Reopen the account first."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("account detail")).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/accounts/${accountId}/transactions/new`);
+  });
+
+  it("shows a disabled customer on create", async () => {
+    const { router } = renderForm(
+      user(),
+      400,
+      "Cannot create a transaction while the customer is disabled. Enable the customer first.",
+      {},
+      "disabled",
+    );
+
+    await screen.findByRole("option", { name: "DEMO Demo Fund" });
+    fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+    fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
+    fireEvent.change(screen.getByLabelText("Booked at"), {
+      target: { value: "2026-10-11T10:00:00+13:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(
+      await screen.findByText("Cannot create a transaction while the customer is disabled. Enable the customer first."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("account detail")).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/accounts/${accountId}/transactions/new`);
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
 });

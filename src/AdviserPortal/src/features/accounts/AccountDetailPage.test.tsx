@@ -370,6 +370,30 @@ describe("AccountDetailPage", () => {
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
+  it.each([
+    ["Bank", "Open"],
+    ["Cash", "Open"],
+    ["Brokerage", "Closed"],
+  ] as const)("hides security actions when the account is %s and %s", async (type, status) => {
+    renderDetail((url, method) => {
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json({ ...account, type, status });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByRole("heading", { name: "Everyday spending" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Buy" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Split" })).not.toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
   it("shows no holdings when the projection is empty", async () => {
     renderDetail((url, method) => {
       if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {

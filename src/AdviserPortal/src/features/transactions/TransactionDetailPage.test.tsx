@@ -177,4 +177,86 @@ describe("TransactionDetailPage", () => {
     expect(router.state.location.pathname).toBe(`/transactions/${originalId}`);
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
+
+  it("shows a closed account when reverse is rejected", async () => {
+    const store = configureStore({
+      reducer: {
+        session: sessionSlice.reducer,
+        [api.reducerPath]: api.reducer,
+      },
+      middleware: (getDefault) => getDefault().concat(api.middleware),
+    });
+    store.dispatch(setCurrentUser(user()));
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+      if (method === "POST") {
+        return json({
+          status: 400,
+          errors: { "": ["Cannot reverse a transaction while the account is closed. Reopen the account first."] },
+        }, 400);
+      }
+      if (method === "GET") {
+        return json(original);
+      }
+      return new Response("", { status: 404 });
+    });
+    render(
+      <Provider store={store}>
+        <RouterProvider router={createMemoryRouter(
+          [{ path: "/transactions/:id", element: <TransactionDetailPage /> }],
+          { initialEntries: [`/transactions/${originalId}`] },
+        )} />
+      </Provider>,
+    );
+    expect(await screen.findByRole("button", { name: "Reverse" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reverse" }));
+    expect(
+      await screen.findByText("Cannot reverse a transaction while the account is closed. Reopen the account first."),
+    ).toBeInTheDocument();
+    expect(screen.getByText(originalId)).toBeInTheDocument();
+  });
+
+  it("shows a disabled customer when reverse is rejected", async () => {
+    const store = configureStore({
+      reducer: {
+        session: sessionSlice.reducer,
+        [api.reducerPath]: api.reducer,
+      },
+      middleware: (getDefault) => getDefault().concat(api.middleware),
+    });
+    store.dispatch(setCurrentUser(user()));
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+      if (method === "POST") {
+        return json({
+          status: 400,
+          title: "User is disabled",
+          detail: "Cannot reverse a transaction while the customer is disabled. Enable the customer first.",
+          code: "disabled",
+          target: "user",
+          targetId: original.customerId,
+        }, 400);
+      }
+      if (method === "GET") {
+        return json(original);
+      }
+      return new Response("", { status: 404 });
+    });
+    render(
+      <Provider store={store}>
+        <RouterProvider router={createMemoryRouter(
+          [{ path: "/transactions/:id", element: <TransactionDetailPage /> }],
+          { initialEntries: [`/transactions/${originalId}`] },
+        )} />
+      </Provider>,
+    );
+    expect(await screen.findByRole("button", { name: "Reverse" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reverse" }));
+    expect(
+      await screen.findByText("Cannot reverse a transaction while the customer is disabled. Enable the customer first."),
+    ).toBeInTheDocument();
+    expect(screen.getByText(originalId)).toBeInTheDocument();
+    expect(screen.queryByText(reverseId)).not.toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
 });
