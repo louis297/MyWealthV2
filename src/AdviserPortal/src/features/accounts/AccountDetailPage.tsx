@@ -80,7 +80,14 @@ export function AccountDetailPage() {
     if (!current || current.status !== "Closed" || !window.confirm("Reopen this account?")) {
       return;
     }
-    await reopenAccount({ id: current.id, rowVersion: current.rowVersion }).unwrap();
+    try {
+      await reopenAccount({ id: current.id, rowVersion: current.rowVersion }).unwrap();
+      setMessages([]);
+      setConflict(false);
+    } catch (error: unknown) {
+      setConflict(false);
+      setMessages(problemMessages(error));
+    }
   }
 
   if (isNotFound(account.error)) {
