@@ -252,6 +252,124 @@ describe("AccountDetailPage", () => {
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
+  it("posts a Sell and shows higher cash and lower quantity", async () => {
+    const instrumentId = holding.instrumentId;
+    const createdId = "99999999-9999-9999-9999-999999999999";
+    let posted = false;
+
+    const store = configureStore({
+      reducer: {
+        session: sessionSlice.reducer,
+        [api.reducerPath]: api.reducer,
+      },
+      middleware: (getDefault) => getDefault().concat(api.middleware),
+    });
+    store.dispatch(setCurrentUser(user({ role: "adviser", name: "Sam Reed" })));
+
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
+      const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+      if (url.includes("/instruments") && method === "GET") {
+        return json({
+          items: [{
+            id: instrumentId,
+            tenantId: account.tenantId,
+            symbol: "DEMO",
+            name: "Demo Fund",
+            quoteCurrency: "NZD",
+            isActive: true,
+            rowVersion: "AAAA",
+          }],
+          page: 1,
+          pageSize: 100,
+          totalCount: 1,
+        });
+      }
+      if (url.endsWith("/transactions") && method === "POST") {
+        posted = true;
+        return json({ id: createdId }, 201);
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({
+          items: posted
+            ? [{
+              id: createdId,
+              tenantId: account.tenantId,
+              accountId,
+              customerId,
+              type: "Sell",
+              cash: { amount: 1250, currency: "NZD" },
+              bookedAt: "2026-10-11T11:00:00+13:00",
+              memo: null,
+              reference: null,
+              originalTransactionId: null,
+              rowVersion: "BBBB",
+              security: [{ instrumentId, quantity: -40, cost: 2000, costCurrency: "NZD" }],
+            }]
+            : [],
+          page: 1,
+          pageSize: 20,
+          totalCount: posted ? 1 : 0,
+        });
+      }
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [{ ...holding, quantity: posted ? 60 : 100, cost: posted ? 3000 : 5000 }] });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json({ ...account, cashBalance: posted ? 2500.5 : 1250.5 });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    const router = createMemoryRouter(
+      [
+        { path: "/accounts/:id", element: <AccountDetailPage /> },
+        { path: "/accounts/:id/transactions/new", element: <CreateTransactionPage /> },
+      ],
+      { initialEntries: [`/accounts/${accountId}`] },
+    );
+
+    render(
+      <Provider store={store}>
+        <RouterProvider router={router} />
+      </Provider>,
+    );
+
+    expect(await screen.findByText("1250.5")).toBeInTheDocument();
+    expect(screen.getByText("100")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "Sell" }));
+
+    await screen.findByRole("option", { name: "DEMO Demo Fund" });
+    fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+    fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "40" } });
+    fireEvent.change(screen.getByLabelText("Booked at"), {
+      target: { value: "2026-10-11T11:00:00+13:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(await screen.findByRole("heading", { name: "Everyday spending" })).toBeInTheDocument();
+    expect(await screen.findByText("2500.5")).toBeInTheDocument();
+    expect(screen.getByText("60")).toBeInTheDocument();
+    expect(screen.getByText("3000")).toBeInTheDocument();
+    expect(screen.queryByText("1250.5")).not.toBeInTheDocument();
+    expect(screen.queryByText("100")).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/accounts/${accountId}`);
+
+    const post = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.method === "POST");
+    const body = JSON.parse(await post!.clone().text()) as {
+      type: string;
+      security: Record<string, unknown>[];
+    };
+    expect(body.type).toBe("Sell");
+    expect(body.security).toEqual([{ instrumentId, quantity: 40 }]);
+    expect(body.security[0]).not.toHaveProperty("cost");
+    expect(body).not.toHaveProperty("tenantId");
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
   it("shows no holdings when the projection is empty", async () => {
     renderDetail((url, method) => {
       if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
