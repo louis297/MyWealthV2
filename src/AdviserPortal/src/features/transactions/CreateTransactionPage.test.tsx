@@ -84,6 +84,7 @@ function renderForm(
   problem = "Price is not available.",
   accountOverride: Partial<typeof account> = {},
   problemShape: "errors" | "disabled" = "errors",
+  search = "",
 ) {
   const store = configureStore({
     reducer: {
@@ -137,7 +138,7 @@ function renderForm(
       { path: "/accounts/:id/transactions/new", element: <CreateTransactionPage /> },
       { path: "/accounts/:id", element: <p>account detail</p> },
     ],
-    { initialEntries: [`/accounts/${accountId}/transactions/new`] },
+    { initialEntries: [`/accounts/${accountId}/transactions/new${search}`] },
   );
 
   render(
@@ -446,6 +447,54 @@ describe("CreateTransactionPage", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("account detail")).not.toBeInTheDocument();
     expect(router.state.location.pathname).toBe(`/accounts/${accountId}/transactions/new`);
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it.each([
+    ["an Adviser", user()],
+    ["a TenantAdmin", user({ role: "tenantAdmin", name: "Pat Admin", adviserId: null })],
+  ])("posts a TransferIn for %s and returns to the account", async (_label, me) => {
+    const { fetchMock, router } = renderForm(me, 201, "Price is not available.", {}, "errors", "?type=TransferIn");
+
+    expect(await screen.findByRole("option", { name: "TransferIn" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Instrument")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Quantity")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Cost")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Currency")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "250.50" } });
+    fireEvent.change(screen.getByLabelText("Memo"), { target: { value: "Salary" } });
+    fireEvent.change(screen.getByLabelText("Booked at"), {
+      target: { value: "2026-10-12T09:00:00+13:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(await screen.findByText("account detail")).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/accounts/${accountId}`);
+
+    const post = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.method === "POST");
+    expect(post?.url).toBe("http://localhost:3000/api/transactions");
+    expect(post?.headers.get("Authorization")).toBeNull();
+    expect(post?.headers.get("X-MyWealth-Request")).toBe("1");
+    expect(post?.headers.get("Idempotency-Key")).toBe(idempotencyKey);
+    expect(post?.credentials).toBe("include");
+    const body = JSON.parse(await post!.clone().text()) as Record<string, unknown>;
+    expect(body).toEqual({
+      accountId,
+      type: "TransferIn",
+      amount: 250.5,
+      bookedAt: "2026-10-12T09:00:00+13:00",
+      memo: "Salary",
+    });
+    expect(body).not.toHaveProperty("security");
+    expect(body).not.toHaveProperty("instrumentId");
+    expect(body).not.toHaveProperty("price");
+    expect(body).not.toHaveProperty("cost");
+    expect(body).not.toHaveProperty("currency");
+    expect(body).not.toHaveProperty("cash");
+    expect(body).not.toHaveProperty("tenantId");
+    expect(body).not.toHaveProperty("reference");
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 });
