@@ -1,9 +1,10 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AccountDetailPage } from "@/features/accounts/AccountDetailPage";
+import { CreateTransactionPage } from "@/features/transactions/CreateTransactionPage";
 import { sessionSlice, setCurrentUser, type CurrentUser } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
 
@@ -34,14 +35,14 @@ const holding = {
   costCurrency: "NZD",
 };
 
-function json(body: unknown) {
+function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
-    status: 200,
+    status,
     headers: { "Content-Type": "application/json" },
   });
 }
 
-function user(): CurrentUser {
+function user(overrides: Partial<CurrentUser> = {}): CurrentUser {
   return {
     id: "11111111-1111-1111-1111-111111111111",
     name: "Pat Admin",
@@ -52,6 +53,7 @@ function user(): CurrentUser {
     tenantCode: "north-advisory",
     adviserId: null,
     rowVersion: "AAAA",
+    ...overrides,
   };
 }
 
@@ -139,6 +141,111 @@ describe("AccountDetailPage", () => {
       expect(request?.credentials).toBe("include");
       expect(new URL(request?.url ?? "").searchParams.has("tenantId")).toBe(false);
     }
+  });
+
+  it("posts a Buy and shows the updated cash, quantity, and new row", async () => {
+    const instrumentId = holding.instrumentId;
+    const createdId = "dddddddd-dddd-dddd-dddd-dddddddddddd";
+    const postedBuy = {
+      id: createdId,
+      tenantId: account.tenantId,
+      accountId,
+      customerId,
+      type: "Buy",
+      cash: { amount: -1250, currency: "NZD" },
+      bookedAt: "2026-10-11T10:00:00+13:00",
+      memo: null,
+      reference: null,
+      originalTransactionId: null,
+      rowVersion: "BBBB",
+      security: [{ instrumentId, quantity: 50, cost: 750, costCurrency: "USD" }],
+    };
+    let posted = false;
+
+    const store = configureStore({
+      reducer: {
+        session: sessionSlice.reducer,
+        [api.reducerPath]: api.reducer,
+      },
+      middleware: (getDefault) => getDefault().concat(api.middleware),
+    });
+    store.dispatch(setCurrentUser(user({ role: "adviser", name: "Sam Reed" })));
+
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
+      const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+      if (url.includes("/instruments") && method === "GET") {
+        return json({
+          items: [{
+            id: instrumentId,
+            tenantId: account.tenantId,
+            symbol: "DEMO",
+            name: "Demo Fund",
+            quoteCurrency: "NZD",
+            isActive: true,
+            rowVersion: "AAAA",
+          }],
+          page: 1,
+          pageSize: 100,
+          totalCount: 1,
+        });
+      }
+      if (url.endsWith("/transactions") && method === "POST") {
+        posted = true;
+        return json({ id: createdId }, 201);
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({
+          items: posted ? [postedBuy] : [],
+          page: 1,
+          pageSize: 20,
+          totalCount: posted ? 1 : 0,
+        });
+      }
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [{ ...holding, quantity: posted ? 150 : 100 }] });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json({ ...account, cashBalance: posted ? 0.5 : 1250.5 });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    const router = createMemoryRouter(
+      [
+        { path: "/accounts/:id", element: <AccountDetailPage /> },
+        { path: "/accounts/:id/transactions/new", element: <CreateTransactionPage /> },
+      ],
+      { initialEntries: [`/accounts/${accountId}`] },
+    );
+
+    render(
+      <Provider store={store}>
+        <RouterProvider router={router} />
+      </Provider>,
+    );
+
+    expect(await screen.findByText("1250.5")).toBeInTheDocument();
+    expect(screen.getByText("100")).toBeInTheDocument();
+    const buy = screen.getByRole("link", { name: "Buy" });
+    expect(buy).toHaveAttribute("href", `/accounts/${accountId}/transactions/new?type=Buy`);
+    fireEvent.click(buy);
+
+    await screen.findByRole("option", { name: "DEMO Demo Fund" });
+    fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+    fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
+    fireEvent.change(screen.getByLabelText("Booked at"), {
+      target: { value: "2026-10-11T10:00:00+13:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(await screen.findByText("0.5")).toBeInTheDocument();
+    expect(screen.getByText("150")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: createdId })).toHaveAttribute("href", `/transactions/${createdId}`);
+    expect(screen.queryByText("1250.5")).not.toBeInTheDocument();
+    expect(screen.queryByText("100")).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/accounts/${accountId}`);
+    expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
   it("shows no holdings when the projection is empty", async () => {
