@@ -312,7 +312,7 @@ Beyond PK / unique constraints already listed:
 - OpenIddict / Identity: keep package indexes
 - `Instruments(PublicId)`, `Instruments(TenantId, Symbol)` CI unique, `Instruments(TenantId, IsActive)`
 - `Accounts(PublicId)`, `Accounts(TenantId, CustomerId)`, `Accounts(TenantId, IsActive)`
-- `Transactions(PublicId)`, `Transactions(TenantId, AccountId, BookedAt)`, unique `TransactionCashLegs(TransactionId)` this increment
+- `Transactions(PublicId)`, `Transactions(TenantId, AccountId, BookedAt)`, unique `TransactionCashLegs(TransactionId)` this increment, unique filtered `Transactions(ReversedByTransactionId)` where not null (`0018`)
 
 ---
 
@@ -335,6 +335,7 @@ Beyond PK / unique constraints already listed:
 0015_transaction_type_opening_holdings.sql  -- CK_Transactions_Type widened to 0–9
 0016_transaction_type_stock_in_out.sql      -- CK_Transactions_Type widened to 0–11
 0017_transaction_type_split.sql             -- CK_Transactions_Type widened to 0–14
+0018_transaction_reversed_by.sql            -- ALTER Transactions.ReversedByTransactionId + FK + unique filtered index
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -393,6 +394,8 @@ Script `0012_accounts.sql`. Columns: [features/accounts.md](features/accounts.md
 
 Script `0013_transactions.sql`. Columns and rules: [features/posting.md](features/posting.md) §6. Header `Transactions` plus child `TransactionCashLegs` (one cash leg per header this increment). Idempotency table in the same script ([ADR 0015](adr/0015-idempotency-keys.md)). No `Accounts.Balance`. No seed in the script — `TestSeed` only.
 
+Amendment 2026-10-13: script `0018_transaction_reversed_by.sql` adds nullable `ReversedByTransactionId` (FK → `Transactions` RESTRICT, unique filtered index `WHERE ReversedByTransactionId IS NOT NULL`). Forward ALTER only. Do not edit `0013`. The original stores `ReversedByTransactionId`; the Reversal stores `OriginalTransactionId`.
+
 ### 11.5 Holdings (accepted, landed)
 
 Scripts `0014_holdings.sql` and `0015_transaction_type_opening_holdings.sql`. Columns: [features/holdings.md](features/holdings.md) §6. `0016_transaction_type_stock_in_out.sql` widens `CK_Transactions_Type` to 0–11 for `StockIn` (10) and `StockOut` (11). `0017_transaction_type_split.sql` widens that check to 0–14 for `Split` (12), `Bonus` (13), and `Scrip` (14). No new column. No seed in the scripts — `TestSeed` only.
@@ -422,3 +425,4 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-09-25 | `Transactions` + `TransactionCashLegs` + idempotency table (`0013`). Spec accepted and landed (`79129eb`). |
 | 2026-10-11 | Holdings (`0014`, `0015`) and `CK_Transactions_Type` widened to 0–11 (`0016`) for StockIn / StockOut. |
 | 2026-10-12 | `CK_Transactions_Type` widened to 0–14 (`0017`) for Split / Bonus / Scrip. No new table. |
+| 2026-10-13 | `Transactions.ReversedByTransactionId` (`0018`). Bidirectional reverse link. Forward ALTER only. |

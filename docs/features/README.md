@@ -112,3 +112,15 @@ instruments
                                     └── split / scrip / bonus
                                             └── net-worth read model + Dashboard
 ```
+
+---
+
+## Phase 3 — Reports (opened for design 2026-10-12)
+
+One domain. Background execution lives in the general-purpose `worker` (ADR 0017).
+
+| Spec | Status | Who | Ships | Why it stays its own slice |
+| --- | --- | --- | --- | --- |
+| [reports](reports.md) | draft | TenantAdmin; Adviser (own book) | Adviser Funds Report (current cash + holding market value, per currency). Manual + editable recurring. `ReportSchedule` + `ReportExecution`. Hangfire on `worker`. | First async / scheduled domain. Reuses net-worth style calculation. |
+
+Invitation / Activation and Fees are deferred.

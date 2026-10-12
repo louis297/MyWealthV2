@@ -212,18 +212,28 @@ Invitation delivery, Customer Portal, audit query, and custom role tables may ru
 
 ---
 
-## 6. Phase 3+ (names only)
+## 6. Phase 3 — Reports (opened for design)
+
+Phase 3 focuses on the Reports domain. Smaller platform pieces (Invitation / Activation, Fees) are deferred.
+
+- Background worker: general-purpose Aspire resource `worker` hosting Hangfire (ADR 0017). One worker for reports and later async work (email, etc.). Not one project per task type.
+- First report: Adviser Funds Report — current cash + holding market value for all open accounts under one Adviser, per currency, no FX fold. Manual trigger + editable recurring schedule. TenantAdmin may select a subordinate Adviser; Adviser is limited to self.
+- Draft: [features/reports.md](features/reports.md).
+
+Still later (not Phase 3):
 
 - Customer Portal — second public OIDC client (`customer-portal`) on the same authorization server; same hosted login; role check rejects the wrong portal
+- Invitation / Activation delivery
+- Fees
 - KYC / AML, IRD, tax residency
 - Households / joint / trusts
 - Advice documents / SoA
 - Custody / bank connectivity
-- Fees, model portfolios, rebalancing
 - Live market data / live FX / cross-currency legs
 - NZ regulation and record retention
 - External IdP (for example Entra) attached only to the authorization server
 - Identity remains the `identity` Aspire resource; external IdP attaches there
+- Back Office (SystemAdmin UI; currently Scalar)
 
 ---
 

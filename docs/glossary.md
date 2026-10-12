@@ -34,6 +34,9 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | TenantAdmin | Highest authority inside one tenant. | SystemAdmin |
 | Adviser | Tenant operator who manages assigned customers (and, from Phase 2, their ledger). | Customer |
 | Customer | Account holder. Login principal. Phase 1 client `adviser-portal` issues no code. No Customer Portal client yet. | A business row with no login principal |
+| Report | A generated, stored artefact (first type: Adviser Funds Report). Produced by the background worker. | A live Dashboard read |
+| ReportSchedule | Editable recurring definition bound to one Adviser. Drives a Hangfire recurring job. | A one-off manual request |
+| Worker | Aspire resource `worker` (`src/Worker`). General-purpose Hangfire host for async tasks. | A second resource API |
 | ApplicationUser / Identity user | ASP.NET Identity user in Infrastructure. All four roles share this table set. | Domain `User` |
 | Permission / Policy | Named capability on an endpoint (for example `accounts.close`). Role → permission is mapped in code. | Per-tenant custom role tables; `AspNetRoles` |
 | UserStatus | `PendingActivation` / `Active` / `Disabled`. Source of truth for a person. | Writing `IsActive` by itself |
@@ -57,7 +60,7 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | Leg (cash / security) | Accounting line that hits one book. Cash leg and security leg live on the **same** Transaction. Buy/Sell = both. StockIn/StockOut and OpeningHoldings = security only. Split/Bonus/Scrip = security only, total cost unchanged, new total quantity ([features/split.md](features/split.md)). | A second HTTP resource; “posting means cash only”; a wide row that holds both cash and stock columns |
 | Journal | Older discussion word for the Transaction header. Prefer *Transaction* in new text. | A second table beside Transactions |
 | Signed book amount | Stored signed decimal on a leg, from **that container’s book**. `+` increases that book; `−` decreases it. Balance / quantity is `SUM` of those signs. Read models may flip a sign for display (Credit as liability in net worth). | Debit/credit columns; a new sign rule per Feature Spec; storing outflows as positive and inferring direction from `Type` |
-| Reversal | A new opposite Transaction (`Type = Reversal`) pointing at the original. Original row is not updated or deleted. Cash leg = arithmetic negation of the original signed amount. Phase 2. | `UPDATE`/`DELETE` of the original; an adjustment that does not point at the original |
+| Reversal | A new opposite Transaction (`Type = Reversal`). The Reversal points at the original (`OriginalTransactionId`). The original receives a single write of `ReversedByTransactionId` pointing at the Reversal; after that write the original is immutable again. Economic legs are never updated. Cash leg = arithmetic negation of the original signed amount. Already reversed = `ReversedByTransactionId` is not null. Phase 2. | An open `UPDATE`/`DELETE` of the original; an adjustment that does not link both ways; a self-join to discover whether a row is reversed |
 | TransactionType | TransferIn / TransferOut / Interest / Opening / OpeningHoldings / Buy / Sell / StockIn / StockOut / Split / Bonus / Scrip / CloseOut / Reversal. Dividend reserved. Split / Bonus / Scrip are accepted in [features/split.md](features/split.md). | User-defined Category |
 | Category | Optional custom label on a transaction. Not in Phase 1. Not an account type. | Account type |
 | Currency | ISO 4217 three-letter code. One row in the platform catalog. | A C# enum |

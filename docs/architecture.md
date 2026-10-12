@@ -68,7 +68,7 @@ Portals:
 - Customer Portal — later second BFF + client on the same authorization server; not registered
 - Back Office — optional; SystemAdmin uses Scalar / API in Phase 1. SystemAdmin may still complete `adviser-portal` login (no tenantCode); firm pages stay forbidden.
 
-Aspire resource names must not be generic (`Frontend`, `Web`). Hosts: `identity`, `webapi`, `adviser-portal`, `bff-adviser-portal`. Reserved names: `customer-portal`, `bff-customer-portal`, `back-office`. Phase 1 does **not** split a separate identity **database**.
+Aspire resource names must not be generic (`Frontend`, `Web`). Hosts: `identity`, `webapi`, `adviser-portal`, `bff-adviser-portal`, `worker`. Reserved names: `customer-portal`, `bff-customer-portal`, `back-office`. Phase 1 does **not** split a separate identity **database**.
 
 One AppHost orchestrates every resource. Separate projects are separate processes. Each ASP.NET project has its own Kestrel and port. Aspire does not merge two projects onto one Kestrel.
 
@@ -78,7 +78,7 @@ One AppHost orchestrates every resource. Separate projects are separate processe
 
 | Project | Path | Responsibility |
 | --- | --- | --- |
-| AppHost | `src/AppHost` | Aspire graph: `dbserver`, `MyWealthDbV2`, `identity`, `webapi`, `adviser-portal`, `bff-adviser-portal` |
+| AppHost | `src/AppHost` | Aspire graph: `dbserver`, `MyWealthDbV2`, `identity`, `webapi`, `adviser-portal`, `bff-adviser-portal`, `worker` |
 | IdentityHost | `src/IdentityHost` | Authorization-server composition root; OpenIddict; hosted login |
 | Web | `src/Web` | Resource-API composition root; Minimal API; OpenAPI / Scalar; Bearer validation. Portal CORS removed (`5e85e9c`); browser does not call `webapi` |
 | Application | `src/Application` | Commands / queries, validation, pipeline, DTOs, named-policy map, port interfaces |
@@ -87,6 +87,7 @@ One AppHost orchestrates every resource. Separate projects are separate processe
 | Shared | `src/Shared` | Aspire resource-name constants |
 | ServiceDefaults | `src/ServiceDefaults` | Health, OpenTelemetry, service discovery |
 | BffAdviserPortal | `src/BffAdviserPortal` | Adviser Portal session edge. Confidential client holder. Cookie + OIDC + YARP |
+| Worker | `src/Worker` | Background worker. Hangfire Server for async and recurring work (ADR 0017). First consumer: Reports. |
 | AdviserPortal | Independent frontend | Vite SPA. No tokens. OIDC client id `adviser-portal` is not held here |
 | Tests | `tests/*` | Domain unit, application unit, infrastructure integration, functional |
 
@@ -291,7 +292,22 @@ If the identity **database** splits later, replace the revocation / login-princi
 
 ---
 
-## 10. ADR index (architecture view)
+## 10. Background worker
+
+Phase 3 introduces a general-purpose background worker (ADR 0017).
+
+- Project: `src/Worker`. Aspire resource: `worker`.
+- Hosts Hangfire Server. Storage is SQL Server on `MyWealthDbV2` in the `Hangfire` schema.
+- Business logic stays in `Application`. The worker resolves and runs Application services; it does not own domain rules.
+- Manual work is enqueued from `webapi` after the normal policy and handler scope checks.
+- Recurring work is driven by Hangfire recurring jobs whose scope is owned by a schedule record. Generation re-validates that scope.
+- Queues (`reports`, `email`, default) provide light isolation. One worker project is enough until a concrete resource or failure-domain need appears.
+- First consumer: [features/reports.md](features/reports.md). Email and other async tasks land here later unless a later ADR splits them.
+
+---
+
+## 11. ADR index (architecture view)
+
 
 Locked conclusions follow function-plan §0 and these ADRs. This folder currently holds English ADR 0014. Treat 0001–0013 as the locked bullets in the function plan until they are ported.
 
@@ -314,7 +330,7 @@ Locked conclusions follow function-plan §0 and these ADRs. This folder currentl
 
 ---
 
-## 11. Changelog
+## 12. Changelog
 
 | Date | Change |
 | --- | --- |
@@ -326,3 +342,4 @@ Locked conclusions follow function-plan §0 and these ADRs. This folder currentl
 | 2026-09-20 | Instruments ports + `/instruments`. SystemAdmin ledger policies on Scalar. |
 | 2026-09-21 | Instruments landed `9ea2f2a`. Accounts Feature Spec opened as `draft`. |
 | 2026-09-21 | Accounts landed (`0012_accounts.sql`, `/accounts`, Disable-Customer guard, TestSeed). |
+| 2026-10-12 | ADR 0017 proposed: general-purpose `worker` host for Hangfire. First consumer Reports. |

@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-25
-last_updated: 2026-09-25
+last_updated: 2026-10-13
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -30,11 +30,13 @@ There is **no separate cash-ledger Feature Spec.** Cash legs live here. There is
 
 **Status is `accepted`.** Implementation follows this file. Landed in the repo (`79129eb`). Script `0013_transactions.sql`, routes `/transactions`, policies `transactions.read` / `transactions.create`. Amends [accounts.md](accounts.md) R16 (close requires cash `SUM = 0`) and account JSON (`cashBalance`). Expand [ADR 0011](../adr/0011-ledger-cash-holdings-reversal.md). Idempotency: [ADR 0015](../adr/0015-idempotency-keys.md).
 
+**Amendment 2026-10-13:** bidirectional reverse link. Keep `OriginalTransactionId` on the Reversal. Add `ReversedByTransactionId` on the original (script `0018_transaction_reversed_by.sql`, forward ALTER only; do not edit `0013`). One limited write of that column when the Reversal is created; after that write the original is immutable again. Economic legs are never updated. Already-reversed is `ReversedByTransactionId IS NOT NULL` — no self-join on list / get.
+
 ---
 
 ## 1. Summary
 
-A TenantAdmin or Adviser records an append-only **Transaction** against one **Open** Account of an assigned / same-tenant Customer. SystemAdmin does the same for a chosen tenant.
+A TenantAdmin or Adviser records a **Transaction** against one **Open** Account of an assigned / same-tenant Customer. SystemAdmin does the same for a chosen tenant. The header is append-only for economic data; the only later write is the single `ReversedByTransactionId` on reverse.
 
 Two **layers**, one **step**:
 
@@ -84,7 +86,7 @@ Customer receives 403. No Adviser Portal activity page in this increment.
 - Adviser Portal Accounts / activity / holdings pages
 - Property / Credit selectable; Credit negative-cash exception is written only, not built
 - Draft / unposted rows
-- `UPDATE` / `DELETE` of a posted transaction
+- `UPDATE` / `DELETE` of a posted transaction, except the single `ReversedByTransactionId` write on reverse (amendment 2026-10-13)
 - Customer ledger-write; Customer Portal
 - SystemAdmin ledger screens on `adviser-portal`
 - Empty holdings tables “for later”
@@ -101,7 +103,7 @@ Customer receives 403. No Adviser Portal activity page in this increment.
 4. As an Adviser I record a `CloseOut` equal to the current balance so I can close the account.
 5. As an Adviser I cannot close an account while cash `SUM ≠ 0` (400).
 6. As an Adviser I cannot record a transaction on a Closed account (400). I reopen first.
-7. As an Adviser I reverse a posted transaction with a new opposite transaction that points at the original. I do not edit the original row.
+7. As an Adviser I reverse a posted transaction with a new opposite transaction. The new row points at the original (`originalTransactionId`). The original receives a single write of `reversedByTransactionId`. After that write I do not edit the original again.
 8. As a TenantAdmin I do the same for any Customer in my firm.
 9. As a SystemAdmin I do the same on Scalar for a chosen tenant.
 10. As a Customer I receive 403 on every `/transactions` verb.
@@ -123,8 +125,8 @@ Customer receives 403. No Adviser Portal activity page in this increment.
 | R7 | Create or reverse while the Customer is Disabled → 400 `disabled` / `target=user`. List / get of existing rows still work. |
 | R8 | Cash amount is a signed book amount in `Account.Currency` only. Body must not send a different currency. Store `decimal(18,4)` + `char(3)`. Application uses Domain `Money` for currency equality; direction lives on the signed decimal, not inside `Money`. |
 | R9 | After insert, cash `SUM` for that account must be `≥ 0`. Phase 2 opens no Credit accounts. Violation → 400. Compute in the same command (lock the Account row or equivalent). No persisted balance column. |
-| R10 | Posted rows are not `UPDATE`d or `DELETE`d. Correction is a new transaction with `Type = Reversal` and `originalTransactionId` set. |
-| R11 | Reversal must target a posted transaction in the same account. Already reversed → 400 (one reversal per original in this increment). Reversal of a reversal is out. |
+| R10 | Posted header and legs are not `UPDATE`d or `DELETE`d, **except** a single write of `ReversedByTransactionId` on the original when a Reversal is created. After that write the original is immutable again. Economic legs are never updated. Correction is a new transaction with `Type = Reversal` and `originalTransactionId` set. |
+| R11 | Reversal must target a posted transaction in the same account. Already reversed (`ReversedByTransactionId` is not null) → 400. One reversal per original. Reversal of a Reversal is out (`ReversedByTransactionId` on a Reversal stays null). |
 | R12 | `CloseAccount`: if cash `SUM ≠ 0` → 400 ordinary `errors`. `SUM = 0` (including never booked) may close. Amends accounts R16. Do not bulk-insert on close. Do not write cash inside `Account.Close()`. |
 | R13 | Closed accounts stay readable. Net worth (later) excludes them. Balance APIs still return the `SUM` (expected 0 after a successful close). |
 | R14 | List envelope `{ items, page, pageSize, totalCount }`; page default 1, size default 20, max 100. Optional `accountId`, optional `customerId`. Neither set → tenant scope (Adviser = assigned Customers). Sort `bookedAt` then id. |
@@ -183,7 +185,7 @@ Invariants:
 - Insert lands **Posted**. No draft / created status in this increment.
 - Header is the aggregate root. Cash `SUM` is not stored on the header.
 - Cash-leg currency equals `Account.Currency` (denormalised).
-- Original transaction is immutable after insert (audit columns aside).
+- Original transaction is immutable after insert (audit columns aside), **except** the single `ReversedByTransactionId` write on reverse. After that write it is immutable again.
 - `Account.Close()` stays a status flip. Zero-cash is an application guard.
 - One cash leg per header in this increment (`PostingId`-style unique on `TransactionId`).
 
@@ -198,9 +200,12 @@ Create(accountId, type, cashAmount, bookedAt, memo?, reference?)
   raise TransactionPosted
 
 Reverse(original)
-  original in same account, not already reversed
+  original in same account
+  original.ReversedByTransactionId is null
+  original.Type is not Reversal
   account Open
-  new type = Reversal, originalTransactionId = original
+  insert new type = Reversal, originalTransactionId = original
+  set original.ReversedByTransactionId = new
   cash leg = opposite of original cash leg
   SUM(account) >= 0
   raise TransactionReversed
@@ -220,10 +225,12 @@ Idempotency **rules** are [ADR 0015](../adr/0015-idempotency-keys.md) (`proposed
 
 | Table | Change | Index / FK |
 | --- | --- | --- |
-| `Transactions` | add | PK `Id`. Unique `PublicId`. FK `TenantId` → `Tenants` RESTRICT. FK `AccountId` → `Accounts` RESTRICT. Optional FK `OriginalTransactionId` → `Transactions` RESTRICT. Index `(TenantId, AccountId, BookedAt)`. |
+| `Transactions` | add | PK `Id`. Unique `PublicId`. FK `TenantId` → `Tenants` RESTRICT. FK `AccountId` → `Accounts` RESTRICT. Optional FK `OriginalTransactionId` → `Transactions` RESTRICT. Optional FK `ReversedByTransactionId` → `Transactions` RESTRICT (script `0018`; unique filtered index `WHERE ReversedByTransactionId IS NOT NULL`). Index `(TenantId, AccountId, BookedAt)`. |
 | `TransactionCashLegs` | add | PK `Id`. Unique `(TransactionId)` this increment. FK `TransactionId` → `Transactions` RESTRICT. Amount `decimal(18,4)`. Currency `char(3)` FK `Currencies.Code` RESTRICT. Audit + `RowVersion` same as header. |
 
-Header **and** cash-leg rows use the same audit + concurrency pair as `Accounts` / `Instruments`: `Created`, `CreatedBy`, `LastModified`, `LastModifiedBy`, `RowVersion`. `AuditableEntityInterceptor` fills the four audit fields on both. Posted rows are not updated, so `LastModified*` stay null unless a later spec adds a harmless touch.
+Header **and** cash-leg rows use the same audit + concurrency pair as `Accounts` / `Instruments`: `Created`, `CreatedBy`, `LastModified`, `LastModifiedBy`, `RowVersion`. `AuditableEntityInterceptor` fills the four audit fields on both. Posted rows are not updated, so `LastModified*` stay null, **except** the single `ReversedByTransactionId` write, which fills `LastModified` / `LastModifiedBy` and bumps `RowVersion`. Reverse still does **not** take a client `rowVersion` (server locks the Account).
+
+Amendment 2026-10-13: script `0018_transaction_reversed_by.sql` adds `ReversedByTransactionId` (nullable FK → `Transactions` RESTRICT, unique filtered index). Do not edit `0013_transactions.sql`. Do not back-fill.
 
 Cash-leg columns: `Id`, `TransactionId`, `Amount`, `Currency`, plus the four audit columns and `RowVersion`. HTTP still addresses the header `PublicId` only; the leg `RowVersion` is not a client token in this increment.
 
@@ -291,11 +298,14 @@ Item:
   "memo": "Salary",
   "reference": null,
   "originalTransactionId": null,
+  "reversedByTransactionId": null,
   "rowVersion": "<base64>"
 }
 ```
 
 The transaction item is optional `cash: { amount, currency }` plus optional `security` ([buy-sell.md](buy-sell.md)). `Split` / `Bonus` / `Scrip` omit `cash` ([split.md](split.md)). Do not keep a parallel flat `amount` on the item.
+
+`originalTransactionId` is set on a Reversal (points at the original). `reversedByTransactionId` is set on the original after reverse (points at the Reversal). Both are null on an unreversed original. Both are returned on list and get. Hide the Reverse button when `reversedByTransactionId` is not null or `type` is `Reversal`.
 
 Account item and account list (amendment when accepted):
 
@@ -326,8 +336,8 @@ None in this increment. Pages live in [docs/portals/](../portals/). Scalar is en
 
 | Project | Assert |
 | --- | --- |
-| Domain.UnitTests | Create / reverse invariants; SUM sign; cannot mutate posted header; Opening / CloseOut rules if placed on the entity |
-| Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403; happy TransferIn/Out/Interest/Opening/CloseOut; Opening rejected after another type; second Opening rejected; close rejected while SUM ≠ 0; create rejected while Closed; reverse new id, original untouched; idempotent replay; hash mismatch 409; missing key 400; account JSON includes `cashBalance` |
+| Domain.UnitTests | Create / reverse invariants; SUM sign; cannot mutate posted header except the single `ReversedByTransactionId` write; Opening / CloseOut rules if placed on the entity |
+| Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403; happy TransferIn/Out/Interest/Opening/CloseOut; Opening rejected after another type; second Opening rejected; close rejected while SUM ≠ 0; create rejected while Closed; reverse new id, original economic legs untouched, original `reversedByTransactionId` set; already reversed → 400; idempotent replay; hash mismatch 409; missing key 400; account JSON includes `cashBalance` |
 | Infrastructure.IntegrationTests | Other tenant’s id → 404; Adviser unassigned Customer → 404; no `Accounts.Balance`; no `Journals` table |
 
 TestSeed (Development / TestAppHost only): one `TransferIn` on “Demo everyday bank” so Scalar shows a non-zero `SUM`. Functional tests still create their own rows. Do not seed a fake two-account transfer.
@@ -352,7 +362,7 @@ Idempotency: [ADR 0015](../adr/0015-idempotency-keys.md) (`proposed`). Expand [A
 | Close | Reject if cash `SUM ≠ 0`. Closed forbids new transactions including reversal. `CloseOut` zeroes the book. `Account.Close()` does not write cash. |
 | Transfer | Cross-account transfer out (§13). |
 | Legs | Header + `TransactionCashLegs` (one cash leg now). Not cash columns on the header. Header **and** cash-leg rows have Created/CreatedBy/LastModified/LastModifiedBy + `RowVersion`. Reverse does not require any `rowVersion`. |
-| Mutation | No `UPDATE`/`DELETE` of posted transactions. |
+| Mutation | No `UPDATE`/`DELETE` of posted transactions, **except** the single `ReversedByTransactionId` write on reverse (script `0018`). After that write the original is immutable again. Economic legs are never updated. |
 | Line sign | Glossary **Signed book amount**. |
 | `bookedAt` | Required `datetimeoffset`. |
 | Opening / types / memo / reference / idempotency / concurrency | R19–R24 and the type table in §5. |

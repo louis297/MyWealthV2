@@ -217,7 +217,7 @@ Session stack, four roles, and User / Tenant invariants do not change in Phase 2
 
 - **Cash and securities are two legs, not two values of one `Type` column.** A buy/sell has a cash leg and a security leg. Transfer / interest / dividend may be cash-only. Split / Bonus / Scrip is a security leg, no cash, total cost unchanged; the write takes the new total quantity ([features/split.md](features/split.md)). Do not ship a single-row catch-all `Transactions` table and split it later.
 - **Do not create ledger tables while storage shape is still open.** `Transaction` + `TransactionCashLeg` are locked in [features/posting.md](features/posting.md). Holdings and security legs are locked in [features/holdings.md](features/holdings.md). No standalone Journal / CashLedger table.
-- **Booked postings are not `UPDATE` / `DELETE`.** Correction tends to be a full opposite posting that points at the original (reversal).
+- **Booked postings are not `UPDATE` / `DELETE`**, except a single write of `ReversedByTransactionId` on the original when a Reversal is created. After that write the original is immutable again. Economic legs are never updated. Correction is a full opposite posting; the Reversal points at the original, and the original points at the Reversal.
 - **After a posting, cash must not go negative on non-Credit accounts. Credit may be negative** (liability).
 - **Day-to-day holding quantity and cost are not edited by hand.** The only entry that may write quantity and cost directly is Opening — lock the shape when that slice opens; keep the name.
 - Instruments are a **tenant catalog**. Adviser may create and read; update / disable is TenantAdmin or SystemAdmin. `QuoteCurrency` locks after create. Cost currency = quote currency.
@@ -238,7 +238,7 @@ Tenant
               └── Holding              projection per (Account, Instrument)
 ```
 
-A Transaction may carry security legs on the same header. `OpeningHoldings` / `StockIn` / `StockOut` are security only. `Buy` / `Sell` are cash plus security ([features/buy-sell.md](features/buy-sell.md)). `Split` / `Bonus` / `Scrip` are security only: the client sends the new total quantity, the leg stores the signed delta at cost `0`, and holding total cost does not move ([features/split.md](features/split.md)). Reversal is a new Transaction that points at the original. Quantity 0 deletes the `Holdings` row. A split reverse that would leave quantity `≤ 0` is rejected.
+A Transaction may carry security legs on the same header. `OpeningHoldings` / `StockIn` / `StockOut` are security only. `Buy` / `Sell` are cash plus security ([features/buy-sell.md](features/buy-sell.md)). `Split` / `Bonus` / `Scrip` are security only: the client sends the new total quantity, the leg stores the signed delta at cost `0`, and holding total cost does not move ([features/split.md](features/split.md)). Reversal is a new Transaction. The Reversal points at the original (`OriginalTransactionId`); the original points at the Reversal (`ReversedByTransactionId`, single write, then immutable again). Quantity 0 deletes the `Holdings` row. A split reverse that would leave quantity `≤ 0` is rejected.
 
 Locked in [features/holdings.md](features/holdings.md), landed `676e77a`:
 
@@ -314,7 +314,7 @@ Invariants:
 - `TenantId` and `AccountId` required. Write = posted. No `Created` / draft status.
 - Cash `SUM` of legs is the account cash balance. Not stored on `Account`.
 - After insert, `SUM ≥ 0` for Phase 2 openable types.
-- Posted header and legs are not `UPDATE`d / `DELETE`d. Reversal is a new row with the opposite cash amount and the opposite security quantity and cost.
+- Posted header and legs are not `UPDATE`d / `DELETE`d, **except** a single write of `ReversedByTransactionId` on the original when a Reversal is created. After that write the original is immutable again. Economic legs are never updated. Reversal is a new row with the opposite cash amount and the opposite security quantity and cost. The Reversal stores `OriginalTransactionId`; the original stores `ReversedByTransactionId`.
 - `Buy` security cost is `quantity × price` in the quote currency. Cash is that cost times FX, negative, in the account currency.
 - `Sell` and `StockOut` store the released average cost on the security leg (`Round(oldCost × qty / oldQty, 4, AwayFromZero)`; the full quantity releases the whole cost). `Sell` cash is `quantity × price × FX`, positive. `StockOut` has no cash leg.
 - `StockIn` stores the client cost and has no cash leg.
@@ -350,3 +350,4 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-09-21 | Account aggregate landed. Disable Customer rejects while any account is active. |
 | 2026-09-25 | Transaction + cash leg accepted (posting spec). Close requires cash SUM = 0. No capture/journal two-step. |
 | 2026-10-12 | Net-worth current point-in-time read model accepted and landed (`af422c2`). Per-currency arrays. No new Domain types. [features/net-worth.md](features/net-worth.md). |
+| 2026-10-13 | Bidirectional reverse link. `ReversedByTransactionId` on the original (single write). `OriginalTransactionId` stays on the Reversal. Script `0018`. |
