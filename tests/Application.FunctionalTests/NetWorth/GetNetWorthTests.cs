@@ -83,6 +83,31 @@ public class GetNetWorthTests : TestBase
         AssertCurrency(currencies[2], "USD", cash: 0m, holdings: 80m);
     }
 
+    [Test]
+    public async Task CustomerRoute_MatchesThatCustomersFirmTotals_AndUnknownIdIs404()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var bank = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Everyday", "Bank", "NZD");
+        (await PostCashAsync(tokens.AccessToken, bank, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var firm = await AccountHttp.Send(HttpMethod.Get, "/net-worth", tokens.AccessToken);
+        var one = await AccountHttp.Send(
+            HttpMethod.Get, $"/users/customers/{customer.PublicId}/net-worth", tokens.AccessToken);
+        firm.StatusCode.ShouldBe(HttpStatusCode.OK);
+        one.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        using var firmJson = JsonDocument.Parse(await firm.Content.ReadAsStringAsync());
+        using var oneJson = JsonDocument.Parse(await one.Content.ReadAsStringAsync());
+        oneJson.RootElement.GetProperty("currencies").GetRawText()
+            .ShouldBe(firmJson.RootElement.GetProperty("currencies").GetRawText());
+        oneJson.RootElement.GetProperty("breakdowns").EnumerateObject().Select(property => property.Name)
+            .ShouldBe(["byCustomer", "byAccountType", "topHoldings"]);
+
+        (await AccountHttp.Send(
+            HttpMethod.Get, $"/users/customers/{Guid.NewGuid()}/net-worth", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
     private static void AssertCurrency(JsonElement row, string currency, decimal cash, decimal holdings)
     {
         row.EnumerateObject().Select(property => property.Name).ShouldBe([
