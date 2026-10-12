@@ -5,6 +5,7 @@ import { CreateAdviserPage } from "@/features/advisers/CreateAdviserPage";
 import { EditAdviserPage } from "@/features/advisers/EditAdviserPage";
 import { AccountDetailPage } from "@/features/accounts/AccountDetailPage";
 import { AccountsListPage } from "@/features/accounts/AccountsListPage";
+import { CreateAccountPage } from "@/features/accounts/CreateAccountPage";
 import { CreateCustomerPage } from "@/features/customers/CreateCustomerPage";
 import { CustomerDetailPage } from "@/features/customers/CustomerDetailPage";
 import { CustomersListPage } from "@/features/customers/CustomersListPage";
@@ -65,6 +66,7 @@ export const appRoutes: RouteObject[] = [
             children: [
               { index: true, element: <CustomersListPage /> },
               { path: "new", element: <CreateCustomerPage /> },
+              { path: ":id/accounts/new", element: <CreateAccountPage /> },
               { path: ":id", element: <CustomerDetailPage /> },
               { path: ":id/edit", element: <EditCustomerPage /> },
             ],

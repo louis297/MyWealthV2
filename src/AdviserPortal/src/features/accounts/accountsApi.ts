@@ -19,6 +19,13 @@ export type AccountListArgs = {
   customerId?: string;
 };
 
+export type CreateAccountBody = {
+  customerId: string;
+  name: string;
+  type: string;
+  currency: string;
+};
+
 export type AccountHolding = {
   id: string;
   accountId: string;
@@ -52,7 +59,20 @@ export const accountsApi = api.injectEndpoints({
       query: (id) => `/accounts/${id}/holdings`,
       providesTags: (_result, _error, id) => [{ type: "Account", id }],
     }),
+    createAccount: builder.mutation<{ id: string }, CreateAccountBody>({
+      query: (body) => ({
+        url: "/accounts",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Account"],
+    }),
   }),
 });
 
-export const { useGetAccountsQuery, useGetAccountQuery, useGetAccountHoldingsQuery } = accountsApi;
+export const {
+  useGetAccountsQuery,
+  useGetAccountQuery,
+  useGetAccountHoldingsQuery,
+  useCreateAccountMutation,
+} = accountsApi;
