@@ -88,7 +88,7 @@ Two endpoints: a firm / adviser list and a single-Customer read. Both return the
 | R4 | TenantAdmin / Adviser omit `tenantId` (400 if present). SystemAdmin may pass `tenantId` on the firm read, same as other ledger lists. The Customer read uses the customer PublicId only. |
 | R5 | Closed accounts are excluded. Open accounts only. |
 | R6 | Results are arrays per currency. Do not fold with FX. Same-currency FX is not applied. |
-| R7 | Cash = existing computed cash balance (SUM of posted cash legs). Holding market value = quantity × mocked price in quote currency. No price → that holding contributes 0 market value (or is omitted; lock on accept). |
+| R7 | Cash = existing computed cash balance (SUM of posted cash legs). Holding market value = quantity × mocked price in quote currency. No price → market value 0, and the holding is still listed. Quantity ≤ 0 is omitted. |
 | R8 | Phase 2 has no Credit. Liabilities array is empty. Do not invent a negative-cash rule. |
 | R9 | Adviser sees only assigned Customers. TenantAdmin sees the firm. SystemAdmin sees the chosen tenant. |
 | R10 | Current point-in-time only. No `asOf` parameter. No stored snapshot. |
@@ -181,8 +181,9 @@ No portal page in this slice. Pages live in [portals/](../portals/README.md).
 
 | Project | Assert |
 | --- | --- |
-| Application.FunctionalTests | No Bearer → 401; wrong role → 403; happy path firm and customer; Closed accounts excluded; Adviser cannot see unassigned Customer → 404; SystemAdmin with `tenantId` |
-| Infrastructure.IntegrationTests | Two-tenant fixture: other tenant’s customer id → 404 |
+| Application.FunctionalTests | No Bearer → 401; wrong role → 403; happy path firm and customer; Closed accounts excluded; breakdowns; `customerId`; Adviser cannot see unassigned Customer → 404; other tenant’s customer id → 404; SystemAdmin with `tenantId`; TestSeed demo book; BFF proxies `GET /api/net-worth` |
+
+Other-tenant 404 lives in these functional tests, the same home as accounts and holdings. This slice does not add an `Infrastructure.IntegrationTests` host.
 
 ---
 
@@ -194,15 +195,19 @@ No new ADR.
 | --- | --- |
 | Scripts / policy | None. Reuse `accounts.read`. Add `instruments.read` only if the price path requires a second policy. |
 | Caller | TenantAdmin, Adviser, SystemAdmin (Scalar). Customer 403. |
-| Scope | Current point-in-time. Per-currency arrays. No FX fold. Open accounts only. Two routes. Breakdowns as sketched. |
+| Scope | Current point-in-time. Per-currency arrays. No FX fold. Open accounts only. Two routes. Optional firm `customerId` (404 when that Customer is missing or out of scope). |
+| No price | Market value 0. The holding stays in `topHoldings` with the instrument quote currency. `TryGetPrice` stays null. |
+| Quantity ≤ 0 | Omitted from market value and from `topHoldings`. |
+| Currencies | A code appears when an in-scope open account books cash in it, or a listed holding’s market value is in it. Zero cash is included. Codes sort ascending. |
+| byCustomer | One row per customer with an open account in scope. `name` is `User.Name`. Sort by name, then `customerId`. |
+| byAccountType | One row per type that has an open account in scope. `type` is the enum name. Sort by that name. |
+| topHoldings | Sum quantity and market value by instrument across open accounts. No cap. Sort by `marketValue` descending, then `symbol`, then `instrumentId`. |
 
 Still open, not this slice:
 
 - Daily snapshots and historical series
 - Live market data
 - Portal page implementation
-- Exact “no price” behaviour (omit vs zero)
-- Top-N limits and sort order for breakdowns
 
 ---
 
