@@ -124,6 +124,11 @@ public static class ApiProxy
         if (http.Request.ContentLength is > 0 || http.Request.Headers.ContainsKey("Transfer-Encoding"))
         {
             outbound.Content = new StreamContent(http.Request.Body);
+            // EnableBuffering wraps the body in a seekable stream whose Length is only the
+            // bytes buffered so far. StreamContent would advertise that short length, and
+            // HttpClient then refuses the rest of the body. Use the inbound length, or
+            // leave it unset when the caller sent no Content-Length (chunked).
+            outbound.Content.Headers.ContentLength = http.Request.ContentLength;
             if (!string.IsNullOrEmpty(http.Request.ContentType))
             {
                 outbound.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(http.Request.ContentType);
