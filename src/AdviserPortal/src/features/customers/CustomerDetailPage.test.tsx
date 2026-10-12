@@ -1,5 +1,5 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -194,52 +194,75 @@ describe("CustomerDetailPage", () => {
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
-  it("renders the customer net-worth read from GET /users/customers/{id}/net-worth", async () => {
+  it("shows the customer and accounts without dashboard breakdowns", async () => {
     const { fetchMock } = renderDetail(user(), (url, method) => {
-      if (url.endsWith(`/users/customers/${customerId}/net-worth`) && method === "GET") {
-        return json(customerNetWorth);
+      if (url.includes("/api/accounts") && method === "GET") {
+        return json({ items: [account], page: 1, pageSize: 20, totalCount: 1 });
       }
       if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
         return json(customer);
       }
+      if (url.includes("net-worth")) {
+        return json({
+          ...customerNetWorth,
+          breakdowns: {
+            byCustomer: [
+              {
+                customerId,
+                name: "Amy Able",
+                currencies: customerNetWorth.currencies,
+              },
+            ],
+            byAccountType: [
+              {
+                type: "Brokerage",
+                currencies: customerNetWorth.currencies,
+              },
+            ],
+            topHoldings: [
+              {
+                instrumentId: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+                symbol: "DEMO",
+                quantity: 100,
+                marketValue: 5000,
+                currency: "NZD",
+              },
+            ],
+          },
+        });
+      }
       return new Response("", { status: 404 });
     });
 
-    expect(await screen.findByRole("heading", { name: "Net worth" })).toBeInTheDocument();
-    const nzd = screen.getByRole("row", { name: /NZD/ });
-    expect(within(nzd).getByText("1000")).toBeInTheDocument();
-    expect(within(nzd).getByText("5000")).toBeInTheDocument();
-    expect(within(nzd).getAllByText("6000")).toHaveLength(2);
-    expect(within(nzd).getByText("0")).toBeInTheDocument();
-    expect(screen.getByText("Jordan Lee")).toBeInTheDocument();
-    expect(screen.queryByText("Forbidden")).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Jordan Lee" })).toBeInTheDocument();
+    expect(screen.getByText("jordan@north.example")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Accounts" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "New account" })).toHaveAttribute(
+      "href",
+      `/customers/${customerId}/accounts/new`,
+    );
+    await expect(
+      screen.findByRole("heading", { name: "By customer" }, { timeout: 300 }),
+    ).rejects.toThrow();
+    expect(screen.queryByRole("heading", { name: "Net worth" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "By account type" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Top holdings" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Amy Able")).not.toBeInTheDocument();
+    expect(screen.queryByText("Brokerage")).not.toBeInTheDocument();
+    expect(screen.queryByText("DEMO")).not.toBeInTheDocument();
+    expect(screen.queryByText("Not found")).not.toBeInTheDocument();
     expect(document.querySelector('input[type="password"]')).toBeNull();
 
-    const request = fetchMock.mock.calls
-      .map(([input]) => input)
-      .find((input): input is Request => input instanceof Request && input.url.endsWith(`/users/customers/${customerId}/net-worth`));
-    expect(request?.url).toBe(
-      `http://localhost:3000/api/users/customers/${customerId}/net-worth`,
-    );
-    expect(request?.headers.get("Authorization")).toBeNull();
-    expect(request?.credentials).toBe("include");
-    expect(
-      fetchMock.mock.calls.some(([input]) => input instanceof Request && input.url.endsWith("/api/net-worth")),
-    ).toBe(false);
-  });
-
-  it("keeps the customer and shows Not found when the net-worth read is 404", async () => {
-    renderDetail(user(), (url, method) => {
-      if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
-        return json(customer);
+    const urls = fetchMock.mock.calls.map(([input]) => {
+      if (typeof input === "string") {
+        return input;
       }
-      return new Response("", { status: 404 });
+      if (input instanceof Request) {
+        return input.url;
+      }
+      return String(input);
     });
-
-    expect(await screen.findByText("Jordan Lee")).toBeInTheDocument();
-    expect(await screen.findByText("Not found")).toBeInTheDocument();
-    expect(screen.queryByText("Forbidden")).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
+    expect(urls.some((url) => url.includes("net-worth"))).toBe(false);
   });
 
   it("is read-only and disables with the current rowVersion", async () => {
