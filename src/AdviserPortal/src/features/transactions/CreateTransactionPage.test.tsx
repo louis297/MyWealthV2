@@ -244,4 +244,101 @@ describe("CreateTransactionPage", () => {
     expect(router.state.location.pathname).toBe(`/accounts/${accountId}/transactions/new`);
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
+
+  async function postedBody(fetchMock: ReturnType<typeof vi.mocked<typeof fetch>>) {
+    const post = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.method === "POST");
+    return JSON.parse(await post!.clone().text()) as Record<string, unknown>;
+  }
+
+  it("posts StockIn with client cost and no cash", async () => {
+    const { fetchMock } = renderForm();
+
+    await screen.findByRole("option", { name: "DEMO Demo Fund" });
+    fireEvent.change(screen.getByLabelText("Type"), { target: { value: "StockIn" } });
+    fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+    fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "20" } });
+    fireEvent.change(screen.getByLabelText("Cost"), { target: { value: "300" } });
+    fireEvent.change(screen.getByLabelText("Booked at"), {
+      target: { value: "2026-10-11T10:00:00+13:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(await screen.findByText("account detail")).toBeInTheDocument();
+    const body = await postedBody(fetchMock);
+    expect(body).toEqual({
+      accountId,
+      type: "StockIn",
+      bookedAt: "2026-10-11T10:00:00+13:00",
+      memo: null,
+      reference: null,
+      security: [{ instrumentId, quantity: 20, cost: 300 }],
+    });
+    expect(body).not.toHaveProperty("cash");
+    expect(body).not.toHaveProperty("amount");
+    expect(body).not.toHaveProperty("price");
+    expect(body).not.toHaveProperty("tenantId");
+  });
+
+  it("posts StockOut with quantity only", async () => {
+    const { fetchMock } = renderForm();
+
+    await screen.findByRole("option", { name: "DEMO Demo Fund" });
+    fireEvent.change(screen.getByLabelText("Type"), { target: { value: "StockOut" } });
+    expect(screen.queryByLabelText("Cost")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+    fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "20" } });
+    fireEvent.change(screen.getByLabelText("Booked at"), {
+      target: { value: "2026-10-11T10:00:00+13:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(await screen.findByText("account detail")).toBeInTheDocument();
+    const body = await postedBody(fetchMock);
+    expect(body).toMatchObject({
+      type: "StockOut",
+      security: [{ instrumentId, quantity: 20 }],
+    });
+    const leg = (body.security as Record<string, unknown>[])[0];
+    expect(leg).not.toHaveProperty("cost");
+    expect(body).not.toHaveProperty("cash");
+    expect(body).not.toHaveProperty("ratio");
+    expect(body).not.toHaveProperty("tenantId");
+  });
+
+  it.each(["Split", "Bonus", "Scrip"])(
+    "posts %s as a new total quantity with cost unchanged",
+    async (type) => {
+      const { fetchMock } = renderForm();
+
+      await screen.findByRole("option", { name: "DEMO Demo Fund" });
+      fireEvent.change(screen.getByLabelText("Type"), { target: { value: type } });
+      expect(screen.getByLabelText("New total quantity")).toBeInTheDocument();
+      expect(screen.queryByLabelText("Cost")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Ratio")).not.toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+      fireEvent.change(screen.getByLabelText("New total quantity"), { target: { value: "200" } });
+      fireEvent.change(screen.getByLabelText("Booked at"), {
+        target: { value: "2026-10-12T10:00:00+13:00" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+      expect(await screen.findByText("account detail")).toBeInTheDocument();
+      const body = await postedBody(fetchMock);
+      expect(body).toMatchObject({
+        type,
+        bookedAt: "2026-10-12T10:00:00+13:00",
+        security: [{ instrumentId, quantity: 200 }],
+      });
+      const leg = (body.security as Record<string, unknown>[])[0];
+      expect(leg).not.toHaveProperty("cost");
+      expect(leg).not.toHaveProperty("ratio");
+      expect(body).not.toHaveProperty("cash");
+      expect(body).not.toHaveProperty("amount");
+      expect(body).not.toHaveProperty("ratio");
+      expect(body).not.toHaveProperty("tenantId");
+      expect(document.querySelector('input[type="password"]')).toBeNull();
+    },
+  );
 });
