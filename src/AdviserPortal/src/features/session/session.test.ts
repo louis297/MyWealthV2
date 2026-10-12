@@ -54,6 +54,14 @@ describe("startLogin host", () => {
     expect(window.location.assign).toHaveBeenCalledWith("/bff/login?returnUrl=%2Fprofile");
   });
 
+  it("keeps /dashboard as the login return path", () => {
+    vi.stubEnv("VITE_BFF_HTTP", "");
+
+    startLogin("/dashboard");
+
+    expect(window.location.assign).toHaveBeenCalledWith("/bff/login?returnUrl=%2Fdashboard");
+  });
+
   it("does not leave the Vite host while sign-out is in progress", () => {
     vi.stubEnv("VITE_BFF_HTTP", bffOrigin);
     sessionStorage.setItem(SIGN_OUT_IN_PROGRESS_KEY, "1");
