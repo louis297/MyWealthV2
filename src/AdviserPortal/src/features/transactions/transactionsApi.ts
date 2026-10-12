@@ -30,6 +30,8 @@ export type Transaction = {
 
 export type TransactionListArgs = {
   page?: number;
+  accountId?: string;
+  customerId?: string;
 };
 
 export const transactionsApi = api.injectEndpoints({
@@ -39,6 +41,12 @@ export const transactionsApi = api.injectEndpoints({
         const params = new URLSearchParams();
         params.set("page", String(args?.page ?? 1));
         params.set("pageSize", "20");
+        if (args?.accountId) {
+          params.set("accountId", args.accountId);
+        }
+        if (args?.customerId) {
+          params.set("customerId", args.customerId);
+        }
         return `/transactions?${params.toString()}`;
       },
       providesTags: ["Transaction"],
