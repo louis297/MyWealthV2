@@ -50,7 +50,24 @@ public class GetNetWorthQueryHandler(
         }
 
         var assignedAdviserId = AccountScope.AssignedAdviserInternalId(currentUser);
+        int? customerId = null;
+        if (request.CustomerId is Guid customerPublicId)
+        {
+            var customers = db.Users.AsNoTracking()
+                .Where(user => user.PublicId == customerPublicId
+                               && user.Role == UserRole.Customer
+                               && user.TenantId == tenantId);
+            if (assignedAdviserId is not null)
+            {
+                customers = customers.Where(user => user.AdviserId == assignedAdviserId);
+            }
+
+            var customer = await customers.SingleOrDefaultAsync(cancellationToken)
+                           ?? throw new NotFoundException("Customer", customerPublicId);
+            customerId = customer.Id;
+        }
+
         return await NetWorthReader.ReadAsync(
-            db, marketData, time, tenantId, customerId: null, assignedAdviserId, cancellationToken);
+            db, marketData, time, tenantId, customerId, assignedAdviserId, cancellationToken);
     }
 }
