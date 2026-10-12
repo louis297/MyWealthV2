@@ -1,5 +1,5 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -673,6 +673,38 @@ describe("AccountDetailPage", () => {
     expect(screen.getByText("Open")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
     expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("asks the user to reload on 409 and does not replay the stale rowVersion", async () => {
+    const posted: string[] = [];
+    let gets = 0;
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderDetail((url, method, body) => {
+      if (url.endsWith(`/accounts/${accountId}/close`) && method === "POST") {
+        posted.push(body ?? "");
+        return new Response("", { status: 409 });
+      }
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        gets += 1;
+        return json({ ...account, rowVersion: gets === 1 ? "AAAA" : "BBBB" });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Close" }));
+
+    expect(await screen.findByText("This row changed. Reload and try again.")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(gets).toBeGreaterThan(1);
+    });
+    expect(posted).toEqual([JSON.stringify({ rowVersion: "AAAA" })]);
+    expect(screen.getByText("Open")).toBeInTheDocument();
   });
 
   it("stays on the URL and shows Not found for a missing account", async () => {
