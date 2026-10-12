@@ -42,11 +42,28 @@ export function NetWorthView({ data }: { data: NetWorth }) {
       <section className="space-y-2">
         <h2 className="text-base font-medium">By account type</h2>
         {byAccountType.length === 0 ? <p>None.</p> : (
-          <ul>
-            {byAccountType.map((row) => (
-              <li key={row.type}>{row.type}</li>
-            ))}
-          </ul>
+          <table className="border-collapse text-sm">
+            <thead>
+              <tr>
+                <th className="border border-slate-200 px-2 py-1 text-left">Type</th>
+                <th className="border border-slate-200 px-2 py-1 text-left">Net</th>
+              </tr>
+            </thead>
+            <tbody>
+              {byAccountType.map((row) => (
+                <tr key={row.type}>
+                  <td className="border border-slate-200 px-2 py-1">{row.type}</td>
+                  <td className="border border-slate-200 px-2 py-1">
+                    {row.currencies.map((currency) => (
+                      <span key={currency.currency} className="mr-3">
+                        <span>{currency.currency}</span> <span>{currency.net}</span>
+                      </span>
+                    ))}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </section>
       <section className="space-y-2">
