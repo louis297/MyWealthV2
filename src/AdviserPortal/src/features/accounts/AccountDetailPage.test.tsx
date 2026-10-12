@@ -145,7 +145,7 @@ describe("AccountDetailPage", () => {
 
   it("posts a Buy and shows the updated cash, quantity, and new row", async () => {
     const instrumentId = holding.instrumentId;
-    const createdId = "dddddddd-dddd-dddd-dddd-dddddddddddd";
+    const createdId = "99999999-9999-9999-9999-999999999999";
     const postedBuy = {
       id: createdId,
       tenantId: account.tenantId,
@@ -239,9 +239,13 @@ describe("AccountDetailPage", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
-    expect(await screen.findByText("0.5")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Everyday spending" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: createdId })).toHaveAttribute(
+      "href",
+      `/transactions/${createdId}`,
+    );
+    expect(screen.getByText("0.5")).toBeInTheDocument();
     expect(screen.getByText("150")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: createdId })).toHaveAttribute("href", `/transactions/${createdId}`);
     expect(screen.queryByText("1250.5")).not.toBeInTheDocument();
     expect(screen.queryByText("100")).not.toBeInTheDocument();
     expect(router.state.location.pathname).toBe(`/accounts/${accountId}`);
