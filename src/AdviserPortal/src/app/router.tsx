@@ -10,6 +10,7 @@ import { CustomerDetailPage } from "@/features/customers/CustomerDetailPage";
 import { CustomersListPage } from "@/features/customers/CustomersListPage";
 import { EditCustomerPage } from "@/features/customers/EditCustomerPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
+import { CreateTransactionPage } from "@/features/transactions/CreateTransactionPage";
 import { TransactionsListPage } from "@/features/transactions/TransactionsListPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
 import { ForbiddenPage } from "@/features/session/ForbiddenPage";
@@ -46,6 +47,7 @@ export const appRoutes: RouteObject[] = [
             children: [
               { index: true, element: <AccountsListPage /> },
               { path: ":id", element: <AccountDetailPage /> },
+              { path: ":id/transactions/new", element: <CreateTransactionPage /> },
             ],
           },
           {
