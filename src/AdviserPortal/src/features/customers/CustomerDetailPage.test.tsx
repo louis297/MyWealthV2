@@ -37,6 +37,21 @@ const emptyNetWorth = {
   breakdowns: { byCustomer: [], byAccountType: [], topHoldings: [] },
 };
 
+const accountId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+
+const account = {
+  id: accountId,
+  tenantId: "22222222-2222-2222-2222-222222222222",
+  customerId,
+  name: "Everyday spending",
+  type: "Bank",
+  currency: "NZD",
+  status: "Open",
+  isActive: true,
+  cashBalance: 1250.5,
+  rowVersion: "AAAA",
+};
+
 const customerNetWorth = {
   asOf: "2026-10-12T16:00:00.000Z",
   currencies: [
@@ -122,6 +137,51 @@ describe("CustomerDetailPage", () => {
     sessionStorage.clear();
     vi.stubGlobal("fetch", vi.fn());
     vi.spyOn(window, "confirm").mockReturnValue(true);
+  });
+
+  it("lists the customer's accounts and links to a new account", async () => {
+    const { fetchMock } = renderDetail(user(), (url, method) => {
+      if (url.includes("/api/accounts") && method === "GET") {
+        return json({ items: [account], page: 1, pageSize: 20, totalCount: 1 });
+      }
+      if (url.endsWith(`/users/customers/${customerId}/net-worth`) && method === "GET") {
+        return json(emptyNetWorth);
+      }
+      if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
+        return json(customer);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByRole("heading", { name: "Accounts" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Everyday spending" })).toHaveAttribute(
+      "href",
+      `/accounts/${accountId}`,
+    );
+    expect(screen.getByText("1250.5")).toBeInTheDocument();
+    expect(screen.getByText("Bank")).toBeInTheDocument();
+    expect(screen.getByText("NZD")).toBeInTheDocument();
+    expect(screen.getByText("Open")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "New account" })).toHaveAttribute(
+      "href",
+      `/customers/${customerId}/accounts/new`,
+    );
+    expect(screen.getByText("Jordan Lee")).toBeInTheDocument();
+
+    const request = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.url.includes("/api/accounts"));
+    expect(request).toBeDefined();
+    const url = new URL(request!.url);
+    expect(url.origin + url.pathname).toBe("http://localhost:3000/api/accounts");
+    expect(url.searchParams.get("customerId")).toBe(customerId);
+    expect(url.searchParams.get("page")).toBe("1");
+    expect(url.searchParams.get("pageSize")).toBe("20");
+    expect(url.searchParams.has("tenantId")).toBe(false);
+    expect(request!.method).toBe("GET");
+    expect(request!.headers.get("Authorization")).toBeNull();
+    expect(request!.credentials).toBe("include");
+    expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
   it("stays on the URL and shows Not found for a missing customer", async () => {
