@@ -566,4 +566,30 @@ describe("CreateTransactionPage", () => {
     expect(post).toBeUndefined();
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
+
+  it("stays on the form when a TransferOut would make cash negative", async () => {
+    const { fetchMock, router } = renderForm(
+      user(),
+      400,
+      "Cash balance cannot become negative.",
+      {},
+      "errors",
+      "?type=TransferOut",
+    );
+
+    expect(await screen.findByText("1250.5")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "-2000" } });
+    fireEvent.change(screen.getByLabelText("Booked at"), {
+      target: { value: "2026-10-12T09:30:00+13:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(await screen.findByText("Cash balance cannot become negative.")).toBeInTheDocument();
+    expect(screen.getByText("1250.5")).toBeInTheDocument();
+    expect(screen.queryByText("account detail")).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/accounts/${accountId}/transactions/new`);
+    const body = await postedBody(fetchMock);
+    expect(body).toMatchObject({ type: "TransferOut", amount: -2000 });
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
 });
