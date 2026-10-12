@@ -570,6 +570,7 @@ describe("AccountDetailPage", () => {
     expect(screen.queryByRole("link", { name: "TransferIn" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "TransferOut" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Buy" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 

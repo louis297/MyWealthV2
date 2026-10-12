@@ -1,5 +1,9 @@
 import { Link, useParams } from "react-router";
-import { useGetAccountHoldingsQuery, useGetAccountQuery } from "@/features/accounts/accountsApi";
+import {
+  useCloseAccountMutation,
+  useGetAccountHoldingsQuery,
+  useGetAccountQuery,
+} from "@/features/accounts/accountsApi";
 import { useGetTransactionsQuery } from "@/features/transactions/transactionsApi";
 
 const cashActions = ["TransferIn", "TransferOut"] as const;
@@ -25,6 +29,15 @@ export function AccountDetailPage() {
     { accountId: id },
     { skip: !id || !account.data },
   );
+  const [closeAccount] = useCloseAccountMutation();
+
+  async function onClose() {
+    const current = account.data;
+    if (!current || current.status !== "Open" || !window.confirm("Close this account?")) {
+      return;
+    }
+    await closeAccount({ id: current.id, rowVersion: current.rowVersion }).unwrap();
+  }
 
   if (isNotFound(account.error)) {
     return <p>Not found</p>;
@@ -52,6 +65,15 @@ export function AccountDetailPage() {
             </Link>
           ))}
         </nav>
+      ) : null}
+      {data.status === "Open" ? (
+        <button
+          type="button"
+          className="border border-slate-300 bg-white px-3 py-1 text-sm"
+          onClick={() => void onClose()}
+        >
+          Close
+        </button>
       ) : null}
       <dl className="space-y-2 text-sm">
         <div>

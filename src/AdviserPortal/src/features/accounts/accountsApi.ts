@@ -67,6 +67,14 @@ export const accountsApi = api.injectEndpoints({
       }),
       invalidatesTags: ["Account"],
     }),
+    closeAccount: builder.mutation<void, { id: string; rowVersion: string }>({
+      query: ({ id, rowVersion }) => ({
+        url: `/accounts/${id}/close`,
+        method: "POST",
+        body: { rowVersion },
+      }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Account", id: arg.id }, "Account"],
+    }),
   }),
 });
 
@@ -75,4 +83,5 @@ export const {
   useGetAccountQuery,
   useGetAccountHoldingsQuery,
   useCreateAccountMutation,
+  useCloseAccountMutation,
 } = accountsApi;
