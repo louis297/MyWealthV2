@@ -85,6 +85,12 @@ export function AccountDetailPage() {
       setMessages([]);
       setConflict(false);
     } catch (error: unknown) {
+      if (isStatus(error, 409)) {
+        setConflict(true);
+        setMessages([]);
+        void account.refetch();
+        return;
+      }
       setConflict(false);
       setMessages(problemMessages(error));
     }
