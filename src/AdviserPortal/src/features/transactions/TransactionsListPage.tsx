@@ -1,5 +1,9 @@
 import { Link, useSearchParams } from "react-router";
 import {
+  canReverse,
+  ReverseTransactionButton,
+} from "@/features/transactions/ReverseTransactionButton";
+import {
   useGetTransactionsQuery,
   type TransactionCash,
   type TransactionSecurity,
@@ -88,12 +92,15 @@ export function TransactionsListPage() {
               <th>Cash</th>
               <th>Security</th>
               <th>Memo</th>
+              <th>Reverse</th>
             </tr>
           </thead>
           <tbody>
             {(data?.items ?? []).map((item) => (
               <tr key={item.id} className="border-b border-slate-100">
-                <td className="py-2">{item.type}</td>
+                <td className="py-2">
+                  <Link to={`/transactions/${item.id}`}>{item.type}</Link>
+                </td>
                 <td>{item.bookedAt}</td>
                 <td>
                   <Link to={`/accounts/${item.accountId}`}>{item.accountId}</Link>
@@ -104,6 +111,7 @@ export function TransactionsListPage() {
                 <td>{cashText(item.cash)}</td>
                 <td>{securityText(item.security)}</td>
                 <td>{item.memo ?? ""}</td>
+                <td>{canReverse(item) ? <ReverseTransactionButton id={item.id} /> : null}</td>
               </tr>
             ))}
           </tbody>

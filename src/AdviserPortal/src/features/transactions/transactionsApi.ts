@@ -60,6 +60,10 @@ export const transactionsApi = api.injectEndpoints({
       },
       providesTags: ["Transaction"],
     }),
+    getTransaction: builder.query<Transaction, string>({
+      query: (id) => `/transactions/${id}`,
+      providesTags: (_result, _error, id) => [{ type: "Transaction", id }],
+    }),
     createTransaction: builder.mutation<
       { id: string },
       { body: CreateTransactionBody; idempotencyKey: string }
@@ -72,7 +76,21 @@ export const transactionsApi = api.injectEndpoints({
       }),
       invalidatesTags: ["Transaction", "Account"],
     }),
+    reverseTransaction: builder.mutation<{ id: string }, { id: string; idempotencyKey: string }>({
+      query: ({ id, idempotencyKey }) => ({
+        url: `/transactions/${id}/reverse`,
+        method: "POST",
+        body: {},
+        headers: { "Idempotency-Key": idempotencyKey },
+      }),
+      invalidatesTags: ["Transaction", "Account"],
+    }),
   }),
 });
 
-export const { useGetTransactionsQuery, useCreateTransactionMutation } = transactionsApi;
+export const {
+  useGetTransactionsQuery,
+  useGetTransactionQuery,
+  useCreateTransactionMutation,
+  useReverseTransactionMutation,
+} = transactionsApi;
