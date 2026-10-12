@@ -1,6 +1,6 @@
 import { Navigate } from "react-router";
 import { useAppSelector } from "@/app/hooks";
-import { canAccessCustomers } from "@/features/session/roles";
+import { canAccessDashboard } from "@/features/session/roles";
 
 export function HomePage() {
   const role = useAppSelector((state) => state.session.currentUser?.role);
@@ -9,8 +9,8 @@ export function HomePage() {
     return <p>Loading session…</p>;
   }
 
-  if (canAccessCustomers(role)) {
-    return <Navigate to="/customers" replace />;
+  if (canAccessDashboard(role)) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <Navigate to="/profile" replace />;

@@ -22,6 +22,10 @@ export function canAccessCustomers(role: string | null | undefined) {
   return role === roles.tenantAdmin || role === roles.adviser;
 }
 
+export function canAccessDashboard(role: string | null | undefined) {
+  return role === roles.tenantAdmin || role === roles.adviser;
+}
+
 export function canAccessAdvisers(role: string | null | undefined) {
   return role === roles.tenantAdmin;
 }
