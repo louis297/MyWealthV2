@@ -58,7 +58,7 @@ function user(overrides: Partial<CurrentUser> = {}): CurrentUser {
 }
 
 function renderDetail(
-  fetchImpl: (url: string, method: string) => Response,
+  fetchImpl: (url: string, method: string, body?: string) => Response,
 ) {
   const store = configureStore({
     reducer: {
@@ -73,7 +73,13 @@ function renderDetail(
   fetchMock.mockImplementation(async (input, init) => {
     const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
     const method = init?.method ?? (input instanceof Request ? input.method : "GET");
-    return fetchImpl(url, method);
+    const body =
+      typeof init?.body === "string"
+        ? init.body
+        : input instanceof Request
+          ? await input.clone().text()
+          : undefined;
+    return fetchImpl(url, method, body);
   });
 
   const router = createMemoryRouter(
@@ -565,6 +571,76 @@ describe("AccountDetailPage", () => {
     expect(screen.queryByRole("link", { name: "TransferOut" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Buy" })).not.toBeInTheDocument();
     expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("closes an open account with the current rowVersion and shows Closed", async () => {
+    const posted: string[] = [];
+    let closed = false;
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { fetchMock } = renderDetail((url, method, body) => {
+      if (url.endsWith(`/accounts/${accountId}/close`) && method === "POST") {
+        posted.push(body ?? "");
+        closed = true;
+        return new Response(null, { status: 204 });
+      }
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json({
+          ...account,
+          status: closed ? "Closed" : "Open",
+          isActive: !closed,
+        });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Close" }));
+
+    expect(await screen.findByText("Closed")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "TransferIn" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Buy" })).not.toBeInTheDocument();
+    expect(posted).toEqual([JSON.stringify({ rowVersion: "AAAA" })]);
+    expect(window.confirm).toHaveBeenCalledWith("Close this account?");
+
+    const post = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.method === "POST");
+    expect(post?.url).toBe(`http://localhost:3000/api/accounts/${accountId}/close`);
+    expect(post?.credentials).toBe("include");
+    expect(post?.headers.get("Authorization")).toBeNull();
+    expect(post?.headers.get("X-MyWealth-Request")).toBe("1");
+    expect(new URL(post?.url ?? "").searchParams.has("tenantId")).toBe(false);
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("does not close the account when confirm is dismissed", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    const { fetchMock } = renderDetail((url, method) => {
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json(account);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Close" }));
+
+    expect(screen.getByText("Open")).toBeInTheDocument();
+    const posts = fetchMock.mock.calls
+      .map(([input]) => input)
+      .filter((input): input is Request => input instanceof Request && input.method === "POST");
+    expect(posts).toEqual([]);
   });
 
   it("stays on the URL and shows Not found for a missing account", async () => {
