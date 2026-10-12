@@ -644,6 +644,37 @@ describe("AccountDetailPage", () => {
     expect(posts).toEqual([]);
   });
 
+  it("stays on the page and shows a close rejection", async () => {
+    const problem = "Cannot close an account while the cash balance is not zero.";
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderDetail((url, method) => {
+      if (url.endsWith(`/accounts/${accountId}/close`) && method === "POST") {
+        return json({
+          title: "One or more validation errors occurred.",
+          status: 400,
+          errors: { "": [problem] },
+        }, 400);
+      }
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [holding] });
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json(account);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Close" }));
+
+    expect(await screen.findByText(problem)).toBeInTheDocument();
+    expect(screen.getByText("Open")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
   it("stays on the URL and shows Not found for a missing account", async () => {
     const { router } = renderDetail(() => new Response("", { status: 404 }));
 
