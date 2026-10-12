@@ -22,6 +22,52 @@ vi.mock("@/features/session/SessionProbePage", () => ({
   SessionProbePage: () => <p>session probe</p>,
 }));
 
+function user(overrides: Partial<CurrentUser> = {}): CurrentUser {
+  return {
+    id: "11111111-1111-1111-1111-111111111111",
+    name: "Pat Admin",
+    email: "pat@north.example",
+    role: "tenantAdmin",
+    status: "active",
+    tenantId: "22222222-2222-2222-2222-222222222222",
+    tenantCode: "north-advisory",
+    adviserId: null,
+    rowVersion: "AAAA",
+    ...overrides,
+  };
+}
+
+function renderHome(me: CurrentUser) {
+  const store = configureStore({
+    reducer: {
+      session: sessionSlice.reducer,
+      [api.reducerPath]: api.reducer,
+    },
+    middleware: (getDefault) => getDefault().concat(api.middleware),
+    preloadedState: {
+      session: {
+        currentUser: me,
+        tenant: null,
+      },
+    },
+  });
+  const router = createMemoryRouter(
+    [
+      { path: "/", element: <HomePage /> },
+      { path: "/dashboard", element: <p>dashboard</p> },
+      { path: "/customers", element: <p>customers workspace</p> },
+      { path: "/profile", element: <p>profile</p> },
+    ],
+    { initialEntries: ["/"] },
+  );
+
+  render(
+    <Provider store={store}>
+      <RouterProvider router={router} />
+    </Provider>,
+  );
+}
+
 describe("HomePage", () => {
   beforeEach(() => {
     startLogin.mockReset();
@@ -99,93 +145,37 @@ describe("HomePage", () => {
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
-  it("sends a signed-in TenantAdmin to /customers, not the session probe", () => {
-    const me: CurrentUser = {
-      id: "11111111-1111-1111-1111-111111111111",
-      name: "Pat Admin",
-      email: "pat@north.example",
-      role: "tenantAdmin",
-      status: "active",
-      tenantId: "22222222-2222-2222-2222-222222222222",
-      tenantCode: "north-advisory",
-      adviserId: null,
-      rowVersion: "AAAA",
-    };
-    const store = configureStore({
-      reducer: {
-        session: sessionSlice.reducer,
-        [api.reducerPath]: api.reducer,
-      },
-      middleware: (getDefault) => getDefault().concat(api.middleware),
-      preloadedState: {
-        session: {
-          currentUser: me,
-          tenant: null,
-        },
-      },
-    });
-    const router = createMemoryRouter(
-      [
-        { path: "/", element: <HomePage /> },
-        { path: "/customers", element: <p>customers workspace</p> },
-        { path: "/profile", element: <p>profile</p> },
-      ],
-      { initialEntries: ["/"] },
-    );
+  it("sends a signed-in TenantAdmin to /dashboard, not the customers workspace", () => {
+    renderHome(user({ role: "tenantAdmin" }));
 
-    render(
-      <Provider store={store}>
-        <RouterProvider router={router} />
-      </Provider>,
-    );
-
-    expect(screen.getByText("customers workspace")).toBeInTheDocument();
+    expect(screen.getByText("dashboard")).toBeInTheDocument();
+    expect(screen.queryByText("customers workspace")).not.toBeInTheDocument();
     expect(screen.queryByText("session probe")).not.toBeInTheDocument();
     expect(startLogin).not.toHaveBeenCalled();
   });
 
-  it("sends SystemAdmin to /profile instead of a Customers workspace", () => {
-    const me: CurrentUser = {
-      id: "11111111-1111-1111-1111-111111111111",
-      name: "System Admin",
-      email: "system-admin@localhost",
-      role: "systemAdmin",
-      status: "active",
-      tenantId: null,
-      tenantCode: null,
-      adviserId: null,
-      rowVersion: "AAAA",
-    };
-    const store = configureStore({
-      reducer: {
-        session: sessionSlice.reducer,
-        [api.reducerPath]: api.reducer,
-      },
-      middleware: (getDefault) => getDefault().concat(api.middleware),
-      preloadedState: {
-        session: {
-          currentUser: me,
-          tenant: null,
-        },
-      },
-    });
-    const router = createMemoryRouter(
-      [
-        { path: "/", element: <HomePage /> },
-        { path: "/customers", element: <p>customers workspace</p> },
-        { path: "/profile", element: <p>profile</p> },
-      ],
-      { initialEntries: ["/"] },
-    );
+  it("sends a signed-in Adviser to /dashboard, not the customers workspace", () => {
+    renderHome(user({ role: "adviser", name: "Sam Reed" }));
 
-    render(
-      <Provider store={store}>
-        <RouterProvider router={router} />
-      </Provider>,
+    expect(screen.getByText("dashboard")).toBeInTheDocument();
+    expect(screen.queryByText("customers workspace")).not.toBeInTheDocument();
+    expect(startLogin).not.toHaveBeenCalled();
+  });
+
+  it("sends SystemAdmin to /profile instead of a Customers workspace", () => {
+    renderHome(
+      user({
+        role: "systemAdmin",
+        name: "System Admin",
+        email: "system-admin@localhost",
+        tenantId: null,
+        tenantCode: null,
+      }),
     );
 
     expect(screen.getByText("profile")).toBeInTheDocument();
     expect(screen.queryByText("customers workspace")).not.toBeInTheDocument();
+    expect(screen.queryByText("dashboard")).not.toBeInTheDocument();
     expect(screen.queryByText("session probe")).not.toBeInTheDocument();
   });
 });
