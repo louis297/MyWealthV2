@@ -1,5 +1,5 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -30,6 +30,32 @@ const customer = {
   rowVersion: "AAAA",
   created: "2026-09-14T00:00:00+00:00",
 };
+
+const emptyNetWorth = {
+  asOf: "2026-10-12T16:00:00.000Z",
+  currencies: [],
+  breakdowns: { byCustomer: [], byAccountType: [], topHoldings: [] },
+};
+
+const customerNetWorth = {
+  asOf: "2026-10-12T16:00:00.000Z",
+  currencies: [
+    {
+      currency: "NZD",
+      assets: { cash: 1000, holdings: 5000, total: 6000 },
+      liabilities: { total: 0 },
+      net: 6000,
+    },
+  ],
+  breakdowns: { byCustomer: [], byAccountType: [], topHoldings: [] },
+};
+
+function json(body: unknown, status = 200) {
+  return new Response(status === 204 ? null : JSON.stringify(body), {
+    status,
+    headers: status === 204 ? undefined : { "Content-Type": "application/json" },
+  });
+}
 
 function user(overrides: Partial<CurrentUser> = {}): CurrentUser {
   return {
@@ -105,11 +131,63 @@ describe("CustomerDetailPage", () => {
     expect(screen.queryByText("customers list")).not.toBeInTheDocument();
     expect(screen.queryByText("Forbidden")).not.toBeInTheDocument();
     expect(router.state.location.pathname).toBe(`/customers/${customerId}`);
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("renders the customer net-worth read from GET /users/customers/{id}/net-worth", async () => {
+    const { fetchMock } = renderDetail(user(), (url, method) => {
+      if (url.endsWith(`/users/customers/${customerId}/net-worth`) && method === "GET") {
+        return json(customerNetWorth);
+      }
+      if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
+        return json(customer);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByRole("heading", { name: "Net worth" })).toBeInTheDocument();
+    const nzd = screen.getByRole("row", { name: /NZD/ });
+    expect(within(nzd).getByText("1000")).toBeInTheDocument();
+    expect(within(nzd).getByText("5000")).toBeInTheDocument();
+    expect(within(nzd).getAllByText("6000")).toHaveLength(2);
+    expect(within(nzd).getByText("0")).toBeInTheDocument();
+    expect(screen.getByText("Jordan Lee")).toBeInTheDocument();
+    expect(screen.queryByText("Forbidden")).not.toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+
+    const request = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.url.endsWith(`/users/customers/${customerId}/net-worth`));
+    expect(request?.url).toBe(
+      `http://localhost:3000/api/users/customers/${customerId}/net-worth`,
+    );
+    expect(request?.headers.get("Authorization")).toBeNull();
+    expect(request?.credentials).toBe("include");
+    expect(
+      fetchMock.mock.calls.some(([input]) => input instanceof Request && input.url.endsWith("/api/net-worth")),
+    ).toBe(false);
+  });
+
+  it("keeps the customer and shows Not found when the net-worth read is 404", async () => {
+    renderDetail(user(), (url, method) => {
+      if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
+        return json(customer);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByText("Jordan Lee")).toBeInTheDocument();
+    expect(await screen.findByText("Not found")).toBeInTheDocument();
+    expect(screen.queryByText("Forbidden")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
   });
 
   it("is read-only and disables with the current rowVersion", async () => {
     const posted: string[] = [];
     renderDetail(user(), (url, method, body) => {
+      if (url.endsWith(`/users/customers/${customerId}/net-worth`) && method === "GET") {
+        return json(emptyNetWorth);
+      }
       if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
         return new Response(JSON.stringify(customer), {
           status: 200,
@@ -142,6 +220,9 @@ describe("CustomerDetailPage", () => {
     const posted: string[] = [];
     let gets = 0;
     renderDetail(user(), (url, method, body) => {
+      if (url.endsWith(`/users/customers/${customerId}/net-worth`) && method === "GET") {
+        return json(emptyNetWorth);
+      }
       if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
         gets += 1;
         return new Response(
