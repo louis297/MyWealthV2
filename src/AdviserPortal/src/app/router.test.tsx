@@ -111,4 +111,49 @@ describe("app routes", () => {
     expect(await screen.findByRole("heading", { name: "Advisers" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
   });
+
+  it("lets TenantAdmin open /dashboard", async () => {
+    renderApp(user(), "/dashboard");
+
+    expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
+  });
+
+  it("lets an Adviser open /dashboard", async () => {
+    renderApp(user({ role: "adviser", name: "Sam Reed" }), "/dashboard");
+
+    expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
+  });
+
+  it("sends SystemAdmin on /dashboard to /forbidden", async () => {
+    renderApp(
+      user({
+        role: "systemAdmin",
+        name: "System Admin",
+        tenantId: null,
+        tenantCode: null,
+      }),
+      "/dashboard",
+    );
+
+    expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Dashboard" })).not.toBeInTheDocument();
+  });
+
+  it("sends SystemAdmin on / to Profile and not a Customers workspace", async () => {
+    renderApp(
+      user({
+        role: "systemAdmin",
+        name: "System Admin",
+        tenantId: null,
+        tenantCode: null,
+      }),
+      "/",
+    );
+
+    expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Customers" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Dashboard" })).not.toBeInTheDocument();
+  });
 });
