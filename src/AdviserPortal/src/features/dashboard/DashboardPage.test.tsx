@@ -1,5 +1,5 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -114,9 +114,13 @@ function renderDashboard(body: unknown) {
     return new Response("", { status: 404 });
   });
 
-  const router = createMemoryRouter([{ path: "/dashboard", element: <DashboardPage /> }], {
-    initialEntries: ["/dashboard"],
-  });
+  const router = createMemoryRouter(
+    [
+      { path: "/dashboard", element: <DashboardPage /> },
+      { path: "/customers/:id", element: <p>customer detail</p> },
+    ],
+    { initialEntries: ["/dashboard"] },
+  );
 
   render(
     <Provider store={store}>
@@ -124,7 +128,7 @@ function renderDashboard(body: unknown) {
     </Provider>,
   );
 
-  return { fetchMock };
+  return { fetchMock, router };
 }
 
 describe("DashboardPage", () => {
@@ -188,6 +192,22 @@ describe("DashboardPage", () => {
     const request = fetchMock.mock.calls[0][0] as Request;
     expect(request.headers.get("Authorization")).toBeNull();
     expect(request.credentials).toBe("include");
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("links each customer to their detail and shows that customer's net", async () => {
+    const { router } = renderDashboard(withBreakdowns);
+
+    const link = await screen.findByRole("link", { name: "Amy Able" });
+    expect(link).toHaveAttribute("href", `/customers/${customerId}`);
+
+    const row = screen.getByRole("row", { name: /Amy Able/ });
+    expect(within(row).getByText("NZD")).toBeInTheDocument();
+    expect(within(row).getByText("6000")).toBeInTheDocument();
+
+    fireEvent.click(link);
+    expect(router.state.location.pathname).toBe(`/customers/${customerId}`);
+    expect(screen.getByText("customer detail")).toBeInTheDocument();
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
