@@ -7,6 +7,10 @@ import {
 } from "@/features/accounts/accountsApi";
 import { useGetTransactionsQuery } from "@/features/transactions/transactionsApi";
 
+function isStatus(error: unknown, status: number) {
+  return typeof error === "object" && error !== null && "status" in error && error.status === status;
+}
+
 function problemMessages(error: unknown): string[] {
   if (typeof error !== "object" || error === null || !("data" in error)) {
     return [];
@@ -46,6 +50,7 @@ export function AccountDetailPage() {
   );
   const [closeAccount] = useCloseAccountMutation();
   const [messages, setMessages] = useState<string[]>([]);
+  const [conflict, setConflict] = useState(false);
 
   async function onClose() {
     const current = account.data;
@@ -55,7 +60,15 @@ export function AccountDetailPage() {
     try {
       await closeAccount({ id: current.id, rowVersion: current.rowVersion }).unwrap();
       setMessages([]);
+      setConflict(false);
     } catch (error: unknown) {
+      if (isStatus(error, 409)) {
+        setConflict(true);
+        setMessages([]);
+        void account.refetch();
+        return;
+      }
+      setConflict(false);
       setMessages(problemMessages(error));
     }
   }
@@ -87,6 +100,7 @@ export function AccountDetailPage() {
           ))}
         </nav>
       ) : null}
+      {conflict ? <p>This row changed. Reload and try again.</p> : null}
       {messages.map((message) => (
         <p key={message}>{message}</p>
       ))}
