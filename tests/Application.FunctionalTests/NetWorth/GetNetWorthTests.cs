@@ -187,6 +187,80 @@ public class GetNetWorthTests : TestBase
             .StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
+    [Test]
+    public async Task Breakdowns_GroupCustomersAndAccountTypes_AndRankHoldings()
+    {
+        var (tenant, adviser, ned, tokens) = await AccountHttp.SignInAdviser();
+        var amy = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Amy Able", "amy@north.example", "Password1!", tenant.Id, adviser.Id);
+
+        var amyBank = await OpenAccountAsync(tokens.AccessToken, amy.PublicId, "Amy bank", "Bank", "NZD");
+        var amyBroker = await OpenAccountAsync(tokens.AccessToken, amy.PublicId, "Amy broker", "Brokerage", "USD");
+        var nedBank = await OpenAccountAsync(tokens.AccessToken, ned.PublicId, "Ned bank", "Bank", "NZD");
+        await OpenAccountAsync(tokens.AccessToken, ned.PublicId, "Ned tin", "Cash", "GBP");
+        var nedBroker = await OpenAccountAsync(tokens.AccessToken, ned.PublicId, "Ned broker", "Brokerage", "USD");
+        (await PostCashAsync(tokens.AccessToken, amyBank, 10m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await PostCashAsync(tokens.AccessToken, nedBank, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var aaa = await CreateInstrumentAsync(tokens.AccessToken, "AAA", "USD");
+        var mmm = await CreateInstrumentAsync(tokens.AccessToken, "MMM", "USD");
+        var bond = await CreateInstrumentAsync(tokens.AccessToken, "BOND", "USD");
+        var zed = await CreateInstrumentAsync(tokens.AccessToken, "ZED", "USD");
+        var gone = await CreateInstrumentAsync(tokens.AccessToken, "GONE", "USD");
+        await SetPriceAsync(aaa, 30m, "USD");
+        await SetPriceAsync(mmm, 5m, "USD");
+        await SetPriceAsync(gone, 100m, "USD");
+        (await PostOpeningAsync(tokens.AccessToken, amyBroker, aaa, 1m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await PostOpeningAsync(tokens.AccessToken, nedBroker, aaa, 2m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await PostOpeningAsync(tokens.AccessToken, amyBroker, mmm, 4m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await PostOpeningAsync(tokens.AccessToken, amyBroker, bond, 2m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await PostOpeningAsync(tokens.AccessToken, amyBroker, zed, 3m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await PostOpeningAsync(tokens.AccessToken, amyBroker, gone, 1m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        await ZeroHoldingAsync(amyBroker, gone);
+
+        var response = await AccountHttp.Send(HttpMethod.Get, "/net-worth", tokens.AccessToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = json.RootElement;
+        var currencies = root.GetProperty("currencies").EnumerateArray().ToList();
+        currencies.Select(row => row.GetProperty("currency").GetString()).ShouldBe(["GBP", "NZD", "USD"]);
+        AssertCurrency(currencies[2], "USD", cash: 0m, holdings: 110m);
+
+        var breakdowns = root.GetProperty("breakdowns");
+        var byCustomer = breakdowns.GetProperty("byCustomer").EnumerateArray().ToList();
+        byCustomer.Select(row => row.GetProperty("name").GetString()).ShouldBe(["Amy Able", "Ned North"]);
+        byCustomer[0].EnumerateObject().Select(property => property.Name).ShouldBe(["customerId", "name", "currencies"]);
+        byCustomer[0].GetProperty("customerId").GetGuid().ShouldBe(amy.PublicId);
+        var amyCurrencies = byCustomer[0].GetProperty("currencies").EnumerateArray().ToList();
+        amyCurrencies.Select(row => row.GetProperty("currency").GetString()).ShouldBe(["NZD", "USD"]);
+        AssertCurrency(amyCurrencies[0], "NZD", cash: 10m, holdings: 0m);
+        AssertCurrency(amyCurrencies[1], "USD", cash: 0m, holdings: 50m);
+        var nedCurrencies = byCustomer[1].GetProperty("currencies").EnumerateArray().ToList();
+        nedCurrencies.Select(row => row.GetProperty("currency").GetString()).ShouldBe(["GBP", "NZD", "USD"]);
+        AssertCurrency(nedCurrencies[2], "USD", cash: 0m, holdings: 60m);
+
+        var byType = breakdowns.GetProperty("byAccountType").EnumerateArray().ToList();
+        byType.Select(row => row.GetProperty("type").GetString()).ShouldBe(["Bank", "Brokerage", "Cash"]);
+        byType[0].EnumerateObject().Select(property => property.Name).ShouldBe(["type", "currencies"]);
+        AssertCurrency(byType[0].GetProperty("currencies").EnumerateArray().Single(), "NZD", cash: 110m, holdings: 0m);
+        AssertCurrency(byType[1].GetProperty("currencies").EnumerateArray().Single(), "USD", cash: 0m, holdings: 110m);
+        AssertCurrency(byType[2].GetProperty("currencies").EnumerateArray().Single(), "GBP", cash: 0m, holdings: 0m);
+
+        var top = breakdowns.GetProperty("topHoldings").EnumerateArray().ToList();
+        top.Select(row => row.GetProperty("symbol").GetString()).ShouldBe(["AAA", "MMM", "BOND", "ZED"]);
+        top[0].EnumerateObject().Select(property => property.Name).ShouldBe([
+            "instrumentId", "symbol", "quantity", "marketValue", "currency"
+        ]);
+        top[0].GetProperty("instrumentId").GetGuid().ShouldBe(aaa);
+        top[0].GetProperty("quantity").GetDecimal().ShouldBe(3m);
+        top[0].GetProperty("marketValue").GetDecimal().ShouldBe(90m);
+        top[0].GetProperty("currency").GetString().ShouldBe("USD");
+        top[2].GetProperty("marketValue").GetDecimal().ShouldBe(0m);
+        top[2].GetProperty("quantity").GetDecimal().ShouldBe(2m);
+        top[2].GetProperty("currency").GetString().ShouldBe("USD");
+        top[3].GetProperty("symbol").GetString().ShouldBe("ZED");
+    }
+
     private static void AssertCurrency(JsonElement row, string currency, decimal cash, decimal holdings)
     {
         row.EnumerateObject().Select(property => property.Name).ShouldBe([
@@ -258,6 +332,21 @@ public class GetNetWorthTests : TestBase
         var instrument = await db.Instruments.SingleAsync(row => row.PublicId == instrumentPublicId);
         var prices = FunctionalTestSetup.WebApiServices.GetRequiredService<MarketDataMock>();
         prices.SetPrice(instrument.Id, Money.Create(amount, currency));
+    }
+
+    private static async Task ZeroHoldingAsync(Guid accountPublicId, Guid instrumentPublicId)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var holdingId = await (
+            from holding in db.Holdings.AsNoTracking()
+            join account in db.Accounts.AsNoTracking() on holding.AccountId equals account.Id
+            join instrument in db.Instruments.AsNoTracking() on holding.InstrumentId equals instrument.Id
+            where account.PublicId == accountPublicId && instrument.PublicId == instrumentPublicId
+            select holding.Id).SingleAsync();
+        await db.Holdings
+            .Where(row => row.Id == holdingId)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.Quantity, 0m));
     }
 
     private static async Task CloseAccountAsync(Guid accountPublicId)
