@@ -22,7 +22,8 @@ public static class ApiProxy
         "/currencies",
         "/accounts",
         "/instruments",
-        "/transactions"
+        "/transactions",
+        "/net-worth"
     ];
 
     public static WebApplication MapBffApi(this WebApplication app)
