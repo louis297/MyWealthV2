@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router";
 import {
   useCloseAccountMutation,
@@ -5,6 +6,20 @@ import {
   useGetAccountQuery,
 } from "@/features/accounts/accountsApi";
 import { useGetTransactionsQuery } from "@/features/transactions/transactionsApi";
+
+function problemMessages(error: unknown): string[] {
+  if (typeof error !== "object" || error === null || !("data" in error)) {
+    return [];
+  }
+  const data = (error as { data?: { errors?: Record<string, string[]>; detail?: string } }).data;
+  if (data?.errors) {
+    return Object.values(data.errors).flat();
+  }
+  if (data?.detail) {
+    return [data.detail];
+  }
+  return [];
+}
 
 const cashActions = ["TransferIn", "TransferOut"] as const;
 const securityActions = ["Buy", "Sell", "StockIn", "StockOut", "Split", "Bonus", "Scrip"] as const;
@@ -30,13 +45,19 @@ export function AccountDetailPage() {
     { skip: !id || !account.data },
   );
   const [closeAccount] = useCloseAccountMutation();
+  const [messages, setMessages] = useState<string[]>([]);
 
   async function onClose() {
     const current = account.data;
     if (!current || current.status !== "Open" || !window.confirm("Close this account?")) {
       return;
     }
-    await closeAccount({ id: current.id, rowVersion: current.rowVersion }).unwrap();
+    try {
+      await closeAccount({ id: current.id, rowVersion: current.rowVersion }).unwrap();
+      setMessages([]);
+    } catch (error: unknown) {
+      setMessages(problemMessages(error));
+    }
   }
 
   if (isNotFound(account.error)) {
@@ -66,6 +87,9 @@ export function AccountDetailPage() {
           ))}
         </nav>
       ) : null}
+      {messages.map((message) => (
+        <p key={message}>{message}</p>
+      ))}
       {data.status === "Open" ? (
         <button
           type="button"
