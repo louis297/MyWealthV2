@@ -252,6 +252,23 @@ describe("CreateTransactionPage", () => {
     return JSON.parse(await post!.clone().text()) as Record<string, unknown>;
   }
 
+  it("stays on the form when Buy is rejected for a cost field", async () => {
+    const { router } = renderForm(user(), 400, "Cost cannot be set on a buy or sell.");
+
+    await screen.findByRole("option", { name: "DEMO Demo Fund" });
+    fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+    fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
+    fireEvent.change(screen.getByLabelText("Booked at"), {
+      target: { value: "2026-10-11T10:00:00+13:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(await screen.findByText("Cost cannot be set on a buy or sell.")).toBeInTheDocument();
+    expect(screen.queryByText("account detail")).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/accounts/${accountId}/transactions/new`);
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
   it("posts StockIn with client cost and no cash", async () => {
     const { fetchMock } = renderForm();
 
