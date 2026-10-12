@@ -783,6 +783,40 @@ describe("AccountDetailPage", () => {
     expect(posts).toEqual([]);
   });
 
+  it("stays closed and shows a reopen rejection", async () => {
+    const problem = "Cannot reopen an account while the customer is disabled. Enable the customer first.";
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderDetail((url, method) => {
+      if (url.endsWith(`/accounts/${accountId}/reopen`) && method === "POST") {
+        return json({
+          status: 400,
+          title: "User is disabled",
+          detail: problem,
+          code: "disabled",
+          target: "user",
+        }, 400);
+      }
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json({ ...account, status: "Closed", isActive: false });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reopen" }));
+
+    expect(await screen.findByText(problem)).toBeInTheDocument();
+    expect(screen.getByText("Closed")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reopen" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "TransferIn" })).not.toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
   it("stays on the URL and shows Not found for a missing account", async () => {
     const { router } = renderDetail(() => new Response("", { status: 404 }));
 
