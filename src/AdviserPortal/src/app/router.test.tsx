@@ -171,6 +171,28 @@ describe("app routes", () => {
     expect(screen.queryByRole("heading", { name: "Accounts" })).not.toBeInTheDocument();
   });
 
+  it("lets TenantAdmin open an account without treating a missing id as Forbidden", async () => {
+    renderApp(user(), "/accounts/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+
+    expect(await screen.findByText("Not found")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
+  });
+
+  it("sends SystemAdmin on an account to /forbidden", async () => {
+    renderApp(
+      user({
+        role: "systemAdmin",
+        name: "System Admin",
+        tenantId: null,
+        tenantCode: null,
+      }),
+      "/accounts/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+    );
+
+    expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
+    expect(screen.queryByText("Not found")).not.toBeInTheDocument();
+  });
+
   it("sends a Customer on /accounts to /forbidden", async () => {
     renderApp(user({ role: "customer", name: "Jordan Lee" }), "/accounts");
 
