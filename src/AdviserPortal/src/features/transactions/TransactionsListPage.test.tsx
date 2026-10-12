@@ -22,6 +22,7 @@ const transaction = {
   memo: "Parcel",
   reference: null,
   originalTransactionId: null,
+  reversedByTransactionId: null,
   rowVersion: "AAAA",
   security: [
     {
@@ -206,11 +207,19 @@ describe("TransactionsListPage", () => {
               id: reversalId,
               type: "Reversal",
               originalTransactionId: transactionId,
+              reversedByTransactionId: null,
+            },
+            {
+              ...transaction,
+              id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+              type: "Buy",
+              originalTransactionId: null,
+              reversedByTransactionId: reversalId,
             },
           ],
           page: 1,
           pageSize: 20,
-          totalCount: 2,
+          totalCount: 3,
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       ),

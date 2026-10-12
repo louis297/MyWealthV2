@@ -1,5 +1,5 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,6 +22,7 @@ const original = {
   memo: "Parcel",
   reference: null,
   originalTransactionId: null,
+  reversedByTransactionId: null,
   rowVersion: "AAAA",
   security: [
     {
@@ -78,15 +79,17 @@ describe("TransactionDetailPage", () => {
     });
     store.dispatch(setCurrentUser(user()));
 
+    let reversed = false;
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockImplementation(async (input, init) => {
       const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
       const method = init?.method ?? (input instanceof Request ? input.method : "GET");
       if (url.endsWith(`/transactions/${originalId}/reverse`) && method === "POST") {
+        reversed = true;
         return json({ id: reverseId }, 201);
       }
       if (url.endsWith(`/transactions/${originalId}`) && method === "GET") {
-        return json(original);
+        return json(reversed ? { ...original, reversedByTransactionId: reverseId } : original);
       }
       return new Response("", { status: 404 });
     });
@@ -104,10 +107,11 @@ describe("TransactionDetailPage", () => {
 
     expect(await screen.findByText(originalId)).toBeInTheDocument();
     expect(screen.getByText("Buy")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reverse" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Reverse" }));
-    expect(await screen.findByText(reverseId)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Reverse" }));
-    expect(await screen.findAllByText(reverseId)).toHaveLength(1);
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
+    });
     expect(screen.getByText(originalId)).toBeInTheDocument();
     expect(screen.getByText("Buy")).toBeInTheDocument();
     expect(router.state.location.pathname).toBe(`/transactions/${originalId}`);
@@ -116,7 +120,7 @@ describe("TransactionDetailPage", () => {
     const posts = fetchMock.mock.calls
       .map(([input]) => input)
       .filter((input): input is Request => input instanceof Request && input.method === "POST");
-    expect(posts).toHaveLength(2);
+    expect(posts).toHaveLength(1);
     for (const post of posts) {
       expect(post.url).toBe(`http://localhost:3000/api/transactions/${originalId}/reverse`);
       expect(post.headers.get("Idempotency-Key")).toBe(idempotencyKey);
@@ -127,6 +131,69 @@ describe("TransactionDetailPage", () => {
       expect(text === "" || text === "{}").toBe(true);
       expect(text).not.toContain("tenantId");
     }
+  });
+
+  it("hides Reverse when the loaded original is already reversed", async () => {
+    const store = configureStore({
+      reducer: {
+        session: sessionSlice.reducer,
+        [api.reducerPath]: api.reducer,
+      },
+      middleware: (getDefault) => getDefault().concat(api.middleware),
+    });
+    store.dispatch(setCurrentUser(user()));
+
+    vi.mocked(fetch).mockImplementation(async () => json({
+      ...original,
+      reversedByTransactionId: reverseId,
+    }));
+
+    const router = createMemoryRouter(
+      [{ path: "/transactions/:id", element: <TransactionDetailPage /> }],
+      { initialEntries: [`/transactions/${originalId}`] },
+    );
+
+    render(
+      <Provider store={store}>
+        <RouterProvider router={router} />
+      </Provider>,
+    );
+
+    expect(await screen.findByText(originalId)).toBeInTheDocument();
+    expect(screen.getByText("Buy")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/transactions/${originalId}`);
+  });
+
+  it("hides Reverse on a reversal", async () => {
+    const store = configureStore({
+      reducer: {
+        session: sessionSlice.reducer,
+        [api.reducerPath]: api.reducer,
+      },
+      middleware: (getDefault) => getDefault().concat(api.middleware),
+    });
+    store.dispatch(setCurrentUser(user()));
+
+    vi.mocked(fetch).mockImplementation(async () => json({
+      ...original,
+      id: reverseId,
+      type: "Reversal",
+      originalTransactionId: originalId,
+      reversedByTransactionId: null,
+    }));
+
+    render(
+      <Provider store={store}>
+        <RouterProvider router={createMemoryRouter(
+          [{ path: "/transactions/:id", element: <TransactionDetailPage /> }],
+          { initialEntries: [`/transactions/${reverseId}`] },
+        )} />
+      </Provider>,
+    );
+
+    expect(await screen.findByText("Reversal")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
   });
 
   it("stays on the original when it has already been reversed", async () => {
