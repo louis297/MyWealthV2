@@ -261,6 +261,63 @@ public class GetNetWorthTests : TestBase
         top[3].GetProperty("symbol").GetString().ShouldBe("ZED");
     }
 
+    [Test]
+    public async Task FirmCustomerId_NarrowsToThatCustomer_AndRejectsOneOutsideScope()
+    {
+        var (tenant, adviser, ned, tokens) = await AccountHttp.SignInAdviser();
+        var amy = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Amy Able", "amy@north.example", "Password1!", tenant.Id, adviser.Id);
+        var amyBank = await OpenAccountAsync(tokens.AccessToken, amy.PublicId, "Amy bank", "Bank", "NZD");
+        var nedBank = await OpenAccountAsync(tokens.AccessToken, ned.PublicId, "Ned bank", "Bank", "NZD");
+        (await PostCashAsync(tokens.AccessToken, amyBank, 10m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await PostCashAsync(tokens.AccessToken, nedBank, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var otherAdviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Blair", "blair@north.example", "Password1!", tenant.Id);
+        var pat = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Pat", "pat@north.example", "Password1!", tenant.Id, otherAdviser.Id);
+        await TestApp.CreatePersonAsync(
+            UserRole.TenantAdmin, "Tess", "tess@north.example", "Password1!", tenant.Id);
+        var adminTokens = await FunctionalTestSetup.Oidc.SignInAsync(
+            "tess@north.example", "Password1!", "north-advisory");
+        var patBank = await OpenAccountAsync(adminTokens.AccessToken, pat.PublicId, "Pat bank", "Bank", "NZD");
+        (await PostCashAsync(adminTokens.AccessToken, patBank, 999m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var narrowed = await AccountHttp.Send(
+            HttpMethod.Get, $"/net-worth?customerId={amy.PublicId}", tokens.AccessToken);
+        var direct = await AccountHttp.Send(
+            HttpMethod.Get, $"/users/customers/{amy.PublicId}/net-worth", tokens.AccessToken);
+        narrowed.StatusCode.ShouldBe(HttpStatusCode.OK);
+        direct.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var narrowedJson = JsonDocument.Parse(await narrowed.Content.ReadAsStringAsync());
+        using var directJson = JsonDocument.Parse(await direct.Content.ReadAsStringAsync());
+        narrowedJson.RootElement.GetProperty("currencies").GetRawText()
+            .ShouldBe(directJson.RootElement.GetProperty("currencies").GetRawText());
+
+        (await AccountHttp.Send(
+            HttpMethod.Get, $"/net-worth?customerId={pat.PublicId}", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await AccountHttp.Send(
+            HttpMethod.Get, $"/net-worth?customerId={Guid.NewGuid()}", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NotFound);
+
+        var (_, _, southCustomer, _) = await AccountHttp.SignInAdviser(
+            "South Co", "south-co", "ann@south.example", customerEmail: "ned@south.example");
+        var system = await AccountHttp.SignInSystemAdmin();
+        (await AccountHttp.Send(
+            HttpMethod.Get,
+            $"/net-worth?tenantId={tenant.PublicId}&customerId={southCustomer.PublicId}",
+            system.AccessToken)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        var systemNarrowed = await AccountHttp.Send(
+            HttpMethod.Get,
+            $"/net-worth?tenantId={tenant.PublicId}&customerId={amy.PublicId}",
+            system.AccessToken);
+        systemNarrowed.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var systemJson = JsonDocument.Parse(await systemNarrowed.Content.ReadAsStringAsync());
+        systemJson.RootElement.GetProperty("currencies").GetRawText()
+            .ShouldBe(directJson.RootElement.GetProperty("currencies").GetRawText());
+    }
+
     private static void AssertCurrency(JsonElement row, string currency, decimal cash, decimal holdings)
     {
         row.EnumerateObject().Select(property => property.Name).ShouldBe([
