@@ -67,7 +67,7 @@ function requestUrl(input: RequestInfo | URL) {
   return String(input);
 }
 
-function renderForm(me: CurrentUser = user()) {
+function renderForm(me: CurrentUser = user(), postStatus = 201) {
   const store = configureStore({
     reducer: {
       session: sessionSlice.reducer,
@@ -88,6 +88,14 @@ function renderForm(me: CurrentUser = user()) {
       return json(account);
     }
     if (url.endsWith("/transactions") && method === "POST") {
+      if (postStatus === 400) {
+        return json({
+          type: "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+          title: "One or more validation errors occurred.",
+          status: 400,
+          errors: { Security: ["Price is not available."] },
+        }, 400);
+      }
       return json({ id: createdId }, 201);
     }
     return new Response("", { status: 404 });
@@ -177,5 +185,23 @@ describe("CreateTransactionPage", () => {
     expect(body).not.toHaveProperty("price");
     expect(body).not.toHaveProperty("cost");
     expect(body).not.toHaveProperty("ratio");
+  });
+
+  it("stays on the form when the server has no price", async () => {
+    const { router } = renderForm(user(), 400);
+
+    await screen.findByRole("option", { name: "DEMO Demo Fund" });
+    fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+    fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
+    fireEvent.change(screen.getByLabelText("Booked at"), {
+      target: { value: "2026-10-11T10:00:00+13:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(await screen.findByText("Price is not available.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "New transaction" })).toBeInTheDocument();
+    expect(screen.queryByText("account detail")).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/accounts/${accountId}/transactions/new`);
+    expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 });
