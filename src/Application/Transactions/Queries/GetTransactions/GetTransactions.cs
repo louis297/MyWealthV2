@@ -126,6 +126,17 @@ public class GetTransactionsQueryHandler(IApplicationDbContext db, ICurrentUser 
                 .Where(transaction => originalIds.Contains(transaction.Id))
                 .ToDictionaryAsync(transaction => transaction.Id, transaction => transaction.PublicId, cancellationToken);
 
+        var reversedByIds = rows
+            .Where(row => row.transaction.ReversedByTransactionId is not null)
+            .Select(row => row.transaction.ReversedByTransactionId!.Value)
+            .Distinct()
+            .ToList();
+        var reversedByPublicIds = reversedByIds.Count == 0
+            ? new Dictionary<int, Guid>()
+            : await db.Transactions.AsNoTracking()
+                .Where(transaction => reversedByIds.Contains(transaction.Id))
+                .ToDictionaryAsync(transaction => transaction.Id, transaction => transaction.PublicId, cancellationToken);
+
         return new PagedList<TransactionDto>
         {
             Items = rows.Select(row =>
@@ -148,6 +159,10 @@ public class GetTransactionsQueryHandler(IApplicationDbContext db, ICurrentUser 
                     OriginalTransactionId = row.transaction.OriginalTransactionId is int originalId
                         && originalPublicIds.TryGetValue(originalId, out var originalPublicId)
                         ? originalPublicId
+                        : null,
+                    ReversedByTransactionId = row.transaction.ReversedByTransactionId is int reversedById
+                        && reversedByPublicIds.TryGetValue(reversedById, out var reversedByPublicId)
+                        ? reversedByPublicId
                         : null,
                     RowVersion = Convert.ToBase64String(row.transaction.RowVersion ?? []),
                     Security = security is { Count: > 0 } ? security : null
