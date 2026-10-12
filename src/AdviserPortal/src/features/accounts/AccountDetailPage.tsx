@@ -2,10 +2,15 @@ import { Link, useParams } from "react-router";
 import { useGetAccountHoldingsQuery, useGetAccountQuery } from "@/features/accounts/accountsApi";
 import { useGetTransactionsQuery } from "@/features/transactions/transactionsApi";
 
+const cashActions = ["TransferIn", "TransferOut"] as const;
 const securityActions = ["Buy", "Sell", "StockIn", "StockOut", "Split", "Bonus", "Scrip"] as const;
 
 function isNotFound(error: unknown) {
   return typeof error === "object" && error !== null && "status" in error && error.status === 404;
+}
+
+function canPostCash(status: string) {
+  return status === "Open";
 }
 
 function canPostSecurity(type: string, status: string) {
@@ -31,13 +36,17 @@ export function AccountDetailPage() {
 
   const data = account.data;
   const items = holdings.data.items;
+  const actions = [
+    ...(canPostCash(data.status) ? cashActions : []),
+    ...(canPostSecurity(data.type, data.status) ? securityActions : []),
+  ];
 
   return (
     <div className="max-w-3xl space-y-4">
       <h1 className="text-xl font-medium">{data.name}</h1>
-      {canPostSecurity(data.type, data.status) ? (
+      {actions.length > 0 ? (
         <nav aria-label="Transaction actions" className="flex flex-wrap gap-3 text-sm">
-          {securityActions.map((action) => (
+          {actions.map((action) => (
             <Link key={action} to={`/accounts/${data.id}/transactions/new?type=${action}`}>
               {action}
             </Link>
