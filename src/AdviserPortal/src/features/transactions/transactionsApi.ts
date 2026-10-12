@@ -24,6 +24,7 @@ export type Transaction = {
   memo?: string | null;
   reference?: string | null;
   originalTransactionId?: string | null;
+  reversedByTransactionId?: string | null;
   rowVersion: string;
   security?: TransactionSecurity[] | null;
 };

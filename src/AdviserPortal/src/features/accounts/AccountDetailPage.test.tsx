@@ -311,7 +311,7 @@ describe("AccountDetailPage", () => {
               memo: null,
               reference: null,
               originalTransactionId: null,
-      reversedByTransactionId: null,
+              reversedByTransactionId: null,
               rowVersion: "BBBB",
               security: [{ instrumentId, quantity: -40, cost: 2000, costCurrency: "NZD" }],
             }]
@@ -485,7 +485,7 @@ describe("AccountDetailPage", () => {
               memo: "Salary",
               reference: null,
               originalTransactionId: null,
-      reversedByTransactionId: null,
+              reversedByTransactionId: null,
               rowVersion: "BBBB",
             }]
             : [],

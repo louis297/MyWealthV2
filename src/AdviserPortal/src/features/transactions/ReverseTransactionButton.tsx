@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useReverseTransactionMutation } from "@/features/transactions/transactionsApi";
 
-export function canReverse(item: { type: string; originalTransactionId?: string | null }) {
-  return item.type !== "Reversal" && !item.originalTransactionId;
+export function canReverse(item: { type: string; reversedByTransactionId?: string | null }) {
+  return item.type !== "Reversal" && !item.reversedByTransactionId;
 }
 
 function problemMessages(error: unknown): string[] {
