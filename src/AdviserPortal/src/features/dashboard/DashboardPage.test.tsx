@@ -195,6 +195,17 @@ describe("DashboardPage", () => {
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
+  it("shows the currency net for each account type", async () => {
+    renderDashboard(withBreakdowns);
+
+    const heading = await screen.findByRole("heading", { name: "By account type" });
+    const section = heading.closest("section");
+    expect(section).not.toBeNull();
+    expect(within(section!).getByText("Brokerage")).toBeInTheDocument();
+    expect(within(section!).getByText("NZD")).toBeInTheDocument();
+    expect(within(section!).getByText("6000")).toBeInTheDocument();
+  });
+
   it("links each customer to their detail and shows that customer's net", async () => {
     const { router } = renderDashboard(withBreakdowns);
 
