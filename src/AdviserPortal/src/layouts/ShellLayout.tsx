@@ -5,6 +5,7 @@ import { startEndSession } from "@/features/session/session";
 import {
   canAccessAccounts,
   canAccessAdvisers,
+  canAccessTransactions,
   canAccessCustomers,
   canAccessDashboard,
   canAccessProfile,
@@ -39,6 +40,11 @@ export function ShellLayout({ children }: { children?: ReactNode }) {
             {canAccessAccounts(me?.role) ? (
               <li>
                 <NavLink to="/accounts">Accounts</NavLink>
+              </li>
+            ) : null}
+            {canAccessTransactions(me?.role) ? (
+              <li>
+                <NavLink to="/transactions">Transactions</NavLink>
               </li>
             ) : null}
             {canAccessCustomers(me?.role) ? (

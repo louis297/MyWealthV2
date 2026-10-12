@@ -30,6 +30,10 @@ export function canAccessAccounts(role: string | null | undefined) {
   return role === roles.tenantAdmin || role === roles.adviser;
 }
 
+export function canAccessTransactions(role: string | null | undefined) {
+  return role === roles.tenantAdmin || role === roles.adviser;
+}
+
 export function canAccessAdvisers(role: string | null | undefined) {
   return role === roles.tenantAdmin;
 }
