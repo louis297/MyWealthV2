@@ -19,7 +19,19 @@ function isCashType(value: string): value is (typeof cashTypes)[number] {
   return (cashTypes as readonly string[]).includes(value);
 }
 
+function cashSignError(type: (typeof cashTypes)[number], amount: number) {
+  const invalid = type === "TransferIn" ? !(amount > 0) : !(amount < 0);
+  return invalid ? "Amount sign is not valid for this transaction type." : null;
+}
+
+function isNotFound(error: unknown) {
+  return typeof error === "object" && error !== null && "status" in error && error.status === 404;
+}
+
 function problemMessages(error: unknown): string[] {
+  if (isNotFound(error)) {
+    return ["Not found"];
+  }
   if (typeof error !== "object" || error === null || !("data" in error)) {
     return [];
   }
@@ -58,6 +70,13 @@ export function CreateTransactionPage() {
     }
 
     const trimmedMemo = memo.trim();
+    if (isCashType(type)) {
+      const signError = cashSignError(type, Number(amount));
+      if (signError) {
+        setMessages([signError]);
+        return;
+      }
+    }
     try {
       if (isCashType(type)) {
         await createTransaction({
@@ -104,6 +123,10 @@ export function CreateTransactionPage() {
     ...(offerCash ? cashTypes : []),
   ];
   const cashType = isCashType(type);
+
+  if (isNotFound(account.error)) {
+    return <p>Not found</p>;
+  }
 
   return (
     <div className="max-w-lg space-y-4">
