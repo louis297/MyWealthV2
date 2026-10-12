@@ -5,7 +5,7 @@ import { useGetInstrumentsQuery } from "@/features/instruments/instrumentsApi";
 import { useCreateTransactionMutation } from "@/features/transactions/transactionsApi";
 
 const securityTypes = ["Buy", "Sell", "StockIn", "StockOut", "Split", "Bonus", "Scrip"] as const;
-const cashTypes = ["TransferIn"] as const;
+const cashTypes = ["TransferIn", "TransferOut"] as const;
 const types = [...securityTypes, ...cashTypes] as const;
 
 function initialType(value: string | null) {
@@ -15,7 +15,7 @@ function initialType(value: string | null) {
   return "Buy";
 }
 
-function isCashType(value: string) {
+function isCashType(value: string): value is (typeof cashTypes)[number] {
   return (cashTypes as readonly string[]).includes(value);
 }
 
@@ -64,7 +64,7 @@ export function CreateTransactionPage() {
           idempotencyKey,
           body: {
             accountId,
-            type: "TransferIn",
+            type,
             amount: Number(amount),
             bookedAt,
             memo: trimmedMemo.length === 0 ? null : trimmedMemo,
