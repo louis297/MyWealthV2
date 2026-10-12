@@ -128,4 +128,53 @@ describe("TransactionDetailPage", () => {
       expect(text).not.toContain("tenantId");
     }
   });
+
+  it("stays on the original when it has already been reversed", async () => {
+    const store = configureStore({
+      reducer: {
+        session: sessionSlice.reducer,
+        [api.reducerPath]: api.reducer,
+      },
+      middleware: (getDefault) => getDefault().concat(api.middleware),
+    });
+    store.dispatch(setCurrentUser(user()));
+
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
+      const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+      if (url.endsWith(`/transactions/${originalId}/reverse`) && method === "POST") {
+        return json({
+          type: "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+          title: "One or more validation errors occurred.",
+          status: 400,
+          errors: { "": ["This transaction has already been reversed."] },
+        }, 400);
+      }
+      if (url.endsWith(`/transactions/${originalId}`) && method === "GET") {
+        return json(original);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    const router = createMemoryRouter(
+      [{ path: "/transactions/:id", element: <TransactionDetailPage /> }],
+      { initialEntries: [`/transactions/${originalId}`] },
+    );
+
+    render(
+      <Provider store={store}>
+        <RouterProvider router={router} />
+      </Provider>,
+    );
+
+    expect(await screen.findByText(originalId)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reverse" }));
+
+    expect(await screen.findByText("This transaction has already been reversed.")).toBeInTheDocument();
+    expect(screen.getByText(originalId)).toBeInTheDocument();
+    expect(screen.getByText("Buy")).toBeInTheDocument();
+    expect(screen.queryByText(reverseId)).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/transactions/${originalId}`);
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
 });
