@@ -141,6 +141,44 @@ describe("app routes", () => {
     expect(screen.queryByRole("heading", { name: "Dashboard" })).not.toBeInTheDocument();
   });
 
+  it("lets TenantAdmin open /accounts", async () => {
+    renderApp(user(), "/accounts");
+
+    expect(await screen.findByRole("heading", { name: "Accounts" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("lets an Adviser open /accounts", async () => {
+    renderApp(user({ role: "adviser", name: "Sam Reed" }), "/accounts");
+
+    expect(await screen.findByRole("heading", { name: "Accounts" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
+  });
+
+  it("sends SystemAdmin on /accounts to /forbidden", async () => {
+    renderApp(
+      user({
+        role: "systemAdmin",
+        name: "System Admin",
+        tenantId: null,
+        tenantCode: null,
+      }),
+      "/accounts",
+    );
+
+    expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Accounts" })).not.toBeInTheDocument();
+  });
+
+  it("sends a Customer on /accounts to /forbidden", async () => {
+    renderApp(user({ role: "customer", name: "Jordan Lee" }), "/accounts");
+
+    expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Accounts" })).not.toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
   it("sends SystemAdmin on / to Profile and not a Customers workspace", async () => {
     renderApp(
       user({
