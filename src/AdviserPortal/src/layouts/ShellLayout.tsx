@@ -3,6 +3,7 @@ import { NavLink, Outlet } from "react-router";
 import { useAppSelector } from "@/app/hooks";
 import { startEndSession } from "@/features/session/session";
 import {
+  canAccessAccounts,
   canAccessAdvisers,
   canAccessCustomers,
   canAccessDashboard,
@@ -33,6 +34,11 @@ export function ShellLayout({ children }: { children?: ReactNode }) {
             {canAccessDashboard(me?.role) ? (
               <li>
                 <NavLink to="/dashboard">Dashboard</NavLink>
+              </li>
+            ) : null}
+            {canAccessAccounts(me?.role) ? (
+              <li>
+                <NavLink to="/accounts">Accounts</NavLink>
               </li>
             ) : null}
             {canAccessCustomers(me?.role) ? (

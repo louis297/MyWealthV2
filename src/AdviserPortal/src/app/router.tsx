@@ -3,6 +3,7 @@ import { AdviserDetailPage } from "@/features/advisers/AdviserDetailPage";
 import { AdvisersListPage } from "@/features/advisers/AdvisersListPage";
 import { CreateAdviserPage } from "@/features/advisers/CreateAdviserPage";
 import { EditAdviserPage } from "@/features/advisers/EditAdviserPage";
+import { AccountsListPage } from "@/features/accounts/AccountsListPage";
 import { CreateCustomerPage } from "@/features/customers/CreateCustomerPage";
 import { CustomerDetailPage } from "@/features/customers/CustomerDetailPage";
 import { CustomersListPage } from "@/features/customers/CustomersListPage";
@@ -36,6 +37,11 @@ export const appRoutes: RouteObject[] = [
             path: "/profile",
             element: <RoleGate allow={[roles.tenantAdmin, roles.adviser, roles.systemAdmin]} />,
             children: [{ index: true, element: <ProfilePage /> }],
+          },
+          {
+            path: "/accounts",
+            element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
+            children: [{ index: true, element: <AccountsListPage /> }],
           },
           {
             path: "/customers",
