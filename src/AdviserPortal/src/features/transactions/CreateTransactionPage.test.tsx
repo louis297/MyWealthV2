@@ -85,6 +85,7 @@ function renderForm(
   accountOverride: Partial<typeof account> = {},
   problemShape: "errors" | "disabled" = "errors",
   search = "",
+  accountStatus = 200,
 ) {
   const store = configureStore({
     reducer: {
@@ -106,9 +107,15 @@ function renderForm(
       return json({ items: [holding] });
     }
     if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+      if (accountStatus === 404) {
+        return new Response("", { status: 404 });
+      }
       return json({ ...account, ...accountOverride });
     }
     if (url.endsWith("/transactions") && method === "POST") {
+      if (postStatus === 404) {
+        return new Response("", { status: 404 });
+      }
       if (postStatus === 400 && problemShape === "disabled") {
         return json({
           type: "https://tools.ietf.org/html/rfc9110#section-15.5.1",
@@ -590,6 +597,52 @@ describe("CreateTransactionPage", () => {
     expect(router.state.location.pathname).toBe(`/accounts/${accountId}/transactions/new`);
     const body = await postedBody(fetchMock);
     expect(body).toMatchObject({ type: "TransferOut", amount: -2000 });
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("shows Not found when the transfer account is not visible", async () => {
+    const { fetchMock, router } = renderForm(
+      user(),
+      201,
+      "Price is not available.",
+      {},
+      "errors",
+      "?type=TransferIn",
+      404,
+    );
+
+    expect(await screen.findByText("Not found")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "New transaction" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Forbidden")).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/accounts/${accountId}/transactions/new`);
+    const post = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.method === "POST");
+    expect(post).toBeUndefined();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("shows Not found when posting a transfer returns 404", async () => {
+    const { router } = renderForm(
+      user(),
+      404,
+      "Price is not available.",
+      {},
+      "errors",
+      "?type=TransferOut",
+    );
+
+    await screen.findByLabelText("Amount");
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "-10" } });
+    fireEvent.change(screen.getByLabelText("Booked at"), {
+      target: { value: "2026-10-12T09:30:00+13:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(await screen.findByText("Not found")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "New transaction" })).toBeInTheDocument();
+    expect(screen.queryByText("account detail")).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/accounts/${accountId}/transactions/new`);
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 });
