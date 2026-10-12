@@ -1,5 +1,5 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -60,7 +60,7 @@ function requestedUrls(fetchMock: ReturnType<typeof vi.mocked<typeof fetch>>) {
   });
 }
 
-function renderList(me: CurrentUser) {
+function renderList(me: CurrentUser, path = "/transactions", status = 200) {
   const store = configureStore({
     reducer: {
       session: sessionSlice.reducer,
@@ -72,15 +72,24 @@ function renderList(me: CurrentUser) {
 
   const fetchMock = vi.mocked(fetch);
   fetchMock.mockImplementation(async () =>
-    new Response(JSON.stringify({ items: [transaction], page: 1, pageSize: 20, totalCount: 1 }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    }),
+    new Response(
+      status === 200
+        ? JSON.stringify({ items: [transaction], page: 1, pageSize: 20, totalCount: 1 })
+        : "",
+      {
+        status,
+        headers: status === 200 ? { "Content-Type": "application/json" } : undefined,
+      },
+    ),
   );
 
-  const router = createMemoryRouter([{ path: "/transactions", element: <TransactionsListPage /> }], {
-    initialEntries: ["/transactions"],
-  });
+  const router = createMemoryRouter(
+    [
+      { path: "/transactions", element: <TransactionsListPage /> },
+      { path: "/forbidden", element: <h1>Forbidden</h1> },
+    ],
+    { initialEntries: [path] },
+  );
 
   render(
     <Provider store={store}>
@@ -88,7 +97,7 @@ function renderList(me: CurrentUser) {
     </Provider>,
   );
 
-  return { fetchMock };
+  return { fetchMock, router };
 }
 
 describe("TransactionsListPage", () => {
@@ -138,5 +147,52 @@ describe("TransactionsListPage", () => {
     const url = new URL((fetchMock.mock.calls[0][0] as Request).url);
     expect(url.pathname).toBe("/api/transactions");
     expect(url.searchParams.has("tenantId")).toBe(false);
+  });
+
+  it("forwards accountId and customerId from the URL and resets page when a filter changes", async () => {
+    const { fetchMock, router } = renderList(
+      user(),
+      `/transactions?accountId=${accountId}&customerId=${customerId}&page=2`,
+    );
+
+    expect(await screen.findByText("Buy")).toBeInTheDocument();
+    expect(screen.getByLabelText("Account")).toHaveValue(accountId);
+    expect(screen.getByLabelText("Customer")).toHaveValue(customerId);
+
+    const first = new URL((fetchMock.mock.calls[0][0] as Request).url);
+    expect(first.pathname).toBe("/api/transactions");
+    expect(first.searchParams.get("accountId")).toBe(accountId);
+    expect(first.searchParams.get("customerId")).toBe(customerId);
+    expect(first.searchParams.get("page")).toBe("2");
+    expect(first.searchParams.get("pageSize")).toBe("20");
+    expect(first.searchParams.has("tenantId")).toBe(false);
+
+    const nextAccount = "ffffffff-ffff-ffff-ffff-ffffffffffff";
+    fireEvent.change(screen.getByLabelText("Account"), { target: { value: nextAccount } });
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe("/transactions");
+      expect(router.state.location.search).toContain(`accountId=${nextAccount}`);
+      expect(router.state.location.search).toContain("page=1");
+      expect(router.state.location.search).toContain(`customerId=${customerId}`);
+    });
+
+    const refetched = requestedUrls(fetchMock)
+      .map((item) => new URL(item))
+      .find((url) => url.searchParams.get("accountId") === nextAccount);
+    expect(refetched?.pathname).toBe("/api/transactions");
+    expect(refetched?.searchParams.get("page")).toBe("1");
+    expect(refetched?.searchParams.get("customerId")).toBe(customerId);
+    expect(refetched?.searchParams.has("tenantId")).toBe(false);
+  });
+
+  it("stays on /transactions when the filtered list is not found", async () => {
+    const { router } = renderList(user(), `/transactions?accountId=${accountId}`, 404);
+
+    expect(await screen.findByText("Not found")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Transactions" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/transactions");
+    expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 });
