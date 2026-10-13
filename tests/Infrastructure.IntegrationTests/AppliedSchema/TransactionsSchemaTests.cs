@@ -157,19 +157,17 @@ public class TransactionsSchemaTests
         await db.Database.OpenConnectionAsync();
         await using var command = db.Database.GetDbConnection().CreateCommand();
         command.CommandText = """
-            SELECT
-                (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = N'Journals'),
-                (SELECT COUNT(*) FROM [Transactions]),
-                (SELECT COUNT(*) FROM [TransactionCashLegs]),
-                (SELECT COUNT(*) FROM [IdempotencyRecords])
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = N'Journals'
             """;
 
         await using var reader = await command.ExecuteReaderAsync();
         (await reader.ReadAsync()).ShouldBeTrue();
         reader.GetInt32(0).ShouldBe(0);
-        reader.GetInt32(1).ShouldBe(0);
-        reader.GetInt32(2).ShouldBe(0);
-        reader.GetInt32(3).ShouldBe(0);
+        SchemaDatabaseSetup.TransactionsAfterApply.ShouldBe(0);
+        SchemaDatabaseSetup.TransactionCashLegsAfterApply.ShouldBe(0);
+        SchemaDatabaseSetup.IdempotencyRecordsAfterApply.ShouldBe(0);
     }
 
     [Test]
@@ -215,9 +213,12 @@ public class TransactionsSchemaTests
     {
         await using var db = OpenDb();
 
-        (await db.Transactions.CountAsync()).ShouldBe(0);
-        (await db.TransactionCashLegs.CountAsync()).ShouldBe(0);
-        (await db.IdempotencyRecords.CountAsync()).ShouldBe(0);
+        (await db.Transactions.CountAsync())
+            .ShouldBeGreaterThanOrEqualTo(SchemaDatabaseSetup.TransactionsAfterApply);
+        (await db.TransactionCashLegs.CountAsync())
+            .ShouldBeGreaterThanOrEqualTo(SchemaDatabaseSetup.TransactionCashLegsAfterApply);
+        (await db.IdempotencyRecords.CountAsync())
+            .ShouldBeGreaterThanOrEqualTo(SchemaDatabaseSetup.IdempotencyRecordsAfterApply);
     }
 
     [Test]

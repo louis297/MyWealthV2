@@ -54,7 +54,19 @@ public class SchemaDatabaseSetup
             new EfSqlBatchExecutor(db));
 
         await applicator.ApplyAsync(cancellationToken);
+
+        // Later fixtures insert rows into this same database. Seed checks must
+        // use the counts from immediately after apply.
+        TransactionsAfterApply = await db.Transactions.CountAsync(cancellationToken);
+        TransactionCashLegsAfterApply = await db.TransactionCashLegs.CountAsync(cancellationToken);
+        IdempotencyRecordsAfterApply = await db.IdempotencyRecords.CountAsync(cancellationToken);
     }
+
+    internal static int TransactionsAfterApply { get; private set; }
+
+    internal static int TransactionCashLegsAfterApply { get; private set; }
+
+    internal static int IdempotencyRecordsAfterApply { get; private set; }
 
     [OneTimeTearDown]
     public async Task OneTimeTearDown()

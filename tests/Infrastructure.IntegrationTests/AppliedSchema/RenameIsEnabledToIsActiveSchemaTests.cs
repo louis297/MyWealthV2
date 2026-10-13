@@ -56,7 +56,8 @@ public class RenameIsEnabledToIsActiveSchemaTests
         var indexes = await QueryNames(db, """
             SELECT i.name
             FROM sys.indexes i
-            WHERE i.name LIKE N'%IsEnabled%' OR i.name LIKE N'%IsActive%'
+            WHERE (i.name LIKE N'%IsEnabled%' OR i.name LIKE N'%IsActive%')
+              AND OBJECT_NAME(i.object_id) IN (N'Currencies', N'Tenants', N'Instruments', N'Users')
             ORDER BY i.name
             """);
         indexes.ShouldBe([
