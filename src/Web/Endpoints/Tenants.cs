@@ -7,6 +7,8 @@ using MyWealthV2.Application.Tenants.Commands.EnableTenant;
 using MyWealthV2.Application.Tenants.Commands.UpdateTenant;
 using MyWealthV2.Application.Tenants.Queries.GetTenantByCode;
 using MyWealthV2.Application.Tenants.Queries.GetTenantById;
+using MyWealthV2.Application.Reports;
+using MyWealthV2.Application.Tenants.Queries.GetTenantReports;
 using MyWealthV2.Application.Tenants.Queries.GetTenants;
 using Microsoft.AspNetCore.Http.HttpResults;
 
@@ -21,6 +23,7 @@ public class Tenants : IEndpointGroup
         groupBuilder.MapGet(GetTenants).RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapGet(GetTenantByCode, "by-code/{code}").RequireAuthorization(Policies.TenantsRead);
         groupBuilder.MapGet(GetTenant, "{id}").RequireAuthorization(Policies.TenantsManage);
+        groupBuilder.MapGet(GetTenantReports, "{id}/reports").RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapPost(CreateTenant).RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapPut(UpdateTenant, "{id}").RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapPost(DisableTenant, "{id}/disable").RequireAuthorization(Policies.TenantsManage);
@@ -46,6 +49,14 @@ public class Tenants : IEndpointGroup
     {
         var item = await sender.Send(new GetTenantByCodeQuery(code));
         return TypedResults.Ok(item);
+    }
+
+    [EndpointSummary("List reports granted to a tenant")]
+    [EndpointDescription("Returns catalog rows granted to the tenant, including inactive catalog rows. SystemAdmin only.")]
+    public static async Task<Ok<IReadOnlyList<TenantReportGrantDto>>> GetTenantReports(ISender sender, Guid id)
+    {
+        var result = await sender.Send(new GetTenantReportsQuery(id));
+        return TypedResults.Ok(result);
     }
 
     [EndpointSummary("Get a tenant")]

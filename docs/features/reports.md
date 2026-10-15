@@ -266,6 +266,7 @@ First phase may hard-code the two parameter forms in the Adviser Portal. A param
 
 | Method | Route | Policy | Success | Failure |
 | --- | --- | --- | --- | --- |
+| GET | `/tenants/{tenantId}/reports` | `tenants.manage` | 200 grant list, including inactive catalog rows | 401 / 403 / 404 |
 | GET | `/reports` | `reports.customer.read` or `reports.book.read` (filter by scope) | 200 list | 401 / 403 |
 | POST | `/reports/schedules` | by report scope (`*.create`) | 201 `{ "id" }` | 400 / 403 / 404 |
 | PUT | `/reports/schedules/{id}` | by report scope | 204 | 400 / 403 / 404 / 409 |
