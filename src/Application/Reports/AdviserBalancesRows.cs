@@ -83,6 +83,7 @@ public static class AdviserBalancesRows
                     continue;
                 }
 
+                var (marketValue, marketCurrency) = MarketValue(holding);
                 lines.Add(new AdviserHoldingLine(
                     account.CustomerId,
                     account.CustomerName,
@@ -93,11 +94,25 @@ public static class AdviserBalancesRows
                     holding.Quantity,
                     holding.CostAmount,
                     holding.CostCurrency,
-                    MarketValue: 0m,
-                    MarketCurrency: holding.QuoteCurrency));
+                    marketValue,
+                    marketCurrency));
             }
         }
 
         return new AdviserBalancesSelection(lines, []);
+    }
+
+    private static (decimal Amount, string Currency) MarketValue(AdviserBalanceHolding holding)
+    {
+        var quote = holding.QuoteCurrency.Trim().ToUpperInvariant();
+        var priceCurrency = holding.PriceCurrency?.Trim().ToUpperInvariant();
+        if (holding.PriceAmount is > 0m
+            && priceCurrency is not null
+            && string.Equals(priceCurrency, quote, StringComparison.Ordinal))
+        {
+            return (holding.Quantity * holding.PriceAmount.Value, priceCurrency);
+        }
+
+        return (0m, quote);
     }
 }
