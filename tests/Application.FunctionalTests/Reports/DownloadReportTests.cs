@@ -52,6 +52,44 @@ public class DownloadReportTests : TestBase
         (await GetAsync(admin.AccessToken, failed)).StatusCode.ShouldBe(HttpStatusCode.Conflict);
     }
 
+    [Test]
+    public async Task Download_OutOfScope_Returns404_AndInScope_Returns200()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm Scope", "firm-scope");
+        var admin = await TestApp.CreatePersonAsync(
+            UserRole.TenantAdmin, "Tess", "tess@firm-scope", "Password1!", tenant.Id);
+        var adviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Ann", "ann@firm-scope", "Password1!", tenant.Id);
+        var otherAdviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Bea", "bea@firm-scope", "Password1!", tenant.Id);
+        var customer = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Cee", "cee@firm-scope", "Password1!", tenant.Id, adviser.Id);
+        var otherCustomer = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Dee", "dee@firm-scope", "Password1!", tenant.Id, otherAdviser.Id);
+        await GrantAsync(tenant.PublicId);
+        var adminTokens = await TestApp.IssueAccessTokenAsync(admin);
+        var executionId = await RequestAsync(adminTokens.AccessToken, customer.PublicId);
+        await using var scope = FunctionalTestSetup.WebApiServices.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<ReportJob>().Execute(executionId);
+
+        var south = await TestApp.CreateTenantAsync("South Scope", "south-scope");
+        var southAdmin = await TestApp.CreatePersonAsync(
+            UserRole.TenantAdmin, "Sol", "sol@south-scope", "Password1!", south.Id);
+        var southTokens = await TestApp.IssueAccessTokenAsync(southAdmin);
+        (await GetAsync(southTokens.AccessToken, executionId)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await GetAsync(adminTokens.AccessToken, Guid.NewGuid())).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+
+        var adviserTokens = await TestApp.IssueAccessTokenAsync(adviser);
+        var otherAdviserTokens = await TestApp.IssueAccessTokenAsync(otherAdviser);
+        var customerTokens = await TestApp.IssueAccessTokenAsync(customer);
+        var otherCustomerTokens = await TestApp.IssueAccessTokenAsync(otherCustomer);
+        (await GetAsync(otherAdviserTokens.AccessToken, executionId)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await GetAsync(otherCustomerTokens.AccessToken, executionId)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await GetAsync(adviserTokens.AccessToken, executionId)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await GetAsync(adminTokens.AccessToken, executionId)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await GetAsync(customerTokens.AccessToken, executionId)).StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
     private static async Task GrantAsync(Guid tenantId)
     {
         var system = await TenantHttp.SignInSystemAdmin();
