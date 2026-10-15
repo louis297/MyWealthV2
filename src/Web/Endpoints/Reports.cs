@@ -1,3 +1,4 @@
+using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Reports;
 using MyWealthV2.Application.Reports.Commands.CreateReportSchedule;
@@ -5,6 +6,7 @@ using MyWealthV2.Application.Reports.Commands.DisableReportSchedule;
 using MyWealthV2.Application.Reports.Commands.RequestReport;
 using MyWealthV2.Application.Reports.Commands.UpdateReportSchedule;
 using MyWealthV2.Application.Reports.Queries.DownloadReportResult;
+using MyWealthV2.Application.Reports.Queries.GetReportExecutions;
 using MyWealthV2.Application.Reports.Queries.GetReportSchedules;
 using MyWealthV2.Application.Reports.Queries.GetReports;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -42,6 +44,7 @@ public class Reports : IEndpointGroup
         groupBuilder.MapPut(UpdateSchedule, "schedules/{id}").RequireAuthorization(CreateReports);
         groupBuilder.MapPost(DisableSchedule, "schedules/{id}/disable").RequireAuthorization(CreateReports);
         groupBuilder.MapPost(RequestReport, "request").RequireAuthorization(CreateReports);
+        groupBuilder.MapGet(GetExecutions, "executions").RequireAuthorization(ReadReports);
         groupBuilder.MapGet(DownloadReport, "executions/{id}/download").RequireAuthorization(ReadReports);
     }
 
@@ -99,6 +102,17 @@ public class Reports : IEndpointGroup
     {
         var id = await sender.Send(command);
         return TypedResults.Accepted($"/reports/executions/{id}", new { id });
+    }
+
+    [EndpointSummary("List report executions")]
+    [EndpointDescription("Returns a paged list of report executions in the caller's tenant.")]
+    public static async Task<Ok<PagedList<ReportExecutionDto>>> GetExecutions(
+        ISender sender,
+        int page = 1,
+        int pageSize = 20)
+    {
+        var result = await sender.Send(new GetReportExecutionsQuery(page, pageSize));
+        return TypedResults.Ok(result);
     }
 
     [EndpointSummary("Download a report result")]
