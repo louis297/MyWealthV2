@@ -3,6 +3,7 @@ using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Tenants;
 using MyWealthV2.Application.Tenants.Commands.CreateTenant;
 using MyWealthV2.Application.Tenants.Commands.GrantTenantReport;
+using MyWealthV2.Application.Tenants.Commands.RevokeTenantReport;
 using MyWealthV2.Application.Tenants.Commands.DisableTenant;
 using MyWealthV2.Application.Tenants.Commands.EnableTenant;
 using MyWealthV2.Application.Tenants.Commands.UpdateTenant;
@@ -26,6 +27,7 @@ public class Tenants : IEndpointGroup
         groupBuilder.MapGet(GetTenant, "{id}").RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapGet(GetTenantReports, "{id}/reports").RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapPost(GrantTenantReport, "{id}/reports").RequireAuthorization(Policies.TenantsManage);
+        groupBuilder.MapDelete(RevokeTenantReport, "{id}/reports/{reportId}").RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapPost(CreateTenant).RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapPut(UpdateTenant, "{id}").RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapPost(DisableTenant, "{id}/disable").RequireAuthorization(Policies.TenantsManage);
@@ -75,6 +77,14 @@ public class Tenants : IEndpointGroup
         return TypedResults.Created(
             $"/tenants/{id}/reports/{result.Id}",
             new CreatedReportGrantDto(result.Id));
+    }
+
+    [EndpointSummary("Revoke a report from a tenant")]
+    [EndpointDescription("Removes a tenant's grant. Already absent is 204. Schedule and execution rows stay. SystemAdmin only.")]
+    public static async Task<NoContent> RevokeTenantReport(ISender sender, Guid id, Guid reportId)
+    {
+        await sender.Send(new RevokeTenantReportCommand(id, reportId));
+        return TypedResults.NoContent();
     }
 
     [EndpointSummary("Get a tenant")]
