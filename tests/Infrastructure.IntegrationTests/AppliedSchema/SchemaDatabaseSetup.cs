@@ -60,6 +60,7 @@ public class SchemaDatabaseSetup
         TransactionsAfterApply = await db.Transactions.CountAsync(cancellationToken);
         TransactionCashLegsAfterApply = await db.TransactionCashLegs.CountAsync(cancellationToken);
         IdempotencyRecordsAfterApply = await db.IdempotencyRecords.CountAsync(cancellationToken);
+        TenantReportsAfterApply = await db.TenantReports.CountAsync(cancellationToken);
     }
 
     internal static int TransactionsAfterApply { get; private set; }
@@ -67,6 +68,8 @@ public class SchemaDatabaseSetup
     internal static int TransactionCashLegsAfterApply { get; private set; }
 
     internal static int IdempotencyRecordsAfterApply { get; private set; }
+
+    internal static int TenantReportsAfterApply { get; private set; }
 
     [OneTimeTearDown]
     public async Task OneTimeTearDown()

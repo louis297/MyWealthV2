@@ -159,7 +159,7 @@ Script: `database/schema/0019_reports.sql`.
 
 Hangfire tables in schema `Hangfire`.
 
-Seed the two first-phase reports (by Code) and (in Development) example TenantReport grants. New tenants are **not** auto-granted.
+Seed the two first-phase reports (by Code) in `0019_reports.sql`. Development / TestAppHost `TestSeed` grants both (`customer-transactions`, `adviser-balances`) to the demo tenant. Idempotent on `(TenantId, ReportId)`. Not a schema script. Not Production. New tenants are **not** auto-granted.
 
 ### 6.1 Scope and AllowedTriggers columns
 
@@ -443,6 +443,7 @@ Catalog and tenant grants stay on Scalar.
 - Customer has only `reports.customer.read`; create and all book routes → 403.
 - Adviser and TenantAdmin have all four policies. SystemAdmin has none of them.
 - Tenant without grant cannot see or run the report.
+- `TestSeed` grants both seeded reports to the demo tenant. A second run keeps the same rows. Another tenant is not granted.
 - Customer Transactions rejects an unassigned Customer for an Adviser; requires from/to; default excludes Closed; reversal sits next to original.
 - Adviser Balances: non-Adviser omitting adviserId → 400; zero cash accounts omitted; quantity ≤ 0 holdings omitted; asOf set server-side; subtotals present.
 - Schedule update changes the Hangfire recurring definition.

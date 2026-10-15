@@ -39,6 +39,8 @@ public static class TestSeed
             return;
         }
 
+        await EnsureDemoReportGrantsAsync(db, tenant.Id, cancellationToken);
+
         var usd = Currency.Create("USD", "United States Dollar", 2);
         var nzd = Currency.Create("NZD", "New Zealand Dollar", 2);
 
@@ -53,6 +55,41 @@ public static class TestSeed
         prices.SetPrice(aia.Id, Money.Create(8.50m, "NZD"));
 
         await EnsureDemoAccountsAsync(db, prices, cancellationToken);
+    }
+
+    private const string CustomerTransactionsCode = "customer-transactions";
+
+    private const string AdviserBalancesCode = "adviser-balances";
+
+    private static async Task EnsureDemoReportGrantsAsync(
+        ApplicationDbContext db,
+        int tenantId,
+        CancellationToken cancellationToken)
+    {
+        var reports = await db.Reports
+            .Where(row => row.Code == CustomerTransactionsCode || row.Code == AdviserBalancesCode)
+            .Select(row => row.Id)
+            .ToListAsync(cancellationToken);
+
+        var added = false;
+        foreach (var reportId in reports)
+        {
+            var granted = await db.TenantReports.AnyAsync(
+                row => row.TenantId == tenantId && row.ReportId == reportId,
+                cancellationToken);
+            if (granted)
+            {
+                continue;
+            }
+
+            db.TenantReports.Add(TenantReport.Grant(tenantId, reportId));
+            added = true;
+        }
+
+        if (added)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
     }
 
     private static async Task<Instrument> EnsureInstrumentAsync(

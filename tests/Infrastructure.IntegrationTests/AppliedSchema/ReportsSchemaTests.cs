@@ -30,7 +30,7 @@ public class ReportsSchemaTests
                 true)
         ]);
 
-        (await Scalar("SELECT COUNT(*) FROM [TenantReports]")).ShouldBe(0);
+        SchemaDatabaseSetup.TenantReportsAfterApply.ShouldBe(0);
     }
 
     [Test]
@@ -229,15 +229,6 @@ public class ReportsSchemaTests
         }
 
         return rows;
-    }
-
-    private static async Task<int> Scalar(string sql)
-    {
-        await using var db = OpenDb();
-        await db.Database.OpenConnectionAsync();
-        await using var command = db.Database.GetDbConnection().CreateCommand();
-        command.CommandText = sql;
-        return Convert.ToInt32(await command.ExecuteScalarAsync());
     }
 
     private static async Task<List<(string Name, string Type, int? Length, int? Precision, int? Scale, string Nullable, int Identity)>> LoadColumns(
