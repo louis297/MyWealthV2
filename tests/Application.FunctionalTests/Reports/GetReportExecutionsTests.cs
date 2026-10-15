@@ -94,6 +94,104 @@ public class GetReportExecutionsTests : TestBase
         bookParameters.GetProperty("includeClosedAccounts").GetBoolean().ShouldBeFalse();
     }
 
+    [Test]
+    public async Task List_FiltersByCallerScope()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm Execution Scope", "firm-execution-scope");
+        await TestApp.CreatePersonAsync(
+            UserRole.TenantAdmin, "Tess", "tess@firm-execution-scope", "Password1!", tenant.Id);
+        var adviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Ann", "ann@firm-execution-scope", "Password1!", tenant.Id);
+        var otherAdviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Bea", "bea@firm-execution-scope", "Password1!", tenant.Id);
+        var customer = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Cee", "cee@firm-execution-scope", "Password1!", tenant.Id, adviser.Id);
+        var otherCustomer = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Dee", "dee@firm-execution-scope", "Password1!", tenant.Id, otherAdviser.Id);
+        await GrantAsync(tenant.PublicId);
+
+        var admin = await FunctionalTestSetup.Oidc.SignInAsync(
+            "tess@firm-execution-scope", "Password1!", "firm-execution-scope");
+        var assignedId = await RequestAsync(admin.AccessToken, customer.PublicId);
+        var unassignedId = await RequestAsync(admin.AccessToken, otherCustomer.PublicId);
+        var now = DateTimeOffset.UtcNow;
+        var ownBookId = await InsertBookExecutionAsync(tenant.Id, adviser.PublicId, now, BookAsOf, "own.pdf");
+        var otherBookId = await InsertBookExecutionAsync(
+            tenant.Id, otherAdviser.PublicId, now.AddMinutes(-1), BookAsOf, "other.pdf");
+        var bookWithoutAdviserId = await InsertRawExecutionAsync(
+            tenant.Id,
+            "adviser-balances",
+            """{"includeClosedAccounts":false}""",
+            now.AddMinutes(-2));
+        var unreadableId = await InsertRawExecutionAsync(
+            tenant.Id,
+            "customer-transactions",
+            "not-json",
+            now.AddMinutes(-3));
+
+        var adminIds = await ReadIdsAsync(admin.AccessToken);
+        adminIds.ShouldBe(
+            [assignedId, unassignedId, ownBookId, otherBookId, bookWithoutAdviserId],
+            ignoreOrder: true);
+        adminIds.ShouldNotContain(unreadableId);
+
+        var customerScope = await ReadIdsAsync(admin.AccessToken, "?scope=Customer");
+        customerScope.ShouldBe([assignedId, unassignedId], ignoreOrder: true);
+        var bookScope = await ReadIdsAsync(admin.AccessToken, "?scope=Book");
+        bookScope.ShouldBe([ownBookId, otherBookId, bookWithoutAdviserId], ignoreOrder: true);
+
+        var adviserTokens = await TestApp.IssueAccessTokenAsync(adviser);
+        (await ReadIdsAsync(adviserTokens.AccessToken)).ShouldBe([assignedId, ownBookId], ignoreOrder: true);
+        (await ReadIdsAsync(adviserTokens.AccessToken, "?scope=Customer")).ShouldBe([assignedId]);
+        (await ReadIdsAsync(adviserTokens.AccessToken, "?scope=Book")).ShouldBe([ownBookId]);
+
+        var customerTokens = await TestApp.IssueAccessTokenAsync(customer);
+        (await ReadIdsAsync(customerTokens.AccessToken)).ShouldBe([assignedId]);
+        var otherTokens = await TestApp.IssueAccessTokenAsync(otherCustomer);
+        (await ReadIdsAsync(otherTokens.AccessToken)).ShouldBe([unassignedId]);
+
+        (await GetAsync(customerTokens.AccessToken, "?scope=Book")).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        (await GetAsync(admin.AccessToken, "?scope=Nope")).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await GetAsync(null)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        var system = await TenantHttp.SignInSystemAdmin();
+        (await GetAsync(system.AccessToken)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    private static async Task<List<Guid>> ReadIdsAsync(string accessToken, string query = "")
+    {
+        var response = await GetAsync(accessToken, query);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return json.RootElement.GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("id").GetGuid())
+            .ToList();
+    }
+
+    private static async Task<Guid> InsertRawExecutionAsync(
+        int tenantId,
+        string reportCode,
+        string parameters,
+        DateTimeOffset created)
+    {
+        var executionId = Guid.NewGuid();
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var reportId = await db.Reports
+            .Where(row => row.Code == reportCode)
+            .Select(row => row.Id)
+            .SingleAsync();
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO [ReportExecutions]
+                ([PublicId], [ReportId], [TenantId], [TriggerKind], [Status], [ParametersJson],
+                 [Created], [CreatedBy], [LastModified], [LastModifiedBy])
+            VALUES
+                ({executionId}, {reportId}, {tenantId}, N'Manual', N'Queued', {parameters},
+                 {created}, N'test', {created}, N'test')
+            """);
+        return executionId;
+    }
+
     private static async Task<Guid> RequestAsync(string accessToken, Guid customerId)
     {
         var created = await TenantHttp.Send(
