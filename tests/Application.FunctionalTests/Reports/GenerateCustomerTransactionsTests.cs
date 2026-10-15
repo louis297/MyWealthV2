@@ -8,7 +8,6 @@ using MyWealthV2.Application.FunctionalTests.Instruments;
 using MyWealthV2.Application.FunctionalTests.Tenants;
 using MyWealthV2.Application.FunctionalTests.Transactions;
 using MyWealthV2.Application.Reports;
-using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Infrastructure.Data;
 using UglyToad.PdfPig;
@@ -153,13 +152,25 @@ public class GenerateCustomerTransactionsTests : TestBase
 
     private static async Task<Guid> QueueAdviserBalancesAsync(int tenantId)
     {
+        var executionId = Guid.NewGuid();
         using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var report = await db.Reports.SingleAsync(row => row.Code == "adviser-balances");
-        var execution = ReportExecution.Queue(tenantId, report.Id, "Manual", "{}", null);
-        db.ReportExecutions.Add(execution);
-        await db.SaveChangesAsync();
-        return execution.PublicId;
+        var reportId = await db.Reports
+            .Where(row => row.Code == "adviser-balances")
+            .Select(row => row.Id)
+            .SingleAsync();
+        var parameters = "{}";
+        var now = DateTimeOffset.UtcNow;
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO [ReportExecutions]
+                ([PublicId], [ReportId], [TenantId], [TriggerKind], [Status], [ParametersJson],
+                 [Created], [CreatedBy], [LastModified], [LastModifiedBy])
+            VALUES
+                ({executionId}, {reportId}, {tenantId}, N'Manual', N'Queued', {parameters},
+                 {now}, N'test', {now}, N'test')
+            """);
+        return executionId;
     }
 
     private static async Task ReplaceParametersAsync(Guid executionId, string parametersJson)

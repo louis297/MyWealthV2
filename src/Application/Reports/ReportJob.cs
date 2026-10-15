@@ -22,8 +22,13 @@ public sealed class ReportJob(
 
         var report = await db.Reports.AsNoTracking()
             .SingleAsync(row => row.Id == execution.ReportId);
-        var generator = generators.Find(report.Code)
-                        ?? throw new InvalidOperationException("Report generator is not available.");
+        var generator = generators.Find(report.Code);
+        if (generator is null)
+        {
+            execution.Fail("Report generator is not available.");
+            await db.SaveChangesAsync(CancellationToken.None);
+            return;
+        }
 
         string? writtenKey = null;
         try
