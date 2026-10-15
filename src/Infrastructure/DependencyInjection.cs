@@ -1,4 +1,7 @@
+using Hangfire;
+using Hangfire.SqlServer;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.Reports;
 using MyWealthV2.Infrastructure.Currencies;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Interceptors;
@@ -68,7 +71,18 @@ public static class DependencyInjection
         builder.Services.AddTransient<IIdentityService, IdentityService>();
         builder.Services.AddScoped<ITokenRevocation, OpenIddictTokenRevocation>();
         builder.Services.AddSingleton<IEmailSender, NoOpEmailSender>();
-        builder.Services.AddSingleton<IReportScheduler, NoOpReportScheduler>();
+
+        builder.Services.AddHangfire(configuration => configuration
+            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UseSqlServerStorage(connectionString, new SqlServerStorageOptions
+            {
+                SchemaName = "Hangfire",
+                PrepareSchemaIfNecessary = true
+            }));
+        builder.Services.AddScoped<ReportJob>();
+        builder.Services.AddSingleton<IReportScheduler, HangfireReportScheduler>();
 
         builder.Services.AddOpenIddict()
             .AddCore(options =>
