@@ -6,6 +6,7 @@ using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Domain.Entities;
+using MyWealthV2.Domain.Enums;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationException;
 
@@ -104,6 +105,24 @@ public static class ReportScheduleRules
         }
 
         return report;
+    }
+
+    public static async Task EnsureCustomerScopeAsync(
+        IApplicationDbContext db,
+        ICurrentUser currentUser,
+        Guid customerId,
+        CancellationToken cancellationToken)
+    {
+        var role = currentUser.Role ?? throw new UnauthorizedAccessException();
+        var tenantId = currentUser.TenantId ?? throw new ForbiddenAccessException();
+        var customer = await db.Users.AsNoTracking()
+                           .SingleOrDefaultAsync(
+                               row => row.PublicId == customerId
+                                      && row.TenantId == tenantId
+                                      && row.Role == UserRole.Customer,
+                               cancellationToken)
+                       ?? throw new NotFoundException("Customer", customerId);
+        CustomerReportScope.Ensure(customer, role, currentUser);
     }
 
     public static bool IsStandardCron(string cron)

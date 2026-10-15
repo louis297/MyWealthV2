@@ -32,6 +32,8 @@ public class CreateReportScheduleCommandHandler(
             db, currentUser, request.ReportId, cancellationToken);
 
         var binding = CustomerTransactionsBinder.Bind(request.Parameters);
+        await ReportScheduleRules.EnsureCustomerScopeAsync(
+            db, currentUser, binding.CustomerId, cancellationToken);
         var schedule = ReportSchedule.Create(
             tenantId,
             report.Id,
