@@ -8,6 +8,7 @@ using MyWealthV2.Application.FunctionalTests.Instruments;
 using MyWealthV2.Application.FunctionalTests.Tenants;
 using MyWealthV2.Application.FunctionalTests.Transactions;
 using MyWealthV2.Application.Reports;
+using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Infrastructure.Data;
 using UglyToad.PdfPig;
@@ -132,6 +133,33 @@ public class GenerateCustomerTransactionsTests : TestBase
         row.ResultStorageKey.ShouldBeNull();
         var path = Path.Combine(ReportStoragePaths.Root, tenant.PublicId.ToString("D"), $"{executionId:D}.pdf");
         File.Exists(path).ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task Execute_WhenTheReportHasNoGenerator_FailsWithoutAFile()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm Book", "firm-book");
+        var executionId = await QueueAdviserBalancesAsync(tenant.Id);
+
+        await using var scope = FunctionalTestSetup.WebApiServices.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<ReportJob>().Execute(executionId);
+
+        var row = await ReadExecutionAsync(executionId);
+        row.Status.ShouldBe("Failed");
+        row.ResultStorageKey.ShouldBeNull();
+        var path = Path.Combine(ReportStoragePaths.Root, tenant.PublicId.ToString("D"), $"{executionId:D}.pdf");
+        File.Exists(path).ShouldBeFalse();
+    }
+
+    private static async Task<Guid> QueueAdviserBalancesAsync(int tenantId)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var report = await db.Reports.SingleAsync(row => row.Code == "adviser-balances");
+        var execution = ReportExecution.Queue(tenantId, report.Id, "Manual", "{}", null);
+        db.ReportExecutions.Add(execution);
+        await db.SaveChangesAsync();
+        return execution.PublicId;
     }
 
     private static async Task ReplaceParametersAsync(Guid executionId, string parametersJson)
