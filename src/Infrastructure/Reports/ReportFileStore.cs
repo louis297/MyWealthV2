@@ -25,6 +25,17 @@ public sealed class ReportFileStore(IOptions<ReportStorageOptions> options) : IR
         return Task.CompletedTask;
     }
 
+    public async Task<byte[]?> ReadAsync(string relativeKey, CancellationToken cancellationToken)
+    {
+        var path = Resolve(relativeKey);
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+
+        return await File.ReadAllBytesAsync(path, cancellationToken);
+    }
+
     private string Resolve(string relativeKey)
     {
         if (string.IsNullOrWhiteSpace(options.Value.StorageRoot))

@@ -5,4 +5,6 @@ public interface IReportFileStore
     Task SaveAsync(string relativeKey, byte[] pdf, CancellationToken cancellationToken);
 
     Task DeleteIfExistsAsync(string relativeKey, CancellationToken cancellationToken);
+
+    Task<byte[]?> ReadAsync(string relativeKey, CancellationToken cancellationToken);
 }

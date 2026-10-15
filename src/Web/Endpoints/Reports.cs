@@ -1,6 +1,7 @@
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Reports;
 using MyWealthV2.Application.Reports.Commands.RequestReport;
+using MyWealthV2.Application.Reports.Queries.DownloadReportResult;
 using MyWealthV2.Application.Reports.Queries.GetReports;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -33,6 +34,7 @@ public class Reports : IEndpointGroup
     {
         groupBuilder.MapGet(GetReports).RequireAuthorization(ReadReports);
         groupBuilder.MapPost(RequestReport, "request").RequireAuthorization(CreateReports);
+        groupBuilder.MapGet(DownloadReport, "executions/{id}/download").RequireAuthorization(ReadReports);
     }
 
     [EndpointSummary("List granted reports")]
@@ -51,5 +53,13 @@ public class Reports : IEndpointGroup
     {
         var id = await sender.Send(command);
         return TypedResults.Accepted($"/reports/executions/{id}", new { id });
+    }
+
+    [EndpointSummary("Download a report result")]
+    [EndpointDescription("Returns the PDF for a succeeded execution in the caller's scope.")]
+    public static async Task<IResult> DownloadReport(ISender sender, Guid id)
+    {
+        var pdf = await sender.Send(new DownloadReportResultQuery(id));
+        return Results.File(pdf.Content, "application/pdf");
     }
 }
