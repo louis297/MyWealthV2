@@ -39,7 +39,11 @@ public static class DependencyInjection
                      Policies.AccountsCreate,
                      Policies.AccountsManage,
                      Policies.TransactionsRead,
-                     Policies.TransactionsCreate
+                     Policies.TransactionsCreate,
+                     Policies.ReportsCustomerRead,
+                     Policies.ReportsCustomerCreate,
+                     Policies.ReportsBookRead,
+                     Policies.ReportsBookCreate
                  })
         {
             var name = policy;
