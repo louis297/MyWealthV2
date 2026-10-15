@@ -23,5 +23,6 @@ public sealed class HangfireReportScheduler(IBackgroundJobClient jobs, IRecurrin
 
     public void RemoveRecurring(Guid scheduleId)
     {
+        recurring.RemoveIfExists(scheduleId.ToString("D"));
     }
 }
