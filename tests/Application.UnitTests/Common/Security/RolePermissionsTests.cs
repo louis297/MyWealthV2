@@ -86,4 +86,25 @@ public class RolePermissionsTests
     {
         RolePermissions.Has(role, policy).ShouldBe(expected);
     }
+
+    [TestCase(UserRole.SystemAdmin, "reports.customer.read", false)]
+    [TestCase(UserRole.SystemAdmin, "reports.customer.create", false)]
+    [TestCase(UserRole.SystemAdmin, "reports.book.read", false)]
+    [TestCase(UserRole.SystemAdmin, "reports.book.create", false)]
+    [TestCase(UserRole.TenantAdmin, "reports.customer.read", true)]
+    [TestCase(UserRole.TenantAdmin, "reports.customer.create", true)]
+    [TestCase(UserRole.TenantAdmin, "reports.book.read", true)]
+    [TestCase(UserRole.TenantAdmin, "reports.book.create", true)]
+    [TestCase(UserRole.Adviser, "reports.customer.read", true)]
+    [TestCase(UserRole.Adviser, "reports.customer.create", true)]
+    [TestCase(UserRole.Adviser, "reports.book.read", true)]
+    [TestCase(UserRole.Adviser, "reports.book.create", true)]
+    [TestCase(UserRole.Customer, "reports.customer.read", true)]
+    [TestCase(UserRole.Customer, "reports.customer.create", false)]
+    [TestCase(UserRole.Customer, "reports.book.read", false)]
+    [TestCase(UserRole.Customer, "reports.book.create", false)]
+    public void Has_MatchesReportsMap(UserRole role, string policy, bool expected)
+    {
+        RolePermissions.Has(role, policy).ShouldBe(expected);
+    }
 }
