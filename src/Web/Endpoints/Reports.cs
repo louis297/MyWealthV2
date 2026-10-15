@@ -2,6 +2,7 @@ using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Reports;
 using MyWealthV2.Application.Reports.Commands.CreateReportSchedule;
 using MyWealthV2.Application.Reports.Commands.RequestReport;
+using MyWealthV2.Application.Reports.Commands.UpdateReportSchedule;
 using MyWealthV2.Application.Reports.Queries.DownloadReportResult;
 using MyWealthV2.Application.Reports.Queries.GetReportSchedules;
 using MyWealthV2.Application.Reports.Queries.GetReports;
@@ -37,6 +38,7 @@ public class Reports : IEndpointGroup
         groupBuilder.MapGet(GetReports).RequireAuthorization(ReadReports);
         groupBuilder.MapGet(GetSchedules, "schedules").RequireAuthorization(ReadReports);
         groupBuilder.MapPost(CreateSchedule, "schedules").RequireAuthorization(CreateReports);
+        groupBuilder.MapPut(UpdateSchedule, "schedules/{id}").RequireAuthorization(CreateReports);
         groupBuilder.MapPost(RequestReport, "request").RequireAuthorization(CreateReports);
         groupBuilder.MapGet(DownloadReport, "executions/{id}/download").RequireAuthorization(ReadReports);
     }
@@ -67,6 +69,18 @@ public class Reports : IEndpointGroup
     {
         var id = await sender.Send(command);
         return TypedResults.Created($"/reports/schedules/{id}", new { id });
+    }
+
+    [EndpointSummary("Update a report schedule")]
+    [EndpointDescription("Replaces a schedule's parameters, cron, and active flag, and updates its Hangfire job.")]
+    public static async Task<NoContent> UpdateSchedule(
+        ISender sender,
+        Guid id,
+        UpdateReportScheduleCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
     }
 
     [EndpointSummary("Request a report")]
