@@ -24,13 +24,13 @@ public class AdviserBalancesRowsTests
             includeClosedAccounts: false);
 
         var cash = selection.Lines.ShouldBeAssignableTo<IReadOnlyList<AdviserBalanceLine>>()!;
-        cash.Select(line => line.AccountId).ShouldBe([overdrawn, everyday]);
-        var negative = cash[0].ShouldBeOfType<AdviserCashLine>();
+        cash.Select(line => line.AccountId).ShouldBe([everyday, overdrawn]);
+        var negative = cash[1].ShouldBeOfType<AdviserCashLine>();
         negative.Balance.ShouldBe(-2.5m);
         negative.Currency.ShouldBe("NZD");
         negative.AccountType.ShouldBe("Bank");
         negative.CustomerName.ShouldBe("Cee");
-        cash[1].ShouldBeOfType<AdviserCashLine>().Balance.ShouldBe(10m);
+        cash[0].ShouldBeOfType<AdviserCashLine>().Balance.ShouldBe(10m);
     }
 
     [Test]
@@ -93,7 +93,7 @@ public class AdviserBalancesRowsTests
             includeClosedAccounts: false);
 
         var holdings = selection.Lines.OfType<AdviserHoldingLine>().ToList();
-        holdings.Select(line => line.Symbol).ShouldBe(["CASHFUND", "FLAT", "EURX", "VTI"]);
+        holdings.Select(line => line.Symbol).ShouldBe(["CASHFUND", "EURX", "FLAT", "VTI"]);
         holdings[0].MarketValue.ShouldBe(0m);
         holdings[0].MarketCurrency.ShouldBe("USD");
         holdings[1].MarketValue.ShouldBe(0m);
@@ -130,7 +130,7 @@ public class AdviserBalancesRowsTests
             .ShouldBe([open]);
 
         var included = AdviserBalancesRows.Select(accounts, includeClosedAccounts: true).Lines;
-        included.OfType<AdviserCashLine>().Select(line => line.Balance).ShouldBe([5m, 7m]);
+        included.OfType<AdviserCashLine>().Select(line => line.Balance).ShouldBe([7m, 5m]);
         included.OfType<AdviserHoldingLine>().Single().Symbol.ShouldBe("VTI");
     }
 
@@ -169,7 +169,7 @@ public class AdviserBalancesRowsTests
         selection.Lines.Select(Describe).ShouldBe(
         [
             "cash Ann 00000000-0000-0000-0000-000000000001 Broker 20000000-0000-0000-0000-000000000001",
-            "holding Ann 00000000-0000-0000-0000-000000000001 Zebra ZZZ",
+            "holding Ann 00000000-0000-0000-0000-000000000001 Zebra ZZZ 30000000-0000-0000-0000-000000000003",
             "cash Ann 00000000-0000-0000-0000-000000000002 Broker 20000000-0000-0000-0000-000000000002",
             "holding Ann 00000000-0000-0000-0000-000000000002 Broker VTI 30000000-0000-0000-0000-000000000001",
             "holding Ann 00000000-0000-0000-0000-000000000002 Broker VTI 30000000-0000-0000-0000-000000000002",

@@ -62,13 +62,14 @@ public static class AdviserBalancesRows
         bool includeClosedAccounts)
     {
         var lines = new List<AdviserBalanceLine>();
-        foreach (var account in accounts)
+        var ordered = accounts
+            .Where(account => includeClosedAccounts || !account.Closed)
+            .OrderBy(account => account.CustomerName, StringComparer.Ordinal)
+            .ThenBy(account => account.CustomerId)
+            .ThenBy(account => account.AccountName, StringComparer.Ordinal)
+            .ThenBy(account => account.AccountId);
+        foreach (var account in ordered)
         {
-            if (account.Closed && !includeClosedAccounts)
-            {
-                continue;
-            }
-
             if (account.CashBalance != 0m)
             {
                 lines.Add(new AdviserCashLine(
@@ -81,13 +82,11 @@ public static class AdviserBalancesRows
                     account.CashBalance));
             }
 
-            foreach (var holding in account.Holdings)
+            foreach (var holding in account.Holdings
+                         .Where(holding => holding.Quantity > 0m)
+                         .OrderBy(holding => holding.Symbol, StringComparer.Ordinal)
+                         .ThenBy(holding => holding.InstrumentId))
             {
-                if (holding.Quantity <= 0m)
-                {
-                    continue;
-                }
-
                 var (marketValue, marketCurrency) = MarketValue(holding);
                 lines.Add(new AdviserHoldingLine(
                     account.CustomerId,
@@ -104,7 +103,46 @@ public static class AdviserBalancesRows
             }
         }
 
-        return new AdviserBalancesSelection(lines, []);
+        return new AdviserBalancesSelection(lines, Subtotals(lines));
+    }
+
+    private static IReadOnlyList<AdviserBalanceSubtotal> Subtotals(IReadOnlyList<AdviserBalanceLine> lines)
+    {
+        var totals = new SortedDictionary<string, CurrencyTotal>(StringComparer.Ordinal);
+        foreach (var line in lines)
+        {
+            switch (line)
+            {
+                case AdviserCashLine cash:
+                    Add(totals, cash.Currency).Cash += cash.Balance;
+                    break;
+                case AdviserHoldingLine holding:
+                    Add(totals, holding.MarketCurrency).Market += holding.MarketValue;
+                    break;
+            }
+        }
+
+        return totals
+            .Select(pair => new AdviserBalanceSubtotal(pair.Key, pair.Value.Cash, pair.Value.Market))
+            .ToList();
+    }
+
+    private static CurrencyTotal Add(SortedDictionary<string, CurrencyTotal> totals, string currency)
+    {
+        if (!totals.TryGetValue(currency, out var total))
+        {
+            total = new CurrencyTotal();
+            totals[currency] = total;
+        }
+
+        return total;
+    }
+
+    private sealed class CurrencyTotal
+    {
+        public decimal Cash { get; set; }
+
+        public decimal Market { get; set; }
     }
 
     private static (decimal Amount, string Currency) MarketValue(AdviserBalanceHolding holding)
