@@ -3,6 +3,7 @@ using MyWealthV2.Application.Reports;
 using MyWealthV2.Domain.Enums;
 using NUnit.Framework;
 using Shouldly;
+using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationException;
 
 namespace MyWealthV2.Application.UnitTests.Reports;
 
@@ -38,5 +39,35 @@ public class AdviserBalancesBinderTests
         explicitId.IncludeClosedAccounts.ShouldBeFalse();
         explicitId.SnapshotJson.ShouldBe(
             $$"""{"adviserId":"{{Named}}","includeClosedAccounts":false}""");
+    }
+
+    [Test]
+    public void Bind_NonAdviserOmitsAdviserId_Rejects()
+    {
+        using var omitted = JsonDocument.Parse("{}");
+
+        var tenantAdmin = Should.Throw<ValidationException>(() =>
+            AdviserBalancesBinder.Bind(omitted.RootElement, UserRole.TenantAdmin, Self));
+        tenantAdmin.Errors["adviserId"].ShouldBe(["adviserId is required."]);
+
+        var systemAdmin = Should.Throw<ValidationException>(() =>
+            AdviserBalancesBinder.Bind(omitted.RootElement, UserRole.SystemAdmin, null));
+        systemAdmin.Errors["adviserId"].ShouldBe(["adviserId is required."]);
+    }
+
+    [Test]
+    public void Bind_UnknownField_Rejects()
+    {
+        using var asOf = JsonDocument.Parse(
+            $$"""{"adviserId":"{{Named}}","asOf":"2026-10-16T08:30:00Z"}""");
+        var clientAsOf = Should.Throw<ValidationException>(() =>
+            AdviserBalancesBinder.Bind(asOf.RootElement, UserRole.TenantAdmin, null));
+        clientAsOf.Errors["parameters"].ShouldBe(["unknown field."]);
+
+        using var extra = JsonDocument.Parse(
+            $$"""{"adviserId":"{{Named}}","customerId":"{{Self}}"}""");
+        var unknown = Should.Throw<ValidationException>(() =>
+            AdviserBalancesBinder.Bind(extra.RootElement, UserRole.Adviser, Self));
+        unknown.Errors["parameters"].ShouldBe(["unknown field."]);
     }
 }
