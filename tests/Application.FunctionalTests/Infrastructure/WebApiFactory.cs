@@ -22,6 +22,7 @@ public class WebApiFactory(
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting($"ConnectionStrings:{MyWealthV2.Shared.Services.Database}", connectionString);
+        builder.UseSetting("Reports:StorageRoot", ReportStoragePaths.Root);
         builder.UseEnvironment("Development");
 
         if (!string.IsNullOrWhiteSpace(identityAuthority))
