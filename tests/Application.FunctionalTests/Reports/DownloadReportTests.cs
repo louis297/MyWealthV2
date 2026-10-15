@@ -90,6 +90,47 @@ public class DownloadReportTests : TestBase
         (await GetAsync(customerTokens.AccessToken, executionId)).StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
+    [Test]
+    public async Task Download_WrongPolicy_Returns403_AndAnonymous_Returns401()
+    {
+        (await GetAsync(null, Guid.NewGuid())).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+
+        var system = await TenantHttp.SignInSystemAdmin();
+        (await GetAsync(system.AccessToken, Guid.NewGuid())).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+
+        var tenant = await TestApp.CreateTenantAsync("Firm Policy", "firm-policy");
+        var adviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Ann", "ann@firm-policy", "Password1!", tenant.Id);
+        var customer = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Cee", "cee@firm-policy", "Password1!", tenant.Id, adviser.Id);
+        var executionId = await QueueBookExecutionAsync(tenant.Id);
+        var customerTokens = await TestApp.IssueAccessTokenAsync(customer);
+        (await GetAsync(customerTokens.AccessToken, executionId)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    private static async Task<Guid> QueueBookExecutionAsync(int tenantId)
+    {
+        var executionId = Guid.NewGuid();
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var reportId = await db.Reports
+            .Where(row => row.Code == "adviser-balances")
+            .Select(row => row.Id)
+            .SingleAsync();
+        var now = DateTimeOffset.UtcNow;
+        var parameters = "{}";
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO [ReportExecutions]
+                ([PublicId], [ReportId], [TenantId], [TriggerKind], [Status], [ParametersJson],
+                 [Created], [CreatedBy], [LastModified], [LastModifiedBy])
+            VALUES
+                ({executionId}, {reportId}, {tenantId}, N'Manual', N'Queued', {parameters},
+                 {now}, N'test', {now}, N'test')
+            """);
+        return executionId;
+    }
+
     private static async Task GrantAsync(Guid tenantId)
     {
         var system = await TenantHttp.SignInSystemAdmin();
