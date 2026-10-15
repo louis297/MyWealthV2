@@ -254,7 +254,7 @@ Shared pipeline:
 3. Resolve `IReportGenerator` from the registry.
 4. `ValidateAndBind` then `CheckScope`.
 5. Persist `ReportSchedule` or `ReportExecution` with the parameter snapshot (JSON).
-6. Enqueue Hangfire: `ReportJob.Execute(executionId)` (one fixed entry point).
+6. A manual request enqueues Hangfire `ReportJob.Execute(executionId)`. Schedule create and update call `AddOrUpdate` with recurring job id = the schedule PublicId, including when `isActive` is false. Disable sets `IsActive` false and calls `RemoveIfExists`. Revoking a tenant grant calls `RemoveIfExists` for that tenant’s schedules of that report and leaves the rows. When the recurring job fires, it inserts a `ReportExecution` with `TriggerKind` Scheduled and enqueues the same `ReportJob.Execute(executionId)` path.
 
 The Hangfire job loads the execution, resolves the same generator by `reportId`, and calls `Generate` with the stored parameters. Adding a report means a new generator class, a registry entry, and a catalog row. The shared endpoint and the Hangfire entry point do not change.
 
@@ -271,6 +271,7 @@ First phase may hard-code the two parameter forms in the Adviser Portal. A param
 | DELETE | `/tenants/{tenantId}/reports/{reportId}` | `tenants.manage` | 204 when removed or already absent. Schedule and execution rows stay | 401 / 403 / 404 |
 | GET | `/reports` | `reports.customer.read` or `reports.book.read` (filter by scope) | 200 list | 401 / 403 |
 | POST | `/reports/schedules` | by report scope (`*.create`) | 201 `{ "id" }` | 400 / 403 / 404 |
+| GET | `/reports/schedules` | by scope (`*.read`) | 200 list | 401 / 403 |
 | PUT | `/reports/schedules/{id}` | by report scope | 204 | 400 / 403 / 404 / 409 |
 | POST | `/reports/schedules/{id}/disable` | by report scope | 204 | 403 / 404 |
 | POST | `/reports/request` | by report scope (`*.create`) | 202 `{ "id" }` | 400 / 403 / 404 |
@@ -313,7 +314,24 @@ Adviser Balances (manual request):
 }
 ```
 
-Manual request omits `cron` / `isActive`. Adviser may omit `adviserId` (defaults to self). TenantAdmin and SystemAdmin must supply `adviserId` or the generator returns 400. `asOf` is never accepted from the client; the server writes it when the job is created. Unknown or missing required parameters → 400 from that report’s `ValidateAndBind`.
+Manual request omits `cron` / `isActive`. A schedule create or update requires both, beside `parameters`. `cron` is a 5-field expression, at most 100 characters. `isActive` is a boolean. PUT also sends `rowVersion` from the list item; a missing token is 400 and a stale token is 409. Disable sends no body.
+
+`GET /reports/schedules` returns an array. Optional `scope` is `Customer` or `Book`, same rule as `GET /reports`. Each item is:
+
+```json
+{
+  "id": "uuid",
+  "reportId": "uuid",
+  "parameters": { },
+  "cron": "0 9 1 * *",
+  "isActive": true,
+  "rowVersion": "base64"
+}
+```
+
+`parameters` is the stored snapshot object. Active and disabled schedules are both listed. There is no DELETE.
+
+Adviser may omit `adviserId` (defaults to self). TenantAdmin and SystemAdmin must supply `adviserId` or the generator returns 400. `asOf` is never accepted from the client; the server writes it when the job is created. Unknown or missing required parameters → 400 from that report’s `ValidateAndBind`.
 
 ### 8.2 Errors
 

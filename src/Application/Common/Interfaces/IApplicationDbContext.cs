@@ -28,6 +28,8 @@ public interface IApplicationDbContext
 
     DbSet<ReportExecution> ReportExecutions { get; }
 
+    DbSet<ReportSchedule> ReportSchedules { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 
     Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken cancellationToken);

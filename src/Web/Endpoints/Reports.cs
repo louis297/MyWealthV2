@@ -1,5 +1,6 @@
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Reports;
+using MyWealthV2.Application.Reports.Commands.CreateReportSchedule;
 using MyWealthV2.Application.Reports.Commands.RequestReport;
 using MyWealthV2.Application.Reports.Queries.DownloadReportResult;
 using MyWealthV2.Application.Reports.Queries.GetReports;
@@ -33,6 +34,7 @@ public class Reports : IEndpointGroup
     public static void Map(RouteGroupBuilder groupBuilder)
     {
         groupBuilder.MapGet(GetReports).RequireAuthorization(ReadReports);
+        groupBuilder.MapPost(CreateSchedule, "schedules").RequireAuthorization(CreateReports);
         groupBuilder.MapPost(RequestReport, "request").RequireAuthorization(CreateReports);
         groupBuilder.MapGet(DownloadReport, "executions/{id}/download").RequireAuthorization(ReadReports);
     }
@@ -45,6 +47,14 @@ public class Reports : IEndpointGroup
     {
         var result = await sender.Send(new GetReportsQuery(scope));
         return TypedResults.Ok(result);
+    }
+
+    [EndpointSummary("Create a report schedule")]
+    [EndpointDescription("Creates a recurring schedule for a granted report and registers its Hangfire job.")]
+    public static async Task<IResult> CreateSchedule(ISender sender, CreateReportScheduleCommand command)
+    {
+        var id = await sender.Send(command);
+        return TypedResults.Created($"/reports/schedules/{id}", new { id });
     }
 
     [EndpointSummary("Request a report")]

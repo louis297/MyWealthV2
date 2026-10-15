@@ -22,5 +22,7 @@ public class ReportExecutionConfiguration : IEntityTypeConfiguration<ReportExecu
         builder.HasOne<Report>().WithMany().HasForeignKey(execution => execution.ReportId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Tenant>().WithMany().HasForeignKey(execution => execution.TenantId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<User>().WithMany().HasForeignKey(execution => execution.TriggeredByUserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<ReportSchedule>().WithMany().HasForeignKey(execution => execution.ScheduleId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -56,6 +56,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<ReportExecution> ReportExecutions => Set<ReportExecution>();
 
+    public DbSet<ReportSchedule> ReportSchedules => Set<ReportSchedule>();
+
     public DbSet<UserToken> UserTokenSeams => Set<UserToken>();
 
     public async Task ExecuteInTransactionAsync(
