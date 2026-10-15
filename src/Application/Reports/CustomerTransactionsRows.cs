@@ -19,7 +19,7 @@ public static class CustomerTransactionsRows
     {
         var fromUtc = new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
         var toUtc = new DateTimeOffset(to.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
-        return transactions
+        var included = transactions
             .Where(row => includeClosedAccounts || !row.AccountClosed)
             .Where(row =>
             {
@@ -27,5 +27,29 @@ public static class CustomerTransactionsRows
                 return booked >= fromUtc && booked < toUtc;
             })
             .ToList();
+        var includedIds = included.Select(row => row.Id).ToHashSet();
+        var reversalByOriginal = new Dictionary<int, CustomerTransactionSource>();
+        foreach (var row in included)
+        {
+            if (row.OriginalTransactionId is int originalId && includedIds.Contains(originalId))
+            {
+                reversalByOriginal[originalId] = row;
+            }
+        }
+
+        var ordered = new List<CustomerTransactionSource>();
+        foreach (var anchor in included
+                     .Where(row => row.OriginalTransactionId is not int originalId || !includedIds.Contains(originalId))
+                     .OrderBy(row => row.BookedAt.ToUniversalTime())
+                     .ThenBy(row => row.Id))
+        {
+            ordered.Add(anchor);
+            if (reversalByOriginal.TryGetValue(anchor.Id, out var reversal))
+            {
+                ordered.Add(reversal);
+            }
+        }
+
+        return ordered;
     }
 }
