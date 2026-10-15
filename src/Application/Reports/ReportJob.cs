@@ -24,15 +24,37 @@ public sealed class ReportJob(
             .SingleAsync(row => row.Id == execution.ReportId);
         var generator = generators.Find(report.Code)
                         ?? throw new InvalidOperationException("Report generator is not available.");
-        var pdf = await generator.GenerateAsync(execution, CancellationToken.None);
-        var tenantPublicId = await db.Tenants.AsNoTracking()
-            .Where(row => row.Id == execution.TenantId)
-            .Select(row => row.PublicId)
-            .SingleAsync();
-        var key = $"{tenantPublicId:D}/{execution.PublicId:D}.pdf";
-        await files.SaveAsync(key, pdf, CancellationToken.None);
-        execution.Succeed(key);
-        await db.SaveChangesAsync(CancellationToken.None);
+
+        string? writtenKey = null;
+        try
+        {
+            var pdf = await generator.GenerateAsync(execution, CancellationToken.None);
+            var tenantPublicId = await db.Tenants.AsNoTracking()
+                .Where(row => row.Id == execution.TenantId)
+                .Select(row => row.PublicId)
+                .SingleAsync();
+            writtenKey = $"{tenantPublicId:D}/{execution.PublicId:D}.pdf";
+            await files.SaveAsync(writtenKey, pdf, CancellationToken.None);
+            execution.Succeed(writtenKey);
+            await db.SaveChangesAsync(CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            if (writtenKey is not null)
+            {
+                try
+                {
+                    await files.DeleteIfExistsAsync(writtenKey, CancellationToken.None);
+                }
+                catch (Exception)
+                {
+                    // Recording the generation failure still has to succeed.
+                }
+            }
+
+            execution.Fail(exception.Message);
+            await db.SaveChangesAsync(CancellationToken.None);
+        }
     }
 
     public Task RunScheduled(Guid scheduleId)
