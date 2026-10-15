@@ -64,6 +64,11 @@ public static class AdviserBalancesRows
         var lines = new List<AdviserBalanceLine>();
         foreach (var account in accounts)
         {
+            if (account.Closed && !includeClosedAccounts)
+            {
+                continue;
+            }
+
             if (account.CashBalance != 0m)
             {
                 lines.Add(new AdviserCashLine(
