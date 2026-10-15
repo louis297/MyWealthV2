@@ -33,6 +33,47 @@ public class AdviserBalancesRowsTests
         cash[1].ShouldBeOfType<AdviserCashLine>().Balance.ShouldBe(10m);
     }
 
+    [Test]
+    public void Select_OmitsHoldingsWithQuantityAtOrBelowZero()
+    {
+        var broker = Guid.Parse("00000000-0000-0000-0000-000000000004");
+        var gone = Guid.Parse("10000000-0000-0000-0000-000000000001");
+        var negative = Guid.Parse("10000000-0000-0000-0000-000000000002");
+        var vti = Guid.Parse("10000000-0000-0000-0000-000000000003");
+
+        var selection = AdviserBalancesRows.Select(
+            [
+                Account(
+                    broker,
+                    "Broker",
+                    0m,
+                    holdings:
+                    [
+                        Holding(gone, "GONE", 0m, cost: 40m),
+                        Holding(negative, "NEG", -1m, cost: 5m),
+                        Holding(vti, "VTI", 12.5m, cost: 100m)
+                    ])
+            ],
+            includeClosedAccounts: false);
+
+        selection.Lines.Count.ShouldBe(1);
+        var holding = selection.Lines[0].ShouldBeOfType<AdviserHoldingLine>();
+        holding.InstrumentId.ShouldBe(vti);
+        holding.Symbol.ShouldBe("VTI");
+        holding.Quantity.ShouldBe(12.5m);
+        holding.CostAmount.ShouldBe(100m);
+        holding.CostCurrency.ShouldBe("USD");
+        holding.AccountName.ShouldBe("Broker");
+        holding.CustomerName.ShouldBe("Cee");
+    }
+
+    private static AdviserBalanceHolding Holding(
+        Guid instrumentId,
+        string symbol,
+        decimal quantity,
+        decimal cost) =>
+        new(instrumentId, symbol, quantity, cost, "USD", PriceAmount: null, PriceCurrency: null, QuoteCurrency: "USD");
+
     private static AdviserBalanceAccount Account(
         Guid accountId,
         string name,
