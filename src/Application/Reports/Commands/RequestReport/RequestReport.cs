@@ -104,9 +104,6 @@ public class RequestReportCommandHandler(
                                cancellationToken)
                        ?? throw new NotFoundException("Customer", customerId);
 
-        if (role == UserRole.Adviser && customer.AdviserId != currentUser.Person?.Id)
-        {
-            throw new NotFoundException("Customer", customerId);
-        }
+        CustomerReportScope.Ensure(customer, role, currentUser);
     }
 }
