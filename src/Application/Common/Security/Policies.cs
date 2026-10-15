@@ -17,4 +17,8 @@ public static class Policies
     public const string AccountsManage = "accounts.manage";
     public const string TransactionsRead = "transactions.read";
     public const string TransactionsCreate = "transactions.create";
+    public const string ReportsCustomerRead = "reports.customer.read";
+    public const string ReportsCustomerCreate = "reports.customer.create";
+    public const string ReportsBookRead = "reports.book.read";
+    public const string ReportsBookCreate = "reports.book.create";
 }

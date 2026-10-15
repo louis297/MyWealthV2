@@ -43,7 +43,7 @@ Policies are split by scope:
 - `reports.customer.read` / `reports.customer.create`
 - `reports.book.read` / `reports.book.create`
 
-Customer receives only `reports.customer.read`. SystemAdmin, TenantAdmin, and Adviser receive all four.
+Customer receives only `reports.customer.read`. TenantAdmin and Adviser receive all four. SystemAdmin receives none of them. Grant and revoke use `tenants.manage`.
 
 A shared request pipeline checks the coarse policy, the tenant grant, and allowed triggers, then delegates parameter and scope validation to the specific report. The frontend sends `reportId` plus a free-form `parameters` object; it never sends a class or method name. A registry maps `ReportId` to an `IReportGenerator`. Generation runs on the worker via Hangfire. Results are stored and downloadable.
 
@@ -109,7 +109,7 @@ Note: Customer has `reports.customer.read` but no first-phase UI. The policy exi
 | R3 | A schedule or manual request must name a ReportId. The report must exist, be granted to the tenant, and allow the requested trigger. Otherwise 404. |
 | R4 | Coarse policy is required before report-specific checks: Customer-scoped mutations need `reports.customer.create`; Book-scoped mutations need `reports.book.create`. Reads follow the same split. |
 | R5 | Customer role has only `reports.customer.read`. Customer may read executions targeted at self. Customer cannot create or schedule. |
-| R6 | SystemAdmin, TenantAdmin, and Adviser have all four policies. |
+| R6 | TenantAdmin and Adviser have all four policies. SystemAdmin has none of them. SystemAdmin grants and revokes with `tenants.manage` and cannot list, request, schedule, or download. |
 | R7 | Adviser on a Book-scoped report may only target self. TenantAdmin may target any Adviser in the same tenant. Cross-tenant or unknown → 404. |
 | R8 | Adviser on a Customer-scoped report may only target an assigned Customer. TenantAdmin may target any Customer in the tenant. Customer (read) only self. |
 | R9 | Each report declares its required parameters and performs its own scope validation after the shared pipeline. |
@@ -402,7 +402,7 @@ Catalog and tenant grants stay on Scalar.
 ## 11. Tests
 
 - Customer has only `reports.customer.read`; create and all book routes → 403.
-- Adviser / TenantAdmin / SystemAdmin have all four policies.
+- Adviser and TenantAdmin have all four policies. SystemAdmin has none of them.
 - Tenant without grant cannot see or run the report.
 - Customer Transactions rejects an unassigned Customer for an Adviser; requires from/to; default excludes Closed; reversal sits next to original.
 - Adviser Balances: non-Adviser omitting adviserId → 400; zero cash accounts omitted; quantity ≤ 0 holdings omitted; asOf set server-side; subtotals present.
@@ -423,7 +423,7 @@ No new ADR beyond [0017](../adr/0017-background-worker.md).
 | Schedule / request | Must name ReportId; parameters are a free-form JSON object per report |
 | Generator | Registry: ReportId → IReportGenerator. Hangfire entry point is fixed (`Execute(executionId)`) |
 | Policies | `reports.customer.read/create`, `reports.book.read/create` |
-| Roles | Customer: `reports.customer.read` only. Other three roles: all four |
+| Roles | Customer: `reports.customer.read` only. TenantAdmin and Adviser: all four. SystemAdmin: none of the four; grants use `tenants.manage` |
 | First reports | Customer Transactions Report + Adviser Balances Report |
 | PDF | QuestPDF. No MD→PDF. No template files |
 | Result storage | Aspire-mounted volume shared by worker and webapi. `ResultStorageKey` stores relative key including file name: `{tenantPublicId}/{executionPublicId}.pdf` |

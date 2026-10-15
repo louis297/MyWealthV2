@@ -87,22 +87,22 @@ public class RolePermissionsTests
         RolePermissions.Has(role, policy).ShouldBe(expected);
     }
 
-    [TestCase(UserRole.SystemAdmin, "reports.customer.read", false)]
-    [TestCase(UserRole.SystemAdmin, "reports.customer.create", false)]
-    [TestCase(UserRole.SystemAdmin, "reports.book.read", false)]
-    [TestCase(UserRole.SystemAdmin, "reports.book.create", false)]
-    [TestCase(UserRole.TenantAdmin, "reports.customer.read", true)]
-    [TestCase(UserRole.TenantAdmin, "reports.customer.create", true)]
-    [TestCase(UserRole.TenantAdmin, "reports.book.read", true)]
-    [TestCase(UserRole.TenantAdmin, "reports.book.create", true)]
-    [TestCase(UserRole.Adviser, "reports.customer.read", true)]
-    [TestCase(UserRole.Adviser, "reports.customer.create", true)]
-    [TestCase(UserRole.Adviser, "reports.book.read", true)]
-    [TestCase(UserRole.Adviser, "reports.book.create", true)]
-    [TestCase(UserRole.Customer, "reports.customer.read", true)]
-    [TestCase(UserRole.Customer, "reports.customer.create", false)]
-    [TestCase(UserRole.Customer, "reports.book.read", false)]
-    [TestCase(UserRole.Customer, "reports.book.create", false)]
+    [TestCase(UserRole.SystemAdmin, Policies.ReportsCustomerRead, false)]
+    [TestCase(UserRole.SystemAdmin, Policies.ReportsCustomerCreate, false)]
+    [TestCase(UserRole.SystemAdmin, Policies.ReportsBookRead, false)]
+    [TestCase(UserRole.SystemAdmin, Policies.ReportsBookCreate, false)]
+    [TestCase(UserRole.TenantAdmin, Policies.ReportsCustomerRead, true)]
+    [TestCase(UserRole.TenantAdmin, Policies.ReportsCustomerCreate, true)]
+    [TestCase(UserRole.TenantAdmin, Policies.ReportsBookRead, true)]
+    [TestCase(UserRole.TenantAdmin, Policies.ReportsBookCreate, true)]
+    [TestCase(UserRole.Adviser, Policies.ReportsCustomerRead, true)]
+    [TestCase(UserRole.Adviser, Policies.ReportsCustomerCreate, true)]
+    [TestCase(UserRole.Adviser, Policies.ReportsBookRead, true)]
+    [TestCase(UserRole.Adviser, Policies.ReportsBookCreate, true)]
+    [TestCase(UserRole.Customer, Policies.ReportsCustomerRead, true)]
+    [TestCase(UserRole.Customer, Policies.ReportsCustomerCreate, false)]
+    [TestCase(UserRole.Customer, Policies.ReportsBookRead, false)]
+    [TestCase(UserRole.Customer, Policies.ReportsBookCreate, false)]
     public void Has_MatchesReportsMap(UserRole role, string policy, bool expected)
     {
         RolePermissions.Has(role, policy).ShouldBe(expected);

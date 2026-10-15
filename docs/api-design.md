@@ -393,7 +393,7 @@ Field rules: [features/reports.md](features/reports.md). Accepted. Not landed.
 | GET | `/reports/executions/{id}` | by that execution’s report scope | 200 |
 | GET | `/reports/executions/{id}/download` | by that execution’s report scope | 200 `application/pdf` |
 
-Customer has `reports.customer.read` only. SystemAdmin, TenantAdmin, and Adviser have all four. Bad parameters → 400. Unknown report, not granted, inactive catalog row, or out of scope → 404. Policy fail → 403.
+Customer has `reports.customer.read` only. TenantAdmin and Adviser have all four. SystemAdmin has none of the four and cannot call these routes. Bad parameters → 400. Unknown report, not granted, inactive catalog row, or out of scope → 404. Policy fail → 403.
 
 BFF allow-list adds the `/reports` prefix.
 

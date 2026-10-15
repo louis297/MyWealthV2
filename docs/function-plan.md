@@ -218,7 +218,7 @@ Phase 3 focuses on the Reports domain. Smaller platform pieces (Invitation / Act
 
 - Background worker: general-purpose Aspire resource `worker` hosting Hangfire (ADR 0017). One worker for reports and later async work (email, etc.). Not one project per task type.
 - Report catalog is a platform table (PublicId + stable Code, IsActive, no update API). A TenantReports row is required before a tenant can use a report; generator checks both IsActive and the grant. Requests send reportId + parameters JSON (max 8 KB, known fields only). PDF via QuestPDF. Aspire mounts a shared volume for worker and webapi; `ResultStorageKey` stores the relative key including the file name.
-- Policies: `reports.customer.read` / `reports.customer.create` and `reports.book.read` / `reports.book.create`. Customer has only `reports.customer.read`. SystemAdmin, TenantAdmin, and Adviser have all four.
+- Policies: `reports.customer.read` / `reports.customer.create` and `reports.book.read` / `reports.book.create`. Customer has only `reports.customer.read`. TenantAdmin and Adviser have all four. SystemAdmin has none of them; grant and revoke use `tenants.manage`.
 - First phase reports: Customer Transactions Report (Customer scope; required date range; includeClosedAccounts default false; reversals next to original) and Adviser Balances Report (Book scope; server-set asOf; cash + holding lines; zero cash omitted; quantity ≤ 0 omitted; subtotals). Both manual + recurring. PDF via code layout. Event plumbing only.
 - Accepted: [features/reports.md](features/reports.md). ADR 0017 accepted.
 
