@@ -3,6 +3,7 @@ using MyWealthV2.Application.Reports;
 using MyWealthV2.Application.Reports.Commands.CreateReportSchedule;
 using MyWealthV2.Application.Reports.Commands.RequestReport;
 using MyWealthV2.Application.Reports.Queries.DownloadReportResult;
+using MyWealthV2.Application.Reports.Queries.GetReportSchedules;
 using MyWealthV2.Application.Reports.Queries.GetReports;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -34,6 +35,7 @@ public class Reports : IEndpointGroup
     public static void Map(RouteGroupBuilder groupBuilder)
     {
         groupBuilder.MapGet(GetReports).RequireAuthorization(ReadReports);
+        groupBuilder.MapGet(GetSchedules, "schedules").RequireAuthorization(ReadReports);
         groupBuilder.MapPost(CreateSchedule, "schedules").RequireAuthorization(CreateReports);
         groupBuilder.MapPost(RequestReport, "request").RequireAuthorization(CreateReports);
         groupBuilder.MapGet(DownloadReport, "executions/{id}/download").RequireAuthorization(ReadReports);
@@ -46,6 +48,16 @@ public class Reports : IEndpointGroup
         string? scope = null)
     {
         var result = await sender.Send(new GetReportsQuery(scope));
+        return TypedResults.Ok(result);
+    }
+
+    [EndpointSummary("List report schedules")]
+    [EndpointDescription("Returns the caller's tenant schedules for reports they can read. Optional scope is Customer or Book.")]
+    public static async Task<Ok<IReadOnlyList<ReportScheduleDto>>> GetSchedules(
+        ISender sender,
+        string? scope = null)
+    {
+        var result = await sender.Send(new GetReportSchedulesQuery(scope));
         return TypedResults.Ok(result);
     }
 
