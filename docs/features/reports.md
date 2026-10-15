@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-10-12
-last_updated: 2026-10-14
+last_updated: 2026-10-16
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -212,7 +212,7 @@ Shared pipeline then report-specific strategy.
 | Command | UpdateReportSchedule | — | Same + ownership |
 | Command | DisableReportSchedule | — | Same |
 | Command | RequestReport | execution id | Policy by report scope; grant; allows manual; report-specific params + scope; enqueue |
-| Query | GetReportExecutions | paged | Policy + scope (Customer sees only self) |
+| Query | GetReportExecutions | paged | Policy + caller scope |
 | Query | DownloadReportResult | file | Succeeded + same scope rules |
 | Internal | EnqueueFromEvent | — | Grant; allows event; report-specific scope |
 
@@ -275,7 +275,7 @@ First phase may hard-code the two parameter forms in the Adviser Portal. A param
 | PUT | `/reports/schedules/{id}` | by report scope | 204 | 400 / 403 / 404 / 409 |
 | POST | `/reports/schedules/{id}/disable` | by report scope | 204 | 403 / 404 |
 | POST | `/reports/request` | by report scope (`*.create`) | 202 `{ "id" }` | 400 / 403 / 404 |
-| GET | `/reports/executions` | by scope of the listed reports | 200 list | 401 / 403 |
+| GET | `/reports/executions` | by scope of the listed reports | 200 paged list | 400 / 401 / 403 |
 | GET | `/reports/executions/{id}` | by that execution’s report scope | 200 | 403 / 404 |
 | GET | `/reports/executions/{id}/download` | by that execution’s report scope | 200 file | 403 / 404 / 409 |
 
@@ -330,6 +330,24 @@ Manual request omits `cron` / `isActive`. A schedule create or update requires b
 ```
 
 `parameters` is the stored snapshot object. Active and disabled schedules are both listed. There is no DELETE.
+
+`GET /reports/executions` returns `{ items, page, pageSize, totalCount }`. `page` defaults to 1. `pageSize` defaults to 20 and the maximum is 100. A `page` or `pageSize` outside 1..100 is 400. Optional `scope` is `Customer` or `Book`, the same rule as `GET /reports`. `totalCount` counts rows after the caller scope filter. Sort is `created` descending, then id descending. A page past the end returns an empty `items` array and the same `totalCount`. Revoking a grant leaves the execution rows on this list.
+
+Each item is:
+
+```json
+{
+  "id": "uuid",
+  "reportId": "uuid",
+  "status": "Queued",
+  "triggerKind": "Manual",
+  "created": "2026-10-16T08:30:00+00:00",
+  "parameters": { },
+  "asOf": "2026-10-16T08:30:00+00:00"
+}
+```
+
+`parameters` is the stored snapshot. `asOf` is included only when the execution has one. The list carries no file bytes, storage key, or error text. TenantAdmin sees the tenant. An Adviser sees Customer-scoped executions for assigned customers, and Book-scoped executions whose snapshot `adviserId` is that Adviser. A Customer sees Customer-scoped executions whose snapshot `customerId` is that Customer. A snapshot that is not a JSON object is left off the list. Another tenant's rows are left off the list.
 
 Adviser may omit `adviserId` (defaults to self). TenantAdmin and SystemAdmin must supply `adviserId` or the generator returns 400. `asOf` is never accepted from the client; the server writes it when the job is created. Unknown or missing required parameters → 400 from that report’s `ValidateAndBind`.
 

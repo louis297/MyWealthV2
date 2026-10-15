@@ -392,7 +392,7 @@ Field rules: [features/reports.md](features/reports.md). Accepted. Not landed.
 | PUT | `/reports/schedules/{id}` | by report scope | 204 |
 | POST | `/reports/schedules/{id}/disable` | by report scope | 204 |
 | POST | `/reports/request` | by report scope (`*.create`) | 202 `{ id }` |
-| GET | `/reports/executions` | by scope | 200 list |
+| GET | `/reports/executions` | by scope | 200 paged list |
 | GET | `/reports/executions/{id}` | by that execution’s report scope | 200 |
 | GET | `/reports/executions/{id}/download` | by that execution’s report scope | 200 `application/pdf` |
 
