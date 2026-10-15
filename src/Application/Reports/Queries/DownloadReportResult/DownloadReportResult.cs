@@ -26,11 +26,11 @@ public class DownloadReportResultHandler(
                         ?? throw new NotFoundException("ReportExecution", request.Id);
         if (execution.Status != "Succeeded" || execution.ResultStorageKey is null)
         {
-            throw new NotFoundException("ReportExecution", request.Id);
+            throw new ReportNotReadyException();
         }
 
         var pdf = await files.ReadAsync(execution.ResultStorageKey, cancellationToken)
-                  ?? throw new NotFoundException("ReportExecution", request.Id);
+                  ?? throw new ReportNotReadyException();
         return new ReportPdf(pdf);
     }
 }
