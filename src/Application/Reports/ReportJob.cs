@@ -10,4 +10,6 @@ public sealed class ReportJob(IApplicationDbContext db)
             .AsNoTracking()
             .SingleOrDefaultAsync(execution => execution.PublicId == executionId);
     }
+
+    public Task RunScheduled(Guid scheduleId) => Task.CompletedTask;
 }
