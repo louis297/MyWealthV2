@@ -54,8 +54,8 @@ public class ReportScheduleAvailabilityTests : TestBase
         await SetCatalogAsync(CustomerTransactionsId, active: true, triggers: """["manual","scheduled"]""");
         await GrantAsync(tenant.PublicId, AdviserBalancesId);
         var balances = await PostAsync(tokens.AccessToken, Body(AdviserBalancesId, customer.PublicId));
-        balances.StatusCode.ShouldBe(HttpStatusCode.NotFound);
-        (await balances.Content.ReadAsStringAsync()).ShouldContain(AdviserBalancesId.ToString());
+        balances.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await balances.Content.ReadAsStringAsync()).ShouldContain("unknown");
 
         FunctionalTestSetup.WebApiServices.GetRequiredService<RecordingReportScheduler>().Recurring
             .ShouldBeEmpty();

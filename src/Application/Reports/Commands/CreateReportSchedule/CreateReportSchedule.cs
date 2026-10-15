@@ -31,13 +31,27 @@ public class CreateReportScheduleCommandHandler(
         var report = await ReportScheduleRules.EnsureAvailableAsync(
             db, currentUser, request.ReportId, cancellationToken);
 
-        var binding = CustomerTransactionsBinder.Bind(request.Parameters);
-        await ReportScheduleRules.EnsureCustomerScopeAsync(
-            db, currentUser, binding.CustomerId, cancellationToken);
+        string snapshotJson;
+        if (report.Code == AdviserBalancesBinder.Code)
+        {
+            var role = currentUser.Role ?? throw new UnauthorizedAccessException();
+            var binding = AdviserBalancesBinder.Bind(request.Parameters, role, currentUser.PublicId);
+            await AdviserReportScope.EnsureAsync(
+                db, tenantId, binding.AdviserId, role, currentUser.PublicId, cancellationToken);
+            snapshotJson = binding.SnapshotJson;
+        }
+        else
+        {
+            var binding = CustomerTransactionsBinder.Bind(request.Parameters);
+            await ReportScheduleRules.EnsureCustomerScopeAsync(
+                db, currentUser, binding.CustomerId, cancellationToken);
+            snapshotJson = binding.SnapshotJson;
+        }
+
         var schedule = ReportSchedule.Create(
             tenantId,
             report.Id,
-            binding.SnapshotJson,
+            snapshotJson,
             request.IsActive ?? false,
             request.Cron ?? string.Empty);
         db.ReportSchedules.Add(schedule);

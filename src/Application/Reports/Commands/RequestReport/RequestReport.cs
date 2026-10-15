@@ -26,7 +26,8 @@ public class RequestReportCommand : IRequest<Guid>
 public class RequestReportCommandHandler(
     IApplicationDbContext db,
     ICurrentUser currentUser,
-    IReportScheduler scheduler)
+    IReportScheduler scheduler,
+    TimeProvider time)
     : IRequestHandler<RequestReportCommand, Guid>
 {
     public const int MaxParametersBytes = 8 * 1024;
@@ -70,20 +71,34 @@ public class RequestReportCommandHandler(
             throw new ForbiddenAccessException();
         }
 
-        if (report.Code != CustomerTransactionsBinder.Code)
+        string snapshotJson;
+        DateTimeOffset? asOf = null;
+        if (report.Code == CustomerTransactionsBinder.Code)
+        {
+            var binding = CustomerTransactionsBinder.Bind(request.Parameters);
+            await EnsureCustomerInScopeAsync(binding.CustomerId, tenantId, role, cancellationToken);
+            snapshotJson = binding.SnapshotJson;
+        }
+        else if (report.Code == AdviserBalancesBinder.Code)
+        {
+            var binding = AdviserBalancesBinder.Bind(request.Parameters, role, currentUser.PublicId);
+            await AdviserReportScope.EnsureAsync(
+                db, tenantId, binding.AdviserId, role, currentUser.PublicId, cancellationToken);
+            snapshotJson = binding.SnapshotJson;
+            asOf = time.GetUtcNow();
+        }
+        else
         {
             throw new NotFoundException("Report", report.PublicId);
         }
-
-        var binding = CustomerTransactionsBinder.Bind(request.Parameters);
-        await EnsureCustomerInScopeAsync(binding.CustomerId, tenantId, role, cancellationToken);
 
         var execution = ReportExecution.Queue(
             tenantId,
             report.Id,
             "Manual",
-            binding.SnapshotJson,
-            currentUser.Person?.Id);
+            snapshotJson,
+            currentUser.Person?.Id,
+            asOf);
         db.ReportExecutions.Add(execution);
         await db.SaveChangesAsync(cancellationToken);
         scheduler.Enqueue(execution.PublicId);

@@ -99,7 +99,7 @@ public static class ReportScheduleRules
             throw new ForbiddenAccessException();
         }
 
-        if (report.Code != CustomerTransactionsBinder.Code)
+        if (report.Code is not (CustomerTransactionsBinder.Code or AdviserBalancesBinder.Code))
         {
             throw new NotFoundException("Report", report.PublicId);
         }
