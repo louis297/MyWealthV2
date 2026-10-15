@@ -45,6 +45,33 @@ public class CustomerTransactionsRowsTests
             .ShouldBe(["open", "closed"]);
     }
 
+    [Test]
+    public void Select_PlacesReversalImmediatelyAfterItsOriginal()
+    {
+        var from = new DateOnly(2026, 1, 1);
+        var to = new DateOnly(2026, 2, 1);
+        var rows = new[]
+        {
+            Row(2, At(2026, 1, 20), originalTransactionId: 1, memo: "reversal-of-in-range"),
+            Row(1, At(2026, 1, 2), memo: "original"),
+            Row(4, At(2026, 1, 15), originalTransactionId: 99, memo: "orphan-reversal"),
+            Row(5, At(2026, 1, 10), memo: "middle"),
+            Row(99, At(2025, 12, 1), memo: "outside-original")
+        };
+
+        var selected = CustomerTransactionsRows.Select(rows, from, to, includeClosedAccounts: false);
+
+        selected.Select(row => row.Memo).ShouldBe([
+            "original",
+            "reversal-of-in-range",
+            "middle",
+            "orphan-reversal"
+        ]);
+    }
+
+    private static DateTimeOffset At(int year, int month, int day) =>
+        new(year, month, day, 0, 0, 0, TimeSpan.Zero);
+
     private static CustomerTransactionSource Row(
         int id,
         DateTimeOffset bookedAt,
