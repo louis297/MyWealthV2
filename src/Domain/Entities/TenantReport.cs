@@ -9,4 +9,11 @@ public class TenantReport : BaseEntity
     public int TenantId { get; private set; }
 
     public int ReportId { get; private set; }
+
+    public static TenantReport Grant(int tenantId, int reportId) =>
+        new()
+        {
+            TenantId = tenantId,
+            ReportId = reportId
+        };
 }

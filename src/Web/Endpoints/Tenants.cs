@@ -2,6 +2,7 @@ using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Tenants;
 using MyWealthV2.Application.Tenants.Commands.CreateTenant;
+using MyWealthV2.Application.Tenants.Commands.GrantTenantReport;
 using MyWealthV2.Application.Tenants.Commands.DisableTenant;
 using MyWealthV2.Application.Tenants.Commands.EnableTenant;
 using MyWealthV2.Application.Tenants.Commands.UpdateTenant;
@@ -24,6 +25,7 @@ public class Tenants : IEndpointGroup
         groupBuilder.MapGet(GetTenantByCode, "by-code/{code}").RequireAuthorization(Policies.TenantsRead);
         groupBuilder.MapGet(GetTenant, "{id}").RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapGet(GetTenantReports, "{id}/reports").RequireAuthorization(Policies.TenantsManage);
+        groupBuilder.MapPost(GrantTenantReport, "{id}/reports").RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapPost(CreateTenant).RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapPut(UpdateTenant, "{id}").RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapPost(DisableTenant, "{id}/disable").RequireAuthorization(Policies.TenantsManage);
@@ -57,6 +59,22 @@ public class Tenants : IEndpointGroup
     {
         var result = await sender.Send(new GetTenantReportsQuery(id));
         return TypedResults.Ok(result);
+    }
+
+    [EndpointSummary("Grant a report to a tenant")]
+    [EndpointDescription("Grants a catalog report to a tenant. Repeat grants return 204. Inactive catalog rows may be granted. SystemAdmin only.")]
+    public static async Task<IResult> GrantTenantReport(ISender sender, Guid id, GrantTenantReportCommand command)
+    {
+        command.TenantId = id;
+        var result = await sender.Send(command);
+        if (!result.Created)
+        {
+            return TypedResults.NoContent();
+        }
+
+        return TypedResults.Created(
+            $"/tenants/{id}/reports/{result.Id}",
+            new CreatedReportGrantDto(result.Id));
     }
 
     [EndpointSummary("Get a tenant")]

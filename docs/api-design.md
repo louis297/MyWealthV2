@@ -384,6 +384,7 @@ Field rules: [features/reports.md](features/reports.md). Accepted. Not landed.
 | Method | Route | Policy | Success |
 | --- | --- | --- | --- |
 | GET | `/tenants/{tenantId}/reports` | `tenants.manage` | 200 grant list, including an inactive catalog row |
+| POST | `/tenants/{tenantId}/reports` | `tenants.manage` | 201 `{ id }` the first time, 204 when the grant already exists |
 | GET | `/reports` | `reports.customer.read` or `reports.book.read` | 200 list (granted + active only) |
 | POST | `/reports/schedules` | by report scope (`*.create`) | 201 `{ id }` |
 | GET | `/reports/schedules` | by scope | 200 list |
