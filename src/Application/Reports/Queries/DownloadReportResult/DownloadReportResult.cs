@@ -27,7 +27,17 @@ public class DownloadReportResultHandler(
                                 row => row.PublicId == request.Id && row.TenantId == tenantId,
                                 cancellationToken)
                         ?? throw new NotFoundException("ReportExecution", request.Id);
-        if (role != UserRole.TenantAdmin)
+        var report = await db.Reports.AsNoTracking()
+                         .SingleAsync(row => row.Id == execution.ReportId, cancellationToken);
+        var readPolicy = report.Scope == "Book"
+            ? Policies.ReportsBookRead
+            : Policies.ReportsCustomerRead;
+        if (!RolePermissions.Has(role, readPolicy))
+        {
+            throw new ForbiddenAccessException();
+        }
+
+        if (report.Scope != "Book" && role != UserRole.TenantAdmin)
         {
             await EnsureCustomerScopeAsync(execution.ParametersJson, tenantId, role, cancellationToken);
         }
@@ -71,14 +81,6 @@ public class DownloadReportResultHandler(
                                cancellationToken)
                        ?? throw new NotFoundException("Customer", binding.CustomerId);
 
-        if (role == UserRole.Customer && currentUser.PublicId != customer.PublicId)
-        {
-            throw new NotFoundException("Customer", customer.PublicId);
-        }
-
-        if (role == UserRole.Adviser && customer.AdviserId != currentUser.Person?.Id)
-        {
-            throw new NotFoundException("Customer", customer.PublicId);
-        }
+        CustomerReportScope.Ensure(customer, role, currentUser);
     }
 }
