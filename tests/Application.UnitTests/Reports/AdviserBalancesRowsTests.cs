@@ -134,6 +134,63 @@ public class AdviserBalancesRowsTests
         included.OfType<AdviserHoldingLine>().Single().Symbol.ShouldBe("VTI");
     }
 
+    [Test]
+    public void Select_SortsLinesAndSubtotalsByCurrency()
+    {
+        var annEarly = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var annLate = Guid.Parse("00000000-0000-0000-0000-000000000002");
+        var cee = Guid.Parse("00000000-0000-0000-0000-000000000003");
+        var brokerEarly = Guid.Parse("20000000-0000-0000-0000-000000000001");
+        var brokerLate = Guid.Parse("20000000-0000-0000-0000-000000000002");
+        var zebra = Guid.Parse("20000000-0000-0000-0000-000000000003");
+        var everyday = Guid.Parse("20000000-0000-0000-0000-000000000004");
+        var closedAccount = Guid.Parse("20000000-0000-0000-0000-000000000005");
+        var vtiEarly = Guid.Parse("30000000-0000-0000-0000-000000000001");
+        var vtiLate = Guid.Parse("30000000-0000-0000-0000-000000000002");
+        var zzz = Guid.Parse("30000000-0000-0000-0000-000000000003");
+
+        var selection = AdviserBalancesRows.Select(
+            [
+                Account(brokerLate, "Broker", 1m, customerId: annLate, customerName: "Ann", holdings:
+                [
+                    Holding(vtiLate, "VTI", 2m, 20m, price: 5m, priceCurrency: "USD"),
+                    Holding(vtiEarly, "VTI", 1m, 10m, price: 4m, priceCurrency: "USD")
+                ]),
+                Account(zebra, "Zebra", 0m, customerId: annEarly, customerName: "Ann", holdings:
+                [
+                    Holding(zzz, "ZZZ", 1m, 1m)
+                ]),
+                Account(brokerEarly, "Broker", 8m, customerId: annEarly, customerName: "Ann"),
+                Account(everyday, "Everyday", 3m, customerId: cee, customerName: "Cee", currency: "USD"),
+                Account(closedAccount, "Shut", 100m, closed: true, customerId: annEarly, customerName: "Ann")
+            ],
+            includeClosedAccounts: false);
+
+        selection.Lines.Select(Describe).ShouldBe(
+        [
+            "cash Ann 00000000-0000-0000-0000-000000000001 Broker 20000000-0000-0000-0000-000000000001",
+            "holding Ann 00000000-0000-0000-0000-000000000001 Zebra ZZZ",
+            "cash Ann 00000000-0000-0000-0000-000000000002 Broker 20000000-0000-0000-0000-000000000002",
+            "holding Ann 00000000-0000-0000-0000-000000000002 Broker VTI 30000000-0000-0000-0000-000000000001",
+            "holding Ann 00000000-0000-0000-0000-000000000002 Broker VTI 30000000-0000-0000-0000-000000000002",
+            "cash Cee 00000000-0000-0000-0000-000000000003 Everyday 20000000-0000-0000-0000-000000000004"
+        ]);
+        selection.Subtotals.ShouldBe(
+        [
+            new AdviserBalanceSubtotal("NZD", 9m, 0m),
+            new AdviserBalanceSubtotal("USD", 3m, 14m)
+        ]);
+    }
+
+    private static string Describe(AdviserBalanceLine line) => line switch
+    {
+        AdviserCashLine cash =>
+            $"cash {cash.CustomerName} {cash.CustomerId} {cash.AccountName} {cash.AccountId}",
+        AdviserHoldingLine holding =>
+            $"holding {holding.CustomerName} {holding.CustomerId} {holding.AccountName} {holding.Symbol} {holding.InstrumentId}",
+        _ => throw new InvalidOperationException(line.GetType().Name)
+    };
+
     private static AdviserBalanceHolding Holding(
         Guid instrumentId,
         string symbol,
@@ -149,14 +206,17 @@ public class AdviserBalancesRowsTests
         string name,
         decimal cash,
         bool closed = false,
-        IReadOnlyList<AdviserBalanceHolding>? holdings = null) =>
+        IReadOnlyList<AdviserBalanceHolding>? holdings = null,
+        Guid? customerId = null,
+        string customerName = "Cee",
+        string currency = "NZD") =>
         new(
-            CustomerId,
-            "Cee",
+            customerId ?? CustomerId,
+            customerName,
             accountId,
             name,
             "Bank",
-            "NZD",
+            currency,
             cash,
             closed,
             holdings ?? []);
