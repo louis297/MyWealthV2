@@ -4,6 +4,8 @@ using FluentValidation.Results;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
+using MyWealthV2.Domain.Entities;
+using MyWealthV2.Domain.Enums;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationException;
 
@@ -21,7 +23,10 @@ public class RequestReportCommand : IRequest<Guid>
     public bool? IsActive { get; set; }
 }
 
-public class RequestReportCommandHandler(IApplicationDbContext db, ICurrentUser currentUser)
+public class RequestReportCommandHandler(
+    IApplicationDbContext db,
+    ICurrentUser currentUser,
+    IReportScheduler scheduler)
     : IRequestHandler<RequestReportCommand, Guid>
 {
     public const int MaxParametersBytes = 8 * 1024;
@@ -65,15 +70,43 @@ public class RequestReportCommandHandler(IApplicationDbContext db, ICurrentUser 
             throw new ForbiddenAccessException();
         }
 
-        if (report.Code == CustomerTransactionsBinder.Code)
-        {
-            CustomerTransactionsBinder.Validate(request.Parameters);
-        }
-        else
+        if (report.Code != CustomerTransactionsBinder.Code)
         {
             throw new NotFoundException("Report", report.PublicId);
         }
 
-        throw new InvalidOperationException("Report request persistence is not implemented.");
+        var binding = CustomerTransactionsBinder.Bind(request.Parameters);
+        await EnsureCustomerInScopeAsync(binding.CustomerId, tenantId, role, cancellationToken);
+
+        var execution = ReportExecution.Queue(
+            tenantId,
+            report.Id,
+            "Manual",
+            binding.SnapshotJson,
+            currentUser.Person?.Id);
+        db.ReportExecutions.Add(execution);
+        await db.SaveChangesAsync(cancellationToken);
+        scheduler.Enqueue(execution.PublicId);
+        return execution.PublicId;
+    }
+
+    private async Task EnsureCustomerInScopeAsync(
+        Guid customerId,
+        int tenantId,
+        UserRole role,
+        CancellationToken cancellationToken)
+    {
+        var customer = await db.Users.AsNoTracking()
+                           .SingleOrDefaultAsync(
+                               row => row.PublicId == customerId
+                                      && row.TenantId == tenantId
+                                      && row.Role == UserRole.Customer,
+                               cancellationToken)
+                       ?? throw new NotFoundException("Customer", customerId);
+
+        if (role == UserRole.Adviser && customer.AdviserId != currentUser.Person?.Id)
+        {
+            throw new NotFoundException("Customer", customerId);
+        }
     }
 }

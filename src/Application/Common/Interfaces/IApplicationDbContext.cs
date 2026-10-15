@@ -26,6 +26,8 @@ public interface IApplicationDbContext
 
     DbSet<TenantReport> TenantReports { get; }
 
+    DbSet<ReportExecution> ReportExecutions { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 
     Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken cancellationToken);

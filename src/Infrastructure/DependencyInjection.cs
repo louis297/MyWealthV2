@@ -6,6 +6,7 @@ using MyWealthV2.Infrastructure.Data.Schema;
 using MyWealthV2.Infrastructure.Email;
 using MyWealthV2.Infrastructure.Identity;
 using MyWealthV2.Infrastructure.MarketData;
+using MyWealthV2.Infrastructure.Reports;
 using MediatR;
 using Microsoft.AspNetCore.Identity;
 
@@ -67,6 +68,7 @@ public static class DependencyInjection
         builder.Services.AddTransient<IIdentityService, IdentityService>();
         builder.Services.AddScoped<ITokenRevocation, OpenIddictTokenRevocation>();
         builder.Services.AddSingleton<IEmailSender, NoOpEmailSender>();
+        builder.Services.AddSingleton<IReportScheduler, NoOpReportScheduler>();
 
         builder.Services.AddOpenIddict()
             .AddCore(options =>

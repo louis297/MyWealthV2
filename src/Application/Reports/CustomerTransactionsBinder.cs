@@ -14,7 +14,7 @@ public static class CustomerTransactionsBinder
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
     };
 
-    public static void Validate(JsonElement parameters)
+    public static CustomerTransactionsBinding Bind(JsonElement parameters)
     {
         CustomerTransactionsInput input;
         try
@@ -60,10 +60,31 @@ public static class CustomerTransactionsBinder
                 new ValidationFailure("from", "from must be on or before to.")
             ]);
         }
+
+        var includeClosedAccounts = input.IncludeClosedAccounts ?? false;
+        var snapshot = JsonSerializer.Serialize(
+            new CustomerTransactionsSnapshot(
+                input.CustomerId.Value,
+                input.From.Value,
+                input.To.Value,
+                includeClosedAccounts),
+            Options);
+        return new CustomerTransactionsBinding(
+            input.CustomerId.Value,
+            input.From.Value,
+            input.To.Value,
+            includeClosedAccounts,
+            snapshot);
     }
 
     private static ValidationException Unknown() =>
         new([new ValidationFailure("parameters", "unknown field.")]);
+
+    private sealed record CustomerTransactionsSnapshot(
+        Guid CustomerId,
+        DateOnly From,
+        DateOnly To,
+        bool IncludeClosedAccounts);
 
     private sealed class CustomerTransactionsInput
     {
