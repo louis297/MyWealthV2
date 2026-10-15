@@ -55,7 +55,7 @@ Session remains the BFF cookie. All API calls go through `/api`. Do not re-intro
   - StockIn / StockOut (client quantity + cost; no cash).
   - Split / Bonus / Scrip (new total quantity; security-only; total cost unchanged).
   - Cash types already accepted (Opening, TransferIn/Out, Interest, CloseOut, etc.) where the account type allows.
-- Reverse on a posted transaction (`POST /transactions/{id}/reverse`). Original stays; opposite legs posted. One reverse per original. Idempotency-Key required.
+- Reverse on a posted transaction (`POST /transactions/{id}/reverse`). Original stays (economic legs); opposite legs posted. The original receives `reversedByTransactionId`. One reverse per original. Idempotency-Key required. Hide the Reverse button when `reversedByTransactionId` is not null or `type` is `Reversal`.
 - Account open / close (reuse existing account endpoints; close still requires cash zero and no holdings).
 
 **Out**

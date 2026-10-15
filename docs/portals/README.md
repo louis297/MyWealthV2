@@ -22,6 +22,7 @@ Phase 1 has one frontend: [adviser-portal.md](adviser-portal.md). Do not add `cu
 | [adviser-portal.md](adviser-portal.md) | Aspire SPA resource, routes, page slices. OIDC client is held by the BFF |
 | [adviser-portal-bff-cut.md](adviser-portal-bff-cut.md) | Landed SPA cut record (`6aae5c7`). Not a second feature spec |
 | [adviser-portal-dashboard.md](adviser-portal-dashboard.md) | Phase 2 Dashboard, ledger pages, and write forms (Buy / Sell / Split / Reverse) (accepted). Consumes net-worth and existing ledger endpoints |
+| [adviser-portal-reports.md](adviser-portal-reports.md) | Phase 3 Reports UI (accepted). Customer page section + Reports tab |
 | [../features/bff-adviser-portal.md](../features/bff-adviser-portal.md) | Session edge (accepted, landed `5e85e9c`). Not a page spec |
 | [frontend-conventions.md](frontend-conventions.md) | Folder layout, naming, session state, API client |
 | [frontend-implementation-notes.md](frontend-implementation-notes.md) | Page-by-page construction for the current pages cut |

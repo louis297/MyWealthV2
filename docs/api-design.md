@@ -220,6 +220,7 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Accounts | `/accounts` | list / get / create / update / close / reopen; `GET …/cash-balance` | `accounts.read` / `accounts.create` / `accounts.manage` |
 | Transactions | `/transactions` | list / get / create / reverse | `transactions.read` / `transactions.create` |
 | Net worth | `/net-worth`, `/users/customers/{id}/net-worth` | GET | `accounts.read` |
+| Reports | `/reports` | list / request / schedules / executions / download | `reports.customer.read` / `reports.customer.create` / `reports.book.read` / `reports.book.create` |
 
 Path `{id}` is always PublicId.
 
@@ -376,7 +377,32 @@ Field rules: [features/posting.md](features/posting.md) for cash types, [feature
 
 ---
 
+### 7.8 Reports
+
+Field rules: [features/reports.md](features/reports.md). Accepted. Not landed.
+
+| Method | Route | Policy | Success |
+| --- | --- | --- | --- |
+| GET | `/reports` | `reports.customer.read` or `reports.book.read` | 200 list (granted + active only) |
+| POST | `/reports/schedules` | by report scope (`*.create`) | 201 `{ id }` |
+| GET | `/reports/schedules` | by scope | 200 list |
+| PUT | `/reports/schedules/{id}` | by report scope | 204 |
+| POST | `/reports/schedules/{id}/disable` | by report scope | 204 |
+| POST | `/reports/request` | by report scope (`*.create`) | 202 `{ id }` |
+| GET | `/reports/executions` | by scope | 200 list |
+| GET | `/reports/executions/{id}` | by that execution’s report scope | 200 |
+| GET | `/reports/executions/{id}/download` | by that execution’s report scope | 200 `application/pdf` |
+
+Customer has `reports.customer.read` only. SystemAdmin, TenantAdmin, and Adviser have all four. Bad parameters → 400. Unknown report, not granted, inactive catalog row, or out of scope → 404. Policy fail → 403.
+
+BFF allow-list adds the `/reports` prefix.
+
+Tenant grant writes stay on Scalar (SystemAdmin). No catalog update API.
+
+---
+
 ## 8. Explicitly out (until a later phase promotes them)
+
 
 - `/auth/login`, `/auth/refresh`, `/auth/logout` on `webapi`
 - Password grant
@@ -417,3 +443,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-10-11 | Buy / Sell / StockIn / StockOut and transaction item shape (`cash` + `security`). Field rules in [features/buy-sell.md](features/buy-sell.md). |
 | 2026-10-12 | Split / Bonus / Scrip accepted. New total quantity, no cash, total cost unchanged. Field rules in [features/split.md](features/split.md). |
 | 2026-10-12 | Net-worth read model accepted and landed (`af422c2`). `GET /net-worth` and `GET /users/customers/{id}/net-worth`. Current point-in-time, per-currency arrays, breakdowns. Field rules in [features/net-worth.md](features/net-worth.md). BFF allow-list adds `/net-worth`. |
+| 2026-10-14 | Reports accepted. `/reports` catalog, schedules, request, executions, download. Policies `reports.customer.*` / `reports.book.*`. BFF allow-list adds `/reports`. Field rules in [features/reports.md](features/reports.md). |

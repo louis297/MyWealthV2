@@ -426,3 +426,26 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-10-11 | Holdings (`0014`, `0015`) and `CK_Transactions_Type` widened to 0–11 (`0016`) for StockIn / StockOut. |
 | 2026-10-12 | `CK_Transactions_Type` widened to 0–14 (`0017`) for Split / Bonus / Scrip. No new table. |
 | 2026-10-13 | `Transactions.ReversedByTransactionId` (`0018`). Bidirectional reverse link. Forward ALTER only. |
+
+---
+
+## 14. Phase 3 tables — Reports (accepted)
+
+Script `0019_reports.sql`. Columns and rules: [features/reports.md](features/reports.md) §6. Not landed.
+
+| Table | Notes |
+| --- | --- |
+| `Reports` | Platform catalog. No TenantId. PublicId unique, Code unique, Name, Function, Scope nvarchar, AllowedTriggers nvarchar, IsActive. Seed the two first-phase reports by Code. |
+| `TenantReports` | TenantId + ReportId unique. Presence = configured for that tenant. No auto-grant. |
+| `ReportSchedules` | ReportId, TenantId, ParametersJson (max 8 KB), IsActive, Cron. RowVersion + audit. |
+| `ReportExecutions` | ReportId, ScheduleId nullable, TenantId, TriggerKind, Status, ParametersJson, AsOf nullable, TriggeredByUserId, ResultStorageKey, ErrorMessage. RowVersion + audit. |
+
+`ResultStorageKey` is the relative file key `{tenantPublicId}/{executionPublicId}.pdf`. PDF bytes live on the Aspire-mounted volume shared by `worker` and `webapi`, not in SQL.
+
+Hangfire tables are created by Hangfire in schema `Hangfire` (documented exception to script-only schema).
+
+### Change log
+
+| Date | Change |
+| --- | --- |
+| 2026-10-14 | Reports tables accepted (`0019_reports.sql`). |

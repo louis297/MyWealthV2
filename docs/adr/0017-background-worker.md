@@ -1,9 +1,9 @@
 ---
 title: "ADR 0017: Background worker for async tasks"
-status: proposed
+status: accepted
 language: en
 date: 2026-10-12
-updated: 2026-10-12
+updated: 2026-10-14
 related:
   - ../architecture.md
   - ../function-plan.md
@@ -12,7 +12,7 @@ related:
 
 # ADR 0017: Background worker for async tasks
 
-Status: proposed
+Status: accepted
 
 ## Context
 
@@ -32,7 +32,8 @@ Introduce one general-purpose background worker as a new Aspire resource.
 - Hangfire storage uses SQL Server against `MyWealthDbV2`, in a dedicated `Hangfire` schema.
 - Business logic stays in `Application`. The worker only resolves and executes Application services / MediatR handlers. It does not own domain rules or direct table access for business data.
 - Manual triggers enter through `webapi` endpoints (named policies + handler scope checks) and enqueue a Hangfire job.
-- Recurring triggers are Hangfire recurring jobs. A `ReportSchedule` (or later equivalent) record owns the scope and the schedule definition. Changing the schedule updates or replaces the Hangfire recurring job. The job carries the schedule’s scope; generation logic re-validates that scope.
+- Recurring triggers are Hangfire recurring jobs. A `ReportSchedule` record names a ReportId and owns the scope and schedule definition. Changing the schedule updates or replaces the Hangfire recurring job. The job carries the schedule’s scope; generation logic re-validates that scope.
+- Event triggers enqueue a Hangfire job when a registered domain or application event occurs, for reports that allow the event trigger and that the tenant has been granted. The worker still executes the same generation path.
 - Use Hangfire queues for light isolation (`reports`, `email`, default). Do not create a separate worker project per task type yet.
 - Email and other future async work land in the same worker unless a later ADR splits them.
 

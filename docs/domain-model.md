@@ -351,3 +351,37 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-09-25 | Transaction + cash leg accepted (posting spec). Close requires cash SUM = 0. No capture/journal two-step. |
 | 2026-10-12 | Net-worth current point-in-time read model accepted and landed (`af422c2`). Per-currency arrays. No new Domain types. [features/net-worth.md](features/net-worth.md). |
 | 2026-10-13 | Bidirectional reverse link. `ReversedByTransactionId` on the original (single write). `OriginalTransactionId` stays on the Reversal. Script `0018`. |
+
+---
+
+## 11. Phase 3 — Reports (accepted)
+
+Field rules: [features/reports.md](features/reports.md). Not landed.
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `Report` | Entity (platform catalog) | No TenantId. PublicId + stable Code. Name, Function, Scope (`Customer` \| `Book`, nvarchar), AllowedTriggers (nvarchar), IsActive. |
+| `TenantReport` | Entity | Grant. TenantId + ReportId. Presence of the row configures the report for that tenant. |
+| `ReportSchedule` | Entity | Recurring definition. ReportId + TenantId + ParametersJson. IsActive. Cron. |
+| `ReportExecution` | Entity | One run. ReportId, optional ScheduleId, TriggerKind, Status, ParametersJson, AsOf (nullable), TriggeredByUserId, ResultStorageKey, ErrorMessage. |
+
+Invariants:
+
+- A tenant can run a report only when `Report.IsActive` is true **and** a `TenantReport` row exists.
+- Scope selects the policy pair (`reports.customer.*` or `reports.book.*`).
+- AllowedTriggers gates manual / scheduled / event.
+- A schedule and an execution each reference exactly one Report.
+- ParametersJson is a bound snapshot (max 8 KB, known fields only).
+- ResultStorageKey is a relative key (`{tenantPublicId}/{executionPublicId}.pdf`) or null. Absolute paths are not stored.
+- Adviser Balances `asOf` is server-set when the execution is created. Not a client field.
+- Platform IsActive has no update API in this phase (DB only).
+
+Generator registry maps Report Code / PublicId to `IReportGenerator`. Hangfire entry point is fixed. PDF is QuestPDF. Shared volume via Aspire.
+
+---
+
+## 12. Change log (Reports)
+
+| Date | Change |
+| --- | --- |
+| 2026-10-14 | Phase 3 Reports model accepted. Catalog + TenantReport + Schedule + Execution. |

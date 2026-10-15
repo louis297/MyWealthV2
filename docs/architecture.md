@@ -343,3 +343,4 @@ Locked conclusions follow function-plan §0 and these ADRs. This folder currentl
 | 2026-09-21 | Instruments landed `9ea2f2a`. Accounts Feature Spec opened as `draft`. |
 | 2026-09-21 | Accounts landed (`0012_accounts.sql`, `/accounts`, Disable-Customer guard, TestSeed). |
 | 2026-10-12 | ADR 0017 proposed: general-purpose `worker` host for Hangfire. First consumer Reports. |
+| 2026-10-14 | ADR 0017 accepted. Reports Feature Spec accepted. QuestPDF. Aspire shared volume for PDF. |
