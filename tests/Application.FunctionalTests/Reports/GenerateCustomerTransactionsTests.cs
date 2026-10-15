@@ -98,6 +98,54 @@ public class GenerateCustomerTransactionsTests : TestBase
         juneAt.ShouldBeGreaterThan(openingAt);
     }
 
+    [Test]
+    public async Task Execute_WhenParametersDoNotBind_FailsWithoutAFile()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm Fail", "firm-fail");
+        await TestApp.CreatePersonAsync(
+            UserRole.TenantAdmin, "Tess", "tess@firm-fail", "Password1!", tenant.Id);
+        var adviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Ann", "ann@firm-fail", "Password1!", tenant.Id);
+        var customer = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Cee Fail", "cee@firm-fail", "Password1!", tenant.Id, adviser.Id);
+        await GrantAsync(tenant.PublicId);
+        var admin = await FunctionalTestSetup.Oidc.SignInAsync("tess@firm-fail", "Password1!", "firm-fail");
+        var created = await TenantHttp.Send(
+            HttpMethod.Post,
+            "/reports/request",
+            admin.AccessToken,
+            new
+            {
+                reportId = CustomerTransactionsId,
+                parameters = new { customerId = customer.PublicId, from = "2026-01-01", to = "2026-02-01" }
+            });
+        created.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        using var json = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+        var executionId = json.RootElement.GetProperty("id").GetGuid();
+        await ReplaceParametersAsync(executionId, """{"unknown":true}""");
+
+        await using var scope = FunctionalTestSetup.WebApiServices.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<ReportJob>().Execute(executionId);
+
+        var row = await ReadExecutionAsync(executionId);
+        row.Status.ShouldBe("Failed");
+        row.ResultStorageKey.ShouldBeNull();
+        var path = Path.Combine(ReportStoragePaths.Root, tenant.PublicId.ToString("D"), $"{executionId:D}.pdf");
+        File.Exists(path).ShouldBeFalse();
+    }
+
+    private static async Task ReplaceParametersAsync(Guid executionId, string parametersJson)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            UPDATE [ReportExecutions]
+            SET [ParametersJson] = {parametersJson}
+            WHERE [PublicId] = {executionId}
+            """);
+    }
+
     private static string ReadPdf(byte[] pdf)
     {
         using var document = PdfDocument.Open(pdf);
