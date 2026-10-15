@@ -3,7 +3,6 @@ using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Domain.Entities;
-using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 
 namespace MyWealthV2.Application.Reports.Commands.CreateReportSchedule;
 
@@ -28,11 +27,9 @@ public class CreateReportScheduleCommandHandler(
     public async Task<Guid> Handle(CreateReportScheduleCommand request, CancellationToken cancellationToken)
     {
         ReportScheduleRules.EnsureShape(request.ReportId, request.Parameters, request.Cron, request.IsActive);
-        _ = currentUser.Role ?? throw new UnauthorizedAccessException();
         var tenantId = currentUser.TenantId ?? throw new ForbiddenAccessException();
-        var report = await db.Reports.AsNoTracking()
-                         .SingleOrDefaultAsync(row => row.PublicId == request.ReportId, cancellationToken)
-                     ?? throw new NotFoundException("Report", request.ReportId);
+        var report = await ReportScheduleRules.EnsureAvailableAsync(
+            db, currentUser, request.ReportId, cancellationToken);
 
         var binding = CustomerTransactionsBinder.Bind(request.Parameters);
         var schedule = ReportSchedule.Create(
