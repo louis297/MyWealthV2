@@ -53,11 +53,16 @@ public class ReportExecution : BaseAuditableEntity
 
     public void Succeed(string resultStorageKey)
     {
-        _ = resultStorageKey;
+        Status = "Succeeded";
+        ResultStorageKey = resultStorageKey;
+        ErrorMessage = null;
     }
 
     public void Fail(string errorMessage)
     {
-        _ = errorMessage;
+        Status = "Failed";
+        ResultStorageKey = null;
+        var message = errorMessage ?? string.Empty;
+        ErrorMessage = message.Length <= 2000 ? message : message[..2000];
     }
 }
