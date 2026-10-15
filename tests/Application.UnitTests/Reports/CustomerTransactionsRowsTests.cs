@@ -25,6 +25,26 @@ public class CustomerTransactionsRowsTests
         selected.Select(row => row.Memo).ShouldBe(["start", "end-of-second"]);
     }
 
+    [Test]
+    public void Select_OmitsClosedAccountsUnlessRequested()
+    {
+        var from = new DateOnly(2026, 1, 1);
+        var to = new DateOnly(2026, 1, 3);
+        var booked = new DateTimeOffset(2026, 1, 2, 9, 0, 0, TimeSpan.Zero);
+        var rows = new[]
+        {
+            Row(1, booked, memo: "open"),
+            Row(2, booked, accountClosed: true, memo: "closed")
+        };
+
+        CustomerTransactionsRows.Select(rows, from, to, includeClosedAccounts: false)
+            .Select(row => row.Memo)
+            .ShouldBe(["open"]);
+        CustomerTransactionsRows.Select(rows, from, to, includeClosedAccounts: true)
+            .Select(row => row.Memo)
+            .ShouldBe(["open", "closed"]);
+    }
+
     private static CustomerTransactionSource Row(
         int id,
         DateTimeOffset bookedAt,
