@@ -15,6 +15,7 @@
     <PackageReference Include="OpenIddict.EntityFrameworkCore" />
     <PackageReference Include="Hangfire.AspNetCore" />
     <PackageReference Include="Hangfire.SqlServer" />
+    <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
 
   <ItemGroup>

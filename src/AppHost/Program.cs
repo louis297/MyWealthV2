@@ -20,7 +20,8 @@ var web = builder.AddProject<Projects.Web>(Services.WebApi)
     {
         url.DisplayText = "Scalar API Reference";
         url.Url = "/scalar";
-    });
+    })
+    .WithVolume("reports", "/data/reports", env: "Reports__StorageRoot");
 
 var identity = builder.AddProject<Projects.IdentityHost>(Services.Identity)
     .WithReference(databaseServer)
@@ -72,5 +73,18 @@ bff.WithEnvironment("Spa__DevServerUrl", portal.GetEndpoint("http"));
 bff.WithEnvironment("Authentication__PublicOrigin", bff.GetEndpoint("https"));
 
 identity.WithPortalOrigins(bff);
+
+builder.AddProject<Projects.Worker>(Services.Worker)
+    .WithReference(databaseServer)
+    .WaitFor(databaseServer)
+    .WithExternalHttpEndpoints()
+    .WithHttpHealthCheck("/health", endpointName: "http")
+    .WithAspNetCoreEnvironment()
+    .WithVolume("reports", "/data/reports", env: "Reports__StorageRoot")
+    .WithUrlForEndpoint("http", url =>
+    {
+        url.DisplayText = "Hangfire";
+        url.Url = "/hangfire";
+    });
 
 builder.Build().Run();

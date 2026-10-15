@@ -31,6 +31,11 @@ public static class Services
     public const string BffAdviserPortal = "bff-adviser-portal";
 
     /// <summary>
+    /// Aspire resource name for the background worker (src/Worker).
+    /// </summary>
+    public const string Worker = "worker";
+
+    /// <summary>
     /// The name of the Database Server service.
     /// This service is responsible for hosting the database server (e.g., PostgreSQL, SQL Server, or SQLite).
     /// </summary>
