@@ -105,13 +105,14 @@ public class Reports : IEndpointGroup
     }
 
     [EndpointSummary("List report executions")]
-    [EndpointDescription("Returns a paged list of report executions in the caller's tenant.")]
+    [EndpointDescription("Returns a paged list of report executions the caller can read. Optional scope is Customer or Book.")]
     public static async Task<Ok<PagedList<ReportExecutionDto>>> GetExecutions(
         ISender sender,
         int page = 1,
-        int pageSize = 20)
+        int pageSize = 20,
+        string? scope = null)
     {
-        var result = await sender.Send(new GetReportExecutionsQuery(page, pageSize));
+        var result = await sender.Send(new GetReportExecutionsQuery(page, pageSize, scope));
         return TypedResults.Ok(result);
     }
 
