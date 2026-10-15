@@ -59,6 +59,24 @@ public static class AdviserBalancesRows
 {
     public static AdviserBalancesSelection Select(
         IReadOnlyList<AdviserBalanceAccount> accounts,
-        bool includeClosedAccounts) =>
-        throw new NotImplementedException();
+        bool includeClosedAccounts)
+    {
+        var lines = new List<AdviserBalanceLine>();
+        foreach (var account in accounts)
+        {
+            if (account.CashBalance != 0m)
+            {
+                lines.Add(new AdviserCashLine(
+                    account.CustomerId,
+                    account.CustomerName,
+                    account.AccountId,
+                    account.AccountName,
+                    account.AccountType,
+                    account.Currency,
+                    account.CashBalance));
+            }
+        }
+
+        return new AdviserBalancesSelection(lines, []);
+    }
 }
