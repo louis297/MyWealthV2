@@ -28,11 +28,19 @@ public class DisableReportScheduleCommandHandler(
             .Select(row => row.PublicId)
             .SingleAsync(cancellationToken);
 
-        await ReportScheduleRules.EnsureAvailableAsync(db, currentUser, reportId, cancellationToken);
-        var parameters = JsonSerializer.Deserialize<JsonElement>(schedule.ParametersJson);
-        var binding = CustomerTransactionsBinder.Bind(parameters);
-        await ReportScheduleRules.EnsureCustomerScopeAsync(
-            db, currentUser, binding.CustomerId, cancellationToken);
+        var report = await ReportScheduleRules.EnsureAvailableAsync(db, currentUser, reportId, cancellationToken);
+        if (report.Code == AdviserBalancesBinder.Code)
+        {
+            await AdviserReportScope.EnsureSnapshotAsync(
+                db, currentUser, schedule.ParametersJson, "ReportSchedule", cancellationToken);
+        }
+        else
+        {
+            var parameters = JsonSerializer.Deserialize<JsonElement>(schedule.ParametersJson);
+            var binding = CustomerTransactionsBinder.Bind(parameters);
+            await ReportScheduleRules.EnsureCustomerScopeAsync(
+                db, currentUser, binding.CustomerId, cancellationToken);
+        }
 
         schedule.Disable();
         await db.SaveChangesAsync(cancellationToken);

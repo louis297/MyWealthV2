@@ -37,7 +37,15 @@ public class DownloadReportResultHandler(
             throw new ForbiddenAccessException();
         }
 
-        if (report.Scope != "Book" && role != UserRole.TenantAdmin)
+        if (report.Scope == "Book")
+        {
+            if (role == UserRole.Adviser)
+            {
+                await AdviserReportScope.EnsureSnapshotAsync(
+                    db, currentUser, execution.ParametersJson, "ReportExecution", cancellationToken);
+            }
+        }
+        else if (role != UserRole.TenantAdmin)
         {
             await EnsureCustomerScopeAsync(execution.ParametersJson, tenantId, role, cancellationToken);
         }

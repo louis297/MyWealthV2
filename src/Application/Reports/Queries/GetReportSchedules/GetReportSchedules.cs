@@ -69,6 +69,28 @@ public class GetReportSchedulesQueryHandler(IApplicationDbContext db, ICurrentUs
                 continue;
             }
 
+            if (row.Code == AdviserBalancesBinder.Code)
+            {
+                if (role == UserRole.Customer)
+                {
+                    continue;
+                }
+
+                var parameters = JsonSerializer.Deserialize<JsonElement>(row.ParametersJson);
+                if (role == UserRole.Adviser)
+                {
+                    if (!parameters.TryGetProperty("adviserId", out var adviserId)
+                        || !adviserId.TryGetGuid(out var id)
+                        || id != currentUser.PublicId)
+                    {
+                        continue;
+                    }
+                }
+
+                items.Add(ToDto(row.PublicId, row.ReportPublicId, parameters, row.Cron, row.IsActive, row.RowVersion));
+                continue;
+            }
+
             if (role == UserRole.Customer)
             {
                 continue;

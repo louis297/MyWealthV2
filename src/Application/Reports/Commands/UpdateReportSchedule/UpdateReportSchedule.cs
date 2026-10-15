@@ -60,10 +60,31 @@ public class UpdateReportScheduleCommandHandler(
             throw new NotFoundException("Report", request.ReportId);
         }
 
-        var binding = CustomerTransactionsBinder.Bind(request.Parameters);
-        await ReportScheduleRules.EnsureCustomerScopeAsync(
-            db, currentUser, binding.CustomerId, cancellationToken);
-        schedule.Revise(binding.SnapshotJson, request.IsActive!.Value, request.Cron!);
+        string snapshotJson;
+        if (report.Code == AdviserBalancesBinder.Code)
+        {
+            var role = currentUser.Role ?? throw new UnauthorizedAccessException();
+            await AdviserReportScope.EnsureSnapshotAsync(
+                db, currentUser, schedule.ParametersJson, "ReportSchedule", cancellationToken);
+            var binding = AdviserBalancesBinder.Bind(request.Parameters, role, currentUser.PublicId);
+            await AdviserReportScope.EnsureAsync(
+                db,
+                tenantId,
+                binding.AdviserId,
+                role,
+                currentUser.PublicId,
+                cancellationToken);
+            snapshotJson = binding.SnapshotJson;
+        }
+        else
+        {
+            var binding = CustomerTransactionsBinder.Bind(request.Parameters);
+            await ReportScheduleRules.EnsureCustomerScopeAsync(
+                db, currentUser, binding.CustomerId, cancellationToken);
+            snapshotJson = binding.SnapshotJson;
+        }
+
+        schedule.Revise(snapshotJson, request.IsActive!.Value, request.Cron!);
         await db.SaveChangesAsync(cancellationToken);
         scheduler.AddOrUpdateRecurring(schedule.PublicId, schedule.Cron);
     }
