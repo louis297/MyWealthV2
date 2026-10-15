@@ -75,6 +75,27 @@ public static class AdviserBalancesRows
                     account.Currency,
                     account.CashBalance));
             }
+
+            foreach (var holding in account.Holdings)
+            {
+                if (holding.Quantity <= 0m)
+                {
+                    continue;
+                }
+
+                lines.Add(new AdviserHoldingLine(
+                    account.CustomerId,
+                    account.CustomerName,
+                    account.AccountId,
+                    account.AccountName,
+                    holding.InstrumentId,
+                    holding.Symbol,
+                    holding.Quantity,
+                    holding.CostAmount,
+                    holding.CostCurrency,
+                    MarketValue: 0m,
+                    MarketCurrency: holding.QuoteCurrency));
+            }
         }
 
         return new AdviserBalancesSelection(lines, []);
