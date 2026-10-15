@@ -10,7 +10,8 @@ public sealed class ReportJob(
     IApplicationDbContext db,
     IReportGeneratorRegistry generators,
     IReportFileStore files,
-    IReportScheduler scheduler)
+    IReportScheduler scheduler,
+    TimeProvider time)
 {
     public async Task Execute(Guid executionId)
     {
@@ -79,7 +80,7 @@ public sealed class ReportJob(
             .SingleOrDefaultAsync(row => row.Id == schedule.ReportId);
         if (report is null
             || !report.IsActive
-            || report.Code != CustomerTransactionsBinder.Code
+            || report.Code is not (CustomerTransactionsBinder.Code or AdviserBalancesBinder.Code)
             || !TenantReportGrantDto.ParseTriggers(report.AllowedTriggers)
                 .Contains("scheduled", StringComparer.Ordinal))
         {
@@ -93,22 +94,43 @@ public sealed class ReportJob(
             return;
         }
 
-        Guid customerId;
+        DateTimeOffset? asOf = null;
         try
         {
-            customerId = CustomerTransactionsBinder.Bind(
-                JsonSerializer.Deserialize<JsonElement>(schedule.ParametersJson)).CustomerId;
+            var parameters = JsonSerializer.Deserialize<JsonElement>(schedule.ParametersJson);
+            if (report.Code == CustomerTransactionsBinder.Code)
+            {
+                var customerId = CustomerTransactionsBinder.Bind(parameters).CustomerId;
+                var customerExists = await db.Users.AsNoTracking().AnyAsync(row =>
+                    row.PublicId == customerId
+                    && row.TenantId == schedule.TenantId
+                    && row.Role == UserRole.Customer);
+                if (!customerExists)
+                {
+                    return;
+                }
+            }
+            else
+            {
+                var adviserId = AdviserBalancesBinder.Bind(parameters, UserRole.TenantAdmin, callerPublicId: null)
+                    .AdviserId;
+                var adviserExists = await db.Users.AsNoTracking().AnyAsync(row =>
+                    row.PublicId == adviserId
+                    && row.TenantId == schedule.TenantId
+                    && row.Role == UserRole.Adviser);
+                if (!adviserExists)
+                {
+                    return;
+                }
+
+                asOf = time.GetUtcNow();
+            }
         }
         catch (ValidationException)
         {
             return;
         }
-
-        var customerExists = await db.Users.AsNoTracking().AnyAsync(row =>
-            row.PublicId == customerId
-            && row.TenantId == schedule.TenantId
-            && row.Role == UserRole.Customer);
-        if (!customerExists)
+        catch (JsonException)
         {
             return;
         }
@@ -119,7 +141,8 @@ public sealed class ReportJob(
             "Scheduled",
             schedule.ParametersJson,
             triggeredByUserId: null,
-            scheduleId: schedule.Id);
+            asOf,
+            schedule.Id);
         execution.CreatedBy = "system";
         db.ReportExecutions.Add(execution);
         await db.SaveChangesAsync(CancellationToken.None);
