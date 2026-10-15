@@ -157,6 +157,84 @@ public class GetReportExecutionsTests : TestBase
         (await GetAsync(system.AccessToken)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
+    [Test]
+    public async Task List_PagesAfterScopeFilter()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm Execution Page", "firm-execution-page");
+        await TestApp.CreatePersonAsync(
+            UserRole.TenantAdmin, "Tess", "tess@firm-execution-page", "Password1!", tenant.Id);
+        var adviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Ann", "ann@firm-execution-page", "Password1!", tenant.Id);
+        var otherAdviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Bea", "bea@firm-execution-page", "Password1!", tenant.Id);
+        var customer = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Cee", "cee@firm-execution-page", "Password1!", tenant.Id, adviser.Id);
+        var otherCustomer = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Dee", "dee@firm-execution-page", "Password1!", tenant.Id, otherAdviser.Id);
+
+        var oldest = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var ids = new List<Guid>();
+        for (var minute = 0; minute < 21; minute++)
+        {
+            ids.Add(await InsertCustomerExecutionAsync(tenant.Id, customer.PublicId, oldest.AddMinutes(minute)));
+        }
+
+        var hidden = await InsertCustomerExecutionAsync(tenant.Id, otherCustomer.PublicId, oldest.AddMinutes(10));
+        var newestFirst = ids.AsEnumerable().Reverse().ToList();
+        var adviserTokens = await TestApp.IssueAccessTokenAsync(adviser);
+
+        var first = await ReadPageAsync(adviserTokens.AccessToken);
+        first.Page.ShouldBe(1);
+        first.PageSize.ShouldBe(20);
+        first.TotalCount.ShouldBe(21);
+        first.Ids.ShouldBe(newestFirst.Take(20).ToList());
+        first.Ids.ShouldNotContain(hidden);
+
+        var second = await ReadPageAsync(adviserTokens.AccessToken, "?page=2");
+        second.Page.ShouldBe(2);
+        second.PageSize.ShouldBe(20);
+        second.TotalCount.ShouldBe(21);
+        second.Ids.ShouldBe([ids[0]]);
+
+        var all = await ReadPageAsync(adviserTokens.AccessToken, "?pageSize=100");
+        all.Page.ShouldBe(1);
+        all.PageSize.ShouldBe(100);
+        all.TotalCount.ShouldBe(21);
+        all.Ids.ShouldBe(newestFirst);
+
+        var past = await ReadPageAsync(adviserTokens.AccessToken, "?page=3");
+        past.TotalCount.ShouldBe(21);
+        past.Ids.ShouldBeEmpty();
+
+        var admin = await FunctionalTestSetup.Oidc.SignInAsync(
+            "tess@firm-execution-page", "Password1!", "firm-execution-page");
+        (await ReadPageAsync(admin.AccessToken)).TotalCount.ShouldBe(22);
+
+        (await GetAsync(adviserTokens.AccessToken, "?page=0")).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await GetAsync(adviserTokens.AccessToken, "?pageSize=101")).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    private static async Task<(int Page, int PageSize, int TotalCount, List<Guid> Ids)> ReadPageAsync(
+        string accessToken,
+        string query = "")
+    {
+        var response = await GetAsync(accessToken, query);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = json.RootElement;
+        return (
+            root.GetProperty("page").GetInt32(),
+            root.GetProperty("pageSize").GetInt32(),
+            root.GetProperty("totalCount").GetInt32(),
+            root.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetGuid()).ToList());
+    }
+
+    private static Task<Guid> InsertCustomerExecutionAsync(int tenantId, Guid customerId, DateTimeOffset created)
+    {
+        var parameters = $$"""{"customerId":"{{customerId}}","from":"2026-01-01","to":"2026-03-31","includeClosedAccounts":false}""";
+        return InsertRawExecutionAsync(tenantId, "customer-transactions", parameters, created);
+    }
+
     private static async Task<List<Guid>> ReadIdsAsync(string accessToken, string query = "")
     {
         var response = await GetAsync(accessToken, query);
