@@ -33,6 +33,45 @@ public class CustomerTransactionsPdfTests
         text.ShouldContain("No transactions in this range.");
     }
 
+    [Test]
+    public void Render_PlacesReversalImmediatelyAfterItsOriginal()
+    {
+        var pdf = CustomerTransactionsPdf.Render(new CustomerTransactionsPdfModel(
+            "Firm Queue",
+            new DateTimeOffset(2026, 3, 31, 14, 5, 6, TimeSpan.Zero),
+            "Cee",
+            new DateOnly(2026, 1, 1),
+            new DateOnly(2026, 3, 31),
+            IncludeClosedAccounts: false,
+            [
+                new CustomerTransactionsPdfRow(
+                    new DateTimeOffset(2026, 1, 2, 9, 0, 0, TimeSpan.Zero),
+                    "Everyday",
+                    "TransferIn",
+                    "10.00 NZD",
+                    "",
+                    "",
+                    "salary"),
+                new CustomerTransactionsPdfRow(
+                    new DateTimeOffset(2026, 1, 20, 9, 0, 0, TimeSpan.Zero),
+                    "Everyday",
+                    "Reversal",
+                    "-10.00 NZD",
+                    "",
+                    "",
+                    "undo salary")
+            ]));
+
+        var text = Read(pdf);
+        text.ShouldNotContain("No transactions in this range.");
+        var original = text.IndexOf("salary", StringComparison.Ordinal);
+        var reversal = text.IndexOf("Reversal", StringComparison.Ordinal);
+        var undo = text.IndexOf("undo salary", StringComparison.Ordinal);
+        original.ShouldBeGreaterThanOrEqualTo(0);
+        reversal.ShouldBeGreaterThan(original);
+        undo.ShouldBeGreaterThan(reversal);
+    }
+
     internal static string Read(byte[] pdf)
     {
         using var document = PdfDocument.Open(pdf);
