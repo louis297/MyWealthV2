@@ -27,6 +27,7 @@ public class CreateReportScheduleCommandHandler(
 {
     public async Task<Guid> Handle(CreateReportScheduleCommand request, CancellationToken cancellationToken)
     {
+        ReportScheduleRules.EnsureShape(request.ReportId, request.Parameters, request.Cron, request.IsActive);
         _ = currentUser.Role ?? throw new UnauthorizedAccessException();
         var tenantId = currentUser.TenantId ?? throw new ForbiddenAccessException();
         var report = await db.Reports.AsNoTracking()
