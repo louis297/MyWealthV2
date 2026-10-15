@@ -1,5 +1,6 @@
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Reports;
+using MyWealthV2.Application.Reports.Commands.RequestReport;
 using MyWealthV2.Application.Reports.Queries.GetReports;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -12,6 +13,14 @@ public class Reports : IEndpointGroup
 {
     public static string RoutePrefix => "/reports";
 
+    private static readonly AuthorizationPolicy CreateReports = new AuthorizationPolicyBuilder()
+        .AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme)
+        .RequireAuthenticatedUser()
+        .AddRequirements(new AnyPermissionRequirement(
+            Policies.ReportsCustomerCreate,
+            Policies.ReportsBookCreate))
+        .Build();
+
     private static readonly AuthorizationPolicy ReadReports = new AuthorizationPolicyBuilder()
         .AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme)
         .RequireAuthenticatedUser()
@@ -23,6 +32,7 @@ public class Reports : IEndpointGroup
     public static void Map(RouteGroupBuilder groupBuilder)
     {
         groupBuilder.MapGet(GetReports).RequireAuthorization(ReadReports);
+        groupBuilder.MapPost(RequestReport, "request").RequireAuthorization(CreateReports);
     }
 
     [EndpointSummary("List granted reports")]
@@ -33,5 +43,13 @@ public class Reports : IEndpointGroup
     {
         var result = await sender.Send(new GetReportsQuery(scope));
         return TypedResults.Ok(result);
+    }
+
+    [EndpointSummary("Request a report")]
+    [EndpointDescription("Queues a manual report run. Returns the execution id.")]
+    public static async Task<IResult> RequestReport(ISender sender, RequestReportCommand command)
+    {
+        var id = await sender.Send(command);
+        return TypedResults.Accepted($"/reports/executions/{id}", new { id });
     }
 }
