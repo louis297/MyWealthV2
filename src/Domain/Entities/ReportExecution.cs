@@ -50,4 +50,14 @@ public class ReportExecution : BaseAuditableEntity
             AsOf = asOf,
             TriggeredByUserId = triggeredByUserId
         };
+
+    public void Succeed(string resultStorageKey)
+    {
+        _ = resultStorageKey;
+    }
+
+    public void Fail(string errorMessage)
+    {
+        _ = errorMessage;
+    }
 }
