@@ -108,6 +108,32 @@ public class AdviserBalancesRowsTests
         cash.Balance.ShouldBe(10m);
     }
 
+    [Test]
+    public void Select_OmitsClosedAccountsUnlessRequested()
+    {
+        var open = Guid.Parse("00000000-0000-0000-0000-000000000006");
+        var closed = Guid.Parse("00000000-0000-0000-0000-000000000007");
+        var vti = Guid.Parse("10000000-0000-0000-0000-000000000021");
+        var accounts = new[]
+        {
+            Account(open, "Open", 5m),
+            Account(
+                closed,
+                "Closed",
+                7m,
+                closed: true,
+                holdings: [Holding(vti, "VTI", 1m, 10m, price: 4m, priceCurrency: "USD")])
+        };
+
+        AdviserBalancesRows.Select(accounts, includeClosedAccounts: false)
+            .Lines.Select(line => line.AccountId)
+            .ShouldBe([open]);
+
+        var included = AdviserBalancesRows.Select(accounts, includeClosedAccounts: true).Lines;
+        included.OfType<AdviserCashLine>().Select(line => line.Balance).ShouldBe([5m, 7m]);
+        included.OfType<AdviserHoldingLine>().Single().Symbol.ShouldBe("VTI");
+    }
+
     private static AdviserBalanceHolding Holding(
         Guid instrumentId,
         string symbol,
