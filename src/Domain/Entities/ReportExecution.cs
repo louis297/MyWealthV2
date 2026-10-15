@@ -51,6 +51,17 @@ public class ReportExecution : BaseAuditableEntity
             TriggeredByUserId = triggeredByUserId
         };
 
+    public void MarkRunning()
+    {
+        if (Status is "Succeeded" or "Failed")
+        {
+            return;
+        }
+
+        Status = "Running";
+        ErrorMessage = null;
+    }
+
     public void Succeed(string resultStorageKey)
     {
         Status = "Succeeded";

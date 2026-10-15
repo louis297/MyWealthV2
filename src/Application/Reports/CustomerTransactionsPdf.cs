@@ -35,9 +35,9 @@ public static class CustomerTransactionsPdf
         {
             container.Page(page =>
             {
-                page.Size(PageSizes.A4);
+                page.Size(PageSizes.A4.Landscape());
                 page.Margin(30);
-                page.DefaultTextStyle(style => style.FontSize(10));
+                page.DefaultTextStyle(style => style.FontSize(9));
                 page.Content().Column(column =>
                 {
                     column.Spacing(4);
@@ -52,6 +52,44 @@ public static class CustomerTransactionsPdf
                     if (model.Rows.Count == 0)
                     {
                         column.Item().PaddingTop(12).Text("No transactions in this range.");
+                    }
+                    else
+                    {
+                        column.Item().PaddingTop(12).Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.RelativeColumn(2);
+                                columns.RelativeColumn();
+                                columns.RelativeColumn();
+                                columns.RelativeColumn();
+                                columns.RelativeColumn();
+                                columns.RelativeColumn();
+                                columns.RelativeColumn(2);
+                            });
+                            table.Header(header =>
+                            {
+                                header.Cell().Text("Booked at").Bold();
+                                header.Cell().Text("Account").Bold();
+                                header.Cell().Text("Type").Bold();
+                                header.Cell().Text("Cash").Bold();
+                                header.Cell().Text("Instrument").Bold();
+                                header.Cell().Text("Quantity").Bold();
+                                header.Cell().Text("Memo").Bold();
+                            });
+                            foreach (var row in model.Rows)
+                            {
+                                var booked = row.BookedAt.ToUniversalTime()
+                                    .ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+                                table.Cell().Text(booked);
+                                table.Cell().Text(row.AccountName);
+                                table.Cell().Text(row.Type);
+                                table.Cell().Text(row.Cash);
+                                table.Cell().Text(row.Instrument);
+                                table.Cell().Text(row.Quantity);
+                                table.Cell().Text(row.Memo ?? string.Empty);
+                            }
+                        });
                     }
                 });
             });
