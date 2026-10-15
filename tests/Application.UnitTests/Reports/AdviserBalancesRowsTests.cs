@@ -67,12 +67,56 @@ public class AdviserBalancesRowsTests
         holding.CustomerName.ShouldBe("Cee");
     }
 
+    [Test]
+    public void Select_PricesHoldingsInQuoteCurrencyWithoutFx()
+    {
+        var broker = Guid.Parse("00000000-0000-0000-0000-000000000005");
+        var missing = Guid.Parse("10000000-0000-0000-0000-000000000011");
+        var flat = Guid.Parse("10000000-0000-0000-0000-000000000012");
+        var foreign = Guid.Parse("10000000-0000-0000-0000-000000000013");
+        var vti = Guid.Parse("10000000-0000-0000-0000-000000000014");
+
+        var selection = AdviserBalancesRows.Select(
+            [
+                Account(
+                    broker,
+                    "Broker",
+                    10m,
+                    holdings:
+                    [
+                        Holding(missing, "CASHFUND", 4m, 4m),
+                        Holding(flat, "FLAT", 2m, 2m, price: 0m, priceCurrency: "USD"),
+                        Holding(foreign, "EURX", 3m, 30m, price: 8m, priceCurrency: "EUR"),
+                        Holding(vti, "VTI", 12.5m, 100m, price: 20m, priceCurrency: "USD")
+                    ])
+            ],
+            includeClosedAccounts: false);
+
+        var holdings = selection.Lines.OfType<AdviserHoldingLine>().ToList();
+        holdings.Select(line => line.Symbol).ShouldBe(["CASHFUND", "FLAT", "EURX", "VTI"]);
+        holdings[0].MarketValue.ShouldBe(0m);
+        holdings[0].MarketCurrency.ShouldBe("USD");
+        holdings[1].MarketValue.ShouldBe(0m);
+        holdings[1].MarketCurrency.ShouldBe("USD");
+        holdings[2].MarketValue.ShouldBe(0m);
+        holdings[2].MarketCurrency.ShouldBe("USD");
+        holdings[3].MarketValue.ShouldBe(250m);
+        holdings[3].MarketCurrency.ShouldBe("USD");
+
+        var cash = selection.Lines.OfType<AdviserCashLine>().Single();
+        cash.Currency.ShouldBe("NZD");
+        cash.Balance.ShouldBe(10m);
+    }
+
     private static AdviserBalanceHolding Holding(
         Guid instrumentId,
         string symbol,
         decimal quantity,
-        decimal cost) =>
-        new(instrumentId, symbol, quantity, cost, "USD", PriceAmount: null, PriceCurrency: null, QuoteCurrency: "USD");
+        decimal cost,
+        decimal? price = null,
+        string? priceCurrency = null,
+        string quoteCurrency = "USD") =>
+        new(instrumentId, symbol, quantity, cost, "USD", price, priceCurrency, quoteCurrency);
 
     private static AdviserBalanceAccount Account(
         Guid accountId,
