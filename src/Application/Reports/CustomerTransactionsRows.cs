@@ -17,10 +17,10 @@ public static class CustomerTransactionsRows
         DateOnly to,
         bool includeClosedAccounts)
     {
-        _ = includeClosedAccounts;
         var fromUtc = new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
         var toUtc = new DateTimeOffset(to.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
         return transactions
+            .Where(row => includeClosedAccounts || !row.AccountClosed)
             .Where(row =>
             {
                 var booked = row.BookedAt.ToUniversalTime();
