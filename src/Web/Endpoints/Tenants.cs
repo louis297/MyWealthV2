@@ -2,11 +2,15 @@ using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Tenants;
 using MyWealthV2.Application.Tenants.Commands.CreateTenant;
+using MyWealthV2.Application.Tenants.Commands.GrantTenantReport;
+using MyWealthV2.Application.Tenants.Commands.RevokeTenantReport;
 using MyWealthV2.Application.Tenants.Commands.DisableTenant;
 using MyWealthV2.Application.Tenants.Commands.EnableTenant;
 using MyWealthV2.Application.Tenants.Commands.UpdateTenant;
 using MyWealthV2.Application.Tenants.Queries.GetTenantByCode;
 using MyWealthV2.Application.Tenants.Queries.GetTenantById;
+using MyWealthV2.Application.Reports;
+using MyWealthV2.Application.Tenants.Queries.GetTenantReports;
 using MyWealthV2.Application.Tenants.Queries.GetTenants;
 using Microsoft.AspNetCore.Http.HttpResults;
 
@@ -21,6 +25,9 @@ public class Tenants : IEndpointGroup
         groupBuilder.MapGet(GetTenants).RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapGet(GetTenantByCode, "by-code/{code}").RequireAuthorization(Policies.TenantsRead);
         groupBuilder.MapGet(GetTenant, "{id}").RequireAuthorization(Policies.TenantsManage);
+        groupBuilder.MapGet(GetTenantReports, "{id}/reports").RequireAuthorization(Policies.TenantsManage);
+        groupBuilder.MapPost(GrantTenantReport, "{id}/reports").RequireAuthorization(Policies.TenantsManage);
+        groupBuilder.MapDelete(RevokeTenantReport, "{id}/reports/{reportId}").RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapPost(CreateTenant).RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapPut(UpdateTenant, "{id}").RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapPost(DisableTenant, "{id}/disable").RequireAuthorization(Policies.TenantsManage);
@@ -46,6 +53,38 @@ public class Tenants : IEndpointGroup
     {
         var item = await sender.Send(new GetTenantByCodeQuery(code));
         return TypedResults.Ok(item);
+    }
+
+    [EndpointSummary("List reports granted to a tenant")]
+    [EndpointDescription("Returns catalog rows granted to the tenant, including inactive catalog rows. SystemAdmin only.")]
+    public static async Task<Ok<IReadOnlyList<TenantReportGrantDto>>> GetTenantReports(ISender sender, Guid id)
+    {
+        var result = await sender.Send(new GetTenantReportsQuery(id));
+        return TypedResults.Ok(result);
+    }
+
+    [EndpointSummary("Grant a report to a tenant")]
+    [EndpointDescription("Grants a catalog report to a tenant. Repeat grants return 204. Inactive catalog rows may be granted. SystemAdmin only.")]
+    public static async Task<IResult> GrantTenantReport(ISender sender, Guid id, GrantTenantReportCommand command)
+    {
+        command.TenantId = id;
+        var result = await sender.Send(command);
+        if (!result.Created)
+        {
+            return TypedResults.NoContent();
+        }
+
+        return TypedResults.Created(
+            $"/tenants/{id}/reports/{result.Id}",
+            new CreatedReportGrantDto(result.Id));
+    }
+
+    [EndpointSummary("Revoke a report from a tenant")]
+    [EndpointDescription("Removes a tenant's grant. Already absent is 204. Schedule and execution rows stay. SystemAdmin only.")]
+    public static async Task<NoContent> RevokeTenantReport(ISender sender, Guid id, Guid reportId)
+    {
+        await sender.Send(new RevokeTenantReportCommand(id, reportId));
+        return TypedResults.NoContent();
     }
 
     [EndpointSummary("Get a tenant")]

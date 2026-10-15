@@ -50,6 +50,14 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
+    public DbSet<Report> Reports => Set<Report>();
+
+    public DbSet<TenantReport> TenantReports => Set<TenantReport>();
+
+    public DbSet<ReportExecution> ReportExecutions => Set<ReportExecution>();
+
+    public DbSet<ReportSchedule> ReportSchedules => Set<ReportSchedule>();
+
     public DbSet<UserToken> UserTokenSeams => Set<UserToken>();
 
     public async Task ExecuteInTransactionAsync(

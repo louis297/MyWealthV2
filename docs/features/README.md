@@ -121,6 +121,6 @@ One domain. Background execution lives in the general-purpose `worker` (ADR 0017
 
 | Spec | Status | Who | Ships | Why it stays its own slice |
 | --- | --- | --- | --- | --- |
-| [reports](reports.md) | draft | TenantAdmin; Adviser (own book) | Adviser Funds Report (current cash + holding market value, per currency). Manual + editable recurring. `ReportSchedule` + `ReportExecution`. Hangfire on `worker`. | First async / scheduled domain. Reuses net-worth style calculation. |
+| [reports](reports.md) | accepted | Customer (`reports.customer.read` only); Adviser; TenantAdmin (all four report policies). SystemAdmin grants with `tenants.manage` and has none of the four | Catalog with scope (`Customer` \| `Book`). TenantReports. Shared pipeline. Customer Transactions + Adviser Balances. PDF via code layout. Manual + scheduled both. Policies `reports.customer.*` / `reports.book.*`. | Two scopes force the catalog and policy split. |
 
 Invitation / Activation and Fees are deferred.

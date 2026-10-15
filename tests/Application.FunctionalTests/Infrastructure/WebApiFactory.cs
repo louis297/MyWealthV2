@@ -5,9 +5,12 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.FunctionalTests.Reports;
 
 namespace MyWealthV2.Application.FunctionalTests.Infrastructure;
 
@@ -19,6 +22,7 @@ public class WebApiFactory(
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting($"ConnectionStrings:{MyWealthV2.Shared.Services.Database}", connectionString);
+        builder.UseSetting("Reports:StorageRoot", ReportStoragePaths.Root);
         builder.UseEnvironment("Development");
 
         if (!string.IsNullOrWhiteSpace(identityAuthority))
@@ -28,6 +32,10 @@ public class WebApiFactory(
 
         builder.ConfigureTestServices(services =>
         {
+            services.RemoveAll<IReportScheduler>();
+            services.AddSingleton<RecordingReportScheduler>();
+            services.AddSingleton<IReportScheduler>(sp => sp.GetRequiredService<RecordingReportScheduler>());
+
             if (identityBackchannel is not null && !string.IsNullOrWhiteSpace(identityAuthority))
             {
                 var authority = identityAuthority.TrimEnd('/');

@@ -47,6 +47,13 @@ public class ProblemDetailsExceptionHandler : IExceptionHandler
                 Title = "Conflict",
                 Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10"
             }),
+            ReportNotReadyException => (StatusCodes.Status409Conflict, new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Conflict",
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+                Detail = "The report is not ready."
+            }),
             IdempotencyConflictException => (StatusCodes.Status409Conflict, new ProblemDetails
             {
                 Status = StatusCodes.Status409Conflict,

@@ -18,16 +18,24 @@ public static class RolePermissions
             Policies.TenantsRead, Policies.AdvisersManage, Policies.CustomersManage, Policies.UsersMe,
             Policies.InstrumentsRead, Policies.InstrumentsCreate, Policies.InstrumentsManage,
             Policies.AccountsRead, Policies.AccountsCreate, Policies.AccountsManage,
-            Policies.TransactionsRead, Policies.TransactionsCreate
+            Policies.TransactionsRead, Policies.TransactionsCreate,
+            Policies.ReportsCustomerRead, Policies.ReportsCustomerCreate,
+            Policies.ReportsBookRead, Policies.ReportsBookCreate
         ],
         [UserRole.Adviser] =
         [
             Policies.TenantsRead, Policies.CustomersManageOwn, Policies.UsersMe,
             Policies.InstrumentsRead, Policies.InstrumentsCreate,
             Policies.AccountsRead, Policies.AccountsCreate, Policies.AccountsManage,
-            Policies.TransactionsRead, Policies.TransactionsCreate
+            Policies.TransactionsRead, Policies.TransactionsCreate,
+            Policies.ReportsCustomerRead, Policies.ReportsCustomerCreate,
+            Policies.ReportsBookRead, Policies.ReportsBookCreate
         ],
-        [UserRole.Customer] = [Policies.UsersMe]
+        [UserRole.Customer] =
+        [
+            Policies.UsersMe,
+            Policies.ReportsCustomerRead
+        ]
     };
 
     public static bool Has(UserRole role, string policy) =>
