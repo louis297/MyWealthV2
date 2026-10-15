@@ -85,6 +85,7 @@ public static class DependencyInjection
             builder.Configuration.GetSection(ReportStorageOptions.SectionName));
         builder.Services.AddSingleton<IReportFileStore, ReportFileStore>();
         builder.Services.AddScoped<IReportGenerator, CustomerTransactionsReportGenerator>();
+        builder.Services.AddScoped<IReportGenerator, AdviserBalancesReportGenerator>();
         builder.Services.AddScoped<IReportGeneratorRegistry, ReportGeneratorRegistry>();
         builder.Services.AddScoped<ReportJob>();
         builder.Services.AddSingleton<IReportScheduler, HangfireReportScheduler>();
