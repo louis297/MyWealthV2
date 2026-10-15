@@ -53,6 +53,19 @@ public class HangfireReportSchedulerTests
         RecurringIds(host).Count.ShouldBe(1);
     }
 
+    [Test]
+    public void RemoveRecurring_RemovesTheScheduleJob()
+    {
+        using var host = BuildHost();
+        var scheduler = host.Services.GetRequiredService<IReportScheduler>();
+        var scheduleId = Guid.Parse("5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22");
+
+        scheduler.AddOrUpdateRecurring(scheduleId, "0 9 1 * *");
+        scheduler.RemoveRecurring(scheduleId);
+
+        RecurringIds(host).ShouldBeEmpty();
+    }
+
     private static HashSet<string> RecurringIds(IHost host)
     {
         using var connection = host.Services.GetRequiredService<JobStorage>().GetConnection();
