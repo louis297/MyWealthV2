@@ -1,6 +1,7 @@
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Reports;
 using MyWealthV2.Application.Reports.Commands.CreateReportSchedule;
+using MyWealthV2.Application.Reports.Commands.DisableReportSchedule;
 using MyWealthV2.Application.Reports.Commands.RequestReport;
 using MyWealthV2.Application.Reports.Commands.UpdateReportSchedule;
 using MyWealthV2.Application.Reports.Queries.DownloadReportResult;
@@ -39,6 +40,7 @@ public class Reports : IEndpointGroup
         groupBuilder.MapGet(GetSchedules, "schedules").RequireAuthorization(ReadReports);
         groupBuilder.MapPost(CreateSchedule, "schedules").RequireAuthorization(CreateReports);
         groupBuilder.MapPut(UpdateSchedule, "schedules/{id}").RequireAuthorization(CreateReports);
+        groupBuilder.MapPost(DisableSchedule, "schedules/{id}/disable").RequireAuthorization(CreateReports);
         groupBuilder.MapPost(RequestReport, "request").RequireAuthorization(CreateReports);
         groupBuilder.MapGet(DownloadReport, "executions/{id}/download").RequireAuthorization(ReadReports);
     }
@@ -80,6 +82,14 @@ public class Reports : IEndpointGroup
     {
         command.Id = id;
         await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Disable a report schedule")]
+    [EndpointDescription("Marks a schedule inactive and removes its Hangfire job. The row stays.")]
+    public static async Task<NoContent> DisableSchedule(ISender sender, Guid id)
+    {
+        await sender.Send(new DisableReportScheduleCommand(id));
         return TypedResults.NoContent();
     }
 
