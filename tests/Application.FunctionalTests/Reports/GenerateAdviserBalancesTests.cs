@@ -123,6 +123,49 @@ public class GenerateAdviserBalancesTests : TestBase
         subtotals.ShouldBeGreaterThan(everydayAt);
     }
 
+    [Test]
+    public async Task Execute_IncludeClosedAccounts_KeepsTheClosedCashLine()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm Book Closed", "firm-book-closed");
+        await TestApp.CreatePersonAsync(
+            UserRole.TenantAdmin, "Tess", "tess@firm-book-closed", "Password1!", tenant.Id);
+        var adviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Ann", "ann@firm-book-closed", "Password1!", tenant.Id);
+        var customer = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Cee", "cee@firm-book-closed", "Password1!", tenant.Id, adviser.Id);
+        await GrantAsync(tenant.PublicId);
+        var admin = await FunctionalTestSetup.Oidc.SignInAsync(
+            "tess@firm-book-closed", "Password1!", "firm-book-closed");
+        var closed = await OpenAccountAsync(admin.AccessToken, customer.PublicId, "Old book", "Bank", "NZD");
+        (await PostCashAsync(admin.AccessToken, closed, 8m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        await MarkClosedAsync(closed);
+
+        var created = await TenantHttp.Send(
+            HttpMethod.Post,
+            "/reports/request",
+            admin.AccessToken,
+            new
+            {
+                reportId = AdviserBalancesId,
+                parameters = new { adviserId = adviser.PublicId, includeClosedAccounts = true }
+            });
+        created.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        using var json = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+        var executionId = json.RootElement.GetProperty("id").GetGuid();
+
+        await using var scope = FunctionalTestSetup.WebApiServices.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<ReportJob>().Execute(executionId);
+
+        var row = await ReadExecutionAsync(executionId);
+        row.Status.ShouldBe("Succeeded");
+        var path = Path.Combine(ReportStoragePaths.Root, tenant.PublicId.ToString("D"), $"{executionId:D}.pdf");
+        var text = ReadPdf(await File.ReadAllBytesAsync(path));
+        text.ShouldContain("Include closed accounts: yes");
+        text.ShouldContain("Old book");
+        text.ShouldContain("8.00 NZD");
+        text.ShouldContain("NZD cash 8.00 NZD market value 0.00 NZD");
+    }
+
     private static string ReadPdf(byte[] pdf)
     {
         using var document = PdfDocument.Open(pdf);
