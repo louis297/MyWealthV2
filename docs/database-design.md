@@ -431,14 +431,14 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 
 ## 14. Phase 3 tables — Reports (accepted)
 
-Script `0019_reports.sql`. Columns and rules: [features/reports.md](features/reports.md) §6. Not landed.
+Script `0019_reports.sql`. Field rules: [features/reports.md](features/reports.md) §6.
 
 | Table | Notes |
 | --- | --- |
-| `Reports` | Platform catalog. No TenantId. PublicId unique, Code unique, Name, Function, Scope nvarchar, AllowedTriggers nvarchar, IsActive. Seed the two first-phase reports by Code. |
-| `TenantReports` | TenantId + ReportId unique. Presence = configured for that tenant. No auto-grant. |
-| `ReportSchedules` | ReportId, TenantId, ParametersJson (max 8 KB), IsActive, Cron. RowVersion + audit. |
-| `ReportExecutions` | ReportId, ScheduleId nullable, TenantId, TriggerKind, Status, ParametersJson, AsOf nullable, TriggeredByUserId, ResultStorageKey, ErrorMessage. RowVersion + audit. |
+| `Reports` | Platform catalog. No TenantId and no audit. `PublicId` unique, `Code` nvarchar(64) unique, `Name` nvarchar(200), `Function` nvarchar(500), `Scope` nvarchar(20) check `Customer` \| `Book`, `AllowedTriggers` nvarchar(200) JSON array, `IsActive` bit default 1. Seed `customer-transactions` (`8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11`) and `adviser-balances` (`5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22`), both `["manual","scheduled"]`. |
+| `TenantReports` | `TenantId` + `ReportId` unique. Presence = configured for that tenant. No auto-grant. No audit. |
+| `ReportSchedules` | `PublicId` unique, `ReportId`, `TenantId`, `ParametersJson` nvarchar(max), `IsActive`, `Cron` nvarchar(100). Index `(TenantId, ReportId)`. RowVersion + audit. |
+| `ReportExecutions` | `PublicId` unique, `ReportId`, `ScheduleId` nullable, `TenantId`, `TriggerKind` nvarchar(20) check `Manual` \| `Scheduled` \| `Event`, `Status` nvarchar(20) check `Queued` \| `Running` \| `Succeeded` \| `Failed`, `ParametersJson` nvarchar(max), `AsOf` nullable, `TriggeredByUserId` nullable, `ResultStorageKey` nvarchar(500) nullable, `ErrorMessage` nvarchar(2000) nullable. Index `(TenantId, ReportId)`. RowVersion + audit. FKs do not cascade. |
 
 `ResultStorageKey` is the relative file key `{tenantPublicId}/{executionPublicId}.pdf`. PDF bytes live on the Aspire-mounted volume shared by `worker` and `webapi`, not in SQL.
 
@@ -449,3 +449,4 @@ Hangfire tables are created by Hangfire in schema `Hangfire` (documented excepti
 | Date | Change |
 | --- | --- |
 | 2026-10-14 | Reports tables accepted (`0019_reports.sql`). |
+| 2026-10-15 | `0019_reports.sql` landed. AllowedTriggers is a JSON array. No grant rows in the script. |

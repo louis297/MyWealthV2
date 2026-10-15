@@ -166,7 +166,8 @@ Seed the two first-phase reports (by Code) and (in Development) example TenantRe
 These are ordinary `nvarchar` columns on `Reports`, not extra tables and not integer enums. Strings keep later value changes free of a schema rewrite.
 
 - `Scope`: `"Customer"` or `"Book"`. Selects which policy pair applies (`reports.customer.*` vs `reports.book.*`) and which parameter set the generator expects.
-- `AllowedTriggers`: which of manual / scheduled / event this report accepts. Stored as a string (comma-separated or a small JSON array — lock the exact format at implementation). The pipeline rejects a trigger the report does not allow.
+- `AllowedTriggers`: which of manual / scheduled / event this report accepts. Stored as a JSON array, for example `["manual","scheduled"]`. The pipeline rejects a trigger the report does not allow.
+- Seeded codes: `customer-transactions` (PublicId `8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11`, scope `Customer`) and `adviser-balances` (PublicId `5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22`, scope `Book`). Both allow `manual` and `scheduled` only.
 
 No separate lookup table in this phase.
 

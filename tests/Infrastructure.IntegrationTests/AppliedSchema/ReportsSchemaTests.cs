@@ -196,8 +196,8 @@ public class ReportsSchemaTests
             ("FK_ReportSchedules_Tenants_TenantId", "Tenants", "Id", (byte)0)
         ]);
         (await ForeignKeys("ReportExecutions")).ShouldBe([
-            ("FK_ReportExecutions_ReportSchedules_ScheduleId", "ReportSchedules", "Id", (byte)0),
             ("FK_ReportExecutions_Reports_ReportId", "Reports", "Id", (byte)0),
+            ("FK_ReportExecutions_ReportSchedules_ScheduleId", "ReportSchedules", "Id", (byte)0),
             ("FK_ReportExecutions_Tenants_TenantId", "Tenants", "Id", (byte)0),
             ("FK_ReportExecutions_Users_TriggeredByUserId", "Users", "Id", (byte)0)
         ]);
