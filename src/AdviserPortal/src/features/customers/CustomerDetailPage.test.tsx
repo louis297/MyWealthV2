@@ -1,8 +1,8 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CustomerDetailPage } from "@/features/customers/CustomerDetailPage";
 import { sessionSlice, setCurrentUser, type CurrentUser } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
@@ -144,16 +144,20 @@ function renderDetail(
     { initialEntries: [`/customers/${customerId}`] },
   );
 
-  render(
+  const view = render(
     <Provider store={store}>
       <RouterProvider router={router} />
     </Provider>,
   );
 
-  return { fetchMock, router };
+  return { fetchMock, router, unmount: view.unmount };
 }
 
 describe("CustomerDetailPage", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     startLogin.mockReset();
     sessionStorage.clear();
@@ -891,5 +895,93 @@ describe("CustomerDetailPage", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "History" }));
     expect(await screen.findByText("No runs yet.")).toBeInTheDocument();
+  });
+
+  it("polls a queued customer report until it succeeds", async () => {
+    const executionId = "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1";
+    let polls = 0;
+    const { fetchMock } = await openGenerate((url, method) => {
+      if (url.includes("/reports/request") && method === "POST") {
+        return json({ id: executionId }, 202);
+      }
+      if (url.endsWith(`/reports/executions/${executionId}`) && method === "GET") {
+        polls += 1;
+        return json({
+          ...succeededExecution,
+          id: executionId,
+          status: polls < 3 ? "Queued" : "Succeeded",
+          asOf: undefined,
+        });
+      }
+      if (url.includes("/reports/executions") && method === "GET") {
+        return historyPage([
+          {
+            ...queuedExecution,
+            id: executionId,
+            triggerKind: "Manual",
+          },
+        ]);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    vi.useFakeTimers();
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-03-31" } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(screen.getByText("Report queued")).toBeInTheDocument();
+    expect(screen.getByText("Queued")).toBeInTheDocument();
+    expect(polls).toBe(0);
+
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(polls).toBe(1);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(polls).toBe(2);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(polls).toBe(3);
+    expect(screen.getByRole("button", { name: "Download" })).toBeInTheDocument();
+
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(polls).toBe(3);
+    const byId = fetchMock.mock.calls.filter(([input]) => {
+      const url = input instanceof Request ? input.url : String(input);
+      return url.includes(`/reports/executions/${executionId}`);
+    });
+    expect(byId).toHaveLength(3);
+  });
+
+  it("stops polling a report when the customer page unmounts", async () => {
+    const executionId = "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1";
+    let polls = 0;
+    const { unmount } = await openGenerate((url, method) => {
+      if (url.includes("/reports/request") && method === "POST") {
+        return json({ id: executionId }, 202);
+      }
+      if (url.endsWith(`/reports/executions/${executionId}`) && method === "GET") {
+        polls += 1;
+        return json({ ...queuedExecution, id: executionId });
+      }
+      if (url.includes("/reports/executions") && method === "GET") {
+        return historyPage([{ ...queuedExecution, id: executionId, triggerKind: "Manual" }]);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    vi.useFakeTimers();
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-03-31" } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByText("Report queued")).toBeInTheDocument();
+
+    unmount();
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(polls).toBe(0);
   });
 });
