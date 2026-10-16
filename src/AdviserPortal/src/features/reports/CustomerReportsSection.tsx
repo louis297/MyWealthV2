@@ -1,6 +1,7 @@
 import { useAppSelector } from "@/app/hooks";
 import { CustomerTransactionsGenerate } from "@/features/reports/CustomerTransactionsGenerate";
 import { ReportCatalog } from "@/features/reports/ReportCatalog";
+import { ReportHistory } from "@/features/reports/ReportHistory";
 import { ReportSchedules } from "@/features/reports/ReportSchedules";
 
 export function CustomerReportsSection({ customerId }: { customerId: string }) {
@@ -17,6 +18,7 @@ export function CustomerReportsSection({ customerId }: { customerId: string }) {
           <>
             <CustomerTransactionsGenerate reportId={item.id} customerId={customerId} />
             <ReportSchedules report={item} scope="Customer" customerId={customerId} role={role} />
+            <ReportHistory reportId={item.id} scope="Customer" customerId={customerId} />
           </>
         ) : null
       }

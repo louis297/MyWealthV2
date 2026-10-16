@@ -1,6 +1,7 @@
 import { useAppSelector } from "@/app/hooks";
 import { AdviserBalancesGenerate } from "@/features/reports/AdviserBalancesGenerate";
 import { ReportCatalog } from "@/features/reports/ReportCatalog";
+import { ReportHistory } from "@/features/reports/ReportHistory";
 import { ReportSchedules } from "@/features/reports/ReportSchedules";
 import { roles } from "@/features/session/roles";
 
@@ -18,6 +19,7 @@ export function ReportsPage() {
           <>
             <AdviserBalancesGenerate reportId={item.id} role={role} />
             <ReportSchedules report={item} scope="Book" role={role} />
+            <ReportHistory reportId={item.id} scope="Book" />
           </>
         ) : null
       }

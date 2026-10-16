@@ -1,4 +1,5 @@
 import { api } from "@/shared/api/api";
+import type { PagedList } from "@/shared/types/page";
 
 export type ReportScope = "Customer" | "Book";
 
@@ -11,6 +12,16 @@ export type ReportSchedule = {
   cron: string;
   isActive: boolean;
   rowVersion: string;
+};
+
+export type ReportExecution = {
+  id: string;
+  reportId: string;
+  status: string;
+  triggerKind: string;
+  created: string;
+  parameters: ReportParameters;
+  asOf?: string | null;
 };
 
 export type ReportCatalogItem = {
@@ -34,6 +45,16 @@ export const reportsApi = api.injectEndpoints({
         method: "POST",
         body,
       }),
+    }),
+    getReportExecutions: builder.query<PagedList<ReportExecution>, { scope: ReportScope; page: number }>({
+      query: ({ scope, page }) => {
+        const params = new URLSearchParams();
+        params.set("scope", scope);
+        params.set("page", String(page));
+        params.set("pageSize", "20");
+        return `/reports/executions?${params.toString()}`;
+      },
+      providesTags: ["Report"],
     }),
     getReportSchedules: builder.query<ReportSchedule[], { scope: ReportScope }>({
       query: ({ scope }) => `/reports/schedules?scope=${encodeURIComponent(scope)}`,
@@ -81,6 +102,7 @@ export const reportsApi = api.injectEndpoints({
 export const {
   useGetReportsQuery,
   useRequestReportMutation,
+  useGetReportExecutionsQuery,
   useGetReportSchedulesQuery,
   useCreateReportScheduleMutation,
   useUpdateReportScheduleMutation,
