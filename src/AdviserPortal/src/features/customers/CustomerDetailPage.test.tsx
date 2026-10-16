@@ -87,9 +87,31 @@ function user(overrides: Partial<CurrentUser> = {}): CurrentUser {
   };
 }
 
+const customerTransactions = {
+  id: "8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11",
+  code: "customer-transactions",
+  name: "Customer Transactions",
+  function: "Lists cash and security activity for one customer.",
+  scope: "Customer",
+  allowedTriggers: ["manual", "scheduled"],
+};
+
+const adviserBalances = {
+  id: "5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22",
+  code: "adviser-balances",
+  name: "Adviser Balances",
+  function: "Cash and holdings for an adviser's book.",
+  scope: "Book",
+  allowedTriggers: ["manual", "scheduled"],
+};
+
 function renderDetail(
   me: CurrentUser,
-  fetchImpl: (url: string, method: string, body: string | undefined) => Response,
+  fetchImpl: (
+    url: string,
+    method: string,
+    body: string | undefined,
+  ) => Response | Promise<Response>,
 ) {
   const store = configureStore({
     reducer: {
@@ -328,5 +350,99 @@ describe("CustomerDetailPage", () => {
       expect(gets).toBeGreaterThan(1);
     });
     expect(posted).toEqual([JSON.stringify({ rowVersion: "AAAA" })]);
+  });
+
+  it("lists customer-scoped reports and does not request book scope", async () => {
+    const { fetchMock } = renderDetail(user(), (url, method) => {
+      if (url.includes("/api/reports") && method === "GET") {
+        const scope = new URL(url).searchParams.get("scope");
+        return json(scope === "Customer" ? [customerTransactions] : [adviserBalances]);
+      }
+      if (url.includes("/api/accounts") && method === "GET") {
+        return json({ items: [account], page: 1, pageSize: 20, totalCount: 1 });
+      }
+      if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
+        return json(customer);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByRole("heading", { name: "Reports" })).toBeInTheDocument();
+    expect(screen.getByText("These run for this customer.")).toBeInTheDocument();
+    expect(screen.getByText("Customer Transactions")).toBeInTheDocument();
+    expect(screen.getByText(customerTransactions.function)).toBeInTheDocument();
+    expect(screen.queryByText("Adviser Balances")).not.toBeInTheDocument();
+
+    const request = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.url.includes("/api/reports"));
+    expect(request).toBeDefined();
+    const url = new URL(request!.url);
+    expect(url.pathname).toBe("/api/reports");
+    expect(url.searchParams.get("scope")).toBe("Customer");
+    expect(request!.headers.get("Authorization")).toBeNull();
+    expect(request!.credentials).toBe("include");
+    const scopes = fetchMock.mock.calls.map(([input]) => {
+      const raw = input instanceof Request ? input.url : String(input);
+      return new URL(raw, "http://localhost:3000").searchParams.get("scope");
+    });
+    expect(scopes).not.toContain("Book");
+  });
+
+  it("shows an empty customer report list", async () => {
+    renderDetail(user(), (url, method) => {
+      if (url.includes("/api/reports") && method === "GET") {
+        return json([]);
+      }
+      if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
+        return json(customer);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByText("No reports available for this customer.")).toBeInTheDocument();
+    expect(screen.queryByText("No reports available.")).not.toBeInTheDocument();
+  });
+
+  it("shows a loading line while the customer report list is in flight", async () => {
+    let release: (response: Response) => void = () => {};
+    const pending = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    renderDetail(user(), (url, method) => {
+      if (url.includes("/api/reports") && method === "GET") {
+        return pending;
+      }
+      if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
+        return json(customer);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByText("Loading reports…")).toBeInTheDocument();
+    release(json([]));
+    expect(await screen.findByText("No reports available for this customer.")).toBeInTheDocument();
+  });
+
+  it("retries a failed customer report list", async () => {
+    let reportGets = 0;
+    renderDetail(user(), (url, method) => {
+      if (url.includes("/api/reports") && method === "GET") {
+        reportGets += 1;
+        if (reportGets === 1) {
+          return new Response("", { status: 500 });
+        }
+        return json([customerTransactions]);
+      }
+      if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
+        return json(customer);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByText("Reports could not be loaded.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("Customer Transactions")).toBeInTheDocument();
+    expect(reportGets).toBeGreaterThan(1);
   });
 });
