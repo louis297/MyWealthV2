@@ -17,6 +17,22 @@ function clock(minute: string, hour: string): string {
   return `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
 }
 
+export function fromCron(cron: string): { preset: CronPreset; time: string } | null {
+  const daily = /^(\d+) (\d+) \* \* \*$/.exec(cron);
+  if (daily) {
+    return { preset: "daily", time: clock(daily[1], daily[2]) };
+  }
+  const weekly = /^(\d+) (\d+) \* \* 1$/.exec(cron);
+  if (weekly) {
+    return { preset: "weekly", time: clock(weekly[1], weekly[2]) };
+  }
+  const monthly = /^(\d+) (\d+) 1 \* \*$/.exec(cron);
+  if (monthly) {
+    return { preset: "monthly", time: clock(monthly[1], monthly[2]) };
+  }
+  return null;
+}
+
 export function humaniseCron(cron: string): string {
   const daily = /^(\d+) (\d+) \* \* \*$/.exec(cron);
   if (daily) {

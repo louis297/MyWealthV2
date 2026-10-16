@@ -1,14 +1,21 @@
 import { type FormEvent, useState } from "react";
 import { useGetAdvisersQuery } from "@/features/advisers/advisersApi";
-import { humaniseCron, toCron, type CronPreset } from "@/features/reports/cron";
+import { fromCron, humaniseCron, toCron, type CronPreset } from "@/features/reports/cron";
 import {
   useCreateReportScheduleMutation,
+  useDisableReportScheduleMutation,
   useGetReportSchedulesQuery,
+  useUpdateReportScheduleMutation,
   type ReportCatalogItem,
   type ReportParameters,
+  type ReportSchedule,
   type ReportScope,
 } from "@/features/reports/reportsApi";
 import { roles } from "@/features/session/roles";
+
+function isStatus(error: unknown, status: number) {
+  return typeof error === "object" && error !== null && "status" in error && error.status === status;
+}
 
 export function ReportSchedules({
   report,
@@ -37,9 +44,13 @@ export function ReportSchedules({
   const [isActive, setIsActive] = useState(true);
   const [messages, setMessages] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
-  const [createSchedule, { isLoading }] = useCreateReportScheduleMutation();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [createSchedule, { isLoading: isCreating }] = useCreateReportScheduleMutation();
+  const [updateSchedule, { isLoading: isUpdating }] = useUpdateReportScheduleMutation();
+  const [disableSchedule] = useDisableReportScheduleMutation();
+  const isLoading = isCreating || isUpdating;
   const customerReport = report.code === "customer-transactions";
-  const blocked = needsAdviser && adviserId === "";
+  const blocked = needsAdviser && adviserId === "" && editingId === null;
   const rows = (schedules.data ?? []).filter((item) => {
     if (item.reportId !== report.id) {
       return false;
@@ -49,10 +60,31 @@ export function ReportSchedules({
     }
     return true;
   });
+  const editing = rows.find((item) => item.id === editingId) ?? null;
+
+  function beginEdit(item: ReportSchedule) {
+    setEditingId(item.id);
+    setFrom(typeof item.parameters.from === "string" ? item.parameters.from : "");
+    setTo(typeof item.parameters.to === "string" ? item.parameters.to : "");
+    setIncludeClosedAccounts(item.parameters.includeClosedAccounts === true);
+    setAdviserId(typeof item.parameters.adviserId === "string" ? item.parameters.adviserId : "");
+    setIsActive(item.isActive);
+    const parsed = fromCron(item.cron);
+    if (parsed) {
+      setPreset(parsed.preset);
+      setTime(parsed.time);
+    }
+    setMessages([]);
+    setSaved(false);
+  }
+
+  async function onDisable(id: string) {
+    await disableSchedule(id).unwrap();
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (blocked) {
+    if (needsAdviser && adviserId === "") {
       return;
     }
     if (customerReport && to < from) {
@@ -65,18 +97,35 @@ export function ReportSchedules({
       : needsAdviser
         ? { adviserId, includeClosedAccounts }
         : { includeClosedAccounts };
+    const cron = toCron(preset, time);
 
     try {
-      await createSchedule({
-        reportId: report.id,
-        parameters,
-        cron: toCron(preset, time),
-        isActive,
-      }).unwrap();
+      if (editing) {
+        await updateSchedule({
+          id: editing.id,
+          reportId: report.id,
+          parameters,
+          cron,
+          isActive,
+          rowVersion: editing.rowVersion,
+        }).unwrap();
+      } else {
+        await createSchedule({
+          reportId: report.id,
+          parameters,
+          cron,
+          isActive,
+        }).unwrap();
+      }
       setMessages([]);
       setSaved(true);
+      setEditingId(null);
     } catch (error: unknown) {
       setSaved(false);
+      if (isStatus(error, 409)) {
+        setMessages(["This row changed. Reload and try again."]);
+        return;
+      }
       setMessages(error instanceof Error ? [error.message] : ["Schedules could not be loaded."]);
     }
   }
@@ -103,7 +152,18 @@ export function ReportSchedules({
               <span>{humaniseCron(item.cron)}</span>
               {typeof item.parameters.from === "string" ? <span>{item.parameters.from}</span> : null}
               {typeof item.parameters.to === "string" ? <span>{item.parameters.to}</span> : null}
-              {item.isActive ? null : <span>Inactive</span>}
+              {item.isActive ? (
+                <>
+                  <button type="button" onClick={() => beginEdit(item)}>
+                    Edit
+                  </button>
+                  <button type="button" onClick={() => void onDisable(item.id)}>
+                    Disable schedule
+                  </button>
+                </>
+              ) : (
+                <span>Inactive</span>
+              )}
             </p>
           ))}
           <form className="space-y-2" onSubmit={(event) => void onSubmit(event)}>
@@ -208,7 +268,7 @@ export function ReportSchedules({
               className="border border-slate-300 bg-white px-3 py-1 text-sm"
               disabled={isLoading || blocked}
             >
-              Create schedule
+              {editing ? "Save schedule" : "Create schedule"}
             </button>
           </form>
         </div>

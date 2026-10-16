@@ -50,6 +50,31 @@ export const reportsApi = api.injectEndpoints({
       }),
       invalidatesTags: ["Report"],
     }),
+    updateReportSchedule: builder.mutation<
+      void,
+      {
+        id: string;
+        reportId: string;
+        parameters: ReportParameters;
+        cron: string;
+        isActive: boolean;
+        rowVersion: string;
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/reports/schedules/${id}`,
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: ["Report"],
+    }),
+    disableReportSchedule: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `/reports/schedules/${id}/disable`,
+        method: "POST",
+      }),
+      invalidatesTags: ["Report"],
+    }),
   }),
 });
 
@@ -58,4 +83,6 @@ export const {
   useRequestReportMutation,
   useGetReportSchedulesQuery,
   useCreateReportScheduleMutation,
+  useUpdateReportScheduleMutation,
+  useDisableReportScheduleMutation,
 } = reportsApi;
