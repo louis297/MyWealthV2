@@ -9,6 +9,7 @@ import {
   canAccessCustomers,
   canAccessDashboard,
   canAccessProfile,
+  canAccessReports,
   roles,
 } from "@/features/session/roles";
 
@@ -35,6 +36,11 @@ export function ShellLayout({ children }: { children?: ReactNode }) {
             {canAccessDashboard(me?.role) ? (
               <li>
                 <NavLink to="/dashboard">Dashboard</NavLink>
+              </li>
+            ) : null}
+            {canAccessReports(me?.role) ? (
+              <li>
+                <NavLink to="/reports">Reports</NavLink>
               </li>
             ) : null}
             {canAccessAccounts(me?.role) ? (

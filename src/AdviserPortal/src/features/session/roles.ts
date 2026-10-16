@@ -26,6 +26,10 @@ export function canAccessDashboard(role: string | null | undefined) {
   return role === roles.tenantAdmin || role === roles.adviser;
 }
 
+export function canAccessReports(role: string | null | undefined) {
+  return role === roles.tenantAdmin || role === roles.adviser;
+}
+
 export function canAccessAccounts(role: string | null | undefined) {
   return role === roles.tenantAdmin || role === roles.adviser;
 }

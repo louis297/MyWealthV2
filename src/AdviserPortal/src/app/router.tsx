@@ -11,6 +11,7 @@ import { CustomerDetailPage } from "@/features/customers/CustomerDetailPage";
 import { CustomersListPage } from "@/features/customers/CustomersListPage";
 import { EditCustomerPage } from "@/features/customers/EditCustomerPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
+import { ReportsPage } from "@/features/reports/ReportsPage";
 import { CreateTransactionPage } from "@/features/transactions/CreateTransactionPage";
 import { TransactionDetailPage } from "@/features/transactions/TransactionDetailPage";
 import { TransactionsListPage } from "@/features/transactions/TransactionsListPage";
@@ -35,6 +36,11 @@ export const appRoutes: RouteObject[] = [
             path: "/dashboard",
             element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
             children: [{ index: true, element: <DashboardPage /> }],
+          },
+          {
+            path: "/reports",
+            element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
+            children: [{ index: true, element: <ReportsPage /> }],
           },
           { path: "/session", element: <SessionProbePage /> },
           { path: "/forbidden", element: <ForbiddenPage /> },
