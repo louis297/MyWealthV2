@@ -122,7 +122,7 @@ export function CustomerDetailPage() {
           />
         </section>
       ) : null}
-      <CustomerReportsSection />
+      <CustomerReportsSection customerId={data.id} />
       <div className="flex gap-2 text-sm">
         <Link to={`/customers/${data.id}/edit`} className="border border-slate-300 bg-white px-3 py-1">
           Edit

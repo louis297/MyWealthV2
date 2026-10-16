@@ -17,7 +17,17 @@ export const reportsApi = api.injectEndpoints({
       query: ({ scope }) => `/reports?scope=${encodeURIComponent(scope)}`,
       providesTags: ["Report"],
     }),
+    requestReport: builder.mutation<
+      { id: string },
+      { reportId: string; parameters: Record<string, unknown> }
+    >({
+      query: (body) => ({
+        url: "/reports/request",
+        method: "POST",
+        body,
+      }),
+    }),
   }),
 });
 
-export const { useGetReportsQuery } = reportsApi;
+export const { useGetReportsQuery, useRequestReportMutation } = reportsApi;
