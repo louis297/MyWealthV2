@@ -1,0 +1,167 @@
+import { configureStore } from "@reduxjs/toolkit";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { Provider } from "react-redux";
+import { createMemoryRouter, RouterProvider } from "react-router";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ReportsPage } from "@/features/reports/ReportsPage";
+import { sessionSlice, setCurrentUser, type CurrentUser } from "@/features/session/sessionSlice";
+import { api } from "@/shared/api/api";
+
+const customerTransactions = {
+  id: "8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11",
+  code: "customer-transactions",
+  name: "Customer Transactions",
+  function: "Lists cash and security activity for one customer.",
+  scope: "Customer",
+  allowedTriggers: ["manual", "scheduled"],
+};
+
+const adviserBalances = {
+  id: "5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22",
+  code: "adviser-balances",
+  name: "Adviser Balances",
+  function: "Cash and holdings for an adviser's book.",
+  scope: "Book",
+  allowedTriggers: ["manual", "scheduled"],
+};
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function user(overrides: Partial<CurrentUser> = {}): CurrentUser {
+  return {
+    id: "11111111-1111-1111-1111-111111111111",
+    name: "Pat Admin",
+    email: "pat@north.example",
+    role: "tenantAdmin",
+    status: "active",
+    tenantId: "22222222-2222-2222-2222-222222222222",
+    tenantCode: "north-advisory",
+    adviserId: null,
+    rowVersion: "AAAA",
+    ...overrides,
+  };
+}
+
+function renderReports(
+  me: CurrentUser,
+  fetchImpl: (url: string, method: string) => Response | Promise<Response>,
+) {
+  const store = configureStore({
+    reducer: {
+      session: sessionSlice.reducer,
+      [api.reducerPath]: api.reducer,
+    },
+    middleware: (getDefault) => getDefault().concat(api.middleware),
+  });
+  store.dispatch(setCurrentUser(me));
+
+  const fetchMock = vi.mocked(fetch);
+  fetchMock.mockImplementation(async (input, init) => {
+    const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
+    const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+    return fetchImpl(url, method);
+  });
+
+  const router = createMemoryRouter([{ path: "/reports", element: <ReportsPage /> }], {
+    initialEntries: ["/reports"],
+  });
+
+  render(
+    <Provider store={store}>
+      <RouterProvider router={router} />
+    </Provider>,
+  );
+
+  return { fetchMock };
+}
+
+describe("ReportsPage", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  it("lists book-scoped reports and does not request customer scope", async () => {
+    const { fetchMock } = renderReports(user(), (url, method) => {
+      if (url.includes("/api/reports") && method === "GET") {
+        const scope = new URL(url).searchParams.get("scope");
+        return json(scope === "Book" ? [adviserBalances] : [customerTransactions]);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByRole("heading", { name: "Reports" })).toBeInTheDocument();
+    expect(screen.getByText("These run for an adviser's book.")).toBeInTheDocument();
+    expect(await screen.findByText("Adviser Balances")).toBeInTheDocument();
+    expect(screen.getByText(adviserBalances.function)).toBeInTheDocument();
+    expect(screen.queryByText("Customer Transactions")).not.toBeInTheDocument();
+
+    const request = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.url.includes("/api/reports"));
+    expect(request).toBeDefined();
+    const url = new URL(request!.url);
+    expect(url.pathname).toBe("/api/reports");
+    expect(url.searchParams.get("scope")).toBe("Book");
+    expect(request!.headers.get("Authorization")).toBeNull();
+    expect(request!.credentials).toBe("include");
+    const scopes = fetchMock.mock.calls.map(([input]) => {
+      const raw = input instanceof Request ? input.url : String(input);
+      return new URL(raw, "http://localhost:3000").searchParams.get("scope");
+    });
+    expect(scopes).not.toContain("Customer");
+  });
+
+  it("shows an empty book report list", async () => {
+    renderReports(user({ role: "adviser", name: "Sam Reed", adviserId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" }), (url) => {
+      if (url.includes("/api/reports")) {
+        return json([]);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByText("No reports available.")).toBeInTheDocument();
+    expect(screen.queryByText("No reports available for this customer.")).not.toBeInTheDocument();
+  });
+
+  it("shows a loading line while the book report list is in flight", async () => {
+    let release: (response: Response) => void = () => {};
+    const pending = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    renderReports(user(), (url) => {
+      if (url.includes("/api/reports")) {
+        return pending;
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByText("Loading reports…")).toBeInTheDocument();
+    release(json([]));
+    expect(await screen.findByText("No reports available.")).toBeInTheDocument();
+  });
+
+  it("retries a failed book report list", async () => {
+    let reportGets = 0;
+    renderReports(user(), (url) => {
+      if (url.includes("/api/reports")) {
+        reportGets += 1;
+        if (reportGets === 1) {
+          return new Response("", { status: 500 });
+        }
+        return json([adviserBalances]);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByText("Reports could not be loaded.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("Adviser Balances")).toBeInTheDocument();
+    expect(reportGets).toBeGreaterThan(1);
+  });
+});
