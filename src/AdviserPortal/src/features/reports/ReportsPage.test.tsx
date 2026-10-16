@@ -281,4 +281,98 @@ describe("ReportsPage", () => {
     expect(advisersUrl.searchParams.get("pageSize")).toBe("100");
     expect(advisersUrl.searchParams.has("tenantId")).toBe(false);
   });
+
+  it("creates an adviser balances schedule without an adviser id", async () => {
+    const { fetchMock } = renderReports(
+      user({
+        role: "adviser",
+        name: "Sam Reed",
+        adviserId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      }),
+      (url, method) => {
+        if (url.includes("/api/reports") && method === "GET" && !url.includes("/schedules")) {
+          return json([adviserBalances]);
+        }
+        if (url.includes("/reports/schedules") && method === "GET") {
+          return json([]);
+        }
+        if (url.includes("/reports/schedules") && method === "POST") {
+          return json({ id: "ssssssss-ssss-ssss-ssss-ssssssssssss" }, 201);
+        }
+        return new Response("", { status: 404 });
+      },
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Schedules" }));
+    expect(screen.queryByLabelText("Adviser")).not.toBeInTheDocument();
+    expect(document.querySelector('input[name="cron"]')).toBeNull();
+    fireEvent.change(screen.getByLabelText("Time"), { target: { value: "09:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create schedule" }));
+
+    expect(await screen.findByText("Schedule saved")).toBeInTheDocument();
+    const request = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.method === "POST");
+    const body = JSON.parse(await request!.clone().text()) as { parameters: Record<string, unknown> };
+    expect(body).toEqual({
+      reportId: adviserBalances.id,
+      parameters: { includeClosedAccounts: false },
+      cron: "0 9 * * *",
+      isActive: true,
+    });
+    expect(body.parameters).not.toHaveProperty("adviserId");
+    expect(body.parameters).not.toHaveProperty("asOf");
+    expect(body).not.toHaveProperty("tenantId");
+  });
+
+  it("requires a tenant admin to pick an adviser before creating a balances schedule", async () => {
+    const samId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const { fetchMock } = renderReports(user(), (url, method) => {
+      if (url.includes("/api/reports") && method === "GET" && !url.includes("/schedules")) {
+        return json([adviserBalances]);
+      }
+      if (url.includes("/users/advisers") && method === "GET") {
+        return json({
+          items: [
+            {
+              id: samId,
+              tenantId: "22222222-2222-2222-2222-222222222222",
+              name: "Sam Reed",
+              email: "sam@north.example",
+              status: "active",
+              rowVersion: "AAAA",
+              created: "2026-09-14T00:00:00+00:00",
+            },
+          ],
+          page: 1,
+          pageSize: 100,
+          totalCount: 1,
+        });
+      }
+      if (url.includes("/reports/schedules") && method === "GET") {
+        return json([]);
+      }
+      if (url.includes("/reports/schedules") && method === "POST") {
+        return json({ id: "ssssssss-ssss-ssss-ssss-ssssssssssss" }, 201);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Schedules" }));
+    expect(screen.getByRole("button", { name: "Create schedule" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Adviser"), { target: { value: samId } });
+    fireEvent.change(screen.getByLabelText("Time"), { target: { value: "09:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create schedule" }));
+
+    expect(await screen.findByText("Schedule saved")).toBeInTheDocument();
+    const request = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.method === "POST" && input.url.includes("/schedules"));
+    expect(JSON.parse(await request!.clone().text())).toEqual({
+      reportId: adviserBalances.id,
+      parameters: { adviserId: samId, includeClosedAccounts: false },
+      cron: "0 9 * * *",
+      isActive: true,
+    });
+  });
 });

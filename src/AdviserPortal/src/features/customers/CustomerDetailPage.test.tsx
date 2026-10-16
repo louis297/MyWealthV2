@@ -577,4 +577,103 @@ describe("CustomerDetailPage", () => {
     });
     expect(posted).toBe(false);
   });
+
+  it("creates a daily customer schedule from presets", async () => {
+    const { fetchMock } = renderDetail(user(), (url, method) => {
+      if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
+        return json(customer);
+      }
+      if (url.includes("/api/reports") && method === "GET" && !url.includes("/schedules")) {
+        return json([customerTransactions]);
+      }
+      if (url.includes("/reports/schedules") && method === "GET") {
+        return json([]);
+      }
+      if (url.includes("/reports/schedules") && method === "POST") {
+        return json({ id: "ssssssss-ssss-ssss-ssss-ssssssssssss" }, 201);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Schedules" }));
+    expect(await screen.findByText("No schedules.")).toBeInTheDocument();
+    expect(screen.getByText("Times are sent as chosen. The server interprets the schedule in UTC.")).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Daily" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Weekly" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Monthly" })).toBeInTheDocument();
+    expect(document.querySelector('input[name="cron"]')).toBeNull();
+    expect(document.querySelector("textarea")).toBeNull();
+
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-03-31" } });
+    fireEvent.change(screen.getByLabelText("Time"), { target: { value: "09:00" } });
+    expect(screen.getByLabelText("Active")).toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "Create schedule" }));
+
+    expect(await screen.findByText("Schedule saved")).toBeInTheDocument();
+    const request = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.method === "POST" && input.url.includes("/reports/schedules"));
+    expect(request).toBeDefined();
+    expect(new URL(request!.url).pathname).toBe("/api/reports/schedules");
+    expect(request!.headers.get("Authorization")).toBeNull();
+    expect(request!.headers.get("X-MyWealth-Request")).toBe("1");
+    expect(request!.credentials).toBe("include");
+    expect(JSON.parse(await request!.clone().text())).toEqual({
+      reportId: customerTransactions.id,
+      parameters: {
+        customerId,
+        from: "2026-01-01",
+        to: "2026-03-31",
+        includeClosedAccounts: false,
+      },
+      cron: "0 9 * * *",
+      isActive: true,
+    });
+  });
+
+  it("lists this customer's schedules and hides another customer's", async () => {
+    renderDetail(user(), (url, method) => {
+      if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
+        return json(customer);
+      }
+      if (url.includes("/api/reports") && method === "GET" && !url.includes("/schedules")) {
+        return json([customerTransactions]);
+      }
+      if (url.includes("/reports/schedules") && method === "GET") {
+        const scope = new URL(url).searchParams.get("scope");
+        if (scope !== "Customer") {
+          return json([]);
+        }
+        return json([
+          {
+            id: "ssssssss-ssss-ssss-ssss-ssssssssssss",
+            reportId: customerTransactions.id,
+            parameters: { customerId, from: "2026-01-01", to: "2026-03-31" },
+            cron: "0 9 * * *",
+            isActive: true,
+            rowVersion: "AAAA",
+          },
+          {
+            id: "tttttttt-tttt-tttt-tttt-tttttttttttt",
+            reportId: customerTransactions.id,
+            parameters: {
+              customerId: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+              from: "2026-04-01",
+              to: "2026-05-01",
+            },
+            cron: "0 9 * * 1",
+            isActive: true,
+            rowVersion: "BBBB",
+          },
+        ]);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Schedules" }));
+    expect(await screen.findByText("every day at 09:00")).toBeInTheDocument();
+    expect(screen.queryByText("every Monday at 09:00")).not.toBeInTheDocument();
+    expect(screen.queryByText("2026-04-01")).not.toBeInTheDocument();
+  });
 });
