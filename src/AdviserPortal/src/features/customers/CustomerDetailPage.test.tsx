@@ -445,4 +445,136 @@ describe("CustomerDetailPage", () => {
     expect(await screen.findByText("Customer Transactions")).toBeInTheDocument();
     expect(reportGets).toBeGreaterThan(1);
   });
+
+  async function openGenerate(fetchImpl: Parameters<typeof renderDetail>[1]) {
+    const rendered = renderDetail(user(), (url, method, body) => {
+      if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
+        return json(customer);
+      }
+      if (url.includes("/api/accounts") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.includes("/api/reports") && method === "GET") {
+        return json([customerTransactions]);
+      }
+      return fetchImpl(url, method, body);
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Generate now" }));
+    return rendered;
+  }
+
+  it("queues a customer transactions report for this customer", async () => {
+    let release: (response: Response) => void = () => {};
+    const pending = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    const { fetchMock } = await openGenerate((url, method) => {
+      if (url.includes("/reports/request") && method === "POST") {
+        return pending;
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-03-31" } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
+    expect(screen.getByRole("button", { name: "Generate now" })).toBeDisabled();
+
+    release(json({ id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" }, 202));
+
+    expect(await screen.findByText("Report queued")).toBeInTheDocument();
+    expect(screen.queryByLabelText("From")).not.toBeInTheDocument();
+
+    const request = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.url.includes("/reports/request"));
+    expect(request).toBeDefined();
+    expect(request!.method).toBe("POST");
+    expect(request!.headers.get("Authorization")).toBeNull();
+    expect(request!.headers.get("X-MyWealth-Request")).toBe("1");
+    expect(request!.credentials).toBe("include");
+    expect(JSON.parse(await request!.clone().text())).toEqual({
+      reportId: customerTransactions.id,
+      parameters: {
+        customerId,
+        from: "2026-01-01",
+        to: "2026-03-31",
+        includeClosedAccounts: false,
+      },
+    });
+  });
+
+  it("sends includeClosedAccounts when the box is checked", async () => {
+    const { fetchMock } = await openGenerate((url, method) => {
+      if (url.includes("/reports/request") && method === "POST") {
+        return json({ id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" }, 202);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-03-31" } });
+    fireEvent.click(screen.getByLabelText("Include closed accounts"));
+    fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
+
+    expect(await screen.findByText("Report queued")).toBeInTheDocument();
+    const request = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.url.includes("/reports/request"));
+    const body = JSON.parse(await request!.clone().text()) as {
+      parameters: { includeClosedAccounts: boolean };
+    };
+    expect(body.parameters.includeClosedAccounts).toBe(true);
+    expect(body).not.toHaveProperty("tenantId");
+    expect(body.parameters).not.toHaveProperty("asOf");
+  });
+
+  it("shows a parameter error and does not queue the report", async () => {
+    await openGenerate((url, method) => {
+      if (url.includes("/reports/request") && method === "POST") {
+        return json({ errors: { From: ["From is required."] } }, 400);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-03-31" } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
+
+    expect(await screen.findByText("From is required.")).toBeInTheDocument();
+    expect(screen.queryByText("Report queued")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("From")).toBeInTheDocument();
+  });
+
+  it("shows that a missing report is not available", async () => {
+    await openGenerate((url, method) => {
+      if (url.includes("/reports/request") && method === "POST") {
+        return new Response("", { status: 404 });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-03-31" } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
+
+    expect(await screen.findByText("Report is not available.")).toBeInTheDocument();
+    expect(screen.queryByText("Report queued")).not.toBeInTheDocument();
+  });
+
+  it("does not submit a customer report when to is before from", async () => {
+    const { fetchMock } = await openGenerate(() => new Response("", { status: 404 }));
+
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-03-31" } });
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-01-01" } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
+
+    expect(await screen.findByText("To must be on or after from.")).toBeInTheDocument();
+    const posted = fetchMock.mock.calls.some(([input, init]) => {
+      const url = input instanceof Request ? input.url : String(input);
+      const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+      return url.includes("/reports/request") && method === "POST";
+    });
+    expect(posted).toBe(false);
+  });
 });
