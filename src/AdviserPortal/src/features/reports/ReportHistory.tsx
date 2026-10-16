@@ -1,5 +1,10 @@
-import { useState } from "react";
-import { useGetReportExecutionsQuery, type ReportParameters, type ReportScope } from "@/features/reports/reportsApi";
+import { useEffect, useState } from "react";
+import {
+  useGetReportExecutionsQuery,
+  type ReportExecution,
+  type ReportParameters,
+  type ReportScope,
+} from "@/features/reports/reportsApi";
 import { Pager } from "@/shared/components/Pager";
 
 function summary(parameters: ReportParameters): string | null {
@@ -9,19 +14,25 @@ function summary(parameters: ReportParameters): string | null {
   return null;
 }
 
+const pollLimit = 30;
+
 export function ReportHistory({
   reportId,
   scope,
   customerId,
+  focusId,
 }: {
   reportId: string;
   scope: ReportScope;
   customerId?: string;
+  focusId?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [downloadError, setDownloadError] = useState(false);
-  const history = useGetReportExecutionsQuery({ scope, page }, { skip: !open });
+  const [overrides, setOverrides] = useState<Record<string, ReportExecution>>({});
+  const shown = open || Boolean(focusId);
+  const history = useGetReportExecutionsQuery({ scope, page }, { skip: !shown });
   const rows = (history.data?.items ?? []).filter((item) => {
     if (item.reportId !== reportId) {
       return false;
@@ -30,7 +41,45 @@ export function ReportHistory({
       return false;
     }
     return true;
-  });
+  }).map((item) => overrides[item.id] ?? item);
+
+  useEffect(() => {
+    if (!focusId) {
+      return;
+    }
+    let polls = 0;
+    let stopped = false;
+    let timer = 0;
+    const tick = () => {
+      if (stopped) {
+        return;
+      }
+      polls += 1;
+      if (polls > pollLimit) {
+        return;
+      }
+      void fetch(`/api/reports/executions/${focusId}`, { credentials: "include" })
+        .then(async (response) => {
+          if (!response.ok || stopped) {
+            return;
+          }
+          const execution = (await response.json()) as ReportExecution;
+          if (stopped) {
+            return;
+          }
+          setOverrides((current) => ({ ...current, [execution.id]: execution }));
+          if (execution.status === "Succeeded" || execution.status === "Failed") {
+            return;
+          }
+          timer = window.setTimeout(tick, 2000);
+        });
+    };
+    timer = window.setTimeout(tick, 2000);
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+    };
+  }, [focusId]);
 
   async function onDownload(id: string) {
     setDownloadError(false);
@@ -55,7 +104,7 @@ export function ReportHistory({
       <button type="button" className="border border-slate-300 bg-white px-3 py-1 text-sm" onClick={() => setOpen((value) => !value)}>
         History
       </button>
-      {open ? (
+      {shown ? (
         <div className="space-y-2 text-sm">
           {history.isLoading ? <p>Loading history…</p> : null}
           {history.isError ? (

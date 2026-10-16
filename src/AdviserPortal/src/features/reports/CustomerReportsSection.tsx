@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAppSelector } from "@/app/hooks";
 import { CustomerTransactionsGenerate } from "@/features/reports/CustomerTransactionsGenerate";
 import { ReportCatalog } from "@/features/reports/ReportCatalog";
@@ -6,6 +7,7 @@ import { ReportSchedules } from "@/features/reports/ReportSchedules";
 
 export function CustomerReportsSection({ customerId }: { customerId: string }) {
   const role = useAppSelector((state) => state.session.currentUser?.role) ?? "";
+  const [focusId, setFocusId] = useState<string | null>(null);
 
   return (
     <ReportCatalog
@@ -16,9 +18,9 @@ export function CustomerReportsSection({ customerId }: { customerId: string }) {
       renderActions={(item) =>
         item.code === "customer-transactions" ? (
           <>
-            <CustomerTransactionsGenerate reportId={item.id} customerId={customerId} />
+            <CustomerTransactionsGenerate reportId={item.id} customerId={customerId} onQueued={setFocusId} />
             <ReportSchedules report={item} scope="Customer" customerId={customerId} role={role} />
-            <ReportHistory reportId={item.id} scope="Customer" customerId={customerId} />
+            <ReportHistory reportId={item.id} scope="Customer" customerId={customerId} focusId={focusId} />
           </>
         ) : null
       }

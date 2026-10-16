@@ -458,7 +458,7 @@ describe("CustomerDetailPage", () => {
       if (url.includes("/api/accounts") && method === "GET") {
         return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
       }
-      if (url.includes("/api/reports") && method === "GET") {
+      if (url.includes("/api/reports") && method === "GET" && !url.includes("/executions") && !url.includes("/schedules")) {
         return json([customerTransactions]);
       }
       return fetchImpl(url, method, body);
@@ -841,7 +841,7 @@ describe("CustomerDetailPage", () => {
   });
 
   it("downloads a succeeded pdf and reports when the file is not ready", async () => {
-    const createObjectURL = vi.fn(() => "blob:report");
+    const createObjectURL = vi.fn((_blob: Blob) => "blob:report");
     Object.defineProperty(URL, "createObjectURL", { configurable: true, value: createObjectURL });
     let downloads = 0;
     renderDetail(user(), (url, method) => {
@@ -872,8 +872,8 @@ describe("CustomerDetailPage", () => {
     await waitFor(() => {
       expect(createObjectURL).toHaveBeenCalled();
     });
-    const blob = createObjectURL.mock.calls[0][0] as Blob;
-    expect(blob.type).toBe("application/pdf");
+    const blob = createObjectURL.mock.calls[0]?.[0];
+    expect(blob?.type).toBe("application/pdf");
 
     fireEvent.click(screen.getByRole("button", { name: "Download" }));
     expect(await screen.findByText("Download not available.")).toBeInTheDocument();
@@ -932,20 +932,31 @@ describe("CustomerDetailPage", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
 
     expect(screen.getByText("Report queued")).toBeInTheDocument();
     expect(screen.getByText("Queued")).toBeInTheDocument();
     expect(polls).toBe(0);
 
-    await vi.advanceTimersByTimeAsync(2000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
     expect(polls).toBe(1);
-    await vi.advanceTimersByTimeAsync(2000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
     expect(polls).toBe(2);
-    await vi.advanceTimersByTimeAsync(2000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
     expect(polls).toBe(3);
     expect(screen.getByRole("button", { name: "Download" })).toBeInTheDocument();
 
-    await vi.advanceTimersByTimeAsync(10000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10000);
+    });
     expect(polls).toBe(3);
     const byId = fetchMock.mock.calls.filter(([input]) => {
       const url = input instanceof Request ? input.url : String(input);

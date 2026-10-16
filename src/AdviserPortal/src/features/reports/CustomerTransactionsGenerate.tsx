@@ -22,9 +22,11 @@ function problemMessages(error: unknown): string[] {
 export function CustomerTransactionsGenerate({
   reportId,
   customerId,
+  onQueued,
 }: {
   reportId: string;
   customerId: string;
+  onQueued?: (executionId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [from, setFrom] = useState("");
@@ -42,7 +44,7 @@ export function CustomerTransactionsGenerate({
     }
 
     try {
-      await requestReport({
+      const created = await requestReport({
         reportId,
         parameters: {
           customerId,
@@ -54,6 +56,7 @@ export function CustomerTransactionsGenerate({
       setMessages([]);
       setOpen(false);
       setQueued(true);
+      onQueued?.(created.id);
     } catch (error: unknown) {
       setQueued(false);
       if (isStatus(error, 404)) {
