@@ -676,4 +676,86 @@ describe("CustomerDetailPage", () => {
     expect(screen.queryByText("every Monday at 09:00")).not.toBeInTheDocument();
     expect(screen.queryByText("2026-04-01")).not.toBeInTheDocument();
   });
+
+  const customerSchedule = {
+    id: "ssssssss-ssss-ssss-ssss-ssssssssssss",
+    reportId: customerTransactions.id,
+    parameters: {
+      customerId,
+      from: "2026-01-01",
+      to: "2026-03-31",
+      includeClosedAccounts: false,
+    },
+    cron: "0 9 * * *",
+    isActive: true,
+    rowVersion: "AAAA",
+  };
+
+  it("sends rowVersion when a schedule is edited and shows a stale row", async () => {
+    const puts: string[] = [];
+    renderDetail(user(), (url, method, body) => {
+      if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
+        return json(customer);
+      }
+      if (url.includes("/api/reports") && method === "GET" && !url.includes("/schedules")) {
+        return json([customerTransactions]);
+      }
+      if (url.includes("/reports/schedules") && method === "GET") {
+        return json([customerSchedule]);
+      }
+      if (url.includes("/reports/schedules/") && method === "PUT") {
+        puts.push(body ?? "");
+        return new Response("", { status: 409 });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Schedules" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Time"), { target: { value: "10:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
+
+    expect(await screen.findByText("This row changed. Reload and try again.")).toBeInTheDocument();
+    expect(puts).toHaveLength(1);
+    expect(JSON.parse(puts[0])).toEqual({
+      reportId: customerTransactions.id,
+      parameters: customerSchedule.parameters,
+      cron: "0 10 * * *",
+      isActive: true,
+      rowVersion: "AAAA",
+    });
+  });
+
+  it("disables a schedule and keeps the inactive row", async () => {
+    let scheduleGets = 0;
+    const posted: Array<{ url: string; body: string | undefined }> = [];
+    renderDetail(user(), (url, method, body) => {
+      if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
+        return json(customer);
+      }
+      if (url.includes("/api/reports") && method === "GET" && !url.includes("/schedules")) {
+        return json([customerTransactions]);
+      }
+      if (url.includes("/reports/schedules") && method === "GET") {
+        scheduleGets += 1;
+        return json([{ ...customerSchedule, isActive: scheduleGets === 1 }]);
+      }
+      if (url.includes("/disable") && method === "POST") {
+        posted.push({ url, body });
+        return new Response(null, { status: 204 });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Schedules" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Disable schedule" }));
+
+    expect(await screen.findByText("Inactive")).toBeInTheDocument();
+    expect(screen.getByText("every day at 09:00")).toBeInTheDocument();
+    expect(posted).toHaveLength(1);
+    expect(new URL(posted[0].url).pathname).toBe(
+      `/api/reports/schedules/${customerSchedule.id}/disable`,
+    );
+    expect(posted[0].body ?? "").toBe("");
+  });
 });
