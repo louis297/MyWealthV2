@@ -1,7 +1,12 @@
+import { ReportCatalog } from "@/features/reports/ReportCatalog";
+
 export function ReportsPage() {
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-medium">Reports</h1>
-    </div>
+    <ReportCatalog
+      scope="Book"
+      title="h1"
+      note="These run for an adviser's book."
+      emptyMessage="No reports available."
+    />
   );
 }
