@@ -215,4 +215,70 @@ describe("ReportsPage", () => {
     );
     expect(urls.some((url) => url.includes("/users/advisers"))).toBe(false);
   });
+
+  it("requires a tenant admin to pick an adviser before queueing balances", async () => {
+    const samId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const { fetchMock } = renderReports(user(), (url, method) => {
+      if (url.includes("/api/reports") && method === "GET") {
+        return json([adviserBalances]);
+      }
+      if (url.includes("/users/advisers") && method === "GET") {
+        return json({
+          items: [
+            {
+              id: samId,
+              tenantId: "22222222-2222-2222-2222-222222222222",
+              name: "Sam Reed",
+              email: "sam@north.example",
+              status: "active",
+              rowVersion: "AAAA",
+              created: "2026-09-14T00:00:00+00:00",
+            },
+          ],
+          page: 1,
+          pageSize: 100,
+          totalCount: 1,
+        });
+      }
+      if (url.includes("/reports/request") && method === "POST") {
+        return json({ id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" }, 202);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Generate now" }));
+    const adviser = screen.getByLabelText("Adviser");
+    expect(adviser).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generate now" })).toBeDisabled();
+
+    fireEvent.change(adviser, { target: { value: samId } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
+
+    expect(await screen.findByText("Report queued")).toBeInTheDocument();
+    const request = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.url.includes("/reports/request"));
+    const body = JSON.parse(await request!.clone().text()) as {
+      parameters: Record<string, unknown>;
+    };
+    expect(body).toEqual({
+      reportId: adviserBalances.id,
+      parameters: {
+        adviserId: samId,
+        includeClosedAccounts: false,
+      },
+    });
+    expect(body.parameters).not.toHaveProperty("asOf");
+    expect(body).not.toHaveProperty("tenantId");
+
+    const advisersCall = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.url.includes("/users/advisers"));
+    expect(advisersCall).toBeDefined();
+    const advisersUrl = new URL(advisersCall!.url);
+    expect(advisersUrl.pathname).toBe("/api/users/advisers");
+    expect(advisersUrl.searchParams.get("enabledOnly")).toBe("true");
+    expect(advisersUrl.searchParams.get("pageSize")).toBe("100");
+    expect(advisersUrl.searchParams.has("tenantId")).toBe(false);
+  });
 });
