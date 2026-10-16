@@ -80,6 +80,14 @@ describe("startLogin host", () => {
     );
   });
 
+  it("keeps /reports as the login return path", () => {
+    vi.stubEnv("VITE_BFF_HTTP", "");
+
+    startLogin("/reports");
+
+    expect(window.location.assign).toHaveBeenCalledWith("/bff/login?returnUrl=%2Freports");
+  });
+
   it("keeps /transactions as the login return path", () => {
     vi.stubEnv("VITE_BFF_HTTP", "");
 

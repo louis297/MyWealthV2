@@ -99,6 +99,7 @@ describe("ShellLayout", () => {
     expect(screen.getByRole("link", { name: "Customers" })).toHaveAttribute("href", "/customers");
     expect(screen.getByRole("link", { name: "Advisers" })).toHaveAttribute("href", "/advisers");
     expect(screen.getByRole("link", { name: "Profile" })).toHaveAttribute("href", "/profile");
+    expect(screen.getByRole("link", { name: "Reports" })).toHaveAttribute("href", "/reports");
     expect(screen.queryByRole("link", { name: /session/i })).not.toBeInTheDocument();
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
@@ -111,6 +112,7 @@ describe("ShellLayout", () => {
     expect(screen.getByRole("link", { name: "Accounts" })).toHaveAttribute("href", "/accounts");
     expect(screen.getByRole("link", { name: "Transactions" })).toHaveAttribute("href", "/transactions");
     expect(screen.getByRole("link", { name: "Customers" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Reports" })).toHaveAttribute("href", "/reports");
     expect(screen.getByRole("link", { name: "Profile" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Advisers" })).not.toBeInTheDocument();
   });
@@ -133,6 +135,7 @@ describe("ShellLayout", () => {
     expect(screen.queryByRole("link", { name: "Transactions" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Customers" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Advisers" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Reports" })).not.toBeInTheDocument();
   });
 
   it("starts end-session when Sign out is clicked", () => {

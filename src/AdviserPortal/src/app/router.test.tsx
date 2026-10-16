@@ -327,6 +327,44 @@ describe("app routes", () => {
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
+  it("lets TenantAdmin open /reports", async () => {
+    renderApp(user(), "/reports");
+
+    expect(await screen.findByRole("heading", { name: "Reports" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("lets an Adviser open /reports", async () => {
+    renderApp(user({ role: "adviser", name: "Sam Reed" }), "/reports");
+
+    expect(await screen.findByRole("heading", { name: "Reports" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
+  });
+
+  it("sends SystemAdmin on /reports to /forbidden", async () => {
+    renderApp(
+      user({
+        role: "systemAdmin",
+        name: "System Admin",
+        tenantId: null,
+        tenantCode: null,
+      }),
+      "/reports",
+    );
+
+    expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Reports" })).not.toBeInTheDocument();
+  });
+
+  it("sends a Customer on /reports to /forbidden", async () => {
+    renderApp(user({ role: "customer", name: "Jordan Lee" }), "/reports");
+
+    expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Reports" })).not.toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
   it("sends a Customer opening TransferIn to /forbidden", async () => {
     renderApp(
       user({ role: "customer", name: "Jordan Lee" }),
