@@ -369,7 +369,7 @@ describe("CustomerDetailPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Reports" })).toBeInTheDocument();
     expect(screen.getByText("These run for this customer.")).toBeInTheDocument();
-    expect(screen.getByText("Customer Transactions")).toBeInTheDocument();
+    expect(await screen.findByText("Customer Transactions")).toBeInTheDocument();
     expect(screen.getByText(customerTransactions.function)).toBeInTheDocument();
     expect(screen.queryByText("Adviser Balances")).not.toBeInTheDocument();
 

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { useGetAccountsQuery } from "@/features/accounts/accountsApi";
+import { CustomerReportsSection } from "@/features/reports/CustomerReportsSection";
 import {
   useDisableCustomerMutation,
   useEnableCustomerMutation,
@@ -121,6 +122,7 @@ export function CustomerDetailPage() {
           />
         </section>
       ) : null}
+      <CustomerReportsSection />
       <div className="flex gap-2 text-sm">
         <Link to={`/customers/${data.id}/edit`} className="border border-slate-300 bg-white px-3 py-1">
           Edit
