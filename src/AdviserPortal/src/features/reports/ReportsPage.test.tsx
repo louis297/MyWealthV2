@@ -164,4 +164,55 @@ describe("ReportsPage", () => {
     expect(await screen.findByText("Adviser Balances")).toBeInTheDocument();
     expect(reportGets).toBeGreaterThan(1);
   });
+
+  it("queues adviser balances without an adviser id", async () => {
+    const { fetchMock } = renderReports(
+      user({
+        role: "adviser",
+        name: "Sam Reed",
+        adviserId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      }),
+      (url, method) => {
+        if (url.includes("/api/reports") && method === "GET") {
+          return json([adviserBalances]);
+        }
+        if (url.includes("/reports/request") && method === "POST") {
+          return json({ id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" }, 202);
+        }
+        return new Response("", { status: 404 });
+      },
+    );
+
+    expect(await screen.findByText("Adviser Balances")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Adviser")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
+    expect(screen.queryByLabelText("Adviser")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Include closed accounts")).not.toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
+
+    expect(await screen.findByText("Report queued")).toBeInTheDocument();
+    const request = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.url.includes("/reports/request"));
+    expect(request).toBeDefined();
+    expect(request!.method).toBe("POST");
+    expect(request!.headers.get("Authorization")).toBeNull();
+    expect(request!.headers.get("X-MyWealth-Request")).toBe("1");
+    expect(request!.credentials).toBe("include");
+    const body = JSON.parse(await request!.clone().text()) as {
+      reportId: string;
+      parameters: Record<string, unknown>;
+    };
+    expect(body).toEqual({
+      reportId: adviserBalances.id,
+      parameters: { includeClosedAccounts: false },
+    });
+    expect(body).not.toHaveProperty("tenantId");
+    expect(body.parameters).not.toHaveProperty("adviserId");
+    expect(body.parameters).not.toHaveProperty("asOf");
+    const urls = fetchMock.mock.calls.map(([input]) =>
+      input instanceof Request ? input.url : String(input),
+    );
+    expect(urls.some((url) => url.includes("/users/advisers"))).toBe(false);
+  });
 });
