@@ -758,4 +758,138 @@ describe("CustomerDetailPage", () => {
     );
     expect(posted[0].body ?? "").toBe("");
   });
+
+  const succeededExecution = {
+    id: "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1",
+    reportId: customerTransactions.id,
+    status: "Succeeded",
+    triggerKind: "Manual",
+    created: "2026-10-16T08:30:00+00:00",
+    parameters: { customerId, from: "2026-01-01", to: "2026-03-31" },
+    asOf: "2026-10-16T09:00:00+00:00",
+  };
+
+  const queuedExecution = {
+    id: "e2e2e2e2-e2e2-e2e2-e2e2-e2e2e2e2e2e2",
+    reportId: customerTransactions.id,
+    status: "Queued",
+    triggerKind: "Scheduled",
+    created: "2026-10-15T08:30:00+00:00",
+    parameters: { customerId, from: "2026-02-01", to: "2026-02-28" },
+  };
+
+  function historyPage(items: unknown[], totalCount = items.length) {
+    return json({ items, page: 1, pageSize: 20, totalCount });
+  }
+
+  it("lists this customer's runs and offers download only when succeeded", async () => {
+    const { fetchMock } = renderDetail(user(), (url, method) => {
+      if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
+        return json(customer);
+      }
+      if (url.includes("/api/reports") && method === "GET" && !url.includes("/schedules") && !url.includes("/executions")) {
+        return json([customerTransactions]);
+      }
+      if (url.includes("/reports/executions") && method === "GET" && !url.includes("/download")) {
+        const parsed = new URL(url);
+        expect(parsed.searchParams.get("scope")).toBe("Customer");
+        expect(parsed.searchParams.get("pageSize")).toBe("20");
+        if (parsed.searchParams.get("page") === "2") {
+          return json({ items: [], page: 2, pageSize: 20, totalCount: 21 });
+        }
+        return historyPage(
+          [
+            succeededExecution,
+            queuedExecution,
+            {
+              ...succeededExecution,
+              id: "e3e3e3e3-e3e3-e3e3-e3e3-e3e3e3e3e3e3",
+              parameters: {
+                customerId: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+                from: "2026-04-01",
+                to: "2026-05-01",
+              },
+            },
+          ],
+          21,
+        );
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "History" }));
+    expect(await screen.findByText("Succeeded")).toBeInTheDocument();
+    expect(screen.getByText("Manual")).toBeInTheDocument();
+    expect(screen.getByText("Scheduled")).toBeInTheDocument();
+    expect(screen.getByText("Queued")).toBeInTheDocument();
+    expect(screen.getByText("2026-01-01 to 2026-03-31")).toBeInTheDocument();
+    expect(screen.getByText("2026-10-16T09:00:00+00:00")).toBeInTheDocument();
+    expect(screen.queryByText("2026-04-01 to 2026-05-01")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Download" })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => {
+      const pages = fetchMock.mock.calls
+        .map(([input]) => (input instanceof Request ? input.url : String(input)))
+        .filter((url) => url.includes("/reports/executions"));
+      expect(pages.some((url) => new URL(url).searchParams.get("page") === "2")).toBe(true);
+    });
+  });
+
+  it("downloads a succeeded pdf and reports when the file is not ready", async () => {
+    const createObjectURL = vi.fn(() => "blob:report");
+    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: createObjectURL });
+    let downloads = 0;
+    renderDetail(user(), (url, method) => {
+      if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
+        return json(customer);
+      }
+      if (url.includes("/api/reports") && method === "GET" && !url.includes("/executions")) {
+        return json([customerTransactions]);
+      }
+      if (url.includes("/download") && method === "GET") {
+        downloads += 1;
+        if (downloads === 1) {
+          return new Response(new Blob(["%PDF"]), {
+            status: 200,
+            headers: { "Content-Type": "application/pdf" },
+          });
+        }
+        return new Response("", { status: 409 });
+      }
+      if (url.includes("/reports/executions") && method === "GET") {
+        return historyPage([succeededExecution]);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "History" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Download" }));
+    await waitFor(() => {
+      expect(createObjectURL).toHaveBeenCalled();
+    });
+    const blob = createObjectURL.mock.calls[0][0] as Blob;
+    expect(blob.type).toBe("application/pdf");
+
+    fireEvent.click(screen.getByRole("button", { name: "Download" }));
+    expect(await screen.findByText("Download not available.")).toBeInTheDocument();
+  });
+
+  it("shows an empty run list", async () => {
+    renderDetail(user(), (url, method) => {
+      if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
+        return json(customer);
+      }
+      if (url.includes("/api/reports") && method === "GET" && !url.includes("/executions")) {
+        return json([customerTransactions]);
+      }
+      if (url.includes("/reports/executions") && method === "GET") {
+        return historyPage([]);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "History" }));
+    expect(await screen.findByText("No runs yet.")).toBeInTheDocument();
+  });
 });

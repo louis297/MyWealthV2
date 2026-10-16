@@ -375,4 +375,30 @@ describe("ReportsPage", () => {
       isActive: true,
     });
   });
+
+  it("loads book execution history", async () => {
+    const { fetchMock } = renderReports(user({ role: "adviser", name: "Sam Reed" }), (url, method) => {
+      if (url.includes("/api/reports") && method === "GET" && !url.includes("/executions") && !url.includes("/schedules")) {
+        return json([adviserBalances]);
+      }
+      if (url.includes("/reports/executions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "History" }));
+    expect(await screen.findByText("No runs yet.")).toBeInTheDocument();
+    const request = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.url.includes("/reports/executions"));
+    expect(request).toBeDefined();
+    const url = new URL(request!.url);
+    expect(url.pathname).toBe("/api/reports/executions");
+    expect(url.searchParams.get("scope")).toBe("Book");
+    expect(url.searchParams.get("page")).toBe("1");
+    expect(url.searchParams.get("pageSize")).toBe("20");
+    expect(request!.headers.get("Authorization")).toBeNull();
+    expect(request!.credentials).toBe("include");
+  });
 });
