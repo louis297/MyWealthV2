@@ -1,12 +1,27 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 import {
+  ConflictNotice,
+  DetailGrid,
+  DetailItem,
+  Messages,
+  Muted,
+  Page,
+  PageHeading,
+  Section,
+  StatusBadge,
+} from "@/components/portal";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
   useCloseAccountMutation,
   useGetAccountHoldingsQuery,
   useGetAccountQuery,
   useReopenAccountMutation,
 } from "@/features/accounts/accountsApi";
 import { useGetTransactionsQuery } from "@/features/transactions/transactionsApi";
+import { cn } from "cn";
 
 function isStatus(error: unknown, status: number) {
   return typeof error === "object" && error !== null && "status" in error && error.status === status;
@@ -88,11 +103,11 @@ export function AccountDetailPage() {
   }
 
   if (isNotFound(account.error)) {
-    return <p>Not found</p>;
+    return <Muted>Not found</Muted>;
   }
 
   if (!account.data || !holdings.data) {
-    return <p>Loading…</p>;
+    return <Muted>Loading…</Muted>;
   }
 
   const data = account.data;
@@ -103,108 +118,108 @@ export function AccountDetailPage() {
   ];
 
   return (
-    <div className="max-w-3xl space-y-4">
-      <h1 className="text-xl font-medium">{data.name}</h1>
+    <Page>
+      <PageHeading
+        title={data.name}
+        actions={
+          data.status === "Open" ? (
+            <Button type="button" variant="destructive" onClick={() => void onLifecycle("close")}>
+              Close
+            </Button>
+          ) : (
+            <Button type="button" variant="outline" onClick={() => void onLifecycle("reopen")}>
+              Reopen
+            </Button>
+          )
+        }
+      />
       {actions.length > 0 ? (
-        <nav aria-label="Transaction actions" className="flex flex-wrap gap-3 text-sm">
+        <nav aria-label="Transaction actions" className="flex flex-wrap gap-2">
           {actions.map((action) => (
-            <Link key={action} to={`/accounts/${data.id}/transactions/new?type=${action}`}>
+            <Link
+              key={action}
+              to={`/accounts/${data.id}/transactions/new?type=${action}`}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            >
               {action}
             </Link>
           ))}
         </nav>
       ) : null}
-      {conflict ? <p>This row changed. Reload and try again.</p> : null}
-      {messages.map((message) => (
-        <p key={message}>{message}</p>
-      ))}
-      {data.status === "Open" ? (
-        <button
-          type="button"
-          className="border border-slate-300 bg-white px-3 py-1 text-sm"
-          onClick={() => void onLifecycle("close")}
-        >
-          Close
-        </button>
-      ) : (
-        <button
-          type="button"
-          className="border border-slate-300 bg-white px-3 py-1 text-sm"
-          onClick={() => void onLifecycle("reopen")}
-        >
-          Reopen
-        </button>
-      )}
-      <dl className="space-y-2 text-sm">
-        <div>
-          <dt className="text-slate-500">Type</dt>
-          <dd>{data.type}</dd>
-        </div>
-        <div>
-          <dt className="text-slate-500">Currency</dt>
-          <dd>{data.currency}</dd>
-        </div>
-        <div>
-          <dt className="text-slate-500">Status</dt>
-          <dd>{data.status}</dd>
-        </div>
-        <div>
-          <dt className="text-slate-500">Cash balance</dt>
-          <dd>{data.cashBalance}</dd>
-        </div>
-      </dl>
-      <section className="space-y-2">
-        <h2 className="text-base font-medium">Holdings</h2>
-        {items.length === 0 ? <p>No holdings.</p> : (
-          <table aria-label="Holdings" className="border-collapse text-sm">
-            <thead>
-              <tr>
-                <th className="border border-slate-200 px-2 py-1 text-left">Symbol</th>
-                <th className="border border-slate-200 px-2 py-1 text-left">Name</th>
-                <th className="border border-slate-200 px-2 py-1 text-left">Quantity</th>
-                <th className="border border-slate-200 px-2 py-1 text-left">Cost</th>
-                <th className="border border-slate-200 px-2 py-1 text-left">Cost currency</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.id}>
-                  <td className="border border-slate-200 px-2 py-1">{item.symbol}</td>
-                  <td className="border border-slate-200 px-2 py-1">{item.name}</td>
-                  <td className="border border-slate-200 px-2 py-1">{item.quantity}</td>
-                  <td className="border border-slate-200 px-2 py-1">{item.cost}</td>
-                  <td className="border border-slate-200 px-2 py-1">{item.costCurrency}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {conflict ? <ConflictNotice /> : null}
+      <Messages messages={messages} />
+      <Card>
+        <CardContent>
+          <DetailGrid>
+            <DetailItem label="Type">{data.type}</DetailItem>
+            <DetailItem label="Currency">{data.currency}</DetailItem>
+            <DetailItem label="Status">
+              <StatusBadge status={data.status} />
+            </DetailItem>
+            <DetailItem label="Cash balance">{data.cashBalance}</DetailItem>
+          </DetailGrid>
+        </CardContent>
+      </Card>
+      <Section title="Holdings">
+        {items.length === 0 ? <Muted>No holdings.</Muted> : (
+          <Card className="gap-0 py-0">
+            <CardContent className="px-0">
+              <Table aria-label="Holdings">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Symbol</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Quantity</TableHead>
+                    <TableHead>Cost</TableHead>
+                    <TableHead>Cost currency</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {items.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>{item.symbol}</TableCell>
+                      <TableCell>{item.name}</TableCell>
+                      <TableCell>{item.quantity}</TableCell>
+                      <TableCell>{item.cost}</TableCell>
+                      <TableCell>{item.costCurrency}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         )}
-      </section>
-      <section className="space-y-2">
-        <h2 className="text-base font-medium">Activity</h2>
-        {(transactions.data?.items.length ?? 0) === 0 ? <p>No activity.</p> : (
-          <table aria-label="Activity" className="border-collapse text-sm">
-            <thead>
-              <tr>
-                <th className="border border-slate-200 px-2 py-1 text-left">Transaction</th>
-                <th className="border border-slate-200 px-2 py-1 text-left">Type</th>
-                <th className="border border-slate-200 px-2 py-1 text-left">Booked at</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.data?.items.map((item) => (
-                <tr key={item.id}>
-                  <td className="border border-slate-200 px-2 py-1">
-                    <Link to={`/transactions/${item.id}`}>{item.id}</Link>
-                  </td>
-                  <td className="border border-slate-200 px-2 py-1">{item.type}</td>
-                  <td className="border border-slate-200 px-2 py-1">{item.bookedAt}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      </Section>
+      <Section title="Activity">
+        {(transactions.data?.items.length ?? 0) === 0 ? <Muted>No activity.</Muted> : (
+          <Card className="gap-0 py-0">
+            <CardContent className="px-0">
+              <Table aria-label="Activity">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Transaction</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Booked at</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {transactions.data?.items.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>
+                        <Link to={`/transactions/${item.id}`} className="font-medium underline-offset-4 hover:underline">
+                          {item.id}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{item.type}</TableCell>
+                      <TableCell>{item.bookedAt}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         )}
-      </section>
-    </div>
+      </Section>
+    </Page>
   );
 }

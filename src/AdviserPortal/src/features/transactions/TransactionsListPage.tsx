@@ -1,4 +1,7 @@
 import { Link, useSearchParams } from "react-router";
+import { FilterBar, Muted, Page, PageHeading, recordLinkClass, TextField } from "@/components/portal";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   canReverse,
   ReverseTransactionButton,
@@ -55,67 +58,71 @@ export function TransactionsListPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-medium">Transactions</h1>
-      <div className="flex flex-wrap items-end gap-3 text-sm">
-        <div>
-          <label htmlFor="transactions-account" className="block">
-            Account
-          </label>
-          <input
-            id="transactions-account"
-            className="mt-1 border border-slate-300 px-2 py-1"
-            value={accountId}
-            onChange={(event) => updateParam("accountId", event.target.value || null)}
-          />
-        </div>
-        <div>
-          <label htmlFor="transactions-customer" className="block">
-            Customer
-          </label>
-          <input
-            id="transactions-customer"
-            className="mt-1 border border-slate-300 px-2 py-1"
-            value={customerId}
-            onChange={(event) => updateParam("customerId", event.target.value || null)}
-          />
-        </div>
-      </div>
-      {notFound ? <p>Not found</p> : (
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-slate-200">
-              <th className="py-2">Type</th>
-              <th>Booked at</th>
-              <th>Account</th>
-              <th>Customer</th>
-              <th>Cash</th>
-              <th>Security</th>
-              <th>Memo</th>
-              <th>Reverse</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(data?.items ?? []).map((item) => (
-              <tr key={item.id} className="border-b border-slate-100">
-                <td className="py-2">
-                  <Link to={`/transactions/${item.id}`}>{item.type}</Link>
-                </td>
-                <td>{item.bookedAt}</td>
-                <td>
-                  <Link to={`/accounts/${item.accountId}`}>{item.accountId}</Link>
-                </td>
-                <td>
-                  <Link to={`/customers/${item.customerId}`}>{item.customerId}</Link>
-                </td>
-                <td>{cashText(item.cash)}</td>
-                <td>{securityText(item.security)}</td>
-                <td>{item.memo ?? ""}</td>
-                <td>{canReverse(item) ? <ReverseTransactionButton id={item.id} /> : null}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <Page>
+      <PageHeading title="Transactions" />
+      <FilterBar>
+        <TextField
+          id="transactions-account"
+          label="Account"
+          className="w-72"
+          value={accountId}
+          onChange={(event) => updateParam("accountId", event.target.value || null)}
+        />
+        <TextField
+          id="transactions-customer"
+          label="Customer"
+          className="w-72"
+          value={customerId}
+          onChange={(event) => updateParam("customerId", event.target.value || null)}
+        />
+      </FilterBar>
+      {notFound ? <Muted>Not found</Muted> : (
+        <Card className="gap-0 py-0">
+          <CardContent className="px-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Booked at</TableHead>
+                  <TableHead>Account</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Cash</TableHead>
+                  <TableHead>Security</TableHead>
+                  <TableHead>Memo</TableHead>
+                  <TableHead>Reverse</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(data?.items ?? []).map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell>
+                      <Link to={`/transactions/${item.id}`} className={recordLinkClass}>
+                        {item.type}
+                      </Link>
+                    </TableCell>
+                    <TableCell>{item.bookedAt}</TableCell>
+                    <TableCell>
+                      <Link to={`/accounts/${item.accountId}`} className={recordLinkClass}>
+                        {item.accountId}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link to={`/customers/${item.customerId}`} className={recordLinkClass}>
+                        {item.customerId}
+                      </Link>
+                    </TableCell>
+                    <TableCell>{cashText(item.cash)}</TableCell>
+                    <TableCell>{securityText(item.security)}</TableCell>
+                    <TableCell>{item.memo ?? ""}</TableCell>
+                    <TableCell className="whitespace-normal">
+                      {canReverse(item) ? <ReverseTransactionButton id={item.id} /> : null}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       )}
       <Pager
         page={page}
@@ -123,6 +130,6 @@ export function TransactionsListPage() {
         totalCount={data?.totalCount ?? 0}
         onPage={(next) => updateParam("page", String(next))}
       />
-    </div>
+    </Page>
   );
 }

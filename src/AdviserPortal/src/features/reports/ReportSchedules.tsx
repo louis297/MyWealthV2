@@ -1,4 +1,6 @@
 import { type FormEvent, useState } from "react";
+import { CheckField, Messages, Muted, SelectField, TextField } from "@/components/portal";
+import { Button } from "@/components/ui/button";
 import { useGetAdvisersQuery } from "@/features/advisers/advisersApi";
 import { fromCron, humaniseCron, toCron, type CronPreset } from "@/features/reports/cron";
 import {
@@ -131,145 +133,111 @@ export function ReportSchedules({
   }
 
   return (
-    <div className="space-y-2">
-      <button type="button" className="border border-slate-300 bg-white px-3 py-1 text-sm" onClick={() => setOpen((value) => !value)}>
+    <div className="flex flex-col items-start gap-2">
+      <Button type="button" variant="outline" size="sm" onClick={() => setOpen((value) => !value)}>
         Schedules
-      </button>
+      </Button>
       {open ? (
-        <div className="space-y-2">
-          {schedules.isLoading ? <p>Loading schedules…</p> : null}
+        <div className="flex w-full flex-col gap-3">
+          {schedules.isLoading ? <Muted>Loading schedules…</Muted> : null}
           {schedules.isError ? (
-            <div className="space-y-2 text-sm">
+            <div className="flex flex-col items-start gap-2 text-sm">
               <p>Schedules could not be loaded.</p>
-              <button type="button" onClick={() => void schedules.refetch()}>
+              <Button type="button" variant="outline" size="sm" onClick={() => void schedules.refetch()}>
                 Retry
-              </button>
+              </Button>
             </div>
           ) : null}
-          {!schedules.isLoading && !schedules.isError && rows.length === 0 ? <p>No schedules.</p> : null}
+          {!schedules.isLoading && !schedules.isError && rows.length === 0 ? <Muted>No schedules.</Muted> : null}
           {rows.map((item) => (
-            <p key={item.id}>
+            <div key={item.id} className="flex flex-wrap items-center gap-2 rounded-md border bg-card px-2 py-1.5 text-sm">
               <span>{humaniseCron(item.cron)}</span>
               {typeof item.parameters.from === "string" ? <span>{item.parameters.from}</span> : null}
               {typeof item.parameters.to === "string" ? <span>{item.parameters.to}</span> : null}
               {item.isActive ? (
                 <>
-                  <button type="button" onClick={() => beginEdit(item)}>
+                  <Button type="button" variant="outline" size="sm" onClick={() => beginEdit(item)}>
                     Edit
-                  </button>
-                  <button type="button" onClick={() => void onDisable(item.id)}>
+                  </Button>
+                  <Button type="button" variant="destructive" size="sm" onClick={() => void onDisable(item.id)}>
                     Disable schedule
-                  </button>
+                  </Button>
                 </>
               ) : (
                 <span>Inactive</span>
               )}
-            </p>
+            </div>
           ))}
-          <form className="space-y-2" onSubmit={(event) => void onSubmit(event)}>
-            <p className="text-sm text-slate-600">Times are sent as chosen. The server interprets the schedule in UTC.</p>
-            {messages.map((message) => (
-              <p key={message}>{message}</p>
-            ))}
-            {saved ? <p>Schedule saved</p> : null}
+          <form className="flex w-full flex-col gap-3 rounded-lg bg-muted/40 p-3" onSubmit={(event) => void onSubmit(event)}>
+            <p className="text-sm text-muted-foreground">Times are sent as chosen. The server interprets the schedule in UTC.</p>
+            <Messages messages={messages} />
+            {saved ? <p className="text-sm">Schedule saved</p> : null}
             {customerReport ? (
               <>
-                <div>
-                  <label htmlFor={`schedule-from-${report.id}`} className="block text-sm">
-                    From
-                  </label>
-                  <input
-                    id={`schedule-from-${report.id}`}
-                    type="date"
-                    className="mt-1 border border-slate-300 px-2 py-1"
-                    value={from}
-                    onChange={(event) => setFrom(event.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <label htmlFor={`schedule-to-${report.id}`} className="block text-sm">
-                    To
-                  </label>
-                  <input
-                    id={`schedule-to-${report.id}`}
-                    type="date"
-                    className="mt-1 border border-slate-300 px-2 py-1"
-                    value={to}
-                    onChange={(event) => setTo(event.target.value)}
-                    required
-                  />
-                </div>
+                <TextField
+                  id={`schedule-from-${report.id}`}
+                  label="From"
+                  type="date"
+                  value={from}
+                  onChange={(event) => setFrom(event.target.value)}
+                  required
+                />
+                <TextField
+                  id={`schedule-to-${report.id}`}
+                  label="To"
+                  type="date"
+                  value={to}
+                  onChange={(event) => setTo(event.target.value)}
+                  required
+                />
               </>
             ) : null}
             {needsAdviser ? (
-              <div>
-                <label htmlFor={`schedule-adviser-${report.id}`} className="block text-sm">
-                  Adviser
-                </label>
-                <select
-                  id={`schedule-adviser-${report.id}`}
-                  className="mt-1 w-full border border-slate-300 px-2 py-1"
-                  value={adviserId}
-                  onChange={(event) => setAdviserId(event.target.value)}
-                  required
-                >
-                  <option value="">Select an adviser</option>
-                  {advisers?.items.map((adviser) => (
-                    <option key={adviser.id} value={adviser.id}>
-                      {adviser.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={includeClosedAccounts}
-                onChange={(event) => setIncludeClosedAccounts(event.target.checked)}
-              />
-              Include closed accounts
-            </label>
-            <div>
-              <label htmlFor={`schedule-frequency-${report.id}`} className="block text-sm">
-                Frequency
-              </label>
-              <select
-                id={`schedule-frequency-${report.id}`}
-                className="mt-1 border border-slate-300 px-2 py-1"
-                value={preset}
-                onChange={(event) => setPreset(event.target.value as CronPreset)}
-              >
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-              </select>
-            </div>
-            <div>
-              <label htmlFor={`schedule-time-${report.id}`} className="block text-sm">
-                Time
-              </label>
-              <input
-                id={`schedule-time-${report.id}`}
-                type="time"
-                className="mt-1 border border-slate-300 px-2 py-1"
-                value={time}
-                onChange={(event) => setTime(event.target.value)}
+              <SelectField
+                id={`schedule-adviser-${report.id}`}
+                label="Adviser"
+                value={adviserId}
+                onChange={(event) => setAdviserId(event.target.value)}
                 required
-              />
-            </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} />
-              Active
-            </label>
-            <button
-              type="submit"
-              className="border border-slate-300 bg-white px-3 py-1 text-sm"
-              disabled={isLoading || blocked}
+              >
+                <option value="">Select an adviser</option>
+                {advisers?.items.map((adviser) => (
+                  <option key={adviser.id} value={adviser.id}>
+                    {adviser.name}
+                  </option>
+                ))}
+              </SelectField>
+            ) : null}
+            <CheckField
+              checked={includeClosedAccounts}
+              onChange={(event) => setIncludeClosedAccounts(event.target.checked)}
             >
+              Include closed accounts
+            </CheckField>
+            <SelectField
+              id={`schedule-frequency-${report.id}`}
+              label="Frequency"
+              value={preset}
+              onChange={(event) => setPreset(event.target.value as CronPreset)}
+            >
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </SelectField>
+            <TextField
+              id={`schedule-time-${report.id}`}
+              label="Time"
+              type="time"
+              value={time}
+              onChange={(event) => setTime(event.target.value)}
+              required
+            />
+            <CheckField checked={isActive} onChange={(event) => setIsActive(event.target.checked)}>
+              Active
+            </CheckField>
+            <Button type="submit" size="sm" disabled={isLoading || blocked}>
               {editing ? "Save schedule" : "Create schedule"}
-            </button>
+            </Button>
           </form>
         </div>
       ) : null}

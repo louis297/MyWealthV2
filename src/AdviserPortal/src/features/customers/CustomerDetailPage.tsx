@@ -1,5 +1,19 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router";
+import {
+  ConflictNotice,
+  DetailGrid,
+  DetailItem,
+  Muted,
+  Page,
+  PageHeading,
+  recordLinkClass,
+  Section,
+  StatusBadge,
+} from "@/components/portal";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useGetAccountsQuery } from "@/features/accounts/accountsApi";
 import { CustomerReportsSection } from "@/features/reports/CustomerReportsSection";
 import {
@@ -8,6 +22,7 @@ import {
   useGetCustomerQuery,
 } from "@/features/customers/customersApi";
 import { Pager } from "@/shared/components/Pager";
+import { cn } from "cn";
 
 function isStatus(error: unknown, status: number) {
   return typeof error === "object" && error !== null && "status" in error && error.status === status;
@@ -50,93 +65,97 @@ export function CustomerDetailPage() {
   }
 
   if (isStatus(error, 404)) {
-    return <p>Not found</p>;
+    return <Muted>Not found</Muted>;
   }
 
   if (isLoading || !data) {
-    return <p>Loading…</p>;
+    return <Muted>Loading…</Muted>;
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-medium">{data.name}</h1>
-      {conflict ? <p>This row changed. Reload and try again.</p> : null}
-      <dl className="space-y-2 text-sm">
-        <div>
-          <dt className="text-slate-500">Email</dt>
-          <dd>{data.email}</dd>
-        </div>
-        <div>
-          <dt className="text-slate-500">Status</dt>
-          <dd>{data.status}</dd>
-        </div>
-        <div>
-          <dt className="text-slate-500">Created</dt>
-          <dd>{data.created.slice(0, 10)}</dd>
-        </div>
-        <div>
-          <dt className="text-slate-500">Id</dt>
-          <dd>{data.id}</dd>
-        </div>
-      </dl>
+    <Page>
+      <PageHeading
+        title={data.name}
+        actions={
+          <>
+            <Link to={`/customers/${data.id}/edit`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+              Edit
+            </Link>
+            {data.status === "disabled" ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => void runStatusChange("enable")}>
+                Enable
+              </Button>
+            ) : (
+              <Button type="button" variant="destructive" size="sm" onClick={() => void runStatusChange("disable")}>
+                Disable
+              </Button>
+            )}
+          </>
+        }
+      />
+      {conflict ? <ConflictNotice /> : null}
+      <Card>
+        <CardContent>
+          <DetailGrid>
+            <DetailItem label="Email">{data.email}</DetailItem>
+            <DetailItem label="Status">
+              <StatusBadge status={data.status} />
+            </DetailItem>
+            <DetailItem label="Created">{data.created.slice(0, 10)}</DetailItem>
+            <DetailItem label="Id">{data.id}</DetailItem>
+          </DetailGrid>
+        </CardContent>
+      </Card>
       {accounts.data ? (
-        <section className="space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-medium">Accounts</h2>
-            <Link
-              to={`/customers/${data.id}/accounts/new`}
-              className="border border-slate-300 bg-white px-3 py-1 text-sm"
-            >
+        <Section
+          title="Accounts"
+          actions={
+            <Link to={`/customers/${data.id}/accounts/new`} className={cn(buttonVariants({ size: "sm" }))}>
               New account
             </Link>
-          </div>
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-200">
-                <th className="py-2">Name</th>
-                <th>Type</th>
-                <th>Currency</th>
-                <th>Cash balance</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {accounts.data.items.map((item) => (
-                <tr key={item.id} className="border-b border-slate-100">
-                  <td className="py-2">
-                    <Link to={`/accounts/${item.id}`}>{item.name}</Link>
-                  </td>
-                  <td>{item.type}</td>
-                  <td>{item.currency}</td>
-                  <td>{item.cashBalance}</td>
-                  <td>{item.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          }
+        >
+          <Card className="gap-0 py-0">
+            <CardContent className="px-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Currency</TableHead>
+                    <TableHead>Cash balance</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {accounts.data.items.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>
+                        <Link to={`/accounts/${item.id}`} className={recordLinkClass}>
+                          {item.name}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{item.type}</TableCell>
+                      <TableCell>{item.currency}</TableCell>
+                      <TableCell>{item.cashBalance}</TableCell>
+                      <TableCell>
+                        <StatusBadge status={item.status} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
           <Pager
             page={accountsPage}
             pageSize={20}
             totalCount={accounts.data.totalCount}
             onPage={setAccountsPage}
           />
-        </section>
+        </Section>
       ) : null}
       <CustomerReportsSection customerId={data.id} />
-      <div className="flex gap-2 text-sm">
-        <Link to={`/customers/${data.id}/edit`} className="border border-slate-300 bg-white px-3 py-1">
-          Edit
-        </Link>
-        {data.status === "disabled" ? (
-          <button type="button" onClick={() => void runStatusChange("enable")}>
-            Enable
-          </button>
-        ) : (
-          <button type="button" onClick={() => void runStatusChange("disable")}>
-            Disable
-          </button>
-        )}
-      </div>
-    </div>
+    </Page>
   );
 }

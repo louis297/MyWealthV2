@@ -1,4 +1,7 @@
 import { Link, useSearchParams } from "react-router";
+import { Page, PageHeading, recordLinkClass, StatusBadge } from "@/components/portal";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useGetAccountsQuery } from "@/features/accounts/accountsApi";
 import { Pager } from "@/shared/components/Pager";
 
@@ -21,38 +24,46 @@ export function AccountsListPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-medium">Accounts</h1>
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-slate-200">
-            <th className="py-2">Name</th>
-            <th>Type</th>
-            <th>Currency</th>
-            <th>Cash balance</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(data?.items ?? []).map((item) => (
-            <tr key={item.id} className="border-b border-slate-100">
-              <td className="py-2">
-                <Link to={`/accounts/${item.id}`}>{item.name}</Link>
-              </td>
-              <td>{item.type}</td>
-              <td>{item.currency}</td>
-              <td>{item.cashBalance}</td>
-              <td>{item.status}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <Page>
+      <PageHeading title="Accounts" />
+      <Card className="gap-0 py-0">
+        <CardContent className="px-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Currency</TableHead>
+                <TableHead>Cash balance</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(data?.items ?? []).map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell>
+                    <Link to={`/accounts/${item.id}`} className={recordLinkClass}>
+                      {item.name}
+                    </Link>
+                  </TableCell>
+                  <TableCell>{item.type}</TableCell>
+                  <TableCell>{item.currency}</TableCell>
+                  <TableCell>{item.cashBalance}</TableCell>
+                  <TableCell>
+                    <StatusBadge status={item.status} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
       <Pager
         page={page}
         pageSize={20}
         totalCount={data?.totalCount ?? 0}
         onPage={(next) => updateParam("page", String(next))}
       />
-    </div>
+    </Page>
   );
 }

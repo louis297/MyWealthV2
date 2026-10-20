@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Messages } from "@/components/portal";
+import { Button } from "@/components/ui/button";
 import { useReverseTransactionMutation } from "@/features/transactions/transactionsApi";
 
 export function canReverse(item: { type: string; reversedByTransactionId?: string | null }) {
@@ -37,13 +39,11 @@ export function ReverseTransactionButton({ id }: { id: string }) {
 
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
-      <button type="button" className="border border-slate-300 px-2 py-1" onClick={() => void onReverse()}>
+      <Button type="button" variant="outline" size="sm" onClick={() => void onReverse()}>
         Reverse
-      </button>
+      </Button>
       {reversedId ? <span>{reversedId}</span> : null}
-      {messages.map((message) => (
-        <span key={message}>{message}</span>
-      ))}
+      <Messages messages={messages} />
     </span>
   );
 }

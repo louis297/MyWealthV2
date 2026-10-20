@@ -1,6 +1,9 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useAppSelector } from "@/app/hooks";
+import { ConflictNotice, Muted, Page, PageHeading, SelectField, TextField } from "@/components/portal";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { useGetAdvisersQuery } from "@/features/advisers/advisersApi";
 import { useGetCustomerQuery, useUpdateCustomerMutation } from "@/features/customers/customersApi";
 import { roles } from "@/features/session/roles";
@@ -54,56 +57,48 @@ export function EditCustomerPage() {
   }
 
   if (error && "status" in error && error.status === 404) {
-    return <p>Not found</p>;
+    return <Muted>Not found</Muted>;
   }
 
   if (isLoading || !data) {
-    return <p>Loading…</p>;
+    return <Muted>Loading…</Muted>;
   }
 
   return (
-    <div className="max-w-lg space-y-4">
-      <h1 className="text-xl font-medium">Edit customer</h1>
-      {conflict ? <p>This row changed. Reload and try again.</p> : null}
-      <form className="space-y-3" onSubmit={(event) => void onSubmit(event)}>
-        <div>
-          <label htmlFor="edit-customer-name" className="block text-sm">
-            Name
-          </label>
-          <input
-            id="edit-customer-name"
-            className="mt-1 w-full border border-slate-300 px-2 py-1"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            required
-          />
-        </div>
-        {isTenantAdmin ? (
-          <div>
-            <label htmlFor="edit-customer-adviser" className="block text-sm">
-              Adviser
-            </label>
-            <select
-              id="edit-customer-adviser"
-              className="mt-1 w-full border border-slate-300 px-2 py-1"
-              value={adviserId}
-              onChange={(event) => setAdviserId(event.target.value)}
+    <Page className="max-w-lg">
+      <PageHeading title="Edit customer" />
+      {conflict ? <ConflictNotice /> : null}
+      <Card>
+        <CardContent>
+          <form className="flex flex-col gap-4" onSubmit={(event) => void onSubmit(event)}>
+            <TextField
+              id="edit-customer-name"
+              label="Name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
               required
-            >
-              {(advisers?.items ?? [])
-                .filter((item) => item.status === "active" || item.id === data.adviserId)
-                .map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-            </select>
-          </div>
-        ) : null}
-        <button type="submit" className="border border-slate-300 bg-white px-3 py-1 text-sm">
-          Save
-        </button>
-      </form>
-    </div>
+            />
+            {isTenantAdmin ? (
+              <SelectField
+                id="edit-customer-adviser"
+                label="Adviser"
+                value={adviserId}
+                onChange={(event) => setAdviserId(event.target.value)}
+                required
+              >
+                {(advisers?.items ?? [])
+                  .filter((item) => item.status === "active" || item.id === data.adviserId)
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+              </SelectField>
+            ) : null}
+            <Button type="submit">Save</Button>
+          </form>
+        </CardContent>
+      </Card>
+    </Page>
   );
 }

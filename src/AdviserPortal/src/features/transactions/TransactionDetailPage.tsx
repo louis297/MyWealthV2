@@ -1,4 +1,7 @@
 import { useParams } from "react-router";
+import { Muted, Page, PageHeading } from "@/components/portal";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   canReverse,
   ReverseTransactionButton,
@@ -14,17 +17,19 @@ export function TransactionDetailPage() {
   const { data, error } = useGetTransactionQuery(id ?? "", { skip: !id });
 
   return (
-    <div className="max-w-lg space-y-4">
-      <h1 className="text-xl font-medium">Transaction</h1>
-      {isNotFound(error) ? <p>Not found</p> : null}
-      {!data && !isNotFound(error) ? <p>Loading…</p> : null}
+    <Page className="max-w-lg">
+      <PageHeading title="Transaction" />
+      {isNotFound(error) ? <Muted>Not found</Muted> : null}
+      {!data && !isNotFound(error) ? <Muted>Loading…</Muted> : null}
       {data ? (
-        <>
-          <p>{data.id}</p>
-          <p>{data.type}</p>
-          {canReverse(data) ? <ReverseTransactionButton id={data.id} /> : null}
-        </>
+        <Card>
+          <CardContent className="flex flex-col items-start gap-3">
+            <p className="font-mono text-xs break-all">{data.id}</p>
+            <Badge variant="secondary">{data.type}</Badge>
+            {canReverse(data) ? <ReverseTransactionButton id={data.id} /> : null}
+          </CardContent>
+        </Card>
       ) : null}
-    </div>
+    </Page>
   );
 }

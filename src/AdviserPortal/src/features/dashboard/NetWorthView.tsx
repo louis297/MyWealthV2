@@ -1,4 +1,8 @@
+import type { ReactNode } from "react";
 import { Link } from "react-router";
+import { Muted, Section } from "@/components/portal";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { NetWorth } from "@/features/dashboard/dashboardApi";
 
 export function NetWorthView({ data }: { data: NetWorth }) {
@@ -8,118 +12,127 @@ export function NetWorthView({ data }: { data: NetWorth }) {
   const topHoldings = data.breakdowns.topHoldings;
 
   return (
-    <div className="space-y-4">
-      {currencies.length === 0 ? <p>No balances.</p> : <CurrencyTable currencies={currencies} />}
-      <section className="space-y-2">
-        <h2 className="text-base font-medium">By customer</h2>
-        {byCustomer.length === 0 ? <p>None.</p> : (
-          <table className="border-collapse text-sm">
-            <thead>
-              <tr>
-                <th className="border border-slate-200 px-2 py-1 text-left">Name</th>
-                <th className="border border-slate-200 px-2 py-1 text-left">Net</th>
-              </tr>
-            </thead>
-            <tbody>
+    <div className="flex flex-col gap-6">
+      {currencies.length === 0 ? <Muted>No balances.</Muted> : <CurrencyTable currencies={currencies} />}
+      <Section title="By customer">
+        {byCustomer.length === 0 ? <Muted>None.</Muted> : (
+          <TableCard>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Net</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {byCustomer.map((row) => (
-                <tr key={row.customerId}>
-                  <td className="border border-slate-200 px-2 py-1">
-                    <Link to={`/customers/${row.customerId}`}>{row.name}</Link>
-                  </td>
-                  <td className="border border-slate-200 px-2 py-1">
+                <TableRow key={row.customerId}>
+                  <TableCell>
+                    <Link to={`/customers/${row.customerId}`} className="font-medium underline-offset-4 hover:underline">
+                      {row.name}
+                    </Link>
+                  </TableCell>
+                  <TableCell>
                     {row.currencies.map((currency) => (
                       <span key={currency.currency} className="mr-3">
                         <span>{currency.currency}</span> <span>{currency.net}</span>
                       </span>
                     ))}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </TableCard>
         )}
-      </section>
-      <section className="space-y-2">
-        <h2 className="text-base font-medium">By account type</h2>
-        {byAccountType.length === 0 ? <p>None.</p> : (
-          <table className="border-collapse text-sm">
-            <thead>
-              <tr>
-                <th className="border border-slate-200 px-2 py-1 text-left">Type</th>
-                <th className="border border-slate-200 px-2 py-1 text-left">Net</th>
-              </tr>
-            </thead>
-            <tbody>
+      </Section>
+      <Section title="By account type">
+        {byAccountType.length === 0 ? <Muted>None.</Muted> : (
+          <TableCard>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Type</TableHead>
+                <TableHead>Net</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {byAccountType.map((row) => (
-                <tr key={row.type}>
-                  <td className="border border-slate-200 px-2 py-1">{row.type}</td>
-                  <td className="border border-slate-200 px-2 py-1">
+                <TableRow key={row.type}>
+                  <TableCell>{row.type}</TableCell>
+                  <TableCell>
                     {row.currencies.map((currency) => (
                       <span key={currency.currency} className="mr-3">
                         <span>{currency.currency}</span> <span>{currency.net}</span>
                       </span>
                     ))}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </TableCard>
         )}
-      </section>
-      <section className="space-y-2">
-        <h2 className="text-base font-medium">Top holdings</h2>
-        {topHoldings.length === 0 ? <p>None.</p> : (
-          <table aria-label="Top holdings" className="border-collapse text-sm">
-            <thead>
-              <tr>
-                <th className="border border-slate-200 px-2 py-1 text-left">Symbol</th>
-                <th className="border border-slate-200 px-2 py-1 text-left">Quantity</th>
-                <th className="border border-slate-200 px-2 py-1 text-left">Market value</th>
-                <th className="border border-slate-200 px-2 py-1 text-left">Currency</th>
-              </tr>
-            </thead>
-            <tbody>
+      </Section>
+      <Section title="Top holdings">
+        {topHoldings.length === 0 ? <Muted>None.</Muted> : (
+          <TableCard label="Top holdings">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Symbol</TableHead>
+                <TableHead>Quantity</TableHead>
+                <TableHead>Market value</TableHead>
+                <TableHead>Currency</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {topHoldings.map((row) => (
-                <tr key={row.instrumentId}>
-                  <td className="border border-slate-200 px-2 py-1">{row.symbol}</td>
-                  <td className="border border-slate-200 px-2 py-1">{row.quantity}</td>
-                  <td className="border border-slate-200 px-2 py-1">{row.marketValue}</td>
-                  <td className="border border-slate-200 px-2 py-1">{row.currency}</td>
-                </tr>
+                <TableRow key={row.instrumentId}>
+                  <TableCell>{row.symbol}</TableCell>
+                  <TableCell>{row.quantity}</TableCell>
+                  <TableCell>{row.marketValue}</TableCell>
+                  <TableCell>{row.currency}</TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </TableCard>
         )}
-      </section>
+      </Section>
     </div>
+  );
+}
+
+function TableCard({ label, children }: { label?: string; children: ReactNode }) {
+  return (
+    <Card className="gap-0 py-0">
+      <CardContent className="px-0">
+        <Table aria-label={label}>{children}</Table>
+      </CardContent>
+    </Card>
   );
 }
 
 function CurrencyTable({ currencies }: { currencies: NetWorth["currencies"] }) {
   return (
-    <table className="border-collapse text-sm">
-      <thead>
-        <tr>
-          <th className="border border-slate-200 px-2 py-1 text-left">Currency</th>
-          <th className="border border-slate-200 px-2 py-1 text-left">Cash</th>
-          <th className="border border-slate-200 px-2 py-1 text-left">Holdings</th>
-          <th className="border border-slate-200 px-2 py-1 text-left">Assets</th>
-          <th className="border border-slate-200 px-2 py-1 text-left">Liabilities</th>
-          <th className="border border-slate-200 px-2 py-1 text-left">Net</th>
-        </tr>
-      </thead>
-      <tbody>
+    <TableCard>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Currency</TableHead>
+          <TableHead>Cash</TableHead>
+          <TableHead>Holdings</TableHead>
+          <TableHead>Assets</TableHead>
+          <TableHead>Liabilities</TableHead>
+          <TableHead>Net</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
         {currencies.map((row) => (
-          <tr key={row.currency}>
-            <th className="border border-slate-200 px-2 py-1 text-left">{row.currency}</th>
-            <td className="border border-slate-200 px-2 py-1">{row.assets.cash}</td>
-            <td className="border border-slate-200 px-2 py-1">{row.assets.holdings}</td>
-            <td className="border border-slate-200 px-2 py-1">{row.assets.total}</td>
-            <td className="border border-slate-200 px-2 py-1">{row.liabilities.total}</td>
-            <td className="border border-slate-200 px-2 py-1">{row.net}</td>
-          </tr>
+          <TableRow key={row.currency}>
+            <TableHead>{row.currency}</TableHead>
+            <TableCell>{row.assets.cash}</TableCell>
+            <TableCell>{row.assets.holdings}</TableCell>
+            <TableCell>{row.assets.total}</TableCell>
+            <TableCell>{row.liabilities.total}</TableCell>
+            <TableCell>{row.net}</TableCell>
+          </TableRow>
         ))}
-      </tbody>
-    </table>
+      </TableBody>
+    </TableCard>
   );
 }

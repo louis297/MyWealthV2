@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import { Muted } from "@/components/portal";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   useGetReportExecutionsQuery,
   type ReportExecution,
@@ -100,38 +103,40 @@ export function ReportHistory({
   }
 
   return (
-    <div className="space-y-2">
-      <button type="button" className="border border-slate-300 bg-white px-3 py-1 text-sm" onClick={() => setOpen((value) => !value)}>
+    <div className="flex flex-col items-start gap-2">
+      <Button type="button" variant="outline" size="sm" onClick={() => setOpen((value) => !value)}>
         History
-      </button>
+      </Button>
       {shown ? (
-        <div className="space-y-2 text-sm">
-          {history.isLoading ? <p>Loading history…</p> : null}
+        <div className="flex w-full flex-col gap-2 text-sm">
+          {history.isLoading ? <Muted>Loading history…</Muted> : null}
           {history.isError ? (
-            <div className="space-y-2">
+            <div className="flex flex-col items-start gap-2">
               <p>History could not be loaded.</p>
-              <button type="button" onClick={() => void history.refetch()}>
+              <Button type="button" variant="outline" size="sm" onClick={() => void history.refetch()}>
                 Retry
-              </button>
+              </Button>
             </div>
           ) : null}
-          {!history.isLoading && !history.isError && rows.length === 0 ? <p>No runs yet.</p> : null}
+          {!history.isLoading && !history.isError && rows.length === 0 ? <Muted>No runs yet.</Muted> : null}
           {downloadError ? <p>Download not available.</p> : null}
           {rows.map((item) => {
             const range = summary(item.parameters);
             return (
-              <p key={item.id}>
-                <span>{item.status}</span>
+              <div key={item.id} className="flex flex-wrap items-center gap-2 rounded-md border bg-card px-2 py-1.5">
+                <Badge variant={item.status === "Failed" ? "outline" : "secondary"}>
+                  <span>{item.status}</span>
+                </Badge>
                 <span>{item.triggerKind}</span>
                 <span>{item.created.slice(0, 10)}</span>
                 {range ? <span>{range}</span> : null}
                 {item.asOf ? <span>{item.asOf}</span> : null}
                 {item.status === "Succeeded" ? (
-                  <button type="button" onClick={() => void onDownload(item.id)}>
+                  <Button type="button" variant="outline" size="sm" onClick={() => void onDownload(item.id)}>
                     Download
-                  </button>
+                  </Button>
                 ) : null}
-              </p>
+              </div>
             );
           })}
           {history.data ? (
