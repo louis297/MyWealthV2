@@ -1,6 +1,36 @@
 import type { ReactNode } from "react";
-import { NavLink, Outlet } from "react-router";
+import type { LucideIcon } from "lucide-react";
+import {
+  ArrowLeftRightIcon,
+  FileChartColumnIcon,
+  LandmarkIcon,
+  LayoutDashboardIcon,
+  LogOutIcon,
+  UserRoundCogIcon,
+  UserRoundIcon,
+  UsersIcon,
+  WalletIcon,
+} from "lucide-react";
+import { NavLink, Outlet, useLocation } from "react-router";
 import { useAppSelector } from "@/app/hooks";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 import { startEndSession } from "@/features/session/session";
 import {
   canAccessAccounts,
@@ -13,65 +43,129 @@ import {
   roles,
 } from "@/features/session/roles";
 
+type ShellNavItem = {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  visible: boolean;
+};
+
 export function ShellLayout({ children }: { children?: ReactNode }) {
   const me = useAppSelector((state) => state.session.currentUser);
   const tenant = useAppSelector((state) => state.session.tenant);
   const firmName = me?.role === roles.systemAdmin ? "Platform" : tenant?.name;
+  const { pathname } = useLocation();
+  const role = me?.role;
+
+  const nav: ShellNavItem[] = [
+    {
+      to: "/dashboard",
+      label: "Dashboard",
+      icon: LayoutDashboardIcon,
+      visible: canAccessDashboard(role),
+    },
+    {
+      to: "/reports",
+      label: "Reports",
+      icon: FileChartColumnIcon,
+      visible: canAccessReports(role),
+    },
+    {
+      to: "/accounts",
+      label: "Accounts",
+      icon: WalletIcon,
+      visible: canAccessAccounts(role),
+    },
+    {
+      to: "/transactions",
+      label: "Transactions",
+      icon: ArrowLeftRightIcon,
+      visible: canAccessTransactions(role),
+    },
+    {
+      to: "/customers",
+      label: "Customers",
+      icon: UsersIcon,
+      visible: canAccessCustomers(role),
+    },
+    {
+      to: "/advisers",
+      label: "Advisers",
+      icon: UserRoundCogIcon,
+      visible: canAccessAdvisers(role),
+    },
+    {
+      to: "/profile",
+      label: "Profile",
+      icon: UserRoundIcon,
+      visible: canAccessProfile(role),
+    },
+  ];
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-slate-200 bg-white px-4 py-2 text-sm">
-        <span className="font-medium">Adviser Portal</span>
-        {firmName ? <span>{firmName}</span> : null}
-        {me?.tenantCode ? <span className="text-slate-500">{me.tenantCode}</span> : null}
-        {me?.name ? <span>{me.name}</span> : null}
-        {me?.role ? <span>{me.role}</span> : null}
-        <button type="button" className="ml-auto" onClick={() => void startEndSession()}>
-          Sign out
-        </button>
-      </header>
-      <div className="flex min-h-[calc(100vh-2.75rem)]">
-        <nav className="w-48 border-r border-slate-200 bg-white p-4 text-sm">
-          <ul className="space-y-2">
-            {canAccessDashboard(me?.role) ? (
-              <li>
-                <NavLink to="/dashboard">Dashboard</NavLink>
-              </li>
-            ) : null}
-            {canAccessReports(me?.role) ? (
-              <li>
-                <NavLink to="/reports">Reports</NavLink>
-              </li>
-            ) : null}
-            {canAccessAccounts(me?.role) ? (
-              <li>
-                <NavLink to="/accounts">Accounts</NavLink>
-              </li>
-            ) : null}
-            {canAccessTransactions(me?.role) ? (
-              <li>
-                <NavLink to="/transactions">Transactions</NavLink>
-              </li>
-            ) : null}
-            {canAccessCustomers(me?.role) ? (
-              <li>
-                <NavLink to="/customers">Customers</NavLink>
-              </li>
-            ) : null}
-            {canAccessAdvisers(me?.role) ? (
-              <li>
-                <NavLink to="/advisers">Advisers</NavLink>
-              </li>
-            ) : null}
-            {canAccessProfile(me?.role) ? (
-              <li>
-                <NavLink to="/profile">Profile</NavLink>
-              </li>
-            ) : null}
-          </ul>
-        </nav>
-        <main className="flex-1 p-4">{children ?? <Outlet />}</main>
-      </div>
-    </div>
+    <SidebarProvider>
+      <Sidebar collapsible="icon" variant="inset">
+        <SidebarHeader>
+          <div className="flex items-center gap-2 px-1 py-1">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+              <LandmarkIcon className="size-4" />
+            </div>
+            <span className="truncate text-sm font-medium group-data-[collapsible=icon]:hidden">
+              Adviser Portal
+            </span>
+          </div>
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>Navigate</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {nav
+                  .filter((item) => item.visible)
+                  .map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <SidebarMenuItem key={item.to}>
+                        <SidebarMenuButton
+                          render={<NavLink to={item.to} />}
+                          isActive={isNavActive(pathname, item.to)}
+                          tooltip={item.label}
+                        >
+                          <Icon />
+                          <span>{item.label}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+        <SidebarRail />
+      </Sidebar>
+      <SidebarInset>
+        <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2">
+          <SidebarTrigger />
+          <Separator orientation="vertical" className="h-4" />
+          {firmName ? <span className="text-sm font-medium">{firmName}</span> : null}
+          {me?.tenantCode ? (
+            <span className="text-sm text-muted-foreground">{me.tenantCode}</span>
+          ) : null}
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {me?.name ? <span className="text-sm">{me.name}</span> : null}
+            {me?.role ? <Badge variant="secondary">{me.role}</Badge> : null}
+            <Button variant="outline" size="sm" onClick={() => void startEndSession()}>
+              <LogOutIcon />
+              Sign out
+            </Button>
+          </div>
+        </header>
+        <div className="flex flex-1 flex-col p-4">{children ?? <Outlet />}</div>
+      </SidebarInset>
+    </SidebarProvider>
   );
+}
+
+function isNavActive(pathname: string, to: string) {
+  return pathname === to || pathname.startsWith(`${to}/`);
 }
