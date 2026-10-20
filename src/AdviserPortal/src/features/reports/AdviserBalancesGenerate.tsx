@@ -2,6 +2,7 @@ import { type FormEvent, useState } from "react";
 import { useGetAdvisersQuery } from "@/features/advisers/advisersApi";
 import { useRequestReportMutation } from "@/features/reports/reportsApi";
 import { roles } from "@/features/session/roles";
+import { Button } from "@/components/ui/button";
 
 export function AdviserBalancesGenerate({
   reportId,
@@ -73,17 +74,16 @@ export function AdviserBalancesGenerate({
             />
             Include closed accounts
           </label>
-          <button
+          <Button
             type="submit"
             className="border border-slate-300 bg-white px-3 py-1 text-sm"
             disabled={isLoading || blocked}
           >
             Generate now
-          </button>
+          </Button>
         </form>
       ) : (
-        <button
-          type="button"
+        <Button
           className="border border-slate-300 bg-white px-3 py-1 text-sm"
           onClick={() => {
             setQueued(false);
@@ -91,7 +91,7 @@ export function AdviserBalancesGenerate({
           }}
         >
           Generate now
-        </button>
+        </Button>
       )}
     </div>
   );

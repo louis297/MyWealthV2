@@ -42,6 +42,7 @@ import {
   canAccessReports,
   roles,
 } from "@/features/session/roles";
+import { ModeToggle } from '@/components/mode-toggle';
 
 type ShellNavItem = {
   to: string;
@@ -154,6 +155,7 @@ export function ShellLayout({ children }: { children?: ReactNode }) {
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {me?.name ? <span className="text-sm">{me.name}</span> : null}
             {me?.role ? <Badge variant="secondary">{me.role}</Badge> : null}
+            <ModeToggle />
             <Button variant="outline" size="sm" onClick={() => void startEndSession()}>
               <LogOutIcon />
               Sign out

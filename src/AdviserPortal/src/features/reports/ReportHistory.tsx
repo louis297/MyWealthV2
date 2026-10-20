@@ -6,6 +6,7 @@ import {
   type ReportScope,
 } from "@/features/reports/reportsApi";
 import { Pager } from "@/shared/components/Pager";
+import { Button } from "@/components/ui/button";
 
 function summary(parameters: ReportParameters): string | null {
   if (typeof parameters.from === "string" && typeof parameters.to === "string") {
@@ -101,18 +102,18 @@ export function ReportHistory({
 
   return (
     <div className="space-y-2">
-      <button type="button" className="border border-slate-300 bg-white px-3 py-1 text-sm" onClick={() => setOpen((value) => !value)}>
+      <Button className="border border-slate-300 bg-white px-3 py-1 text-sm" onClick={() => setOpen((value) => !value)}>
         History
-      </button>
+      </Button>
       {shown ? (
         <div className="space-y-2 text-sm">
           {history.isLoading ? <p>Loading history…</p> : null}
           {history.isError ? (
             <div className="space-y-2">
               <p>History could not be loaded.</p>
-              <button type="button" onClick={() => void history.refetch()}>
+              <Button onClick={() => void history.refetch()}>
                 Retry
-              </button>
+              </Button>
             </div>
           ) : null}
           {!history.isLoading && !history.isError && rows.length === 0 ? <p>No runs yet.</p> : null}
@@ -127,9 +128,9 @@ export function ReportHistory({
                 {range ? <span>{range}</span> : null}
                 {item.asOf ? <span>{item.asOf}</span> : null}
                 {item.status === "Succeeded" ? (
-                  <button type="button" onClick={() => void onDownload(item.id)}>
+                  <Button onClick={() => void onDownload(item.id)}>
                     Download
-                  </button>
+                  </Button>
                 ) : null}
               </p>
             );

@@ -4,6 +4,7 @@ import {
   type ReportCatalogItem,
   type ReportScope,
 } from "@/features/reports/reportsApi";
+import { Button } from "@/components/ui/button";
 
 export function ReportCatalog({
   scope,
@@ -30,9 +31,9 @@ export function ReportCatalog({
       {isError ? (
         <div className="space-y-2 text-sm">
           <p>Reports could not be loaded.</p>
-          <button type="button" onClick={() => void refetch()}>
+          <Button onClick={() => void refetch()}>
             Retry
-          </button>
+          </Button>
         </div>
       ) : null}
       {!isLoading && !isError && data && data.length === 0 ? <p>{emptyMessage}</p> : null}

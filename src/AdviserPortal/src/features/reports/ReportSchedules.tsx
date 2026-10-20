@@ -12,6 +12,7 @@ import {
   type ReportScope,
 } from "@/features/reports/reportsApi";
 import { roles } from "@/features/session/roles";
+import { Button } from "@/components/ui/button";
 
 function isStatus(error: unknown, status: number) {
   return typeof error === "object" && error !== null && "status" in error && error.status === status;
@@ -132,18 +133,18 @@ export function ReportSchedules({
 
   return (
     <div className="space-y-2">
-      <button type="button" className="border border-slate-300 bg-white px-3 py-1 text-sm" onClick={() => setOpen((value) => !value)}>
+      <Button className="border border-slate-300 bg-white px-3 py-1 text-sm" onClick={() => setOpen((value) => !value)}>
         Schedules
-      </button>
+      </Button>
       {open ? (
         <div className="space-y-2">
           {schedules.isLoading ? <p>Loading schedules…</p> : null}
           {schedules.isError ? (
             <div className="space-y-2 text-sm">
               <p>Schedules could not be loaded.</p>
-              <button type="button" onClick={() => void schedules.refetch()}>
+              <Button onClick={() => void schedules.refetch()}>
                 Retry
-              </button>
+              </Button>
             </div>
           ) : null}
           {!schedules.isLoading && !schedules.isError && rows.length === 0 ? <p>No schedules.</p> : null}
@@ -154,12 +155,12 @@ export function ReportSchedules({
               {typeof item.parameters.to === "string" ? <span>{item.parameters.to}</span> : null}
               {item.isActive ? (
                 <>
-                  <button type="button" onClick={() => beginEdit(item)}>
+                  <Button onClick={() => beginEdit(item)}>
                     Edit
-                  </button>
-                  <button type="button" onClick={() => void onDisable(item.id)}>
+                  </Button>
+                  <Button onClick={() => void onDisable(item.id)}>
                     Disable schedule
-                  </button>
+                  </Button>
                 </>
               ) : (
                 <span>Inactive</span>
@@ -263,13 +264,13 @@ export function ReportSchedules({
               <input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} />
               Active
             </label>
-            <button
+            <Button
               type="submit"
               className="border border-slate-300 bg-white px-3 py-1 text-sm"
               disabled={isLoading || blocked}
             >
               {editing ? "Save schedule" : "Create schedule"}
-            </button>
+            </Button>
           </form>
         </div>
       ) : null}
