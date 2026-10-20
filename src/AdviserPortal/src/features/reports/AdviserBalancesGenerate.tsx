@@ -65,7 +65,7 @@ export function AdviserBalancesGenerate({
           <CheckField checked={includeClosedAccounts} onChange={(event) => setIncludeClosedAccounts(event.target.checked)}>
             Include closed accounts
           </CheckField>
-          <Button type="submit" size="sm" disabled={isLoading || blocked}>
+          <Button type="submit" variant="outline" size="sm" disabled={isLoading || blocked}>
             Generate now
           </Button>
         </form>
@@ -73,6 +73,7 @@ export function AdviserBalancesGenerate({
         <Button
           type="button"
           size="sm"
+          variant="outline"
           onClick={() => {
             setQueued(false);
             setOpen(true);
