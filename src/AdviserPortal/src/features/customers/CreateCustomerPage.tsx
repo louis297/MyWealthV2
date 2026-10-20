@@ -1,6 +1,9 @@
 import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router";
 import { useAppSelector } from "@/app/hooks";
+import { ErrorNotice, Page, PageHeading, SelectField, TextField } from "@/components/portal";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { useGetAdvisersQuery } from "@/features/advisers/advisersApi";
 import { useCreateCustomerMutation } from "@/features/customers/customersApi";
 import { roles } from "@/features/session/roles";
@@ -42,88 +45,59 @@ export function CreateCustomerPage() {
   }
 
   return (
-    <div className="max-w-lg space-y-4">
-      <h1 className="text-xl font-medium">New customer</h1>
-      {error ? <p>{error}</p> : null}
-      <form className="space-y-3" onSubmit={(event) => void onSubmit(event)}>
-        <div>
-          <label htmlFor="customer-name" className="block text-sm">
-            Name
-          </label>
-          <input
-            id="customer-name"
-            className="mt-1 w-full border border-slate-300 px-2 py-1"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="customer-email" className="block text-sm">
-            Email
-          </label>
-          <input
-            id="customer-email"
-            type="email"
-            className="mt-1 w-full border border-slate-300 px-2 py-1"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="customer-password" className="block text-sm">
-            Password
-          </label>
-          <input
-            id="customer-password"
-            type="password"
-            minLength={8}
-            className="mt-1 w-full border border-slate-300 px-2 py-1"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="customer-confirm-password" className="block text-sm">
-            Confirm password
-          </label>
-          <input
-            id="customer-confirm-password"
-            type="password"
-            minLength={8}
-            className="mt-1 w-full border border-slate-300 px-2 py-1"
-            value={confirmPassword}
-            onChange={(event) => setConfirmPassword(event.target.value)}
-            required
-          />
-        </div>
-        {isTenantAdmin ? (
-          <div>
-            <label htmlFor="customer-adviser" className="block text-sm">
-              Adviser
-            </label>
-            <select
-              id="customer-adviser"
-              className="mt-1 w-full border border-slate-300 px-2 py-1"
-              value={adviserId}
-              onChange={(event) => setAdviserId(event.target.value)}
+    <Page className="max-w-lg">
+      <PageHeading title="New customer" />
+      {error ? <ErrorNotice>{error}</ErrorNotice> : null}
+      <Card>
+        <CardContent>
+          <form className="flex flex-col gap-4" onSubmit={(event) => void onSubmit(event)}>
+            <TextField id="customer-name" label="Name" value={name} onChange={(event) => setName(event.target.value)} required />
+            <TextField
+              id="customer-email"
+              label="Email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
               required
-            >
-              <option value="">Select an adviser</option>
-              {activeAdvisers.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : null}
-        <button type="submit" className="border border-slate-300 bg-white px-3 py-1 text-sm">
-          Create customer
-        </button>
-      </form>
-    </div>
+            />
+            <TextField
+              id="customer-password"
+              label="Password"
+              type="password"
+              minLength={8}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+            <TextField
+              id="customer-confirm-password"
+              label="Confirm password"
+              type="password"
+              minLength={8}
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              required
+            />
+            {isTenantAdmin ? (
+              <SelectField
+                id="customer-adviser"
+                label="Adviser"
+                value={adviserId}
+                onChange={(event) => setAdviserId(event.target.value)}
+                required
+              >
+                <option value="">Select an adviser</option>
+                {activeAdvisers.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </SelectField>
+            ) : null}
+            <Button type="submit">Create customer</Button>
+          </form>
+        </CardContent>
+      </Card>
+    </Page>
   );
 }

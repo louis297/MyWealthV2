@@ -1,5 +1,8 @@
 import { type FormEvent, useState } from "react";
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
+import { DetailGrid, DetailItem, Muted, Page, PageHeading, StatusBadge, TextField } from "@/components/portal";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useUpdateMeMutation, useUpdateMePasswordMutation } from "@/features/profile/profileApi";
 import { startLogin } from "@/features/session/session";
 import { clearSession } from "@/features/session/sessionSlice";
@@ -14,7 +17,7 @@ export function ProfilePage() {
   const [updateMePassword] = useUpdateMePasswordMutation();
 
   if (!me) {
-    return <p>Loading session…</p>;
+    return <Muted>Loading session…</Muted>;
   }
 
   const profile = me;
@@ -32,77 +35,63 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="max-w-lg space-y-8">
-      <h1 className="text-xl font-medium">Profile</h1>
-      <dl className="space-y-2 text-sm">
-        <div>
-          <dt className="text-slate-500">Email</dt>
-          <dd>{profile.email}</dd>
-        </div>
-        <div>
-          <dt className="text-slate-500">Role</dt>
-          <dd>{profile.role}</dd>
-        </div>
-        <div>
-          <dt className="text-slate-500">Status</dt>
-          <dd>{profile.status}</dd>
-        </div>
-        <div>
-          <dt className="text-slate-500">Tenant</dt>
-          <dd>{profile.tenantCode ?? "—"}</dd>
-        </div>
-        <div>
-          <dt className="text-slate-500">Id</dt>
-          <dd>{profile.id}</dd>
-        </div>
-      </dl>
-      <form className="space-y-3" onSubmit={(event) => void onSaveName(event)}>
-        <div>
-          <label htmlFor="profile-name" className="block text-sm">
-            Name
-          </label>
-          <input
-            id="profile-name"
-            className="mt-1 w-full border border-slate-300 px-2 py-1"
-            value={name}
-            maxLength={200}
-            onChange={(event) => setName(event.target.value)}
-          />
-        </div>
-        <button type="submit" className="border border-slate-300 bg-white px-3 py-1 text-sm">
-          Save name
-        </button>
-      </form>
-      <form className="space-y-3" onSubmit={(event) => void onChangePassword(event)}>
-        <div>
-          <label htmlFor="profile-current-password" className="block text-sm">
-            Current password
-          </label>
-          <input
-            id="profile-current-password"
-            type="password"
-            className="mt-1 w-full border border-slate-300 px-2 py-1"
-            value={currentPassword}
-            onChange={(event) => setCurrentPassword(event.target.value)}
-          />
-        </div>
-        <div>
-          <label htmlFor="profile-new-password" className="block text-sm">
-            New password
-          </label>
-          <input
-            id="profile-new-password"
-            type="password"
-            minLength={8}
-            className="mt-1 w-full border border-slate-300 px-2 py-1"
-            value={newPassword}
-            onChange={(event) => setNewPassword(event.target.value)}
-          />
-        </div>
-        <button type="submit" className="border border-slate-300 bg-white px-3 py-1 text-sm">
-          Change password
-        </button>
-      </form>
-    </div>
+    <Page className="max-w-lg">
+      <PageHeading title="Profile" />
+      <Card>
+        <CardContent>
+          <DetailGrid>
+            <DetailItem label="Email">{profile.email}</DetailItem>
+            <DetailItem label="Role">{profile.role}</DetailItem>
+            <DetailItem label="Status">
+              <StatusBadge status={profile.status} />
+            </DetailItem>
+            <DetailItem label="Tenant">{profile.tenantCode ?? "—"}</DetailItem>
+            <DetailItem label="Id">{profile.id}</DetailItem>
+          </DetailGrid>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Name</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form className="flex flex-col gap-4" onSubmit={(event) => void onSaveName(event)}>
+            <TextField
+              id="profile-name"
+              label="Name"
+              value={name}
+              maxLength={200}
+              onChange={(event) => setName(event.target.value)}
+            />
+            <Button type="submit">Save name</Button>
+          </form>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Password</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form className="flex flex-col gap-4" onSubmit={(event) => void onChangePassword(event)}>
+            <TextField
+              id="profile-current-password"
+              label="Current password"
+              type="password"
+              value={currentPassword}
+              onChange={(event) => setCurrentPassword(event.target.value)}
+            />
+            <TextField
+              id="profile-new-password"
+              label="New password"
+              type="password"
+              minLength={8}
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+            />
+            <Button type="submit">Change password</Button>
+          </form>
+        </CardContent>
+      </Card>
+    </Page>
   );
 }

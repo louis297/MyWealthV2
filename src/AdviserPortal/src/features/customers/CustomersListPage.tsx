@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { useAppSelector } from "@/app/hooks";
+import { CheckField, FilterBar, Page, PageHeading, recordLinkClass, SelectField, StatusBadge, TextField } from "@/components/portal";
+import { buttonVariants } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useGetAdvisersQuery } from "@/features/advisers/advisersApi";
 import { useGetCustomersQuery } from "@/features/customers/customersApi";
 import { roles } from "@/features/session/roles";
 import { Pager } from "@/shared/components/Pager";
+import { cn } from "cn";
 
 function createdDate(value: string) {
   return value.slice(0, 10);
@@ -77,84 +82,81 @@ export function CustomersListPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-medium">Customers</h1>
-        <Link to="/customers/new" className="border border-slate-300 bg-white px-3 py-1 text-sm">
-          New customer
-        </Link>
-      </div>
-      <div className="flex flex-wrap items-end gap-3 text-sm">
-        <div>
-          <label htmlFor="customers-search" className="block">
-            Search
-          </label>
-          <input
-            id="customers-search"
-            className="mt-1 border border-slate-300 px-2 py-1"
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-          />
-        </div>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={enabledOnly}
-            onChange={(event) => updateParam("enabledOnly", event.target.checked ? "true" : null)}
-          />
+    <Page>
+      <PageHeading
+        title="Customers"
+        actions={
+          <Link to="/customers/new" className={cn(buttonVariants({ size: "sm" }))}>
+            New customer
+          </Link>
+        }
+      />
+      <FilterBar>
+        <TextField
+          id="customers-search"
+          label="Search"
+          className="w-56"
+          value={searchInput}
+          onChange={(event) => setSearchInput(event.target.value)}
+        />
+        <CheckField checked={enabledOnly} onChange={(event) => updateParam("enabledOnly", event.target.checked ? "true" : null)}>
           Active only
-        </label>
+        </CheckField>
         {isTenantAdmin ? (
-          <div>
-            <label htmlFor="customers-adviser" className="block">
-              Adviser
-            </label>
-            <select
-              id="customers-adviser"
-              className="mt-1 border border-slate-300 px-2 py-1"
-              value={adviserId}
-              onChange={(event) => updateParam("adviserId", event.target.value || null)}
-            >
-              <option value="">All</option>
-              {(advisers?.items ?? []).map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <SelectField
+            id="customers-adviser"
+            label="Adviser"
+            className="w-56"
+            value={adviserId}
+            onChange={(event) => updateParam("adviserId", event.target.value || null)}
+          >
+            <option value="">All</option>
+            {(advisers?.items ?? []).map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </SelectField>
         ) : null}
-      </div>
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-slate-200">
-            <th className="py-2">Name</th>
-            <th>Email</th>
-            <th>Status</th>
-            <th>Adviser</th>
-            <th>Created</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(data?.items ?? []).map((item) => (
-            <tr key={item.id} className="border-b border-slate-100">
-              <td className="py-2">
-                <Link to={`/customers/${item.id}`}>{item.name}</Link>
-              </td>
-              <td>{item.email}</td>
-              <td>{item.status}</td>
-              <td>{adviserName(item.adviserId)}</td>
-              <td>{createdDate(item.created)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      </FilterBar>
+      <Card className="gap-0 py-0">
+        <CardContent className="px-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Adviser</TableHead>
+                <TableHead>Created</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(data?.items ?? []).map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell>
+                    <Link to={`/customers/${item.id}`} className={recordLinkClass}>
+                      {item.name}
+                    </Link>
+                  </TableCell>
+                  <TableCell>{item.email}</TableCell>
+                  <TableCell>
+                    <StatusBadge status={item.status} />
+                  </TableCell>
+                  <TableCell>{adviserName(item.adviserId)}</TableCell>
+                  <TableCell>{createdDate(item.created)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
       <Pager
         page={page}
         pageSize={20}
         totalCount={data?.totalCount ?? 0}
         onPage={(next) => updateParam("page", String(next))}
       />
-    </div>
+    </Page>
   );
 }

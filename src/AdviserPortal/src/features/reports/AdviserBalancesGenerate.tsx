@@ -1,8 +1,9 @@
 import { type FormEvent, useState } from "react";
+import { CheckField, SelectField } from "@/components/portal";
+import { Button } from "@/components/ui/button";
 import { useGetAdvisersQuery } from "@/features/advisers/advisersApi";
 import { useRequestReportMutation } from "@/features/reports/reportsApi";
 import { roles } from "@/features/session/roles";
-import { Button } from "@/components/ui/button";
 
 export function AdviserBalancesGenerate({
   reportId,
@@ -41,50 +42,37 @@ export function AdviserBalancesGenerate({
   }
 
   return (
-    <div className="space-y-2">
-      {queued ? <p>Report queued</p> : null}
+    <div className="flex flex-col items-start gap-2">
+      {queued ? <p className="text-sm text-muted-foreground">Report queued</p> : null}
       {open ? (
-        <form className="space-y-2" onSubmit={(event) => void onSubmit(event)}>
+        <form className="flex w-full flex-col gap-3 rounded-lg bg-muted/40 p-3" onSubmit={(event) => void onSubmit(event)}>
           {needsAdviser ? (
-            <div>
-              <label htmlFor={`adviser-${reportId}`} className="block text-sm">
-                Adviser
-              </label>
-              <select
-                id={`adviser-${reportId}`}
-                className="mt-1 w-full border border-slate-300 px-2 py-1"
-                value={adviserId}
-                onChange={(event) => setAdviserId(event.target.value)}
-                required
-              >
-                <option value="">Select an adviser</option>
-                {advisers?.items.map((adviser) => (
-                  <option key={adviser.id} value={adviser.id}>
-                    {adviser.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <SelectField
+              id={`adviser-${reportId}`}
+              label="Adviser"
+              value={adviserId}
+              onChange={(event) => setAdviserId(event.target.value)}
+              required
+            >
+              <option value="">Select an adviser</option>
+              {advisers?.items.map((adviser) => (
+                <option key={adviser.id} value={adviser.id}>
+                  {adviser.name}
+                </option>
+              ))}
+            </SelectField>
           ) : null}
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={includeClosedAccounts}
-              onChange={(event) => setIncludeClosedAccounts(event.target.checked)}
-            />
+          <CheckField checked={includeClosedAccounts} onChange={(event) => setIncludeClosedAccounts(event.target.checked)}>
             Include closed accounts
-          </label>
-          <Button
-            type="submit"
-            className="border border-slate-300 bg-white px-3 py-1 text-sm"
-            disabled={isLoading || blocked}
-          >
+          </CheckField>
+          <Button type="submit" size="sm" disabled={isLoading || blocked}>
             Generate now
           </Button>
         </form>
       ) : (
         <Button
-          className="border border-slate-300 bg-white px-3 py-1 text-sm"
+          type="button"
+          size="sm"
           onClick={() => {
             setQueued(false);
             setOpen(true);

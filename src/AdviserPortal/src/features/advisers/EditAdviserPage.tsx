@@ -1,5 +1,8 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
+import { ConflictNotice, Muted, Page, PageHeading, TextField } from "@/components/portal";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { useGetAdviserQuery, useUpdateAdviserMutation } from "@/features/advisers/advisersApi";
 
 function isConflict(error: unknown) {
@@ -38,34 +41,31 @@ export function EditAdviserPage() {
   }
 
   if (error && "status" in error && error.status === 404) {
-    return <p>Not found</p>;
+    return <Muted>Not found</Muted>;
   }
 
   if (isLoading || !data) {
-    return <p>Loading…</p>;
+    return <Muted>Loading…</Muted>;
   }
 
   return (
-    <div className="max-w-lg space-y-4">
-      <h1 className="text-xl font-medium">Edit adviser</h1>
-      {conflict ? <p>This row changed. Reload and try again.</p> : null}
-      <form className="space-y-3" onSubmit={(event) => void onSubmit(event)}>
-        <div>
-          <label htmlFor="edit-adviser-name" className="block text-sm">
-            Name
-          </label>
-          <input
-            id="edit-adviser-name"
-            className="mt-1 w-full border border-slate-300 px-2 py-1"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            required
-          />
-        </div>
-        <button type="submit" className="border border-slate-300 bg-white px-3 py-1 text-sm">
-          Save
-        </button>
-      </form>
-    </div>
+    <Page className="max-w-lg">
+      <PageHeading title="Edit adviser" />
+      {conflict ? <ConflictNotice /> : null}
+      <Card>
+        <CardContent>
+          <form className="flex flex-col gap-4" onSubmit={(event) => void onSubmit(event)}>
+            <TextField
+              id="edit-adviser-name"
+              label="Name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              required
+            />
+            <Button type="submit">Save</Button>
+          </form>
+        </CardContent>
+      </Card>
+    </Page>
   );
 }

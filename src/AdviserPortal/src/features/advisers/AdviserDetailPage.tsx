@@ -1,10 +1,15 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router";
+import { ConflictNotice, DetailGrid, DetailItem, Muted, Page, PageHeading, StatusBadge } from "@/components/portal";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   useDisableAdviserMutation,
   useEnableAdviserMutation,
   useGetAdviserQuery,
 } from "@/features/advisers/advisersApi";
+import { cn } from "cn";
 
 const assignedCustomersMessage =
   "Reassign or disable assigned customers before disabling this adviser.";
@@ -63,55 +68,57 @@ export function AdviserDetailPage() {
   }
 
   if (error && "status" in error && error.status === 404) {
-    return <p>Not found</p>;
+    return <Muted>Not found</Muted>;
   }
 
   if (isLoading || !data) {
-    return <p>Loading…</p>;
+    return <Muted>Loading…</Muted>;
   }
 
   return (
-    <div className="max-w-lg space-y-4">
-      <h1 className="text-xl font-medium">{data.name}</h1>
-      {conflict ? <p>This row changed. Reload and try again.</p> : null}
+    <Page className="max-w-lg">
+      <PageHeading
+        title={data.name}
+        actions={
+          <>
+            <Link to={`/advisers/${data.id}/edit`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+              Edit
+            </Link>
+            {data.status === "disabled" ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => void runStatusChange("enable")}>
+                Enable
+              </Button>
+            ) : (
+              <Button type="button" variant="destructive" size="sm" onClick={() => void runStatusChange("disable")}>
+                Disable
+              </Button>
+            )}
+          </>
+        }
+      />
+      {conflict ? <ConflictNotice /> : null}
       {guardMessage ? (
-        <p>
-          {guardMessage}{" "}
-          <Link to={`/customers?adviserId=${data.id}`}>View assigned customers</Link>
-        </p>
+        <Alert variant="destructive">
+          <AlertDescription>
+            {guardMessage}{" "}
+            <Link to={`/customers?adviserId=${data.id}`} className="underline underline-offset-4">
+              View assigned customers
+            </Link>
+          </AlertDescription>
+        </Alert>
       ) : null}
-      <dl className="space-y-2 text-sm">
-        <div>
-          <dt className="text-slate-500">Email</dt>
-          <dd>{data.email}</dd>
-        </div>
-        <div>
-          <dt className="text-slate-500">Status</dt>
-          <dd>{data.status}</dd>
-        </div>
-        <div>
-          <dt className="text-slate-500">Created</dt>
-          <dd>{data.created.slice(0, 10)}</dd>
-        </div>
-        <div>
-          <dt className="text-slate-500">Id</dt>
-          <dd>{data.id}</dd>
-        </div>
-      </dl>
-      <div className="flex gap-2 text-sm">
-        <Link to={`/advisers/${data.id}/edit`} className="border border-slate-300 bg-white px-3 py-1">
-          Edit
-        </Link>
-        {data.status === "disabled" ? (
-          <button type="button" onClick={() => void runStatusChange("enable")}>
-            Enable
-          </button>
-        ) : (
-          <button type="button" onClick={() => void runStatusChange("disable")}>
-            Disable
-          </button>
-        )}
-      </div>
-    </div>
+      <Card>
+        <CardContent>
+          <DetailGrid>
+            <DetailItem label="Email">{data.email}</DetailItem>
+            <DetailItem label="Status">
+              <StatusBadge status={data.status} />
+            </DetailItem>
+            <DetailItem label="Created">{data.created.slice(0, 10)}</DetailItem>
+            <DetailItem label="Id">{data.id}</DetailItem>
+          </DetailGrid>
+        </CardContent>
+      </Card>
+    </Page>
   );
 }

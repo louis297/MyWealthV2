@@ -1,5 +1,8 @@
 import { type FormEvent, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
+import { Messages, Muted, Page, PageHeading, SelectField, TextField } from "@/components/portal";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { useGetAccountHoldingsQuery, useGetAccountQuery } from "@/features/accounts/accountsApi";
 import { useGetInstrumentsQuery } from "@/features/instruments/instrumentsApi";
 import { useCreateTransactionMutation } from "@/features/transactions/transactionsApi";
@@ -125,136 +128,96 @@ export function CreateTransactionPage() {
   const cashType = isCashType(type);
 
   if (isNotFound(account.error)) {
-    return <p>Not found</p>;
+    return <Muted>Not found</Muted>;
   }
 
   return (
-    <div className="max-w-lg space-y-4">
-      <h1 className="text-xl font-medium">New transaction</h1>
+    <Page className="max-w-lg">
+      <PageHeading title="New transaction" />
       {account.data ? (
-        <p>
+        <p className="text-sm">
           Cash balance <span>{account.data.cashBalance}</span>
         </p>
       ) : null}
       {(holdings.data?.items ?? []).map((item) => (
-        <p key={item.id}>
+        <p key={item.id} className="text-sm">
           {item.symbol} quantity <span>{item.quantity}</span>
         </p>
       ))}
-      {messages.map((message) => (
-        <p key={message}>{message}</p>
-      ))}
-      <form className="space-y-3" onSubmit={(event) => void onSubmit(event)}>
-        <div>
-          <label htmlFor="transaction-type" className="block text-sm">
-            Type
-          </label>
-          <select
-            id="transaction-type"
-            className="mt-1 w-full border border-slate-300 px-2 py-1"
-            value={type}
-            onChange={(event) => setType(event.target.value)}
-          >
-            {offeredTypes.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-        </div>
-        {cashType ? (
-          <>
-            <div>
-              <label htmlFor="transaction-amount" className="block text-sm">
-                Amount
-              </label>
-              <input
-                id="transaction-amount"
-                className="mt-1 w-full border border-slate-300 px-2 py-1"
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="transaction-memo" className="block text-sm">
-                Memo
-              </label>
-              <input
-                id="transaction-memo"
-                className="mt-1 w-full border border-slate-300 px-2 py-1"
-                value={memo}
-                onChange={(event) => setMemo(event.target.value)}
-                maxLength={200}
-              />
-            </div>
-          </>
-        ) : (
-          <>
-            <div>
-              <label htmlFor="transaction-instrument" className="block text-sm">
-                Instrument
-              </label>
-              <select
-                id="transaction-instrument"
-                className="mt-1 w-full border border-slate-300 px-2 py-1"
-                value={instrumentId}
-                onChange={(event) => setInstrumentId(event.target.value)}
-                required
-              >
-                <option value="">Select an instrument</option>
-                {(instruments.data?.items ?? []).map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.symbol} {item.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="transaction-quantity" className="block text-sm">
-                {type === "Split" || type === "Bonus" || type === "Scrip" ? "New total quantity" : "Quantity"}
-              </label>
-              <input
-                id="transaction-quantity"
-                className="mt-1 w-full border border-slate-300 px-2 py-1"
-                value={quantity}
-                onChange={(event) => setQuantity(event.target.value)}
-                required
-              />
-            </div>
-            {type === "StockIn" ? (
-              <div>
-                <label htmlFor="transaction-cost" className="block text-sm">
-                  Cost
-                </label>
-                <input
-                  id="transaction-cost"
-                  className="mt-1 w-full border border-slate-300 px-2 py-1"
-                  value={cost}
-                  onChange={(event) => setCost(event.target.value)}
+      <Messages messages={messages} />
+      <Card>
+        <CardContent>
+          <form className="flex flex-col gap-4" onSubmit={(event) => void onSubmit(event)}>
+            <SelectField id="transaction-type" label="Type" value={type} onChange={(event) => setType(event.target.value)}>
+              {offeredTypes.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </SelectField>
+            {cashType ? (
+              <>
+                <TextField
+                  id="transaction-amount"
+                  label="Amount"
+                  value={amount}
+                  onChange={(event) => setAmount(event.target.value)}
                   required
                 />
-              </div>
-            ) : null}
-          </>
-        )}
-        <div>
-          <label htmlFor="transaction-booked-at" className="block text-sm">
-            Booked at
-          </label>
-          <input
-            id="transaction-booked-at"
-            type="datetime-local"
-            className="mt-1 w-full border border-slate-300 px-2 py-1"
-            value={bookedAt}
-            onChange={(event) => setBookedAt(event.target.value)}
-            required
-          />
-        </div>
-        <button type="submit" className="border border-slate-300 px-3 py-1 text-sm">
-          Post transaction
-        </button>
-      </form>
-    </div>
+                <TextField
+                  id="transaction-memo"
+                  label="Memo"
+                  value={memo}
+                  onChange={(event) => setMemo(event.target.value)}
+                  maxLength={200}
+                />
+              </>
+            ) : (
+              <>
+                <SelectField
+                  id="transaction-instrument"
+                  label="Instrument"
+                  value={instrumentId}
+                  onChange={(event) => setInstrumentId(event.target.value)}
+                  required
+                >
+                  <option value="">Select an instrument</option>
+                  {(instruments.data?.items ?? []).map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.symbol} {item.name}
+                    </option>
+                  ))}
+                </SelectField>
+                <TextField
+                  id="transaction-quantity"
+                  label={type === "Split" || type === "Bonus" || type === "Scrip" ? "New total quantity" : "Quantity"}
+                  value={quantity}
+                  onChange={(event) => setQuantity(event.target.value)}
+                  required
+                />
+                {type === "StockIn" ? (
+                  <TextField
+                    id="transaction-cost"
+                    label="Cost"
+                    value={cost}
+                    onChange={(event) => setCost(event.target.value)}
+                    required
+                  />
+                ) : null}
+              </>
+            )}
+            <TextField
+              id="transaction-booked-at"
+              label="Booked at"
+              type="datetime-local"
+              value={bookedAt}
+              onChange={(event) => setBookedAt(event.target.value)}
+              required
+            />
+            <Button type="submit">Post transaction</Button>
+          </form>
+        </CardContent>
+      </Card>
+    </Page>
   );
 }

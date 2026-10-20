@@ -1,5 +1,8 @@
 import { type FormEvent, useState } from "react";
 import { useNavigate, useParams } from "react-router";
+import { Messages, Page, PageHeading, SelectField, TextField } from "@/components/portal";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { useCreateAccountMutation } from "@/features/accounts/accountsApi";
 import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
 
@@ -49,65 +52,38 @@ export function CreateAccountPage() {
   }
 
   return (
-    <div className="max-w-lg space-y-4">
-      <h1 className="text-xl font-medium">New account</h1>
-      {messages.map((message) => (
-        <p key={message}>{message}</p>
-      ))}
-      <form className="space-y-3" onSubmit={(event) => void onSubmit(event)}>
-        <div>
-          <label htmlFor="account-name" className="block text-sm">
-            Name
-          </label>
-          <input
-            id="account-name"
-            className="mt-1 w-full border border-slate-300 px-2 py-1"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="account-type" className="block text-sm">
-            Type
-          </label>
-          <select
-            id="account-type"
-            className="mt-1 w-full border border-slate-300 px-2 py-1"
-            value={type}
-            onChange={(event) => setType(event.target.value)}
-            required
-          >
-            {accountTypes.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="account-currency" className="block text-sm">
-            Currency
-          </label>
-          <select
-            id="account-currency"
-            className="mt-1 w-full border border-slate-300 px-2 py-1"
-            value={currency}
-            onChange={(event) => setCurrency(event.target.value)}
-            required
-          >
-            <option value="">Select a currency</option>
-            {(currencies ?? []).map((item) => (
-              <option key={item.code} value={item.code}>
-                {item.code}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button type="submit" className="border border-slate-300 bg-white px-3 py-1 text-sm">
-          Create account
-        </button>
-      </form>
-    </div>
+    <Page className="max-w-lg">
+      <PageHeading title="New account" />
+      <Messages messages={messages} />
+      <Card>
+        <CardContent>
+          <form className="flex flex-col gap-4" onSubmit={(event) => void onSubmit(event)}>
+            <TextField id="account-name" label="Name" value={name} onChange={(event) => setName(event.target.value)} required />
+            <SelectField id="account-type" label="Type" value={type} onChange={(event) => setType(event.target.value)} required>
+              {accountTypes.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </SelectField>
+            <SelectField
+              id="account-currency"
+              label="Currency"
+              value={currency}
+              onChange={(event) => setCurrency(event.target.value)}
+              required
+            >
+              <option value="">Select a currency</option>
+              {(currencies ?? []).map((item) => (
+                <option key={item.code} value={item.code}>
+                  {item.code}
+                </option>
+              ))}
+            </SelectField>
+            <Button type="submit">Create account</Button>
+          </form>
+        </CardContent>
+      </Card>
+    </Page>
   );
 }

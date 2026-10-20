@@ -1,5 +1,8 @@
 import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router";
+import { ErrorNotice, Page, PageHeading, TextField } from "@/components/portal";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { useCreateAdviserMutation } from "@/features/advisers/advisersApi";
 
 export function CreateAdviserPage() {
@@ -27,67 +30,43 @@ export function CreateAdviserPage() {
   }
 
   return (
-    <div className="max-w-lg space-y-4">
-      <h1 className="text-xl font-medium">New adviser</h1>
-      {error ? <p>{error}</p> : null}
-      <form className="space-y-3" onSubmit={(event) => void onSubmit(event)}>
-        <div>
-          <label htmlFor="adviser-name" className="block text-sm">
-            Name
-          </label>
-          <input
-            id="adviser-name"
-            className="mt-1 w-full border border-slate-300 px-2 py-1"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="adviser-email" className="block text-sm">
-            Email
-          </label>
-          <input
-            id="adviser-email"
-            type="email"
-            className="mt-1 w-full border border-slate-300 px-2 py-1"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="adviser-password" className="block text-sm">
-            Password
-          </label>
-          <input
-            id="adviser-password"
-            type="password"
-            minLength={8}
-            className="mt-1 w-full border border-slate-300 px-2 py-1"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="adviser-confirm-password" className="block text-sm">
-            Confirm password
-          </label>
-          <input
-            id="adviser-confirm-password"
-            type="password"
-            minLength={8}
-            className="mt-1 w-full border border-slate-300 px-2 py-1"
-            value={confirmPassword}
-            onChange={(event) => setConfirmPassword(event.target.value)}
-            required
-          />
-        </div>
-        <button type="submit" className="border border-slate-300 bg-white px-3 py-1 text-sm">
-          Create adviser
-        </button>
-      </form>
-    </div>
+    <Page className="max-w-lg">
+      <PageHeading title="New adviser" />
+      {error ? <ErrorNotice>{error}</ErrorNotice> : null}
+      <Card>
+        <CardContent>
+          <form className="flex flex-col gap-4" onSubmit={(event) => void onSubmit(event)}>
+            <TextField id="adviser-name" label="Name" value={name} onChange={(event) => setName(event.target.value)} required />
+            <TextField
+              id="adviser-email"
+              label="Email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+            <TextField
+              id="adviser-password"
+              label="Password"
+              type="password"
+              minLength={8}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+            <TextField
+              id="adviser-confirm-password"
+              label="Confirm password"
+              type="password"
+              minLength={8}
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              required
+            />
+            <Button type="submit">Create adviser</Button>
+          </form>
+        </CardContent>
+      </Card>
+    </Page>
   );
 }
