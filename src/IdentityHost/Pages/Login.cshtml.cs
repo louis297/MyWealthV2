@@ -15,7 +15,8 @@ namespace MyWealthV2.IdentityHost.Pages;
 public class LoginModel(
     UserManager<ApplicationUser> userManager,
     SignInManager<ApplicationUser> signInManager,
-    IApplicationDbContext db) : PageModel
+    IApplicationDbContext db,
+    ITenantIdAccessor tenantIds) : PageModel
 {
     public const string UniformFailure = "Invalid login.";
 
@@ -89,6 +90,8 @@ public class LoginModel(
         {
             return null;
         }
+
+        tenantIds.Engage(tenant.Id);
 
         return await db.Users.SingleOrDefaultAsync(
             person => person.TenantId == tenant.Id && person.Email == Email,

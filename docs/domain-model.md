@@ -3,7 +3,7 @@ title: Domain model
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-10-12
+updated: 2026-10-21
 related:
   - README.md
   - glossary.md
@@ -26,7 +26,7 @@ The session protocol (OpenIddict, authorization code + PKCE, refresh) lives on t
 ## 1. Modelling rules
 
 - Entities inherit `BaseEntity` (`int Id`) or `BaseAuditableEntity`. APIs expose `PublicId` (UUID). Internal keys do not appear in routes or JSON.
-- Tenant-scoped business entities carry `TenantId`. Isolation is shared database + database FK + application dual check + EF filter + isolation tests. SystemAdmin has no tenant.
+- Tenant-scoped business entities carry `TenantId`. Isolation is shared database + database FK + application dual check + EF global query filter (safety net) + isolation tests. The filter is engaged only when a tenant id is known. SystemAdmin has no tenant, so the filter stays disengaged.
 - A currency code must exist in the platform catalog and, when used as a **new** reference, be enabled. Access is through `ICurrencyCatalog`. The hot path does not JOIN.
 - `Money` is a domain value object (amount + currency). Never persist a bare `decimal`. Phase 1 has no balance column; the type still lives in Domain so the ledger does not invent a second amount shape.
 - Invariants live on entities / domain services, not only in FluentValidation.
@@ -177,6 +177,8 @@ Do not add a fifth role in Phase 1. Ledger permission names are registered when 
 ## 6. Domain events (Phase 1)
 
 Raise even if there is no subscriber yet. The application uses these events to revoke tokens and write audit.
+
+Events are dispatched after a successful `SaveChanges` on the same context. They are **not** part of the database transaction. A failure in a handler does not roll back the original change; the side effect is eventually consistent. See [fixes/domain-event-dispatch.md](fixes/domain-event-dispatch.md).
 
 | Event | When |
 | --- | --- |

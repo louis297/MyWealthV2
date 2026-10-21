@@ -19,13 +19,33 @@ namespace MyWealthV2.Infrastructure.Data;
 public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IApplicationDbContext
 {
     private readonly IServiceProvider? _services;
+    private readonly ITenantIdAccessor? _tenantIds;
+
+    public bool TenantFilterEngaged => _tenantIds?.IsEngaged == true;
+
+    public int? CurrentTenantId => _tenantIds?.TenantId;
 
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
     {
     }
 
+    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, ITenantIdAccessor tenantIds)
+        : this(options)
+    {
+        _tenantIds = tenantIds;
+    }
+
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, IServiceProvider services)
         : base(options)
+    {
+        _services = services;
+    }
+
+    public ApplicationDbContext(
+        DbContextOptions<ApplicationDbContext> options,
+        IServiceProvider services,
+        ITenantIdAccessor tenantIds)
+        : this(options, tenantIds)
     {
         _services = services;
     }
@@ -137,6 +157,47 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
         base.OnModelCreating(builder);
         builder.UseOpenIddict();
         builder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+        ApplyTenantQueryFilters(builder);
+    }
+
+    private void ApplyTenantQueryFilters(ModelBuilder builder)
+    {
+        foreach (var entityType in builder.Model.GetEntityTypes().ToList())
+        {
+            var clrType = entityType.ClrType;
+            if (clrType is null
+                || clrType == typeof(ApplicationUser)
+                || entityType.BaseType is not null
+                || clrType.Namespace?.StartsWith("OpenIddict", StringComparison.Ordinal) == true)
+            {
+                continue;
+            }
+
+            var tenantId = entityType.FindProperty("TenantId");
+            if (tenantId?.ClrType != typeof(int) && tenantId?.ClrType != typeof(int?))
+            {
+                continue;
+            }
+
+            typeof(ApplicationDbContext)
+                .GetMethod(nameof(ApplyTenantQueryFilter), BindingFlags.Instance | BindingFlags.NonPublic)!
+                .MakeGenericMethod(clrType)
+                .Invoke(this, [builder, tenantId.ClrType == typeof(int?)]);
+        }
+    }
+
+    private void ApplyTenantQueryFilter<TEntity>(ModelBuilder builder, bool nullableTenantId)
+        where TEntity : class
+    {
+        if (nullableTenantId)
+        {
+            builder.Entity<TEntity>().HasQueryFilter(entity =>
+                !TenantFilterEngaged || EF.Property<int?>(entity, "TenantId") == CurrentTenantId);
+            return;
+        }
+
+        builder.Entity<TEntity>().HasQueryFilter(entity =>
+            !TenantFilterEngaged || EF.Property<int>(entity, "TenantId") == CurrentTenantId);
     }
 
     private static bool IsUniqueConstraintViolation(DbUpdateException exception) =>

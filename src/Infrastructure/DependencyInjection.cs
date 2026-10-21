@@ -43,6 +43,7 @@ public static class DependencyInjection
 
         builder.EnrichSqlServerDbContext<ApplicationDbContext>();
 
+        builder.Services.AddScoped<ITenantIdAccessor, TenantIdAccessor>();
         builder.Services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
         builder.Services.AddSingleton<ICurrencyCatalog, CurrencyCatalog>();
         builder.Services.AddSingleton<MarketDataMock>();

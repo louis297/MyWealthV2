@@ -3,7 +3,7 @@ title: Architecture
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-09-21
+updated: 2026-10-21
 related:
   - README.md
   - glossary.md
@@ -122,10 +122,10 @@ Minimal API → MediatR. Pipeline order:
 
 Logging → UnhandledException → Authorization → Validation → Performance → Handler
 
-Save interceptors:
+Save interceptors and post-save dispatch:
 
-- `AuditableEntityInterceptor`
-- `DispatchDomainEventsInterceptor`
+- `AuditableEntityInterceptor` (registered interceptor)
+- Domain events are dispatched by an explicit call in `ApplicationDbContext.SaveChangesAsync` after `base.SaveChangesAsync`. They are **not** part of the database transaction. A failure in an event handler does not roll back the original change. If `IMediator` cannot be resolved the failure is logged (not silently ignored). See [fixes/domain-event-dispatch.md](fixes/domain-event-dispatch.md).
 
 Writes to Tenant / User check `RowVersion`. Conflict maps to HTTP 409.
 
@@ -216,7 +216,7 @@ identity-auth scripts: SchemaVersions, Identity user tables, OpenIddict tables, 
 | Authentication | OpenIddict authorization code + PKCE; hosted login; short JWT + revocable refresh | `identity` issues; `webapi` validates; Infrastructure is shared |
 | Login key | Non-SystemAdmin must send tenantCode. Email unique inside a tenant. SystemAdmin email unique globally | Hosted login + Domain lookup |
 | Authorization | Named policies + code Role → permission; scope in the handler | `webapi` endpoints + Application (ADR 0013) |
-| Tenancy | Shared database + row `TenantId` + **database FK** + application dual check + EF filter + isolation tests | Everywhere. No SQL RLS, database-per-tenant, schema-per-tenant, or subdomain in Phase 1 |
+| Tenancy | Shared database + row `TenantId` + **database FK** + application dual check + EF global query filter (safety net) + isolation tests | Everywhere. No SQL RLS, database-per-tenant, schema-per-tenant, or subdomain in Phase 1. See [fixes/tenant-query-filter.md](fixes/tenant-query-filter.md) |
 | Currency | `Currencies` catalog + in-memory `ICurrencyCatalog` | Domain rules + Infrastructure |
 | Instruments / market / FX | Phase 2 instruments slice. Tenant table + mocked ports | [features/instruments.md](features/instruments.md) |
 | Keys | Internal `int` identity; HTTP uses `PublicId` UUID | Domain / database / API |
@@ -228,7 +228,7 @@ identity-auth scripts: SchemaVersions, Identity user tables, OpenIddict tables, 
 | CORS | No portal CORS on `webapi` (`5e85e9c`). BFF does not add credentialed CORS. Scalar stays on the `webapi` origin | `webapi` |
 | Ports | See §6 | Defined in Application, implemented in Infrastructure |
 
-Tenant resolution: login requires tenantCode except for SystemAdmin. The JWT carries tenant PublicId and `tenantCode` (empty for SystemAdmin). Request handling must **not** trust only an easy-to-miss global filter. Repositories / handlers tighten to the current tenant again (dual check). Isolation tests are a CI gate.
+Tenant resolution: login requires tenantCode except for SystemAdmin. The JWT carries tenant PublicId and `tenantCode` (empty for SystemAdmin). An EF global query filter on tenant-scoped entities acts as a safety net. The filter is engaged only after a tenant id is known (`ITenantIdAccessor` on the `DbContext`). Until then it matches every row, so login lookup, the current-user load, schema tests, and seeders keep working. A tenant-code login and a MediatR request engage it before the user or handler query. The report job and the disabled-tenant token revoke engage it from the row they just loaded. SystemAdmin has no tenant, so the filter stays disengaged and the handler predicate remains the control. `IgnoreQueryFilters()` is the escape hatch for a query that must cross tenants while the filter is engaged. Request handling must **not** trust only the filter. Repositories / handlers tighten to the current tenant again (dual check). Isolation tests are a CI gate.
 
 API paths and JSON use PublicId only. Internal code still uses `int`.
 
