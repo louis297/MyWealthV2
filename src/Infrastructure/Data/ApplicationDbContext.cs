@@ -179,7 +179,7 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
                 continue;
             }
 
-            GetType()
+            typeof(ApplicationDbContext)
                 .GetMethod(nameof(ApplyTenantQueryFilter), BindingFlags.Instance | BindingFlags.NonPublic)!
                 .MakeGenericMethod(clrType)
                 .Invoke(this, [builder, tenantId.ClrType == typeof(int?)]);

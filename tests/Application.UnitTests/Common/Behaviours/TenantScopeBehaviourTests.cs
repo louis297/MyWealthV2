@@ -3,6 +3,7 @@ using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Moq;
+using MyWealthV2.Application.Common.Behaviours;
 using NUnit.Framework;
 using Shouldly;
 
@@ -43,7 +44,11 @@ public class TenantScopeBehaviourTests
         currentUser.Setup(user => user.Id).Returns((string?)null);
 
         var builder = Host.CreateApplicationBuilder();
-        builder.AddApplicationServices();
+        builder.Services.AddMediatR(cfg =>
+        {
+            cfg.RegisterServicesFromAssembly(typeof(ProbeRequest).Assembly);
+            cfg.AddOpenBehavior(typeof(TenantScopeBehaviour<,>));
+        });
         builder.Services.AddSingleton(currentUser.Object);
         builder.Services.AddSingleton<IUser>(currentUser.Object);
         builder.Services.AddSingleton<ITenantIdAccessor>(accessor);
