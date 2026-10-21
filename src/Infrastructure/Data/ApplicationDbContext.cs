@@ -19,13 +19,33 @@ namespace MyWealthV2.Infrastructure.Data;
 public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IApplicationDbContext
 {
     private readonly IServiceProvider? _services;
+    private readonly ITenantIdAccessor? _tenantIds;
+
+    public bool TenantFilterEngaged => _tenantIds?.IsEngaged == true;
+
+    public int? CurrentTenantId => _tenantIds?.TenantId;
 
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
     {
     }
 
+    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, ITenantIdAccessor tenantIds)
+        : this(options)
+    {
+        _tenantIds = tenantIds;
+    }
+
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, IServiceProvider services)
         : base(options)
+    {
+        _services = services;
+    }
+
+    public ApplicationDbContext(
+        DbContextOptions<ApplicationDbContext> options,
+        IServiceProvider services,
+        ITenantIdAccessor tenantIds)
+        : this(options, tenantIds)
     {
         _services = services;
     }
