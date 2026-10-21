@@ -11,7 +11,8 @@ public sealed class ReportJob(
     IReportGeneratorRegistry generators,
     IReportFileStore files,
     IReportScheduler scheduler,
-    TimeProvider time)
+    TimeProvider time,
+    ITenantIdAccessor tenantIds)
 {
     public async Task Execute(Guid executionId)
     {
@@ -21,6 +22,8 @@ public sealed class ReportJob(
         {
             return;
         }
+
+        tenantIds.Engage(execution.TenantId);
 
         execution.MarkRunning();
         await db.SaveChangesAsync(CancellationToken.None);
@@ -71,7 +74,14 @@ public sealed class ReportJob(
     {
         var schedule = await db.ReportSchedules
             .SingleOrDefaultAsync(row => row.PublicId == scheduleId);
-        if (schedule is null || !schedule.IsActive)
+        if (schedule is null)
+        {
+            return;
+        }
+
+        tenantIds.Engage(schedule.TenantId);
+
+        if (!schedule.IsActive)
         {
             return;
         }

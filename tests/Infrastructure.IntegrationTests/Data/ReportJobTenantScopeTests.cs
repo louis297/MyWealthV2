@@ -32,7 +32,8 @@ public class ReportJobTenantScopeTests
         {
             Code = report.Code
         };
-        var job = new ReportJob(db, new SingleRegistry(generator), new NoFileStore(), new NoScheduler(), TimeProvider.System);
+        var job = new ReportJob(
+            db, new SingleRegistry(generator), new NoFileStore(), new NoScheduler(), TimeProvider.System, accessor);
 
         await job.Execute(execution.PublicId);
 
@@ -51,7 +52,8 @@ public class ReportJobTenantScopeTests
         db.ReportSchedules.Add(schedule);
         await db.SaveChangesAsync();
 
-        var job = new ReportJob(db, new SingleRegistry(new UnusedGenerator()), new NoFileStore(), new NoScheduler(), TimeProvider.System);
+        var job = new ReportJob(
+            db, new SingleRegistry(new UnusedGenerator()), new NoFileStore(), new NoScheduler(), TimeProvider.System, accessor);
 
         await job.RunScheduled(schedule.PublicId);
 
