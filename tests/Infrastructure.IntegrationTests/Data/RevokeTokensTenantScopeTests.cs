@@ -29,8 +29,8 @@ public class RevokeTokensTenantScopeTests
 
         gate.UsersReadWhileEngaged.ShouldBe(true);
         accessor.TenantId.ShouldBe(tenantA.Id);
-        revocation.Subjects.ShouldBe([adminA.PublicId.ToString()]);
-        revocation.Subjects.ShouldNotContain(adminB.PublicId.ToString());
+        revocation.Subjects.Select(Guid.Parse).ShouldBe([adminA.PublicId]);
+        revocation.Subjects.Select(Guid.Parse).ShouldNotContain(adminB.PublicId);
     }
 
     private static ApplicationDbContext OpenDb(TenantIdAccessor accessor)

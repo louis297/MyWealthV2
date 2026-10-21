@@ -12,6 +12,7 @@ public class RevokeTokensOnTenantDisabled(IServiceScopeFactory scopes) : INotifi
         using var scope = scopes.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
         var revocation = scope.ServiceProvider.GetRequiredService<ITokenRevocation>();
+        scope.ServiceProvider.GetRequiredService<ITenantIdAccessor>().Engage(notification.Tenant.Id);
 
         var subjects = await db.Users.AsNoTracking()
             .Where(user => user.TenantId == notification.Tenant.Id)
