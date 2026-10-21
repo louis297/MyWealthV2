@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Entities;
@@ -84,6 +85,8 @@ public class TenantQueryFilterTests
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlServer(SchemaDatabaseSetup.ConnectionString)
+            .ConfigureWarnings(warnings => warnings.Throw(
+                CoreEventId.PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning))
             .Options;
         return new ApplicationDbContext(options, accessor);
     }

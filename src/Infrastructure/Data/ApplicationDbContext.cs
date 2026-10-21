@@ -157,6 +157,47 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
         base.OnModelCreating(builder);
         builder.UseOpenIddict();
         builder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+        ApplyTenantQueryFilters(builder);
+    }
+
+    private void ApplyTenantQueryFilters(ModelBuilder builder)
+    {
+        foreach (var entityType in builder.Model.GetEntityTypes().ToList())
+        {
+            var clrType = entityType.ClrType;
+            if (clrType is null
+                || clrType == typeof(ApplicationUser)
+                || entityType.BaseType is not null
+                || clrType.Namespace?.StartsWith("OpenIddict", StringComparison.Ordinal) == true)
+            {
+                continue;
+            }
+
+            var tenantId = entityType.FindProperty("TenantId");
+            if (tenantId?.ClrType != typeof(int) && tenantId?.ClrType != typeof(int?))
+            {
+                continue;
+            }
+
+            GetType()
+                .GetMethod(nameof(ApplyTenantQueryFilter), BindingFlags.Instance | BindingFlags.NonPublic)!
+                .MakeGenericMethod(clrType)
+                .Invoke(this, [builder, tenantId.ClrType == typeof(int?)]);
+        }
+    }
+
+    private void ApplyTenantQueryFilter<TEntity>(ModelBuilder builder, bool nullableTenantId)
+        where TEntity : class
+    {
+        if (nullableTenantId)
+        {
+            builder.Entity<TEntity>().HasQueryFilter(entity =>
+                !TenantFilterEngaged || EF.Property<int?>(entity, "TenantId") == CurrentTenantId);
+            return;
+        }
+
+        builder.Entity<TEntity>().HasQueryFilter(entity =>
+            !TenantFilterEngaged || EF.Property<int>(entity, "TenantId") == CurrentTenantId);
     }
 
     private static bool IsUniqueConstraintViolation(DbUpdateException exception) =>
