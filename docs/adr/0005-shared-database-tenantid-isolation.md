@@ -26,7 +26,7 @@ Phase 1 keeps **one shared database (`MyWealthDbV2`) and row-level `TenantId`**,
 
 1. Business tables have a **database FK** `TenantId` → `Tenants` (`Users.TenantId` is null only for SystemAdmin).
 2. `AspNetUsers.TenantId` is a projection column, nullable, **with no FK** (avoids a cycle with `Users.IdentityUserId` → `AspNetUsers`).
-3. Login carries **tenantCode** (no subdomain routing). The JWT carries tenant PublicId and tenantCode. An EF global query filter on tenant-scoped business entities acts as a safety net (SystemAdmin calls `IgnoreQueryFilters()`). Repositories / handlers **tighten to the current tenant again**. Do not trust the filter alone. See [fixes/tenant-query-filter.md](../fixes/tenant-query-filter.md).
+3. Login carries **tenantCode** (no subdomain routing). The JWT carries tenant PublicId and tenantCode. An EF global query filter on tenant-scoped business entities acts as a safety net. The filter is engaged only when a tenant id is known. SystemAdmin has no tenant, so the filter stays disengaged. `IgnoreQueryFilters()` is the escape hatch while the filter is engaged. Repositories / handlers **tighten to the current tenant again**. Do not trust the filter alone. See [fixes/tenant-query-filter.md](../fixes/tenant-query-filter.md).
 4. Email is unique **inside a tenant**. SystemAdmin email is unique globally.
 5. From the Tenants slice onward, cross-tenant read/write tests are a **CI gate** on every business slice.
 6. Phase 1 does not use SQL RLS, database-per-tenant, or schema-per-tenant.

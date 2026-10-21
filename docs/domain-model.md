@@ -26,7 +26,7 @@ The session protocol (OpenIddict, authorization code + PKCE, refresh) lives on t
 ## 1. Modelling rules
 
 - Entities inherit `BaseEntity` (`int Id`) or `BaseAuditableEntity`. APIs expose `PublicId` (UUID). Internal keys do not appear in routes or JSON.
-- Tenant-scoped business entities carry `TenantId`. Isolation is shared database + database FK + application dual check + EF global query filter (safety net) + isolation tests. SystemAdmin has no tenant and calls `IgnoreQueryFilters()`.
+- Tenant-scoped business entities carry `TenantId`. Isolation is shared database + database FK + application dual check + EF global query filter (safety net) + isolation tests. The filter is engaged only when a tenant id is known. SystemAdmin has no tenant, so the filter stays disengaged.
 - A currency code must exist in the platform catalog and, when used as a **new** reference, be enabled. Access is through `ICurrencyCatalog`. The hot path does not JOIN.
 - `Money` is a domain value object (amount + currency). Never persist a bare `decimal`. Phase 1 has no balance column; the type still lives in Domain so the ledger does not invent a second amount shape.
 - Invariants live on entities / domain services, not only in FluentValidation.

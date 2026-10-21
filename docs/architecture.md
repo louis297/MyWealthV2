@@ -228,7 +228,7 @@ identity-auth scripts: SchemaVersions, Identity user tables, OpenIddict tables, 
 | CORS | No portal CORS on `webapi` (`5e85e9c`). BFF does not add credentialed CORS. Scalar stays on the `webapi` origin | `webapi` |
 | Ports | See §6 | Defined in Application, implemented in Infrastructure |
 
-Tenant resolution: login requires tenantCode except for SystemAdmin. The JWT carries tenant PublicId and `tenantCode` (empty for SystemAdmin). An EF global query filter on tenant-scoped entities acts as a safety net. Request handling must **not** trust only the filter. Repositories / handlers tighten to the current tenant again (dual check). SystemAdmin paths call `IgnoreQueryFilters()`. Isolation tests are a CI gate.
+Tenant resolution: login requires tenantCode except for SystemAdmin. The JWT carries tenant PublicId and `tenantCode` (empty for SystemAdmin). An EF global query filter on tenant-scoped entities acts as a safety net. The filter is engaged only after a tenant id is known (`ITenantIdAccessor` on the `DbContext`). Until then it matches every row, so login lookup, the current-user load, schema tests, and seeders keep working. A tenant-code login and a MediatR request engage it before the user or handler query. The report job and the disabled-tenant token revoke engage it from the row they just loaded. SystemAdmin has no tenant, so the filter stays disengaged and the handler predicate remains the control. `IgnoreQueryFilters()` is the escape hatch for a query that must cross tenants while the filter is engaged. Request handling must **not** trust only the filter. Repositories / handlers tighten to the current tenant again (dual check). Isolation tests are a CI gate.
 
 API paths and JSON use PublicId only. Internal code still uses `int`.
 
