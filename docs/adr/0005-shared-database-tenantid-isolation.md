@@ -3,7 +3,7 @@ title: "ADR 0005: Shared database plus row-level TenantId"
 status: accepted
 language: en
 date: 2026-08-18
-updated: 2026-09-12
+updated: 2026-10-21
 related:
   - ../database-design.md
   - ../architecture.md
@@ -14,7 +14,7 @@ related:
 
 Status: accepted
 
-Phase-1 isolation: one shared database + row-level `TenantId` + **dual check** + isolation tests.
+Phase-1 isolation: one shared database + row-level `TenantId` + **dual check** + EF global query filter (safety net) + isolation tests.
 
 ## Context
 
@@ -26,7 +26,7 @@ Phase 1 keeps **one shared database (`MyWealthDbV2`) and row-level `TenantId`**,
 
 1. Business tables have a **database FK** `TenantId` → `Tenants` (`Users.TenantId` is null only for SystemAdmin).
 2. `AspNetUsers.TenantId` is a projection column, nullable, **with no FK** (avoids a cycle with `Users.IdentityUserId` → `AspNetUsers`).
-3. Login carries **tenantCode** (no subdomain routing). The JWT carries tenant PublicId and tenantCode. Repositories / handlers **tighten to the current tenant again**. Do not trust the filter alone.
+3. Login carries **tenantCode** (no subdomain routing). The JWT carries tenant PublicId and tenantCode. An EF global query filter on tenant-scoped business entities acts as a safety net (SystemAdmin calls `IgnoreQueryFilters()`). Repositories / handlers **tighten to the current tenant again**. Do not trust the filter alone. See [fixes/tenant-query-filter.md](../fixes/tenant-query-filter.md).
 4. Email is unique **inside a tenant**. SystemAdmin email is unique globally.
 5. From the Tenants slice onward, cross-tenant read/write tests are a **CI gate** on every business slice.
 6. Phase 1 does not use SQL RLS, database-per-tenant, or schema-per-tenant.
