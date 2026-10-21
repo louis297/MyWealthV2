@@ -242,7 +242,7 @@ describe("AccountDetailPage", () => {
     fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
-      target: { value: "2026-10-11T10:00:00+13:00" },
+      target: { value: "2026-10-11T10:00" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
@@ -352,7 +352,7 @@ describe("AccountDetailPage", () => {
     fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "40" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
-      target: { value: "2026-10-11T11:00:00+13:00" },
+      target: { value: "2026-10-11T11:00" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
@@ -524,7 +524,7 @@ describe("AccountDetailPage", () => {
     fireEvent.change(await screen.findByLabelText("Amount"), { target: { value: "80" } });
     fireEvent.change(screen.getByLabelText("Memo"), { target: { value: "Salary" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
-      target: { value: "2026-10-12T09:00:00+13:00" },
+      target: { value: "2026-10-12T09:00" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
@@ -544,7 +544,7 @@ describe("AccountDetailPage", () => {
       accountId,
       type: "TransferIn",
       amount: 80,
-      bookedAt: "2026-10-12T09:00:00+13:00",
+      bookedAt: "2026-10-12T09:00",
       memo: "Salary",
     });
     expect(post?.headers.get("Idempotency-Key")).toMatch(

@@ -180,7 +180,7 @@ describe("CreateTransactionPage", () => {
     fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
-      target: { value: "2026-10-11T10:00:00+13:00" },
+      target: { value: "2026-10-11T10:00" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
@@ -212,7 +212,7 @@ describe("CreateTransactionPage", () => {
     expect(body).toEqual({
       accountId,
       type: "Buy",
-      bookedAt: "2026-10-11T10:00:00+13:00",
+      bookedAt: "2026-10-11T10:00",
       memo: null,
       reference: null,
       security: [{ instrumentId, quantity: 50 }],
@@ -233,7 +233,7 @@ describe("CreateTransactionPage", () => {
     fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
-      target: { value: "2026-10-11T10:00:00+13:00" },
+      target: { value: "2026-10-11T10:00" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
@@ -254,7 +254,7 @@ describe("CreateTransactionPage", () => {
     fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "200" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
-      target: { value: "2026-10-11T10:00:00+13:00" },
+      target: { value: "2026-10-11T10:00" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
@@ -280,7 +280,7 @@ describe("CreateTransactionPage", () => {
     fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
-      target: { value: "2026-10-11T10:00:00+13:00" },
+      target: { value: "2026-10-11T10:00" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
@@ -299,7 +299,7 @@ describe("CreateTransactionPage", () => {
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "20" } });
     fireEvent.change(screen.getByLabelText("Cost"), { target: { value: "300" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
-      target: { value: "2026-10-11T10:00:00+13:00" },
+      target: { value: "2026-10-11T10:00" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
@@ -308,7 +308,7 @@ describe("CreateTransactionPage", () => {
     expect(body).toEqual({
       accountId,
       type: "StockIn",
-      bookedAt: "2026-10-11T10:00:00+13:00",
+      bookedAt: "2026-10-11T10:00",
       memo: null,
       reference: null,
       security: [{ instrumentId, quantity: 20, cost: 300 }],
@@ -328,7 +328,7 @@ describe("CreateTransactionPage", () => {
     fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "20" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
-      target: { value: "2026-10-11T10:00:00+13:00" },
+      target: { value: "2026-10-11T10:00" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
@@ -358,7 +358,7 @@ describe("CreateTransactionPage", () => {
       fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
       fireEvent.change(screen.getByLabelText("New total quantity"), { target: { value: "200" } });
       fireEvent.change(screen.getByLabelText("Booked at"), {
-        target: { value: "2026-10-12T10:00:00+13:00" },
+        target: { value: "2026-10-12T10:00" },
       });
       fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
@@ -366,7 +366,7 @@ describe("CreateTransactionPage", () => {
       const body = await postedBody(fetchMock);
       expect(body).toMatchObject({
         type,
-        bookedAt: "2026-10-12T10:00:00+13:00",
+        bookedAt: "2026-10-12T10:00",
         security: [{ instrumentId, quantity: 200 }],
       });
       const leg = (body.security as Record<string, unknown>[])[0];
@@ -387,7 +387,7 @@ describe("CreateTransactionPage", () => {
     fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
-      target: { value: "2026-10-11T10:00:00+13:00" },
+      target: { value: "2026-10-11T10:00" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
@@ -421,7 +421,7 @@ describe("CreateTransactionPage", () => {
     fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
-      target: { value: "2026-10-11T10:00:00+13:00" },
+      target: { value: "2026-10-11T10:00" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
@@ -445,7 +445,7 @@ describe("CreateTransactionPage", () => {
     fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
-      target: { value: "2026-10-11T10:00:00+13:00" },
+      target: { value: "2026-10-11T10:00" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
@@ -471,7 +471,7 @@ describe("CreateTransactionPage", () => {
     fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "250.50" } });
     fireEvent.change(screen.getByLabelText("Memo"), { target: { value: "Salary" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
-      target: { value: "2026-10-12T09:00:00+13:00" },
+      target: { value: "2026-10-12T09:00" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
@@ -491,7 +491,7 @@ describe("CreateTransactionPage", () => {
       accountId,
       type: "TransferIn",
       amount: 250.5,
-      bookedAt: "2026-10-12T09:00:00+13:00",
+      bookedAt: "2026-10-12T09:00",
       memo: "Salary",
     });
     expect(body).not.toHaveProperty("security");
@@ -519,7 +519,7 @@ describe("CreateTransactionPage", () => {
     expect(screen.queryByLabelText("Instrument")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "-40.25" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
-      target: { value: "2026-10-12T09:30:00+13:00" },
+      target: { value: "2026-10-12T09:30" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
@@ -530,7 +530,7 @@ describe("CreateTransactionPage", () => {
       accountId,
       type: "TransferOut",
       amount: -40.25,
-      bookedAt: "2026-10-12T09:30:00+13:00",
+      bookedAt: "2026-10-12T09:30",
       memo: null,
     });
     expect(body).not.toHaveProperty("security");
@@ -560,7 +560,7 @@ describe("CreateTransactionPage", () => {
     await screen.findByRole("option", { name: type });
     fireEvent.change(screen.getByLabelText("Amount"), { target: { value: amount } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
-      target: { value: "2026-10-12T09:00:00+13:00" },
+      target: { value: "2026-10-12T09:00" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
@@ -587,7 +587,7 @@ describe("CreateTransactionPage", () => {
     expect(await screen.findByText("1250.5")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "-2000" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
-      target: { value: "2026-10-12T09:30:00+13:00" },
+      target: { value: "2026-10-12T09:30" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
@@ -635,7 +635,7 @@ describe("CreateTransactionPage", () => {
     await screen.findByLabelText("Amount");
     fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "-10" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
-      target: { value: "2026-10-12T09:30:00+13:00" },
+      target: { value: "2026-10-12T09:30" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
@@ -670,7 +670,7 @@ describe("CreateTransactionPage", () => {
 
     fireEvent.change(await screen.findByLabelText("Amount"), { target: { value: "-10" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
-      target: { value: "2026-10-12T09:30:00+13:00" },
+      target: { value: "2026-10-12T09:30" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
@@ -693,7 +693,7 @@ describe("CreateTransactionPage", () => {
 
     fireEvent.change(await screen.findByLabelText("Amount"), { target: { value: "10" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
-      target: { value: "2026-10-12T09:00:00+13:00" },
+      target: { value: "2026-10-12T09:00" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
