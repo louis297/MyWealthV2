@@ -10,6 +10,10 @@ var databaseServer = builder
         container.WithLifetime(ContainerLifetime.Persistent))
     .AddDatabase(Services.Database);
 
+var solutionRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", ".."));
+var reportsPath = Path.Combine(solutionRoot, "artifacts", "reports");
+Directory.CreateDirectory(reportsPath);
+
 var web = builder.AddProject<Projects.Web>(Services.WebApi)
     .WithReference(databaseServer)
     .WaitFor(databaseServer)
@@ -21,7 +25,9 @@ var web = builder.AddProject<Projects.Web>(Services.WebApi)
         url.DisplayText = "Scalar API Reference";
         url.Url = "/scalar";
     })
-    .WithVolume("reports", "/data/reports", env: "Reports__StorageRoot");
+    //.WithBindMount(reportsPath, "/data/reports")
+    .WithEnvironment("Reports__StorageRoot", reportsPath);
+    //.WithVolume("reports", "/data/reports", env: "Reports__StorageRoot");
 
 var identity = builder.AddProject<Projects.IdentityHost>(Services.Identity)
     .WithReference(databaseServer)
@@ -80,7 +86,8 @@ builder.AddProject<Projects.Worker>(Services.Worker)
     .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health", endpointName: "http")
     .WithAspNetCoreEnvironment()
-    .WithVolume("reports", "/data/reports", env: "Reports__StorageRoot")
+    .WithEnvironment("Reports__StorageRoot", reportsPath)
+    //.WithVolume("reports", "/data/reports", env: "Reports__StorageRoot")
     .WithUrlForEndpoint("http", url =>
     {
         url.DisplayText = "Hangfire";
