@@ -7,6 +7,17 @@ namespace MyWealthV2.Infrastructure.Data;
 
 public static class DomainEventDispatcher
 {
+    public static Task DispatchAsync(
+        DbContext context,
+        IServiceProvider? services,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        _ = services;
+        cancellationToken.ThrowIfCancellationRequested();
+        throw new NotImplementedException();
+    }
+
     public static async Task DispatchAsync(
         DbContext context,
         IMediator mediator,
@@ -15,7 +26,6 @@ public static class DomainEventDispatcher
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(mediator);
-        _ = logger;
 
         var entities = context.ChangeTracker
             .Entries<BaseEntity>()
@@ -28,7 +38,17 @@ public static class DomainEventDispatcher
 
         foreach (var domainEvent in domainEvents)
         {
-            await mediator.Publish(domainEvent, cancellationToken);
+            try
+            {
+                await mediator.Publish(domainEvent, cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                logger?.LogError(
+                    exception,
+                    "Domain event {EventType} failed after save. The saved change stays committed.",
+                    domainEvent.GetType().Name);
+            }
         }
     }
 }

@@ -1,5 +1,8 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MyWealthV2.Domain.Common;
 using MyWealthV2.Infrastructure.Data;
@@ -49,6 +52,74 @@ public class DomainEventDispatchTests
         logger.Errors.Count.ShouldBe(1);
         logger.Errors[0].Exception.ShouldBeOfType<InvalidOperationException>();
         logger.Errors[0].Exception!.Message.ShouldBe("boom");
+    }
+
+    [Test]
+    public async Task DispatchAsync_LogsMissingMediator_AndThrowsInDevelopment()
+    {
+        await using var db = new DispatchContext();
+        var entity = Track(db, "pending");
+        var logger = new RecordingLogger();
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(() =>
+            DomainEventDispatcher.DispatchAsync(db, Services(logger, development: true), CancellationToken.None));
+
+        exception.Message.ShouldContain("IMediator");
+        logger.Errors.Count.ShouldBe(1);
+        logger.Errors[0].Message.ShouldContain("IMediator");
+        entity.DomainEvents.Count.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task DispatchAsync_LogsMissingMediator_AndReturnsOutsideDevelopment()
+    {
+        await using var db = new DispatchContext();
+        var entity = Track(db, "pending");
+        var logger = new RecordingLogger();
+
+        await DomainEventDispatcher.DispatchAsync(db, Services(logger, development: false), CancellationToken.None);
+
+        logger.Errors.Count.ShouldBe(1);
+        logger.Errors[0].Message.ShouldContain("IMediator");
+        entity.DomainEvents.Count.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task DispatchAsync_DoesNotLog_WhenThereAreNoEvents()
+    {
+        await using var db = new DispatchContext();
+        var logger = new RecordingLogger();
+
+        await DomainEventDispatcher.DispatchAsync(db, Services(logger, development: true), CancellationToken.None);
+
+        logger.Errors.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task DispatchAsync_DoesNotLog_WhenTheContextHasNoServiceProvider()
+    {
+        await using var db = new DispatchContext();
+        var entity = Track(db, "pending");
+
+        await DomainEventDispatcher.DispatchAsync(db, services: null, CancellationToken.None);
+
+        entity.DomainEvents.Count.ShouldBe(1);
+    }
+
+    private static Tracked Track(DispatchContext db, string name)
+    {
+        var entity = new Tracked();
+        entity.AddDomainEvent(new Ping(name));
+        db.Add(entity);
+        return entity;
+    }
+
+    private static ServiceProvider Services(RecordingLogger logger, bool development)
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ILogger<ApplicationDbContext>>(logger);
+        services.AddSingleton<IHostEnvironment>(new TestEnvironment(development));
+        return services.BuildServiceProvider();
     }
 
     private sealed class DispatchContext : DbContext
@@ -115,7 +186,19 @@ public class DomainEventDispatchTests
             throw new NotSupportedException();
     }
 
-    private sealed class RecordingLogger : ILogger
+    private sealed class TestEnvironment(bool development) : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } =
+            development ? Environments.Development : Environments.Production;
+
+        public string ApplicationName { get; set; } = "tests";
+
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+    }
+
+    private sealed class RecordingLogger : ILogger<ApplicationDbContext>
     {
         public List<(LogLevel Level, Exception? Exception, string Message)> Errors { get; } = [];
 
