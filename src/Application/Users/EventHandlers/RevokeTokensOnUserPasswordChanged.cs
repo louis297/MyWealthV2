@@ -9,6 +9,7 @@ public class RevokeTokensOnUserPasswordChanged(IServiceScopeFactory scopes)
 {
     public async Task Handle(UserPasswordChanged notification, CancellationToken cancellationToken)
     {
+        // Runs during SaveChanges, so resolve services from a new scope instead of the saving context.
         using var scope = scopes.CreateScope();
         var revocation = scope.ServiceProvider.GetRequiredService<ITokenRevocation>();
         await revocation.RevokeSubject(notification.User.PublicId.ToString(), cancellationToken);
