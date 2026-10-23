@@ -29,7 +29,7 @@ public class DependencyInjectionTests
     }
 
     [Test]
-    public void RegistersDispatchDomainEventsInterceptorWhenMediatorIsPresent()
+    public void DoesNotRegisterDispatchDomainEventsInterceptorWhenMediatorIsPresent()
     {
         var builder = CreateBuilder();
         builder.Services.AddScoped<IUser, StubUser>();
@@ -41,7 +41,7 @@ public class DependencyInjectionTests
 
         var interceptors = scope.ServiceProvider.GetServices<ISaveChangesInterceptor>().ToList();
 
-        interceptors.ShouldContain(interceptor => interceptor is DispatchDomainEventsInterceptor);
+        interceptors.ShouldNotContain(interceptor => interceptor is DispatchDomainEventsInterceptor);
     }
 
     [Test]
