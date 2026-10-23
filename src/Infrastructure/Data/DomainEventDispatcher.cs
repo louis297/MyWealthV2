@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using MyWealthV2.Domain.Common;
 
 namespace MyWealthV2.Infrastructure.Data;
@@ -9,10 +10,12 @@ public static class DomainEventDispatcher
     public static async Task DispatchAsync(
         DbContext context,
         IMediator mediator,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(mediator);
+        _ = logger;
 
         var entities = context.ChangeTracker
             .Entries<BaseEntity>()

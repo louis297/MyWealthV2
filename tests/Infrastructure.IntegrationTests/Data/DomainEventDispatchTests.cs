@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using MyWealthV2.Domain.Common;
 using MyWealthV2.Infrastructure.Data;
 using Shouldly;
@@ -27,6 +28,29 @@ public class DomainEventDispatchTests
         entity.DomainEvents.ShouldBeEmpty();
     }
 
+    [Test]
+    public async Task DispatchAsync_LogsHandlerFailure_AndPublishesTheNextEvent()
+    {
+        await using var db = new DispatchContext();
+        var entity = new Tracked();
+        var failing = new Ping("fail");
+        var next = new Ping("next");
+        entity.AddDomainEvent(failing);
+        entity.AddDomainEvent(next);
+        db.Add(entity);
+
+        var mediator = new RecordingMediator();
+        var logger = new RecordingLogger();
+
+        await DomainEventDispatcher.DispatchAsync(db, mediator, CancellationToken.None, logger);
+
+        mediator.Published.ShouldBe([failing, next]);
+        entity.DomainEvents.ShouldBeEmpty();
+        logger.Errors.Count.ShouldBe(1);
+        logger.Errors[0].Exception.ShouldBeOfType<InvalidOperationException>();
+        logger.Errors[0].Exception!.Message.ShouldBe("boom");
+    }
+
     private sealed class DispatchContext : DbContext
     {
         public DispatchContext()
@@ -52,15 +76,24 @@ public class DomainEventDispatchTests
 
         public Task Publish(object notification, CancellationToken cancellationToken = default)
         {
-            Published.Add((BaseEvent)notification);
+            Record(notification);
             return Task.CompletedTask;
         }
 
         public Task Publish<TNotification>(TNotification notification, CancellationToken cancellationToken = default)
             where TNotification : INotification
         {
-            Published.Add((BaseEvent)(object)notification!);
+            Record(notification!);
             return Task.CompletedTask;
+        }
+
+        private void Record(object notification)
+        {
+            Published.Add((BaseEvent)notification);
+            if (notification is Ping { Name: "fail" })
+            {
+                throw new InvalidOperationException("boom");
+            }
         }
 
         public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default) =>
@@ -80,5 +113,38 @@ public class DomainEventDispatchTests
 
         public IAsyncEnumerable<object?> CreateStream(object request, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+    }
+
+    private sealed class RecordingLogger : ILogger
+    {
+        public List<(LogLevel Level, Exception? Exception, string Message)> Errors { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state) where TState : notnull => NullScope.Instance;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel < LogLevel.Error)
+            {
+                return;
+            }
+
+            Errors.Add((logLevel, exception, formatter(state, exception)));
+        }
+
+        private sealed class NullScope : IDisposable
+        {
+            public static readonly NullScope Instance = new();
+
+            public void Dispose()
+            {
+            }
+        }
     }
 }
