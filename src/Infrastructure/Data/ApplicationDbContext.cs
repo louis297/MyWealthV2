@@ -8,7 +8,6 @@ using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Infrastructure.Data.Entities;
-using MyWealthV2.Infrastructure.Data.Interceptors;
 using MyWealthV2.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -149,7 +148,7 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
             return;
         }
 
-        await DispatchDomainEventsInterceptor.PublishAfterCommitAsync(this, mediator, cancellationToken);
+        await DomainEventDispatcher.DispatchAsync(this, mediator, cancellationToken);
     }
 
     protected override void OnModelCreating(ModelBuilder builder)
