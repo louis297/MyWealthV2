@@ -50,14 +50,14 @@ public class ClientAllowListTests : TestBase
     }
 
     [Test]
-    public async Task ReservedClients_AreNotRegistered()
+    public async Task RegisteredClients_IncludeAdviserPortalAndBackOffice_NotCustomerPortal()
     {
         using var scope = FunctionalTestSetup.Identity.Services.CreateScope();
         var manager = scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
 
         (await manager.FindByClientIdAsync("adviser-portal")).ShouldNotBeNull();
+        (await manager.FindByClientIdAsync(Services.BackOffice)).ShouldNotBeNull();
         (await manager.FindByClientIdAsync("customer-portal")).ShouldBeNull();
-        (await manager.FindByClientIdAsync("back-office")).ShouldBeNull();
     }
 
     private static string FailureCopy(string html)
