@@ -1,0 +1,67 @@
+@page "/tenants"
+@inject IPlatformApi Api
+
+<PageTitle>Tenants</PageTitle>
+<h1>Tenants</h1>
+<p><a href="/tenants/new">New tenant</a></p>
+
+<form method="get" action="/tenants">
+    <label>Search <input name="search" value="@Search" /></label>
+    <label>Status
+        <select name="isEnabled">
+            <option value="" selected="@(string.IsNullOrEmpty(IsEnabled))">All</option>
+            <option value="true" selected="@(IsEnabled == "true")">Active</option>
+            <option value="false" selected="@(IsEnabled == "false")">Disabled</option>
+        </select>
+    </label>
+    <button type="submit">Filter</button>
+</form>
+
+@if (error is not null)
+{
+    <p>@error</p>
+}
+else if (list is not null)
+{
+    <table>
+        <thead>
+            <tr><th>Name</th><th>Code</th><th>Currency</th><th>Active</th></tr>
+        </thead>
+        <tbody>
+        @foreach (var item in list.Items)
+        {
+            <tr>
+                <td><a href="@($"/tenants/{item.Id}")">@item.Name</a></td>
+                <td>@item.Code</td>
+                <td>@item.ReportingCurrency</td>
+                <td>@(item.IsActive ? "Active" : "Disabled")</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+    <p>@(list.TotalCount) tenants</p>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "search")]
+    public string? Search { get; set; }
+
+    [SupplyParameterFromQuery(Name = "isEnabled")]
+    public string? IsEnabled { get; set; }
+
+    private TenantPage? list;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            bool? enabled = bool.TryParse(IsEnabled, out var parsed) ? parsed : null;
+            list = await Api.ListTenantsAsync(1, 20, enabled, Search);
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+}

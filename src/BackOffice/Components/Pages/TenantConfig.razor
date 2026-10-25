@@ -1,0 +1,103 @@
+@page "/tenants/{TenantId:guid}/config"
+@inject IPlatformApi Api
+
+<PageTitle>Tenant configuration</PageTitle>
+<h1>Configuration</h1>
+<p><a href="@($"/tenants/{TenantId}")">Back to tenant</a></p>
+
+@if (error is not null)
+{
+    <p>@error</p>
+}
+
+@if (grants.Count == 0)
+{
+    <p>No grants.</p>
+}
+else
+{
+    <table>
+        <thead>
+            <tr><th>Code</th><th>Name</th><th>Scope</th><th>Catalog</th><th></th></tr>
+        </thead>
+        <tbody>
+        @foreach (var grant in grants)
+        {
+            <tr>
+                <td>@grant.Code</td>
+                <td>@grant.Name</td>
+                <td>@grant.Scope</td>
+                <td>@(grant.IsActive ? "Active" : "Inactive")</td>
+                <td><button type="button" @onclick="() => Revoke(grant.Id)">Revoke</button></td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+<EditForm Model="form" OnValidSubmit="Grant" FormName="grant-report">
+    <label>Report id <InputText @bind-Value="form.ReportId" /></label>
+    <button type="submit">Grant</button>
+</EditForm>
+
+@code {
+    [Parameter]
+    public Guid TenantId { get; set; }
+
+    private IReadOnlyList<ReportGrantItem> grants = [];
+    private readonly FormModel form = new();
+    private string? error;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            grants = await Api.ListReportGrantsAsync(TenantId);
+            error = null;
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+
+    private async Task Grant()
+    {
+        if (!Guid.TryParse(form.ReportId, out var reportId))
+        {
+            error = "Report id must be the catalog PublicId.";
+            return;
+        }
+
+        try
+        {
+            await Api.GrantReportAsync(TenantId, reportId);
+            form.ReportId = "";
+            await Load();
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+
+    private async Task Revoke(Guid reportId)
+    {
+        try
+        {
+            await Api.RevokeReportAsync(TenantId, reportId);
+            await Load();
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+
+    private sealed class FormModel
+    {
+        public string ReportId { get; set; } = "";
+    }
+}

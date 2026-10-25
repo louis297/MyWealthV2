@@ -1,0 +1,102 @@
+@page "/tenant-admins/{Id:guid}"
+@inject IPlatformApi Api
+
+<PageTitle>Tenant admin</PageTitle>
+
+@if (error is not null)
+{
+    <p>@error</p>
+}
+
+@if (item is not null)
+{
+    <h1>@item.Name</h1>
+    <p>Email: <span>@item.Email</span></p>
+    <p>Tenant: <a href="@($"/tenants/{item.TenantId}")">@item.TenantId</a></p>
+    <p>Status: @item.Status</p>
+    <p>Active: @(item.IsActive ? "Active" : "Disabled")</p>
+
+    <EditForm Model="form" OnValidSubmit="Save" FormName="edit-tenant-admin">
+        <label>Name <InputText @bind-Value="form.Name" /></label>
+        <button type="submit">Save</button>
+    </EditForm>
+
+    @if (item.IsActive)
+    {
+        <button type="button" @onclick="Disable">Disable</button>
+    }
+    else
+    {
+        <button type="button" @onclick="Enable">Enable</button>
+    }
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private TenantAdminItem? item;
+    private readonly FormModel form = new();
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            item = await Api.GetTenantAdminAsync(Id);
+            form.Name = item.Name;
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+
+    private async Task Save()
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await Api.UpdateTenantAdminAsync(Id, form.Name, item.RowVersion);
+            item = await Api.GetTenantAdminAsync(Id);
+            error = null;
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Status == 409
+                ? "This tenant admin changed. Reload the page."
+                : exception.Message;
+        }
+    }
+
+    private async Task Disable()
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        await Api.DisableTenantAdminAsync(Id, item.RowVersion);
+        item = await Api.GetTenantAdminAsync(Id);
+    }
+
+    private async Task Enable()
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        await Api.EnableTenantAdminAsync(Id, item.RowVersion);
+        item = await Api.GetTenantAdminAsync(Id);
+    }
+
+    private sealed class FormModel
+    {
+        public string Name { get; set; } = "";
+    }
+}

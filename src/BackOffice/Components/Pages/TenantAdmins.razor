@@ -1,0 +1,70 @@
+@page "/tenant-admins"
+@inject IPlatformApi Api
+
+<PageTitle>Tenant admins</PageTitle>
+<h1>Tenant admins</h1>
+<p><a href="/tenant-admins/new">New tenant admin</a></p>
+
+<form method="get" action="/tenant-admins">
+    <label>Tenant <input name="tenantId" value="@TenantId" /></label>
+    <label>Search <input name="search" value="@Search" /></label>
+    <label>Status
+        <select name="enabledOnly">
+            <option value="" selected="@(string.IsNullOrEmpty(EnabledOnly))">All</option>
+            <option value="true" selected="@(EnabledOnly == "true")">Active</option>
+        </select>
+    </label>
+    <button type="submit">Filter</button>
+</form>
+
+@if (error is not null)
+{
+    <p>@error</p>
+}
+else if (list is not null)
+{
+    <table>
+        <thead>
+            <tr><th>Name</th><th>Email</th><th>Status</th><th>Active</th></tr>
+        </thead>
+        <tbody>
+        @foreach (var item in list.Items)
+        {
+            <tr>
+                <td><a href="@($"/tenant-admins/{item.Id}")">@item.Name</a></td>
+                <td>@item.Email</td>
+                <td>@item.Status</td>
+                <td>@(item.IsActive ? "Active" : "Disabled")</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "tenantId")]
+    public string? TenantId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "search")]
+    public string? Search { get; set; }
+
+    [SupplyParameterFromQuery(Name = "enabledOnly")]
+    public string? EnabledOnly { get; set; }
+
+    private TenantAdminPage? list;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Guid? tenant = Guid.TryParse(TenantId, out var parsed) ? parsed : null;
+            bool? enabled = bool.TryParse(EnabledOnly, out var flag) ? flag : null;
+            list = await Api.ListTenantAdminsAsync(1, 20, tenant, enabled, Search);
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+}

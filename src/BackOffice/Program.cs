@@ -6,6 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddBackOfficeAuthentication();
+builder.AddPlatformApi();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
