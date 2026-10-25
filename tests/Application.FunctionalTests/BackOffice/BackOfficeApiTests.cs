@@ -111,6 +111,20 @@ public class BackOfficeApiTests
         api.Requests[2].Body.ShouldBeNullOrEmpty();
     }
 
+    [Test]
+    public async Task ReportGrantList_ReadsGranted()
+    {
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.OK, $$"""
+            [{"id":"{{ReportId}}","code":"adviser-balances","name":"Adviser Balances Report","scope":"Book","isActive":true,"granted":true}]
+            """);
+        var platform = Create(api);
+
+        var item = (await platform.ListReportGrantsAsync(TenantId)).ShouldHaveSingleItem();
+        item.Code.ShouldBe("adviser-balances");
+        item.IsGranted.ShouldBeTrue();
+    }
+
     private static PlatformApi Create(ScriptedHandler api) =>
         new(
             new HttpClient(api) { BaseAddress = new Uri("http://webapi") },

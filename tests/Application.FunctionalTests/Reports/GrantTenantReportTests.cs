@@ -107,9 +107,9 @@ public class GrantTenantReportTests : TestBase
             .ShouldBe(["adviser-balances", "customer-transactions"]);
         var customer = items.Single(item => item.GetProperty("id").GetGuid() == CustomerTransactionsId);
         customer.GetProperty("isActive").GetBoolean().ShouldBeFalse();
-        customer.GetProperty("isGranted").GetBoolean().ShouldBeTrue();
+        customer.GetProperty("granted").GetBoolean().ShouldBeTrue();
         items.Single(item => item.GetProperty("code").GetString() == "adviser-balances")
-            .GetProperty("isGranted").GetBoolean().ShouldBeFalse();
+            .GetProperty("granted").GetBoolean().ShouldBeFalse();
     }
 
     private static async Task SetCatalogActiveAsync(Guid reportPublicId, bool active)
