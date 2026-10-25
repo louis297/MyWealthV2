@@ -10,9 +10,9 @@
     <p>@error</p>
 }
 
-@if (grants.Count == 0)
+@if (reports.Count == 0)
 {
-    <p>No grants.</p>
+    <p>No reports.</p>
 }
 else
 {
@@ -21,31 +21,34 @@ else
             <tr><th>Code</th><th>Name</th><th>Scope</th><th>Catalog</th><th></th></tr>
         </thead>
         <tbody>
-        @foreach (var grant in grants)
+        @foreach (var report in reports)
         {
             <tr>
-                <td>@grant.Code</td>
-                <td>@grant.Name</td>
-                <td>@grant.Scope</td>
-                <td>@(grant.IsActive ? "Active" : "Inactive")</td>
-                <td><button type="button" @onclick="() => Revoke(grant.Id)">Revoke</button></td>
+                <td>@report.Code</td>
+                <td>@report.Name</td>
+                <td>@report.Scope</td>
+                <td>@(report.IsActive ? "Active" : "Inactive")</td>
+                <td>
+                    @if (report.IsGranted)
+                    {
+                        <button type="button" @onclick="() => Disable(report.Id)">Disable</button>
+                    }
+                    else
+                    {
+                        <button type="button" @onclick="() => Enable(report.Id)">Enable</button>
+                    }
+                </td>
             </tr>
         }
         </tbody>
     </table>
 }
 
-<EditForm Model="form" OnValidSubmit="Grant" FormName="grant-report">
-    <label>Report id <InputText @bind-Value="form.ReportId" /></label>
-    <button type="submit">Grant</button>
-</EditForm>
-
 @code {
     [Parameter]
     public Guid TenantId { get; set; }
 
-    private IReadOnlyList<ReportGrantItem> grants = [];
-    private readonly FormModel form = new();
+    private IReadOnlyList<ReportGrantItem> reports = [];
     private string? error;
 
     protected override async Task OnInitializedAsync() => await Load();
@@ -54,7 +57,7 @@ else
     {
         try
         {
-            grants = await Api.ListReportGrantsAsync(TenantId);
+            reports = await Api.ListReportGrantsAsync(TenantId);
             error = null;
         }
         catch (PlatformApiException exception)
@@ -63,18 +66,11 @@ else
         }
     }
 
-    private async Task Grant()
+    private async Task Enable(Guid reportId)
     {
-        if (!Guid.TryParse(form.ReportId, out var reportId))
-        {
-            error = "Report id must be the catalog PublicId.";
-            return;
-        }
-
         try
         {
             await Api.GrantReportAsync(TenantId, reportId);
-            form.ReportId = "";
             await Load();
         }
         catch (PlatformApiException exception)
@@ -83,7 +79,7 @@ else
         }
     }
 
-    private async Task Revoke(Guid reportId)
+    private async Task Disable(Guid reportId)
     {
         try
         {
@@ -94,10 +90,5 @@ else
         {
             error = exception.Message;
         }
-    }
-
-    private sealed class FormModel
-    {
-        public string ReportId { get; set; } = "";
     }
 }

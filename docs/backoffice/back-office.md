@@ -112,8 +112,10 @@ Reached from tenant detail (`/tenants/{id}/config`). All verbs use `tenants.mana
 **Report grants** (enable / disable a report for this tenant)
 
 - List: `GET /tenants/{tenantId}/reports` — every catalog row, including inactive rows, each with `isGranted`
-- Enable (grant): `POST /tenants/{tenantId}/reports` with the report id
-- Disable (revoke): `DELETE /tenants/{tenantId}/reports/{reportId}`
+- Each row has one button: Enable when `isGranted` is false, Disable when `isGranted` is true
+- Enable calls `POST /tenants/{tenantId}/reports` with that report id
+- Disable calls `DELETE /tenants/{tenantId}/reports/{reportId}`
+- The page does not ask for a report id
 - New tenants have no grants; the UI does not auto-grant
 - Revoke also removes that tenant’s Hangfire recurring jobs for the report (existing behaviour); schedule and execution rows stay
 - Do not offer “run” or “schedule” actions — SystemAdmin has no `reports.*.*` policies
@@ -133,7 +135,7 @@ Core tenant settings (name, reporting currency, tenant IsActive) stay on the det
 | BO5 | TenantAdmin list (filtered by tenant), create, rename, disable, and enable succeed against the existing `/users/tenant-admins` endpoints |
 | BO6 | Code and email remain immutable in the UI |
 | BO7 | Disable is the only removal path; no physical delete action is offered |
-| BO8 | From a tenant, SystemAdmin can list report grants and grant or revoke a report; the UI calls the existing `/tenants/{tenantId}/reports` endpoints |
+| BO8 | From a tenant, SystemAdmin sees each catalog report and can enable or disable it. The page calls the existing `/tenants/{tenantId}/reports` endpoints and does not ask for a report id |
 | BO9 | The configuration page does not offer run or schedule actions |
 | BO10 | Sign-out revokes refresh and ends the session; next visit is hosted login |
 
