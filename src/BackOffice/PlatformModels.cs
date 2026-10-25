@@ -35,7 +35,7 @@ public sealed record ReportGrantItem(
     string Name,
     string Scope,
     bool IsActive,
-    bool IsGranted);
+    bool Granted);
 
 public sealed record CurrencyItem(string Code, string Name, bool IsActive);
 

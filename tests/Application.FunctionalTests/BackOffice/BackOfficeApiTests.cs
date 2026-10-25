@@ -122,7 +122,7 @@ public class BackOfficeApiTests
 
         var item = (await platform.ListReportGrantsAsync(TenantId)).ShouldHaveSingleItem();
         item.Code.ShouldBe("adviser-balances");
-        item.IsGranted.ShouldBeTrue();
+        item.Granted.ShouldBeTrue();
     }
 
     private static PlatformApi Create(ScriptedHandler api) =>

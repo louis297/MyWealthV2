@@ -111,8 +111,8 @@ Reached from tenant detail (`/tenants/{id}/config`). All verbs use `tenants.mana
 
 **Report grants** (enable / disable a report for this tenant)
 
-- List: `GET /tenants/{tenantId}/reports` — every catalog row, including inactive rows, each with `isGranted`
-- Each row has one button: Enable when `isGranted` is false, Disable when `isGranted` is true
+- List: `GET /tenants/{tenantId}/reports` — full catalog for that tenant. Each item includes `granted`. Inactive catalog rows are included
+- Each row has one button: Enable when `granted` is false, Disable when `granted` is true
 - Enable calls `POST /tenants/{tenantId}/reports` with that report id
 - Disable calls `DELETE /tenants/{tenantId}/reports/{reportId}`
 - The page does not ask for a report id

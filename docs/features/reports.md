@@ -266,7 +266,7 @@ First phase may hard-code the two parameter forms in the Adviser Portal. A param
 
 | Method | Route | Policy | Success | Failure |
 | --- | --- | --- | --- | --- |
-| GET | `/tenants/{tenantId}/reports` | `tenants.manage` | 200 every catalog row for that tenant, including inactive rows, each with `isGranted` | 401 / 403 / 404 |
+| GET | `/tenants/{tenantId}/reports` | `tenants.manage` | 200 full catalog for that tenant, each item includes `granted`; includes inactive catalog rows | 401 / 403 / 404 |
 | POST | `/tenants/{tenantId}/reports` | `tenants.manage` | 201 `{ "id" }` the first time, 204 when the grant already exists. Inactive catalog rows may be granted | 401 / 403 / 404 |
 | DELETE | `/tenants/{tenantId}/reports/{reportId}` | `tenants.manage` | 204 when removed or already absent. Schedule and execution rows stay | 401 / 403 / 404 |
 | GET | `/reports` | `reports.customer.read` or `reports.book.read` (filter by scope) | 200 list | 401 / 403 |
@@ -280,7 +280,7 @@ First phase may hard-code the two parameter forms in the Adviser Portal. A param
 | GET | `/reports/executions/{id}/download` | by that execution’s report scope | 200 file | 403 / 404 / 409 |
 
 Customer calling a Book-scoped route or a create route → 403.  
-Tenant grant endpoints: SystemAdmin / Scalar.
+Tenant grant endpoints: SystemAdmin / Scalar. Creating a tenant does not auto-grant any report. `GET /tenants/{tenantId}/reports` still returns the full catalog, with `granted` false until a grant is posted.
 
 ### 8.1 Bodies
 

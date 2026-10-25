@@ -29,7 +29,7 @@ else
                 <td>@report.Scope</td>
                 <td>@(report.IsActive ? "Active" : "Inactive")</td>
                 <td>
-                    @if (report.IsGranted)
+                    @if (report.Granted)
                     {
                         <button type="button" @onclick="() => Disable(report.Id)">Disable</button>
                     }

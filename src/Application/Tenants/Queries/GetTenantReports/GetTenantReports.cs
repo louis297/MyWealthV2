@@ -36,7 +36,7 @@ public class GetTenantReportsQueryHandler(IApplicationDbContext db)
             Scope = report.Scope,
             AllowedTriggers = TenantReportGrantDto.ParseTriggers(report.AllowedTriggers),
             IsActive = report.IsActive,
-            IsGranted = grantedReportIds.Contains(report.Id)
+            Granted = grantedReportIds.Contains(report.Id)
         }).ToList();
     }
 }
