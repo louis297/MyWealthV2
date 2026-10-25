@@ -53,7 +53,7 @@ How this file relates to the rest of the tree is in [README.md](README.md). This
 
 | Role | Can log in | Phase 1 UI | Notes |
 | --- | --- | --- | --- |
-| SystemAdmin | Yes, no tenantCode | None (Scalar / API). `adviser-portal` allow-list yes (probe). | Platform-level. No TenantId. Tenant manage is not the Adviser Portal. |
+| SystemAdmin | Yes, no tenantCode | Back Office ([backoffice/back-office.md](backoffice/back-office.md)). Scalar remains. `adviser-portal` allow-list yes (probe). | Platform-level. No TenantId. Tenant manage is not the Adviser Portal. |
 | TenantAdmin | Yes + tenantCode | Adviser Portal | Highest authority inside the tenant. |
 | Adviser | Yes + tenantCode | Adviser Portal | Manages assigned Customers. No ledger yet in Phase 1. |
 | Customer | Yes + tenantCode | None | Login principal. `adviser-portal` issues no code. No Customer Portal client yet. |
@@ -235,7 +235,6 @@ Still later (not Phase 3):
 - NZ regulation and record retention
 - External IdP (for example Entra) attached only to the authorization server
 - Identity remains the `identity` Aspire resource; external IdP attaches there
-- Back Office (SystemAdmin UI; currently Scalar)
 
 ---
 
@@ -248,7 +247,7 @@ Still later (not Phase 3):
 - Any ledger API or ledger table in Phase 1
 - Resource Owner Password Credentials grant
 - A custom resource-API login that issues tokens
-- A second OIDC client in Phase 1
+- A public `customer-portal` OIDC client. `back-office` is the SystemAdmin confidential client and is registered
 - A separate identity SQL database in Phase 1
 
 ---

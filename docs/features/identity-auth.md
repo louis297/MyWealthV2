@@ -368,6 +368,16 @@ Accepted with [bff-adviser-portal.md](bff-adviser-portal.md) and ADR 0016. Lande
 - Allow-list unchanged. SystemAdmin still receives a code. Customer still does not.
 - No new table. No new ADR beyond 0016.
 
+### Amendment 2026-10-25 (Back Office client)
+
+Accepted with [backoffice/back-office.md](../backoffice/back-office.md). Do not rewrite R1–R21 or A8 in place. A8’s “Back Office is not registered” sentence is historical.
+
+- Client `back-office` is confidential. Secret `Identity:BackOfficeClientSecret` comes from the Aspire parameter `back-office-client-secret` (not in git). PKCE stays. The Blazor host exchanges the code. The browser does not.
+- Allow-list row: `back-office` → SystemAdmin only. TenantAdmin, Adviser, and Customer receive no code. Failure copy stays uniform.
+- Redirect `{backOfficeOrigin}/signin-oidc`. Post-logout `{backOfficeOrigin}/`. The origin is `Identity:BackOfficeOrigin`. Do not add it to `Identity:PortalOrigins`; that list stays the `adviser-portal` client.
+- `customer-portal` stays unregistered.
+- No BFF. The host holds the cookie session and the access and refresh tokens, and calls `webapi` with Bearer. No new table. No new resource route.
+
 ### Amendment 2026-09-14 (R21 — end session)
 
 Passthrough without an action left `/connect/logout` unhandled. Manual Sign out then bounced through `/callback` and OpenIddict returned `invalid_grant` / `ID2010` (authorization code redeemed twice). No new ADR. No `/auth/logout`.

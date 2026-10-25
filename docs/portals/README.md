@@ -15,7 +15,7 @@ related:
 
 UI and OIDC-client contracts. Backend handlers stay in [features/](../features/README.md).
 
-Phase 1 has one frontend: [adviser-portal.md](adviser-portal.md). Do not add `customer-portal` or a Back Office file until that slice opens.
+Phase 1 has one frontend: [adviser-portal.md](adviser-portal.md). Customer Portal is not registered. Back Office lives in [../backoffice/](../backoffice/) and is independent of this folder.
 
 | Doc | Owns |
 | --- | --- |
@@ -27,4 +27,4 @@ Phase 1 has one frontend: [adviser-portal.md](adviser-portal.md). Do not add `cu
 | [frontend-conventions.md](frontend-conventions.md) | Folder layout, naming, session state, API client |
 | [frontend-implementation-notes.md](frontend-implementation-notes.md) | Page-by-page construction for the current pages cut |
 
-[adviser-portal.md](adviser-portal.md) is **accepted** (shell + pages cut C). Dashboard cut is **accepted**. Conventions and construction notes stay `review`. Do not add `customer-portal` or a Back Office file until that slice opens.
+[adviser-portal.md](adviser-portal.md) is **accepted** (shell + pages cut C). Dashboard cut is **accepted**. Conventions and construction notes stay `review`. Customer Portal is not registered. Back Office is independent and accepted: [../backoffice/](../backoffice/).
