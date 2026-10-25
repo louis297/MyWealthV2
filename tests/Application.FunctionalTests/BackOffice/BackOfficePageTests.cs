@@ -17,6 +17,7 @@ public class BackOfficePageTests
     private static readonly Guid TenantId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     private static readonly Guid PersonId = Guid.Parse("22222222-2222-2222-2222-222222222222");
     private static readonly Guid ReportId = Guid.Parse("8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11");
+    private static readonly Guid AdviserBalancesId = Guid.Parse("5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22");
 
     private BackOfficeFactory _factory = null!;
     private HttpClient _client = null!;
@@ -65,13 +66,22 @@ public class BackOfficePageTests
     }
 
     [Test]
-    public async Task Configuration_ListsGrants_AndDoesNotOfferRunOrSchedule()
+    public async Task Configuration_ListsEachReport_WithEnableOrDisable_AndDoesNotOfferRunOrSchedule()
     {
         var body = await GetAsync($"/tenants/{TenantId}/config");
 
-        body.ShouldContain("customer-transactions");
-        body.ShouldContain(">Grant<");
-        body.ShouldContain(">Revoke<");
+        var customerAt = body.IndexOf("customer-transactions", StringComparison.Ordinal);
+        var adviserAt = body.IndexOf("adviser-balances", StringComparison.Ordinal);
+        var disableAt = body.IndexOf(">Disable<", StringComparison.Ordinal);
+        var enableAt = body.IndexOf(">Enable<", StringComparison.Ordinal);
+        customerAt.ShouldBeGreaterThanOrEqualTo(0);
+        adviserAt.ShouldBeGreaterThan(customerAt);
+        disableAt.ShouldBeGreaterThan(customerAt);
+        disableAt.ShouldBeLessThan(adviserAt);
+        enableAt.ShouldBeGreaterThan(adviserAt);
+        body.ShouldNotContain("Report id");
+        body.ShouldNotContain(">Grant<");
+        body.ShouldNotContain(">Revoke<");
         body.ShouldNotContain(">Run<");
         body.ShouldNotContain(">Schedule<");
         body.ShouldNotContain("/reports/request");
@@ -144,7 +154,8 @@ public class BackOfficePageTests
 
         public Task<IReadOnlyList<ReportGrantItem>> ListReportGrantsAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<ReportGrantItem>>([
-                new ReportGrantItem(ReportId, "customer-transactions", "Customer Transactions Report", "Customer", true)
+                new ReportGrantItem(ReportId, "customer-transactions", "Customer Transactions Report", "Customer", true, true),
+                new ReportGrantItem(AdviserBalancesId, "adviser-balances", "Adviser Balances Report", "Book", false, false)
             ]);
 
         public Task GrantReportAsync(Guid tenantId, Guid reportId, CancellationToken cancellationToken = default) =>
