@@ -5,6 +5,8 @@ public static class OpenIddictClientUris
     public static readonly Uri FallbackRedirect = new("https://localhost/signin-oidc");
     public static readonly Uri FallbackPostLogout = new("https://localhost/");
 
+    public const string BackOfficeFallbackOrigin = "https://localhost/back-office";
+
     public static IReadOnlyList<string> ReadPortalOrigins(IConfiguration configuration)
     {
         var origins = new List<string>();
@@ -25,6 +27,12 @@ public static class OpenIddictClientUris
             .OfType<string>()
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    public static string ReadBackOfficeOrigin(IConfiguration configuration)
+    {
+        return NormalizeOrigin(configuration["Identity:BackOfficeOrigin"])
+            ?? BackOfficeFallbackOrigin;
     }
 
     public static (IReadOnlyList<Uri> Redirects, IReadOnlyList<Uri> PostLogout) FromOrigins(IEnumerable<string> origins)

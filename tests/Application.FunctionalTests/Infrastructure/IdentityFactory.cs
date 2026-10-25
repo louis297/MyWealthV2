@@ -16,6 +16,7 @@ public class IdentityFactory(
         builder.UseSetting($"ConnectionStrings:{MyWealthV2.Shared.Services.Database}", connectionString);
         builder.UseEnvironment("Development");
         builder.UseSetting("Identity:AdviserPortalClientSecret", AdviserPortalTestSecret.Value);
+        builder.UseSetting("Identity:BackOfficeClientSecret", BackOfficeTestSecret.Value);
         if (logs is not null)
         {
             builder.ConfigureLogging(logging => logging.AddProvider(logs));
