@@ -4,6 +4,10 @@
     <a href="/">Back Office</a>
     <a href="/tenants">Tenants</a>
     <a href="/tenant-admins">Tenant admins</a>
+    <form method="post" action="/sign-out">
+        <AntiforgeryToken />
+        <button type="submit">Sign out</button>
+    </form>
 </nav>
 
 @Body

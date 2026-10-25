@@ -9,10 +9,14 @@ public static class BackOfficeAuthenticationExtensions
 {
     public const string SessionCookieName = "__Host-back-office";
 
+    public const string SystemAdminPolicy = "SystemAdmin";
+
     public static IHostApplicationBuilder AddBackOfficeAuthentication(this IHostApplicationBuilder builder)
     {
         var authority = builder.Configuration["Authentication:Authority"];
-        builder.Services.AddAuthorization();
+        builder.Services.AddAuthorizationBuilder()
+            .AddPolicy(SystemAdminPolicy, policy =>
+                policy.RequireAuthenticatedUser().RequireClaim("role", "systemAdmin"));
         builder.Services
             .AddAuthentication(options =>
             {
@@ -32,6 +36,7 @@ public static class BackOfficeAuthenticationExtensions
                 options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
                     ? CookieSecurePolicy.SameAsRequest
                     : CookieSecurePolicy.Always;
+                options.AccessDeniedPath = "/forbidden";
                 options.SlidingExpiration = false;
                 options.Events.OnSigningIn = context =>
                 {

@@ -27,10 +27,14 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
 
+app.MapBackOfficeSignOut();
+app.MapGet("/forbidden", () => Results.Content("<h1>Forbidden</h1>", "text/html"))
+    .RequireAuthorization();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
-    .RequireAuthorization();
-app.MapFallback(() => Results.NotFound()).RequireAuthorization();
+    .RequireAuthorization(BackOfficeAuthenticationExtensions.SystemAdminPolicy);
+app.MapFallback(() => Results.NotFound())
+    .RequireAuthorization(BackOfficeAuthenticationExtensions.SystemAdminPolicy);
 app.MapDefaultEndpoints();
 
 app.Run();
