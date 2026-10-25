@@ -57,40 +57,70 @@ public class GetTenantReportsTests : TestBase
     }
 
     [Test]
-    public async Task NewTenant_ReturnsEmptyList_AndAGrantIncludesAnInactiveCatalogRow()
+    public async Task List_ReturnsEveryCatalogRow_WithGrantState_IncludingInactive()
     {
         var tenant = await TestApp.CreateTenantAsync("North Grants", "north-grants");
         var tokens = await TenantHttp.SignInSystemAdmin();
 
-        var empty = await TenantHttp.Send(
-            HttpMethod.Get, $"/tenants/{tenant.PublicId}/reports", tokens.AccessToken);
-        empty.StatusCode.ShouldBe(HttpStatusCode.OK);
-        using (var json = JsonDocument.Parse(await empty.Content.ReadAsStringAsync()))
+        try
         {
-            json.RootElement.ValueKind.ShouldBe(JsonValueKind.Array);
-            json.RootElement.GetArrayLength().ShouldBe(0);
+            await SetCatalogActiveAsync(CustomerTransactionsId, active: false);
+            var other = await TestApp.CreateTenantAsync("Other Grants", "other-grants");
+            await GrantAsync(other.Id, AdviserBalancesId);
+
+            var before = await TenantHttp.Send(
+                HttpMethod.Get, $"/tenants/{tenant.PublicId}/reports", tokens.AccessToken);
+            before.StatusCode.ShouldBe(HttpStatusCode.OK);
+            using (var json = JsonDocument.Parse(await before.Content.ReadAsStringAsync()))
+            {
+                var items = json.RootElement.EnumerateArray().ToList();
+                items.Count.ShouldBe(await CatalogCountAsync());
+                items.Select(item => item.GetProperty("code").GetString())
+                    .ShouldBe(["adviser-balances", "customer-transactions"]);
+                items.ShouldAllBe(item => item.GetProperty("granted").GetBoolean() == false);
+
+                var adviser = items[0];
+                adviser.GetProperty("id").GetGuid().ShouldBe(AdviserBalancesId);
+                adviser.GetProperty("name").GetString().ShouldBe("Adviser Balances Report");
+                adviser.GetProperty("scope").GetString().ShouldBe("Book");
+                adviser.GetProperty("isActive").GetBoolean().ShouldBeTrue();
+                adviser.TryGetProperty("isGranted", out _).ShouldBeFalse();
+                adviser.TryGetProperty("tenantId", out _).ShouldBeFalse();
+
+                var customer = items[1];
+                customer.GetProperty("id").GetGuid().ShouldBe(CustomerTransactionsId);
+                customer.GetProperty("name").GetString().ShouldBe("Customer Transactions Report");
+                customer.GetProperty("function").GetString().ShouldBe("Transactions in a date range for one customer.");
+                customer.GetProperty("scope").GetString().ShouldBe("Customer");
+                customer.GetProperty("isActive").GetBoolean().ShouldBeFalse();
+                customer.GetProperty("allowedTriggers").EnumerateArray().Select(trigger => trigger.GetString())
+                    .ShouldBe(["manual", "scheduled"]);
+            }
+
+            await GrantAsync(tenant.Id, CustomerTransactionsId);
+
+            var after = await TenantHttp.Send(
+                HttpMethod.Get, $"/tenants/{tenant.PublicId}/reports", tokens.AccessToken);
+            after.StatusCode.ShouldBe(HttpStatusCode.OK);
+            using var granted = JsonDocument.Parse(await after.Content.ReadAsStringAsync());
+            var grantedCustomer = granted.RootElement.EnumerateArray()
+                .Single(item => item.GetProperty("id").GetGuid() == CustomerTransactionsId);
+            granted.RootElement.GetArrayLength().ShouldBe(await CatalogCountAsync());
+            grantedCustomer.GetProperty("isActive").GetBoolean().ShouldBeFalse();
+            grantedCustomer.GetProperty("granted").GetBoolean().ShouldBeTrue();
+            granted.RootElement.EnumerateArray()
+                .Single(item => item.GetProperty("id").GetGuid() == AdviserBalancesId)
+                .GetProperty("granted").GetBoolean().ShouldBeFalse();
         }
-
-        await GrantAsync(tenant.Id, CustomerTransactionsId);
-        await SetCatalogActiveAsync(CustomerTransactionsId, active: false);
-
-        var response = await TenantHttp.Send(
-            HttpMethod.Get, $"/tenants/{tenant.PublicId}/reports", tokens.AccessToken);
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        using var granted = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        var item = granted.RootElement.EnumerateArray().Single();
-        item.GetProperty("id").GetGuid().ShouldBe(CustomerTransactionsId);
-        item.GetProperty("code").GetString().ShouldBe("customer-transactions");
-        item.GetProperty("name").GetString().ShouldBe("Customer Transactions Report");
-        item.GetProperty("function").GetString().ShouldBe("Transactions in a date range for one customer.");
-        item.GetProperty("scope").GetString().ShouldBe("Customer");
-        item.GetProperty("isActive").GetBoolean().ShouldBeFalse();
-        item.GetProperty("allowedTriggers").EnumerateArray().Select(trigger => trigger.GetString())
-            .ShouldBe(["manual", "scheduled"]);
-        item.TryGetProperty("tenantId", out _).ShouldBeFalse();
+        finally
+        {
+            await SetCatalogActiveAsync(CustomerTransactionsId, active: true);
+        }
     }
 
     private static readonly Guid CustomerTransactionsId = Guid.Parse("8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11");
+
+    private static readonly Guid AdviserBalancesId = Guid.Parse("5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22");
 
     private static async Task GrantAsync(int tenantId, Guid reportPublicId)
     {
@@ -100,6 +130,13 @@ public class GetTenantReportsTests : TestBase
             INSERT INTO [TenantReports] ([TenantId], [ReportId])
             SELECT {tenantId}, [Id] FROM [Reports] WHERE [PublicId] = {reportPublicId}
             """);
+    }
+
+    private static async Task<int> CatalogCountAsync()
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await db.Reports.CountAsync();
     }
 
     private static async Task SetCatalogActiveAsync(Guid reportPublicId, bool active)

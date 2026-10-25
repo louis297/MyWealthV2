@@ -4,7 +4,7 @@ status: accepted
 phase: 3
 language: en
 created: 2026-10-14
-updated: 2026-10-16
+updated: 2026-10-25
 related:
   - adviser-portal.md
   - adviser-portal-dashboard.md
@@ -50,7 +50,7 @@ Backend prerequisites (landed):
 
 **Out**
 
-- Catalog or tenant-grant management (Scalar / SystemAdmin via `tenants.manage`).
+- Catalog or tenant-grant management (Back Office tenant configuration and Scalar, `tenants.manage`).
 - Customer Portal (Customer has `reports.customer.read` but no portal client).
 - Raw cron string editor.
 - Email delivery of the PDF.
@@ -248,7 +248,7 @@ Use the existing portal empty / error patterns. Do not invent a second toast lib
 | Generate / schedule Customer-scoped | yes (assigned) | yes | no | no |
 | Generate / schedule Book-scoped | yes (self only; no adviser picker) | yes (must pick Adviser) | no | no |
 | Download Succeeded PDF | yes (in scope) | yes | no | no |
-| Manage catalog / grants | no | no | Scalar only | no |
+| Manage catalog / grants | no | no | Back Office and Scalar | no |
 
 ---
 

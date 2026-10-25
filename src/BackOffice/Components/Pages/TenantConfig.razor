@@ -1,0 +1,96 @@
+@page "/tenants/{TenantId:guid}/config"
+@inject IPlatformApi Api
+
+<PageTitle>Tenant configuration</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">Configuration</MudText>
+<MudLink Href="@($"/tenants/{TenantId}")" Class="mb-4">Back to tenant</MudLink>
+
+@if (error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="my-4">@error</MudAlert>
+}
+
+@if (reports.Count == 0)
+{
+    <MudText Class="mt-4">No reports.</MudText>
+}
+else
+{
+    <MudSimpleTable Hover="true" Dense="true" Bordered="true" Class="mt-4">
+        <thead>
+            <tr><th>Code</th><th>Name</th><th>Scope</th><th>Catalog</th><th>Grant state</th><th></th></tr>
+        </thead>
+        <tbody>
+        @foreach (var report in reports)
+        {
+            <tr>
+                <td>@report.Code</td>
+                <td>@report.Name</td>
+                <td>@report.Scope</td>
+                <td>@(report.IsActive ? "Active" : "Inactive")</td>
+                <td>@(report.Granted ? "Granted" : "Not granted")</td>
+                <td>
+                    @if (report.Granted)
+                    {
+                        <button type="button" class="bo-action bo-action-danger" @onclick="() => Disable(report.Id)">Disable</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="bo-action bo-action-success" @onclick="() => Enable(report.Id)">Enable</button>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </MudSimpleTable>
+}
+
+@code {
+    [Parameter]
+    public Guid TenantId { get; set; }
+
+    private IReadOnlyList<ReportGrantItem> reports = [];
+    private string? error;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            reports = await Api.ListReportGrantsAsync(TenantId);
+            error = null;
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+
+    private async Task Enable(Guid reportId)
+    {
+        try
+        {
+            await Api.GrantReportAsync(TenantId, reportId);
+            await Load();
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+
+    private async Task Disable(Guid reportId)
+    {
+        try
+        {
+            await Api.RevokeReportAsync(TenantId, reportId);
+            await Load();
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+}

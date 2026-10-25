@@ -1,0 +1,23 @@
+@page "/"
+
+<PageTitle>Back Office</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">Back Office</MudText>
+<MudText Typo="Typo.body1" Class="mb-6">Platform operations for firms and their administrators.</MudText>
+
+<MudGrid>
+    <MudItem xs="12" sm="6">
+        <MudPaper Class="pa-4" Outlined="true">
+            <MudText Typo="Typo.h6" Class="mb-1">Tenants</MudText>
+            <MudText Typo="Typo.body2" Class="mb-4">Create firms, update their settings, and grant reports.</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/tenants">Open tenants</MudButton>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6">
+        <MudPaper Class="pa-4" Outlined="true">
+            <MudText Typo="Typo.h6" Class="mb-1">Tenant admins</MudText>
+            <MudText Typo="Typo.body2" Class="mb-4">Create and maintain the administrator for each firm.</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/tenant-admins">Open tenant admins</MudButton>
+        </MudPaper>
+    </MudItem>
+</MudGrid>

@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-10-12
-last_updated: 2026-10-16
+last_updated: 2026-10-25
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -94,7 +94,7 @@ Note: Customer has `reports.customer.read` but no first-phase UI. The policy exi
 2. As an Adviser I open the Reports tab and see Book-scoped reports; I can generate now or create a schedule for my own book.
 3. As a TenantAdmin I can do the same, and on Book-scoped reports I can select a subordinate Adviser.
 4. As a Customer (API) I can list and download Customer-scoped executions that target me; I cannot create or schedule.
-5. As a SystemAdmin I grant or revoke reports for a tenant (Scalar).
+5. As a SystemAdmin I see every catalog report for a tenant, including inactive rows, and enable or disable each one. Back Office tenant configuration does this. Scalar calls the same verbs.
 6. As any allowed caller I can change or disable a schedule; the next Hangfire run uses the new definition.
 7. As the system, when a registered event occurs, I can enqueue an execution for a report that allows it and that the tenant has been granted.
 
@@ -109,7 +109,7 @@ Note: Customer has `reports.customer.read` but no first-phase UI. The policy exi
 | R3 | A schedule or manual request must name a ReportId. The report must exist, be granted to the tenant, and allow the requested trigger. Otherwise 404. |
 | R4 | Coarse policy is required before report-specific checks: Customer-scoped mutations need `reports.customer.create`; Book-scoped mutations need `reports.book.create`. Reads follow the same split. |
 | R5 | Customer role has only `reports.customer.read`. Customer may read executions targeted at self. Customer cannot create or schedule. |
-| R6 | TenantAdmin and Adviser have all four policies. SystemAdmin has none of them. SystemAdmin grants and revokes with `tenants.manage` and cannot list, request, schedule, or download. |
+| R6 | TenantAdmin and Adviser have all four policies. SystemAdmin has none of them and cannot call `GET /reports`, request, schedule, or download. Listing the catalog for a tenant, granting, and revoking use `tenants.manage`. |
 | R7 | Adviser on a Book-scoped report may only target self. TenantAdmin may target any Adviser in the same tenant. Cross-tenant or unknown → 404. |
 | R8 | Adviser on a Customer-scoped report may only target an assigned Customer. TenantAdmin may target any Customer in the tenant. Customer (read) only self. |
 | R9 | Each report declares its required parameters and performs its own scope validation after the shared pipeline. |
@@ -206,8 +206,9 @@ Shared pipeline then report-specific strategy.
 
 | Kind | Name | Returns | Checks |
 | --- | --- | --- | --- |
-| Query | GetReports | granted reports (filterable by scope) | Policy by scope or both; tenant grant |
-| Command | GrantTenantReport / Revoke | — | SystemAdmin |
+| Query | GetReports | granted active reports (filterable by scope) | Policy by scope or both; tenant grant. SystemAdmin cannot call this |
+| Query | GetTenantReports | full catalog for that tenant, each item `granted` | `tenants.manage`. Ordered by code. Includes inactive catalog rows and rows with no grant. Unknown tenant → 404 |
+| Command | GrantTenantReport / Revoke | — | SystemAdmin. `tenants.manage`. Does not change the catalog |
 | Command | CreateReportSchedule | schedule id | Policy by report scope; grant; allows scheduled; report-specific params + scope |
 | Command | UpdateReportSchedule | — | Same + ownership |
 | Command | DisableReportSchedule | — | Same |
@@ -266,7 +267,7 @@ First phase may hard-code the two parameter forms in the Adviser Portal. A param
 
 | Method | Route | Policy | Success | Failure |
 | --- | --- | --- | --- | --- |
-| GET | `/tenants/{tenantId}/reports` | `tenants.manage` | 200 grant list, including inactive catalog rows | 401 / 403 / 404 |
+| GET | `/tenants/{tenantId}/reports` | `tenants.manage` | 200 full catalog for that tenant, each item includes `granted`; includes inactive catalog rows | 401 / 403 / 404 |
 | POST | `/tenants/{tenantId}/reports` | `tenants.manage` | 201 `{ "id" }` the first time, 204 when the grant already exists. Inactive catalog rows may be granted | 401 / 403 / 404 |
 | DELETE | `/tenants/{tenantId}/reports/{reportId}` | `tenants.manage` | 204 when removed or already absent. Schedule and execution rows stay | 401 / 403 / 404 |
 | GET | `/reports` | `reports.customer.read` or `reports.book.read` (filter by scope) | 200 list | 401 / 403 |
@@ -280,7 +281,22 @@ First phase may hard-code the two parameter forms in the Adviser Portal. A param
 | GET | `/reports/executions/{id}/download` | by that execution’s report scope | 200 file | 403 / 404 / 409 |
 
 Customer calling a Book-scoped route or a create route → 403.  
-Tenant grant endpoints: SystemAdmin / Scalar.
+SystemAdmin has none of the four `reports.*` policies and cannot call `GET /reports`, request, schedule, or download.
+
+`GET /tenants/{tenantId}/reports` (`tenants.manage`) returns every platform catalog row for that tenant, ordered by `code`. A row is included when no `TenantReports` grant exists, and when the catalog row is inactive. Unknown tenant PublicId → 404. Other roles → 403. The list does not include another tenant’s grants. Creating a tenant does not insert `TenantReports` rows, so a new tenant returns the full catalog with every `granted` false.
+
+| Field | Notes |
+| --- | --- |
+| `id` | Report PublicId |
+| `code` | Stable catalog code |
+| `name` | |
+| `function` | |
+| `scope` | `Customer` or `Book` |
+| `allowedTriggers` | Same JSON array shape as the catalog |
+| `isActive` | Catalog `Reports.IsActive`. Not the grant |
+| `granted` | `true` when a `TenantReports` row exists for this tenant and report; otherwise `false` |
+
+Back Office tenant configuration and Scalar both call this list. Grant and revoke stay `POST` and `DELETE` on the same route. There is no catalog `IsActive` write API.
 
 ### 8.1 Bodies
 
@@ -434,14 +450,15 @@ Adviser Portal only in this phase.
 - Adviser: adviserId defaults to self (hidden).
 - TenantAdmin: Adviser picker.
 
-Catalog and tenant grants stay on Scalar.
+Catalog `IsActive` stays on Scalar. There is no catalog update API. Tenant grants are the Back Office configuration page (`/tenants/{id}/config`), which lists this catalog and calls the existing grant and revoke verbs. Scalar can call the same verbs.
 
 ---
 
 ## 11. Tests
 
 - Customer has only `reports.customer.read`; create and all book routes → 403.
-- Adviser and TenantAdmin have all four policies. SystemAdmin has none of them.
+- Adviser and TenantAdmin have all four policies. SystemAdmin has none of them and cannot call `GET /reports`.
+- `GET /tenants/{tenantId}/reports` returns the full catalog ordered by code, including inactive rows, each with `granted`. A new tenant has every `granted` false. Grant or revoke flips only that item and leaves the row in the list. Unknown tenant → 404. Other roles → 403. Another tenant’s grant does not appear.
 - Tenant without grant cannot see or run the report.
 - `TestSeed` grants both seeded reports to the demo tenant. A second run keeps the same rows. Another tenant is not granted.
 - Customer Transactions rejects an unassigned Customer for an Adviser; requires from/to; default excludes Closed; reversal sits next to original.
@@ -459,11 +476,11 @@ No new ADR beyond [0017](../adr/0017-background-worker.md).
 | Item | Lock |
 | --- | --- |
 | Catalog | Platform table. PublicId + stable Code. IsActive (no update API). Scope and AllowedTriggers are nvarchar columns |
-| Grant | TenantReports row required **and** Report.IsActive. No auto-grant for new tenants |
+| Grant | TenantReports row required **and** Report.IsActive to run. List is the full catalog with `granted`, including inactive rows. No auto-grant for new tenants |
 | Schedule / request | Must name ReportId; parameters are a free-form JSON object per report |
 | Generator | Registry: ReportId → IReportGenerator. Hangfire entry point is fixed (`Execute(executionId)`) |
 | Policies | `reports.customer.read/create`, `reports.book.read/create` |
-| Roles | Customer: `reports.customer.read` only. TenantAdmin and Adviser: all four. SystemAdmin: none of the four; grants use `tenants.manage` |
+| Roles | Customer: `reports.customer.read` only. TenantAdmin and Adviser: all four. SystemAdmin: none of the four; catalog list, grant, and revoke use `tenants.manage` |
 | First reports | Customer Transactions Report + Adviser Balances Report |
 | PDF | QuestPDF. No MD→PDF. No template files |
 | Result storage | Aspire-mounted volume shared by worker and webapi. `ResultStorageKey` stores relative key including file name: `{tenantPublicId}/{executionPublicId}.pdf` |

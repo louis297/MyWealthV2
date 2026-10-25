@@ -1,0 +1,79 @@
+@page "/tenant-admins"
+@inject IPlatformApi Api
+
+<PageTitle>Tenant admins</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Tenant admins</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/tenant-admins/new">New tenant admin</MudButton>
+</MudStack>
+
+<MudPaper Class="pa-4 mb-4" Outlined="true">
+    <form method="get" action="/tenant-admins" class="bo-filter">
+        <label>Tenant <input name="tenantId" value="@TenantId" /></label>
+        <label>Search <input name="search" value="@Search" /></label>
+        <label>Status
+            <select name="enabledOnly">
+                <option value="" selected="@(string.IsNullOrEmpty(EnabledOnly))">All</option>
+                <option value="true" selected="@(EnabledOnly == "true")">Active</option>
+            </select>
+        </label>
+        <button type="submit">Filter</button>
+    </form>
+</MudPaper>
+
+@if (error is not null)
+{
+    <MudAlert Severity="Severity.Error">@error</MudAlert>
+}
+else if (list is not null)
+{
+    <MudTable Items="list.Items" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="1">
+        <HeaderContent>
+            <MudTh>Name</MudTh>
+            <MudTh>Email</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Active</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Name"><MudLink Href="@($"/tenant-admins/{context.Id}")">@context.Name</MudLink></MudTd>
+            <MudTd DataLabel="Email">@context.Email</MudTd>
+            <MudTd DataLabel="Status">@context.Status</MudTd>
+            <MudTd DataLabel="Active">
+                <MudChip T="string" Size="Size.Small" Color="@(context.IsActive ? Color.Success : Color.Default)">@(context.IsActive ? "Active" : "Disabled")</MudChip>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText>No tenant admins.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+    <MudText Typo="Typo.body2" Class="mt-3">@(list.TotalCount) tenant admins</MudText>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "tenantId")]
+    public string? TenantId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "search")]
+    public string? Search { get; set; }
+
+    [SupplyParameterFromQuery(Name = "enabledOnly")]
+    public string? EnabledOnly { get; set; }
+
+    private TenantAdminPage? list;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Guid? tenant = Guid.TryParse(TenantId, out var parsed) ? parsed : null;
+            bool? enabled = bool.TryParse(EnabledOnly, out var flag) ? flag : null;
+            list = await Api.ListTenantAdminsAsync(1, 20, tenant, enabled, Search);
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+}

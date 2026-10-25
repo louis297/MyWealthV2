@@ -1,0 +1,70 @@
+@page "/tenant-admins/new"
+@inject IPlatformApi Api
+@inject NavigationManager Navigation
+
+<PageTitle>New tenant admin</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">New tenant admin</MudText>
+
+@if (error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@error</MudAlert>
+}
+
+<MudPaper Class="pa-4" Outlined="true">
+    <EditForm Model="form" OnValidSubmit="Create" FormName="new-tenant-admin">
+        <MudStack Spacing="3" Style="max-width: 28rem;">
+            <MudTextField @bind-Value="form.TenantId" Label="Tenant" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="form.Name" Label="Name" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="form.Email" Label="Email" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="form.Password" Label="Password" InputType="InputType.Password" Variant="Variant.Outlined" />
+            <MudStack Row="true" Spacing="2">
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Create</MudButton>
+                <MudButton Variant="Variant.Text" Href="/tenant-admins">Cancel</MudButton>
+            </MudStack>
+        </MudStack>
+    </EditForm>
+</MudPaper>
+
+@code {
+    [SupplyParameterFromQuery(Name = "tenantId")]
+    public string? TenantQuery { get; set; }
+
+    private readonly FormModel form = new();
+    private string? error;
+
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrWhiteSpace(TenantQuery))
+        {
+            form.TenantId = TenantQuery;
+        }
+    }
+
+    private async Task Create()
+    {
+        if (!Guid.TryParse(form.TenantId, out var tenantId))
+        {
+            error = "Tenant must be a PublicId.";
+            return;
+        }
+
+        try
+        {
+            var id = await Api.CreateTenantAdminAsync(tenantId, form.Name, form.Email, form.Password);
+            Navigation.NavigateTo($"/tenant-admins/{id}");
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+
+    private sealed class FormModel
+    {
+        public string TenantId { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Password { get; set; } = "";
+    }
+}

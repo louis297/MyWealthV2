@@ -3,7 +3,7 @@ title: Architecture
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-10-21
+updated: 2026-10-25
 related:
   - README.md
   - glossary.md
@@ -47,8 +47,12 @@ flowchart LR
   AppHost[src/AppHost] -.-> Id
   AppHost -.-> Web
   AppHost -.-> Sql
+  Browser --> Bo[back-office]
+  Bo -->|OIDC code + refresh| Id
+  Bo -->|Bearer resource API| Web
   AppHost -.-> Bff
   AppHost -.-> Portal
+  AppHost -.-> Bo
 ```
 
 Rules that stay true:
@@ -66,9 +70,9 @@ Portals:
 
 - **Adviser Portal** — only frontend in Phase 1. OIDC client id `adviser-portal` is held by `bff-adviser-portal`, not by the browser.
 - Customer Portal — later second BFF + client on the same authorization server; not registered
-- Back Office — optional; SystemAdmin uses Scalar / API in Phase 1. SystemAdmin may still complete `adviser-portal` login (no tenantCode); firm pages stay forbidden.
+- Back Office — landed ([backoffice/back-office.md](backoffice/back-office.md)). Blazor host `back-office` (no BFF). Scalar remains. SystemAdmin may still complete `adviser-portal` login (no tenantCode); firm pages stay forbidden.
 
-Aspire resource names must not be generic (`Frontend`, `Web`). Hosts: `identity`, `webapi`, `adviser-portal`, `bff-adviser-portal`, `worker`. Reserved names: `customer-portal`, `bff-customer-portal`, `back-office`. Phase 1 does **not** split a separate identity **database**.
+Aspire resource names must not be generic (`Frontend`, `Web`). Hosts: `identity`, `webapi`, `adviser-portal`, `bff-adviser-portal`, `back-office`, `worker`. Reserved names: `customer-portal`, `bff-customer-portal`. Phase 1 does **not** split a separate identity **database**.
 
 One AppHost orchestrates every resource. Separate projects are separate processes. Each ASP.NET project has its own Kestrel and port. Aspire does not merge two projects onto one Kestrel.
 
@@ -78,7 +82,7 @@ One AppHost orchestrates every resource. Separate projects are separate processe
 
 | Project | Path | Responsibility |
 | --- | --- | --- |
-| AppHost | `src/AppHost` | Aspire graph: `dbserver`, `MyWealthDbV2`, `identity`, `webapi`, `adviser-portal`, `bff-adviser-portal`, `worker` |
+| AppHost | `src/AppHost` | Aspire graph: `dbserver`, `MyWealthDbV2`, `identity`, `webapi`, `adviser-portal`, `bff-adviser-portal`, `back-office`, `worker` |
 | IdentityHost | `src/IdentityHost` | Authorization-server composition root; OpenIddict; hosted login |
 | Web | `src/Web` | Resource-API composition root; Minimal API; OpenAPI / Scalar; Bearer validation. Portal CORS removed (`5e85e9c`); browser does not call `webapi` |
 | Application | `src/Application` | Commands / queries, validation, pipeline, DTOs, named-policy map, port interfaces |
@@ -87,6 +91,7 @@ One AppHost orchestrates every resource. Separate projects are separate processe
 | Shared | `src/Shared` | Aspire resource-name constants |
 | ServiceDefaults | `src/ServiceDefaults` | Health, OpenTelemetry, service discovery |
 | BffAdviserPortal | `src/BffAdviserPortal` | Adviser Portal session edge. Confidential client holder. Cookie + OIDC + YARP |
+| BackOffice | `src/BackOffice` | SystemAdmin UI. Confidential client `back-office`. Cookie + OIDC. Calls `webapi` with Bearer. No BFF |
 | Worker | `src/Worker` | Background worker. Hangfire Server for async and recurring work (ADR 0017). First consumer: Reports. |
 | AdviserPortal | Independent frontend | Vite SPA. No tokens. OIDC client id `adviser-portal` is not held here |
 | Tests | `tests/*` | Domain unit, application unit, infrastructure integration, functional |
@@ -107,14 +112,14 @@ Hosted in `src/IdentityHost` (ADR 0014). Aspire resource name: `identity`.
 | --- | --- |
 | Protocol | OpenIddict **defaults, do not remap**: `/.well-known/openid-configuration`, `/.well-known/jwks`, `/connect/authorize`, `/connect/token`, `/connect/revocation`, `/connect/logout` (plus default `/connect/userinfo`). Callers follow discovery; do not hard-code |
 | Hosted login | Password page on `identity`: email + password + tenantCode (SystemAdmin omits tenantCode) |
-| Client | One confidential client: `adviser-portal`, held by `bff-adviser-portal`. Authorization code + PKCE + refresh. No password grant |
+| Client | Two confidential clients. `adviser-portal` is held by `bff-adviser-portal`. `back-office` is held by `src/BackOffice`. Authorization code + PKCE + refresh. No password grant. `customer-portal` is not registered |
 | Access | Short-lived JWT. **Asymmetric** signing. Public keys on JWKS |
 | Refresh | OpenIddict token store. Revoked on logout, password change, and disable. Rotated when presented. No custom `RefreshTokens` table |
 | Scopes | `openid`, `profile`, `offline_access`, `api`. Role and tenant are JWT claims, not scopes. Permissions are not expanded into the token |
 
-The login gate on the authorization server reads domain invariants: tenant enabled, `UserStatus = Active`, valid Identity link, then the client × role allow-list. `adviser-portal` does not issue a code to Customer. SystemAdmin may complete login with no tenantCode. Adviser-management resource policies stay 403.
+The login gate on the authorization server reads domain invariants: tenant enabled, `UserStatus = Active`, valid Identity link, then the client × role allow-list. `adviser-portal` does not issue a code to Customer. `back-office` issues a code only to SystemAdmin. SystemAdmin may complete login with no tenantCode. Adviser-management resource policies stay 403.
 
-The BFF redeems the code and stores tokens. The SPA does not. It does not own a password form that issues tokens. Contract: [features/bff-adviser-portal.md](features/bff-adviser-portal.md).
+The BFF redeems the adviser-portal code and stores tokens. The SPA does not. It does not own a password form that issues tokens. Contract: [features/bff-adviser-portal.md](features/bff-adviser-portal.md). The Back Office host redeems its own code the same way and calls `webapi` with Bearer. Contract: [backoffice/back-office.md](backoffice/back-office.md).
 
 ### 3.2 Resource API (`webapi`)
 

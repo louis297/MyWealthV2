@@ -1,0 +1,119 @@
+@page "/tenant-admins/{Id:guid}"
+@inject IPlatformApi Api
+
+<PageTitle>Tenant admin</PageTitle>
+
+@if (error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@error</MudAlert>
+}
+
+@if (item is not null)
+{
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudText Typo="Typo.h4">@item.Name</MudText>
+        <MudChip T="string" Color="@(item.IsActive ? Color.Success : Color.Default)">@(item.IsActive ? "Active" : "Disabled")</MudChip>
+    </MudStack>
+
+    <MudPaper Class="pa-4 mb-4" Outlined="true">
+        <MudStack Spacing="3" Style="max-width: 28rem;">
+            <div>
+                <MudText Typo="Typo.caption">Email</MudText>
+                <MudText Typo="Typo.body1">@item.Email</MudText>
+            </div>
+            <div>
+                <MudText Typo="Typo.caption">Tenant</MudText>
+                <MudLink Href="@($"/tenants/{item.TenantId}")">@item.TenantId</MudLink>
+            </div>
+            <div>
+                <MudText Typo="Typo.caption">Status</MudText>
+                <MudText Typo="Typo.body1">@item.Status</MudText>
+            </div>
+            <EditForm Model="form" OnValidSubmit="Save" FormName="edit-tenant-admin">
+                <MudStack Spacing="3">
+                    <MudTextField @bind-Value="form.Name" Label="Name" Variant="Variant.Outlined" />
+                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Save</MudButton>
+                </MudStack>
+            </EditForm>
+        </MudStack>
+    </MudPaper>
+
+    @if (item.IsActive)
+    {
+        <button type="button" class="bo-action bo-action-danger" @onclick="Disable">Disable</button>
+    }
+    else
+    {
+        <button type="button" class="bo-action bo-action-success" @onclick="Enable">Enable</button>
+    }
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private TenantAdminItem? item;
+    private readonly FormModel form = new();
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            item = await Api.GetTenantAdminAsync(Id);
+            form.Name = item.Name;
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+
+    private async Task Save()
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await Api.UpdateTenantAdminAsync(Id, form.Name, item.RowVersion);
+            item = await Api.GetTenantAdminAsync(Id);
+            error = null;
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Status == 409
+                ? "This tenant admin changed. Reload the page."
+                : exception.Message;
+        }
+    }
+
+    private async Task Disable()
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        await Api.DisableTenantAdminAsync(Id, item.RowVersion);
+        item = await Api.GetTenantAdminAsync(Id);
+    }
+
+    private async Task Enable()
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        await Api.EnableTenantAdminAsync(Id, item.RowVersion);
+        item = await Api.GetTenantAdminAsync(Id);
+    }
+
+    private sealed class FormModel
+    {
+        public string Name { get; set; } = "";
+    }
+}

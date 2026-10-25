@@ -88,7 +88,7 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | Adviser Portal | Only frontend in Phase 1. Aspire SPA resource and OIDC `ClientId`: `adviser-portal`. Does not issue tokens. Browser talks to `bff-adviser-portal`, not to `identity` / `webapi` (ADR 0016). |
 | Session probe | First portal page after callback: renders `GET /users/me` to prove the handshake. Not a product Dashboard. |
 | Customer Portal | Later second client (`customer-portal`) on the same authorization server. Not registered. Expected shape is a second BFF + client (`bff-customer-portal`), not a public SPA token stack. |
-| Back Office | Platform-ops UI. Optional in Phase 1; SystemAdmin uses API / Scalar. |
+| Back Office | Platform-ops UI for SystemAdmin. Landed: [backoffice/back-office.md](backoffice/back-office.md). Blazor host `back-office`, no BFF. Scalar remains available. |
 | Hosted login | Password page on `identity` (tenantCode + email + password). Shared by all first-party portals. |
 
 ---
@@ -105,6 +105,7 @@ One row per process. Aspire resource names are the words used in docs and servic
 | Resource API | `webapi` | `Web` | `src/Web` | Feature specs in `features/` (unprefixed) |
 | Adviser Portal SPA | `adviser-portal` | `AdviserPortal` | `src/AdviserPortal` | [portals/adviser-portal.md](portals/adviser-portal.md) |
 | Adviser Portal BFF | `bff-adviser-portal` | `BffAdviserPortal` | `src/BffAdviserPortal` | [features/bff-adviser-portal.md](features/bff-adviser-portal.md) (accepted) |
+| Back Office | `back-office` | `BackOffice` | `src/BackOffice` | [backoffice/back-office.md](backoffice/back-office.md) (accepted) |
 
 Later portals copy the last row: `bff-customer-portal`, `BffCustomerPortal`, `src/BffCustomerPortal`, `features/bff-customer-portal.md`. Do not create that file until the slice opens. Do not use `adviser-portal-bff` or `AdviserPortalBff`.
 

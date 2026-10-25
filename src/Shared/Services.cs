@@ -31,6 +31,11 @@ public static class Services
     public const string BffAdviserPortal = "bff-adviser-portal";
 
     /// <summary>
+    /// Aspire resource name and OIDC client id for the Back Office (src/BackOffice).
+    /// </summary>
+    public const string BackOffice = "back-office";
+
+    /// <summary>
     /// Aspire resource name for the background worker (src/Worker).
     /// </summary>
     public const string Worker = "worker";

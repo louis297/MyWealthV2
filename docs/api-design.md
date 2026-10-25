@@ -3,7 +3,7 @@ title: API design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-10-12
+updated: 2026-10-25
 related:
   - README.md
   - glossary.md
@@ -379,11 +379,11 @@ Field rules: [features/posting.md](features/posting.md) for cash types, [feature
 
 ### 7.8 Reports
 
-Field rules: [features/reports.md](features/reports.md). Accepted. Not landed.
+Field rules: [features/reports.md](features/reports.md). Accepted.
 
 | Method | Route | Policy | Success |
 | --- | --- | --- | --- |
-| GET | `/tenants/{tenantId}/reports` | `tenants.manage` | 200 grant list, including an inactive catalog row |
+| GET | `/tenants/{tenantId}/reports` | `tenants.manage` | 200 full catalog for that tenant, each item includes `granted`; includes inactive catalog rows |
 | POST | `/tenants/{tenantId}/reports` | `tenants.manage` | 201 `{ id }` the first time, 204 when the grant already exists |
 | DELETE | `/tenants/{tenantId}/reports/{reportId}` | `tenants.manage` | 204 when removed or already absent |
 | GET | `/reports` | `reports.customer.read` or `reports.book.read` | 200 list (granted + active only) |
@@ -396,11 +396,13 @@ Field rules: [features/reports.md](features/reports.md). Accepted. Not landed.
 | GET | `/reports/executions/{id}` | by that execution’s report scope | 200 |
 | GET | `/reports/executions/{id}/download` | by that execution’s report scope | 200 `application/pdf` |
 
-Customer has `reports.customer.read` only. TenantAdmin and Adviser have all four. SystemAdmin has none of the four and cannot call these routes. Bad parameters → 400. Unknown report, not granted, inactive catalog row, or out of scope → 404. Policy fail → 403.
+Customer has `reports.customer.read` only. TenantAdmin and Adviser have all four. SystemAdmin has none of the four and cannot call `GET /reports`, request, schedule, or download. Bad parameters → 400. Unknown report, not granted, inactive catalog row, or out of scope → 404 on those firm routes. Policy fail → 403.
+
+`GET /tenants/{tenantId}/reports` is `tenants.manage`. It returns the full catalog for that tenant, ordered by code, including inactive rows, each with `granted`. A new tenant is not auto-granted. Unknown tenant → 404. Other roles → 403. Field rules are in [features/reports.md](features/reports.md).
 
 BFF allow-list adds the `/reports` prefix.
 
-Tenant grant writes stay on Scalar (SystemAdmin). No catalog update API.
+Back Office tenant configuration lists that catalog and calls the existing grant `POST` and revoke `DELETE`. Scalar can call the same verbs. No catalog update API.
 
 ---
 

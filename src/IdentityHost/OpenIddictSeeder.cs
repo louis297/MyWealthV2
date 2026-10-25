@@ -24,27 +24,63 @@ public static class OpenIddictSeeder
     {
         var manager = services.GetRequiredService<IOpenIddictApplicationManager>();
         var configuration = services.GetRequiredService<IConfiguration>();
-        var origins = OpenIddictClientUris.ReadPortalOrigins(configuration);
-        var (redirects, postLogout) = OpenIddictClientUris.FromOrigins(origins);
+        var portalOrigins = OpenIddictClientUris.ReadPortalOrigins(configuration);
+        var (portalRedirects, portalPostLogout) = OpenIddictClientUris.FromOrigins(portalOrigins);
 
-        var secret = configuration["Identity:AdviserPortalClientSecret"];
-        if (string.IsNullOrWhiteSpace(secret))
+        var adviserSecret = configuration["Identity:AdviserPortalClientSecret"];
+        if (string.IsNullOrWhiteSpace(adviserSecret))
         {
             throw new InvalidOperationException("Identity:AdviserPortalClientSecret is required.");
         }
 
-        var existing = await manager.FindByClientIdAsync("adviser-portal", cancellationToken);
+        await UpsertAsync(
+            manager,
+            clientId: "adviser-portal",
+            secret: adviserSecret,
+            displayName: "Adviser Portal",
+            redirects: portalRedirects,
+            postLogout: portalPostLogout,
+            cancellationToken);
+
+        var backOfficeSecret = configuration["Identity:BackOfficeClientSecret"];
+        if (string.IsNullOrWhiteSpace(backOfficeSecret))
+        {
+            throw new InvalidOperationException("Identity:BackOfficeClientSecret is required.");
+        }
+
+        var backOfficeOrigin = OpenIddictClientUris.ReadBackOfficeOrigin(configuration);
+        var (backOfficeRedirects, backOfficePostLogout) = OpenIddictClientUris.FromOrigins([backOfficeOrigin]);
+        await UpsertAsync(
+            manager,
+            clientId: "back-office",
+            secret: backOfficeSecret,
+            displayName: "Back Office",
+            redirects: backOfficeRedirects,
+            postLogout: backOfficePostLogout,
+            cancellationToken);
+    }
+
+    private static async Task UpsertAsync(
+        IOpenIddictApplicationManager manager,
+        string clientId,
+        string secret,
+        string displayName,
+        IReadOnlyList<Uri> redirects,
+        IReadOnlyList<Uri> postLogout,
+        CancellationToken cancellationToken)
+    {
+        var existing = await manager.FindByClientIdAsync(clientId, cancellationToken);
         var descriptor = new OpenIddictApplicationDescriptor();
         if (existing is not null)
         {
             await manager.PopulateAsync(descriptor, existing, cancellationToken);
         }
 
-        descriptor.ClientId = "adviser-portal";
+        descriptor.ClientId = clientId;
         descriptor.ClientType = ClientTypes.Confidential;
         descriptor.ClientSecret = secret;
         descriptor.ConsentType = ConsentTypes.Implicit;
-        descriptor.DisplayName = "Adviser Portal";
+        descriptor.DisplayName = displayName;
         descriptor.Requirements.Add(Requirements.Features.ProofKeyForCodeExchange);
 
         foreach (var permission in RequiredPermissions)

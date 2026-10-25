@@ -19,31 +19,24 @@ public class GetTenantReportsQueryHandler(IApplicationDbContext db)
                          .SingleOrDefaultAsync(row => row.PublicId == request.TenantId, cancellationToken)
                      ?? throw new NotFoundException("Tenant", request.TenantId);
 
-        var rows = await (
-            from grant in db.TenantReports.AsNoTracking()
-            join report in db.Reports.AsNoTracking() on grant.ReportId equals report.Id
-            where grant.TenantId == tenant.Id
-            orderby report.Code
-            select new
-            {
-                report.PublicId,
-                report.Code,
-                report.Name,
-                report.Function,
-                report.Scope,
-                report.AllowedTriggers,
-                report.IsActive
-            }).ToListAsync(cancellationToken);
+        var reports = await db.Reports.AsNoTracking()
+            .OrderBy(report => report.Code)
+            .ToListAsync(cancellationToken);
+        var grantedReportIds = (await db.TenantReports.AsNoTracking()
+            .Where(grant => grant.TenantId == tenant.Id)
+            .Select(grant => grant.ReportId)
+            .ToListAsync(cancellationToken)).ToHashSet();
 
-        return rows.Select(row => new TenantReportGrantDto
+        return reports.Select(report => new TenantReportGrantDto
         {
-            Id = row.PublicId,
-            Code = row.Code,
-            Name = row.Name,
-            Function = row.Function,
-            Scope = row.Scope,
-            AllowedTriggers = TenantReportGrantDto.ParseTriggers(row.AllowedTriggers),
-            IsActive = row.IsActive
+            Id = report.PublicId,
+            Code = report.Code,
+            Name = report.Name,
+            Function = report.Function,
+            Scope = report.Scope,
+            AllowedTriggers = TenantReportGrantDto.ParseTriggers(report.AllowedTriggers),
+            IsActive = report.IsActive,
+            Granted = grantedReportIds.Contains(report.Id)
         }).ToList();
     }
 }

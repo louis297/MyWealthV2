@@ -46,6 +46,9 @@
         <ProjectReference Include="..\..\src\BffAdviserPortal\BffAdviserPortal.csproj">
           <Aliases>BffHost</Aliases>
         </ProjectReference>
+        <ProjectReference Include="..\..\src\BackOffice\BackOffice.csproj">
+          <Aliases>BackOfficeHost</Aliases>
+        </ProjectReference>
         <ProjectReference Include="..\TestAppHost\TestAppHost.csproj" />
     </ItemGroup>
 

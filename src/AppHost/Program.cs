@@ -80,6 +80,30 @@ bff.WithEnvironment("Authentication__PublicOrigin", bff.GetEndpoint("https"));
 
 identity.WithPortalOrigins(bff);
 
+var backOfficeClientSecret = builder.AddParameter("back-office-client-secret", secret: true);
+
+identity.WithEnvironment("Identity__BackOfficeClientSecret", backOfficeClientSecret);
+
+var backOffice = builder.AddProject<Projects.BackOffice>(Services.BackOffice)
+    .WithReference(web)
+    .WithReference(identity)
+    .WaitFor(web)
+    .WaitFor(identity)
+    .WithExternalHttpEndpoints()
+    .WithHttpHealthCheck("/health", endpointName: "http")
+    .WithAspNetCoreEnvironment()
+    .WithEnvironment("Authentication__Authority", identity.GetEndpoint("https"))
+    .WithEnvironment("Authentication__ClientSecret", backOfficeClientSecret)
+    .WithEnvironment("Api__BaseAddress", "https+http://webapi")
+    .WithUrlForEndpoint("https", url =>
+    {
+        url.DisplayText = "Back Office";
+        url.Url = "/";
+    });
+
+backOffice.WithEnvironment("Authentication__PublicOrigin", backOffice.GetEndpoint("https"));
+identity.WithEnvironment("Identity__BackOfficeOrigin", backOffice.GetEndpoint("https"));
+
 builder.AddProject<Projects.Worker>(Services.Worker)
     .WithReference(databaseServer)
     .WaitFor(databaseServer)

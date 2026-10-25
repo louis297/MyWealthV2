@@ -1,0 +1,125 @@
+@page "/tenants/{Id:guid}"
+@inject IPlatformApi Api
+
+<PageTitle>Tenant</PageTitle>
+
+@if (error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@error</MudAlert>
+}
+
+@if (item is not null)
+{
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+        <MudText Typo="Typo.h4">@item.Name</MudText>
+        <MudChip T="string" Color="@(item.IsActive ? Color.Success : Color.Default)">@(item.IsActive ? "Active" : "Disabled")</MudChip>
+    </MudStack>
+    <MudStack Row="true" Spacing="2" Class="mb-4">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="@($"/tenants/{Id}/config")">Configuration</MudButton>
+        <MudButton Variant="Variant.Outlined" Href="@($"/tenant-admins?tenantId={Id}")">Tenant admins</MudButton>
+    </MudStack>
+
+    <MudPaper Class="pa-4 mb-4" Outlined="true">
+        <MudStack Spacing="3" Style="max-width: 28rem;">
+            <div>
+                <MudText Typo="Typo.caption">Code</MudText>
+                <MudText Typo="Typo.body1">@item.Code</MudText>
+            </div>
+            <EditForm Model="form" OnValidSubmit="Save" FormName="edit-tenant">
+                <MudStack Spacing="3">
+                    <MudTextField @bind-Value="form.Name" Label="Name" Variant="Variant.Outlined" />
+                    <MudSelect T="string" @bind-Value="form.ReportingCurrency" Label="Reporting currency" Variant="Variant.Outlined">
+                        @foreach (var currency in currencies)
+                        {
+                            <MudSelectItem T="string" Value="@currency.Code">@currency.Code</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Save</MudButton>
+                </MudStack>
+            </EditForm>
+        </MudStack>
+    </MudPaper>
+
+    @if (item.IsActive)
+    {
+        <button type="button" class="bo-action bo-action-danger" @onclick="Disable">Disable</button>
+    }
+    else
+    {
+        <button type="button" class="bo-action bo-action-success" @onclick="Enable">Enable</button>
+    }
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private TenantItem? item;
+    private IReadOnlyList<CurrencyItem> currencies = [];
+    private readonly FormModel form = new();
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            item = await Api.GetTenantAsync(Id);
+            currencies = await Api.ListCurrenciesAsync();
+            form.Name = item.Name;
+            form.ReportingCurrency = item.ReportingCurrency;
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+
+    private async Task Save()
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await Api.UpdateTenantAsync(Id, form.Name, form.ReportingCurrency, item.RowVersion);
+            item = await Api.GetTenantAsync(Id);
+            error = null;
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Status == 409
+                ? "This tenant changed. Reload the page."
+                : exception.Message;
+        }
+    }
+
+    private async Task Disable()
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        await Api.DisableTenantAsync(Id, item.RowVersion);
+        item = await Api.GetTenantAsync(Id);
+    }
+
+    private async Task Enable()
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        await Api.EnableTenantAsync(Id, item.RowVersion);
+        item = await Api.GetTenantAsync(Id);
+    }
+
+    private sealed class FormModel
+    {
+        public string Name { get; set; } = "";
+        public string ReportingCurrency { get; set; } = "";
+    }
+}

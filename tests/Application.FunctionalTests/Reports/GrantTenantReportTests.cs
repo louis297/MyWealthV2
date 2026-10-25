@@ -102,9 +102,14 @@ public class GrantTenantReportTests : TestBase
         var list = await TenantHttp.Send(
             HttpMethod.Get, $"/tenants/{tenant.PublicId}/reports", tokens.AccessToken);
         using var granted = JsonDocument.Parse(await list.Content.ReadAsStringAsync());
-        granted.RootElement.GetArrayLength().ShouldBe(1);
-        granted.RootElement[0].GetProperty("id").GetGuid().ShouldBe(CustomerTransactionsId);
-        granted.RootElement[0].GetProperty("isActive").GetBoolean().ShouldBeFalse();
+        var items = granted.RootElement.EnumerateArray().ToList();
+        items.Select(item => item.GetProperty("code").GetString())
+            .ShouldBe(["adviser-balances", "customer-transactions"]);
+        var customer = items.Single(item => item.GetProperty("id").GetGuid() == CustomerTransactionsId);
+        customer.GetProperty("isActive").GetBoolean().ShouldBeFalse();
+        customer.GetProperty("granted").GetBoolean().ShouldBeTrue();
+        items.Single(item => item.GetProperty("code").GetString() == "adviser-balances")
+            .GetProperty("granted").GetBoolean().ShouldBeFalse();
     }
 
     private static async Task SetCatalogActiveAsync(Guid reportPublicId, bool active)

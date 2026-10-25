@@ -3,7 +3,7 @@ title: Function plan
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-10-12
+updated: 2026-10-25
 related:
   - README.md
   - glossary.md
@@ -53,7 +53,7 @@ How this file relates to the rest of the tree is in [README.md](README.md). This
 
 | Role | Can log in | Phase 1 UI | Notes |
 | --- | --- | --- | --- |
-| SystemAdmin | Yes, no tenantCode | None (Scalar / API). `adviser-portal` allow-list yes (probe). | Platform-level. No TenantId. Tenant manage is not the Adviser Portal. |
+| SystemAdmin | Yes, no tenantCode | Back Office ([backoffice/back-office.md](backoffice/back-office.md)). Scalar remains. `adviser-portal` allow-list yes (probe). | Platform-level. No TenantId. Tenant manage is not the Adviser Portal. |
 | TenantAdmin | Yes + tenantCode | Adviser Portal | Highest authority inside the tenant. |
 | Adviser | Yes + tenantCode | Adviser Portal | Manages assigned Customers. No ledger yet in Phase 1. |
 | Customer | Yes + tenantCode | None | Login principal. `adviser-portal` issues no code. No Customer Portal client yet. |
@@ -218,7 +218,7 @@ Phase 3 focuses on the Reports domain. Smaller platform pieces (Invitation / Act
 
 - Background worker: general-purpose Aspire resource `worker` hosting Hangfire (ADR 0017). One worker for reports and later async work (email, etc.). Not one project per task type.
 - Report catalog is a platform table (PublicId + stable Code, IsActive, no update API). A TenantReports row is required before a tenant can use a report; generator checks both IsActive and the grant. Requests send reportId + parameters JSON (max 8 KB, known fields only). PDF via QuestPDF. Aspire mounts a shared volume for worker and webapi; `ResultStorageKey` stores the relative key including the file name.
-- Policies: `reports.customer.read` / `reports.customer.create` and `reports.book.read` / `reports.book.create`. Customer has only `reports.customer.read`. TenantAdmin and Adviser have all four. SystemAdmin has none of them; grant and revoke use `tenants.manage`.
+- Policies: `reports.customer.read` / `reports.customer.create` and `reports.book.read` / `reports.book.create`. Customer has only `reports.customer.read`. TenantAdmin and Adviser have all four. SystemAdmin has none of them and cannot call `GET /reports`. `GET /tenants/{tenantId}/reports` (`tenants.manage`) returns the full catalog ordered by code, including inactive rows, each with `granted`. New tenants are not auto-granted. Back Office tenant configuration lists that response and enables or disables each report. Scalar can call the same verbs.
 - First phase reports: Customer Transactions Report (Customer scope; required date range; includeClosedAccounts default false; reversals next to original) and Adviser Balances Report (Book scope; server-set asOf; cash + holding lines; zero cash omitted; quantity ≤ 0 omitted; subtotals). Both manual + recurring. PDF via code layout. Event plumbing only.
 - Accepted: [features/reports.md](features/reports.md). ADR 0017 accepted.
 
@@ -235,7 +235,6 @@ Still later (not Phase 3):
 - NZ regulation and record retention
 - External IdP (for example Entra) attached only to the authorization server
 - Identity remains the `identity` Aspire resource; external IdP attaches there
-- Back Office (SystemAdmin UI; currently Scalar)
 
 ---
 
@@ -248,7 +247,7 @@ Still later (not Phase 3):
 - Any ledger API or ledger table in Phase 1
 - Resource Owner Password Credentials grant
 - A custom resource-API login that issues tokens
-- A second OIDC client in Phase 1
+- A public `customer-portal` OIDC client. `back-office` is the SystemAdmin confidential client and is registered
 - A separate identity SQL database in Phase 1
 
 ---

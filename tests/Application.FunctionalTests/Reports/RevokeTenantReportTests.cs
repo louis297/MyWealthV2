@@ -86,7 +86,12 @@ public class RevokeTenantReportTests : TestBase
             HttpMethod.Get, $"/tenants/{tenant.PublicId}/reports", tokens.AccessToken);
         using (var json = JsonDocument.Parse(await list.Content.ReadAsStringAsync()))
         {
-            json.RootElement.GetArrayLength().ShouldBe(0);
+            var items = json.RootElement.EnumerateArray().ToList();
+            items.Select(item => item.GetProperty("code").GetString())
+                .ShouldBe(["adviser-balances", "customer-transactions"]);
+            var customer = items.Single(item => item.GetProperty("id").GetGuid() == CustomerTransactionsId);
+            customer.GetProperty("granted").GetBoolean().ShouldBeFalse();
+            customer.TryGetProperty("isGranted", out _).ShouldBeFalse();
         }
 
         var again = await TenantHttp.Send(HttpMethod.Delete, path, tokens.AccessToken);
