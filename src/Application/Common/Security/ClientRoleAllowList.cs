@@ -4,12 +4,12 @@ namespace MyWealthV2.Application.Common.Security;
 
 public static class ClientRoleAllowList
 {
-    // Reserved, do not register the clients: customer-portal → Customer;
-    // Back Office (name unlocked) → SystemAdmin.
+    // Reserved, do not register the client: customer-portal → Customer.
 
     private static readonly Dictionary<string, HashSet<UserRole>> Allowed = new(StringComparer.Ordinal)
     {
-        ["adviser-portal"] = [UserRole.SystemAdmin, UserRole.TenantAdmin, UserRole.Adviser]
+        ["adviser-portal"] = [UserRole.SystemAdmin, UserRole.TenantAdmin, UserRole.Adviser],
+        ["back-office"] = [UserRole.SystemAdmin]
     };
 
     public static bool Allows(string? clientId, UserRole role) =>
