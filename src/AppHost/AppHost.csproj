@@ -19,6 +19,7 @@
     <ProjectReference Include="..\Web\Web.csproj" />
     <ProjectReference Include="..\IdentityHost\IdentityHost.csproj" />
     <ProjectReference Include="..\BffAdviserPortal\BffAdviserPortal.csproj" />
+    <ProjectReference Include="..\BackOffice\BackOffice.csproj" />
     <ProjectReference Include="..\Worker\Worker.csproj" />
   </ItemGroup>
 
