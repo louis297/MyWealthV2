@@ -72,13 +72,18 @@ public class BackOfficePageTests
 
         var customerAt = body.IndexOf("customer-transactions", StringComparison.Ordinal);
         var adviserAt = body.IndexOf("adviser-balances", StringComparison.Ordinal);
+        var grantedAt = body.IndexOf(">Granted<", StringComparison.Ordinal);
+        var notGrantedAt = body.IndexOf(">Not granted<", StringComparison.Ordinal);
         var disableAt = body.IndexOf(">Disable<", StringComparison.Ordinal);
         var enableAt = body.IndexOf(">Enable<", StringComparison.Ordinal);
         customerAt.ShouldBeGreaterThanOrEqualTo(0);
         adviserAt.ShouldBeGreaterThan(customerAt);
-        disableAt.ShouldBeGreaterThan(customerAt);
+        grantedAt.ShouldBeGreaterThan(customerAt);
+        grantedAt.ShouldBeLessThan(adviserAt);
+        disableAt.ShouldBeGreaterThan(grantedAt);
         disableAt.ShouldBeLessThan(adviserAt);
-        enableAt.ShouldBeGreaterThan(adviserAt);
+        notGrantedAt.ShouldBeGreaterThan(adviserAt);
+        enableAt.ShouldBeGreaterThan(notGrantedAt);
         body.ShouldNotContain("Report id");
         body.ShouldNotContain(">Grant<");
         body.ShouldNotContain(">Revoke<");
