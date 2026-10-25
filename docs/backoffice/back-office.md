@@ -112,9 +112,9 @@ Reached from tenant detail (`/tenants/{id}/config`). All verbs use `tenants.mana
 **Report grants** (enable / disable a report for this tenant)
 
 - List: `GET /tenants/{tenantId}/reports` — full catalog for that tenant. Each item includes `granted`. Inactive catalog rows are included
-- Each row has one button: Enable when `granted` is false, Disable when `granted` is true
-- Enable calls `POST /tenants/{tenantId}/reports` with that report id
-- Disable calls `DELETE /tenants/{tenantId}/reports/{reportId}`
+- Each row shows Code, Name, Scope, catalog `isActive`, and `granted`
+- Enable when `granted` is false calls `POST /tenants/{tenantId}/reports` with that report id
+- Disable when `granted` is true calls `DELETE /tenants/{tenantId}/reports/{reportId}`
 - The page does not ask for a report id
 - New tenants have no grants; the UI does not auto-grant
 - Revoke also removes that tenant’s Hangfire recurring jobs for the report (existing behaviour); schedule and execution rows stay
