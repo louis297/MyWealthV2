@@ -16,10 +16,18 @@ public class ClientRoleAllowListTests
         ClientRoleAllowList.Allows("adviser-portal", role).ShouldBe(expected);
     }
 
+    [TestCase(UserRole.SystemAdmin, true)]
+    [TestCase(UserRole.TenantAdmin, false)]
+    [TestCase(UserRole.Adviser, false)]
+    [TestCase(UserRole.Customer, false)]
+    public void BackOffice_AllowsSystemAdminOnly(UserRole role, bool expected)
+    {
+        ClientRoleAllowList.Allows("back-office", role).ShouldBe(expected);
+    }
+
     [TestCase(null)]
     [TestCase("")]
     [TestCase("customer-portal")]
-    [TestCase("back-office")]
     public void UnknownOrReservedClient_DeniesEveryRole(string? clientId)
     {
         foreach (var role in Enum.GetValues<UserRole>())
