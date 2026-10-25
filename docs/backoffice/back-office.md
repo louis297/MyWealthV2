@@ -13,6 +13,7 @@ related:
   - ../features/identity-auth.md
   - ../features/tenants.md
   - ../features/tenant-admins.md
+  - ../features/reports.md
   - ../adr/0014-openiddict-authorization-code-pkce.md
 ---
 
@@ -135,7 +136,7 @@ Core tenant settings (name, reporting currency, tenant IsActive) stay on the det
 | BO5 | TenantAdmin list (filtered by tenant), create, rename, disable, and enable succeed against the existing `/users/tenant-admins` endpoints |
 | BO6 | Code and email remain immutable in the UI |
 | BO7 | Disable is the only removal path; no physical delete action is offered |
-| BO8 | From a tenant, SystemAdmin sees each catalog report and can enable or disable it. The page calls the existing `/tenants/{tenantId}/reports` endpoints and does not ask for a report id |
+| BO8 | From a tenant, SystemAdmin sees every catalog report with Code, Name, Scope, catalog `isActive`, and `granted` (Granted or Not granted). Enable calls `POST` when `granted` is false. Disable calls `DELETE` when `granted` is true. The page does not ask for a report id and does not run or schedule |
 | BO9 | The configuration page does not offer run or schedule actions |
 | BO10 | Sign-out revokes refresh and ends the session; next visit is hosted login |
 
