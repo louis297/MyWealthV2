@@ -3,20 +3,28 @@
 @inject NavigationManager Navigation
 
 <PageTitle>New tenant admin</PageTitle>
-<h1>New tenant admin</h1>
+
+<MudText Typo="Typo.h4" Class="mb-4">New tenant admin</MudText>
 
 @if (error is not null)
 {
-    <p>@error</p>
+    <MudAlert Severity="Severity.Error" Class="mb-4">@error</MudAlert>
 }
 
-<EditForm Model="form" OnValidSubmit="Create" FormName="new-tenant-admin">
-    <label>Tenant <InputText @bind-Value="form.TenantId" /></label>
-    <label>Name <InputText @bind-Value="form.Name" /></label>
-    <label>Email <InputText @bind-Value="form.Email" /></label>
-    <label>Password <InputText type="password" @bind-Value="form.Password" /></label>
-    <button type="submit">Create</button>
-</EditForm>
+<MudPaper Class="pa-4" Outlined="true">
+    <EditForm Model="form" OnValidSubmit="Create" FormName="new-tenant-admin">
+        <MudStack Spacing="3" Style="max-width: 28rem;">
+            <MudTextField @bind-Value="form.TenantId" Label="Tenant" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="form.Name" Label="Name" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="form.Email" Label="Email" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="form.Password" Label="Password" InputType="InputType.Password" Variant="Variant.Outlined" />
+            <MudStack Row="true" Spacing="2">
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Create</MudButton>
+                <MudButton Variant="Variant.Text" Href="/tenant-admins">Cancel</MudButton>
+            </MudStack>
+        </MudStack>
+    </EditForm>
+</MudPaper>
 
 @code {
     [SupplyParameterFromQuery(Name = "tenantId")]

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.HttpOverrides;
+using MudBlazor.Services;
 using MyWealthV2.BackOffice;
 using MyWealthV2.BackOffice.Components;
 
@@ -8,6 +9,7 @@ builder.AddServiceDefaults();
 builder.AddBackOfficeAuthentication();
 builder.AddPlatformApi();
 builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddMudServices();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
@@ -27,6 +29,8 @@ if (app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
+
+app.MapStaticAssets();
 
 app.MapBackOfficeSignOut();
 app.MapGet("/forbidden", () => Results.Content("<h1>Forbidden</h1>", "text/html"))

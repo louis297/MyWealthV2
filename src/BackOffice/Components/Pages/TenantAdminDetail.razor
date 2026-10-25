@@ -5,29 +5,46 @@
 
 @if (error is not null)
 {
-    <p>@error</p>
+    <MudAlert Severity="Severity.Error" Class="mb-4">@error</MudAlert>
 }
 
 @if (item is not null)
 {
-    <h1>@item.Name</h1>
-    <p>Email: <span>@item.Email</span></p>
-    <p>Tenant: <a href="@($"/tenants/{item.TenantId}")">@item.TenantId</a></p>
-    <p>Status: @item.Status</p>
-    <p>Active: @(item.IsActive ? "Active" : "Disabled")</p>
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudText Typo="Typo.h4">@item.Name</MudText>
+        <MudChip T="string" Color="@(item.IsActive ? Color.Success : Color.Default)">@(item.IsActive ? "Active" : "Disabled")</MudChip>
+    </MudStack>
 
-    <EditForm Model="form" OnValidSubmit="Save" FormName="edit-tenant-admin">
-        <label>Name <InputText @bind-Value="form.Name" /></label>
-        <button type="submit">Save</button>
-    </EditForm>
+    <MudPaper Class="pa-4 mb-4" Outlined="true">
+        <MudStack Spacing="3" Style="max-width: 28rem;">
+            <div>
+                <MudText Typo="Typo.caption">Email</MudText>
+                <MudText Typo="Typo.body1">@item.Email</MudText>
+            </div>
+            <div>
+                <MudText Typo="Typo.caption">Tenant</MudText>
+                <MudLink Href="@($"/tenants/{item.TenantId}")">@item.TenantId</MudLink>
+            </div>
+            <div>
+                <MudText Typo="Typo.caption">Status</MudText>
+                <MudText Typo="Typo.body1">@item.Status</MudText>
+            </div>
+            <EditForm Model="form" OnValidSubmit="Save" FormName="edit-tenant-admin">
+                <MudStack Spacing="3">
+                    <MudTextField @bind-Value="form.Name" Label="Name" Variant="Variant.Outlined" />
+                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Save</MudButton>
+                </MudStack>
+            </EditForm>
+        </MudStack>
+    </MudPaper>
 
     @if (item.IsActive)
     {
-        <button type="button" @onclick="Disable">Disable</button>
+        <button type="button" class="bo-action bo-action-danger" @onclick="Disable">Disable</button>
     }
     else
     {
-        <button type="button" @onclick="Enable">Enable</button>
+        <button type="button" class="bo-action bo-action-success" @onclick="Enable">Enable</button>
     }
 }
 

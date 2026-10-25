@@ -5,37 +5,48 @@
 
 @if (error is not null)
 {
-    <p>@error</p>
+    <MudAlert Severity="Severity.Error" Class="mb-4">@error</MudAlert>
 }
 
 @if (item is not null)
 {
-    <h1>@item.Name</h1>
-    <p>Code: <span>@item.Code</span></p>
-    <p>Active: @(item.IsActive ? "Active" : "Disabled")</p>
-    <p><a href="@($"/tenants/{Id}/config")">Configuration</a></p>
-    <p><a href="@($"/tenant-admins?tenantId={Id}")">Tenant admins</a></p>
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+        <MudText Typo="Typo.h4">@item.Name</MudText>
+        <MudChip T="string" Color="@(item.IsActive ? Color.Success : Color.Default)">@(item.IsActive ? "Active" : "Disabled")</MudChip>
+    </MudStack>
+    <MudStack Row="true" Spacing="2" Class="mb-4">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="@($"/tenants/{Id}/config")">Configuration</MudButton>
+        <MudButton Variant="Variant.Outlined" Href="@($"/tenant-admins?tenantId={Id}")">Tenant admins</MudButton>
+    </MudStack>
 
-    <EditForm Model="form" OnValidSubmit="Save" FormName="edit-tenant">
-        <label>Name <InputText @bind-Value="form.Name" /></label>
-        <label>Reporting currency
-            <InputSelect @bind-Value="form.ReportingCurrency">
-                @foreach (var currency in currencies)
-                {
-                    <option value="@currency.Code">@currency.Code</option>
-                }
-            </InputSelect>
-        </label>
-        <button type="submit">Save</button>
-    </EditForm>
+    <MudPaper Class="pa-4 mb-4" Outlined="true">
+        <MudStack Spacing="3" Style="max-width: 28rem;">
+            <div>
+                <MudText Typo="Typo.caption">Code</MudText>
+                <MudText Typo="Typo.body1">@item.Code</MudText>
+            </div>
+            <EditForm Model="form" OnValidSubmit="Save" FormName="edit-tenant">
+                <MudStack Spacing="3">
+                    <MudTextField @bind-Value="form.Name" Label="Name" Variant="Variant.Outlined" />
+                    <MudSelect T="string" @bind-Value="form.ReportingCurrency" Label="Reporting currency" Variant="Variant.Outlined">
+                        @foreach (var currency in currencies)
+                        {
+                            <MudSelectItem T="string" Value="@currency.Code">@currency.Code</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Save</MudButton>
+                </MudStack>
+            </EditForm>
+        </MudStack>
+    </MudPaper>
 
     @if (item.IsActive)
     {
-        <button type="button" @onclick="Disable">Disable</button>
+        <button type="button" class="bo-action bo-action-danger" @onclick="Disable">Disable</button>
     }
     else
     {
-        <button type="button" @onclick="Enable">Enable</button>
+        <button type="button" class="bo-action bo-action-success" @onclick="Enable">Enable</button>
     }
 }
 

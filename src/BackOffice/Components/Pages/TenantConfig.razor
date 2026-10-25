@@ -2,21 +2,22 @@
 @inject IPlatformApi Api
 
 <PageTitle>Tenant configuration</PageTitle>
-<h1>Configuration</h1>
-<p><a href="@($"/tenants/{TenantId}")">Back to tenant</a></p>
+
+<MudText Typo="Typo.h4" Class="mb-2">Configuration</MudText>
+<MudLink Href="@($"/tenants/{TenantId}")" Class="mb-4">Back to tenant</MudLink>
 
 @if (error is not null)
 {
-    <p>@error</p>
+    <MudAlert Severity="Severity.Error" Class="my-4">@error</MudAlert>
 }
 
 @if (reports.Count == 0)
 {
-    <p>No reports.</p>
+    <MudText Class="mt-4">No reports.</MudText>
 }
 else
 {
-    <table>
+    <MudSimpleTable Hover="true" Dense="true" Bordered="true" Class="mt-4">
         <thead>
             <tr><th>Code</th><th>Name</th><th>Scope</th><th>Catalog</th><th>Grant state</th><th></th></tr>
         </thead>
@@ -32,17 +33,17 @@ else
                 <td>
                     @if (report.Granted)
                     {
-                        <button type="button" @onclick="() => Disable(report.Id)">Disable</button>
+                        <button type="button" class="bo-action bo-action-danger" @onclick="() => Disable(report.Id)">Disable</button>
                     }
                     else
                     {
-                        <button type="button" @onclick="() => Enable(report.Id)">Enable</button>
+                        <button type="button" class="bo-action bo-action-success" @onclick="() => Enable(report.Id)">Enable</button>
                     }
                 </td>
             </tr>
         }
         </tbody>
-    </table>
+    </MudSimpleTable>
 }
 
 @code {
