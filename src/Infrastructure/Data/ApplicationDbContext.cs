@@ -1,14 +1,11 @@
 using System.Data;
 using System.Reflection;
 using FluentValidation.Results;
-using MediatR;
 using Microsoft.Data.SqlClient;
-using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Infrastructure.Data.Entities;
-using MyWealthV2.Infrastructure.Data.Interceptors;
 using MyWealthV2.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -141,16 +138,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
         }
     }
 
-    private async Task DispatchDomainEvents(CancellationToken cancellationToken)
-    {
-        var mediator = _services?.GetService<IMediator>();
-        if (mediator is null)
-        {
-            return;
-        }
-
-        await DispatchDomainEventsInterceptor.PublishAfterCommitAsync(this, mediator, cancellationToken);
-    }
+    private Task DispatchDomainEvents(CancellationToken cancellationToken) =>
+        DomainEventDispatcher.DispatchAsync(this, _services, cancellationToken);
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

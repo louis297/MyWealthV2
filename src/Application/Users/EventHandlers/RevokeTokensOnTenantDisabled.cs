@@ -9,6 +9,7 @@ public class RevokeTokensOnTenantDisabled(IServiceScopeFactory scopes) : INotifi
 {
     public async Task Handle(TenantDisabled notification, CancellationToken cancellationToken)
     {
+        // Runs during SaveChanges, so resolve services from a new scope instead of the saving context.
         using var scope = scopes.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
         var revocation = scope.ServiceProvider.GetRequiredService<ITokenRevocation>();

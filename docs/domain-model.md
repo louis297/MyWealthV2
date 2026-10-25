@@ -178,7 +178,7 @@ Do not add a fifth role in Phase 1. Ledger permission names are registered when 
 
 Raise even if there is no subscriber yet. The application uses these events to revoke tokens and write audit.
 
-Events are dispatched after a successful `SaveChanges` on the same context. They are **not** part of the database transaction. A failure in a handler does not roll back the original change; the side effect is eventually consistent. See [fixes/domain-event-dispatch.md](fixes/domain-event-dispatch.md).
+Events are dispatched after a successful `SaveChanges` on the same context. They are **not** part of the database transaction. When that save runs inside an outer transaction, dispatch still happens before the outer commit. A failure in a handler does not roll back the original change; the side effect is eventually consistent. Token revocation after a user disable, a password change, or a tenant disable is one of those side effects. See [fixes/domain-event-dispatch.md](fixes/domain-event-dispatch.md).
 
 | Event | When |
 | --- | --- |

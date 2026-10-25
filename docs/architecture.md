@@ -124,8 +124,10 @@ Logging → UnhandledException → Authorization → Validation → Performance 
 
 Save interceptors and post-save dispatch:
 
-- `AuditableEntityInterceptor` (registered interceptor)
-- Domain events are dispatched by an explicit call in `ApplicationDbContext.SaveChangesAsync` after `base.SaveChangesAsync`. They are **not** part of the database transaction. A failure in an event handler does not roll back the original change. If `IMediator` cannot be resolved the failure is logged (not silently ignored). See [fixes/domain-event-dispatch.md](fixes/domain-event-dispatch.md).
+- `AuditableEntityInterceptor` is the only registered save interceptor.
+- `DomainEventDispatcher.DispatchAsync` runs from `ApplicationDbContext.SaveChangesAsync` after `base.SaveChangesAsync` returns. The events are **not** part of the database transaction. Inside `ExecuteInTransactionAsync` that call is still before `CommitAsync`, so a handler can see uncommitted work, and a later rollback does not undo the handler.
+- A handler exception is logged and does not fail the save. The command returns success. The side effect is eventually consistent. Token revocation is one of those side effects: a failed revoke does not undo disable, password change, or tenant disable. Those handlers open a new scope because they run during the save and must not reuse that context.
+- When the context has a service provider, events are waiting, and `IMediator` cannot be resolved, dispatch logs an error. In Development that call throws. A context built without a service provider does not dispatch. See [fixes/domain-event-dispatch.md](fixes/domain-event-dispatch.md).
 
 Writes to Tenant / User check `RowVersion`. Conflict maps to HTTP 409.
 

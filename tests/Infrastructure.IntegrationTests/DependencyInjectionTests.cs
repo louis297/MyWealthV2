@@ -13,7 +13,7 @@ namespace MyWealthV2.Infrastructure.IntegrationTests;
 public class DependencyInjectionTests
 {
     [Test]
-    public void ResolvesSaveChangesInterceptorsWithoutMediatR()
+    public void ResolvesOnlyTheAuditableSaveInterceptorWithoutMediatR()
     {
         var builder = CreateBuilder();
         builder.Services.AddScoped<IUser, StubUser>();
@@ -24,12 +24,11 @@ public class DependencyInjectionTests
 
         var interceptors = scope.ServiceProvider.GetServices<ISaveChangesInterceptor>().ToList();
 
-        interceptors.ShouldContain(interceptor => interceptor is AuditableEntityInterceptor);
-        interceptors.ShouldNotContain(interceptor => interceptor is DispatchDomainEventsInterceptor);
+        interceptors.ShouldHaveSingleItem().ShouldBeOfType<AuditableEntityInterceptor>();
     }
 
     [Test]
-    public void RegistersDispatchDomainEventsInterceptorWhenMediatorIsPresent()
+    public void ResolvesOnlyTheAuditableSaveInterceptorWhenMediatorIsPresent()
     {
         var builder = CreateBuilder();
         builder.Services.AddScoped<IUser, StubUser>();
@@ -41,7 +40,7 @@ public class DependencyInjectionTests
 
         var interceptors = scope.ServiceProvider.GetServices<ISaveChangesInterceptor>().ToList();
 
-        interceptors.ShouldContain(interceptor => interceptor is DispatchDomainEventsInterceptor);
+        interceptors.ShouldHaveSingleItem().ShouldBeOfType<AuditableEntityInterceptor>();
     }
 
     [Test]
