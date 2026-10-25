@@ -3,7 +3,7 @@ title: Domain model
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-10-21
+updated: 2026-10-25
 related:
   - README.md
   - glossary.md
