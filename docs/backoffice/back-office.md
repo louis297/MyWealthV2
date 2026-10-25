@@ -111,7 +111,7 @@ Reached from tenant detail (`/tenants/{id}/config`). All verbs use `tenants.mana
 
 **Report grants** (enable / disable a report for this tenant)
 
-- List: `GET /tenants/{tenantId}/reports` — catalog rows with grant state (including inactive catalog rows)
+- List: `GET /tenants/{tenantId}/reports` — every catalog row, including inactive rows, each with `isGranted`
 - Enable (grant): `POST /tenants/{tenantId}/reports` with the report id
 - Disable (revoke): `DELETE /tenants/{tenantId}/reports/{reportId}`
 - New tenants have no grants; the UI does not auto-grant

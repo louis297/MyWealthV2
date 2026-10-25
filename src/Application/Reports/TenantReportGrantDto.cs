@@ -18,6 +18,8 @@ public sealed class TenantReportGrantDto
 
     public required bool IsActive { get; init; }
 
+    public required bool IsGranted { get; init; }
+
     public static IReadOnlyList<string> ParseTriggers(string json) =>
         JsonSerializer.Deserialize<string[]>(json) ?? [];
 }

@@ -383,7 +383,7 @@ Field rules: [features/reports.md](features/reports.md). Accepted. Not landed.
 
 | Method | Route | Policy | Success |
 | --- | --- | --- | --- |
-| GET | `/tenants/{tenantId}/reports` | `tenants.manage` | 200 grant list, including an inactive catalog row |
+| GET | `/tenants/{tenantId}/reports` | `tenants.manage` | 200 every catalog row, including an inactive row, each with `isGranted` |
 | POST | `/tenants/{tenantId}/reports` | `tenants.manage` | 201 `{ id }` the first time, 204 when the grant already exists |
 | DELETE | `/tenants/{tenantId}/reports/{reportId}` | `tenants.manage` | 204 when removed or already absent |
 | GET | `/reports` | `reports.customer.read` or `reports.book.read` | 200 list (granted + active only) |

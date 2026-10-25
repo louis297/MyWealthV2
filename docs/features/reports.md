@@ -266,7 +266,7 @@ First phase may hard-code the two parameter forms in the Adviser Portal. A param
 
 | Method | Route | Policy | Success | Failure |
 | --- | --- | --- | --- | --- |
-| GET | `/tenants/{tenantId}/reports` | `tenants.manage` | 200 grant list, including inactive catalog rows | 401 / 403 / 404 |
+| GET | `/tenants/{tenantId}/reports` | `tenants.manage` | 200 every catalog row for that tenant, including inactive rows, each with `isGranted` | 401 / 403 / 404 |
 | POST | `/tenants/{tenantId}/reports` | `tenants.manage` | 201 `{ "id" }` the first time, 204 when the grant already exists. Inactive catalog rows may be granted | 401 / 403 / 404 |
 | DELETE | `/tenants/{tenantId}/reports/{reportId}` | `tenants.manage` | 204 when removed or already absent. Schedule and execution rows stay | 401 / 403 / 404 |
 | GET | `/reports` | `reports.customer.read` or `reports.book.read` (filter by scope) | 200 list | 401 / 403 |

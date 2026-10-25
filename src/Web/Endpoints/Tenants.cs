@@ -55,8 +55,8 @@ public class Tenants : IEndpointGroup
         return TypedResults.Ok(item);
     }
 
-    [EndpointSummary("List reports granted to a tenant")]
-    [EndpointDescription("Returns catalog rows granted to the tenant, including inactive catalog rows. SystemAdmin only.")]
+    [EndpointSummary("List catalog reports for a tenant")]
+    [EndpointDescription("Returns every catalog row, including inactive rows, with isGranted for this tenant. SystemAdmin only.")]
     public static async Task<Ok<IReadOnlyList<TenantReportGrantDto>>> GetTenantReports(ISender sender, Guid id)
     {
         var result = await sender.Send(new GetTenantReportsQuery(id));
