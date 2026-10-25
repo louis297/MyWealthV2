@@ -5,10 +5,58 @@ using MyWealthV2.Shared;
 
 namespace MyWealthV2.BackOffice;
 
-public sealed class PlatformApi(HttpClient api, HttpClient tokens, IAccessTokens access, string clientSecret)
+public sealed class PlatformApi(HttpClient api, HttpClient tokens, IAccessTokens access, string clientSecret) : IPlatformApi
 {
     public Task<string> ListTenantsAsync(CancellationToken cancellationToken = default) =>
         SendAsync(HttpMethod.Get, "/tenants?page=1&pageSize=20", json: null, cancellationToken);
+
+    public Task<TenantPage> ListTenantsAsync(int page, int pageSize, bool? isEnabled, string? search, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task<TenantItem> GetTenantAsync(Guid id, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task<Guid> CreateTenantAsync(string name, string code, string reportingCurrency, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task UpdateTenantAsync(Guid id, string name, string reportingCurrency, string rowVersion, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task DisableTenantAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task EnableTenantAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task<TenantAdminPage> ListTenantAdminsAsync(int page, int pageSize, Guid? tenantId, bool? enabledOnly, string? search, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task<TenantAdminItem> GetTenantAdminAsync(Guid id, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task<Guid> CreateTenantAdminAsync(Guid tenantId, string name, string email, string password, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task UpdateTenantAdminAsync(Guid id, string name, string rowVersion, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task DisableTenantAdminAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task EnableTenantAdminAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task<IReadOnlyList<ReportGrantItem>> ListReportGrantsAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task GrantReportAsync(Guid tenantId, Guid reportId, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task RevokeReportAsync(Guid tenantId, Guid reportId, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task<IReadOnlyList<CurrencyItem>> ListCurrenciesAsync(CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
 
     private async Task<string> SendAsync(
         HttpMethod method,
