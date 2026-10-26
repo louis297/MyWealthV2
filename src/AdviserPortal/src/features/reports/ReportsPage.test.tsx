@@ -632,4 +632,42 @@ describe("ReportsPage", () => {
       .map((input) => new URL(input.url));
     expect(filtered.some((url) => url.searchParams.get("reportId") === adviserBalances.id && url.searchParams.get("page") === "1")).toBe(true);
   });
+
+  it("shows reports, schedules, and history on separate tabs", async () => {
+    renderReports(user({ role: "adviser", name: "Sam Reed" }), (url, method) => {
+      if (url.includes("/api/reports") && method === "GET" && !url.includes("/executions") && !url.includes("/schedules")) {
+        return json([adviserBalances]);
+      }
+      if (url.includes("/reports/schedules") && method === "GET") {
+        return json([]);
+      }
+      if (url.includes("/reports/executions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByRole("heading", { name: "Reports" })).toBeInTheDocument();
+    const reportsTab = screen.getByRole("tab", { name: "Reports" });
+    const schedulesTab = screen.getByRole("tab", { name: "Schedules" });
+    const historyTab = screen.getByRole("tab", { name: "History" });
+    expect(reportsTab).toHaveAttribute("aria-selected", "true");
+    expect(schedulesTab).toHaveAttribute("aria-selected", "false");
+    expect(historyTab).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByLabelText("Report")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Schedules" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "History" })).not.toBeInTheDocument();
+
+    fireEvent.click(schedulesTab);
+    expect(await screen.findByRole("heading", { name: "Schedules" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Report")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "History" })).not.toBeInTheDocument();
+    expect(await screen.findByText("No schedules.")).toBeInTheDocument();
+
+    fireEvent.click(historyTab);
+    expect(await screen.findByRole("heading", { name: "History" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Schedules" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Report")).not.toBeInTheDocument();
+    expect(await screen.findByText("No runs yet.")).toBeInTheDocument();
+  });
 });
