@@ -19,4 +19,6 @@ public class Report : BaseEntity
     public string AllowedTriggers { get; private set; } = string.Empty;
 
     public bool IsActive { get; private set; }
+
+    public void SetIsActive(bool isActive) => IsActive = isActive;
 }

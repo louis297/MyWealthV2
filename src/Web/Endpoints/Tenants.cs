@@ -56,7 +56,7 @@ public class Tenants : IEndpointGroup
     }
 
     [EndpointSummary("List catalog reports for a tenant")]
-    [EndpointDescription("Returns the full catalog for this tenant, including inactive rows, each with granted. SystemAdmin only. New tenants are not auto-granted.")]
+    [EndpointDescription("Returns active catalog rows for this tenant, each with granted. Platform-inactive reports are omitted. SystemAdmin only. New tenants are not auto-granted.")]
     public static async Task<Ok<IReadOnlyList<TenantReportGrantDto>>> GetTenantReports(ISender sender, Guid id)
     {
         var result = await sender.Send(new GetTenantReportsQuery(id));
@@ -64,7 +64,7 @@ public class Tenants : IEndpointGroup
     }
 
     [EndpointSummary("Grant a report to a tenant")]
-    [EndpointDescription("Grants a catalog report to a tenant. Repeat grants return 204. Inactive catalog rows may be granted. SystemAdmin only.")]
+    [EndpointDescription("Grants an active catalog report to a tenant. Repeat grants return 204. An inactive catalog report is 404. SystemAdmin only.")]
     public static async Task<IResult> GrantTenantReport(ISender sender, Guid id, GrantTenantReportCommand command)
     {
         command.TenantId = id;

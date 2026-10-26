@@ -4,6 +4,7 @@ using MyWealthV2.Application.Reports;
 using MyWealthV2.Application.Reports.Commands.CreateReportSchedule;
 using MyWealthV2.Application.Reports.Commands.DisableReportSchedule;
 using MyWealthV2.Application.Reports.Commands.RequestReport;
+using MyWealthV2.Application.Reports.Commands.UpdateReportCatalog;
 using MyWealthV2.Application.Reports.Commands.UpdateReportSchedule;
 using MyWealthV2.Application.Reports.Queries.DownloadReportResult;
 using MyWealthV2.Application.Reports.Queries.GetReportExecutions;
@@ -38,6 +39,7 @@ public class Reports : IEndpointGroup
 
     public static void Map(RouteGroupBuilder groupBuilder)
     {
+        groupBuilder.MapPut(UpdateCatalog, "{id:guid}").RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapGet(GetReports).RequireAuthorization(ReadReports);
         groupBuilder.MapGet(GetSchedules, "schedules").RequireAuthorization(ReadReports);
         groupBuilder.MapPost(CreateSchedule, "schedules").RequireAuthorization(CreateReports);
@@ -46,6 +48,15 @@ public class Reports : IEndpointGroup
         groupBuilder.MapPost(RequestReport, "request").RequireAuthorization(CreateReports);
         groupBuilder.MapGet(GetExecutions, "executions").RequireAuthorization(ReadReports);
         groupBuilder.MapGet(DownloadReport, "executions/{id}/download").RequireAuthorization(ReadReports);
+    }
+
+    [EndpointSummary("Update a catalog report")]
+    [EndpointDescription("Sets catalog IsActive and/or AllowedTriggers. IsActive false revokes every tenant grant and removes Hangfire jobs. Schedule and execution rows stay. SystemAdmin only.")]
+    public static async Task<NoContent> UpdateCatalog(ISender sender, Guid id, UpdateReportCatalogCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
     }
 
     [EndpointSummary("List granted reports")]
