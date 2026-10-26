@@ -417,7 +417,8 @@ describe("ReportsPage", () => {
       return new Response("", { status: 404 });
     });
 
-    fireEvent.click(await screen.findByRole("button", { name: "History" }));
+    expect(screen.queryByRole("button", { name: "History" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "History" })).toBeInTheDocument();
     expect(await screen.findByText("No runs yet.")).toBeInTheDocument();
     const request = fetchMock.mock.calls
       .map(([input]) => input)
@@ -428,7 +429,62 @@ describe("ReportsPage", () => {
     expect(url.searchParams.get("scope")).toBe("Book");
     expect(url.searchParams.get("page")).toBe("1");
     expect(url.searchParams.get("pageSize")).toBe("20");
+    expect(url.searchParams.has("reportId")).toBe(false);
     expect(request!.headers.get("Authorization")).toBeNull();
     expect(request!.credentials).toBe("include");
+  });
+
+  it("lists every book run and adds reportId when history is filtered", async () => {
+    const futureBook = {
+      id: "99999999-9999-9999-9999-999999999999",
+      code: "future-book",
+      name: "Future Book",
+      function: "Later.",
+      scope: "Book",
+      allowedTriggers: ["manual"],
+    };
+    const balancesRun = {
+      id: "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1",
+      reportId: adviserBalances.id,
+      status: "Succeeded",
+      triggerKind: "Manual",
+      created: "2026-10-16T08:30:00+00:00",
+      parameters: { includeClosedAccounts: false },
+    };
+    const futureRun = {
+      id: "e2e2e2e2-e2e2-e2e2-e2e2-e2e2e2e2e2e2",
+      reportId: futureBook.id,
+      status: "Failed",
+      triggerKind: "Scheduled",
+      created: "2026-10-15T08:30:00+00:00",
+      parameters: {},
+    };
+    const { fetchMock } = renderReports(user(), (url, method) => {
+      if (url.includes("/reports/executions") && method === "GET") {
+        const parsed = new URL(url);
+        const reportId = parsed.searchParams.get("reportId");
+        const items = reportId === adviserBalances.id ? [balancesRun] : [balancesRun, futureRun];
+        return json({ items, page: 1, pageSize: 20, totalCount: reportId ? 1 : 21 });
+      }
+      if (url.includes("/api/reports") && method === "GET") {
+        return json([adviserBalances, futureBook]);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByText("Future Book")).toBeInTheDocument();
+    expect(screen.getAllByText("Adviser Balances").length).toBeGreaterThan(0);
+    expect(screen.getByText("Failed")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Download" })).toHaveLength(1);
+
+    fireEvent.change(screen.getByLabelText("History report"), { target: { value: adviserBalances.id } });
+    await screen.findByText("Succeeded");
+    expect(screen.queryByText("Failed")).not.toBeInTheDocument();
+    const filtered = fetchMock.mock.calls
+      .map(([input]) => input)
+      .filter((input): input is Request => input instanceof Request && input.url.includes("/reports/executions"))
+      .map((input) => new URL(input.url));
+    expect(filtered.some((url) => url.searchParams.get("reportId") === adviserBalances.id && url.searchParams.get("page") === "1")).toBe(true);
   });
 });

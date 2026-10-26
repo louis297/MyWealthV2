@@ -851,15 +851,17 @@ describe("CustomerDetailPage", () => {
       return new Response("", { status: 404 });
     });
 
-    fireEvent.click(await screen.findByRole("button", { name: "History" }));
+    expect(screen.queryByRole("button", { name: "History" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "History" })).toBeInTheDocument();
     expect(await screen.findByText("Succeeded")).toBeInTheDocument();
+    expect(screen.getAllByText("Customer Transactions").length).toBeGreaterThan(0);
     expect(screen.getByText("Manual")).toBeInTheDocument();
     expect(screen.getByText("Scheduled")).toBeInTheDocument();
     expect(screen.getByText("Queued")).toBeInTheDocument();
     expect(screen.getByText("2026-01-01 to 2026-03-31")).toBeInTheDocument();
     expect(screen.getByText("2026-10-16T09:00:00+00:00")).toBeInTheDocument();
-    expect(screen.queryByText("2026-04-01 to 2026-05-01")).not.toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Download" })).toHaveLength(1);
+    expect(screen.getByText("2026-04-01 to 2026-05-01")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Download" })).toHaveLength(2);
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     await waitFor(() => {
@@ -897,7 +899,6 @@ describe("CustomerDetailPage", () => {
       return new Response("", { status: 404 });
     });
 
-    fireEvent.click(await screen.findByRole("button", { name: "History" }));
     fireEvent.click(await screen.findByRole("button", { name: "Download" }));
     await waitFor(() => {
       expect(createObjectURL).toHaveBeenCalled();
@@ -923,7 +924,6 @@ describe("CustomerDetailPage", () => {
       return new Response("", { status: 404 });
     });
 
-    fireEvent.click(await screen.findByRole("button", { name: "History" }));
     expect(await screen.findByText("No runs yet.")).toBeInTheDocument();
   });
 
