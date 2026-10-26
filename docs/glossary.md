@@ -3,7 +3,7 @@ title: Glossary
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-10-21
+updated: 2026-10-26
 related:
   - function-plan.md
   - domain-model.md
@@ -34,7 +34,7 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | TenantAdmin | Highest authority inside one tenant. | SystemAdmin |
 | Adviser | Tenant operator who manages assigned customers (and, from Phase 2, their ledger). | Customer |
 | Customer | Account holder. Login principal. Phase 1 client `adviser-portal` issues no code. No Customer Portal client yet. | A business row with no login principal |
-| Report | Platform catalog entry: PublicId, stable Code, name, function, scope (`Customer` or `Book`), allowed triggers, IsActive. | A tenant-owned row; a generated file |
+| Report | Platform catalog entry: PublicId, stable Code, name, function, scope (`Customer` or `Book`), allowed triggers, IsActive. Disable cascades revoke of all TenantReports. | A tenant-owned row; a generated file |
 | Book | An Adviser’s set of assigned Customers. Book-scoped reports run across that set. TenantAdmin selects an Adviser. | The whole tenant; a single Customer |
 | TenantReport | Grant of a Report to a Tenant. Required before the tenant can schedule or run it. | An execution |
 | ReportSchedule | Editable recurring definition. Must name a ReportId. Stores a free-form `parameters` JSON object. | A one-off manual request |

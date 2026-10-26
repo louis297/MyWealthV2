@@ -4,7 +4,7 @@ status: accepted
 phase: 3
 language: en
 created: 2026-10-14
-updated: 2026-10-25
+updated: 2026-10-26
 related:
   - adviser-portal.md
   - adviser-portal-dashboard.md
@@ -57,7 +57,7 @@ Backend prerequisites (landed):
 - Historical as-of snapshots, FX fold, live vendor prices.
 - Event-triggered executions in the UI (plumbing exists on the backend; no concrete events are bound).
 - SystemAdmin reports screens.
-- Parameter schema driven dynamic forms (first phase hard-codes the two known parameter shapes).
+- Parameter schema driven dynamic forms (first phase hard-codes the two known parameter shapes; the Generate dropdown still switches on the selected report’s code / PublicId).
 
 ---
 
@@ -92,7 +92,7 @@ All routes are under `/api`. Policy is enforced by the backend; the portal only 
 | `GET /reports/schedules?scope=…` | Schedules list | Array. Includes disabled. |
 | `PUT /reports/schedules/{id}` | Edit schedule | Body includes `rowVersion`. 204. Stale → 409. |
 | `POST /reports/schedules/{id}/disable` | Disable | No body. 204. |
-| `GET /reports/executions?scope=…&page=&pageSize=` | History | Paged `{ items, page, pageSize, totalCount }`. Sort created desc. |
+| `GET /reports/executions?scope=…&reportId=&page=&pageSize=` | History | Paged `{ items, page, pageSize, totalCount }`. Optional `reportId` filters to one report. Sort created desc. |
 | `GET /reports/executions/{id}` | Poll / detail | Single execution. |
 | `GET /reports/executions/{id}/download` | Download | 200 `application/pdf` only when `Succeeded`. |
 
@@ -109,21 +109,21 @@ Do not treat a cross-tenant or out-of-scope 404 as 403.
 
 ## Page structure
 
+Both entry points use the same layout: a Generate section, a Schedules panel, and a History panel. The only differences are scope and the implicit parameters (customerId on the Customer page; adviserId rules on the Reports tab).
+
 ### Customer page — Reports section
 
 Appears on `/customers/:id` after the existing person fields and accounts list. Visible only to TenantAdmin and Adviser.
 
 **Header.** “Reports” with a short note that these run for this customer.
 
-**Report list.** Cards or table rows for each item from `GET /reports?scope=Customer`. Each row shows:
+**Generate section.**
 
-- Name
-- Function (truncated if long)
-- Actions: Generate now, Schedules (expand or secondary panel), History (expand or secondary panel)
+- Report dropdown: items from `GET /reports?scope=Customer`. Shows name (and function as secondary text if space allows). Empty: “No reports available for this customer.”
+- Selecting a report reveals its parameter form and a Generate button. The form is hard-coded per known report (switch on code / PublicId). Unknown reports in the list show a short “parameters not available in this version” note and disable Generate.
+- customerId is always hidden and set to the page’s Customer PublicId.
 
-If the list is empty: “No reports available for this customer.” (tenant has no granted active Customer-scoped reports).
-
-**Generate now (Customer Transactions).** Modal or inline form:
+**Generate form (Customer Transactions).**
 
 | Field | Binding | Required | Notes |
 | --- | --- | --- | --- |
@@ -136,7 +136,7 @@ Submit calls `POST /reports/request` with:
 
 ```json
 {
-  "reportId": "<customer-transactions PublicId>",
+  "reportId": "<selected report PublicId>",
   "parameters": {
     "customerId": "<page customer PublicId>",
     "from": "2026-01-01",
@@ -146,21 +146,21 @@ Submit calls `POST /reports/request` with:
 }
 ```
 
-On 202: close the form, show a toast “Report queued”, and start polling the returned execution id (or refresh the history list). On 400: show the server message next to the form. On 404: “Report is not available.”
+On 202: show a toast “Report queued”, clear or leave the form, and refresh the History panel (the new row appears with status Queued). On 400: show the server message next to the form. On 404: “Report is not available.”
 
-**Schedules panel.** Lists `GET /reports/schedules?scope=Customer` filtered client-side to those whose stored `parameters.customerId` matches the page customer (or show all Customer-scoped schedules the caller can see; the backend already scopes by caller). Each item shows cron (humanised from the preset if possible), isActive, and actions Edit / Disable.
+**Schedules panel.**
 
-Create schedule form uses the same parameter fields as Generate now, plus:
+- Lists `GET /reports/schedules?scope=Customer`. Optional client-side filter by report (dropdown of the same Customer-scoped reports, plus All). Backend already scopes by caller; further filter to the page customer’s `parameters.customerId` is allowed.
+- Each item shows report name (resolved from reportId), cron (humanised from the preset if possible), isActive, and actions Edit / Disable.
+- Create schedule is available only when the selected report’s `allowedTriggers` includes `"scheduled"`. The form uses the same parameter fields as Generate now, plus frequency / time / active (see Cron presets).
+- Edit sends `PUT` with the same shape plus `rowVersion` from the list item. Disable calls the disable endpoint. No hard delete.
+- If the selected report does not allow scheduled, the create form is hidden and an existing schedule for that report is shown as read-only (or with Disable only).
 
-| Field | Binding | Notes |
-| --- | --- | --- |
-| Frequency | preset → `cron` | Daily / Weekly / Monthly |
-| Time | time input | Combined into a 5-field cron (see Cron presets) |
-| Active | checkbox → `isActive` | Default true |
+**History panel.** Separate panel.
 
-Edit sends `PUT` with the same shape plus `rowVersion` from the list item. Disable calls the disable endpoint. No hard delete.
-
-**History panel.** `GET /reports/executions?scope=Customer&page=1&pageSize=20`. Show status, triggerKind, created, parameters summary (date range), asOf if present. Download link only when status is `Succeeded` (calls the download endpoint; browser receives the PDF). Failed rows show status only (no error text in the list payload). Pagination uses the returned `totalCount`.
+- Default: `GET /reports/executions?scope=Customer&page=1&pageSize=20` (all Customer-scoped executions the caller can see).
+- Report filter dropdown (All + the Customer-scoped reports). Selecting one report calls the same endpoint with `&reportId=<PublicId>`. Pagination uses the returned `totalCount` after the filter.
+- Columns: report name, status, triggerKind, created, parameters summary (date range), asOf if present. Download link only when status is `Succeeded`. Failed rows show status only (no error text in the list payload).
 
 ### Reports tab (`/reports`)
 
@@ -168,11 +168,12 @@ Shell nav item labelled “Reports”. Visible to TenantAdmin and Adviser. Syste
 
 **Header.** “Reports” with a short note that these run for an adviser’s book.
 
-**Report list.** Cards or table rows for each item from `GET /reports?scope=Book`. Same layout as the Customer section.
+**Generate section.**
 
-Empty: “No reports available.”
+- Report dropdown: items from `GET /reports?scope=Book`. Empty: “No reports available.”
+- Selecting a report reveals its parameter form and a Generate button (hard-coded per known report).
 
-**Generate now (Adviser Balances).** Form:
+**Generate form (Adviser Balances).**
 
 | Field | Binding | Required | Notes |
 | --- | --- | --- | --- |
@@ -184,7 +185,7 @@ Adviser submit body:
 
 ```json
 {
-  "reportId": "<adviser-balances PublicId>",
+  "reportId": "<selected report PublicId>",
   "parameters": {
     "includeClosedAccounts": false
   }
@@ -193,7 +194,7 @@ Adviser submit body:
 
 TenantAdmin submit body includes `"adviserId": "<selected PublicId>"` inside `parameters`. Omitting it as TenantAdmin is a 400; the form must prevent submit until an Adviser is selected.
 
-**Schedules and History.** Same panels as the Customer section, but scoped to Book. Schedule create requires the Adviser picker for TenantAdmin (stored inside `parameters`). History list is `GET /reports/executions?scope=Book`. An Adviser sees only executions whose snapshot `adviserId` is self. A TenantAdmin sees the tenant.
+**Schedules and History.** Same panels as the Customer section, but scoped to Book. Schedule create requires the Adviser picker for TenantAdmin and is shown only when the selected report’s `allowedTriggers` includes `"scheduled"`. History list is `GET /reports/executions?scope=Book` (optional `reportId`). An Adviser sees only executions whose snapshot `adviserId` is self. A TenantAdmin sees the tenant.
 
 ---
 
@@ -256,12 +257,12 @@ Use the existing portal empty / error patterns. Do not invent a second toast lib
 
 | ID | Behaviour |
 | --- | --- |
-| R1 | `/customers/:id` shows a Reports section that lists only Customer-scoped granted active reports. Book-scoped reports do not appear. |
-| R2 | `/reports` shows only Book-scoped granted active reports. Customer-scoped reports do not appear. Empty list when the tenant has none. |
-| R3 | Generate now on Customer Transactions sends `POST /reports/request` with `reportId` + `parameters.customerId` (page customer) + `from` + `to` + optional `includeClosedAccounts`. 202 queues the run and the history list updates. |
-| R4 | Generate now on Adviser Balances: Adviser omits `adviserId`. TenantAdmin must select an Adviser or the form blocks submit. `asOf` is never sent. |
-| R5 | Schedule create / edit / disable use the schedule endpoints. Edit sends `rowVersion`. Stale rowVersion shows the 409. Disable leaves the row visible with `isActive` false. |
-| R6 | History is paged. Download appears only for `Succeeded`. Clicking it calls the download endpoint and the browser receives a PDF. |
+| R1 | `/customers/:id` shows a Reports section whose Generate dropdown lists only Customer-scoped granted active reports. Book-scoped reports do not appear. |
+| R2 | `/reports` shows a Generate dropdown of only Book-scoped granted active reports. Customer-scoped reports do not appear. Empty list when the tenant has none. |
+| R3 | Generate now on a selected Customer Transactions report sends `POST /reports/request` with `reportId` + `parameters.customerId` (page customer) + `from` + `to` + optional `includeClosedAccounts`. 202 queues the run and the History panel refreshes. |
+| R4 | Generate now on a selected Adviser Balances report: Adviser omits `adviserId`. TenantAdmin must select an Adviser or the form blocks submit. `asOf` is never sent. |
+| R5 | Schedule create / edit / disable use the schedule endpoints. Create is offered only when the selected report’s `allowedTriggers` includes `"scheduled"`. Edit sends `rowVersion`. Stale rowVersion shows the 409. Disable leaves the row visible with `isActive` false. |
+| R6 | History is a separate panel, paged, defaulting to all reports in the scope. A report filter dropdown adds `reportId` to the executions query. Download appears only for `Succeeded`. |
 | R7 | After Generate now the UI polls the execution until Succeeded / Failed or 60 s. Polling stops on unmount. |
 | R8 | TenantAdmin sees the Adviser picker on the Reports tab. Adviser does not. |
 | R9 | All calls go through the BFF `/api` prefix. No SPA token storage. SystemAdmin does not see the Reports tab or the Customer page Reports section. |
@@ -273,7 +274,7 @@ Use the existing portal empty / error patterns. Do not invent a second toast lib
 
 ## Tests
 
-Portal tests assert routes, role visibility, that the Customer section calls `scope=Customer` and the Reports tab calls `scope=Book`, that Generate and Schedule send the documented body shapes, that the Adviser picker is present only for TenantAdmin, and that Download is offered only for `Succeeded`. Do not re-prove backend isolation, PDF content, or Hangfire behaviour here.
+Portal tests assert routes, role visibility, that the Customer section calls `scope=Customer` and the Reports tab calls `scope=Book`, that the Generate dropdown switches the hard-coded parameter form, that Generate and Schedule send the documented body shapes, that Schedule create is hidden when `allowedTriggers` omits `"scheduled"`, that History defaults to all reports and the report filter adds `reportId`, that the Adviser picker is present only for TenantAdmin, and that Download is offered only for `Succeeded`. Do not re-prove backend isolation, PDF content, or Hangfire behaviour here.
 
 ---
 
@@ -284,4 +285,4 @@ Portal tests assert routes, role visibility, that the Customer section calls `sc
 - Timezone display vs UTC cron (help text documents the first-cut limitation).
 - Result retention / purge (no UI for it).
 - Event-triggered executions (no UI).
-- Parameter schema for dynamic forms (hard-coded for the two reports).
+- Parameter schema for dynamic forms (hard-coded switch on the selected report for the two known shapes).

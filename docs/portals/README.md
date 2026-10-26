@@ -3,7 +3,7 @@ title: Portals
 status: review
 language: en
 created: 2026-09-12
-updated: 2026-10-12
+updated: 2026-10-26
 related:
   - ../README.md
   - ../function-plan.md
@@ -28,3 +28,24 @@ Phase 1 has one frontend: [adviser-portal.md](adviser-portal.md). Customer Porta
 | [frontend-implementation-notes.md](frontend-implementation-notes.md) | Page-by-page construction for the current pages cut |
 
 [adviser-portal.md](adviser-portal.md) is **accepted** (shell + pages cut C). Dashboard cut is **accepted**. Conventions and construction notes stay `review`. Customer Portal is not registered. Back Office is independent and accepted: [../backoffice/](../backoffice/).
+
+---
+
+## Change summary (2026-10-26)
+
+Reports page and catalog configuration updates to support multiple reports and platform-level control.
+
+**Adviser Portal** ([adviser-portal-reports.md](adviser-portal-reports.md))
+
+- Customer page Reports section and `/reports` tab now use a shared layout: Generate section, Schedules panel, History panel.
+- Generate: report dropdown (`GET /reports?scope=…`). Selecting a report shows its hard-coded parameter form and Generate button.
+- History: separate panel. Defaults to paged list of all reports in the scope. Optional report filter adds `reportId` to `GET /reports/executions`.
+- Schedule create is shown only when the selected report’s `allowedTriggers` includes `"scheduled"`.
+
+**Backend / Back Office** (see [../features/reports.md](../features/reports.md) and [../backoffice/back-office.md](../backoffice/back-office.md))
+
+- `PUT /reports/{id}` (`tenants.manage`) writes catalog `isActive` and/or `allowedTriggers`.
+- `isActive` false cascades revoke of every `TenantReports` row for that report (Hangfire cleaned; schedule and execution rows stay). Re-enable restores no grants.
+- Removing `"scheduled"` from `allowedTriggers` disables every existing schedule for that report (rows stay; no grant revoke). Adding it does not re-enable those schedules.
+- Back Office `/reports` page configures both switches. Tenant grants remain on `/tenants/{id}/config`.
+- `GET /reports/executions` accepts optional `reportId` (filter then `totalCount`).

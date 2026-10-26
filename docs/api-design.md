@@ -3,7 +3,7 @@ title: API design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-10-25
+updated: 2026-10-26
 related:
   - README.md
   - glossary.md
@@ -387,12 +387,13 @@ Field rules: [features/reports.md](features/reports.md). Accepted.
 | POST | `/tenants/{tenantId}/reports` | `tenants.manage` | 201 `{ id }` the first time, 204 when the grant already exists |
 | DELETE | `/tenants/{tenantId}/reports/{reportId}` | `tenants.manage` | 204 when removed or already absent |
 | GET | `/reports` | `reports.customer.read` or `reports.book.read` | 200 list (granted + active only) |
+| PUT | `/reports/{id}` | `tenants.manage` | 204. Body may include `isActive` and/or `allowedTriggers`. `isActive` false cascades revoke of every TenantReports row. Removing `"scheduled"` from `allowedTriggers` disables every schedule for that report (rows stay; no grant revoke) |
 | POST | `/reports/schedules` | by report scope (`*.create`) | 201 `{ id }` |
 | GET | `/reports/schedules` | by scope | 200 list |
 | PUT | `/reports/schedules/{id}` | by report scope | 204 |
 | POST | `/reports/schedules/{id}/disable` | by report scope | 204 |
 | POST | `/reports/request` | by report scope (`*.create`) | 202 `{ id }` |
-| GET | `/reports/executions` | by scope | 200 paged list |
+| GET | `/reports/executions` | by scope | 200 paged list. Optional `reportId` filters to one report |
 | GET | `/reports/executions/{id}` | by that execution’s report scope | 200 |
 | GET | `/reports/executions/{id}/download` | by that execution’s report scope | 200 `application/pdf` |
 
@@ -402,7 +403,7 @@ Customer has `reports.customer.read` only. TenantAdmin and Adviser have all four
 
 BFF allow-list adds the `/reports` prefix.
 
-Back Office tenant configuration lists that catalog and calls the existing grant `POST` and revoke `DELETE`. Scalar can call the same verbs. No catalog update API.
+Back Office tenant configuration lists that catalog and calls the existing grant `POST` and revoke `DELETE`. Catalog `IsActive` is written with `PUT /reports/{id}` (`tenants.manage`). Disabling cascades a revoke of every tenant grant for that report. Scalar can call the same verbs.
 
 ---
 
@@ -448,4 +449,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-10-11 | Buy / Sell / StockIn / StockOut and transaction item shape (`cash` + `security`). Field rules in [features/buy-sell.md](features/buy-sell.md). |
 | 2026-10-12 | Split / Bonus / Scrip accepted. New total quantity, no cash, total cost unchanged. Field rules in [features/split.md](features/split.md). |
 | 2026-10-12 | Net-worth read model accepted and landed (`af422c2`). `GET /net-worth` and `GET /users/customers/{id}/net-worth`. Current point-in-time, per-currency arrays, breakdowns. Field rules in [features/net-worth.md](features/net-worth.md). BFF allow-list adds `/net-worth`. |
-| 2026-10-14 | Reports accepted. `/reports` catalog, schedules, request, executions, download. Policies `reports.customer.*` / `reports.book.*`. BFF allow-list adds `/reports`. Field rules in [features/reports.md](features/reports.md). |
+| 2026-10-26 | Reports: `PUT /reports/{id}` for catalog IsActive. False cascades revoke of all TenantReports for that report. |

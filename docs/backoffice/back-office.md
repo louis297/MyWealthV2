@@ -36,6 +36,7 @@ Accepted 2026-10-25. SystemAdmin still uses Scalar for the same verbs. The Back 
 - SystemAdmin login via existing hosted login on `identity` (no `tenantCode`)
 - Pages for Tenant manage and TenantAdmin manage (list / create / update / disable / enable)
 - Tenant configuration: report grants (enable / disable a report for a tenant)
+- Report catalog: platform IsActive (disable cascades revoke of every tenant grant for that report) and AllowedTriggers (removing `"scheduled"` disables existing schedules for that report)
 - Direct calls to existing `webapi` endpoints under policy `tenants.manage` (and `tenant-admins.manage`)
 
 **Out**
@@ -44,7 +45,7 @@ Accepted 2026-10-25. SystemAdmin still uses Scalar for the same verbs. The Back 
 - React / public SPA token stack
 - Physical delete (model is disable)
 - Adviser / Customer manage in this slice (SystemAdmin currently receives 403 on `/users/advisers` and `/users/customers`; do not reopen Phase 1 people routes here)
-- Report catalog management (platform `Reports` table; IsActive on the catalog stays Scalar / later)
+- Report catalog AllowedTriggers is in (platform-level schedule permission)
 - Running or scheduling reports (those are firm verbs; SystemAdmin has no `reports.*.*` policies)
 - Ledger pages (Instruments, Accounts, Transactions) — later slices
 - Impersonation / “enter this tenant” header switching
@@ -77,6 +78,7 @@ Redirect URI and post-logout follow the same pattern as the Adviser Portal BFF (
 | `/tenants/new` | SystemAdmin | Create (name, code, reportingCurrency) |
 | `/tenants/{id}` | SystemAdmin | Detail + core settings (rename / reporting currency / disable / enable) |
 | `/tenants/{id}/config` | SystemAdmin | Tenant configuration (report grants; room for later settings) |
+| `/reports` | SystemAdmin | Platform catalog. List + set IsActive and AllowedTriggers |
 | `/tenant-admins` | SystemAdmin | List (filter by tenant, search); links to create / detail |
 | `/tenant-admins/new` | SystemAdmin | Create (tenant, name, email, password) |
 | `/tenant-admins/{id}` | SystemAdmin | Detail + rename / disable / enable |
@@ -88,7 +90,7 @@ All routes require an authenticated SystemAdmin. Other roles that reach the host
 
 ## Pages (field bindings)
 
-Consumes existing endpoints only. Field rules and validation live in the Feature Specs.
+Consumes existing endpoints plus the catalog IsActive write. Field rules and validation live in the Feature Specs.
 
 ### Tenants
 
@@ -123,6 +125,19 @@ Reached from tenant detail (`/tenants/{id}/config`). All verbs use `tenants.mana
 
 Core tenant settings (name, reporting currency, tenant IsActive) stay on the detail page. Configuration is the place for per-tenant feature flags and grants.
 
+### Report catalog
+
+Platform page (`/reports`). All verbs use `tenants.manage`.
+
+- List: every catalog row (Code, Name, Scope, IsActive, AllowedTriggers). Inactive rows are included.
+- Set IsActive: `PUT /reports/{id}` with `{ "isActive": true|false }`.
+- Transition to false revokes every `TenantReports` row for that report and removes the related Hangfire recurring jobs. `ReportSchedule` and `ReportExecution` rows stay.
+- Transition to true restores no grants. Each tenant must be re-granted on its configuration page.
+- Set AllowedTriggers: same `PUT /reports/{id}` may include `{ "allowedTriggers": ["manual","scheduled"] }` (or a subset). Known values only: `manual`, `scheduled`, `event`.
+- Removing `"scheduled"` disables every existing `ReportSchedule` for that report (sets IsActive false and removes the Hangfire job). Rows stay. Grants are not revoked.
+- Adding `"scheduled"` does not re-enable previously disabled schedules.
+- Do not offer run or schedule actions.
+
 ---
 
 ## Acceptance (BO)
@@ -139,6 +154,7 @@ Core tenant settings (name, reporting currency, tenant IsActive) stay on the det
 | BO8 | From a tenant, SystemAdmin sees every catalog report with Code, Name, Scope, catalog `isActive`, and `granted` (Granted or Not granted). Enable calls `POST` when `granted` is false. Disable calls `DELETE` when `granted` is true. The page does not ask for a report id and does not run or schedule |
 | BO9 | The configuration page does not offer run or schedule actions |
 | BO10 | Sign-out revokes refresh and ends the session; next visit is hosted login |
+| BO11 | `/reports` lists the platform catalog. Setting IsActive to false calls `PUT /reports/{id}` and the backend revokes every tenant grant for that report (Hangfire cleaned; schedule/execution rows stay). Setting it back to true restores no grants. Setting AllowedTriggers to omit `"scheduled"` disables every schedule for that report (rows stay; no grant revoke). Adding `"scheduled"` does not re-enable those schedules |
 
 ---
 
@@ -154,6 +170,5 @@ Back Office tests assert routes, role gate, and that the UI client sends the sha
 - Instruments catalog management
 - Cross-tenant ledger inspection (Accounts, Transactions, Net worth)
 - Further tenant configuration (fees, invitation settings, etc.) as those slices land
-- Report catalog IsActive (platform-level; not per-tenant)
 
 These stay out until their own page slices are written.
