@@ -462,6 +462,50 @@ describe("ReportsPage", () => {
     expect(screen.getByRole("button", { name: "Disable schedule" })).toBeInTheDocument();
   });
 
+  it("reloads history after generate now queues a run", async () => {
+    const executionId = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
+    let listGets = 0;
+    renderReports(user({ role: "adviser", name: "Sam Reed" }), (url, method) => {
+      if (method === "GET" && new URL(url).pathname === "/api/reports") {
+        return json([adviserBalances]);
+      }
+      if (url.includes("/reports/schedules") && method === "GET") {
+        return json([]);
+      }
+      if (url.includes("/reports/executions") && method === "GET" && !url.endsWith(executionId)) {
+        listGets += 1;
+        if (listGets === 1) {
+          return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+        }
+        return json({
+          items: [
+            {
+              id: executionId,
+              reportId: adviserBalances.id,
+              status: "Queued",
+              triggerKind: "Manual",
+              created: "2026-10-16T08:30:00+00:00",
+              parameters: { includeClosedAccounts: false },
+            },
+          ],
+          page: 1,
+          pageSize: 20,
+          totalCount: 1,
+        });
+      }
+      if (url.includes("/reports/request") && method === "POST") {
+        return json({ id: executionId }, 202);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.change(await screen.findByLabelText("Report"), { target: { value: adviserBalances.id } });
+    expect(await screen.findByText("No runs yet.")).toBeInTheDocument();
+    fireEvent.click(within(generateForm()).getByRole("button", { name: "Generate now" }));
+    expect(await screen.findByText("Queued")).toBeInTheDocument();
+    expect(listGets).toBeGreaterThan(1);
+  });
+
   it("loads book execution history", async () => {
     const { fetchMock } = renderReports(user({ role: "adviser", name: "Sam Reed" }), (url, method) => {
       if (url.includes("/api/reports") && method === "GET" && !url.includes("/executions") && !url.includes("/schedules")) {
