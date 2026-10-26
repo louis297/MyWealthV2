@@ -13,6 +13,8 @@ public class GetReportExecutionsTests : TestBase
 {
     private static readonly Guid CustomerTransactionsId = Guid.Parse("8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11");
 
+    private static readonly Guid AdviserBalancesId = Guid.Parse("5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22");
+
     private static readonly DateTimeOffset BookAsOf = new(2026, 10, 16, 8, 30, 0, TimeSpan.Zero);
 
     [SetUp]
@@ -212,6 +214,38 @@ public class GetReportExecutionsTests : TestBase
 
         (await GetAsync(adviserTokens.AccessToken, "?page=0")).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         (await GetAsync(adviserTokens.AccessToken, "?pageSize=101")).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
+    public async Task List_ReportIdLimitsItemsAndTotalCount()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm Execution Report", "firm-execution-report");
+        await TestApp.CreatePersonAsync(
+            UserRole.TenantAdmin, "Tess", "tess@firm-execution-report", "Password1!", tenant.Id);
+        var adviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Ann", "ann@firm-execution-report", "Password1!", tenant.Id);
+
+        var created = new DateTimeOffset(2026, 10, 16, 8, 0, 0, TimeSpan.Zero);
+        var customerExecutionId = await InsertCustomerExecutionAsync(tenant.Id, Guid.NewGuid(), created);
+        var bookExecutionId = await InsertBookExecutionAsync(
+            tenant.Id, adviser.PublicId, created.AddHours(-1), BookAsOf, "firm/book.pdf");
+
+        var admin = await FunctionalTestSetup.Oidc.SignInAsync(
+            "tess@firm-execution-report", "Password1!", "firm-execution-report");
+
+        var all = await ReadPageAsync(admin.AccessToken);
+        all.TotalCount.ShouldBe(2);
+        all.Ids.ShouldBe([customerExecutionId, bookExecutionId], ignoreOrder: true);
+
+        var filtered = await ReadPageAsync(admin.AccessToken, $"?reportId={CustomerTransactionsId}");
+        filtered.TotalCount.ShouldBe(1);
+        filtered.Ids.ShouldBe([customerExecutionId]);
+
+        var wrongScope = await ReadPageAsync(
+            admin.AccessToken,
+            $"?scope=Customer&reportId={AdviserBalancesId}");
+        wrongScope.TotalCount.ShouldBe(0);
+        wrongScope.Ids.ShouldBeEmpty();
     }
 
     private static async Task<(int Page, int PageSize, int TotalCount, List<Guid> Ids)> ReadPageAsync(
