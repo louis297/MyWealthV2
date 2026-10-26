@@ -681,4 +681,38 @@ describe("ReportsPage", () => {
     expect(screen.queryByLabelText("Report")).not.toBeInTheDocument();
     expect(await screen.findByText("No runs yet.")).toBeInTheDocument();
   });
+
+  it("clears the selected report when switching tabs", async () => {
+    renderReports(user({ role: "adviser", name: "Sam Reed" }), (url, method) => {
+      if (url.includes("/api/reports") && method === "GET" && !url.includes("/executions") && !url.includes("/schedules")) {
+        return json([adviserBalances]);
+      }
+      if (url.includes("/reports/schedules") && method === "GET") {
+        return json([]);
+      }
+      if (url.includes("/reports/executions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    await chooseOption("Report", "Adviser Balances");
+    expect(screen.getByText(adviserBalances.function)).toBeInTheDocument();
+    expect(screen.getByLabelText("Include closed accounts")).toBeInTheDocument();
+
+    openTab("Schedules");
+    expect(screen.queryByRole("button", { name: "Create schedule" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Times are sent as chosen. The server interprets the schedule in UTC.")).not.toBeInTheDocument();
+
+    openTab("Reports");
+    expect(screen.getByRole("combobox", { name: "Report" })).toHaveTextContent("Select a report");
+    expect(screen.queryByText(adviserBalances.function)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Include closed accounts")).not.toBeInTheDocument();
+
+    await chooseOption("Report", "Adviser Balances");
+    openTab("History");
+    openTab("Reports");
+    expect(screen.getByRole("combobox", { name: "Report" })).toHaveTextContent("Select a report");
+    expect(screen.queryByLabelText("Include closed accounts")).not.toBeInTheDocument();
+  });
 });
