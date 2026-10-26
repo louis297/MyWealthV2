@@ -333,6 +333,52 @@ describe("ReportsPage", () => {
     expect(advisersUrl.searchParams.has("tenantId")).toBe(false);
   });
 
+  it("shows a balances parameter error and does not queue the report", async () => {
+    renderReports(user({ role: "adviser", name: "Sam Reed" }), (url, method) => {
+      if (method === "GET" && new URL(url).pathname === "/api/reports") {
+        return json([adviserBalances]);
+      }
+      if (url.includes("/reports/schedules") && method === "GET") {
+        return json([]);
+      }
+      if (url.includes("/reports/executions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.includes("/reports/request") && method === "POST") {
+        return json({ errors: { Adviser: ["Adviser is required."] } }, 400);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.change(await screen.findByLabelText("Report"), { target: { value: adviserBalances.id } });
+    fireEvent.click(within(generateForm()).getByRole("button", { name: "Generate now" }));
+    expect(await screen.findByText("Adviser is required.")).toBeInTheDocument();
+    expect(screen.queryByText("Report queued")).not.toBeInTheDocument();
+  });
+
+  it("shows that a missing balances report is not available", async () => {
+    renderReports(user({ role: "adviser", name: "Sam Reed" }), (url, method) => {
+      if (method === "GET" && new URL(url).pathname === "/api/reports") {
+        return json([adviserBalances]);
+      }
+      if (url.includes("/reports/schedules") && method === "GET") {
+        return json([]);
+      }
+      if (url.includes("/reports/executions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.includes("/reports/request") && method === "POST") {
+        return new Response("", { status: 404 });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.change(await screen.findByLabelText("Report"), { target: { value: adviserBalances.id } });
+    fireEvent.click(within(generateForm()).getByRole("button", { name: "Generate now" }));
+    expect(await screen.findByText("Report is not available.")).toBeInTheDocument();
+    expect(screen.queryByText("Report queued")).not.toBeInTheDocument();
+  });
+
   it("creates an adviser balances schedule without an adviser id", async () => {
     const { fetchMock } = renderReports(
       user({
