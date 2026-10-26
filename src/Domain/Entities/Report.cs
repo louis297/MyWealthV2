@@ -21,4 +21,6 @@ public class Report : BaseEntity
     public bool IsActive { get; private set; }
 
     public void SetIsActive(bool isActive) => IsActive = isActive;
+
+    public void SetAllowedTriggers(string allowedTriggers) => AllowedTriggers = allowedTriggers;
 }
