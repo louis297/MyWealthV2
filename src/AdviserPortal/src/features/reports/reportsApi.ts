@@ -45,6 +45,7 @@ export const reportsApi = api.injectEndpoints({
         method: "POST",
         body,
       }),
+      invalidatesTags: ["Report"],
     }),
     getReportExecutions: builder.query<
       PagedList<ReportExecution>,
