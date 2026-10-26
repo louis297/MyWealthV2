@@ -180,6 +180,19 @@ public class BackOfficePageTests
         public Task RevokeReportAsync(Guid tenantId, Guid reportId, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 
+        public Task<IReadOnlyList<PlatformReportItem>> ListReportCatalogAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<PlatformReportItem>>([
+                new PlatformReportItem(ReportId, "customer-transactions", "Customer Transactions Report", "Customer", ["manual", "scheduled"], true),
+                new PlatformReportItem(AdviserBalancesId, "adviser-balances", "Adviser Balances Report", "Book", ["manual"], false)
+            ]);
+
+        public Task UpdateReportCatalogAsync(
+            Guid reportId,
+            bool? isActive,
+            IReadOnlyList<string>? allowedTriggers,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
         public Task<IReadOnlyList<CurrencyItem>> ListCurrenciesAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<CurrencyItem>>([new CurrencyItem("NZD", "New Zealand Dollar", true)]);
     }

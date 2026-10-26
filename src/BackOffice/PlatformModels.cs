@@ -37,6 +37,14 @@ public sealed record ReportGrantItem(
     bool IsActive,
     bool Granted);
 
+public sealed record PlatformReportItem(
+    Guid Id,
+    string Code,
+    string Name,
+    string Scope,
+    IReadOnlyList<string> AllowedTriggers,
+    bool IsActive);
+
 public sealed record CurrencyItem(string Code, string Name, bool IsActive);
 
 public sealed class PlatformApiException(int status, string body) : Exception(body)

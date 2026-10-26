@@ -1,0 +1,118 @@
+@page "/reports"
+@inject IPlatformApi Api
+
+<PageTitle>Reports</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">Reports</MudText>
+<MudText Typo="Typo.body1" Class="mb-4">Platform catalog. A disabled report is removed from every tenant.</MudText>
+
+@if (error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="my-4">@error</MudAlert>
+}
+
+@if (reports.Count == 0)
+{
+    <MudText Class="mt-4">No reports.</MudText>
+}
+else
+{
+    <MudSimpleTable Hover="true" Dense="true" Bordered="true" Class="mt-4">
+        <thead>
+            <tr><th>Code</th><th>Name</th><th>Scope</th><th>Status</th><th>Allowed triggers</th><th></th></tr>
+        </thead>
+        <tbody>
+        @foreach (var report in reports)
+        {
+            <tr>
+                <td>@report.Code</td>
+                <td>@report.Name</td>
+                <td>@report.Scope</td>
+                <td>@(report.IsActive ? "Active" : "Inactive")</td>
+                <td>
+                    @foreach (var trigger in KnownTriggers)
+                    {
+                        <label class="me-3">
+                            <input type="checkbox"
+                                   checked="@report.AllowedTriggers.Contains(trigger)"
+                                   @onchange="args => ToggleTrigger(report, trigger, args.Value is true)" />
+                            @trigger
+                        </label>
+                    }
+                </td>
+                <td>
+                    @if (report.IsActive)
+                    {
+                        <button type="button" class="bo-action bo-action-danger" @onclick="() => SetActive(report.Id, false)">Disable</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="bo-action bo-action-success" @onclick="() => SetActive(report.Id, true)">Enable</button>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </MudSimpleTable>
+}
+
+@code {
+    private static readonly string[] KnownTriggers = ["manual", "scheduled", "event"];
+
+    private IReadOnlyList<PlatformReportItem> reports = [];
+    private string? error;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            reports = await Api.ListReportCatalogAsync();
+            error = null;
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+
+    private async Task SetActive(Guid reportId, bool isActive)
+    {
+        try
+        {
+            await Api.UpdateReportCatalogAsync(reportId, isActive, allowedTriggers: null);
+            await Load();
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+
+    private async Task ToggleTrigger(PlatformReportItem report, string trigger, bool selected)
+    {
+        var triggers = report.AllowedTriggers.ToHashSet(StringComparer.Ordinal);
+        if (selected)
+        {
+            triggers.Add(trigger);
+        }
+        else
+        {
+            triggers.Remove(trigger);
+        }
+
+        try
+        {
+            await Api.UpdateReportCatalogAsync(
+                report.Id,
+                isActive: null,
+                KnownTriggers.Where(triggers.Contains).ToArray());
+            await Load();
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+}

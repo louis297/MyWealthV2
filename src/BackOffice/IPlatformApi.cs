@@ -32,5 +32,13 @@ public interface IPlatformApi
 
     Task RevokeReportAsync(Guid tenantId, Guid reportId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<PlatformReportItem>> ListReportCatalogAsync(CancellationToken cancellationToken = default);
+
+    Task UpdateReportCatalogAsync(
+        Guid reportId,
+        bool? isActive,
+        IReadOnlyList<string>? allowedTriggers,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<CurrencyItem>> ListCurrenciesAsync(CancellationToken cancellationToken = default);
 }

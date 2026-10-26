@@ -152,6 +152,34 @@ public sealed class PlatformApi(HttpClient api, HttpClient tokens, IAccessTokens
             json: null,
             cancellationToken);
 
+    public Task<IReadOnlyList<PlatformReportItem>> ListReportCatalogAsync(
+        CancellationToken cancellationToken = default) =>
+        ReadAsync<IReadOnlyList<PlatformReportItem>>(
+            HttpMethod.Get,
+            "/reports/catalog",
+            json: null,
+            cancellationToken);
+
+    public Task UpdateReportCatalogAsync(
+        Guid reportId,
+        bool? isActive,
+        IReadOnlyList<string>? allowedTriggers,
+        CancellationToken cancellationToken = default)
+    {
+        object body = (isActive, allowedTriggers) switch
+        {
+            (not null, not null) => new { isActive, allowedTriggers },
+            (not null, null) => new { isActive },
+            (null, not null) => new { allowedTriggers },
+            _ => throw new ArgumentException("isActive or allowedTriggers is required.")
+        };
+        return SendExpectingSuccessAsync(
+            HttpMethod.Put,
+            $"/reports/{reportId}",
+            JsonSerializer.Serialize(body, Json),
+            cancellationToken);
+    }
+
     public Task<IReadOnlyList<CurrencyItem>> ListCurrenciesAsync(CancellationToken cancellationToken = default) =>
         ReadAsync<IReadOnlyList<CurrencyItem>>(
             HttpMethod.Get,
