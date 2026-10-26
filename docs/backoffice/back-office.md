@@ -4,7 +4,7 @@ status: accepted
 phase: 1
 language: en
 created: 2026-10-24
-updated: 2026-10-25
+updated: 2026-10-26
 related:
   - README.md
   - ../function-plan.md
@@ -31,7 +31,7 @@ Accepted 2026-10-25. SystemAdmin still uses Scalar for the same verbs. The Back 
 
 **In**
 
-- Aspire resource `back-office` (Blazor Server / Blazor Web App + Interactive Server)
+- Aspire resource `back-office` (Blazor Web App + Interactive Server, MudBlazor)
 - Confidential OIDC client registered on `identity` (ClientId `back-office`)
 - SystemAdmin login via existing hosted login on `identity` (no `tenantCode`)
 - Pages for Tenant manage and TenantAdmin manage (list / create / update / disable / enable)
@@ -57,7 +57,7 @@ Accepted 2026-10-25. SystemAdmin still uses Scalar for the same verbs. The Back 
 | --- | --- |
 | Aspire resource | `back-office` |
 | Project | `src/BackOffice` |
-| UI stack | Blazor Server (or .NET Blazor Web App, Interactive Server) |
+| UI stack | Blazor Web App + Interactive Server. Component library: MudBlazor. No functional change from the accepted page contract |
 | OIDC client | Confidential, `ClientId = back-office`, secret via Aspire parameter (not in git) |
 | Login | Redirect to hosted `/login` on `identity`. SystemAdmin omits `tenantCode` |
 | Session | Cookie on the Back Office host. Access + refresh held server-side |

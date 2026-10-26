@@ -70,7 +70,7 @@ Portals:
 
 - **Adviser Portal** — only frontend in Phase 1. OIDC client id `adviser-portal` is held by `bff-adviser-portal`, not by the browser.
 - Customer Portal — later second BFF + client on the same authorization server; not registered
-- Back Office — landed ([backoffice/back-office.md](backoffice/back-office.md)). Blazor host `back-office` (no BFF). Scalar remains. SystemAdmin may still complete `adviser-portal` login (no tenantCode); firm pages stay forbidden.
+- Back Office — landed ([backoffice/back-office.md](backoffice/back-office.md)). Blazor host `back-office` with MudBlazor (no BFF). Scalar remains. SystemAdmin may still complete `adviser-portal` login (no tenantCode); firm pages stay forbidden.
 
 Aspire resource names must not be generic (`Frontend`, `Web`). Hosts: `identity`, `webapi`, `adviser-portal`, `bff-adviser-portal`, `back-office`, `worker`. Reserved names: `customer-portal`, `bff-customer-portal`. Phase 1 does **not** split a separate identity **database**.
 
@@ -91,7 +91,7 @@ One AppHost orchestrates every resource. Separate projects are separate processe
 | Shared | `src/Shared` | Aspire resource-name constants |
 | ServiceDefaults | `src/ServiceDefaults` | Health, OpenTelemetry, service discovery |
 | BffAdviserPortal | `src/BffAdviserPortal` | Adviser Portal session edge. Confidential client holder. Cookie + OIDC + YARP |
-| BackOffice | `src/BackOffice` | SystemAdmin UI. Confidential client `back-office`. Cookie + OIDC. Calls `webapi` with Bearer. No BFF |
+| BackOffice | `src/BackOffice` | SystemAdmin UI. Blazor + MudBlazor. Confidential client `back-office`. Cookie + OIDC. Calls `webapi` with Bearer. No BFF |
 | Worker | `src/Worker` | Background worker. Hangfire Server for async and recurring work (ADR 0017). First consumer: Reports. |
 | AdviserPortal | Independent frontend | Vite SPA. No tokens. OIDC client id `adviser-portal` is not held here |
 | Tests | `tests/*` | Domain unit, application unit, infrastructure integration, functional |
