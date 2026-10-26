@@ -9,6 +9,7 @@ using MyWealthV2.Application.Reports.Commands.UpdateReportSchedule;
 using MyWealthV2.Application.Reports.Queries.DownloadReportResult;
 using MyWealthV2.Application.Reports.Queries.GetReportExecutions;
 using MyWealthV2.Application.Reports.Queries.GetReportSchedules;
+using MyWealthV2.Application.Reports.Queries.GetReportCatalog;
 using MyWealthV2.Application.Reports.Queries.GetReports;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -39,6 +40,7 @@ public class Reports : IEndpointGroup
 
     public static void Map(RouteGroupBuilder groupBuilder)
     {
+        groupBuilder.MapGet(GetCatalog, "catalog").RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapPut(UpdateCatalog, "{id:guid}").RequireAuthorization(Policies.TenantsManage);
         groupBuilder.MapGet(GetReports).RequireAuthorization(ReadReports);
         groupBuilder.MapGet(GetSchedules, "schedules").RequireAuthorization(ReadReports);
@@ -48,6 +50,14 @@ public class Reports : IEndpointGroup
         groupBuilder.MapPost(RequestReport, "request").RequireAuthorization(CreateReports);
         groupBuilder.MapGet(GetExecutions, "executions").RequireAuthorization(ReadReports);
         groupBuilder.MapGet(DownloadReport, "executions/{id}/download").RequireAuthorization(ReadReports);
+    }
+
+    [EndpointSummary("List the platform report catalog")]
+    [EndpointDescription("Returns every catalog row, including inactive, ordered by code. No grant field. SystemAdmin only.")]
+    public static async Task<Ok<IReadOnlyList<PlatformReportDto>>> GetCatalog(ISender sender)
+    {
+        var result = await sender.Send(new GetReportCatalogQuery());
+        return TypedResults.Ok(result);
     }
 
     [EndpointSummary("Update a catalog report")]
