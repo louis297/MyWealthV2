@@ -373,9 +373,15 @@ describe("CustomerDetailPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Reports" })).toBeInTheDocument();
     expect(screen.getByText("These run for this customer.")).toBeInTheDocument();
-    expect(await screen.findByText("Customer Transactions")).toBeInTheDocument();
+    const report = await screen.findByLabelText("Report");
+    expect(screen.getByRole("option", { name: "Customer Transactions" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Adviser Balances" })).not.toBeInTheDocument();
+    expect(screen.queryByText(customerTransactions.function)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("From")).not.toBeInTheDocument();
+    fireEvent.change(report, { target: { value: customerTransactions.id } });
     expect(screen.getByText(customerTransactions.function)).toBeInTheDocument();
-    expect(screen.queryByText("Adviser Balances")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("From")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Adviser")).not.toBeInTheDocument();
 
     const request = fetchMock.mock.calls
       .map(([input]) => input)
@@ -446,8 +452,32 @@ describe("CustomerDetailPage", () => {
 
     expect(await screen.findByText("Reports could not be loaded.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-    expect(await screen.findByText("Customer Transactions")).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: "Customer Transactions" })).toBeInTheDocument();
     expect(reportGets).toBeGreaterThan(1);
+  });
+
+  it("disables generate when the selected customer report has no parameter form", async () => {
+    const futureReport = {
+      id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      code: "future-report",
+      name: "Future Report",
+      function: "Not in this version.",
+      scope: "Customer",
+      allowedTriggers: ["manual"],
+    };
+    renderDetail(user(), (url, method) => {
+      if (url.includes("/api/reports") && method === "GET") {
+        return json([futureReport]);
+      }
+      if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
+        return json(customer);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.change(await screen.findByLabelText("Report"), { target: { value: futureReport.id } });
+    expect(screen.getByText("parameters not available in this version")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generate now" })).toBeDisabled();
   });
 
   async function openGenerate(fetchImpl: Parameters<typeof renderDetail>[1]) {
@@ -463,7 +493,7 @@ describe("CustomerDetailPage", () => {
       }
       return fetchImpl(url, method, body);
     });
-    fireEvent.click(await screen.findByRole("button", { name: "Generate now" }));
+    fireEvent.change(await screen.findByLabelText("Report"), { target: { value: customerTransactions.id } });
     return rendered;
   }
 

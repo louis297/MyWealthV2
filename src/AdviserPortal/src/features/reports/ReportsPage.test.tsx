@@ -97,9 +97,15 @@ describe("ReportsPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Reports" })).toBeInTheDocument();
     expect(screen.getByText("These run for an adviser's book.")).toBeInTheDocument();
-    expect(await screen.findByText("Adviser Balances")).toBeInTheDocument();
+    const report = await screen.findByLabelText("Report");
+    expect(screen.getByRole("option", { name: "Adviser Balances" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Customer Transactions" })).not.toBeInTheDocument();
+    expect(screen.queryByText(adviserBalances.function)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Include closed accounts")).not.toBeInTheDocument();
+    fireEvent.change(report, { target: { value: adviserBalances.id } });
     expect(screen.getByText(adviserBalances.function)).toBeInTheDocument();
-    expect(screen.queryByText("Customer Transactions")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Include closed accounts")).toBeInTheDocument();
+    expect(screen.queryByLabelText("From")).not.toBeInTheDocument();
 
     const request = fetchMock.mock.calls
       .map(([input]) => input)
@@ -161,8 +167,29 @@ describe("ReportsPage", () => {
 
     expect(await screen.findByText("Reports could not be loaded.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-    expect(await screen.findByText("Adviser Balances")).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: "Adviser Balances" })).toBeInTheDocument();
     expect(reportGets).toBeGreaterThan(1);
+  });
+
+  it("disables generate when the selected report has no parameter form", async () => {
+    const futureReport = {
+      id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      code: "future-report",
+      name: "Future Report",
+      function: "Not in this version.",
+      scope: "Book",
+      allowedTriggers: ["manual"],
+    };
+    renderReports(user(), (url, method) => {
+      if (url.includes("/api/reports") && method === "GET") {
+        return json([futureReport]);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    fireEvent.change(await screen.findByLabelText("Report"), { target: { value: futureReport.id } });
+    expect(screen.getByText("parameters not available in this version")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generate now" })).toBeDisabled();
   });
 
   it("queues adviser balances without an adviser id", async () => {
@@ -183,9 +210,10 @@ describe("ReportsPage", () => {
       },
     );
 
-    expect(await screen.findByText("Adviser Balances")).toBeInTheDocument();
+    const report = await screen.findByLabelText("Report");
     expect(screen.queryByLabelText("Adviser")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
+    expect(screen.queryByLabelText("Include closed accounts")).not.toBeInTheDocument();
+    fireEvent.change(report, { target: { value: adviserBalances.id } });
     expect(screen.queryByLabelText("Adviser")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Include closed accounts")).not.toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
@@ -246,7 +274,7 @@ describe("ReportsPage", () => {
       return new Response("", { status: 404 });
     });
 
-    fireEvent.click(await screen.findByRole("button", { name: "Generate now" }));
+    fireEvent.change(await screen.findByLabelText("Report"), { target: { value: adviserBalances.id } });
     const adviser = screen.getByLabelText("Adviser");
     expect(adviser).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Generate now" })).toBeDisabled();
