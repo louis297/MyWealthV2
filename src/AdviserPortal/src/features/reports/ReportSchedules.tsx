@@ -66,8 +66,10 @@ export function ReportSchedules({
     return true;
   });
   const editing = rows.find((item) => item.id === editingId) ?? null;
-  const formReport = editing ? reports.find((item) => item.id === editing.reportId) ?? selected : selected;
-  const canSchedule = allowsScheduled(selected ?? undefined);
+  const scheduleReport = reports.find((item) => item.id === filterId) ?? null;
+  const chosen = selected ?? scheduleReport;
+  const formReport = editing ? reports.find((item) => item.id === editing.reportId) ?? chosen : chosen;
+  const canSchedule = allowsScheduled((selected ?? formReport) ?? undefined);
   const customerReport = formReport?.code === "customer-transactions";
   const needsAdviser = formReport?.code === "adviser-balances" && role === roles.tenantAdmin;
   const { data: advisers } = useGetAdvisersQuery(

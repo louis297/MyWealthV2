@@ -22,7 +22,12 @@ export function ReportsPage() {
         <h1 className="text-lg font-semibold tracking-tight">Reports</h1>
         <p className="text-sm text-muted-foreground">These run for an adviser's book.</p>
       </div>
-      <Tabs defaultValue="reports">
+      <Tabs
+        defaultValue="reports"
+        onValueChange={() => {
+          setSelectedId("");
+        }}
+      >
         <TabsList>
           <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="schedules">Schedules</TabsTrigger>

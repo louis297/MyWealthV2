@@ -403,8 +403,8 @@ describe("ReportsPage", () => {
       },
     );
 
-    await chooseOption("Report", "Adviser Balances");
     openTab("Schedules");
+    await chooseOption("Schedule report", "Adviser Balances");
     expect(await screen.findByRole("heading", { name: "Schedules" })).toBeInTheDocument();
     expect(screen.queryByLabelText("Adviser")).not.toBeInTheDocument();
     expect(document.querySelector('input[name="cron"]')).toBeNull();
@@ -460,8 +460,8 @@ describe("ReportsPage", () => {
       return new Response("", { status: 404 });
     });
 
-    await chooseOption("Report", "Adviser Balances");
     openTab("Schedules");
+    await chooseOption("Schedule report", "Adviser Balances");
     const schedule = (await screen.findByText("Times are sent as chosen. The server interprets the schedule in UTC.")).closest("form");
     expect(schedule).not.toBeNull();
     expect(within(schedule as HTMLElement).getByRole("button", { name: "Create schedule" })).toBeDisabled();
@@ -502,10 +502,10 @@ describe("ReportsPage", () => {
       return new Response("", { status: 404 });
     });
 
-    await chooseOption("Report", "Adviser Balances");
     openTab("Schedules");
     expect(await screen.findByRole("heading", { name: "Schedules" })).toBeInTheDocument();
     expect(await screen.findByText("every day at 09:00")).toBeInTheDocument();
+    await chooseOption("Schedule report", "Adviser Balances");
     expect(screen.getAllByText("Adviser Balances").length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Create schedule" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
@@ -553,6 +553,7 @@ describe("ReportsPage", () => {
     openTab("History");
     expect(await screen.findByText("No runs yet.")).toBeInTheDocument();
     openTab("Reports");
+    await chooseOption("Report", "Adviser Balances");
     fireEvent.click(within(generateForm()).getByRole("button", { name: "Generate now" }));
     expect(await screen.findByText("Report queued")).toBeInTheDocument();
     openTab("History");
