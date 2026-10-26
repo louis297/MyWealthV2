@@ -109,7 +109,7 @@ Do not treat a cross-tenant or out-of-scope 404 as 403.
 
 ## Page structure
 
-Both entry points use the same layout: a Generate section, a Schedules panel, and a History panel. The only differences are scope and the implicit parameters (customerId on the Customer page; adviserId rules on the Reports tab).
+The Customer page shows a Generate section, a Schedules panel, and a History panel in one section. `/reports` shows those same three panels on three tabs: Reports, Schedules, and History. Reports is selected by default, and only the selected panel is shown. Scope and implicit parameters differ by entry point: `customerId` on the Customer page, and the adviserId rules on `/reports`.
 
 ### Customer page — Reports section
 
@@ -162,16 +162,18 @@ On 202: show a toast “Report queued”, clear or leave the form, and refresh t
 - Report filter dropdown (All + the Customer-scoped reports). Selecting one report calls the same endpoint with `&reportId=<PublicId>`. Pagination uses the returned `totalCount` after the filter.
 - Columns: report name, status, triggerKind, created, parameters summary (date range), asOf if present. Download link only when status is `Succeeded`. Failed rows show status only (no error text in the list payload).
 
-### Reports tab (`/reports`)
+### Reports page (`/reports`)
 
 Shell nav item labelled “Reports”. Visible to TenantAdmin and Adviser. SystemAdmin does not see it.
 
-**Header.** “Reports” with a short note that these run for an adviser’s book.
+**Header.** “Reports” with a short note that these run for an adviser’s book. The header stays above the tabs.
 
-**Generate section.**
+**Tabs.** Reports, Schedules, and History. Reports is selected when the page opens. Selecting a tab shows that panel.
+
+**Reports tab (Generate).**
 
 - Report dropdown: items from `GET /reports?scope=Book`. Empty: “No reports available.”
-- Selecting a report reveals its parameter form and a Generate button (hard-coded per known report).
+- Selecting a report reveals its parameter form and a Generate button (hard-coded per known report). The chosen report stays selected when the user opens Schedules.
 
 **Generate form (Adviser Balances).**
 
@@ -194,7 +196,9 @@ Adviser submit body:
 
 TenantAdmin submit body includes `"adviserId": "<selected PublicId>"` inside `parameters`. Omitting it as TenantAdmin is a 400; the form must prevent submit until an Adviser is selected.
 
-**Schedules and History.** Same panels as the Customer section, but scoped to Book. Schedule create requires the Adviser picker for TenantAdmin and is shown only when the selected report’s `allowedTriggers` includes `"scheduled"`. History list is `GET /reports/executions?scope=Book` (optional `reportId`). An Adviser sees only executions whose snapshot `adviserId` is self. A TenantAdmin sees the tenant.
+**Schedules tab.** The Schedules panel from the Customer section, scoped to Book. Schedule create requires the Adviser picker for TenantAdmin and is shown only when the report selected on the Reports tab has `allowedTriggers` that include `"scheduled"`.
+
+**History tab.** The History panel from the Customer section, scoped to Book. The list is `GET /reports/executions?scope=Book` (optional `reportId`). An Adviser sees only executions whose snapshot `adviserId` is self. A TenantAdmin sees the tenant. A run queued from the Reports tab appears in this list.
 
 ---
 
@@ -262,7 +266,7 @@ Use the existing portal empty / error patterns. Do not invent a second toast lib
 | R3 | Generate now on a selected Customer Transactions report sends `POST /reports/request` with `reportId` + `parameters.customerId` (page customer) + `from` + `to` + optional `includeClosedAccounts`. 202 queues the run and the History panel refreshes. |
 | R4 | Generate now on a selected Adviser Balances report: Adviser omits `adviserId`. TenantAdmin must select an Adviser or the form blocks submit. `asOf` is never sent. |
 | R5 | Schedule create / edit / disable use the schedule endpoints. Create is offered only when the selected report’s `allowedTriggers` includes `"scheduled"`. Edit sends `rowVersion`. Stale rowVersion shows the 409. Disable leaves the row visible with `isActive` false. |
-| R6 | History is a separate panel, paged, defaulting to all reports in the scope. A report filter dropdown adds `reportId` to the executions query. Download appears only for `Succeeded`. |
+| R6 | History is its own panel on the customer page and the History tab on `/reports`. It is paged and defaults to all reports in the scope. A report filter dropdown adds `reportId` to the executions query. Download appears only for `Succeeded`. |
 | R7 | After Generate now the UI polls the execution until Succeeded / Failed or 60 s. Polling stops on unmount. |
 | R8 | TenantAdmin sees the Adviser picker on the Reports tab. Adviser does not. |
 | R9 | All calls go through the BFF `/api` prefix. No SPA token storage. SystemAdmin does not see the Reports tab or the Customer page Reports section. |
@@ -274,7 +278,7 @@ Use the existing portal empty / error patterns. Do not invent a second toast lib
 
 ## Tests
 
-Portal tests assert routes, role visibility, that the Customer section calls `scope=Customer` and the Reports tab calls `scope=Book`, that the Generate dropdown switches the hard-coded parameter form, that Generate and Schedule send the documented body shapes, that Schedule create is hidden when `allowedTriggers` omits `"scheduled"`, that History defaults to all reports and the report filter adds `reportId`, that the Adviser picker is present only for TenantAdmin, and that Download is offered only for `Succeeded`. Do not re-prove backend isolation, PDF content, or Hangfire behaviour here.
+Portal tests assert routes, role visibility, that the Customer section calls `scope=Customer` and the Reports page calls `scope=Book`, that the Generate dropdown switches the hard-coded parameter form, that Generate and Schedule send the documented body shapes, that Schedule create is hidden when `allowedTriggers` omits `"scheduled"`, that History defaults to all reports and the report filter adds `reportId`, that the Adviser picker is present only for TenantAdmin, and that Download is offered only for `Succeeded`. On `/reports`, tests also assert Reports, Schedules, and History are tabs and that only the selected panel is shown. The customer Reports section keeps the three panels in one section. Do not re-prove backend isolation, PDF content, or Hangfire behaviour here.
 
 ---
 

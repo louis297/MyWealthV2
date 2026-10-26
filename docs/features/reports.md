@@ -459,10 +459,11 @@ Adviser Portal only in this phase.
 - Implicit customerId = the page’s Customer.
 - Schedule create is offered only when the selected report’s `allowedTriggers` includes `"scheduled"`.
 
-**Reports tab**
+**Reports page (`/reports`)**
 
-- Generate section with a report dropdown (Book-scoped granted active reports). Selecting a report shows its hard-coded parameter form.
-- Schedules and History panels as above, scoped to Book. Optional `reportId` on history.
+- Three tabs: Reports, Schedules, and History. Reports is selected by default, and only the selected panel is shown.
+- Reports tab: Generate section with a report dropdown (Book-scoped granted active reports). Selecting a report shows its hard-coded parameter form.
+- Schedules and History tabs use the panels above, scoped to Book. Optional `reportId` on history.
 - Adviser: adviserId defaults to self (hidden).
 - TenantAdmin: Adviser picker.
 - Schedule create is offered only when the selected report’s `allowedTriggers` includes `"scheduled"`.

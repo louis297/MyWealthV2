@@ -37,7 +37,7 @@ Reports page and catalog configuration updates to support multiple reports and p
 
 **Adviser Portal** ([adviser-portal-reports.md](adviser-portal-reports.md))
 
-- Customer page Reports section and `/reports` tab now use a shared layout: Generate section, Schedules panel, History panel.
+- The customer page Reports section keeps Generate, Schedules, and History in one section. `/reports` shows those panels on three tabs: Reports, Schedules, and History. Reports is selected by default.
 - Generate: report dropdown (`GET /reports?scope=…`). Selecting a report shows its hard-coded parameter form and Generate button.
 - History: separate panel. Defaults to paged list of all reports in the scope. Optional report filter adds `reportId` to `GET /reports/executions`.
 - Schedule create is shown only when the selected report’s `allowedTriggers` includes `"scheduled"`.
