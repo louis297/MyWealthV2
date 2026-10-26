@@ -46,12 +46,18 @@ export const reportsApi = api.injectEndpoints({
         body,
       }),
     }),
-    getReportExecutions: builder.query<PagedList<ReportExecution>, { scope: ReportScope; page: number }>({
-      query: ({ scope, page }) => {
+    getReportExecutions: builder.query<
+      PagedList<ReportExecution>,
+      { scope: ReportScope; page: number; reportId?: string }
+    >({
+      query: ({ scope, page, reportId }) => {
         const params = new URLSearchParams();
         params.set("scope", scope);
         params.set("page", String(page));
         params.set("pageSize", "20");
+        if (reportId) {
+          params.set("reportId", reportId);
+        }
         return `/reports/executions?${params.toString()}`;
       },
       providesTags: ["Report"],

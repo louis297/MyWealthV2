@@ -31,7 +31,7 @@ export function ReportsPage() {
         item.code === "adviser-balances" && canGenerate && role ? (
           <>
             <ReportSchedules report={item} scope="Book" role={role} />
-            <ReportHistory reportId={item.id} scope="Book" focusId={focusId} />
+            <ReportHistory scope="Book" focusId={focusId} />
           </>
         ) : null
       }

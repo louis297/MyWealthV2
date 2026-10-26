@@ -29,7 +29,7 @@ export function CustomerReportsSection({ customerId }: { customerId: string }) {
         item.code === "customer-transactions" ? (
           <>
             <ReportSchedules report={item} scope="Customer" customerId={customerId} role={role} />
-            <ReportHistory reportId={item.id} scope="Customer" customerId={customerId} focusId={focusId} />
+            <ReportHistory scope="Customer" focusId={focusId} />
           </>
         ) : null
       }

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Muted } from "@/components/portal";
+import { Muted, SelectField } from "@/components/portal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   useGetReportExecutionsQuery,
+  useGetReportsQuery,
   type ReportExecution,
   type ReportParameters,
   type ReportScope,
@@ -20,31 +21,23 @@ function summary(parameters: ReportParameters): string | null {
 const pollLimit = 30;
 
 export function ReportHistory({
-  reportId,
   scope,
-  customerId,
   focusId,
 }: {
-  reportId: string;
   scope: ReportScope;
-  customerId?: string;
   focusId?: string | null;
 }) {
-  const [open, setOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const [reportId, setReportId] = useState("");
   const [downloadError, setDownloadError] = useState(false);
   const [overrides, setOverrides] = useState<Record<string, ReportExecution>>({});
-  const shown = open || Boolean(focusId);
-  const history = useGetReportExecutionsQuery({ scope, page }, { skip: !shown });
-  const rows = (history.data?.items ?? []).filter((item) => {
-    if (item.reportId !== reportId) {
-      return false;
-    }
-    if (customerId && item.parameters.customerId !== customerId) {
-      return false;
-    }
-    return true;
-  }).map((item) => overrides[item.id] ?? item);
+  const catalog = useGetReportsQuery({ scope });
+  const history = useGetReportExecutionsQuery({ scope, page, reportId: reportId || undefined });
+  const rows = (history.data?.items ?? []).map((item) => overrides[item.id] ?? item);
+
+  function reportName(id: string) {
+    return catalog.data?.find((item) => item.id === id)?.name ?? id;
+  }
 
   useEffect(() => {
     if (!focusId) {
@@ -103,47 +96,58 @@ export function ReportHistory({
   }
 
   return (
-    <div className="flex flex-col items-start gap-2">
-      <Button type="button" variant="outline" size="sm" onClick={() => setOpen((value) => !value)}>
-        History
-      </Button>
-      {shown ? (
-        <div className="flex w-full flex-col gap-2 text-sm">
-          {history.isLoading ? <Muted>Loading history…</Muted> : null}
-          {history.isError ? (
-            <div className="flex flex-col items-start gap-2">
-              <p>History could not be loaded.</p>
-              <Button type="button" variant="outline" size="sm" onClick={() => void history.refetch()}>
-                Retry
-              </Button>
-            </div>
-          ) : null}
-          {!history.isLoading && !history.isError && rows.length === 0 ? <Muted>No runs yet.</Muted> : null}
-          {downloadError ? <p>Download not available.</p> : null}
-          {rows.map((item) => {
-            const range = summary(item.parameters);
-            return (
-              <div key={item.id} className="flex flex-wrap items-center gap-2 rounded-md border bg-card px-2 py-1.5">
-                <Badge variant={item.status === "Failed" ? "outline" : "secondary"}>
-                  <span>{item.status}</span>
-                </Badge>
-                <span>{item.triggerKind}</span>
-                <span>{item.created.slice(0, 10)}</span>
-                {range ? <span>{range}</span> : null}
-                {item.asOf ? <span>{item.asOf}</span> : null}
-                {item.status === "Succeeded" ? (
-                  <Button type="button" variant="outline" size="sm" onClick={() => void onDownload(item.id)}>
-                    Download
-                  </Button>
-                ) : null}
-              </div>
-            );
-          })}
-          {history.data ? (
-            <Pager page={page} pageSize={20} totalCount={history.data.totalCount} onPage={setPage} />
-          ) : null}
+    <section className="flex w-full flex-col gap-2 text-sm">
+      <h2 className="text-base font-medium">History</h2>
+      <SelectField
+        id={`history-report-${scope}`}
+        label="History report"
+        value={reportId}
+        onChange={(event) => {
+          setReportId(event.target.value);
+          setPage(1);
+        }}
+      >
+        <option value="">All</option>
+        {catalog.data?.map((item) => (
+          <option key={item.id} value={item.id}>
+            {item.name}
+          </option>
+        ))}
+      </SelectField>
+      {history.isLoading ? <Muted>Loading history…</Muted> : null}
+      {history.isError ? (
+        <div className="flex flex-col items-start gap-2">
+          <p>History could not be loaded.</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => void history.refetch()}>
+            Retry
+          </Button>
         </div>
       ) : null}
-    </div>
+      {!history.isLoading && !history.isError && rows.length === 0 ? <Muted>No runs yet.</Muted> : null}
+      {downloadError ? <p>Download not available.</p> : null}
+      {rows.map((item) => {
+        const range = summary(item.parameters);
+        return (
+          <div key={item.id} className="flex flex-wrap items-center gap-2 rounded-md border bg-card px-2 py-1.5">
+            <span>{reportName(item.reportId)}</span>
+            <Badge variant={item.status === "Failed" ? "outline" : "secondary"}>
+              <span>{item.status}</span>
+            </Badge>
+            <span>{item.triggerKind}</span>
+            <span>{item.created.slice(0, 10)}</span>
+            {range ? <span>{range}</span> : null}
+            {item.asOf ? <span>{item.asOf}</span> : null}
+            {item.status === "Succeeded" ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => void onDownload(item.id)}>
+                Download
+              </Button>
+            ) : null}
+          </div>
+        );
+      })}
+      {history.data ? (
+        <Pager page={page} pageSize={20} totalCount={history.data.totalCount} onPage={setPage} />
+      ) : null}
+    </section>
   );
 }

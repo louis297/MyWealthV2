@@ -1,5 +1,5 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -374,8 +374,8 @@ describe("CustomerDetailPage", () => {
     expect(await screen.findByRole("heading", { name: "Reports" })).toBeInTheDocument();
     expect(screen.getByText("These run for this customer.")).toBeInTheDocument();
     const report = await screen.findByLabelText("Report");
-    expect(screen.getByRole("option", { name: "Customer Transactions" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "Adviser Balances" })).not.toBeInTheDocument();
+    expect(within(report).getByRole("option", { name: "Customer Transactions" })).toBeInTheDocument();
+    expect(within(report).queryByRole("option", { name: "Adviser Balances" })).not.toBeInTheDocument();
     expect(screen.queryByText(customerTransactions.function)).not.toBeInTheDocument();
     expect(screen.queryByLabelText("From")).not.toBeInTheDocument();
     fireEvent.change(report, { target: { value: customerTransactions.id } });
@@ -452,7 +452,7 @@ describe("CustomerDetailPage", () => {
 
     expect(await screen.findByText("Reports could not be loaded.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-    expect(await screen.findByRole("option", { name: "Customer Transactions" })).toBeInTheDocument();
+    expect(within(await screen.findByLabelText("Report")).getByRole("option", { name: "Customer Transactions" })).toBeInTheDocument();
     expect(reportGets).toBeGreaterThan(1);
   });
 
@@ -853,13 +853,13 @@ describe("CustomerDetailPage", () => {
 
     expect(screen.queryByRole("button", { name: "History" })).not.toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "History" })).toBeInTheDocument();
-    expect(await screen.findByText("Succeeded")).toBeInTheDocument();
+    expect((await screen.findAllByText("Succeeded")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Customer Transactions").length).toBeGreaterThan(0);
-    expect(screen.getByText("Manual")).toBeInTheDocument();
+    expect(screen.getAllByText("Manual")).toHaveLength(2);
     expect(screen.getByText("Scheduled")).toBeInTheDocument();
     expect(screen.getByText("Queued")).toBeInTheDocument();
     expect(screen.getByText("2026-01-01 to 2026-03-31")).toBeInTheDocument();
-    expect(screen.getByText("2026-10-16T09:00:00+00:00")).toBeInTheDocument();
+    expect(screen.getAllByText("2026-10-16T09:00:00+00:00")).toHaveLength(2);
     expect(screen.getByText("2026-04-01 to 2026-05-01")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Download" })).toHaveLength(2);
 

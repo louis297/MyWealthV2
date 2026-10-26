@@ -1,5 +1,5 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -98,8 +98,8 @@ describe("ReportsPage", () => {
     expect(await screen.findByRole("heading", { name: "Reports" })).toBeInTheDocument();
     expect(screen.getByText("These run for an adviser's book.")).toBeInTheDocument();
     const report = await screen.findByLabelText("Report");
-    expect(screen.getByRole("option", { name: "Adviser Balances" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "Customer Transactions" })).not.toBeInTheDocument();
+    expect(within(report).getByRole("option", { name: "Adviser Balances" })).toBeInTheDocument();
+    expect(within(report).queryByRole("option", { name: "Customer Transactions" })).not.toBeInTheDocument();
     expect(screen.queryByText(adviserBalances.function)).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Include closed accounts")).not.toBeInTheDocument();
     fireEvent.change(report, { target: { value: adviserBalances.id } });
@@ -167,7 +167,7 @@ describe("ReportsPage", () => {
 
     expect(await screen.findByText("Reports could not be loaded.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-    expect(await screen.findByRole("option", { name: "Adviser Balances" })).toBeInTheDocument();
+    expect(within(await screen.findByLabelText("Report")).getByRole("option", { name: "Adviser Balances" })).toBeInTheDocument();
     expect(reportGets).toBeGreaterThan(1);
   });
 
@@ -472,15 +472,16 @@ describe("ReportsPage", () => {
       return new Response("", { status: 404 });
     });
 
-    expect(await screen.findByText("Future Book")).toBeInTheDocument();
+    expect(await screen.findByText("Failed")).toBeInTheDocument();
+    expect(screen.getAllByText("Future Book").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Adviser Balances").length).toBeGreaterThan(0);
-    expect(screen.getByText("Failed")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Next" })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Download" })).toHaveLength(1);
 
     fireEvent.change(screen.getByLabelText("History report"), { target: { value: adviserBalances.id } });
-    await screen.findByText("Succeeded");
-    expect(screen.queryByText("Failed")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText("Failed")).not.toBeInTheDocument();
+    });
     const filtered = fetchMock.mock.calls
       .map(([input]) => input)
       .filter((input): input is Request => input instanceof Request && input.url.includes("/reports/executions"))
