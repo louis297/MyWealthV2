@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Muted, SelectField } from "@/components/portal";
+import { SelectItem } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -107,11 +108,11 @@ export function ReportHistory({
           setPage(1);
         }}
       >
-        <option value="">All</option>
+        <SelectItem value="">All</SelectItem>
         {catalog.data?.map((item) => (
-          <option key={item.id} value={item.id}>
+          <SelectItem key={item.id} value={item.id}>
             {item.name}
-          </option>
+          </SelectItem>
         ))}
       </SelectField>
       {history.isLoading ? <Muted>Loading history…</Muted> : null}

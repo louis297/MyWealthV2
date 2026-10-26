@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CustomerDetailPage } from "@/features/customers/CustomerDetailPage";
 import { sessionSlice, setCurrentUser, type CurrentUser } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
+import { chooseOption, openSelect, pickOption } from "@/test/chooseOption";
 
 const startLogin = vi.fn();
 
@@ -373,12 +374,12 @@ describe("CustomerDetailPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Reports" })).toBeInTheDocument();
     expect(screen.getByText("These run for this customer.")).toBeInTheDocument();
-    const report = await screen.findByLabelText("Report");
-    expect(within(report).getByRole("option", { name: "Customer Transactions" })).toBeInTheDocument();
-    expect(within(report).queryByRole("option", { name: "Adviser Balances" })).not.toBeInTheDocument();
+    await openSelect("Report");
+    expect(screen.getByRole("option", { name: "Customer Transactions" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Adviser Balances" })).not.toBeInTheDocument();
     expect(screen.queryByText(customerTransactions.function)).not.toBeInTheDocument();
     expect(screen.queryByLabelText("From")).not.toBeInTheDocument();
-    fireEvent.change(report, { target: { value: customerTransactions.id } });
+    await pickOption("Customer Transactions");
     expect(screen.getByText(customerTransactions.function)).toBeInTheDocument();
     expect(within(generateForm()).getByLabelText("From")).toBeInTheDocument();
     expect(within(generateForm()).queryByLabelText("Adviser")).not.toBeInTheDocument();
@@ -470,7 +471,8 @@ describe("CustomerDetailPage", () => {
 
     expect(await screen.findByText("Reports could not be loaded.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-    expect(within(await screen.findByLabelText("Report")).getByRole("option", { name: "Customer Transactions" })).toBeInTheDocument();
+    await openSelect("Report");
+    expect(screen.getByRole("option", { name: "Customer Transactions" })).toBeInTheDocument();
     expect(reportGets).toBeGreaterThan(1);
   });
 
@@ -493,7 +495,7 @@ describe("CustomerDetailPage", () => {
       return new Response("", { status: 404 });
     });
 
-    fireEvent.change(await screen.findByLabelText("Report"), { target: { value: futureReport.id } });
+    await chooseOption("Report", "Future Report");
     expect(screen.getByText("parameters not available in this version")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Generate now" })).toBeDisabled();
   });
@@ -515,7 +517,7 @@ describe("CustomerDetailPage", () => {
       }
       return fetchImpl(url, method, body);
     });
-    fireEvent.change(await screen.findByLabelText("Report"), { target: { value: customerTransactions.id } });
+    await chooseOption("Report", "Customer Transactions");
     return rendered;
   }
 
@@ -652,14 +654,16 @@ describe("CustomerDetailPage", () => {
     });
 
     expect(screen.queryByRole("button", { name: "Schedules" })).not.toBeInTheDocument();
-    fireEvent.change(await screen.findByLabelText("Report"), { target: { value: customerTransactions.id } });
+    await chooseOption("Report", "Customer Transactions");
     const schedule = (await screen.findByText("Times are sent as chosen. The server interprets the schedule in UTC.")).closest("form");
     expect(schedule).not.toBeNull();
     const fields = within(schedule as HTMLElement);
     expect(await screen.findByText("No schedules.")).toBeInTheDocument();
-    expect(fields.getByRole("option", { name: "Daily" })).toBeInTheDocument();
-    expect(fields.getByRole("option", { name: "Weekly" })).toBeInTheDocument();
-    expect(fields.getByRole("option", { name: "Monthly" })).toBeInTheDocument();
+    await openSelect("Frequency", fields);
+    expect(screen.getByRole("option", { name: "Daily" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Weekly" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Monthly" })).toBeInTheDocument();
+    fireEvent.click(fields.getByLabelText("Frequency"));
     expect(document.querySelector('input[name="cron"]')).toBeNull();
     expect(document.querySelector("textarea")).toBeNull();
 
@@ -770,7 +774,7 @@ describe("CustomerDetailPage", () => {
       return new Response("", { status: 404 });
     });
 
-    fireEvent.change(await screen.findByLabelText("Report"), { target: { value: customerTransactions.id } });
+    await chooseOption("Report", "Customer Transactions");
     fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
     fireEvent.change(screen.getByLabelText("Time"), { target: { value: "10:00" } });
     fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));

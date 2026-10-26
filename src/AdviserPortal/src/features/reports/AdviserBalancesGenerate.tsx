@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from "react";
 import { CheckField, Messages, SelectField } from "@/components/portal";
+import { SelectItem } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useGetAdvisersQuery } from "@/features/advisers/advisersApi";
 import { useRequestReportMutation } from "@/features/reports/reportsApi";
@@ -83,11 +84,11 @@ export function AdviserBalancesGenerate({
           onChange={(event) => setAdviserId(event.target.value)}
           required
         >
-          <option value="">Select an adviser</option>
+          <SelectItem value="">Select an adviser</SelectItem>
           {advisers?.items.map((adviser) => (
-            <option key={adviser.id} value={adviser.id}>
+            <SelectItem key={adviser.id} value={adviser.id}>
               {adviser.name}
-            </option>
+            </SelectItem>
           ))}
         </SelectField>
       ) : null}

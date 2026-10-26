@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ReportsPage } from "@/features/reports/ReportsPage";
 import { sessionSlice, setCurrentUser, type CurrentUser } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
+import { chooseOption, openSelect, pickOption } from "@/test/chooseOption";
 
 const customerTransactions = {
   id: "8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11",
@@ -101,12 +102,12 @@ describe("ReportsPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Reports" })).toBeInTheDocument();
     expect(screen.getByText("These run for an adviser's book.")).toBeInTheDocument();
-    const report = await screen.findByLabelText("Report");
-    expect(within(report).getByRole("option", { name: "Adviser Balances" })).toBeInTheDocument();
-    expect(within(report).queryByRole("option", { name: "Customer Transactions" })).not.toBeInTheDocument();
+    await openSelect("Report");
+    expect(screen.getByRole("option", { name: "Adviser Balances" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Customer Transactions" })).not.toBeInTheDocument();
     expect(screen.queryByText(adviserBalances.function)).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Include closed accounts")).not.toBeInTheDocument();
-    fireEvent.change(report, { target: { value: adviserBalances.id } });
+    await pickOption("Adviser Balances");
     expect(screen.getByText(adviserBalances.function)).toBeInTheDocument();
     expect(within(generateForm()).getByLabelText("Include closed accounts")).toBeInTheDocument();
     expect(within(generateForm()).queryByLabelText("From")).not.toBeInTheDocument();
@@ -189,7 +190,8 @@ describe("ReportsPage", () => {
 
     expect(await screen.findByText("Reports could not be loaded.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-    expect(within(await screen.findByLabelText("Report")).getByRole("option", { name: "Adviser Balances" })).toBeInTheDocument();
+    await openSelect("Report");
+    expect(screen.getByRole("option", { name: "Adviser Balances" })).toBeInTheDocument();
     expect(reportGets).toBeGreaterThan(1);
   });
 
@@ -209,7 +211,7 @@ describe("ReportsPage", () => {
       return new Response("", { status: 404 });
     });
 
-    fireEvent.change(await screen.findByLabelText("Report"), { target: { value: futureReport.id } });
+    await chooseOption("Report", "Future Report");
     expect(screen.getByText("parameters not available in this version")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Generate now" })).toBeDisabled();
   });
@@ -232,10 +234,10 @@ describe("ReportsPage", () => {
       },
     );
 
-    const report = await screen.findByLabelText("Report");
+    expect(await screen.findByLabelText("Report")).toBeInTheDocument();
     expect(screen.queryByLabelText("Adviser")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Include closed accounts")).not.toBeInTheDocument();
-    fireEvent.change(report, { target: { value: adviserBalances.id } });
+    await chooseOption("Report", "Adviser Balances");
     expect(screen.queryByLabelText("Adviser")).not.toBeInTheDocument();
     expect(within(generateForm()).getByLabelText("Include closed accounts")).not.toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
@@ -296,13 +298,10 @@ describe("ReportsPage", () => {
       return new Response("", { status: 404 });
     });
 
-    fireEvent.change(await screen.findByLabelText("Report"), { target: { value: adviserBalances.id } });
-    const adviser = within(generateForm()).getByLabelText("Adviser");
-    expect(adviser).toBeInTheDocument();
+    await chooseOption("Report", "Adviser Balances");
+    expect(within(generateForm()).getByLabelText("Adviser")).toBeInTheDocument();
     expect(within(generateForm()).getByRole("button", { name: "Generate now" })).toBeDisabled();
-    expect(await within(generateForm()).findByRole("option", { name: "Sam Reed" })).toBeInTheDocument();
-
-    fireEvent.change(adviser, { target: { value: samId } });
+    await chooseOption("Adviser", "Sam Reed", within(generateForm()));
     fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
 
     expect(await screen.findByText("Report queued")).toBeInTheDocument();
@@ -350,7 +349,7 @@ describe("ReportsPage", () => {
       return new Response("", { status: 404 });
     });
 
-    fireEvent.change(await screen.findByLabelText("Report"), { target: { value: adviserBalances.id } });
+    await chooseOption("Report", "Adviser Balances");
     fireEvent.click(within(generateForm()).getByRole("button", { name: "Generate now" }));
     expect(await screen.findByText("Adviser is required.")).toBeInTheDocument();
     expect(screen.queryByText("Report queued")).not.toBeInTheDocument();
@@ -373,7 +372,7 @@ describe("ReportsPage", () => {
       return new Response("", { status: 404 });
     });
 
-    fireEvent.change(await screen.findByLabelText("Report"), { target: { value: adviserBalances.id } });
+    await chooseOption("Report", "Adviser Balances");
     fireEvent.click(within(generateForm()).getByRole("button", { name: "Generate now" }));
     expect(await screen.findByText("Report is not available.")).toBeInTheDocument();
     expect(screen.queryByText("Report queued")).not.toBeInTheDocument();
@@ -401,7 +400,7 @@ describe("ReportsPage", () => {
     );
 
     expect(screen.queryByRole("button", { name: "Schedules" })).not.toBeInTheDocument();
-    fireEvent.change(await screen.findByLabelText("Report"), { target: { value: adviserBalances.id } });
+    await chooseOption("Report", "Adviser Balances");
     expect(await screen.findByRole("heading", { name: "Schedules" })).toBeInTheDocument();
     expect(screen.queryByLabelText("Adviser")).not.toBeInTheDocument();
     expect(document.querySelector('input[name="cron"]')).toBeNull();
@@ -457,12 +456,11 @@ describe("ReportsPage", () => {
       return new Response("", { status: 404 });
     });
 
-    fireEvent.change(await screen.findByLabelText("Report"), { target: { value: adviserBalances.id } });
+    await chooseOption("Report", "Adviser Balances");
     const schedule = (await screen.findByText("Times are sent as chosen. The server interprets the schedule in UTC.")).closest("form");
     expect(schedule).not.toBeNull();
     expect(within(schedule as HTMLElement).getByRole("button", { name: "Create schedule" })).toBeDisabled();
-    expect(await within(schedule as HTMLElement).findByRole("option", { name: "Sam Reed" })).toBeInTheDocument();
-    fireEvent.change(within(schedule as HTMLElement).getByLabelText("Adviser"), { target: { value: samId } });
+    await chooseOption("Adviser", "Sam Reed", within(schedule as HTMLElement));
     fireEvent.change(screen.getByLabelText("Time"), { target: { value: "09:00" } });
     fireEvent.click(screen.getByRole("button", { name: "Create schedule" }));
 
@@ -502,7 +500,7 @@ describe("ReportsPage", () => {
     expect(await screen.findByRole("heading", { name: "Schedules" })).toBeInTheDocument();
     expect(await screen.findByText("every day at 09:00")).toBeInTheDocument();
     expect(screen.getAllByText("Adviser Balances").length).toBeGreaterThan(0);
-    fireEvent.change(screen.getByLabelText("Report"), { target: { value: manualOnly.id } });
+    await chooseOption("Report", "Adviser Balances");
     expect(screen.queryByRole("button", { name: "Create schedule" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Disable schedule" })).toBeInTheDocument();
@@ -545,7 +543,7 @@ describe("ReportsPage", () => {
       return new Response("", { status: 404 });
     });
 
-    fireEvent.change(await screen.findByLabelText("Report"), { target: { value: adviserBalances.id } });
+    await chooseOption("Report", "Adviser Balances");
     expect(await screen.findByText("No runs yet.")).toBeInTheDocument();
     fireEvent.click(within(generateForm()).getByRole("button", { name: "Generate now" }));
     expect(await screen.findByText("Queued")).toBeInTheDocument();
@@ -624,7 +622,7 @@ describe("ReportsPage", () => {
     expect(screen.getByRole("button", { name: "Next" })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Download" })).toHaveLength(1);
 
-    fireEvent.change(screen.getByLabelText("History report"), { target: { value: adviserBalances.id } });
+    await chooseOption("History report", "Adviser Balances");
     await waitFor(() => {
       expect(screen.queryByText("Failed")).not.toBeInTheDocument();
     });

@@ -1,9 +1,9 @@
-import type { ComponentProps, ReactNode } from "react";
+import { Children, cloneElement, isValidElement, type ComponentProps, type ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "cn";
 
 export function Page({ children, className }: { children: ReactNode; className?: string }) {
@@ -116,19 +116,81 @@ export function TextField({ id, label, className, ...props }: ComponentProps<typ
   );
 }
 
+function itemLabel(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node);
+  }
+  if (Array.isArray(node)) {
+    return node.map(itemLabel).join("");
+  }
+  if (isValidElement<{ children?: ReactNode }>(node)) {
+    return itemLabel(node.props.children);
+  }
+  return "";
+}
+
+function readItems(children: ReactNode) {
+  const items: { label: string; value: string | null }[] = [];
+  Children.forEach(children, (child) => {
+    if (!isValidElement<{ value?: string | null; children?: ReactNode }>(child) || child.type !== SelectItem) {
+      return;
+    }
+    const raw = child.props.value;
+    items.push({
+      label: itemLabel(child.props.children).trim(),
+      value: raw === "" || raw == null ? null : String(raw),
+    });
+  });
+  return items;
+}
+
+function withNullEmpty(children: ReactNode) {
+  return Children.map(children, (child) => {
+    if (!isValidElement<{ value?: string | null }>(child) || child.type !== SelectItem) {
+      return child;
+    }
+    if (child.props.value === "" || child.props.value == null) {
+      return cloneElement(child, { value: null });
+    }
+    return child;
+  });
+}
+
 export function SelectField({
   id,
   label,
   className,
+  value,
+  onChange,
+  required,
   children,
-  ...props
-}: Omit<ComponentProps<"select">, "size"> & { id: string; label: string }) {
+}: {
+  id: string;
+  label: string;
+  className?: string;
+  value?: string;
+  onChange?: (event: { target: { value: string } }) => void;
+  required?: boolean;
+  children?: ReactNode;
+}) {
+  const selected = value === "" || value == null ? null : value;
+
   return (
     <Field>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <NativeSelect id={id} className={cn("w-full", className)} {...props}>
-        {children}
-      </NativeSelect>
+      <Select
+        items={readItems(children)}
+        value={selected}
+        onValueChange={(next) => onChange?.({ target: { value: next == null ? "" : String(next) } })}
+        required={required}
+      >
+        <SelectTrigger id={id} className={cn("w-full", className)}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent alignItemWithTrigger={false}>
+          <SelectGroup>{withNullEmpty(children)}</SelectGroup>
+        </SelectContent>
+      </Select>
     </Field>
   );
 }

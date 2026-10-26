@@ -4,6 +4,7 @@ import { useAppSelector } from "@/app/hooks";
 import { ErrorNotice, Page, PageHeading, SelectField, TextField } from "@/components/portal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { SelectItem } from "@/components/ui/select";
 import { useGetAdvisersQuery } from "@/features/advisers/advisersApi";
 import { useCreateCustomerMutation } from "@/features/customers/customersApi";
 import { roles } from "@/features/session/roles";
@@ -86,11 +87,11 @@ export function CreateCustomerPage() {
                 onChange={(event) => setAdviserId(event.target.value)}
                 required
               >
-                <option value="">Select an adviser</option>
+                <SelectItem value="">Select an adviser</SelectItem>
                 {activeAdvisers.map((item) => (
-                  <option key={item.id} value={item.id}>
+                  <SelectItem key={item.id} value={item.id}>
                     {item.name}
-                  </option>
+                  </SelectItem>
                 ))}
               </SelectField>
             ) : null}

@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateCustomerPage } from "@/features/customers/CreateCustomerPage";
 import { sessionSlice, setCurrentUser, type CurrentUser } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
+import { chooseOption } from "@/test/chooseOption";
 
 const startLogin = vi.fn();
 
@@ -115,8 +116,7 @@ describe("CreateCustomerPage", () => {
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "jordan@north.example" } });
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "Passw0rd!" } });
     fireEvent.change(screen.getByLabelText("Confirm password"), { target: { value: "Passw0rd!" } });
-    await screen.findByRole("option", { name: "Sam Reed" });
-    fireEvent.change(screen.getByLabelText("Adviser"), { target: { value: adviserId } });
+    await chooseOption("Adviser", "Sam Reed");
     fireEvent.click(screen.getByRole("button", { name: "Create customer" }));
 
     expect(await screen.findByText("customer detail")).toBeInTheDocument();

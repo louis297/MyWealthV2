@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router";
 import { useAppSelector } from "@/app/hooks";
 import { ConflictNotice, Muted, Page, PageHeading, SelectField, TextField } from "@/components/portal";
 import { Button } from "@/components/ui/button";
+import { SelectItem } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { useGetAdvisersQuery } from "@/features/advisers/advisersApi";
 import { useGetCustomerQuery, useUpdateCustomerMutation } from "@/features/customers/customersApi";
@@ -89,9 +90,9 @@ export function EditCustomerPage() {
                 {(advisers?.items ?? [])
                   .filter((item) => item.status === "active" || item.id === data.adviserId)
                   .map((item) => (
-                    <option key={item.id} value={item.id}>
+                    <SelectItem key={item.id} value={item.id}>
                       {item.name}
-                    </option>
+                    </SelectItem>
                   ))}
               </SelectField>
             ) : null}

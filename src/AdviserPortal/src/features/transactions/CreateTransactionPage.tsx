@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 import { Messages, Muted, Page, PageHeading, SelectField, TextField } from "@/components/portal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { SelectItem } from "@/components/ui/select";
 import { useGetAccountHoldingsQuery, useGetAccountQuery } from "@/features/accounts/accountsApi";
 import { useGetInstrumentsQuery } from "@/features/instruments/instrumentsApi";
 import { useCreateTransactionMutation } from "@/features/transactions/transactionsApi";
@@ -150,9 +151,9 @@ export function CreateTransactionPage() {
           <form className="flex flex-col gap-4" onSubmit={(event) => void onSubmit(event)}>
             <SelectField id="transaction-type" label="Type" value={type} onChange={(event) => setType(event.target.value)}>
               {offeredTypes.map((item) => (
-                <option key={item} value={item}>
+                <SelectItem key={item} value={item}>
                   {item}
-                </option>
+                </SelectItem>
               ))}
             </SelectField>
             {cashType ? (
@@ -181,11 +182,11 @@ export function CreateTransactionPage() {
                   onChange={(event) => setInstrumentId(event.target.value)}
                   required
                 >
-                  <option value="">Select an instrument</option>
+                  <SelectItem value="">Select an instrument</SelectItem>
                   {(instruments.data?.items ?? []).map((item) => (
-                    <option key={item.id} value={item.id}>
+                    <SelectItem key={item.id} value={item.id}>
                       {item.symbol} {item.name}
-                    </option>
+                    </SelectItem>
                   ))}
                 </SelectField>
                 <TextField

@@ -7,6 +7,7 @@ import { AccountDetailPage } from "@/features/accounts/AccountDetailPage";
 import { CreateTransactionPage } from "@/features/transactions/CreateTransactionPage";
 import { sessionSlice, setCurrentUser, type CurrentUser } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
+import { chooseOption } from "@/test/chooseOption";
 
 const accountId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
 const customerId = "cccccccccccccccc-cccc-cccc-cccc-cccccccccccc";
@@ -238,8 +239,7 @@ describe("AccountDetailPage", () => {
     expect(buy).toHaveAttribute("href", `/accounts/${accountId}/transactions/new?type=Buy`);
     fireEvent.click(buy);
 
-    await screen.findByRole("option", { name: "DEMO Demo Fund" });
-    fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+    await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T10:00" },
@@ -348,8 +348,7 @@ describe("AccountDetailPage", () => {
     expect(screen.getByText("100")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: "Sell" }));
 
-    await screen.findByRole("option", { name: "DEMO Demo Fund" });
-    fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+    await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "40" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T11:00" },

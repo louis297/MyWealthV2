@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router";
 import { Messages, Page, PageHeading, SelectField, TextField } from "@/components/portal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { SelectItem } from "@/components/ui/select";
 import { useCreateAccountMutation } from "@/features/accounts/accountsApi";
 import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
 
@@ -61,9 +62,9 @@ export function CreateAccountPage() {
             <TextField id="account-name" label="Name" value={name} onChange={(event) => setName(event.target.value)} required />
             <SelectField id="account-type" label="Type" value={type} onChange={(event) => setType(event.target.value)} required>
               {accountTypes.map((item) => (
-                <option key={item} value={item}>
+                <SelectItem key={item} value={item}>
                   {item}
-                </option>
+                </SelectItem>
               ))}
             </SelectField>
             <SelectField
@@ -73,11 +74,11 @@ export function CreateAccountPage() {
               onChange={(event) => setCurrency(event.target.value)}
               required
             >
-              <option value="">Select a currency</option>
+              <SelectItem value="">Select a currency</SelectItem>
               {(currencies ?? []).map((item) => (
-                <option key={item.code} value={item.code}>
+                <SelectItem key={item.code} value={item.code}>
                   {item.code}
-                </option>
+                </SelectItem>
               ))}
             </SelectField>
             <Button type="submit">Create account</Button>

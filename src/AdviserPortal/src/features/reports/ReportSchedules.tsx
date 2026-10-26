@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from "react";
 import { CheckField, Messages, Muted, SelectField, TextField } from "@/components/portal";
 import { Button } from "@/components/ui/button";
+import { SelectItem } from "@/components/ui/select";
 import { useGetAdvisersQuery } from "@/features/advisers/advisersApi";
 import { fromCron, humaniseCron, toCron, type CronPreset } from "@/features/reports/cron";
 import {
@@ -159,11 +160,11 @@ export function ReportSchedules({
         value={filterId}
         onChange={(event) => setFilterId(event.target.value)}
       >
-        <option value="">All</option>
+        <SelectItem value="">All</SelectItem>
         {reports.map((item) => (
-          <option key={item.id} value={item.id}>
+          <SelectItem key={item.id} value={item.id}>
             {item.name}
-          </option>
+          </SelectItem>
         ))}
       </SelectField>
       {schedules.isLoading ? <Muted>Loading schedules…</Muted> : null}
@@ -231,11 +232,11 @@ export function ReportSchedules({
               onChange={(event) => setAdviserId(event.target.value)}
               required
             >
-              <option value="">Select an adviser</option>
+              <SelectItem value="">Select an adviser</SelectItem>
               {advisers?.items.map((adviser) => (
-                <option key={adviser.id} value={adviser.id}>
+                <SelectItem key={adviser.id} value={adviser.id}>
                   {adviser.name}
-                </option>
+                </SelectItem>
               ))}
             </SelectField>
           ) : null}
@@ -251,9 +252,9 @@ export function ReportSchedules({
             value={preset}
             onChange={(event) => setPreset(event.target.value as CronPreset)}
           >
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
+            <SelectItem value="daily">Daily</SelectItem>
+            <SelectItem value="weekly">Weekly</SelectItem>
+            <SelectItem value="monthly">Monthly</SelectItem>
           </SelectField>
           <TextField
             id={`schedule-time-${formReport.id}`}

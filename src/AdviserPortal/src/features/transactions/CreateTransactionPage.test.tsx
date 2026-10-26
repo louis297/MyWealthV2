@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { sessionSlice, setCurrentUser, type CurrentUser } from "@/features/session/sessionSlice";
 import { CreateTransactionPage } from "@/features/transactions/CreateTransactionPage";
 import { api } from "@/shared/api/api";
+import { chooseOption, openSelect } from "@/test/chooseOption";
 
 const accountId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
 const instrumentId = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
@@ -175,9 +176,8 @@ describe("CreateTransactionPage", () => {
     const { fetchMock, router } = renderForm();
 
     expect(await screen.findByRole("heading", { name: "New transaction" })).toBeInTheDocument();
-    await screen.findByRole("option", { name: "DEMO Demo Fund" });
-    fireEvent.change(screen.getByLabelText("Type"), { target: { value: "Buy" } });
-    fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+    await chooseOption("Type", "Buy");
+    await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T10:00" },
@@ -229,8 +229,7 @@ describe("CreateTransactionPage", () => {
   it("stays on the form when the server has no price", async () => {
     const { router } = renderForm(user(), 400);
 
-    await screen.findByRole("option", { name: "DEMO Demo Fund" });
-    fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+    await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T10:00" },
@@ -249,9 +248,8 @@ describe("CreateTransactionPage", () => {
 
     expect(await screen.findByText("1250.5")).toBeInTheDocument();
     expect(screen.getByText("100")).toBeInTheDocument();
-    await screen.findByRole("option", { name: "DEMO Demo Fund" });
-    fireEvent.change(screen.getByLabelText("Type"), { target: { value: "Sell" } });
-    fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+    await chooseOption("Type", "Sell");
+    await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "200" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T10:00" },
@@ -276,8 +274,7 @@ describe("CreateTransactionPage", () => {
   it("stays on the form when Buy is rejected for a cost field", async () => {
     const { router } = renderForm(user(), 400, "Cost cannot be set on a buy or sell.");
 
-    await screen.findByRole("option", { name: "DEMO Demo Fund" });
-    fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+    await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T10:00" },
@@ -293,9 +290,8 @@ describe("CreateTransactionPage", () => {
   it("posts StockIn with client cost and no cash", async () => {
     const { fetchMock } = renderForm();
 
-    await screen.findByRole("option", { name: "DEMO Demo Fund" });
-    fireEvent.change(screen.getByLabelText("Type"), { target: { value: "StockIn" } });
-    fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+    await chooseOption("Type", "StockIn");
+    await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "20" } });
     fireEvent.change(screen.getByLabelText("Cost"), { target: { value: "300" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
@@ -322,10 +318,9 @@ describe("CreateTransactionPage", () => {
   it("posts StockOut with quantity only", async () => {
     const { fetchMock } = renderForm();
 
-    await screen.findByRole("option", { name: "DEMO Demo Fund" });
-    fireEvent.change(screen.getByLabelText("Type"), { target: { value: "StockOut" } });
+    await chooseOption("Type", "StockOut");
     expect(screen.queryByLabelText("Cost")).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+    await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "20" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T10:00" },
@@ -350,12 +345,11 @@ describe("CreateTransactionPage", () => {
     async (type) => {
       const { fetchMock } = renderForm();
 
-      await screen.findByRole("option", { name: "DEMO Demo Fund" });
-      fireEvent.change(screen.getByLabelText("Type"), { target: { value: type } });
+      await chooseOption("Type", type);
       expect(screen.getByLabelText("New total quantity")).toBeInTheDocument();
       expect(screen.queryByLabelText("Cost")).not.toBeInTheDocument();
       expect(screen.queryByLabelText("Ratio")).not.toBeInTheDocument();
-      fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+      await chooseOption("Instrument", "DEMO Demo Fund");
       fireEvent.change(screen.getByLabelText("New total quantity"), { target: { value: "200" } });
       fireEvent.change(screen.getByLabelText("Booked at"), {
         target: { value: "2026-10-12T10:00" },
@@ -383,8 +377,7 @@ describe("CreateTransactionPage", () => {
   it("omits tenantId for a TenantAdmin", async () => {
     const { fetchMock } = renderForm(user({ role: "tenantAdmin", name: "Pat Admin", adviserId: null }));
 
-    await screen.findByRole("option", { name: "DEMO Demo Fund" });
-    fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+    await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T10:00" },
@@ -400,7 +393,9 @@ describe("CreateTransactionPage", () => {
   it.each(["Bank", "Cash"])("does not offer security types on a %s account", async (type) => {
     renderForm(user(), 201, "Price is not available.", { type });
 
+    await openSelect("Type");
     await waitFor(() => {
+      expect(screen.getByRole("option", { name: "TransferIn" })).toBeInTheDocument();
       expect(screen.queryByRole("option", { name: "Buy" })).not.toBeInTheDocument();
     });
     for (const securityType of ["Sell", "StockIn", "StockOut", "Split", "Bonus", "Scrip"]) {
@@ -417,8 +412,7 @@ describe("CreateTransactionPage", () => {
       { status: "Closed" },
     );
 
-    await screen.findByRole("option", { name: "DEMO Demo Fund" });
-    fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+    await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T10:00" },
@@ -441,8 +435,7 @@ describe("CreateTransactionPage", () => {
       "disabled",
     );
 
-    await screen.findByRole("option", { name: "DEMO Demo Fund" });
-    fireEvent.change(screen.getByLabelText("Instrument"), { target: { value: instrumentId } });
+    await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T10:00" },
@@ -463,7 +456,9 @@ describe("CreateTransactionPage", () => {
   ])("posts a TransferIn for %s and returns to the account", async (_label, me) => {
     const { fetchMock, router } = renderForm(me, 201, "Price is not available.", {}, "errors", "?type=TransferIn");
 
+    await openSelect("Type");
     expect(await screen.findByRole("option", { name: "TransferIn" })).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Type"));
     expect(screen.queryByLabelText("Instrument")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Quantity")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Cost")).not.toBeInTheDocument();
@@ -515,7 +510,9 @@ describe("CreateTransactionPage", () => {
       "?type=TransferOut",
     );
 
+    await openSelect("Type");
     expect(await screen.findByRole("option", { name: "TransferOut" })).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Type"));
     expect(screen.queryByLabelText("Instrument")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "-40.25" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
@@ -557,7 +554,9 @@ describe("CreateTransactionPage", () => {
       `?type=${type}`,
     );
 
-    await screen.findByRole("option", { name: type });
+    await openSelect("Type");
+    expect(await screen.findByRole("option", { name: type })).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Type"));
     fireEvent.change(screen.getByLabelText("Amount"), { target: { value: amount } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-12T09:00" },
@@ -649,6 +648,7 @@ describe("CreateTransactionPage", () => {
   it("offers only cash transfers on an open Bank account", async () => {
     renderForm(user(), 201, "Price is not available.", { type: "Bank" }, "errors", "?type=TransferIn");
 
+    await openSelect("Type");
     expect(await screen.findByRole("option", { name: "TransferIn" })).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.queryByRole("option", { name: "Buy" })).not.toBeInTheDocument();

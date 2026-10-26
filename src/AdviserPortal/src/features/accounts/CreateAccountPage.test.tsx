@@ -1,11 +1,12 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateAccountPage } from "@/features/accounts/CreateAccountPage";
 import { sessionSlice, setCurrentUser, type CurrentUser } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
+import { chooseOption, openSelect, pickOption } from "@/test/chooseOption";
 
 const customerId = "cccccccccccccccc-cccc-cccc-cccc-cccccccccccc";
 const accountId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
@@ -89,17 +90,16 @@ async function postCall(fetchMock: ReturnType<typeof vi.mocked<typeof fetch>>) {
 }
 
 async function fillAndSubmit() {
-  await screen.findByRole("option", { name: "NZD" });
-  const type = screen.getByLabelText("Type");
-  expect(within(type).getAllByRole("option").map((option) => option.textContent)).toEqual([
+  await openSelect("Type");
+  expect((await screen.findAllByRole("option")).map((option) => option.textContent?.trim())).toEqual([
     "Bank",
     "Cash",
     "Brokerage",
     "Other",
   ]);
+  await pickOption("Bank");
   fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Everyday spending" } });
-  fireEvent.change(type, { target: { value: "Bank" } });
-  fireEvent.change(screen.getByLabelText("Currency"), { target: { value: "NZD" } });
+  await chooseOption("Currency", "NZD");
   fireEvent.click(screen.getByRole("button", { name: "Create account" }));
 }
 

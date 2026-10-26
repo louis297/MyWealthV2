@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router";
 import { useAppSelector } from "@/app/hooks";
 import { CheckField, FilterBar, Page, PageHeading, recordLinkClass, SelectField, StatusBadge, TextField } from "@/components/portal";
 import { buttonVariants } from "@/components/ui/button";
+import { SelectItem } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useGetAdvisersQuery } from "@/features/advisers/advisersApi";
@@ -110,11 +111,11 @@ export function CustomersListPage() {
             value={adviserId}
             onChange={(event) => updateParam("adviserId", event.target.value || null)}
           >
-            <option value="">All</option>
+            <SelectItem value="">All</SelectItem>
             {(advisers?.items ?? []).map((item) => (
-              <option key={item.id} value={item.id}>
+              <SelectItem key={item.id} value={item.id}>
                 {item.name}
-              </option>
+              </SelectItem>
             ))}
           </SelectField>
         ) : null}

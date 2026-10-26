@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Muted, SelectField } from "@/components/portal";
 import { Button } from "@/components/ui/button";
+import { SelectItem } from "@/components/ui/select";
 import {
   useGetReportsQuery,
   type ReportCatalogItem,
@@ -66,11 +67,11 @@ export function ReportCatalog({
             value={selectedId}
             onChange={(event) => onSelectedId(event.target.value)}
           >
-            <option value="">Select a report</option>
+            <SelectItem value="">Select a report</SelectItem>
             {data.map((item) => (
-              <option key={item.id} value={item.id}>
+              <SelectItem key={item.id} value={item.id}>
                 {item.name}
-              </option>
+              </SelectItem>
             ))}
           </SelectField>
           {selected ? <p className="text-sm text-muted-foreground">{selected.function}</p> : null}

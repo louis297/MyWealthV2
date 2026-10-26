@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EditCustomerPage } from "@/features/customers/EditCustomerPage";
 import { sessionSlice, setCurrentUser, type CurrentUser } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
+import { chooseOption } from "@/test/chooseOption";
 
 const startLogin = vi.fn();
 
@@ -141,8 +142,7 @@ describe("EditCustomerPage", () => {
     });
 
     fireEvent.change(await screen.findByLabelText("Name"), { target: { value: "Jordan Updated" } });
-    await screen.findByRole("option", { name: "Alex Kim" });
-    fireEvent.change(screen.getByLabelText("Adviser"), { target: { value: otherAdviserId } });
+    await chooseOption("Adviser", "Alex Kim");
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(await screen.findByText("customer detail")).toBeInTheDocument();
