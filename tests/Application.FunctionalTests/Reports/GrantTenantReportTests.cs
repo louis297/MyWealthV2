@@ -75,45 +75,68 @@ public class GrantTenantReportTests : TestBase
     }
 
     [Test]
-    public async Task FirstGrant_Returns201_RepeatReturns204_InactiveCatalogRowCanBeGranted()
+    public async Task ActiveReport_FirstGrantReturns201_RepeatReturns204()
     {
         var tenant = await TestApp.CreateTenantAsync("Grant Once", "grant-once");
+        var tokens = await TenantHttp.SignInSystemAdmin();
+
+        var created = await TenantHttp.Send(
+            HttpMethod.Post,
+            $"/tenants/{tenant.PublicId}/reports",
+            tokens.AccessToken,
+            new { reportId = AdviserBalancesId });
+        created.StatusCode.ShouldBe(HttpStatusCode.Created);
+        using (var json = JsonDocument.Parse(await created.Content.ReadAsStringAsync()))
+        {
+            json.RootElement.GetProperty("id").GetGuid().ShouldBe(AdviserBalancesId);
+        }
+
+        var again = await TenantHttp.Send(
+            HttpMethod.Post,
+            $"/tenants/{tenant.PublicId}/reports",
+            tokens.AccessToken,
+            new { reportId = AdviserBalancesId });
+        again.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        (await GrantCountAsync(tenant.Id, AdviserBalancesId)).ShouldBe(1);
+    }
+
+    [Test]
+    public async Task InactiveCatalog_Returns404_AndInsertsNoRow()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Grant Inactive", "grant-inactive");
         var tokens = await TenantHttp.SignInSystemAdmin();
         await SetCatalogActiveAsync(CustomerTransactionsId, active: false);
 
         try
         {
-            var created = await TenantHttp.Send(
+            var response = await TenantHttp.Send(
                 HttpMethod.Post,
                 $"/tenants/{tenant.PublicId}/reports",
                 tokens.AccessToken,
                 new { reportId = CustomerTransactionsId });
-            created.StatusCode.ShouldBe(HttpStatusCode.Created);
-            using (var json = JsonDocument.Parse(await created.Content.ReadAsStringAsync()))
-            {
-                json.RootElement.GetProperty("id").GetGuid().ShouldBe(CustomerTransactionsId);
-            }
-
-            var again = await TenantHttp.Send(
-                HttpMethod.Post,
-                $"/tenants/{tenant.PublicId}/reports",
-                tokens.AccessToken,
-                new { reportId = CustomerTransactionsId });
-            again.StatusCode.ShouldBe(HttpStatusCode.NoContent);
-
-            var list = await TenantHttp.Send(
-                HttpMethod.Get, $"/tenants/{tenant.PublicId}/reports", tokens.AccessToken);
-            using var granted = JsonDocument.Parse(await list.Content.ReadAsStringAsync());
-            var items = granted.RootElement.EnumerateArray().ToList();
-            items.Select(item => item.GetProperty("code").GetString())
-                .ShouldBe(["adviser-balances"]);
-            items.Single().GetProperty("isActive").GetBoolean().ShouldBeTrue();
-            items.Single().GetProperty("granted").GetBoolean().ShouldBeFalse();
+            response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+            (await response.Content.ReadAsStringAsync()).ShouldContain(CustomerTransactionsId.ToString());
+            (await GrantCountAsync(tenant.Id, CustomerTransactionsId)).ShouldBe(0);
         }
         finally
         {
             await SetCatalogActiveAsync(CustomerTransactionsId, active: true);
         }
+    }
+
+    private static readonly Guid AdviserBalancesId = Guid.Parse("5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22");
+
+    private static async Task<int> GrantCountAsync(int tenantId, Guid reportPublicId)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var reportId = await db.Reports.AsNoTracking()
+            .Where(report => report.PublicId == reportPublicId)
+            .Select(report => report.Id)
+            .SingleAsync();
+        return await db.TenantReports.CountAsync(
+            grant => grant.TenantId == tenantId && grant.ReportId == reportId);
     }
 
     private static async Task SetCatalogActiveAsync(Guid reportPublicId, bool active)
