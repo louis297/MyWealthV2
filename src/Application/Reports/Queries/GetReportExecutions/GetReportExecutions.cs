@@ -11,8 +11,11 @@ using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationE
 namespace MyWealthV2.Application.Reports.Queries.GetReportExecutions;
 
 [Authorize(Policy = Policies.ReportsCustomerRead + "," + Policies.ReportsBookRead)]
-public record GetReportExecutionsQuery(int Page = 1, int PageSize = 20, string? Scope = null)
-    : IRequest<PagedList<ReportExecutionDto>>;
+public record GetReportExecutionsQuery(
+    int Page = 1,
+    int PageSize = 20,
+    string? Scope = null,
+    Guid? ReportId = null) : IRequest<PagedList<ReportExecutionDto>>;
 
 public class GetReportExecutionsQueryValidator : AbstractValidator<GetReportExecutionsQuery>
 {
@@ -37,7 +40,9 @@ public class GetReportExecutionsQueryHandler(IApplicationDbContext db, ICurrentU
         var rows = await (
             from execution in db.ReportExecutions.AsNoTracking()
             join report in db.Reports.AsNoTracking() on execution.ReportId equals report.Id
-            where execution.TenantId == tenantId && scopes.Contains(report.Scope)
+            where execution.TenantId == tenantId
+                && scopes.Contains(report.Scope)
+                && (request.ReportId == null || report.PublicId == request.ReportId)
             orderby execution.Created descending, execution.Id descending
             select new
             {
