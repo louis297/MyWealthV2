@@ -76,6 +76,78 @@ public class UpdateReportCatalogTests : TestBase
     }
 
     [Test]
+    public async Task RemoveScheduled_DisablesSchedules_LeavesGrants_AddingItDoesNotReEnable()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Trigger Catalog", "trigger-catalog");
+        var other = await TestApp.CreateTenantAsync("Trigger Other", "trigger-other");
+        var tokens = await TenantHttp.SignInSystemAdmin();
+        await GrantAsync(tokens.AccessToken, tenant.PublicId, CustomerTransactionsId);
+        await GrantAsync(tokens.AccessToken, other.PublicId, CustomerTransactionsId);
+        var first = await InsertScheduleAsync(tenant.Id, CustomerTransactionsId);
+        var second = await InsertScheduleAsync(other.Id, CustomerTransactionsId);
+        var balances = await InsertScheduleAsync(tenant.Id, AdviserBalancesId);
+
+        try
+        {
+            var removed = await TenantHttp.Send(
+                HttpMethod.Put,
+                $"/reports/{CustomerTransactionsId}",
+                tokens.AccessToken,
+                new { allowedTriggers = new[] { "manual" } });
+            removed.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+            (await ScheduleActiveAsync(first)).ShouldBeFalse();
+            (await ScheduleActiveAsync(second)).ShouldBeFalse();
+            (await ScheduleActiveAsync(balances)).ShouldBeTrue();
+            (await GrantCountAsync(tenant.Id, CustomerTransactionsId)).ShouldBe(1);
+            (await GrantCountAsync(other.Id, CustomerTransactionsId)).ShouldBe(1);
+            (await TriggersAsync(CustomerTransactionsId)).ShouldBe(["manual"]);
+
+            var scheduler = FunctionalTestSetup.WebApiServices.GetRequiredService<RecordingReportScheduler>();
+            scheduler.Removed.OrderBy(id => id).ToList()
+                .ShouldBe(new[] { first, second }.OrderBy(id => id).ToList());
+
+            var again = await TenantHttp.Send(
+                HttpMethod.Put,
+                $"/reports/{CustomerTransactionsId}",
+                tokens.AccessToken,
+                new { allowedTriggers = new[] { "manual" } });
+            again.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+            scheduler.Removed.Count.ShouldBe(2);
+
+            var restored = await TenantHttp.Send(
+                HttpMethod.Put,
+                $"/reports/{CustomerTransactionsId}",
+                tokens.AccessToken,
+                new { allowedTriggers = new[] { "manual", "scheduled" } });
+            restored.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+            (await ScheduleActiveAsync(first)).ShouldBeFalse();
+            (await ScheduleActiveAsync(second)).ShouldBeFalse();
+            scheduler.Removed.Count.ShouldBe(2);
+            (await GrantCountAsync(tenant.Id, CustomerTransactionsId)).ShouldBe(1);
+        }
+        finally
+        {
+            await SetAllowedTriggersAsync(CustomerTransactionsId, """["manual","scheduled"]""");
+        }
+    }
+
+    [Test]
+    public async Task UnknownTrigger_Returns400()
+    {
+        var tokens = await TenantHttp.SignInSystemAdmin();
+
+        var response = await TenantHttp.Send(
+            HttpMethod.Put,
+            $"/reports/{CustomerTransactionsId}",
+            tokens.AccessToken,
+            new { allowedTriggers = new[] { "manual", "weekly" } });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await TriggersAsync(CustomerTransactionsId)).ShouldBe(["manual", "scheduled"]);
+    }
+
+    [Test]
     public async Task Disable_RevokesEveryGrant_RemovesHangfire_LeavesRows_EnableRestoresNoGrants()
     {
         var north = await TestApp.CreateTenantAsync("North Catalog", "north-catalog");
@@ -215,6 +287,25 @@ public class UpdateReportCatalogTests : TestBase
         using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         return await db.ReportExecutions.AsNoTracking().AnyAsync(row => row.PublicId == publicId);
+    }
+
+    private static async Task<List<string>> TriggersAsync(Guid reportPublicId)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var json = await db.Reports.AsNoTracking()
+            .Where(report => report.PublicId == reportPublicId)
+            .Select(report => report.AllowedTriggers)
+            .SingleAsync();
+        return JsonSerializer.Deserialize<List<string>>(json) ?? [];
+    }
+
+    private static async Task SetAllowedTriggersAsync(Guid reportPublicId, string json)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE [Reports] SET [AllowedTriggers] = {json} WHERE [PublicId] = {reportPublicId}");
     }
 
     private static async Task SetCatalogActiveAsync(Guid reportPublicId, bool active)
