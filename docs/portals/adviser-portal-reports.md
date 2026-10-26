@@ -173,7 +173,7 @@ Shell nav item labelled “Reports”. Visible to TenantAdmin and Adviser. Syste
 **Reports tab (Generate).**
 
 - Report dropdown: items from `GET /reports?scope=Book`. Empty: “No reports available.”
-- Selecting a report reveals its parameter form and a Generate button (hard-coded per known report). The chosen report stays selected when the user opens Schedules.
+- Selecting a report reveals its parameter form and a Generate button (hard-coded per known report). Switching to Schedules or History clears this selection.
 
 **Generate form (Adviser Balances).**
 
@@ -196,7 +196,7 @@ Adviser submit body:
 
 TenantAdmin submit body includes `"adviserId": "<selected PublicId>"` inside `parameters`. Omitting it as TenantAdmin is a 400; the form must prevent submit until an Adviser is selected.
 
-**Schedules tab.** The Schedules panel from the Customer section, scoped to Book. Schedule create requires the Adviser picker for TenantAdmin and is shown only when the report selected on the Reports tab has `allowedTriggers` that include `"scheduled"`.
+**Schedules tab.** The Schedules panel from the Customer section, scoped to Book. Schedule create uses the Schedule report dropdown on this tab. It is shown only when that report’s `allowedTriggers` includes `"scheduled"`, and it requires the Adviser picker for TenantAdmin. Leaving the tab clears that selection.
 
 **History tab.** The History panel from the Customer section, scoped to Book. The list is `GET /reports/executions?scope=Book` (optional `reportId`). An Adviser sees only executions whose snapshot `adviserId` is self. A TenantAdmin sees the tenant. A run queued from the Reports tab appears in this list.
 
