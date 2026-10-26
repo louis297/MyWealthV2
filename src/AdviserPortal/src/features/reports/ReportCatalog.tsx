@@ -1,8 +1,6 @@
 import type { ReactNode } from "react";
 import { Muted, SelectField } from "@/components/portal";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   useGetReportsQuery,
   type ReportCatalogItem,
@@ -28,7 +26,7 @@ export function ReportCatalog({
   selectedId,
   onSelectedId,
   renderSelected,
-  renderActions,
+  children,
 }: {
   scope: ReportScope;
   title: "h1" | "h2";
@@ -37,7 +35,7 @@ export function ReportCatalog({
   selectedId: string;
   onSelectedId: (id: string) => void;
   renderSelected?: (item: ReportCatalogItem) => ReactNode;
-  renderActions?: (item: ReportCatalogItem) => ReactNode;
+  children?: ReactNode;
 }) {
   const { data, isLoading, isError, refetch } = useGetReportsQuery({ scope });
   const Title = title;
@@ -77,32 +75,9 @@ export function ReportCatalog({
           </SelectField>
           {selected ? <p className="text-sm text-muted-foreground">{selected.function}</p> : null}
           {selected && renderSelected ? renderSelected(selected) : null}
-          {renderActions ? (
-            <Card className="gap-0 py-0">
-              <CardContent className="px-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>{item.name}</TableCell>
-                        <TableCell className="whitespace-normal align-top">
-                          <div className="flex min-w-56 flex-col items-start gap-3">{renderActions(item)}</div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          ) : null}
         </>
       ) : null}
+      {children}
     </section>
   );
 }

@@ -380,12 +380,17 @@ describe("CustomerDetailPage", () => {
     expect(screen.queryByLabelText("From")).not.toBeInTheDocument();
     fireEvent.change(report, { target: { value: customerTransactions.id } });
     expect(screen.getByText(customerTransactions.function)).toBeInTheDocument();
-    expect(screen.getByLabelText("From")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Adviser")).not.toBeInTheDocument();
+    expect(within(generateForm()).getByLabelText("From")).toBeInTheDocument();
+    expect(within(generateForm()).queryByLabelText("Adviser")).not.toBeInTheDocument();
 
     const request = fetchMock.mock.calls
       .map(([input]) => input)
-      .find((input): input is Request => input instanceof Request && input.url.includes("/api/reports"));
+      .find((input): input is Request => {
+        if (!(input instanceof Request)) {
+          return false;
+        }
+        return new URL(input.url).pathname === "/api/reports";
+      });
     expect(request).toBeDefined();
     const url = new URL(request!.url);
     expect(url.pathname).toBe("/api/reports");
@@ -415,13 +420,20 @@ describe("CustomerDetailPage", () => {
   });
 
   it("shows a loading line while the customer report list is in flight", async () => {
-    let release: (response: Response) => void = () => {};
-    const pending = new Promise<Response>((resolve) => {
+    let release: () => void = () => {};
+    const pending = new Promise<void>((resolve) => {
       release = resolve;
     });
-    renderDetail(user(), (url, method) => {
-      if (url.includes("/api/reports") && method === "GET") {
-        return pending;
+    renderDetail(user(), async (url, method) => {
+      if (method === "GET" && new URL(url).pathname === "/api/reports") {
+        await pending;
+        return json([]);
+      }
+      if (url.includes("/reports/executions")) {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.includes("/reports/schedules")) {
+        return json([]);
       }
       if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
         return json(customer);
@@ -430,19 +442,25 @@ describe("CustomerDetailPage", () => {
     });
 
     expect(await screen.findByText("Loading reports…")).toBeInTheDocument();
-    release(json([]));
+    release();
     expect(await screen.findByText("No reports available for this customer.")).toBeInTheDocument();
   });
 
   it("retries a failed customer report list", async () => {
     let reportGets = 0;
     renderDetail(user(), (url, method) => {
-      if (url.includes("/api/reports") && method === "GET") {
+      if (method === "GET" && new URL(url).pathname === "/api/reports") {
         reportGets += 1;
         if (reportGets === 1) {
           return new Response("", { status: 500 });
         }
         return json([customerTransactions]);
+      }
+      if (url.includes("/reports/executions")) {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.includes("/reports/schedules")) {
+        return json([]);
       }
       if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
         return json(customer);
@@ -480,6 +498,10 @@ describe("CustomerDetailPage", () => {
     expect(screen.getByRole("button", { name: "Generate now" })).toBeDisabled();
   });
 
+  function generateForm() {
+    return screen.getByRole("button", { name: "Generate now" }).closest("form") as HTMLElement;
+  }
+
   async function openGenerate(fetchImpl: Parameters<typeof renderDetail>[1]) {
     const rendered = renderDetail(user(), (url, method, body) => {
       if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
@@ -509,15 +531,15 @@ describe("CustomerDetailPage", () => {
       return new Response("", { status: 404 });
     });
 
-    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
-    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-03-31" } });
-    fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
-    expect(screen.getByRole("button", { name: "Generate now" })).toBeDisabled();
+    fireEvent.change(within(generateForm()).getByLabelText("From"), { target: { value: "2026-01-01" } });
+    fireEvent.change(within(generateForm()).getByLabelText("To"), { target: { value: "2026-03-31" } });
+    fireEvent.click(within(generateForm()).getByRole("button", { name: "Generate now" }));
+    expect(within(generateForm()).getByRole("button", { name: "Generate now" })).toBeDisabled();
 
     release(json({ id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" }, 202));
 
     expect(await screen.findByText("Report queued")).toBeInTheDocument();
-    expect(screen.queryByLabelText("From")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Generate now" })).not.toBeInTheDocument();
 
     const request = fetchMock.mock.calls
       .map(([input]) => input)
@@ -546,9 +568,9 @@ describe("CustomerDetailPage", () => {
       return new Response("", { status: 404 });
     });
 
-    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
-    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-03-31" } });
-    fireEvent.click(screen.getByLabelText("Include closed accounts"));
+    fireEvent.change(within(generateForm()).getByLabelText("From"), { target: { value: "2026-01-01" } });
+    fireEvent.change(within(generateForm()).getByLabelText("To"), { target: { value: "2026-03-31" } });
+    fireEvent.click(within(generateForm()).getByLabelText("Include closed accounts"));
     fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
 
     expect(await screen.findByText("Report queued")).toBeInTheDocument();
@@ -571,13 +593,13 @@ describe("CustomerDetailPage", () => {
       return new Response("", { status: 404 });
     });
 
-    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
-    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-03-31" } });
+    fireEvent.change(within(generateForm()).getByLabelText("From"), { target: { value: "2026-01-01" } });
+    fireEvent.change(within(generateForm()).getByLabelText("To"), { target: { value: "2026-03-31" } });
     fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
 
     expect(await screen.findByText("From is required.")).toBeInTheDocument();
     expect(screen.queryByText("Report queued")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("From")).toBeInTheDocument();
+    expect(within(generateForm()).getByLabelText("From")).toBeInTheDocument();
   });
 
   it("shows that a missing report is not available", async () => {
@@ -588,8 +610,8 @@ describe("CustomerDetailPage", () => {
       return new Response("", { status: 404 });
     });
 
-    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
-    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-03-31" } });
+    fireEvent.change(within(generateForm()).getByLabelText("From"), { target: { value: "2026-01-01" } });
+    fireEvent.change(within(generateForm()).getByLabelText("To"), { target: { value: "2026-03-31" } });
     fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
 
     expect(await screen.findByText("Report is not available.")).toBeInTheDocument();
@@ -599,8 +621,8 @@ describe("CustomerDetailPage", () => {
   it("does not submit a customer report when to is before from", async () => {
     const { fetchMock } = await openGenerate(() => new Response("", { status: 404 }));
 
-    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-03-31" } });
-    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-01-01" } });
+    fireEvent.change(within(generateForm()).getByLabelText("From"), { target: { value: "2026-03-31" } });
+    fireEvent.change(within(generateForm()).getByLabelText("To"), { target: { value: "2026-01-01" } });
     fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
 
     expect(await screen.findByText("To must be on or after from.")).toBeInTheDocument();
@@ -629,20 +651,23 @@ describe("CustomerDetailPage", () => {
       return new Response("", { status: 404 });
     });
 
-    fireEvent.click(await screen.findByRole("button", { name: "Schedules" }));
+    expect(screen.queryByRole("button", { name: "Schedules" })).not.toBeInTheDocument();
+    fireEvent.change(await screen.findByLabelText("Report"), { target: { value: customerTransactions.id } });
+    const schedule = (await screen.findByText("Times are sent as chosen. The server interprets the schedule in UTC.")).closest("form");
+    expect(schedule).not.toBeNull();
+    const fields = within(schedule as HTMLElement);
     expect(await screen.findByText("No schedules.")).toBeInTheDocument();
-    expect(screen.getByText("Times are sent as chosen. The server interprets the schedule in UTC.")).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Daily" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Weekly" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Monthly" })).toBeInTheDocument();
+    expect(fields.getByRole("option", { name: "Daily" })).toBeInTheDocument();
+    expect(fields.getByRole("option", { name: "Weekly" })).toBeInTheDocument();
+    expect(fields.getByRole("option", { name: "Monthly" })).toBeInTheDocument();
     expect(document.querySelector('input[name="cron"]')).toBeNull();
     expect(document.querySelector("textarea")).toBeNull();
 
-    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
-    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-03-31" } });
-    fireEvent.change(screen.getByLabelText("Time"), { target: { value: "09:00" } });
-    expect(screen.getByLabelText("Active")).toBeChecked();
-    fireEvent.click(screen.getByRole("button", { name: "Create schedule" }));
+    fireEvent.change(fields.getByLabelText("From"), { target: { value: "2026-01-01" } });
+    fireEvent.change(fields.getByLabelText("To"), { target: { value: "2026-03-31" } });
+    fireEvent.change(fields.getByLabelText("Time"), { target: { value: "09:00" } });
+    expect(fields.getByLabelText("Active")).toBeChecked();
+    fireEvent.click(fields.getByRole("button", { name: "Create schedule" }));
 
     expect(await screen.findByText("Schedule saved")).toBeInTheDocument();
     const request = fetchMock.mock.calls
@@ -705,8 +730,9 @@ describe("CustomerDetailPage", () => {
       return new Response("", { status: 404 });
     });
 
-    fireEvent.click(await screen.findByRole("button", { name: "Schedules" }));
+    expect(await screen.findByLabelText("Schedule report")).toBeInTheDocument();
     expect(await screen.findByText("every day at 09:00")).toBeInTheDocument();
+    expect(screen.getAllByText("Customer Transactions").length).toBeGreaterThan(0);
     expect(screen.queryByText("every Monday at 09:00")).not.toBeInTheDocument();
     expect(screen.queryByText("2026-04-01")).not.toBeInTheDocument();
   });
@@ -744,7 +770,7 @@ describe("CustomerDetailPage", () => {
       return new Response("", { status: 404 });
     });
 
-    fireEvent.click(await screen.findByRole("button", { name: "Schedules" }));
+    fireEvent.change(await screen.findByLabelText("Report"), { target: { value: customerTransactions.id } });
     fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
     fireEvent.change(screen.getByLabelText("Time"), { target: { value: "10:00" } });
     fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
@@ -781,7 +807,6 @@ describe("CustomerDetailPage", () => {
       return new Response("", { status: 404 });
     });
 
-    fireEvent.click(await screen.findByRole("button", { name: "Schedules" }));
     fireEvent.click(await screen.findByRole("button", { name: "Disable schedule" }));
 
     expect(await screen.findByText("Inactive")).toBeInTheDocument();
@@ -956,8 +981,8 @@ describe("CustomerDetailPage", () => {
     });
 
     vi.useFakeTimers();
-    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
-    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-03-31" } });
+    fireEvent.change(within(generateForm()).getByLabelText("From"), { target: { value: "2026-01-01" } });
+    fireEvent.change(within(generateForm()).getByLabelText("To"), { target: { value: "2026-03-31" } });
     fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
@@ -1013,8 +1038,8 @@ describe("CustomerDetailPage", () => {
     });
 
     vi.useFakeTimers();
-    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
-    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-03-31" } });
+    fireEvent.change(within(generateForm()).getByLabelText("From"), { target: { value: "2026-01-01" } });
+    fireEvent.change(within(generateForm()).getByLabelText("To"), { target: { value: "2026-03-31" } });
     fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);

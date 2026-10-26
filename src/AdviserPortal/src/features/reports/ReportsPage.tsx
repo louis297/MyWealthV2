@@ -4,12 +4,15 @@ import { AdviserBalancesGenerate } from "@/features/reports/AdviserBalancesGener
 import { ReportCatalog, ReportParametersUnavailable } from "@/features/reports/ReportCatalog";
 import { ReportHistory } from "@/features/reports/ReportHistory";
 import { ReportSchedules } from "@/features/reports/ReportSchedules";
+import { useGetReportsQuery } from "@/features/reports/reportsApi";
 import { roles } from "@/features/session/roles";
 
 export function ReportsPage() {
   const role = useAppSelector((state) => state.session.currentUser?.role);
   const [selectedId, setSelectedId] = useState("");
   const [focusId, setFocusId] = useState<string | null>(null);
+  const { data: reports = [] } = useGetReportsQuery({ scope: "Book" });
+  const selected = reports.find((item) => item.id === selectedId) ?? null;
   const canGenerate = role === roles.adviser || role === roles.tenantAdmin;
 
   return (
@@ -27,14 +30,9 @@ export function ReportsPage() {
           <ReportParametersUnavailable />
         )
       }
-      renderActions={(item) =>
-        item.code === "adviser-balances" && canGenerate && role ? (
-          <>
-            <ReportSchedules report={item} scope="Book" role={role} />
-            <ReportHistory scope="Book" focusId={focusId} />
-          </>
-        ) : null
-      }
-    />
+    >
+      <ReportSchedules reports={reports} scope="Book" selected={selected} role={role ?? ""} />
+      <ReportHistory scope="Book" focusId={focusId} />
+    </ReportCatalog>
   );
 }

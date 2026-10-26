@@ -47,6 +47,10 @@ function user(overrides: Partial<CurrentUser> = {}): CurrentUser {
   };
 }
 
+function generateForm() {
+  return screen.getByRole("button", { name: "Generate now" }).closest("form") as HTMLElement;
+}
+
 function renderReports(
   me: CurrentUser,
   fetchImpl: (url: string, method: string) => Response | Promise<Response>,
@@ -104,12 +108,17 @@ describe("ReportsPage", () => {
     expect(screen.queryByLabelText("Include closed accounts")).not.toBeInTheDocument();
     fireEvent.change(report, { target: { value: adviserBalances.id } });
     expect(screen.getByText(adviserBalances.function)).toBeInTheDocument();
-    expect(screen.getByLabelText("Include closed accounts")).toBeInTheDocument();
-    expect(screen.queryByLabelText("From")).not.toBeInTheDocument();
+    expect(within(generateForm()).getByLabelText("Include closed accounts")).toBeInTheDocument();
+    expect(within(generateForm()).queryByLabelText("From")).not.toBeInTheDocument();
 
     const request = fetchMock.mock.calls
       .map(([input]) => input)
-      .find((input): input is Request => input instanceof Request && input.url.includes("/api/reports"));
+      .find((input): input is Request => {
+        if (!(input instanceof Request)) {
+          return false;
+        }
+        return new URL(input.url).pathname === "/api/reports";
+      });
     expect(request).toBeDefined();
     const url = new URL(request!.url);
     expect(url.pathname).toBe("/api/reports");
@@ -136,31 +145,44 @@ describe("ReportsPage", () => {
   });
 
   it("shows a loading line while the book report list is in flight", async () => {
-    let release: (response: Response) => void = () => {};
-    const pending = new Promise<Response>((resolve) => {
+    let release: () => void = () => {};
+    const pending = new Promise<void>((resolve) => {
       release = resolve;
     });
-    renderReports(user(), (url) => {
-      if (url.includes("/api/reports")) {
-        return pending;
+    renderReports(user(), async (url) => {
+      if (new URL(url).pathname === "/api/reports") {
+        await pending;
+        return json([]);
+      }
+      if (url.includes("/reports/executions")) {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.includes("/reports/schedules")) {
+        return json([]);
       }
       return new Response("", { status: 404 });
     });
 
     expect(await screen.findByText("Loading reports…")).toBeInTheDocument();
-    release(json([]));
+    release();
     expect(await screen.findByText("No reports available.")).toBeInTheDocument();
   });
 
   it("retries a failed book report list", async () => {
     let reportGets = 0;
     renderReports(user(), (url) => {
-      if (url.includes("/api/reports")) {
+      if (new URL(url).pathname === "/api/reports") {
         reportGets += 1;
         if (reportGets === 1) {
           return new Response("", { status: 500 });
         }
         return json([adviserBalances]);
+      }
+      if (url.includes("/reports/executions")) {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.includes("/reports/schedules")) {
+        return json([]);
       }
       return new Response("", { status: 404 });
     });
@@ -215,7 +237,7 @@ describe("ReportsPage", () => {
     expect(screen.queryByLabelText("Include closed accounts")).not.toBeInTheDocument();
     fireEvent.change(report, { target: { value: adviserBalances.id } });
     expect(screen.queryByLabelText("Adviser")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Include closed accounts")).not.toBeChecked();
+    expect(within(generateForm()).getByLabelText("Include closed accounts")).not.toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
 
     expect(await screen.findByText("Report queued")).toBeInTheDocument();
@@ -275,10 +297,10 @@ describe("ReportsPage", () => {
     });
 
     fireEvent.change(await screen.findByLabelText("Report"), { target: { value: adviserBalances.id } });
-    const adviser = screen.getByLabelText("Adviser");
+    const adviser = within(generateForm()).getByLabelText("Adviser");
     expect(adviser).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Generate now" })).toBeDisabled();
-    expect(await screen.findByRole("option", { name: "Sam Reed" })).toBeInTheDocument();
+    expect(within(generateForm()).getByRole("button", { name: "Generate now" })).toBeDisabled();
+    expect(await within(generateForm()).findByRole("option", { name: "Sam Reed" })).toBeInTheDocument();
 
     fireEvent.change(adviser, { target: { value: samId } });
     fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
@@ -332,7 +354,9 @@ describe("ReportsPage", () => {
       },
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "Schedules" }));
+    expect(screen.queryByRole("button", { name: "Schedules" })).not.toBeInTheDocument();
+    fireEvent.change(await screen.findByLabelText("Report"), { target: { value: adviserBalances.id } });
+    expect(await screen.findByRole("heading", { name: "Schedules" })).toBeInTheDocument();
     expect(screen.queryByLabelText("Adviser")).not.toBeInTheDocument();
     expect(document.querySelector('input[name="cron"]')).toBeNull();
     fireEvent.change(screen.getByLabelText("Time"), { target: { value: "09:00" } });
@@ -387,10 +411,12 @@ describe("ReportsPage", () => {
       return new Response("", { status: 404 });
     });
 
-    fireEvent.click(await screen.findByRole("button", { name: "Schedules" }));
-    expect(screen.getByRole("button", { name: "Create schedule" })).toBeDisabled();
-    expect(await screen.findByRole("option", { name: "Sam Reed" })).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Adviser"), { target: { value: samId } });
+    fireEvent.change(await screen.findByLabelText("Report"), { target: { value: adviserBalances.id } });
+    const schedule = (await screen.findByText("Times are sent as chosen. The server interprets the schedule in UTC.")).closest("form");
+    expect(schedule).not.toBeNull();
+    expect(within(schedule as HTMLElement).getByRole("button", { name: "Create schedule" })).toBeDisabled();
+    expect(await within(schedule as HTMLElement).findByRole("option", { name: "Sam Reed" })).toBeInTheDocument();
+    fireEvent.change(within(schedule as HTMLElement).getByLabelText("Adviser"), { target: { value: samId } });
     fireEvent.change(screen.getByLabelText("Time"), { target: { value: "09:00" } });
     fireEvent.click(screen.getByRole("button", { name: "Create schedule" }));
 
@@ -404,6 +430,36 @@ describe("ReportsPage", () => {
       cron: "0 9 * * *",
       isActive: true,
     });
+  });
+
+  it("hides schedule create and edit when the report is manual only", async () => {
+    const manualOnly = { ...adviserBalances, allowedTriggers: ["manual"] };
+    renderReports(user({ role: "adviser", name: "Sam Reed" }), (url, method) => {
+      if (url.includes("/reports/schedules") && method === "GET") {
+        return json([
+          {
+            id: "ssssssss-ssss-ssss-ssss-ssssssssssss",
+            reportId: manualOnly.id,
+            parameters: { includeClosedAccounts: false },
+            cron: "0 9 * * *",
+            isActive: true,
+            rowVersion: "AAAA",
+          },
+        ]);
+      }
+      if (url.includes("/api/reports") && method === "GET" && !url.includes("/executions")) {
+        return json([manualOnly]);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByRole("heading", { name: "Schedules" })).toBeInTheDocument();
+    expect(await screen.findByText("every day at 09:00")).toBeInTheDocument();
+    expect(screen.getAllByText("Adviser Balances").length).toBeGreaterThan(0);
+    fireEvent.change(screen.getByLabelText("Report"), { target: { value: manualOnly.id } });
+    expect(screen.queryByRole("button", { name: "Create schedule" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Disable schedule" })).toBeInTheDocument();
   });
 
   it("loads book execution history", async () => {

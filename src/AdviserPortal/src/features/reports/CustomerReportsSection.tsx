@@ -4,11 +4,14 @@ import { CustomerTransactionsGenerate } from "@/features/reports/CustomerTransac
 import { ReportCatalog, ReportParametersUnavailable } from "@/features/reports/ReportCatalog";
 import { ReportHistory } from "@/features/reports/ReportHistory";
 import { ReportSchedules } from "@/features/reports/ReportSchedules";
+import { useGetReportsQuery } from "@/features/reports/reportsApi";
 
 export function CustomerReportsSection({ customerId }: { customerId: string }) {
   const role = useAppSelector((state) => state.session.currentUser?.role) ?? "";
   const [selectedId, setSelectedId] = useState("");
   const [focusId, setFocusId] = useState<string | null>(null);
+  const { data: reports = [] } = useGetReportsQuery({ scope: "Customer" });
+  const selected = reports.find((item) => item.id === selectedId) ?? null;
 
   return (
     <ReportCatalog
@@ -25,14 +28,15 @@ export function CustomerReportsSection({ customerId }: { customerId: string }) {
           <ReportParametersUnavailable />
         )
       }
-      renderActions={(item) =>
-        item.code === "customer-transactions" ? (
-          <>
-            <ReportSchedules report={item} scope="Customer" customerId={customerId} role={role} />
-            <ReportHistory scope="Customer" focusId={focusId} />
-          </>
-        ) : null
-      }
-    />
+    >
+      <ReportSchedules
+        reports={reports}
+        scope="Customer"
+        selected={selected}
+        customerId={customerId}
+        role={role}
+      />
+      <ReportHistory scope="Customer" focusId={focusId} />
+    </ReportCatalog>
   );
 }
