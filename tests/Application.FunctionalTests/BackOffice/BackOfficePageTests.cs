@@ -66,27 +66,38 @@ public class BackOfficePageTests
     }
 
     [Test]
-    public async Task Configuration_ListsEachReport_WithEnableOrDisable_AndDoesNotOfferRunOrSchedule()
+    public async Task Configuration_ListsActiveReports_HidesInactive_AndDoesNotOfferRunOrSchedule()
     {
         var body = await GetAsync($"/tenants/{TenantId}/config");
 
-        var customerAt = body.IndexOf("customer-transactions", StringComparison.Ordinal);
-        var adviserAt = body.IndexOf("adviser-balances", StringComparison.Ordinal);
-        var grantedAt = body.IndexOf(">Granted<", StringComparison.Ordinal);
-        var notGrantedAt = body.IndexOf(">Not granted<", StringComparison.Ordinal);
-        var disableAt = body.IndexOf(">Disable<", StringComparison.Ordinal);
-        var enableAt = body.IndexOf(">Enable<", StringComparison.Ordinal);
-        customerAt.ShouldBeGreaterThanOrEqualTo(0);
-        adviserAt.ShouldBeGreaterThan(customerAt);
-        grantedAt.ShouldBeGreaterThan(customerAt);
-        grantedAt.ShouldBeLessThan(adviserAt);
-        disableAt.ShouldBeGreaterThan(grantedAt);
-        disableAt.ShouldBeLessThan(adviserAt);
-        notGrantedAt.ShouldBeGreaterThan(adviserAt);
-        enableAt.ShouldBeGreaterThan(notGrantedAt);
+        body.ShouldContain("customer-transactions");
+        body.ShouldContain(">Granted<");
+        body.ShouldContain(">Disable<");
+        body.ShouldNotContain("adviser-balances");
+        body.ShouldNotContain(">Not granted<");
+        body.ShouldNotContain(">Catalog<");
         body.ShouldNotContain("Report id");
         body.ShouldNotContain(">Grant<");
         body.ShouldNotContain(">Revoke<");
+        body.ShouldNotContain(">Run<");
+        body.ShouldNotContain(">Schedule<");
+        body.ShouldNotContain("/reports/request");
+        body.ShouldNotContain("/reports/schedules");
+    }
+
+    [Test]
+    public async Task ReportsPage_ListsCatalog_IncludingInactive_AndDoesNotOfferRunOrSchedule()
+    {
+        var body = await GetAsync("/reports");
+
+        var customerAt = body.IndexOf("customer-transactions", StringComparison.Ordinal);
+        var adviserAt = body.IndexOf("adviser-balances", StringComparison.Ordinal);
+        customerAt.ShouldBeGreaterThanOrEqualTo(0);
+        adviserAt.ShouldBeGreaterThan(customerAt);
+        body.ShouldContain(">Active<");
+        body.ShouldContain(">Inactive<");
+        body.ShouldContain("manual");
+        body.ShouldContain("scheduled");
         body.ShouldNotContain(">Run<");
         body.ShouldNotContain(">Schedule<");
         body.ShouldNotContain("/reports/request");
