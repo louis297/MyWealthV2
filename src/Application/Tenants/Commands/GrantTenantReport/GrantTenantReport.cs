@@ -30,6 +30,10 @@ public class GrantTenantReportCommandHandler(IApplicationDbContext db)
         var report = await db.Reports.AsNoTracking()
                          .SingleOrDefaultAsync(row => row.PublicId == request.ReportId, cancellationToken)
                      ?? throw new NotFoundException("Report", request.ReportId);
+        if (!report.IsActive)
+        {
+            throw new NotFoundException("Report", report.PublicId);
+        }
 
         var existing = await db.TenantReports.AsNoTracking()
             .AnyAsync(row => row.TenantId == tenant.Id && row.ReportId == report.Id, cancellationToken);
