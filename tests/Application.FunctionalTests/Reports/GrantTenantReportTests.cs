@@ -81,35 +81,39 @@ public class GrantTenantReportTests : TestBase
         var tokens = await TenantHttp.SignInSystemAdmin();
         await SetCatalogActiveAsync(CustomerTransactionsId, active: false);
 
-        var created = await TenantHttp.Send(
-            HttpMethod.Post,
-            $"/tenants/{tenant.PublicId}/reports",
-            tokens.AccessToken,
-            new { reportId = CustomerTransactionsId });
-        created.StatusCode.ShouldBe(HttpStatusCode.Created);
-        using (var json = JsonDocument.Parse(await created.Content.ReadAsStringAsync()))
+        try
         {
-            json.RootElement.GetProperty("id").GetGuid().ShouldBe(CustomerTransactionsId);
+            var created = await TenantHttp.Send(
+                HttpMethod.Post,
+                $"/tenants/{tenant.PublicId}/reports",
+                tokens.AccessToken,
+                new { reportId = CustomerTransactionsId });
+            created.StatusCode.ShouldBe(HttpStatusCode.Created);
+            using (var json = JsonDocument.Parse(await created.Content.ReadAsStringAsync()))
+            {
+                json.RootElement.GetProperty("id").GetGuid().ShouldBe(CustomerTransactionsId);
+            }
+
+            var again = await TenantHttp.Send(
+                HttpMethod.Post,
+                $"/tenants/{tenant.PublicId}/reports",
+                tokens.AccessToken,
+                new { reportId = CustomerTransactionsId });
+            again.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+            var list = await TenantHttp.Send(
+                HttpMethod.Get, $"/tenants/{tenant.PublicId}/reports", tokens.AccessToken);
+            using var granted = JsonDocument.Parse(await list.Content.ReadAsStringAsync());
+            var items = granted.RootElement.EnumerateArray().ToList();
+            items.Select(item => item.GetProperty("code").GetString())
+                .ShouldBe(["adviser-balances"]);
+            items.Single().GetProperty("isActive").GetBoolean().ShouldBeTrue();
+            items.Single().GetProperty("granted").GetBoolean().ShouldBeFalse();
         }
-
-        var again = await TenantHttp.Send(
-            HttpMethod.Post,
-            $"/tenants/{tenant.PublicId}/reports",
-            tokens.AccessToken,
-            new { reportId = CustomerTransactionsId });
-        again.StatusCode.ShouldBe(HttpStatusCode.NoContent);
-
-        var list = await TenantHttp.Send(
-            HttpMethod.Get, $"/tenants/{tenant.PublicId}/reports", tokens.AccessToken);
-        using var granted = JsonDocument.Parse(await list.Content.ReadAsStringAsync());
-        var items = granted.RootElement.EnumerateArray().ToList();
-        items.Select(item => item.GetProperty("code").GetString())
-            .ShouldBe(["adviser-balances", "customer-transactions"]);
-        var customer = items.Single(item => item.GetProperty("id").GetGuid() == CustomerTransactionsId);
-        customer.GetProperty("isActive").GetBoolean().ShouldBeFalse();
-        customer.GetProperty("granted").GetBoolean().ShouldBeTrue();
-        items.Single(item => item.GetProperty("code").GetString() == "adviser-balances")
-            .GetProperty("granted").GetBoolean().ShouldBeFalse();
+        finally
+        {
+            await SetCatalogActiveAsync(CustomerTransactionsId, active: true);
+        }
     }
 
     private static async Task SetCatalogActiveAsync(Guid reportPublicId, bool active)

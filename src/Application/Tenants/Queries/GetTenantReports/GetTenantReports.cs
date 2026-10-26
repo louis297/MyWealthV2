@@ -20,6 +20,7 @@ public class GetTenantReportsQueryHandler(IApplicationDbContext db)
                      ?? throw new NotFoundException("Tenant", request.TenantId);
 
         var reports = await db.Reports.AsNoTracking()
+            .Where(report => report.IsActive)
             .OrderBy(report => report.Code)
             .ToListAsync(cancellationToken);
         var grantedReportIds = (await db.TenantReports.AsNoTracking()
