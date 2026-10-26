@@ -278,6 +278,7 @@ describe("ReportsPage", () => {
     const adviser = screen.getByLabelText("Adviser");
     expect(adviser).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Generate now" })).toBeDisabled();
+    expect(await screen.findByRole("option", { name: "Sam Reed" })).toBeInTheDocument();
 
     fireEvent.change(adviser, { target: { value: samId } });
     fireEvent.click(screen.getByRole("button", { name: "Generate now" }));
@@ -388,6 +389,7 @@ describe("ReportsPage", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Schedules" }));
     expect(screen.getByRole("button", { name: "Create schedule" })).toBeDisabled();
+    expect(await screen.findByRole("option", { name: "Sam Reed" })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Adviser"), { target: { value: samId } });
     fireEvent.change(screen.getByLabelText("Time"), { target: { value: "09:00" } });
     fireEvent.click(screen.getByRole("button", { name: "Create schedule" }));

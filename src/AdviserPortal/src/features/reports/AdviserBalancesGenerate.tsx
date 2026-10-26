@@ -19,7 +19,6 @@ export function AdviserBalancesGenerate({
     { page: 1, pageSize: 100, enabledOnly: true },
     { skip: !needsAdviser },
   );
-  const [open, setOpen] = useState(false);
   const [adviserId, setAdviserId] = useState("");
   const [includeClosedAccounts, setIncludeClosedAccounts] = useState(false);
   const [queued, setQueued] = useState(false);
@@ -36,52 +35,38 @@ export function AdviserBalancesGenerate({
       reportId,
       parameters: needsAdviser ? { adviserId, includeClosedAccounts } : { includeClosedAccounts },
     }).unwrap();
-    setOpen(false);
     setQueued(true);
     onQueued?.(created.id);
   }
 
+  if (queued) {
+    return <p className="text-sm text-muted-foreground">Report queued</p>;
+  }
+
   return (
-    <div className="flex flex-col items-start gap-2">
-      {queued ? <p className="text-sm text-muted-foreground">Report queued</p> : null}
-      {open ? (
-        <form className="flex w-full flex-col gap-3 rounded-lg bg-muted/40 p-3" onSubmit={(event) => void onSubmit(event)}>
-          {needsAdviser ? (
-            <SelectField
-              id={`adviser-${reportId}`}
-              label="Adviser"
-              value={adviserId}
-              onChange={(event) => setAdviserId(event.target.value)}
-              required
-            >
-              <option value="">Select an adviser</option>
-              {advisers?.items.map((adviser) => (
-                <option key={adviser.id} value={adviser.id}>
-                  {adviser.name}
-                </option>
-              ))}
-            </SelectField>
-          ) : null}
-          <CheckField checked={includeClosedAccounts} onChange={(event) => setIncludeClosedAccounts(event.target.checked)}>
-            Include closed accounts
-          </CheckField>
-          <Button type="submit" variant="outline" size="sm" disabled={isLoading || blocked}>
-            Generate now
-          </Button>
-        </form>
-      ) : (
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => {
-            setQueued(false);
-            setOpen(true);
-          }}
+    <form className="flex w-full flex-col gap-3 rounded-lg bg-muted/40 p-3" onSubmit={(event) => void onSubmit(event)}>
+      {needsAdviser ? (
+        <SelectField
+          id={`adviser-${reportId}`}
+          label="Adviser"
+          value={adviserId}
+          onChange={(event) => setAdviserId(event.target.value)}
+          required
         >
-          Generate now
-        </Button>
-      )}
-    </div>
+          <option value="">Select an adviser</option>
+          {advisers?.items.map((adviser) => (
+            <option key={adviser.id} value={adviser.id}>
+              {adviser.name}
+            </option>
+          ))}
+        </SelectField>
+      ) : null}
+      <CheckField checked={includeClosedAccounts} onChange={(event) => setIncludeClosedAccounts(event.target.checked)}>
+        Include closed accounts
+      </CheckField>
+      <Button type="submit" variant="outline" size="sm" disabled={isLoading || blocked}>
+        Generate now
+      </Button>
+    </form>
   );
 }

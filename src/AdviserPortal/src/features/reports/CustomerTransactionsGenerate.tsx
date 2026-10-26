@@ -30,7 +30,6 @@ export function CustomerTransactionsGenerate({
   customerId: string;
   onQueued?: (executionId: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [includeClosedAccounts, setIncludeClosedAccounts] = useState(false);
@@ -56,7 +55,6 @@ export function CustomerTransactionsGenerate({
         },
       }).unwrap();
       setMessages([]);
-      setOpen(false);
       setQueued(true);
       onQueued?.(created.id);
     } catch (error: unknown) {
@@ -69,47 +67,35 @@ export function CustomerTransactionsGenerate({
     }
   }
 
+  if (queued) {
+    return <p className="text-sm text-muted-foreground">Report queued</p>;
+  }
+
   return (
-    <div className="flex flex-col items-start gap-2">
-      {queued ? <p className="text-sm text-muted-foreground">Report queued</p> : null}
-      {open ? (
-        <form className="flex w-full flex-col gap-3 rounded-lg bg-muted/40 p-3" onSubmit={(event) => void onSubmit(event)}>
-          <Messages messages={messages} />
-          <TextField
-            id={`from-${reportId}`}
-            label="From"
-            type="date"
-            value={from}
-            onChange={(event) => setFrom(event.target.value)}
-            required
-          />
-          <TextField
-            id={`to-${reportId}`}
-            label="To"
-            type="date"
-            value={to}
-            onChange={(event) => setTo(event.target.value)}
-            required
-          />
-          <CheckField checked={includeClosedAccounts} onChange={(event) => setIncludeClosedAccounts(event.target.checked)}>
-            Include closed accounts
-          </CheckField>
-          <Button type="submit" size="sm" disabled={isLoading}>
-            Generate now
-          </Button>
-        </form>
-      ) : (
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => {
-            setQueued(false);
-            setOpen(true);
-          }}
-        >
-          Generate now
-        </Button>
-      )}
-    </div>
+    <form className="flex w-full flex-col gap-3 rounded-lg bg-muted/40 p-3" onSubmit={(event) => void onSubmit(event)}>
+      <Messages messages={messages} />
+      <TextField
+        id={`from-${reportId}`}
+        label="From"
+        type="date"
+        value={from}
+        onChange={(event) => setFrom(event.target.value)}
+        required
+      />
+      <TextField
+        id={`to-${reportId}`}
+        label="To"
+        type="date"
+        value={to}
+        onChange={(event) => setTo(event.target.value)}
+        required
+      />
+      <CheckField checked={includeClosedAccounts} onChange={(event) => setIncludeClosedAccounts(event.target.checked)}>
+        Include closed accounts
+      </CheckField>
+      <Button type="submit" size="sm" disabled={isLoading}>
+        Generate now
+      </Button>
+    </form>
   );
 }
