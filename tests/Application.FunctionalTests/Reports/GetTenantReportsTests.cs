@@ -57,7 +57,7 @@ public class GetTenantReportsTests : TestBase
     }
 
     [Test]
-    public async Task List_ReturnsEveryCatalogRow_WithGrantState_IncludingInactive()
+    public async Task List_ReturnsActiveCatalogRows_OmitsInactive_WithGrantState()
     {
         var tenant = await TestApp.CreateTenantAsync("North Grants", "north-grants");
         var tokens = await TenantHttp.SignInSystemAdmin();
@@ -67,6 +67,7 @@ public class GetTenantReportsTests : TestBase
             await SetCatalogActiveAsync(CustomerTransactionsId, active: false);
             var other = await TestApp.CreateTenantAsync("Other Grants", "other-grants");
             await GrantAsync(other.Id, AdviserBalancesId);
+            await GrantAsync(tenant.Id, CustomerTransactionsId);
 
             var before = await TenantHttp.Send(
                 HttpMethod.Get, $"/tenants/{tenant.PublicId}/reports", tokens.AccessToken);
@@ -74,43 +75,31 @@ public class GetTenantReportsTests : TestBase
             using (var json = JsonDocument.Parse(await before.Content.ReadAsStringAsync()))
             {
                 var items = json.RootElement.EnumerateArray().ToList();
-                items.Count.ShouldBe(await CatalogCountAsync());
                 items.Select(item => item.GetProperty("code").GetString())
-                    .ShouldBe(["adviser-balances", "customer-transactions"]);
+                    .ShouldBe(["adviser-balances"]);
+                items.ShouldAllBe(item => item.GetProperty("isActive").GetBoolean());
                 items.ShouldAllBe(item => item.GetProperty("granted").GetBoolean() == false);
 
                 var adviser = items[0];
                 adviser.GetProperty("id").GetGuid().ShouldBe(AdviserBalancesId);
                 adviser.GetProperty("name").GetString().ShouldBe("Adviser Balances Report");
+                adviser.GetProperty("function").GetString().ShouldBe("Point-in-time cash and holding lines for an adviser's customers.");
                 adviser.GetProperty("scope").GetString().ShouldBe("Book");
-                adviser.GetProperty("isActive").GetBoolean().ShouldBeTrue();
+                adviser.GetProperty("allowedTriggers").EnumerateArray().Select(trigger => trigger.GetString())
+                    .ShouldBe(["manual", "scheduled"]);
                 adviser.TryGetProperty("isGranted", out _).ShouldBeFalse();
                 adviser.TryGetProperty("tenantId", out _).ShouldBeFalse();
-
-                var customer = items[1];
-                customer.GetProperty("id").GetGuid().ShouldBe(CustomerTransactionsId);
-                customer.GetProperty("name").GetString().ShouldBe("Customer Transactions Report");
-                customer.GetProperty("function").GetString().ShouldBe("Transactions in a date range for one customer.");
-                customer.GetProperty("scope").GetString().ShouldBe("Customer");
-                customer.GetProperty("isActive").GetBoolean().ShouldBeFalse();
-                customer.GetProperty("allowedTriggers").EnumerateArray().Select(trigger => trigger.GetString())
-                    .ShouldBe(["manual", "scheduled"]);
             }
 
-            await GrantAsync(tenant.Id, CustomerTransactionsId);
+            await GrantAsync(tenant.Id, AdviserBalancesId);
 
             var after = await TenantHttp.Send(
                 HttpMethod.Get, $"/tenants/{tenant.PublicId}/reports", tokens.AccessToken);
             after.StatusCode.ShouldBe(HttpStatusCode.OK);
             using var granted = JsonDocument.Parse(await after.Content.ReadAsStringAsync());
-            var grantedCustomer = granted.RootElement.EnumerateArray()
-                .Single(item => item.GetProperty("id").GetGuid() == CustomerTransactionsId);
-            granted.RootElement.GetArrayLength().ShouldBe(await CatalogCountAsync());
-            grantedCustomer.GetProperty("isActive").GetBoolean().ShouldBeFalse();
-            grantedCustomer.GetProperty("granted").GetBoolean().ShouldBeTrue();
-            granted.RootElement.EnumerateArray()
-                .Single(item => item.GetProperty("id").GetGuid() == AdviserBalancesId)
-                .GetProperty("granted").GetBoolean().ShouldBeFalse();
+            var rows = granted.RootElement.EnumerateArray().ToList();
+            rows.Select(item => item.GetProperty("code").GetString()).ShouldBe(["adviser-balances"]);
+            rows.Single().GetProperty("granted").GetBoolean().ShouldBeTrue();
         }
         finally
         {
@@ -130,13 +119,6 @@ public class GetTenantReportsTests : TestBase
             INSERT INTO [TenantReports] ([TenantId], [ReportId])
             SELECT {tenantId}, [Id] FROM [Reports] WHERE [PublicId] = {reportPublicId}
             """);
-    }
-
-    private static async Task<int> CatalogCountAsync()
-    {
-        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        return await db.Reports.CountAsync();
     }
 
     private static async Task SetCatalogActiveAsync(Guid reportPublicId, bool active)
