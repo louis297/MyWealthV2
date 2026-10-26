@@ -1,9 +1,27 @@
 import { type FormEvent, useState } from "react";
-import { CheckField, SelectField } from "@/components/portal";
+import { CheckField, Messages, SelectField } from "@/components/portal";
 import { Button } from "@/components/ui/button";
 import { useGetAdvisersQuery } from "@/features/advisers/advisersApi";
 import { useRequestReportMutation } from "@/features/reports/reportsApi";
 import { roles } from "@/features/session/roles";
+
+function isStatus(error: unknown, status: number) {
+  return typeof error === "object" && error !== null && "status" in error && error.status === status;
+}
+
+function problemMessages(error: unknown): string[] {
+  if (typeof error !== "object" || error === null || !("data" in error)) {
+    return [];
+  }
+  const data = (error as { data?: { errors?: Record<string, string[]>; detail?: string } }).data;
+  if (data?.errors) {
+    return Object.values(data.errors).flat();
+  }
+  if (data?.detail) {
+    return [data.detail];
+  }
+  return [];
+}
 
 export function AdviserBalancesGenerate({
   reportId,
@@ -21,6 +39,7 @@ export function AdviserBalancesGenerate({
   );
   const [adviserId, setAdviserId] = useState("");
   const [includeClosedAccounts, setIncludeClosedAccounts] = useState(false);
+  const [messages, setMessages] = useState<string[]>([]);
   const [queued, setQueued] = useState(false);
   const [requestReport, { isLoading }] = useRequestReportMutation();
   const blocked = needsAdviser && adviserId === "";
@@ -31,12 +50,22 @@ export function AdviserBalancesGenerate({
       return;
     }
 
-    const created = await requestReport({
-      reportId,
-      parameters: needsAdviser ? { adviserId, includeClosedAccounts } : { includeClosedAccounts },
-    }).unwrap();
-    setQueued(true);
-    onQueued?.(created.id);
+    try {
+      const created = await requestReport({
+        reportId,
+        parameters: needsAdviser ? { adviserId, includeClosedAccounts } : { includeClosedAccounts },
+      }).unwrap();
+      setMessages([]);
+      setQueued(true);
+      onQueued?.(created.id);
+    } catch (error: unknown) {
+      setQueued(false);
+      if (isStatus(error, 404)) {
+        setMessages(["Report is not available."]);
+        return;
+      }
+      setMessages(problemMessages(error));
+    }
   }
 
   if (queued) {
@@ -45,6 +74,7 @@ export function AdviserBalancesGenerate({
 
   return (
     <form className="flex w-full flex-col gap-3 rounded-lg bg-muted/40 p-3" onSubmit={(event) => void onSubmit(event)}>
+      <Messages messages={messages} />
       {needsAdviser ? (
         <SelectField
           id={`adviser-${reportId}`}
