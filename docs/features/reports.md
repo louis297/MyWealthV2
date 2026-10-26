@@ -55,7 +55,9 @@ A shared request pipeline checks the coarse policy, the tenant grant, and allowe
 
 - Report catalog (`Reports`): platform table. PublicId (external), Code (stable internal key), Name, Function, Scope, AllowedTriggers, IsActive. No tenant column.
 - Tenant–report grant (`TenantReports`): a row must exist before the tenant can use the report. Generator checks Report.IsActive **and** the TenantReport row.
-- Catalog IsActive write: SystemAdmin may set `Reports.IsActive`. Setting it to false cascades a revoke of every `TenantReports` row for that report (Hangfire recurring jobs removed; schedule and execution rows stay). Setting it back to true does not restore any grants.
+- Tenant grant list returns active catalog rows only. Granting a platform-inactive report is 404 and inserts no row.
+- Catalog IsActive write: SystemAdmin may set `Reports.IsActive`. Setting it to false cascades a revoke of every `TenantReports` row for that report (Hangfire recurring jobs removed; schedule and execution rows stay). Setting it back to true does not restore any grants. The report then reappears on each tenant grant list as not granted.
+- Platform catalog read: `GET /reports/catalog` (`tenants.manage`) returns every catalog row, including inactive. It is not `GET /reports`.
 - Catalog AllowedTriggers write: SystemAdmin may set `Reports.AllowedTriggers`. Removing `"scheduled"` disables every existing schedule for that report (sets `ReportSchedule.IsActive` false and removes the Hangfire job) but leaves the rows and does not revoke grants. Adding `"scheduled"` does not re-enable those schedules.
 - `ReportSchedule`: must name `ReportId`; carries the parameters the report requires; editable (cron, active flag).
 - `ReportExecution`: one run (manual, scheduled, or event).
@@ -96,7 +98,7 @@ Note: Customer has `reports.customer.read` but no first-phase UI. The policy exi
 2. As an Adviser I open the Reports tab and see Book-scoped reports; I can generate now or create a schedule for my own book.
 3. As a TenantAdmin I can do the same, and on Book-scoped reports I can select a subordinate Adviser.
 4. As a Customer (API) I can list and download Customer-scoped executions that target me; I cannot create or schedule.
-5. As a SystemAdmin I see every catalog report for a tenant, including inactive rows, and enable or disable each one. Back Office tenant configuration does this. Scalar calls the same verbs.
+5. As a SystemAdmin I see every active catalog report for a tenant and enable or disable each one. A platform-inactive report is not on that list. Platform catalog configuration is the Back Office `/reports` page (`GET /reports/catalog`, `PUT /reports/{id}`). Scalar calls the same verbs.
 6. As any allowed caller I can change or disable a schedule; the next Hangfire run uses the new definition.
 7. As the system, when a registered event occurs, I can enqueue an execution for a report that allows it and that the tenant has been granted.
 
@@ -120,8 +122,9 @@ Note: Customer has `reports.customer.read` but no first-phase UI. The policy exi
 | R12 | Only succeeded executions expose a download. |
 | R13 | Customer Transactions Report: `customerId` + `from` + `to` required; `includeClosedAccounts` defaults false; reversals marked and placed next to the original. |
 | R14 | Adviser Balances Report: server sets `asOf` at job creation; zero-balance accounts omitted; holdings with quantity ≤ 0 omitted; `includeClosedAccounts` defaults false; subtotals required; Adviser may omit `adviserId`, other roles may not. |
-| R15 | Catalog `IsActive` may be written by SystemAdmin (`tenants.manage`). Transition to false revokes every `TenantReports` row for that report (Hangfire jobs removed; `ReportSchedule` and `ReportExecution` rows stay). Transition to true restores no grants. |
+| R15 | Catalog `IsActive` may be written by SystemAdmin (`tenants.manage`). Transition to false revokes every `TenantReports` row for that report (Hangfire jobs removed; `ReportSchedule` and `ReportExecution` rows stay; schedule `IsActive` is unchanged). Transition to true restores no grants. |
 | R16 | Catalog `AllowedTriggers` may be written by SystemAdmin (`tenants.manage`). Removing `"scheduled"` disables every existing schedule for that report (IsActive false + Hangfire RemoveIfExists) but leaves the rows and does not revoke grants. Adding `"scheduled"` does not re-enable those schedules. |
+| R17 | `GET /tenants/{tenantId}/reports` returns active catalog rows only. Granting a platform-inactive report is 404 and inserts no row. `GET /reports/catalog` returns every catalog row, including inactive, and has no `granted` field. |
 
 ---
 
@@ -139,7 +142,8 @@ Invariants:
 - A schedule references exactly one Report.
 - An execution references exactly one Report.
 - A tenant can use a report only when Report.IsActive is true **and** a TenantReport row exists.
-- Disabling a catalog report (`IsActive` false) revokes every tenant grant for that report. Re-enabling the catalog does not recreate any `TenantReports` rows.
+- A platform-inactive report is not offered for tenant grant. The tenant grant list omits it. Granting it is rejected.
+- Disabling a catalog report (`IsActive` false) revokes every tenant grant for that report. Re-enabling the catalog does not recreate any `TenantReports` rows. The report then reappears on tenant grant lists as not granted.
 - Scope on the Report selects which policy pair applies.
 - AllowedTriggers gates manual / scheduled / event.
 
@@ -212,10 +216,10 @@ Shared pipeline then report-specific strategy.
 | Kind | Name | Returns | Checks |
 | --- | --- | --- | --- |
 | Query | GetReports | granted active reports (filterable by scope) | Policy by scope or both; tenant grant. SystemAdmin cannot call this |
-| Query | GetTenantReports | full catalog for that tenant, each item `granted` | `tenants.manage`. Ordered by code. Includes inactive catalog rows and rows with no grant. Unknown tenant → 404 |
-| Command | GrantTenantReport / Revoke | — | SystemAdmin. `tenants.manage`. Does not change the catalog |
-| Command | SetReportIsActive | — | SystemAdmin. `tenants.manage`. On false: cascade revoke of all TenantReports for that report + Hangfire cleanup. On true: no grant restore. Idempotent if already that value |
-| Command | SetReportAllowedTriggers | — | SystemAdmin. `tenants.manage`. On removal of `"scheduled"`: disable every ReportSchedule for that report (IsActive false + Hangfire RemoveIfExists). Rows stay. No grant revoke. On add: no schedule re-enable |
+| Query | GetReportCatalog | every catalog row, including inactive | `tenants.manage`. Ordered by code. No `granted`. Other roles → 403 |
+| Query | GetTenantReports | active catalog rows for that tenant, each item `granted` | `tenants.manage`. Ordered by code. Omits inactive catalog rows. Includes active rows with no grant. Unknown tenant → 404 |
+| Command | GrantTenantReport / Revoke | — | SystemAdmin. `tenants.manage`. Does not change the catalog. Inactive catalog report → 404 and no row |
+| Command | UpdateReportCatalog | — | SystemAdmin. `tenants.manage`. One `PUT /reports/{id}`. Applies the fields that are present. `isActive` false: cascade revoke of all TenantReports for that report + Hangfire cleanup; schedule `IsActive` unchanged. `isActive` true: no grant restore. Removing `"scheduled"` from `allowedTriggers`: disable every ReportSchedule for that report (IsActive false + Hangfire RemoveIfExists). Rows stay. No grant revoke from the trigger change. Adding `"scheduled"` does not re-enable schedules. Neither field → 400. Unknown trigger → 400. Unknown report → 404. Idempotent when the stored value already matches |
 | Command | CreateReportSchedule | schedule id | Policy by report scope; grant; allows scheduled; report-specific params + scope |
 | Command | UpdateReportSchedule | — | Same + ownership |
 | Command | DisableReportSchedule | — | Same |
@@ -274,11 +278,12 @@ First phase may hard-code the two parameter forms in the Adviser Portal. A param
 
 | Method | Route | Policy | Success | Failure |
 | --- | --- | --- | --- | --- |
-| GET | `/tenants/{tenantId}/reports` | `tenants.manage` | 200 full catalog for that tenant, each item includes `granted`; includes inactive catalog rows | 401 / 403 / 404 |
-| POST | `/tenants/{tenantId}/reports` | `tenants.manage` | 201 `{ "id" }` the first time, 204 when the grant already exists. Inactive catalog rows may be granted | 401 / 403 / 404 |
+| GET | `/reports/catalog` | `tenants.manage` | 200 every catalog row, including inactive, ordered by code. No `granted` | 401 / 403 |
+| GET | `/tenants/{tenantId}/reports` | `tenants.manage` | 200 active catalog rows for that tenant, each item includes `granted`. Inactive catalog rows are omitted | 401 / 403 / 404 |
+| POST | `/tenants/{tenantId}/reports` | `tenants.manage` | 201 `{ "id" }` the first time, 204 when the grant already exists. Inactive catalog report → 404 and no row | 401 / 403 / 404 |
 | DELETE | `/tenants/{tenantId}/reports/{reportId}` | `tenants.manage` | 204 when removed or already absent. Schedule and execution rows stay | 401 / 403 / 404 |
-| GET | `/reports` | `reports.customer.read` or `reports.book.read` (filter by scope) | 200 list | 401 / 403 |
-| PUT | `/reports/{id}` | `tenants.manage` | 204. Body may include `isActive` and/or `allowedTriggers`. `isActive` false cascades revoke of every TenantReports row for that report (Hangfire cleaned; schedule/execution rows stay). `allowedTriggers` removing `"scheduled"` disables every schedule for that report (IsActive false + Hangfire RemoveIfExists; rows stay; no grant revoke). Adding `"scheduled"` does not re-enable schedules. Unknown report → 404 | 401 / 403 / 404 |
+| GET | `/reports` | `reports.customer.read` or `reports.book.read` (filter by scope) | 200 list (granted + active only) | 401 / 403 |
+| PUT | `/reports/{id}` | `tenants.manage` | 204. Body may include `isActive` and/or `allowedTriggers`. Neither field → 400. Unknown trigger value → 400. `isActive` false cascades revoke of every TenantReports row for that report (Hangfire cleaned; schedule and execution rows stay; schedule `IsActive` unchanged). `isActive` true restores no grants. `allowedTriggers` removing `"scheduled"` disables every schedule for that report (IsActive false + Hangfire RemoveIfExists; rows stay; no grant revoke). Adding `"scheduled"` does not re-enable schedules. Unknown report → 404 | 400 / 401 / 403 / 404 |
 | POST | `/reports/schedules` | by report scope (`*.create`) | 201 `{ "id" }` | 400 / 403 / 404 |
 | GET | `/reports/schedules` | by scope (`*.read`) | 200 list | 401 / 403 |
 | PUT | `/reports/schedules/{id}` | by report scope | 204 | 400 / 403 / 404 / 409 |
@@ -291,7 +296,9 @@ First phase may hard-code the two parameter forms in the Adviser Portal. A param
 Customer calling a Book-scoped route or a create route → 403.  
 SystemAdmin has none of the four `reports.*` policies and cannot call `GET /reports`, request, schedule, or download.
 
-`GET /tenants/{tenantId}/reports` (`tenants.manage`) returns every platform catalog row for that tenant, ordered by `code`. A row is included when no `TenantReports` grant exists, and when the catalog row is inactive. Unknown tenant PublicId → 404. Other roles → 403. The list does not include another tenant’s grants. Creating a tenant does not insert `TenantReports` rows, so a new tenant returns the full catalog with every `granted` false.
+`GET /reports/catalog` (`tenants.manage`) returns every platform catalog row, ordered by `code`, including inactive rows. Items have no `granted` field. Other roles → 403. This is the Back Office `/reports` list. It is not `GET /reports`.
+
+`GET /tenants/{tenantId}/reports` (`tenants.manage`) returns every **active** platform catalog row for that tenant, ordered by `code`. A platform-inactive row is omitted. An active row is included when no `TenantReports` grant exists. Unknown tenant PublicId → 404. Other roles → 403. The list does not include another tenant’s grants. Creating a tenant does not insert `TenantReports` rows, so a new tenant returns the active catalog with every `granted` false. Granting a platform-inactive report is 404 and inserts no row.
 
 | Field | Notes |
 | --- | --- |
@@ -301,10 +308,10 @@ SystemAdmin has none of the four `reports.*` policies and cannot call `GET /repo
 | `function` | |
 | `scope` | `Customer` or `Book` |
 | `allowedTriggers` | Same JSON array shape as the catalog |
-| `isActive` | Catalog `Reports.IsActive`. Not the grant |
-| `granted` | `true` when a `TenantReports` row exists for this tenant and report; otherwise `false` |
+| `isActive` | Catalog `Reports.IsActive`. Not the grant. On this list it is true, because inactive rows are omitted |
+| `granted` | `true` when a `TenantReports` row exists for this tenant and report; otherwise `false`. Absent on `GET /reports/catalog` |
 
-Back Office tenant configuration and Scalar both call this list. Grant and revoke stay `POST` and `DELETE` on the same route. Catalog `IsActive` is written with `PUT /reports/{id}` (`tenants.manage`). Disabling cascades a revoke of every tenant grant for that report.
+Back Office tenant configuration calls the tenant list and hides any row with `isActive` false. Grant and revoke stay `POST` and `DELETE`. Catalog `IsActive` and `AllowedTriggers` are written with `PUT /reports/{id}` (`tenants.manage`). The platform page lists `GET /reports/catalog`. Disabling the catalog cascades a revoke of every tenant grant for that report. Scalar can call the same verbs.
 
 ### 8.1 Bodies
 
@@ -460,7 +467,7 @@ Adviser Portal only in this phase.
 - TenantAdmin: Adviser picker.
 - Schedule create is offered only when the selected report’s `allowedTriggers` includes `"scheduled"`.
 
-Catalog `IsActive` is managed by SystemAdmin via `PUT /reports/{id}` (`tenants.manage`). Setting it to false cascades a revoke of every `TenantReports` row for that report (Hangfire recurring jobs removed; `ReportSchedule` and `ReportExecution` rows stay). Setting it back to true does not restore any grants. Tenant grants remain the Back Office configuration page (`/tenants/{id}/config`), which lists this catalog and calls the existing grant and revoke verbs. Scalar can call the same verbs.
+Catalog `IsActive` and `AllowedTriggers` are managed by SystemAdmin on the Back Office `/reports` page via `GET /reports/catalog` and `PUT /reports/{id}` (`tenants.manage`). Setting `IsActive` to false cascades a revoke of every `TenantReports` row for that report (Hangfire recurring jobs removed; `ReportSchedule` and `ReportExecution` rows stay; schedule `IsActive` is unchanged). Setting it back to true does not restore any grants. The report then reappears on each tenant configuration page as not granted. Tenant grants remain `/tenants/{id}/config`, which lists active catalog rows only and calls the existing grant and revoke verbs. A platform-inactive report is not shown there. Scalar can call the same verbs.
 
 ---
 
@@ -468,7 +475,9 @@ Catalog `IsActive` is managed by SystemAdmin via `PUT /reports/{id}` (`tenants.m
 
 - Customer has only `reports.customer.read`; create and all book routes → 403.
 - Adviser and TenantAdmin have all four policies. SystemAdmin has none of them and cannot call `GET /reports`.
-- `GET /tenants/{tenantId}/reports` returns the full catalog ordered by code, including inactive rows, each with `granted`. A new tenant has every `granted` false. Grant or revoke flips only that item and leaves the row in the list. Unknown tenant → 404. Other roles → 403. Another tenant’s grant does not appear.
+- `GET /reports/catalog` returns every catalog row ordered by code, including inactive rows, with no `granted`. SystemAdmin → 200. Other roles → 403.
+- `GET /tenants/{tenantId}/reports` returns active catalog rows ordered by code, each with `granted`. Inactive catalog rows are omitted. A new tenant has every `granted` false. Grant or revoke flips only that item and leaves the row in the list. Unknown tenant → 404. Other roles → 403. Another tenant’s grant does not appear.
+- `POST /tenants/{tenantId}/reports` for a platform-inactive report is 404 and inserts no row. A repeat grant of an active report is 204.
 - `PUT /reports/{id}` with `isActive: false` revokes every TenantReports row for that report and removes the related Hangfire recurring jobs. Schedule and execution rows stay. A subsequent `isActive: true` restores no grants. Unknown report → 404. Other roles → 403.
 - `PUT /reports/{id}` with `allowedTriggers` that omits `"scheduled"` disables every ReportSchedule for that report (IsActive false + Hangfire RemoveIfExists). Rows stay. No grants are revoked. Adding `"scheduled"` does not re-enable those schedules.
 - `GET /reports/executions` accepts optional `reportId`. When present, `totalCount` and `items` are limited to that report after the caller scope filter.
@@ -489,7 +498,8 @@ No new ADR beyond [0017](../adr/0017-background-worker.md).
 | Item | Lock |
 | --- | --- |
 | Catalog | Platform table. PublicId + stable Code. IsActive and AllowedTriggers writable by SystemAdmin (`PUT /reports/{id}`, `tenants.manage`). IsActive false cascades revoke of all TenantReports (Hangfire cleaned; schedule/execution rows stay). Re-enable restores no grants. Removing `"scheduled"` from AllowedTriggers disables every schedule for that report (rows stay; no grant revoke). Adding it does not re-enable. Scope and AllowedTriggers are nvarchar columns |
-| Grant | TenantReports row required **and** Report.IsActive to run. List is the full catalog with `granted`, including inactive rows. No auto-grant for new tenants |
+| Grant | TenantReports row required **and** Report.IsActive to run. Tenant list is the active catalog with `granted`. Inactive rows are omitted. Granting an inactive catalog report is 404. No auto-grant for new tenants |
+| Catalog list | `GET /reports/catalog` (`tenants.manage`) returns every catalog row, including inactive. No `granted`. Not `GET /reports` |
 | Schedule / request | Must name ReportId; parameters are a free-form JSON object per report |
 | Generator | Registry: ReportId → IReportGenerator. Hangfire entry point is fixed (`Execute(executionId)`) |
 | Policies | `reports.customer.read/create`, `reports.book.read/create` |

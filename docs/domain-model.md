@@ -370,7 +370,8 @@ Field rules: [features/reports.md](features/reports.md). Not landed.
 Invariants:
 
 - A tenant can run a report only when `Report.IsActive` is true **and** a `TenantReport` row exists.
-- Disabling a catalog report (`IsActive` false) revokes every `TenantReport` row for that report (Hangfire recurring jobs removed; schedule and execution rows stay). Re-enabling the catalog does not recreate any grants.
+- A platform-inactive report is not offered for tenant grant. The tenant grant list omits it. Granting it is rejected.
+- Disabling a catalog report (`IsActive` false) revokes every `TenantReport` row for that report (Hangfire recurring jobs removed; schedule and execution rows stay; schedule `IsActive` is unchanged). Re-enabling the catalog does not recreate any grants.
 - Removing `"scheduled"` from `AllowedTriggers` disables every `ReportSchedule` for that report (IsActive false + Hangfire RemoveIfExists). Rows stay. Grants are not revoked. Adding `"scheduled"` does not re-enable those schedules.
 - Scope selects the policy pair (`reports.customer.*` or `reports.book.*`).
 - AllowedTriggers gates manual / scheduled / event.
@@ -389,3 +390,4 @@ Generator registry maps Report Code / PublicId to `IReportGenerator`. Hangfire e
 | Date | Change |
 | --- | --- |
 | 2026-10-26 | Catalog IsActive write + cascade revoke. Disable removes all TenantReports for the report (Hangfire cleaned; schedule/execution rows stay). Re-enable restores no grants. |
+| 2026-10-26 | Tenant grant list omits platform-inactive reports. Granting an inactive catalog report is rejected. `GET /reports/catalog` lists every catalog row for SystemAdmin. |

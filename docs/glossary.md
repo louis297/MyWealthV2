@@ -34,9 +34,9 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | TenantAdmin | Highest authority inside one tenant. | SystemAdmin |
 | Adviser | Tenant operator who manages assigned customers (and, from Phase 2, their ledger). | Customer |
 | Customer | Account holder. Login principal. Phase 1 client `adviser-portal` issues no code. No Customer Portal client yet. | A business row with no login principal |
-| Report | Platform catalog entry: PublicId, stable Code, name, function, scope (`Customer` or `Book`), allowed triggers, IsActive. Disable cascades revoke of all TenantReports. | A tenant-owned row; a generated file |
+| Report | Platform catalog entry: PublicId, stable Code, name, function, scope (`Customer` or `Book`), allowed triggers, IsActive. Disable cascades revoke of all TenantReports. A platform-inactive report is not offered for tenant grant. | A tenant-owned row; a generated file |
 | Book | An Adviser’s set of assigned Customers. Book-scoped reports run across that set. TenantAdmin selects an Adviser. | The whole tenant; a single Customer |
-| TenantReport | Grant of a Report to a Tenant. Required before the tenant can schedule or run it. | An execution |
+| TenantReport | Grant of a Report to a Tenant. Required before the tenant can schedule or run it. Not offered while the catalog report is inactive. | An execution |
 | ReportSchedule | Editable recurring definition. Must name a ReportId. Stores a free-form `parameters` JSON object. | A one-off manual request |
 | IReportGenerator | Per-report strategy. Registered by ReportId. Binds and validates `parameters`, checks scope, generates the result. | A Hangfire job type per report |
 | asOf | Server-written UTC timestamp on Adviser Balances Report, set when the job is created. Not a client parameter. | A date the caller sends |

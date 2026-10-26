@@ -383,11 +383,12 @@ Field rules: [features/reports.md](features/reports.md). Accepted.
 
 | Method | Route | Policy | Success |
 | --- | --- | --- | --- |
-| GET | `/tenants/{tenantId}/reports` | `tenants.manage` | 200 full catalog for that tenant, each item includes `granted`; includes inactive catalog rows |
-| POST | `/tenants/{tenantId}/reports` | `tenants.manage` | 201 `{ id }` the first time, 204 when the grant already exists |
+| GET | `/reports/catalog` | `tenants.manage` | 200 every catalog row, including inactive, ordered by code. No `granted` |
+| GET | `/tenants/{tenantId}/reports` | `tenants.manage` | 200 active catalog rows for that tenant, each item includes `granted`. Inactive catalog rows are omitted |
+| POST | `/tenants/{tenantId}/reports` | `tenants.manage` | 201 `{ id }` the first time, 204 when the grant already exists. Inactive catalog report → 404 and no row |
 | DELETE | `/tenants/{tenantId}/reports/{reportId}` | `tenants.manage` | 204 when removed or already absent |
 | GET | `/reports` | `reports.customer.read` or `reports.book.read` | 200 list (granted + active only) |
-| PUT | `/reports/{id}` | `tenants.manage` | 204. Body may include `isActive` and/or `allowedTriggers`. `isActive` false cascades revoke of every TenantReports row. Removing `"scheduled"` from `allowedTriggers` disables every schedule for that report (rows stay; no grant revoke) |
+| PUT | `/reports/{id}` | `tenants.manage` | 204. Body may include `isActive` and/or `allowedTriggers`. Neither field → 400. Unknown trigger → 400. `isActive` false cascades revoke of every TenantReports row (schedule `IsActive` unchanged). Removing `"scheduled"` from `allowedTriggers` disables every schedule for that report (rows stay; no grant revoke) |
 | POST | `/reports/schedules` | by report scope (`*.create`) | 201 `{ id }` |
 | GET | `/reports/schedules` | by scope | 200 list |
 | PUT | `/reports/schedules/{id}` | by report scope | 204 |
@@ -399,11 +400,13 @@ Field rules: [features/reports.md](features/reports.md). Accepted.
 
 Customer has `reports.customer.read` only. TenantAdmin and Adviser have all four. SystemAdmin has none of the four and cannot call `GET /reports`, request, schedule, or download. Bad parameters → 400. Unknown report, not granted, inactive catalog row, or out of scope → 404 on those firm routes. Policy fail → 403.
 
-`GET /tenants/{tenantId}/reports` is `tenants.manage`. It returns the full catalog for that tenant, ordered by code, including inactive rows, each with `granted`. A new tenant is not auto-granted. Unknown tenant → 404. Other roles → 403. Field rules are in [features/reports.md](features/reports.md).
+`GET /reports/catalog` is `tenants.manage`. It returns every catalog row, ordered by code, including inactive rows, with no `granted`. Other roles → 403. It is not `GET /reports`.
 
-BFF allow-list adds the `/reports` prefix.
+`GET /tenants/{tenantId}/reports` is `tenants.manage`. It returns the active catalog for that tenant, ordered by code, each with `granted`. Platform-inactive rows are omitted. A new tenant is not auto-granted. Unknown tenant → 404. Other roles → 403. Granting a platform-inactive report is 404 and inserts no row. Field rules are in [features/reports.md](features/reports.md).
 
-Back Office tenant configuration lists that catalog and calls the existing grant `POST` and revoke `DELETE`. Catalog `IsActive` is written with `PUT /reports/{id}` (`tenants.manage`). Disabling cascades a revoke of every tenant grant for that report. Scalar can call the same verbs.
+BFF allow-list adds the `/reports` prefix. `GET /reports/catalog` and `PUT /reports/{id}` sit on that prefix and reject non-SystemAdmin callers with 403. The Adviser Portal does not call them.
+
+Back Office tenant configuration lists the active catalog and calls the existing grant `POST` and revoke `DELETE`. It does not show a platform-inactive report. Catalog `IsActive` and `AllowedTriggers` are written with `PUT /reports/{id}` (`tenants.manage`). The platform page lists `GET /reports/catalog`. Disabling cascades a revoke of every tenant grant for that report. Scalar can call the same verbs.
 
 ---
 
@@ -450,3 +453,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-10-12 | Split / Bonus / Scrip accepted. New total quantity, no cash, total cost unchanged. Field rules in [features/split.md](features/split.md). |
 | 2026-10-12 | Net-worth read model accepted and landed (`af422c2`). `GET /net-worth` and `GET /users/customers/{id}/net-worth`. Current point-in-time, per-currency arrays, breakdowns. Field rules in [features/net-worth.md](features/net-worth.md). BFF allow-list adds `/net-worth`. |
 | 2026-10-26 | Reports: `PUT /reports/{id}` for catalog IsActive. False cascades revoke of all TenantReports for that report. |
+| 2026-10-26 | Reports: `GET /reports/catalog` lists every catalog row for SystemAdmin. Tenant grant list omits inactive rows. Granting an inactive catalog report is 404. |
