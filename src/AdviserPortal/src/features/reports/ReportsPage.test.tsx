@@ -52,6 +52,10 @@ function generateForm() {
   return screen.getByRole("button", { name: "Generate now" }).closest("form") as HTMLElement;
 }
 
+function openTab(name: "Reports" | "Schedules" | "History") {
+  fireEvent.click(screen.getByRole("tab", { name }));
+}
+
 function renderReports(
   me: CurrentUser,
   fetchImpl: (url: string, method: string) => Response | Promise<Response>,
@@ -399,8 +403,8 @@ describe("ReportsPage", () => {
       },
     );
 
-    expect(screen.queryByRole("button", { name: "Schedules" })).not.toBeInTheDocument();
     await chooseOption("Report", "Adviser Balances");
+    openTab("Schedules");
     expect(await screen.findByRole("heading", { name: "Schedules" })).toBeInTheDocument();
     expect(screen.queryByLabelText("Adviser")).not.toBeInTheDocument();
     expect(document.querySelector('input[name="cron"]')).toBeNull();
@@ -457,6 +461,7 @@ describe("ReportsPage", () => {
     });
 
     await chooseOption("Report", "Adviser Balances");
+    openTab("Schedules");
     const schedule = (await screen.findByText("Times are sent as chosen. The server interprets the schedule in UTC.")).closest("form");
     expect(schedule).not.toBeNull();
     expect(within(schedule as HTMLElement).getByRole("button", { name: "Create schedule" })).toBeDisabled();
@@ -497,10 +502,11 @@ describe("ReportsPage", () => {
       return new Response("", { status: 404 });
     });
 
+    await chooseOption("Report", "Adviser Balances");
+    openTab("Schedules");
     expect(await screen.findByRole("heading", { name: "Schedules" })).toBeInTheDocument();
     expect(await screen.findByText("every day at 09:00")).toBeInTheDocument();
     expect(screen.getAllByText("Adviser Balances").length).toBeGreaterThan(0);
-    await chooseOption("Report", "Adviser Balances");
     expect(screen.queryByRole("button", { name: "Create schedule" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Disable schedule" })).toBeInTheDocument();
@@ -544,8 +550,12 @@ describe("ReportsPage", () => {
     });
 
     await chooseOption("Report", "Adviser Balances");
+    openTab("History");
     expect(await screen.findByText("No runs yet.")).toBeInTheDocument();
+    openTab("Reports");
     fireEvent.click(within(generateForm()).getByRole("button", { name: "Generate now" }));
+    expect(await screen.findByText("Report queued")).toBeInTheDocument();
+    openTab("History");
     expect(await screen.findByText("Queued")).toBeInTheDocument();
     expect(listGets).toBeGreaterThan(1);
   });
@@ -561,7 +571,7 @@ describe("ReportsPage", () => {
       return new Response("", { status: 404 });
     });
 
-    expect(screen.queryByRole("button", { name: "History" })).not.toBeInTheDocument();
+    openTab("History");
     expect(await screen.findByRole("heading", { name: "History" })).toBeInTheDocument();
     expect(await screen.findByText("No runs yet.")).toBeInTheDocument();
     const request = fetchMock.mock.calls
@@ -616,6 +626,7 @@ describe("ReportsPage", () => {
       return new Response("", { status: 404 });
     });
 
+    openTab("History");
     expect(await screen.findByText("Failed")).toBeInTheDocument();
     expect(screen.getAllByText("Future Book").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Adviser Balances").length).toBeGreaterThan(0);
@@ -654,7 +665,7 @@ describe("ReportsPage", () => {
     expect(reportsTab).toHaveAttribute("aria-selected", "true");
     expect(schedulesTab).toHaveAttribute("aria-selected", "false");
     expect(historyTab).toHaveAttribute("aria-selected", "false");
-    expect(screen.getByLabelText("Report")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Report")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Schedules" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "History" })).not.toBeInTheDocument();
 

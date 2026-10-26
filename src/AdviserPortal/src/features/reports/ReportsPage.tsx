@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAppSelector } from "@/app/hooks";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdviserBalancesGenerate } from "@/features/reports/AdviserBalancesGenerate";
 import { ReportCatalog, ReportParametersUnavailable } from "@/features/reports/ReportCatalog";
 import { ReportHistory } from "@/features/reports/ReportHistory";
@@ -16,23 +17,39 @@ export function ReportsPage() {
   const canGenerate = role === roles.adviser || role === roles.tenantAdmin;
 
   return (
-    <ReportCatalog
-      scope="Book"
-      title="h1"
-      note="These run for an adviser's book."
-      emptyMessage="No reports available."
-      selectedId={selectedId}
-      onSelectedId={setSelectedId}
-      renderSelected={(item) =>
-        item.code === "adviser-balances" && canGenerate && role ? (
-          <AdviserBalancesGenerate reportId={item.id} role={role} onQueued={setFocusId} />
-        ) : (
-          <ReportParametersUnavailable />
-        )
-      }
-    >
-      <ReportSchedules reports={reports} scope="Book" selected={selected} role={role ?? ""} />
-      <ReportHistory scope="Book" focusId={focusId} />
-    </ReportCatalog>
+    <section className="flex flex-col gap-3">
+      <div className="space-y-1">
+        <h1 className="text-lg font-semibold tracking-tight">Reports</h1>
+        <p className="text-sm text-muted-foreground">These run for an adviser's book.</p>
+      </div>
+      <Tabs defaultValue="reports">
+        <TabsList>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
+          <TabsTrigger value="schedules">Schedules</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
+        </TabsList>
+        <TabsContent value="reports">
+          <ReportCatalog
+            scope="Book"
+            emptyMessage="No reports available."
+            selectedId={selectedId}
+            onSelectedId={setSelectedId}
+            renderSelected={(item) =>
+              item.code === "adviser-balances" && canGenerate && role ? (
+                <AdviserBalancesGenerate reportId={item.id} role={role} onQueued={setFocusId} />
+              ) : (
+                <ReportParametersUnavailable />
+              )
+            }
+          />
+        </TabsContent>
+        <TabsContent value="schedules">
+          <ReportSchedules reports={reports} scope="Book" selected={selected} role={role ?? ""} />
+        </TabsContent>
+        <TabsContent value="history">
+          <ReportHistory scope="Book" focusId={focusId} />
+        </TabsContent>
+      </Tabs>
+    </section>
   );
 }

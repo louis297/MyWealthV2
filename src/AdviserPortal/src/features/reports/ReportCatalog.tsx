@@ -30,8 +30,8 @@ export function ReportCatalog({
   children,
 }: {
   scope: ReportScope;
-  title: "h1" | "h2";
-  note: string;
+  title?: "h1" | "h2";
+  note?: string;
   emptyMessage: string;
   selectedId: string;
   onSelectedId: (id: string) => void;
@@ -39,16 +39,18 @@ export function ReportCatalog({
   children?: ReactNode;
 }) {
   const { data, isLoading, isError, refetch } = useGetReportsQuery({ scope });
-  const Title = title;
+  const Title = title ?? "h2";
   const titleClass = title === "h1" ? "text-lg font-semibold tracking-tight" : "text-base font-medium";
   const selected = data?.find((item) => item.id === selectedId) ?? null;
 
   return (
     <section className="flex flex-col gap-3">
-      <div className="space-y-1">
-        <Title className={titleClass}>Reports</Title>
-        <p className="text-sm text-muted-foreground">{note}</p>
-      </div>
+      {title ? (
+        <div className="space-y-1">
+          <Title className={titleClass}>Reports</Title>
+          <p className="text-sm text-muted-foreground">{note}</p>
+        </div>
+      ) : null}
       {isLoading ? <Muted>Loading reports…</Muted> : null}
       {isError ? (
         <div className="flex flex-col items-start gap-2 text-sm">
