@@ -15,7 +15,10 @@ public class PerClientCookieTests : TestBase
     private const string AdviserPortal = "adviser-portal";
     private const string BackOffice = "back-office";
     private const string AdviserRedirect = "https://localhost/signin-oidc";
+    private const string AdviserPostLogout = "https://localhost/";
     private const string BackOfficeRedirect = "https://localhost/back-office/signin-oidc";
+    private const string AdviserPortalCookie = ".AspNetCore.Identity.AdviserPortal";
+    private const string BackOfficeCookie = ".AspNetCore.Identity.BackOffice";
 
     [Test]
     public async Task SystemAdminOnBackOffice_DoesNotSilentlyAuthorizeAdviserPortal()
@@ -80,6 +83,41 @@ public class PerClientCookieTests : TestBase
         (await browser.EmailForAsync(AdviserPortal, adviser)).ShouldBe("tess@firm-isolate");
     }
 
+    [Test]
+    public async Task AdviserPortalLogout_ClearsOnlyThatIdentityCookie()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm Logout", "firm-logout");
+        await TestApp.CreatePersonAsync(
+            UserRole.TenantAdmin, "Tess", "tess@firm-logout", "Password1!", tenant.Id);
+
+        using var browser = new IdentityBrowser();
+        await browser.LoginAsync(AdviserPortal, "tess@firm-logout", "Password1!", "firm-logout");
+        await browser.LoginAsync(
+            BackOffice,
+            DevelopmentIdentitySeeder.SystemAdminEmail,
+            DevelopmentIdentitySeeder.SystemAdminPassword,
+            tenantCode: null);
+
+        var logout = await browser.LogoutAsync(AdviserPortal, AdviserPostLogout);
+        logout.StatusCode.ShouldBe(HttpStatusCode.Redirect);
+        logout.Headers.Location.ShouldNotBeNull();
+        logout.Headers.Location.ToString().ShouldBe(AdviserPostLogout);
+
+        var setCookies = logout.Headers.TryGetValues("Set-Cookie", out var values)
+            ? string.Join('\n', values)
+            : "";
+        setCookies.ShouldContain(AdviserPortalCookie);
+        setCookies.ShouldNotContain(BackOfficeCookie);
+
+        var adviser = await browser.AuthorizeAsync(AdviserPortal);
+        adviser.IsLogin.ShouldBeTrue();
+        adviser.Code.ShouldBeNull();
+
+        var backOffice = await browser.AuthorizeAsync(BackOffice);
+        backOffice.Code.ShouldNotBeNullOrWhiteSpace();
+        (await browser.EmailForAsync(BackOffice, backOffice)).ShouldBe(DevelopmentIdentitySeeder.SystemAdminEmail);
+    }
+
     private sealed class IdentityBrowser : IDisposable
     {
         private readonly HttpClient _client = FunctionalTestSetup.Identity.CreateClient(
@@ -128,6 +166,18 @@ public class PerClientCookieTests : TestBase
             var afterLogin = await _client.PostAsync(loginUrl, form);
             var completed = await FollowAsync(_client, afterLogin, RedirectFor(clientId));
             return completed.Code;
+        }
+
+        public async Task<HttpResponseMessage> LogoutAsync(string clientId, string postLogoutRedirectUri)
+        {
+            var url = "/connect/logout?" + string.Join("&",
+            [
+                "client_id=" + Uri.EscapeDataString(clientId),
+                "post_logout_redirect_uri=" + Uri.EscapeDataString(postLogoutRedirectUri)
+            ]);
+            var response = await _client.GetAsync(url);
+            await response.Content.LoadIntoBufferAsync();
+            return response;
         }
 
         public async Task<string> EmailForAsync(string clientId, AuthorizeHit hit)
