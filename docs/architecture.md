@@ -3,7 +3,7 @@ title: Architecture
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-10-25
+updated: 2026-10-27
 related:
   - README.md
   - glossary.md
@@ -118,6 +118,8 @@ Hosted in `src/IdentityHost` (ADR 0014). Aspire resource name: `identity`.
 | Scopes | `openid`, `profile`, `offline_access`, `api`. Role and tenant are JWT claims, not scopes. Permissions are not expanded into the token |
 
 The login gate on the authorization server reads domain invariants: tenant enabled, `UserStatus = Active`, valid Identity link, then the client × role allow-list. `adviser-portal` does not issue a code to Customer. `back-office` issues a code only to SystemAdmin. SystemAdmin may complete login with no tenantCode. Adviser-management resource policies stay 403.
+
+IdentityHost isolates the two first-party clients with a per-client cookie scheme (identity-auth amendment 2026-10-27). `/connect/authorize` and hosted `/login` authenticate and sign in only against the scheme for the current `client_id`. `/connect/logout` signs out only that scheme. A login on one client does not silently authenticate the other. This is server-side; clients do not send a special parameter.
 
 The BFF redeems the adviser-portal code and stores tokens. The SPA does not. It does not own a password form that issues tokens. Contract: [features/bff-adviser-portal.md](features/bff-adviser-portal.md). The Back Office host redeems its own code the same way and calls `webapi` with Bearer. Contract: [backoffice/back-office.md](backoffice/back-office.md).
 

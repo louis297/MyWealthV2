@@ -52,13 +52,18 @@ public class LoginModel(
         }
 
         var clientId = ClientIdFromReturnUrl(returnUrl);
-        if (clientId is not null && !ClientRoleAllowList.Allows(clientId, user.Role))
+        if (!ClientCookieSchemes.TryGet(clientId, out var scheme)
+            || !ClientRoleAllowList.Allows(clientId, user.Role))
         {
             Error = UniformFailure;
             return Page();
         }
 
-        await signInManager.SignInAsync(identityUser, isPersistent: false);
+        var principal = await signInManager.CreateUserPrincipalAsync(identityUser);
+        await HttpContext.SignInAsync(
+            scheme,
+            principal,
+            new AuthenticationProperties { IsPersistent = false });
 
         if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
         {

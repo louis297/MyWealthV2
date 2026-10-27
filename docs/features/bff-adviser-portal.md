@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-01
-last_updated: 2026-10-02
+last_updated: 2026-10-27
 related:
   - ../function-plan.md
   - ../architecture.md
@@ -87,7 +87,7 @@ The Adviser Portal browser talks only to the BFF origin: login/logout on the BFF
 | R5 | Proxy preserves method, path after `/api`, query, JSON body, and product headers (`Idempotency-Key`, `Content-Type`). List envelope, PublicId, and error envelope stay [api-design.md](../api-design.md). |
 | R6 | Refresh lives only in the BFF process (tokens saved by the OIDC handler). The SPA must not call `/connect/token` or `/connect/revocation`. |
 | R7 | On `webapi` 401, the BFF refreshes **once** with the stored refresh token and retries the proxied request. If refresh fails, clear the BFF cookie and return 401 to the SPA. Do not start authorize from an XHR. |
-| R8 | Logout order: sign out the BFF cookie → `POST identity /connect/revocation` (`token_type_hint=refresh_token`) → OpenIddict end-session (`/connect/logout` with `client_id` and `post_logout_redirect_uri`). Do not add `/auth/logout`. identity-auth R21 still owns the identity action. |
+| R8 | Logout order: sign out the BFF cookie → `POST identity /connect/revocation` (`token_type_hint=refresh_token`) → OpenIddict end-session (`/connect/logout` with `client_id` and `post_logout_redirect_uri`). Do not add `/auth/logout`. identity-auth R21 still owns the identity action. IdentityHost clears only the `adviser-portal` scheme cookie (identity-auth amendment 2026-10-27). |
 | R9 | `ClientId` remains `adviser-portal`. Allow-list unchanged: SystemAdmin, TenantAdmin, Adviser. Customer + correct password → no code, uniform failure (identity-auth R4 / R20). |
 | R10 | Client is confidential. Secret only in Aspire / host configuration. Authorization code + PKCE stay on. No password grant. |
 | R11 | Redirect registered on the client: `{bffOrigin}/signin-oidc`. Post-logout: `{bffOrigin}/`. `{bffOrigin}` is the BFF https browser entry (the Aspire dashboard link), not a launchSettings port. Development currently shows `https://localhost:7190/`; that port is not the product origin. Upsert a `*.dev.localhost` alias only when that host is itself a browser entry. Do not replace the https entry with the alias. Do not register the BFF http endpoint or the Vite origin. |

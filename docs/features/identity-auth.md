@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-12
-last_updated: 2026-09-14
+last_updated: 2026-10-27
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -377,6 +377,43 @@ Accepted with [backoffice/back-office.md](../backoffice/back-office.md). Do not 
 - Redirect `{backOfficeOrigin}/signin-oidc`. Post-logout `{backOfficeOrigin}/`. The origin is `Identity:BackOfficeOrigin`. Do not add it to `Identity:PortalOrigins`; that list stays the `adviser-portal` client.
 - `customer-portal` stays unregistered.
 - No BFF. The host holds the cookie session and the access and refresh tokens, and calls `webapi` with Bearer. No new table. No new resource route.
+
+### Amendment 2026-10-27 (Per-client identity cookies)
+
+Accepted. Isolates `adviser-portal` and `back-office` on the identity origin so a login on one client does not silently authenticate the other. Do not rewrite R1–R21 or earlier amendments in place. No new table. No protocol-path remap. No second identity host. Clients do not send a special parameter; isolation is enforced by IdentityHost.
+
+**Problem.** IdentityHost previously used one authentication cookie on the `identity` origin. `/connect/authorize` for either client read that cookie. A later login overwrote it, so both clients received the last authenticated subject (silent SSO). `prompt=login` is a client hint and is not the control.
+
+**Decision.** IdentityHost registers a distinct cookie authentication scheme per first-party client. Scheme selection is by `client_id` on the current authorize or logout request.
+
+| ClientId | Cookie scheme (name) | Cookie name (example) |
+| --- | --- | --- |
+| `adviser-portal` | `adviser-portal` | `.AspNetCore.Identity.AdviserPortal` |
+| `back-office` | `back-office` | `.AspNetCore.Identity.BackOffice` |
+
+Exact cookie names may follow the framework default for a named scheme. They must differ. No `Domain` attribute. `Path=/`. HttpOnly. `SameSite=Lax`. `Secure` outside Development.
+
+**Authorize (`/connect/authorize`).** Read `client_id`. Authenticate only against that client’s scheme. If that scheme has no valid cookie, redirect to hosted `/login`. Do not fall back to the other client’s cookie. Do not honour a shared default scheme for these two clients.
+
+**Hosted login (`/login`).** The page receives the client context from the authorize return (the OpenIddict authorize request that was interrupted). After the password check and the client × role allow-list succeed, `SignInAsync` uses the scheme for that `client_id` only. SystemAdmin still omits `tenantCode`. Allow-list is unchanged: `adviser-portal` → SystemAdmin / TenantAdmin / Adviser; `back-office` → SystemAdmin only. Wrong role → no code, uniform failure.
+
+**Logout (R21).** `/connect/logout` receives `client_id`. Sign out only that client’s scheme (`SignInManager.SignOutAsync` against the matching scheme, then OpenIddict SignOut). The other client’s cookie stays. Revocation of the presented refresh is unchanged. Post-logout redirect stays the registered URI for that client.
+
+**What does not change.**
+
+- BFF cookie (`__Host-bff-adviser-portal`) and Back Office host cookie stay on their own origins. Access and refresh stay server-side on those hosts.
+- Protocol paths stay OpenIddict defaults. No custom `/auth/login`.
+- Refresh store, lifetimes, and revocation events (password change, person disable, tenant disable) stay as identity-auth.
+- `customer-portal` stays unregistered. When it is registered later, it gets its own scheme the same way.
+
+**Acceptance (amendment A14–A17).**
+
+| Id | Given | When | Then |
+| --- | --- | --- | --- |
+| A14 | Active TenantAdmin logged in on `adviser-portal` (identity cookie for that scheme set) | Browser opens Back Office (client `back-office`) | Back Office does not silently complete. Hosted `/login` is shown. No authorization code until SystemAdmin credentials succeed on the `back-office` scheme. |
+| A15 | Seed SystemAdmin logged in on `back-office` | Browser opens Adviser Portal (client `adviser-portal`) | Portal does not silently complete as SystemAdmin. Hosted `/login` is shown for `adviser-portal`. |
+| A16 | Both clients have a valid identity cookie for different subjects | Sign out on Adviser Portal (`client_id=adviser-portal`) | Only the `adviser-portal` scheme cookie is cleared. Back Office identity cookie remains. Next Back Office visit does not force login. |
+| A17 | Authorize request for `back-office` with a valid `adviser-portal` cookie present and no `back-office` cookie | IdentityHost processes `/connect/authorize` | Does not issue a code from the `adviser-portal` cookie. Redirects to `/login` for `back-office`. |
 
 ### Amendment 2026-09-14 (R21 — end session)
 
