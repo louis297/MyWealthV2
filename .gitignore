@@ -3,6 +3,12 @@
 ##
 ## Get latest from `dotnet new gitignore`
 
+#Rider IDE
+.idea/
+
+#aspire
+.aspire/
+
 #draft docs
 draft/
 
