@@ -4,7 +4,7 @@ status: accepted
 phase: 1
 language: en
 created: 2026-10-24
-updated: 2026-10-26
+updated: 2026-10-27
 related:
   - README.md
   - ../function-plan.md
@@ -62,6 +62,7 @@ Accepted 2026-10-25. SystemAdmin still uses Scalar for the same verbs. The Back 
 | OIDC client | Confidential, `ClientId = back-office`, secret via Aspire parameter (not in git) |
 | Login | Redirect to hosted `/login` on `identity`. SystemAdmin omits `tenantCode` |
 | Session | Cookie on the Back Office host. Access + refresh held server-side |
+| Identity cookie | Isolated. IdentityHost uses a per-client cookie scheme for `back-office`. Login on Adviser Portal does not authenticate Back Office, and the reverse. See identity-auth amendment 2026-10-27. |
 | Resource calls | Typed `HttpClient` to `webapi` with Bearer access token |
 | CORS | None required on `webapi` (server-to-server) |
 
@@ -154,8 +155,9 @@ Platform page (`/reports`). All verbs use `tenants.manage`.
 | BO7 | Disable is the only removal path; no physical delete action is offered |
 | BO8 | From a tenant, SystemAdmin sees every active catalog report with Code, Name, Scope, and `granted` (Granted or Not granted). A platform-inactive report is not shown, including when the client payload still contains one. Enable calls `POST` when `granted` is false. Disable calls `DELETE` when `granted` is true. The page does not ask for a report id and does not run or schedule |
 | BO9 | The configuration page does not offer run or schedule actions |
-| BO10 | Sign-out revokes refresh and ends the session; next visit is hosted login |
+| BO10 | Sign-out revokes refresh and ends the session; next visit is hosted login. IdentityHost clears only the `back-office` scheme cookie (identity-auth A16). |
 | BO11 | `/reports` lists `GET /reports/catalog`, including inactive rows. Setting IsActive to false calls `PUT /reports/{id}` and the backend revokes every tenant grant for that report (Hangfire cleaned; schedule and execution rows stay; schedule `IsActive` unchanged). Setting it back to true restores no grants. Setting AllowedTriggers to omit `"scheduled"` disables every schedule for that report (rows stay; no grant revoke). Adding `"scheduled"` does not re-enable those schedules |
+| BO12 | After a successful Adviser Portal login in the same browser, an unauthenticated Back Office visit still shows hosted `/login`. No silent code for the Portal subject. |
 
 ---
 

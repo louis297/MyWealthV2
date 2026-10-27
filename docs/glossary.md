@@ -34,9 +34,9 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | TenantAdmin | Highest authority inside one tenant. | SystemAdmin |
 | Adviser | Tenant operator who manages assigned customers (and, from Phase 2, their ledger). | Customer |
 | Customer | Account holder. Login principal. Phase 1 client `adviser-portal` issues no code. No Customer Portal client yet. | A business row with no login principal |
-| Report | Platform catalog entry: PublicId, stable Code, name, function, scope (`Customer` or `Book`), allowed triggers, IsActive. Disable cascades revoke of all TenantReports. A platform-inactive report is not offered for tenant grant. | A tenant-owned row; a generated file |
+| Report | Platform catalog entry: PublicId, stable Code, name, function, scope (`Customer` or `Book`), allowed triggers, IsActive. Disable cascades revoke of all TenantReports. | A tenant-owned row; a generated file |
 | Book | An Adviser’s set of assigned Customers. Book-scoped reports run across that set. TenantAdmin selects an Adviser. | The whole tenant; a single Customer |
-| TenantReport | Grant of a Report to a Tenant. Required before the tenant can schedule or run it. Not offered while the catalog report is inactive. | An execution |
+| TenantReport | Grant of a Report to a Tenant. Required before the tenant can schedule or run it. | An execution |
 | ReportSchedule | Editable recurring definition. Must name a ReportId. Stores a free-form `parameters` JSON object. | A one-off manual request |
 | IReportGenerator | Per-report strategy. Registered by ReportId. Binds and validates `parameters`, checks scope, generates the result. | A Hangfire job type per report |
 | asOf | Server-written UTC timestamp on Adviser Balances Report, set when the job is created. Not a client parameter. | A date the caller sends |
@@ -132,7 +132,8 @@ Later portals copy the last row: `bff-customer-portal`, `BffCustomerPortal`, `sr
 | IEmailSender | Invite / reset mail. Phase 1 is no-op or log-only. | Built-in SMTP in Domain |
 | Authorization server | Issues and revokes tokens, exposes discovery and JWKS. Hosted in Aspire `identity` via OpenIddict. | A custom resource-API `/auth/login` that mints JWTs; OpenIddict inside `webapi` |
 | OpenIddict | The authorization-server library. Tables replace a custom refresh store. Protocol paths stay on library defaults (`/connect/*`, well-known discovery / JWKS); do not remap. | Duende IdentityServer; an external CIAM tenant; a custom `/auth` token issuer |
-| OIDC client | Registered application that runs authorization code + PKCE. Client id `adviser-portal` is confidential and held by `bff-adviser-portal`, not by the browser. | A second token issuer per portal |
+| OIDC client | Registered application that runs authorization code + PKCE. Client id `adviser-portal` is confidential and held by `bff-adviser-portal`. Client id `back-office` is confidential and held by the Back Office host. | A second token issuer per portal |
+| Identity cookie scheme | Named cookie authentication scheme on `identity`, one per first-party client. `/connect/authorize` and hosted `/login` use only the scheme for the current `client_id`. Logout clears only that scheme. See identity-auth amendment 2026-10-27. | One shared identity cookie for every client; relying on client-sent `prompt=login` |
 | Authorization code + PKCE | Redirect grant. First-party session protocol. BFF uses PKCE with a client secret. | Resource Owner Password Credentials grant |
 | JWT / access token | Short-lived bearer issued by OpenIddict. The portal browser must not store it. | Long-lived access token with no refresh; tokens minted by a resource endpoint or by the BFF |
 | Refresh token | Stored by OpenIddict. Revoked on password change, disable, and logout. Rotated when the BFF presents it. Only the BFF holds the handle. | A custom `RefreshTokens` table |
