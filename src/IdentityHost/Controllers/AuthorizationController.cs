@@ -16,7 +16,6 @@ using static OpenIddict.Abstractions.OpenIddictConstants;
 namespace MyWealthV2.IdentityHost.Controllers;
 
 public class AuthorizationController(
-    SignInManager<ApplicationUser> signInManager,
     UserManager<ApplicationUser> userManager,
     IApplicationDbContext db) : Controller
 {
@@ -28,22 +27,29 @@ public class AuthorizationController(
         var request = HttpContext.GetOpenIddictServerRequest()
             ?? throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 
-        if (User.Identity?.IsAuthenticated != true)
+        if (!ClientCookieSchemes.TryGet(request.ClientId, out var scheme))
         {
-            return Challenge(
-                new AuthenticationProperties
-                {
-                    RedirectUri = Request.PathBase + Request.Path + QueryString.Create(
-                        Request.HasFormContentType ? Request.Form.ToList() : Request.Query.ToList())
-                },
-                IdentityConstants.ApplicationScheme);
+            return Forbid(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
 
-        var identityUser = await userManager.GetUserAsync(User);
+        var properties = new AuthenticationProperties
+        {
+            RedirectUri = Request.PathBase + Request.Path + QueryString.Create(
+                Request.HasFormContentType ? Request.Form.ToList() : Request.Query.ToList())
+        };
+
+        var authenticated = await HttpContext.AuthenticateAsync(scheme);
+        var session = authenticated.Principal;
+        if (authenticated.Succeeded != true || session is null)
+        {
+            return Challenge(properties, scheme);
+        }
+
+        var identityUser = await userManager.GetUserAsync(session);
         if (identityUser is null)
         {
-            await signInManager.SignOutAsync();
-            return Challenge(IdentityConstants.ApplicationScheme);
+            await HttpContext.SignOutAsync(scheme);
+            return Challenge(scheme);
         }
 
         var person = await db.Users.SingleOrDefaultAsync(
@@ -52,8 +58,8 @@ public class AuthorizationController(
 
         if (person is null)
         {
-            await signInManager.SignOutAsync();
-            return Challenge(IdentityConstants.ApplicationScheme);
+            await HttpContext.SignOutAsync(scheme);
+            return Challenge(scheme);
         }
 
         Tenant? tenant = null;
@@ -64,14 +70,14 @@ public class AuthorizationController(
 
         if (!LoginEligibility.CanComplete(person, tenant))
         {
-            await signInManager.SignOutAsync();
-            return Challenge(IdentityConstants.ApplicationScheme);
+            await HttpContext.SignOutAsync(scheme);
+            return Challenge(scheme);
         }
 
         if (!ClientRoleAllowList.Allows(request.ClientId, person.Role))
         {
-            await signInManager.SignOutAsync();
-            return Challenge(IdentityConstants.ApplicationScheme);
+            await HttpContext.SignOutAsync(scheme);
+            return Challenge(scheme);
         }
 
         var identity = new ClaimsIdentity(
@@ -113,7 +119,12 @@ public class AuthorizationController(
     [IgnoreAntiforgeryToken]
     public async Task<IActionResult> Logout()
     {
-        await signInManager.SignOutAsync();
+        var request = HttpContext.GetOpenIddictServerRequest();
+        if (ClientCookieSchemes.TryGet(request?.ClientId, out var scheme))
+        {
+            await HttpContext.SignOutAsync(scheme);
+        }
+
         return SignOut(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 

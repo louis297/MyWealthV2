@@ -35,12 +35,13 @@ builder.Services.AddCors(options =>
     });
 });
 
+var development = builder.Environment.IsDevelopment();
 builder.Services
-    .AddAuthentication(IdentityConstants.ApplicationScheme)
-    .AddCookie(IdentityConstants.ApplicationScheme, options =>
-    {
-        options.LoginPath = "/login";
-    });
+    .AddAuthentication()
+    .AddCookie(ClientCookieSchemes.AdviserPortal, options =>
+        ClientCookieSchemes.Configure(options, ClientCookieSchemes.AdviserPortalCookie, development))
+    .AddCookie(ClientCookieSchemes.BackOffice, options =>
+        ClientCookieSchemes.Configure(options, ClientCookieSchemes.BackOfficeCookie, development));
 
 builder.Services.AddOpenIddict()
     .AddServer(options =>
