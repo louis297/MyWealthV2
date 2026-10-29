@@ -44,7 +44,8 @@ public class RenameIsEnabledToIsActiveSchemaTests
         var defaults = await QueryNames(db, """
             SELECT dc.name
             FROM sys.default_constraints dc
-            WHERE dc.name LIKE N'DF_%IsEnabled%' OR dc.name LIKE N'DF_%IsActive%'
+            WHERE (dc.name LIKE N'DF_%IsEnabled%' OR dc.name LIKE N'DF_%IsActive%')
+              AND OBJECT_NAME(i.object_id) IN (N'Currencies', N'Tenants', N'Instruments')
             ORDER BY dc.name
             """);
         defaults.ShouldBe([
