@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.x'
+          # cache: true
+          # cache-dependency-path: '**/packages.lock.json'
+
+      - name: Restore
+        run: dotnet restore MyWealthV2.slnx
+
+      - name: Build
+        run: dotnet build MyWealthV2.slnx --no-restore --configuration Release
+
+      - name: Test
+        run: |
+          dotnet test MyWealthV2.slnx \
+            --no-build \
+            --configuration Release \
+            --verbosity normal \
+            --logger "trx;LogFileName=test-results.trx"
+        env:
+          Parameters__adviser_portal_client_secret: ${{ secrets.ADVISER_PORTAL_CLIENT_SECRET }}
+          Parameters__back_office_client_secret: ${{ secrets.BACK_OFFICE_CLIENT_SECRET }}
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/test-results.trx'
+          retention-days: 7
+
+  frontend:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # needs: build-and-test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: src/AdviserPortal/package-lock.json
+
+      - name: Install and build
+        working-directory: src/AdviserPortal
+        run: |
+          npm ci
+          npm run build
