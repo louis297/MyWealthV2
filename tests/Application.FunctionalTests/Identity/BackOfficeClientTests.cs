@@ -42,7 +42,11 @@ public class BackOfficeClientTests : TestBase
         using var scope = _identity.Services.CreateScope();
         var manager = scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
 
-        (await manager.FindByClientIdAsync("customer-portal")).ShouldBeNull();
+        var customer = await manager.FindByClientIdAsync("customer-portal");
+        customer.ShouldNotBeNull();
+        var customerDescriptor = new OpenIddictApplicationDescriptor();
+        await manager.PopulateAsync(customerDescriptor, customer);
+        customerDescriptor.RedirectUris.Select(uri => uri.AbsoluteUri).ShouldNotContain(Origin + "/signin-oidc");
 
         var application = await manager.FindByClientIdAsync(Services.BackOffice);
         application.ShouldNotBeNull();
