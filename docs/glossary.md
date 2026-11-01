@@ -33,7 +33,7 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | SystemAdmin | Platform-level operator. Not bound to a tenant. | TenantAdmin |
 | TenantAdmin | Highest authority inside one tenant. | SystemAdmin |
 | Adviser | Tenant operator who manages assigned customers (and, from Phase 2, their ledger). | Customer |
-| Customer | Account holder. Login principal. Phase 1 client `adviser-portal` issues no code. No Customer Portal client yet. | A business row with no login principal |
+| Customer | Account holder. Login principal. Phase 1 client `adviser-portal` issues no code. Client `customer-portal` is accepted ([customer-portal/customer-portal.md](customer-portal/customer-portal.md)). | A business row with no login principal |
 | Report | Platform catalog entry: PublicId, stable Code, name, function, scope (`Customer` or `Book`), allowed triggers, IsActive. Disable cascades revoke of all TenantReports. | A tenant-owned row; a generated file |
 | Book | An Adviser’s set of assigned Customers. Book-scoped reports run across that set. TenantAdmin selects an Adviser. | The whole tenant; a single Customer |
 | TenantReport | Grant of a Report to a Tenant. Required before the tenant can schedule or run it. | An execution |
@@ -87,7 +87,7 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | --- | --- |
 | Adviser Portal | Only frontend in Phase 1. Aspire SPA resource and OIDC `ClientId`: `adviser-portal`. Does not issue tokens. Browser talks to `bff-adviser-portal`, not to `identity` / `webapi` (ADR 0016). |
 | Session probe | First portal page after callback: renders `GET /users/me` to prove the handshake. Not a product Dashboard. |
-| Customer Portal | Later second client (`customer-portal`) on the same authorization server. Not registered. Expected shape is a second BFF + client (`bff-customer-portal`), not a public SPA token stack. |
+| Customer Portal | Second client (`customer-portal`) on the same authorization server. Accepted: [customer-portal/customer-portal.md](customer-portal/customer-portal.md). Shape is a second BFF + client (`bff-customer-portal`), not a public SPA token stack. |
 | Back Office | Platform-ops UI for SystemAdmin. Landed: [backoffice/back-office.md](backoffice/back-office.md). Blazor host `back-office`, no BFF. Scalar remains available. |
 | Hosted login | Password page on `identity` (tenantCode + email + password). Shared by all first-party portals. |
 
@@ -103,11 +103,13 @@ One row per process. Aspire resource names are the words used in docs and servic
 | --- | --- | --- | --- | --- |
 | Authorization server | `identity` | `IdentityHost` | `src/IdentityHost` | [features/identity-auth.md](features/identity-auth.md) |
 | Resource API | `webapi` | `Web` | `src/Web` | Feature specs in `features/` (unprefixed) |
-| Adviser Portal SPA | `adviser-portal` | `AdviserPortal` | `src/AdviserPortal` | [portals/adviser-portal.md](portals/adviser-portal.md) |
+| Adviser Portal SPA | `adviser-portal` | `AdviserPortal` | `src/AdviserPortal` | [adviser-portal/adviser-portal.md](adviser-portal/adviser-portal.md) |
 | Adviser Portal BFF | `bff-adviser-portal` | `BffAdviserPortal` | `src/BffAdviserPortal` | [features/bff-adviser-portal.md](features/bff-adviser-portal.md) (accepted) |
+| Customer Portal SPA | `customer-portal` | `CustomerPortal` | `src/CustomerPortal` | [customer-portal/customer-portal.md](customer-portal/customer-portal.md) (accepted) |
+| Customer Portal BFF | `bff-customer-portal` | `BffCustomerPortal` | `src/BffCustomerPortal` | [features/bff-customer-portal.md](features/bff-customer-portal.md) (accepted) |
 | Back Office | `back-office` | `BackOffice` | `src/BackOffice` | [backoffice/back-office.md](backoffice/back-office.md) (accepted) |
 
-Later portals copy the last row: `bff-customer-portal`, `BffCustomerPortal`, `src/BffCustomerPortal`, `features/bff-customer-portal.md`. Do not create that file until the slice opens. Do not use `adviser-portal-bff` or `AdviserPortalBff`.
+Later portals copy the last BFF row: `bff-customer-portal`, `BffCustomerPortal`, `src/BffCustomerPortal`, `features/bff-customer-portal.md`. Do not use `customer-portal-bff` or `CustomerPortalBff`.
 
 ---
 

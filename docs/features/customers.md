@@ -24,7 +24,7 @@ related:
 
 TenantAdmin / Adviser Customer HTTP: list / get / create (Identity dual-write) / rename / reassign adviser / disable / enable. Tables, `User` factory (including the Customer shape), dual-write, `TargetDisabled`, policies `customers.manage` / `customers.manage-own`, and `UserDisabled` revocation already exist (identity-auth + tenant-admins + advisers). This slice does not add a script or a new policy name.
 
-Unlike advisers: TenantAdmin sees the current tenant; an Adviser sees, creates, and edits only assigned Customers. Disable Customer has no ledger guard in Phase 1. Creating or reassigning onto a disabled Adviser uses api-design §4.1 `target=user` (the call site advisers reserved). The portal Customers page is not this slice (see [adviser-portal](../portals/adviser-portal.md)).
+Unlike advisers: TenantAdmin sees the current tenant; an Adviser sees, creates, and edits only assigned Customers. Disable Customer has no ledger guard in Phase 1. Creating or reassigning onto a disabled Adviser uses api-design §4.1 `target=user` (the call site advisers reserved). The portal Customers page is not this slice (see [adviser-portal](../adviser-portal/adviser-portal.md)).
 
 Landed in GitHub master 2026-09-14 (`b16d059`, hosted-login smoke after create).
 
@@ -61,7 +61,7 @@ A Customer may complete authorization-server login (tests / reserved). There is 
 - Physical delete
 - “Cannot disable the last Customer”
 - Ledger / open-Account guard (owned by landed [accounts](accounts.md); this slice does not create Account tables)
-- Customer Portal client; Adviser Portal Customers page (portals)
+- Customer Portal client; Adviser Portal Customers page (docs/adviser-portal/)
 - SystemAdmin managing Customers (Scalar is not that surface)
 - A Customer calling this collection (403; profile is `/users/me`)
 - An `INotificationHandler<CustomerAdviserReassigned>`; an `AdviserAssignments` history table
@@ -104,7 +104,7 @@ A Customer may complete authorization-server login (tests / reserved). There is 
 | R16 | **Who may set the adviser.** TenantAdmin create requires `adviserId` (Adviser PublicId). Adviser create: omit `adviserId` = self; if present it must equal the caller’s PublicId, else 400 ordinary validation (not 404 — the caller is assigning, not reading someone else’s row). An Adviser cannot reassign. |
 | R17 | **Scope.** TenantAdmin: current tenant, Role=Customer. Adviser: current tenant, Role=Customer, and `AdviserId` = self. Cross-tenant, same-tenant but not assigned, same-tenant but Role is not Customer → GET/PUT/disable/enable 404. Two-tenant fixture required. |
 | R18 | List is current tenant, `Role=Customer` only. Every item includes `status`, `isActive`, and `adviserId`. `enabledOnly` omitted/`false` = every Status; `true` = `IsActive = 1`; any other value 400. `page` default 1, `pageSize` default 20 max 100. Optional `search`: Name / Email contains (CI) or person PublicId exact. Sort name then email. No `tenantId=` or `status=` query. Optional `adviserId=` (Adviser PublicId): TenantAdmin filters by that Adviser; unknown / other-tenant adviser → empty list (do not 404; this is a filter). Adviser with `adviserId=`: equal to self → ignore (already scoped); any other value → 400. |
-| R19 | Development `TestSeed` creates `customer@localhost` on `demo` and `customer2@localhost` on `demo2` when that firm's adviser exists. Tests create people. |
+| R19 | Do not seed a demo Customer. Tests create people. |
 
 ---
 
@@ -296,7 +296,7 @@ Keep [api-design.md](../api-design.md) §7.4 pointing here for Customer field ru
 
 ## 9. UI
 
-None in this slice. The Adviser Portal Customers list / form belongs to the later-pages cut in [portals/adviser-portal.md](../portals/adviser-portal.md). Default home = Customers is a portal contract, not a deliverable of this slice.
+None in this slice. The Adviser Portal Customers list / form belongs to the later-pages cut in [adviser-portal/adviser-portal.md](../adviser-portal/adviser-portal.md). Default home = Customers is a portal contract, not a deliverable of this slice.
 
 ---
 
@@ -329,7 +329,6 @@ No new ADR.
 | List | Reused envelope; `enabledOnly`; item includes `status` + `adviserId`; TenantAdmin may pass `adviserId=` |
 | Portal | No page in this slice |
 | Customer login | Login principal remains; `adviser-portal` issues no code; this collection 403 |
-| Demo seed person | Development: `customer@localhost` on `demo`, `customer2@localhost` on `demo2` |
 
 Still open, not this slice:
 

@@ -126,7 +126,7 @@ Keep the resource catalog in [api-design.md](../api-design.md) pointing here for
 
 ## 9. UI
 
-<!-- Portal impact, or "None in this slice. Pages live in docs/portals/." -->
+<!-- Portal impact, or "None in this slice. Pages live in docs/adviser-portal/." -->
 
 ---
 

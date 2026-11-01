@@ -323,7 +323,7 @@ Development mock prices are not a UI. SystemAdmin uses Scalar (and later Back Of
 
 Contribute to host `TestSeed` (Development and TestAppHost only). Not `0010_instruments.sql`. Not Production. Idempotent on `(TenantId, Symbol)`.
 
-Target: the Development seed tenants `demo` and `demo2` (people seed). Skip a tenant that is absent. CreatedBy = system name.
+Target: the existing Development demo tenant (Phase 1 people seed). CreatedBy = system name.
 
 | Symbol | Name | QuoteCurrency | IsActive |
 | --- | --- | --- | --- |
@@ -369,7 +369,7 @@ Locked:
 | Columns | No ISIN / Exchange / Kind / price |
 | Port methods | `IMarketData.TryGetPrice`, `IFxRate.GetRate` |
 | Portal | No page in this slice. SystemAdmin uses Scalar |
-| TestSeed | VTI, AIA, NZD-CASH on Development tenants `demo` and `demo2`; mock prices for the first two |
+| TestSeed | VTI, AIA, NZD-CASH on the Development demo tenant; mock prices for the first two |
 
 Still open, not this slice:
 

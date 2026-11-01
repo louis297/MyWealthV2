@@ -88,6 +88,8 @@ Customer receives 403. No Adviser Portal activity page in this increment.
 - Draft / unposted rows
 - `UPDATE` / `DELETE` of a posted transaction, except the single `ReversedByTransactionId` write on reverse (amendment 2026-10-13)
 - Customer ledger-write; Customer Portal
+
+**Amendment for Customer Portal (accepted 2026-11-02).** Supersedes the Customer 403 sentences for reads. Grant Customer `transactions.read`. List / get for the caller’s own accounts only. Other customer’s transaction or account id → 404. No `transactions.create`.
 - SystemAdmin ledger screens on `adviser-portal`
 - Empty holdings tables “for later”
 - Seeding from the SQL script or in Production
@@ -328,7 +330,7 @@ Cross-tenant or wrong-collection id → **404**, not 403.
 
 ## 9. UI
 
-None in this increment. Pages live in [docs/portals/](../portals/). Scalar is enough for SystemAdmin and for local smoke.
+None in this increment. Pages live in [docs/adviser-portal/](../adviser-portal/). Scalar is enough for SystemAdmin and for local smoke.
 
 ---
 
@@ -340,7 +342,7 @@ None in this increment. Pages live in [docs/portals/](../portals/). Scalar is en
 | Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403; happy TransferIn/Out/Interest/Opening/CloseOut; Opening rejected after another type; second Opening rejected; close rejected while SUM ≠ 0; create rejected while Closed; reverse new id, original economic legs untouched, original `reversedByTransactionId` set; already reversed → 400; idempotent replay; hash mismatch 409; missing key 400; account JSON includes `cashBalance` |
 | Infrastructure.IntegrationTests | Other tenant’s id → 404; Adviser unassigned Customer → 404; no `Accounts.Balance`; no `Journals` table |
 
-TestSeed (Development / TestAppHost only): one `TransferIn` on “Demo everyday bank” for each Development seed tenant (`demo` and `demo2`) so Scalar shows a non-zero `SUM`. Functional tests still create their own rows. Do not seed a fake two-account transfer.
+TestSeed (Development / TestAppHost only): one `TransferIn` on “Demo everyday bank” so Scalar shows a non-zero `SUM`. Functional tests still create their own rows. Do not seed a fake two-account transfer.
 
 ---
 

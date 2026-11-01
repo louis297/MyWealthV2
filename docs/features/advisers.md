@@ -23,7 +23,7 @@ related:
 
 TenantAdmin Adviser HTTP: list / get / create (Identity dual-write) / rename / disable / enable. Tables, `User` factory, dual-write, `TargetDisabled`, policy `advisers.manage`, and `UserDisabled` revocation already exist (identity-auth + tenant-admins). This slice does not add a script or a new policy name.
 
-Unlike tenant-admins: caller and scope are the current tenant; disable is blocked while assigned Customers are not Disabled. The portal Advisers page is not this slice (see [adviser-portal](../portals/adviser-portal.md)).
+Unlike tenant-admins: caller and scope are the current tenant; disable is blocked while assigned Customers are not Disabled. The portal Advisers page is not this slice (see [adviser-portal](../adviser-portal/adviser-portal.md)).
 
 Landed in GitHub master 2026-09-14 (`8e5568c`, hosted-login smoke after create).
 
@@ -56,7 +56,7 @@ A TenantAdmin creates an Adviser in **their** tenant (`name`, `email`, `password
 - Physical delete
 - “Cannot disable the last Adviser” (no such gap; the only guard is assigned Customers)
 - Shipping Customer HTTP (tests may `User.Create(Customer)` directly)
-- Adviser Portal Advisers page (portals)
+- Adviser Portal Advisers page (docs/adviser-portal/)
 - SystemAdmin managing Advisers (Scalar is for TenantAdmins)
 
 ---
@@ -94,7 +94,7 @@ A TenantAdmin creates an Adviser in **their** tenant (`name`, `email`, `password
 | R15 | No physical delete. |
 | R16 | List is current tenant, `Role=Adviser` only. Every item includes `status` and `isActive`. `enabledOnly` omitted/`false` = every Status; `true` = `IsActive = 1`; any other value 400. `page` default 1, `pageSize` default 20 max 100. Optional `search`: Name / Email contains (CI) or person PublicId exact. Sort name then email. No `tenantId=` or `status=` query. |
 | R17 | **Cross-tenant 404**: another tenant’s Adviser PublicId → GET/PUT/disable/enable 404, same as missing. Same-tenant PublicId whose Role is not Adviser (TenantAdmin / Customer) → 404. Two-tenant fixture required. |
-| R18 | Development seeds `adviser@localhost` on `demo` and `adviser2@localhost` on `demo2`, same password as the SystemAdmin seed. Tests create people. |
+| R18 | Do not seed a demo Adviser. Tests create people. |
 
 ---
 
@@ -239,7 +239,7 @@ Keep [api-design.md](../api-design.md) §7.4 pointing here for Adviser field rul
 
 ## 9. UI
 
-None in this slice. The Adviser Portal Advisers list / form belongs to the later-pages cut in [portals/adviser-portal.md](../portals/adviser-portal.md).
+None in this slice. The Adviser Portal Advisers list / form belongs to the later-pages cut in [adviser-portal/adviser-portal.md](../adviser-portal/adviser-portal.md).
 
 ---
 
@@ -268,7 +268,6 @@ No new ADR.
 | Disable guard | Domain `DisableAdviser(bool)`; assigned non-disabled Customer → ordinary 400, not §4.1 |
 | List | Reused envelope; `enabledOnly`; item includes `status` |
 | Portal | No page in this slice |
-| Demo seed person | Development: `adviser@localhost` on `demo`, `adviser2@localhost` on `demo2` |
 
 Still open, not this slice:
 

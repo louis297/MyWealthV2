@@ -404,7 +404,7 @@ Exact cookie names may follow the framework default for a named scheme. They mus
 - BFF cookie (`__Host-bff-adviser-portal`) and Back Office host cookie stay on their own origins. Access and refresh stay server-side on those hosts.
 - Protocol paths stay OpenIddict defaults. No custom `/auth/login`.
 - Refresh store, lifetimes, and revocation events (password change, person disable, tenant disable) stay as identity-auth.
-- `customer-portal` stays unregistered. When it is registered later, it gets its own scheme the same way.
+- `customer-portal` stays unregistered until the 2026-11-02 amendment. When registered, it gets its own scheme the same way.
 
 **Acceptance (amendment A14–A17).**
 
@@ -414,6 +414,24 @@ Exact cookie names may follow the framework default for a named scheme. They mus
 | A15 | Seed SystemAdmin logged in on `back-office` | Browser opens Adviser Portal (client `adviser-portal`) | Portal does not silently complete as SystemAdmin. Hosted `/login` is shown for `adviser-portal`. |
 | A16 | Both clients have a valid identity cookie for different subjects | Sign out on Adviser Portal (`client_id=adviser-portal`) | Only the `adviser-portal` scheme cookie is cleared. Back Office identity cookie remains. Next Back Office visit does not force login. |
 | A17 | Authorize request for `back-office` with a valid `adviser-portal` cookie present and no `back-office` cookie | IdentityHost processes `/connect/authorize` | Does not issue a code from the `adviser-portal` cookie. Redirects to `/login` for `back-office`. |
+
+### Amendment 2026-11-02 (Customer Portal client)
+
+Accepted with [bff-customer-portal.md](bff-customer-portal.md) and [../customer-portal/customer-portal.md](../customer-portal/customer-portal.md). Do not rewrite R1–R21 or earlier amendments in place. No new table. No protocol-path remap. No second identity host.
+
+- Client `customer-portal` is confidential. Secret `Identity:CustomerPortalClientSecret` comes from the Aspire parameter `customer-portal-client-secret` (not in git). PKCE stays. The BFF exchanges the code. The browser does not.
+- Allow-list row: `customer-portal` → Customer only. TenantAdmin, Adviser, and SystemAdmin receive no code. Failure copy stays uniform.
+- Redirect `{bffOrigin}/signin-oidc`. Post-logout `{bffOrigin}/`. The origin is the `bff-customer-portal` https browser entry.
+- Per-client cookie scheme: `customer-portal` (name example `.AspNetCore.Identity.CustomerPortal`). Same rules as the 2026-10-27 amendment. Authorize and hosted login authenticate / sign-in only against this scheme for `client_id=customer-portal`. Logout clears only this scheme.
+
+**Acceptance (amendment A18–A21).**
+
+| Id | Given | When | Then |
+| --- | --- | --- | --- |
+| A18 | Active Customer + correct password | Hosted login for client `customer-portal` | Authorization code issued. BFF can redeem. |
+| A19 | Active TenantAdmin / Adviser / SystemAdmin + correct password | Hosted login for client `customer-portal` | No authorization code. Uniform failure. |
+| A20 | Active Customer logged in on `customer-portal` (identity cookie for that scheme set) | Browser opens Adviser Portal (client `adviser-portal`) | Adviser Portal does not silently complete as Customer. Hosted `/login` is shown. |
+| A21 | Both `customer-portal` and `adviser-portal` have a valid identity cookie | Sign out on Customer Portal (`client_id=customer-portal`) | Only the `customer-portal` scheme cookie is cleared. Adviser Portal identity cookie remains. |
 
 ### Amendment 2026-09-14 (R21 — end session)
 

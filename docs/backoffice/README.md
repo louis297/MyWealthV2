@@ -16,7 +16,7 @@ related:
 
 Platform-ops UI for SystemAdmin. Independent of the Adviser Portal.
 
-The Adviser Portal (`docs/portals/`) is a first-party firm UI (React + BFF).  
+The Adviser Portal (`docs/adviser-portal/`) is a first-party firm UI (React + BFF).  
 This folder owns the Back Office host only.
 
 | Doc | Owns |

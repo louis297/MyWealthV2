@@ -90,6 +90,8 @@ A shared request pipeline checks the coarse policy, the tenant grant, and allowe
 
 Note: Customer has `reports.customer.read` but no first-phase UI. The policy exists so a later Customer Portal (or other client) can list and download without a policy change.
 
+**Amendment for Customer Portal (accepted 2026-11-02).** Supersedes R5 for request only. Grant Customer `reports.customer.create` in addition to `reports.customer.read`. `POST /reports/request` succeeds only when `parameters.customerId` is the caller (else 404). `POST /reports/schedules` and other schedule verbs stay 403 for Customer. Book-scoped routes stay 403. See [../customer-portal/customer-portal.md](../customer-portal/customer-portal.md) for the UI contract.
+
 ---
 
 ## 3. Stories
@@ -168,7 +170,7 @@ Script: `database/schema/0019_reports.sql`.
 
 Hangfire tables in schema `Hangfire`.
 
-Seed the two first-phase reports (by Code) in `0019_reports.sql`. Development / TestAppHost `TestSeed` grants both (`customer-transactions`, `adviser-balances`) to the Development seed tenants `demo` and `demo2`. Idempotent on `(TenantId, ReportId)`. Not a schema script. Not Production. New tenants are **not** auto-granted.
+Seed the two first-phase reports (by Code) in `0019_reports.sql`. Development / TestAppHost `TestSeed` grants both (`customer-transactions`, `adviser-balances`) to the demo tenant. Idempotent on `(TenantId, ReportId)`. Not a schema script. Not Production. New tenants are **not** auto-granted.
 
 ### 6.1 Scope and AllowedTriggers columns
 
@@ -483,7 +485,7 @@ Catalog `IsActive` and `AllowedTriggers` are managed by SystemAdmin on the Back 
 - `PUT /reports/{id}` with `allowedTriggers` that omits `"scheduled"` disables every ReportSchedule for that report (IsActive false + Hangfire RemoveIfExists). Rows stay. No grants are revoked. Adding `"scheduled"` does not re-enable those schedules.
 - `GET /reports/executions` accepts optional `reportId`. When present, `totalCount` and `items` are limited to that report after the caller scope filter.
 - Tenant without grant cannot see or run the report.
-- `TestSeed` grants both seeded reports to the Development seed tenants `demo` and `demo2`. A second run keeps the same rows. Any other tenant is not granted.
+- `TestSeed` grants both seeded reports to the demo tenant. A second run keeps the same rows. Another tenant is not granted.
 - Customer Transactions rejects an unassigned Customer for an Adviser; requires from/to; default excludes Closed; reversal sits next to original.
 - Adviser Balances: non-Adviser omitting adviserId → 400; zero cash accounts omitted; quantity ≤ 0 holdings omitted; asOf set server-side; subtotals present.
 - Schedule update changes the Hangfire recurring definition.

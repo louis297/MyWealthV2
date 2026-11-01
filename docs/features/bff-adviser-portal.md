@@ -15,13 +15,13 @@ related:
   - ../adr/0014-openiddict-authorization-code-pkce.md
   - ../adr/0016-bff-for-first-party-portals.md
   - identity-auth.md
-  - ../portals/adviser-portal.md
-  - ../portals/frontend-conventions.md
+  - ../adviser-portal/adviser-portal.md
+  - ../adviser-portal/frontend-conventions.md
 ---
 
 # Adviser Portal BFF
 
-Session edge for the Adviser Portal. The SPA stops being the OIDC client. Aspire resource `bff-adviser-portal` (`src/BffAdviserPortal`) runs cookie auth, the OpenID Connect handler against `identity`, and a reverse proxy to `webapi`. Tokens never enter the browser. Pages, fields, and resource HTTP stay in [adviser-portal.md](../portals/adviser-portal.md) and the Feature Specs that own those routes.
+Session edge for the Adviser Portal. The SPA stops being the OIDC client. Aspire resource `bff-adviser-portal` (`src/BffAdviserPortal`) runs cookie auth, the OpenID Connect handler against `identity`, and a reverse proxy to `webapi`. Tokens never enter the browser. Pages, fields, and resource HTTP stay in [adviser-portal.md](../adviser-portal/adviser-portal.md) and the Feature Specs that own those routes.
 
 This file is a build contract. ADR 0016 is accepted. Landed on repo master `5e85e9c` (2026-10-01, `78d7eb4`…`5e85e9c`). Do not implement from a chat summary; implement from this file.
 
@@ -245,7 +245,7 @@ Adviser Portal pages cut C stay. Changes limited to session plumbing:
 - `/forbidden` stays a second line for a leftover **wrong-role** session. Customer must not obtain a cookie (R9).
 - No React password page.
 
-Construction notes (`review`): add a BFF cut to [frontend-implementation-notes.md](../portals/frontend-implementation-notes.md) when this spec is accepted. Do not rebuild pages to ship the BFF.
+Construction notes (`review`): add a BFF cut to [frontend-implementation-notes.md](../adviser-portal/frontend-implementation-notes.md) when this spec is accepted. Do not rebuild pages to ship the BFF.
 
 ---
 
@@ -316,7 +316,7 @@ Repo master `5e85e9c` (2026-10-01). Agents must not replay this list.
 | `6aae5c7` | Adviser Portal pointed at the BFF (no SPA `/callback`, no token persist, `/api` + credentials, `X-MyWealth-Request` on mutations) |
 | `5e85e9c` | Portal CORS removed from `webapi` (`AddCors` / `UseCors` gone). Scalar stays on `webapi` and does not need a portal origin |
 
-Aspire parameter `adviser-portal-client-secret` (`secret: true`, not in git) feeds `Identity:AdviserPortalClientSecret` and `Authentication:ClientSecret`. First AppHost run prompts; user-secrets key is `Parameters:adviser-portal-client-secret`. Portal adaptation record: [adviser-portal-bff-cut.md](../portals/adviser-portal-bff-cut.md).
+Aspire parameter `adviser-portal-client-secret` (`secret: true`, not in git) feeds `Identity:AdviserPortalClientSecret` and `Authentication:ClientSecret`. First AppHost run prompts; user-secrets key is `Parameters:adviser-portal-client-secret`. Portal adaptation record: [adviser-portal-bff-cut.md](../adviser-portal/adviser-portal-bff-cut.md).
 
 Landed deviation: §11 named YARP. The tree uses `ApiProxy` + `IWebApiTransport`. Do not add YARP unless a later amendment says so. Allow-list prefixes in code: `/users`, `/tenants`, `/currencies`, `/accounts`, `/instruments`, `/transactions`. Net-worth read model (accepted 2026-10-12) adds prefix `/net-worth` for `GET /net-worth`; the Customer read reuses `/users` (`GET /users/customers/{id}/net-worth`).
 ---
