@@ -18,6 +18,10 @@ public static class TestSeed
 
     public const string DemoCustomerName = "Demo Customer";
 
+    public const string SecondCustomerEmail = "customer2@localhost";
+
+    public const string SecondCustomerName = "Demo Customer 2";
+
     public static async Task SeedAsync(IServiceProvider services, CancellationToken cancellationToken)
     {
         var db = services.GetRequiredService<ApplicationDbContext>();
