@@ -108,6 +108,20 @@ var customerBff = builder.AddProject<Projects.BffCustomerPortal>(Services.BffCus
 customerBff.WithEnvironment("Authentication__PublicOrigin", customerBff.GetEndpoint("https"));
 identity.WithEnvironment("Identity__CustomerPortalOrigins__0", customerBff.GetEndpoint("https"));
 
+var customerPortal = builder.AddViteApp(Services.CustomerPortal, "../CustomerPortal")
+    .WithExternalHttpEndpoints()
+    .WithEnvironment("BROWSER", "none")
+    .WithEnvironment("VITE_BFF_HTTP", customerBff.GetEndpoint("https"))
+    .WithUrls(context =>
+    {
+        foreach (var url in context.Urls)
+        {
+            url.DisplayLocation = UrlDisplayLocation.DetailsOnly;
+        }
+    });
+
+customerBff.WithEnvironment("Spa__DevServerUrl", customerPortal.GetEndpoint("http"));
+
 var backOfficeClientSecret = builder.AddParameter("back-office-client-secret", secret: true);
 
 identity.WithEnvironment("Identity__BackOfficeClientSecret", backOfficeClientSecret);
