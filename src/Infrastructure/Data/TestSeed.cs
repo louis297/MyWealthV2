@@ -26,9 +26,10 @@ public static class TestSeed
     {
         var db = services.GetRequiredService<ApplicationDbContext>();
         var prices = services.GetRequiredService<MarketDataMock>();
-        await SeedAsync(db, prices, cancellationToken);
-        await EnsureDemoCustomerAsync(services, db, cancellationToken);
-        await EnsureDemoAccountsAsync(db, prices, cancellationToken);
+        foreach (var firm in Firms)
+        {
+            await SeedFirmAsync(services, db, prices, firm, cancellationToken);
+        }
     }
 
     public static async Task SeedAsync(
@@ -36,14 +37,47 @@ public static class TestSeed
         MarketDataMock prices,
         CancellationToken cancellationToken)
     {
+        foreach (var firm in Firms)
+        {
+            await SeedFirmAsync(services: null, db, prices, firm, cancellationToken);
+        }
+    }
+
+    private readonly record struct SeedFirm(
+        string TenantCode,
+        string AdviserEmail,
+        string CustomerEmail,
+        string CustomerName);
+
+    private static readonly SeedFirm[] Firms =
+    [
+        new(
+            DevelopmentIdentitySeeder.DemoTenantCode,
+            DevelopmentIdentitySeeder.AdviserEmail,
+            DemoCustomerEmail,
+            DemoCustomerName),
+        new(
+            DevelopmentIdentitySeeder.SecondTenantCode,
+            DevelopmentIdentitySeeder.SecondAdviserEmail,
+            SecondCustomerEmail,
+            SecondCustomerName),
+    ];
+
+    private static async Task SeedFirmAsync(
+        IServiceProvider? services,
+        ApplicationDbContext db,
+        MarketDataMock prices,
+        SeedFirm firm,
+        CancellationToken cancellationToken)
+    {
         var tenant = await db.Tenants.SingleOrDefaultAsync(
-            row => row.Code == DevelopmentIdentitySeeder.DemoTenantCode, cancellationToken);
+            row => row.Code == firm.TenantCode, cancellationToken);
         if (tenant is null)
         {
             return;
         }
 
-        await EnsureDemoReportGrantsAsync(db, tenant.Id, cancellationToken);
+        await EnsureReportGrantsAsync(db, tenant.Id, cancellationToken);
 
         var usd = Currency.Create("USD", "United States Dollar", 2);
         var nzd = Currency.Create("NZD", "New Zealand Dollar", 2);
@@ -58,14 +92,19 @@ public static class TestSeed
         prices.SetPrice(vti.Id, Money.Create(250m, "USD"));
         prices.SetPrice(aia.Id, Money.Create(8.50m, "NZD"));
 
-        await EnsureDemoAccountsAsync(db, prices, cancellationToken);
+        if (services is not null)
+        {
+            await EnsureCustomerAsync(services, db, tenant, firm, cancellationToken);
+        }
+
+        await EnsureAccountsAsync(db, prices, tenant.Id, firm.CustomerEmail, cancellationToken);
     }
 
     private const string CustomerTransactionsCode = "customer-transactions";
 
     private const string AdviserBalancesCode = "adviser-balances";
 
-    private static async Task EnsureDemoReportGrantsAsync(
+    private static async Task EnsureReportGrantsAsync(
         ApplicationDbContext db,
         int tenantId,
         CancellationToken cancellationToken)
@@ -125,22 +164,17 @@ public static class TestSeed
         return instrument;
     }
 
-    private static async Task EnsureDemoCustomerAsync(
+    private static async Task EnsureCustomerAsync(
         IServiceProvider services,
         ApplicationDbContext db,
+        Tenant tenant,
+        SeedFirm firm,
         CancellationToken cancellationToken)
     {
-        var tenant = await db.Tenants.SingleOrDefaultAsync(
-            row => row.Code == DevelopmentIdentitySeeder.DemoTenantCode, cancellationToken);
-        if (tenant is null)
-        {
-            return;
-        }
-
         var adviser = await db.DomainUsers.SingleOrDefaultAsync(
             row => row.TenantId == tenant.Id
                    && row.Role == UserRole.Adviser
-                   && row.Email == DevelopmentIdentitySeeder.AdviserEmail,
+                   && row.Email == firm.AdviserEmail,
             cancellationToken);
         if (adviser is null)
         {
@@ -148,7 +182,7 @@ public static class TestSeed
         }
 
         if (await db.DomainUsers.AnyAsync(
-                row => row.TenantId == tenant.Id && row.Email == DemoCustomerEmail, cancellationToken))
+                row => row.TenantId == tenant.Id && row.Email == firm.CustomerEmail, cancellationToken))
         {
             return;
         }
@@ -158,7 +192,7 @@ public static class TestSeed
         var identityUser = new ApplicationUser
         {
             UserName = publicId.ToString(),
-            Email = DemoCustomerEmail,
+            Email = firm.CustomerEmail,
             EmailConfirmed = true,
             TenantId = tenant.Id
         };
@@ -173,8 +207,8 @@ public static class TestSeed
 
         var customer = User.Create(
             UserRole.Customer,
-            DemoCustomerName,
-            DemoCustomerEmail,
+            firm.CustomerName,
+            firm.CustomerEmail,
             identityUser.Id,
             tenant.Id,
             adviser.Id,
@@ -185,20 +219,15 @@ public static class TestSeed
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private static async Task EnsureDemoAccountsAsync(
+    private static async Task EnsureAccountsAsync(
         ApplicationDbContext db,
         MarketDataMock prices,
+        int tenantId,
+        string customerEmail,
         CancellationToken cancellationToken)
     {
-        var tenant = await db.Tenants.SingleOrDefaultAsync(
-            row => row.Code == DevelopmentIdentitySeeder.DemoTenantCode, cancellationToken);
-        if (tenant is null)
-        {
-            return;
-        }
-
         var customer = await db.DomainUsers.SingleOrDefaultAsync(
-            row => row.TenantId == tenant.Id && row.Email == DemoCustomerEmail, cancellationToken);
+            row => row.TenantId == tenantId && row.Email == customerEmail, cancellationToken);
         if (customer is null)
         {
             return;
@@ -208,24 +237,24 @@ public static class TestSeed
         var nzd = Currency.Create("NZD", "New Zealand Dollar", 2);
 
         await EnsureAccountAsync(
-            db, tenant.Id, customer.Id, "Demo everyday bank", AccountType.Bank, nzd, closed: false,
+            db, tenantId, customer.Id, "Demo everyday bank", AccountType.Bank, nzd, closed: false,
             cancellationToken);
         await EnsureAccountAsync(
-            db, tenant.Id, customer.Id, "Demo brokerage", AccountType.Brokerage, usd, closed: false,
+            db, tenantId, customer.Id, "Demo brokerage", AccountType.Brokerage, usd, closed: false,
             cancellationToken);
         await EnsureAccountAsync(
-            db, tenant.Id, customer.Id, "Demo cash tin", AccountType.Cash, nzd, closed: false,
+            db, tenantId, customer.Id, "Demo cash tin", AccountType.Cash, nzd, closed: false,
             cancellationToken);
         await EnsureAccountAsync(
-            db, tenant.Id, customer.Id, "Demo closed other", AccountType.Other, nzd, closed: true,
+            db, tenantId, customer.Id, "Demo closed other", AccountType.Other, nzd, closed: true,
             cancellationToken);
-        await EnsureDemoEverydayTransferAsync(db, tenant.Id, customer.Id, cancellationToken);
-        await EnsureDemoBrokerageOpeningAsync(db, tenant.Id, customer.Id, cancellationToken);
-        await EnsureDemoBrokerageFundingAsync(db, tenant.Id, customer.Id, cancellationToken);
-        await EnsureDemoBrokerageBuyAsync(db, prices, tenant.Id, customer.Id, cancellationToken);
-        await EnsureDemoBrokerageStockInAsync(db, tenant.Id, customer.Id, cancellationToken);
-        await EnsureDemoBrokerageSplitAsync(db, tenant.Id, customer.Id, cancellationToken);
-        await SyncDemoBrokerageHoldingAsync(db, tenant.Id, customer.Id, cancellationToken);
+        await EnsureDemoEverydayTransferAsync(db, tenantId, customer.Id, cancellationToken);
+        await EnsureDemoBrokerageOpeningAsync(db, tenantId, customer.Id, cancellationToken);
+        await EnsureDemoBrokerageFundingAsync(db, tenantId, customer.Id, cancellationToken);
+        await EnsureDemoBrokerageBuyAsync(db, prices, tenantId, customer.Id, cancellationToken);
+        await EnsureDemoBrokerageStockInAsync(db, tenantId, customer.Id, cancellationToken);
+        await EnsureDemoBrokerageSplitAsync(db, tenantId, customer.Id, cancellationToken);
+        await SyncDemoBrokerageHoldingAsync(db, tenantId, customer.Id, cancellationToken);
     }
 
     private const string DemoBrokerageOpeningReference = "TestSeed-DemoBrokerage-OpeningHoldings";

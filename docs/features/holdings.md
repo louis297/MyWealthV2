@@ -227,7 +227,7 @@ None. Pages live in [docs/portals/](../portals/). Scalar is enough.
 | Application.FunctionalTests | 401; Customer 403; OpeningHoldings happy path; second instrument allowed; same instrument 400; disabled instrument 400; Bank 400; cash field 400; reverse; close rejected while quantity remains; holdings read includes `id` |
 | Infrastructure.IntegrationTests | Other tenant 404; Adviser unassigned 404; no quantity column on `Accounts`; no free-text symbol; `PublicId` on `Holdings` |
 
-TestSeed (Development / TestAppHost only): one `OpeningHoldings` on Demo brokerage for an existing TestSeed instrument. Not a Buy. Functional tests create their own rows.
+TestSeed (Development / TestAppHost only): one `OpeningHoldings` on Demo brokerage for an existing TestSeed instrument, on each Development seed tenant (`demo` and `demo2`). Not a Buy. Functional tests create their own rows.
 
 ---
 

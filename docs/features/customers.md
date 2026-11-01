@@ -104,7 +104,7 @@ A Customer may complete authorization-server login (tests / reserved). There is 
 | R16 | **Who may set the adviser.** TenantAdmin create requires `adviserId` (Adviser PublicId). Adviser create: omit `adviserId` = self; if present it must equal the caller’s PublicId, else 400 ordinary validation (not 404 — the caller is assigning, not reading someone else’s row). An Adviser cannot reassign. |
 | R17 | **Scope.** TenantAdmin: current tenant, Role=Customer. Adviser: current tenant, Role=Customer, and `AdviserId` = self. Cross-tenant, same-tenant but not assigned, same-tenant but Role is not Customer → GET/PUT/disable/enable 404. Two-tenant fixture required. |
 | R18 | List is current tenant, `Role=Customer` only. Every item includes `status`, `isActive`, and `adviserId`. `enabledOnly` omitted/`false` = every Status; `true` = `IsActive = 1`; any other value 400. `page` default 1, `pageSize` default 20 max 100. Optional `search`: Name / Email contains (CI) or person PublicId exact. Sort name then email. No `tenantId=` or `status=` query. Optional `adviserId=` (Adviser PublicId): TenantAdmin filters by that Adviser; unknown / other-tenant adviser → empty list (do not 404; this is a filter). Adviser with `adviserId=`: equal to self → ignore (already scoped); any other value → 400. |
-| R19 | Do not seed a demo Customer. Tests create people. |
+| R19 | Development `TestSeed` creates `customer@localhost` on `demo` and `customer2@localhost` on `demo2` when that firm's adviser exists. Tests create people. |
 
 ---
 
@@ -329,6 +329,7 @@ No new ADR.
 | List | Reused envelope; `enabledOnly`; item includes `status` + `adviserId`; TenantAdmin may pass `adviserId=` |
 | Portal | No page in this slice |
 | Customer login | Login principal remains; `adviser-portal` issues no code; this collection 403 |
+| Demo seed person | Development: `customer@localhost` on `demo`, `customer2@localhost` on `demo2` |
 
 Still open, not this slice:
 

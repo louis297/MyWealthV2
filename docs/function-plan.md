@@ -198,7 +198,7 @@ Session edge is [features/bff-adviser-portal.md](features/bff-adviser-portal.md)
 ### 5.3 Phase 2 conventions (agreed 2026-09-20)
 
 - **SystemAdmin on ledger APIs.** Phase 2 resource APIs grant SystemAdmin the same write surface as TenantAdmin (and read). The caller has no `TenantId`; list and create take the target tenant’s PublicId. Get / update / disable by resource PublicId may cross tenants. Cross-tenant 404 applies to TenantAdmin / Adviser only. Adviser Portal still has no SystemAdmin ledger screens — Scalar now, Back Office later. Do not reopen Phase 1 people routes (`/users/advisers`, `/users/customers`) for SystemAdmin in this phase.
-- **Test seed per slice.** Each Phase 2 Feature Spec adds rows to a dedicated Development / TestAppHost seeder (`TestSeed`). Not a schema script. Not production. Idempotent on natural keys. Functional tests still create their own isolation data; the seeder is for local Scalar / host smoke.
+- **Test seed per slice.** Each Phase 2 Feature Spec adds rows to a dedicated Development / TestAppHost seeder (`TestSeed`). Not a schema script. Not production. Idempotent on natural keys. Functional tests still create their own isolation data; the seeder is for local Scalar / host smoke. Development seeds two firms, `demo` and `demo2`. `TestSeed` copies the demo book (customer, instruments, accounts, postings, holdings, and the two report grants) onto both. Any other tenant is not seeded.
 
 ### 5.4 Not locked (do not invent tables from this list)
 

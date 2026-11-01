@@ -340,7 +340,7 @@ None in this increment. Pages live in [docs/portals/](../portals/). Scalar is en
 | Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403; happy TransferIn/Out/Interest/Opening/CloseOut; Opening rejected after another type; second Opening rejected; close rejected while SUM ≠ 0; create rejected while Closed; reverse new id, original economic legs untouched, original `reversedByTransactionId` set; already reversed → 400; idempotent replay; hash mismatch 409; missing key 400; account JSON includes `cashBalance` |
 | Infrastructure.IntegrationTests | Other tenant’s id → 404; Adviser unassigned Customer → 404; no `Accounts.Balance`; no `Journals` table |
 
-TestSeed (Development / TestAppHost only): one `TransferIn` on “Demo everyday bank” so Scalar shows a non-zero `SUM`. Functional tests still create their own rows. Do not seed a fake two-account transfer.
+TestSeed (Development / TestAppHost only): one `TransferIn` on “Demo everyday bank” for each Development seed tenant (`demo` and `demo2`) so Scalar shows a non-zero `SUM`. Functional tests still create their own rows. Do not seed a fake two-account transfer.
 
 ---
 
