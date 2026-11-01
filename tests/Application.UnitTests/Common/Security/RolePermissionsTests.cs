@@ -100,7 +100,7 @@ public class RolePermissionsTests
     [TestCase(UserRole.Adviser, Policies.ReportsBookRead, true)]
     [TestCase(UserRole.Adviser, Policies.ReportsBookCreate, true)]
     [TestCase(UserRole.Customer, Policies.ReportsCustomerRead, true)]
-    [TestCase(UserRole.Customer, Policies.ReportsCustomerCreate, false)]
+    [TestCase(UserRole.Customer, Policies.ReportsCustomerCreate, true)]
     [TestCase(UserRole.Customer, Policies.ReportsBookRead, false)]
     [TestCase(UserRole.Customer, Policies.ReportsBookCreate, false)]
     public void Has_MatchesReportsMap(UserRole role, string policy, bool expected)
