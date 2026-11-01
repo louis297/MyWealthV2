@@ -23,6 +23,12 @@ public static class DevelopmentIdentitySeeder
     public const string AdviserEmail = "adviser@localhost";
     public const string AdviserPassword = SystemAdminPassword;
 
+    public const string SecondTenantCode = "demo2";
+    public const string SecondTenantName = "Demo Advisory 2";
+
+    public const string SecondTenantAdminEmail = "tenant-admin2@localhost";
+    public const string SecondAdviserEmail = "adviser2@localhost";
+
     public static async Task SeedAsync(IServiceProvider services, CancellationToken cancellationToken)
     {
         var db = services.GetRequiredService<ApplicationDbContext>();
@@ -44,39 +50,62 @@ public static class DevelopmentIdentitySeeder
             return;
         }
 
+        await SeedFirmsAsync(services, cancellationToken);
+    }
+
+    public static async Task SeedFirmsAsync(IServiceProvider services, CancellationToken cancellationToken)
+    {
+        var db = services.GetRequiredService<ApplicationDbContext>();
+        var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
         var catalog = services.GetRequiredService<ICurrencyCatalog>();
         var nzd = catalog.TryGet("NZD")
-                  ?? throw new InvalidOperationException("NZD must exist before seeding the demo tenant.");
+                  ?? throw new InvalidOperationException("NZD must exist before seeding a development tenant.");
 
-        var tenant = await db.Tenants.SingleOrDefaultAsync(
-            row => row.Code == DemoTenantCode, cancellationToken);
-        if (tenant is null)
+        foreach (var firm in Firms)
         {
-            tenant = Tenant.Create(DemoTenantName, DemoTenantCode, nzd);
-            db.Tenants.Add(tenant);
-            await db.SaveChangesAsync(cancellationToken);
+            var tenant = await db.Tenants.SingleOrDefaultAsync(
+                row => row.Code == firm.Code, cancellationToken);
+            if (tenant is null)
+            {
+                tenant = Tenant.Create(firm.Name, firm.Code, nzd);
+                db.Tenants.Add(tenant);
+                await db.SaveChangesAsync(cancellationToken);
+            }
+
+            await EnsurePersonAsync(
+                db,
+                userManager,
+                UserRole.TenantAdmin,
+                firm.TenantAdminName,
+                firm.TenantAdminEmail,
+                TenantAdminPassword,
+                tenant.Id,
+                cancellationToken);
+
+            await EnsurePersonAsync(
+                db,
+                userManager,
+                UserRole.Adviser,
+                firm.AdviserName,
+                firm.AdviserEmail,
+                AdviserPassword,
+                tenant.Id,
+                cancellationToken);
         }
-
-        await EnsurePersonAsync(
-            db,
-            userManager,
-            UserRole.TenantAdmin,
-            name: "Tenant Admin",
-            email: TenantAdminEmail,
-            password: TenantAdminPassword,
-            tenant.Id,
-            cancellationToken);
-
-        await EnsurePersonAsync(
-            db,
-            userManager,
-            UserRole.Adviser,
-            name: "Demo Adviser",
-            email: AdviserEmail,
-            password: AdviserPassword,
-            tenant.Id,
-            cancellationToken);
     }
+
+    private readonly record struct DevelopmentFirm(
+        string Code,
+        string Name,
+        string TenantAdminEmail,
+        string TenantAdminName,
+        string AdviserEmail,
+        string AdviserName);
+
+    private static readonly DevelopmentFirm[] Firms =
+    [
+        new(DemoTenantCode, DemoTenantName, TenantAdminEmail, "Tenant Admin", AdviserEmail, "Demo Adviser"),
+    ];
 
     private static async Task EnsurePersonAsync(
         ApplicationDbContext db,
