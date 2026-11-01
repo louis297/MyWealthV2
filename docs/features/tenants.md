@@ -97,7 +97,7 @@ SystemAdmin onboards a firm with `name`, `code`, and an enabled `reportingCurren
 | R14 | No physical delete. FK `Users.TenantId` is RESTRICT. |
 | R15 | List query: `page` (1-based, default 1), `pageSize` (default 20, max 100), optional `isEnabled`, optional `search`. `search` matches Name or Code contains (CI) or `PublicId` exact. Sort: `name` ascending, then `code`. Disabled rows stay on the same list (filter if the caller asks). |
 | R16 | Tenants is a **platform** resource. It has no `TenantId` column. Dual-check isolation of *tenant-owned rows* starts as a reusable two-tenant fixture here and is asserted on later slices. This slice’s own gate is policy 403, not a 404-for-other-tenant pattern. |
-| R17 | Do not seed a demo firm in Development. Tests create tenants. SystemAdmin seed stays identity-auth. |
+| R17 | Development seeds two firms: `demo` (Demo Advisory) and `demo2` (Demo Advisory 2). Tests still create their own tenants. SystemAdmin seed stays identity-auth. |
 
 ---
 
@@ -312,7 +312,7 @@ Do not open a new ADR (0005 / 0007 / 0013 already cover isolation, PublicId, and
 | Concurrency | `rowVersion` required on PUT / disable / enable |
 | List | Envelope `{ items, page, pageSize, totalCount }`; page 1 / size 20 / max 100 |
 | Portal | No page |
-| Demo seed firm | No |
+| Demo seed firm | Development: `demo` and `demo2` |
 
 Still open, not this slice:
 

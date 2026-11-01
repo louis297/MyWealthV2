@@ -105,6 +105,7 @@ public static class DevelopmentIdentitySeeder
     private static readonly DevelopmentFirm[] Firms =
     [
         new(DemoTenantCode, DemoTenantName, TenantAdminEmail, "Tenant Admin", AdviserEmail, "Demo Adviser"),
+        new(SecondTenantCode, SecondTenantName, SecondTenantAdminEmail, "Tenant Admin 2", SecondAdviserEmail, "Demo Adviser 2"),
     ];
 
     private static async Task EnsurePersonAsync(
