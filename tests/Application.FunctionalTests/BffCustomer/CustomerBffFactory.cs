@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using BffCustomer::MyWealthV2.BffCustomerPortal;
 
 namespace MyWealthV2.Application.FunctionalTests.BffCustomer;
 
@@ -14,6 +15,7 @@ public sealed class CustomerBffFactory : WebApplicationFactory<BffCustomer::Prog
     private readonly string _authority;
     private readonly HttpMessageHandler _identityHandler;
     private readonly string _environment;
+    private readonly IWebApiTransport? _api;
     private readonly string? _apiBaseAddress;
     private readonly string? _publicOrigin;
 
@@ -21,12 +23,14 @@ public sealed class CustomerBffFactory : WebApplicationFactory<BffCustomer::Prog
         string authority,
         HttpMessageHandler identityHandler,
         string environment = "Development",
+        IWebApiTransport? api = null,
         string? apiBaseAddress = null,
         string? publicOrigin = null)
     {
         _authority = authority.TrimEnd('/');
         _identityHandler = identityHandler;
         _environment = environment;
+        _api = api;
         _apiBaseAddress = apiBaseAddress;
         _publicOrigin = publicOrigin;
     }
@@ -50,6 +54,10 @@ public sealed class CustomerBffFactory : WebApplicationFactory<BffCustomer::Prog
         {
             services.AddSingleton<IPostConfigureOptions<OpenIdConnectOptions>>(
                 new MyWealthV2.Application.FunctionalTests.Bff.OidcBackchannelPostConfigure(_authority, _identityHandler));
+            if (_api is not null)
+            {
+                services.AddSingleton(_api);
+            }
         });
     }
 

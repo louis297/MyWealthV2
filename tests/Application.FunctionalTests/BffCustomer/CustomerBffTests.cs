@@ -31,6 +31,7 @@ public class CustomerBffTests : TestBase
         _factory = new CustomerBffFactory(
             probe.BaseAddress!.ToString(),
             FunctionalTestSetup.Identity.Server.CreateHandler(),
+            api: new HandlerWebApi(FunctionalTestSetup.WebApiHandler),
             apiBaseAddress: FunctionalTestSetup.WebClient.BaseAddress!.ToString());
         _bff = _factory.CreateClient(new WebApplicationFactoryClientOptions
         {
@@ -268,4 +269,12 @@ public class CustomerBffTests : TestBase
         new(JsonSerializer.Serialize(body), System.Text.Encoding.UTF8, "application/json");
 
     private sealed record LoginStop(Uri? Callback, string? Code);
+
+    private sealed class HandlerWebApi(HttpMessageHandler inner) : BffCustomer::MyWealthV2.BffCustomerPortal.IWebApiTransport
+    {
+        private readonly HttpMessageInvoker _invoker = new(inner, disposeHandler: false);
+
+        public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            _invoker.SendAsync(request, cancellationToken);
+    }
 }
