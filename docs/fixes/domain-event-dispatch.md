@@ -13,6 +13,8 @@ related:
 
 Status: accepted
 
+The transactional outbox left out of scope here is accepted in [ADR 0018](../adr/0018-transactional-outbox.md). Implementation follows [features/outbox.md](../features/outbox.md). This fix remains the record of the previous post-`SaveChanges` dispatch behaviour.
+
 ## Problem
 
 `docs/architecture.md` lists `DispatchDomainEventsInterceptor` among the save interceptors.

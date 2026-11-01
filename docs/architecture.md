@@ -129,12 +129,13 @@ Minimal API → MediatR. Pipeline order:
 
 Logging → UnhandledException → Authorization → Validation → Performance → Handler
 
-Save interceptors and post-save dispatch:
+Save interceptors and domain-event delivery:
 
 - `AuditableEntityInterceptor` is the only registered save interceptor.
-- `DomainEventDispatcher.DispatchAsync` runs from `ApplicationDbContext.SaveChangesAsync` after `base.SaveChangesAsync` returns. The events are **not** part of the database transaction. Inside `ExecuteInTransactionAsync` that call is still before `CommitAsync`, so a handler can see uncommitted work, and a later rollback does not undo the handler.
-- A handler exception is logged and does not fail the save. The command returns success. The side effect is eventually consistent. Token revocation is one of those side effects: a failed revoke does not undo disable, password change, or tenant disable. Those handlers open a new scope because they run during the save and must not reuse that context.
-- When the context has a service provider, events are waiting, and `IMediator` cannot be resolved, dispatch logs an error. In Development that call throws. A context built without a service provider does not dispatch. See [fixes/domain-event-dispatch.md](fixes/domain-event-dispatch.md).
+- Domain events are written to `OutboxMessages` in the same database transaction as the business changes (ADR 0018, accepted). Immediate post-`SaveChanges` MediatR dispatch is removed. Implementation follows [features/outbox.md](features/outbox.md).
+- `Payload` is the serialised domain event. `TenantId` is also a column so the worker can set tenant context without parsing JSON.
+- Delivery is at-least-once from the `worker` (ADR 0017). The worker claims by `Status`, publishes via MediatR in a new scope, then sets `Processed`, `Failed`, or `DeadLettered`. Handlers must be idempotent.
+- A handler failure does not roll back the original command. Token revocation remains eventually consistent, but the event is no longer lost. See [adr/0018-transactional-outbox.md](adr/0018-transactional-outbox.md) and [fixes/domain-event-dispatch.md](fixes/domain-event-dispatch.md).
 
 Writes to Tenant / User check `RowVersion`. Conflict maps to HTTP 409.
 
@@ -311,14 +312,14 @@ Phase 3 introduces a general-purpose background worker (ADR 0017).
 - Manual work is enqueued from `webapi` after the normal policy and handler scope checks.
 - Recurring work is driven by Hangfire recurring jobs whose scope is owned by a schedule record. Generation re-validates that scope.
 - Queues (`reports`, `email`, default) provide light isolation. One worker project is enough until a concrete resource or failure-domain need appears.
-- First consumer: [features/reports.md](features/reports.md). Email and other async tasks land here later unless a later ADR splits them.
+- First consumer: [features/reports.md](features/reports.md). The same worker delivers domain events from `OutboxMessages` (ADR 0018 and [features/outbox.md](features/outbox.md), both accepted). Email and other async tasks land here later unless a later ADR splits them.
 
 ---
 
 ## 11. ADR index (architecture view)
 
 
-Locked conclusions follow function-plan §0 and these ADRs. The `docs/adr/` folder holds English ADRs 0001–0017 (as of 2026-11-01). All are accepted unless a later ADR explicitly supersedes one.
+Locked conclusions follow function-plan §0 and these ADRs. The `docs/adr/` folder holds English ADRs 0001–0018 (as of 2026-11-01). All are accepted unless a later ADR explicitly supersedes one.
 
 | ADR | Constraint on this document |
 | --- | --- |
@@ -338,6 +339,7 @@ Locked conclusions follow function-plan §0 and these ADRs. The `docs/adr/` fold
 | 0015 | `Idempotency-Key` on mutating creates; first consumer `/transactions` |
 | 0016 | First-party portals use a BFF (`bff-adviser-portal`). Browser talks to BFF; BFF holds tokens and calls `webapi` with Bearer. |
 | 0017 | General-purpose background worker (`src/Worker`) with Hangfire. First consumer: Reports. |
+| 0018 | Transactional outbox for domain events (accepted). Same-transaction write to `OutboxMessages`; worker delivers via MediatR. Contract: features/outbox.md (accepted). |
 
 ---
 
@@ -356,3 +358,6 @@ Locked conclusions follow function-plan §0 and these ADRs. The `docs/adr/` fold
 | 2026-10-12 | ADR 0017 proposed: general-purpose `worker` host for Hangfire. First consumer Reports. |
 | 2026-10-14 | ADR 0017 accepted. Reports Feature Spec accepted. QuestPDF. Aspire shared volume for PDF. |
 | 2026-11-01 | ADR index updated: `docs/adr/` holds 0001–0017. Added 0016 (BFF) and 0017 (worker) to the constraint table. CI (GitHub Actions) now runs build + test on push/PR. |
+| 2026-11-01 | ADR 0018 proposed: transactional outbox for domain events. Dispatch section and worker note point at the outbox path. |
+| 2026-11-01 | ADR 0018 accepted. Feature spec [features/outbox.md](features/outbox.md) opened as draft (open items with reference approaches). |
+| 2026-11-01 | [features/outbox.md](features/outbox.md) accepted. Former open items locked to the reference approaches. |

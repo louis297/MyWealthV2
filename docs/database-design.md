@@ -444,6 +444,25 @@ Script `0019_reports.sql`. Field rules: [features/reports.md](features/reports.m
 
 Hangfire tables are created by Hangfire in schema `Hangfire` (documented exception to script-only schema).
 
+### 14.1 Outbox (accepted — ADR 0018, features/outbox.md)
+
+Script `0020_outbox.sql` (not yet landed). Table `OutboxMessages` in the application schema (not `Hangfire`).
+
+| Column | Notes |
+| --- | --- |
+| `Id` | uniqueidentifier |
+| `Type` | `nvarchar(200)`. Event class full name |
+| `Payload` | `nvarchar(max)`. Serialised domain event |
+| `OccurredAt` | datetimeoffset |
+| `TenantId` | nullable |
+| `Status` | `nvarchar(20)` check `Pending` \| `Processing` \| `Processed` \| `Failed` \| `DeadLettered` |
+| `ProcessedAt` | nullable |
+| `Error` | `nvarchar(2000)` nullable |
+| `RetryCount` | int |
+| audit + `RowVersion` | `RowVersion` used when claiming |
+
+Index `(Status, OccurredAt)`. No FK. No `JobId`, `CorrelationId`, or `AggregateId`.
+
 ### Change log
 
 | Date | Change |
@@ -451,3 +470,5 @@ Hangfire tables are created by Hangfire in schema `Hangfire` (documented excepti
 | 2026-10-14 | Reports tables accepted (`0019_reports.sql`). |
 | 2026-10-15 | `0019_reports.sql` landed. AllowedTriggers is a JSON array. No grant rows in the script. |
 | 2026-10-16 | Demo tenant grants for both seeded reports live in `TestSeed`, not in `0019_reports.sql`. |
+| 2026-11-01 | Proposed `OutboxMessages` columns recorded (ADR 0018). No script yet. |
+| 2026-11-01 | Outbox feature accepted. Script name `0020_outbox.sql`. Lengths and index locked. |

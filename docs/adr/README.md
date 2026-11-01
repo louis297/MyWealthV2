@@ -3,7 +3,7 @@ title: Architecture decision records
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-09-25
+updated: 2026-11-01
 ---
 
 # Architecture decision records
@@ -33,5 +33,6 @@ Write an ADR when the choice would surprise a later reader: host, identity, sche
 | [0015](0015-idempotency-keys.md) | `Idempotency-Key` on mutating creates (first consumer: `/transactions`) | accepted |
 | [0016](0016-bff-for-first-party-portals.md) | BFF holds first-party portal OIDC and tokens | accepted |
 | [0017](0017-background-worker.md) | Background worker for async tasks (Hangfire) | accepted |
+| [0018](0018-transactional-outbox.md) | Transactional outbox for domain events | accepted |
 
-0010 is accepted and expanded with [features/instruments.md](../features/instruments.md) (landed `9ea2f2a`). Account container: [features/accounts.md](../features/accounts.md) (landed). Posting / cash book: [features/posting.md](../features/posting.md) (landed `79129eb`). Idempotency: ADR 0015 (`accepted`). 0011 remains direction for holdings / security legs. 0016 is **accepted and landed** (`78d7eb4`…`5e85e9c`) with [features/bff-adviser-portal.md](../features/bff-adviser-portal.md).
+0010 is accepted and expanded with [features/instruments.md](../features/instruments.md) (landed `9ea2f2a`). Account container: [features/accounts.md](../features/accounts.md) (landed). Posting / cash book: [features/posting.md](../features/posting.md) (landed `79129eb`). Idempotency: ADR 0015 (`accepted`). 0011 remains direction for holdings / security legs. 0016 is **accepted and landed** (`78d7eb4`…`5e85e9c`) with [features/bff-adviser-portal.md](../features/bff-adviser-portal.md). 0018 is **accepted**; implementation follows [features/outbox.md](../features/outbox.md) (accepted).
