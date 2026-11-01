@@ -29,6 +29,21 @@ public static class OpenIddictClientUris
             .ToArray();
     }
 
+    public static IReadOnlyList<string> ReadCustomerPortalOrigins(IConfiguration configuration)
+    {
+        var many = configuration.GetSection("Identity:CustomerPortalOrigins").Get<string[]>();
+        if (many is null)
+        {
+            return [];
+        }
+
+        return many
+            .Select(NormalizeOrigin)
+            .OfType<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     public static string ReadBackOfficeOrigin(IConfiguration configuration)
     {
         return NormalizeOrigin(configuration["Identity:BackOfficeOrigin"])

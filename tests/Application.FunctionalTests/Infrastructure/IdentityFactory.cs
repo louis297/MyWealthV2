@@ -17,6 +17,7 @@ public class IdentityFactory(
         builder.UseEnvironment("Development");
         builder.UseSetting("Identity:AdviserPortalClientSecret", AdviserPortalTestSecret.Value);
         builder.UseSetting("Identity:BackOfficeClientSecret", BackOfficeTestSecret.Value);
+        builder.UseSetting("Identity:CustomerPortalClientSecret", CustomerPortalTestSecret.Value);
         if (logs is not null)
         {
             builder.ConfigureLogging(logging => logging.AddProvider(logs));

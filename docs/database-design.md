@@ -194,7 +194,7 @@ Default tables:
 
 | Table | Holds |
 | --- | --- |
-| `OpenIddictApplications` | Clients. Phase 1 row: public client `adviser-portal` |
+| `OpenIddictApplications` | Clients. Phase 1 row: public client `adviser-portal`. Startup upsert also registers confidential `adviser-portal`, `back-office`, and `customer-portal` (no schema script) |
 | `OpenIddictAuthorizations` | Grants |
 | `OpenIddictScopes` | `openid`, `profile`, `offline_access`, `api` |
 | `OpenIddictTokens` | Authorization codes, access tokens, **refresh tokens** |

@@ -41,7 +41,7 @@ Browser
 
 The portal (`adviser-portal`) does not issue tokens. It redirects to `identity`, stores access / refresh after the callback, and calls `webapi` with Bearer.
 
-Phase 1 registers one public OIDC client: `adviser-portal`. IdentityHost allows SystemAdmin, TenantAdmin, and Adviser on that client. A Customer with a correct password does not receive an authorization code for it. Customer Portal is a later second client; it is not registered in Phase 1. Adviser-management resource routes stay 403 for Customer.
+Phase 1 registers one public OIDC client: `adviser-portal`. IdentityHost allows SystemAdmin, TenantAdmin, and Adviser on that client. A Customer with a correct password does not receive an authorization code for it. Client `customer-portal` is the accepted confidential client for Customer only (amendment 2026-11-02). Adviser-management resource routes stay 403 for Customer.
 
 ---
 
@@ -187,7 +187,7 @@ Protocol paths use **OpenIddict defaults. Do not remap.** Portals and `webapi` f
 
 - Custom `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout` as a token issuer
 - Resource Owner Password Credentials
-- The later `customer-portal` client
+- A public `customer-portal` client. The accepted client is confidential and held by `bff-customer-portal`
 - A separate identity SQL database
 - Invitation, forgot-password, MFA, external IdP
 

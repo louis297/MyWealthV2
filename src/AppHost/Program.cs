@@ -80,6 +80,10 @@ bff.WithEnvironment("Authentication__PublicOrigin", bff.GetEndpoint("https"));
 
 identity.WithPortalOrigins(bff);
 
+var customerPortalClientSecret = builder.AddParameter("customer-portal-client-secret", secret: true);
+
+identity.WithEnvironment("Identity__CustomerPortalClientSecret", customerPortalClientSecret);
+
 var backOfficeClientSecret = builder.AddParameter("back-office-client-secret", secret: true);
 
 identity.WithEnvironment("Identity__BackOfficeClientSecret", backOfficeClientSecret);

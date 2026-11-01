@@ -58,6 +58,23 @@ public static class OpenIddictSeeder
             redirects: backOfficeRedirects,
             postLogout: backOfficePostLogout,
             cancellationToken);
+
+        var customerSecret = configuration["Identity:CustomerPortalClientSecret"];
+        if (string.IsNullOrWhiteSpace(customerSecret))
+        {
+            throw new InvalidOperationException("Identity:CustomerPortalClientSecret is required.");
+        }
+
+        var customerOrigins = OpenIddictClientUris.ReadCustomerPortalOrigins(configuration);
+        var (customerRedirects, customerPostLogout) = OpenIddictClientUris.FromOrigins(customerOrigins);
+        await UpsertAsync(
+            manager,
+            clientId: "customer-portal",
+            secret: customerSecret,
+            displayName: "Customer Portal",
+            redirects: customerRedirects,
+            postLogout: customerPostLogout,
+            cancellationToken);
     }
 
     private static async Task UpsertAsync(
