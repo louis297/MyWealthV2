@@ -36,7 +36,8 @@ public static class RolePermissions
             Policies.UsersMe,
             Policies.AccountsRead,
             Policies.TransactionsRead,
-            Policies.ReportsCustomerRead
+            Policies.ReportsCustomerRead,
+            Policies.ReportsCustomerCreate
         ]
     };
 
