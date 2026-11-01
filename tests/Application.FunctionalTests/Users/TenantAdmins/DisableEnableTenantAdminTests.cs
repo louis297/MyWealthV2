@@ -58,7 +58,7 @@ public class DisableEnableTenantAdminTests : TestBase
     }
 
     [Test]
-    public async Task Disable_SetsDisabledAndRevokesRefresh()
+    public async Task Disable_SetsDisabled_AndLeavesTheRefreshToken()
     {
         var tenant = await TestApp.CreateTenantAsync("North Advisory", "north-advisory");
         var tokens = await TenantAdminHttp.SignInSystemAdmin();
@@ -76,7 +76,7 @@ public class DisableEnableTenantAdminTests : TestBase
         item.RootElement.GetProperty("isActive").GetBoolean().ShouldBeFalse();
 
         var refresh = await FunctionalTestSetup.Oidc.RefreshAsync(personTokens.RefreshToken!);
-        refresh.IsSuccessStatusCode.ShouldBeFalse();
+        refresh.IsSuccessStatusCode.ShouldBeTrue();
 
         rowVersion = item.RootElement.GetProperty("rowVersion").GetString();
         var second = await TenantAdminHttp.Send(

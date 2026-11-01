@@ -4,8 +4,10 @@ using FluentValidation.Results;
 using Microsoft.Data.SqlClient;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Domain.Common;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Infrastructure.Data.Entities;
+using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -128,9 +130,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
     {
         try
         {
-            var result = await base.SaveChangesAsync(cancellationToken);
-            await DispatchDomainEvents(cancellationToken);
-            return result;
+            CaptureOutboxMessages();
+            return await base.SaveChangesAsync(cancellationToken);
         }
         catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
         {
@@ -140,8 +141,43 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
         }
     }
 
-    private Task DispatchDomainEvents(CancellationToken cancellationToken) =>
-        DomainEventDispatcher.DispatchAsync(this, _services, cancellationToken);
+    private void CaptureOutboxMessages()
+    {
+        var entities = ChangeTracker.Entries<BaseEntity>()
+            .Where(entry => entry.Entity.DomainEvents.Count > 0)
+            .Select(entry => entry.Entity)
+            .ToList();
+        if (entities.Count == 0)
+        {
+            return;
+        }
+
+        var now = (_services?.GetService<TimeProvider>() ?? TimeProvider.System).GetUtcNow();
+        var createdBy = _services?.GetService<IUser>()?.Id;
+        int? accessorTenantId = _tenantIds is { IsEngaged: true } ? _tenantIds.TenantId : null;
+
+        foreach (var entity in entities)
+        {
+            foreach (var domainEvent in entity.DomainEvents.ToList())
+            {
+                OutboxMessages.Add(new OutboxMessage
+                {
+                    Id = Guid.NewGuid(),
+                    Type = domainEvent.GetType().FullName
+                        ?? throw new InvalidOperationException("Domain event type has no full name."),
+                    Payload = OutboxSerializer.Serialize(domainEvent),
+                    OccurredAt = OutboxSerializer.OccurredAt(domainEvent, now),
+                    TenantId = OutboxSerializer.TenantId(domainEvent, accessorTenantId),
+                    Status = "Pending",
+                    RetryCount = 0,
+                    Created = now,
+                    CreatedBy = createdBy
+                });
+            }
+
+            entity.ClearDomainEvents();
+        }
+    }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

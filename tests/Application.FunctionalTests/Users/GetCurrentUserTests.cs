@@ -52,7 +52,7 @@ public class GetCurrentUserTests : TestBase
     }
 
     [Test]
-    public async Task PasswordChange_RevokesRefresh()
+    public async Task PasswordChange_LeavesTheRefreshToken()
     {
         var tokens = await FunctionalTestSetup.Oidc.SignInAsync(
             DevelopmentIdentitySeeder.SystemAdminEmail,
@@ -71,7 +71,7 @@ public class GetCurrentUserTests : TestBase
         change.StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
         var refresh = await FunctionalTestSetup.Oidc.RefreshAsync(tokens.RefreshToken!);
-        refresh.IsSuccessStatusCode.ShouldBeFalse();
+        refresh.IsSuccessStatusCode.ShouldBeTrue();
     }
 
     [Test]

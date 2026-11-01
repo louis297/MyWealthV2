@@ -55,7 +55,7 @@ public class DisableEnableTenantTests : TestBase
     }
 
     [Test]
-    public async Task Disable_LeavesPeopleActiveAndRevokesRefresh()
+    public async Task Disable_LeavesPeopleActive_AndLeavesTheRefreshToken()
     {
         var tenant = await TestApp.CreateTenantAsync("North Advisory", "north-advisory");
         var person = await TestApp.CreatePersonAsync(
@@ -75,7 +75,7 @@ public class DisableEnableTenantTests : TestBase
         loaded!.Status.ShouldBe(UserStatus.Active);
 
         var refresh = await FunctionalTestSetup.Oidc.RefreshAsync(personTokens.RefreshToken!);
-        refresh.IsSuccessStatusCode.ShouldBeFalse();
+        refresh.IsSuccessStatusCode.ShouldBeTrue();
 
         rowVersion = item.RootElement.GetProperty("rowVersion").GetString();
         var second = await TenantHttp.Send(
@@ -107,7 +107,7 @@ public class DisableEnableTenantTests : TestBase
         enabled.RootElement.GetProperty("isActive").GetBoolean().ShouldBeTrue();
 
         var oldRefresh = await FunctionalTestSetup.Oidc.RefreshAsync(personTokens.RefreshToken!);
-        oldRefresh.IsSuccessStatusCode.ShouldBeFalse();
+        oldRefresh.IsSuccessStatusCode.ShouldBeTrue();
 
         var login = await FunctionalTestSetup.Oidc.SignInAsync("ned@north", "Password1!", "north-advisory");
         login.AccessToken.ShouldNotBeNullOrEmpty();
