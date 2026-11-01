@@ -124,6 +124,8 @@ Later portals copy the last row: `bff-customer-portal`, `BffCustomerPortal`, `sr
 | Schema applicator | On startup, runs scripts that have not been applied. Does not `EnsureDeleted` in the normal path. | `EnsureCreated` / `EnsureDeleted` as daily boot |
 | Command | MediatR write use case. | — |
 | Query | MediatR read use case. | — |
+| Domain event | Fact raised by an aggregate. Persisted to `OutboxMessages` in the same transaction (ADR 0018, accepted). Delivered at-least-once by the worker via MediatR. Contract: [features/outbox.md](features/outbox.md). | Immediate post-`SaveChanges` dispatch; an integration event or message-broker message |
+| Outbox message | Row in `OutboxMessages`. `Type` + `Payload` (serialised domain event) identify the fact. `Status` drives claim and retry. `TenantId` is a column for context. | A Hangfire job; a command record |
 | Endpoint group | Minimal API group under `src/Web/Endpoints`. | MVC controllers as the default style |
 | Feature spec | One deliverable vertical slice under `docs/features/`. | A phase folder of leftover notes |
 | ADR | A decision under `docs/adr/` that is not re-litigated in place. | Rewriting an accepted ADR’s conclusion |

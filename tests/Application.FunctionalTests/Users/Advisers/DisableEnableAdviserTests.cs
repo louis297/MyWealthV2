@@ -56,7 +56,7 @@ public class DisableEnableAdviserTests : TestBase
     }
 
     [Test]
-    public async Task Disable_SetsDisabledAndRevokesRefresh()
+    public async Task Disable_SetsDisabled_AndLeavesTheRefreshToken()
     {
         var (_, tokens) = await AdviserHttp.SignInTenantAdmin();
         var id = await CreateAsync(tokens.AccessToken, "Ned North", "ned@north.example");
@@ -73,7 +73,7 @@ public class DisableEnableAdviserTests : TestBase
         item.RootElement.GetProperty("isActive").GetBoolean().ShouldBeFalse();
 
         var refresh = await FunctionalTestSetup.Oidc.RefreshAsync(personTokens.RefreshToken!);
-        refresh.IsSuccessStatusCode.ShouldBeFalse();
+        refresh.IsSuccessStatusCode.ShouldBeTrue();
 
         rowVersion = item.RootElement.GetProperty("rowVersion").GetString();
         var second = await AdviserHttp.Send(

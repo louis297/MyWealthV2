@@ -8,7 +8,7 @@ public class RevokeTokensOnUserDisabled(IServiceScopeFactory scopes) : INotifica
 {
     public async Task Handle(UserDisabled notification, CancellationToken cancellationToken)
     {
-        // Runs during SaveChanges, so resolve services from a new scope instead of the saving context.
+        // The outbox worker publishes this after commit. A new scope keeps revocation off the caller's context.
         using var scope = scopes.CreateScope();
         var revocation = scope.ServiceProvider.GetRequiredService<ITokenRevocation>();
         await revocation.RevokeSubject(notification.User.PublicId.ToString(), cancellationToken);
