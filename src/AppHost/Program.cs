@@ -84,6 +84,30 @@ var customerPortalClientSecret = builder.AddParameter("customer-portal-client-se
 
 identity.WithEnvironment("Identity__CustomerPortalClientSecret", customerPortalClientSecret);
 
+var customerBff = builder.AddProject<Projects.BffCustomerPortal>(Services.BffCustomerPortal)
+    .WithReference(web)
+    .WithReference(identity)
+    .WaitFor(web)
+    .WaitFor(identity)
+    .WithExternalHttpEndpoints()
+    .WithHttpHealthCheck("/health", endpointName: "http")
+    .WithAspNetCoreEnvironment()
+    .WithEnvironment("Authentication__Authority", identity.GetEndpoint("https"))
+    .WithEnvironment("Authentication__ClientSecret", customerPortalClientSecret)
+    .WithEnvironment("Api__BaseAddress", "https+http://webapi")
+    .WithUrlForEndpoint("https", url =>
+    {
+        url.DisplayText = "Customer Portal";
+        url.Url = "/";
+    })
+    .WithUrlForEndpoint("http", url =>
+    {
+        url.DisplayLocation = UrlDisplayLocation.DetailsOnly;
+    });
+
+customerBff.WithEnvironment("Authentication__PublicOrigin", customerBff.GetEndpoint("https"));
+identity.WithEnvironment("Identity__CustomerPortalOrigins__0", customerBff.GetEndpoint("https"));
+
 var backOfficeClientSecret = builder.AddParameter("back-office-client-secret", secret: true);
 
 identity.WithEnvironment("Identity__BackOfficeClientSecret", backOfficeClientSecret);

@@ -18,6 +18,7 @@
     <Project Path="src/IdentityHost/IdentityHost.csproj" />
     <Project Path="src/BackOffice/BackOffice.csproj" />
     <Project Path="src/BffAdviserPortal/BffAdviserPortal.csproj" />
+    <Project Path="src/BffCustomerPortal/BffCustomerPortal.csproj" />
     <Project Path="src/Worker/Worker.csproj" />
   </Folder>
   <Folder Name="/tests/">
