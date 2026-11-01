@@ -15,7 +15,7 @@ related:
 
 **Product:** MyWealthV2  
 **Status:** draft  
-**Updated:** 2026-09-20
+**Updated:** 2026-10-25
 
 This document owns **what / who / when**. How for the current phase lives in architecture, domain model, database design, API design, and Feature Specs.
 

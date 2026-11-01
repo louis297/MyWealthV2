@@ -3,7 +3,7 @@ title: Architecture
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-10-27
+updated: 2026-11-01
 related:
   - README.md
   - glossary.md
@@ -318,7 +318,7 @@ Phase 3 introduces a general-purpose background worker (ADR 0017).
 ## 11. ADR index (architecture view)
 
 
-Locked conclusions follow function-plan §0 and these ADRs. This folder currently holds English ADR 0014. Treat 0001–0013 as the locked bullets in the function plan until they are ported.
+Locked conclusions follow function-plan §0 and these ADRs. The `docs/adr/` folder holds English ADRs 0001–0017 (as of 2026-11-01). All are accepted unless a later ADR explicitly supersedes one.
 
 | ADR | Constraint on this document |
 | --- | --- |
@@ -336,6 +336,8 @@ Locked conclusions follow function-plan §0 and these ADRs. This folder currentl
 | 0013 | Four roles, one table per layer, named policies + code map |
 | 0014 | OpenIddict in Aspire `identity`; authorization code + PKCE; hosted login; one client; same `MyWealthDbV2` |
 | 0015 | `Idempotency-Key` on mutating creates; first consumer `/transactions` |
+| 0016 | First-party portals use a BFF (`bff-adviser-portal`). Browser talks to BFF; BFF holds tokens and calls `webapi` with Bearer. |
+| 0017 | General-purpose background worker (`src/Worker`) with Hangfire. First consumer: Reports. |
 
 ---
 
@@ -353,3 +355,4 @@ Locked conclusions follow function-plan §0 and these ADRs. This folder currentl
 | 2026-09-21 | Accounts landed (`0012_accounts.sql`, `/accounts`, Disable-Customer guard, TestSeed). |
 | 2026-10-12 | ADR 0017 proposed: general-purpose `worker` host for Hangfire. First consumer Reports. |
 | 2026-10-14 | ADR 0017 accepted. Reports Feature Spec accepted. QuestPDF. Aspire shared volume for PDF. |
+| 2026-11-01 | ADR index updated: `docs/adr/` holds 0001–0017. Added 0016 (BFF) and 0017 (worker) to the constraint table. CI (GitHub Actions) now runs build + test on push/PR. |
