@@ -15,6 +15,7 @@ public class GetTransactionByIdQueryHandler(IApplicationDbContext db, ICurrentUs
     public async Task<TransactionDto> Handle(GetTransactionByIdQuery request, CancellationToken cancellationToken)
     {
         var assignedAdviserId = AccountScope.AssignedAdviserInternalId(currentUser);
+        var selfCustomerId = AccountScope.SelfCustomerId(currentUser);
         var query =
             from transaction in db.Transactions.AsNoTracking()
             join account in db.Accounts.AsNoTracking() on transaction.AccountId equals account.Id
@@ -22,6 +23,7 @@ public class GetTransactionByIdQueryHandler(IApplicationDbContext db, ICurrentUs
             join tenant in db.Tenants.AsNoTracking() on transaction.TenantId equals tenant.Id
             where transaction.PublicId == request.Id
                   && (assignedAdviserId == null || customer.AdviserId == assignedAdviserId)
+                  && (selfCustomerId == null || customer.Id == selfCustomerId)
             select new { transaction, account, customer, tenant };
 
         if (currentUser.Role != UserRole.SystemAdmin)
