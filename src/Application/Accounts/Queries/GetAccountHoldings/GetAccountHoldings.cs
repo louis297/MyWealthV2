@@ -16,11 +16,13 @@ public class GetAccountHoldingsQueryHandler(IApplicationDbContext db, ICurrentUs
     public async Task<AccountHoldingsDto> Handle(GetAccountHoldingsQuery request, CancellationToken cancellationToken)
     {
         var assignedAdviserId = AccountScope.AssignedAdviserInternalId(currentUser);
+        var selfCustomerId = AccountScope.SelfCustomerId(currentUser);
         var accounts =
             from account in db.Accounts.AsNoTracking()
             join customer in db.Users.AsNoTracking() on account.CustomerId equals customer.Id
             where account.PublicId == request.AccountId
                   && (assignedAdviserId == null || customer.AdviserId == assignedAdviserId)
+                  && (selfCustomerId == null || customer.Id == selfCustomerId)
             select account;
 
         if (currentUser.Role != UserRole.SystemAdmin)

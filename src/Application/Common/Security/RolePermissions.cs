@@ -34,6 +34,7 @@ public static class RolePermissions
         [UserRole.Customer] =
         [
             Policies.UsersMe,
+            Policies.AccountsRead,
             Policies.ReportsCustomerRead
         ]
     };

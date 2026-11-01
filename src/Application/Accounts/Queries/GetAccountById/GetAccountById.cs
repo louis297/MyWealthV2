@@ -15,12 +15,14 @@ public class GetAccountByIdQueryHandler(IApplicationDbContext db, ICurrentUser c
     public async Task<AccountDto> Handle(GetAccountByIdQuery request, CancellationToken cancellationToken)
     {
         var assignedAdviserId = AccountScope.AssignedAdviserInternalId(currentUser);
+        var selfCustomerId = AccountScope.SelfCustomerId(currentUser);
         var query =
             from account in db.Accounts.AsNoTracking()
             join tenant in db.Tenants.AsNoTracking() on account.TenantId equals tenant.Id
             join customer in db.Users.AsNoTracking() on account.CustomerId equals customer.Id
             where account.PublicId == request.Id
                   && (assignedAdviserId == null || customer.AdviserId == assignedAdviserId)
+                  && (selfCustomerId == null || customer.Id == selfCustomerId)
             select new { account, tenant, customer };
 
         if (currentUser.Role != UserRole.SystemAdmin)
