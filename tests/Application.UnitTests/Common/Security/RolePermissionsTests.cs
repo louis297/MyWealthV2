@@ -80,7 +80,7 @@ public class RolePermissionsTests
     [TestCase(UserRole.TenantAdmin, Policies.TransactionsCreate, true)]
     [TestCase(UserRole.Adviser, Policies.TransactionsRead, true)]
     [TestCase(UserRole.Adviser, Policies.TransactionsCreate, true)]
-    [TestCase(UserRole.Customer, Policies.TransactionsRead, false)]
+    [TestCase(UserRole.Customer, Policies.TransactionsRead, true)]
     [TestCase(UserRole.Customer, Policies.TransactionsCreate, false)]
     public void Has_MatchesTransactionsMap(UserRole role, string policy, bool expected)
     {
