@@ -446,7 +446,7 @@ Hangfire tables are created by Hangfire in schema `Hangfire` (documented excepti
 
 ### 14.1 Outbox (accepted — ADR 0018, features/outbox.md)
 
-Script `0020_outbox.sql` (not yet landed). Table `OutboxMessages` in the application schema (not `Hangfire`).
+Script `0020_outbox.sql`. Table `OutboxMessages` in the application schema (not `Hangfire`).
 
 | Column | Notes |
 | --- | --- |
@@ -472,3 +472,4 @@ Index `(Status, OccurredAt)`. No FK. No `JobId`, `CorrelationId`, or `AggregateI
 | 2026-10-16 | Demo tenant grants for both seeded reports live in `TestSeed`, not in `0019_reports.sql`. |
 | 2026-11-01 | Proposed `OutboxMessages` columns recorded (ADR 0018). No script yet. |
 | 2026-11-01 | Outbox feature accepted. Script name `0020_outbox.sql`. Lengths and index locked. |
+| 2026-11-01 | `0020_outbox.sql` landed. |

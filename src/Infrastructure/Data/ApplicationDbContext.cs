@@ -77,6 +77,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<UserToken> UserTokenSeams => Set<UserToken>();
 
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
     public async Task ExecuteInTransactionAsync(
         Func<CancellationToken, Task> action,
         CancellationToken cancellationToken)
@@ -156,6 +158,7 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
             var clrType = entityType.ClrType;
             if (clrType is null
                 || clrType == typeof(ApplicationUser)
+                || clrType == typeof(OutboxMessage)
                 || entityType.BaseType is not null
                 || clrType.Namespace?.StartsWith("OpenIddict", StringComparison.Ordinal) == true)
             {
