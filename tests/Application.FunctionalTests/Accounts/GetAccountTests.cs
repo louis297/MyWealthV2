@@ -23,19 +23,36 @@ public class GetAccountTests : TestBase
     }
 
     [Test]
-    public async Task Customer_Returns403()
+    public async Task Customer_ReadsOwnAccounts_OtherCustomerAndTenantAre404()
     {
-        var tenant = await TestApp.CreateTenantAsync("Firm C", "firmc");
-        var adviser = await TestApp.CreatePersonAsync(
-            UserRole.Adviser, "Cara", "cara@firmc", "Password1!", tenant.Id);
-        var customer = await TestApp.CreatePersonAsync(
-            UserRole.Customer, "Dee", "dee@firmc", "Password1!", tenant.Id, adviser.Id);
-        var tokens = await TestApp.IssueAccessTokenAsync(customer);
+        var (tenant, adviser, customer, adviserTokens) = await AccountHttp.SignInAdviser();
+        var ownId = await CreateAsync(adviserTokens.AccessToken, customer.PublicId, "Mine");
+        var otherCustomer = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Pat", "pat@north.example", "Password1!", tenant.Id, adviser.Id);
+        var otherId = await CreateAsync(adviserTokens.AccessToken, otherCustomer.PublicId, "Theirs");
 
-        (await AccountHttp.Send(HttpMethod.Get, "/accounts", tokens.AccessToken))
-            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
-        (await AccountHttp.Send(HttpMethod.Get, $"/accounts/{Guid.NewGuid()}", tokens.AccessToken))
-            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        var (_, _, southCustomer, southTokens) = await AccountHttp.SignInAdviser(
+            "South Co", "south-co", "ann@south.example", customerEmail: "ned@south.example");
+        var southId = await CreateAsync(southTokens.AccessToken, southCustomer.PublicId, "South");
+
+        var tokens = await TestApp.IssueAccessTokenAsync(customer);
+        (await ReadIds("/accounts", tokens.AccessToken)).ShouldBe([ownId]);
+
+        (await AccountHttp.Send(HttpMethod.Get, $"/accounts/{ownId}", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await AccountHttp.Send(HttpMethod.Get, $"/accounts/{ownId}/cash-balance", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await AccountHttp.Send(HttpMethod.Get, $"/accounts/{ownId}/holdings", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        (await AccountHttp.Send(HttpMethod.Get, $"/accounts/{otherId}", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await AccountHttp.Send(HttpMethod.Get, $"/accounts/{otherId}/cash-balance", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await AccountHttp.Send(HttpMethod.Get, $"/accounts/{otherId}/holdings", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await AccountHttp.Send(HttpMethod.Get, $"/accounts/{southId}", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
     [Test]

@@ -66,7 +66,7 @@ public class RolePermissionsTests
     [TestCase(UserRole.Adviser, Policies.AccountsRead, true)]
     [TestCase(UserRole.Adviser, Policies.AccountsCreate, true)]
     [TestCase(UserRole.Adviser, Policies.AccountsManage, true)]
-    [TestCase(UserRole.Customer, Policies.AccountsRead, false)]
+    [TestCase(UserRole.Customer, Policies.AccountsRead, true)]
     [TestCase(UserRole.Customer, Policies.AccountsCreate, false)]
     [TestCase(UserRole.Customer, Policies.AccountsManage, false)]
     public void Has_MatchesAccountsMap(UserRole role, string policy, bool expected)

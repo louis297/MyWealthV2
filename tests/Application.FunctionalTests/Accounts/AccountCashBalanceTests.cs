@@ -75,8 +75,10 @@ public class AccountCashBalanceTests : TestBase
             .StatusCode.ShouldBe(HttpStatusCode.NotFound);
 
         var customerTokens = await TestApp.IssueAccessTokenAsync(customer);
-        (await AccountHttp.Send(HttpMethod.Get, $"/accounts/{accountId}/cash-balance", customerTokens.AccessToken))
-            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        var own = await AccountHttp.Send(HttpMethod.Get, $"/accounts/{accountId}/cash-balance", customerTokens.AccessToken);
+        own.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var ownJson = JsonDocument.Parse(await own.Content.ReadAsStringAsync());
+        ownJson.RootElement.GetProperty("cashBalance").GetDecimal().ShouldBe(40.00m);
     }
 
     private static async Task<JsonElement> ReadAccount(string accessToken, Guid accountId)
