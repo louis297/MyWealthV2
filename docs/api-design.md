@@ -93,7 +93,7 @@ Protocol scopes (not permissions): `openid`, `profile`, `offline_access`, `api`.
 | SystemAdmin | Hosted login on `adviser-portal` (and later Back Office), no tenantCode | `/tenants` manage + `GET /tenants/by-code/{code}`, `/users/tenant-admins`, `/users/me`, `/currencies` |
 | TenantAdmin | Hosted login on `adviser-portal` + tenantCode | `/users/advisers`, tenant `/users/customers`, `GET /tenants/by-code/{own}`, `/users/me`, `/currencies` |
 | Adviser | Hosted login on `adviser-portal` + tenantCode | Assigned `/users/customers`, `GET /tenants/by-code/{own}`, `/users/me`, `/currencies` |
-| Customer | Login principal; `adviser-portal` issues no code. Tokens wait for `customer-portal` | `/users/me` and `/currencies` only, on a client that allows Customer. `/users/advisers`, `/users/customers`, `/users/tenant-admins`, `/tenants` including by-code → 403 |
+| Customer | Login principal; `adviser-portal` issues no code. Tokens wait for `customer-portal` | Own accounts, transactions, and net worth (`accounts.read`, `transactions.read`). `POST /reports/request` when `customerId` is the caller (`reports.customer.create`). Schedule verbs and book scope stay 403. `/users/me` and `/currencies`. `/users/advisers`, `/users/customers`, `/users/tenant-admins`, `/tenants` including by-code → 403 |
 
 Disable / enable for people: `POST /{id}/disable`, `POST /{id}/enable` (`Disabled` ↔ `Active`). Not a physical delete. Disabling an Adviser requires assigned non-disabled Customers to be handled first. Disabling the last TenantAdmin is allowed in Phase 1 (known gap).
 

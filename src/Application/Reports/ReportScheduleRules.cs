@@ -77,6 +77,11 @@ public static class ReportScheduleRules
         CancellationToken cancellationToken)
     {
         var role = currentUser.Role ?? throw new UnauthorizedAccessException();
+        if (role == UserRole.Customer)
+        {
+            throw new ForbiddenAccessException();
+        }
+
         var tenantId = currentUser.TenantId ?? throw new ForbiddenAccessException();
         var report = await db.Reports.AsNoTracking()
                          .SingleOrDefaultAsync(row => row.PublicId == reportId, cancellationToken)
