@@ -40,6 +40,8 @@ public static class DependencyInjection
                      Policies.AccountsManage,
                      Policies.TransactionsRead,
                      Policies.TransactionsCreate,
+                     Policies.PortfoliosRead,
+                     Policies.PortfoliosManage,
                      Policies.ReportsCustomerRead,
                      Policies.ReportsCustomerCreate,
                      Policies.ReportsBookRead,

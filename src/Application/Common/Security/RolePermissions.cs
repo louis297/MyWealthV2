@@ -11,7 +11,8 @@ public static class RolePermissions
             Policies.TenantsManage, Policies.TenantsRead, Policies.TenantAdminsManage, Policies.UsersMe,
             Policies.InstrumentsRead, Policies.InstrumentsCreate, Policies.InstrumentsManage,
             Policies.AccountsRead, Policies.AccountsCreate, Policies.AccountsManage,
-            Policies.TransactionsRead, Policies.TransactionsCreate
+            Policies.TransactionsRead, Policies.TransactionsCreate,
+            Policies.PortfoliosRead, Policies.PortfoliosManage
         ],
         [UserRole.TenantAdmin] =
         [
@@ -19,6 +20,7 @@ public static class RolePermissions
             Policies.InstrumentsRead, Policies.InstrumentsCreate, Policies.InstrumentsManage,
             Policies.AccountsRead, Policies.AccountsCreate, Policies.AccountsManage,
             Policies.TransactionsRead, Policies.TransactionsCreate,
+            Policies.PortfoliosRead, Policies.PortfoliosManage,
             Policies.ReportsCustomerRead, Policies.ReportsCustomerCreate,
             Policies.ReportsBookRead, Policies.ReportsBookCreate
         ],
@@ -28,6 +30,7 @@ public static class RolePermissions
             Policies.InstrumentsRead, Policies.InstrumentsCreate,
             Policies.AccountsRead, Policies.AccountsCreate, Policies.AccountsManage,
             Policies.TransactionsRead, Policies.TransactionsCreate,
+            Policies.PortfoliosRead, Policies.PortfoliosManage,
             Policies.ReportsCustomerRead, Policies.ReportsCustomerCreate,
             Policies.ReportsBookRead, Policies.ReportsBookCreate
         ],
