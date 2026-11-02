@@ -61,6 +61,7 @@ public class Portfolio : BaseAuditableEntity
 
     public void Disable()
     {
+        IsActive = false;
     }
 
     public void ReplaceLines(IReadOnlyList<(int InstrumentId, decimal TargetWeight)> lines)
