@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appRoutes } from "@/app/router";
 import { sessionSlice } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
+import { chooseOption, openSelect, pickOption } from "@/test/chooseOption";
 
 const me = {
   id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
@@ -196,11 +197,12 @@ describe("Customer Portal", () => {
 
   it("generates a customer report with the caller's id and no schedule controls", async () => {
     const { fetchMock } = renderAt("/reports");
-    expect(await screen.findAllByRole("option", { name: "Customer Transactions" })).not.toHaveLength(0);
+    await openSelect("Report");
+    expect(screen.getByRole("option", { name: "Customer Transactions" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /schedule/i })).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Report"), { target: { value: "unknown-report" } });
+    await pickOption("Mystery");
     expect(screen.getByText("parameters not available in this version")).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Report"), { target: { value: reportId } });
+    await chooseOption("Report", "Customer Transactions");
     fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
     fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-03-31" } });
     fireEvent.submit(screen.getByRole("button", { name: "Generate" }).closest("form")!);
