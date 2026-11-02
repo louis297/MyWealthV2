@@ -259,6 +259,15 @@ export function PortfolioDetailPage() {
                   }
                   inputMode="decimal"
                 />
+                {lines.length > 1 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setLines((current) => current.filter((item) => item.key !== line.key))}
+                  >
+                    Remove line
+                  </Button>
+                ) : null}
               </div>
             ))}
             <Button

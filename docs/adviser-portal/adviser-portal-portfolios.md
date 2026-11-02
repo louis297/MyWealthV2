@@ -88,7 +88,7 @@ Unchanged. BFF cookie. Missing / dead session → authorize flow. Wrong role →
 | --- | --- |
 | P1 | TenantAdmin / Adviser open `/portfolios` and see the list from `GET /portfolios`. Adviser sees only portfolios in the current tenant. |
 | P2 | Create form posts `POST /portfolios`. Base currency is required and immutable after create. Lines must sum to 100.00. Optional settings (drift, minimum trade, cash residual) accept the Feature Spec defaults when omitted. |
-| P3 | Edit form on `/portfolios/:id` loads `GET /portfolios/{id}` and posts `PUT /portfolios/{id}`. Changing weights on a portfolio that has Active assignments returns 202 and enqueues rebalance for every assignment. Unchanged weights or no assignments return 204. |
+| P3 | Edit form on `/portfolios/:id` loads `GET /portfolios/{id}` and posts `PUT /portfolios/{id}`. The editor can add a line and remove a line while more than one line remains. Changing weights or lines on a portfolio that has Active assignments returns 202 and enqueues rebalance for every assignment. Unchanged weights or no assignments return 204. |
 | P4 | Disable button calls `POST /portfolios/{id}/disable`. All Active assignments are removed. Existing holdings are left untouched. The portfolio no longer appears as assignable. |
 | P5 | On an Open Brokerage or Other account the Assign control is present. Selecting a portfolio calls `POST /accounts/{id}/portfolio`. Success or NoChange is shown. Bank, Cash, or Closed accounts do not offer the control (or the call returns 400). |
 | P6 | Unassign calls the unassign endpoint. The assignment is marked Removed. No trades are written. Manual security trade buttons become available again. |
@@ -114,7 +114,7 @@ None. Decisions recorded below.
 
 ## Locked decisions (2026-11-03)
 
-- **Weights table / pie chart**: first version is a simple editable table (instrument + weight %). A basic pie chart is optional and can be adjusted later. No advanced layout required in this cut.
+- **Weights table / pie chart**: first version is a simple editable table (instrument + weight %). The edit form has Add line and Remove line. Remove line is hidden when only one line remains. A basic pie chart is optional and can be adjusted later. No advanced layout required in this cut.
 - **Confirmation before weight change**: a simple confirmation dialog. Copy: “This will rebalance every account currently assigned to this portfolio. Continue?” Confirm proceeds; Cancel aborts.
 - **202 job progress**: manual page refresh only. Same pattern as report generation. No polling or progress bar in this cut.
 - **Current vs target on account detail**: show both. Prefer a side-by-side table (Current | Target) on the account holdings section when an Active assignment exists. Stack vertically on narrow screens.
