@@ -81,6 +81,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
+    public DbSet<FxRate> FxRates => Set<FxRate>();
+
     public async Task ExecuteInTransactionAsync(
         Func<CancellationToken, Task> action,
         CancellationToken cancellationToken)

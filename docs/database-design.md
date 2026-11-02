@@ -465,7 +465,7 @@ Index `(Status, OccurredAt)`. No FK. No `JobId`, `CorrelationId`, or `AggregateI
 
 ### 14.2 FX Rates (accepted — ADR 0019, features/fx-rates.md)
 
-Script `0021_fx_rates.sql` (not yet landed). Table `FxRates` in the application schema. Platform data, no `TenantId`.
+Script `0021_fx_rates.sql`. Table `FxRates` in the application schema. Platform data, no `TenantId`.
 
 | Column | Notes |
 | --- | --- |
@@ -490,3 +490,4 @@ Hourly Hangfire job (UTC) fetches actual directed pairs for active catalog curre
 | 2026-11-01 | Proposed `OutboxMessages` columns recorded (ADR 0018). No script yet. |
 | 2026-11-01 | Outbox feature accepted. Script name `0020_outbox.sql`. Lengths and index locked. |
 | 2026-11-02 | FX rates accepted. Script name `0021_fx_rates.sql`. Table `FxRates`. ADR 0019. |
+| 2026-11-02 | `0021_fx_rates.sql` landed. No seed rows in the script. |
