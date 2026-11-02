@@ -224,6 +224,28 @@ describe("PortfolioDetailPage edit", () => {
     });
   });
 
+  it("removes a line and posts the remaining weight", async () => {
+    const { fetchMock } = renderDetail();
+
+    expect(await screen.findByRole("heading", { name: "Balanced Growth" })).toBeInTheDocument();
+    const removeButtons = screen.getAllByRole("button", { name: "Remove line" });
+    fireEvent.click(removeButtons[1]);
+    const weights = screen.getAllByLabelText("Weight");
+    expect(weights).toHaveLength(1);
+    fireEvent.change(weights[0], { target: { value: "100" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    const request = await vi.waitFor(() => {
+      const found = putRequest(fetchMock);
+      expect(found).toBeDefined();
+      return found!;
+    });
+    expect(JSON.parse(await request.clone().text())).toMatchObject({
+      lines: [{ instrumentId: vti, targetWeight: 100 }],
+    });
+    expect(screen.queryByRole("button", { name: "Remove line" })).not.toBeInTheDocument();
+  });
+
   it("confirms a weight change when an account is assigned and shows the queued rebalance", async () => {
     const { fetchMock } = renderDetail({
       assigned: true,
