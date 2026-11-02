@@ -10,14 +10,35 @@ public sealed class FxRateSyncJob(
     TimeProvider time,
     ILogger<FxRateSyncJob> logger)
 {
-    public Task Sync(CancellationToken cancellationToken = default)
+    public async Task Sync(CancellationToken cancellationToken = default)
     {
-        _ = catalog;
-        _ = source;
         _ = store;
         _ = time;
-        _ = logger;
-        _ = cancellationToken;
-        throw new NotImplementedException();
+        try
+        {
+            foreach (var code in ActiveCodes())
+            {
+                var quotes = OtherCodes(code);
+                if (quotes.Count == 0)
+                {
+                    continue;
+                }
+
+                await source.GetLatestAsync(code, quotes, cancellationToken);
+            }
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "FX rate sync failed.");
+        }
     }
+
+    private List<string> ActiveCodes() =>
+        catalog.List(enabledOnly: true)
+            .Select(currency => currency.Code.Trim().ToUpperInvariant())
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+    private List<string> OtherCodes(string code) =>
+        ActiveCodes().Where(other => other != code).ToList();
 }
