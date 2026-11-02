@@ -91,5 +91,18 @@ public class PortfolioTests
         portfolio.DomainEvents.OfType<PortfolioCreated>().ShouldHaveSingleItem();
     }
 
+    [Test]
+    public void ReplaceLines_RaisesPortfolioWeightsChanged()
+    {
+        var portfolio = Portfolio.Create(1, "Balanced", Nzd(), [(10, 60m), (11, 40m)]);
+        portfolio.ClearDomainEvents();
+
+        portfolio.ReplaceLines([(10, 70m), (11, 30m)]);
+
+        portfolio.Lines.Select(line => line.TargetWeight).ShouldBe([70m, 30m]);
+        portfolio.BaseCurrency.ShouldBe("NZD");
+        portfolio.DomainEvents.OfType<PortfolioWeightsChanged>().ShouldHaveSingleItem();
+    }
+
     private static Currency Nzd() => Currency.Create("NZD", "New Zealand Dollar", 2);
 }

@@ -70,6 +70,11 @@ public class Portfolio : BaseAuditableEntity
         return trimmed;
     }
 
+    public void ReplaceLines(IReadOnlyList<(int InstrumentId, decimal TargetWeight)> lines)
+    {
+        _ = lines;
+    }
+
     private void ReplaceLineWeights(IReadOnlyList<(int InstrumentId, decimal TargetWeight)> lines)
     {
         if (lines.Count == 0)
