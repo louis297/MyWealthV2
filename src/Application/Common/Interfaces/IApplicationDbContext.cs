@@ -20,6 +20,12 @@ public interface IApplicationDbContext
 
     DbSet<Holding> Holdings { get; }
 
+    DbSet<Portfolio> Portfolios { get; }
+
+    DbSet<PortfolioLine> PortfolioLines { get; }
+
+    DbSet<AccountPortfolioAssignment> AccountPortfolioAssignments { get; }
+
     DbSet<IdempotencyRecord> IdempotencyRecords { get; }
 
     DbSet<Report> Reports { get; }
@@ -35,6 +41,8 @@ public interface IApplicationDbContext
     Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken cancellationToken);
 
     Task LockAccountAsync(int accountId, CancellationToken cancellationToken);
+
+    void ClearTrackedChanges();
 
     Task LoadCashLegAsync(Transaction transaction, CancellationToken cancellationToken);
 

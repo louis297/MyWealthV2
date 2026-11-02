@@ -107,4 +107,17 @@ public class RolePermissionsTests
     {
         RolePermissions.Has(role, policy).ShouldBe(expected);
     }
+
+    [TestCase(UserRole.SystemAdmin, Policies.PortfoliosRead, true)]
+    [TestCase(UserRole.SystemAdmin, Policies.PortfoliosManage, true)]
+    [TestCase(UserRole.TenantAdmin, Policies.PortfoliosRead, true)]
+    [TestCase(UserRole.TenantAdmin, Policies.PortfoliosManage, true)]
+    [TestCase(UserRole.Adviser, Policies.PortfoliosRead, true)]
+    [TestCase(UserRole.Adviser, Policies.PortfoliosManage, true)]
+    [TestCase(UserRole.Customer, Policies.PortfoliosRead, false)]
+    [TestCase(UserRole.Customer, Policies.PortfoliosManage, false)]
+    public void Has_MatchesPortfoliosMap(UserRole role, string policy, bool expected)
+    {
+        RolePermissions.Has(role, policy).ShouldBe(expected);
+    }
 }

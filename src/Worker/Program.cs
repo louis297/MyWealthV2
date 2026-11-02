@@ -23,7 +23,7 @@ builder.Services.AddScoped(sp => new InstrumentPriceSyncJob(
     sp.GetRequiredService<ILogger<InstrumentPriceSyncJob>>()));
 builder.Services.AddHangfireServer(options =>
 {
-    options.Queues = ["reports", "outbox", "fx", "prices"];
+    options.Queues = ["reports", "rebalance", "outbox", "fx", "prices"];
 });
 
 var app = builder.Build();

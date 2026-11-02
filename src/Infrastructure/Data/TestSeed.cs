@@ -353,6 +353,58 @@ public static class TestSeed
         await EnsureDemoBrokerageStockInAsync(db, tenantId, customer.Id, cancellationToken);
         await EnsureDemoBrokerageSplitAsync(db, tenantId, customer.Id, cancellationToken);
         await SyncDemoBrokerageHoldingAsync(db, tenantId, customer.Id, cancellationToken);
+        await EnsureDemoPortfolioAsync(db, tenantId, customer.Id, cancellationToken);
+    }
+
+    private static async Task EnsureDemoPortfolioAsync(
+        ApplicationDbContext db,
+        int tenantId,
+        int customerId,
+        CancellationToken cancellationToken)
+    {
+        var portfolio = await db.Portfolios.SingleOrDefaultAsync(
+            row => row.TenantId == tenantId && row.Name == "Demo Growth", cancellationToken);
+        if (portfolio is null)
+        {
+            var vti = await db.Instruments.SingleOrDefaultAsync(
+                row => row.TenantId == tenantId && row.Symbol == "VTI", cancellationToken);
+            if (vti is null)
+            {
+                return;
+            }
+
+            portfolio = Portfolio.Create(
+                tenantId,
+                "Demo Growth",
+                Currency.Create("USD", "United States Dollar", 2),
+                [(vti.Id, 100m)]);
+            var created = TimeProvider.System.GetUtcNow();
+            portfolio.Created = created;
+            portfolio.CreatedBy = CreatedBy;
+            db.Portfolios.Add(portfolio);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        var account = await DemoBrokerageAsync(db, customerId, cancellationToken);
+        if (account is null)
+        {
+            return;
+        }
+
+        var assigned = await db.AccountPortfolioAssignments.AnyAsync(
+            row => row.AccountId == account.Id && row.Status == AssignmentStatus.Active,
+            cancellationToken);
+        if (assigned)
+        {
+            return;
+        }
+
+        var assignment = AccountPortfolioAssignment.Assign(
+            null, tenantId, account.Id, portfolio.Id, CreatedBy, TimeProvider.System.GetUtcNow());
+        assignment.Created = TimeProvider.System.GetUtcNow();
+        assignment.CreatedBy = CreatedBy;
+        db.AccountPortfolioAssignments.Add(assignment);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private const string DemoBrokerageOpeningReference = "TestSeed-DemoBrokerage-OpeningHoldings";

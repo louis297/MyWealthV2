@@ -10,6 +10,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.FunctionalTests.Portfolios;
 using MyWealthV2.Application.FunctionalTests.Reports;
 
 namespace MyWealthV2.Application.FunctionalTests.Infrastructure;
@@ -35,6 +36,9 @@ public class WebApiFactory(
             services.RemoveAll<IReportScheduler>();
             services.AddSingleton<RecordingReportScheduler>();
             services.AddSingleton<IReportScheduler>(sp => sp.GetRequiredService<RecordingReportScheduler>());
+            services.RemoveAll<IRebalanceScheduler>();
+            services.AddSingleton<RecordingRebalanceScheduler>();
+            services.AddSingleton<IRebalanceScheduler>(sp => sp.GetRequiredService<RecordingRebalanceScheduler>());
 
             if (identityBackchannel is not null && !string.IsNullOrWhiteSpace(identityAuthority))
             {

@@ -3,6 +3,8 @@ using Hangfire.SqlServer;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Fx;
 using MyWealthV2.Application.MarketData;
+using MyWealthV2.Application.Portfolios;
+using MyWealthV2.Application.Portfolios.Commands.RebalanceAccount;
 using MyWealthV2.Application.Reports;
 using MyWealthV2.Infrastructure.Currencies;
 using MyWealthV2.Infrastructure.Data;
@@ -97,6 +99,9 @@ public static class DependencyInjection
         builder.Services.AddScoped<IReportGeneratorRegistry, ReportGeneratorRegistry>();
         builder.Services.AddScoped<ReportJob>();
         builder.Services.AddSingleton<IReportScheduler, HangfireReportScheduler>();
+        builder.Services.AddScoped<AccountRebalancer>();
+        builder.Services.AddScoped<RebalanceJob>();
+        builder.Services.AddSingleton<IRebalanceScheduler, HangfireRebalanceScheduler>();
 
         builder.Services.AddOpenIddict()
             .AddCore(options =>

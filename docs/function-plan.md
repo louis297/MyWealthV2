@@ -156,6 +156,7 @@ One domain. Feature Specs come after this map. Suggested internal slice order (n
 5. Buy / Sell / StockIn / StockOut (accepted 2026-10-11, landed `821c715`: [features/buy-sell.md](features/buy-sell.md))
 6. Split / Bonus / Scrip (accepted 2026-10-12: [features/split.md](features/split.md), `0017_transaction_type_split.sql`)
 7. Net-worth read model (accepted and landed 2026-10-12 `af422c2`: [features/net-worth.md](features/net-worth.md); `GET /net-worth` + `GET /users/customers/{id}/net-worth`). Adviser Portal Dashboard and ledger pages accepted: [adviser-portal/adviser-portal-dashboard.md](adviser-portal/adviser-portal-dashboard.md).
+8. Portfolios (accepted 2026-11-02: [features/portfolios.md](features/portfolios.md)). Model portfolios with base currency and target weights. Assign rebalances synchronously. Weight change and bulk rebalance are async. While assigned, manual security trades rejected. One Active assignment per Brokerage/Other account. No new Account.Type. Portal pages are later.
 
 Session edge is [features/bff-adviser-portal.md](features/bff-adviser-portal.md) (accepted 2026-10-01, landed `5e85e9c`). Resource API auth does not change. Add ledger policy names only.
 
@@ -206,7 +207,7 @@ Transaction header + cash-leg shape: [features/posting.md](features/posting.md) 
 
 ### 5.5 Out of Phase 2
 
-Live market data / live FX, Customer Portal, invitation delivery, KYC, households, advice documents, custody, fees, model portfolios, rebalancing. Opening Property or Credit accounts. Property address / appraisal workflow, credit limits / billing cycles, linking a loan to a property.
+Live market data / live FX, Customer Portal, invitation delivery, KYC, households, advice documents, custody, fees. Adviser Portal portfolio pages. Opening Property or Credit accounts. Property address / appraisal workflow, credit limits / billing cycles, linking a loan to a property.
 
 Invitation delivery, Customer Portal, audit query, and custom role tables may run in parallel with the ledger or later. They are not prerequisites of the ledger domain.
 

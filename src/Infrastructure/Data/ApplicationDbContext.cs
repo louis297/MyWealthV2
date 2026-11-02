@@ -67,6 +67,12 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<Holding> Holdings => Set<Holding>();
 
+    public DbSet<Portfolio> Portfolios => Set<Portfolio>();
+
+    public DbSet<PortfolioLine> PortfolioLines => Set<PortfolioLine>();
+
+    public DbSet<AccountPortfolioAssignment> AccountPortfolioAssignments => Set<AccountPortfolioAssignment>();
+
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     public DbSet<Report> Reports => Set<Report>();
@@ -105,6 +111,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
             }
         });
     }
+
+    public void ClearTrackedChanges() => ChangeTracker.Clear();
 
     public async Task LockAccountAsync(int accountId, CancellationToken cancellationToken)
     {
