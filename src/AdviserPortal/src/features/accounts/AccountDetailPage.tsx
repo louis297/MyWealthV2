@@ -22,9 +22,11 @@ import {
   useGetAccountQuery,
   useReopenAccountMutation,
 } from "@/features/accounts/accountsApi";
+import { useGetInstrumentsQuery } from "@/features/instruments/instrumentsApi";
 import {
   useAssignPortfolioMutation,
   useGetAccountPortfolioQuery,
+  useGetPortfolioQuery,
   useGetPortfoliosQuery,
   useRebalanceAccountMutation,
   useUnassignPortfolioMutation,
@@ -77,6 +79,10 @@ export function AccountDetailPage() {
     account.data && account.data.status === "Open" && (account.data.type === "Brokerage" || account.data.type === "Other"),
   );
   const assignment = useGetAccountPortfolioQuery(id ?? "", { skip: !id || !eligible });
+  const targetPortfolio = useGetPortfolioQuery(assignment.data?.portfolioId ?? "", {
+    skip: assignment.data?.status !== "Active",
+  });
+  const catalog = useGetInstrumentsQuery(undefined, { skip: assignment.data?.status !== "Active" });
   const portfolioChoices = useGetPortfoliosQuery({ pageSize: 100 }, { skip: !eligible });
   const [closeAccount] = useCloseAccountMutation();
   const [reopenAccount] = useReopenAccountMutation();
@@ -177,6 +183,34 @@ export function AccountDetailPage() {
   const data = account.data;
   const items = holdings.data.items;
   const locked = assignment.isSuccess && assignment.data?.status === "Active";
+  const weights = new Map((targetPortfolio.data?.lines ?? []).map((line) => [line.instrumentId, line.targetWeight]));
+  const catalogById = new Map((catalog.data?.items ?? []).map((item) => [item.id, item]));
+  const held = new Set(items.map((item) => item.instrumentId));
+  const holdingRows = [
+    ...items.map((item) => ({
+      key: item.id,
+      symbol: item.symbol,
+      name: item.name,
+      quantity: String(item.quantity),
+      cost: String(item.cost),
+      costCurrency: item.costCurrency,
+      target: weights.has(item.instrumentId) ? String(weights.get(item.instrumentId)) : "—",
+    })),
+    ...(targetPortfolio.data?.lines ?? [])
+      .filter((line) => !held.has(line.instrumentId))
+      .map((line) => {
+        const instrument = catalogById.get(line.instrumentId);
+        return {
+          key: line.instrumentId,
+          symbol: instrument?.symbol ?? "—",
+          name: instrument?.name ?? "—",
+          quantity: "—",
+          cost: "—",
+          costCurrency: "—",
+          target: String(line.targetWeight),
+        };
+      }),
+  ];
   const actions = [
     ...(canPostCash(data.status) ? cashActions : []),
     ...(canPostSecurity(data.type, data.status) && !locked ? securityActions : []),
@@ -274,7 +308,7 @@ export function AccountDetailPage() {
         {items.length === 0 ? <Muted>No holdings.</Muted> : (
           <Card className="gap-0 py-0">
             <CardContent className="px-0">
-              <Table aria-label="Holdings">
+              <Table aria-label="Holdings" className={locked ? "max-sm:[&_[data-slot=table-cell]]:block max-sm:[&_[data-slot=table-head]]:block" : undefined}>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Symbol</TableHead>
@@ -282,16 +316,26 @@ export function AccountDetailPage() {
                     <TableHead>Quantity</TableHead>
                     <TableHead>Cost</TableHead>
                     <TableHead>Cost currency</TableHead>
+                    {locked ? <TableHead>Target</TableHead> : null}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((item) => (
-                    <TableRow key={item.id}>
+                  {(locked ? holdingRows : items.map((item) => ({
+                    key: item.id,
+                    symbol: item.symbol,
+                    name: item.name,
+                    quantity: String(item.quantity),
+                    cost: String(item.cost),
+                    costCurrency: item.costCurrency,
+                    target: "",
+                  }))).map((item) => (
+                    <TableRow key={item.key}>
                       <TableCell>{item.symbol}</TableCell>
                       <TableCell>{item.name}</TableCell>
                       <TableCell>{item.quantity}</TableCell>
                       <TableCell>{item.cost}</TableCell>
                       <TableCell>{item.costCurrency}</TableCell>
+                      {locked ? <TableCell>{item.target}</TableCell> : null}
                     </TableRow>
                   ))}
                 </TableBody>
