@@ -66,12 +66,21 @@ public class Portfolio : BaseAuditableEntity
 
     public void ApplySettings(PortfolioSettings settings)
     {
-        _ = settings;
+        if (settings.DriftAbsolute < 0m || settings.DriftRelative < 0m || settings.MinimumTrade < 0m
+            || settings.CashResidualPercent is < 0m or > 100m)
+        {
+            throw new DomainException("Portfolio settings are invalid.");
+        }
+
+        DriftAbsolute = settings.DriftAbsolute;
+        DriftRelative = settings.DriftRelative;
+        MinimumTrade = settings.MinimumTrade;
+        CashResidualPercent = settings.CashResidualPercent;
     }
 
     public void Rename(string name)
     {
-        _ = name;
+        Name = NormaliseName(name);
     }
 
     public void ReplaceLines(IReadOnlyList<(int InstrumentId, decimal TargetWeight)> lines)
