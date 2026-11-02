@@ -2,6 +2,7 @@ using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Portfolios;
 using MyWealthV2.Application.Portfolios.Commands.CreatePortfolio;
+using MyWealthV2.Application.Portfolios.Commands.RebalancePortfolio;
 using MyWealthV2.Application.Portfolios.Commands.DisablePortfolio;
 using MyWealthV2.Application.Portfolios.Commands.UpdatePortfolio;
 using MyWealthV2.Application.Portfolios.Queries.GetPortfolioById;
@@ -21,6 +22,7 @@ public class Portfolios : IEndpointGroup
         groupBuilder.MapPost(CreatePortfolio).RequireAuthorization(Policies.PortfoliosManage);
         groupBuilder.MapPut(UpdatePortfolio, "{id}").RequireAuthorization(Policies.PortfoliosManage);
         groupBuilder.MapPost(DisablePortfolio, "{id}/disable").RequireAuthorization(Policies.PortfoliosManage);
+        groupBuilder.MapPost(RebalancePortfolio, "{id}/rebalance").RequireAuthorization(Policies.TransactionsCreate);
     }
 
     [EndpointSummary("List portfolios")]
@@ -55,11 +57,16 @@ public class Portfolios : IEndpointGroup
 
     [EndpointSummary("Update a portfolio")]
     [EndpointDescription("Renames a portfolio and replaces its lines. Base currency cannot change.")]
-    public static async Task<NoContent> UpdatePortfolio(ISender sender, Guid id, UpdatePortfolioCommand command)
+    public static async Task<Results<NoContent, Accepted<RebalanceAcceptedDto>>> UpdatePortfolio(
+        ISender sender,
+        Guid id,
+        UpdatePortfolioCommand command)
     {
         command.Id = id;
-        await sender.Send(command);
-        return TypedResults.NoContent();
+        var accepted = await sender.Send(command);
+        return accepted is null
+            ? TypedResults.NoContent()
+            : TypedResults.Accepted($"/portfolios/{id}/rebalance", accepted);
     }
 
     [EndpointSummary("Disable a portfolio")]
@@ -69,6 +76,14 @@ public class Portfolios : IEndpointGroup
         command.Id = id;
         await sender.Send(command);
         return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Rebalance a portfolio")]
+    [EndpointDescription("Enqueues a full rebalance for every active assignment.")]
+    public static async Task<Accepted<RebalanceAcceptedDto>> RebalancePortfolio(ISender sender, Guid id)
+    {
+        var accepted = await sender.Send(new RebalancePortfolioCommand { Id = id });
+        return TypedResults.Accepted($"/portfolios/{id}/rebalance", accepted);
     }
 }
 

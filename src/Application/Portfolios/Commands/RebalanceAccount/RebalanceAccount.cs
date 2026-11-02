@@ -23,40 +23,50 @@ public class RebalanceAccountCommand : IRequest<RebalanceResultDto>
     public Guid Handle { get; init; }
 }
 
-public class RebalanceAccountCommandHandler(
-    IApplicationDbContext db,
-    ICurrentUser currentUser,
-    IMarketData marketData,
-    IFxRate fxRates,
-    TimeProvider time)
+public class RebalanceAccountCommandHandler(IApplicationDbContext db, ICurrentUser currentUser, AccountRebalancer rebalancer)
     : IRequestHandler<RebalanceAccountCommand, RebalanceResultDto>
 {
     public async Task<RebalanceResultDto> Handle(RebalanceAccountCommand request, CancellationToken cancellationToken)
+    {
+        _ = await AccountScope.ManagedAccounts(db, currentUser)
+                .SingleOrDefaultAsync(row => row.PublicId == request.AccountId, cancellationToken)
+            ?? throw new NotFoundException("Account", request.AccountId);
+        return await rebalancer.RebalanceAsync(request.AccountId, request.Handle, cancellationToken);
+    }
+}
+
+public class AccountRebalancer(
+    IApplicationDbContext db,
+    IMarketData marketData,
+    IFxRate fxRates,
+    TimeProvider time)
+{
+    public async Task<RebalanceResultDto> RebalanceAsync(Guid accountId, Guid handle, CancellationToken cancellationToken)
     {
         try
         {
             RebalanceResultDto? result = null;
             await db.ExecuteInTransactionAsync(async token =>
             {
-                result = await RebalanceAsync(request, token);
+                result = await RebalanceCoreAsync(accountId, handle, token);
             }, cancellationToken);
             return result!;
         }
         catch (RebalanceException exception)
         {
             db.ClearTrackedChanges();
-            await RecordFailureAsync(request.AccountId, exception.Message, cancellationToken);
+            await RecordFailureAsync(accountId, exception.Message, cancellationToken);
             throw;
         }
     }
 
-    private async Task<RebalanceResultDto> RebalanceAsync(
-        RebalanceAccountCommand request,
+    private async Task<RebalanceResultDto> RebalanceCoreAsync(
+        Guid accountId,
+        Guid handle,
         CancellationToken cancellationToken)
     {
-        var account = await AccountScope.ManagedAccounts(db, currentUser)
-            .SingleOrDefaultAsync(row => row.PublicId == request.AccountId, cancellationToken)
-            ?? throw new NotFoundException("Account", request.AccountId);
+        var account = await db.Accounts.SingleOrDefaultAsync(row => row.PublicId == accountId, cancellationToken)
+            ?? throw new NotFoundException("Account", accountId);
         await db.LockAccountAsync(account.Id, cancellationToken);
 
         var assignment = await db.AccountPortfolioAssignments.SingleOrDefaultAsync(
@@ -92,7 +102,7 @@ public class RebalanceAccountCommandHandler(
                     row => row.AccountId == account.Id && row.InstrumentId == trade.InstrumentId,
                     cancellationToken);
                 var price = Money.Create(trade.Price, trade.QuoteCurrency);
-                var reference = $"rb:{request.Handle:N}:{(trade.Buy ? "B" : "S")}:{trade.InstrumentId}";
+                var reference = $"rb:{handle:N}:{(trade.Buy ? "B" : "S")}:{trade.InstrumentId}";
                 Domain.Entities.Transaction transaction;
                 try
                 {
@@ -111,7 +121,7 @@ public class RebalanceAccountCommandHandler(
                 }
 
                 db.Transactions.Add(transaction);
-                var key = Key(account.PublicId, request.Handle, trade.InstrumentId, trade.Buy);
+                var key = Key(account.PublicId, handle, trade.InstrumentId, trade.Buy);
                 db.IdempotencyRecords.Add(IdempotencyRecord.Create(
                     account.TenantId,
                     key,

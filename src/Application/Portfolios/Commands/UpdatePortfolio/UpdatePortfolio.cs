@@ -2,6 +2,7 @@ using FluentValidation.Results;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
+using MyWealthV2.Application.Portfolios;
 using MyWealthV2.Application.Portfolios.Commands.CreatePortfolio;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
@@ -13,7 +14,7 @@ using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationE
 namespace MyWealthV2.Application.Portfolios.Commands.UpdatePortfolio;
 
 [Authorize(Policy = Policies.PortfoliosManage)]
-public class UpdatePortfolioCommand : IRequest
+public class UpdatePortfolioCommand : IRequest<RebalanceAcceptedDto?>
 {
     public Guid Id { get; set; }
 
@@ -46,10 +47,13 @@ public class UpdatePortfolioCommandValidator : AbstractValidator<UpdatePortfolio
     }
 }
 
-public class UpdatePortfolioCommandHandler(IApplicationDbContext db, ICurrentUser currentUser)
-    : IRequestHandler<UpdatePortfolioCommand>
+public class UpdatePortfolioCommandHandler(
+    IApplicationDbContext db,
+    ICurrentUser currentUser,
+    IRebalanceScheduler scheduler)
+    : IRequestHandler<UpdatePortfolioCommand, RebalanceAcceptedDto?>
 {
-    public async Task Handle(UpdatePortfolioCommand request, CancellationToken cancellationToken)
+    public async Task<RebalanceAcceptedDto?> Handle(UpdatePortfolioCommand request, CancellationToken cancellationToken)
     {
         var portfolio = await LoadAsync(request.Id, cancellationToken);
         if (!string.Equals(Convert.ToBase64String(portfolio.RowVersion ?? []), request.RowVersion, StringComparison.Ordinal))
@@ -65,6 +69,7 @@ public class UpdatePortfolioCommandHandler(IApplicationDbContext db, ICurrentUse
             ]);
         }
 
+        var weightsChanged = false;
         try
         {
             portfolio.Rename(request.Name!);
@@ -80,7 +85,8 @@ public class UpdatePortfolioCommandHandler(IApplicationDbContext db, ICurrentUse
 
             var previous = portfolio.Lines.ToList();
             portfolio.ReplaceLines(await ResolveLinesAsync(request.Lines!, portfolio.TenantId, cancellationToken));
-            if (portfolio.DomainEvents.OfType<PortfolioWeightsChanged>().Any())
+            weightsChanged = portfolio.DomainEvents.OfType<PortfolioWeightsChanged>().Any();
+            if (weightsChanged)
             {
                 db.PortfolioLines.RemoveRange(previous);
             }
@@ -93,6 +99,30 @@ public class UpdatePortfolioCommandHandler(IApplicationDbContext db, ICurrentUse
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        if (!weightsChanged)
+        {
+            return null;
+        }
+
+        var accountIds = await (
+            from assignment in db.AccountPortfolioAssignments
+            join account in db.Accounts on assignment.AccountId equals account.Id
+            where assignment.PortfolioId == portfolio.Id && assignment.Status == AssignmentStatus.Active
+            select account.PublicId).ToListAsync(cancellationToken);
+        if (accountIds.Count == 0)
+        {
+            return null;
+        }
+
+        var handles = accountIds
+            .Select(accountId => new RebalanceAccountHandleDto(accountId, Guid.NewGuid()))
+            .ToList();
+        foreach (var handle in handles)
+        {
+            scheduler.Enqueue(handle.AccountId, handle.Handle);
+        }
+
+        return new RebalanceAcceptedDto(Guid.NewGuid(), handles);
     }
 
     private async Task<Portfolio> LoadAsync(Guid id, CancellationToken cancellationToken)

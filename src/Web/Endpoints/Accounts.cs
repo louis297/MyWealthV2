@@ -13,6 +13,8 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using MyWealthV2.Application.Accounts.Queries.GetAccountHoldings;
 using MyWealthV2.Application.Portfolios;
 using MyWealthV2.Application.Portfolios.Commands.AssignPortfolio;
+using MyWealthV2.Application.Portfolios.Commands.RebalanceAccount;
+using MyWealthV2.Application.Portfolios.Commands.UnassignPortfolio;
 using MyWealthV2.Application.Portfolios.Queries.GetAccountPortfolio;
 using MyWealthV2.Web.Infrastructure;
 
@@ -34,6 +36,8 @@ public class Accounts : IEndpointGroup
         groupBuilder.MapGet(GetHoldings, "{id}/holdings").RequireAuthorization(Policies.AccountsRead);
         groupBuilder.MapGet(GetAccountPortfolio, "{id}/portfolio").RequireAuthorization(ReadPortfolio);
         groupBuilder.MapPost(AssignPortfolio, "{id}/portfolio").RequireAuthorization(Policies.TransactionsCreate);
+        groupBuilder.MapDelete(UnassignPortfolio, "{id}/portfolio").RequireAuthorization(Policies.TransactionsCreate);
+        groupBuilder.MapPost(RebalanceAccount, "{id}/rebalance").RequireAuthorization(Policies.TransactionsCreate);
     }
 
     private static readonly AuthorizationPolicy ReadPortfolio = new AuthorizationPolicyBuilder()
@@ -135,6 +139,26 @@ public class Accounts : IEndpointGroup
     {
         command.AccountId = id;
         var result = await sender.Send(command);
+        return TypedResults.Ok(result);
+    }
+
+    [EndpointSummary("Unassign a portfolio")]
+    [EndpointDescription("Removes the active portfolio assignment and leaves holdings unchanged.")]
+    public static async Task<NoContent> UnassignPortfolio(ISender sender, Guid id)
+    {
+        await sender.Send(new UnassignPortfolioCommand { AccountId = id });
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Rebalance an account")]
+    [EndpointDescription("Runs a full rebalance for the account's active portfolio.")]
+    public static async Task<Ok<RebalanceResultDto>> RebalanceAccount(ISender sender, Guid id)
+    {
+        var result = await sender.Send(new RebalanceAccountCommand
+        {
+            AccountId = id,
+            Handle = Guid.NewGuid()
+        });
         return TypedResults.Ok(result);
     }
 }
