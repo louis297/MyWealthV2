@@ -220,6 +220,7 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Accounts | `/accounts` | list / get / create / update / close / reopen; `GET …/cash-balance` | `accounts.read` / `accounts.create` / `accounts.manage` |
 | Transactions | `/transactions` | list / get / create / reverse | `transactions.read` / `transactions.create` |
 | Net worth | `/net-worth`, `/users/customers/{id}/net-worth` | GET | `accounts.read` |
+| Portfolios | `/portfolios`, `/accounts/{id}/portfolio`, `/accounts/{id}/rebalance` | draft — see features/portfolios.md | `portfolios.read` / `portfolios.manage` + `transactions.create` |
 | Reports | `/reports` | list / request / schedules / executions / download | `reports.customer.read` / `reports.customer.create` / `reports.book.read` / `reports.book.create` |
 
 Path `{id}` is always PublicId.
@@ -452,5 +453,6 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-10-11 | Buy / Sell / StockIn / StockOut and transaction item shape (`cash` + `security`). Field rules in [features/buy-sell.md](features/buy-sell.md). |
 | 2026-10-12 | Split / Bonus / Scrip accepted. New total quantity, no cash, total cost unchanged. Field rules in [features/split.md](features/split.md). |
 | 2026-10-12 | Net-worth read model accepted and landed (`af422c2`). `GET /net-worth` and `GET /users/customers/{id}/net-worth`. Current point-in-time, per-currency arrays, breakdowns. Field rules in [features/net-worth.md](features/net-worth.md). BFF allow-list adds `/net-worth`. |
+| 2026-11-02 | Portfolios draft. `/portfolios` and assignment/rebalance routes sketched in [features/portfolios.md](features/portfolios.md). Async 202 returns jobId + per-account handles. |
 | 2026-10-26 | Reports: `PUT /reports/{id}` for catalog IsActive. False cascades revoke of all TenantReports for that report. |
 | 2026-10-26 | Reports: `GET /reports/catalog` lists every catalog row for SystemAdmin. Tenant grant list omits inactive rows. Granting an inactive catalog report is 404. |

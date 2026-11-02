@@ -55,6 +55,8 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | Cash ledger | Cash entries and balance in the account’s booking currency. Phase 2. Owned by the posting spec, not a separate Feature Spec. | Holding quantity |
 | Cash balance | `SUM` of posted cash-leg signed amounts on one Account. Computed. Not a column on `Accounts`. | A persisted `Account.Balance`; net worth |
 | Holding | Position of one instrument inside an account (quantity + cost). Phase 2. | A single transaction |
+| Portfolio | Target-weight model of instruments with a mandatory base currency. Draft. An Adviser assigns at most one Active portfolio to a Brokerage or Other account. | A new Account.Type; a free-form basket |
+| AccountPortfolioAssignment | Link that binds one Account to one Active Portfolio. Draft. While Active, manual security trades are rejected. | A second holdings book |
 | Instrument | Holdable object from an in-database catalog. Phase 2. | A free-text name stored on Holding |
 | Symbol | Instrument code on the tenant catalog (ticker-style unique key inside one tenant). | Display `Name`; ISIN |
 | QuoteCurrency | Currency used for the instrument’s price, market data, and cost accumulation. | Account booking currency |

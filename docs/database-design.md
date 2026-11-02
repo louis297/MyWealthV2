@@ -402,6 +402,19 @@ Scripts `0014_holdings.sql` and `0015_transaction_type_opening_holdings.sql`. Co
 
 ---
 
+
+### Portfolios (draft — not yet a schema decision)
+
+Feature spec: [features/portfolios.md](features/portfolios.md) (draft 2026-11-02).
+
+Planned tables (script number provisional `0023_portfolios.sql`):
+
+- `Portfolios` — TenantId, Name, BaseCurrency (immutable), IsActive, drift/min-trade/residual settings, PublicId, audit, RowVersion
+- `PortfolioLines` — PortfolioId, InstrumentId, TargetWeight (decimal 2 places)
+- `AccountPortfolioAssignments` — AccountId, PortfolioId, Status (Active/Removed), AssignedAt, AssignedBy, LastRebalanceAt, LastRebalanceStatus, LastRebalanceMessage; filtered unique on AccountId where Status = Active
+
+Not landed. Do not create the tables until the spec is accepted.
+
 ## 12. Still not a schema decision
 
 These stay open in the function plan and do not change tables:
