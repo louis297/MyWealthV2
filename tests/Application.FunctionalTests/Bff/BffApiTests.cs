@@ -159,6 +159,20 @@ public class BffApiTests
         _api.Calls.ShouldContain(call => call.Path == $"/users/customers/{customerId}/net-worth");
     }
 
+    [Test]
+    public async Task Session_ProxiesPortfolios()
+    {
+        _api.Scripts["/portfolios"] = (HttpStatusCode.OK, """{"items":[],"page":1,"pageSize":20,"totalCount":0}""");
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/portfolios");
+        request.Headers.TryAddWithoutValidation("Cookie", _sessionCookie);
+        var response = await _bff.SendAsync(request);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).ShouldBe("""{"items":[],"page":1,"pageSize":20,"totalCount":0}""");
+        _api.Calls.ShouldContain(call => call.Path == "/portfolios");
+    }
+
     [TestCase("/api/health")]
     [TestCase("/api/scalar")]
     public async Task UnknownApiPrefix_Is404AndNotForwarded(string path)

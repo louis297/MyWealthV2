@@ -87,6 +87,7 @@ function renderForm(
   problemShape: "errors" | "disabled" = "errors",
   search = "",
   accountStatus = 200,
+  assigned = false,
 ) {
   const store = configureStore({
     reducer: {
@@ -103,6 +104,18 @@ function renderForm(
     const method = init?.method ?? (input instanceof Request ? input.method : "GET");
     if (url.includes("/instruments") && method === "GET") {
       return json({ items: [instrument], page: 1, pageSize: 100, totalCount: 1 });
+    }
+    if (url.endsWith(`/accounts/${accountId}/portfolio`) && method === "GET") {
+      return assigned
+        ? json({
+            accountId,
+            portfolioId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            status: "Active",
+            lastRebalanceAt: null,
+            lastRebalanceStatus: null,
+            lastRebalanceMessage: null,
+          })
+        : new Response("", { status: 404 });
     }
     if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
       return json({ items: [holding] });
@@ -703,5 +716,49 @@ describe("CreateTransactionPage", () => {
     expect(screen.queryByText("account detail")).not.toBeInTheDocument();
     expect(router.state.location.pathname).toBe(`/accounts/${accountId}/transactions/new`);
     expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("blocks a security trade while a portfolio is assigned", async () => {
+    const { fetchMock } = renderForm(
+      user(),
+      201,
+      "Price is not available.",
+      {},
+      "errors",
+      "?type=Buy",
+      200,
+      true,
+    );
+
+    expect(
+      await screen.findByText("Manual security trades are blocked while a portfolio is assigned."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Post transaction" })).not.toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(([input]) => input instanceof Request && input.method === "POST"),
+    ).toBe(false);
+  });
+
+  it("still posts a cash transfer while a portfolio is assigned", async () => {
+    const { fetchMock } = renderForm(
+      user(),
+      201,
+      "Price is not available.",
+      {},
+      "errors",
+      "?type=TransferIn",
+      200,
+      true,
+    );
+
+    fireEvent.change(await screen.findByLabelText("Amount"), { target: { value: "25" } });
+    fireEvent.change(screen.getByLabelText("Booked at"), { target: { value: "2026-10-12T09:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(await screen.findByText("account detail")).toBeInTheDocument();
+    const post = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.method === "POST");
+    expect(JSON.parse(await post!.clone().text())).toMatchObject({ type: "TransferIn", amount: 25 });
   });
 });

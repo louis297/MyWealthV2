@@ -11,6 +11,9 @@ import { CustomerDetailPage } from "@/features/customers/CustomerDetailPage";
 import { CustomersListPage } from "@/features/customers/CustomersListPage";
 import { EditCustomerPage } from "@/features/customers/EditCustomerPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
+import { CreatePortfolioPage } from "@/features/portfolios/CreatePortfolioPage";
+import { PortfolioDetailPage } from "@/features/portfolios/PortfolioDetailPage";
+import { PortfoliosListPage } from "@/features/portfolios/PortfoliosListPage";
 import { ReportsPage } from "@/features/reports/ReportsPage";
 import { CreateTransactionPage } from "@/features/transactions/CreateTransactionPage";
 import { TransactionDetailPage } from "@/features/transactions/TransactionDetailPage";
@@ -41,6 +44,15 @@ export const appRoutes: RouteObject[] = [
             path: "/reports",
             element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
             children: [{ index: true, element: <ReportsPage /> }],
+          },
+          {
+            path: "/portfolios",
+            element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
+            children: [
+              { index: true, element: <PortfoliosListPage /> },
+              { path: "new", element: <CreatePortfolioPage /> },
+              { path: ":id", element: <PortfolioDetailPage /> },
+            ],
           },
           { path: "/session", element: <SessionProbePage /> },
           { path: "/forbidden", element: <ForbiddenPage /> },

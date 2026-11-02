@@ -88,6 +88,24 @@ describe("startLogin host", () => {
     expect(window.location.assign).toHaveBeenCalledWith("/bff/login?returnUrl=%2Freports");
   });
 
+  it("keeps /portfolios as the login return path", () => {
+    vi.stubEnv("VITE_BFF_HTTP", "");
+
+    startLogin("/portfolios");
+
+    expect(window.location.assign).toHaveBeenCalledWith("/bff/login?returnUrl=%2Fportfolios");
+  });
+
+  it("keeps a portfolio detail path as the login return path", () => {
+    vi.stubEnv("VITE_BFF_HTTP", "");
+
+    startLogin("/portfolios/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+
+    expect(window.location.assign).toHaveBeenCalledWith(
+      "/bff/login?returnUrl=%2Fportfolios%2Fbbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+    );
+  });
+
   it("keeps /transactions as the login return path", () => {
     vi.stubEnv("VITE_BFF_HTTP", "");
 

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeftRightIcon,
+  BriefcaseIcon,
   FileChartColumnIcon,
   LandmarkIcon,
   LayoutDashboardIcon,
@@ -38,6 +39,7 @@ import {
   canAccessTransactions,
   canAccessCustomers,
   canAccessDashboard,
+  canAccessPortfolios,
   canAccessProfile,
   canAccessReports,
   roles,
@@ -70,6 +72,12 @@ export function ShellLayout({ children }: { children?: ReactNode }) {
       label: "Reports",
       icon: FileChartColumnIcon,
       visible: canAccessReports(role),
+    },
+    {
+      to: "/portfolios",
+      label: "Portfolios",
+      icon: BriefcaseIcon,
+      visible: canAccessPortfolios(role),
     },
     {
       to: "/accounts",
