@@ -50,6 +50,11 @@ public class Portfolio : BaseAuditableEntity
     {
         var rounded = lines.Select(line => decimal.Round(line.TargetWeight, 2, MidpointRounding.AwayFromZero)).ToArray();
         var gap = 100m - rounded.Sum();
+        if (gap != 0m && Math.Abs(gap) > 0.01m * lines.Count)
+        {
+            throw new DomainException("Weights must sum to 100.");
+        }
+
         rounded[^1] += gap;
         _lines.Clear();
         for (var index = 0; index < lines.Count; index++)
