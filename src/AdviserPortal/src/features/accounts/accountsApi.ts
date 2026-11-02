@@ -16,7 +16,9 @@ export type Account = {
 
 export type AccountListArgs = {
   page?: number;
+  pageSize?: number;
   customerId?: string;
+  type?: string;
 };
 
 export type CreateAccountBody = {
@@ -43,9 +45,12 @@ export const accountsApi = api.injectEndpoints({
       query: (args) => {
         const params = new URLSearchParams();
         params.set("page", String(args?.page ?? 1));
-        params.set("pageSize", "20");
+        params.set("pageSize", String(args?.pageSize ?? 20));
         if (args?.customerId) {
           params.set("customerId", args.customerId);
+        }
+        if (args?.type) {
+          params.set("type", args.type);
         }
         return `/accounts?${params.toString()}`;
       },
