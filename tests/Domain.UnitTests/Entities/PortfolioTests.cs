@@ -56,5 +56,31 @@ public class PortfolioTests
             .Message.ShouldBe("A portfolio needs at least one line.");
     }
 
+    [Test]
+    public void Create_StoresIdentityAndDefaultSettings()
+    {
+        var id = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+        var portfolio = Portfolio.Create(7, "  Balanced Growth  ", Nzd(), [(10, 100m)], id);
+
+        portfolio.TenantId.ShouldBe(7);
+        portfolio.Name.ShouldBe("Balanced Growth");
+        portfolio.BaseCurrency.ShouldBe("NZD");
+        portfolio.IsActive.ShouldBeTrue();
+        portfolio.PublicId.ShouldBe(id);
+        portfolio.DriftAbsolute.ShouldBe(1m);
+        portfolio.DriftRelative.ShouldBe(5m);
+        portfolio.MinimumTrade.ShouldBe(100m);
+        portfolio.CashResidualPercent.ShouldBe(1m);
+        portfolio.Lines.Single().SortOrder.ShouldBe(0);
+    }
+
+    [Test]
+    public void Create_RejectsABlankNameOrCurrency()
+    {
+        Should.Throw<DomainException>(() => Portfolio.Create(1, "  ", Nzd(), [(10, 100m)]));
+        Should.Throw<DomainException>(() => Portfolio.Create(1, new string('a', 201), Nzd(), [(10, 100m)]));
+        Should.Throw<DomainException>(() => Portfolio.Create(1, "Balanced", null!, [(10, 100m)]));
+    }
+
     private static Currency Nzd() => Currency.Create("NZD", "New Zealand Dollar", 2);
 }
