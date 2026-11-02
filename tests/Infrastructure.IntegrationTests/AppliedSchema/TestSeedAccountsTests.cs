@@ -3,7 +3,6 @@ using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Identity;
-using MyWealthV2.Infrastructure.MarketData;
 using NUnit.Framework;
 using Shouldly;
 
@@ -20,11 +19,9 @@ public class TestSeedAccountsTests
             db, tenant, UserRole.Adviser, "Demo Adviser", DevelopmentIdentitySeeder.AdviserEmail);
         await EnsurePersonAsync(
             db, tenant, UserRole.Customer, "Demo Customer", "customer@localhost", adviser.Id);
-        var prices = new MarketDataMock();
-
-        await TestSeed.SeedAsync(db, prices, CancellationToken.None);
+        await TestSeed.SeedAsync(db, CancellationToken.None);
         var first = await LoadSeededAsync(db);
-        await TestSeed.SeedAsync(db, prices, CancellationToken.None);
+        await TestSeed.SeedAsync(db, CancellationToken.None);
         var second = await LoadSeededAsync(db);
 
         first.Select(row => row.Name).ShouldBe([
@@ -67,10 +64,8 @@ public class TestSeedAccountsTests
             db, tenant, UserRole.Adviser, "Demo Adviser", DevelopmentIdentitySeeder.AdviserEmail);
         await EnsurePersonAsync(
             db, tenant, UserRole.Customer, "Demo Customer", "customer@localhost", adviser.Id);
-        var prices = new MarketDataMock();
-
-        await TestSeed.SeedAsync(db, prices, CancellationToken.None);
-        await TestSeed.SeedAsync(db, prices, CancellationToken.None);
+        await TestSeed.SeedAsync(db, CancellationToken.None);
+        await TestSeed.SeedAsync(db, CancellationToken.None);
 
         var bank = await db.Accounts.SingleAsync(row => row.TenantId == tenant.Id && row.Name == "Demo everyday bank");
         var rows = await (
@@ -96,11 +91,9 @@ public class TestSeedAccountsTests
             db, tenant, UserRole.Adviser, "Demo Adviser", DevelopmentIdentitySeeder.AdviserEmail);
         await EnsurePersonAsync(
             db, tenant, UserRole.Customer, "Demo Customer", "customer@localhost", adviser.Id);
-        var prices = new MarketDataMock();
-
-        await TestSeed.SeedAsync(db, prices, CancellationToken.None);
+        await TestSeed.SeedAsync(db, CancellationToken.None);
         var first = await LoadOpeningAsync(db, tenant.Id);
-        await TestSeed.SeedAsync(db, prices, CancellationToken.None);
+        await TestSeed.SeedAsync(db, CancellationToken.None);
         var second = await LoadOpeningAsync(db, tenant.Id);
 
         first.TransactionPublicId.ShouldNotBe(Guid.Empty);
@@ -128,10 +121,8 @@ public class TestSeedAccountsTests
             db, tenant, UserRole.Adviser, "Demo Adviser", DevelopmentIdentitySeeder.AdviserEmail);
         await EnsurePersonAsync(
             db, tenant, UserRole.Customer, "Demo Customer", "customer@localhost", adviser.Id);
-        var prices = new MarketDataMock();
-
-        await TestSeed.SeedAsync(db, prices, CancellationToken.None);
-        await TestSeed.SeedAsync(db, prices, CancellationToken.None);
+        await TestSeed.SeedAsync(db, CancellationToken.None);
+        await TestSeed.SeedAsync(db, CancellationToken.None);
 
         var account = await db.Accounts.SingleAsync(row => row.TenantId == tenant.Id && row.Name == "Demo brokerage");
         var vti = await db.Instruments.SingleAsync(row => row.TenantId == tenant.Id && row.Symbol == "VTI");
@@ -170,9 +161,7 @@ public class TestSeedAccountsTests
             db, tenant, UserRole.Adviser, "Demo Adviser", DevelopmentIdentitySeeder.AdviserEmail);
         await EnsurePersonAsync(
             db, tenant, UserRole.Customer, "Demo Customer", "customer@localhost", adviser.Id);
-        var prices = new MarketDataMock();
-
-        await TestSeed.SeedAsync(db, prices, CancellationToken.None);
+        await TestSeed.SeedAsync(db, CancellationToken.None);
         var account = await db.Accounts.SingleAsync(row => row.TenantId == tenant.Id && row.Name == "Demo brokerage");
         var first = await LoadSecurityAsync(db, account.Id, "TestSeed-DemoBrokerage-Split");
         var firstId = await db.Transactions
@@ -180,7 +169,7 @@ public class TestSeedAccountsTests
             .Select(row => row.PublicId)
             .SingleAsync();
 
-        await TestSeed.SeedAsync(db, prices, CancellationToken.None);
+        await TestSeed.SeedAsync(db, CancellationToken.None);
         var second = await LoadSecurityAsync(db, account.Id, "TestSeed-DemoBrokerage-Split");
         var secondId = await db.Transactions
             .Where(row => row.AccountId == account.Id && row.Reference == "TestSeed-DemoBrokerage-Split")

@@ -11,7 +11,7 @@ using MyWealthV2.Application.Reports;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.ValueObjects;
 using MyWealthV2.Infrastructure.Data;
-using MyWealthV2.Infrastructure.MarketData;
+using MyWealthV2.Infrastructure.Data.Entities;
 using UglyToad.PdfPig;
 
 namespace MyWealthV2.Application.FunctionalTests.Reports;
@@ -219,9 +219,7 @@ public class GenerateAdviserBalancesTests : TestBase
     {
         using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var instrument = await db.Instruments.SingleAsync(row => row.PublicId == instrumentPublicId);
-        var prices = FunctionalTestSetup.WebApiServices.GetRequiredService<MarketDataMock>();
-        prices.SetPrice(instrument.Id, Money.Create(amount, currency));
+        await TestPrices.UpsertAsync(db, instrumentPublicId, amount, currency);
     }
 
     private static Task<HttpResponseMessage> PostCashAsync(string accessToken, Guid accountId, decimal amount) =>

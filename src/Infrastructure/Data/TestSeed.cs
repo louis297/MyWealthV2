@@ -7,7 +7,6 @@ using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.ValueObjects;
 using MyWealthV2.Infrastructure.Data.Entities;
 using MyWealthV2.Infrastructure.Identity;
-using MyWealthV2.Infrastructure.MarketData;
 
 namespace MyWealthV2.Infrastructure.Data;
 
@@ -26,23 +25,19 @@ public static class TestSeed
     public static async Task SeedAsync(IServiceProvider services, CancellationToken cancellationToken)
     {
         var db = services.GetRequiredService<ApplicationDbContext>();
-        var prices = services.GetRequiredService<MarketDataMock>();
         await EnsureFxRatesAsync(db, cancellationToken);
         foreach (var firm in Firms)
         {
-            await SeedFirmAsync(services, db, prices, firm, cancellationToken);
+            await SeedFirmAsync(services, db, firm, cancellationToken);
         }
     }
 
-    public static async Task SeedAsync(
-        ApplicationDbContext db,
-        MarketDataMock prices,
-        CancellationToken cancellationToken)
+    public static async Task SeedAsync(ApplicationDbContext db, CancellationToken cancellationToken)
     {
         await EnsureFxRatesAsync(db, cancellationToken);
         foreach (var firm in Firms)
         {
-            await SeedFirmAsync(services: null, db, prices, firm, cancellationToken);
+            await SeedFirmAsync(services: null, db, firm, cancellationToken);
         }
     }
 
@@ -112,10 +107,39 @@ public static class TestSeed
             SecondCustomerName),
     ];
 
+    private readonly record struct SeedInstrument(
+        string Symbol,
+        string Name,
+        string QuoteCurrency,
+        bool Active,
+        decimal? Price);
+
+    private static readonly SeedInstrument[] Catalog =
+    [
+        new("VTI", "Vanguard Total Stock Market ETF", "USD", true, 250m),
+        new("AAPL", "Apple Inc.", "USD", true, 180m),
+        new("MSFT", "Microsoft Corporation", "USD", true, 400m),
+        new("AIA", "Auckland International Airport", "NZD", true, 8.50m),
+        new("FPH", "Fisher & Paykel Healthcare", "NZD", true, 30m),
+        new("MEL", "Meridian Energy", "NZD", true, 5.50m),
+        new("BHP", "BHP Group", "AUD", true, 45m),
+        new("CBA", "Commonwealth Bank of Australia", "AUD", true, 130m),
+        new("WOW", "Woolworths Group", "AUD", true, 35m),
+        new("SAP", "SAP SE", "EUR", true, 180m),
+        new("AIR", "Airbus SE", "EUR", true, 150m),
+        new("OR", "L'Oréal", "EUR", true, 400m),
+        new("SHEL", "Shell plc", "GBP", true, 28m),
+        new("HSBA", "HSBC Holdings", "GBP", true, 7m),
+        new("ULVR", "Unilever", "GBP", true, 45m),
+        new("7203", "Toyota Motor", "JPY", true, 3000m),
+        new("6758", "Sony Group", "JPY", true, 13000m),
+        new("9984", "SoftBank Group", "JPY", true, 8000m),
+        new("NZD-CASH", "Demo disabled cash proxy", "NZD", false, null)
+    ];
+
     private static async Task SeedFirmAsync(
         IServiceProvider? services,
         ApplicationDbContext db,
-        MarketDataMock prices,
         SeedFirm firm,
         CancellationToken cancellationToken)
     {
@@ -127,26 +151,52 @@ public static class TestSeed
         }
 
         await EnsureReportGrantsAsync(db, tenant.Id, cancellationToken);
-
-        var usd = Currency.Create("USD", "United States Dollar", 2);
-        var nzd = Currency.Create("NZD", "New Zealand Dollar", 2);
-
-        var vti = await EnsureInstrumentAsync(
-            db, tenant.Id, "VTI", "Vanguard Total Stock Market ETF", usd, enabled: true, cancellationToken);
-        var aia = await EnsureInstrumentAsync(
-            db, tenant.Id, "AIA", "Auckland International Airport", nzd, enabled: true, cancellationToken);
-        await EnsureInstrumentAsync(
-            db, tenant.Id, "NZD-CASH", "Demo disabled cash proxy", nzd, enabled: false, cancellationToken);
-
-        prices.SetPrice(vti.Id, Money.Create(250m, "USD"));
-        prices.SetPrice(aia.Id, Money.Create(8.50m, "NZD"));
+        await EnsureCatalogAsync(db, tenant.Id, cancellationToken);
 
         if (services is not null)
         {
             await EnsureCustomerAsync(services, db, tenant, firm, cancellationToken);
         }
 
-        await EnsureAccountsAsync(db, prices, tenant.Id, firm.CustomerEmail, cancellationToken);
+        await EnsureAccountsAsync(db, tenant.Id, firm.CustomerEmail, cancellationToken);
+    }
+
+    private static async Task EnsureCatalogAsync(
+        ApplicationDbContext db,
+        int tenantId,
+        CancellationToken cancellationToken)
+    {
+        var asOf = new DateOnly(2026, 1, 1);
+        var fetchedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        foreach (var item in Catalog)
+        {
+            var currency = Currency.Create(item.QuoteCurrency, item.QuoteCurrency, 2);
+            var instrument = await EnsureInstrumentAsync(
+                db, tenantId, item.Symbol, item.Name, currency, item.Active, cancellationToken);
+            if (item.Price is not decimal price)
+            {
+                continue;
+            }
+
+            var stored = await db.InstrumentPrices.AnyAsync(
+                row => row.InstrumentId == instrument.Id && row.AsOfDate == asOf,
+                cancellationToken);
+            if (stored)
+            {
+                continue;
+            }
+
+            db.InstrumentPrices.Add(new InstrumentPrice
+            {
+                InstrumentId = instrument.Id,
+                Price = price,
+                AsOfDate = asOf,
+                Source = "TwelveData",
+                FetchedAt = fetchedAt
+            });
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private const string CustomerTransactionsCode = "customer-transactions";
@@ -270,7 +320,6 @@ public static class TestSeed
 
     private static async Task EnsureAccountsAsync(
         ApplicationDbContext db,
-        MarketDataMock prices,
         int tenantId,
         string customerEmail,
         CancellationToken cancellationToken)
@@ -300,7 +349,7 @@ public static class TestSeed
         await EnsureDemoEverydayTransferAsync(db, tenantId, customer.Id, cancellationToken);
         await EnsureDemoBrokerageOpeningAsync(db, tenantId, customer.Id, cancellationToken);
         await EnsureDemoBrokerageFundingAsync(db, tenantId, customer.Id, cancellationToken);
-        await EnsureDemoBrokerageBuyAsync(db, prices, tenantId, customer.Id, cancellationToken);
+        await EnsureDemoBrokerageBuyAsync(db, tenantId, customer.Id, cancellationToken);
         await EnsureDemoBrokerageStockInAsync(db, tenantId, customer.Id, cancellationToken);
         await EnsureDemoBrokerageSplitAsync(db, tenantId, customer.Id, cancellationToken);
         await SyncDemoBrokerageHoldingAsync(db, tenantId, customer.Id, cancellationToken);
@@ -398,7 +447,6 @@ public static class TestSeed
 
     private static async Task EnsureDemoBrokerageBuyAsync(
         ApplicationDbContext db,
-        MarketDataMock prices,
         int tenantId,
         int customerId,
         CancellationToken cancellationToken)
@@ -411,20 +459,27 @@ public static class TestSeed
 
         var vti = await db.Instruments.SingleOrDefaultAsync(
             row => row.TenantId == tenantId && row.Symbol == "VTI", cancellationToken);
-        var price = vti is null ? null : prices.TryGetPrice(vti.Id);
-        if (vti is null || price is null)
+        var bookedAt = new DateTimeOffset(2026, 1, 15, 10, 30, 0, TimeSpan.FromHours(13));
+        var asOf = DateOnly.FromDateTime(bookedAt.DateTime);
+        var stored = vti is null
+            ? null
+            : await db.InstrumentPrices.AsNoTracking()
+                .Where(row => row.InstrumentId == vti.Id && row.AsOfDate <= asOf)
+                .OrderByDescending(row => row.AsOfDate)
+                .FirstOrDefaultAsync(cancellationToken);
+        if (vti is null || stored is null)
         {
             return;
         }
 
         var quote = vti.QuoteCurrency.Trim();
-        if (!string.Equals(quote, account.Currency.Trim(), StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(price.Currency, quote, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(quote, account.Currency.Trim(), StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
 
-        var bookedAt = new DateTimeOffset(2026, 1, 15, 10, 30, 0, TimeSpan.FromHours(13));
+        var price = Money.Create(stored.Price, quote);
+
         var transaction = Transaction.PostBuy(
             tenantId,
             account.Id,

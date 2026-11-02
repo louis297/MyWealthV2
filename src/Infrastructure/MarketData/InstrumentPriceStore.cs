@@ -1,20 +1,48 @@
 using Microsoft.EntityFrameworkCore;
+using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.MarketData;
+using MyWealthV2.Domain.ValueObjects;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Entities;
 
 namespace MyWealthV2.Infrastructure.MarketData;
 
-public sealed class InstrumentPriceStore(ApplicationDbContext db, TimeProvider time) : IInstrumentPriceStore
+public sealed class InstrumentPriceStore(ApplicationDbContext db, TimeProvider time) : IInstrumentPriceStore, IMarketData
 {
     public const string SourceName = "TwelveData";
+
+    public Money? TryGetPrice(int instrumentId, DateTimeOffset? asOf = null)
+    {
+        var date = asOf is null
+            ? DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime)
+            : DateOnly.FromDateTime(asOf.Value.DateTime);
+        var row = db.InstrumentPrices.AsNoTracking()
+            .Where(price => price.InstrumentId == instrumentId && price.AsOfDate <= date)
+            .OrderByDescending(price => price.AsOfDate)
+            .Select(price => (decimal?)price.Price)
+            .FirstOrDefault();
+        if (row is null)
+        {
+            return null;
+        }
+
+        var quote = db.Instruments.IgnoreQueryFilters().AsNoTracking()
+            .Where(instrument => instrument.Id == instrumentId)
+            .Select(instrument => instrument.QuoteCurrency)
+            .FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(quote))
+        {
+            return null;
+        }
+
+        return Money.Create(row.Value, quote);
+    }
 
     public async Task UpsertAsync(
         IReadOnlyList<InstrumentPriceQuote> quotes,
         DateTimeOffset fetchedAt,
         CancellationToken cancellationToken = default)
     {
-        _ = time;
         if (quotes.Count == 0)
         {
             return;

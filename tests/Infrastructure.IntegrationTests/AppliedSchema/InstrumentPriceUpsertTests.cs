@@ -67,13 +67,19 @@ public class InstrumentPriceUpsertTests
         }
         finally
         {
+            db.ChangeTracker.Clear();
             await db.Database.ExecuteSqlRawAsync(
                 "DELETE FROM [InstrumentPrices] WHERE [InstrumentId] IN ({0}, {1})",
                 instrument.Id,
                 other.Id);
-            db.Instruments.RemoveRange(instrument, other);
-            db.Tenants.RemoveRange(tenant, otherTenant);
-            await db.SaveChangesAsync();
+            await db.Database.ExecuteSqlRawAsync(
+                "DELETE FROM [Instruments] WHERE [Id] IN ({0}, {1})",
+                instrument.Id,
+                other.Id);
+            await db.Database.ExecuteSqlRawAsync(
+                "DELETE FROM [Tenants] WHERE [Id] IN ({0}, {1})",
+                tenant.Id,
+                otherTenant.Id);
         }
     }
 
