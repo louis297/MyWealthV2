@@ -2,5 +2,9 @@ namespace MyWealthV2.Application.Common.Interfaces;
 
 public interface IFxRate
 {
-    decimal GetRate(string from, string to, DateTimeOffset? asOf = null);
+    Task<decimal> GetRateAsync(
+        string from,
+        string to,
+        DateTimeOffset? asOf = null,
+        CancellationToken cancellationToken = default);
 }

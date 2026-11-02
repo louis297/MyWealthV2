@@ -482,9 +482,9 @@ public class CreateTransactionCommandHandler(
         {
             try
             {
-                fxRate = fxRates.GetRate(quote, bookingCurrency, request.BookedAt);
+                fxRate = await fxRates.GetRateAsync(quote, bookingCurrency, request.BookedAt, cancellationToken);
             }
-            catch (InvalidOperationException)
+            catch (FxRateNotFoundException)
             {
                 throw new ValidationException([
                     new ValidationFailure(nameof(CreateTransactionCommand.Security), "FX rate is not available.")

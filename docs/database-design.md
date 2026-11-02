@@ -194,7 +194,7 @@ Default tables:
 
 | Table | Holds |
 | --- | --- |
-| `OpenIddictApplications` | Clients. Phase 1 row: public client `adviser-portal`. Startup upsert also registers confidential `adviser-portal`, `back-office`, and `customer-portal` (no schema script) |
+| `OpenIddictApplications` | Clients. Phase 1 row: public client `adviser-portal` |
 | `OpenIddictAuthorizations` | Grants |
 | `OpenIddictScopes` | `openid`, `profile`, `offline_access`, `api` |
 | `OpenIddictTokens` | Authorization codes, access tokens, **refresh tokens** |
@@ -463,6 +463,23 @@ Script `0020_outbox.sql` (not yet landed). Table `OutboxMessages` in the applica
 
 Index `(Status, OccurredAt)`. No FK. No `JobId`, `CorrelationId`, or `AggregateId`.
 
+### 14.2 FX Rates (accepted — ADR 0019, features/fx-rates.md)
+
+Script `0021_fx_rates.sql`. Table `FxRates` in the application schema. Platform data, no `TenantId`.
+
+| Column | Notes |
+| --- | --- |
+| `BaseCurrency` | `char(3)` FK → `Currencies.Code` (RESTRICT) |
+| `QuoteCurrency` | `char(3)` FK → `Currencies.Code` (RESTRICT) |
+| `Rate` | `decimal(18,8)`. How many QuoteCurrency per 1 BaseCurrency |
+| `AsOfDate` | `date`. Date the source published |
+| `Source` | `nvarchar(50)`. `'Frankfurter'` |
+| `FetchedAt` | `datetimeoffset`. When the job wrote the row |
+
+PK `(BaseCurrency, QuoteCurrency, AsOfDate)`. Index on `FetchedAt`. No PublicId. No RowVersion. No audit columns beyond `FetchedAt`. No seed in the script — the hourly job populates it. Development / TestAppHost uses `TestSeed` with round, obviously-fake rates.
+
+Hourly Hangfire job (UTC) fetches actual directed pairs for active catalog currencies when today's UTC date is not already stored for every pair. One Frankfurter call per base (`/v2/rates?base=X&quotes=...`). On the same `AsOfDate`, update `Rate` and `FetchedAt`. Fetch failure logs and leaves previous rows. `IFxRate` reads the table: same currency = 1; no row for the pair → `FxRateNotFoundException` (carries base, quote, as-of).
+
 ### Change log
 
 | Date | Change |
@@ -472,3 +489,5 @@ Index `(Status, OccurredAt)`. No FK. No `JobId`, `CorrelationId`, or `AggregateI
 | 2026-10-16 | Demo tenant grants for both seeded reports live in `TestSeed`, not in `0019_reports.sql`. |
 | 2026-11-01 | Proposed `OutboxMessages` columns recorded (ADR 0018). No script yet. |
 | 2026-11-01 | Outbox feature accepted. Script name `0020_outbox.sql`. Lengths and index locked. |
+| 2026-11-02 | FX rates accepted. Script name `0021_fx_rates.sql`. Table `FxRates`. ADR 0019. |
+| 2026-11-02 | `0021_fx_rates.sql` landed. No seed rows in the script. |

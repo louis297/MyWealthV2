@@ -132,7 +132,7 @@ Later portals copy the last BFF row: `bff-customer-portal`, `BffCustomerPortal`,
 | Feature spec | One deliverable vertical slice under `docs/features/`. | A phase folder of leftover notes |
 | ADR | A decision under `docs/adr/` that is not re-litigated in place. | Rewriting an accepted ADR’s conclusion |
 | IMarketData | Instrument price port. Mocked when the ledger exists. Not introduced in Phase 1: port surface not locked. | Calling a live vendor from a handler |
-| IFxRate | FX port. Same currency = 1. Cross-currency is not silently treated as 1. | Hard-coded 1 for every pair |
+| IFxRate | FX port. Same currency = 1. Missing pair throws `FxRateNotFoundException` (carries base, quote, as-of). Backed by local `FxRates` table; not a live call. Contract: [features/fx-rates.md](features/fx-rates.md), ADR 0019. | Hard-coded 1 for every pair; calling Frankfurter on the read path |
 | IEmailSender | Invite / reset mail. Phase 1 is no-op or log-only. | Built-in SMTP in Domain |
 | Authorization server | Issues and revokes tokens, exposes discovery and JWKS. Hosted in Aspire `identity` via OpenIddict. | A custom resource-API `/auth/login` that mints JWTs; OpenIddict inside `webapi` |
 | OpenIddict | The authorization-server library. Tables replace a custom refresh store. Protocol paths stay on library defaults (`/connect/*`, well-known discovery / JWKS); do not remap. | Duende IdentityServer; an external CIAM tenant; a custom `/auth` token issuer |

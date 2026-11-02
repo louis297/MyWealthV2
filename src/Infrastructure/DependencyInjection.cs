@@ -1,6 +1,7 @@
 using Hangfire;
 using Hangfire.SqlServer;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.Fx;
 using MyWealthV2.Application.Reports;
 using MyWealthV2.Infrastructure.Currencies;
 using MyWealthV2.Infrastructure.Data;
@@ -42,8 +43,13 @@ public static class DependencyInjection
         builder.Services.AddSingleton<ICurrencyCatalog, CurrencyCatalog>();
         builder.Services.AddSingleton<MarketDataMock>();
         builder.Services.AddSingleton<IMarketData>(sp => sp.GetRequiredService<MarketDataMock>());
-        builder.Services.AddSingleton<FxRateMock>();
-        builder.Services.AddSingleton<IFxRate>(sp => sp.GetRequiredService<FxRateMock>());
+        builder.Services.AddScoped<FxRateStore>();
+        builder.Services.AddScoped<IFxRate>(sp => sp.GetRequiredService<FxRateStore>());
+        builder.Services.AddScoped<IFxRateStore>(sp => sp.GetRequiredService<FxRateStore>());
+        builder.Services.AddHttpClient<IFxRateSource, FrankfurterClient>(client =>
+        {
+            client.BaseAddress = new Uri("https://api.frankfurter.dev");
+        });
 
         var schemaDirectory = Path.Combine(AppContext.BaseDirectory, "schema");
         builder.Services.AddSingleton<ISchemaScriptSource>(_ => new FileSchemaScriptSource(schemaDirectory));

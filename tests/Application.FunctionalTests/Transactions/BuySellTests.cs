@@ -6,6 +6,7 @@ using MyWealthV2.Application.FunctionalTests.Accounts;
 using MyWealthV2.Application.FunctionalTests.Instruments;
 using MyWealthV2.Domain.ValueObjects;
 using MyWealthV2.Infrastructure.Data;
+using MyWealthV2.Infrastructure.Data.Entities;
 using MyWealthV2.Infrastructure.MarketData;
 
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
@@ -188,7 +189,7 @@ public class BuySellTests : TestBase
         var nzd = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Other", "NZD");
         var vti = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
         await SetPriceAsync(vti, 10m, "USD");
-        SetRate("USD", "NZD", 1.6m);
+        await SetRateAsync("USD", "NZD", 1.6m);
         (await PostCashAsync(tokens.AccessToken, nzd, "TransferIn", 100m)).StatusCode
             .ShouldBe(HttpStatusCode.Created);
         (await PostSecurityAsync(tokens.AccessToken, nzd, "Buy", vti, 2m)).StatusCode
@@ -368,7 +369,7 @@ public class BuySellTests : TestBase
         var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "NZD");
         var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
         await SetPriceAsync(instrumentId, 15m, "USD");
-        SetRate("USD", "NZD", 5m / 3m);
+        await SetRateAsync("USD", "NZD", 5m / 3m);
         (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 2000m)).StatusCode
             .ShouldBe(HttpStatusCode.Created);
         var buyId = await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 50m));
@@ -524,8 +525,21 @@ public class BuySellTests : TestBase
     private static Task<HttpResponseMessage> PostBodyAsync(string accessToken, object body) =>
         TransactionHttp.Send(HttpMethod.Post, "/transactions", accessToken, body, Guid.NewGuid());
 
-    private static void SetRate(string from, string to, decimal rate) =>
-        FunctionalTestSetup.WebApiServices.GetRequiredService<FxRateMock>().SetRate(from, to, rate);
+    private static async Task SetRateAsync(string from, string to, decimal rate)
+    {
+        await using var scope = FunctionalTestSetup.ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        db.FxRates.Add(new FxRate
+        {
+            BaseCurrency = from,
+            QuoteCurrency = to,
+            Rate = rate,
+            AsOfDate = new DateOnly(2026, 10, 11),
+            Source = "Frankfurter",
+            FetchedAt = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
+    }
 
     private static async Task<int> HoldingCountAsync(string accessToken, Guid accountId)
     {

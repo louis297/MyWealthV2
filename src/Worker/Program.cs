@@ -1,6 +1,8 @@
 using Hangfire;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.Fx;
 using MyWealthV2.Infrastructure.Data;
+using MyWealthV2.Infrastructure.MarketData;
 using MyWealthV2.Worker.Reports;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,14 +11,16 @@ builder.AddServiceDefaults();
 builder.AddInfrastructureServices();
 builder.Services.AddScoped<IUser, SystemUser>();
 builder.Services.AddScoped<OutboxProcessor>();
+builder.Services.AddScoped<FxRateSyncJob>();
 builder.Services.AddHangfireServer(options =>
 {
-    options.Queues = ["reports", "outbox"];
+    options.Queues = ["reports", "outbox", "fx"];
 });
 
 var app = builder.Build();
 
 OutboxRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
+FxRateRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 
 if (app.Environment.IsDevelopment())
 {

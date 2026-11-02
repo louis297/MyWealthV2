@@ -41,7 +41,7 @@ Browser
 
 The portal (`adviser-portal`) does not issue tokens. It redirects to `identity`, stores access / refresh after the callback, and calls `webapi` with Bearer.
 
-Phase 1 registers one public OIDC client: `adviser-portal`. IdentityHost allows SystemAdmin, TenantAdmin, and Adviser on that client. A Customer with a correct password does not receive an authorization code for it. Client `customer-portal` is the accepted confidential client for Customer only (amendment 2026-11-02). Adviser-management resource routes stay 403 for Customer.
+Phase 1 registers one public OIDC client: `adviser-portal`. IdentityHost allows SystemAdmin, TenantAdmin, and Adviser on that client. A Customer with a correct password does not receive an authorization code for it. Customer Portal is a later second client; it is not registered in Phase 1. Adviser-management resource routes stay 403 for Customer.
 
 ---
 
@@ -93,7 +93,7 @@ Protocol scopes (not permissions): `openid`, `profile`, `offline_access`, `api`.
 | SystemAdmin | Hosted login on `adviser-portal` (and later Back Office), no tenantCode | `/tenants` manage + `GET /tenants/by-code/{code}`, `/users/tenant-admins`, `/users/me`, `/currencies` |
 | TenantAdmin | Hosted login on `adviser-portal` + tenantCode | `/users/advisers`, tenant `/users/customers`, `GET /tenants/by-code/{own}`, `/users/me`, `/currencies` |
 | Adviser | Hosted login on `adviser-portal` + tenantCode | Assigned `/users/customers`, `GET /tenants/by-code/{own}`, `/users/me`, `/currencies` |
-| Customer | Login principal; `adviser-portal` issues no code. Tokens wait for `customer-portal` | Own accounts, transactions, and net worth (`accounts.read`, `transactions.read`). `POST /reports/request` when `customerId` is the caller (`reports.customer.create`). Schedule verbs and book scope stay 403. `/users/me` and `/currencies`. `/users/advisers`, `/users/customers`, `/users/tenant-admins`, `/tenants` including by-code → 403 |
+| Customer | Login principal; `adviser-portal` issues no code. Tokens wait for `customer-portal` | `/users/me` and `/currencies` only, on a client that allows Customer. `/users/advisers`, `/users/customers`, `/users/tenant-admins`, `/tenants` including by-code → 403 |
 
 Disable / enable for people: `POST /{id}/disable`, `POST /{id}/enable` (`Disabled` ↔ `Active`). Not a physical delete. Disabling an Adviser requires assigned non-disabled Customers to be handled first. Disabling the last TenantAdmin is allowed in Phase 1 (known gap).
 
@@ -187,7 +187,7 @@ Protocol paths use **OpenIddict defaults. Do not remap.** Portals and `webapi` f
 
 - Custom `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout` as a token issuer
 - Resource Owner Password Credentials
-- A public `customer-portal` client. The accepted client is confidential and held by `bff-customer-portal`
+- The later `customer-portal` client
 - A separate identity SQL database
 - Invitation, forgot-password, MFA, external IdP
 
