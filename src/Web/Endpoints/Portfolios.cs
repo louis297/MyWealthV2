@@ -2,6 +2,8 @@ using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Portfolios;
 using MyWealthV2.Application.Portfolios.Commands.CreatePortfolio;
+using MyWealthV2.Application.Portfolios.Commands.DisablePortfolio;
+using MyWealthV2.Application.Portfolios.Commands.UpdatePortfolio;
 using MyWealthV2.Application.Portfolios.Queries.GetPortfolioById;
 using MyWealthV2.Application.Portfolios.Queries.GetPortfolios;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -17,6 +19,8 @@ public class Portfolios : IEndpointGroup
         groupBuilder.MapGet(GetPortfolios).RequireAuthorization(Policies.PortfoliosRead);
         groupBuilder.MapGet(GetPortfolio, "{id}").RequireAuthorization(Policies.PortfoliosRead);
         groupBuilder.MapPost(CreatePortfolio).RequireAuthorization(Policies.PortfoliosManage);
+        groupBuilder.MapPut(UpdatePortfolio, "{id}").RequireAuthorization(Policies.PortfoliosManage);
+        groupBuilder.MapPost(DisablePortfolio, "{id}/disable").RequireAuthorization(Policies.PortfoliosManage);
     }
 
     [EndpointSummary("List portfolios")]
@@ -47,6 +51,24 @@ public class Portfolios : IEndpointGroup
     {
         var id = await sender.Send(command);
         return TypedResults.Created($"/portfolios/{id}", new CreatedPortfolioDto(id));
+    }
+
+    [EndpointSummary("Update a portfolio")]
+    [EndpointDescription("Renames a portfolio and replaces its lines. Base currency cannot change.")]
+    public static async Task<NoContent> UpdatePortfolio(ISender sender, Guid id, UpdatePortfolioCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Disable a portfolio")]
+    [EndpointDescription("Disables a portfolio and removes every active assignment. Holdings are left untouched.")]
+    public static async Task<NoContent> DisablePortfolio(ISender sender, Guid id, DisablePortfolioCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
     }
 }
 
