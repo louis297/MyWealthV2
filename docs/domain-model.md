@@ -203,7 +203,7 @@ Do not create entities, tables, or empty aggregate roots for:
 - Account balances, holding quantities, net worth
 - Refresh tokens, OIDC clients, authorization codes
 
-`Instrument`, `IMarketData`, and `IFxRate` ship with the instruments slice (§8.4).
+`Instrument` and `IMarketData` ship with the instruments slice (§8.4). `IFxRate` is implemented by the fx-rates slice ([features/fx-rates.md](features/fx-rates.md), accepted 2026-11-02): local `FxRates` table, Frankfurter hourly job, same currency = 1, missing pair → `FxRateNotFoundException`.
 
 The `Money` value object **does** live in the Domain assembly, even with no balance column in Phase 1.
 
@@ -226,7 +226,7 @@ Session stack, four roles, and User / Tenant invariants do not change in Phase 2
 - An Account is a value container under a Customer. `Account.Currency` is the cash-ledger booking currency and is immutable after open. `Account.Type` is immutable after open. Openable in Phase 2: Bank / Cash / Brokerage / Other. Reserved, not selectable in Phase 2: Property / Credit. Type does **not** replace the cash ledger: balance comes from cash postings, not from summing rows because `AccountType == Bank`.
 - Bank, Cash, and Credit accounts must not hold Instruments. Brokerage, Property, and Other may. “No holdings” is any Instrument, not only listed equities. Phase 2 must not open Property or Credit.
 - Credit counts as a liability in net worth. Closed accounts are excluded. Net worth returns per-currency arrays; no FX fold into one number. Current point-in-time read model accepted and landed in [features/net-worth.md](features/net-worth.md) (`GET /net-worth`, `GET /users/customers/{id}/net-worth`, `af422c2`).
-- Market data and FX go through ports + mocks. Introduce `IMarketData` / `IFxRate` at the start of the ledger domain, with Instruments. Same currency = 1. Cross-currency is never silently 1.
+- Market data goes through the `IMarketData` port + mock. FX goes through `IFxRate`, implemented by the fx-rates slice (local table, not a live call). Same currency = 1. Cross-currency is never silently 1. Missing pair throws `FxRateNotFoundException`.
 
 ### 8.2 Conceptual objects (not a table design)
 
@@ -275,7 +275,7 @@ Invariants:
 - `QuoteCurrency` set on create from an enabled `ICurrencyCatalog` code, then immutable.
 - Cost currency = quote currency. No second currency field.
 - `IsActive` only. Not a `UserStatus` machine. HTTP disable / enable flip the bit.
-- No ISIN / Exchange / Kind / price on the aggregate. Price is `IMarketData.TryGetPrice`. FX is `IFxRate.GetRate` (same currency = 1; missing cross pair fails).
+- No ISIN / Exchange / Kind / price on the aggregate. Price is `IMarketData.TryGetPrice`. FX is `IFxRate.GetRate` (same currency = 1; missing cross pair → `FxRateNotFoundException`).
 
 Field rules: [features/instruments.md](features/instruments.md). Landed in repo 2026-09-20 `9ea2f2a`.
 
@@ -352,7 +352,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-09-21 | Account aggregate landed. Disable Customer rejects while any account is active. |
 | 2026-09-25 | Transaction + cash leg accepted (posting spec). Close requires cash SUM = 0. No capture/journal two-step. |
 | 2026-10-12 | Net-worth current point-in-time read model accepted and landed (`af422c2`). Per-currency arrays. No new Domain types. [features/net-worth.md](features/net-worth.md). |
-| 2026-10-13 | Bidirectional reverse link. `ReversedByTransactionId` on the original (single write). `OriginalTransactionId` stays on the Reversal. Script `0018`. |
+| 2026-11-02 | FX rates accepted. `IFxRate` implemented by local `FxRates` table + Frankfurter hourly job. Missing pair → `FxRateNotFoundException`. [features/fx-rates.md](features/fx-rates.md), ADR 0019. |
 
 ---
 

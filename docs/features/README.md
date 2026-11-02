@@ -123,6 +123,7 @@ One domain. Background execution lives in the general-purpose `worker` (ADR 0017
 | --- | --- | --- | --- | --- |
 | [reports](reports.md) | accepted | Customer (`reports.customer.read` only); Adviser; TenantAdmin (all four report policies). SystemAdmin has none of the four. SystemAdmin lists the platform catalog with `GET /reports/catalog` and grants active reports with `tenants.manage` | Catalog with scope (`Customer` \| `Book`). TenantReports. Shared pipeline. Customer Transactions + Adviser Balances. PDF via code layout. Manual + scheduled both. Policies `reports.customer.*` / `reports.book.*`. | Two scopes force the catalog and policy split. |
 | [outbox](outbox.md) | accepted | Platform (no HTTP caller) | Transactional `OutboxMessages`. Worker delivers domain events via MediatR. Replaces immediate post-save dispatch. ADR 0018 accepted. Script `0020_outbox.sql`. | Cross-cutting delivery. Not a report and not a ledger slice. |
+| [fx-rates](fx-rates.md) | accepted (2026-11-02) | Platform (worker job; any Application caller of `IFxRate`) | Hourly Hangfire job pulls Frankfurter daily rates for active catalog currencies. Table `FxRates`. Script `0021_fx_rates.sql`. ADR 0019 accepted. HTTP read surface deferred. | Platform rate cache. Consumers (net-worth fold, instrument prices) are later. |
 
 Invitation / Activation and Fees are deferred.
 

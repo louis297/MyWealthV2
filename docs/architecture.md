@@ -263,7 +263,7 @@ Password change, disable, and logout revoke that subject’s OpenIddict tokens. 
 | `IIdentityService` (or equivalent) | Phase 1 | Create / verify / change-password for Identity users. OpenIddict protocol stays out of Domain |
 | Token-revocation port | Phase 1 | `webapi` writes the shared OpenIddict store today. Replace the adapter if the identity database splits later |
 | `IMarketData` | Phase 2 instruments | `TryGetPrice(instrumentId, asOf?) → Money?`. Mock. Missing → empty, not 0 |
-| `IFxRate` | Phase 2 instruments | `GetRate(from, to, asOf?)`. Same currency = 1. Missing cross pair fails |
+| `IFxRate` | Phase 3 fx-rates | `GetRate(from, to, asOf?)`. Same currency = 1. Missing pair → `FxRateNotFoundException`. Implemented against local `FxRates` table (Frankfurter hourly job). See [features/fx-rates.md](features/fx-rates.md). |
 
 Do not add a port whose surface is still open. Do add a port (or value object) when later use is certain and omitting it would force a Phase-1 redesign (`Money`, `ICurrencyCatalog`, no-op `IEmailSender`).
 
@@ -319,7 +319,7 @@ Phase 3 introduces a general-purpose background worker (ADR 0017).
 - Manual work is enqueued from `webapi` after the normal policy and handler scope checks.
 - Recurring work is driven by Hangfire recurring jobs whose scope is owned by a schedule record. Generation re-validates that scope.
 - Queues (`reports`, `email`, default) provide light isolation. One worker project is enough until a concrete resource or failure-domain need appears.
-- First consumer: [features/reports.md](features/reports.md). The same worker delivers domain events from `OutboxMessages` (ADR 0018 and [features/outbox.md](features/outbox.md), both accepted). Email and other async tasks land here later unless a later ADR splits them.
+- First consumer: [features/reports.md](features/reports.md). The same worker delivers domain events from `OutboxMessages` (ADR 0018 and [features/outbox.md](features/outbox.md), both accepted) and runs the hourly FX rate sync ([features/fx-rates.md](features/fx-rates.md), ADR 0019, both accepted). Email and other async tasks land here later unless a later ADR splits them.
 
 ---
 
@@ -347,6 +347,7 @@ Locked conclusions follow function-plan §0 and these ADRs. The `docs/adr/` fold
 | 0016 | First-party portals use a BFF (`bff-adviser-portal`). Browser talks to BFF; BFF holds tokens and calls `webapi` with Bearer. |
 | 0017 | General-purpose background worker (`src/Worker`) with Hangfire. First consumer: Reports. |
 | 0018 | Transactional outbox for domain events (accepted). Same-transaction write to `OutboxMessages`; worker delivers via MediatR. Contract: features/outbox.md (accepted). |
+| 0019 | FX rate source and refresh (accepted). Frankfurter daily rates, hourly Hangfire job (UTC), directed pairs for active catalog currencies. Contract: features/fx-rates.md (accepted). |
 
 ---
 
@@ -368,3 +369,4 @@ Locked conclusions follow function-plan §0 and these ADRs. The `docs/adr/` fold
 | 2026-11-01 | ADR 0018 proposed: transactional outbox for domain events. Dispatch section and worker note point at the outbox path. |
 | 2026-11-01 | ADR 0018 accepted. Feature spec [features/outbox.md](features/outbox.md) opened as draft (open items with reference approaches). |
 | 2026-11-01 | [features/outbox.md](features/outbox.md) accepted. Former open items locked to the reference approaches. |
+| 2026-11-02 | ADR 0019 and [features/fx-rates.md](features/fx-rates.md) accepted. Hourly Frankfurter sync into `FxRates`. `IFxRate` reads the local table. |

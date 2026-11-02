@@ -246,7 +246,7 @@ Still later (not Phase 3):
 - Any ledger API or ledger table in Phase 1
 - Resource Owner Password Credentials grant
 - A custom resource-API login that issues tokens
-- A public `customer-portal` OIDC client. The accepted client is confidential (`customer-portal`, held by `bff-customer-portal`). `back-office` is the SystemAdmin confidential client and is registered
+- A public `customer-portal` OIDC client. `back-office` is the SystemAdmin confidential client and is registered
 - A separate identity SQL database in Phase 1
 
 ---
