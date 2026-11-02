@@ -1,4 +1,5 @@
 using MyWealthV2.Domain.Entities;
+using MyWealthV2.Domain.Events;
 using MyWealthV2.Domain.Exceptions;
 using NUnit.Framework;
 using Shouldly;
@@ -80,6 +81,14 @@ public class PortfolioTests
         Should.Throw<DomainException>(() => Portfolio.Create(1, "  ", Nzd(), [(10, 100m)]));
         Should.Throw<DomainException>(() => Portfolio.Create(1, new string('a', 201), Nzd(), [(10, 100m)]));
         Should.Throw<DomainException>(() => Portfolio.Create(1, "Balanced", null!, [(10, 100m)]));
+    }
+
+    [Test]
+    public void Create_RaisesPortfolioCreated()
+    {
+        var portfolio = Portfolio.Create(1, "Balanced", Nzd(), [(10, 100m)]);
+
+        portfolio.DomainEvents.OfType<PortfolioCreated>().ShouldHaveSingleItem();
     }
 
     private static Currency Nzd() => Currency.Create("NZD", "New Zealand Dollar", 2);
