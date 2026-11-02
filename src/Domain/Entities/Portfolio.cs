@@ -48,6 +48,16 @@ public class Portfolio : BaseAuditableEntity
 
     private void ReplaceLineWeights(IReadOnlyList<(int InstrumentId, decimal TargetWeight)> lines)
     {
+        if (lines.Count == 0)
+        {
+            throw new DomainException("A portfolio needs at least one line.");
+        }
+
+        if (lines.Select(line => line.InstrumentId).Distinct().Count() != lines.Count)
+        {
+            throw new DomainException("A portfolio line instrument is duplicated.");
+        }
+
         var rounded = new decimal[lines.Count];
         for (var index = 0; index < lines.Count; index++)
         {
