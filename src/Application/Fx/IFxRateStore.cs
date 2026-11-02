@@ -6,4 +6,9 @@ public interface IFxRateStore
         IReadOnlyList<FxRateQuote> quotes,
         DateTimeOffset fetchedAt,
         CancellationToken cancellationToken = default);
+
+    Task<bool> HasAsOfDateForEveryPairAsync(
+        IReadOnlyList<string> currencies,
+        DateOnly asOf,
+        CancellationToken cancellationToken = default);
 }

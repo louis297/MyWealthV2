@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Fx;
 using MyWealthV2.Infrastructure.Data;
+using MyWealthV2.Infrastructure.Data.Entities;
 
 namespace MyWealthV2.Infrastructure.MarketData;
 
@@ -27,14 +28,78 @@ public sealed class FxRateStore(ApplicationDbContext db, TimeProvider time) : IF
         return FxRateSelector.Select(source, target, date, rows);
     }
 
-    public Task UpsertAsync(
+    public async Task UpsertAsync(
         IReadOnlyList<FxRateQuote> quotes,
         DateTimeOffset fetchedAt,
         CancellationToken cancellationToken = default)
     {
-        _ = quotes;
-        _ = fetchedAt;
-        _ = cancellationToken;
-        throw new NotImplementedException();
+        var existing = await db.FxRates.ToListAsync(cancellationToken);
+        foreach (var quote in quotes)
+        {
+            var baseCurrency = quote.BaseCurrency.Trim().ToUpperInvariant();
+            var quoteCurrency = quote.QuoteCurrency.Trim().ToUpperInvariant();
+            var row = existing.SingleOrDefault(candidate =>
+                candidate.BaseCurrency.Trim() == baseCurrency
+                && candidate.QuoteCurrency.Trim() == quoteCurrency
+                && candidate.AsOfDate == quote.AsOfDate);
+            if (row is null)
+            {
+                row = new FxRate
+                {
+                    BaseCurrency = baseCurrency,
+                    QuoteCurrency = quoteCurrency,
+                    AsOfDate = quote.AsOfDate
+                };
+                db.FxRates.Add(row);
+                existing.Add(row);
+            }
+
+            row.Rate = quote.Rate;
+            row.Source = "Frankfurter";
+            row.FetchedAt = fetchedAt;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<bool> HasAsOfDateForEveryPairAsync(
+        IReadOnlyList<string> currencies,
+        DateOnly asOf,
+        CancellationToken cancellationToken = default)
+    {
+        var codes = currencies
+            .Select(code => code.Trim().ToUpperInvariant())
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (codes.Count < 2)
+        {
+            return true;
+        }
+
+        var stored = await db.FxRates.AsNoTracking()
+            .Where(row => row.AsOfDate == asOf)
+            .Select(row => new { row.BaseCurrency, row.QuoteCurrency })
+            .ToListAsync(cancellationToken);
+        var pairs = stored
+            .Select(row => $"{row.BaseCurrency.Trim()}|{row.QuoteCurrency.Trim()}")
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var baseCurrency in codes)
+        {
+            foreach (var quoteCurrency in codes)
+            {
+                if (baseCurrency == quoteCurrency)
+                {
+                    continue;
+                }
+
+                if (!pairs.Contains($"{baseCurrency}|{quoteCurrency}"))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 }

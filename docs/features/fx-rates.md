@@ -82,6 +82,7 @@ The worker fetches the latest Frankfurter rates every hour and stores directed p
 | R13 | No in-memory cache (`IMemoryCache`) in this slice. The table is the source of truth. |
 | R14 | No HTTP read endpoint in this slice. A read surface (e.g. `GET /fx-rates`) is expected later for Scalar / ops; design it when a consumer needs it. Do not treat the absence as a permanent decision. |
 | R15 | Index on `FetchedAt` for “latest successful sync” observability. |
+| R16 | The hourly job always runs. It calls Frankfurter only when some active directed pair has no row whose `AsOfDate` is today's UTC date. Once every active pair has today's source date, later hours that UTC day do not call Frankfurter. A run that stored an older source date still calls again later the same UTC day. On weekends and holidays the source date is not today, so the job still calls each hour and upserts that `AsOfDate`. |
 
 ---
 

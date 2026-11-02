@@ -25,7 +25,7 @@ The platform currency catalog is small and stable (seed: NZD, AUD, USD, EUR, GBP
 ## Decision
 
 - **Source**: Frankfurter (`https://api.frankfurter.dev`). Daily reference rates from central banks. No API key. Free for commercial use of its blended rates.
-- **Refresh**: Hourly Hangfire recurring job, schedule in UTC. Each run fetches the latest rates and upserts by as-of date. No real-time feed.
+- **Refresh**: Hourly Hangfire recurring job, schedule in UTC. Each run checks the local table. It fetches the latest rates only when today's UTC date is not already stored for every active directed pair, then upserts by as-of date. No real-time feed.
 - **Storage model**: Directed pairs among the **active** currencies in the platform catalog. Because Frankfurter supports arbitrary base + symbols and the pair count is small, the job fetches the actual pair rates. Store one row per ordered pair per as-of date. Relative-to-USD is the fallback only if a future source cannot supply arbitrary pairs.
 - **Columns**: Keep both `AsOfDate` (the date the source published) and `FetchedAt` (when the job wrote the row). On a repeated run for the same `AsOfDate`, update `Rate` and `FetchedAt`.
 - **Port**: `IFxRate` is implemented against the local table (not a live HTTP call on the read path). Same currency returns 1. Missing pair fails (does not silently return 1).
