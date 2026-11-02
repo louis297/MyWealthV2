@@ -21,6 +21,10 @@ type DraftLine = {
   weight: string;
 };
 
+function isNotFound(error: unknown) {
+  return typeof error === "object" && error !== null && "status" in error && error.status === 404;
+}
+
 function isStatus(error: unknown, status: number) {
   return typeof error === "object" && error !== null && "status" in error && error.status === status;
 }
@@ -184,6 +188,10 @@ export function PortfolioDetailPage() {
       setConflict(false);
       setMessages(problemMessages(error));
     }
+  }
+
+  if (isNotFound(portfolio.error)) {
+    return <Muted>Not found</Muted>;
   }
 
   if (portfolio.isLoading || assigned.isLoading || !portfolio.data || !assigned.data || lines.length === 0) {
