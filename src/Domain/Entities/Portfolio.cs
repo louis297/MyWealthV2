@@ -59,6 +59,10 @@ public class Portfolio : BaseAuditableEntity
         return portfolio;
     }
 
+    public void Disable()
+    {
+    }
+
     public void ReplaceLines(IReadOnlyList<(int InstrumentId, decimal TargetWeight)> lines)
     {
         var next = BuildLines(lines);
