@@ -59,6 +59,19 @@ public class Portfolio : BaseAuditableEntity
         return portfolio;
     }
 
+    public void ReplaceLines(IReadOnlyList<(int InstrumentId, decimal TargetWeight)> lines)
+    {
+        var next = BuildLines(lines);
+        if (SameWeights(next))
+        {
+            return;
+        }
+
+        _lines.Clear();
+        _lines.AddRange(next);
+        AddDomainEvent(new PortfolioWeightsChanged(this));
+    }
+
     private static string NormaliseName(string name)
     {
         var trimmed = name?.Trim() ?? string.Empty;
@@ -70,13 +83,25 @@ public class Portfolio : BaseAuditableEntity
         return trimmed;
     }
 
-    public void ReplaceLines(IReadOnlyList<(int InstrumentId, decimal TargetWeight)> lines)
+    private void ReplaceLineWeights(IReadOnlyList<(int InstrumentId, decimal TargetWeight)> lines)
     {
-        ReplaceLineWeights(lines);
-        AddDomainEvent(new PortfolioWeightsChanged(this));
+        var next = BuildLines(lines);
+        _lines.Clear();
+        _lines.AddRange(next);
     }
 
-    private void ReplaceLineWeights(IReadOnlyList<(int InstrumentId, decimal TargetWeight)> lines)
+    private bool SameWeights(IReadOnlyList<PortfolioLine> next)
+    {
+        if (_lines.Count != next.Count)
+        {
+            return false;
+        }
+
+        return _lines.All(line => next.Any(other =>
+            other.InstrumentId == line.InstrumentId && other.TargetWeight == line.TargetWeight));
+    }
+
+    private static List<PortfolioLine> BuildLines(IReadOnlyList<(int InstrumentId, decimal TargetWeight)> lines)
     {
         if (lines.Count == 0)
         {
@@ -115,10 +140,13 @@ public class Portfolio : BaseAuditableEntity
         {
             throw new DomainException("Each weight must be greater than 0 and at most 100.");
         }
-        _lines.Clear();
+
+        var built = new List<PortfolioLine>(lines.Count);
         for (var index = 0; index < lines.Count; index++)
         {
-            _lines.Add(PortfolioLine.Create(lines[index].InstrumentId, rounded[index], index));
+            built.Add(PortfolioLine.Create(lines[index].InstrumentId, rounded[index], index));
         }
+
+        return built;
     }
 }
