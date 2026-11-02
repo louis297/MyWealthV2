@@ -65,11 +65,11 @@ export type CreatePortfolioBody = {
 
 export const portfoliosApi = api.injectEndpoints({
   endpoints: (builder) => ({
-    getPortfolios: builder.query<PagedList<Portfolio>, { page?: number } | void>({
+    getPortfolios: builder.query<PagedList<Portfolio>, { page?: number; pageSize?: number } | void>({
       query: (args) => {
         const params = new URLSearchParams();
         params.set("page", String(args?.page ?? 1));
-        params.set("pageSize", "20");
+        params.set("pageSize", String(args?.pageSize ?? 20));
         return `/portfolios?${params.toString()}`;
       },
       providesTags: ["Portfolio"],
@@ -81,6 +81,18 @@ export const portfoliosApi = api.injectEndpoints({
         body,
       }),
       invalidatesTags: ["Portfolio"],
+    }),
+    getAccountPortfolio: builder.query<AccountPortfolio, string>({
+      query: (accountId) => `/accounts/${accountId}/portfolio`,
+      providesTags: (_result, _error, accountId) => [{ type: "Account", id: accountId }],
+    }),
+    assignPortfolio: builder.mutation<{ status: string }, { accountId: string; portfolioId: string }>({
+      query: ({ accountId, portfolioId }) => ({
+        url: `/accounts/${accountId}/portfolio`,
+        method: "POST",
+        body: { portfolioId },
+      }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Account", id: arg.accountId }, "Portfolio"],
     }),
     getPortfolio: builder.query<Portfolio, string>({
       query: (id) => `/portfolios/${id}`,
@@ -147,6 +159,8 @@ export const portfoliosApi = api.injectEndpoints({
 export const {
   useGetPortfoliosQuery,
   useCreatePortfolioMutation,
+  useGetAccountPortfolioQuery,
+  useAssignPortfolioMutation,
   useGetPortfolioQuery,
   useGetAssignedAccountsQuery,
   useUpdatePortfolioMutation,

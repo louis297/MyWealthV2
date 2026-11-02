@@ -9,10 +9,12 @@ import {
   Page,
   PageHeading,
   Section,
+  SelectField,
   StatusBadge,
 } from "@/components/portal";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { SelectItem } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   useCloseAccountMutation,
@@ -20,6 +22,11 @@ import {
   useGetAccountQuery,
   useReopenAccountMutation,
 } from "@/features/accounts/accountsApi";
+import {
+  useAssignPortfolioMutation,
+  useGetAccountPortfolioQuery,
+  useGetPortfoliosQuery,
+} from "@/features/portfolios/portfoliosApi";
 import { useGetTransactionsQuery } from "@/features/transactions/transactionsApi";
 import { cn } from "cn";
 
@@ -64,10 +71,34 @@ export function AccountDetailPage() {
     { accountId: id },
     { skip: !id || !account.data },
   );
+  const eligible = Boolean(
+    account.data && account.data.status === "Open" && (account.data.type === "Brokerage" || account.data.type === "Other"),
+  );
+  useGetAccountPortfolioQuery(id ?? "", { skip: !id || !eligible });
+  const portfolioChoices = useGetPortfoliosQuery({ pageSize: 100 }, { skip: !eligible });
   const [closeAccount] = useCloseAccountMutation();
   const [reopenAccount] = useReopenAccountMutation();
+  const [assignPortfolio] = useAssignPortfolioMutation();
+  const [portfolioId, setPortfolioId] = useState("");
+  const [assignStatus, setAssignStatus] = useState<string | null>(null);
   const [messages, setMessages] = useState<string[]>([]);
   const [conflict, setConflict] = useState(false);
+
+  async function onAssign() {
+    if (!id || !portfolioId) {
+      return;
+    }
+    try {
+      const result = await assignPortfolio({ accountId: id, portfolioId }).unwrap();
+      setAssignStatus(result.status);
+      setConflict(false);
+      setMessages([]);
+    } catch (error: unknown) {
+      setAssignStatus(null);
+      setConflict(false);
+      setMessages(problemMessages(error));
+    }
+  }
 
   async function onLifecycle(action: "close" | "reopen") {
     const current = account.data;
@@ -160,6 +191,32 @@ export function AccountDetailPage() {
           </DetailGrid>
         </CardContent>
       </Card>
+      {eligible && (portfolioChoices.data || portfolioChoices.isError) ? (
+        <Section title="Portfolio">
+          <div className="flex flex-wrap items-end gap-3">
+            <SelectField
+              id="account-portfolio"
+              label="Portfolio"
+              value={portfolioId}
+              onChange={(event) => setPortfolioId(event.target.value)}
+              className="w-64"
+            >
+              <SelectItem value="">Select a portfolio</SelectItem>
+              {(portfolioChoices.data?.items ?? [])
+                .filter((item) => item.isActive)
+                .map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.name}
+                  </SelectItem>
+                ))}
+            </SelectField>
+            <Button type="button" onClick={() => void onAssign()} disabled={!portfolioId}>
+              Assign
+            </Button>
+          </div>
+          {assignStatus ? <p>{assignStatus}</p> : null}
+        </Section>
+      ) : null}
       <Section title="Holdings">
         {items.length === 0 ? <Muted>No holdings.</Muted> : (
           <Card className="gap-0 py-0">

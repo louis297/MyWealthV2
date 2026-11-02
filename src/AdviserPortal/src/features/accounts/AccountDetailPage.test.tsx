@@ -7,7 +7,7 @@ import { AccountDetailPage } from "@/features/accounts/AccountDetailPage";
 import { CreateTransactionPage } from "@/features/transactions/CreateTransactionPage";
 import { sessionSlice, setCurrentUser, type CurrentUser } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
-import { chooseOption, openSelect } from "@/test/chooseOption";
+import { chooseOption, openSelect, pickOption } from "@/test/chooseOption";
 
 const accountId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
 const customerId = "cccccccccccccccc-cccc-cccc-cccc-cccccccccccc";
@@ -902,7 +902,7 @@ describe("AccountDetailPage", () => {
     await openSelect("Portfolio");
     expect(screen.getByRole("option", { name: "Balanced Growth" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Retired" })).not.toBeInTheDocument();
-    await chooseOption("Portfolio", "Balanced Growth");
+    await pickOption("Balanced Growth");
     fireEvent.click(screen.getByRole("button", { name: "Assign" }));
 
     expect(await screen.findByText("Success")).toBeInTheDocument();
