@@ -266,6 +266,9 @@ export function AccountDetailPage() {
               <Button type="button" variant="outline" onClick={() => void onUnassign()}>
                 Unassign
               </Button>
+              <Button type="button" variant="outline" onClick={() => void onRetry()}>
+                Rebalance
+              </Button>
             </div>
           ) : (
             <div className="flex flex-wrap items-end gap-3">
