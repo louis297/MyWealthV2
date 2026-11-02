@@ -13,10 +13,21 @@ public static class InstrumentPriceBook
         DateOnly asOf,
         IReadOnlyList<InstrumentPriceRow> rows)
     {
-        _ = instrumentId;
-        _ = asOf;
-        _ = rows;
-        return 0m;
+        InstrumentPriceRow? chosen = null;
+        foreach (var row in rows)
+        {
+            if (row.InstrumentId != instrumentId || row.AsOfDate > asOf)
+            {
+                continue;
+            }
+
+            if (chosen is null || row.AsOfDate > chosen.Value.AsOfDate)
+            {
+                chosen = row;
+            }
+        }
+
+        return chosen?.Price;
     }
 
     public static IReadOnlyList<InstrumentPriceRow> Upsert(
@@ -26,10 +37,26 @@ public static class InstrumentPriceBook
         DateOnly asOfDate,
         DateTimeOffset fetchedAt)
     {
-        _ = instrumentId;
-        _ = price;
-        _ = asOfDate;
-        _ = fetchedAt;
-        return existing;
+        var updated = new List<InstrumentPriceRow>(existing.Count + 1);
+        var replaced = false;
+        foreach (var row in existing)
+        {
+            if (row.InstrumentId == instrumentId && row.AsOfDate == asOfDate)
+            {
+                updated.Add(new InstrumentPriceRow(instrumentId, price, asOfDate, fetchedAt));
+                replaced = true;
+            }
+            else
+            {
+                updated.Add(row);
+            }
+        }
+
+        if (!replaced)
+        {
+            updated.Add(new InstrumentPriceRow(instrumentId, price, asOfDate, fetchedAt));
+        }
+
+        return updated;
     }
 }
