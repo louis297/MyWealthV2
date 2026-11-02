@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { ConflictNotice, DetailGrid, DetailItem, Messages, Muted, Page, PageHeading, recordLinkClass, Section, SelectField, TextField } from "@/components/portal";
 import { Button } from "@/components/ui/button";
@@ -103,6 +103,7 @@ export function PortfolioDetailPage() {
   const [messages, setMessages] = useState<string[]>([]);
   const [conflict, setConflict] = useState(false);
   const [queued, setQueued] = useState(false);
+  const lineSeq = useRef(0);
 
   if (portfolio.data && syncedId !== portfolio.data.id) {
     setName(portfolio.data.name);
@@ -240,6 +241,7 @@ export function PortfolioDetailPage() {
                     )
                   }
                 >
+                  <SelectItem value="">Select an instrument</SelectItem>
                   {activeInstruments.map((item) => (
                     <SelectItem key={item.id} value={item.id}>
                       {item.symbol}
@@ -259,6 +261,17 @@ export function PortfolioDetailPage() {
                 />
               </div>
             ))}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                lineSeq.current += 1;
+                const key = `line-${lineSeq.current}`;
+                setLines((current) => [...current, { key, instrumentId: "", weight: "" }]);
+              }}
+            >
+              Add line
+            </Button>
             <Button type="submit">Save</Button>
           </form>
         </CardContent>
