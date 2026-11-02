@@ -5,7 +5,7 @@ using MyWealthV2.Infrastructure.Data;
 
 namespace MyWealthV2.Infrastructure.MarketData;
 
-public sealed class FxRateStore(ApplicationDbContext db, TimeProvider time) : IFxRate
+public sealed class FxRateStore(ApplicationDbContext db, TimeProvider time) : IFxRate, IFxRateStore
 {
     public async Task<decimal> GetRateAsync(
         string from,
@@ -25,5 +25,16 @@ public sealed class FxRateStore(ApplicationDbContext db, TimeProvider time) : IF
             .ToListAsync(cancellationToken);
 
         return FxRateSelector.Select(source, target, date, rows);
+    }
+
+    public Task UpsertAsync(
+        IReadOnlyList<FxRateQuote> quotes,
+        DateTimeOffset fetchedAt,
+        CancellationToken cancellationToken = default)
+    {
+        _ = quotes;
+        _ = fetchedAt;
+        _ = cancellationToken;
+        throw new NotImplementedException();
     }
 }
