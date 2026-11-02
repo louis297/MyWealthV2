@@ -29,6 +29,25 @@ public class RebalancePlannerTests
         ]);
     }
 
+    [Test]
+    public void Plan_KeepsTheCashResidualOutOfTheBuy()
+    {
+        var plan = RebalancePlanner.Plan(Input(
+            cash: 0m,
+            residual: 1m,
+            holdings:
+            [
+                Holding(1, "VTI", "USD", 10m, 25m, quoteToBase: 2m, quoteToAccount: 2m)
+            ],
+            targets:
+            [
+                Target(2, "AIA", "NZD", 100m, 10m, quoteToBase: 1m, quoteToAccount: 1m)
+            ]));
+
+        plan.Status.ShouldBe(RebalanceStatus.Success);
+        plan.Trades.Single(trade => trade.Symbol == "AIA").Quantity.ShouldBe(49.5m);
+    }
+
     private static RebalanceInput Input(
         decimal cash,
         decimal residual,
