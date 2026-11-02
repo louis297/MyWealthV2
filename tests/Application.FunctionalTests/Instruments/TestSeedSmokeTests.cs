@@ -10,7 +10,7 @@ namespace MyWealthV2.Application.FunctionalTests.Instruments;
 public class TestSeedSmokeTests : TestBase
 {
     [Test]
-    public async Task DemoTenant_HasThreeSeedSymbols()
+    public async Task DemoTenant_HasTheSeedCatalog()
     {
         var tenant = await TestApp.CreateTenantAsync(
             DevelopmentIdentitySeeder.DemoTenantName,
@@ -39,6 +39,9 @@ public class TestSeedSmokeTests : TestBase
         var symbols = json.RootElement.GetProperty("items").EnumerateArray()
             .Select(item => item.GetProperty("symbol").GetString())
             .ToList();
-        symbols.ShouldBe(["AIA", "NZD-CASH", "VTI"]);
+        symbols.ShouldBe([
+            "6758", "7203", "9984", "AAPL", "AIA", "AIR", "BHP", "CBA", "FPH", "HSBA",
+            "MEL", "MSFT", "NZD-CASH", "OR", "SAP", "SHEL", "ULVR", "VTI", "WOW"
+        ]);
     }
 }

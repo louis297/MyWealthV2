@@ -78,7 +78,10 @@ public class DevelopmentSeedSecondFirmTests : TestBase
         {
             json.RootElement.GetProperty("items").EnumerateArray()
                 .Select(item => item.GetProperty("symbol").GetString())
-                .ShouldBe(["AIA", "NZD-CASH", "VTI"]);
+                .ShouldBe([
+                    "6758", "7203", "9984", "AAPL", "AIA", "AIR", "BHP", "CBA", "FPH", "HSBA",
+                    "MEL", "MSFT", "NZD-CASH", "OR", "SAP", "SHEL", "ULVR", "VTI", "WOW"
+                ]);
         }
 
         var reports = await TenantHttp.Send(HttpMethod.Get, "/reports", adviser.AccessToken);
