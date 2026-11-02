@@ -66,7 +66,7 @@ function user(): CurrentUser {
   };
 }
 
-function renderDetail(options?: { assigned?: boolean; putStatus?: number; putBody?: unknown; inactive?: boolean }) {
+function renderDetail(options?: { assigned?: boolean; putStatus?: number; putBody?: unknown; inactive?: boolean; missing?: boolean }) {
   const store = configureStore({
     reducer: {
       session: sessionSlice.reducer,
@@ -83,6 +83,9 @@ function renderDetail(options?: { assigned?: boolean; putStatus?: number; putBod
     const method = input instanceof Request ? input.method : "GET";
     const path = new URL(url, "http://localhost:3000").pathname;
     if (path === `/api/portfolios/${portfolioId}` && method === "GET") {
+      if (options?.missing) {
+        return new Response("", { status: 404 });
+      }
       return new Response(JSON.stringify({ ...portfolio, isActive: options?.inactive ? false : !disabled }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -287,5 +290,12 @@ describe("PortfolioDetailPage edit", () => {
     expect(new URL(request.url).pathname).toBe(`/api/portfolios/${portfolioId}/rebalance`);
     expect(request.headers.get("X-MyWealth-Request")).toBe("1");
     expect(await screen.findByText("Rebalance queued.")).toBeInTheDocument();
+  });
+
+  it("shows Not found for an unknown portfolio", async () => {
+    renderDetail({ missing: true });
+
+    expect(await screen.findByText("Not found")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
   });
 });
