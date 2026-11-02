@@ -46,6 +46,10 @@ public static class DependencyInjection
         builder.Services.AddScoped<FxRateStore>();
         builder.Services.AddScoped<IFxRate>(sp => sp.GetRequiredService<FxRateStore>());
         builder.Services.AddScoped<IFxRateStore>(sp => sp.GetRequiredService<FxRateStore>());
+        builder.Services.AddHttpClient<IFxRateSource, FrankfurterClient>(client =>
+        {
+            client.BaseAddress = new Uri("https://api.frankfurter.dev");
+        });
 
         var schemaDirectory = Path.Combine(AppContext.BaseDirectory, "schema");
         builder.Services.AddSingleton<ISchemaScriptSource>(_ => new FileSchemaScriptSource(schemaDirectory));
