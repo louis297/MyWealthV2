@@ -349,7 +349,7 @@ Locked conclusions follow function-plan §0 and these ADRs. The `docs/adr/` fold
 | 0018 | Transactional outbox for domain events (accepted). Same-transaction write to `OutboxMessages`; worker delivers via MediatR. Contract: features/outbox.md (accepted). |
 | 0019 | FX rate source and refresh (accepted). Frankfurter daily rates, hourly Hangfire job (UTC), directed pairs for active catalog currencies. Contract: features/fx-rates.md (accepted). |
 | — | Instrument prices (accepted, no new ADR). Twelve Data EOD, hourly Hangfire job (UTC), local `InstrumentPrices` table. Contract: features/instrument-prices.md (accepted). Follows ADR 0019 pattern. |
-| — | Portfolios (draft). Model portfolios, Full Rebalance, assignment lock. Contract: features/portfolios.md (draft). No new ADR. |
+| — | Portfolios (accepted). Model portfolios, Full Rebalance, assignment lock. Contract: features/portfolios.md (accepted). No new ADR. |
 
 ---
 
@@ -374,3 +374,4 @@ Locked conclusions follow function-plan §0 and these ADRs. The `docs/adr/` fold
 | 2026-11-02 | ADR 0019 and [features/fx-rates.md](features/fx-rates.md) accepted. Hourly Frankfurter sync into `FxRates`. `IFxRate` reads the local table. |
 | 2026-11-02 | [features/instrument-prices.md](features/instrument-prices.md) accepted. Hourly Twelve Data sync into `InstrumentPrices`. `IMarketData` reads the local table. |
 | 2026-11-02 | [features/portfolios.md](features/portfolios.md) drafted. Full Rebalance model portfolios. Async job + per-account handle. Assigned accounts reject manual security trades. |
+| 2026-11-02 | [features/portfolios.md](features/portfolios.md) accepted. Assign and single-account rebalance are synchronous. Weight change and bulk rebalance return 202. Disable unassigns every Active assignment. |

@@ -403,17 +403,17 @@ Scripts `0014_holdings.sql` and `0015_transaction_type_opening_holdings.sql`. Co
 ---
 
 
-### Portfolios (draft — not yet a schema decision)
+### 11.6 Portfolios (accepted)
 
-Feature spec: [features/portfolios.md](features/portfolios.md) (draft 2026-11-02).
+Feature spec: [features/portfolios.md](features/portfolios.md) (accepted 2026-11-02).
 
-Planned tables (script number provisional `0023_portfolios.sql`):
+Script `0023_portfolios.sql`:
 
-- `Portfolios` — TenantId, Name, BaseCurrency (immutable), IsActive, drift/min-trade/residual settings, PublicId, audit, RowVersion
-- `PortfolioLines` — PortfolioId, InstrumentId, TargetWeight (decimal 2 places)
-- `AccountPortfolioAssignments` — AccountId, PortfolioId, Status (Active/Removed), AssignedAt, AssignedBy, LastRebalanceAt, LastRebalanceStatus, LastRebalanceMessage; filtered unique on AccountId where Status = Active
+- `Portfolios` — TenantId, Name, BaseCurrency (immutable), IsActive, drift / minimum-trade / cash-residual settings, PublicId, audit, RowVersion
+- `PortfolioLines` — PortfolioId, InstrumentId, TargetWeight (decimal 2 places), SortOrder. No TenantId.
+- `AccountPortfolioAssignments` — TenantId, AccountId, PortfolioId, Status (Active/Removed), AssignedAt, AssignedBy, LastRebalanceAt, LastRebalanceStatus, LastRebalanceMessage; filtered unique on AccountId where Status = Active
 
-Not landed. Do not create the tables until the spec is accepted.
+No seed in the script. Development / TestAppHost `TestSeed` adds one demo portfolio and one assignment, and does not post rebalance trades.
 
 ## 12. Still not a schema decision
 
@@ -437,6 +437,7 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-09-21 | `Accounts` (`0012`). Container under a Customer. Derived `IsActive`. Landed in the repo. |
 | 2026-09-25 | `Transactions` + `TransactionCashLegs` + idempotency table (`0013`). Spec accepted and landed (`79129eb`). |
 | 2026-10-11 | Holdings (`0014`, `0015`) and `CK_Transactions_Type` widened to 0–11 (`0016`) for StockIn / StockOut. |
+| 2026-11-02 | Portfolios accepted. Script `0023_portfolios.sql`: `Portfolios`, `PortfolioLines`, `AccountPortfolioAssignments`. |
 | 2026-10-12 | `CK_Transactions_Type` widened to 0–14 (`0017`) for Split / Bonus / Scrip. No new table. |
 | 2026-10-13 | `Transactions.ReversedByTransactionId` (`0018`). Bidirectional reverse link. Forward ALTER only. |
 
