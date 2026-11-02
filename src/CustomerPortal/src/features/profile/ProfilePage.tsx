@@ -1,5 +1,8 @@
 import { type FormEvent, useState } from "react";
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
+import { Muted, Page, PageHeading, TextField } from "@/components/portal";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useUpdateMeMutation, useUpdateMePasswordMutation } from "@/features/profile/profileApi";
 import { startLogin } from "@/features/session/session";
 import { clearSession } from "@/features/session/sessionSlice";
@@ -14,15 +17,14 @@ export function ProfilePage() {
   const [updateMePassword] = useUpdateMePasswordMutation();
 
   if (!me) {
-    return <p>Loading session…</p>;
+    return <Muted>Loading session…</Muted>;
   }
+
+  const profile = me;
 
   async function onSaveName(event: FormEvent) {
     event.preventDefault();
-    if (!me) {
-      return;
-    }
-    await updateMe({ name: name.trim(), rowVersion: me.rowVersion }).unwrap();
+    await updateMe({ name: name.trim(), rowVersion: profile.rowVersion }).unwrap();
   }
 
   async function onChangePassword(event: FormEvent) {
@@ -33,37 +35,49 @@ export function ProfilePage() {
   }
 
   return (
-    <section>
-      <h1>Profile</h1>
-      <p>{me.email}</p>
-      <form onSubmit={(event) => void onSaveName(event)}>
-        <label>
-          Name
-          <input aria-label="Name" value={name} onChange={(event) => setName(event.target.value)} />
-        </label>
-        <button type="submit">Save name</button>
-      </form>
-      <form onSubmit={(event) => void onChangePassword(event)}>
-        <label>
-          Current password
-          <input
-            aria-label="Current password"
-            type="password"
-            value={currentPassword}
-            onChange={(event) => setCurrentPassword(event.target.value)}
-          />
-        </label>
-        <label>
-          New password
-          <input
-            aria-label="New password"
-            type="password"
-            value={newPassword}
-            onChange={(event) => setNewPassword(event.target.value)}
-          />
-        </label>
-        <button type="submit">Change password</button>
-      </form>
-    </section>
+    <Page className="max-w-lg">
+      <PageHeading title="Profile" />
+      <p>{profile.email}</p>
+      <Card>
+        <CardHeader>
+          <CardTitle>Name</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form className="flex flex-col gap-4" onSubmit={(event) => void onSaveName(event)}>
+            <TextField
+              id="profile-name"
+              label="Name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
+            <Button type="submit">Save name</Button>
+          </form>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Password</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form className="flex flex-col gap-4" onSubmit={(event) => void onChangePassword(event)}>
+            <TextField
+              id="profile-current-password"
+              label="Current password"
+              type="password"
+              value={currentPassword}
+              onChange={(event) => setCurrentPassword(event.target.value)}
+            />
+            <TextField
+              id="profile-new-password"
+              label="New password"
+              type="password"
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+            />
+            <Button type="submit">Change password</Button>
+          </form>
+        </CardContent>
+      </Card>
+    </Page>
   );
 }

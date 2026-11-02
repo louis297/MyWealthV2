@@ -3,6 +3,7 @@ import { Outlet, useLocation } from "react-router";
 import { useAppDispatch } from "@/app/hooks";
 import { isSignOutInProgress, startLogin } from "@/features/session/session";
 import { setCurrentUser } from "@/features/session/sessionSlice";
+import { Muted } from "@/components/portal";
 import { useGetMeQuery } from "@/shared/api/api";
 
 export function RequireSession() {
@@ -24,7 +25,7 @@ export function RequireSession() {
   }, [isError, location.pathname, location.search]);
 
   if (isLoading || isError || !me) {
-    return <p>Loading session…</p>;
+    return <Muted>Loading session…</Muted>;
   }
 
   return <Outlet />;

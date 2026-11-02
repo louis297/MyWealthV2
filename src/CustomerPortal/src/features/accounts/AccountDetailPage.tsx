@@ -1,4 +1,7 @@
 import { useParams } from "react-router";
+import { DetailGrid, DetailItem, Muted, Page, PageHeading, Section, StatusBadge } from "@/components/portal";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   useGetAccountQuery,
   useGetActivityQuery,
@@ -18,37 +21,84 @@ export function AccountDetailPage() {
   const activity = useGetActivityQuery(id, { skip: account.isError });
 
   if (isNotFound(account.error)) {
-    return <p>Not found</p>;
+    return <Muted>Not found</Muted>;
   }
 
   if (account.isLoading || !account.data) {
-    return <p>Loading session…</p>;
+    return <Muted>Loading session…</Muted>;
   }
 
+  const holdingsItems = holdings.data?.items ?? [];
+  const activityItems = activity.data?.items ?? [];
+
   return (
-    <section>
-      <h1>{account.data.name}</h1>
-      <p>Status {account.data.status}</p>
-      <p>Type {account.data.type}</p>
-      {cash.data ? <p>Cash balance {cash.data.cashBalance} {cash.data.currency}</p> : null}
-      <h2>Holdings</h2>
-      {holdings.data && holdings.data.items.length === 0 ? <p>No holdings.</p> : null}
-      {holdings.data && holdings.data.items.length > 0 ? (
-        <ul>
-          {holdings.data.items.map((holding) => (
-            <li key={holding.id}>{holding.symbol} {holding.quantity}</li>
-          ))}
-        </ul>
-      ) : null}
-      <h2>Activity</h2>
-      {activity.data && activity.data.items.length === 0 ? <p>No activity.</p> : null}
-      {activity.data && activity.data.items.length > 0 ? (
-        <ul>
-          {activity.data.items.map((row) => (
-            <li key={row.id}>{row.type} {row.bookedAt}</li>
-          ))}
-        </ul>
-      ) : null}
-    </section>
+    <Page>
+      <PageHeading title={account.data.name} />
+      <Card>
+        <CardContent>
+          <DetailGrid>
+            <DetailItem label="Status">
+              <StatusBadge status={account.data.status} />
+            </DetailItem>
+            <DetailItem label="Type">{account.data.type}</DetailItem>
+            {cash.data ? (
+              <DetailItem label="Cash balance">
+                {cash.data.cashBalance} {cash.data.currency}
+              </DetailItem>
+            ) : null}
+          </DetailGrid>
+        </CardContent>
+      </Card>
+      <Section title="Holdings">
+        {holdings.data && holdingsItems.length === 0 ? <Muted>No holdings.</Muted> : null}
+        {holdingsItems.length > 0 ? (
+          <Card className="gap-0 py-0">
+            <CardContent className="px-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Symbol</TableHead>
+                    <TableHead>Quantity</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {holdingsItems.map((holding) => (
+                    <TableRow key={holding.id}>
+                      <TableCell>{holding.symbol}</TableCell>
+                      <TableCell>{holding.quantity}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        ) : null}
+      </Section>
+      <Section title="Activity">
+        {activity.data && activityItems.length === 0 ? <Muted>No activity.</Muted> : null}
+        {activityItems.length > 0 ? (
+          <Card className="gap-0 py-0">
+            <CardContent className="px-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Booked at</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {activityItems.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>{row.type}</TableCell>
+                      <TableCell>{row.bookedAt}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        ) : null}
+      </Section>
+    </Page>
   );
 }
