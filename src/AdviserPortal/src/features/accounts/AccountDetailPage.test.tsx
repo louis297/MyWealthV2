@@ -916,6 +916,78 @@ describe("AccountDetailPage", () => {
     expect(new URL(request!.url).searchParams.has("tenantId")).toBe(false);
   });
 
+  it("hides the portfolio dropdown and Assign until Unassign", async () => {
+    const portfolioId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    let assigned = false;
+    renderDetail((url, method) => {
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json(account);
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.includes("/api/portfolios?") && method === "GET") {
+        return json({
+          items: [
+            {
+              id: portfolioId,
+              name: "Balanced Growth",
+              baseCurrency: "NZD",
+              isActive: true,
+              lines: [],
+              rowVersion: "AAAA",
+              tenantId: account.tenantId,
+              driftAbsolute: 1,
+              driftRelative: 5,
+              minimumTrade: 100,
+              cashResidualPercent: 1,
+            },
+          ],
+          page: 1,
+          pageSize: 100,
+          totalCount: 1,
+        });
+      }
+      if (url.endsWith(`/accounts/${accountId}/portfolio`) && method === "POST") {
+        assigned = true;
+        return json({ status: "Success" });
+      }
+      if (url.endsWith(`/accounts/${accountId}/portfolio`) && method === "DELETE") {
+        assigned = false;
+        return new Response(null, { status: 204 });
+      }
+      if (url.endsWith(`/accounts/${accountId}/portfolio`) && method === "GET") {
+        return assigned
+          ? json({
+              accountId,
+              portfolioId,
+              status: "Active",
+              lastRebalanceAt: null,
+              lastRebalanceStatus: "Success",
+              lastRebalanceMessage: null,
+            })
+          : new Response("", { status: 404 });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    await chooseOption("Portfolio", "Balanced Growth");
+    fireEvent.click(screen.getByRole("button", { name: "Assign" }));
+    await waitFor(() => {
+      expect(screen.queryByLabelText("Portfolio")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Assign" })).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "Unassign" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Unassign" }));
+    expect(await screen.findByLabelText("Portfolio")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Assign" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Unassign" })).not.toBeInTheDocument();
+  });
+
   it("shows NoChange when assign does not trade", async () => {
     const portfolioId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
     renderDetail((url, method) => {
