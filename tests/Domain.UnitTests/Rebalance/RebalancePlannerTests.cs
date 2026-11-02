@@ -48,11 +48,70 @@ public class RebalancePlannerTests
         plan.Trades.Single(trade => trade.Symbol == "AIA").Quantity.ShouldBe(49.5m);
     }
 
+    [Test]
+    public void Plan_SkipsALineInsideAbsoluteDrift()
+    {
+        var plan = RebalancePlanner.Plan(Input(
+            cash: 8m,
+            residual: 0m,
+            holdings:
+            [
+                Holding(2, "AIA", "NZD", 99.2m, 10m, 1m, 1m)
+            ],
+            targets:
+            [
+                Target(2, "AIA", "NZD", 100m, 10m, 1m, 1m)
+            ]));
+
+        plan.Status.ShouldBe(RebalanceStatus.NoChange);
+        plan.Trades.ShouldBeEmpty();
+    }
+
+    [Test]
+    public void Plan_SkipsALineInsideRelativeDrift()
+    {
+        var plan = RebalancePlanner.Plan(Input(
+            cash: 215m,
+            residual: 0m,
+            holdings:
+            [
+                Holding(2, "AIA", "NZD", 78.5m, 10m, 1m, 1m)
+            ],
+            targets:
+            [
+                Target(2, "AIA", "NZD", 80m, 10m, 1m, 1m)
+            ]));
+
+        plan.Status.ShouldBe(RebalanceStatus.NoChange);
+        plan.Trades.ShouldBeEmpty();
+    }
+
+    [Test]
+    public void Plan_SkipsATargetTradeBelowTheMinimum()
+    {
+        var plan = RebalancePlanner.Plan(Input(
+            cash: 50m,
+            residual: 0m,
+            minimumTrade: 100m,
+            holdings:
+            [
+                Holding(2, "AIA", "NZD", 95m, 10m, 1m, 1m)
+            ],
+            targets:
+            [
+                Target(2, "AIA", "NZD", 100m, 10m, 1m, 1m)
+            ]));
+
+        plan.Status.ShouldBe(RebalanceStatus.NoChange);
+        plan.Trades.ShouldBeEmpty();
+    }
+
     private static RebalanceInput Input(
         decimal cash,
         decimal residual,
         PlannerHolding[] holdings,
-        PlannerTarget[] targets) =>
+        PlannerTarget[] targets,
+        decimal minimumTrade = 100m) =>
         new(
             "NZD",
             "NZD",
@@ -60,7 +119,7 @@ public class RebalancePlannerTests
             1m,
             DriftAbsolute: 1m,
             DriftRelative: 5m,
-            MinimumTrade: 100m,
+            minimumTrade,
             residual,
             holdings,
             targets);
