@@ -125,6 +125,14 @@ export const portfoliosApi = api.injectEndpoints({
       },
       providesTags: ["Portfolio", "Account"],
     }),
+    disablePortfolio: builder.mutation<void, { id: string; rowVersion: string }>({
+      query: ({ id, rowVersion }) => ({
+        url: `/portfolios/${id}/disable`,
+        method: "POST",
+        body: { rowVersion },
+      }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Portfolio", id: arg.id }, "Portfolio"],
+    }),
     updatePortfolio: builder.mutation<RebalanceAccepted | null, { id: string; body: UpdatePortfolioBody }>({
       query: ({ id, body }) => ({
         url: `/portfolios/${id}`,
@@ -142,4 +150,5 @@ export const {
   useGetPortfolioQuery,
   useGetAssignedAccountsQuery,
   useUpdatePortfolioMutation,
+  useDisablePortfolioMutation,
 } = portfoliosApi;

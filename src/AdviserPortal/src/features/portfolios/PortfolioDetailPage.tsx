@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { SelectItem } from "@/components/ui/select";
 import { useGetInstrumentsQuery } from "@/features/instruments/instrumentsApi";
 import {
+  useDisablePortfolioMutation,
   useGetAssignedAccountsQuery,
   useGetPortfolioQuery,
   useUpdatePortfolioMutation,
@@ -88,6 +89,7 @@ export function PortfolioDetailPage() {
   const assigned = useGetAssignedAccountsQuery(id ?? "", { skip: !id });
   const instruments = useGetInstrumentsQuery();
   const [updatePortfolio] = useUpdatePortfolioMutation();
+  const [disablePortfolio] = useDisablePortfolioMutation();
   const [name, setName] = useState("");
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [syncedId, setSyncedId] = useState<string | null>(null);
@@ -99,6 +101,27 @@ export function PortfolioDetailPage() {
     setName(portfolio.data.name);
     setLines(draftFrom(portfolio.data.lines));
     setSyncedId(portfolio.data.id);
+  }
+
+  async function onDisable() {
+    const current = portfolio.data;
+    if (!current?.isActive) {
+      return;
+    }
+    try {
+      await disablePortfolio({ id: current.id, rowVersion: current.rowVersion }).unwrap();
+      setConflict(false);
+      setMessages([]);
+    } catch (error: unknown) {
+      if (isStatus(error, 409)) {
+        setConflict(true);
+        setMessages([]);
+        void portfolio.refetch();
+        return;
+      }
+      setConflict(false);
+      setMessages(problemMessages(error));
+    }
   }
 
   async function onSubmit(event: FormEvent) {
@@ -155,7 +178,16 @@ export function PortfolioDetailPage() {
 
   return (
     <Page>
-      <PageHeading title={data.name} />
+      <PageHeading
+        title={data.name}
+        actions={
+          data.isActive ? (
+            <Button type="button" variant="destructive" onClick={() => void onDisable()}>
+              Disable
+            </Button>
+          ) : null
+        }
+      />
       {queued ? <p>Rebalance queued.</p> : null}
       {conflict ? <ConflictNotice /> : null}
       <Messages messages={messages} />
@@ -163,6 +195,7 @@ export function PortfolioDetailPage() {
         <CardContent>
           <DetailGrid>
             <DetailItem label="Base currency">{data.baseCurrency}</DetailItem>
+            <DetailItem label="Status">{data.isActive ? "Active" : "Inactive"}</DetailItem>
           </DetailGrid>
         </CardContent>
       </Card>
