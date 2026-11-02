@@ -6,11 +6,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PortfolioDetailPage } from "@/features/portfolios/PortfolioDetailPage";
 import { sessionSlice, setCurrentUser, type CurrentUser } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
+import { pickOption } from "@/test/chooseOption";
 
 const portfolioId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
 const accountId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const vti = "cccccccc-cccc-cccc-cccc-cccccccccccc";
 const fph = "dddddddd-dddd-dddd-dddd-dddddddddddd";
+const spy = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
 
 const portfolio = {
   id: portfolioId,
@@ -33,10 +35,11 @@ const instruments = {
   items: [
     { id: vti, tenantId: portfolio.tenantId, symbol: "VTI", name: "Vanguard", quoteCurrency: "USD", isActive: true, rowVersion: "AAAA" },
     { id: fph, tenantId: portfolio.tenantId, symbol: "FPH", name: "Fisher", quoteCurrency: "NZD", isActive: true, rowVersion: "AAAA" },
+    { id: spy, tenantId: portfolio.tenantId, symbol: "SPY", name: "S&P 500", quoteCurrency: "USD", isActive: true, rowVersion: "AAAA" },
   ],
   page: 1,
   pageSize: 100,
-  totalCount: 2,
+  totalCount: 3,
 };
 
 const brokerageAccount = {
@@ -190,6 +193,35 @@ describe("PortfolioDetailPage edit", () => {
       ],
     });
     expect(screen.queryByText("Rebalance queued.")).not.toBeInTheDocument();
+  });
+
+  it("adds a line and posts the new instrument and weight", async () => {
+    const { fetchMock } = renderDetail();
+
+    expect(await screen.findByRole("heading", { name: "Balanced Growth" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add line" }));
+    const instrumentFields = screen.getAllByLabelText("Instrument");
+    const weights = screen.getAllByLabelText("Weight");
+    expect(instrumentFields).toHaveLength(3);
+    fireEvent.change(weights[0], { target: { value: "50" } });
+    fireEvent.change(weights[1], { target: { value: "30" } });
+    fireEvent.click(instrumentFields[2]);
+    await pickOption("SPY");
+    fireEvent.change(weights[2], { target: { value: "20" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    const request = await vi.waitFor(() => {
+      const found = putRequest(fetchMock);
+      expect(found).toBeDefined();
+      return found!;
+    });
+    expect(JSON.parse(await request.clone().text())).toMatchObject({
+      lines: [
+        { instrumentId: vti, targetWeight: 50 },
+        { instrumentId: fph, targetWeight: 30 },
+        { instrumentId: spy, targetWeight: 20 },
+      ],
+    });
   });
 
   it("confirms a weight change when an account is assigned and shows the queued rebalance", async () => {
