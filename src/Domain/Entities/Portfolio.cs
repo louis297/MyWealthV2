@@ -55,6 +55,7 @@ public class Portfolio : BaseAuditableEntity
             CashResidualPercent = 1m
         };
         portfolio.ReplaceLineWeights(lines);
+        portfolio.AddDomainEvent(new PortfolioCreated(portfolio));
         return portfolio;
     }
 
