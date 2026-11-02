@@ -83,7 +83,18 @@ export function ReportsPage() {
     const response = await fetch(`/api/reports/executions/${id}/download`, { credentials: "include" });
     if (!response.ok) {
       setMessages(["Download not available."]);
+      return;
     }
+    const bytes = await response.arrayBuffer();
+    const blob = new Blob([bytes], { type: response.headers.get("Content-Type") ?? "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "report.pdf";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   }
 
   return (
