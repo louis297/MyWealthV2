@@ -318,6 +318,7 @@ public class CreateTransactionCommandHandler(
         var currentSum = await TransactionCash.SumAsync(db, loaded.Account.Id, cancellationToken);
         var existingCount = await TransactionCash.CountAsync(db, loaded.Account.Id, cancellationToken);
         var type = Enum.Parse<TransactionType>(request.Type!);
+        await PortfolioTradeLock.RejectIfAssignedAsync(db, loaded.Account.Id, type, cancellationToken);
         Domain.Entities.Transaction transaction;
         try
         {

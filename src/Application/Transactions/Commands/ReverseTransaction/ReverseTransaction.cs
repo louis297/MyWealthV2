@@ -106,6 +106,7 @@ public class ReverseTransactionCommandHandler(
             .Where(row => row.Id == loaded.Transaction.Id)
             .Select(row => new { row.Type, row.ReversedByTransactionId })
             .SingleAsync(cancellationToken);
+        await PortfolioTradeLock.RejectIfAssignedAsync(db, loaded.Account.Id, header.Type, cancellationToken);
         if (header.Type == TransactionType.Reversal || header.ReversedByTransactionId is not null)
         {
             throw new ValidationException([
