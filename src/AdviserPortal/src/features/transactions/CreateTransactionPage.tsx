@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { SelectItem } from "@/components/ui/select";
 import { useGetAccountHoldingsQuery, useGetAccountQuery } from "@/features/accounts/accountsApi";
+import { useGetAccountPortfolioQuery } from "@/features/portfolios/portfoliosApi";
 import { useGetInstrumentsQuery } from "@/features/instruments/instrumentsApi";
 import { useCreateTransactionMutation } from "@/features/transactions/transactionsApi";
 
@@ -63,6 +64,7 @@ export function CreateTransactionPage() {
   const [bookedAt, setBookedAt] = useState("");
   const [messages, setMessages] = useState<string[]>([]);
   const account = useGetAccountQuery(accountId ?? "", { skip: !accountId });
+  const assignment = useGetAccountPortfolioQuery(accountId ?? "", { skip: !accountId });
   const holdings = useGetAccountHoldingsQuery(accountId ?? "", { skip: !accountId });
   const instruments = useGetInstrumentsQuery();
   const [createTransaction] = useCreateTransactionMutation();
@@ -70,6 +72,9 @@ export function CreateTransactionPage() {
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!accountId) {
+      return;
+    }
+    if (assignment.isSuccess && assignment.data?.status === "Active" && !isCashType(type)) {
       return;
     }
 
@@ -127,6 +132,7 @@ export function CreateTransactionPage() {
     ...(offerCash ? cashTypes : []),
   ];
   const cashType = isCashType(type);
+  const securityBlocked = assignment.isSuccess && assignment.data?.status === "Active" && !cashType;
 
   if (isNotFound(account.error)) {
     return <Muted>Not found</Muted>;
@@ -156,66 +162,72 @@ export function CreateTransactionPage() {
                 </SelectItem>
               ))}
             </SelectField>
-            {cashType ? (
-              <>
-                <TextField
-                  id="transaction-amount"
-                  label="Amount"
-                  value={amount}
-                  onChange={(event) => setAmount(event.target.value)}
-                  required
-                />
-                <TextField
-                  id="transaction-memo"
-                  label="Memo"
-                  value={memo}
-                  onChange={(event) => setMemo(event.target.value)}
-                  maxLength={200}
-                />
-              </>
+            {securityBlocked ? (
+              <p>Manual security trades are blocked while a portfolio is assigned.</p>
             ) : (
               <>
-                <SelectField
-                  id="transaction-instrument"
-                  label="Instrument"
-                  value={instrumentId}
-                  onChange={(event) => setInstrumentId(event.target.value)}
-                  required
-                >
-                  <SelectItem value="">Select an instrument</SelectItem>
-                  {(instruments.data?.items ?? []).map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.symbol} {item.name}
-                    </SelectItem>
-                  ))}
-                </SelectField>
+                {cashType ? (
+                  <>
+                    <TextField
+                      id="transaction-amount"
+                      label="Amount"
+                      value={amount}
+                      onChange={(event) => setAmount(event.target.value)}
+                      required
+                    />
+                    <TextField
+                      id="transaction-memo"
+                      label="Memo"
+                      value={memo}
+                      onChange={(event) => setMemo(event.target.value)}
+                      maxLength={200}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <SelectField
+                      id="transaction-instrument"
+                      label="Instrument"
+                      value={instrumentId}
+                      onChange={(event) => setInstrumentId(event.target.value)}
+                      required
+                    >
+                      <SelectItem value="">Select an instrument</SelectItem>
+                      {(instruments.data?.items ?? []).map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.symbol} {item.name}
+                        </SelectItem>
+                      ))}
+                    </SelectField>
+                    <TextField
+                      id="transaction-quantity"
+                      label={type === "Split" || type === "Bonus" || type === "Scrip" ? "New total quantity" : "Quantity"}
+                      value={quantity}
+                      onChange={(event) => setQuantity(event.target.value)}
+                      required
+                    />
+                    {type === "StockIn" ? (
+                      <TextField
+                        id="transaction-cost"
+                        label="Cost"
+                        value={cost}
+                        onChange={(event) => setCost(event.target.value)}
+                        required
+                      />
+                    ) : null}
+                  </>
+                )}
                 <TextField
-                  id="transaction-quantity"
-                  label={type === "Split" || type === "Bonus" || type === "Scrip" ? "New total quantity" : "Quantity"}
-                  value={quantity}
-                  onChange={(event) => setQuantity(event.target.value)}
+                  id="transaction-booked-at"
+                  label="Booked at"
+                  type="datetime-local"
+                  value={bookedAt}
+                  onChange={(event) => setBookedAt(event.target.value)}
                   required
                 />
-                {type === "StockIn" ? (
-                  <TextField
-                    id="transaction-cost"
-                    label="Cost"
-                    value={cost}
-                    onChange={(event) => setCost(event.target.value)}
-                    required
-                  />
-                ) : null}
+                <Button type="submit">Post transaction</Button>
               </>
             )}
-            <TextField
-              id="transaction-booked-at"
-              label="Booked at"
-              type="datetime-local"
-              value={bookedAt}
-              onChange={(event) => setBookedAt(event.target.value)}
-              required
-            />
-            <Button type="submit">Post transaction</Button>
           </form>
         </CardContent>
       </Card>
