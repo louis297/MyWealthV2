@@ -106,6 +106,59 @@ public class RebalancePlannerTests
         plan.Trades.ShouldBeEmpty();
     }
 
+    [Test]
+    public void Plan_FailsWhenAPriceIsMissing()
+    {
+        var plan = RebalancePlanner.Plan(Input(
+            cash: 1000m,
+            residual: 0m,
+            holdings: [],
+            targets: [Target(2, "AIA", "NZD", 100m, null, 1m, 1m)]));
+
+        plan.Status.ShouldBe(RebalanceStatus.Failed);
+        plan.Code.ShouldBe("missing_price");
+        plan.Message.ShouldNotBeNull().ShouldContain("AIA");
+        plan.Trades.ShouldBeEmpty();
+    }
+
+    [Test]
+    public void Plan_FailsWhenFxIsMissing()
+    {
+        var plan = RebalancePlanner.Plan(Input(
+            cash: 0m,
+            residual: 0m,
+            holdings: [Holding(1, "VTI", "USD", 10m, 25m, null, 2m)],
+            targets: [Target(2, "AIA", "NZD", 100m, 10m, 1m, 1m)]));
+
+        plan.Status.ShouldBe(RebalanceStatus.Failed);
+        plan.Code.ShouldBe("missing_fx");
+        plan.Message.ShouldNotBeNull().ShouldContain("USD");
+        plan.Message.ShouldContain("NZD");
+        plan.Trades.ShouldBeEmpty();
+    }
+
+    [Test]
+    public void Plan_FailsWhenCashCannotFundTheBuys()
+    {
+        var plan = RebalancePlanner.Plan(new RebalanceInput(
+            "NZD",
+            "NZD",
+            100m,
+            1m,
+            1m,
+            5m,
+            0m,
+            0m,
+            [],
+            [Target(2, "AIA", "USD", 100m, 10m, 1m, 2m)]));
+
+        plan.Status.ShouldBe(RebalanceStatus.Failed);
+        plan.Code.ShouldBe("insufficient_cash");
+        plan.Message.ShouldNotBeNull().ShouldContain("USD");
+        plan.Message.ShouldContain("NZD");
+        plan.Trades.ShouldBeEmpty();
+    }
+
     private static RebalanceInput Input(
         decimal cash,
         decimal residual,
