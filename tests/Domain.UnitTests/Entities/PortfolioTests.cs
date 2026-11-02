@@ -143,5 +143,41 @@ public class PortfolioTests
         portfolio.DomainEvents.ShouldBeEmpty();
     }
 
+    [Test]
+    public void ApplySettings_StoresTheSuppliedValues()
+    {
+        var portfolio = Portfolio.Create(1, "Balanced", Nzd(), [(10, 100m)]);
+
+        portfolio.ApplySettings(new PortfolioSettings(2m, 10m, 250m, 0m));
+
+        portfolio.DriftAbsolute.ShouldBe(2m);
+        portfolio.DriftRelative.ShouldBe(10m);
+        portfolio.MinimumTrade.ShouldBe(250m);
+        portfolio.CashResidualPercent.ShouldBe(0m);
+        portfolio.DomainEvents.OfType<PortfolioWeightsChanged>().ShouldBeEmpty();
+    }
+
+    [Test]
+    public void ApplySettings_RejectsANegativeOrHugeResidual()
+    {
+        var portfolio = Portfolio.Create(1, "Balanced", Nzd(), [(10, 100m)]);
+
+        Should.Throw<DomainException>(() => portfolio.ApplySettings(new PortfolioSettings(1m, 5m, 100m, -1m)));
+        Should.Throw<DomainException>(() => portfolio.ApplySettings(new PortfolioSettings(1m, 5m, 100m, 100.01m)));
+        Should.Throw<DomainException>(() => portfolio.ApplySettings(new PortfolioSettings(-1m, 5m, 100m, 1m)));
+    }
+
+    [Test]
+    public void Rename_TrimsAndDoesNotRaiseAWeightChange()
+    {
+        var portfolio = Portfolio.Create(1, "Balanced", Nzd(), [(10, 100m)]);
+        portfolio.ClearDomainEvents();
+
+        portfolio.Rename("  Growth  ");
+
+        portfolio.Name.ShouldBe("Growth");
+        portfolio.DomainEvents.ShouldBeEmpty();
+    }
+
     private static Currency Nzd() => Currency.Create("NZD", "New Zealand Dollar", 2);
 }

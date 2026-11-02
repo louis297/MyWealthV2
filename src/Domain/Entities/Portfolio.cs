@@ -64,6 +64,16 @@ public class Portfolio : BaseAuditableEntity
         IsActive = false;
     }
 
+    public void ApplySettings(PortfolioSettings settings)
+    {
+        _ = settings;
+    }
+
+    public void Rename(string name)
+    {
+        _ = name;
+    }
+
     public void ReplaceLines(IReadOnlyList<(int InstrumentId, decimal TargetWeight)> lines)
     {
         var next = BuildLines(lines);
