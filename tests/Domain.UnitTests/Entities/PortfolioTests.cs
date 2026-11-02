@@ -39,5 +39,22 @@ public class PortfolioTests
         Should.Throw<DomainException>(() => Portfolio.Create(1, "Balanced", Nzd(), [(10, -1m), (11, 101m)]));
     }
 
+    [Test]
+    public void Create_RejectsADuplicateInstrument()
+    {
+        Should.Throw<DomainException>(() => Portfolio.Create(1, "Balanced", Nzd(),
+        [
+            (10, 60m),
+            (10, 40m)
+        ]));
+    }
+
+    [Test]
+    public void Create_RejectsAnEmptyLineList()
+    {
+        Should.Throw<DomainException>(() => Portfolio.Create(1, "Balanced", Nzd(), []))
+            .Message.ShouldBe("A portfolio needs at least one line.");
+    }
+
     private static Currency Nzd() => Currency.Create("NZD", "New Zealand Dollar", 2);
 }
