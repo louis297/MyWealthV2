@@ -42,6 +42,8 @@ public interface IApplicationDbContext
 
     Task LockAccountAsync(int accountId, CancellationToken cancellationToken);
 
+    void ClearTrackedChanges();
+
     Task LoadCashLegAsync(Transaction transaction, CancellationToken cancellationToken);
 
     Task LoadSecurityLegsAsync(Transaction transaction, CancellationToken cancellationToken);

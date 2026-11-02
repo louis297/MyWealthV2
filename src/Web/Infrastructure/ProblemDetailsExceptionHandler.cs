@@ -62,6 +62,14 @@ public class ProblemDetailsExceptionHandler : IExceptionHandler
                 Detail = "This Idempotency-Key was already used for a different request."
             }),
             TargetDisabledException tde => (StatusCodes.Status400BadRequest, DisabledProblem(tde)),
+            RebalanceException rebalance => (StatusCodes.Status400BadRequest, CodedProblem(rebalance.Code, rebalance.Message)),
+            AssignmentConflictException conflict => (StatusCodes.Status409Conflict, new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Conflict",
+                Detail = conflict.Message,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10"
+            }),
             _ => (-1, null)
         };
 
@@ -87,8 +95,19 @@ public class ProblemDetailsExceptionHandler : IExceptionHandler
             Detail = exception.Detail
         };
         problem.Extensions["code"] = exception.Code;
-        problem.Extensions["target"] = exception.Target;
-        problem.Extensions["targetId"] = exception.TargetId;
+        return problem;
+    }
+
+    private static ProblemDetails CodedProblem(string code, string detail)
+    {
+        var problem = new ProblemDetails
+        {
+            Status = StatusCodes.Status400BadRequest,
+            Type = "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+            Title = "Rebalance failed",
+            Detail = detail
+        };
+        problem.Extensions["code"] = code;
         return problem;
     }
 }

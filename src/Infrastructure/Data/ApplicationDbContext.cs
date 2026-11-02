@@ -112,6 +112,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
         });
     }
 
+    public void ClearTrackedChanges() => ChangeTracker.Clear();
+
     public async Task LockAccountAsync(int accountId, CancellationToken cancellationToken)
     {
         var connection = Database.GetDbConnection();

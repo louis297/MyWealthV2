@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using MyWealthV2.Application.Accounts;
 using MyWealthV2.Application.Accounts.Commands.CloseAccount;
 using MyWealthV2.Application.Accounts.Commands.CreateAccount;
@@ -10,6 +11,10 @@ using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using Microsoft.AspNetCore.Http.HttpResults;
 using MyWealthV2.Application.Accounts.Queries.GetAccountHoldings;
+using MyWealthV2.Application.Portfolios;
+using MyWealthV2.Application.Portfolios.Commands.AssignPortfolio;
+using MyWealthV2.Application.Portfolios.Queries.GetAccountPortfolio;
+using MyWealthV2.Web.Infrastructure;
 
 namespace MyWealthV2.Web.Endpoints;
 
@@ -27,7 +32,13 @@ public class Accounts : IEndpointGroup
         groupBuilder.MapPost(CloseAccount, "{id}/close").RequireAuthorization(Policies.AccountsManage);
         groupBuilder.MapPost(ReopenAccount, "{id}/reopen").RequireAuthorization(Policies.AccountsManage);
         groupBuilder.MapGet(GetHoldings, "{id}/holdings").RequireAuthorization(Policies.AccountsRead);
+        groupBuilder.MapGet(GetAccountPortfolio, "{id}/portfolio").RequireAuthorization(ReadPortfolio);
+        groupBuilder.MapPost(AssignPortfolio, "{id}/portfolio").RequireAuthorization(Policies.TransactionsCreate);
     }
+
+    private static readonly AuthorizationPolicy ReadPortfolio = new AuthorizationPolicyBuilder()
+        .AddRequirements(new AnyPermissionRequirement(Policies.PortfoliosRead, Policies.AccountsRead))
+        .Build();
 
     [EndpointSummary("List accounts")]
     [EndpointDescription("Returns a paged list of accounts in one tenant.")]
@@ -104,6 +115,26 @@ public class Accounts : IEndpointGroup
     public static async Task<Ok<AccountHoldingsDto>> GetHoldings(ISender sender, Guid id)
     {
         var result = await sender.Send(new GetAccountHoldingsQuery(id));
+        return TypedResults.Ok(result);
+    }
+
+    [EndpointSummary("Get the account portfolio")]
+    [EndpointDescription("Returns the active portfolio assignment and the last rebalance status.")]
+    public static async Task<Ok<AccountPortfolioDto>> GetAccountPortfolio(ISender sender, Guid id)
+    {
+        var result = await sender.Send(new GetAccountPortfolioQuery(id));
+        return TypedResults.Ok(result);
+    }
+
+    [EndpointSummary("Assign a portfolio")]
+    [EndpointDescription("Assigns one portfolio to an open Brokerage or Other account and rebalances it.")]
+    public static async Task<Ok<RebalanceResultDto>> AssignPortfolio(
+        ISender sender,
+        Guid id,
+        AssignPortfolioCommand command)
+    {
+        command.AccountId = id;
+        var result = await sender.Send(command);
         return TypedResults.Ok(result);
     }
 }
