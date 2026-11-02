@@ -72,7 +72,8 @@ public class Portfolio : BaseAuditableEntity
 
     public void ReplaceLines(IReadOnlyList<(int InstrumentId, decimal TargetWeight)> lines)
     {
-        _ = lines;
+        ReplaceLineWeights(lines);
+        AddDomainEvent(new PortfolioWeightsChanged(this));
     }
 
     private void ReplaceLineWeights(IReadOnlyList<(int InstrumentId, decimal TargetWeight)> lines)
