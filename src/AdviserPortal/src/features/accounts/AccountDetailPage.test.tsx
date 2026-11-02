@@ -1109,4 +1109,69 @@ describe("AccountDetailPage", () => {
     expect(await screen.findByText("No rebalance has run yet.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
   });
+
+  it("shows current quantity beside the target weight", async () => {
+    const portfolioId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const otherId = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
+    renderDetail((url, method) => {
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [holding] });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json(account);
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.includes("/instruments") && method === "GET") {
+        return json({
+          items: [
+            { id: holding.instrumentId, symbol: "DEMO", name: "Demo Fund", quoteCurrency: "NZD", isActive: true, tenantId: account.tenantId, rowVersion: "AAAA" },
+            { id: otherId, symbol: "FPH", name: "Fisher", quoteCurrency: "NZD", isActive: true, tenantId: account.tenantId, rowVersion: "AAAA" },
+          ],
+          page: 1,
+          pageSize: 100,
+          totalCount: 2,
+        });
+      }
+      if (url.endsWith(`/portfolios/${portfolioId}`) && method === "GET") {
+        return json({
+          id: portfolioId,
+          name: "Balanced Growth",
+          baseCurrency: "NZD",
+          isActive: true,
+          tenantId: account.tenantId,
+          rowVersion: "AAAA",
+          driftAbsolute: 1,
+          driftRelative: 5,
+          minimumTrade: 100,
+          cashResidualPercent: 1,
+          lines: [
+            { instrumentId: holding.instrumentId, targetWeight: 60, sortOrder: 0 },
+            { instrumentId: otherId, targetWeight: 40, sortOrder: 1 },
+          ],
+        });
+      }
+      if (url.endsWith(`/accounts/${accountId}/portfolio`) && method === "GET") {
+        return json({
+          accountId,
+          portfolioId,
+          status: "Active",
+          lastRebalanceAt: null,
+          lastRebalanceStatus: "Success",
+          lastRebalanceMessage: null,
+        });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    const table = await screen.findByRole("table", { name: "Holdings" });
+    expect(await within(table).findByRole("columnheader", { name: "Target" })).toBeInTheDocument();
+    const demo = within(table).getByText("DEMO").closest("tr");
+    expect(demo).toHaveTextContent("100");
+    expect(demo).toHaveTextContent("60");
+    const fisher = within(table).getByText("FPH").closest("tr");
+    expect(fisher).toHaveTextContent("—");
+    expect(fisher).toHaveTextContent("40");
+  });
 });
