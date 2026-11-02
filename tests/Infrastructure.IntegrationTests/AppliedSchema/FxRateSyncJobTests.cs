@@ -85,6 +85,70 @@ public class FxRateSyncJobTests
         }
     }
 
+    [Test]
+    public async Task Sync_SkipsTheSourceWhenEveryPairAlreadyHasTodaysDate()
+    {
+        await using var db = Open();
+        await db.Database.ExecuteSqlRawAsync("DELETE FROM [FxRates]");
+        var today = new DateOnly(2026, 11, 2);
+        var now = new DateTimeOffset(2026, 11, 2, 15, 0, 0, TimeSpan.Zero);
+        db.FxRates.Add(Stored("USD", "NZD", 1.20000000m, today));
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+
+        var source = new CountingSource();
+        var job = new FxRateSyncJob(
+            new FixedCatalog("USD", "NZD"),
+            source,
+            new FxRateStore(db, TimeProvider.System),
+            new FixedTime(now),
+            new SilentLogger());
+
+        try
+        {
+            await job.Sync();
+            source.Calls.Count.ShouldBeGreaterThan(0);
+
+            source.Calls.Clear();
+            db.FxRates.Add(Stored("NZD", "USD", 0.80000000m, today));
+            await db.SaveChangesAsync();
+            db.ChangeTracker.Clear();
+
+            await job.Sync();
+            source.Calls.ShouldBeEmpty();
+            (await db.FxRates.AsNoTracking().CountAsync(row => row.AsOfDate == today)).ShouldBe(2);
+        }
+        finally
+        {
+            await db.Database.ExecuteSqlRawAsync("DELETE FROM [FxRates]");
+        }
+    }
+
+    private sealed class CountingSource : IFxRateSource
+    {
+        public List<(string Base, IReadOnlyList<string> Quotes)> Calls { get; } = [];
+
+        public Task<IReadOnlyList<FxRateQuote>> GetLatestAsync(
+            string baseCurrency,
+            IReadOnlyList<string> quotes,
+            CancellationToken cancellationToken = default)
+        {
+            Calls.Add((baseCurrency, quotes.ToList()));
+            return Task.FromResult<IReadOnlyList<FxRateQuote>>([]);
+        }
+    }
+
+    private static FxRate Stored(string baseCurrency, string quoteCurrency, decimal rate, DateOnly asOf) =>
+        new()
+        {
+            BaseCurrency = baseCurrency,
+            QuoteCurrency = quoteCurrency,
+            Rate = rate,
+            AsOfDate = asOf,
+            Source = "Frankfurter",
+            FetchedAt = new DateTimeOffset(2026, 11, 2, 1, 0, 0, TimeSpan.Zero)
+        };
+
     private sealed class RecordingSource(DateOnly asOf) : IFxRateSource
     {
         public List<(string Base, IReadOnlyList<string> Quotes)> Calls { get; } = [];
