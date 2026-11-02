@@ -1,3 +1,4 @@
+using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Fx;
 using NUnit.Framework;
 using Shouldly;
@@ -13,5 +14,16 @@ public class FxRateSelectorTests
     {
         FxRateSelector.Select("nzd", "NZD", Today, []).ShouldBe(1m);
         FxRateSelector.Select("USD", "usd", Today, []).ShouldBe(1m);
+    }
+
+    [Test]
+    public void Select_MissingPair_ThrowsWithTheRequestedDate()
+    {
+        var exception = Should.Throw<FxRateNotFoundException>(() =>
+            FxRateSelector.Select("usd", "nzd", Today, []));
+
+        exception.BaseCurrency.ShouldBe("USD");
+        exception.QuoteCurrency.ShouldBe("NZD");
+        exception.AsOf.ShouldBe(Today);
     }
 }
