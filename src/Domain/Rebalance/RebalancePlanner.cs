@@ -9,6 +9,7 @@ public static class RebalancePlanner
         var targets = input.Targets.Select(target => Value(target, input)).ToList();
         var cashBase = input.Cash * Rate(input.AccountCurrency, input.BaseCurrency, input.AccountToBase);
         var total = cashBase + valued.Sum(row => row.MarketValueBase);
+        var investable = total * (1m - input.CashResidualPercent / 100m);
         var trades = new List<RebalanceTrade>();
         var targetIds = targets.Select(target => target.InstrumentId).ToHashSet();
 
@@ -21,7 +22,7 @@ public static class RebalancePlanner
         {
             var current = valued.SingleOrDefault(row => row.InstrumentId == target.InstrumentId);
             var currentValue = current?.MarketValueBase ?? 0m;
-            var targetValue = decimal.Round(target.Weight / 100m * total, 4, MidpointRounding.AwayFromZero);
+            var targetValue = decimal.Round(target.Weight / 100m * investable, 4, MidpointRounding.AwayFromZero);
             var delta = targetValue - currentValue;
             if (delta == 0m)
             {
