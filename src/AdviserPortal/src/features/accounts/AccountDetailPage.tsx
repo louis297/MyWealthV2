@@ -261,32 +261,35 @@ export function AccountDetailPage() {
       </Card>
       {eligible && (portfolioChoices.data || portfolioChoices.isError) ? (
         <Section title="Portfolio">
-          <div className="flex flex-wrap items-end gap-3">
-            <SelectField
-              id="account-portfolio"
-              label="Portfolio"
-              value={portfolioId}
-              onChange={(event) => setPortfolioId(event.target.value)}
-              className="w-64"
-            >
-              <SelectItem value="">Select a portfolio</SelectItem>
-              {(portfolioChoices.data?.items ?? [])
-                .filter((item) => item.isActive)
-                .map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name}
-                  </SelectItem>
-                ))}
-            </SelectField>
-            <Button type="button" onClick={() => void onAssign()} disabled={!portfolioId}>
-              Assign
-            </Button>
-            {locked ? (
+          {locked ? (
+            <div className="flex flex-wrap items-end gap-3">
               <Button type="button" variant="outline" onClick={() => void onUnassign()}>
                 Unassign
               </Button>
-            ) : null}
-          </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-end gap-3">
+              <SelectField
+                id="account-portfolio"
+                label="Portfolio"
+                value={portfolioId}
+                onChange={(event) => setPortfolioId(event.target.value)}
+                className="w-64"
+              >
+                <SelectItem value="">Select a portfolio</SelectItem>
+                {(portfolioChoices.data?.items ?? [])
+                  .filter((item) => item.isActive)
+                  .map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name}
+                    </SelectItem>
+                  ))}
+              </SelectField>
+              <Button type="button" onClick={() => void onAssign()} disabled={!portfolioId}>
+                Assign
+              </Button>
+            </div>
+          )}
           {locked ? (
             <p>
               {assignment.data?.lastRebalanceStatus
