@@ -1,5 +1,5 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,7 +7,7 @@ import { AccountDetailPage } from "@/features/accounts/AccountDetailPage";
 import { CreateTransactionPage } from "@/features/transactions/CreateTransactionPage";
 import { sessionSlice, setCurrentUser, type CurrentUser } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
-import { chooseOption } from "@/test/chooseOption";
+import { chooseOption, openSelect } from "@/test/chooseOption";
 
 const accountId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
 const customerId = "cccccccccccccccc-cccc-cccc-cccc-cccccccccccc";
@@ -865,5 +865,143 @@ describe("AccountDetailPage", () => {
     expect(screen.queryByText("Forbidden")).not.toBeInTheDocument();
     expect(router.state.location.pathname).toBe(`/accounts/${accountId}`);
     expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("assigns an active portfolio and shows Success", async () => {
+    const portfolioId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const posted: string[] = [];
+    const { fetchMock } = renderDetail((url, method, body) => {
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json(account);
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.includes("/api/portfolios?") && method === "GET") {
+        return json({
+          items: [
+            { id: portfolioId, name: "Balanced Growth", baseCurrency: "NZD", isActive: true, lines: [], rowVersion: "AAAA", tenantId: account.tenantId, driftAbsolute: 1, driftRelative: 5, minimumTrade: 100, cashResidualPercent: 1 },
+            { id: "ffffffff-ffff-ffff-ffff-ffffffffffff", name: "Retired", baseCurrency: "NZD", isActive: false, lines: [], rowVersion: "AAAA", tenantId: account.tenantId, driftAbsolute: 1, driftRelative: 5, minimumTrade: 100, cashResidualPercent: 1 },
+          ],
+          page: 1,
+          pageSize: 100,
+          totalCount: 2,
+        });
+      }
+      if (url.endsWith(`/accounts/${accountId}/portfolio`) && method === "POST") {
+        posted.push(body ?? "");
+        return json({ status: "Success" });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByRole("heading", { name: "Everyday spending" })).toBeInTheDocument();
+    await openSelect("Portfolio");
+    expect(screen.getByRole("option", { name: "Balanced Growth" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Retired" })).not.toBeInTheDocument();
+    await chooseOption("Portfolio", "Balanced Growth");
+    fireEvent.click(screen.getByRole("button", { name: "Assign" }));
+
+    expect(await screen.findByText("Success")).toBeInTheDocument();
+    expect(posted).toEqual([JSON.stringify({ portfolioId })]);
+    const request = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.method === "POST" && input.url.includes("/portfolio"));
+    expect(new URL(request!.url).pathname).toBe(`/api/accounts/${accountId}/portfolio`);
+    expect(request?.headers.get("X-MyWealth-Request")).toBe("1");
+    expect(request?.headers.get("Authorization")).toBeNull();
+    expect(new URL(request!.url).searchParams.has("tenantId")).toBe(false);
+  });
+
+  it("shows NoChange when assign does not trade", async () => {
+    const portfolioId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    renderDetail((url, method) => {
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json({ ...account, type: "Other" });
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.includes("/api/portfolios?") && method === "GET") {
+        return json({
+          items: [{ id: portfolioId, name: "Balanced Growth", baseCurrency: "NZD", isActive: true, lines: [], rowVersion: "AAAA", tenantId: account.tenantId, driftAbsolute: 1, driftRelative: 5, minimumTrade: 100, cashResidualPercent: 1 }],
+          page: 1,
+          pageSize: 100,
+          totalCount: 1,
+        });
+      }
+      if (url.endsWith(`/accounts/${accountId}/portfolio`) && method === "POST") {
+        return json({ status: "NoChange" });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByLabelText("Portfolio")).toBeInTheDocument();
+    await chooseOption("Portfolio", "Balanced Growth");
+    fireEvent.click(screen.getByRole("button", { name: "Assign" }));
+    expect(await screen.findByText("NoChange")).toBeInTheDocument();
+  });
+
+  it("does not offer assign on Bank, Cash, or Closed accounts", async () => {
+    for (const next of [
+      { ...account, type: "Bank" },
+      { ...account, type: "Cash" },
+      { ...account, type: "Brokerage", status: "Closed" },
+    ]) {
+      cleanup();
+      renderDetail((url, method) => {
+        if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+          return json({ items: [] });
+        }
+        if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+          return json(next);
+        }
+        if (url.includes("/transactions") && method === "GET") {
+          return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+        }
+        return new Response("", { status: 404 });
+      });
+
+      expect(await screen.findByRole("heading", { name: "Everyday spending" })).toBeInTheDocument();
+      expect(screen.queryByLabelText("Portfolio")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Assign" })).not.toBeInTheDocument();
+    }
+  });
+
+  it("shows the server message when assign is rejected", async () => {
+    const portfolioId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    renderDetail((url, method) => {
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json(account);
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.includes("/api/portfolios?") && method === "GET") {
+        return json({
+          items: [{ id: portfolioId, name: "Balanced Growth", baseCurrency: "NZD", isActive: true, lines: [], rowVersion: "AAAA", tenantId: account.tenantId, driftAbsolute: 1, driftRelative: 5, minimumTrade: 100, cashResidualPercent: 1 }],
+          page: 1,
+          pageSize: 100,
+          totalCount: 1,
+        });
+      }
+      if (url.endsWith(`/accounts/${accountId}/portfolio`) && method === "POST") {
+        return json({ detail: "Missing price for VTI." }, 400);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    await chooseOption("Portfolio", "Balanced Growth");
+    fireEvent.click(screen.getByRole("button", { name: "Assign" }));
+    expect(await screen.findByText("Missing price for VTI.")).toBeInTheDocument();
   });
 });
