@@ -40,8 +40,21 @@ public class Portfolio : BaseAuditableEntity
         _ = tenantId;
         _ = name;
         _ = baseCurrency;
-        _ = lines;
         _ = publicId;
-        return new Portfolio();
+        var portfolio = new Portfolio();
+        portfolio.ReplaceLineWeights(lines);
+        return portfolio;
+    }
+
+    private void ReplaceLineWeights(IReadOnlyList<(int InstrumentId, decimal TargetWeight)> lines)
+    {
+        var rounded = lines.Select(line => decimal.Round(line.TargetWeight, 2, MidpointRounding.AwayFromZero)).ToArray();
+        var gap = 100m - rounded.Sum();
+        rounded[^1] += gap;
+        _lines.Clear();
+        for (var index = 0; index < lines.Count; index++)
+        {
+            _lines.Add(PortfolioLine.Create(lines[index].InstrumentId, rounded[index], index));
+        }
     }
 }
