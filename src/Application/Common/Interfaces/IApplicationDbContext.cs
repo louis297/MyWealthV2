@@ -20,6 +20,12 @@ public interface IApplicationDbContext
 
     DbSet<Holding> Holdings { get; }
 
+    DbSet<Portfolio> Portfolios { get; }
+
+    DbSet<PortfolioLine> PortfolioLines { get; }
+
+    DbSet<AccountPortfolioAssignment> AccountPortfolioAssignments { get; }
+
     DbSet<IdempotencyRecord> IdempotencyRecords { get; }
 
     DbSet<Report> Reports { get; }
