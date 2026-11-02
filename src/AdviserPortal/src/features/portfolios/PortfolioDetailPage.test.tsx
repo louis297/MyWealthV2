@@ -66,7 +66,7 @@ function user(): CurrentUser {
   };
 }
 
-function renderDetail(options?: { assigned?: boolean; putStatus?: number; putBody?: unknown }) {
+function renderDetail(options?: { assigned?: boolean; putStatus?: number; putBody?: unknown; inactive?: boolean }) {
   const store = configureStore({
     reducer: {
       session: sessionSlice.reducer,
@@ -77,12 +77,20 @@ function renderDetail(options?: { assigned?: boolean; putStatus?: number; putBod
   store.dispatch(setCurrentUser(user()));
 
   const fetchMock = vi.mocked(fetch);
+  let disabled = false;
   fetchMock.mockImplementation(async (input) => {
     const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
     const method = input instanceof Request ? input.method : "GET";
     const path = new URL(url, "http://localhost:3000").pathname;
     if (path === `/api/portfolios/${portfolioId}` && method === "GET") {
-      return new Response(JSON.stringify(portfolio), { status: 200, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ ...portfolio, isActive: options?.inactive ? false : !disabled }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (path === `/api/portfolios/${portfolioId}/disable` && method === "POST") {
+      disabled = true;
+      return new Response("", { status: 204 });
     }
     if (path === "/api/instruments" && method === "GET") {
       return new Response(JSON.stringify(instruments), { status: 200, headers: { "Content-Type": "application/json" } });
@@ -220,5 +228,33 @@ describe("PortfolioDetailPage edit", () => {
 
     expect(window.confirm).toHaveBeenCalled();
     expect(putRequest(fetchMock)).toBeUndefined();
+  });
+
+  it("disables the portfolio with the row version only", async () => {
+    const { fetchMock } = renderDetail();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Disable" }));
+
+    const request = await vi.waitFor(() => {
+      const found = fetchMock.mock.calls
+        .map(([input]) => input)
+        .find((input): input is Request => input instanceof Request && input.method === "POST");
+      expect(found).toBeDefined();
+      return found!;
+    });
+    expect(new URL(request.url).pathname).toBe(`/api/portfolios/${portfolioId}/disable`);
+    expect(request.headers.get("X-MyWealth-Request")).toBe("1");
+    expect(request.headers.get("Authorization")).toBeNull();
+    expect(JSON.parse(await request.clone().text())).toEqual({ rowVersion: "AAAA" });
+    expect(await screen.findByText("Inactive")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Disable" })).not.toBeInTheDocument();
+  });
+
+  it("does not offer Disable on an inactive portfolio", async () => {
+    renderDetail({ inactive: true });
+
+    expect(await screen.findByRole("heading", { name: "Balanced Growth" })).toBeInTheDocument();
+    expect(screen.getByText("Inactive")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Disable" })).not.toBeInTheDocument();
   });
 });
