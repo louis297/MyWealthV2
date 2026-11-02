@@ -48,7 +48,22 @@ public class Portfolio : BaseAuditableEntity
 
     private void ReplaceLineWeights(IReadOnlyList<(int InstrumentId, decimal TargetWeight)> lines)
     {
-        var rounded = lines.Select(line => decimal.Round(line.TargetWeight, 2, MidpointRounding.AwayFromZero)).ToArray();
+        var rounded = new decimal[lines.Count];
+        for (var index = 0; index < lines.Count; index++)
+        {
+            var weight = lines[index].TargetWeight;
+            if (weight <= 0m || weight > 100m)
+            {
+                throw new DomainException("Each weight must be greater than 0 and at most 100.");
+            }
+
+            rounded[index] = decimal.Round(weight, 2, MidpointRounding.AwayFromZero);
+            if (rounded[index] <= 0m || rounded[index] > 100m)
+            {
+                throw new DomainException("Each weight must be greater than 0 and at most 100.");
+            }
+        }
+
         var gap = 100m - rounded.Sum();
         if (gap != 0m && Math.Abs(gap) > 0.01m * lines.Count)
         {
@@ -56,6 +71,10 @@ public class Portfolio : BaseAuditableEntity
         }
 
         rounded[^1] += gap;
+        if (rounded[^1] <= 0m || rounded[^1] > 100m)
+        {
+            throw new DomainException("Each weight must be greater than 0 and at most 100.");
+        }
         _lines.Clear();
         for (var index = 0; index < lines.Count; index++)
         {
