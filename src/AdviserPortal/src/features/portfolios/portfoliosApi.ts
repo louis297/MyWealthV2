@@ -86,6 +86,13 @@ export const portfoliosApi = api.injectEndpoints({
       query: (accountId) => `/accounts/${accountId}/portfolio`,
       providesTags: (_result, _error, accountId) => [{ type: "Account", id: accountId }],
     }),
+    rebalanceAccount: builder.mutation<{ status: string }, string>({
+      query: (accountId) => ({
+        url: `/accounts/${accountId}/rebalance`,
+        method: "POST",
+      }),
+      invalidatesTags: (_result, _error, accountId) => [{ type: "Account", id: accountId }, "Portfolio"],
+    }),
     unassignPortfolio: builder.mutation<void, string>({
       query: (accountId) => ({
         url: `/accounts/${accountId}/portfolio`,
@@ -169,6 +176,7 @@ export const {
   useGetAccountPortfolioQuery,
   useAssignPortfolioMutation,
   useUnassignPortfolioMutation,
+  useRebalanceAccountMutation,
   useGetPortfolioQuery,
   useGetAssignedAccountsQuery,
   useUpdatePortfolioMutation,

@@ -26,6 +26,7 @@ import {
   useAssignPortfolioMutation,
   useGetAccountPortfolioQuery,
   useGetPortfoliosQuery,
+  useRebalanceAccountMutation,
   useUnassignPortfolioMutation,
 } from "@/features/portfolios/portfoliosApi";
 import { useGetTransactionsQuery } from "@/features/transactions/transactionsApi";
@@ -81,10 +82,26 @@ export function AccountDetailPage() {
   const [reopenAccount] = useReopenAccountMutation();
   const [assignPortfolio] = useAssignPortfolioMutation();
   const [unassignPortfolio] = useUnassignPortfolioMutation();
+  const [rebalanceAccount] = useRebalanceAccountMutation();
   const [portfolioId, setPortfolioId] = useState("");
   const [assignStatus, setAssignStatus] = useState<string | null>(null);
   const [messages, setMessages] = useState<string[]>([]);
   const [conflict, setConflict] = useState(false);
+
+  async function onRetry() {
+    if (!id) {
+      return;
+    }
+    try {
+      const result = await rebalanceAccount(id).unwrap();
+      setAssignStatus(result.status);
+      setMessages([]);
+    } catch (error: unknown) {
+      const problems = problemMessages(error);
+      setAssignStatus(null);
+      setMessages(problems.length > 0 ? problems : ["Rebalance failed. Check the message and try again."]);
+    }
+  }
 
   async function onUnassign() {
     if (!id) {
@@ -236,7 +253,21 @@ export function AccountDetailPage() {
               </Button>
             ) : null}
           </div>
+          {locked ? (
+            <p>
+              {assignment.data?.lastRebalanceStatus
+                ? assignment.data.lastRebalanceStatus === "Failed"
+                  ? assignment.data.lastRebalanceMessage || "Rebalance failed. Check the message and try again."
+                  : assignment.data.lastRebalanceStatus
+                : "No rebalance has run yet."}
+            </p>
+          ) : null}
           {assignStatus ? <p>{assignStatus}</p> : null}
+          {locked && assignment.data?.lastRebalanceStatus === "Failed" ? (
+            <Button type="button" variant="outline" onClick={() => void onRetry()}>
+              Retry
+            </Button>
+          ) : null}
         </Section>
       ) : null}
       <Section title="Holdings">
