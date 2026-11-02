@@ -1182,6 +1182,49 @@ describe("AccountDetailPage", () => {
     expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
   });
 
+  it("rebalances an assigned account after cash moves", async () => {
+    const { fetchMock } = renderDetail((url, method) => {
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json(account);
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.endsWith(`/accounts/${accountId}/rebalance`) && method === "POST") {
+        return json({ status: "NoChange" });
+      }
+      if (url.endsWith(`/accounts/${accountId}/portfolio`) && method === "GET") {
+        return json({
+          accountId,
+          portfolioId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          status: "Active",
+          lastRebalanceAt: "2026-11-02T00:00:00+00:00",
+          lastRebalanceStatus: "Success",
+          lastRebalanceMessage: null,
+        });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByRole("button", { name: "Unassign" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Rebalance" }));
+
+    const request = await vi.waitFor(() => {
+      const found = fetchMock.mock.calls
+        .map(([input]) => input)
+        .find((input): input is Request => input instanceof Request && input.method === "POST" && input.url.includes("/rebalance"));
+      expect(found).toBeDefined();
+      return found!;
+    });
+    expect(new URL(request.url).pathname).toBe(`/api/accounts/${accountId}/rebalance`);
+    expect(request.headers.get("X-MyWealth-Request")).toBe("1");
+    expect(request.headers.get("Authorization")).toBeNull();
+    expect(await screen.findByText("NoChange")).toBeInTheDocument();
+  });
+
   it("shows current quantity beside the target weight", async () => {
     const portfolioId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
     const otherId = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
