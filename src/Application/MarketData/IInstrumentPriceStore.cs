@@ -6,4 +6,9 @@ public interface IInstrumentPriceStore
         IReadOnlyList<InstrumentPriceQuote> quotes,
         DateTimeOffset fetchedAt,
         CancellationToken cancellationToken = default);
+
+    Task<bool> HasAsOfDateForEveryActiveInstrumentAsync(
+        IReadOnlyList<int> instrumentIds,
+        DateOnly asOf,
+        CancellationToken cancellationToken = default);
 }
