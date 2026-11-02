@@ -1004,4 +1004,46 @@ describe("AccountDetailPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Assign" }));
     expect(await screen.findByText("Missing price for VTI.")).toBeInTheDocument();
   });
+
+  it("unassigns an active portfolio and restores security actions", async () => {
+    let assigned = true;
+    const deleted: string[] = [];
+    renderDetail((url, method) => {
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [holding] });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json(account);
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.endsWith(`/accounts/${accountId}/portfolio`) && method === "DELETE") {
+        deleted.push(url);
+        assigned = false;
+        return new Response(null, { status: 204 });
+      }
+      if (url.endsWith(`/accounts/${accountId}/portfolio`) && method === "GET") {
+        return assigned
+          ? json({
+              accountId,
+              portfolioId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+              status: "Active",
+              lastRebalanceAt: null,
+              lastRebalanceStatus: "Success",
+              lastRebalanceMessage: null,
+            })
+          : new Response("", { status: 404 });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByRole("button", { name: "Unassign" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Buy" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "TransferIn" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Unassign" }));
+    expect(await screen.findByRole("link", { name: "Buy" })).toBeInTheDocument();
+    expect(deleted.some((url) => url.includes(`/api/accounts/${accountId}/portfolio`))).toBe(true);
+    expect(screen.queryByRole("button", { name: "Unassign" })).not.toBeInTheDocument();
+  });
 });
