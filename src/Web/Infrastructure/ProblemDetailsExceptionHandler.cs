@@ -95,6 +95,8 @@ public class ProblemDetailsExceptionHandler : IExceptionHandler
             Detail = exception.Detail
         };
         problem.Extensions["code"] = exception.Code;
+        problem.Extensions["target"] = exception.Target;
+        problem.Extensions["targetId"] = exception.TargetId;
         return problem;
     }
 
