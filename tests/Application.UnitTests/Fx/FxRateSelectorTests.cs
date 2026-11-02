@@ -26,4 +26,25 @@ public class FxRateSelectorTests
         exception.QuoteCurrency.ShouldBe("NZD");
         exception.AsOf.ShouldBe(Today);
     }
+
+    [Test]
+    public void Select_UsesTheLatestRowOnOrBeforeTheRequestedDate()
+    {
+        var rows = new FxRateQuote[]
+        {
+            new("usd", "NZD", 1.50000000m, new DateOnly(2026, 1, 1)),
+            new("USD", "nzd", 1.60000000m, new DateOnly(2026, 10, 11)),
+            new("EUR", "JPY", 160m, new DateOnly(2026, 10, 11))
+        };
+
+        FxRateSelector.Select("USD", "NZD", new DateOnly(2026, 10, 11), rows).ShouldBe(1.60000000m);
+        FxRateSelector.Select("USD", "NZD", new DateOnly(2026, 10, 10), rows).ShouldBe(1.50000000m);
+        FxRateSelector.Select("USD", "NZD", Today, rows).ShouldBe(1.60000000m);
+
+        var missing = Should.Throw<FxRateNotFoundException>(() =>
+            FxRateSelector.Select("USD", "NZD", new DateOnly(2025, 12, 31), rows));
+        missing.BaseCurrency.ShouldBe("USD");
+        missing.QuoteCurrency.ShouldBe("NZD");
+        missing.AsOf.ShouldBe(new DateOnly(2025, 12, 31));
+    }
 }
