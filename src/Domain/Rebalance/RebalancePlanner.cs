@@ -5,6 +5,27 @@ public static class RebalancePlanner
     public static RebalancePlan Plan(RebalanceInput input)
     {
         var holdings = input.Holdings.Where(holding => holding.Quantity > 0m).ToList();
+        foreach (var holding in holdings)
+        {
+            if (QuoteProblem(holding.Symbol, holding.QuoteCurrency, holding.Price, holding.QuoteToBase, holding.QuoteToAccount, input) is { } problem)
+            {
+                return problem;
+            }
+        }
+
+        foreach (var target in input.Targets)
+        {
+            if (QuoteProblem(target.Symbol, target.QuoteCurrency, target.Price, target.QuoteToBase, target.QuoteToAccount, input) is { } problem)
+            {
+                return problem;
+            }
+        }
+
+        if (!Same(input.AccountCurrency, input.BaseCurrency) && input.AccountToBase is null)
+        {
+            return Fail("missing_fx", $"FX rate is not available for {input.AccountCurrency}/{input.BaseCurrency}.");
+        }
+
         var valued = holdings.Select(holding => Value(holding, input)).ToList();
         var targets = input.Targets.Select(target => Value(target, input)).ToList();
         var cashBase = input.Cash * Rate(input.AccountCurrency, input.BaseCurrency, input.AccountToBase);
@@ -52,10 +73,66 @@ public static class RebalancePlanner
             }
         }
 
-        return trades.Count == 0
-            ? new RebalancePlan(RebalanceStatus.NoChange, null, null, [])
-            : new RebalancePlan(RebalanceStatus.Success, null, null, trades);
+        if (trades.Count == 0)
+        {
+            return new RebalancePlan(RebalanceStatus.NoChange, null, null, []);
+        }
+
+        var cash = input.Cash;
+        foreach (var trade in trades)
+        {
+            cash += trade.Buy
+                ? -RoundMoney(RoundMoney(trade.Quantity * trade.Price) * trade.QuoteToAccount)
+                : RoundMoney(trade.Quantity * trade.Price * trade.QuoteToAccount);
+        }
+
+        if (cash < 0m)
+        {
+            var accountShortfall = -cash;
+            var baseShortfall = accountShortfall * Rate(input.AccountCurrency, input.BaseCurrency, input.AccountToBase);
+            var quote = trades.Last(trade => trade.Buy).QuoteCurrency;
+            return Fail(
+                "insufficient_cash",
+                $"Shortfall {baseShortfall:0.00} {input.BaseCurrency} ({accountShortfall:0.00} {input.AccountCurrency}) quote {quote}.");
+        }
+
+        return new RebalancePlan(RebalanceStatus.Success, null, null, trades);
     }
+
+    private static RebalancePlan? QuoteProblem(
+        string symbol,
+        string quote,
+        decimal? price,
+        decimal? quoteToBase,
+        decimal? quoteToAccount,
+        RebalanceInput input)
+    {
+        if (price is null or <= 0m)
+        {
+            return Fail("missing_price", $"Price is not available for {symbol}.");
+        }
+
+        if (!Same(quote, input.BaseCurrency) && quoteToBase is null)
+        {
+            return Fail("missing_fx", $"FX rate is not available for {quote}/{input.BaseCurrency}.");
+        }
+
+        if (!Same(quote, input.AccountCurrency) && quoteToAccount is null)
+        {
+            return Fail("missing_fx", $"FX rate is not available for {quote}/{input.AccountCurrency}.");
+        }
+
+        return null;
+    }
+
+    private static RebalancePlan Fail(string code, string message) =>
+        new(RebalanceStatus.Failed, code, message, []);
+
+    private static bool Same(string left, string right) =>
+        string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
+
+    private static decimal RoundMoney(decimal amount) =>
+        decimal.Round(amount, 4, MidpointRounding.AwayFromZero);
 
     private static Valued Value(PlannerHolding holding, RebalanceInput input) =>
         Value(holding.InstrumentId, holding.Symbol, holding.QuoteCurrency, holding.Quantity, holding.Price!.Value,
@@ -96,7 +173,7 @@ public static class RebalancePlanner
     }
 
     private static decimal Rate(string from, string to, decimal? supplied) =>
-        string.Equals(from, to, StringComparison.OrdinalIgnoreCase) ? 1m : supplied!.Value;
+        Same(from, to) ? 1m : supplied!.Value;
 
     private static RebalanceTrade Sell(Valued row, decimal quantity) =>
         new(row.InstrumentId, row.Symbol, false, quantity, row.Price, row.Quote, row.ToAccount);
