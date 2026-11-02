@@ -214,6 +214,6 @@ Still open, not this slice:
 The repository should build after each commit. Agents split each line into red then green.
 
 1. Failing functional tests for `GET /net-worth` and `GET /users/customers/{id}/net-worth` (401 / 403 / happy path / isolation).
-2. Query handlers + endpoint wiring + mocked price call.
+2. Query handlers + endpoint wiring + `IMarketData` price call.
 3. TestSeed verification that existing demo holdings appear in market value.
 4. Accept change: status, companion edits to api-design / function-plan / glossary / features README.

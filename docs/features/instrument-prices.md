@@ -241,7 +241,7 @@ Still open, not this slice:
 1. Failing tests for `IMarketData` as-of selection and missing → empty.
 2. Script `0022_instrument_prices.sql` + EF mapping + integration test.
 3. `InstrumentPriceSyncJob` + source client (or stub) + skip-if-today-stored.
-4. Wire `IMarketData` to the table (replace mock in the composition root used by the worker and webapi).
+4. Wire `IMarketData` to the table (composition root used by the worker and webapi).
 5. TestSeed fake prices for VTI / AIA.
 6. Docs: this file to accepted, database-design, architecture, function-plan, domain-model port note.
 

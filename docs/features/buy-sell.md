@@ -121,7 +121,7 @@ Policies: no new names. `transactions.create` for the four types and reverse.
 | `TransactionSecurityLeg` | Entity (existing) | Exactly one instrument. Quantity signed. Cost in quote currency. |
 | `Holding` | Projection (existing) | Per `(Account, Instrument)`. Average cost. Quantity 0 deletes the row. |
 | `TransactionType` | Enum | Accept `Buy`, `Sell`, `StockIn`, `StockOut`. |
-| `IMarketData` / `IFxRate` | Ports (existing) | Mock only. Used by `Buy` / `Sell` only. |
+| `IMarketData` / `IFxRate` | Ports (existing) | Read local tables. Used by `Buy` / `Sell` only. |
 
 Invariants:
 
@@ -248,7 +248,7 @@ None. Pages live in [docs/adviser-portal/](../adviser-portal/). Scalar is enough
 | --- | --- |
 | Domain.UnitTests | Signs; server cost on Buy; StockIn client cost; average-cost release rounding (R15); Bank/Cash refuse; cannot mutate posted header; result quantity and cash `≥ 0` |
 | Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403; happy Buy then Sell; StockIn then StockOut; missing price → 400; missing FX → 400; Sell/StockOut over quantity → 400; Buy that would make cash negative → 400; reverse restores; reverse that would go negative → 400; idempotent replay; hash mismatch 409; disabled instrument → 400 |
-| Infrastructure.IntegrationTests | Two-tenant fixture: other tenant’s account or instrument → 404. TestSeed idempotent. Mock price used; same-currency FX = 1; missing cross pair is not 1. |
+| Infrastructure.IntegrationTests | Two-tenant fixture: other tenant’s account or instrument → 404. TestSeed idempotent. Table price used; same-currency FX = 1; missing cross pair is not 1. |
 
 TestSeed (Development / TestAppHost only): one `Buy` and one `StockIn` on the existing demo brokerage for an existing TestSeed instrument that has a seeded price. Not an Opening. Functional tests create their own rows.
 
@@ -264,7 +264,7 @@ No new ADR. Decisions 2026-10-11.
 | Caller | TenantAdmin; Adviser (assigned); SystemAdmin (Scalar, `tenantId` on create). Customer 403. |
 | Types | `Buy`, `Sell`, `StockIn`, `StockOut`. `Split` / `Bonus` / `Scrip` are accepted in [split.md](split.md), not as `StockIn` / `StockOut`. |
 | Legs | Exactly one security leg. `Buy` / `Sell`: exactly one cash leg. `StockIn` / `StockOut`: no cash leg. |
-| Price | `Buy` / `Sell` only. `IMarketData.TryGetPrice(instrumentId, bookedAt)`. Mocked. Missing → 400. Not stored. |
+| Price | `Buy` / `Sell` only. `IMarketData.TryGetPrice(instrumentId, bookedAt)`. Reads `InstrumentPrices`. Missing → 400. Not stored. |
 | FX | `Buy` / `Sell` only, when quote ≠ account currency. Missing pair → 400, never 1. |
 | StockIn cost | Client-supplied, `≥ 0`, quote currency. No price call. |
 | StockOut / Sell release | `released = Round(oldCost × qty / oldQty, 4, MidpointRounding.AwayFromZero)`. Remaining = old − released. Full quantity → remaining 0. |
@@ -295,6 +295,6 @@ Open questions: none that block review.
 The repository should build after each commit. Agents split each line into red then green.
 
 1. Domain: four types + average-cost release (R15) + unit tests.
-2. Application: extend `CreateTransaction` / `ReverseTransaction`; wire mocked `IMarketData` / `IFxRate` for Buy/Sell; functional tests (Buy, Sell, StockIn, StockOut, missing price, oversell, cash negative, reverse rejected).
+2. Application: extend `CreateTransaction` / `ReverseTransaction`; wire `IMarketData` / `IFxRate` (local tables) for Buy/Sell; functional tests (Buy, Sell, StockIn, StockOut, missing price, oversell, cash negative, reverse rejected).
 3. API: bodies; item shape `cash` + `security`; pure-cash item moves to `cash`; isolation tests.
 4. TestSeed one `Buy` and one `StockIn`. Amend posting and holdings type tables and the transaction item shape in the same change that accepts this file.

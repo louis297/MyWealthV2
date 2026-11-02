@@ -214,14 +214,15 @@ Keep [database-design.md](../database-design.md) in the same change.
 IMarketData
   TryGetPrice(instrumentId: int, asOf: DateTimeOffset?) → Money?
       Quote currency of that instrument. Missing → empty, do not invent 0.
+      Reads local `InstrumentPrices` (see instrument-prices.md).
 
 IFxRate
   GetRate(from: string, to: string, asOf: DateTimeOffset?) → decimal
       Same code (CI) → 1.
-      Else mock pair. Missing pair → fail (do not return 1).
+      Else latest row from `FxRates` with AsOfDate ≤ requested date. Missing pair → fail (do not return 1).
 ```
 
-Infrastructure ships an in-memory mock seeded by tests / Development. Production in Phase 2 is the same mock (no vendor). `asOf` may be ignored by the mock; keep the argument so a later adapter does not change the port.
+Infrastructure reads the local tables. Development / TestSeed writes deterministic fake rows for tests. Request paths do not call vendors. `asOf` is honoured by both implementations.
 
 This slice does not have to call the ports from a handler. It **registers** them so holdings / net-worth do not invent a second pair.
 
@@ -331,7 +332,7 @@ Target: the existing Development demo tenant (Phase 1 people seed). CreatedBy = 
 | AIA | Auckland International Airport | NZD | true |
 | NZD-CASH | Demo disabled cash proxy | NZD | false |
 
-Also seed mock `IMarketData` prices for VTI and AIA (not for the disabled row). Missing price on NZD-CASH is the empty-price case.
+Also seed table prices for VTI and AIA (not for the disabled row). Missing price on NZD-CASH is the empty-price case. Later expanded by [instrument-prices.md](instrument-prices.md).
 
 Functional tests do **not** rely on these rows for isolation; they create their own instruments. One smoke test may assert the three symbols exist after TestAppHost start.
 
@@ -390,7 +391,7 @@ The repository should build after each commit. Agents split each line into red t
 3. Policies registered in `RolePermissions`
 4. Create / get / list handlers + functional tests (401 / 403 / isolation / unique symbol)
 5. Update / disable / enable + `rowVersion` 409
-6. `IMarketData` / `IFxRate` ports + mock + unit tests for the 1-vs-not-1 FX rule
-7. `TestSeed` instruments + mock prices + idempotent integration test
+6. `IMarketData` / `IFxRate` ports + unit tests for the 1-vs-not-1 FX rule (implementations read local tables; see instrument-prices.md and fx-rates.md)
+7. `TestSeed` instruments + table prices + idempotent integration test
 
 Do not put holdings or portal pages in these commits.

@@ -32,14 +32,14 @@ Free-text name/symbol on a holding cannot be de-duplicated and cannot attach a q
 - No `Isin`, `Exchange`, `InstrumentKind`, or price column in this slice. Price lives on `IMarketData`, not on the row.
 - An Adviser may create and read. Update / disable / enable is TenantAdmin or SystemAdmin. Customer has no policy. SystemAdmin list/create takes the tenant PublicId.
 - `QuoteCurrency` is immutable after create. Cost currency equals quote currency (no second column).
-- `IMarketData.TryGetPrice` and `IFxRate.GetRate` ship with this slice, mocked. Same-currency FX is 1. Cross-currency is never treated as 1.
+- `IMarketData.TryGetPrice` and `IFxRate.GetRate` ship with this slice. Same-currency FX is 1. Cross-currency is never treated as 1. Infrastructure now reads local tables (`InstrumentPrices` / `FxRates`); see [features/instrument-prices.md](../features/instrument-prices.md) and [features/fx-rates.md](../features/fx-rates.md).
 
 ## Alternatives considered
 
 | Option | Why not |
 | --- | --- |
 | Keep free-text symbols | No mark-to-market, no corporate actions |
-| Global ISIN master data | Not needed for mock prices keyed by `InstrumentId` |
+| Global ISIN master data | Not needed; prices are keyed by `InstrumentId` via `IMarketData` |
 | Platform-level catalog | Harder isolation and “Adviser may create” |
 | Price column on `Instruments` | Second write path; prices change; conflicts with `IMarketData` |
 | ISIN / Exchange now | Optional later ALTER; this slice does not consume them |
@@ -47,4 +47,4 @@ Free-text name/symbol on a holding cannot be de-duplicated and cannot attach a q
 
 ## Consequences
 
-Instruments come before accounts and holdings. Later slices must not store a free-text symbol on a holding. Live vendor adapters wait for a later phase; the port signatures stay.
+Instruments come before accounts and holdings. Later slices must not store a free-text symbol on a holding. Port implementations read local caches (Twelve Data for prices, Frankfurter for FX); request paths do not call vendors.
