@@ -21,6 +21,21 @@ export type Portfolio = {
   lines: PortfolioLine[];
 };
 
+export type PortfolioLineInput = {
+  instrumentId: string;
+  targetWeight: number;
+};
+
+export type CreatePortfolioBody = {
+  name: string;
+  baseCurrency: string;
+  lines: PortfolioLineInput[];
+  driftAbsolute?: number;
+  driftRelative?: number;
+  minimumTrade?: number;
+  cashResidualPercent?: number;
+};
+
 export const portfoliosApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getPortfolios: builder.query<PagedList<Portfolio>, { page?: number } | void>({
@@ -32,7 +47,15 @@ export const portfoliosApi = api.injectEndpoints({
       },
       providesTags: ["Portfolio"],
     }),
+    createPortfolio: builder.mutation<{ id: string }, CreatePortfolioBody>({
+      query: (body) => ({
+        url: "/portfolios",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Portfolio"],
+    }),
   }),
 });
 
-export const { useGetPortfoliosQuery } = portfoliosApi;
+export const { useGetPortfoliosQuery, useCreatePortfolioMutation } = portfoliosApi;
