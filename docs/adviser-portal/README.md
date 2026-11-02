@@ -23,6 +23,7 @@ Phase 1 frontend lives here. Customer Portal lives in [../customer-portal/](../c
 | [adviser-portal-bff-cut.md](adviser-portal-bff-cut.md) | Landed SPA cut record (`6aae5c7`). Not a second feature spec |
 | [adviser-portal-dashboard.md](adviser-portal-dashboard.md) | Phase 2 Dashboard, ledger pages, and write forms (Buy / Sell / Split / Reverse) (accepted). Consumes net-worth and existing ledger endpoints |
 | [adviser-portal-reports.md](adviser-portal-reports.md) | Phase 3 Reports UI (accepted). Detailed page contract for Customer page section + Reports tab (routes, field bindings, states, polling, acceptance). |
+| [adviser-portal-portfolios.md](adviser-portal-portfolios.md) | Phase 2 Portfolios UI (draft). List / create / edit / disable, assign / unassign, manual and bulk rebalance, trade lock. Consumes landed portfolios feature. |
 | [../features/bff-adviser-portal.md](../features/bff-adviser-portal.md) | Session edge (accepted, landed `5e85e9c`). Not a page spec |
 | [frontend-conventions.md](frontend-conventions.md) | Folder layout, naming, session state, API client |
 | [frontend-implementation-notes.md](frontend-implementation-notes.md) | Page-by-page construction for the current pages cut |
