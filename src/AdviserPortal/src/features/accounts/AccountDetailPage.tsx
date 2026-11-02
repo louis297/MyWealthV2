@@ -26,6 +26,7 @@ import {
   useAssignPortfolioMutation,
   useGetAccountPortfolioQuery,
   useGetPortfoliosQuery,
+  useUnassignPortfolioMutation,
 } from "@/features/portfolios/portfoliosApi";
 import { useGetTransactionsQuery } from "@/features/transactions/transactionsApi";
 import { cn } from "cn";
@@ -74,15 +75,30 @@ export function AccountDetailPage() {
   const eligible = Boolean(
     account.data && account.data.status === "Open" && (account.data.type === "Brokerage" || account.data.type === "Other"),
   );
-  useGetAccountPortfolioQuery(id ?? "", { skip: !id || !eligible });
+  const assignment = useGetAccountPortfolioQuery(id ?? "", { skip: !id || !eligible });
   const portfolioChoices = useGetPortfoliosQuery({ pageSize: 100 }, { skip: !eligible });
   const [closeAccount] = useCloseAccountMutation();
   const [reopenAccount] = useReopenAccountMutation();
   const [assignPortfolio] = useAssignPortfolioMutation();
+  const [unassignPortfolio] = useUnassignPortfolioMutation();
   const [portfolioId, setPortfolioId] = useState("");
   const [assignStatus, setAssignStatus] = useState<string | null>(null);
   const [messages, setMessages] = useState<string[]>([]);
   const [conflict, setConflict] = useState(false);
+
+  async function onUnassign() {
+    if (!id) {
+      return;
+    }
+    try {
+      await unassignPortfolio(id).unwrap();
+      setAssignStatus(null);
+      setPortfolioId("");
+      setMessages([]);
+    } catch (error: unknown) {
+      setMessages(problemMessages(error));
+    }
+  }
 
   async function onAssign() {
     if (!id || !portfolioId) {
@@ -143,9 +159,10 @@ export function AccountDetailPage() {
 
   const data = account.data;
   const items = holdings.data.items;
+  const locked = assignment.isSuccess && assignment.data?.status === "Active";
   const actions = [
     ...(canPostCash(data.status) ? cashActions : []),
-    ...(canPostSecurity(data.type, data.status) ? securityActions : []),
+    ...(canPostSecurity(data.type, data.status) && !locked ? securityActions : []),
   ];
 
   return (
@@ -213,6 +230,11 @@ export function AccountDetailPage() {
             <Button type="button" onClick={() => void onAssign()} disabled={!portfolioId}>
               Assign
             </Button>
+            {locked ? (
+              <Button type="button" variant="outline" onClick={() => void onUnassign()}>
+                Unassign
+              </Button>
+            ) : null}
           </div>
           {assignStatus ? <p>{assignStatus}</p> : null}
         </Section>
