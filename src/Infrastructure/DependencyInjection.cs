@@ -1,6 +1,7 @@
 using Hangfire;
 using Hangfire.SqlServer;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.Fx;
 using MyWealthV2.Application.Reports;
 using MyWealthV2.Infrastructure.Currencies;
 using MyWealthV2.Infrastructure.Data;
@@ -42,7 +43,9 @@ public static class DependencyInjection
         builder.Services.AddSingleton<ICurrencyCatalog, CurrencyCatalog>();
         builder.Services.AddSingleton<MarketDataMock>();
         builder.Services.AddSingleton<IMarketData>(sp => sp.GetRequiredService<MarketDataMock>());
-        builder.Services.AddScoped<IFxRate, FxRateStore>();
+        builder.Services.AddScoped<FxRateStore>();
+        builder.Services.AddScoped<IFxRate>(sp => sp.GetRequiredService<FxRateStore>());
+        builder.Services.AddScoped<IFxRateStore>(sp => sp.GetRequiredService<FxRateStore>());
 
         var schemaDirectory = Path.Combine(AppContext.BaseDirectory, "schema");
         builder.Services.AddSingleton<ISchemaScriptSource>(_ => new FileSchemaScriptSource(schemaDirectory));
