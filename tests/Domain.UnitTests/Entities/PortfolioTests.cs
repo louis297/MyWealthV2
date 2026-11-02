@@ -31,5 +31,13 @@ public class PortfolioTests
         ]));
     }
 
+    [Test]
+    public void Create_RejectsAWeightOutsideZeroTo100()
+    {
+        Should.Throw<DomainException>(() => Portfolio.Create(1, "Balanced", Nzd(), [(10, 0m), (11, 100m)]));
+        Should.Throw<DomainException>(() => Portfolio.Create(1, "Balanced", Nzd(), [(10, 100.01m)]));
+        Should.Throw<DomainException>(() => Portfolio.Create(1, "Balanced", Nzd(), [(10, -1m), (11, 101m)]));
+    }
+
     private static Currency Nzd() => Currency.Create("NZD", "New Zealand Dollar", 2);
 }
