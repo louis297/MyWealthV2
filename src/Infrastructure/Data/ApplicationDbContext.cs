@@ -83,6 +83,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<FxRate> FxRates => Set<FxRate>();
 
+    public DbSet<InstrumentPrice> InstrumentPrices => Set<InstrumentPrice>();
+
     public async Task ExecuteInTransactionAsync(
         Func<CancellationToken, Task> action,
         CancellationToken cancellationToken)

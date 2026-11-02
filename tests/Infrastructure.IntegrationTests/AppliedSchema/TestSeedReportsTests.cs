@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Identity;
-using MyWealthV2.Infrastructure.MarketData;
 using NUnit.Framework;
 using Shouldly;
 
@@ -16,11 +15,9 @@ public class TestSeedReportsTests
         await using var db = OpenDb();
         await EnsureDemoTenantAsync(db);
         await EnsureTenantAsync(db, "Reports Other Advisory", "reports-other");
-        var prices = new MarketDataMock();
-
-        await TestSeed.SeedAsync(db, prices, CancellationToken.None);
+        await TestSeed.SeedAsync(db, CancellationToken.None);
         var first = await LoadGrantsAsync(db, DevelopmentIdentitySeeder.DemoTenantCode);
-        await TestSeed.SeedAsync(db, prices, CancellationToken.None);
+        await TestSeed.SeedAsync(db, CancellationToken.None);
         var second = await LoadGrantsAsync(db, DevelopmentIdentitySeeder.DemoTenantCode);
 
         first.Select(row => row.Code).ShouldBe(["adviser-balances", "customer-transactions"]);

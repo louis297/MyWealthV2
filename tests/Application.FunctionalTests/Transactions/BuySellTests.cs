@@ -4,10 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Application.FunctionalTests.Accounts;
 using MyWealthV2.Application.FunctionalTests.Instruments;
-using MyWealthV2.Domain.ValueObjects;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Entities;
-using MyWealthV2.Infrastructure.MarketData;
 
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
@@ -462,9 +460,7 @@ public class BuySellTests : TestBase
     {
         using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var instrument = await db.Instruments.SingleAsync(row => row.PublicId == instrumentPublicId);
-        var prices = FunctionalTestSetup.WebApiServices.GetRequiredService<MarketDataMock>();
-        prices.SetPrice(instrument.Id, Money.Create(amount, currency));
+        await TestPrices.UpsertAsync(db, instrumentPublicId, amount, currency);
     }
 
     private static async Task<decimal> CashBalanceAsync(string accessToken, Guid accountId)

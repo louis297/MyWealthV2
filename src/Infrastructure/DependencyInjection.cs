@@ -2,6 +2,7 @@ using Hangfire;
 using Hangfire.SqlServer;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Fx;
+using MyWealthV2.Application.MarketData;
 using MyWealthV2.Application.Reports;
 using MyWealthV2.Infrastructure.Currencies;
 using MyWealthV2.Infrastructure.Data;
@@ -41,14 +42,20 @@ public static class DependencyInjection
         builder.Services.AddScoped<ITenantIdAccessor, TenantIdAccessor>();
         builder.Services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
         builder.Services.AddSingleton<ICurrencyCatalog, CurrencyCatalog>();
-        builder.Services.AddSingleton<MarketDataMock>();
-        builder.Services.AddSingleton<IMarketData>(sp => sp.GetRequiredService<MarketDataMock>());
         builder.Services.AddScoped<FxRateStore>();
         builder.Services.AddScoped<IFxRate>(sp => sp.GetRequiredService<FxRateStore>());
         builder.Services.AddScoped<IFxRateStore>(sp => sp.GetRequiredService<FxRateStore>());
         builder.Services.AddHttpClient<IFxRateSource, FrankfurterClient>(client =>
         {
             client.BaseAddress = new Uri("https://api.frankfurter.dev");
+        });
+        builder.Services.AddScoped<InstrumentPriceStore>();
+        builder.Services.AddScoped<IInstrumentPriceStore>(sp => sp.GetRequiredService<InstrumentPriceStore>());
+        builder.Services.AddScoped<IMarketData>(sp => sp.GetRequiredService<InstrumentPriceStore>());
+        builder.Services.AddScoped<IActiveInstrumentCatalog, ActiveInstrumentCatalog>();
+        builder.Services.AddHttpClient<IInstrumentPriceSource, TwelveDataClient>(client =>
+        {
+            client.BaseAddress = new Uri("https://api.twelvedata.com");
         });
 
         var schemaDirectory = Path.Combine(AppContext.BaseDirectory, "schema");

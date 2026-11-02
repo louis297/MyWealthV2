@@ -480,6 +480,22 @@ PK `(BaseCurrency, QuoteCurrency, AsOfDate)`. Index on `FetchedAt`. No PublicId.
 
 Hourly Hangfire job (UTC) fetches actual directed pairs for active catalog currencies when today's UTC date is not already stored for every pair. One Frankfurter call per base (`/v2/rates?base=X&quotes=...`). On the same `AsOfDate`, update `Rate` and `FetchedAt`. Fetch failure logs and leaves previous rows. `IFxRate` reads the table: same currency = 1; no row for the pair → `FxRateNotFoundException` (carries base, quote, as-of).
 
+### 14.3 Instrument Prices (accepted — features/instrument-prices.md)
+
+Script `0022_instrument_prices.sql`. Table `InstrumentPrices` in the application schema. Platform data, no `TenantId`.
+
+| Column | Notes |
+| --- | --- |
+| `InstrumentId` | `int` FK → `Instruments.Id` (RESTRICT) |
+| `Price` | `decimal(18,8)`. In the instrument’s QuoteCurrency |
+| `AsOfDate` | `date`. Date the source published |
+| `Source` | `nvarchar(50)`. `'TwelveData'` |
+| `FetchedAt` | `datetimeoffset`. When the job wrote the row |
+
+PK `(InstrumentId, AsOfDate)`. Index on `FetchedAt`. No PublicId. No RowVersion. No audit columns beyond `FetchedAt`. No seed in the script — the hourly job populates it. Development / TestAppHost uses `TestSeed` with round, obviously-fake prices (several instruments per seed currency).
+
+Hourly Hangfire job (UTC) fetches EOD prices from Twelve Data for instruments that are active in at least one tenant when today's UTC date is not already stored for every active instrument. Same symbol + quote currency across tenants is fetched once and written to every matching `InstrumentId`. On the same `AsOfDate`, update `Price` and `FetchedAt`. Fetch failure logs and leaves previous rows. `IMarketData` reads the table: latest row with `AsOfDate` ≤ requested date (or today if omitted); no row → empty (not 0).
+
 ### Change log
 
 | Date | Change |
@@ -491,3 +507,5 @@ Hourly Hangfire job (UTC) fetches actual directed pairs for active catalog curre
 | 2026-11-01 | Outbox feature accepted. Script name `0020_outbox.sql`. Lengths and index locked. |
 | 2026-11-02 | FX rates accepted. Script name `0021_fx_rates.sql`. Table `FxRates`. ADR 0019. |
 | 2026-11-02 | `0021_fx_rates.sql` landed. No seed rows in the script. |
+| 2026-11-02 | Instrument prices accepted. Script name `0022_instrument_prices.sql`. Table `InstrumentPrices`. Source Twelve Data. |
+| 2026-11-02 | `0022_instrument_prices.sql` landed. No seed rows in the script. TestSeed writes the fake prices. |

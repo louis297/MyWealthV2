@@ -75,7 +75,7 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | ReportingCurrency | Tenant currency for aggregated reports. May remain a later-disabled catalog code. | Account booking currency (may happen to match) |
 | Money | Amount + currency code. Never a bare decimal. Domain VO in Phase 1; no catalog lookup, no rounding to DecimalPlaces. Ledger **direction** lives on the signed book amount of a leg, not inside `Money`. | `double` / currency-less `decimal`; a persisted Phase-1 column |
 | Net worth | Assets minus liabilities at a point in time. Phase 2 returns per-currency arrays; no FX fold. | A single account balance; historical snapshots |
-| Market value | Quantity × price (quote currency), then FX if needed. Phase 2 uses mocked prices. | Cost basis used as if it were net worth |
+| Market value | Quantity × price (quote currency), then FX if needed. Price comes from `IMarketData` (`InstrumentPrices`). | Cost basis used as if it were net worth |
 | Tenant isolation | A business row belongs to exactly one tenant. Cross-tenant read/write must fail. Dual check (handler `Where`) + EF global query filter as safety net + isolation tests. | Relying only on the EF global query filter |
 | TenantId | Tenant foreign key on business tables. | The string claim in the JWT by itself |
 
@@ -131,7 +131,7 @@ Later portals copy the last BFF row: `bff-customer-portal`, `BffCustomerPortal`,
 | Endpoint group | Minimal API group under `src/Web/Endpoints`. | MVC controllers as the default style |
 | Feature spec | One deliverable vertical slice under `docs/features/`. | A phase folder of leftover notes |
 | ADR | A decision under `docs/adr/` that is not re-litigated in place. | Rewriting an accepted ADR’s conclusion |
-| IMarketData | Instrument price port. Mocked when the ledger exists. Not introduced in Phase 1: port surface not locked. | Calling a live vendor from a handler |
+| IMarketData | Instrument price port. `TryGetPrice(instrumentId, asOf?) → Money?`. Missing → empty, not 0. Backed by local `InstrumentPrices` table; not a live call. Contract: [features/instrument-prices.md](features/instrument-prices.md). | Calling a live vendor from a handler; inventing 0 |
 | IFxRate | FX port. Same currency = 1. Missing pair throws `FxRateNotFoundException` (carries base, quote, as-of). Backed by local `FxRates` table; not a live call. Contract: [features/fx-rates.md](features/fx-rates.md), ADR 0019. | Hard-coded 1 for every pair; calling Frankfurter on the read path |
 | IEmailSender | Invite / reset mail. Phase 1 is no-op or log-only. | Built-in SMTP in Domain |
 | Authorization server | Issues and revokes tokens, exposes discovery and JWKS. Hosted in Aspire `identity` via OpenIddict. | A custom resource-API `/auth/login` that mints JWTs; OpenIddict inside `webapi` |

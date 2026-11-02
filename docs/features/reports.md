@@ -432,7 +432,7 @@ Rules:
 - Point-in-time. Server sets `asOf` (UTC datetime) when the execution/job is created. Client cannot send it.
 - One line per cash balance and one line per holding. Not a single blended “balance”.
 - Cash line: customer, account, account type, currency, cash balance (sum of posted cash legs). Omit the account if cash balance is 0.
-- Holding line: customer, account, instrument, quantity, cost, market value. Market value uses current mocked price; missing price → 0. Omit holdings with quantity ≤ 0.
+- Holding line: customer, account, instrument, quantity, cost, market value. Market value uses the current `IMarketData` price; missing price → 0. Omit holdings with quantity ≤ 0.
 - Closed accounts excluded unless `includeClosedAccounts` is true.
 - No FX fold.
 - Sort: customer, then account, then cash line (if any) then holding lines.

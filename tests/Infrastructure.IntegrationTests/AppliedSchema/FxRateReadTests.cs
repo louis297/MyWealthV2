@@ -36,12 +36,10 @@ public class FxRateReadTests
     {
         await using var db = Open();
         await DeleteAllAsync(db);
-        var prices = new MarketDataMock();
-
         try
         {
-            await TestSeed.SeedAsync(db, prices, CancellationToken.None);
-            await TestSeed.SeedAsync(db, prices, CancellationToken.None);
+            await TestSeed.SeedAsync(db, CancellationToken.None);
+            await TestSeed.SeedAsync(db, CancellationToken.None);
 
             var rows = await db.FxRates.AsNoTracking().ToListAsync();
             rows.Count.ShouldBe(10);

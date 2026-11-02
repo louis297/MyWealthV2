@@ -24,7 +24,7 @@ related:
 
 # Net worth
 
-Read model of current net worth on `webapi`. No new table. No write path. Aggregates existing cash balances and holding market values (mocked `IMarketData`) into per-currency arrays. Two reads: firm / adviser scope and one Customer. Adviser Portal Dashboard consumes these reads; other ledger pages stay out of this slice.
+Read model of current net worth on `webapi`. No new table. No write path. Aggregates existing cash balances and holding market values (`IMarketData` from `InstrumentPrices`) into per-currency arrays. Two reads: firm / adviser scope and one Customer. Adviser Portal Dashboard consumes these reads; other ledger pages stay out of this slice.
 
 **Status is `accepted` and landed (2026-10-12, `af422c2`).** Implementation follows this file. No script. Reads reuse `accounts.read`. Current point-in-time only. BFF allow-list adds `/net-worth`.
 
@@ -34,7 +34,7 @@ Read model of current net worth on `webapi`. No new table. No write path. Aggreg
 
 A TenantAdmin or Adviser reads current net worth for the customers they can already see. SystemAdmin does the same on Scalar for a chosen tenant. Customer receives 403.
 
-Cash is the existing computed `SUM` of posted cash legs. Holding market value is current quantity × current mocked price in the instrument quote currency. Results are grouped by currency. There is no FX fold into a single number. Closed accounts are excluded. Phase 2 has no Credit, so liabilities are empty.
+Cash is the existing computed `SUM` of posted cash legs. Holding market value is current quantity × the `IMarketData` price in the instrument quote currency. Results are grouped by currency. There is no FX fold into a single number. Closed accounts are excluded. Phase 2 has no Credit, so liabilities are empty.
 
 Two endpoints: a firm / adviser list and a single-Customer read. Both return the same shape. The Customer read reuses the existing assignment and isolation rules.
 
@@ -90,7 +90,7 @@ Two endpoints: a firm / adviser list and a single-Customer read. Both return the
 | R4 | TenantAdmin / Adviser omit `tenantId` (400 if present). SystemAdmin may pass `tenantId` on the firm read, same as other ledger lists. The Customer read uses the customer PublicId only. |
 | R5 | Closed accounts are excluded. Open accounts only. |
 | R6 | Results are arrays per currency. Do not fold with FX. Same-currency FX is not applied. |
-| R7 | Cash = existing computed cash balance (SUM of posted cash legs). Holding market value = quantity × mocked price in quote currency. No price → market value 0, and the holding is still listed. Quantity ≤ 0 is omitted. |
+| R7 | Cash = existing computed cash balance (SUM of posted cash legs). Holding market value = quantity × `IMarketData` price in quote currency. No price → market value 0, and the holding is still listed. Quantity ≤ 0 is omitted. |
 | R8 | Phase 2 has no Credit. Liabilities array is empty. Do not invent a negative-cash rule. |
 | R9 | Adviser sees only assigned Customers. TenantAdmin sees the firm. SystemAdmin sees the chosen tenant. |
 | R10 | Current point-in-time only. No `asOf` parameter. No stored snapshot. |
