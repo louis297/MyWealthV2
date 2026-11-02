@@ -238,7 +238,7 @@ Ordinary validation stays in `errors`: Bank/Cash, disabled instrument, missing p
 
 ## 9. UI
 
-None. Pages live in [docs/portals/](../portals/). Scalar is enough.
+None. Pages live in [docs/adviser-portal/](../adviser-portal/). Scalar is enough.
 
 ---
 
@@ -250,7 +250,7 @@ None. Pages live in [docs/portals/](../portals/). Scalar is enough.
 | Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403; happy Buy then Sell; StockIn then StockOut; missing price → 400; missing FX → 400; Sell/StockOut over quantity → 400; Buy that would make cash negative → 400; reverse restores; reverse that would go negative → 400; idempotent replay; hash mismatch 409; disabled instrument → 400 |
 | Infrastructure.IntegrationTests | Two-tenant fixture: other tenant’s account or instrument → 404. TestSeed idempotent. Mock price used; same-currency FX = 1; missing cross pair is not 1. |
 
-TestSeed (Development / TestAppHost only): one `Buy` and one `StockIn` on the existing demo brokerage for an existing TestSeed instrument that has a mock price, on each Development seed tenant (`demo` and `demo2`). Not an Opening. Functional tests create their own rows.
+TestSeed (Development / TestAppHost only): one `Buy` and one `StockIn` on the existing demo brokerage for an existing TestSeed instrument that has a mock price. Not an Opening. Functional tests create their own rows.
 
 ---
 

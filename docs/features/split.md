@@ -206,7 +206,7 @@ Ordinary validation stays in `errors`: Bank/Cash, disabled instrument, no holdin
 
 ## 9. UI
 
-None. Pages live in [docs/portals/](../portals/). Scalar is enough.
+None. Pages live in [docs/adviser-portal/](../adviser-portal/). Scalar is enough.
 
 ---
 
@@ -218,7 +218,7 @@ None. Pages live in [docs/portals/](../portals/). Scalar is enough.
 | Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403; happy Split to a new total; Bonus and Scrip same cost; reverse split; reverse restores quantity and cost; no holding → 400; quantity equal to current → 400; cash or ratio field → 400; idempotent replay; hash mismatch 409 |
 | Infrastructure.IntegrationTests | Two-tenant fixture: other tenant’s account or instrument → 404. TestSeed idempotent. |
 
-TestSeed (Development / TestAppHost only): one `Split` on the existing demo brokerage holding, on each Development seed tenant (`demo` and `demo2`). Not a Buy. Functional tests create their own rows.
+TestSeed (Development / TestAppHost only): one `Split` on the existing demo brokerage holding. Not a Buy. Functional tests create their own rows.
 
 ---
 

@@ -94,7 +94,7 @@ SystemAdmin adds a TenantAdmin to an **enabled** tenant (`tenantId`, `name`, `em
 | R15 | No physical delete. `Users.TenantId` → Tenants RESTRICT; `Users.IdentityUserId` → AspNetUsers RESTRICT. |
 | R16 | List contains `Role = TenantAdmin` only. **Every item includes `status` and `isActive`** (same encoding as `/users/me`). Query aligned with currencies: `enabledOnly` omitted / `false` = every Status; `true` = `IsActive = 1` (excludes `Disabled` and `PendingActivation`); any other string → 400. Also `page` (1-based, default 1), `pageSize` (default 20, max 100), optional `tenantId` (tenant PublicId), optional `search`. `search` matches Name or Email contains (CI) or the person’s PublicId exact. Sort: `name` ascending, then `email`. Do not add a `status=` query parameter. |
 | R17 | This collection’s gate is policy 403, not “other tenant → 404”. SystemAdmin has no TenantId and can see TenantAdmins in every firm. Cross-tenant 404 starts on advisers / customers for in-tenant callers. The two-tenant fixture on this slice asserts: unfiltered list includes A and B; `tenantId=A` returns only A. |
-| R18 | Development seeds `tenant-admin@localhost` on `demo` and `tenant-admin2@localhost` on `demo2`, same password as the SystemAdmin seed. Tests create people. The SystemAdmin seed stays identity-auth. |
+| R18 | Do not seed a demo TenantAdmin in Development. Tests create people. The SystemAdmin seed stays identity-auth. |
 
 ---
 
@@ -308,7 +308,7 @@ Do not open a new ADR (0012 / 0013 / 0014 already cover invite deferral, policie
 | List | Same envelope as tenants; item **includes** `status`; `enabledOnly` matches currencies (omit/`false` = all, `true` = Active only) |
 | Wrong collection | Other-role PublicId → 404 |
 | Portal | No page |
-| Demo seed person | Development: `tenant-admin@localhost` on `demo`, `tenant-admin2@localhost` on `demo2` |
+| Demo seed person | No |
 
 Still open, not this slice:
 

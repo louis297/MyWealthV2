@@ -18,7 +18,7 @@ related:
 
 Aspire resource + OIDC client contract + the **current** page slice. Backend verbs live in Feature Specs, not here.
 
-Phase 1 public client is `adviser-portal` only. Do not add a `customer-portal.md` until that slice opens.
+Adviser Portal lives in `docs/adviser-portal/`. Customer Portal lives in `docs/customer-portal/`. Do not add a second portal file under the wrong folder.
 
 ---
 

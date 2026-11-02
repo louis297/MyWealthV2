@@ -26,7 +26,7 @@ Do not add empty files for a phase that has not opened.
 - `note` is discussion only. Do not create tables or routes from a note.
 - From Tenants onward, every tenant-scoped slice includes cross-tenant isolation tests.
 - `/users` is a namespace prefix for people collections, not a parent resource. Do not nest `/users/{id}/advisers`. `/tenants` and `/currencies` stay at the root.
-- The Adviser Portal is not a backend slice. Portal scope lives in [portals/](../portals/README.md).
+- The Adviser Portal is not a backend slice. Portal scope lives in [adviser-portal/](../adviser-portal/README.md).
 - Implementation plans mark suggested git commits. The repository should build after each commit.
 
 ---
@@ -54,7 +54,7 @@ Not a Feature Spec:
 | Isolation tests | Each business slice from tenants onward |
 | Invitation delivery | Out of identity-auth; table and email port reserved |
 | Ledger policy names | Phase 2 |
-| Adviser Portal (OIDC shell + pages cut C) | [portals/](../portals/README.md) |
+| Adviser Portal (OIDC shell + pages cut C) | [adviser-portal/](../adviser-portal/README.md) |
 | SystemAdmin UI | None — Scalar |
 
 ### Implementation order
@@ -76,7 +76,7 @@ isolation-tests
 
 Repo master (2026-09-14, `09dc6ec`): people collections, currencies HTTP, amendments A/B, portal pages C, logout/callback fixes, and isolated TestAppHost SQL (`dbserver-test` / `MyWealthDbV2-test`) are in the tree. A1–A10 and B1–B11 passed (confirmed 2026-09-15). Do not rewrite those specs.
 
-Acceptance: [identity-auth](identity-auth.md) amendment A (A1–A10), [tenants](tenants.md) amendment B (B1–B11), [adviser-portal](../portals/adviser-portal.md) cut C (C1–C15). Construction notes (`review`): [portals/frontend-implementation-notes.md](../portals/frontend-implementation-notes.md).
+Acceptance: [identity-auth](identity-auth.md) amendment A (A1–A10), [tenants](tenants.md) amendment B (B1–B11), [adviser-portal](../adviser-portal/adviser-portal.md) cut C (C1–C15). Construction notes (`review`): [adviser-portal/frontend-implementation-notes.md](../adviser-portal/frontend-implementation-notes.md).
 
 `GET /currencies` is not public. Register no `currencies.read` policy. Use default `.RequireAuthorization()`. Query `enabledOnly`: omitted / `false` = all rows; `true` = enabled only. Every item includes `isActive`.
 
@@ -99,7 +99,7 @@ Lock table and port shape in the Feature Spec. Do not implement from ADR 0010 / 
 | [buy-sell](buy-sell.md) | accepted (landed in repo 2026-10-12 `821c715`) | TenantAdmin; Adviser (assigned Customers); SystemAdmin (Scalar) | `Buy` / `Sell` / `StockIn` / `StockOut` on the same Transaction; server price on Buy/Sell; client cost on StockIn; average-cost release. Item shape `cash` + `security`. `0016_transaction_type_stock_in_out.sql`. Portal out | Security activity after Opening. Split / scrip next. |
 | [split](split.md) | accepted (2026-10-12) | TenantAdmin; Adviser (assigned Customers); SystemAdmin (Scalar) | `Split` / `Bonus` / `Scrip`; security-only; new total quantity; total cost unchanged. No ratio on this write. `0017_transaction_type_split.sql` widens the type check to 0–14. Portal out | Corporate-action quantity change. Not StockIn/StockOut. |
 | [net-worth](net-worth.md) | accepted (landed 2026-10-12 `af422c2`) | TenantAdmin; Adviser (assigned Customers); SystemAdmin (Scalar) | Current point-in-time read model. `GET /net-worth` and `GET /users/customers/{id}/net-worth`. Per-currency arrays + breakdowns. No script. Reuse `accounts.read`. BFF prefix `/net-worth`. Portal Dashboard accepted | Read model after securities activity. No new tables. |
-| [bff-adviser-portal](bff-adviser-portal.md) | accepted (2026-10-01; landed `5e85e9c`) | Adviser Portal session | Aspire `bff-adviser-portal`; confidential client; cookie + OIDC + HttpClient proxy; tokens out of the browser | Platform session increment, not a ledger slice. ADR 0016 accepted. Portal cut: [adviser-portal-bff-cut.md](../portals/adviser-portal-bff-cut.md) |
+| [bff-adviser-portal](bff-adviser-portal.md) | accepted (2026-10-01; landed `5e85e9c`) | Adviser Portal session | Aspire `bff-adviser-portal`; confidential client; cookie + OIDC + HttpClient proxy; tokens out of the browser | Platform session increment, not a ledger slice. ADR 0016 accepted. Portal cut: [adviser-portal-bff-cut.md](../adviser-portal/adviser-portal-bff-cut.md) |
 
 Suggested order (tendency, not a locked backlog). Cash is not its own spec; it lives in posting:
 
@@ -125,3 +125,15 @@ One domain. Background execution lives in the general-purpose `worker` (ADR 0017
 | [outbox](outbox.md) | accepted | Platform (no HTTP caller) | Transactional `OutboxMessages`. Worker delivers domain events via MediatR. Replaces immediate post-save dispatch. ADR 0018 accepted. Script `0020_outbox.sql`. | Cross-cutting delivery. Not a report and not a ledger slice. |
 
 Invitation / Activation and Fees are deferred.
+
+---
+
+## Phase 3+ — Customer Portal (accepted 2026-11-02)
+
+Second first-party portal. One BFF + one confidential client, same shape as the Adviser Portal (ADR 0016). Portal page contract lives in [customer-portal/](../customer-portal/README.md).
+
+| Spec | Status | Who | Ships | Why it stays its own slice |
+| --- | --- | --- | --- | --- |
+| [bff-customer-portal](bff-customer-portal.md) | accepted | Customer Portal session | Aspire `bff-customer-portal`; confidential client `customer-portal`; cookie + OIDC + HttpClient proxy; tokens out of the browser; prefix allow-list for self reads + report request | Platform session increment, not a ledger slice. Portal: [../customer-portal/customer-portal.md](../customer-portal/customer-portal.md) |
+
+Required backend amendments (self-scope reads and report request for Customer) are accepted in identity-auth, accounts, posting, net-worth, reports, and holdings. They land with this slice; do not rebuild the resource API.

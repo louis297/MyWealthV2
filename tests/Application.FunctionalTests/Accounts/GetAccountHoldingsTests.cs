@@ -133,20 +133,6 @@ public class GetAccountHoldingsTests : TestBase
         response.Headers.Location.ShouldBeNull();
     }
 
-    [Test]
-    public async Task Customer_Returns403()
-    {
-        var tenant = await TestApp.CreateTenantAsync("Firm C", "firmc");
-        var adviser = await TestApp.CreatePersonAsync(
-            UserRole.Adviser, "Cara", "cara@firmc", "Password1!", tenant.Id);
-        var customer = await TestApp.CreatePersonAsync(
-            UserRole.Customer, "Dee", "dee@firmc", "Password1!", tenant.Id, adviser.Id);
-        var tokens = await TestApp.IssueAccessTokenAsync(customer);
-
-        (await AccountHttp.Send(HttpMethod.Get, $"/accounts/{Guid.NewGuid()}/holdings", tokens.AccessToken))
-            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
-    }
-
     private static Task<HttpResponseMessage> PostOpeningAsync(string accessToken, Guid accountId, object security) =>
         TransactionHttp.Send(HttpMethod.Post, "/transactions", accessToken, new
         {

@@ -13,7 +13,7 @@ Copy, then fill. Do not turn a template file into a living spec.
 | --- | --- |
 | [feature.md](feature.md) | `docs/features/<kebab-name>.md` |
 | [adr.md](adr.md) | `docs/adr/NNNN-short-title.md` |
-| [portal.md](portal.md) | `docs/portals/<kebab-name>.md` |
+| [portal.md](portal.md) | `docs/adviser-portal/<kebab-name>.md` or `docs/customer-portal/<kebab-name>.md` |
 
 Numbers on ADRs are not reused. Do not add an empty file for a phase that has not opened.
 

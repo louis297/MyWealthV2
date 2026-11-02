@@ -64,6 +64,8 @@ Two endpoints: a firm / adviser list and a single-Customer read. Both return the
 - Lots, realized gain, performance attribution
 - Customer ledger-write
 
+**Amendment for Customer Portal (accepted 2026-11-02).** Supersedes the Customer 403 sentence. Customer may call `GET /users/customers/{ownPublicId}/net-worth` (and `GET /net-worth`, which for Customer returns the same self scope). Other customer id → 404. Reuse `accounts.read`.
+
 ---
 
 ## 3. Stories
@@ -173,7 +175,7 @@ Recommended first Dashboard widgets (from discussion):
 
 Defer: charts, historical comparison, FX fold, Credit/Property, snapshots.
 
-No portal page in this slice. Pages live in [portals/](../portals/README.md).
+No portal page in this slice. Pages live in [adviser-portal/](../adviser-portal/README.md).
 
 ---
 

@@ -80,6 +80,48 @@ bff.WithEnvironment("Authentication__PublicOrigin", bff.GetEndpoint("https"));
 
 identity.WithPortalOrigins(bff);
 
+var customerPortalClientSecret = builder.AddParameter("customer-portal-client-secret", secret: true);
+
+identity.WithEnvironment("Identity__CustomerPortalClientSecret", customerPortalClientSecret);
+
+var customerBff = builder.AddProject<Projects.BffCustomerPortal>(Services.BffCustomerPortal)
+    .WithReference(web)
+    .WithReference(identity)
+    .WaitFor(web)
+    .WaitFor(identity)
+    .WithExternalHttpEndpoints()
+    .WithHttpHealthCheck("/health", endpointName: "http")
+    .WithAspNetCoreEnvironment()
+    .WithEnvironment("Authentication__Authority", identity.GetEndpoint("https"))
+    .WithEnvironment("Authentication__ClientSecret", customerPortalClientSecret)
+    .WithEnvironment("Api__BaseAddress", "https+http://webapi")
+    .WithUrlForEndpoint("https", url =>
+    {
+        url.DisplayText = "Customer Portal";
+        url.Url = "/";
+    })
+    .WithUrlForEndpoint("http", url =>
+    {
+        url.DisplayLocation = UrlDisplayLocation.DetailsOnly;
+    });
+
+customerBff.WithEnvironment("Authentication__PublicOrigin", customerBff.GetEndpoint("https"));
+identity.WithEnvironment("Identity__CustomerPortalOrigins__0", customerBff.GetEndpoint("https"));
+
+var customerPortal = builder.AddViteApp(Services.CustomerPortal, "../CustomerPortal")
+    .WithExternalHttpEndpoints()
+    .WithEnvironment("BROWSER", "none")
+    .WithEnvironment("VITE_BFF_HTTP", customerBff.GetEndpoint("https"))
+    .WithUrls(context =>
+    {
+        foreach (var url in context.Urls)
+        {
+            url.DisplayLocation = UrlDisplayLocation.DetailsOnly;
+        }
+    });
+
+customerBff.WithEnvironment("Spa__DevServerUrl", customerPortal.GetEndpoint("http"));
+
 var backOfficeClientSecret = builder.AddParameter("back-office-client-secret", secret: true);
 
 identity.WithEnvironment("Identity__BackOfficeClientSecret", backOfficeClientSecret);

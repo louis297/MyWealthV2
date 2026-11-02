@@ -1,9 +1,9 @@
 ---
-title: Portals
+title: Adviser Portal
 status: review
 language: en
 created: 2026-09-12
-updated: 2026-10-26
+updated: 2026-11-02
 related:
   - ../README.md
   - ../function-plan.md
@@ -11,11 +11,11 @@ related:
   - ../adr/0014-openiddict-authorization-code-pkce.md
 ---
 
-# Portals
+# Adviser Portal
 
-UI and OIDC-client contracts. Backend handlers stay in [features/](../features/README.md).
+UI and OIDC-client contracts for the Adviser Portal. Backend handlers stay in [features/](../features/README.md).
 
-Phase 1 has one frontend: [adviser-portal.md](adviser-portal.md). Customer Portal is not registered. Back Office lives in [../backoffice/](../backoffice/) and is independent of this folder.
+Phase 1 frontend lives here. Customer Portal lives in [../customer-portal/](../customer-portal/) (accepted). Back Office lives in [../backoffice/](../backoffice/) and is independent of this folder.
 
 | Doc | Owns |
 | --- | --- |
@@ -27,7 +27,23 @@ Phase 1 has one frontend: [adviser-portal.md](adviser-portal.md). Customer Porta
 | [frontend-conventions.md](frontend-conventions.md) | Folder layout, naming, session state, API client |
 | [frontend-implementation-notes.md](frontend-implementation-notes.md) | Page-by-page construction for the current pages cut |
 
-[adviser-portal.md](adviser-portal.md) is **accepted** (shell + pages cut C). Dashboard cut is **accepted**. Conventions and construction notes stay `review`. Customer Portal is not registered. Back Office is independent and accepted: [../backoffice/](../backoffice/).
+[adviser-portal.md](adviser-portal.md) is **accepted** (shell + pages cut C). Dashboard cut is **accepted**. Conventions and construction notes stay `review`. Customer Portal is independent and accepted: [../customer-portal/](../customer-portal/). Back Office is independent and accepted: [../backoffice/](../backoffice/).
+
+---
+
+## Change summary (2026-11-02)
+
+Folder renamed from `docs/portals/` to `docs/adviser-portal/`. Customer Portal moved to `docs/customer-portal/`.
+
+---
+
+## Change summary (2026-11-02, earlier)
+
+Customer Portal opened for design.
+
+- New portal contract: [../customer-portal/customer-portal.md](../customer-portal/customer-portal.md) (draft). Customer login, own accounts / holdings / activity / net worth, own Customer-scoped reports (list / generate / download). No ledger writes, no schedules.
+- New BFF: [../features/bff-customer-portal.md](../features/bff-customer-portal.md) (draft). Aspire `bff-customer-portal`, confidential client `customer-portal`, cookie `__Host-bff-customer-portal`, prefix allow-list `/users` `/accounts` `/transactions` `/net-worth` `/reports`.
+- Required backend amendments listed in the portal doc (identity-auth client + allow-list, self-scope on accounts / transactions / net-worth, reports.customer.create for request only).
 
 ---
 

@@ -50,8 +50,18 @@ public class GetNetWorthQueryHandler(
         }
 
         var assignedAdviserId = AccountScope.AssignedAdviserInternalId(currentUser);
+        var selfCustomerId = AccountScope.SelfCustomerId(currentUser);
         int? customerId = null;
-        if (request.CustomerId is Guid customerPublicId)
+        if (selfCustomerId is int ownCustomerId)
+        {
+            if (request.CustomerId is Guid requested && requested != currentUser.PublicId)
+            {
+                throw new NotFoundException("Customer", requested);
+            }
+
+            customerId = ownCustomerId;
+        }
+        else if (request.CustomerId is Guid customerPublicId)
         {
             var customers = db.Users.AsNoTracking()
                 .Where(user => user.PublicId == customerPublicId

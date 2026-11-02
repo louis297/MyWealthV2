@@ -28,20 +28,44 @@ public class GetNetWorthTests : TestBase
     }
 
     [Test]
-    public async Task Customer_Returns403()
+    public async Task Customer_ReadsOwnNetWorth_OtherCustomerIs404()
     {
-        var tenant = await TestApp.CreateTenantAsync("Firm C", "firmc");
-        var adviser = await TestApp.CreatePersonAsync(
-            UserRole.Adviser, "Cara", "cara@firmc", "Password1!", tenant.Id);
-        var customer = await TestApp.CreatePersonAsync(
-            UserRole.Customer, "Dee", "dee@firmc", "Password1!", tenant.Id, adviser.Id);
-        var tokens = await TestApp.IssueAccessTokenAsync(customer);
+        var (tenant, adviser, customer, adviserTokens) = await AccountHttp.SignInAdviser();
+        var own = await OpenAccountAsync(adviserTokens.AccessToken, customer.PublicId, "Everyday", "Bank", "NZD");
+        (await PostCashAsync(adviserTokens.AccessToken, own, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
 
-        (await AccountHttp.Send(HttpMethod.Get, "/net-worth", tokens.AccessToken))
-            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        var otherCustomer = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Pat", "pat@north.example", "Password1!", tenant.Id, adviser.Id);
+        var other = await OpenAccountAsync(adviserTokens.AccessToken, otherCustomer.PublicId, "Pat bank", "Bank", "NZD");
+        (await PostCashAsync(adviserTokens.AccessToken, other, 50m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var (_, _, southCustomer, _) = await AccountHttp.SignInAdviser(
+            "South Co", "south-co", "ann@south.example", customerEmail: "ned@south.example");
+
+        var tokens = await TestApp.IssueAccessTokenAsync(customer);
+        var firm = await AccountHttp.Send(HttpMethod.Get, "/net-worth", tokens.AccessToken);
+        var self = await AccountHttp.Send(
+            HttpMethod.Get, $"/users/customers/{customer.PublicId}/net-worth", tokens.AccessToken);
+        firm.StatusCode.ShouldBe(HttpStatusCode.OK);
+        self.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        using var firmJson = JsonDocument.Parse(await firm.Content.ReadAsStringAsync());
+        using var selfJson = JsonDocument.Parse(await self.Content.ReadAsStringAsync());
+        var firmCurrencies = firmJson.RootElement.GetProperty("currencies").EnumerateArray().ToList();
+        firmCurrencies.Count.ShouldBe(1);
+        AssertCurrency(firmCurrencies[0], "NZD", cash: 100m, holdings: 0m);
+        selfJson.RootElement.GetProperty("currencies").GetRawText()
+            .ShouldBe(firmJson.RootElement.GetProperty("currencies").GetRawText());
+
         (await AccountHttp.Send(
-            HttpMethod.Get, $"/users/customers/{customer.PublicId}/net-worth", tokens.AccessToken))
-            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+            HttpMethod.Get, $"/users/customers/{otherCustomer.PublicId}/net-worth", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await AccountHttp.Send(
+            HttpMethod.Get, $"/net-worth?customerId={otherCustomer.PublicId}", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await AccountHttp.Send(
+            HttpMethod.Get, $"/users/customers/{southCustomer.PublicId}/net-worth", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
     [Test]

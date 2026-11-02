@@ -89,7 +89,8 @@ Implement **accepted** specs for the current phase only. `draft` and `note` are 
 | [api-design.md](api-design.md) | HTTP conventions and the resource catalog | Full request/response per action |
 | [features/](features/README.md) | One vertical slice: commands, rules, endpoints, tests | Other slices’ APIs |
 | [adr/](adr/README.md) | A decision that must not be re-litigated in place | Feature scope |
-| [portals/](portals/) | Adviser Portal scope, UI conventions, page construction notes | Backend handlers |
+| [adviser-portal/](adviser-portal/) | Adviser Portal scope, UI conventions, page construction notes | Backend handlers |
+| [customer-portal/](customer-portal/) | Customer Portal scope and page contract (accepted) | Backend handlers |
 
 Schema truth is the versioned SQL under `database/schema/`, applied by the schema applicator. Do not treat `EnsureCreated` / `EnsureDeleted` as the normal boot path.
 
@@ -116,6 +117,6 @@ Use the same `status` on every doc front matter:
 - When code and an accepted doc disagree, change the code or the doc in the same change.
 - Feature Spec **In** scope is only what that slice ships. Later-phase words may appear as out-of-scope names, not as tables to create.
 - `api-design.md` is conventions plus a resource catalog. Field rules live in the Feature Spec.
-- File names are kebab-case. Specs: `features/<name>.md`. ADRs: `adr/NNNN-short-title.md`. Portal specs: `portals/<name>.md`.
+- File names are kebab-case. Specs: `features/<name>.md`. ADRs: `adr/NNNN-short-title.md`. Adviser Portal specs: `adviser-portal/<name>.md`. Customer Portal specs: `customer-portal/<name>.md`.
 - Host codes live in [glossary.md](glossary.md). Resource specs stay unprefixed (`accounts.md`). A BFF spec is `features/bff-<portal>.md` (`bff-adviser-portal.md`). Do not rename an accepted spec to add a prefix.
 - Do not create empty spec files for phases that have not opened.

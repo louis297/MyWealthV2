@@ -67,12 +67,14 @@ public class GetAccountsQueryHandler(IApplicationDbContext db, ICurrentUser curr
         }
 
         var assignedAdviserId = AccountScope.AssignedAdviserInternalId(currentUser);
+        var selfCustomerId = AccountScope.SelfCustomerId(currentUser);
         var query =
             from account in db.Accounts.AsNoTracking()
             join tenant in db.Tenants.AsNoTracking() on account.TenantId equals tenant.Id
             join customer in db.Users.AsNoTracking() on account.CustomerId equals customer.Id
             where account.TenantId == tenantId
                   && (assignedAdviserId == null || customer.AdviserId == assignedAdviserId)
+                  && (selfCustomerId == null || customer.Id == selfCustomerId)
             select new { account, tenant, customer };
 
         if (bool.TryParse(request.EnabledOnly, out var enabledOnly) && enabledOnly)

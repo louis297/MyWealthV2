@@ -45,7 +45,7 @@ How this file relates to the rest of the tree is in [README.md](README.md). This
 
 - **Phase 1:** platform foundation. The vertical cut stops at “people in a firm + currency catalog”. Session uses the same OIDC shape a second portal will reuse.
 - **Phase 2:** ledger domain (instrument catalog first, then account container, cash ledger, securities / holdings, posting and reversal, read models). One domain, several slices. Model it as real sub-ledgers. Do not ship a throwaway single-row `Transactions` design that pretends to be both cash and securities.
-- **Phase 3+:** one domain at a time (Customer Portal as a second BFF + OIDC client, KYC, household groups, advice documents, and so on).
+- **Phase 3+:** one domain at a time (Customer Portal as a second BFF + OIDC client — accepted 2026-11-02, KYC, household groups, advice documents, and so on).
 
 ---
 
@@ -56,7 +56,7 @@ How this file relates to the rest of the tree is in [README.md](README.md). This
 | SystemAdmin | Yes, no tenantCode | Back Office ([backoffice/back-office.md](backoffice/back-office.md)). Scalar remains. `adviser-portal` allow-list yes (probe). | Platform-level. No TenantId. Tenant manage is not the Adviser Portal. |
 | TenantAdmin | Yes + tenantCode | Adviser Portal | Highest authority inside the tenant. |
 | Adviser | Yes + tenantCode | Adviser Portal | Manages assigned Customers. No ledger yet in Phase 1. |
-| Customer | Yes + tenantCode | None | Login principal. `adviser-portal` issues no code. No Customer Portal client yet. |
+| Customer | Yes + tenantCode | Customer Portal (accepted) | Login principal. `adviser-portal` issues no code. Client `customer-portal` is accepted ([customer-portal/customer-portal.md](customer-portal/customer-portal.md)). |
 
 ---
 
@@ -75,7 +75,7 @@ Phase 2  Ledger domain (one domain, several slices)
          Session stack: portal browser talks to `bff-adviser-portal` (ADR 0016). Resource API session does not change.
 
 Phase 3+ Other domains, one at a time
-         Customer Portal = second BFF + client on the same authorization server
+         Customer Portal = second BFF + client on the same authorization server (accepted 2026-11-02)
          Invitation delivery, KYC, households, advice documents, custody, tax, …
 ```
 
@@ -136,10 +136,10 @@ Disabling the last TenantAdmin is allowed in Phase 1 (known gap). After a tenant
 
 ### 4.5 Phase 1 frontend
 
-Adviser Portal only. Split in two implementation slices (see [portals/adviser-portal.md](portals/adviser-portal.md)):
+Adviser Portal only. Split in two implementation slices (see [adviser-portal/adviser-portal.md](adviser-portal/adviser-portal.md)):
 
 1. **Shell + callback (landed in repo 2026-09-13):** Vite on Aspire `adviser-portal`, authorize redirect, `/callback`, session probe via `GET /users/me`, 401 refresh-once. No password form. SystemAdmin may use the probe (Development seed). OpenIddict redirect URIs upsert from the portal origin, including the Aspire dashboard alias.
-2. **Pages (cut C, accepted, landed 2026-09-14):** role-filtered shell, Profile, Customers, Advisers. Default home = Customers. IdentityHost refuses Customer on this client. SystemAdmin uses Scalar for tenant manage. Shell name from `GET /tenants/by-code/{code}`. Construction notes (`review`): [portals/frontend-implementation-notes.md](portals/frontend-implementation-notes.md).
+2. **Pages (cut C, accepted, landed 2026-09-14):** role-filtered shell, Profile, Customers, Advisers. Default home = Customers. IdentityHost refuses Customer on this client. SystemAdmin uses Scalar for tenant manage. Shell name from `GET /tenants/by-code/{code}`. Construction notes (`review`): [adviser-portal/frontend-implementation-notes.md](adviser-portal/frontend-implementation-notes.md).
 
 **Out:** Accounts, Instruments, Transactions, Dashboard. No Customer Portal client in Phase 1.
 
@@ -155,7 +155,7 @@ One domain. Feature Specs come after this map. Suggested internal slice order (n
 4. Holdings / securities ledger / Opening of holdings (accepted, landed 2026-10-11 `676e77a`)
 5. Buy / Sell / StockIn / StockOut (accepted 2026-10-11, landed `821c715`: [features/buy-sell.md](features/buy-sell.md))
 6. Split / Bonus / Scrip (accepted 2026-10-12: [features/split.md](features/split.md), `0017_transaction_type_split.sql`)
-7. Net-worth read model (accepted and landed 2026-10-12 `af422c2`: [features/net-worth.md](features/net-worth.md); `GET /net-worth` + `GET /users/customers/{id}/net-worth`). Adviser Portal Dashboard and ledger pages accepted: [portals/adviser-portal-dashboard.md](portals/adviser-portal-dashboard.md).
+7. Net-worth read model (accepted and landed 2026-10-12 `af422c2`: [features/net-worth.md](features/net-worth.md); `GET /net-worth` + `GET /users/customers/{id}/net-worth`). Adviser Portal Dashboard and ledger pages accepted: [adviser-portal/adviser-portal-dashboard.md](adviser-portal/adviser-portal-dashboard.md).
 
 Session edge is [features/bff-adviser-portal.md](features/bff-adviser-portal.md) (accepted 2026-10-01, landed `5e85e9c`). Resource API auth does not change. Add ledger policy names only.
 
@@ -198,11 +198,11 @@ Session edge is [features/bff-adviser-portal.md](features/bff-adviser-portal.md)
 ### 5.3 Phase 2 conventions (agreed 2026-09-20)
 
 - **SystemAdmin on ledger APIs.** Phase 2 resource APIs grant SystemAdmin the same write surface as TenantAdmin (and read). The caller has no `TenantId`; list and create take the target tenant’s PublicId. Get / update / disable by resource PublicId may cross tenants. Cross-tenant 404 applies to TenantAdmin / Adviser only. Adviser Portal still has no SystemAdmin ledger screens — Scalar now, Back Office later. Do not reopen Phase 1 people routes (`/users/advisers`, `/users/customers`) for SystemAdmin in this phase.
-- **Test seed per slice.** Each Phase 2 Feature Spec adds rows to a dedicated Development / TestAppHost seeder (`TestSeed`). Not a schema script. Not production. Idempotent on natural keys. Functional tests still create their own isolation data; the seeder is for local Scalar / host smoke. Development seeds two firms, `demo` and `demo2`. `TestSeed` copies the demo book (customer, instruments, accounts, postings, holdings, and the two report grants) onto both. Any other tenant is not seeded.
+- **Test seed per slice.** Each Phase 2 Feature Spec adds rows to a dedicated Development / TestAppHost seeder (`TestSeed`). Not a schema script. Not production. Idempotent on natural keys. Functional tests still create their own isolation data; the seeder is for local Scalar / host smoke.
 
 ### 5.4 Not locked (do not invent tables from this list)
 
-Transaction header + cash-leg shape: [features/posting.md](features/posting.md) (accepted, landed). Holdings Opening: [features/holdings.md](features/holdings.md) (accepted, landed 2026-10-11 `676e77a`). Buy / Sell / StockIn / StockOut: [features/buy-sell.md](features/buy-sell.md) (accepted, landed 2026-10-12 `821c715`, `0016_transaction_type_stock_in_out.sql`). Split / Bonus / Scrip: [features/split.md](features/split.md) (accepted 2026-10-12; new total quantity, total cost unchanged, no ratio on this write, `0017_transaction_type_split.sql`). Net-worth read model: [features/net-worth.md](features/net-worth.md) (accepted and landed 2026-10-12 `af422c2`; current point-in-time, per-currency arrays, no script). Adviser Portal Dashboard and ledger pages accepted: [portals/adviser-portal-dashboard.md](portals/adviser-portal-dashboard.md). Still open: daily snapshots. Close requires cash zero and no holdings.
+Transaction header + cash-leg shape: [features/posting.md](features/posting.md) (accepted, landed). Holdings Opening: [features/holdings.md](features/holdings.md) (accepted, landed 2026-10-11 `676e77a`). Buy / Sell / StockIn / StockOut: [features/buy-sell.md](features/buy-sell.md) (accepted, landed 2026-10-12 `821c715`, `0016_transaction_type_stock_in_out.sql`). Split / Bonus / Scrip: [features/split.md](features/split.md) (accepted 2026-10-12; new total quantity, total cost unchanged, no ratio on this write, `0017_transaction_type_split.sql`). Net-worth read model: [features/net-worth.md](features/net-worth.md) (accepted and landed 2026-10-12 `af422c2`; current point-in-time, per-currency arrays, no script). Adviser Portal Dashboard and ledger pages accepted: [adviser-portal/adviser-portal-dashboard.md](adviser-portal/adviser-portal-dashboard.md). Still open: daily snapshots. Close requires cash zero and no holdings.
 
 ### 5.5 Out of Phase 2
 
@@ -224,7 +224,6 @@ Phase 3 focuses on the Reports domain. Smaller platform pieces (Invitation / Act
 
 Still later (not Phase 3):
 
-- Customer Portal — second public OIDC client (`customer-portal`) on the same authorization server; same hosted login; role check rejects the wrong portal
 - Invitation / Activation delivery
 - Fees
 - KYC / AML, IRD, tax residency
@@ -247,7 +246,7 @@ Still later (not Phase 3):
 - Any ledger API or ledger table in Phase 1
 - Resource Owner Password Credentials grant
 - A custom resource-API login that issues tokens
-- A public `customer-portal` OIDC client. `back-office` is the SystemAdmin confidential client and is registered
+- A public `customer-portal` OIDC client. The accepted client is confidential (`customer-portal`, held by `bff-customer-portal`). `back-office` is the SystemAdmin confidential client and is registered
 - A separate identity SQL database in Phase 1
 
 ---
@@ -274,4 +273,4 @@ List page size is locked in tenants and reused by people lists (page 1 / size 20
 
 Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; uniform login failure; hosted login is Razor Pages at `/login`; access 15 minutes; refresh 14 days absolute.
 
-Phase 1 platform slices are accepted and tested (A1–A10, B1–B11, C1–C15). Phase 2 is open. Feature map in §5 is agreed. Instruments is accepted and landed (`9ea2f2a`). IsActive rename + `Users.IsActive` landed (`bbd0f26`, `0011`). Accounts is accepted and landed (`3e8b8f3`, `0012_accounts.sql`, `/accounts`). Posting is accepted and landed 2026-09-25 (`docs/features/posting.md`, script `0013_transactions.sql`, `/transactions`, master `79129eb`). Holdings Opening is accepted and landed 2026-10-11 (`docs/features/holdings.md`, `0014_holdings.sql`, `0015_transaction_type_opening_holdings.sql`, `GET /accounts/{id}/holdings`, master `676e77a`). Buy / Sell / StockIn / StockOut accepted and landed 2026-10-12 (`docs/features/buy-sell.md`, `0016_transaction_type_stock_in_out.sql`, master `821c715`). Split / Bonus / Scrip accepted 2026-10-12 (`docs/features/split.md`, `0017_transaction_type_split.sql`). Net-worth read model accepted and landed 2026-10-12 (`docs/features/net-worth.md`, master `af422c2`). Adviser Portal Dashboard and ledger pages accepted (`docs/portals/adviser-portal-dashboard.md`). Next: implement the portal cut. Implement further ledger slices from a new Feature Spec, not from ADR 0011 alone.
+Phase 1 platform slices are accepted and tested (A1–A10, B1–B11, C1–C15). Phase 2 is open. Feature map in §5 is agreed. Instruments is accepted and landed (`9ea2f2a`). IsActive rename + `Users.IsActive` landed (`bbd0f26`, `0011`). Accounts is accepted and landed (`3e8b8f3`, `0012_accounts.sql`, `/accounts`). Posting is accepted and landed 2026-09-25 (`docs/features/posting.md`, script `0013_transactions.sql`, `/transactions`, master `79129eb`). Holdings Opening is accepted and landed 2026-10-11 (`docs/features/holdings.md`, `0014_holdings.sql`, `0015_transaction_type_opening_holdings.sql`, `GET /accounts/{id}/holdings`, master `676e77a`). Buy / Sell / StockIn / StockOut accepted and landed 2026-10-12 (`docs/features/buy-sell.md`, `0016_transaction_type_stock_in_out.sql`, master `821c715`). Split / Bonus / Scrip accepted 2026-10-12 (`docs/features/split.md`, `0017_transaction_type_split.sql`). Net-worth read model accepted and landed 2026-10-12 (`docs/features/net-worth.md`, master `af422c2`). Adviser Portal Dashboard and ledger pages accepted (`docs/adviser-portal/adviser-portal-dashboard.md`). Next: implement the portal cut. Implement further ledger slices from a new Feature Spec, not from ADR 0011 alone.

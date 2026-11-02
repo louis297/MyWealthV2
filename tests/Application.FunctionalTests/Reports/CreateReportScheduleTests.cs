@@ -199,6 +199,44 @@ public class CreateReportScheduleTests : TestBase
         (await ReadSchedulesAsync(tenant.Id)).ShouldBeEmpty();
     }
 
+    [Test]
+    public async Task Customer_ScheduleVerbs_Return403()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm Schedule Customer", "firm-schedule-customer");
+        await TestApp.CreatePersonAsync(
+            UserRole.TenantAdmin, "Tess", "tess@firm-schedule-customer", "Password1!", tenant.Id);
+        var adviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Ann", "ann@firm-schedule-customer", "Password1!", tenant.Id);
+        var customer = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Cee", "cee@firm-schedule-customer", "Password1!", tenant.Id, adviser.Id);
+        await GrantAsync(tenant.PublicId);
+        var admin = await FunctionalTestSetup.Oidc.SignInAsync(
+            "tess@firm-schedule-customer", "Password1!", "firm-schedule-customer");
+        var created = await PostAsync(admin.AccessToken, customer.PublicId, "0 9 1 * *", "2026-01-01", "2026-03-31");
+        created.StatusCode.ShouldBe(HttpStatusCode.Created);
+        using var createdJson = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+        var id = createdJson.RootElement.GetProperty("id").GetGuid();
+
+        var tokens = await TestApp.IssueAccessTokenAsync(customer);
+        var list = await TenantHttp.Send(HttpMethod.Get, "/reports/schedules", tokens.AccessToken);
+        list.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var listed = JsonDocument.Parse(await list.Content.ReadAsStringAsync());
+        var rowVersion = listed.RootElement.EnumerateArray().Single().GetProperty("rowVersion").GetString();
+
+        (await PostAsync(tokens.AccessToken, customer.PublicId, "15 8 * * 1", "2026-04-01", "2026-06-30"))
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        (await TenantHttp.Send(HttpMethod.Put, $"/reports/schedules/{id}", tokens.AccessToken, new
+        {
+            reportId = CustomerTransactionsId,
+            parameters = new { customerId = customer.PublicId, from = "2026-01-01", to = "2026-03-31" },
+            cron = "0 9 1 * *",
+            isActive = true,
+            rowVersion
+        })).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        (await TenantHttp.Send(HttpMethod.Post, $"/reports/schedules/{id}/disable", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
     private static string Snapshot(Guid customerId, string from, string to) =>
         $$"""{"customerId":"{{customerId}}","from":"{{from}}","to":"{{to}}","includeClosedAccounts":false}""";
 

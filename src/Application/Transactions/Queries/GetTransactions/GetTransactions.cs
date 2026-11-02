@@ -59,6 +59,7 @@ public class GetTransactionsQueryHandler(IApplicationDbContext db, ICurrentUser 
         }
 
         var assignedAdviserId = AccountScope.AssignedAdviserInternalId(currentUser);
+        var selfCustomerId = AccountScope.SelfCustomerId(currentUser);
         var query =
             from transaction in db.Transactions.AsNoTracking()
             join account in db.Accounts.AsNoTracking() on transaction.AccountId equals account.Id
@@ -66,15 +67,35 @@ public class GetTransactionsQueryHandler(IApplicationDbContext db, ICurrentUser 
             join tenant in db.Tenants.AsNoTracking() on transaction.TenantId equals tenant.Id
             where transaction.TenantId == tenantId
                   && (assignedAdviserId == null || customer.AdviserId == assignedAdviserId)
+                  && (selfCustomerId == null || customer.Id == selfCustomerId)
             select new { transaction, account, customer, tenant };
 
         if (request.AccountId is { } accountPublicId)
         {
+            if (selfCustomerId is int ownCustomerId)
+            {
+                var visible = await (
+                    from account in db.Accounts.AsNoTracking()
+                    where account.PublicId == accountPublicId
+                          && account.TenantId == tenantId
+                          && account.CustomerId == ownCustomerId
+                    select account.Id).AnyAsync(cancellationToken);
+                if (!visible)
+                {
+                    throw new NotFoundException("Account", accountPublicId);
+                }
+            }
+
             query = query.Where(row => row.account.PublicId == accountPublicId);
         }
 
         if (request.CustomerId is { } customerPublicId)
         {
+            if (selfCustomerId is not null && customerPublicId != currentUser.PublicId)
+            {
+                throw new NotFoundException("Customer", customerPublicId);
+            }
+
             query = query.Where(row => row.customer.PublicId == customerPublicId);
         }
 

@@ -44,13 +44,65 @@ public class CreateTransactionTests : TestBase
 
         var post = await TransactionHttp.Send(
             HttpMethod.Post, "/transactions", tokens.AccessToken, body, Guid.NewGuid());
-        var list = await TransactionHttp.Send(HttpMethod.Get, "/transactions", tokens.AccessToken);
-        var item = await TransactionHttp.Send(
-            HttpMethod.Get, $"/transactions/{Guid.NewGuid()}", tokens.AccessToken);
 
         post.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
-        list.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
-        item.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Test]
+    public async Task Customer_ReadsOwnTransactions_OtherCustomerIs404()
+    {
+        var (tenant, adviser, customer, adviserTokens) = await AccountHttp.SignInAdviser();
+        var ownAccount = await OpenAccountAsync(adviserTokens.AccessToken, customer.PublicId);
+        var ownId = await PostTransferInAsync(adviserTokens.AccessToken, ownAccount);
+
+        var otherCustomer = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Pat", "pat@north.example", "Password1!", tenant.Id, adviser.Id);
+        var otherAccount = await OpenAccountAsync(adviserTokens.AccessToken, otherCustomer.PublicId);
+        var otherId = await PostTransferInAsync(adviserTokens.AccessToken, otherAccount);
+
+        var (_, _, southCustomer, southTokens) = await AccountHttp.SignInAdviser(
+            "South Co", "south-co", "ann@south.example", customerEmail: "ned@south.example");
+        var southAccount = await OpenAccountAsync(southTokens.AccessToken, southCustomer.PublicId);
+        var southId = await PostTransferInAsync(southTokens.AccessToken, southAccount);
+
+        var tokens = await TestApp.IssueAccessTokenAsync(customer);
+        var list = await TransactionHttp.Send(HttpMethod.Get, "/transactions", tokens.AccessToken);
+        list.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var listJson = JsonDocument.Parse(await list.Content.ReadAsStringAsync());
+        listJson.RootElement.GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("id").GetGuid())
+            .ShouldBe([ownId]);
+
+        (await TransactionHttp.Send(HttpMethod.Get, $"/transactions/{ownId}", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await TransactionHttp.Send(HttpMethod.Get, $"/transactions?accountId={ownAccount}", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        (await TransactionHttp.Send(HttpMethod.Get, $"/transactions/{otherId}", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await TransactionHttp.Send(HttpMethod.Get, $"/transactions?accountId={otherAccount}", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await TransactionHttp.Send(
+                HttpMethod.Get, $"/transactions?customerId={otherCustomer.PublicId}", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await TransactionHttp.Send(HttpMethod.Get, $"/transactions/{southId}", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await TransactionHttp.Send(HttpMethod.Get, $"/transactions?accountId={southAccount}", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    private static async Task<Guid> PostTransferInAsync(string accessToken, Guid accountId)
+    {
+        var response = await TransactionHttp.Send(HttpMethod.Post, "/transactions", accessToken, new
+        {
+            accountId,
+            type = "TransferIn",
+            amount = 25.00m,
+            bookedAt = "2026-09-24T09:00:00+12:00"
+        }, Guid.NewGuid());
+        response.StatusCode.ShouldBe(HttpStatusCode.Created);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return json.RootElement.GetProperty("id").GetGuid();
     }
 
     [Test]

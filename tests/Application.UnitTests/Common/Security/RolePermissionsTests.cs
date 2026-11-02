@@ -66,7 +66,7 @@ public class RolePermissionsTests
     [TestCase(UserRole.Adviser, Policies.AccountsRead, true)]
     [TestCase(UserRole.Adviser, Policies.AccountsCreate, true)]
     [TestCase(UserRole.Adviser, Policies.AccountsManage, true)]
-    [TestCase(UserRole.Customer, Policies.AccountsRead, false)]
+    [TestCase(UserRole.Customer, Policies.AccountsRead, true)]
     [TestCase(UserRole.Customer, Policies.AccountsCreate, false)]
     [TestCase(UserRole.Customer, Policies.AccountsManage, false)]
     public void Has_MatchesAccountsMap(UserRole role, string policy, bool expected)
@@ -80,7 +80,7 @@ public class RolePermissionsTests
     [TestCase(UserRole.TenantAdmin, Policies.TransactionsCreate, true)]
     [TestCase(UserRole.Adviser, Policies.TransactionsRead, true)]
     [TestCase(UserRole.Adviser, Policies.TransactionsCreate, true)]
-    [TestCase(UserRole.Customer, Policies.TransactionsRead, false)]
+    [TestCase(UserRole.Customer, Policies.TransactionsRead, true)]
     [TestCase(UserRole.Customer, Policies.TransactionsCreate, false)]
     public void Has_MatchesTransactionsMap(UserRole role, string policy, bool expected)
     {
@@ -100,7 +100,7 @@ public class RolePermissionsTests
     [TestCase(UserRole.Adviser, Policies.ReportsBookRead, true)]
     [TestCase(UserRole.Adviser, Policies.ReportsBookCreate, true)]
     [TestCase(UserRole.Customer, Policies.ReportsCustomerRead, true)]
-    [TestCase(UserRole.Customer, Policies.ReportsCustomerCreate, false)]
+    [TestCase(UserRole.Customer, Policies.ReportsCustomerCreate, true)]
     [TestCase(UserRole.Customer, Policies.ReportsBookRead, false)]
     [TestCase(UserRole.Customer, Policies.ReportsBookCreate, false)]
     public void Has_MatchesReportsMap(UserRole role, string policy, bool expected)

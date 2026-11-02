@@ -6,12 +6,14 @@ public static class ClientCookieSchemes
 {
     public const string AdviserPortal = "adviser-portal";
     public const string BackOffice = "back-office";
+    public const string CustomerPortal = "customer-portal";
     public const string AdviserPortalCookie = ".AspNetCore.Identity.AdviserPortal";
     public const string BackOfficeCookie = ".AspNetCore.Identity.BackOffice";
+    public const string CustomerPortalCookie = ".AspNetCore.Identity.CustomerPortal";
 
     public static bool TryGet(string? clientId, out string scheme)
     {
-        if (clientId is AdviserPortal or BackOffice)
+        if (clientId is AdviserPortal or BackOffice or CustomerPortal)
         {
             scheme = clientId;
             return true;

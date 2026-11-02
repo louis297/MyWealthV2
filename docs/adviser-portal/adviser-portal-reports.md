@@ -29,7 +29,7 @@ Backend prerequisites (landed):
 - Shared pipeline + generators for Customer Transactions and Adviser Balances.
 - Hangfire worker (ADR 0017). PDF via QuestPDF. Shared volume for result files.
 - Policies: `reports.customer.read` / `reports.customer.create` and `reports.book.read` / `reports.book.create`. Customer has only the customer read policy. TenantAdmin and Adviser have all four. SystemAdmin has none of them.
-- TestSeed grants both seeded reports to the Development seed tenants `demo` and `demo2`.
+- TestSeed grants both seeded reports to the demo tenant.
 - Seeded PublicIds (stable):
   - Customer Transactions: `8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11` (code `customer-transactions`, scope `Customer`).
   - Adviser Balances: `5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22` (code `adviser-balances`, scope `Book`).

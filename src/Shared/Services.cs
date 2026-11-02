@@ -31,6 +31,17 @@ public static class Services
     public const string BffAdviserPortal = "bff-adviser-portal";
 
     /// <summary>
+    /// Aspire resource name and OIDC client id for the Customer Portal.
+    /// The client id stays here. The Aspire resource that holds it is <see cref="BffCustomerPortal"/>.
+    /// </summary>
+    public const string CustomerPortal = "customer-portal";
+
+    /// <summary>
+    /// Aspire resource name for the Customer Portal BFF (src/BffCustomerPortal).
+    /// </summary>
+    public const string BffCustomerPortal = "bff-customer-portal";
+
+    /// <summary>
     /// Aspire resource name and OIDC client id for the Back Office (src/BackOffice).
     /// </summary>
     public const string BackOffice = "back-office";

@@ -14,11 +14,13 @@ public class PerClientCookieTests : TestBase
 {
     private const string AdviserPortal = "adviser-portal";
     private const string BackOffice = "back-office";
+    private const string CustomerPortal = "customer-portal";
     private const string AdviserRedirect = "https://localhost/signin-oidc";
     private const string AdviserPostLogout = "https://localhost/";
     private const string BackOfficeRedirect = "https://localhost/back-office/signin-oidc";
     private const string AdviserPortalCookie = ".AspNetCore.Identity.AdviserPortal";
     private const string BackOfficeCookie = ".AspNetCore.Identity.BackOffice";
+    private const string CustomerPortalCookie = ".AspNetCore.Identity.CustomerPortal";
 
     [Test]
     public async Task SystemAdminOnBackOffice_DoesNotSilentlyAuthorizeAdviserPortal()
@@ -116,6 +118,86 @@ public class PerClientCookieTests : TestBase
         var backOffice = await browser.AuthorizeAsync(BackOffice);
         backOffice.Code.ShouldNotBeNullOrWhiteSpace();
         (await browser.EmailForAsync(BackOffice, backOffice)).ShouldBe(DevelopmentIdentitySeeder.SystemAdminEmail);
+    }
+
+    [Test]
+    public async Task Customer_OnCustomerPortal_ReceivesACode()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm Customer", "firm-customer");
+        var adviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Ann", "ann@firm-customer", "Password1!", tenant.Id);
+        await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Cee", "cee@firm-customer", "Password1!", tenant.Id, adviser.Id);
+
+        using var browser = new IdentityBrowser();
+        await browser.LoginAsync(CustomerPortal, "cee@firm-customer", "Password1!", "firm-customer");
+    }
+
+    [Test]
+    public async Task Staff_OnCustomerPortal_IssuesNoCode()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm Staff", "firm-staff");
+        await TestApp.CreatePersonAsync(
+            UserRole.TenantAdmin, "Tess", "tess@firm-staff", "Password1!", tenant.Id);
+
+        using var browser = new IdentityBrowser();
+        var started = await browser.AuthorizeAsync(CustomerPortal);
+        started.IsLogin.ShouldBeTrue();
+        var code = await browser.SubmitLoginAsync(
+            started.Location, CustomerPortal, "tess@firm-staff", "Password1!", "firm-staff");
+        code.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task CustomerOnCustomerPortal_DoesNotSilentlyAuthorizeAdviserPortal()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm Cross", "firm-cross");
+        var adviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Ann", "ann@firm-cross", "Password1!", tenant.Id);
+        await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Cee", "cee@firm-cross", "Password1!", tenant.Id, adviser.Id);
+
+        using var browser = new IdentityBrowser();
+        await browser.LoginAsync(CustomerPortal, "cee@firm-cross", "Password1!", "firm-cross");
+
+        var adviserPortal = await browser.AuthorizeAsync(AdviserPortal);
+        adviserPortal.IsLogin.ShouldBeTrue($"Adviser Portal authorize completed silently: {adviserPortal.Location}");
+        adviserPortal.Code.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task CustomerPortalLogout_ClearsOnlyThatIdentityCookie()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm Both", "firm-both");
+        var adviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Ann", "ann@firm-both", "Password1!", tenant.Id);
+        await TestApp.CreatePersonAsync(
+            UserRole.TenantAdmin, "Tess", "tess@firm-both", "Password1!", tenant.Id);
+        await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Cee", "cee@firm-both", "Password1!", tenant.Id, adviser.Id);
+
+        using var browser = new IdentityBrowser();
+        await browser.LoginAsync(AdviserPortal, "tess@firm-both", "Password1!", "firm-both");
+        await browser.LoginAsync(CustomerPortal, "cee@firm-both", "Password1!", "firm-both");
+
+        var logout = await browser.LogoutAsync(CustomerPortal, AdviserPostLogout);
+        logout.StatusCode.ShouldBe(HttpStatusCode.Redirect);
+        logout.Headers.Location.ShouldNotBeNull();
+        logout.Headers.Location.ToString().ShouldBe(AdviserPostLogout);
+
+        var setCookies = logout.Headers.TryGetValues("Set-Cookie", out var values)
+            ? string.Join('\n', values)
+            : "";
+        setCookies.ShouldContain(CustomerPortalCookie);
+        setCookies.ShouldNotContain(AdviserPortalCookie);
+
+        var customer = await browser.AuthorizeAsync(CustomerPortal);
+        customer.IsLogin.ShouldBeTrue();
+        customer.Code.ShouldBeNull();
+
+        var adviserPortal = await browser.AuthorizeAsync(AdviserPortal);
+        adviserPortal.Code.ShouldNotBeNullOrWhiteSpace();
+        (await browser.EmailForAsync(AdviserPortal, adviserPortal)).ShouldBe("tess@firm-both");
     }
 
     private sealed class IdentityBrowser : IDisposable
@@ -263,8 +345,12 @@ public class PerClientCookieTests : TestBase
         private static string RedirectFor(string clientId) =>
             clientId == BackOffice ? BackOfficeRedirect : AdviserRedirect;
 
-        private static string SecretFor(string clientId) =>
-            clientId == BackOffice ? BackOfficeTestSecret.Value : AdviserPortalTestSecret.Value;
+        private static string SecretFor(string clientId) => clientId switch
+        {
+            BackOffice => BackOfficeTestSecret.Value,
+            CustomerPortal => CustomerPortalTestSecret.Value,
+            _ => AdviserPortalTestSecret.Value
+        };
 
         private static string Antiforgery(string html)
         {

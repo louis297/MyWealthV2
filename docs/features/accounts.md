@@ -41,7 +41,7 @@ The container is per-Customer, not per-Adviser. Adviser visibility is the existi
 
 Close / reopen change `Status` (`Open` ↔ `Closed`). `IsActive` follows: Open = 1, Closed = 0. Never an `IsEnabled` column. Never write `IsActive` from HTTP. No physical delete. Disable Customer rejects while any account for that person is still active (guard added here; the customers spec reserved it).
 
-Confirmed 2026-09-21: (1) Adviser may read / open / rename / close / reopen accounts of assigned Customers; (2) HTTP verbs are close / reopen; (3) TestSeed creates demo Customer `customer@localhost` when the demo tenant exists, and the same book for `customer2@localhost` on `demo2`.
+Confirmed 2026-09-21: (1) Adviser may read / open / rename / close / reopen accounts of assigned Customers; (2) HTTP verbs are close / reopen; (3) TestSeed creates demo Customer `customer@localhost` when the demo tenant exists.
 
 ---
 
@@ -69,6 +69,8 @@ Confirmed 2026-09-21: (1) Adviser may read / open / rename / close / reopen acco
 - Close-and-liquidate (still open; this slice always allows close because there is no cash / holding yet)
 - Physical delete
 - Customer Portal or ledger-write for Customer
+
+**Amendment for Customer Portal (accepted 2026-11-02).** Supersedes the Customer 403 sentences for reads. Grant Customer `accounts.read`. List / get / cash-balance / holdings reads for the caller’s own accounts only. Other customer’s account id → 404. No `accounts.create` / `accounts.manage`. Story 7 and R18 stay for writes.
 - Adviser Portal Accounts page (portal cut later)
 - SystemAdmin ledger screens on `adviser-portal`
 - Empty Holding / Journal / CashLedger tables “for later”
@@ -346,9 +348,9 @@ SystemAdmin uses Scalar (and later Back Office), not this portal.
 
 Contribute to host `TestSeed` (Development and TestAppHost only). Not `0012_accounts.sql`. Not Production.
 
-If a Development seed tenant (`demo` or `demo2`) is missing, skip that firm (same no-op as instruments). TestAppHost skips both until a test creates the tenant.
+If the Development demo tenant (`DevelopmentIdentitySeeder.DemoTenantCode` = `demo`) is missing, return (same no-op as instruments). TestAppHost skips the demo tenant today.
 
-If that tenant exists and its Adviser (`adviser@localhost` on `demo`, `adviser2@localhost` on `demo2`) exists but the matching Customer (`customer@localhost` or `customer2@localhost`) does not, create that Customer (Active, assigned to that Adviser, password same pattern as the demo people, idempotent on email). Do not seed a Customer when that tenant or adviser is absent.
+If the demo tenant exists and the demo Adviser (`adviser@localhost`) exists but Customer `customer@localhost` does not, create that Customer (Active, assigned to the demo Adviser, password same pattern as the demo people, idempotent on email). Do not seed a Customer when the demo tenant is absent.
 
 Then ensure accounts idempotent on `(CustomerId, Name)`:
 
@@ -392,7 +394,7 @@ No new ADR. Expand [ADR 0011](../adr/0011-ledger-cash-holdings-reversal.md) for 
 | Policies | `accounts.read` / `accounts.create` / `accounts.manage`. SystemAdmin has all three. Adviser has all three (assigned scope) |
 | Disable Customer | Reject while any account is active |
 | Portal | No page in this slice. SystemAdmin uses Scalar |
-| TestSeed | Customers `customer@localhost` and `customer2@localhost` if missing; the four named accounts on `demo` and `demo2` |
+| TestSeed | Demo Customer `customer@localhost` if missing; four named accounts on the demo tenant |
 
 Still open, not this slice:
 

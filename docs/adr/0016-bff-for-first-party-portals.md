@@ -13,7 +13,7 @@ related:
   - 0014-openiddict-authorization-code-pkce.md
   - ../features/identity-auth.md
   - ../features/bff-adviser-portal.md
-  - ../portals/adviser-portal.md
+  - ../adviser-portal/adviser-portal.md
 ---
 
 # ADR 0016: BFF holds first-party portal OIDC and tokens
@@ -87,7 +87,7 @@ Locks this ADR **replaces** when accepted:
 - OpenIddict application row becomes confidential; secret and redirect URIs are upserted for the BFF https browser entry. A `*.dev.localhost` alias is included only when that host is a browser entry. Do not treat a launchSettings port such as `https://localhost:7190` as the product origin.
 - Functional tests that boot the portal session start the BFF. Identity-auth A1–A10 stay; do not re-prove allow-list here except “Customer still gets no session on this client”.
 - Production multi-instance BFF needs shared Data Protection keys. Development single instance does not lock that store.
-- Companion docs when this ADR is accepted: architecture host map, function-plan §0 session bullet, glossary OIDC-client rows, identity-auth amendment (client type + who redeems the code), [adviser-portal.md](../portals/adviser-portal.md) client table, [frontend-conventions.md](../portals/frontend-conventions.md).
+- Companion docs when this ADR is accepted: architecture host map, function-plan §0 session bullet, glossary OIDC-client rows, identity-auth amendment (client type + who redeems the code), [adviser-portal.md](../adviser-portal/adviser-portal.md) client table, [frontend-conventions.md](../adviser-portal/frontend-conventions.md).
 
 **Still not this decision**
 
@@ -100,6 +100,6 @@ Locks this ADR **replaces** when accepted:
 
 - Feature spec: [features/bff-adviser-portal.md](../features/bff-adviser-portal.md)
 - Related ADRs: 0014 (issuer and grant), 0003 (SPA stack), 0006 (password store; issuer still 0014)
-- Portal: [portals/adviser-portal.md](../portals/adviser-portal.md)
+- Portal: [adviser-portal/adviser-portal.md](../adviser-portal/adviser-portal.md)
 - Identity: [features/identity-auth.md](../features/identity-auth.md)
 ---

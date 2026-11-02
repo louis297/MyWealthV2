@@ -60,6 +60,33 @@ public class RequestCustomerTransactionsTests : TestBase
         (await PostAsync(adviserTokens.AccessToken, customer.PublicId)).StatusCode.ShouldBe(HttpStatusCode.Accepted);
     }
 
+    [Test]
+    public async Task Customer_RequestsOwnReport_OtherCustomerIs404_BookStays403()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm Self", "firm-self");
+        var adviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Ann", "ann@firm-self", "Password1!", tenant.Id);
+        var customer = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Cee", "cee@firm-self", "Password1!", tenant.Id, adviser.Id);
+        var other = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Dee", "dee@firm-self", "Password1!", tenant.Id, adviser.Id);
+        await GrantAsync(tenant.PublicId);
+        await GrantAsync(tenant.PublicId, AdviserBalancesId);
+
+        var tokens = await TestApp.IssueAccessTokenAsync(customer);
+        var created = await PostAsync(tokens.AccessToken, customer.PublicId);
+        created.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+
+        (await PostAsync(tokens.AccessToken, other.PublicId)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await TenantHttp.Send(HttpMethod.Post, "/reports/request", tokens.AccessToken, new
+        {
+            reportId = AdviserBalancesId,
+            parameters = new { adviserId = adviser.PublicId }
+        })).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    private static readonly Guid AdviserBalancesId = Guid.Parse("5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22");
+
     private static object Body(Guid customerId) => new
     {
         reportId = CustomerTransactionsId,
@@ -69,14 +96,16 @@ public class RequestCustomerTransactionsTests : TestBase
     private static Task<HttpResponseMessage> PostAsync(string accessToken, Guid customerId) =>
         TenantHttp.Send(HttpMethod.Post, "/reports/request", accessToken, Body(customerId));
 
-    private static async Task GrantAsync(Guid tenantId)
+    private static Task GrantAsync(Guid tenantId) => GrantAsync(tenantId, CustomerTransactionsId);
+
+    private static async Task GrantAsync(Guid tenantId, Guid reportId)
     {
         var system = await TenantHttp.SignInSystemAdmin();
         var response = await TenantHttp.Send(
             HttpMethod.Post,
             $"/tenants/{tenantId}/reports",
             system.AccessToken,
-            new { reportId = CustomerTransactionsId });
+            new { reportId });
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
     }
 

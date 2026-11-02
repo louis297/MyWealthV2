@@ -10,24 +10,34 @@ namespace MyWealthV2.Application.FunctionalTests.Reports;
 public class RequestReportValidationTests : TestBase
 {
     private static readonly Guid CustomerTransactionsId = Guid.Parse("8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11");
+    private static readonly Guid AdviserBalancesId = Guid.Parse("5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22");
 
     [Test]
-    public async Task CustomerAndSystemAdmin_Return403()
+    public async Task Customer_BookIs403_OtherCustomerIs404_OwnIs202_SystemAdminIs403()
     {
         var tenant = await TestApp.CreateTenantAsync("Firm Request", "firm-request");
         var adviser = await TestApp.CreatePersonAsync(
             UserRole.Adviser, "Ann", "ann@firm-request", "Password1!", tenant.Id);
         var customer = await TestApp.CreatePersonAsync(
             UserRole.Customer, "Cee", "cee@firm-request", "Password1!", tenant.Id, adviser.Id);
-        await GrantAsync(tenant.PublicId);
-        var body = ValidBody(customer.PublicId);
+        var other = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Dee", "dee@firm-request", "Password1!", tenant.Id, adviser.Id);
+        await GrantAsync(tenant.PublicId, CustomerTransactionsId);
+        await GrantAsync(tenant.PublicId, AdviserBalancesId);
 
         var customerTokens = await TestApp.IssueAccessTokenAsync(customer);
         var system = await TenantHttp.SignInSystemAdmin();
 
-        (await TenantHttp.Send(HttpMethod.Post, "/reports/request", customerTokens.AccessToken, body))
-            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
-        (await TenantHttp.Send(HttpMethod.Post, "/reports/request", system.AccessToken, body))
+        (await PostAsync(customerTokens.AccessToken, ValidBody(customer.PublicId)))
+            .StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        (await PostAsync(customerTokens.AccessToken, ValidBody(other.PublicId)))
+            .StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await PostAsync(customerTokens.AccessToken, new
+        {
+            reportId = AdviserBalancesId,
+            parameters = new { adviserId = adviser.PublicId }
+        })).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        (await PostAsync(system.AccessToken, ValidBody(customer.PublicId)))
             .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
@@ -41,7 +51,7 @@ public class RequestReportValidationTests : TestBase
             UserRole.Adviser, "Ann", "ann@firm-bad", "Password1!", tenant.Id);
         var target = await TestApp.CreatePersonAsync(
             UserRole.Customer, "Cee", "cee@firm-bad", "Password1!", tenant.Id, customer.Id);
-        await GrantAsync(tenant.PublicId);
+        await GrantAsync(tenant.PublicId, CustomerTransactionsId);
         var tokens = await FunctionalTestSetup.Oidc.SignInAsync("tess@firm-bad", "Password1!", "firm-bad");
 
         var missingFrom = await PostAsync(tokens.AccessToken, new
@@ -106,7 +116,7 @@ public class RequestReportValidationTests : TestBase
         missing.StatusCode.ShouldBe(HttpStatusCode.NotFound);
         (await missing.Content.ReadAsStringAsync()).ShouldContain(CustomerTransactionsId.ToString());
 
-        await GrantAsync(tenant.PublicId);
+        await GrantAsync(tenant.PublicId, CustomerTransactionsId);
         await SetCatalogAsync(CustomerTransactionsId, active: false, triggers: """["manual","scheduled"]""");
         var inactive = await PostAsync(tokens.AccessToken, body);
         inactive.StatusCode.ShouldBe(HttpStatusCode.NotFound);
@@ -130,14 +140,14 @@ public class RequestReportValidationTests : TestBase
     private static Task<HttpResponseMessage> PostAsync(string accessToken, object body) =>
         TenantHttp.Send(HttpMethod.Post, "/reports/request", accessToken, body);
 
-    private static async Task GrantAsync(Guid tenantId)
+    private static async Task GrantAsync(Guid tenantId, Guid reportId)
     {
         var system = await TenantHttp.SignInSystemAdmin();
         var response = await TenantHttp.Send(
             HttpMethod.Post,
             $"/tenants/{tenantId}/reports",
             system.AccessToken,
-            new { reportId = CustomerTransactionsId });
+            new { reportId });
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
     }
 

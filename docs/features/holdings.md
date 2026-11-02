@@ -68,6 +68,8 @@ Cash position stays the `SUM` of cash legs. An `OpeningHoldings` header has no c
 - Lots, wash sales, realized-gain reports, fees
 - Short positions
 - Customer ledger-write
+
+**Amendment for Customer Portal (accepted 2026-11-02).** Holdings read reuses `accounts.read`. With Customer `accounts.read` and self-scope, `GET /accounts/{id}/holdings` succeeds for the caller’s own accounts and returns 404 for another customer’s account. No write.
 - A second POST collection
 - `UPDATE` / `DELETE` of a posted transaction
 - Hand-edited holding quantity or cost
@@ -215,7 +217,7 @@ Ordinary validation stays in `errors`: Bank/Cash, disabled instrument, second Op
 
 ## 9. UI
 
-None. Pages live in [docs/portals/](../portals/). Scalar is enough.
+None. Pages live in [docs/adviser-portal/](../adviser-portal/). Scalar is enough.
 
 ---
 
@@ -227,7 +229,7 @@ None. Pages live in [docs/portals/](../portals/). Scalar is enough.
 | Application.FunctionalTests | 401; Customer 403; OpeningHoldings happy path; second instrument allowed; same instrument 400; disabled instrument 400; Bank 400; cash field 400; reverse; close rejected while quantity remains; holdings read includes `id` |
 | Infrastructure.IntegrationTests | Other tenant 404; Adviser unassigned 404; no quantity column on `Accounts`; no free-text symbol; `PublicId` on `Holdings` |
 
-TestSeed (Development / TestAppHost only): one `OpeningHoldings` on Demo brokerage for an existing TestSeed instrument, on each Development seed tenant (`demo` and `demo2`). Not a Buy. Functional tests create their own rows.
+TestSeed (Development / TestAppHost only): one `OpeningHoldings` on Demo brokerage for an existing TestSeed instrument. Not a Buy. Functional tests create their own rows.
 
 ---
 

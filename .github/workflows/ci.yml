@@ -44,6 +44,7 @@ jobs:
         env:
           Parameters__adviser_portal_client_secret: ${{ secrets.ADVISER_PORTAL_CLIENT_SECRET }}
           Parameters__back_office_client_secret: ${{ secrets.BACK_OFFICE_CLIENT_SECRET }}
+          Parameters__customer_portal_client_secret: ${{ secrets.CUSTOMER_PORTAL_CLIENT_SECRET }}
 
       - name: Upload test results
         if: always()
@@ -53,8 +54,8 @@ jobs:
           path: '**/test-results.trx'
           retention-days: 7
 
-  frontend:
-    name: Frontend Build
+  adviser-portal:
+    name: Adviser portal Build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # needs: build-and-test
@@ -71,6 +72,28 @@ jobs:
 
       - name: Install and build
         working-directory: src/AdviserPortal
+        run: |
+          npm ci
+          npm run build
+          
+  customer-portal:
+    name: Customer portal Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # needs: build-and-test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: src/CustomerPortal/package-lock.json
+
+      - name: Install and build
+        working-directory: src/CustomerPortal
         run: |
           npm ci
           npm run build

@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Domain.Enums;
 using OpenIddict.Abstractions;
+using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace MyWealthV2.Application.FunctionalTests.Identity;
 
@@ -50,14 +51,22 @@ public class ClientAllowListTests : TestBase
     }
 
     [Test]
-    public async Task RegisteredClients_IncludeAdviserPortalAndBackOffice_NotCustomerPortal()
+    public async Task RegisteredClients_IncludeAdviserPortalBackOfficeAndCustomerPortal()
     {
         using var scope = FunctionalTestSetup.Identity.Services.CreateScope();
         var manager = scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
 
         (await manager.FindByClientIdAsync("adviser-portal")).ShouldNotBeNull();
         (await manager.FindByClientIdAsync(Services.BackOffice)).ShouldNotBeNull();
-        (await manager.FindByClientIdAsync("customer-portal")).ShouldBeNull();
+
+        var customer = await manager.FindByClientIdAsync("customer-portal");
+        customer.ShouldNotBeNull();
+        (await manager.ValidateClientSecretAsync(customer, CustomerPortalTestSecret.Value)).ShouldBeTrue();
+        var descriptor = new OpenIddictApplicationDescriptor();
+        await manager.PopulateAsync(descriptor, customer);
+        descriptor.ClientType.ShouldBe(ClientTypes.Confidential);
+        descriptor.RedirectUris.Select(uri => uri.AbsoluteUri).ShouldBe(["https://localhost/signin-oidc"]);
+        descriptor.PostLogoutRedirectUris.Select(uri => uri.AbsoluteUri).ShouldBe(["https://localhost/"]);
     }
 
     private static string FailureCopy(string html)

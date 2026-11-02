@@ -17,6 +17,11 @@ public class GetCustomerNetWorthQueryHandler(
 {
     public async Task<NetWorthDto> Handle(GetCustomerNetWorthQuery request, CancellationToken cancellationToken)
     {
+        if (currentUser.Role == UserRole.Customer && request.Id != currentUser.PublicId)
+        {
+            throw new NotFoundException("Customer", request.Id);
+        }
+
         var assignedAdviserId = AccountScope.AssignedAdviserInternalId(currentUser);
         var customers = db.Users.AsNoTracking()
             .Where(user => user.PublicId == request.Id && user.Role == UserRole.Customer);
