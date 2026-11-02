@@ -37,24 +37,55 @@ public class AccountPortfolioAssignment : BaseAuditableEntity
         DateTimeOffset assignedAt,
         Guid? publicId = null)
     {
-        _ = current;
-        _ = tenantId;
-        _ = accountId;
-        _ = portfolioId;
-        _ = assignedBy;
-        _ = assignedAt;
-        _ = publicId;
-        return new AccountPortfolioAssignment { Status = AssignmentStatus.Removed };
+        if (string.IsNullOrWhiteSpace(assignedBy))
+        {
+            throw new DomainException("AssignedBy is required.");
+        }
+
+        if (current is not null && current.AccountId != accountId)
+        {
+            throw new DomainException("Assignment is for a different account.");
+        }
+
+        if (current is { Status: AssignmentStatus.Active } && current.PortfolioId == portfolioId)
+        {
+            throw new DomainException("Account already has this portfolio assigned.");
+        }
+
+        if (current is { Status: AssignmentStatus.Active })
+        {
+            current.Remove();
+        }
+
+        var assignment = new AccountPortfolioAssignment
+        {
+            PublicId = publicId ?? Guid.NewGuid(),
+            TenantId = tenantId,
+            AccountId = accountId,
+            PortfolioId = portfolioId,
+            Status = AssignmentStatus.Active,
+            AssignedAt = assignedAt,
+            AssignedBy = assignedBy.Trim()
+        };
+        assignment.AddDomainEvent(new PortfolioAssigned(assignment));
+        return assignment;
     }
 
     public void Remove()
     {
+        if (Status == AssignmentStatus.Removed)
+        {
+            return;
+        }
+
+        Status = AssignmentStatus.Removed;
+        AddDomainEvent(new PortfolioUnassigned(this));
     }
 
     public void RecordRebalance(RebalanceStatus status, string? message, DateTimeOffset at)
     {
-        _ = status;
-        _ = message;
-        _ = at;
+        LastRebalanceStatus = status;
+        LastRebalanceMessage = string.IsNullOrWhiteSpace(message) ? null : message.Trim();
+        LastRebalanceAt = at;
     }
 }
