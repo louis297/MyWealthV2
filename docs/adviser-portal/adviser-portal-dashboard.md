@@ -51,7 +51,7 @@ Session remains the BFF cookie. All API calls go through `/api`. Do not re-intro
 - Activity / transactions list (filter by account or customer; reuse existing posting reads).
 - Instrument picker on write forms (calls existing `GET /instruments?enabledOnly=true`, optionally with the existing `search` query). Simple select or basic list. No typeahead, no min-character trigger, no dedicated search endpoint.
 - Write forms on an Open Brokerage / Other account:
-  - Buy / Sell (server price via mocked `IMarketData`; cash + security legs).
+  - Buy / Sell (server price via `IMarketData`; cash + security legs).
   - StockIn / StockOut (client quantity + cost; no cash).
   - Split / Bonus / Scrip (new total quantity; security-only; total cost unchanged).
   - Cash types already accepted (Opening, TransferIn/Out, Interest, CloseOut, etc.) where the account type allows.
@@ -112,7 +112,7 @@ Unchanged from the BFF cut. Probe is still `GET /api/users/me`. 401 does not ref
 | D7 | `/transactions` shows activity; filters by account or customer work with existing endpoints. |
 | D8 | No React password page. All calls go through the BFF `/api` prefix. Customer still receives no session. |
 | D9 | Missing / dead session → authorize flow. Wrong-role leftover → `/forbidden`. |
-| D10 | Adviser posts a Buy on an Open Brokerage account. Server prices the security leg; cash and quantity update. Missing mock price → form shows the 400. |
+| D10 | Adviser posts a Buy on an Open Brokerage account. Server prices the security leg; cash and quantity update. Missing price → form shows the 400. |
 | D11 | Adviser posts a Sell that would take quantity or cash negative → 400; original stays. Successful Sell reduces quantity at average cost and increases cash. |
 | D12 | Adviser posts StockIn / StockOut (no cash) and Split / Bonus / Scrip (new total quantity, cost unchanged). Wrong body fields → 400. |
 | D13 | Adviser reverses a posted Buy / Sell / Split. Original remains; new reverse transaction appears. The Reverse button is hidden when `reversedByTransactionId` is not null or `type` is `Reversal`. Already reversed → 400. Idempotency-Key required; replay returns the same id. |

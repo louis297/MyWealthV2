@@ -508,3 +508,4 @@ Hourly Hangfire job (UTC) fetches EOD prices from Twelve Data for instruments th
 | 2026-11-02 | FX rates accepted. Script name `0021_fx_rates.sql`. Table `FxRates`. ADR 0019. |
 | 2026-11-02 | `0021_fx_rates.sql` landed. No seed rows in the script. |
 | 2026-11-02 | Instrument prices accepted. Script name `0022_instrument_prices.sql`. Table `InstrumentPrices`. Source Twelve Data. |
+| 2026-11-02 | `0022_instrument_prices.sql` landed. No seed rows in the script. TestSeed writes the fake prices. |

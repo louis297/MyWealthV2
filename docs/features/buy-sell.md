@@ -25,7 +25,7 @@ related:
 
 # Buy / Sell / Stock in-out
 
-Cash + security legs on the existing Transaction aggregate. Public write stays `POST /transactions`. No new table (tables from `0014_holdings.sql`). `0016_transaction_type_stock_in_out.sql` widens the type check so StockIn and StockOut can be stored. Server prices Buy / Sell via the existing mocked `IMarketData` / `IFxRate`. Stock in/out has no cash leg. Amends the type tables in [posting.md](posting.md) and [holdings.md](holdings.md), and the transaction item shape.
+Cash + security legs on the existing Transaction aggregate. Public write stays `POST /transactions`. No new table (tables from `0014_holdings.sql`). `0016_transaction_type_stock_in_out.sql` widens the type check so StockIn and StockOut can be stored. Server prices Buy / Sell via `IMarketData` (`InstrumentPrices`) and `IFxRate` (`FxRates`). Stock in/out has no cash leg. Amends the type tables in [posting.md](posting.md) and [holdings.md](holdings.md), and the transaction item shape.
 
 Split / Bonus / Scrip are accepted in [split.md](split.md). No portal page. No price on the holdings read.
 
@@ -46,7 +46,7 @@ The header is the existing Transaction. Each of these types has exactly one secu
 **In**
 
 - Domain: types `Buy`, `Sell`, `StockIn`, `StockOut` on the existing `Transaction` aggregate. Exactly one security leg. `Buy` / `Sell` also have exactly one cash leg. Average-cost update on the existing `Holding` projection.
-- Application: extend `CreateTransaction` / `ReverseTransaction` for the four types. Reuse mocked `IMarketData.TryGetPrice` and `IFxRate` for `Buy` / `Sell` only.
+- Application: extend `CreateTransaction` / `ReverseTransaction` for the four types. Reuse `IMarketData.TryGetPrice` and `IFxRate` for `Buy` / `Sell` only.
 - No new table or column. Tables and columns from [holdings.md](holdings.md) (`0014_holdings.sql`). Script `0016_transaction_type_stock_in_out.sql` only widens `CK_Transactions_Type` to 0–11.
 - No new policy. Writes reuse `transactions.create`. Holdings read stays `accounts.read`.
 - Isolation tests + Development / TestAppHost `TestSeed` (one `Buy` and one `StockIn` on an existing demo brokerage).
@@ -58,7 +58,7 @@ The header is the existing Transaction. Each of these types has exactly one secu
 - Dividend (ordinary cash type; no instrument).
 - Adviser Portal pages.
 - Price or market value on `GET /accounts/{id}/holdings`. Net worth, snapshots, Dashboard.
-- Live vendor market data / live FX (ports stay mocked).
+- Live vendor calls on the request path. `IMarketData` and `IFxRate` read local tables.
 - Fees, lots, wash sales, realized-gain reports, short positions.
 - Multi-instrument Buy/Sell (one security leg per header this increment).
 - Cross-account transfer.
@@ -74,7 +74,7 @@ The header is the existing Transaction. Each of these types has exactly one secu
 1. As an Adviser I record a `Buy` of an instrument on a Brokerage account so quantity and cash both move without typing a price.
 2. As an Adviser I record a `Sell` and the cash increases while the holding quantity falls at average cost.
 3. As an Adviser I cannot Buy or Sell on Bank or Cash (400).
-4. As an Adviser I cannot pick a disabled instrument (400). Missing mock price → 400. Missing FX pair → 400.
+4. As an Adviser I cannot pick a disabled instrument (400). Missing price → 400. Missing FX pair → 400.
 5. As an Adviser I cannot Sell more than the current holding quantity (400). After the command, cash `SUM ≥ 0` and holding quantity `≥ 0`.
 6. As an Adviser I reverse a Buy or Sell. The original row stays. The reverse restores cash and quantity.
 7. As an Adviser I record a `StockIn` (quantity + cost, no cash) so shares arrive from outside without a buy.
@@ -96,7 +96,7 @@ The header is the existing Transaction. Each of these types has exactly one secu
 | R7 | Instrument must exist, same tenant, and `IsActive`. Disabled or missing → 400. |
 | R8 | Type on create in this increment: `Buy`, `Sell`, `StockIn`, `StockOut` (plus the already-accepted cash set and `OpeningHoldings`). `Split` / `Bonus` / `Scrip` are accepted in [split.md](split.md). Unknown → 400. |
 | R9 | Body `security` is an array of exactly one leg. `Buy` / `Sell` leg fields: `instrumentId`, `quantity` `> 0`. No `cost`, no `price`, no `amount`, no `cash` on that create body → 400 if present. `StockIn` also requires `cost` `≥ 0` (client-supplied, quote currency). `StockOut` is `instrumentId` + `quantity` `> 0` only. |
-| R10 | `Buy` / `Sell` only: server calls `IMarketData.TryGetPrice(instrumentId, bookedAt)`. Missing or empty price → 400. Price is not stored on the leg. Ports stay mocked. |
+| R10 | `Buy` / `Sell` only: server calls `IMarketData.TryGetPrice(instrumentId, bookedAt)`. Missing or empty price → 400. Price is not stored on the leg. The port reads `InstrumentPrices`. |
 | R11 | `Buy` / `Sell` cost on the security leg is `quantity × price` in the instrument quote currency. Body must not send a currency. `StockIn` cost is the client amount, same quote currency. |
 | R12 | `Buy` / `Sell` cash-leg currency is `Account.Currency`. If the quote currency differs, server calls `IFxRate`. Missing pair → 400, never treat as 1. Same-currency FX is 1. Cash amount is server-computed: `Buy` decreases cash (`amount < 0`); `Sell` increases cash (`amount > 0`). `StockIn` / `StockOut` have no cash leg; a cash / amount field on those bodies → 400. |
 | R13 | Security-leg quantity is stored signed: `Buy` / `StockIn` `+quantity`; `Sell` / `StockOut` `−quantity`. After insert, quantity `SUM` per `(Account, Instrument)` `≥ 0`. Cash `SUM ≥ 0` on non-Credit accounts. |
@@ -250,7 +250,7 @@ None. Pages live in [docs/adviser-portal/](../adviser-portal/). Scalar is enough
 | Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403; happy Buy then Sell; StockIn then StockOut; missing price → 400; missing FX → 400; Sell/StockOut over quantity → 400; Buy that would make cash negative → 400; reverse restores; reverse that would go negative → 400; idempotent replay; hash mismatch 409; disabled instrument → 400 |
 | Infrastructure.IntegrationTests | Two-tenant fixture: other tenant’s account or instrument → 404. TestSeed idempotent. Mock price used; same-currency FX = 1; missing cross pair is not 1. |
 
-TestSeed (Development / TestAppHost only): one `Buy` and one `StockIn` on the existing demo brokerage for an existing TestSeed instrument that has a mock price. Not an Opening. Functional tests create their own rows.
+TestSeed (Development / TestAppHost only): one `Buy` and one `StockIn` on the existing demo brokerage for an existing TestSeed instrument that has a seeded price. Not an Opening. Functional tests create their own rows.
 
 ---
 
@@ -283,7 +283,7 @@ Open questions: none that block review.
 - **Split / Bonus / Scrip.** Accepted in [split.md](split.md). Not this slice. Same tables, same `POST /transactions`, security-only, **total cost unchanged**. Client sends the new total quantity, not a ratio. Do not model them as `StockIn` / `StockOut`.
 - Price or market value on `GET /accounts/{id}/holdings`. Net worth. Dashboard. Daily snapshots.
 - Fees, lots, wash sales, realized-gain reports, short positions.
-- Live vendor market data / live FX (ports stay mocked).
+- Live vendor calls on the request path. `IMarketData` and `IFxRate` read local tables.
 - Multi-instrument Buy/Sell.
 - Cross-account transfer. Property / Credit. Customer ledger-write.
 - Client price override on Buy/Sell.

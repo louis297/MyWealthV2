@@ -220,9 +220,16 @@ Demo catalog is expanded so each platform seed currency has several instruments.
 
 Obvious test values, not real market prices. Additional historical dates may be added in TestSeed for as-of tests. The rows above are the minimum deterministic set.
 
+Locked with the implementation:
+
+- Endpoint: `GET https://api.twelvedata.com/eod?symbol={symbol}&dp=8&apikey={key}`. One credit per symbol. The job waits 8 seconds between symbols so a run stays within 8 credits per minute.
+- `datetime` (the date) is `AsOfDate`. `close` is `Price`.
+- Known non-US seed symbols use `SYMBOL:EXCHANGE`: `AIA:NZX`, `FPH:NZX`, `MEL:NZX`, `BHP:ASX`, `CBA:ASX`, `WOW:ASX`, `SAP:XETR`, `AIR:EPA`, `OR:EPA`, `SHEL:LSE`, `HSBA:LSE`, `ULVR:LSE`, `7203:TSE`, `6758:TSE`, `9984:TSE`. `VTI`, `AAPL`, and `MSFT` are sent unchanged. Any other symbol is sent as stored.
+- A per-symbol rejection (unknown symbol, or a source currency that is not the instrument quote currency) is logged and skipped. Other symbols in that run are still written. A transport failure (network, 401, 429, 5xx) logs and does not upsert.
+- API key: Aspire parameter `twelve-data-api-key`, passed only to the worker as `TwelveData__ApiKey`. Not in git.
+
 Still open, not this slice:
 
-- Exact Twelve Data endpoint and symbol mapping (exchange suffix for non-US). Confirm before accept.
 - Net-worth FX fold (still later).
 - Exact shape of the future HTTP read surface. Deferred until a consumer needs it.
 - Real-time prices.
@@ -243,3 +250,5 @@ Still open, not this slice:
 ## Change summary
 
 2026-11-02 — Accepted. Local EOD price cache for active instruments, same pattern as FX rates. `IMarketData` reads the table. Source is Twelve Data free Basic. Job is hourly with skip-if-today-stored. Demo catalog expanded to several instruments per seed currency.
+
+2026-11-02 — Landed. Script `0022_instrument_prices.sql`. Twelve Data `GET /eod`, hourly Hangfire job `instrument-price-sync`, `IMarketData` reads `InstrumentPrices`. TestSeed writes the fake catalog prices.

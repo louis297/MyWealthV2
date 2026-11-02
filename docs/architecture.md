@@ -235,7 +235,7 @@ identity-auth scripts: SchemaVersions, Identity user tables, OpenIddict tables, 
 | Authorization | Named policies + code Role → permission; scope in the handler | `webapi` endpoints + Application (ADR 0013) |
 | Tenancy | Shared database + row `TenantId` + **database FK** + application dual check + EF global query filter (safety net) + isolation tests | Everywhere. No SQL RLS, database-per-tenant, schema-per-tenant, or subdomain in Phase 1. See [fixes/tenant-query-filter.md](fixes/tenant-query-filter.md) |
 | Currency | `Currencies` catalog + in-memory `ICurrencyCatalog` | Domain rules + Infrastructure |
-| Instruments / market / FX | Phase 2 instruments slice. Tenant table + mocked ports | [features/instruments.md](features/instruments.md) |
+| Instruments / market / FX | Tenant instrument catalog. `IMarketData` reads `InstrumentPrices`. `IFxRate` reads `FxRates` | [features/instruments.md](features/instruments.md), [features/instrument-prices.md](features/instrument-prices.md), [features/fx-rates.md](features/fx-rates.md) |
 | Keys | Internal `int` identity; HTTP uses `PublicId` UUID | Domain / database / API |
 | Money | `Money` value object in Domain; no balance column in Phase 1 | Domain |
 | Validation | FluentValidation + database constraints + entity invariants | Use case + SQL + Domain |

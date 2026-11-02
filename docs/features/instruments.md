@@ -22,7 +22,7 @@ related:
 
 # Instruments
 
-Tenant instrument catalog on `webapi`: list / get / create / rename / disable / enable. First Phase-2 ledger slice. Adds script `0010_instruments.sql`, policies `instruments.read` / `instruments.create` / `instruments.manage`, aggregate `Instrument`, and mocked ports `IMarketData` / `IFxRate`.
+Tenant instrument catalog on `webapi`: list / get / create / rename / disable / enable. First Phase-2 ledger slice. Adds script `0010_instruments.sql`, policies `instruments.read` / `instruments.create` / `instruments.manage`, aggregate `Instrument`, and ports `IMarketData` / `IFxRate`.
 
 Holdings, accounts, and posting are out. This slice does not persist a price. Later slices store `InstrumentId` only.
 
@@ -50,7 +50,7 @@ The catalog is firm-wide, not per-Adviser. Customer receives 403. TenantAdmin / 
 - Domain: `Instrument` aggregate
 - Script `0010_instruments.sql` + EF mapping
 - Policies `instruments.read`, `instruments.create`, `instruments.manage` (register on ADR 0013 Phase-2 list)
-- Ports `IMarketData` and `IFxRate` in Application. Infrastructure mock in this slice; real implementations: [instrument-prices.md](instrument-prices.md) (accepted) and [fx-rates.md](fx-rates.md) (accepted).
+- Ports `IMarketData` and `IFxRate` in Application. `IMarketData` reads `InstrumentPrices` ([instrument-prices.md](instrument-prices.md)). `IFxRate` reads `FxRates` ([fx-rates.md](fx-rates.md)).
 - `webapi` `/instruments` (root, not under `/users`)
 - List envelope + `enabledOnly` + isolation tests
 - `TestSeed` rows for Development / TestAppHost (not the schema script)
@@ -110,7 +110,7 @@ The catalog is firm-wide, not per-Adviser. Customer receives 403. TenantAdmin / 
 | R16 | This slice does **not** block disable because holdings exist (no holdings table). The holdings slice adds: new holding of a disabled instrument → 400; existing holdings unchanged. |
 | R17 | List is one tenant. TenantAdmin / Adviser: current tenant. SystemAdmin: `tenantId` query. Every item includes `isActive` and `tenantId`. `enabledOnly` omitted/`false` = all; `true` = `IsActive` only; any other value 400. `page` default 1, `pageSize` default 20 max 100. Optional `search`: Symbol / Name contains (CI) or PublicId exact. Sort symbol then name. |
 | R18 | Customer has no instrument policy → 403 on every verb. SystemAdmin has `instruments.read`, `instruments.create`, and `instruments.manage`. Adviser Portal does not add SystemAdmin ledger nav. |
-| R19 | Same-currency FX is 1. Cross-currency is never treated as 1. Ports are mocked. No live call. |
+| R19 | Same-currency FX is 1. Cross-currency is never treated as 1. Ports read local tables. No live call. |
 | R20 | Catalog HTTP does not return a price. Callers that need a price use `IMarketData` on the server in a later slice. |
 
 Policies (register now; map in `RolePermissions`):
@@ -129,8 +129,8 @@ Policies (register now; map in `RolePermissions`):
 | --- | --- | --- |
 | `Instrument` | Aggregate | Tenant catalog row. Not a holding. |
 | `InstrumentCreated` / `InstrumentDisabled` / `InstrumentEnabled` | Event | Raise even with no subscriber yet. Rename raises nothing in this slice. |
-| `IMarketData` | Port | Application. Mock in Infrastructure. |
-| `IFxRate` | Port | Application. Mock in Infrastructure. |
+| `IMarketData` | Port | Application. Reads `InstrumentPrices`. |
+| `IFxRate` | Port | Application. Reads `FxRates`. |
 
 Invariants:
 
@@ -317,7 +317,7 @@ None in this slice.
 
 Adviser Portal has no Instruments page. The catalog is consumed only as a picker on Buy / Sell / StockIn / StockOut / Split forms (`GET /instruments?enabledOnly=true`). Create / rename / disable stay on Scalar (and later Back Office). Do not add an Instruments nav item.
 
-Development mock prices are not a UI. SystemAdmin uses Scalar (and later Back Office), not this portal.
+Development seed prices are not a UI. SystemAdmin uses Scalar (and later Back Office), not this portal.
 
 ### 9.1 Test seed
 
@@ -360,7 +360,7 @@ Locked:
 | Scope | Tenant catalog, not platform, not free text on holdings |
 | Callers | Adviser may create + read. Update / disable / enable TenantAdmin **or SystemAdmin**. Customer 403 |
 | `QuoteCurrency` | Immutable after create. Cost currency = quote currency |
-| Ports | Introduced here, mocked. Same-currency FX = 1. Cross-currency never silently 1 |
+| Ports | Introduced here. `IMarketData` reads `InstrumentPrices`. `IFxRate` reads `FxRates`. Same-currency FX = 1. Cross-currency never silently 1 |
 | HTTP namespace | `/instruments` at the root |
 | Lifecycle | Disable / enable + `rowVersion`. No physical delete |
 | Script | `0010_instruments.sql` |
@@ -369,7 +369,7 @@ Locked:
 | Columns | No ISIN / Exchange / Kind / price |
 | Port methods | `IMarketData.TryGetPrice`, `IFxRate.GetRate` |
 | Portal | No page in this slice. SystemAdmin uses Scalar |
-| TestSeed | VTI, AIA, NZD-CASH on the Development demo tenant; mock prices for the first two |
+| TestSeed | VTI, AIA, NZD-CASH on the Development demo tenant. Later expanded, with table prices, by [instrument-prices.md](instrument-prices.md) |
 
 Still open, not this slice:
 

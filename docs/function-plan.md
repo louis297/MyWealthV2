@@ -161,7 +161,7 @@ Session edge is [features/bff-adviser-portal.md](features/bff-adviser-portal.md)
 
 ### 5.1 In scope (agreed 2026-09-17)
 
-- Tenant instrument catalog + mocked `IMarketData` / `IFxRate` (accepted, landed `9ea2f2a`).
+- Tenant instrument catalog (accepted, landed `9ea2f2a`). `IMarketData` reads `InstrumentPrices`. `IFxRate` reads `FxRates`.
 - Account container under a Customer.
 - **Phase 2 may open:** Bank, Cash, Brokerage, Other.
 - **Reserved names, not selectable in Phase 2:** Property, Credit (personal loans, cards, real property). Keep the names and the capability matrix so a later phase can add them without reshaping Account.
