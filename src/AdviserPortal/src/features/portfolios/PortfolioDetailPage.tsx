@@ -1,14 +1,16 @@
 import { type FormEvent, useState } from "react";
-import { useParams } from "react-router";
-import { ConflictNotice, DetailGrid, DetailItem, Messages, Muted, Page, PageHeading, SelectField, TextField } from "@/components/portal";
+import { Link, useParams } from "react-router";
+import { ConflictNotice, DetailGrid, DetailItem, Messages, Muted, Page, PageHeading, recordLinkClass, Section, SelectField, TextField } from "@/components/portal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { SelectItem } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useGetInstrumentsQuery } from "@/features/instruments/instrumentsApi";
 import {
   useDisablePortfolioMutation,
   useGetAssignedAccountsQuery,
   useGetPortfolioQuery,
+  useRebalancePortfolioMutation,
   useUpdatePortfolioMutation,
   type PortfolioLine,
 } from "@/features/portfolios/portfoliosApi";
@@ -90,6 +92,7 @@ export function PortfolioDetailPage() {
   const instruments = useGetInstrumentsQuery();
   const [updatePortfolio] = useUpdatePortfolioMutation();
   const [disablePortfolio] = useDisablePortfolioMutation();
+  const [rebalancePortfolio] = useRebalancePortfolioMutation();
   const [name, setName] = useState("");
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [syncedId, setSyncedId] = useState<string | null>(null);
@@ -101,6 +104,20 @@ export function PortfolioDetailPage() {
     setName(portfolio.data.name);
     setLines(draftFrom(portfolio.data.lines));
     setSyncedId(portfolio.data.id);
+  }
+
+  async function onRebalance() {
+    if (!id) {
+      return;
+    }
+    try {
+      const result = await rebalancePortfolio(id).unwrap();
+      setQueued(Boolean(result?.jobId));
+      setMessages([]);
+    } catch (error: unknown) {
+      setQueued(false);
+      setMessages(problemMessages(error));
+    }
   }
 
   async function onDisable() {
@@ -238,6 +255,44 @@ export function PortfolioDetailPage() {
           </form>
         </CardContent>
       </Card>
+      <Section
+        title="Assigned accounts"
+        actions={
+          <Button type="button" variant="outline" onClick={() => void onRebalance()}>
+            Rebalance accounts
+          </Button>
+        }
+      >
+        {assigned.data.length === 0 ? <Muted>No accounts are assigned to this portfolio.</Muted> : (
+          <Card className="gap-0 py-0">
+            <CardContent className="px-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Account</TableHead>
+                    <TableHead>Last rebalance</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {assigned.data.map((row) => (
+                    <TableRow key={row.account.id}>
+                      <TableCell>
+                        <Link to={`/accounts/${row.account.id}`} className={recordLinkClass}>
+                          {row.account.name}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        {row.assignment.lastRebalanceStatus ?? "No rebalance has run yet."}
+                        {row.assignment.lastRebalanceMessage ? ` ${row.assignment.lastRebalanceMessage}` : ""}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+      </Section>
     </Page>
   );
 }
