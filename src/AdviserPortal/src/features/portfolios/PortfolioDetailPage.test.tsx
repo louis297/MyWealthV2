@@ -88,6 +88,12 @@ function renderDetail(options?: { assigned?: boolean; putStatus?: number; putBod
         headers: { "Content-Type": "application/json" },
       });
     }
+    if (path === `/api/portfolios/${portfolioId}/rebalance` && method === "POST") {
+      return new Response(
+        JSON.stringify({ jobId: "job-1", accounts: [{ accountId, handle: "handle-1" }] }),
+        { status: 202, headers: { "Content-Type": "application/json" } },
+      );
+    }
     if (path === `/api/portfolios/${portfolioId}/disable` && method === "POST") {
       disabled = true;
       return new Response("", { status: 204 });
@@ -256,5 +262,30 @@ describe("PortfolioDetailPage edit", () => {
     expect(await screen.findByRole("heading", { name: "Balanced Growth" })).toBeInTheDocument();
     expect(screen.getByText("Inactive")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Disable" })).not.toBeInTheDocument();
+  });
+
+  it("says when no accounts are assigned", async () => {
+    renderDetail();
+
+    expect(await screen.findByText("No accounts are assigned to this portfolio.")).toBeInTheDocument();
+  });
+
+  it("lists an assigned account and queues a bulk rebalance", async () => {
+    const { fetchMock } = renderDetail({ assigned: true });
+
+    expect(await screen.findByRole("link", { name: "Growth account" })).toHaveAttribute("href", `/accounts/${accountId}`);
+    expect(screen.getByText("Success")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Rebalance accounts" }));
+
+    const request = await vi.waitFor(() => {
+      const found = fetchMock.mock.calls
+        .map(([input]) => input)
+        .find((input): input is Request => input instanceof Request && input.method === "POST" && input.url.includes("/rebalance"));
+      expect(found).toBeDefined();
+      return found!;
+    });
+    expect(new URL(request.url).pathname).toBe(`/api/portfolios/${portfolioId}/rebalance`);
+    expect(request.headers.get("X-MyWealth-Request")).toBe("1");
+    expect(await screen.findByText("Rebalance queued.")).toBeInTheDocument();
   });
 });
