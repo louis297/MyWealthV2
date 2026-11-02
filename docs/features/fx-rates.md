@@ -45,7 +45,7 @@ The worker fetches the latest Frankfurter rates every hour and stores directed p
 
 **Out**
 
-- Instrument prices / `IMarketData` (later).
+- Instrument prices / `IMarketData` (accepted separately: [instrument-prices.md](instrument-prices.md)).
 - Net-worth FX fold (later; current net-worth stays per-currency).
 - HTTP endpoint for rates (deferred; a read surface is expected later for Scalar / ops, not a permanent exclusion).
 - Real-time or intraday rates.

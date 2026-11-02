@@ -131,7 +131,7 @@ Later portals copy the last BFF row: `bff-customer-portal`, `BffCustomerPortal`,
 | Endpoint group | Minimal API group under `src/Web/Endpoints`. | MVC controllers as the default style |
 | Feature spec | One deliverable vertical slice under `docs/features/`. | A phase folder of leftover notes |
 | ADR | A decision under `docs/adr/` that is not re-litigated in place. | Rewriting an accepted ADR’s conclusion |
-| IMarketData | Instrument price port. Mocked when the ledger exists. Not introduced in Phase 1: port surface not locked. | Calling a live vendor from a handler |
+| IMarketData | Instrument price port. `TryGetPrice(instrumentId, asOf?) → Money?`. Missing → empty, not 0. Backed by local `InstrumentPrices` table; not a live call. Contract: [features/instrument-prices.md](features/instrument-prices.md). | Calling a live vendor from a handler; inventing 0 |
 | IFxRate | FX port. Same currency = 1. Missing pair throws `FxRateNotFoundException` (carries base, quote, as-of). Backed by local `FxRates` table; not a live call. Contract: [features/fx-rates.md](features/fx-rates.md), ADR 0019. | Hard-coded 1 for every pair; calling Frankfurter on the read path |
 | IEmailSender | Invite / reset mail. Phase 1 is no-op or log-only. | Built-in SMTP in Domain |
 | Authorization server | Issues and revokes tokens, exposes discovery and JWKS. Hosted in Aspire `identity` via OpenIddict. | A custom resource-API `/auth/login` that mints JWTs; OpenIddict inside `webapi` |

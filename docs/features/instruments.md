@@ -50,7 +50,7 @@ The catalog is firm-wide, not per-Adviser. Customer receives 403. TenantAdmin / 
 - Domain: `Instrument` aggregate
 - Script `0010_instruments.sql` + EF mapping
 - Policies `instruments.read`, `instruments.create`, `instruments.manage` (register on ADR 0013 Phase-2 list)
-- Ports `IMarketData` and `IFxRate` in Application; Infrastructure mock only
+- Ports `IMarketData` and `IFxRate` in Application. Infrastructure mock in this slice; real implementations: [instrument-prices.md](instrument-prices.md) (accepted) and [fx-rates.md](fx-rates.md) (accepted).
 - `webapi` `/instruments` (root, not under `/users`)
 - List envelope + `enabledOnly` + isolation tests
 - `TestSeed` rows for Development / TestAppHost (not the schema script)

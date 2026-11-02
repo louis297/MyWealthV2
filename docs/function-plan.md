@@ -221,6 +221,7 @@ Phase 3 focuses on the Reports domain. Smaller platform pieces (Invitation / Act
 - Policies: `reports.customer.read` / `reports.customer.create` and `reports.book.read` / `reports.book.create`. Customer has only `reports.customer.read`. TenantAdmin and Adviser have all four. SystemAdmin has none of them and cannot call `GET /reports`. `GET /reports/catalog` (`tenants.manage`) returns every catalog row, including inactive, with no `granted`. `GET /tenants/{tenantId}/reports` (`tenants.manage`) returns active catalog rows ordered by code, each with `granted`. Granting a platform-inactive report is 404. New tenants are not auto-granted. Back Office `/reports` is the platform page. Tenant configuration lists the active catalog and enables or disables each report. Scalar can call the same verbs.
 - First phase reports: Customer Transactions Report (Customer scope; required date range; includeClosedAccounts default false; reversals next to original) and Adviser Balances Report (Book scope; server-set asOf; cash + holding lines; zero cash omitted; quantity ≤ 0 omitted; subtotals). Both manual + recurring. PDF via code layout. Event plumbing only.
 - Accepted: [features/reports.md](features/reports.md). ADR 0017 accepted.
+- Platform caches: [features/fx-rates.md](features/fx-rates.md) (ADR 0019) and [features/instrument-prices.md](features/instrument-prices.md) (follows ADR 0019 pattern). Both hourly Hangfire jobs into local tables.
 
 Still later (not Phase 3):
 
@@ -230,7 +231,7 @@ Still later (not Phase 3):
 - Households / joint / trusts
 - Advice documents / SoA
 - Custody / bank connectivity
-- Live market data / live FX / cross-currency legs
+- Live (real-time) market data / live FX / cross-currency legs
 - NZ regulation and record retention
 - External IdP (for example Entra) attached only to the authorization server
 - Identity remains the `identity` Aspire resource; external IdP attaches there
