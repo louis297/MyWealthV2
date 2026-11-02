@@ -37,13 +37,36 @@ public class Portfolio : BaseAuditableEntity
         IReadOnlyList<(int InstrumentId, decimal TargetWeight)> lines,
         Guid? publicId = null)
     {
-        _ = tenantId;
-        _ = name;
-        _ = baseCurrency;
-        _ = publicId;
-        var portfolio = new Portfolio();
+        if (baseCurrency is null || string.IsNullOrWhiteSpace(baseCurrency.Code))
+        {
+            throw new DomainException("Currency is required.");
+        }
+
+        var portfolio = new Portfolio
+        {
+            TenantId = tenantId,
+            Name = NormaliseName(name),
+            BaseCurrency = baseCurrency.Code.Trim().ToUpperInvariant(),
+            PublicId = publicId ?? Guid.NewGuid(),
+            IsActive = true,
+            DriftAbsolute = 1m,
+            DriftRelative = 5m,
+            MinimumTrade = 100m,
+            CashResidualPercent = 1m
+        };
         portfolio.ReplaceLineWeights(lines);
         return portfolio;
+    }
+
+    private static string NormaliseName(string name)
+    {
+        var trimmed = name?.Trim() ?? string.Empty;
+        if (trimmed.Length is < 1 or > 200)
+        {
+            throw new DomainException("Name is required.");
+        }
+
+        return trimmed;
     }
 
     private void ReplaceLineWeights(IReadOnlyList<(int InstrumentId, decimal TargetWeight)> lines)
