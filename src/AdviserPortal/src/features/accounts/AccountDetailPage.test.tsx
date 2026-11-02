@@ -1046,4 +1046,67 @@ describe("AccountDetailPage", () => {
     expect(deleted.some((url) => url.includes(`/api/accounts/${accountId}/portfolio`))).toBe(true);
     expect(screen.queryByRole("button", { name: "Unassign" })).not.toBeInTheDocument();
   });
+
+  it("shows a failed rebalance message and retries the account", async () => {
+    const posted: string[] = [];
+    renderDetail((url, method) => {
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json(account);
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.endsWith(`/accounts/${accountId}/rebalance`) && method === "POST") {
+        posted.push(url);
+        return json({ status: "Success" });
+      }
+      if (url.endsWith(`/accounts/${accountId}/portfolio`) && method === "GET") {
+        return json({
+          accountId,
+          portfolioId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          status: "Active",
+          lastRebalanceAt: "2026-11-02T00:00:00+00:00",
+          lastRebalanceStatus: "Failed",
+          lastRebalanceMessage: "Missing price for VTI.",
+        });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByText("Missing price for VTI.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("Success")).toBeInTheDocument();
+    expect(posted.some((url) => url.includes(`/api/accounts/${accountId}/rebalance`))).toBe(true);
+  });
+
+  it("says when no rebalance has run", async () => {
+    renderDetail((url, method) => {
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json(account);
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.endsWith(`/accounts/${accountId}/portfolio`) && method === "GET") {
+        return json({
+          accountId,
+          portfolioId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          status: "Active",
+          lastRebalanceAt: null,
+          lastRebalanceStatus: null,
+          lastRebalanceMessage: null,
+        });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByText("No rebalance has run yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+  });
 });
