@@ -42,8 +42,7 @@ public static class DependencyInjection
         builder.Services.AddSingleton<ICurrencyCatalog, CurrencyCatalog>();
         builder.Services.AddSingleton<MarketDataMock>();
         builder.Services.AddSingleton<IMarketData>(sp => sp.GetRequiredService<MarketDataMock>());
-        builder.Services.AddSingleton<FxRateMock>();
-        builder.Services.AddSingleton<IFxRate>(sp => sp.GetRequiredService<FxRateMock>());
+        builder.Services.AddScoped<IFxRate, FxRateStore>();
 
         var schemaDirectory = Path.Combine(AppContext.BaseDirectory, "schema");
         builder.Services.AddSingleton<ISchemaScriptSource>(_ => new FileSchemaScriptSource(schemaDirectory));

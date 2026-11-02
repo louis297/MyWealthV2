@@ -17,6 +17,27 @@ public static class FxRateSelector
             return 1m;
         }
 
-        throw new FxRateNotFoundException(source, target, asOf);
+        FxRateQuote? chosen = null;
+        foreach (var row in rows)
+        {
+            if (!string.Equals(row.BaseCurrency.Trim(), source, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(row.QuoteCurrency.Trim(), target, StringComparison.OrdinalIgnoreCase)
+                || row.AsOfDate > asOf)
+            {
+                continue;
+            }
+
+            if (chosen is null || row.AsOfDate > chosen.Value.AsOfDate)
+            {
+                chosen = row;
+            }
+        }
+
+        if (chosen is null)
+        {
+            throw new FxRateNotFoundException(source, target, asOf);
+        }
+
+        return chosen.Value.Rate;
     }
 }

@@ -20,10 +20,10 @@ public class FxRateReadTests
 
         try
         {
-            var fx = new FxRateStore(db);
+            var fx = new FxRateStore(db, TimeProvider.System);
             var booked = new DateTimeOffset(2026, 10, 11, 10, 0, 0, TimeSpan.FromHours(13));
-            fx.GetRate("usd", "nzd", booked).ShouldBe(1.60000000m);
-            fx.GetRate("NZD", "NZD", booked).ShouldBe(1m);
+            (await fx.GetRateAsync("usd", "nzd", booked)).ShouldBe(1.60000000m);
+            (await fx.GetRateAsync("NZD", "NZD", booked)).ShouldBe(1m);
         }
         finally
         {
@@ -44,7 +44,7 @@ public class FxRateReadTests
             await TestSeed.SeedAsync(db, prices, CancellationToken.None);
 
             var rows = await db.FxRates.AsNoTracking().ToListAsync();
-            rows.Count.ShouldBe(11);
+            rows.Count.ShouldBe(10);
             rows.ShouldAllBe(row => row.AsOfDate == new DateOnly(2026, 1, 1));
             rows.ShouldAllBe(row => row.Source == "Frankfurter");
             Pair(rows, "USD", "NZD").ShouldBe(1.50000000m);

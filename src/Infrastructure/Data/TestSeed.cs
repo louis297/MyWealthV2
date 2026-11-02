@@ -5,6 +5,7 @@ using MyWealthV2.Domain.Common;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.ValueObjects;
+using MyWealthV2.Infrastructure.Data.Entities;
 using MyWealthV2.Infrastructure.Identity;
 using MyWealthV2.Infrastructure.MarketData;
 
@@ -26,6 +27,7 @@ public static class TestSeed
     {
         var db = services.GetRequiredService<ApplicationDbContext>();
         var prices = services.GetRequiredService<MarketDataMock>();
+        await EnsureFxRatesAsync(db, cancellationToken);
         foreach (var firm in Firms)
         {
             await SeedFirmAsync(services, db, prices, firm, cancellationToken);
@@ -37,10 +39,57 @@ public static class TestSeed
         MarketDataMock prices,
         CancellationToken cancellationToken)
     {
+        await EnsureFxRatesAsync(db, cancellationToken);
         foreach (var firm in Firms)
         {
             await SeedFirmAsync(services: null, db, prices, firm, cancellationToken);
         }
+    }
+
+    private static readonly (string BaseCurrency, string QuoteCurrency, decimal Rate)[] SeedRates =
+    [
+        ("USD", "NZD", 1.50000000m),
+        ("USD", "AUD", 1.40000000m),
+        ("USD", "EUR", 0.90000000m),
+        ("USD", "GBP", 0.80000000m),
+        ("USD", "JPY", 150.00000000m),
+        ("NZD", "USD", 0.66666667m),
+        ("AUD", "USD", 0.71428571m),
+        ("EUR", "USD", 1.11111111m),
+        ("GBP", "USD", 1.25000000m),
+        ("JPY", "USD", 0.00666667m)
+    ];
+
+    private static async Task EnsureFxRatesAsync(ApplicationDbContext db, CancellationToken cancellationToken)
+    {
+        var asOf = new DateOnly(2026, 1, 1);
+        var existing = await db.FxRates
+            .Where(row => row.AsOfDate == asOf)
+            .Select(row => new { row.BaseCurrency, row.QuoteCurrency })
+            .ToListAsync(cancellationToken);
+        var known = existing
+            .Select(row => $"{row.BaseCurrency.Trim()}|{row.QuoteCurrency.Trim()}")
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var pair in SeedRates)
+        {
+            if (!known.Add($"{pair.BaseCurrency}|{pair.QuoteCurrency}"))
+            {
+                continue;
+            }
+
+            db.FxRates.Add(new FxRate
+            {
+                BaseCurrency = pair.BaseCurrency,
+                QuoteCurrency = pair.QuoteCurrency,
+                Rate = pair.Rate,
+                AsOfDate = asOf,
+                Source = "Frankfurter",
+                FetchedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+            });
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private readonly record struct SeedFirm(
