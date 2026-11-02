@@ -1,6 +1,6 @@
 ---
 title: Adviser Portal — Portfolios
-status: draft
+status: accepted
 phase: 2
 language: en
 created: 2026-11-02
@@ -21,7 +21,7 @@ related:
 
 Phase 2 portal cut for model portfolios. Consumes the landed portfolios feature (`docs/features/portfolios.md`, master @ 4e6f4dc). Backend contracts live in the Feature Spec. This file owns routes, page scope, and behavioural acceptance for the Adviser Portal.
 
-**Status is `draft`.** Not a build contract until accepted.
+**Status is `accepted`.**
 
 Backend prerequisites (landed):
 

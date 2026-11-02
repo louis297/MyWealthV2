@@ -64,7 +64,7 @@ A TenantAdmin or Adviser creates a **Portfolio** (name, base currency, lines of 
 - New `Account.Type` for portfolios
 - Scheduled / drift-triggered automatic rebalance (only weight-change and explicit manual in this slice)
 - Fees, tax lots, performance attribution
-- Portal pages: draft contract is [../adviser-portal/adviser-portal-portfolios.md](../adviser-portal/adviser-portal-portfolios.md) (not a build contract until accepted)
+- Portal pages: accepted contract is [../adviser-portal/adviser-portal-portfolios.md](../adviser-portal/adviser-portal-portfolios.md)
 - Live prices or live FX
 - Idempotency key on the rebalance command itself (individual transactions still follow existing idempotency rules)
 
@@ -242,7 +242,7 @@ Rebalance business failures (missing price, missing FX, insufficient cash) → 4
 
 ## 9. UI
 
-Adviser Portal contract is drafted: [../adviser-portal/adviser-portal-portfolios.md](../adviser-portal/adviser-portal-portfolios.md) (status draft). Covers list / create / edit / disable, assign / unassign, manual and bulk rebalance, trade lock, and last-rebalance status. Not a build contract until accepted.
+Adviser Portal contract is accepted: [../adviser-portal/adviser-portal-portfolios.md](../adviser-portal/adviser-portal-portfolios.md). Covers list / create / edit / disable, assign / unassign, manual and bulk rebalance, trade lock, and last-rebalance status.
 
 ---
 
@@ -276,7 +276,7 @@ No new ADR (reuses existing Money, Instrument, Transaction, FX, and price ports)
 | Execution | Weight-change and bulk rebalance always async (202). Assign and single-account manual rebalance are sync (200). |
 | Confirmation | Frontend Confirm click only; API has no extra confirm flag |
 | Idempotency | No key on the rebalance command; already-aligned accounts are skipped |
-| Portal | Draft contract: [../adviser-portal/adviser-portal-portfolios.md](../adviser-portal/adviser-portal-portfolios.md) |
+| Portal | Accepted: [../adviser-portal/adviser-portal-portfolios.md](../adviser-portal/adviser-portal-portfolios.md) |
 | Async 202 body | `jobId` + per-account `handle` array |
 | Cash residual base | 1% of total investable value in BaseCurrency (cash + holdings MV) |
 
@@ -298,7 +298,7 @@ Possible failure `code` values (to be used consistently):
 
 The message should include, where relevant, the instrument symbol, the missing pair, or the shortfall amount in both BaseCurrency and Account.Currency.
 
-**Deferred:** detailed field bindings beyond the draft portal contract. No poll route (manual refresh only).
+**Deferred:** no poll route (manual refresh only). Field bindings are the accepted portal contract.
 
 ---
 
