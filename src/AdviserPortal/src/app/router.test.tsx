@@ -365,6 +365,51 @@ describe("app routes", () => {
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
+  it("lets TenantAdmin open /portfolios", async () => {
+    renderApp(user(), "/portfolios");
+
+    expect(await screen.findByRole("heading", { name: "Portfolios" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("lets an Adviser open /portfolios/new", async () => {
+    renderApp(user({ role: "adviser", name: "Sam Reed" }), "/portfolios/new");
+
+    expect(await screen.findByRole("heading", { name: "New portfolio" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
+  });
+
+  it("lets TenantAdmin open a portfolio detail", async () => {
+    renderApp(user(), "/portfolios/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+
+    expect(await screen.findByRole("link", { name: "Portfolios" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
+  });
+
+  it("sends SystemAdmin on /portfolios to /forbidden", async () => {
+    renderApp(
+      user({
+        role: "systemAdmin",
+        name: "System Admin",
+        tenantId: null,
+        tenantCode: null,
+      }),
+      "/portfolios",
+    );
+
+    expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Portfolios" })).not.toBeInTheDocument();
+  });
+
+  it("sends a Customer on /portfolios to /forbidden", async () => {
+    renderApp(user({ role: "customer", name: "Jordan Lee" }), "/portfolios");
+
+    expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Portfolios" })).not.toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
   it("sends a Customer opening TransferIn to /forbidden", async () => {
     renderApp(
       user({ role: "customer", name: "Jordan Lee" }),
