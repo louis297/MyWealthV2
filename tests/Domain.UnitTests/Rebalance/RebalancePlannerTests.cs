@@ -91,6 +91,30 @@ public class RebalancePlannerTests
     }
 
     [Test]
+    public void Plan_SellsOverweightTargetsBeforeBuyingUnderweightTargets()
+    {
+        var plan = RebalancePlanner.Plan(Input(
+            cash: 0m,
+            residual: 0m,
+            holdings:
+            [
+                Holding(1, "AAA", "NZD", 60m, 100m, 1m, 1m),
+                Holding(2, "BBB", "NZD", 40m, 100m, 1m, 1m)
+            ],
+            targets:
+            [
+                Target(2, "BBB", "NZD", 60m, 100m, 1m, 1m),
+                Target(1, "AAA", "NZD", 40m, 100m, 1m, 1m)
+            ]));
+
+        plan.Status.ShouldBe(RebalanceStatus.Success);
+        plan.Trades.Select(trade => (trade.Symbol, trade.Buy, trade.Quantity)).ShouldBe([
+            ("AAA", false, 20m),
+            ("BBB", true, 20m)
+        ]);
+    }
+
+    [Test]
     public void Plan_SkipsATargetTradeBelowTheMinimum()
     {
         var plan = RebalancePlanner.Plan(Input(
