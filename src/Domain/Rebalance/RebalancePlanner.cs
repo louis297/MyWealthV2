@@ -45,7 +45,7 @@ public static class RebalancePlanner
             var currentValue = current?.MarketValueBase ?? 0m;
             var targetValue = decimal.Round(target.Weight / 100m * investable, 4, MidpointRounding.AwayFromZero);
             var delta = targetValue - currentValue;
-            if (delta == 0m || SkipForDrift(input, total, currentValue, targetValue) || Math.Abs(delta) < input.MinimumTrade)
+            if (delta == 0m || Math.Abs(delta) < input.MinimumTrade)
             {
                 continue;
             }
@@ -77,6 +77,10 @@ public static class RebalancePlanner
         {
             return new RebalancePlan(RebalanceStatus.NoChange, null, null, []);
         }
+
+        // Post every sell before any buy. Cash from an overweight line has to land
+        // before an underweight buy, or the buy fails while the balance is temporarily negative.
+        trades = trades.Where(trade => !trade.Buy).Concat(trades.Where(trade => trade.Buy)).ToList();
 
         var cash = input.Cash;
         foreach (var trade in trades)
@@ -158,20 +162,6 @@ public static class RebalancePlanner
         return new Valued(instrumentId, symbol, quote, quantity, price, toBase, toAccount, quantity * price * toBase, weight);
     }
 
-    private static bool SkipForDrift(RebalanceInput input, decimal total, decimal currentValue, decimal targetValue)
-    {
-        if (total == 0m)
-        {
-            return false;
-        }
-
-        var currentShare = currentValue / total * 100m;
-        var targetShare = targetValue / total * 100m;
-        var absolute = Math.Abs(currentShare - targetShare);
-        var relative = targetShare == 0m ? 100m : absolute / targetShare * 100m;
-        return absolute < input.DriftAbsolute || relative < input.DriftRelative;
-    }
-
     private static decimal Rate(string from, string to, decimal? supplied) =>
         Same(from, to) ? 1m : supplied!.Value;
 
@@ -198,8 +188,6 @@ public sealed record RebalanceInput(
     string AccountCurrency,
     decimal Cash,
     decimal? AccountToBase,
-    decimal DriftAbsolute,
-    decimal DriftRelative,
     decimal MinimumTrade,
     decimal CashResidualPercent,
     IReadOnlyList<PlannerHolding> Holdings,

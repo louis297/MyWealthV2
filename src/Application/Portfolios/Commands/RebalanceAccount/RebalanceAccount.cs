@@ -181,8 +181,6 @@ public class AccountRebalancer(
             account.Currency,
             cash,
             accountToBase,
-            portfolio.DriftAbsolute,
-            portfolio.DriftRelative,
             portfolio.MinimumTrade,
             portfolio.CashResidualPercent,
             holdings,
