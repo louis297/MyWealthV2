@@ -78,6 +78,10 @@ public static class RebalancePlanner
             return new RebalancePlan(RebalanceStatus.NoChange, null, null, []);
         }
 
+        // Post every sell before any buy. Cash from an overweight line has to land
+        // before an underweight buy, or the buy fails while the balance is temporarily negative.
+        trades = trades.Where(trade => !trade.Buy).Concat(trades.Where(trade => trade.Buy)).ToList();
+
         var cash = input.Cash;
         foreach (var trade in trades)
         {

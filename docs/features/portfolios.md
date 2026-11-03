@@ -29,7 +29,7 @@ related:
 
 # Portfolios
 
-Model portfolios (target-weight investment schemes) on `webapi`. An Adviser or TenantAdmin defines a portfolio of instruments with target weights and a mandatory base currency. An Adviser assigns one portfolio to an Open Brokerage or Other account. Assignment and any later weight change run a **Full Rebalance**: sell every holding not in the target, then buy/sell to the target weights. All trades are ordinary `Buy` / `Sell` transactions (existing model). Customer cannot assign or rebalance. No new `Account.Type`.
+Model portfolios (target-weight investment schemes) on `webapi`. An Adviser or TenantAdmin defines a portfolio of instruments with target weights and a mandatory base currency. An Adviser assigns one portfolio to an Open Brokerage or Other account. Assignment and any later weight change run a **Full Rebalance**: sell every holding not in the target, then sell overweight target lines before buying underweight ones. All trades are ordinary `Buy` / `Sell` transactions (existing model). Customer cannot assign or rebalance. No new `Account.Type`.
 
 **Status is `accepted`.** Implementation follows this file.
 
@@ -94,7 +94,7 @@ A TenantAdmin or Adviser creates a **Portfolio** (name, base currency, lines of 
 | R5 | An account may have at most one Active `AccountPortfolioAssignment`. Assigning a new portfolio first marks the previous Active assignment `Removed`. |
 | R6 | Portfolio has a mandatory `BaseCurrency` (enabled catalog code). Immutable after create. |
 | R7 | Portfolio lines: each `TargetWeight` > 0 and ≤ 100; sum of weights = 100 (exact, after rounding to a locked precision — see open items). Instrument must be active and belong to the same tenant. |
-| R8 | **Full Rebalance** on assign and on weight change: (a) sell every current holding whose instrument is not in the target lines, in full, including dust below the minimum trade; (b) then buy/sell so that each target instrument’s market value in base currency equals `(weight / 100) × V × (1 − residual)`. `V` is cash plus holdings market value, converted into the portfolio base currency. Once rebalance has started, only residual and minimum trade apply to step (b). Drift is not re-checked per line. |
+| R8 | **Full Rebalance** on assign and on weight change: (a) sell every current holding whose instrument is not in the target lines, in full, including dust below the minimum trade; (b) then sell overweight target lines before buying underweight ones, so that each target instrument’s market value in base currency equals `(weight / 100) × V × (1 − residual)`. Sells post before buys so cash is not temporarily negative. `V` is cash plus holdings market value, converted into the portfolio base currency. Once rebalance has started, only residual and minimum trade apply to step (b). Drift is not re-checked per line. |
 | R9 | All trades are ordinary `Buy` / `Sell` transactions under the existing Account lock. No direct Holding edits. |
 | R10 | Valuation uses the current `IMarketData` price and `IFxRate` `quote → base` (identity when they match). The cash leg reuses ordinary Buy/Sell, which converts `quote → account currency`. Missing price or either FX pair → the whole rebalance for that account fails (400 or recorded failure; no transactions written). |
 | R11 | Insufficient cash (after planned sells) to fund the net buys → whole rebalance fails. No partial execution. |
