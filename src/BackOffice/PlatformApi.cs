@@ -1,11 +1,10 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
-using MyWealthV2.Shared;
 
 namespace MyWealthV2.BackOffice;
 
-public sealed class PlatformApi(HttpClient api, HttpClient tokens, IAccessTokens access, string clientSecret) : IPlatformApi
+public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOfficeTokenRefresh tokenRefresh) : IPlatformApi
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -290,33 +289,13 @@ public sealed class PlatformApi(HttpClient api, HttpClient tokens, IAccessTokens
             return null;
         }
 
-        using var message = new HttpRequestMessage(HttpMethod.Post, "/connect/token")
-        {
-            Content = new FormUrlEncodedContent(new Dictionary<string, string?>
-            {
-                ["grant_type"] = "refresh_token",
-                ["refresh_token"] = access.RefreshToken,
-                ["client_id"] = Services.BackOffice,
-                ["client_secret"] = clientSecret
-            })
-        };
-        using var response = await tokens.SendAsync(message, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        var next = await tokenRefresh.ExchangeAsync(access.RefreshToken, cancellationToken);
+        if (next is null)
         {
             return null;
         }
 
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
-        var nextAccess = document.RootElement.GetProperty("access_token").GetString();
-        var nextRefresh = document.RootElement.TryGetProperty("refresh_token", out var refresh)
-            ? refresh.GetString()
-            : access.RefreshToken;
-        if (string.IsNullOrEmpty(nextAccess) || string.IsNullOrEmpty(nextRefresh))
-        {
-            return null;
-        }
-
-        access.Store(nextAccess, nextRefresh);
-        return nextAccess;
+        access.Store(next.AccessToken, next.RefreshToken, next.ExpiresAt);
+        return next.AccessToken;
     }
 }

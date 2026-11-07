@@ -6,5 +6,5 @@ public interface IAccessTokens
 
     string? RefreshToken { get; }
 
-    void Store(string accessToken, string refreshToken);
+    void Store(string accessToken, string refreshToken, DateTimeOffset expiresAt);
 }
