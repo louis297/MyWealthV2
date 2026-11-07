@@ -90,6 +90,17 @@ public class TwelveDataClientTests
     }
 
     [Test]
+    public async Task GetLatest_NotFound_ReturnsNull()
+    {
+        var handler = new StubHandler(HttpStatusCode.NotFound, """
+            {"code":404,"message":"symbol not found","status":"error"}
+            """);
+        var client = Client(handler, "test-key");
+
+        (await client.GetLatestAsync("AIA", "NZD")).ShouldBeNull();
+    }
+
+    [Test]
     public async Task GetLatest_ServerError_Throws()
     {
         var handler = new StubHandler(HttpStatusCode.InternalServerError, """{"status":"error"}""");
