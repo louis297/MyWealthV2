@@ -508,7 +508,7 @@ Script `0022_instrument_prices.sql`. Table `InstrumentPrices` in the application
 
 PK `(InstrumentId, AsOfDate)`. Index on `FetchedAt`. No PublicId. No RowVersion. No audit columns beyond `FetchedAt`. No seed in the script — the hourly job populates it. Development / TestAppHost uses `TestSeed` with round, obviously-fake prices (several instruments per seed currency).
 
-Hourly Hangfire job (UTC) fetches EOD prices from Twelve Data for instruments that are active in at least one tenant when today's UTC date is not already stored for every active instrument. A run requests at most 8 symbol groups, the ones whose latest `FetchedAt` is earliest (no row is earliest). Same symbol + quote currency across tenants is fetched once and written to every matching `InstrumentId`. On the same `AsOfDate`, update `Price` and `FetchedAt`. Fetch failure logs and leaves previous rows. `IMarketData` reads the table: latest row with `AsOfDate` ≤ requested date (or today if omitted); no row → empty (not 0).
+Hourly Hangfire job (UTC) fetches EOD prices from Twelve Data for instruments that are active in at least one tenant. A symbol whose latest `FetchedAt` is today's UTC date is not requested again until the next UTC day. A run requests at most 8 of the remaining symbol groups, the ones whose latest `FetchedAt` is earliest (no row is earliest). The job also skips the source once every active instrument has today's source date. Same symbol + quote currency across tenants is fetched once and written to every matching `InstrumentId`. On the same `AsOfDate`, update `Price` and `FetchedAt`. Fetch failure logs and leaves previous rows. `IMarketData` reads the table: latest row with `AsOfDate` ≤ requested date (or today if omitted); no row → empty (not 0).
 
 ### Change log
 

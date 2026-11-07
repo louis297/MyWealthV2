@@ -38,6 +38,7 @@ public sealed class InstrumentPriceSyncJob(
                     group.ToList(),
                     group.Min(instrument =>
                         fetchedAt.TryGetValue(instrument.Id, out var at) ? at : DateTimeOffset.MinValue)))
+                .Where(group => DateOnly.FromDateTime(group.OldestFetch.UtcDateTime) != today)
                 .OrderBy(group => group.OldestFetch)
                 .ThenBy(group => group.Key.Symbol, StringComparer.Ordinal)
                 .ThenBy(group => group.Key.Quote, StringComparer.Ordinal)
