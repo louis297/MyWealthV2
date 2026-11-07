@@ -45,6 +45,10 @@ public static class BackOfficeAuthenticationExtensions
                     context.CookieOptions.MaxAge = null;
                     return Task.CompletedTask;
                 };
+                options.Events.OnValidatePrincipal = context =>
+                    context.HttpContext.RequestServices
+                        .GetRequiredService<BackOfficeTokenRefresh>()
+                        .ValidatePrincipalAsync(context);
             })
             .AddOpenIdConnect(options =>
             {

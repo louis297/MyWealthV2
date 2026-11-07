@@ -27,7 +27,7 @@ public sealed class CookieAccessTokens(IHttpContextAccessor http) : IAccessToken
         }
     }
 
-    public void Store(string accessToken, string refreshToken)
+    public void Store(string accessToken, string refreshToken, DateTimeOffset expiresAt)
     {
         _access = accessToken;
         _refresh = refreshToken;
@@ -46,11 +46,11 @@ public sealed class CookieAccessTokens(IHttpContextAccessor http) : IAccessToken
             return;
         }
 
-        authenticated.Properties.StoreTokens(
-        [
-            new AuthenticationToken { Name = "access_token", Value = accessToken },
-            new AuthenticationToken { Name = "refresh_token", Value = refreshToken }
-        ]);
+        var tokens = authenticated.Properties.GetTokens().ToList();
+        Set(tokens, "access_token", accessToken);
+        Set(tokens, "refresh_token", refreshToken);
+        Set(tokens, "expires_at", expiresAt.ToString("o", System.Globalization.CultureInfo.InvariantCulture));
+        authenticated.Properties.StoreTokens(tokens);
         context.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme,
                 authenticated.Principal,
@@ -75,5 +75,17 @@ public sealed class CookieAccessTokens(IHttpContextAccessor http) : IAccessToken
         _access = context.GetTokenAsync("access_token").GetAwaiter().GetResult();
         _refresh = context.GetTokenAsync("refresh_token").GetAwaiter().GetResult();
         _captured = true;
+    }
+
+    private static void Set(List<AuthenticationToken> tokens, string name, string value)
+    {
+        var index = tokens.FindIndex(token => token.Name == name);
+        if (index >= 0)
+        {
+            tokens[index] = new AuthenticationToken { Name = name, Value = value };
+            return;
+        }
+
+        tokens.Add(new AuthenticationToken { Name = name, Value = value });
     }
 }

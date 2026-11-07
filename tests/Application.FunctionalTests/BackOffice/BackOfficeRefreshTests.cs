@@ -30,10 +30,8 @@ public class BackOfficeRefreshTests
         var store = new MemoryAccessTokens("old-access", "old-refresh");
         var platform = new PlatformApi(
             new HttpClient(api) { BaseAddress = new Uri("http://webapi") },
-            new HttpClient(tokenEndpoint) { BaseAddress = new Uri("http://identity") },
             store,
-            BackOfficeTestSecret.Value,
-            NewRefresh(new ScriptedHandler(), new DateTimeOffset(2026, 11, 7, 12, 0, 0, TimeSpan.Zero)));
+            NewRefresh(tokenEndpoint, new DateTimeOffset(2026, 11, 7, 12, 0, 0, TimeSpan.Zero)));
 
         var body = await platform.ListTenantsAsync();
 
@@ -66,9 +64,7 @@ public class BackOfficeRefreshTests
         var store = new MemoryAccessTokens("old-access", "old-refresh");
         var platform = new PlatformApi(
             new HttpClient(api) { BaseAddress = new Uri("http://webapi") },
-            new HttpClient(new ScriptedHandler()) { BaseAddress = new Uri("http://identity") },
             store,
-            BackOfficeTestSecret.Value,
             refresh);
 
         var body = await platform.ListTenantsAsync();
@@ -221,7 +217,10 @@ public class BackOfficeRefreshTests
         http.Response.HasStarted.ShouldBeTrue();
         var tokens = new CookieAccessTokens(new ContextAccessor(http));
 
-        tokens.Store("next-access", "next-refresh");
+        tokens.Store(
+            "next-access",
+            "next-refresh",
+            new DateTimeOffset(2026, 11, 7, 12, 15, 0, TimeSpan.Zero));
 
         tokens.AccessToken.ShouldBe("next-access");
         tokens.RefreshToken.ShouldBe("next-refresh");
@@ -336,10 +335,11 @@ public class BackOfficeRefreshTests
 
         public string? RefreshToken { get; private set; } = refresh;
 
-        public void Store(string accessToken, string refreshToken)
+        public void Store(string accessToken, string refreshToken, DateTimeOffset expiresAt)
         {
             AccessToken = accessToken;
             RefreshToken = refreshToken;
+            _ = expiresAt;
         }
     }
 

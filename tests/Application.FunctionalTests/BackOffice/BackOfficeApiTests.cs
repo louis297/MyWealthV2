@@ -128,9 +128,7 @@ public class BackOfficeApiTests
     private static PlatformApi Create(ScriptedHandler api) =>
         new(
             new HttpClient(api) { BaseAddress = new Uri("http://webapi") },
-            new HttpClient(new ScriptedHandler()) { BaseAddress = new Uri("http://identity") },
             new MemoryTokens(),
-            BackOfficeTestSecret.Value,
             new BackOfficeTokenRefresh(
                 new HttpClient(new ScriptedHandler()),
                 () => "http://identity/connect/token",
@@ -165,10 +163,11 @@ public class BackOfficeApiTests
 
         public string? RefreshToken { get; private set; } = "refresh";
 
-        public void Store(string accessToken, string refreshToken)
+        public void Store(string accessToken, string refreshToken, DateTimeOffset expiresAt)
         {
             AccessToken = accessToken;
             RefreshToken = refreshToken;
+            _ = expiresAt;
         }
     }
 

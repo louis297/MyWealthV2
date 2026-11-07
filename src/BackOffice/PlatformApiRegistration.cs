@@ -30,22 +30,9 @@ public static class PlatformApiRegistration
         builder.Services.AddScoped<IPlatformApi>(services =>
         {
             var api = services.GetRequiredService<IHttpClientFactory>().CreateClient("back-office-webapi");
-            var configuration = services.GetRequiredService<IConfiguration>();
-            var authority = configuration["Authentication:Authority"];
-            var oidc = services.GetRequiredService<IOptionsMonitor<OpenIdConnectOptions>>()
-                .Get(OpenIdConnectDefaults.AuthenticationScheme);
-            var handler = oidc.BackchannelHttpHandler ?? new HttpClientHandler();
-            var tokens = new HttpClient(handler, disposeHandler: false)
-            {
-                BaseAddress = string.IsNullOrWhiteSpace(authority)
-                    ? oidc.Backchannel.BaseAddress
-                    : new Uri(authority.TrimEnd('/') + "/")
-            };
             return new PlatformApi(
                 api,
-                tokens,
                 services.GetRequiredService<IAccessTokens>(),
-                configuration["Authentication:ClientSecret"] ?? "",
                 services.GetRequiredService<BackOfficeTokenRefresh>());
         });
         return builder;
@@ -53,12 +40,25 @@ public static class PlatformApiRegistration
 
     private sealed class OidcBackchannelHandler(IOptionsMonitor<OpenIdConnectOptions> oidc) : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(
+        protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
             var backchannel = oidc.Get(OpenIdConnectDefaults.AuthenticationScheme).Backchannel;
-            return backchannel.SendAsync(request, cancellationToken);
+            using var outgoing = new HttpRequestMessage(request.Method, request.RequestUri);
+            if (request.Content is not null)
+            {
+                var body = await request.Content.ReadAsByteArrayAsync(cancellationToken);
+                var content = new ByteArrayContent(body);
+                foreach (var header in request.Content.Headers)
+                {
+                    content.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                }
+
+                outgoing.Content = content;
+            }
+
+            return await backchannel.SendAsync(outgoing, cancellationToken);
         }
     }
 }
