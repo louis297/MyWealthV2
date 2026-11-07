@@ -11,4 +11,8 @@ public interface IInstrumentPriceStore
         IReadOnlyList<int> instrumentIds,
         DateOnly asOf,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyDictionary<int, DateTimeOffset>> LatestFetchedAtByInstrumentAsync(
+        IReadOnlyList<int> instrumentIds,
+        CancellationToken cancellationToken = default);
 }

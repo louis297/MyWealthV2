@@ -102,4 +102,22 @@ public sealed class InstrumentPriceStore(ApplicationDbContext db, TimeProvider t
             .CountAsync(cancellationToken);
         return stored == ids.Count;
     }
+
+    public async Task<IReadOnlyDictionary<int, DateTimeOffset>> LatestFetchedAtByInstrumentAsync(
+        IReadOnlyList<int> instrumentIds,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = instrumentIds.Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return new Dictionary<int, DateTimeOffset>();
+        }
+
+        var rows = await db.InstrumentPrices.AsNoTracking()
+            .Where(row => ids.Contains(row.InstrumentId))
+            .GroupBy(row => row.InstrumentId)
+            .Select(group => new { InstrumentId = group.Key, FetchedAt = group.Max(row => row.FetchedAt) })
+            .ToListAsync(cancellationToken);
+        return rows.ToDictionary(row => row.InstrumentId, row => row.FetchedAt);
+    }
 }
