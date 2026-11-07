@@ -8,6 +8,7 @@ using System.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using BackOfficeHost::MyWealthV2.BackOffice;
 
 namespace MyWealthV2.Application.FunctionalTests.BackOffice;
@@ -163,10 +164,11 @@ public class BackOfficeRefreshTests
     }
 
     [Test]
-    public async Task Store_AfterTheResponseStarted_KeepsTheNewAccessToken()
+    public void Store_AfterTheResponseStarted_KeepsTheNewAccessToken()
     {
         var http = new DefaultHttpContext();
-        await http.Response.StartAsync();
+        http.Features.Set<IHttpResponseFeature>(new StartedResponse());
+        http.Response.HasStarted.ShouldBeTrue();
         var tokens = new CookieAccessTokens(new ContextAccessor(http));
 
         tokens.Store("next-access", "next-refresh");
@@ -217,6 +219,27 @@ public class BackOfficeRefreshTests
     private sealed class FixedTime(DateTimeOffset utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => utcNow;
+    }
+
+    private sealed class StartedResponse : IHttpResponseFeature
+    {
+        public int StatusCode { get; set; } = StatusCodes.Status200OK;
+
+        public string? ReasonPhrase { get; set; }
+
+        public IHeaderDictionary Headers { get; set; } = new HeaderDictionary();
+
+        public Stream Body { get; set; } = new MemoryStream();
+
+        public bool HasStarted => true;
+
+        public void OnStarting(Func<object, Task> callback, object state)
+        {
+        }
+
+        public void OnCompleted(Func<object, Task> callback, object state)
+        {
+        }
     }
 
     private sealed class ContextAccessor(HttpContext? context) : IHttpContextAccessor

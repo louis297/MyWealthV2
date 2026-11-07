@@ -33,7 +33,7 @@ public sealed class CookieAccessTokens(IHttpContextAccessor http) : IAccessToken
         _refresh = refreshToken;
         _captured = true;
         var context = http.HttpContext;
-        if (context is null)
+        if (context is null || context.Response.HasStarted)
         {
             return;
         }
@@ -67,12 +67,13 @@ public sealed class CookieAccessTokens(IHttpContextAccessor http) : IAccessToken
         }
 
         var context = http.HttpContext;
-        if (context is not null)
+        if (context is null)
         {
-            _access = context.GetTokenAsync("access_token").GetAwaiter().GetResult();
-            _refresh = context.GetTokenAsync("refresh_token").GetAwaiter().GetResult();
+            return;
         }
 
+        _access = context.GetTokenAsync("access_token").GetAwaiter().GetResult();
+        _refresh = context.GetTokenAsync("refresh_token").GetAwaiter().GetResult();
         _captured = true;
     }
 }
