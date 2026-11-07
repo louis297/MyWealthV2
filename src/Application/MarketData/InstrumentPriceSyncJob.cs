@@ -46,6 +46,7 @@ public sealed class InstrumentPriceSyncJob(
                 .ToList();
 
             var collected = new List<InstrumentPriceQuote>();
+            var rejected = new List<int>();
             for (var index = 0; index < groups.Count; index++)
             {
                 if (index > 0 && requestSpacing > TimeSpan.Zero)
@@ -57,6 +58,7 @@ public sealed class InstrumentPriceSyncJob(
                 var sourced = await source.GetLatestAsync(group.Key.Symbol, group.Key.Quote, cancellationToken);
                 if (sourced is null)
                 {
+                    rejected.AddRange(group.Instruments.Select(instrument => instrument.Id));
                     logger.LogWarning(
                         "Instrument price source rejected {Symbol} {QuoteCurrency}.",
                         group.Key.Symbol,
@@ -66,6 +68,7 @@ public sealed class InstrumentPriceSyncJob(
 
                 if (!string.Equals(sourced.Value.Currency.Trim(), group.Key.Quote, StringComparison.OrdinalIgnoreCase))
                 {
+                    rejected.AddRange(group.Instruments.Select(instrument => instrument.Id));
                     logger.LogWarning(
                         "Instrument price currency {Currency} does not match {QuoteCurrency} for {Symbol}.",
                         sourced.Value.Currency,
@@ -80,9 +83,15 @@ public sealed class InstrumentPriceSyncJob(
                 }
             }
 
+            var fetchedAtNow = time.GetUtcNow();
             if (collected.Count > 0)
             {
-                await store.UpsertAsync(collected, time.GetUtcNow(), cancellationToken);
+                await store.UpsertAsync(collected, fetchedAtNow, cancellationToken);
+            }
+
+            if (rejected.Count > 0)
+            {
+                await store.NoteFetchedAsync(rejected, fetchedAtNow, cancellationToken);
             }
         }
         catch (Exception exception)
