@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
@@ -14,6 +15,8 @@ public sealed class BackOfficeTokenRefresh
     private readonly Func<string> _tokenEndpoint;
     private readonly string _clientSecret;
     private readonly TimeProvider _time;
+    private readonly ConcurrentDictionary<string, RefreshedTokens> _current = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, Lazy<Task<RefreshedTokens?>>> _calls = new(StringComparer.Ordinal);
 
     public BackOfficeTokenRefresh(HttpClient tokens, Func<string> tokenEndpoint, string clientSecret, TimeProvider time)
     {
@@ -23,7 +26,40 @@ public sealed class BackOfficeTokenRefresh
         _time = time;
     }
 
-    public async Task<RefreshedTokens?> ExchangeAsync(string refreshToken, CancellationToken cancellationToken = default)
+    public Task<RefreshedTokens?> ExchangeAsync(string refreshToken, CancellationToken cancellationToken = default)
+    {
+        if (_current.TryGetValue(refreshToken, out var cached) && cached.ExpiresAt > _time.GetUtcNow().AddMinutes(1))
+        {
+            return Task.FromResult<RefreshedTokens?>(cached);
+        }
+
+        var call = _calls.GetOrAdd(
+            refreshToken,
+            static (presented, self) => new Lazy<Task<RefreshedTokens?>>(() => self.PostAndRememberAsync(presented)),
+            this);
+        return call.Value.WaitAsync(cancellationToken);
+    }
+
+    private async Task<RefreshedTokens?> PostAndRememberAsync(string refreshToken)
+    {
+        if (_current.TryGetValue(refreshToken, out var cached) && cached.ExpiresAt > _time.GetUtcNow().AddMinutes(1))
+        {
+            return cached;
+        }
+
+        var result = await PostAsync(refreshToken, CancellationToken.None);
+        if (result is null)
+        {
+            _calls.TryRemove(refreshToken, out _);
+            return null;
+        }
+
+        _current[refreshToken] = result;
+        _current[result.RefreshToken] = result;
+        return result;
+    }
+
+    private async Task<RefreshedTokens?> PostAsync(string refreshToken, CancellationToken cancellationToken)
     {
         using var message = new HttpRequestMessage(HttpMethod.Post, _tokenEndpoint())
         {
