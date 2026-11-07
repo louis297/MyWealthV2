@@ -129,6 +129,60 @@ public class InstrumentPriceSyncJobTests
     }
 
     [Test]
+    public async Task Sync_RequestsTheEightSymbolsWithTheEarliestFetchedAt()
+    {
+        await using var db = Open();
+        var (tenant, otherTenant) = await TwoTenantFixture.InsertAsync(db);
+        var never = await AddInstrumentAsync(db, tenant, "M1", "USD", active: true);
+        var older = new List<Instrument>();
+        for (var index = 2; index <= 8; index++)
+        {
+            older.Add(await AddInstrumentAsync(db, tenant, $"M{index}", "USD", active: true));
+        }
+
+        var fresh = await AddInstrumentAsync(db, tenant, "M9", "USD", active: true);
+        for (var index = 0; index < older.Count; index++)
+        {
+            db.InstrumentPrices.Add(Stored(
+                older[index].Id,
+                10m + index,
+                new DateOnly(2026, 10, 1),
+                new DateTimeOffset(2026, 10, index + 1, 0, 0, 0, TimeSpan.Zero)));
+        }
+
+        db.InstrumentPrices.Add(Stored(
+            fresh.Id,
+            90m,
+            new DateOnly(2026, 11, 1),
+            new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero)));
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+
+        var now = new DateTimeOffset(2026, 11, 2, 3, 0, 0, TimeSpan.Zero);
+        var source = new RecordingSource(new DateOnly(2026, 11, 1), price: 11m, currency: "USD");
+        var active = new List<ActiveInstrument> { new(never.Id, "M1", "USD") };
+        active.AddRange(older.Select(instrument => new ActiveInstrument(instrument.Id, instrument.Symbol, "USD")));
+        active.Add(new ActiveInstrument(fresh.Id, "M9", "USD"));
+        var job = Job(db, new FixedCatalog([.. active]), source, new FixedTime(now));
+
+        try
+        {
+            await job.Sync();
+
+            source.Calls.Select(call => call.Symbol).ShouldBe(["M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8"]);
+
+            source.Calls.Clear();
+            await job.Sync();
+
+            source.Calls.Select(call => call.Symbol).ShouldBe(["M9", "M1", "M2", "M3", "M4", "M5", "M6", "M7"]);
+        }
+        finally
+        {
+            await CleanupAsync(db, tenant.Id, otherTenant.Id);
+        }
+    }
+
+    [Test]
     public async Task Sync_SkipsTheSourceWhenEveryActiveInstrumentHasTodaysDate()
     {
         await using var db = Open();
