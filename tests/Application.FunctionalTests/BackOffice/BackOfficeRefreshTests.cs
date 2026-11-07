@@ -9,6 +9,8 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using BackOfficeHost::MyWealthV2.BackOffice;
 
 namespace MyWealthV2.Application.FunctionalTests.BackOffice;
@@ -30,7 +32,8 @@ public class BackOfficeRefreshTests
             new HttpClient(api) { BaseAddress = new Uri("http://webapi") },
             new HttpClient(tokenEndpoint) { BaseAddress = new Uri("http://identity") },
             store,
-            BackOfficeTestSecret.Value);
+            BackOfficeTestSecret.Value,
+            NewRefresh(new ScriptedHandler(), new DateTimeOffset(2026, 11, 7, 12, 0, 0, TimeSpan.Zero)));
 
         var body = await platform.ListTenantsAsync();
 
@@ -46,6 +49,53 @@ public class BackOfficeRefreshTests
         form["client_secret"].ShouldBe(BackOfficeTestSecret.Value);
         store.AccessToken.ShouldBe("next-access");
         store.RefreshToken.ShouldBe("next-refresh");
+    }
+
+    [Test]
+    public async Task WebApi401_AndTheNextCookieValidation_ExchangeTheRefreshTokenOnce()
+    {
+        var now = new DateTimeOffset(2026, 11, 7, 12, 0, 0, TimeSpan.Zero);
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.Unauthorized, """{"title":"Unauthorized"}""");
+        api.Enqueue(HttpStatusCode.OK, """{"items":[],"page":1,"pageSize":20,"totalCount":0}""");
+        var tokenEndpoint = new ScriptedHandler();
+        tokenEndpoint.Enqueue(
+            HttpStatusCode.OK,
+            """{"access_token":"next-access","refresh_token":"next-refresh","expires_in":900}""");
+        var refresh = NewRefresh(tokenEndpoint, now);
+        var store = new MemoryAccessTokens("old-access", "old-refresh");
+        var platform = new PlatformApi(
+            new HttpClient(api) { BaseAddress = new Uri("http://webapi") },
+            new HttpClient(new ScriptedHandler()) { BaseAddress = new Uri("http://identity") },
+            store,
+            BackOfficeTestSecret.Value,
+            refresh);
+
+        var body = await platform.ListTenantsAsync();
+        var context = Principal("old-access", "old-refresh", now.AddMinutes(-1), "id-1");
+        await refresh.ValidatePrincipalAsync(context);
+
+        body.ShouldContain("\"items\"");
+        api.Requests[1].Authorization.ShouldBe("Bearer next-access");
+        tokenEndpoint.Requests.Count.ShouldBe(1);
+        context.Properties.GetTokenValue("access_token").ShouldBe("next-access");
+        context.Properties.GetTokenValue("refresh_token").ShouldBe("next-refresh");
+    }
+
+    [Test]
+    public void CookieValidation_RefreshesExpiredAccessTokens()
+    {
+        using var probe = FunctionalTestSetup.Identity.CreateClient();
+        using var factory = new BackOfficeFactory(
+            probe.BaseAddress!.ToString(),
+            FunctionalTestSetup.Identity.Server.CreateHandler());
+        using var scope = factory.Services.CreateScope();
+        var options = scope.ServiceProvider
+            .GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
+            .Get(CookieAuthenticationDefaults.AuthenticationScheme);
+
+        var declaringType = options.Events.OnValidatePrincipal.Method.DeclaringType!.FullName ?? "";
+        declaringType.ShouldContain(nameof(BackOfficeAuthenticationExtensions));
     }
 
     [Test]

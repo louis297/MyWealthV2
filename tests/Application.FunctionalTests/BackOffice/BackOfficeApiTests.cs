@@ -130,7 +130,12 @@ public class BackOfficeApiTests
             new HttpClient(api) { BaseAddress = new Uri("http://webapi") },
             new HttpClient(new ScriptedHandler()) { BaseAddress = new Uri("http://identity") },
             new MemoryTokens(),
-            BackOfficeTestSecret.Value);
+            BackOfficeTestSecret.Value,
+            new BackOfficeTokenRefresh(
+                new HttpClient(new ScriptedHandler()),
+                () => "http://identity/connect/token",
+                BackOfficeTestSecret.Value,
+                TimeProvider.System));
 
     private static void AssertRequest(CapturedRequest request, string method, string path)
     {

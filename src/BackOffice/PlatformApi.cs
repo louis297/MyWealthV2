@@ -5,7 +5,12 @@ using MyWealthV2.Shared;
 
 namespace MyWealthV2.BackOffice;
 
-public sealed class PlatformApi(HttpClient api, HttpClient tokens, IAccessTokens access, string clientSecret) : IPlatformApi
+public sealed class PlatformApi(
+    HttpClient api,
+    HttpClient tokens,
+    IAccessTokens access,
+    string clientSecret,
+    BackOfficeTokenRefresh tokenRefresh) : IPlatformApi
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -285,7 +290,7 @@ public sealed class PlatformApi(HttpClient api, HttpClient tokens, IAccessTokens
 
     private async Task<string?> RefreshAsync(CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(access.RefreshToken))
+        if (ReferenceEquals(tokenRefresh, null) || string.IsNullOrEmpty(access.RefreshToken))
         {
             return null;
         }
