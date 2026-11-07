@@ -94,7 +94,44 @@ public class BackOfficeRefreshTests
         tokenEndpoint.Requests.Count.ShouldBe(0);
     }
 
-    private static BackOfficeTokenRefresh NewRefresh(ScriptedHandler tokenEndpoint, DateTimeOffset utcNow) =>
+    [Test]
+    public async Task SecondPresentationOfARotatedRefreshToken_DoesNotCallTheTokenEndpoint()
+    {
+        var now = new DateTimeOffset(2026, 11, 7, 12, 0, 0, TimeSpan.Zero);
+        var tokenEndpoint = new ScriptedHandler();
+        tokenEndpoint.Enqueue(
+            HttpStatusCode.OK,
+            """{"access_token":"next-access","refresh_token":"next-refresh","expires_in":900}""");
+        tokenEndpoint.Enqueue(HttpStatusCode.BadRequest, """{"error":"invalid_grant"}""");
+        var refresh = NewRefresh(tokenEndpoint, now);
+
+        await refresh.ValidatePrincipalAsync(Principal("old-access", "old-refresh", now.AddMinutes(-1), "id-1"));
+        var again = Principal("old-access", "old-refresh", now.AddMinutes(-1), "id-1");
+        await refresh.ValidatePrincipalAsync(again);
+
+        tokenEndpoint.Requests.Count.ShouldBe(1);
+        again.ShouldRenew.ShouldBeTrue();
+        again.Properties.GetTokenValue("access_token").ShouldBe("next-access");
+        again.Properties.GetTokenValue("refresh_token").ShouldBe("next-refresh");
+    }
+
+    [Test]
+    public async Task ConcurrentPresentations_ExchangeTheRefreshTokenOnce()
+    {
+        var now = new DateTimeOffset(2026, 11, 7, 12, 0, 0, TimeSpan.Zero);
+        var tokenEndpoint = new BlockingHandler();
+        var refresh = NewRefresh(tokenEndpoint, now);
+
+        var first = refresh.ExchangeAsync("old-refresh");
+        var second = refresh.ExchangeAsync("old-refresh");
+        var results = await Task.WhenAll(first, second);
+
+        tokenEndpoint.Entered.ShouldBe(1);
+        results[0]!.AccessToken.ShouldBe("next-access");
+        results[1]!.RefreshToken.ShouldBe("next-refresh");
+    }
+
+    private static BackOfficeTokenRefresh NewRefresh(HttpMessageHandler tokenEndpoint, DateTimeOffset utcNow) =>
         new(
             new HttpClient(tokenEndpoint) { BaseAddress = new Uri("http://identity/") },
             () => "http://identity/connect/token",
@@ -136,6 +173,32 @@ public class BackOfficeRefreshTests
     private sealed class FixedTime(DateTimeOffset utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => utcNow;
+    }
+
+    private sealed class BlockingHandler : HttpMessageHandler
+    {
+        private int _entered;
+
+        public int Entered => _entered;
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            var count = Interlocked.Increment(ref _entered);
+            if (count == 1)
+            {
+                await Task.Delay(200, cancellationToken);
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    """{"access_token":"next-access","refresh_token":"next-refresh","expires_in":900}""",
+                    Encoding.UTF8,
+                    "application/json")
+            };
+        }
     }
 
     private sealed class MemoryAccessTokens(string? access, string? refresh) : IAccessTokens
