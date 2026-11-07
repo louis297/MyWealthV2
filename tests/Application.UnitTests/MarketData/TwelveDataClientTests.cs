@@ -19,14 +19,14 @@ public class TwelveDataClientTests
         TwelveDataSymbols.For("CBA", "AUD").ShouldBe("CBA:ASX");
         TwelveDataSymbols.For("WOW", "AUD").ShouldBe("WOW:ASX");
         TwelveDataSymbols.For("SAP", "EUR").ShouldBe("SAP:XETR");
-        TwelveDataSymbols.For("AIR", "EUR").ShouldBe("AIR:EPA");
-        TwelveDataSymbols.For("OR", "EUR").ShouldBe("OR:EPA");
+        TwelveDataSymbols.For("AIR", "EUR").ShouldBe("AIR:Euronext");
+        TwelveDataSymbols.For("OR", "EUR").ShouldBe("OR:Euronext");
         TwelveDataSymbols.For("SHEL", "GBP").ShouldBe("SHEL:LSE");
         TwelveDataSymbols.For("HSBA", "GBP").ShouldBe("HSBA:LSE");
         TwelveDataSymbols.For("ULVR", "GBP").ShouldBe("ULVR:LSE");
-        TwelveDataSymbols.For("7203", "JPY").ShouldBe("7203:TSE");
-        TwelveDataSymbols.For("6758", "JPY").ShouldBe("6758:TSE");
-        TwelveDataSymbols.For("9984", "JPY").ShouldBe("9984:TSE");
+        TwelveDataSymbols.For("7203", "JPY").ShouldBe("7203:JPX");
+        TwelveDataSymbols.For("6758", "JPY").ShouldBe("6758:JPX");
+        TwelveDataSymbols.For("9984", "JPY").ShouldBe("9984:JPX");
         TwelveDataSymbols.For("AAPL", "USD").ShouldBe("AAPL");
         TwelveDataSymbols.For("VTI", "USD").ShouldBe("VTI");
         TwelveDataSymbols.For("MSFT", "USD").ShouldBe("MSFT");
@@ -87,6 +87,17 @@ public class TwelveDataClientTests
 
         handler.StatusCode = HttpStatusCode.BadRequest;
         (await client.GetLatestAsync("NOPE", "USD")).ShouldBeNull();
+    }
+
+    [Test]
+    public async Task GetLatest_NotFound_ReturnsNull()
+    {
+        var handler = new StubHandler(HttpStatusCode.NotFound, """
+            {"code":404,"message":"symbol not found","status":"error"}
+            """);
+        var client = Client(handler, "test-key");
+
+        (await client.GetLatestAsync("AIA", "NZD")).ShouldBeNull();
     }
 
     [Test]
