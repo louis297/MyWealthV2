@@ -28,16 +28,36 @@ public sealed class BackOfficeTokenRefresh
 
     public Task<RefreshedTokens?> ExchangeAsync(string refreshToken, CancellationToken cancellationToken = default)
     {
-        if (_current.TryGetValue(refreshToken, out var cached) && cached.ExpiresAt > _time.GetUtcNow().AddMinutes(1))
+        var presented = LatestRefreshToken(refreshToken);
+        if (_current.TryGetValue(presented, out var cached) && cached.ExpiresAt > _time.GetUtcNow().AddMinutes(1))
         {
             return Task.FromResult<RefreshedTokens?>(cached);
         }
 
+        if (_calls.TryGetValue(presented, out var completed)
+            && completed.IsValueCreated
+            && completed.Value.IsCompleted)
+        {
+            _calls.TryRemove(new KeyValuePair<string, Lazy<Task<RefreshedTokens?>>>(presented, completed));
+        }
+
         var call = _calls.GetOrAdd(
-            refreshToken,
-            static (presented, self) => new Lazy<Task<RefreshedTokens?>>(() => self.PostAndRememberAsync(presented)),
+            presented,
+            static (token, self) => new Lazy<Task<RefreshedTokens?>>(() => self.PostAndRememberAsync(token)),
             this);
         return call.Value.WaitAsync(cancellationToken);
+    }
+
+    private string LatestRefreshToken(string refreshToken)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var current = refreshToken;
+        while (seen.Add(current) && _current.TryGetValue(current, out var cached) && cached.RefreshToken != current)
+        {
+            current = cached.RefreshToken;
+        }
+
+        return current;
     }
 
     private async Task<RefreshedTokens?> PostAndRememberAsync(string refreshToken)
