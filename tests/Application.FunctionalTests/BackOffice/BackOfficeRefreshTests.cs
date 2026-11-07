@@ -131,6 +131,37 @@ public class BackOfficeRefreshTests
         results[1]!.RefreshToken.ShouldBe("next-refresh");
     }
 
+    [Test]
+    public async Task ExpiredCachedAccessToken_PresentsTheLatestRefreshToken()
+    {
+        var now = new DateTimeOffset(2026, 11, 7, 12, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTime(now);
+        var tokenEndpoint = new ScriptedHandler();
+        tokenEndpoint.Enqueue(
+            HttpStatusCode.OK,
+            """{"access_token":"next-access","refresh_token":"next-refresh","expires_in":900}""");
+        tokenEndpoint.Enqueue(
+            HttpStatusCode.OK,
+            """{"access_token":"later-access","refresh_token":"later-refresh","expires_in":900}""");
+        var refresh = new BackOfficeTokenRefresh(
+            new HttpClient(tokenEndpoint),
+            () => "http://identity/connect/token",
+            BackOfficeTestSecret.Value,
+            clock);
+
+        var first = await refresh.ExchangeAsync("old-refresh");
+        first!.RefreshToken.ShouldBe("next-refresh");
+        clock.UtcNow = now.AddMinutes(20);
+
+        var second = await refresh.ExchangeAsync("old-refresh");
+
+        second!.AccessToken.ShouldBe("later-access");
+        second.RefreshToken.ShouldBe("later-refresh");
+        tokenEndpoint.Requests.Count.ShouldBe(2);
+        var form = HttpUtility.ParseQueryString(tokenEndpoint.Requests[1].Body);
+        form["refresh_token"].ShouldBe("next-refresh");
+    }
+
     private static BackOfficeTokenRefresh NewRefresh(HttpMessageHandler tokenEndpoint, DateTimeOffset utcNow) =>
         new(
             new HttpClient(tokenEndpoint) { BaseAddress = new Uri("http://identity/") },
@@ -173,6 +204,13 @@ public class BackOfficeRefreshTests
     private sealed class FixedTime(DateTimeOffset utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => utcNow;
+    }
+
+    private sealed class ManualTime(DateTimeOffset utcNow) : TimeProvider
+    {
+        public DateTimeOffset UtcNow { get; set; } = utcNow;
+
+        public override DateTimeOffset GetUtcNow() => UtcNow;
     }
 
     private sealed class BlockingHandler : HttpMessageHandler
