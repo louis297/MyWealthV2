@@ -162,6 +162,19 @@ public class BackOfficeRefreshTests
         form["refresh_token"].ShouldBe("next-refresh");
     }
 
+    [Test]
+    public async Task Store_AfterTheResponseStarted_KeepsTheNewAccessToken()
+    {
+        var http = new DefaultHttpContext();
+        await http.Response.StartAsync();
+        var tokens = new CookieAccessTokens(new ContextAccessor(http));
+
+        tokens.Store("next-access", "next-refresh");
+
+        tokens.AccessToken.ShouldBe("next-access");
+        tokens.RefreshToken.ShouldBe("next-refresh");
+    }
+
     private static BackOfficeTokenRefresh NewRefresh(HttpMessageHandler tokenEndpoint, DateTimeOffset utcNow) =>
         new(
             new HttpClient(tokenEndpoint) { BaseAddress = new Uri("http://identity/") },
@@ -204,6 +217,11 @@ public class BackOfficeRefreshTests
     private sealed class FixedTime(DateTimeOffset utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => utcNow;
+    }
+
+    private sealed class ContextAccessor(HttpContext? context) : IHttpContextAccessor
+    {
+        public HttpContext? HttpContext { get; set; } = context;
     }
 
     private sealed class ManualTime(DateTimeOffset utcNow) : TimeProvider
