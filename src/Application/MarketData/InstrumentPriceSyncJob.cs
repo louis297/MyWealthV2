@@ -10,6 +10,8 @@ public sealed class InstrumentPriceSyncJob(
     TimeSpan requestSpacing,
     ILogger<InstrumentPriceSyncJob> logger)
 {
+    public const int RequestsPerRun = 8;
+
     public async Task Sync(CancellationToken cancellationToken = default)
     {
         try
@@ -24,12 +26,22 @@ public sealed class InstrumentPriceSyncJob(
                 return;
             }
 
+            var fetchedAt = await store.LatestFetchedAtByInstrumentAsync(
+                active.Select(instrument => instrument.Id).ToList(),
+                cancellationToken);
             var groups = active
                 .GroupBy(instrument => (
                     Symbol: instrument.Symbol.Trim().ToUpperInvariant(),
                     Quote: instrument.QuoteCurrency.Trim().ToUpperInvariant()))
-                .OrderBy(group => group.Key.Symbol, StringComparer.Ordinal)
+                .Select(group => new SymbolGroup(
+                    group.Key,
+                    group.ToList(),
+                    group.Min(instrument =>
+                        fetchedAt.TryGetValue(instrument.Id, out var at) ? at : DateTimeOffset.MinValue)))
+                .OrderBy(group => group.OldestFetch)
+                .ThenBy(group => group.Key.Symbol, StringComparer.Ordinal)
                 .ThenBy(group => group.Key.Quote, StringComparer.Ordinal)
+                .Take(RequestsPerRun)
                 .ToList();
 
             var collected = new List<InstrumentPriceQuote>();
@@ -61,7 +73,7 @@ public sealed class InstrumentPriceSyncJob(
                     continue;
                 }
 
-                foreach (var instrument in group)
+                foreach (var instrument in group.Instruments)
                 {
                     collected.Add(new InstrumentPriceQuote(instrument.Id, sourced.Value.Price, sourced.Value.AsOfDate));
                 }
@@ -77,4 +89,9 @@ public sealed class InstrumentPriceSyncJob(
             logger.LogError(exception, "Instrument price sync failed.");
         }
     }
+
+    private sealed record SymbolGroup(
+        (string Symbol, string Quote) Key,
+        List<ActiveInstrument> Instruments,
+        DateTimeOffset OldestFetch);
 }

@@ -85,6 +85,7 @@ The worker fetches the latest EOD prices for instruments that are active in any 
 | R13 | Index on `FetchedAt` for “latest successful sync” observability. Index on `(InstrumentId, AsOfDate)` for the as-of lookup. |
 | R14 | The job always runs. It calls the source only when some active instrument has no row whose `AsOfDate` is today’s UTC date. Once every active instrument has today’s source date, later runs that UTC day do not call the source. A run that stored an older source date still calls again later the same UTC day. On weekends and holidays the source date is not today, so the job still calls and upserts that `AsOfDate`. |
 | R15 | Same symbol across tenants is fetched once per run (by symbol + quote currency) and the price is written to every matching active `InstrumentId`. |
+| R16 | A run requests at most 8 symbol groups, the free-tier minute budget. It chooses the groups whose latest `FetchedAt` is earliest. An instrument with no price row is earlier than any stored `FetchedAt`. The group uses the earliest of its instruments. Ties break by symbol, then quote currency. The next run therefore refreshes symbols this run did not write. |
 
 ---
 
@@ -181,7 +182,7 @@ Follows ADR 0019 pattern. No new ADR.
 | Scripts / policy | `0022_instrument_prices.sql`; no new policy |
 | Caller | Worker job only for writes; any Application caller for `IMarketData` |
 | Scope | Platform prices for active instruments (union across tenants); daily EOD; local read |
-| Schedule | Hourly, UTC. Skip external call once every active instrument has today’s source date (R14). |
+| Schedule | Hourly, UTC. Skip external call once every active instrument has today’s source date (R14). Each run requests at most 8 symbol groups, oldest `FetchedAt` first (R16). |
 | Source | Twelve Data free Basic (8 credits/min, 800/day). Key via Aspire parameter. EOD / time-series endpoint. |
 | Columns | Keep both `AsOfDate` (source date) and `FetchedAt` (when we wrote). On same `AsOfDate`, update `Price` + `FetchedAt`. |
 | Cache | No `IMemoryCache` this slice |
@@ -222,7 +223,7 @@ Obvious test values, not real market prices. Additional historical dates may be 
 
 Locked with the implementation:
 
-- Endpoint: `GET https://api.twelvedata.com/eod?symbol={symbol}&dp=8&apikey={key}`. One credit per symbol. The job waits 8 seconds between symbols so a run stays within 8 credits per minute.
+- Endpoint: `GET https://api.twelvedata.com/eod?symbol={symbol}&dp=8&apikey={key}`. One credit per symbol. A run requests at most 8 symbol groups, the ones with the earliest `FetchedAt` (no row is earliest). The job waits 8 seconds between those symbols so the run stays within 8 credits per minute. The next hour takes the next stalest groups.
 - `datetime` (the date) is `AsOfDate`. `close` is `Price`.
 - Known non-US seed symbols use `SYMBOL:EXCHANGE`: `AIA:NZX`, `FPH:NZX`, `MEL:NZX`, `BHP:ASX`, `CBA:ASX`, `WOW:ASX`, `SAP:XETR`, `AIR:Euronext`, `OR:Euronext`, `SHEL:LSE`, `HSBA:LSE`, `ULVR:LSE`, `7203:JPX`, `6758:JPX`, `9984:JPX`. `VTI`, `AAPL`, and `MSFT` are sent unchanged. Any other symbol is sent as stored.
 - A per-symbol rejection (unknown symbol, a symbol outside the current plan, or a source currency that is not the instrument quote currency) is logged and skipped. Twelve Data reports an unknown or plan-limited symbol as HTTP 404 with `status: error` (and some rejections as HTTP 400). That is not a transport failure. Other symbols in that run are still written. A transport failure (network, 401, 429, 5xx) logs and does not upsert.
@@ -254,3 +255,5 @@ Still open, not this slice:
 2026-11-02 — Landed. Script `0022_instrument_prices.sql`. Twelve Data `GET /eod`, hourly Hangfire job `instrument-price-sync`, `IMarketData` reads `InstrumentPrices`. TestSeed writes the fake catalog prices.
 
 2026-11-08 — Twelve Data exchange suffixes for Airbus, L'Oréal, Toyota, Sony, and SoftBank are `Euronext` and `JPX`. HTTP 404 from the source is a per-symbol rejection.
+
+2026-11-08 — Each hourly run requests at most 8 symbol groups, chosen by earliest `FetchedAt`, so the free-tier minute budget rotates through the catalog.
