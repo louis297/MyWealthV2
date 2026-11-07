@@ -193,6 +193,127 @@ public class InstrumentPriceSyncJobTests
     }
 
     [Test]
+    public async Task Sync_ChoosesEightDistinctInstrumentsByTheirLatestFetch()
+    {
+        await using var db = Open();
+        var (tenant, otherTenant) = await TwoTenantFixture.InsertAsync(db);
+        var refreshed = await AddInstrumentAsync(db, tenant, "H1", "USD", active: true);
+        var stale = new List<Instrument>();
+        for (var index = 1; index <= 8; index++)
+        {
+            stale.Add(await AddInstrumentAsync(db, tenant, $"S{index}", "USD", active: true));
+        }
+
+        var today = new DateOnly(2026, 11, 2);
+        var now = new DateTimeOffset(2026, 11, 2, 3, 0, 0, TimeSpan.Zero);
+        db.InstrumentPrices.Add(Stored(
+            refreshed.Id,
+            1m,
+            new DateOnly(2020, 1, 1),
+            new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero)));
+        db.InstrumentPrices.Add(Stored(
+            refreshed.Id,
+            2m,
+            today,
+            new DateTimeOffset(2026, 11, 2, 1, 0, 0, TimeSpan.Zero)));
+        foreach (var instrument in stale)
+        {
+            db.InstrumentPrices.Add(Stored(
+                instrument.Id,
+                10m,
+                new DateOnly(2026, 11, 1),
+                new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero)));
+        }
+
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+
+        var source = new RecordingSource(new DateOnly(2026, 11, 1), price: 11m, currency: "USD");
+        var active = stale
+            .Select(instrument => new ActiveInstrument(instrument.Id, instrument.Symbol, "USD"))
+            .Prepend(new ActiveInstrument(refreshed.Id, "H1", "USD"))
+            .ToArray();
+        var job = Job(db, new FixedCatalog(active), source, new FixedTime(now));
+
+        try
+        {
+            await job.Sync();
+
+            source.Calls.Select(call => call.Symbol).ShouldBe(["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8"]);
+        }
+        finally
+        {
+            await CleanupAsync(db, tenant.Id, otherTenant.Id);
+        }
+    }
+
+    [Test]
+    public async Task Sync_DoesNotRepeatARejectedInstrumentTheSameDay()
+    {
+        await using var db = Open();
+        var (tenant, otherTenant) = await TwoTenantFixture.InsertAsync(db);
+        var instruments = new List<Instrument>();
+        for (var index = 1; index <= 9; index++)
+        {
+            instruments.Add(await AddInstrumentAsync(db, tenant, $"A{index}", "USD", active: true));
+        }
+
+        var oldest = instruments[0];
+        db.InstrumentPrices.Add(Stored(
+            oldest.Id,
+            1m,
+            new DateOnly(2020, 1, 1),
+            new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero)));
+        db.InstrumentPrices.Add(Stored(
+            oldest.Id,
+            5m,
+            new DateOnly(2026, 10, 1),
+            new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero)));
+        for (var index = 1; index < instruments.Count; index++)
+        {
+            db.InstrumentPrices.Add(Stored(
+                instruments[index].Id,
+                10m + index,
+                new DateOnly(2026, 10, 1),
+                new DateTimeOffset(2026, 10, index + 1, 0, 0, 0, TimeSpan.Zero)));
+        }
+
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+
+        var now = new DateTimeOffset(2026, 11, 2, 3, 0, 0, TimeSpan.Zero);
+        var source = new RejectingSource();
+        var active = instruments
+            .Select(instrument => new ActiveInstrument(instrument.Id, instrument.Symbol, "USD"))
+            .ToArray();
+        var job = Job(db, new FixedCatalog(active), source, new FixedTime(now));
+
+        try
+        {
+            await job.Sync();
+
+            source.Calls.Select(call => call.Symbol).ShouldBe(["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8"]);
+            var oldestRows = await db.InstrumentPrices.AsNoTracking()
+                .Where(row => row.InstrumentId == oldest.Id)
+                .OrderBy(row => row.AsOfDate)
+                .ToListAsync();
+            oldestRows[0].FetchedAt.ShouldBe(new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero));
+            oldestRows[1].Price.ShouldBe(5m);
+            oldestRows[1].AsOfDate.ShouldBe(new DateOnly(2026, 10, 1));
+            oldestRows[1].FetchedAt.ShouldBe(now);
+
+            source.Calls.Clear();
+            await job.Sync();
+
+            source.Calls.Select(call => call.Symbol).ShouldBe(["A9"]);
+        }
+        finally
+        {
+            await CleanupAsync(db, tenant.Id, otherTenant.Id);
+        }
+    }
+
+    [Test]
     public async Task Sync_SkipsTheSourceWhenEveryActiveInstrumentHasTodaysDate()
     {
         await using var db = Open();
@@ -350,6 +471,20 @@ public class InstrumentPriceSyncJobTests
             }
 
             return Task.FromResult<SourcedInstrumentPrice?>(new SourcedInstrumentPrice(250m, asOf, quoteCurrency));
+        }
+    }
+
+    private sealed class RejectingSource : IInstrumentPriceSource
+    {
+        public List<(string Symbol, string QuoteCurrency)> Calls { get; } = [];
+
+        public Task<SourcedInstrumentPrice?> GetLatestAsync(
+            string symbol,
+            string quoteCurrency,
+            CancellationToken cancellationToken = default)
+        {
+            Calls.Add((symbol, quoteCurrency));
+            return Task.FromResult<SourcedInstrumentPrice?>(null);
         }
     }
 
