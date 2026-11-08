@@ -10,7 +10,7 @@ namespace MyWealthV2.Infrastructure.IntegrationTests.MarketData;
 public class InstrumentPriceRecurringJobTests
 {
     [Test]
-    public void Register_AddsTheHourlyUtcJob()
+    public void Register_AddsTheDailyNoonUtcJob()
     {
         var builder = Host.CreateApplicationBuilder();
         builder.Services.AddHangfire(configuration => configuration.UseInMemoryStorage());
@@ -22,7 +22,7 @@ public class InstrumentPriceRecurringJobTests
         var ids = connection.GetAllItemsFromSet("recurring-jobs");
         ids.ShouldBe(["instrument-price-sync"]);
         var hash = connection.GetAllEntriesFromHash("recurring-job:instrument-price-sync");
-        hash["Cron"].ShouldBe("0 * * * *");
+        hash["Cron"].ShouldBe("0 12 * * *");
         hash["TimeZoneId"].ShouldBe("UTC");
         using var payload = JsonDocument.Parse(hash["Job"]);
         payload.RootElement.GetProperty("Queue").GetString().ShouldBe("prices");
