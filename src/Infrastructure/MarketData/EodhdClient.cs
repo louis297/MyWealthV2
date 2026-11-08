@@ -20,8 +20,9 @@ public sealed class EodhdClient(HttpClient http, IConfiguration configuration) :
         }
 
         var providerSymbol = EodhdSymbols.For(symbol, quoteCurrency);
+        // A request path that starts with '/' replaces BaseAddress's path, so /api must be in the path.
         var path =
-            $"/eod/{Uri.EscapeDataString(providerSymbol)}?api_token={Uri.EscapeDataString(apiKey)}&fmt=json";
+            $"/api/eod/{Uri.EscapeDataString(providerSymbol)}?api_token={Uri.EscapeDataString(apiKey)}&fmt=json";
         using var response = await http.GetAsync(path, cancellationToken);
         if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Forbidden)
         {
