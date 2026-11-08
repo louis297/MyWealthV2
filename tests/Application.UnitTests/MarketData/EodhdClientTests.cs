@@ -47,7 +47,7 @@ public class EodhdClientTests
 
         var price = await client.GetLatestAsync("AAPL", "USD");
 
-        handler.Urls.ShouldBe(["/eod/AAPL.US?api_token=test-key&fmt=json"]);
+        handler.Urls.ShouldBe(["https://eodhd.com/api/eod/AAPL.US?api_token=test-key&fmt=json"]);
         price.ShouldBe(new MyWealthV2.Application.MarketData.SourcedInstrumentPrice(
             180.125m, new DateOnly(2026, 11, 3), "USD"));
     }
@@ -62,7 +62,7 @@ public class EodhdClientTests
 
         var price = await client.GetLatestAsync("AIA", "NZD");
 
-        handler.Urls.ShouldBe(["/eod/AIA.NZ?api_token=test-key&fmt=json"]);
+        handler.Urls.ShouldBe(["https://eodhd.com/api/eod/AIA.NZ?api_token=test-key&fmt=json"]);
         price.ShouldNotBeNull();
         price.Value.AsOfDate.ShouldBe(new DateOnly(2026, 11, 1));
         price.Value.Price.ShouldBe(8.5m);
@@ -145,7 +145,7 @@ public class EodhdClientTests
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
-            Urls.Add(request.RequestUri!.PathAndQuery);
+            Urls.Add(request.RequestUri!.AbsoluteUri);
             return Task.FromResult(new HttpResponseMessage(StatusCode)
             {
                 Content = new StringContent(Body, Encoding.UTF8, "application/json")
