@@ -11,14 +11,14 @@ public static class TwelveDataSymbols
         [("CBA", "AUD")] = "CBA:ASX",
         [("WOW", "AUD")] = "WOW:ASX",
         [("SAP", "EUR")] = "SAP:XETR",
-        [("AIR", "EUR")] = "AIR:Euronext",
-        [("OR", "EUR")] = "OR:Euronext",
+        [("AIR", "EUR")] = "AIR:EPA",
+        [("OR", "EUR")] = "OR:EPA",
         [("SHEL", "GBP")] = "SHEL:LSE",
         [("HSBA", "GBP")] = "HSBA:LSE",
         [("ULVR", "GBP")] = "ULVR:LSE",
-        [("7203", "JPY")] = "7203:JPX",
-        [("6758", "JPY")] = "6758:JPX",
-        [("9984", "JPY")] = "9984:JPX"
+        [("7203", "JPY")] = "7203:TSE",
+        [("6758", "JPY")] = "6758:TSE",
+        [("9984", "JPY")] = "9984:TSE"
     };
 
     public static string For(string symbol, string quoteCurrency)

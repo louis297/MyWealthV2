@@ -224,7 +224,7 @@ Locked with the implementation:
 
 - Endpoint: `GET https://api.twelvedata.com/eod?symbol={symbol}&dp=8&apikey={key}`. One credit per symbol. The job waits 8 seconds between symbols so a run stays within 8 credits per minute.
 - `datetime` (the date) is `AsOfDate`. `close` is `Price`.
-- Known non-US seed symbols use `SYMBOL:EXCHANGE`: `AIA:NZX`, `FPH:NZX`, `MEL:NZX`, `BHP:ASX`, `CBA:ASX`, `WOW:ASX`, `SAP:XETR`, `AIR:Euronext`, `OR:Euronext`, `SHEL:LSE`, `HSBA:LSE`, `ULVR:LSE`, `7203:JPX`, `6758:JPX`, `9984:JPX`. `VTI`, `AAPL`, and `MSFT` are sent unchanged. Any other symbol is sent as stored.
+- Known non-US seed symbols use `SYMBOL:EXCHANGE`: `AIA:NZX`, `FPH:NZX`, `MEL:NZX`, `BHP:ASX`, `CBA:ASX`, `WOW:ASX`, `SAP:XETR`, `AIR:EPA`, `OR:EPA`, `SHEL:LSE`, `HSBA:LSE`, `ULVR:LSE`, `7203:TSE`, `6758:TSE`, `9984:TSE`. `VTI`, `AAPL`, and `MSFT` are sent unchanged. Any other symbol is sent as stored.
 - A per-symbol rejection (unknown symbol, a symbol outside the current plan, or a source currency that is not the instrument quote currency) is logged and skipped. Twelve Data reports an unknown or plan-limited symbol as HTTP 404 with `status: error` (and some rejections as HTTP 400). That is not a transport failure. Other symbols in that run are still written. A transport failure (network, 401, 429, 5xx) logs and does not upsert.
 - API key: Aspire parameter `twelve-data-api-key`, passed only to the worker as `TwelveData__ApiKey`. Not in git.
 
@@ -252,5 +252,3 @@ Still open, not this slice:
 2026-11-02 — Accepted. Local EOD price cache for active instruments, same pattern as FX rates. `IMarketData` reads the table. Source is Twelve Data free Basic. Job is hourly with skip-if-today-stored. Demo catalog expanded to several instruments per seed currency.
 
 2026-11-02 — Landed. Script `0022_instrument_prices.sql`. Twelve Data `GET /eod`, hourly Hangfire job `instrument-price-sync`, `IMarketData` reads `InstrumentPrices`. TestSeed writes the fake catalog prices.
-
-2026-11-08 — Twelve Data exchange suffixes for Airbus, L'Oréal, Toyota, Sony, and SoftBank are `Euronext` and `JPX`. HTTP 404 from the source is a per-symbol rejection.
