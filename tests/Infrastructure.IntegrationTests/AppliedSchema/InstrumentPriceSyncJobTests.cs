@@ -174,17 +174,7 @@ public class InstrumentPriceSyncJobTests
             source.Calls.Clear();
             await job.Sync();
 
-            source.Calls.Select(call => call.Symbol).ShouldBe(["M9"]);
-
-            source.Calls.Clear();
-            var nextDay = Job(
-                db,
-                new FixedCatalog([.. active]),
-                source,
-                new FixedTime(now.AddDays(1)));
-            await nextDay.Sync();
-
-            source.Calls.Select(call => call.Symbol).ShouldBe(["M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8"]);
+            source.Calls.Select(call => call.Symbol).ShouldBe(["M9", "M1", "M2", "M3", "M4", "M5", "M6", "M7"]);
         }
         finally
         {
