@@ -503,12 +503,12 @@ Script `0022_instrument_prices.sql`. Table `InstrumentPrices` in the application
 | `InstrumentId` | `int` FK → `Instruments.Id` (RESTRICT) |
 | `Price` | `decimal(18,8)`. In the instrument’s QuoteCurrency |
 | `AsOfDate` | `date`. Date the source published |
-| `Source` | `nvarchar(50)`. `'TwelveData'` |
+| `Source` | `nvarchar(50)`. `'EODHD'` |
 | `FetchedAt` | `datetimeoffset`. When the job wrote the row |
 
 PK `(InstrumentId, AsOfDate)`. Index on `FetchedAt`. No PublicId. No RowVersion. No audit columns beyond `FetchedAt`. No seed in the script — the hourly job populates it. Development / TestAppHost uses `TestSeed` with round, obviously-fake prices (several instruments per seed currency).
 
-Hourly Hangfire job (UTC) fetches EOD prices from Twelve Data for instruments that are active in at least one tenant when today's UTC date is not already stored for every active instrument. Same symbol + quote currency across tenants is fetched once and written to every matching `InstrumentId`. On the same `AsOfDate`, update `Price` and `FetchedAt`. Fetch failure logs and leaves previous rows. `IMarketData` reads the table: latest row with `AsOfDate` ≤ requested date (or today if omitted); no row → empty (not 0).
+Hourly Hangfire job (UTC) fetches EOD prices from EODHD for instruments that are active in at least one tenant when today's UTC date is not already stored for every active instrument. Same symbol + quote currency across tenants is fetched once and written to every matching `InstrumentId`. On the same `AsOfDate`, update `Price` and `FetchedAt`. Fetch failure logs and leaves previous rows. `IMarketData` reads the table: latest row with `AsOfDate` ≤ requested date (or today if omitted); no row → empty (not 0).
 
 ### Change log
 
@@ -522,4 +522,5 @@ Hourly Hangfire job (UTC) fetches EOD prices from Twelve Data for instruments th
 | 2026-11-02 | FX rates accepted. Script name `0021_fx_rates.sql`. Table `FxRates`. ADR 0019. |
 | 2026-11-02 | `0021_fx_rates.sql` landed. No seed rows in the script. |
 | 2026-11-02 | Instrument prices accepted. Script name `0022_instrument_prices.sql`. Table `InstrumentPrices`. Source Twelve Data. |
+| 2026-11-08 | Source switched to EODHD. Column value `'EODHD'`. |
 | 2026-11-02 | `0022_instrument_prices.sql` landed. No seed rows in the script. TestSeed writes the fake prices. |

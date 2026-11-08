@@ -15,7 +15,7 @@ instruments, accounts, posting (cash + journal), holdings, buy/sell/stock in-out
 Adviser Portal Dashboard and ledger pages accepted. Portfolios portal contract accepted.
 
 **Phase 3** (platform services + second portal) — accepted and largely landed:  
-reports (catalog, grants, generate, schedules, history), transactional outbox, FX rates (Frankfurter), instrument prices (Twelve Data EOD).  
+reports (catalog, grants, generate, schedules, history), transactional outbox, FX rates (Frankfurter), instrument prices (EODHD EOD).  
 Customer Portal (second BFF + confidential client) accepted.
 
 Later domains (KYC, households, advice documents, fees, etc.) are planned one domain at a time.

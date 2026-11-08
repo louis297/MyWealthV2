@@ -55,9 +55,9 @@ public static class DependencyInjection
         builder.Services.AddScoped<IInstrumentPriceStore>(sp => sp.GetRequiredService<InstrumentPriceStore>());
         builder.Services.AddScoped<IMarketData>(sp => sp.GetRequiredService<InstrumentPriceStore>());
         builder.Services.AddScoped<IActiveInstrumentCatalog, ActiveInstrumentCatalog>();
-        builder.Services.AddHttpClient<IInstrumentPriceSource, TwelveDataClient>(client =>
+        builder.Services.AddHttpClient<IInstrumentPriceSource, EodhdClient>(client =>
         {
-            client.BaseAddress = new Uri("https://api.twelvedata.com");
+            client.BaseAddress = new Uri("https://eodhd.com/api");
         });
 
         var schemaDirectory = Path.Combine(AppContext.BaseDirectory, "schema");

@@ -191,7 +191,7 @@ public static class TestSeed
                 InstrumentId = instrument.Id,
                 Price = price,
                 AsOfDate = asOf,
-                Source = "TwelveData",
+                Source = "EODHD",
                 FetchedAt = fetchedAt
             });
         }

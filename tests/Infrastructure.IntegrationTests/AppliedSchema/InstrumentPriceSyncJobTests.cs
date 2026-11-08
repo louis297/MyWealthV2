@@ -74,7 +74,7 @@ public class InstrumentPriceSyncJobTests
                 row.Price == 251m
                 && row.AsOfDate == new DateOnly(2026, 11, 1)
                 && row.FetchedAt == fetchedAt
-                && row.Source == "TwelveData");
+                && row.Source == "EODHD");
         }
         finally
         {
@@ -120,7 +120,7 @@ public class InstrumentPriceSyncJobTests
             var writtenRow = await db.InstrumentPrices.AsNoTracking().SingleAsync(row => row.InstrumentId == written.Id);
             writtenRow.Price.ShouldBe(250m);
             writtenRow.AsOfDate.ShouldBe(new DateOnly(2026, 11, 1));
-            writtenRow.Source.ShouldBe("TwelveData");
+            writtenRow.Source.ShouldBe("EODHD");
         }
         finally
         {
@@ -221,7 +221,7 @@ public class InstrumentPriceSyncJobTests
             InstrumentId = instrumentId,
             Price = price,
             AsOfDate = asOf,
-            Source = "TwelveData",
+            Source = "EODHD",
             FetchedAt = fetchedAt
         };
 

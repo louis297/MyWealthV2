@@ -203,7 +203,7 @@ Do not create entities, tables, or empty aggregate roots for:
 - Account balances, holding quantities, net worth
 - Refresh tokens, OIDC clients, authorization codes
 
-`Instrument` and `IMarketData` ship with the instruments slice (§8.4). `IMarketData` is implemented by the instrument-prices slice ([features/instrument-prices.md](features/instrument-prices.md), accepted 2026-11-02): local `InstrumentPrices` table, Twelve Data hourly job, missing → empty. `IFxRate` is implemented by the fx-rates slice ([features/fx-rates.md](features/fx-rates.md), accepted 2026-11-02): local `FxRates` table, Frankfurter hourly job, same currency = 1, missing pair → `FxRateNotFoundException`.
+`Instrument` and `IMarketData` ship with the instruments slice (§8.4). `IMarketData` is implemented by the instrument-prices slice ([features/instrument-prices.md](features/instrument-prices.md), accepted 2026-11-02): local `InstrumentPrices` table, EODHD hourly job, missing → empty. `IFxRate` is implemented by the fx-rates slice ([features/fx-rates.md](features/fx-rates.md), accepted 2026-11-02): local `FxRates` table, Frankfurter hourly job, same currency = 1, missing pair → `FxRateNotFoundException`.
 
 The `Money` value object **does** live in the Domain assembly, even with no balance column in Phase 1.
 
@@ -356,6 +356,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-10-12 | Net-worth current point-in-time read model accepted and landed (`af422c2`). Per-currency arrays. No new Domain types. [features/net-worth.md](features/net-worth.md). |
 | 2026-11-02 | FX rates accepted. `IFxRate` implemented by local `FxRates` table + Frankfurter hourly job. Missing pair → `FxRateNotFoundException`. [features/fx-rates.md](features/fx-rates.md), ADR 0019. |
 | 2026-11-02 | Instrument prices accepted. `IMarketData` implemented by local `InstrumentPrices` table + Twelve Data hourly job. Missing → empty. [features/instrument-prices.md](features/instrument-prices.md). |
+| 2026-11-08 | Instrument price source switched to EODHD. |
 
 | 2026-11-02 | Portfolios draft. Model portfolios with base currency and target weights. Full Rebalance (async) on assign and weight change. While assigned, manual security trades rejected. One Active assignment per account. [features/portfolios.md](features/portfolios.md). |
 | 2026-11-02 | Portfolios accepted. `Portfolio`, `PortfolioLine`, `AccountPortfolioAssignment`. Assign is synchronous. Weight change and bulk rebalance are asynchronous. [features/portfolios.md](features/portfolios.md). |

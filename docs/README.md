@@ -3,7 +3,7 @@ title: Documentation
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-09-20
+updated: 2026-11-03
 ---
 
 # MyWealthV2 documentation
@@ -18,13 +18,19 @@ Coding and commit rules for agents belong in the repository-root `AGENTS.md`, no
 
 ## Current phase
 
-**Phase 2 — ledger domain.** Opened 2026-09-15. One domain, several slices.
+**Phase 2 — ledger domain.** Opened 2026-09-15. One domain, several slices. Largely landed through portfolios and net-worth.
 
-Phase 1 platform contracts stay accepted. Do not reopen them. Do not ship a single `Transactions` table that pretends to be both cash and securities.
+Phase 1 platform contracts stay accepted. Do not reopen them.
 
-**Feature map:** [function-plan.md](function-plan.md) §5. Instruments: [features/instruments.md](features/instruments.md) (landed `9ea2f2a`; IsActive rename `bbd0f26`). Accounts: [features/accounts.md](features/accounts.md) (`accepted`, landed `3e8b8f3`). Posting: [features/posting.md](features/posting.md) (`accepted` 2026-09-25, landed). Write Feature Specs one slice at a time. Do not lock columns outside the spec that owns them.
+**Feature map:** [function-plan.md](function-plan.md) and [features/README.md](features/README.md).
 
-Suggested internal order (tendency, not a locked backlog): instruments → account container → posting (`/transactions` + cash legs) → securities / holdings / Opening holdings → net-worth read model + Dashboard.
+Landed Phase 2 slices (accepted + implementation on master): instruments, accounts, posting, holdings, buy/sell, split/bonus/scrip, net-worth, portfolios.
+
+Accepted Phase 3 platform slices: reports, outbox, FX rates, instrument prices. Customer Portal accepted.
+
+Write Feature Specs one slice at a time. Do not lock columns outside the spec that owns them.
+
+Suggested internal order (tendency, not a locked backlog) was: instruments → account container → posting → securities / holdings → buy/sell → split/scrip/bonus → net-worth + Dashboard → portfolios.
 
 ### Phase 2 working mode
 

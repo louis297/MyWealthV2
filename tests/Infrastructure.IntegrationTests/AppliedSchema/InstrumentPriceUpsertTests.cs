@@ -46,7 +46,7 @@ public class InstrumentPriceUpsertTests
             var updated = sameDay.ShouldHaveSingleItem();
             updated.Price.ShouldBe(251m);
             updated.FetchedAt.ShouldBe(secondFetched);
-            updated.Source.ShouldBe("TwelveData");
+            updated.Source.ShouldBe("EODHD");
             (await db.InstrumentPrices.AsNoTracking().SingleAsync(row => row.InstrumentId == other.Id))
                 .Price.ShouldBe(180m);
 
