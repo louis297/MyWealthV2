@@ -55,7 +55,7 @@ public class InstrumentPricesSchemaTests
         command.CommandText = """
             INSERT INTO [InstrumentPrices]
                 ([InstrumentId], [Price], [AsOfDate], [Source], [FetchedAt])
-            VALUES (2147483647, 250.00000000, '2026-01-01', N'TwelveData', SYSDATETIMEOFFSET())
+            VALUES (2147483647, 250.00000000, '2026-01-01', N'EODHD', SYSDATETIMEOFFSET())
             """;
 
         var exception = await Should.ThrowAsync<SqlException>(() => command.ExecuteNonQueryAsync());

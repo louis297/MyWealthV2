@@ -70,7 +70,7 @@ public class TestSeedInstrumentsTests
 
             price.ShouldNotBeNull();
             price.Price.ShouldBe(expected.Price.Value);
-            price.Source.ShouldBe("TwelveData");
+            price.Source.ShouldBe("EODHD");
         }
 
         (await db.InstrumentPrices.AsNoTracking().CountAsync(row => ids.Contains(row.InstrumentId)))

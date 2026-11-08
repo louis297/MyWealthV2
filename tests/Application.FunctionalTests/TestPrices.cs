@@ -32,7 +32,7 @@ internal static class TestPrices
         }
 
         row.Price = amount;
-        row.Source = "TwelveData";
+        row.Source = "EODHD";
         row.FetchedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
         await db.SaveChangesAsync();
     }
