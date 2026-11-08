@@ -23,7 +23,7 @@ public sealed class TwelveDataClient(HttpClient http, IConfiguration configurati
         var path =
             $"/eod?symbol={Uri.EscapeDataString(providerSymbol)}&dp=8&apikey={Uri.EscapeDataString(apiKey)}";
         using var response = await http.GetAsync(path, cancellationToken);
-        if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.NotFound)
+        if (response.StatusCode == HttpStatusCode.BadRequest)
         {
             return null;
         }
