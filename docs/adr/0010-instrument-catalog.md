@@ -47,4 +47,4 @@ Free-text name/symbol on a holding cannot be de-duplicated and cannot attach a q
 
 ## Consequences
 
-Instruments come before accounts and holdings. Later slices must not store a free-text symbol on a holding. Port implementations read local caches (Twelve Data for prices, Frankfurter for FX); request paths do not call vendors.
+Instruments come before accounts and holdings. Later slices must not store a free-text symbol on a holding. Port implementations read local caches (EODHD for prices, Frankfurter for FX); request paths do not call vendors.

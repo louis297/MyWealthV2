@@ -262,7 +262,7 @@ Password change, disable, and logout revoke that subject’s OpenIddict tokens. 
 | `IEmailSender` | Phase 1, no-op | Invite / reset seam. No send use case this phase |
 | `IIdentityService` (or equivalent) | Phase 1 | Create / verify / change-password for Identity users. OpenIddict protocol stays out of Domain |
 | Token-revocation port | Phase 1 | `webapi` writes the shared OpenIddict store today. Replace the adapter if the identity database splits later |
-| `IMarketData` | Phase 3 instrument-prices | `TryGetPrice(instrumentId, asOf?) → Money?`. Missing → empty, not 0. Implemented against local `InstrumentPrices` table (Twelve Data hourly job). See [features/instrument-prices.md](features/instrument-prices.md). |
+| `IMarketData` | Phase 3 instrument-prices | `TryGetPrice(instrumentId, asOf?) → Money?`. Missing → empty, not 0. Implemented against local `InstrumentPrices` table (EODHD hourly job). See [features/instrument-prices.md](features/instrument-prices.md). |
 | `IFxRate` | Phase 3 fx-rates | `GetRate(from, to, asOf?)`. Same currency = 1. Missing pair → `FxRateNotFoundException`. Implemented against local `FxRates` table (Frankfurter hourly job). See [features/fx-rates.md](features/fx-rates.md). |
 
 Do not add a port whose surface is still open. Do add a port (or value object) when later use is certain and omitting it would force a Phase-1 redesign (`Money`, `ICurrencyCatalog`, no-op `IEmailSender`).
@@ -348,7 +348,7 @@ Locked conclusions follow function-plan §0 and these ADRs. The `docs/adr/` fold
 | 0017 | General-purpose background worker (`src/Worker`) with Hangfire. First consumer: Reports. |
 | 0018 | Transactional outbox for domain events (accepted). Same-transaction write to `OutboxMessages`; worker delivers via MediatR. Contract: features/outbox.md (accepted). |
 | 0019 | FX rate source and refresh (accepted). Frankfurter daily rates, hourly Hangfire job (UTC), directed pairs for active catalog currencies. Contract: features/fx-rates.md (accepted). |
-| — | Instrument prices (accepted, no new ADR). Twelve Data EOD, hourly Hangfire job (UTC), local `InstrumentPrices` table. Contract: features/instrument-prices.md (accepted). Follows ADR 0019 pattern. |
+| — | Instrument prices (accepted, no new ADR). EODHD EOD, hourly Hangfire job (UTC), local `InstrumentPrices` table. Contract: features/instrument-prices.md (accepted). Follows ADR 0019 pattern. |
 | — | Portfolios (accepted). Model portfolios, Full Rebalance, assignment lock. Contract: features/portfolios.md (accepted). No new ADR. |
 
 ---
@@ -373,5 +373,6 @@ Locked conclusions follow function-plan §0 and these ADRs. The `docs/adr/` fold
 | 2026-11-01 | [features/outbox.md](features/outbox.md) accepted. Former open items locked to the reference approaches. |
 | 2026-11-02 | ADR 0019 and [features/fx-rates.md](features/fx-rates.md) accepted. Hourly Frankfurter sync into `FxRates`. `IFxRate` reads the local table. |
 | 2026-11-02 | [features/instrument-prices.md](features/instrument-prices.md) accepted. Hourly Twelve Data sync into `InstrumentPrices`. `IMarketData` reads the local table. |
+| 2026-11-08 | Source switched to EODHD (global EOD free tier). See features/instrument-prices.md change summary. |
 | 2026-11-02 | [features/portfolios.md](features/portfolios.md) drafted. Full Rebalance model portfolios. Async job + per-account handle. Assigned accounts reject manual security trades. |
 | 2026-11-02 | [features/portfolios.md](features/portfolios.md) accepted. Assign and single-account rebalance are synchronous. Weight change and bulk rebalance return 202. Disable unassigns every Active assignment. |
