@@ -13,7 +13,7 @@ public static class InstrumentPriceRecurringJob
             JobId,
             "prices",
             job => job.Sync(CancellationToken.None),
-            "0 * * * *",
+            "0 12 * * *",
             new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
     }
 }
