@@ -40,7 +40,7 @@ The worker fetches the latest EOD prices for instruments that are active in any 
 **In**
 
 - Table `InstrumentPrices` (application schema).
-- Hangfire recurring job `InstrumentPriceSyncJob` (hourly).
+- Hangfire recurring job `InstrumentPriceSyncJob` (daily at 12:00 UTC).
 - Application port implementation of `IMarketData` that reads the table.
 - Upsert by `(InstrumentId, AsOfDate)`.
 - Fetch for active instruments across all tenants (union of symbols).
@@ -71,7 +71,7 @@ The worker fetches the latest EOD prices for instruments that are active in any 
 | ID | Rule |
 | --- | --- |
 | R1 | Source is EODHD (`https://eodhd.com/api`). Free plan: 20 API calls/day, 20/min. API key via Aspire parameter, not in git. Use the End-of-Day endpoint. Symbols use `SYMBOL.EXCHANGE` form (e.g. `AIA.NZ`, `AAPL.US`). |
-| R2 | Job runs **hourly** via Hangfire recurring job, schedule in **UTC**. Business logic lives in Application; the worker only hosts it. |
+| R2 | Job runs **daily at 12:00 UTC** via Hangfire recurring job (`0 12 * * *`). Business logic lives in Application; the worker only hosts it. |
 | R3 | Store one price per instrument per as-of date for instruments that are **active** in at least one tenant. Job reads the union of active `Instruments` on every run. Inactive instruments are not fetched; existing rows stay. |
 | R4 | Price is in the instrument’s `QuoteCurrency`. Do not convert on write. Callers that need another currency use `IFxRate`. |
 | R5 | Upsert key is `(InstrumentId, AsOfDate)`. `AsOfDate` is the date the source returns (previous working day on weekends / holidays). On each successful run, if the `AsOfDate` already exists for the instrument, update `Price` and `FetchedAt`; if it is a new date, insert. |
@@ -181,7 +181,7 @@ Follows ADR 0019 pattern. No new ADR.
 | Scripts / policy | `0022_instrument_prices.sql`; no new policy |
 | Caller | Worker job only for writes; any Application caller for `IMarketData` |
 | Scope | Platform prices for active instruments (union across tenants); daily EOD; local read |
-| Schedule | Hourly, UTC. Skip external call once every active instrument has today’s source date (R14). |
+| Schedule | Daily at 12:00 UTC (`0 12 * * *`). Skip external call once every active instrument has today’s source date (R14). |
 | Source | EODHD free plan (20 calls/day, 20/min). Key via Aspire parameter. EOD endpoint. One call returns full history for one symbol. |
 | Columns | Keep both `AsOfDate` (source date) and `FetchedAt` (when we wrote). On same `AsOfDate`, update `Price` + `FetchedAt`. |
 | Cache | No `IMemoryCache` this slice |
@@ -222,7 +222,7 @@ Obvious test values, not real market prices. Additional historical dates may be 
 
 Locked with the implementation:
 
-- Endpoint: `GET https://eodhd.com/api/eod/{SYMBOL.EXCHANGE}?api_token={key}&fmt=json`. One call per symbol returns the full history. The job takes the latest bar. Free plan limit is 20 calls/day; hourly runs only call when today's source date is missing (R14).
+- Endpoint: `GET https://eodhd.com/api/eod/{SYMBOL.EXCHANGE}?api_token={key}&fmt=json`. One call per symbol returns the full history. The job takes the latest bar. Free plan limit is 20 calls/day; the daily run only calls when today's source date is missing (R14).
 - `date` is `AsOfDate`. `close` is `Price`.
 - Seed symbols use `SYMBOL.EXCHANGE`: `AIA.NZ`, `FPH.NZ`, `MEL.NZ`, `BHP.AU`, `CBA.AU`, `WOW.AU`, `SAP.XETRA`, `AIR.PA`, `OR.PA`, `SHEL.LSE`, `HSBA.LSE`, `ULVR.LSE`, `7203.TSE`, `6758.TSE`, `9984.TSE`, `VTI.US`, `AAPL.US`, `MSFT.US`. Any other symbol is sent as stored (caller must supply the exchange suffix if required).
 - A per-symbol rejection (unknown symbol, or a source currency that is not the instrument quote currency) is logged and skipped. Other symbols in that run are still written. A transport failure (network, 401, 429, 5xx) logs and does not upsert.
@@ -254,3 +254,5 @@ Still open, not this slice:
 2026-11-02 — Landed. Script `0022_instrument_prices.sql`. Twelve Data `GET /eod`, hourly Hangfire job `instrument-price-sync`, `IMarketData` reads `InstrumentPrices`. TestSeed writes the fake catalog prices.
 
 2026-11-08 — Source switched from Twelve Data to EODHD. Free plan provides global EOD coverage (US free tier on Twelve Data was insufficient for NZ/AU/UK/EU/JP seeds). Endpoint `GET /api/eod/{SYMBOL.EXCHANGE}`. Source column value `'EODHD'`. Aspire parameter `eodhd-api-key` (`Eodhd__ApiKey`). One call = one symbol full history; the job stores the latest bar. Seed symbols use the locked `SYMBOL.EXCHANGE` map. Landed.
+
+2026-11-08 — Schedule changed from hourly (`0 * * * *`) to daily at 12:00 UTC (`0 12 * * *`). Skip-if-today-stored (R14) is unchanged.
