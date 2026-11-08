@@ -146,7 +146,7 @@ var backOffice = builder.AddProject<Projects.BackOffice>(Services.BackOffice)
 backOffice.WithEnvironment("Authentication__PublicOrigin", backOffice.GetEndpoint("https"));
 identity.WithEnvironment("Identity__BackOfficeOrigin", backOffice.GetEndpoint("https"));
 
-var twelveDataApiKey = builder.AddParameter("twelve-data-api-key", secret: true);
+var eodhdApiKey = builder.AddParameter("eodhd-api-key", secret: true);
 
 builder.AddProject<Projects.Worker>(Services.Worker)
     .WithReference(databaseServer)
@@ -155,7 +155,7 @@ builder.AddProject<Projects.Worker>(Services.Worker)
     .WithHttpHealthCheck("/health", endpointName: "http")
     .WithAspNetCoreEnvironment()
     .WithEnvironment("Reports__StorageRoot", reportsPath)
-    .WithEnvironment("TwelveData__ApiKey", twelveDataApiKey)
+    .WithEnvironment("Eodhd__ApiKey", eodhdApiKey)
     //.WithVolume("reports", "/data/reports", env: "Reports__StorageRoot")
     .WithUrlForEndpoint("http", url =>
     {
