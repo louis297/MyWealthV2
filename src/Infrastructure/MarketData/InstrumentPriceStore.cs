@@ -9,7 +9,7 @@ namespace MyWealthV2.Infrastructure.MarketData;
 
 public sealed class InstrumentPriceStore(ApplicationDbContext db, TimeProvider time) : IInstrumentPriceStore, IMarketData
 {
-    public const string SourceName = "TwelveData";
+    public const string SourceName = "EODHD";
 
     public Money? TryGetPrice(int instrumentId, DateTimeOffset? asOf = null)
     {
