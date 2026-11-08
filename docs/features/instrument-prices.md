@@ -253,4 +253,4 @@ Still open, not this slice:
 
 2026-11-02 — Landed. Script `0022_instrument_prices.sql`. Twelve Data `GET /eod`, hourly Hangfire job `instrument-price-sync`, `IMarketData` reads `InstrumentPrices`. TestSeed writes the fake catalog prices.
 
-2026-11-08 — Source switched from Twelve Data to EODHD. Free plan provides global EOD coverage (US free tier on Twelve Data was insufficient for NZ/AU/UK/EU/JP seeds). Endpoint `GET /api/eod/{SYMBOL.EXCHANGE}`. Source column value `'EODHD'`. Aspire parameter `eodhd-api-key`. One call = one symbol full history. Implementation update pending.
+2026-11-08 — Source switched from Twelve Data to EODHD. Free plan provides global EOD coverage (US free tier on Twelve Data was insufficient for NZ/AU/UK/EU/JP seeds). Endpoint `GET /api/eod/{SYMBOL.EXCHANGE}`. Source column value `'EODHD'`. Aspire parameter `eodhd-api-key` (`Eodhd__ApiKey`). One call = one symbol full history; the job stores the latest bar. Seed symbols use the locked `SYMBOL.EXCHANGE` map. Landed.
