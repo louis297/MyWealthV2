@@ -111,15 +111,12 @@ public class InstrumentPriceSyncJobTests
             await job.Sync();
 
             source.Calls.Select(call => call.Symbol).OrderBy(symbol => symbol).ShouldBe(["AAPL", "MSFT", "VTI"]);
-            var attemptedAt = new DateTimeOffset(2026, 11, 2, 3, 0, 0, TimeSpan.Zero);
             var keptRow = await db.InstrumentPrices.AsNoTracking().SingleAsync(row => row.InstrumentId == kept.Id);
             keptRow.Price.ShouldBe(180m);
-            keptRow.AsOfDate.ShouldBe(new DateOnly(2026, 11, 1));
-            keptRow.FetchedAt.ShouldBe(attemptedAt);
+            keptRow.FetchedAt.ShouldBe(previousFetched);
             var mismatchedRow = await db.InstrumentPrices.AsNoTracking().SingleAsync(row => row.InstrumentId == mismatched.Id);
             mismatchedRow.Price.ShouldBe(400m);
-            mismatchedRow.AsOfDate.ShouldBe(new DateOnly(2026, 11, 1));
-            mismatchedRow.FetchedAt.ShouldBe(attemptedAt);
+            mismatchedRow.FetchedAt.ShouldBe(previousFetched);
             var writtenRow = await db.InstrumentPrices.AsNoTracking().SingleAsync(row => row.InstrumentId == written.Id);
             writtenRow.Price.ShouldBe(250m);
             writtenRow.AsOfDate.ShouldBe(new DateOnly(2026, 11, 1));

@@ -85,7 +85,7 @@ The worker fetches the latest EOD prices for instruments that are active in any 
 | R13 | Index on `FetchedAt` for “latest successful sync” observability. Index on `(InstrumentId, AsOfDate)` for the as-of lookup. |
 | R14 | The job always runs. A symbol group whose latest `FetchedAt` falls on today’s UTC date is not requested again until the next UTC day, even when the stored `AsOfDate` is an older market date (weekends and holidays). An instrument with no price row stays eligible. Once every active instrument has a row whose `AsOfDate` is today’s UTC date, later runs that UTC day do not call the source. |
 | R15 | Same symbol across tenants is fetched once per run (by symbol + quote currency) and the price is written to every matching active `InstrumentId`. |
-| R16 | A run requests at most 8 symbol groups, the free-tier minute budget. Rank each distinct instrument by the latest `FetchedAt` on its rows, not by an older historical row. An instrument with no price row is earlier than any stored `FetchedAt`. Skip instruments already fetched today. A group is as stale as its stalest instrument. Ties break by symbol, then quote currency. A per-symbol rejection updates `FetchedAt` on that instrument's latest row only, so the same instrument is not chosen again until the next UTC day. Price and `AsOfDate` stay. |
+| R16 | A run requests at most 8 symbol groups, the free-tier minute budget, chosen from groups not already fetched today. It chooses the groups whose latest `FetchedAt` is earliest. An instrument with no price row is earlier than any stored `FetchedAt`. The group uses the earliest of its instruments. Ties break by symbol, then quote currency. The next run the same UTC day requests the next stalest groups that were not fetched today. |
 
 ---
 
@@ -226,7 +226,7 @@ Locked with the implementation:
 - Endpoint: `GET https://api.twelvedata.com/eod?symbol={symbol}&dp=8&apikey={key}`. One credit per symbol. A symbol whose latest `FetchedAt` is today’s UTC date is not requested again until the next UTC day. A run requests at most 8 of the remaining symbol groups, the ones with the earliest `FetchedAt` (no row is earliest). The job waits 8 seconds between those symbols so the run stays within 8 credits per minute.
 - `datetime` (the date) is `AsOfDate`. `close` is `Price`.
 - Known non-US seed symbols use `SYMBOL:EXCHANGE`: `AIA:NZX`, `FPH:NZX`, `MEL:NZX`, `BHP:ASX`, `CBA:ASX`, `WOW:ASX`, `SAP:XETR`, `AIR:Euronext`, `OR:Euronext`, `SHEL:LSE`, `HSBA:LSE`, `ULVR:LSE`, `7203:JPX`, `6758:JPX`, `9984:JPX`. `VTI`, `AAPL`, and `MSFT` are sent unchanged. Any other symbol is sent as stored.
-- A per-symbol rejection (unknown symbol, a symbol outside the current plan, or a source currency that is not the instrument quote currency) is logged and skipped. Twelve Data reports an unknown or plan-limited symbol as HTTP 404 with `status: error` (and some rejections as HTTP 400). That is not a transport failure. The latest price row's `FetchedAt` moves to this run so the instrument is not selected again today; older rows and the stored price stay. Other symbols in that run are still written. A transport failure (network, 401, 429, 5xx) logs and does not upsert.
+- A per-symbol rejection (unknown symbol, a symbol outside the current plan, or a source currency that is not the instrument quote currency) is logged and skipped. Twelve Data reports an unknown or plan-limited symbol as HTTP 404 with `status: error` (and some rejections as HTTP 400). That is not a transport failure. Other symbols in that run are still written. A transport failure (network, 401, 429, 5xx) logs and does not upsert.
 - API key: Aspire parameter `twelve-data-api-key`, passed only to the worker as `TwelveData__ApiKey`. Not in git.
 
 Still open, not this slice:
@@ -256,4 +256,4 @@ Still open, not this slice:
 
 2026-11-08 — Twelve Data exchange suffixes for Airbus, L'Oréal, Toyota, Sony, and SoftBank are `Euronext` and `JPX`. HTTP 404 from the source is a per-symbol rejection.
 
-2026-11-08 — Each hourly run requests at most 8 symbol groups, chosen by each distinct instrument's latest `FetchedAt`, so older price rows do not keep the same instruments at the front of the queue. A symbol already fetched today, including a per-symbol rejection, is not requested again until the next UTC day.
+2026-11-08 — Each hourly run requests at most 8 symbol groups, chosen by earliest `FetchedAt`, so the free-tier minute budget rotates through the catalog. A symbol already fetched today is not requested again until the next UTC day.

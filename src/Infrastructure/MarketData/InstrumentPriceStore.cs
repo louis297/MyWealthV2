@@ -120,27 +120,4 @@ public sealed class InstrumentPriceStore(ApplicationDbContext db, TimeProvider t
             .ToListAsync(cancellationToken);
         return rows.ToDictionary(row => row.InstrumentId, row => row.FetchedAt);
     }
-
-    public async Task NoteFetchedAsync(
-        IReadOnlyList<int> instrumentIds,
-        DateTimeOffset fetchedAt,
-        CancellationToken cancellationToken = default)
-    {
-        var ids = instrumentIds.Distinct().ToList();
-        if (ids.Count == 0)
-        {
-            return;
-        }
-
-        var rows = await db.InstrumentPrices
-            .Where(row => ids.Contains(row.InstrumentId))
-            .ToListAsync(cancellationToken);
-        foreach (var group in rows.GroupBy(row => row.InstrumentId))
-        {
-            var latest = group.OrderByDescending(row => row.AsOfDate).First();
-            latest.FetchedAt = fetchedAt;
-        }
-
-        await db.SaveChangesAsync(cancellationToken);
-    }
 }
