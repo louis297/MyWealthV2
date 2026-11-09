@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using MyWealthV2.Application.Fx;
 using MyWealthV2.Application.MarketData;
 using MyWealthV2.Infrastructure.Data;
+using MyWealthV2.Infrastructure.Data.Schema;
 using MyWealthV2.Infrastructure.MarketData;
 using MyWealthV2.Worker.Reports;
 
@@ -27,6 +28,15 @@ builder.Services.AddHangfireServer(options =>
 });
 
 var app = builder.Build();
+
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    var applicator = scope.ServiceProvider.GetRequiredService<SchemaApplicator>();
+    await applicator.ApplyAsync(CancellationToken.None);
+
+    var catalog = scope.ServiceProvider.GetRequiredService<ICurrencyCatalog>();
+    await catalog.ReloadAsync(CancellationToken.None);
+}
 
 OutboxRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 FxRateRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
