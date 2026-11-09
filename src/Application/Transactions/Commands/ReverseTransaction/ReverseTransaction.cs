@@ -85,40 +85,54 @@ public class ReverseTransactionCommandHandler(
             return ReplayOrConflict(existing, hash);
         }
 
-        if (loaded.Account.Status == AccountStatus.Closed)
+        if (loaded.LegAccounts.Any(leg => leg.Account.Status == AccountStatus.Closed))
         {
             throw new ValidationException([
                 new ValidationFailure(string.Empty, "Cannot reverse a transaction while the account is closed. Reopen the account first.")
             ]);
         }
 
-        if (loaded.Customer.Status == UserStatus.Disabled)
+        var disabled = loaded.LegAccounts.FirstOrDefault(leg => leg.Customer.Status == UserStatus.Disabled);
+        if (disabled is not null)
         {
             throw new TargetDisabledException(
                 "user",
-                loaded.Customer.PublicId,
+                disabled.Customer.PublicId,
                 "User is disabled",
                 "Cannot reverse a transaction while the customer is disabled. Enable the customer first.");
         }
 
-        await db.LockAccountAsync(loaded.Account.Id, cancellationToken);
+        foreach (var leg in loaded.LegAccounts)
+        {
+            await db.LockAccountAsync(leg.Account.Id, cancellationToken);
+        }
+
         var header = await db.Transactions.AsNoTracking()
             .Where(row => row.Id == loaded.Transaction.Id)
             .Select(row => new { row.Type, row.ReversedByTransactionId })
             .SingleAsync(cancellationToken);
-        await PortfolioTradeLock.RejectIfAssignedAsync(db, loaded.Account.Id, header.Type, cancellationToken);
+        foreach (var leg in loaded.LegAccounts)
+        {
+            await PortfolioTradeLock.RejectIfAssignedAsync(db, leg.Account.Id, header.Type, cancellationToken);
+        }
+
         if (header.Type == TransactionType.Reversal || header.ReversedByTransactionId is not null)
         {
             throw new ValidationException([
                 new ValidationFailure(string.Empty, "This transaction has already been reversed.")
             ]);
         }
-        var currentSum = await TransactionCash.SumAsync(db, loaded.Account.Id, cancellationToken);
+        var currentSums = new Dictionary<int, decimal>();
+        foreach (var leg in loaded.LegAccounts)
+        {
+            currentSums[leg.Account.Id] = await TransactionCash.SumAsync(db, leg.Account.Id, cancellationToken);
+        }
+
         var currentQuantities = await CurrentQuantitiesAsync(loaded, cancellationToken);
         Domain.Entities.Transaction reversal;
         try
         {
-            reversal = loaded.Transaction.Reverse(time.GetUtcNow(), currentSum, currentQuantities);
+            reversal = loaded.Transaction.Reverse(time.GetUtcNow(), currentSums, currentQuantities);
         }
         catch (DomainException exception)
         {
@@ -144,12 +158,16 @@ public class ReverseTransactionCommandHandler(
         {
             try
             {
-                await HoldingProjection.SyncAsync(
-                    db,
-                    loaded.Transaction.TenantId,
-                    loaded.Account.Id,
-                    reversal.SecurityLegs.Select(leg => leg.InstrumentId),
-                    cancellationToken);
+                foreach (var account in reversal.SecurityLegs.GroupBy(leg => leg.AccountId))
+                {
+                    await HoldingProjection.SyncAsync(
+                        db,
+                        loaded.Transaction.TenantId,
+                        account.Key,
+                        account.Select(leg => leg.InstrumentId),
+                        cancellationToken);
+                }
+
                 await db.SaveChangesAsync(cancellationToken);
             }
             catch (DomainException exception)
@@ -160,12 +178,15 @@ public class ReverseTransactionCommandHandler(
             }
         }
 
-        var postedSum = await TransactionCash.SumAsync(db, loaded.Account.Id, cancellationToken);
-        if (postedSum < 0)
+        foreach (var leg in loaded.LegAccounts)
         {
-            throw new ValidationException([
-                new ValidationFailure(string.Empty, "Cash balance cannot become negative.")
-            ]);
+            var postedSum = await TransactionCash.SumAsync(db, leg.Account.Id, cancellationToken);
+            if (postedSum < 0)
+            {
+                throw new ValidationException([
+                    new ValidationFailure(string.Empty, "Cash balance cannot become negative.")
+                ]);
+            }
         }
 
         return new IdempotentResult(201, body);
@@ -173,29 +194,38 @@ public class ReverseTransactionCommandHandler(
 
     private async Task<LoadedTransaction> LoadAsync(Guid publicId, CancellationToken cancellationToken)
     {
-        var assignedAdviserId = AccountScope.AssignedAdviserInternalId(currentUser);
-        var query =
-            from transaction in db.Transactions
-            join legAccount in TransactionLegAccounts.Query(db) on transaction.Id equals legAccount.TransactionId
-            join account in db.Accounts on legAccount.AccountId equals account.Id
-            join customer in db.Users on account.CustomerId equals customer.Id
-            where transaction.PublicId == publicId
-                  && (assignedAdviserId == null || customer.AdviserId == assignedAdviserId)
-            select new { transaction, account, customer };
-
+        var query = db.Transactions.Where(row => row.PublicId == publicId);
         if (currentUser.Role != UserRole.SystemAdmin)
         {
-            query = query.Where(row => row.transaction.TenantId == currentUser.TenantId);
+            query = query.Where(row => row.TenantId == currentUser.TenantId);
         }
 
-        var row = await query.SingleOrDefaultAsync(cancellationToken)
-                  ?? throw new NotFoundException("Transaction", publicId);
-        await db.LoadCashLegsAsync(row.transaction, cancellationToken);
-        await db.LoadSecurityLegsAsync(row.transaction, cancellationToken);
-        return new LoadedTransaction(row.transaction, row.account, row.customer);
+        var transaction = await query.SingleOrDefaultAsync(cancellationToken)
+                          ?? throw new NotFoundException("Transaction", publicId);
+
+        var legAccounts = await (
+            from legAccount in TransactionLegAccounts.Query(db)
+            join account in db.Accounts on legAccount.AccountId equals account.Id
+            join customer in db.Users on account.CustomerId equals customer.Id
+            where legAccount.TransactionId == transaction.Id
+            orderby account.Id
+            select new LegAccount(account, customer)).ToListAsync(cancellationToken);
+
+        // Write authority covers every leg account (leg-accounts R6).
+        var assignedAdviserId = AccountScope.AssignedAdviserInternalId(currentUser);
+        if (legAccounts.Count == 0
+            || legAccounts.Any(leg => leg.Account.TenantId != transaction.TenantId)
+            || (assignedAdviserId is not null && legAccounts.Any(leg => leg.Customer.AdviserId != assignedAdviserId)))
+        {
+            throw new NotFoundException("Transaction", publicId);
+        }
+
+        await db.LoadCashLegsAsync(transaction, cancellationToken);
+        await db.LoadSecurityLegsAsync(transaction, cancellationToken);
+        return new LoadedTransaction(transaction, legAccounts);
     }
 
-    private async Task<IReadOnlyDictionary<int, decimal>?> CurrentQuantitiesAsync(
+    private async Task<IReadOnlyDictionary<(int AccountId, int InstrumentId), decimal>?> CurrentQuantitiesAsync(
         LoadedTransaction loaded,
         CancellationToken cancellationToken)
     {
@@ -204,13 +234,13 @@ public class ReverseTransactionCommandHandler(
             return null;
         }
 
-        var quantities = new Dictionary<int, decimal>();
+        var quantities = new Dictionary<(int AccountId, int InstrumentId), decimal>();
         foreach (var leg in loaded.Transaction.SecurityLegs)
         {
             var holding = await db.Holdings.AsNoTracking().SingleOrDefaultAsync(
-                row => row.AccountId == loaded.Account.Id && row.InstrumentId == leg.InstrumentId,
+                row => row.AccountId == leg.AccountId && row.InstrumentId == leg.InstrumentId,
                 cancellationToken);
-            quantities[leg.InstrumentId] = holding?.Quantity ?? 0m;
+            quantities[(leg.AccountId, leg.InstrumentId)] = holding?.Quantity ?? 0m;
         }
 
         return quantities;
@@ -236,6 +266,7 @@ public class ReverseTransactionCommandHandler(
 
     private sealed record LoadedTransaction(
         Domain.Entities.Transaction Transaction,
-        Account Account,
-        User Customer);
+        IReadOnlyList<LegAccount> LegAccounts);
+
+    private sealed record LegAccount(Account Account, User Customer);
 }

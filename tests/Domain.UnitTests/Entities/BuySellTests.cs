@@ -356,8 +356,8 @@ public class BuySellTests
 
         var reversal = original.Reverse(
             BookedAt.AddDays(1),
-            currentCashSum: 500m,
-            currentQuantityByInstrument: new Dictionary<int, decimal> { [11] = 2m });
+            currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 500m },
+            currentQuantity: new Dictionary<(int, int), decimal> { [(2, 11)] = 2m });
 
         original.Type.ShouldBe(TransactionType.Buy);
         original.CashLegs.Single().Amount.ShouldBe(originalCash);
@@ -411,8 +411,8 @@ public class BuySellTests
         var sellCash = sell.CashLegs.Single().Amount;
         Should.Throw<DomainException>(() => sell.Reverse(
             BookedAt,
-            currentCashSum: 10m,
-            currentQuantityByInstrument: new Dictionary<int, decimal> { [11] = 2m }));
+            currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 10m },
+            currentQuantity: new Dictionary<(int, int), decimal> { [(2, 11)] = 2m }));
         sell.Type.ShouldBe(TransactionType.Sell);
         sell.CashLegs.Single().Amount.ShouldBe(sellCash);
 
@@ -420,8 +420,8 @@ public class BuySellTests
         var buyQuantity = buy.SecurityLegs.Single().Quantity;
         Should.Throw<DomainException>(() => buy.Reverse(
             BookedAt,
-            currentCashSum: 1000m,
-            currentQuantityByInstrument: new Dictionary<int, decimal> { [11] = 1m }));
+            currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 1000m },
+            currentQuantity: new Dictionary<(int, int), decimal> { [(2, 11)] = 1m }));
         buy.Type.ShouldBe(TransactionType.Buy);
         buy.SecurityLegs.Single().Quantity.ShouldBe(buyQuantity);
     }

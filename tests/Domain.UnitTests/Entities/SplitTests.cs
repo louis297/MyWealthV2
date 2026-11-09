@@ -176,8 +176,8 @@ public class SplitTests
 
         var reversal = original.Reverse(
             BookedAt.AddDays(1),
-            currentCashSum: 0m,
-            currentQuantityByInstrument: new Dictionary<int, decimal> { [11] = 200m });
+            currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 0m },
+            currentQuantity: new Dictionary<(int, int), decimal> { [(2, 11)] = 200m });
 
         original.Type.ShouldBe(TransactionType.Split);
         original.CashLegs.ShouldBeEmpty();
@@ -216,8 +216,8 @@ public class SplitTests
 
         Should.Throw<DomainException>(() => original.Reverse(
             BookedAt.AddDays(1),
-            currentCashSum: 0m,
-            currentQuantityByInstrument: new Dictionary<int, decimal> { [11] = 100m }));
+            currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 0m },
+            currentQuantity: new Dictionary<(int, int), decimal> { [(2, 11)] = 100m }));
 
         original.Type.ShouldBe(TransactionType.Split);
         original.SecurityLegs.Single().Quantity.ShouldBe(originalQuantity);

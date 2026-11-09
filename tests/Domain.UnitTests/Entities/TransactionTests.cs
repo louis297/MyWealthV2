@@ -140,7 +140,7 @@ public class TransactionTests
     {
         var original = Post(TransactionType.TransferIn, 100m, currentCashSum: 0m, existingTransactionCount: 0);
         var bookedAt = original.BookedAt;
-        original.Reverse(bookedAt.AddDays(1), currentCashSum: 100m);
+        original.Reverse(bookedAt.AddDays(1), currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 100m });
 
         original.Type.ShouldBe(TransactionType.TransferIn);
         original.CashLegs.ShouldAllBe(leg => leg.AccountId == 2);
@@ -161,7 +161,7 @@ public class TransactionTests
         original.ClearDomainEvents();
         var bookedAt = new DateTimeOffset(2026, 9, 25, 10, 0, 0, TimeSpan.Zero);
 
-        var reversal = original.Reverse(bookedAt, currentCashSum: 100m);
+        var reversal = original.Reverse(bookedAt, currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 100m });
 
         original.Type.ShouldBe(TransactionType.TransferIn);
         original.CashLegs.Single().Amount.ShouldBe(100m);
@@ -183,7 +183,7 @@ public class TransactionTests
 
         Should.Throw<DomainException>(() => original.Reverse(
             bookedAt.AddMinutes(1),
-            currentCashSum: 100m));
+            currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 100m }));
     }
 
     [Test]
@@ -193,11 +193,11 @@ public class TransactionTests
         original.Id = 7;
         var reversal = original.Reverse(
             new DateTimeOffset(2026, 9, 25, 10, 0, 0, TimeSpan.Zero),
-            currentCashSum: 100m);
+            currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 100m });
 
         Should.Throw<DomainException>(() => reversal.Reverse(
             new DateTimeOffset(2026, 9, 25, 11, 0, 0, TimeSpan.Zero),
-            currentCashSum: 0m));
+            currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 0m }));
     }
 
     [Test]
@@ -207,7 +207,7 @@ public class TransactionTests
 
         Should.Throw<DomainException>(() => original.Reverse(
             new DateTimeOffset(2026, 9, 25, 10, 0, 0, TimeSpan.Zero),
-            currentCashSum: 20m));
+            currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 20m }));
     }
 
     private static List<string> PublicInstanceMethods(Type type) =>

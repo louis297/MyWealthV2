@@ -166,7 +166,7 @@ public class LegAccountTests
             currentCashSum: 1000m);
         original.Id = 7;
 
-        var reversal = original.Reverse(BookedAt.AddDays(1), currentCashSum: 980m);
+        var reversal = original.Reverse(BookedAt.AddDays(1), currentCashSumByAccount: new Dictionary<int, decimal> { [42] = 980m });
 
         reversal.CashLegs.Single().AccountId.ShouldBe(AccountId);
         reversal.SecurityLegs.Single().AccountId.ShouldBe(AccountId);

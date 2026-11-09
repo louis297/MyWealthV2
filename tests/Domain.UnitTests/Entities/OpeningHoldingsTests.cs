@@ -169,7 +169,7 @@ public class OpeningHoldingsTests
         original.ClearDomainEvents();
         var reverseAt = BookedAt.AddDays(1);
 
-        var reversal = original.Reverse(reverseAt, currentCashSum: 0m);
+        var reversal = original.Reverse(reverseAt, currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 0m });
 
         original.Type.ShouldBe(TransactionType.OpeningHoldings);
         original.Memo.ShouldBe("Open VTI");
@@ -200,9 +200,9 @@ public class OpeningHoldingsTests
     {
         var original = Post(AccountType.Brokerage, (11, 100m, 1500m, "USD"));
         original.Id = 7;
-        var reversal = original.Reverse(BookedAt.AddDays(1), currentCashSum: 0m);
+        var reversal = original.Reverse(BookedAt.AddDays(1), currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 0m });
 
-        Should.Throw<DomainException>(() => reversal.Reverse(BookedAt.AddDays(2), currentCashSum: 0m));
+        Should.Throw<DomainException>(() => reversal.Reverse(BookedAt.AddDays(2), currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 0m }));
     }
 
     [Test]
@@ -213,11 +213,11 @@ public class OpeningHoldingsTests
 
         Should.Throw<DomainException>(() => original.Reverse(
             BookedAt.AddDays(1),
-            currentCashSum: 0m,
-            currentQuantityByInstrument: new Dictionary<int, decimal>
+            currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 0m },
+            currentQuantity: new Dictionary<(int, int), decimal>
             {
-                [11] = 100m,
-                [12] = 1m
+                [(2, 11)] = 100m,
+                [(2, 12)] = 1m
             }));
     }
 

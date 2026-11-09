@@ -322,10 +322,14 @@ public class Transaction : BaseAuditableEntity
         return transaction;
     }
 
+    /// <summary>
+    /// Builds the Reversal: one opposite leg per original leg, each on that leg's Account.
+    /// Balances are keyed by leg Account (and Instrument for holdings).
+    /// </summary>
     public Transaction Reverse(
         DateTimeOffset bookedAt,
-        decimal currentCashSum,
-        IReadOnlyDictionary<int, decimal>? currentQuantityByInstrument = null)
+        IReadOnlyDictionary<int, decimal> currentCashSumByAccount,
+        IReadOnlyDictionary<(int AccountId, int InstrumentId), decimal>? currentQuantity = null)
     {
         if (Type == TransactionType.Reversal)
         {
@@ -337,16 +341,20 @@ public class Transaction : BaseAuditableEntity
             throw new DomainException("This transaction has already been reversed.");
         }
 
-        var cashLegs = new List<TransactionCashLeg>(CashLegs.Count);
-        foreach (var leg in CashLegs)
+        var cashLegs = CashLegs
+            .Select(leg => TransactionCashLeg.Create(leg.AccountId, -leg.Amount, leg.Currency))
+            .ToList();
+        foreach (var account in cashLegs.GroupBy(leg => leg.AccountId))
         {
-            var opposite = -leg.Amount;
-            if (currentCashSum + opposite < 0)
+            if (!currentCashSumByAccount.TryGetValue(account.Key, out var currentCashSum))
+            {
+                throw new DomainException("Cash balance is required for every leg account.");
+            }
+
+            if (currentCashSum + account.Sum(leg => leg.Amount) < 0)
             {
                 throw new DomainException("Cash balance cannot become negative.");
             }
-
-            cashLegs.Add(TransactionCashLeg.Create(leg.AccountId, opposite, leg.Currency));
         }
 
         List<TransactionSecurityLeg>? reversalLegs = null;
@@ -356,8 +364,8 @@ public class Transaction : BaseAuditableEntity
             foreach (var leg in SecurityLegs)
             {
                 var current = leg.Quantity;
-                if (currentQuantityByInstrument is not null
-                    && !currentQuantityByInstrument.TryGetValue(leg.InstrumentId, out current))
+                if (currentQuantity is not null
+                    && !currentQuantity.TryGetValue((leg.AccountId, leg.InstrumentId), out current))
                 {
                     throw new DomainException("Holding quantity is required to reverse a security leg.");
                 }

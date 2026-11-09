@@ -56,8 +56,8 @@ internal static class LegAccountsFixture
         var typeValue = (int)type;
 
         await db.Database.ExecuteSqlInterpolatedAsync($"""
-            INSERT INTO [Transactions] ([PublicId], [TenantId], [Type], [BookedAt], [Created], [CreatedBy])
-            VALUES ({publicId}, {tenantId}, {typeValue}, {bookedAt}, SYSDATETIMEOFFSET(), N'test')
+            INSERT INTO [Transactions] ([PublicId], [TenantId], [Type], [BookedAt], [Created], [CreatedBy], [LastModified], [LastModifiedBy])
+            VALUES ({publicId}, {tenantId}, {typeValue}, {bookedAt}, SYSDATETIMEOFFSET(), N'test', SYSDATETIMEOFFSET(), N'test')
             """);
         var transactionId = await db.Transactions
             .Where(row => row.PublicId == publicId)
@@ -69,8 +69,8 @@ internal static class LegAccountsFixture
             var account = await db.Accounts.SingleAsync(row => row.PublicId == accountPublicId);
             var currency = account.Currency;
             await db.Database.ExecuteSqlInterpolatedAsync($"""
-                INSERT INTO [TransactionCashLegs] ([TransactionId], [AccountId], [Amount], [Currency], [Created], [CreatedBy])
-                VALUES ({transactionId}, {account.Id}, {amount}, {currency}, SYSDATETIMEOFFSET(), N'test')
+                INSERT INTO [TransactionCashLegs] ([TransactionId], [AccountId], [Amount], [Currency], [Created], [CreatedBy], [LastModified], [LastModifiedBy])
+                VALUES ({transactionId}, {account.Id}, {amount}, {currency}, SYSDATETIMEOFFSET(), N'test', SYSDATETIMEOFFSET(), N'test')
                 """);
         }
 
