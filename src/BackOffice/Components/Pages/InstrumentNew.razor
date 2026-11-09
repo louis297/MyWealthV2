@@ -1,0 +1,119 @@
+@page "/instruments/new"
+@inject IPlatformApi Api
+@inject NavigationManager Navigation
+
+<PageTitle>New instrument</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">New instrument</MudText>
+
+@if (error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@error</MudAlert>
+}
+
+@if (!offerCreate)
+{
+    <MudAlert Severity="Severity.Info">Choose an active tenant</MudAlert>
+}
+else
+{
+    <MudPaper Class="pa-4" Outlined="true">
+        <EditForm Model="form" OnValidSubmit="Create" FormName="new-instrument">
+            <MudStack Spacing="3" Style="max-width: 28rem;">
+                <label>Tenant
+                    <select @bind="form.TenantId">
+                        @foreach (var tenant in tenants)
+                        {
+                            <option value="@tenant.Id">@tenant.Name</option>
+                        }
+                    </select>
+                </label>
+                <MudTextField @bind-Value="form.Symbol" Label="Symbol" Variant="Variant.Outlined" />
+                <MudTextField @bind-Value="form.Name" Label="Name" Variant="Variant.Outlined" />
+                <MudSelect T="string" @bind-Value="form.QuoteCurrency" Label="Quote currency" Variant="Variant.Outlined">
+                    @foreach (var currency in currencies)
+                    {
+                        <MudSelectItem T="string" Value="@currency.Code">@currency.Code</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudStack Row="true" Spacing="2">
+                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Create</MudButton>
+                    <MudButton Variant="Variant.Text" Href="@CancelHref">Cancel</MudButton>
+                </MudStack>
+            </MudStack>
+        </EditForm>
+    </MudPaper>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "tenantId")]
+    public string? TenantQuery { get; set; }
+
+    private readonly FormModel form = new();
+    private IReadOnlyList<TenantItem> tenants = [];
+    private IReadOnlyList<CurrencyItem> currencies = [];
+    private string? error;
+    private bool offerCreate;
+
+    private string CancelHref =>
+        Guid.TryParse(form.TenantId, out var tenantId)
+            ? $"/instruments?tenantId={tenantId}"
+            : "/instruments";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var tenantPage = await Api.ListTenantsAsync(1, 100, true, null);
+            tenants = tenantPage.Items;
+            currencies = await Api.ListCurrenciesAsync();
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+            return;
+        }
+
+        form.QuoteCurrency = currencies.FirstOrDefault()?.Code ?? "";
+        if (!Guid.TryParse(TenantQuery, out var requested))
+        {
+            offerCreate = tenants.Count > 0;
+            form.TenantId = tenants.FirstOrDefault()?.Id.ToString() ?? "";
+            return;
+        }
+
+        var selected = tenants.FirstOrDefault(tenant => tenant.Id == requested);
+        offerCreate = selected is not null;
+        if (selected is not null)
+        {
+            form.TenantId = selected.Id.ToString();
+        }
+    }
+
+    private async Task Create()
+    {
+        if (!Guid.TryParse(form.TenantId, out var tenantId) || tenants.All(tenant => tenant.Id != tenantId))
+        {
+            error = "Choose an active tenant.";
+            return;
+        }
+
+        try
+        {
+            var id = await Api.CreateInstrumentAsync(tenantId, form.Symbol, form.Name, form.QuoteCurrency);
+            Navigation.NavigateTo($"/instruments/{id}");
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+
+    private sealed class FormModel
+    {
+        public string TenantId { get; set; } = "";
+        public string Symbol { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string QuoteCurrency { get; set; } = "";
+    }
+}
