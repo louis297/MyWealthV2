@@ -30,7 +30,7 @@ public class Transaction : BaseAuditableEntity
 
     public byte[] RowVersion { get; private set; } = null!;
 
-    public TransactionCashLeg? CashLeg { get; private set; }
+    public List<TransactionCashLeg> CashLegs { get; private set; } = [];
 
     public List<TransactionSecurityLeg> SecurityLegs { get; private set; } = [];
 
@@ -72,7 +72,7 @@ public class Transaction : BaseAuditableEntity
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
             PublicId = Guid.NewGuid(),
-            CashLeg = TransactionCashLeg.Create(amount, currency)
+            CashLegs = [TransactionCashLeg.Create(amount, currency)]
         };
         transaction.AddDomainEvent(new TransactionPosted(transaction));
         return transaction;
@@ -152,7 +152,7 @@ public class Transaction : BaseAuditableEntity
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
             PublicId = Guid.NewGuid(),
-            CashLeg = TransactionCashLeg.Create(cash, currency),
+            CashLegs = [TransactionCashLeg.Create(cash, currency)],
             SecurityLegs =
             [
                 TransactionSecurityLeg.Create(instrumentId, quantity, cost, price.Currency)
@@ -194,7 +194,7 @@ public class Transaction : BaseAuditableEntity
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
             PublicId = Guid.NewGuid(),
-            CashLeg = TransactionCashLeg.Create(cash, currency),
+            CashLegs = [TransactionCashLeg.Create(cash, currency)],
             SecurityLegs =
             [
                 TransactionSecurityLeg.Create(instrumentId, -quantity, -released, price.Currency)
@@ -346,16 +346,16 @@ public class Transaction : BaseAuditableEntity
             throw new DomainException("This transaction has already been reversed.");
         }
 
-        TransactionCashLeg? cashLeg = null;
-        if (CashLeg is not null)
+        var cashLegs = new List<TransactionCashLeg>(CashLegs.Count);
+        foreach (var leg in CashLegs)
         {
-            var opposite = -CashLeg.Amount;
+            var opposite = -leg.Amount;
             if (currentCashSum + opposite < 0)
             {
                 throw new DomainException("Cash balance cannot become negative.");
             }
 
-            cashLeg = TransactionCashLeg.Create(opposite, CashLeg.Currency);
+            cashLegs.Add(TransactionCashLeg.Create(opposite, leg.Currency));
         }
 
         List<TransactionSecurityLeg>? reversalLegs = null;
@@ -392,7 +392,7 @@ public class Transaction : BaseAuditableEntity
             }
         }
 
-        if (cashLeg is null && reversalLegs is null)
+        if (cashLegs.Count == 0 && reversalLegs is null)
         {
             throw new DomainException("A transaction has no cash leg to reverse.");
         }
@@ -405,7 +405,7 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt,
             PublicId = Guid.NewGuid(),
             OriginalTransactionId = Id,
-            CashLeg = cashLeg,
+            CashLegs = cashLegs,
             SecurityLegs = reversalLegs ?? []
         };
         ReversedBy = reversal;

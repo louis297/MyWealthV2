@@ -39,9 +39,9 @@ public class BuySellTests
         transaction.PublicId.ShouldNotBe(Guid.Empty);
         transaction.DomainEvents.OfType<TransactionPosted>().ShouldHaveSingleItem();
 
-        transaction.CashLeg.ShouldNotBeNull();
-        transaction.CashLeg!.Amount.ShouldBe(-1250.0000m);
-        transaction.CashLeg.Currency.ShouldBe("NZD");
+        transaction.CashLegs.ShouldHaveSingleItem();
+        transaction.CashLegs.Single().Amount.ShouldBe(-1250.0000m);
+        transaction.CashLegs.Single().Currency.ShouldBe("NZD");
 
         var leg = transaction.SecurityLegs.Single();
         leg.InstrumentId.ShouldBe(11);
@@ -55,8 +55,8 @@ public class BuySellTests
     {
         var transaction = PostBuy(quantity: 2m, price: 250m, priceCurrency: "USD", accountCurrency: "USD", fxRate: 1m);
 
-        transaction.CashLeg!.Amount.ShouldBe(-500.0000m);
-        transaction.CashLeg.Currency.ShouldBe("USD");
+        transaction.CashLegs.Single().Amount.ShouldBe(-500.0000m);
+        transaction.CashLegs.Single().Currency.ShouldBe("USD");
         var leg = transaction.SecurityLegs.Single();
         leg.Quantity.ShouldBe(2m);
         leg.CostAmount.ShouldBe(500.0000m);
@@ -69,7 +69,7 @@ public class BuySellTests
         var transaction = PostBuy(quantity: 1m, price: 10.00005m, priceCurrency: "USD", accountCurrency: "USD", fxRate: 1m);
 
         transaction.SecurityLegs.Single().CostAmount.ShouldBe(10.0001m);
-        transaction.CashLeg!.Amount.ShouldBe(-10.0001m);
+        transaction.CashLegs.Single().Amount.ShouldBe(-10.0001m);
     }
 
     [Test]
@@ -92,9 +92,9 @@ public class BuySellTests
             currentCost: 10m);
 
         partial.Type.ShouldBe(TransactionType.Sell);
-        partial.CashLeg.ShouldNotBeNull();
-        partial.CashLeg!.Amount.ShouldBe(15.0000m);
-        partial.CashLeg.Currency.ShouldBe("USD");
+        partial.CashLegs.ShouldHaveSingleItem();
+        partial.CashLegs.Single().Amount.ShouldBe(15.0000m);
+        partial.CashLegs.Single().Currency.ShouldBe("USD");
         var partialLeg = partial.SecurityLegs.Single();
         partialLeg.Quantity.ShouldBe(-1m);
         partialLeg.CostAmount.ShouldBe(-3.3333m);
@@ -118,8 +118,8 @@ public class BuySellTests
             currentCost: 500.0001m);
 
         full.Reference.ShouldBeNull();
-        full.CashLeg!.Amount.ShouldBe(800.0000m);
-        full.CashLeg.Currency.ShouldBe("NZD");
+        full.CashLegs.Single().Amount.ShouldBe(800.0000m);
+        full.CashLegs.Single().Currency.ShouldBe("NZD");
         var fullLeg = full.SecurityLegs.Single();
         fullLeg.Quantity.ShouldBe(-2m);
         fullLeg.CostAmount.ShouldBe(-500.0001m);
@@ -142,7 +142,7 @@ public class BuySellTests
             reference: null);
 
         transaction.Type.ShouldBe(TransactionType.StockIn);
-        transaction.CashLeg.ShouldBeNull();
+        transaction.CashLegs.ShouldBeEmpty();
         var leg = transaction.SecurityLegs.Single();
         leg.InstrumentId.ShouldBe(11);
         leg.Quantity.ShouldBe(20m);
@@ -161,7 +161,7 @@ public class BuySellTests
             bookedAt: BookedAt,
             memo: null,
             reference: null);
-        zero.CashLeg.ShouldBeNull();
+        zero.CashLegs.ShouldBeEmpty();
         zero.SecurityLegs.Single().CostAmount.ShouldBe(0m);
 
         Should.Throw<DomainException>(() => Transaction.PostStockIn(
@@ -194,7 +194,7 @@ public class BuySellTests
             currentCost: 10m);
 
         partial.Type.ShouldBe(TransactionType.StockOut);
-        partial.CashLeg.ShouldBeNull();
+        partial.CashLegs.ShouldBeEmpty();
         partial.DomainEvents.OfType<TransactionPosted>().ShouldHaveSingleItem();
         var partialLeg = partial.SecurityLegs.Single();
         partialLeg.Quantity.ShouldBe(-1m);
@@ -213,7 +213,7 @@ public class BuySellTests
             reference: null,
             currentQuantity: 2m,
             currentCost: 500.0001m);
-        full.CashLeg.ShouldBeNull();
+        full.CashLegs.ShouldBeEmpty();
         full.SecurityLegs.Single().Quantity.ShouldBe(-2m);
         full.SecurityLegs.Single().CostAmount.ShouldBe(-500.0001m);
 
@@ -348,7 +348,7 @@ public class BuySellTests
     public void Reverse_BuyCopiesOppositeCashAndSecurityAndLeavesTheOriginal()
     {
         var original = PostBuy(quantity: 2m, price: 250m, priceCurrency: "USD", accountCurrency: "USD", fxRate: 1m);
-        var originalCash = original.CashLeg!.Amount;
+        var originalCash = original.CashLegs.Single().Amount;
         var originalLeg = original.SecurityLegs.Single();
         var originalQuantity = originalLeg.Quantity;
         var originalCost = originalLeg.CostAmount;
@@ -359,16 +359,16 @@ public class BuySellTests
             currentQuantityByInstrument: new Dictionary<int, decimal> { [11] = 2m });
 
         original.Type.ShouldBe(TransactionType.Buy);
-        original.CashLeg.Amount.ShouldBe(originalCash);
+        original.CashLegs.Single().Amount.ShouldBe(originalCash);
         original.SecurityLegs.Single().Quantity.ShouldBe(originalQuantity);
         original.SecurityLegs.Single().CostAmount.ShouldBe(originalCost);
 
         reversal.Type.ShouldBe(TransactionType.Reversal);
         reversal.OriginalTransactionId.ShouldBe(original.Id);
         reversal.ReversedByTransactionId.ShouldBeNull();
-        reversal.CashLeg.ShouldNotBeNull();
-        reversal.CashLeg!.Amount.ShouldBe(-originalCash);
-        reversal.CashLeg.Currency.ShouldBe("USD");
+        reversal.CashLegs.ShouldHaveSingleItem();
+        reversal.CashLegs.Single().Amount.ShouldBe(-originalCash);
+        reversal.CashLegs.Single().Currency.ShouldBe("USD");
         var leg = reversal.SecurityLegs.Single();
         leg.InstrumentId.ShouldBe(11);
         leg.Quantity.ShouldBe(-originalQuantity);
@@ -407,13 +407,13 @@ public class BuySellTests
             currentCashSum: 0m,
             currentQuantity: 3m,
             currentCost: 10m);
-        var sellCash = sell.CashLeg!.Amount;
+        var sellCash = sell.CashLegs.Single().Amount;
         Should.Throw<DomainException>(() => sell.Reverse(
             BookedAt,
             currentCashSum: 10m,
             currentQuantityByInstrument: new Dictionary<int, decimal> { [11] = 2m }));
         sell.Type.ShouldBe(TransactionType.Sell);
-        sell.CashLeg.Amount.ShouldBe(sellCash);
+        sell.CashLegs.Single().Amount.ShouldBe(sellCash);
 
         var buy = PostBuy(quantity: 2m, price: 10m, priceCurrency: "USD", accountCurrency: "USD", fxRate: 1m);
         var buyQuantity = buy.SecurityLegs.Single().Quantity;

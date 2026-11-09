@@ -35,9 +35,9 @@ public class TransactionTests
         transaction.Reference.ShouldBeNull();
         transaction.OriginalTransactionId.ShouldBeNull();
         transaction.PublicId.ShouldNotBe(Guid.Empty);
-        transaction.CashLeg.ShouldNotBeNull();
-        transaction.CashLeg!.Amount.ShouldBe(100.00m);
-        transaction.CashLeg.Currency.ShouldBe("NZD");
+        transaction.CashLegs.ShouldHaveSingleItem();
+        transaction.CashLegs.Single().Amount.ShouldBe(100.00m);
+        transaction.CashLegs.Single().Currency.ShouldBe("NZD");
         transaction.DomainEvents.OfType<TransactionPosted>().ShouldHaveSingleItem();
     }
 
@@ -69,7 +69,7 @@ public class TransactionTests
     {
         var transaction = Post(TransactionType.TransferOut, -40m, currentCashSum: 40m, existingTransactionCount: 0);
 
-        transaction.CashLeg!.Amount.ShouldBe(-40m);
+        transaction.CashLegs.Single().Amount.ShouldBe(-40m);
         transaction.Type.ShouldBe(TransactionType.TransferOut);
     }
 
@@ -86,7 +86,7 @@ public class TransactionTests
 
         var transaction = Post(TransactionType.CloseOut, -100m, currentCashSum: 100m, existingTransactionCount: 1);
 
-        transaction.CashLeg!.Amount.ShouldBe(-100m);
+        transaction.CashLegs.Single().Amount.ShouldBe(-100m);
         transaction.Type.ShouldBe(TransactionType.CloseOut);
     }
 
@@ -103,7 +103,7 @@ public class TransactionTests
     {
         var transaction = Post(TransactionType.Interest, amount, currentCashSum: 10m, existingTransactionCount: 1);
 
-        transaction.CashLeg!.Amount.ShouldBe(amount);
+        transaction.CashLegs.Single().Amount.ShouldBe(amount);
         transaction.Type.ShouldBe(TransactionType.Interest);
     }
 
@@ -124,7 +124,7 @@ public class TransactionTests
 
         transaction.Memo.ShouldBe("Salary");
         transaction.Reference.ShouldBeNull();
-        transaction.CashLeg!.Currency.ShouldBe("NZD");
+        transaction.CashLegs.Single().Currency.ShouldBe("NZD");
     }
 
     [Test]
@@ -145,7 +145,7 @@ public class TransactionTests
         original.Type.ShouldBe(TransactionType.TransferIn);
         original.AccountId.ShouldBe(2);
         original.BookedAt.ShouldBe(bookedAt);
-        original.CashLeg!.Amount.ShouldBe(100m);
+        original.CashLegs.Single().Amount.ShouldBe(100m);
 
         PublicInstanceMethods(typeof(Transaction)).ShouldBe(["Reverse"]);
         PublicInstanceMethods(typeof(TransactionCashLeg)).ShouldBeEmpty();
@@ -164,7 +164,7 @@ public class TransactionTests
         var reversal = original.Reverse(bookedAt, currentCashSum: 100m);
 
         original.Type.ShouldBe(TransactionType.TransferIn);
-        original.CashLeg!.Amount.ShouldBe(100m);
+        original.CashLegs.Single().Amount.ShouldBe(100m);
         original.DomainEvents.ShouldBeEmpty();
         reversal.ShouldNotBeSameAs(original);
         reversal.PublicId.ShouldNotBe(original.PublicId);
@@ -176,8 +176,8 @@ public class TransactionTests
         reversal.ReversedByTransactionId.ShouldBeNull();
         reversal.Memo.ShouldBeNull();
         reversal.Reference.ShouldBeNull();
-        reversal.CashLeg!.Amount.ShouldBe(-100m);
-        reversal.CashLeg.Currency.ShouldBe("NZD");
+        reversal.CashLegs.Single().Amount.ShouldBe(-100m);
+        reversal.CashLegs.Single().Currency.ShouldBe("NZD");
         reversal.DomainEvents.OfType<TransactionReversed>().ShouldHaveSingleItem();
         reversal.DomainEvents.OfType<TransactionPosted>().ShouldBeEmpty();
 

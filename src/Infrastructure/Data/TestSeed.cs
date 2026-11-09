@@ -492,7 +492,7 @@ public static class TestSeed
             DemoBrokerageFundingReference,
             currentCashSum: await CashSumAsync(db, account.Id, cancellationToken),
             existingTransactionCount: 1);
-        Stamp(transaction, transaction.CashLeg!);
+        Stamp(transaction, transaction.CashLegs.Single());
         db.Transactions.Add(transaction);
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -545,7 +545,7 @@ public static class TestSeed
             memo: "Demo brokerage buy",
             reference: DemoBrokerageBuyReference,
             currentCashSum: await CashSumAsync(db, account.Id, cancellationToken));
-        Stamp(transaction, transaction.CashLeg!);
+        Stamp(transaction, transaction.CashLegs.Single());
         foreach (var leg in transaction.SecurityLegs)
         {
             Stamp(leg);
@@ -771,8 +771,8 @@ public static class TestSeed
         var created = TimeProvider.System.GetUtcNow();
         transaction.Created = created;
         transaction.CreatedBy = CreatedBy;
-        transaction.CashLeg!.Created = created;
-        transaction.CashLeg.CreatedBy = CreatedBy;
+        transaction.CashLegs.Single().Created = created;
+        transaction.CashLegs.Single().CreatedBy = CreatedBy;
         db.Transactions.Add(transaction);
         await db.SaveChangesAsync(cancellationToken);
     }

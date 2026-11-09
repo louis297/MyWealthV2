@@ -35,9 +35,9 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         builder.HasIndex(transaction => transaction.ReversedByTransactionId)
             .IsUnique()
             .HasFilter("[ReversedByTransactionId] IS NOT NULL");
-        builder.HasOne(transaction => transaction.CashLeg)
+        builder.HasMany(transaction => transaction.CashLegs)
             .WithOne()
-            .HasForeignKey<TransactionCashLeg>(leg => leg.TransactionId)
+            .HasForeignKey(leg => leg.TransactionId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasMany(transaction => transaction.SecurityLegs)
             .WithOne()

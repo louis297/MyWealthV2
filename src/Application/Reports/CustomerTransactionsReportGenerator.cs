@@ -37,7 +37,7 @@ public sealed class CustomerTransactionsReportGenerator(
             ? []
             : await db.Transactions.AsNoTracking()
                 .Where(row => accountIds.Contains(row.AccountId))
-                .Include(row => row.CashLeg)
+                .Include(row => row.CashLegs)
                 .Include(row => row.SecurityLegs)
                 .ToListAsync(cancellationToken);
 
@@ -68,7 +68,7 @@ public sealed class CustomerTransactionsReportGenerator(
                 account.Name,
                 transaction.Type.ToString(),
                 transaction.Memo));
-            cashById[transaction.Id] = FormatCash(transaction.CashLeg);
+            cashById[transaction.Id] = FormatCash(transaction.CashLegs.SingleOrDefault());
             var legs = transaction.SecurityLegs.OrderBy(leg => leg.Id).ToList();
             instrumentById[transaction.Id] = string.Join(", ", legs.Select(leg => Symbol(symbols, leg.InstrumentId)));
             quantityById[transaction.Id] = string.Join(

@@ -132,8 +132,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
         await command.ExecuteScalarAsync(cancellationToken);
     }
 
-    public Task LoadCashLegAsync(Transaction transaction, CancellationToken cancellationToken) =>
-        Entry(transaction).Reference(row => row.CashLeg).LoadAsync(cancellationToken);
+    public Task LoadCashLegsAsync(Transaction transaction, CancellationToken cancellationToken) =>
+        Entry(transaction).Collection(row => row.CashLegs).LoadAsync(cancellationToken);
 
     public Task LoadSecurityLegsAsync(Transaction transaction, CancellationToken cancellationToken) =>
         Entry(transaction).Collection(row => row.SecurityLegs).LoadAsync(cancellationToken);

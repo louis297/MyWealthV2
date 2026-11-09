@@ -189,7 +189,7 @@ public class ReverseTransactionCommandHandler(
 
         var row = await query.SingleOrDefaultAsync(cancellationToken)
                   ?? throw new NotFoundException("Transaction", publicId);
-        await db.LoadCashLegAsync(row.transaction, cancellationToken);
+        await db.LoadCashLegsAsync(row.transaction, cancellationToken);
         await db.LoadSecurityLegsAsync(row.transaction, cancellationToken);
         return new LoadedTransaction(row.transaction, row.account, row.customer);
     }

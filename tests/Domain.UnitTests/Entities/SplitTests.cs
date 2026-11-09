@@ -36,7 +36,7 @@ public class SplitTests
         transaction.Memo.ShouldBe("Two for one");
         transaction.Reference.ShouldBe("split-1");
         transaction.PublicId.ShouldNotBe(Guid.Empty);
-        transaction.CashLeg.ShouldBeNull();
+        transaction.CashLegs.ShouldBeEmpty();
         transaction.DomainEvents.OfType<TransactionPosted>().ShouldHaveSingleItem();
 
         var leg = transaction.SecurityLegs.Single();
@@ -65,7 +65,7 @@ public class SplitTests
             currentCost: 800m);
 
         transaction.Type.ShouldBe(type);
-        transaction.CashLeg.ShouldBeNull();
+        transaction.CashLegs.ShouldBeEmpty();
         var leg = transaction.SecurityLegs.Single();
         leg.Quantity.ShouldBe(15m);
         leg.CostAmount.ShouldBe(0m);
@@ -89,7 +89,7 @@ public class SplitTests
             currentQuantity: 100m,
             currentCost: 2500m);
 
-        transaction.CashLeg.ShouldBeNull();
+        transaction.CashLegs.ShouldBeEmpty();
         var leg = transaction.SecurityLegs.Single();
         leg.Quantity.ShouldBe(-50m);
         leg.CostAmount.ShouldBe(0m);
@@ -180,12 +180,12 @@ public class SplitTests
             currentQuantityByInstrument: new Dictionary<int, decimal> { [11] = 200m });
 
         original.Type.ShouldBe(TransactionType.Split);
-        original.CashLeg.ShouldBeNull();
+        original.CashLegs.ShouldBeEmpty();
         original.SecurityLegs.Single().Quantity.ShouldBe(originalQuantity);
         original.SecurityLegs.Single().CostAmount.ShouldBe(0m);
 
         reversal.Type.ShouldBe(TransactionType.Reversal);
-        reversal.CashLeg.ShouldBeNull();
+        reversal.CashLegs.ShouldBeEmpty();
         reversal.OriginalTransactionId.ShouldBe(original.Id);
         reversal.ReversedByTransactionId.ShouldBeNull();
         reversal.DomainEvents.OfType<TransactionReversed>().ShouldHaveSingleItem();

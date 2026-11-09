@@ -23,7 +23,7 @@ public class OpeningHoldingsTests
         transaction.Type.ShouldBe(TransactionType.OpeningHoldings);
         transaction.BookedAt.ShouldBe(BookedAt);
         transaction.PublicId.ShouldNotBe(Guid.Empty);
-        transaction.CashLeg.ShouldBeNull();
+        transaction.CashLegs.ShouldBeEmpty();
         transaction.DomainEvents.OfType<TransactionPosted>().ShouldHaveSingleItem();
 
         TransactionSecurityLeg leg = transaction.SecurityLegs.Single();
@@ -86,7 +86,7 @@ public class OpeningHoldingsTests
             (11, 1m, 10m, "USD"),
             (12, 2m, 0m, "USD"));
 
-        transaction.CashLeg.ShouldBeNull();
+        transaction.CashLegs.ShouldBeEmpty();
         transaction.SecurityLegs.Select(leg => leg.InstrumentId).ShouldBe([11, 12]);
     }
 
@@ -174,7 +174,7 @@ public class OpeningHoldingsTests
         original.Type.ShouldBe(TransactionType.OpeningHoldings);
         original.Memo.ShouldBe("Open VTI");
         original.Reference.ShouldBe("ref");
-        original.CashLeg.ShouldBeNull();
+        original.CashLegs.ShouldBeEmpty();
         original.DomainEvents.ShouldBeEmpty();
         original.SecurityLegs.Select(leg => (leg.InstrumentId, leg.Quantity, leg.CostAmount, leg.CostCurrency))
             .ShouldBe([(11, 100m, 1500.00m, "USD"), (12, 2m, 0m, "USD")]);
@@ -188,7 +188,7 @@ public class OpeningHoldingsTests
         reversal.OriginalTransactionId.ShouldBe(7);
         reversal.Memo.ShouldBeNull();
         reversal.Reference.ShouldBeNull();
-        reversal.CashLeg.ShouldBeNull();
+        reversal.CashLegs.ShouldBeEmpty();
         reversal.SecurityLegs.Select(leg => (leg.InstrumentId, leg.Quantity, leg.CostAmount, leg.CostCurrency))
             .ShouldBe([(11, -100m, -1500.00m, "USD"), (12, -2m, 0m, "USD")]);
         reversal.DomainEvents.OfType<TransactionReversed>().ShouldHaveSingleItem();
