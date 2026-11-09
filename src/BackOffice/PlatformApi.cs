@@ -221,7 +221,7 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
     }
 
     public Task<InstrumentItem> GetInstrumentAsync(Guid id, CancellationToken cancellationToken = default) =>
-        throw new NotImplementedException();
+        ReadAsync<InstrumentItem>(HttpMethod.Get, $"/instruments/{id}", json: null, cancellationToken);
 
     public Task UpdateInstrumentAsync(
         Guid id,
@@ -229,7 +229,11 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         string name,
         string rowVersion,
         CancellationToken cancellationToken = default) =>
-        throw new NotImplementedException();
+        SendExpectingSuccessAsync(
+            HttpMethod.Put,
+            $"/instruments/{id}",
+            JsonSerializer.Serialize(new { symbol, name, rowVersion }, Json),
+            cancellationToken);
 
     private static string RowVersion(string rowVersion) =>
         JsonSerializer.Serialize(new { rowVersion }, Json);
