@@ -192,8 +192,18 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         Guid tenantId,
         bool? enabledOnly,
         string? search,
-        CancellationToken cancellationToken = default) =>
-        throw new NotImplementedException();
+        CancellationToken cancellationToken = default)
+    {
+        var path = Query("/instruments", new Dictionary<string, string?>
+        {
+            ["tenantId"] = tenantId.ToString(),
+            ["page"] = page.ToString(),
+            ["pageSize"] = pageSize.ToString(),
+            ["enabledOnly"] = Flag(enabledOnly),
+            ["search"] = search
+        });
+        return ReadAsync<InstrumentPage>(HttpMethod.Get, path, json: null, cancellationToken);
+    }
 
     private static string RowVersion(string rowVersion) =>
         JsonSerializer.Serialize(new { rowVersion }, Json);
