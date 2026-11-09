@@ -141,6 +141,26 @@ public class BackOfficeApiTests
     }
 
     [Test]
+    public async Task InstrumentCalls_CreateSendsTenantSymbolNameAndQuoteCurrency()
+    {
+        var instrumentId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.Created, $$"""{"id":"{{instrumentId}}"}""");
+        var platform = Create(api);
+
+        var id = await platform.CreateInstrumentAsync(TenantId, "vti", "Vanguard", "usd");
+
+        id.ShouldBe(instrumentId);
+        AssertRequest(api.Requests[0], "POST", "/instruments");
+        var body = Body(api.Requests[0]);
+        body.GetProperty("tenantId").GetGuid().ShouldBe(TenantId);
+        body.GetProperty("symbol").GetString().ShouldBe("vti");
+        body.GetProperty("name").GetString().ShouldBe("Vanguard");
+        body.GetProperty("quoteCurrency").GetString().ShouldBe("usd");
+        body.EnumerateObject().Count().ShouldBe(4);
+    }
+
+    [Test]
     public async Task ReportGrantList_ReadsGranted()
     {
         var api = new ScriptedHandler();

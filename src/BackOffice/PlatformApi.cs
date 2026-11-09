@@ -205,6 +205,21 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         return ReadAsync<InstrumentPage>(HttpMethod.Get, path, json: null, cancellationToken);
     }
 
+    public async Task<Guid> CreateInstrumentAsync(
+        Guid tenantId,
+        string symbol,
+        string name,
+        string quoteCurrency,
+        CancellationToken cancellationToken = default)
+    {
+        var created = await ReadAsync<Created>(
+            HttpMethod.Post,
+            "/instruments",
+            JsonSerializer.Serialize(new { tenantId, symbol, name, quoteCurrency }, Json),
+            cancellationToken);
+        return created.Id;
+    }
+
     private static string RowVersion(string rowVersion) =>
         JsonSerializer.Serialize(new { rowVersion }, Json);
 

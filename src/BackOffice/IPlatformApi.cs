@@ -49,4 +49,11 @@ public interface IPlatformApi
         bool? enabledOnly,
         string? search,
         CancellationToken cancellationToken = default);
+
+    Task<Guid> CreateInstrumentAsync(
+        Guid tenantId,
+        string symbol,
+        string name,
+        string quoteCurrency,
+        CancellationToken cancellationToken = default);
 }

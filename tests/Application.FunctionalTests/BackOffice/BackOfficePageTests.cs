@@ -204,5 +204,13 @@ public class BackOfficePageTests
             string? search,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(new InstrumentPage([], page, pageSize, 0));
+
+        public Task<Guid> CreateInstrumentAsync(
+            Guid tenantId,
+            string symbol,
+            string name,
+            string quoteCurrency,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(Guid.Parse("33333333-3333-3333-3333-333333333333"));
     }
 }
