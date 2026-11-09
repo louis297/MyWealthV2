@@ -172,6 +172,30 @@ public class BackOfficePageTests
     }
 
     [Test]
+    public async Task InstrumentNew_PrefillsAnActiveTenantAndOffersQuoteCurrency()
+    {
+        var body = await GetAsync($"/instruments/new?tenantId={TenantId}");
+
+        body.ShouldContain("North Advisory");
+        body.ShouldContain(TenantId.ToString());
+        body.ShouldContain("Symbol");
+        body.ShouldContain("Name");
+        body.ShouldContain("NZD");
+        body.ShouldContain(">Create<");
+        body.ShouldNotContain(">Delete<");
+        body.ShouldNotContain("Price");
+    }
+
+    [Test]
+    public async Task InstrumentNew_ForATenantOutsideTheActiveList_DoesNotOfferCreate()
+    {
+        var body = await GetAsync($"/instruments/new?tenantId={OutsideTenantId}");
+
+        body.ShouldNotContain(">Create<");
+        body.ShouldNotContain(OutsideTenantId.ToString());
+    }
+
+    [Test]
     public async Task ReportsPage_ListsCatalog_IncludingInactive_AndDoesNotOfferRunOrSchedule()
     {
         var body = await GetAsync("/reports");
