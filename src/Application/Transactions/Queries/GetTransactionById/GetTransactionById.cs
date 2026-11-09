@@ -35,20 +35,7 @@ public class GetTransactionByIdQueryHandler(IApplicationDbContext db, ICurrentUs
         var row = await query.SingleOrDefaultAsync(cancellationToken)
                   ?? throw new NotFoundException("Transaction", request.Id);
 
-        var cashLeg = await db.TransactionCashLegs.AsNoTracking()
-            .SingleOrDefaultAsync(leg => leg.TransactionId == row.transaction.Id, cancellationToken);
-        var security = await (
-            from leg in db.TransactionSecurityLegs.AsNoTracking()
-            join instrument in db.Instruments.AsNoTracking() on leg.InstrumentId equals instrument.Id
-            where leg.TransactionId == row.transaction.Id
-            orderby leg.Id
-            select new TransactionSecurityDto
-            {
-                InstrumentId = instrument.PublicId,
-                Quantity = leg.Quantity,
-                Cost = leg.CostAmount,
-                CostCurrency = leg.CostCurrency.Trim()
-            }).ToListAsync(cancellationToken);
+        var legs = await TransactionLegReader.LoadAsync(db, [row.transaction.Id], cancellationToken);
 
         Guid? originalPublicId = null;
         if (row.transaction.OriginalTransactionId is int originalId)
@@ -72,19 +59,15 @@ public class GetTransactionByIdQueryHandler(IApplicationDbContext db, ICurrentUs
         {
             Id = row.transaction.PublicId,
             TenantId = row.tenant.PublicId,
-            AccountId = row.account.PublicId,
-            CustomerId = row.customer.PublicId,
             Type = row.transaction.Type.ToString(),
-            Cash = cashLeg is null
-                ? null
-                : new TransactionCashDto { Amount = cashLeg.Amount, Currency = cashLeg.Currency.Trim() },
+            Cash = legs.Cash[row.transaction.Id].ToList(),
             BookedAt = TransactionDto.FormatBookedAt(row.transaction.BookedAt),
             Memo = row.transaction.Memo,
             Reference = row.transaction.Reference,
             OriginalTransactionId = originalPublicId,
             ReversedByTransactionId = reversedByPublicId,
             RowVersion = Convert.ToBase64String(row.transaction.RowVersion ?? []),
-            Security = security.Count == 0 ? null : security
+            Security = legs.Security[row.transaction.Id].ToList()
         };
     }
 }
