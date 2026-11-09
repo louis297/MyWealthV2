@@ -19,6 +19,10 @@ public class BackOfficePageTests
     private static readonly Guid ReportId = Guid.Parse("8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11");
     private static readonly Guid AdviserBalancesId = Guid.Parse("5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22");
     private static readonly Guid InstrumentId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+    private static readonly Guid SecondInstrumentId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+    private static readonly Guid EmptyTenantId = Guid.Parse("55555555-5555-5555-5555-555555555555");
+    private static readonly Guid OutsideTenantId = Guid.Parse("66666666-6666-6666-6666-666666666666");
+    private static readonly Guid MissingTenantId = Guid.Parse("77777777-7777-7777-7777-777777777777");
 
     private BackOfficeFactory _factory = null!;
     private HttpClient _client = null!;
@@ -100,6 +104,74 @@ public class BackOfficePageTests
     }
 
     [Test]
+    public async Task Instruments_WithTenant_ShowsTheCatalogInServerOrder()
+    {
+        var listsBefore = _api.InstrumentLists.Count;
+        var tenantsBefore = _api.TenantLists.Count;
+
+        var body = await GetAsync($"/instruments?tenantId={TenantId}&enabledOnly=true&search=vti&page=2&pageSize=50");
+
+        var call = _api.InstrumentLists[listsBefore];
+        call.Page.ShouldBe(2);
+        call.PageSize.ShouldBe(50);
+        call.TenantId.ShouldBe(TenantId);
+        call.EnabledOnly.ShouldBe(true);
+        call.Search.ShouldBe("vti");
+        var tenants = _api.TenantLists[tenantsBefore];
+        tenants.Page.ShouldBe(1);
+        tenants.PageSize.ShouldBe(100);
+        tenants.IsEnabled.ShouldBe(true);
+        var zuluAt = body.IndexOf("ZZZ", StringComparison.Ordinal);
+        var vtiAt = body.IndexOf("VTI", StringComparison.Ordinal);
+        zuluAt.ShouldBeGreaterThanOrEqualTo(0);
+        vtiAt.ShouldBeGreaterThan(zuluAt);
+        body.ShouldContain("Zulu");
+        body.ShouldContain("Vanguard");
+        body.ShouldContain("USD");
+        body.ShouldContain("NZD");
+        body.ShouldContain(">Active<");
+        body.ShouldContain(">Disabled<");
+        body.ShouldContain(">Open<");
+        body.ShouldContain($"href=\"/instruments/{InstrumentId}\"");
+        body.ShouldContain($"href=\"/instruments/new?tenantId={TenantId}\"");
+        body.ShouldContain("name=\"tenantId\"");
+        body.ShouldContain("name=\"search\"");
+        body.ShouldContain("name=\"enabledOnly\"");
+        body.ShouldNotContain(">Delete<");
+        body.ShouldNotContain("Price");
+        body.ShouldNotContain("/holdings");
+        body.ShouldNotContain("/accounts");
+    }
+
+    [Test]
+    public async Task Instruments_WithTenantAndNoRows_ShowsAnEmptyCatalog()
+    {
+        var body = await GetAsync($"/instruments?tenantId={EmptyTenantId}");
+
+        body.ShouldContain("No instruments");
+        body.ShouldNotContain("ZZZ");
+        body.ShouldNotContain($"href=\"/instruments/new?tenantId={EmptyTenantId}\"");
+    }
+
+    [Test]
+    public async Task Instruments_ForATenantOutsideTheActiveList_DoesNotOfferCreate()
+    {
+        var body = await GetAsync($"/instruments?tenantId={OutsideTenantId}");
+
+        body.ShouldContain("Outside");
+        body.ShouldNotContain($"href=\"/instruments/new?tenantId={OutsideTenantId}\"");
+    }
+
+    [Test]
+    public async Task Instruments_ForAnUnknownTenant_ShowsTheApiError()
+    {
+        var body = await GetAsync($"/instruments?tenantId={MissingTenantId}");
+
+        body.ShouldContain("Tenant was not found.");
+        body.ShouldNotContain($"href=\"/instruments/new?tenantId={MissingTenantId}\"");
+    }
+
+    [Test]
     public async Task ReportsPage_ListsCatalog_IncludingInactive_AndDoesNotOfferRunOrSchedule()
     {
         var body = await GetAsync("/reports");
@@ -146,8 +218,17 @@ public class BackOfficePageTests
 
     private sealed class StubApi : IPlatformApi
     {
-        public Task<TenantPage> ListTenantsAsync(int page, int pageSize, bool? isEnabled, string? search, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new TenantPage([], page, pageSize, 0));
+        public List<TenantListRequest> TenantLists { get; } = [];
+
+        public Task<TenantPage> ListTenantsAsync(int page, int pageSize, bool? isEnabled, string? search, CancellationToken cancellationToken = default)
+        {
+            TenantLists.Add(new TenantListRequest(page, pageSize, isEnabled, search));
+            return Task.FromResult(new TenantPage(
+                [new TenantItem(TenantId, "North Advisory", "north-advisory", "NZD", true, "rv1")],
+                page,
+                pageSize,
+                1));
+        }
 
         public Task<TenantItem> GetTenantAsync(Guid id, CancellationToken cancellationToken = default) =>
             Task.FromResult(new TenantItem(id, "North Advisory", "north-advisory", "NZD", true, "rv1"));
@@ -212,6 +293,8 @@ public class BackOfficePageTests
 
         public int InstrumentListCalls { get; private set; }
 
+        public List<InstrumentListRequest> InstrumentLists { get; } = [];
+
         public Task<InstrumentPage> ListInstrumentsAsync(
             int page,
             int pageSize,
@@ -221,12 +304,44 @@ public class BackOfficePageTests
             CancellationToken cancellationToken = default)
         {
             InstrumentListCalls++;
+            InstrumentLists.Add(new InstrumentListRequest(page, pageSize, tenantId, enabledOnly, search));
+            if (tenantId == EmptyTenantId)
+            {
+                return Task.FromResult(new InstrumentPage([], page, pageSize, 0));
+            }
+
+            if (tenantId == MissingTenantId)
+            {
+                throw new PlatformApiException(404, "Tenant was not found.");
+            }
+
+            if (tenantId == OutsideTenantId)
+            {
+                return Task.FromResult(new InstrumentPage(
+                    [new InstrumentItem(InstrumentId, tenantId, "OUT", "Outside", "USD", true, "rv1")],
+                    page,
+                    pageSize,
+                    1));
+            }
+
             return Task.FromResult(new InstrumentPage(
-                [new InstrumentItem(InstrumentId, tenantId, "VTI", "Vanguard", "USD", true, "rv1")],
+                [
+                    new InstrumentItem(InstrumentId, tenantId, "ZZZ", "Zulu", "USD", false, "rv1"),
+                    new InstrumentItem(SecondInstrumentId, tenantId, "VTI", "Vanguard", "NZD", true, "rv2")
+                ],
                 page,
                 pageSize,
-                1));
+                2));
         }
+
+        public readonly record struct TenantListRequest(int Page, int PageSize, bool? IsEnabled, string? Search);
+
+        public readonly record struct InstrumentListRequest(
+            int Page,
+            int PageSize,
+            Guid TenantId,
+            bool? EnabledOnly,
+            string? Search);
 
         public Task<Guid> CreateInstrumentAsync(
             Guid tenantId,
