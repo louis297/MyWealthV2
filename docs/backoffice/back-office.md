@@ -4,7 +4,7 @@ status: accepted
 phase: 1
 language: en
 created: 2026-10-24
-updated: 2026-10-27
+updated: 2026-11-09
 related:
   - README.md
   - ../function-plan.md
@@ -14,6 +14,8 @@ related:
   - ../features/tenants.md
   - ../features/tenant-admins.md
   - ../features/reports.md
+  - ../features/instruments.md
+  - back-office-instruments.md
   - ../adr/0014-openiddict-authorization-code-pkce.md
 ---
 
@@ -37,7 +39,8 @@ Accepted 2026-10-25. SystemAdmin still uses Scalar for the same verbs. The Back 
 - Pages for Tenant manage and TenantAdmin manage (list / create / update / disable / enable)
 - Tenant configuration: report grants for active catalog rows only (enable / disable a report for a tenant). A platform-inactive report is not shown
 - Report catalog page `/reports`: platform IsActive (disable cascades revoke of every tenant grant for that report) and AllowedTriggers (removing `"scheduled"` disables existing schedules for that report). List is `GET /reports/catalog`
-- Direct calls to existing `webapi` endpoints under policy `tenants.manage` (and `tenant-admins.manage`)
+- Instruments catalog management for a chosen tenant: list / create / rename / disable / enable. Contract: [back-office-instruments.md](back-office-instruments.md)
+- Direct calls to existing `webapi` endpoints under policy `tenants.manage` (and `tenant-admins.manage`) and the instrument policies (`instruments.read` / `instruments.create` / `instruments.manage`)
 
 **Out**
 
@@ -47,7 +50,7 @@ Accepted 2026-10-25. SystemAdmin still uses Scalar for the same verbs. The Back 
 - Adviser / Customer manage in this slice (SystemAdmin currently receives 403 on `/users/advisers` and `/users/customers`; do not reopen Phase 1 people routes here)
 - Report catalog AllowedTriggers is in (platform-level schedule permission)
 - Running or scheduling reports (those are firm verbs; SystemAdmin has no `reports.*.*` policies)
-- Ledger pages (Instruments, Accounts, Transactions) — later slices
+- Cross-tenant ledger pages (Accounts, Transactions, Holdings, Net worth) — later slice
 - Impersonation / “enter this tenant” header switching
 
 ---
@@ -80,6 +83,9 @@ Redirect URI and post-logout follow the same pattern as the Adviser Portal BFF (
 | `/tenants/{id}` | SystemAdmin | Detail + core settings (rename / reporting currency / disable / enable) |
 | `/tenants/{id}/config` | SystemAdmin | Tenant configuration (grants for active catalog reports only) |
 | `/reports` | SystemAdmin | Platform catalog. `GET /reports/catalog`. Set IsActive and AllowedTriggers |
+| `/instruments` | SystemAdmin | Tenant instrument catalog. Requires tenant selection. See [back-office-instruments.md](back-office-instruments.md) |
+| `/instruments/new` | SystemAdmin | Create instrument for the chosen tenant |
+| `/instruments/{id}` | SystemAdmin | Detail + rename / disable / enable |
 | `/tenant-admins` | SystemAdmin | List (filter by tenant, search); links to create / detail |
 | `/tenant-admins/new` | SystemAdmin | Create (tenant, name, email, password) |
 | `/tenant-admins/{id}` | SystemAdmin | Detail + rename / disable / enable |
@@ -140,6 +146,15 @@ Platform page (`/reports`). All verbs use `tenants.manage`.
 - Adding `"scheduled"` does not re-enable previously disabled schedules.
 - Do not offer run or schedule actions.
 
+### Instruments
+
+Tenant instrument catalog for a chosen tenant. Full field bindings and acceptance: [back-office-instruments.md](back-office-instruments.md).
+
+- List: `GET /instruments?tenantId=` (required). Search, `enabledOnly`, paging.
+- Create: `POST /instruments` with `tenantId`, `symbol`, `name`, `quoteCurrency`.
+- Detail: `GET /instruments/{id}`. Rename via `PUT` (symbol and/or name + `rowVersion`). Disable / enable via `POST …/disable` and `POST …/enable` with `rowVersion`.
+- QuoteCurrency immutable. No price. No physical delete. No ledger navigation from this page.
+
 ---
 
 ## Acceptance (BO)
@@ -158,6 +173,7 @@ Platform page (`/reports`). All verbs use `tenants.manage`.
 | BO10 | Sign-out revokes refresh and ends the session; next visit is hosted login. IdentityHost clears only the `back-office` scheme cookie (identity-auth A16). |
 | BO11 | `/reports` lists `GET /reports/catalog`, including inactive rows. Setting IsActive to false calls `PUT /reports/{id}` and the backend revokes every tenant grant for that report (Hangfire cleaned; schedule and execution rows stay; schedule `IsActive` unchanged). Setting it back to true restores no grants. Setting AllowedTriggers to omit `"scheduled"` disables every schedule for that report (rows stay; no grant revoke). Adding `"scheduled"` does not re-enable those schedules |
 | BO12 | After a successful Adviser Portal login in the same browser, an unauthenticated Back Office visit still shows hosted `/login`. No silent code for the Portal subject. |
+| BO13 | Instruments list requires a tenant selection and calls `GET /instruments?tenantId=`. Create, rename, disable, and enable send the shapes in [back-office-instruments.md](back-office-instruments.md). QuoteCurrency is not editable. No physical delete. |
 
 ---
 
@@ -170,8 +186,8 @@ Back Office tests assert routes, role gate, and that the UI client sends the sha
 ## Later slices
 
 - Advisers (requires policy amendment: grant `advisers.manage` to SystemAdmin and accept `tenantId` on create)
-- Instruments catalog management
-- Cross-tenant ledger inspection (Accounts, Transactions, Net worth)
+- Cross-tenant ledger inspection (Accounts, Transactions, Holdings, Net worth)
+- Portfolios catalog management (same SystemAdmin + `tenantId` pattern as instruments; page contract not yet written)
 - Further tenant configuration (fees, invitation settings, etc.) as those slices land
 
 These stay out until their own page slices are written.
