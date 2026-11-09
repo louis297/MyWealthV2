@@ -3,7 +3,7 @@ title: Documentation
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-11-03
+updated: 2026-11-09
 ---
 
 # MyWealthV2 documentation
@@ -12,7 +12,7 @@ This folder is the design source of truth for MyWealthV2.
 
 Write English only. Use the terms in [glossary.md](glossary.md). If a new word appears in a spec, add it to the glossary in the same change. Do not add a parallel Chinese draft tree or `v2draft/` pointers.
 
-Coding and commit rules for agents belong in the repository-root `AGENTS.md`, not here.
+Coding and commit rules for agents belong in the repository-root `CLAUDE.md`, not here.
 
 ---
 

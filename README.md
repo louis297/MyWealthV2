@@ -100,7 +100,7 @@ docs/                      # Design source of truth
 
 ## Contributing / agents
 
-Coding and commit rules for agents live in the repository-root `AGENTS.md`.
+Coding and commit rules for agents live in the repository-root `CLAUDE.md`.
 
 ## License
 

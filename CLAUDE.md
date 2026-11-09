@@ -1,4 +1,4 @@
-# Agent rules
+# Agent rules (Claude Code)
 
 This file is for agents working in the **MyWealthV2 repository**. Design lives in `docs/`. Do not copy Feature Specs or ADRs into this file.
 
