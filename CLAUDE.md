@@ -48,23 +48,27 @@ Create a git commit after every discrete step of work. Do not leave completed st
 - If a step produced no file changes, skip the commit.
 - Do not amend, rebase, or rewrite history unless the user explicitly asks.
 
-A Feature Spec §12 lists **behaviour** commits. Split each behaviour into red then green (and refactor if it produced a file change). The tree must build after every commit.
+A Feature Spec §12 lists **behaviour** commits. Split each behaviour into a red commit and a green commit, plus a refactor commit if the refactor changed files. The tree must **compile** after every commit. A red commit has failing tests on purpose; every green or refactor commit must pass the test suite.
 
 ## Use agentic-friendly TDD for development work
 
 For production code, work test-first. Tests are the executable spec; do not start by writing implementation.
 
-1. **Red** — Write the smallest failing test for one behaviour from the accepted spec. Run it and confirm it fails for the reason you expect.
-2. **Green** — Write the minimum production code to make that test pass. Run the relevant tests. Do not add behaviour the test does not require.
-3. **Refactor** — Clean up only while the suite is green. No new behaviour during refactor.
+1. **Red**: Write the failing tests for one behaviour from the accepted spec. Run them and confirm they fail **on an assertion**, for the reason you expect. A compile error is not a valid red.
+2. **Green**: Write the minimum production code that makes those tests pass. Run the focused tests, then the test projects the change touches, before you commit. Do not add behaviour the tests do not require.
+3. **Refactor** (optional): Clean up only while the tests are green. Add no new behaviour. Skip the step if nothing needs cleaning.
 
-Treat each of red, green, and refactor as a step: commit after each one that produces a file change.
+Rules:
 
-- One behaviour per cycle. Prefer the lowest test layer that can prove it (domain unit, then application, then functional/integration).
+- **One behaviour per cycle, not one test.** A behaviour may need several test cases (happy path, validation cases, the cross-tenant 404). Write them together in one red step.
+- **Stubs in red are allowed.** In C#, a test that uses a new type will not compile. The red commit may add the needed signatures (types, members, endpoint shells) with bodies that throw `NotImplementedException` or return a default, so that the tree compiles and the test fails on its assertion. The stubs contain no logic.
+- **Prefer the lowest test layer** that can prove the behaviour: domain unit, then application, then functional/integration. Use the functional layer for HTTP status codes, auth, tenant isolation, and SQL schema behaviour.
 - Assert outcomes and invariants, not private implementation details.
 - Do not skip the red run. A test that never failed is not a test.
-- Do not make a failing test pass by weakening it unless the spec was wrong.
-- Docs, config, and chores with no testable behaviour are exempt.
+- Do not make a failing test pass by weakening it unless the spec was wrong. If it was, fix the spec in the same change and tell the user.
+- **Bug fixes** start with a test that reproduces the bug (red), then the fix (green).
+- **Exempt from test-first**: docs, config, CI, DI or wiring with no logic of its own, generated files, pure renames or moves, and refactors already covered by green tests. Still build and run the affected tests before you commit.
+- **Spikes**: if you need to try out an unknown API or library before you can write a sensible test, you may spike it. Tell the user it is a spike, do not commit it, then throw it away and start the red step.
 
 ## Stop and hand off (mandatory)
 
