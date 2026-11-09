@@ -176,7 +176,8 @@ public class ReverseTransactionCommandHandler(
         var assignedAdviserId = AccountScope.AssignedAdviserInternalId(currentUser);
         var query =
             from transaction in db.Transactions
-            join account in db.Accounts on transaction.AccountId equals account.Id
+            join legAccount in TransactionLegAccounts.Query(db) on transaction.Id equals legAccount.TransactionId
+            join account in db.Accounts on legAccount.AccountId equals account.Id
             join customer in db.Users on account.CustomerId equals customer.Id
             where transaction.PublicId == publicId
                   && (assignedAdviserId == null || customer.AdviserId == assignedAdviserId)

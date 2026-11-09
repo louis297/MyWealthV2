@@ -345,8 +345,7 @@ public class CreateTransactionCommandHandler(
                 var instrumentIds = legs.Select(leg => leg.InstrumentId).ToList();
                 var alreadyOpened = await (
                     from securityLeg in db.TransactionSecurityLegs
-                    join prior in db.Transactions on securityLeg.TransactionId equals prior.Id
-                    where prior.AccountId == loaded.Account.Id
+                    where securityLeg.AccountId == loaded.Account.Id
                           && instrumentIds.Contains(securityLeg.InstrumentId)
                     select securityLeg.Id).AnyAsync(cancellationToken);
                 if (alreadyOpened)

@@ -30,7 +30,7 @@ public class SplitTests
             currentCost: 2500m);
 
         transaction.TenantId.ShouldBe(1);
-        transaction.AccountId.ShouldBe(2);
+        transaction.SecurityLegs.ShouldAllBe(leg => leg.AccountId == 2);
         transaction.Type.ShouldBe(TransactionType.Split);
         transaction.BookedAt.ShouldBe(BookedAt);
         transaction.Memo.ShouldBe("Two for one");

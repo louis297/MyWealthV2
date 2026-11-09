@@ -19,7 +19,7 @@ public class OpeningHoldingsTests
         var transaction = Post(accountType, (11, 100m, 1500.00m, "USD"));
 
         transaction.TenantId.ShouldBe(1);
-        transaction.AccountId.ShouldBe(2);
+        transaction.SecurityLegs.ShouldAllBe(leg => leg.AccountId == 2);
         transaction.Type.ShouldBe(TransactionType.OpeningHoldings);
         transaction.BookedAt.ShouldBe(BookedAt);
         transaction.PublicId.ShouldNotBe(Guid.Empty);
@@ -183,7 +183,7 @@ public class OpeningHoldingsTests
         reversal.PublicId.ShouldNotBe(original.PublicId);
         reversal.Type.ShouldBe(TransactionType.Reversal);
         reversal.TenantId.ShouldBe(1);
-        reversal.AccountId.ShouldBe(2);
+        reversal.SecurityLegs.ShouldAllBe(leg => leg.AccountId == 2);
         reversal.BookedAt.ShouldBe(reverseAt);
         reversal.OriginalTransactionId.ShouldBe(7);
         reversal.Memo.ShouldBeNull();

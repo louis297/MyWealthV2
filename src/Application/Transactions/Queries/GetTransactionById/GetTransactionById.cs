@@ -18,7 +18,8 @@ public class GetTransactionByIdQueryHandler(IApplicationDbContext db, ICurrentUs
         var selfCustomerId = AccountScope.SelfCustomerId(currentUser);
         var query =
             from transaction in db.Transactions.AsNoTracking()
-            join account in db.Accounts.AsNoTracking() on transaction.AccountId equals account.Id
+            join legAccount in TransactionLegAccounts.Query(db) on transaction.Id equals legAccount.TransactionId
+            join account in db.Accounts.AsNoTracking() on legAccount.AccountId equals account.Id
             join customer in db.Users.AsNoTracking() on account.CustomerId equals customer.Id
             join tenant in db.Tenants.AsNoTracking() on transaction.TenantId equals tenant.Id
             where transaction.PublicId == request.Id

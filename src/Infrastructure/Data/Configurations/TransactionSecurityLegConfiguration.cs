@@ -14,8 +14,13 @@ public class TransactionSecurityLegConfiguration : IEntityTypeConfiguration<Tran
         builder.Property(leg => leg.CostCurrency).HasColumnType("char(3)").IsFixedLength().HasMaxLength(3).IsRequired();
         builder.Property(leg => leg.CreatedBy).HasMaxLength(450).IsRequired();
         builder.Property(leg => leg.RowVersion).IsRowVersion();
-        builder.Ignore(leg => leg.AccountId);
-        builder.HasIndex(leg => new { leg.TransactionId, leg.InstrumentId }).IsUnique();
+        builder.HasIndex(leg => new { leg.TransactionId, leg.AccountId, leg.InstrumentId }).IsUnique();
+        builder.HasIndex(leg => new { leg.AccountId, leg.InstrumentId })
+            .IncludeProperties(leg => new { leg.Quantity, leg.CostAmount });
+        builder.HasOne<Account>()
+            .WithMany()
+            .HasForeignKey(leg => leg.AccountId)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Instrument>()
             .WithMany()
             .HasForeignKey(leg => leg.InstrumentId)

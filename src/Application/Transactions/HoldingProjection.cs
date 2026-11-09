@@ -16,8 +16,7 @@ internal static class HoldingProjection
         {
             var legs = await (
                 from leg in db.TransactionSecurityLegs
-                join transaction in db.Transactions on leg.TransactionId equals transaction.Id
-                where transaction.AccountId == accountId && leg.InstrumentId == instrumentId
+                where leg.AccountId == accountId && leg.InstrumentId == instrumentId
                 select new { leg.Quantity, leg.CostAmount, leg.CostCurrency }).ToListAsync(cancellationToken);
 
             var quantity = legs.Sum(leg => leg.Quantity);

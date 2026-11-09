@@ -31,7 +31,8 @@ public class BuySellTests
             currentCashSum: 2000m);
 
         transaction.TenantId.ShouldBe(1);
-        transaction.AccountId.ShouldBe(2);
+        transaction.CashLegs.ShouldAllBe(leg => leg.AccountId == 2);
+        transaction.SecurityLegs.ShouldAllBe(leg => leg.AccountId == 2);
         transaction.Type.ShouldBe(TransactionType.Buy);
         transaction.BookedAt.ShouldBe(BookedAt);
         transaction.Memo.ShouldBe("First buy");

@@ -36,7 +36,8 @@ public sealed class CustomerTransactionsReportGenerator(
         var transactions = accountIds.Count == 0
             ? []
             : await db.Transactions.AsNoTracking()
-                .Where(row => accountIds.Contains(row.AccountId))
+                .Where(row => row.CashLegs.Any(leg => accountIds.Contains(leg.AccountId))
+                              || row.SecurityLegs.Any(leg => accountIds.Contains(leg.AccountId)))
                 .Include(row => row.CashLegs)
                 .Include(row => row.SecurityLegs)
                 .ToListAsync(cancellationToken);
@@ -59,7 +60,11 @@ public sealed class CustomerTransactionsReportGenerator(
         var quantityById = new Dictionary<int, string>();
         foreach (var transaction in transactions)
         {
-            var account = accountsById[transaction.AccountId];
+            var account = transaction.CashLegs.Select(leg => leg.AccountId)
+                .Concat(transaction.SecurityLegs.Select(leg => leg.AccountId))
+                .Where(accountsById.ContainsKey)
+                .Select(accountId => accountsById[accountId])
+                .First();
             sources.Add(new CustomerTransactionSource(
                 transaction.Id,
                 transaction.OriginalTransactionId,

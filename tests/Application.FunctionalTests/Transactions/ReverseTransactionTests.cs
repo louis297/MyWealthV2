@@ -225,7 +225,7 @@ public class ReverseTransactionTests : TestBase
         using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var account = await db.Accounts.SingleAsync(row => row.PublicId == accountId);
-        return await db.Transactions.CountAsync(row => row.AccountId == account.Id);
+        return await db.Transactions.CountAsync(row => (row.CashLegs.Any(leg => leg.AccountId == account.Id) || row.SecurityLegs.Any(leg => leg.AccountId == account.Id)));
     }
 
     private static async Task DisableCustomerAsync(int customerId)

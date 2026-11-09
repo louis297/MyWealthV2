@@ -71,7 +71,7 @@ public class TestSeedAccountsTests
         var rows = await (
             from transaction in db.Transactions
             join leg in db.TransactionCashLegs on transaction.Id equals leg.TransactionId
-            where transaction.AccountId == bank.Id
+            where leg.AccountId == bank.Id
                   && transaction.Reference == "TestSeed-DemoEverydayBank-OpeningTransfer"
             select new { transaction.Type, transaction.CreatedBy, leg.Amount, leg.Currency }).ToListAsync();
 
@@ -165,14 +165,14 @@ public class TestSeedAccountsTests
         var account = await db.Accounts.SingleAsync(row => row.TenantId == tenant.Id && row.Name == "Demo brokerage");
         var first = await LoadSecurityAsync(db, account.Id, "TestSeed-DemoBrokerage-Split");
         var firstId = await db.Transactions
-            .Where(row => row.AccountId == account.Id && row.Reference == "TestSeed-DemoBrokerage-Split")
+            .Where(row => (row.CashLegs.Any(leg => leg.AccountId == account.Id) || row.SecurityLegs.Any(leg => leg.AccountId == account.Id)) && row.Reference == "TestSeed-DemoBrokerage-Split")
             .Select(row => row.PublicId)
             .SingleAsync();
 
         await TestSeed.SeedAsync(db, CancellationToken.None);
         var second = await LoadSecurityAsync(db, account.Id, "TestSeed-DemoBrokerage-Split");
         var secondId = await db.Transactions
-            .Where(row => row.AccountId == account.Id && row.Reference == "TestSeed-DemoBrokerage-Split")
+            .Where(row => (row.CashLegs.Any(leg => leg.AccountId == account.Id) || row.SecurityLegs.Any(leg => leg.AccountId == account.Id)) && row.Reference == "TestSeed-DemoBrokerage-Split")
             .Select(row => row.PublicId)
             .SingleAsync();
 
@@ -198,7 +198,7 @@ public class TestSeedAccountsTests
         var rows = await (
             from transaction in db.Transactions
             join leg in db.TransactionCashLegs on transaction.Id equals leg.TransactionId
-            where transaction.AccountId == accountId && transaction.Reference == reference
+            where leg.AccountId == accountId && transaction.Reference == reference
             select new { transaction.Type, leg.Amount, leg.Currency }).ToListAsync();
         return rows.Select(row => (row.Type, row.Amount, row.Currency)).ToList();
     }
@@ -209,7 +209,7 @@ public class TestSeedAccountsTests
         string reference)
     {
         var transactions = await db.Transactions
-            .Where(row => row.AccountId == accountId && row.Reference == reference)
+            .Where(row => (row.CashLegs.Any(leg => leg.AccountId == accountId) || row.SecurityLegs.Any(leg => leg.AccountId == accountId)) && row.Reference == reference)
             .ToListAsync();
         var result = new List<(TransactionType, decimal?, int, decimal, decimal)>();
         foreach (var transaction in transactions)
@@ -227,7 +227,7 @@ public class TestSeedAccountsTests
         var account = await db.Accounts.SingleAsync(
             row => row.TenantId == tenantId && row.Name == "Demo brokerage");
         var transaction = await db.Transactions.SingleAsync(
-            row => row.AccountId == account.Id && row.Reference == "TestSeed-DemoBrokerage-OpeningHoldings");
+            row => (row.CashLegs.Any(leg => leg.AccountId == account.Id) || row.SecurityLegs.Any(leg => leg.AccountId == account.Id)) && row.Reference == "TestSeed-DemoBrokerage-OpeningHoldings");
         var leg = await db.TransactionSecurityLegs.SingleAsync(row => row.TransactionId == transaction.Id);
         var instrument = await db.Instruments.SingleAsync(row => row.Id == leg.InstrumentId);
         var holding = await db.Holdings.SingleAsync(

@@ -266,7 +266,7 @@ public class GenerateCustomerTransactionsTests : TestBase
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var account = await db.Accounts.SingleAsync(row => row.PublicId == accountId);
         var transaction = await db.Transactions
-            .Where(row => row.AccountId == account.Id)
+            .Where(row => (row.CashLegs.Any(leg => leg.AccountId == account.Id) || row.SecurityLegs.Any(leg => leg.AccountId == account.Id)))
             .OrderByDescending(row => row.Id)
             .FirstAsync();
         return transaction.PublicId;

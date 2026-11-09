@@ -28,7 +28,7 @@ public class TransactionTests
             existingTransactionCount: 0);
 
         transaction.TenantId.ShouldBe(1);
-        transaction.AccountId.ShouldBe(2);
+        transaction.CashLegs.ShouldAllBe(leg => leg.AccountId == 2);
         transaction.Type.ShouldBe(TransactionType.TransferIn);
         transaction.BookedAt.ShouldBe(bookedAt);
         transaction.Memo.ShouldBe("Salary");
@@ -143,7 +143,7 @@ public class TransactionTests
         original.Reverse(bookedAt.AddDays(1), currentCashSum: 100m);
 
         original.Type.ShouldBe(TransactionType.TransferIn);
-        original.AccountId.ShouldBe(2);
+        original.CashLegs.ShouldAllBe(leg => leg.AccountId == 2);
         original.BookedAt.ShouldBe(bookedAt);
         original.CashLegs.Single().Amount.ShouldBe(100m);
 
@@ -170,7 +170,7 @@ public class TransactionTests
         reversal.PublicId.ShouldNotBe(original.PublicId);
         reversal.Type.ShouldBe(TransactionType.Reversal);
         reversal.TenantId.ShouldBe(original.TenantId);
-        reversal.AccountId.ShouldBe(original.AccountId);
+        reversal.CashLegs.ShouldAllBe(leg => leg.AccountId == 2);
         reversal.BookedAt.ShouldBe(bookedAt);
         reversal.OriginalTransactionId.ShouldBe(7);
         reversal.ReversedByTransactionId.ShouldBeNull();
