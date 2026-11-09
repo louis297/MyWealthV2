@@ -312,7 +312,9 @@ Beyond PK / unique constraints already listed:
 - OpenIddict / Identity: keep package indexes
 - `Instruments(PublicId)`, `Instruments(TenantId, Symbol)` CI unique, `Instruments(TenantId, IsActive)`
 - `Accounts(PublicId)`, `Accounts(TenantId, CustomerId)`, `Accounts(TenantId, IsActive)`
-- `Transactions(PublicId)`, `Transactions(TenantId, AccountId, BookedAt)`, unique `TransactionCashLegs(TransactionId)` this increment, unique filtered `Transactions(ReversedByTransactionId)` where not null (`0018`)
+- `Transactions(PublicId)`, `Transactions(TenantId, BookedAt)`, unique filtered `Transactions(ReversedByTransactionId)` where not null (`0018`)
+- `TransactionCashLegs(AccountId)` INCLUDE `Amount`, unique `TransactionCashLegs(TransactionId, AccountId)` (`0024`)
+- `TransactionSecurityLegs(AccountId, InstrumentId)` INCLUDE `Quantity, CostAmount`, unique `TransactionSecurityLegs(TransactionId, AccountId, InstrumentId)` (`0024`)
 
 ---
 
@@ -336,6 +338,8 @@ Beyond PK / unique constraints already listed:
 0016_transaction_type_stock_in_out.sql      -- CK_Transactions_Type widened to 0–11
 0017_transaction_type_split.sql             -- CK_Transactions_Type widened to 0–14
 0018_transaction_reversed_by.sql            -- ALTER Transactions.ReversedByTransactionId + FK + unique filtered index
+...
+0024_leg_accounts.sql                       -- AccountId onto both leg tables (back-filled); drop Transactions.AccountId
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -394,6 +398,8 @@ Script `0012_accounts.sql`. Columns: [features/accounts.md](features/accounts.md
 
 Script `0013_transactions.sql`. Columns and rules: [features/posting.md](features/posting.md) §6. Header `Transactions` plus child `TransactionCashLegs` (one cash leg per header this increment). Idempotency table in the same script ([ADR 0015](adr/0015-idempotency-keys.md)). No `Accounts.Balance`. No seed in the script — `TestSeed` only.
 
+Amendment 2026-11-10 (leg accounts, [features/leg-accounts.md](features/leg-accounts.md)): script `0024_leg_accounts.sql` adds `AccountId int NOT NULL` (FK → `Accounts` RESTRICT) to `TransactionCashLegs` and `TransactionSecurityLegs`, back-fills it from the header, then drops `Transactions.AccountId` with its FK and index. The header keeps `TenantId` and has no Account or Customer. Cash legs are unique per `(TransactionId, AccountId)`; security legs per `(TransactionId, AccountId, InstrumentId)`. Forward only; `0013` / `0014` are not edited.
+
 Amendment 2026-10-13: script `0018_transaction_reversed_by.sql` adds nullable `ReversedByTransactionId` (FK → `Transactions` RESTRICT, unique filtered index `WHERE ReversedByTransactionId IS NOT NULL`). Forward ALTER only. Do not edit `0013`. The original stores `ReversedByTransactionId`; the Reversal stores `OriginalTransactionId`.
 
 ### 11.5 Holdings (accepted, landed)
@@ -440,6 +446,7 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-02 | Portfolios accepted. Script `0023_portfolios.sql`: `Portfolios`, `PortfolioLines`, `AccountPortfolioAssignments`. |
 | 2026-10-12 | `CK_Transactions_Type` widened to 0–14 (`0017`) for Split / Bonus / Scrip. No new table. |
 | 2026-10-13 | `Transactions.ReversedByTransactionId` (`0018`). Bidirectional reverse link. Forward ALTER only. |
+| 2026-11-10 | Leg accounts (`0024`): `AccountId` moves from `Transactions` onto both leg tables, back-filled. Header index becomes `(TenantId, BookedAt)`. |
 
 ---
 

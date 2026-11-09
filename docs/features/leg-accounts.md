@@ -28,7 +28,7 @@ Structural amendment to the Transaction aggregate on `webapi`. The Transaction h
 
 This is groundwork for cross-account transfer ([posting.md](posting.md) §13), which is the **next** increment and is not specified here. No new `TransactionType`, no new route, no new policy. Every existing type keeps its leg composition, and in this increment every leg of one Transaction still books into the same Account. The transaction item JSON changes shape now (per-leg `accountId`) so the portals change once, not twice.
 
-**Status is `accepted` (2026-11-10).** Implementation follows this file. The amendments to [posting.md](posting.md), [holdings.md](holdings.md), [buy-sell.md](buy-sell.md), [split.md](split.md) and the other docs listed in §14 land with the implementation.
+**Status is `accepted` (2026-11-10) and landed** on branch `feature/leg-accounts`. Script `0024_leg_accounts.sql`. The amendments to [posting.md](posting.md), [holdings.md](holdings.md), [buy-sell.md](buy-sell.md), [split.md](split.md), [net-worth.md](net-worth.md), [portfolios.md](portfolios.md), [reports.md](reports.md), the portal specs, ADR 0011, domain-model, database-design, api-design and the glossary landed with the implementation.
 
 ---
 

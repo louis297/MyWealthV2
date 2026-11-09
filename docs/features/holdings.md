@@ -30,6 +30,9 @@ Buy / Sell / StockIn / StockOut are accepted in [buy-sell.md](buy-sell.md). Spli
 
 **Status is `accepted` and landed** on repo master `676e77a` (PR #1, 2026-10-11). Scripts `0014_holdings.sql` and `0015_transaction_type_opening_holdings.sql` (`CK_Transactions_Type` widened to 0–9; `0016` widens it to 0–11; `0017` widens it to 0–14). `GET /accounts/{id}/holdings` returns `{ "items": [...] }`, not a paged list. TestSeed has one `OpeningHoldings` on the demo brokerage, plus a funding transfer, a Buy, a StockIn, and a Split.
 
+
+**Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md). Each security leg carries its own `AccountId`; the header has none (script `0024`). Security legs are unique per `(TransactionId, AccountId, InstrumentId)`. The projection key is the leg's `(AccountId, InstrumentId)` (R14). "Same Account-locked command" means every leg account locked in ascending `Accounts.Id` order. Bank / Cash refusal is checked per security leg's Account. Item JSON: leg-accounts §8.1.
+
 ---
 
 ## 1. Summary
@@ -207,7 +210,7 @@ Holdings item:
 }
 ```
 
-Transaction item shape is owned by [buy-sell.md](buy-sell.md): optional `cash` object + optional `security` array. This increment did not change landed cash JSON.
+Transaction item shape is owned by [leg-accounts.md](leg-accounts.md) §8.1: `cash` and `security` arrays, each leg with its own `accountId` / `customerId`. `OpeningHoldings` returns `cash: []`.
 
 ### 8.2 Errors
 

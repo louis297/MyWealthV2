@@ -32,6 +32,9 @@ Both support manual trigger and editable recurring schedules in the first phase.
 
 **Status is `accepted`.** Implementation follows this file.
 
+
+**Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md) R20. The Customer Transactions report has one row per leg account of the Customer: a transaction appears in each of the Customer's accounts it books into, with that account's cash and security legs. The closed-account filter and the reversal-after-original ordering apply per account row.
+
 ---
 
 ## 1. Summary

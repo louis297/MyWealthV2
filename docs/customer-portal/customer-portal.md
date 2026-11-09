@@ -39,7 +39,7 @@ These amendments land with the Customer Portal slice. Do not rebuild the resourc
 | --- | --- |
 | [identity-auth](../features/identity-auth.md) | Register confidential client `customer-portal`. Allow-list: Customer only. Per-client cookie scheme `customer-portal` (same pattern as the 2026-10-27 amendment). TenantAdmin / Adviser / SystemAdmin receive no code. |
 | [accounts](../features/accounts.md) | Grant Customer `accounts.read`. List / get / cash-balance / holdings reads for the caller’s own accounts only. Other customer’s account id → 404. No `accounts.create` / `accounts.manage`. |
-| [posting](../features/posting.md) | Grant Customer `transactions.read`. List / get for the caller’s own accounts only. Other customer’s transaction or account id → 404. No `transactions.create`. |
+| [posting](../features/posting.md) | Grant Customer `transactions.read`. List / get for the caller’s own accounts only. Other customer’s transaction or account id → 404. No `transactions.create`. Amended 2026-11-10 by [leg-accounts](../features/leg-accounts.md) R7: a transaction is visible when any leg books into an own account, and the item lists only the legs on own accounts. |
 | [net-worth](../features/net-worth.md) | Customer may call `GET /users/customers/{ownPublicId}/net-worth` (and `GET /net-worth`, which for Customer returns the same self scope). Other customer id → 404. Reuse `accounts.read`. |
 | [reports](../features/reports.md) | Customer already has `reports.customer.read`. Grant `reports.customer.create` for **request only**. `POST /reports/request` succeeds only when `parameters.customerId` is the caller (else 404). `POST /reports/schedules` and schedule verbs stay 403 for Customer. Book-scoped routes stay 403. |
 

@@ -307,16 +307,17 @@ Close requires cash `SUM = 0` and no `Holdings` rows ([features/holdings.md](fea
 
 | Type | Kind | Notes |
 | --- | --- | --- |
-| `Transaction` | Aggregate | Business-event header under an Account. Not a capture row that later copies into a journal. |
-| `TransactionCashLeg` | Entity | One cash accounting line on a cash header, and on `Buy` / `Sell`. Absent on `OpeningHoldings`, `StockIn`, `StockOut`, `Split`, `Bonus`, and `Scrip`. |
-| `TransactionSecurityLeg` | Entity | Exactly one on `Buy`, `Sell`, `StockIn`, `StockOut`, `Split`, `Bonus`, and `Scrip`. Quantity is signed. |
+| `Transaction` | Aggregate | Business-event header in a tenant. Has no Account and no Customer; it belongs to its leg accounts. Not a capture row that later copies into a journal. |
+| `TransactionCashLeg` | Entity | Cash accounting line on one Account (`AccountId`). One on a cash header, and on `Buy` / `Sell`. At most one per `(Transaction, Account)`. Absent on `OpeningHoldings`, `StockIn`, `StockOut`, `Split`, `Bonus`, and `Scrip`. |
+| `TransactionSecurityLeg` | Entity | Security accounting line on one Account (`AccountId`). Exactly one on `Buy`, `Sell`, `StockIn`, `StockOut`, `Split`, `Bonus`, and `Scrip`. Quantity is signed. |
 | `TransactionType` | Enum | Cash set plus `OpeningHoldings`, `Buy`, `Sell`, `StockIn` (10), `StockOut` (11), `Split` (12), `Bonus` (13), `Scrip` (14), and `Reversal`. |
 | `TransactionPosted` / `TransactionReversed` | Event | Side effects only. Must not write the books. |
 
 Invariants:
 
-- `TenantId` and `AccountId` required. Write = posted. No `Created` / draft status.
-- Cash `SUM` of legs is the account cash balance. Not stored on `Account`.
+- `TenantId` required on the header; `AccountId` required on every leg. Every leg account is in the header's tenant. At least one leg. Write = posted. No `Created` / draft status.
+- Every existing type builds all its legs on the one `accountId` of the create body. A Reversal builds one opposite leg per original leg, on that leg's Account, and is all-or-nothing across leg accounts ([features/leg-accounts.md](features/leg-accounts.md)).
+- Cash `SUM` of the cash legs on an Account is its cash balance. Not stored on `Account`.
 - After insert, `SUM ≥ 0` for Phase 2 openable types.
 - Posted header and legs are not `UPDATE`d / `DELETE`d, **except** a single write of `ReversedByTransactionId` on the original when a Reversal is created. After that write the original is immutable again. Economic legs are never updated. Reversal is a new row with the opposite cash amount and the opposite security quantity and cost. The Reversal stores `OriginalTransactionId`; the original stores `ReversedByTransactionId`.
 - `Buy` security cost is `quantity × price` in the quote currency. Cash is that cost times FX, negative, in the account currency.
@@ -326,7 +327,7 @@ Invariants:
 - Cash `Opening`: at most one per account; only while no other transaction exists; `amount > 0`.
 - Closed account rejects new transactions. `Account.Close()` does not write cash.
 
-Field rules: [features/posting.md](features/posting.md), [features/holdings.md](features/holdings.md), [features/buy-sell.md](features/buy-sell.md), and [features/split.md](features/split.md).
+Field rules: [features/posting.md](features/posting.md), [features/holdings.md](features/holdings.md), [features/buy-sell.md](features/buy-sell.md), [features/split.md](features/split.md), and [features/leg-accounts.md](features/leg-accounts.md).
 
 ---
 

@@ -84,7 +84,7 @@ Session remains the BFF cookie. All API calls go through `/api`. Do not re-intro
 | `/accounts/:id` | Same | Detail: cash balance, holdings list, recent activity, action buttons (TransferIn / TransferOut on an Open account; Buy / Sell / StockIn / StockOut / Split / Reverse / Close). |
 | `/accounts/:id/holdings` | Same | Holdings projection for the account. |
 | `/accounts/:id/transactions/new` | Same | Create form. Type selector drives the body shape from the Feature Specs. Requires `Idempotency-Key`. |
-| `/transactions` | Same | Activity list. Optional `accountId` / `customerId` filters. Reverse action on a row, hidden when `reversedByTransactionId` is not null or `type` is `Reversal`. |
+| `/transactions` | Same | Activity list. Optional `accountId` / `customerId` filters. Account and Customer columns list every visible leg account and its Customer; Cash lists each visible cash leg ([leg-accounts](../features/leg-accounts.md) §8.1, amended 2026-11-10). Reverse action on a row, hidden when `reversedByTransactionId` is not null or `type` is `Reversal`. |
 | `/transactions/:id` | Same | Read-only detail. Reverse button is hidden when `reversedByTransactionId` is not null or `type` is `Reversal`. |
 | `/profile` | Unchanged | |
 | `/customers`, `/advisers` | Unchanged | Still available; no longer the default home. |

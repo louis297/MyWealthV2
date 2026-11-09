@@ -28,6 +28,9 @@ Read model of current net worth on `webapi`. No new table. No write path. Aggreg
 
 **Status is `accepted` and landed (2026-10-12, `af422c2`).** Implementation follows this file. No script. Reads reuse `accounts.read`. Current point-in-time only. BFF allow-list adds `/net-worth`.
 
+
+**Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md) R19. Cash per Account is the `SUM` of cash legs whose `AccountId` is that Account. Holdings still come from the projection. Aggregation is otherwise unchanged.
+
 ---
 
 ## 1. Summary

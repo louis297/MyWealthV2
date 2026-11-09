@@ -362,7 +362,7 @@ Field rules: [features/accounts.md](features/accounts.md).
 
 ### 7.7 Transactions
 
-Field rules: [features/posting.md](features/posting.md) for cash types, [features/holdings.md](features/holdings.md) for `OpeningHoldings`, [features/buy-sell.md](features/buy-sell.md) for `Buy` / `Sell` / `StockIn` / `StockOut`, and [features/split.md](features/split.md) for `Split` / `Bonus` / `Scrip`. The transaction item is optional `cash: { amount, currency }` plus optional `security`. There is no flat `amount` on the item. Create body for a cash type still sends `amount`. `Split` / `Bonus` / `Scrip` send the new total quantity and omit cash.
+Field rules: [features/posting.md](features/posting.md) for cash types, [features/holdings.md](features/holdings.md) for `OpeningHoldings`, [features/buy-sell.md](features/buy-sell.md) for `Buy` / `Sell` / `StockIn` / `StockOut`, and [features/split.md](features/split.md) for `Split` / `Bonus` / `Scrip`. The transaction item has `cash` and `security` arrays; every leg carries its own `accountId` and `customerId`, and only legs on accounts the caller can see are returned ([features/leg-accounts.md](features/leg-accounts.md) §8.1). There is no top-level `accountId` / `customerId` and no flat `amount` on the item. Create body for a cash type still sends `amount`. `Split` / `Bonus` / `Scrip` send the new total quantity and omit cash.
 
 | Method | Route | Policy | Success |
 | --- | --- | --- | --- |

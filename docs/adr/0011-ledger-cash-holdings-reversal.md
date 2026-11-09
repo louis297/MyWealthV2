@@ -21,7 +21,7 @@ Storage shape for holdings / security legs / Opening of quantity is locked in [f
 
 Phase 2 is open. Instruments, Accounts, posting (`/transactions`, `0013`), and holdings Opening are landed.
 
-**Pending amendment (draft, 2026-11-10):** [features/leg-accounts.md](../features/leg-accounts.md) moves `AccountId` from the header onto every leg and changes the item JSON to per-leg accounts. Not a build contract until accepted; this file stays true to the code until then.
+**Amendment 2026-11-10 (accepted, landed):** [features/leg-accounts.md](../features/leg-accounts.md). The header has no Account and no Customer; every cash and security leg carries its own `AccountId` (script `0024_leg_accounts.sql`). Rules that read "the transaction's Account" apply to every leg account. Groundwork for cross-account transfer.
 
 ## Context
 
