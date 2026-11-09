@@ -161,6 +161,34 @@ public class BackOfficeApiTests
     }
 
     [Test]
+    public async Task InstrumentCalls_GetAndRenameUseTheInstrumentIdOnly()
+    {
+        var instrumentId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.OK, InstrumentJson(instrumentId));
+        api.Enqueue(HttpStatusCode.NoContent, "");
+        var platform = Create(api);
+
+        var item = await platform.GetInstrumentAsync(instrumentId);
+        await platform.UpdateInstrumentAsync(instrumentId, "VOO", "Vanguard 500", "rv1");
+
+        item.Symbol.ShouldBe("VTI");
+        item.QuoteCurrency.ShouldBe("USD");
+        item.RowVersion.ShouldBe("rv1");
+        AssertRequest(api.Requests[0], "GET", $"/instruments/{instrumentId}");
+        api.Requests[0].Path.ShouldNotContain("tenantId");
+        AssertRequest(api.Requests[1], "PUT", $"/instruments/{instrumentId}");
+        var body = Body(api.Requests[1]);
+        body.GetProperty("symbol").GetString().ShouldBe("VOO");
+        body.GetProperty("name").GetString().ShouldBe("Vanguard 500");
+        body.GetProperty("rowVersion").GetString().ShouldBe("rv1");
+        body.TryGetProperty("quoteCurrency", out _).ShouldBeFalse();
+        body.TryGetProperty("tenantId", out _).ShouldBeFalse();
+        body.TryGetProperty("isActive", out _).ShouldBeFalse();
+        body.EnumerateObject().Count().ShouldBe(3);
+    }
+
+    [Test]
     public async Task ReportGrantList_ReadsGranted()
     {
         var api = new ScriptedHandler();
@@ -199,6 +227,11 @@ public class BackOfficeApiTests
     private static string TenantJson() =>
         $$"""
         {"id":"{{TenantId}}","name":"North","code":"north","reportingCurrency":"NZD","isActive":true,"rowVersion":"rv1","created":"2026-10-25T00:00:00+00:00"}
+        """;
+
+    private static string InstrumentJson(Guid id) =>
+        $$"""
+        {"id":"{{id}}","tenantId":"{{TenantId}}","symbol":"VTI","name":"Vanguard","quoteCurrency":"USD","isActive":true,"rowVersion":"rv1"}
         """;
 
     private static string AdminJson() =>

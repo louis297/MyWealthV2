@@ -56,4 +56,13 @@ public interface IPlatformApi
         string name,
         string quoteCurrency,
         CancellationToken cancellationToken = default);
+
+    Task<InstrumentItem> GetInstrumentAsync(Guid id, CancellationToken cancellationToken = default);
+
+    Task UpdateInstrumentAsync(
+        Guid id,
+        string symbol,
+        string name,
+        string rowVersion,
+        CancellationToken cancellationToken = default);
 }

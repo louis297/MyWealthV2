@@ -212,5 +212,16 @@ public class BackOfficePageTests
             string quoteCurrency,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(Guid.Parse("33333333-3333-3333-3333-333333333333"));
+
+        public Task<InstrumentItem> GetInstrumentAsync(Guid id, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new InstrumentItem(id, TenantId, "VTI", "Vanguard", "USD", true, "rv1"));
+
+        public Task UpdateInstrumentAsync(
+            Guid id,
+            string symbol,
+            string name,
+            string rowVersion,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 }

@@ -220,6 +220,17 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         return created.Id;
     }
 
+    public Task<InstrumentItem> GetInstrumentAsync(Guid id, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task UpdateInstrumentAsync(
+        Guid id,
+        string symbol,
+        string name,
+        string rowVersion,
+        CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
     private static string RowVersion(string rowVersion) =>
         JsonSerializer.Serialize(new { rowVersion }, Json);
 
