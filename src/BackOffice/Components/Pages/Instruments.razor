@@ -1,0 +1,125 @@
+@page "/instruments"
+@inject IPlatformApi Api
+
+<PageTitle>Instruments</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Instruments</MudText>
+    @if (selectedTenant is not null)
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="@($"/instruments/new?tenantId={selectedTenant.Id}")">New instrument</MudButton>
+    }
+</MudStack>
+
+<MudPaper Class="pa-4 mb-4" Outlined="true">
+    <form method="get" action="/instruments" class="bo-filter">
+        <label>Tenant
+            <select name="tenantId">
+                <option value="" selected="@string.IsNullOrEmpty(TenantId)">Choose a tenant</option>
+                @foreach (var tenant in tenants)
+                {
+                    <option value="@tenant.Id" selected="@(TenantId == tenant.Id.ToString())">@tenant.Name</option>
+                }
+            </select>
+        </label>
+        <label>Search <input name="search" value="@Search" /></label>
+        <label>Status
+            <select name="enabledOnly">
+                <option value="" selected="@string.IsNullOrEmpty(EnabledOnly)">All</option>
+                <option value="true" selected="@(EnabledOnly == "true")">Active</option>
+            </select>
+        </label>
+        <button type="submit">Filter</button>
+    </form>
+</MudPaper>
+
+@if (prompt)
+{
+    <MudAlert Severity="Severity.Info">Choose a tenant</MudAlert>
+}
+else if (error is not null)
+{
+    <MudAlert Severity="Severity.Error">@error</MudAlert>
+}
+else if (list is not null)
+{
+    @if (list.Items.Count == 0)
+    {
+        <MudText>No instruments</MudText>
+    }
+    else
+    {
+        <MudTable Items="list.Items" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="1">
+            <HeaderContent>
+                <MudTh>Symbol</MudTh>
+                <MudTh>Name</MudTh>
+                <MudTh>Quote currency</MudTh>
+                <MudTh>Active</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Symbol"><MudLink Href="@($"/instruments/{context.Id}")">@context.Symbol</MudLink></MudTd>
+                <MudTd DataLabel="Name">@context.Name</MudTd>
+                <MudTd DataLabel="Quote currency">@context.QuoteCurrency</MudTd>
+                <MudTd DataLabel="Active">@(context.IsActive ? "Active" : "Disabled")</MudTd>
+                <MudTd DataLabel="Open"><MudLink Href="@($"/instruments/{context.Id}")">Open</MudLink></MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "tenantId")]
+    public string? TenantId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "search")]
+    public string? Search { get; set; }
+
+    [SupplyParameterFromQuery(Name = "enabledOnly")]
+    public string? EnabledOnly { get; set; }
+
+    [SupplyParameterFromQuery(Name = "page")]
+    public int? PageNumber { get; set; }
+
+    [SupplyParameterFromQuery(Name = "pageSize")]
+    public int? PageSize { get; set; }
+
+    private IReadOnlyList<TenantItem> tenants = [];
+    private TenantItem? selectedTenant;
+    private InstrumentPage? list;
+    private string? error;
+    private bool prompt;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var tenantPage = await Api.ListTenantsAsync(1, 100, true, null);
+            tenants = tenantPage.Items;
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+            return;
+        }
+
+        if (!Guid.TryParse(TenantId, out var tenantId))
+        {
+            prompt = true;
+            return;
+        }
+
+        selectedTenant = tenants.FirstOrDefault(tenant => tenant.Id == tenantId);
+        var page = PageNumber is >= 1 ? PageNumber.Value : 1;
+        var pageSize = PageSize is null ? 20 : Math.Clamp(PageSize.Value, 1, 100);
+        bool? enabled = bool.TryParse(EnabledOnly, out var parsed) ? parsed : null;
+        try
+        {
+            list = await Api.ListInstrumentsAsync(page, pageSize, tenantId, enabled, Search);
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+}

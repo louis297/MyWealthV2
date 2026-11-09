@@ -112,6 +112,106 @@ public class BackOfficeApiTests
     }
 
     [Test]
+    public async Task InstrumentCalls_ListUsesTenantAndFilters()
+    {
+        var instrumentId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.OK, $$"""
+            {"items":[{"id":"{{instrumentId}}","tenantId":"{{TenantId}}","symbol":"VTI","name":"Vanguard","quoteCurrency":"USD","isActive":true,"rowVersion":"rv1"}],"page":1,"pageSize":20,"totalCount":1}
+            """);
+        var platform = Create(api);
+
+        var page = await platform.ListInstrumentsAsync(1, 20, TenantId, true, "vti");
+
+        var item = page.Items.ShouldHaveSingleItem();
+        item.Id.ShouldBe(instrumentId);
+        item.TenantId.ShouldBe(TenantId);
+        item.Symbol.ShouldBe("VTI");
+        item.Name.ShouldBe("Vanguard");
+        item.QuoteCurrency.ShouldBe("USD");
+        item.IsActive.ShouldBeTrue();
+        item.RowVersion.ShouldBe("rv1");
+        page.Page.ShouldBe(1);
+        page.PageSize.ShouldBe(20);
+        page.TotalCount.ShouldBe(1);
+        AssertRequest(
+            api.Requests[0],
+            "GET",
+            $"/instruments?tenantId={TenantId}&page=1&pageSize=20&enabledOnly=true&search=vti");
+    }
+
+    [Test]
+    public async Task InstrumentCalls_CreateSendsTenantSymbolNameAndQuoteCurrency()
+    {
+        var instrumentId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.Created, $$"""{"id":"{{instrumentId}}"}""");
+        var platform = Create(api);
+
+        var id = await platform.CreateInstrumentAsync(TenantId, "vti", "Vanguard", "usd");
+
+        id.ShouldBe(instrumentId);
+        AssertRequest(api.Requests[0], "POST", "/instruments");
+        var body = Body(api.Requests[0]);
+        body.GetProperty("tenantId").GetGuid().ShouldBe(TenantId);
+        body.GetProperty("symbol").GetString().ShouldBe("vti");
+        body.GetProperty("name").GetString().ShouldBe("Vanguard");
+        body.GetProperty("quoteCurrency").GetString().ShouldBe("usd");
+        body.EnumerateObject().Count().ShouldBe(4);
+    }
+
+    [Test]
+    public async Task InstrumentCalls_GetAndRenameUseTheInstrumentIdOnly()
+    {
+        var instrumentId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.OK, InstrumentJson(instrumentId));
+        api.Enqueue(HttpStatusCode.NoContent, "");
+        var platform = Create(api);
+
+        var item = await platform.GetInstrumentAsync(instrumentId);
+        await platform.UpdateInstrumentAsync(instrumentId, "VOO", "Vanguard 500", "rv1");
+
+        item.Symbol.ShouldBe("VTI");
+        item.QuoteCurrency.ShouldBe("USD");
+        item.RowVersion.ShouldBe("rv1");
+        AssertRequest(api.Requests[0], "GET", $"/instruments/{instrumentId}");
+        api.Requests[0].Path.ShouldNotContain("tenantId");
+        AssertRequest(api.Requests[1], "PUT", $"/instruments/{instrumentId}");
+        var body = Body(api.Requests[1]);
+        body.GetProperty("symbol").GetString().ShouldBe("VOO");
+        body.GetProperty("name").GetString().ShouldBe("Vanguard 500");
+        body.GetProperty("rowVersion").GetString().ShouldBe("rv1");
+        body.TryGetProperty("quoteCurrency", out _).ShouldBeFalse();
+        body.TryGetProperty("tenantId", out _).ShouldBeFalse();
+        body.TryGetProperty("isActive", out _).ShouldBeFalse();
+        body.EnumerateObject().Count().ShouldBe(3);
+    }
+
+    [Test]
+    public async Task InstrumentCalls_DisableAndEnableSendRowVersionOnly()
+    {
+        var instrumentId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.NoContent, "");
+        api.Enqueue(HttpStatusCode.NoContent, "");
+        var platform = Create(api);
+
+        await platform.DisableInstrumentAsync(instrumentId, "rv1");
+        await platform.EnableInstrumentAsync(instrumentId, "rv2");
+
+        AssertRequest(api.Requests[0], "POST", $"/instruments/{instrumentId}/disable");
+        var disable = Body(api.Requests[0]);
+        disable.GetProperty("rowVersion").GetString().ShouldBe("rv1");
+        disable.TryGetProperty("tenantId", out _).ShouldBeFalse();
+        disable.EnumerateObject().Count().ShouldBe(1);
+        AssertRequest(api.Requests[1], "POST", $"/instruments/{instrumentId}/enable");
+        var enable = Body(api.Requests[1]);
+        enable.GetProperty("rowVersion").GetString().ShouldBe("rv2");
+        enable.EnumerateObject().Count().ShouldBe(1);
+    }
+
+    [Test]
     public async Task ReportGrantList_ReadsGranted()
     {
         var api = new ScriptedHandler();
@@ -150,6 +250,11 @@ public class BackOfficeApiTests
     private static string TenantJson() =>
         $$"""
         {"id":"{{TenantId}}","name":"North","code":"north","reportingCurrency":"NZD","isActive":true,"rowVersion":"rv1","created":"2026-10-25T00:00:00+00:00"}
+        """;
+
+    private static string InstrumentJson(Guid id) =>
+        $$"""
+        {"id":"{{id}}","tenantId":"{{TenantId}}","symbol":"VTI","name":"Vanguard","quoteCurrency":"USD","isActive":true,"rowVersion":"rv1"}
         """;
 
     private static string AdminJson() =>

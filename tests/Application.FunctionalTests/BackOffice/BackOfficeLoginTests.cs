@@ -19,6 +19,8 @@ public class BackOfficeLoginTests
         "/tenants/new",
         "/tenant-admins",
         "/tenant-admins/new",
+        "/instruments",
+        "/instruments/new",
         "/forbidden"
     ];
 

@@ -186,6 +186,69 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
             json: null,
             cancellationToken);
 
+    public Task<InstrumentPage> ListInstrumentsAsync(
+        int page,
+        int pageSize,
+        Guid tenantId,
+        bool? enabledOnly,
+        string? search,
+        CancellationToken cancellationToken = default)
+    {
+        var path = Query("/instruments", new Dictionary<string, string?>
+        {
+            ["tenantId"] = tenantId.ToString(),
+            ["page"] = page.ToString(),
+            ["pageSize"] = pageSize.ToString(),
+            ["enabledOnly"] = Flag(enabledOnly),
+            ["search"] = search
+        });
+        return ReadAsync<InstrumentPage>(HttpMethod.Get, path, json: null, cancellationToken);
+    }
+
+    public async Task<Guid> CreateInstrumentAsync(
+        Guid tenantId,
+        string symbol,
+        string name,
+        string quoteCurrency,
+        CancellationToken cancellationToken = default)
+    {
+        var created = await ReadAsync<Created>(
+            HttpMethod.Post,
+            "/instruments",
+            JsonSerializer.Serialize(new { tenantId, symbol, name, quoteCurrency }, Json),
+            cancellationToken);
+        return created.Id;
+    }
+
+    public Task<InstrumentItem> GetInstrumentAsync(Guid id, CancellationToken cancellationToken = default) =>
+        ReadAsync<InstrumentItem>(HttpMethod.Get, $"/instruments/{id}", json: null, cancellationToken);
+
+    public Task UpdateInstrumentAsync(
+        Guid id,
+        string symbol,
+        string name,
+        string rowVersion,
+        CancellationToken cancellationToken = default) =>
+        SendExpectingSuccessAsync(
+            HttpMethod.Put,
+            $"/instruments/{id}",
+            JsonSerializer.Serialize(new { symbol, name, rowVersion }, Json),
+            cancellationToken);
+
+    public Task DisableInstrumentAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
+        SendExpectingSuccessAsync(
+            HttpMethod.Post,
+            $"/instruments/{id}/disable",
+            RowVersion(rowVersion),
+            cancellationToken);
+
+    public Task EnableInstrumentAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
+        SendExpectingSuccessAsync(
+            HttpMethod.Post,
+            $"/instruments/{id}/enable",
+            RowVersion(rowVersion),
+            cancellationToken);
+
     private static string RowVersion(string rowVersion) =>
         JsonSerializer.Serialize(new { rowVersion }, Json);
 

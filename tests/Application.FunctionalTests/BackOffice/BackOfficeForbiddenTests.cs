@@ -38,6 +38,8 @@ public class BackOfficeForbiddenTests
 
     [TestCase("/")]
     [TestCase("/tenants")]
+    [TestCase("/instruments")]
+    [TestCase("/instruments/new")]
     public async Task OtherRole_IsSentToForbidden(string path)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, path);

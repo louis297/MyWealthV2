@@ -38,7 +38,7 @@ Landed in GitHub `louis297/MyWealthV2` master 2026-09-20, last slice commit `9ea
 
 A TenantAdmin or Adviser creates an instrument in the **current** tenant (`symbol` = instrument code, `name` = display name, `quoteCurrency`). SystemAdmin does the same for a chosen tenant (`tenantId` on create and on the list query). `QuoteCurrency` must be an enabled platform currency and is immutable after create. Cost currency equals quote currency (no extra column). An Adviser may create and read. Update / disable / enable are TenantAdmin or SystemAdmin. Disabled instruments stay in the catalog; they cannot be chosen as a **new** holding when that slice exists. Existing holdings (later) keep the id, same rule as a later-disabled `ReportingCurrency`.
 
-The catalog is firm-wide, not per-Adviser. Customer receives 403. TenantAdmin / Adviser crossing tenants → 404. SystemAdmin may read and write any tenant’s row (Scalar now; Back Office later). Adviser Portal has no SystemAdmin instruments screen.
+The catalog is firm-wide, not per-Adviser. Customer receives 403. TenantAdmin / Adviser crossing tenants → 404. SystemAdmin may read and write any tenant’s row (Scalar or Back Office; page contract [../backoffice/back-office-instruments.md](../backoffice/back-office-instruments.md)). Adviser Portal has no SystemAdmin instruments screen.
 
 ---
 
@@ -67,7 +67,7 @@ The catalog is firm-wide, not per-Adviser. Customer receives 403. TenantAdmin / 
 - Changing `QuoteCurrency` after create
 - A second cost-currency column
 - Customer Portal or ledger-write for Customer
-- Adviser Portal Instruments page. Catalog management stays on Scalar / later Back Office.
+- Adviser Portal Instruments page. Catalog management is Scalar or the Back Office ([../backoffice/back-office-instruments.md](../backoffice/back-office-instruments.md)).
 - SystemAdmin ledger screens on `adviser-portal`
 - Empty Account / Holding / Journal tables “for later”
 - Seeding instruments from `0010_instruments.sql` or in Production
@@ -81,7 +81,7 @@ The catalog is firm-wide, not per-Adviser. Customer receives 403. TenantAdmin / 
 3. As an Adviser I list and open instruments in my firm (default = all rows, each item has `isActive`; `enabledOnly=true` for active only).
 4. As an Adviser I cannot PUT / disable / enable (403).
 5. As a TenantAdmin in another firm I receive 404 for someone else’s instrument id.
-6. As a SystemAdmin I list / create / rename / disable instruments for a chosen tenant on Scalar (and later Back Office), not on Adviser Portal.
+6. As a SystemAdmin I list / create / rename / disable instruments for a chosen tenant on Scalar or the Back Office, not on Adviser Portal.
 7. As a Customer I receive 403 on every `/instruments` verb.
 8. As a later holdings slice I reject a **new** holding of a disabled instrument; rows that already point at it stay.
 
@@ -314,11 +314,13 @@ Keep the resource catalog in [api-design.md](../api-design.md) pointing here for
 
 ## 9. UI
 
-None in this slice.
+None in the original instruments slice.
 
-Adviser Portal has no Instruments page. The catalog is consumed only as a picker on Buy / Sell / StockIn / StockOut / Split forms (`GET /instruments?enabledOnly=true`). Create / rename / disable stay on Scalar (and later Back Office). Do not add an Instruments nav item.
+Adviser Portal has no Instruments page. The catalog is consumed only as a picker on Buy / Sell / StockIn / StockOut / Split forms (`GET /instruments?enabledOnly=true`). Create / rename / disable stay on Scalar or the Back Office.
 
-Development seed prices are not a UI. SystemAdmin uses Scalar (and later Back Office), not this portal.
+Back Office page contract (accepted 2026-11-09): [../backoffice/back-office-instruments.md](../backoffice/back-office-instruments.md). SystemAdmin list / create / rename / disable / enable for a chosen tenant. QuoteCurrency immutable. No price. No physical delete.
+
+Development seed prices are not a UI.
 
 ### 9.1 Test seed
 
@@ -369,7 +371,7 @@ Locked:
 | Symbol | Instrument code. Upper case, 1–32, `[A-Z0-9.-]`, unique per tenant including disabled. `Name` is the display name |
 | Columns | No ISIN / Exchange / Kind / price |
 | Port methods | `IMarketData.TryGetPrice`, `IFxRate.GetRate` |
-| Portal | No page in this slice. SystemAdmin uses Scalar |
+| Portal | Adviser Portal has no Instruments management page. Back Office page contract: [../backoffice/back-office-instruments.md](../backoffice/back-office-instruments.md) (accepted 2026-11-09). SystemAdmin also uses Scalar |
 | TestSeed | VTI, AIA, NZD-CASH on the Development demo tenant. Later expanded, with table prices, by [instrument-prices.md](instrument-prices.md) |
 
 Still open, not this slice:

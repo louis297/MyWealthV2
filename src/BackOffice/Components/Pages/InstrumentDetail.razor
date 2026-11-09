@@ -1,0 +1,158 @@
+@page "/instruments/{Id:guid}"
+@inject IPlatformApi Api
+
+<PageTitle>Instrument</PageTitle>
+
+@if (error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@error</MudAlert>
+}
+
+@if (item is not null)
+{
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudText Typo="Typo.h4">@item.Symbol</MudText>
+        <MudChip T="string" Color="@(item.IsActive ? Color.Success : Color.Default)">@(item.IsActive ? "Active" : "Disabled")</MudChip>
+    </MudStack>
+
+    <MudPaper Class="pa-4 mb-4" Outlined="true">
+        <MudStack Spacing="3" Style="max-width: 28rem;">
+            <div>
+                <MudText Typo="Typo.caption">Quote currency</MudText>
+                <MudText Typo="Typo.body1">@item.QuoteCurrency</MudText>
+            </div>
+            <div>
+                <MudText Typo="Typo.caption">Tenant</MudText>
+                <MudLink Href="@($"/tenants/{item.TenantId}")">@item.TenantId</MudLink>
+            </div>
+            <EditForm Model="form" OnValidSubmit="Save" FormName="edit-instrument">
+                <MudStack Spacing="3">
+                    <MudTextField @bind-Value="form.Symbol" Label="Symbol" Variant="Variant.Outlined" />
+                    <MudTextField @bind-Value="form.Name" Label="Name" Variant="Variant.Outlined" />
+                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Save</MudButton>
+                </MudStack>
+            </EditForm>
+        </MudStack>
+    </MudPaper>
+
+    @if (item.IsActive)
+    {
+        <button type="button" class="bo-action bo-action-danger" @onclick="Disable">Disable</button>
+    }
+    else
+    {
+        <button type="button" class="bo-action bo-action-success" @onclick="Enable">Enable</button>
+    }
+}
+
+@code {
+    private const string ConflictMessage = "This instrument changed. Reload the page.";
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private InstrumentItem? item;
+    private readonly FormModel form = new();
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await Reload();
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+
+    private async Task Save()
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await Api.UpdateInstrumentAsync(Id, form.Symbol, form.Name, item.RowVersion);
+            await Reload();
+            error = null;
+        }
+        catch (PlatformApiException exception)
+        {
+            await ShowFailureAsync(exception);
+        }
+    }
+
+    private async Task Disable()
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await Api.DisableInstrumentAsync(Id, item.RowVersion);
+            await Reload();
+            error = null;
+        }
+        catch (PlatformApiException exception)
+        {
+            await ShowFailureAsync(exception);
+        }
+    }
+
+    private async Task Enable()
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await Api.EnableInstrumentAsync(Id, item.RowVersion);
+            await Reload();
+            error = null;
+        }
+        catch (PlatformApiException exception)
+        {
+            await ShowFailureAsync(exception);
+        }
+    }
+
+    private async Task ShowFailureAsync(PlatformApiException exception)
+    {
+        if (exception.Status != 409)
+        {
+            error = exception.Message;
+            return;
+        }
+
+        error = ConflictMessage;
+        try
+        {
+            await Reload();
+        }
+        catch (PlatformApiException reload)
+        {
+            error = reload.Message;
+        }
+    }
+
+    private async Task Reload()
+    {
+        item = await Api.GetInstrumentAsync(Id);
+        form.Symbol = item.Symbol;
+        form.Name = item.Name;
+    }
+
+    private sealed class FormModel
+    {
+        public string Symbol { get; set; } = "";
+        public string Name { get; set; } = "";
+    }
+}
