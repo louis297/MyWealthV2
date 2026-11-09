@@ -21,6 +21,8 @@ Storage shape for holdings / security legs / Opening of quantity is locked in [f
 
 Phase 2 is open. Instruments, Accounts, posting (`/transactions`, `0013`), and holdings Opening are landed.
 
+**Pending amendment (draft, 2026-11-10):** [features/leg-accounts.md](../features/leg-accounts.md) moves `AccountId` from the header onto every leg and changes the item JSON to per-leg accounts. Not a build contract until accepted; this file stays true to the code until then.
+
 ## Context
 
 A single `Type` column that pretends to be both cash and security, plus hand-edited holdings, collapses when a real ledger starts. Updating or deleting an original posting destroys the audit trail.

@@ -32,6 +32,8 @@ There is **no separate cash-ledger Feature Spec.** Cash legs live here. There is
 
 **Amendment 2026-10-13:** bidirectional reverse link. Keep `OriginalTransactionId` on the Reversal. Add `ReversedByTransactionId` on the original (script `0018_transaction_reversed_by.sql`, forward ALTER only; do not edit `0013`). One limited write of that column when the Reversal is created; after that write the original is immutable again. Economic legs are never updated. Already-reversed is `ReversedByTransactionId IS NOT NULL` — no self-join on list / get.
 
+**Pending amendment (draft, 2026-11-10):** [leg-accounts.md](leg-accounts.md) moves `AccountId` from the header onto every leg and changes the item JSON to per-leg accounts. Not a build contract until accepted; this file stays true to the code until then.
+
 ---
 
 ## 1. Summary
