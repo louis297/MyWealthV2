@@ -14,28 +14,24 @@ public class GetTransactionByIdQueryHandler(IApplicationDbContext db, ICurrentUs
 {
     public async Task<TransactionDto> Handle(GetTransactionByIdQuery request, CancellationToken cancellationToken)
     {
-        var assignedAdviserId = AccountScope.AssignedAdviserInternalId(currentUser);
-        var selfCustomerId = AccountScope.SelfCustomerId(currentUser);
-        var query =
-            from transaction in db.Transactions.AsNoTracking()
-            join legAccount in TransactionLegAccounts.Query(db) on transaction.Id equals legAccount.TransactionId
-            join account in db.Accounts.AsNoTracking() on legAccount.AccountId equals account.Id
-            join customer in db.Users.AsNoTracking() on account.CustomerId equals customer.Id
-            join tenant in db.Tenants.AsNoTracking() on transaction.TenantId equals tenant.Id
-            where transaction.PublicId == request.Id
-                  && (assignedAdviserId == null || customer.AdviserId == assignedAdviserId)
-                  && (selfCustomerId == null || customer.Id == selfCustomerId)
-            select new { transaction, account, customer, tenant };
-
+        var header = db.Transactions.AsNoTracking().Where(transaction => transaction.PublicId == request.Id);
         if (currentUser.Role != UserRole.SystemAdmin)
         {
-            query = query.Where(row => row.transaction.TenantId == currentUser.TenantId);
+            header = header.Where(transaction => transaction.TenantId == currentUser.TenantId);
         }
 
-        var row = await query.SingleOrDefaultAsync(cancellationToken)
+        var row = await (
+                      from transaction in header
+                      join tenant in db.Tenants.AsNoTracking() on transaction.TenantId equals tenant.Id
+                      select new { transaction, tenant }).SingleOrDefaultAsync(cancellationToken)
                   ?? throw new NotFoundException("Transaction", request.Id);
 
-        var legs = await TransactionLegReader.LoadAsync(db, [row.transaction.Id], cancellationToken);
+        var visibleAccountIds = TransactionVisibility.VisibleAccountIds(db, currentUser, row.transaction.TenantId);
+        var legs = await TransactionLegReader.LoadAsync(db, [row.transaction.Id], visibleAccountIds, cancellationToken);
+        if (!legs.Cash[row.transaction.Id].Any() && !legs.Security[row.transaction.Id].Any())
+        {
+            throw new NotFoundException("Transaction", request.Id);
+        }
 
         Guid? originalPublicId = null;
         if (row.transaction.OriginalTransactionId is int originalId)

@@ -2,19 +2,20 @@ using MyWealthV2.Application.Common.Interfaces;
 
 namespace MyWealthV2.Application.Transactions;
 
-/// <summary>Reads cash and security legs as item DTOs, each with its leg account and Customer.</summary>
+/// <summary>Reads the legs on visible Accounts as item DTOs, each with its leg account and Customer.</summary>
 internal static class TransactionLegReader
 {
     public static async Task<TransactionLegs> LoadAsync(
         IApplicationDbContext db,
         IReadOnlyCollection<int> transactionIds,
+        IQueryable<int> visibleAccountIds,
         CancellationToken cancellationToken)
     {
         var cashRows = await (
             from leg in db.TransactionCashLegs.AsNoTracking()
             join account in db.Accounts.AsNoTracking() on leg.AccountId equals account.Id
             join customer in db.Users.AsNoTracking() on account.CustomerId equals customer.Id
-            where transactionIds.Contains(leg.TransactionId)
+            where transactionIds.Contains(leg.TransactionId) && visibleAccountIds.Contains(leg.AccountId)
             orderby leg.Id
             select new
             {
@@ -30,7 +31,7 @@ internal static class TransactionLegReader
             join account in db.Accounts.AsNoTracking() on leg.AccountId equals account.Id
             join customer in db.Users.AsNoTracking() on account.CustomerId equals customer.Id
             join instrument in db.Instruments.AsNoTracking() on leg.InstrumentId equals instrument.Id
-            where transactionIds.Contains(leg.TransactionId)
+            where transactionIds.Contains(leg.TransactionId) && visibleAccountIds.Contains(leg.AccountId)
             orderby leg.Id
             select new
             {

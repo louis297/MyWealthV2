@@ -58,18 +58,11 @@ public class GetTransactionsQueryHandler(IApplicationDbContext db, ICurrentUser 
                        ?? throw new NotFoundException("Tenant", "current");
         }
 
-        var assignedAdviserId = AccountScope.AssignedAdviserInternalId(currentUser);
         var selfCustomerId = AccountScope.SelfCustomerId(currentUser);
-        var query =
-            from transaction in db.Transactions.AsNoTracking()
-            join legAccount in TransactionLegAccounts.Query(db) on transaction.Id equals legAccount.TransactionId
-            join account in db.Accounts.AsNoTracking() on legAccount.AccountId equals account.Id
-            join customer in db.Users.AsNoTracking() on account.CustomerId equals customer.Id
-            join tenant in db.Tenants.AsNoTracking() on transaction.TenantId equals tenant.Id
-            where transaction.TenantId == tenantId
-                  && (assignedAdviserId == null || customer.AdviserId == assignedAdviserId)
-                  && (selfCustomerId == null || customer.Id == selfCustomerId)
-            select new { transaction, account, customer, tenant };
+        var visibleAccountIds = TransactionVisibility.VisibleAccountIds(db, currentUser, tenantId);
+        var transactions = db.Transactions.AsNoTracking()
+            .Where(transaction => transaction.TenantId == tenantId)
+            .WithLegOn(visibleAccountIds);
 
         if (request.AccountId is { } accountPublicId)
         {
@@ -87,7 +80,8 @@ public class GetTransactionsQueryHandler(IApplicationDbContext db, ICurrentUser 
                 }
             }
 
-            query = query.Where(row => row.account.PublicId == accountPublicId);
+            transactions = transactions.WithLegOn(
+                db.Accounts.Where(account => account.PublicId == accountPublicId).Select(account => account.Id));
         }
 
         if (request.CustomerId is { } customerPublicId)
@@ -97,8 +91,17 @@ public class GetTransactionsQueryHandler(IApplicationDbContext db, ICurrentUser 
                 throw new NotFoundException("Customer", customerPublicId);
             }
 
-            query = query.Where(row => row.customer.PublicId == customerPublicId);
+            transactions = transactions.WithLegOn(
+                from account in db.Accounts
+                join customer in db.Users on account.CustomerId equals customer.Id
+                where customer.PublicId == customerPublicId
+                select account.Id);
         }
+
+        var query =
+            from transaction in transactions
+            join tenant in db.Tenants.AsNoTracking() on transaction.TenantId equals tenant.Id
+            select new { transaction, tenant };
 
         var totalCount = await query.CountAsync(cancellationToken);
         var rows = await query
@@ -109,7 +112,7 @@ public class GetTransactionsQueryHandler(IApplicationDbContext db, ICurrentUser 
             .ToListAsync(cancellationToken);
 
         var transactionIds = rows.Select(row => row.transaction.Id).ToList();
-        var legs = await TransactionLegReader.LoadAsync(db, transactionIds, cancellationToken);
+        var legs = await TransactionLegReader.LoadAsync(db, transactionIds, visibleAccountIds, cancellationToken);
 
         var originalIds = rows
             .Where(row => row.transaction.OriginalTransactionId is not null)

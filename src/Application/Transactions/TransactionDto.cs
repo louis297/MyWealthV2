@@ -8,7 +8,7 @@ public sealed class TransactionDto
 
     public required string Type { get; init; }
 
-    /// <summary>Cash legs, each with its leg account. Empty when the type has no cash leg.</summary>
+    /// <summary>Cash legs on Accounts the caller can see. Empty when the type has no cash leg.</summary>
     public required IReadOnlyList<TransactionCashDto> Cash { get; init; }
 
     public required string BookedAt { get; init; }
@@ -23,7 +23,7 @@ public sealed class TransactionDto
 
     public required string RowVersion { get; init; }
 
-    /// <summary>Security legs, each with its leg account. Empty when the type has no security leg.</summary>
+    /// <summary>Security legs on Accounts the caller can see. Empty when the type has no security leg.</summary>
     public required IReadOnlyList<TransactionSecurityDto> Security { get; init; }
 
     public static string FormatBookedAt(DateTimeOffset bookedAt) =>
