@@ -156,17 +156,15 @@ describe("AccountDetailPage", () => {
     const postedBuy = {
       id: createdId,
       tenantId: account.tenantId,
-      accountId,
-      customerId,
       type: "Buy",
-      cash: { amount: -1250, currency: "NZD" },
+      cash: [{ accountId, customerId, amount: -1250, currency: "NZD" }],
       bookedAt: "2026-10-11T10:00:00+13:00",
       memo: null,
       reference: null,
       originalTransactionId: null,
       reversedByTransactionId: null,
       rowVersion: "BBBB",
-      security: [{ instrumentId, quantity: 50, cost: 750, costCurrency: "USD" }],
+      security: [{ accountId, customerId, instrumentId, quantity: 50, cost: 750, costCurrency: "USD" }],
     };
     let posted = false;
 
@@ -303,17 +301,15 @@ describe("AccountDetailPage", () => {
             ? [{
               id: createdId,
               tenantId: account.tenantId,
-              accountId,
-              customerId,
               type: "Sell",
-              cash: { amount: 1250, currency: "NZD" },
+              cash: [{ accountId, customerId, amount: 1250, currency: "NZD" }],
               bookedAt: "2026-10-11T11:00:00+13:00",
               memo: null,
               reference: null,
               originalTransactionId: null,
               reversedByTransactionId: null,
               rowVersion: "BBBB",
-              security: [{ instrumentId, quantity: -40, cost: 2000, costCurrency: "NZD" }],
+              security: [{ accountId, customerId, instrumentId, quantity: -40, cost: 2000, costCurrency: "NZD" }],
             }]
             : [],
           page: 1,
