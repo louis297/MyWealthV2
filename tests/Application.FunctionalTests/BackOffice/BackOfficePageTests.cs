@@ -18,6 +18,7 @@ public class BackOfficePageTests
     private static readonly Guid PersonId = Guid.Parse("22222222-2222-2222-2222-222222222222");
     private static readonly Guid ReportId = Guid.Parse("8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11");
     private static readonly Guid AdviserBalancesId = Guid.Parse("5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22");
+    private static readonly Guid InstrumentId = Guid.Parse("33333333-3333-3333-3333-333333333333");
 
     private BackOfficeFactory _factory = null!;
     private HttpClient _client = null!;
@@ -83,6 +84,19 @@ public class BackOfficePageTests
         body.ShouldNotContain(">Schedule<");
         body.ShouldNotContain("/reports/request");
         body.ShouldNotContain("/reports/schedules");
+    }
+
+    [Test]
+    public async Task Instruments_WithoutTenant_PromptsAndDoesNotCallTheList()
+    {
+        var callsBefore = _api.InstrumentListCalls;
+
+        var body = await GetAsync("/instruments");
+
+        body.ShouldContain("Choose a tenant");
+        body.ShouldNotContain("VTI");
+        body.ShouldContain("href=\"/instruments\"");
+        _api.InstrumentListCalls.ShouldBe(callsBefore);
     }
 
     [Test]
@@ -196,14 +210,23 @@ public class BackOfficePageTests
         public Task<IReadOnlyList<CurrencyItem>> ListCurrenciesAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<CurrencyItem>>([new CurrencyItem("NZD", "New Zealand Dollar", true)]);
 
+        public int InstrumentListCalls { get; private set; }
+
         public Task<InstrumentPage> ListInstrumentsAsync(
             int page,
             int pageSize,
             Guid tenantId,
             bool? enabledOnly,
             string? search,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(new InstrumentPage([], page, pageSize, 0));
+            CancellationToken cancellationToken = default)
+        {
+            InstrumentListCalls++;
+            return Task.FromResult(new InstrumentPage(
+                [new InstrumentItem(InstrumentId, tenantId, "VTI", "Vanguard", "USD", true, "rv1")],
+                page,
+                pageSize,
+                1));
+        }
 
         public Task<Guid> CreateInstrumentAsync(
             Guid tenantId,
