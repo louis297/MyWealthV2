@@ -2,6 +2,7 @@ extern alias BackOfficeHost;
 
 using System.Net;
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 using BackOfficeHost::MyWealthV2.BackOffice;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -250,8 +251,22 @@ public class BackOfficePageTests
         request.Headers.TryAddWithoutValidation("Cookie", SessionCookie());
         var response = await _client.SendAsync(request);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        return await response.Content.ReadAsStringAsync();
+        return VisibleMarkup(await response.Content.ReadAsStringAsync());
     }
+
+    // Interactive Server writes a protected marker and an antiforgery token into
+    // every response. Those values are base64, so a short symbol such as ZZZ or
+    // VTI can appear in them even when the catalog does not render it.
+    private static string VisibleMarkup(string html) =>
+        ProtectedPayload.Replace(
+            html,
+            match => match.Value.StartsWith("<!--", StringComparison.Ordinal)
+                ? ""
+                : "name=\"__RequestVerificationToken\" value=\"\"");
+
+    private static readonly Regex ProtectedPayload = new(
+        "<!--Blazor.*?-->|name=\"__RequestVerificationToken\"\\s+value=\"[^\"]*\"",
+        RegexOptions.Singleline | RegexOptions.Compiled);
 
     private string SessionCookie()
     {
