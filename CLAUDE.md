@@ -6,6 +6,23 @@ This file is for agents working in the **MyWealthV2 repository**. Design lives i
 
 Do not read, list, search, edit, create, delete, move, or otherwise touch anything under `draft/`. Treat that directory as if it does not exist. Work from `docs/` and the rest of the repo instead.
 
+## Language
+
+- Chat may be in English, Chinese, or a mix of both. Reply in whichever language the user is using.
+- Everything written to the repo is **English only**: docs, code, comments, test names, commit messages, and log or error text.
+- When a design idea is discussed in Chinese, write it in English using the terms in `docs/glossary.md`. If no term fits, add one to the glossary. Do not leave Chinese words in brackets in the docs.
+
+## Docs tasks
+
+When the user says it is a docs task (for example "It's a docs task", "docs only", or "这是文档任务"), we are discussing design. The task stays in docs mode until the user says otherwise.
+
+- Change files under `docs/` only. Do not change code, tests, `database/schema/`, config, or CI.
+- You may read code to check how something works now. Do not "fix" code you find that disagrees with a doc. Note it in the doc or tell the user.
+- All design docs live under `docs/`. Do not put doc files at the repo root, next to code, or in a new top-level folder. The only exceptions are the existing root `README.md`, `CLAUDE.md`, and tool READMEs such as `.devcontainer/README.md`.
+- Follow the doc conventions in `docs/README.md`: front matter, `status`, glossary terms.
+- Do not set a spec's `status` to `accepted` unless the user says so. `accepted` makes it a build contract.
+- Commit each docs change as its own step (see below). The TDD rules do not apply.
+
 ## What to implement
 
 - Implement only **`accepted`** specs for the **current phase** (`docs/README.md`, `docs/function-plan.md`, the slice Feature Spec or portal spec).
