@@ -182,10 +182,7 @@ public class OpeningHoldingsProjectionTests : TestBase
             amount.ValueKind.ShouldBe(JsonValueKind.Null);
         }
 
-        if (item.TryGetProperty("cash", out var cash))
-        {
-            cash.ValueKind.ShouldBe(JsonValueKind.Null);
-        }
+        TransactionJson.CashLegs(item).ShouldBeEmpty();
     }
 
     private static async Task<Guid> OpenAccountAsync(string accessToken, Guid customerId, string name)

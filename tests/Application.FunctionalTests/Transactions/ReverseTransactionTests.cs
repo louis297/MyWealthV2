@@ -25,14 +25,14 @@ public class ReverseTransactionTests : TestBase
 
         var original = await ReadItem(tokens.AccessToken, originalId);
         original.GetProperty("type").GetString().ShouldBe("TransferIn");
-        original.GetProperty("cash").GetProperty("amount").GetDecimal().ShouldBe(100m);
+        TransactionJson.SingleCash(original).GetProperty("amount").GetDecimal().ShouldBe(100m);
         original.GetProperty("originalTransactionId").ValueKind.ShouldBe(JsonValueKind.Null);
         original.GetProperty("reversedByTransactionId").GetGuid().ShouldBe(reversalId);
 
         var reversal = await ReadItem(tokens.AccessToken, reversalId);
         reversal.GetProperty("type").GetString().ShouldBe("Reversal");
-        reversal.GetProperty("cash").GetProperty("amount").GetDecimal().ShouldBe(-100m);
-        reversal.GetProperty("accountId").GetGuid().ShouldBe(accountId);
+        TransactionJson.SingleCash(reversal).GetProperty("amount").GetDecimal().ShouldBe(-100m);
+        TransactionJson.SingleCash(reversal).GetProperty("accountId").GetGuid().ShouldBe(accountId);
         reversal.GetProperty("originalTransactionId").GetGuid().ShouldBe(originalId);
         reversal.GetProperty("reversedByTransactionId").ValueKind.ShouldBe(JsonValueKind.Null);
         (await CountTransactionsAsync(accountId)).ShouldBe(2);
@@ -120,7 +120,7 @@ public class ReverseTransactionTests : TestBase
         var reversal = await ReverseAsync(tokens.AccessToken, withdrawalId);
         reversal.StatusCode.ShouldBe(HttpStatusCode.Created);
         var item = await ReadItem(tokens.AccessToken, await ReadId(reversal));
-        item.GetProperty("cash").GetProperty("amount").GetDecimal().ShouldBe(30m);
+        TransactionJson.SingleCash(item).GetProperty("amount").GetDecimal().ShouldBe(30m);
         item.GetProperty("originalTransactionId").GetGuid().ShouldBe(withdrawalId);
         _ = depositId;
     }
