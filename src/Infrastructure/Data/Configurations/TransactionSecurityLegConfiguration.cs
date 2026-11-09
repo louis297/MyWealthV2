@@ -14,6 +14,7 @@ public class TransactionSecurityLegConfiguration : IEntityTypeConfiguration<Tran
         builder.Property(leg => leg.CostCurrency).HasColumnType("char(3)").IsFixedLength().HasMaxLength(3).IsRequired();
         builder.Property(leg => leg.CreatedBy).HasMaxLength(450).IsRequired();
         builder.Property(leg => leg.RowVersion).IsRowVersion();
+        builder.Ignore(leg => leg.AccountId);
         builder.HasIndex(leg => new { leg.TransactionId, leg.InstrumentId }).IsUnique();
         builder.HasOne<Instrument>()
             .WithMany()

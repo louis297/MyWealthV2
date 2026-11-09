@@ -12,7 +12,7 @@ public class TransactionsSchemaTests
         var columns = await LoadColumns("Transactions");
 
         columns.Select(column => column.Name).ShouldBe([
-            "Id", "PublicId", "TenantId", "AccountId", "Type", "BookedAt", "Memo", "Reference",
+            "Id", "PublicId", "TenantId", "Type", "BookedAt", "Memo", "Reference",
             "OriginalTransactionId", "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion",
             "ReversedByTransactionId"
         ]);
@@ -25,9 +25,6 @@ public class TransactionsSchemaTests
             column => column.Type.ShouldBe("uniqueidentifier"),
             column => column.Nullable.ShouldBe("NO"));
         Column(columns, "TenantId").ShouldSatisfyAllConditions(
-            column => column.Type.ShouldBe("int"),
-            column => column.Nullable.ShouldBe("NO"));
-        Column(columns, "AccountId").ShouldSatisfyAllConditions(
             column => column.Type.ShouldBe("int"),
             column => column.Nullable.ShouldBe("NO"));
         Column(columns, "Type").ShouldSatisfyAllConditions(
@@ -74,7 +71,7 @@ public class TransactionsSchemaTests
 
         columns.Select(column => column.Name).ShouldBe([
             "Id", "TransactionId", "Amount", "Currency",
-            "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion"
+            "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion", "AccountId"
         ]);
 
         Column(columns, "Id").ShouldSatisfyAllConditions(
@@ -82,6 +79,9 @@ public class TransactionsSchemaTests
             column => column.Nullable.ShouldBe("NO"),
             column => column.Identity.ShouldBe(1));
         Column(columns, "TransactionId").ShouldSatisfyAllConditions(
+            column => column.Type.ShouldBe("int"),
+            column => column.Nullable.ShouldBe("NO"));
+        Column(columns, "AccountId").ShouldSatisfyAllConditions(
             column => column.Type.ShouldBe("int"),
             column => column.Nullable.ShouldBe("NO"));
         Column(columns, "Amount").ShouldSatisfyAllConditions(
@@ -174,14 +174,20 @@ public class TransactionsSchemaTests
     public async Task Apply_AddsUniqueKeysAndBookedAtIndex()
     {
         (await UniqueColumns("Transactions")).ShouldContain(("UQ_Transactions_PublicId", "PublicId"));
-        (await UniqueColumns("TransactionCashLegs")).ShouldContain(("UQ_TransactionCashLegs_TransactionId", "TransactionId"));
+        (await UniqueColumns("TransactionCashLegs")).ShouldBe([
+            ("UQ_TransactionCashLegs_TransactionId_AccountId", "TransactionId"),
+            ("UQ_TransactionCashLegs_TransactionId_AccountId", "AccountId")
+        ]);
         (await UniqueColumns("IdempotencyRecords")).ShouldBe([
             ("UQ_IdempotencyRecords_TenantId_Key", "TenantId"),
             ("UQ_IdempotencyRecords_TenantId_Key", "Key")
         ]);
 
-        (await IndexColumns("Transactions", "IX_Transactions_TenantId_AccountId_BookedAt"))
-            .ShouldBe(["TenantId", "AccountId", "BookedAt"]);
+        (await IndexColumns("Transactions", "IX_Transactions_TenantId_AccountId_BookedAt")).ShouldBeEmpty();
+        (await IndexColumns("Transactions", "IX_Transactions_TenantId_BookedAt"))
+            .ShouldBe(["TenantId", "BookedAt"]);
+        (await IndexColumns("TransactionCashLegs", "IX_TransactionCashLegs_AccountId"))
+            .ShouldBe(["AccountId"]);
         (await IndexColumns("Transactions", "IX_Transactions_ReversedByTransactionId"))
             .ShouldBe(["ReversedByTransactionId"]);
         (await FilteredUniqueIndex("Transactions", "IX_Transactions_ReversedByTransactionId"))
@@ -194,12 +200,12 @@ public class TransactionsSchemaTests
     public async Task Apply_AddsForeignKeysRestrict()
     {
         (await ForeignKeys("Transactions")).ShouldBe([
-            ("FK_Transactions_Accounts_AccountId", "Accounts", "Id", (byte)0),
             ("FK_Transactions_Tenants_TenantId", "Tenants", "Id", (byte)0),
             ("FK_Transactions_Transactions_OriginalTransactionId", "Transactions", "Id", (byte)0),
             ("FK_Transactions_Transactions_ReversedByTransactionId", "Transactions", "Id", (byte)0)
         ]);
         (await ForeignKeys("TransactionCashLegs")).ShouldBe([
+            ("FK_TransactionCashLegs_Accounts_AccountId", "Accounts", "Id", (byte)0),
             ("FK_TransactionCashLegs_Currencies_Currency", "Currencies", "Code", (byte)0),
             ("FK_TransactionCashLegs_Transactions_TransactionId", "Transactions", "Id", (byte)0)
         ]);
@@ -352,7 +358,7 @@ public class TransactionsSchemaTests
             SELECT COL_NAME(ic.object_id, ic.column_id)
             FROM sys.indexes i
             JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
-            WHERE i.object_id = OBJECT_ID(@tableName) AND i.name = @name
+            WHERE i.object_id = OBJECT_ID(@tableName) AND i.name = @name AND ic.is_included_column = 0
             ORDER BY ic.key_ordinal
             """;
         var table = command.CreateParameter();

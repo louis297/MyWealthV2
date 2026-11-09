@@ -8,6 +8,8 @@ public class TransactionSecurityLeg : BaseAuditableEntity
 
     public int TransactionId { get; private set; }
 
+    public int AccountId { get; private set; }
+
     public int InstrumentId { get; private set; }
 
     public decimal Quantity { get; private set; }
