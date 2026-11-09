@@ -223,5 +223,11 @@ public class BackOfficePageTests
             string rowVersion,
             CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
+
+        public Task DisableInstrumentAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task EnableInstrumentAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 }

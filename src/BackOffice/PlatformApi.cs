@@ -235,6 +235,12 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
             JsonSerializer.Serialize(new { symbol, name, rowVersion }, Json),
             cancellationToken);
 
+    public Task DisableInstrumentAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task EnableInstrumentAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
     private static string RowVersion(string rowVersion) =>
         JsonSerializer.Serialize(new { rowVersion }, Json);
 

@@ -189,6 +189,29 @@ public class BackOfficeApiTests
     }
 
     [Test]
+    public async Task InstrumentCalls_DisableAndEnableSendRowVersionOnly()
+    {
+        var instrumentId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.NoContent, "");
+        api.Enqueue(HttpStatusCode.NoContent, "");
+        var platform = Create(api);
+
+        await platform.DisableInstrumentAsync(instrumentId, "rv1");
+        await platform.EnableInstrumentAsync(instrumentId, "rv2");
+
+        AssertRequest(api.Requests[0], "POST", $"/instruments/{instrumentId}/disable");
+        var disable = Body(api.Requests[0]);
+        disable.GetProperty("rowVersion").GetString().ShouldBe("rv1");
+        disable.TryGetProperty("tenantId", out _).ShouldBeFalse();
+        disable.EnumerateObject().Count().ShouldBe(1);
+        AssertRequest(api.Requests[1], "POST", $"/instruments/{instrumentId}/enable");
+        var enable = Body(api.Requests[1]);
+        enable.GetProperty("rowVersion").GetString().ShouldBe("rv2");
+        enable.EnumerateObject().Count().ShouldBe(1);
+    }
+
+    [Test]
     public async Task ReportGrantList_ReadsGranted()
     {
         var api = new ScriptedHandler();

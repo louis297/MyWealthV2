@@ -65,4 +65,8 @@ public interface IPlatformApi
         string name,
         string rowVersion,
         CancellationToken cancellationToken = default);
+
+    Task DisableInstrumentAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default);
+
+    Task EnableInstrumentAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default);
 }
