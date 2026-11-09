@@ -195,5 +195,14 @@ public class BackOfficePageTests
 
         public Task<IReadOnlyList<CurrencyItem>> ListCurrenciesAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<CurrencyItem>>([new CurrencyItem("NZD", "New Zealand Dollar", true)]);
+
+        public Task<InstrumentPage> ListInstrumentsAsync(
+            int page,
+            int pageSize,
+            Guid tenantId,
+            bool? enabledOnly,
+            string? search,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new InstrumentPage([], page, pageSize, 0));
     }
 }

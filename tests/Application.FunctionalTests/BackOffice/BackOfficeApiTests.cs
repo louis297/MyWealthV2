@@ -112,6 +112,35 @@ public class BackOfficeApiTests
     }
 
     [Test]
+    public async Task InstrumentCalls_ListUsesTenantAndFilters()
+    {
+        var instrumentId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.OK, $$"""
+            {"items":[{"id":"{{instrumentId}}","tenantId":"{{TenantId}}","symbol":"VTI","name":"Vanguard","quoteCurrency":"USD","isActive":true,"rowVersion":"rv1"}],"page":1,"pageSize":20,"totalCount":1}
+            """);
+        var platform = Create(api);
+
+        var page = await platform.ListInstrumentsAsync(1, 20, TenantId, true, "vti");
+
+        var item = page.Items.ShouldHaveSingleItem();
+        item.Id.ShouldBe(instrumentId);
+        item.TenantId.ShouldBe(TenantId);
+        item.Symbol.ShouldBe("VTI");
+        item.Name.ShouldBe("Vanguard");
+        item.QuoteCurrency.ShouldBe("USD");
+        item.IsActive.ShouldBeTrue();
+        item.RowVersion.ShouldBe("rv1");
+        page.Page.ShouldBe(1);
+        page.PageSize.ShouldBe(20);
+        page.TotalCount.ShouldBe(1);
+        AssertRequest(
+            api.Requests[0],
+            "GET",
+            $"/instruments?tenantId={TenantId}&page=1&pageSize=20&enabledOnly=true&search=vti");
+    }
+
+    [Test]
     public async Task ReportGrantList_ReadsGranted()
     {
         var api = new ScriptedHandler();

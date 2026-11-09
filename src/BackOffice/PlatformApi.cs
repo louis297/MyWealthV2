@@ -186,6 +186,15 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
             json: null,
             cancellationToken);
 
+    public Task<InstrumentPage> ListInstrumentsAsync(
+        int page,
+        int pageSize,
+        Guid tenantId,
+        bool? enabledOnly,
+        string? search,
+        CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
     private static string RowVersion(string rowVersion) =>
         JsonSerializer.Serialize(new { rowVersion }, Json);
 

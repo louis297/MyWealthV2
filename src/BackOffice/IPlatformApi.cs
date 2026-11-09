@@ -41,4 +41,12 @@ public interface IPlatformApi
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<CurrencyItem>> ListCurrenciesAsync(CancellationToken cancellationToken = default);
+
+    Task<InstrumentPage> ListInstrumentsAsync(
+        int page,
+        int pageSize,
+        Guid tenantId,
+        bool? enabledOnly,
+        string? search,
+        CancellationToken cancellationToken = default);
 }

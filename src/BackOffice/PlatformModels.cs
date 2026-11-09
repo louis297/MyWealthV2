@@ -47,6 +47,21 @@ public sealed record PlatformReportItem(
 
 public sealed record CurrencyItem(string Code, string Name, bool IsActive);
 
+public sealed record InstrumentItem(
+    Guid Id,
+    Guid TenantId,
+    string Symbol,
+    string Name,
+    string QuoteCurrency,
+    bool IsActive,
+    string RowVersion);
+
+public sealed record InstrumentPage(
+    IReadOnlyList<InstrumentItem> Items,
+    int Page,
+    int PageSize,
+    int TotalCount);
+
 public sealed class PlatformApiException(int status, string body) : Exception(body)
 {
     public int Status { get; } = status;
