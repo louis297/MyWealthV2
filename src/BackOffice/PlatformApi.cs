@@ -236,10 +236,18 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
             cancellationToken);
 
     public Task DisableInstrumentAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
-        throw new NotImplementedException();
+        SendExpectingSuccessAsync(
+            HttpMethod.Post,
+            $"/instruments/{id}/disable",
+            RowVersion(rowVersion),
+            cancellationToken);
 
     public Task EnableInstrumentAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
-        throw new NotImplementedException();
+        SendExpectingSuccessAsync(
+            HttpMethod.Post,
+            $"/instruments/{id}/enable",
+            RowVersion(rowVersion),
+            cancellationToken);
 
     private static string RowVersion(string rowVersion) =>
         JsonSerializer.Serialize(new { rowVersion }, Json);
