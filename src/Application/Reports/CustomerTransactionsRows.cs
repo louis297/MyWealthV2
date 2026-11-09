@@ -7,7 +7,8 @@ public sealed record CustomerTransactionSource(
     bool AccountClosed,
     string AccountName,
     string Type,
-    string? Memo);
+    string? Memo,
+    int AccountId = 0);
 
 public static class CustomerTransactionsRows
 {
