@@ -55,30 +55,39 @@ public sealed class CustomerTransactionsReportGenerator(
 
         var accountsById = accounts.ToDictionary(row => row.Id);
         var sources = new List<CustomerTransactionSource>(transactions.Count);
-        var cashById = new Dictionary<int, string>();
-        var instrumentById = new Dictionary<int, string>();
-        var quantityById = new Dictionary<int, string>();
+        var cashByRow = new Dictionary<(int Id, int AccountId), string>();
+        var instrumentByRow = new Dictionary<(int Id, int AccountId), string>();
+        var quantityByRow = new Dictionary<(int Id, int AccountId), string>();
         foreach (var transaction in transactions)
         {
-            var account = transaction.CashLegs.Select(leg => leg.AccountId)
+            // One row per leg account of this Customer (leg-accounts R20).
+            var legAccountIds = transaction.CashLegs.Select(leg => leg.AccountId)
                 .Concat(transaction.SecurityLegs.Select(leg => leg.AccountId))
                 .Where(accountsById.ContainsKey)
-                .Select(accountId => accountsById[accountId])
-                .First();
-            sources.Add(new CustomerTransactionSource(
-                transaction.Id,
-                transaction.OriginalTransactionId,
-                transaction.BookedAt,
-                account.Status == AccountStatus.Closed,
-                account.Name,
-                transaction.Type.ToString(),
-                transaction.Memo));
-            cashById[transaction.Id] = FormatCash(transaction.CashLegs.SingleOrDefault());
-            var legs = transaction.SecurityLegs.OrderBy(leg => leg.Id).ToList();
-            instrumentById[transaction.Id] = string.Join(", ", legs.Select(leg => Symbol(symbols, leg.InstrumentId)));
-            quantityById[transaction.Id] = string.Join(
-                ", ",
-                legs.Select(leg => leg.Quantity.ToString("0.################", CultureInfo.InvariantCulture)));
+                .Distinct();
+            foreach (var accountId in legAccountIds)
+            {
+                var account = accountsById[accountId];
+                var key = (transaction.Id, accountId);
+                sources.Add(new CustomerTransactionSource(
+                    transaction.Id,
+                    transaction.OriginalTransactionId,
+                    transaction.BookedAt,
+                    account.Status == AccountStatus.Closed,
+                    account.Name,
+                    transaction.Type.ToString(),
+                    transaction.Memo,
+                    accountId));
+                cashByRow[key] = FormatCash(transaction.CashLegs.SingleOrDefault(leg => leg.AccountId == accountId));
+                var legs = transaction.SecurityLegs
+                    .Where(leg => leg.AccountId == accountId)
+                    .OrderBy(leg => leg.Id)
+                    .ToList();
+                instrumentByRow[key] = string.Join(", ", legs.Select(leg => Symbol(symbols, leg.InstrumentId)));
+                quantityByRow[key] = string.Join(
+                    ", ",
+                    legs.Select(leg => leg.Quantity.ToString("0.################", CultureInfo.InvariantCulture)));
+            }
         }
 
         var selected = CustomerTransactionsRows.Select(
@@ -91,9 +100,9 @@ public sealed class CustomerTransactionsReportGenerator(
                 row.BookedAt,
                 row.AccountName,
                 row.Type,
-                cashById[row.Id],
-                instrumentById[row.Id],
-                quantityById[row.Id],
+                cashByRow[(row.Id, row.AccountId)],
+                instrumentByRow[(row.Id, row.AccountId)],
+                quantityByRow[(row.Id, row.AccountId)],
                 row.Memo))
             .ToList();
 
