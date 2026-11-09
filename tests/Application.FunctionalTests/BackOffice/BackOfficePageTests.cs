@@ -196,6 +196,36 @@ public class BackOfficePageTests
     }
 
     [Test]
+    public async Task InstrumentDetail_ShowsQuoteCurrencyAndDisableWhenActive()
+    {
+        var body = await GetAsync($"/instruments/{InstrumentId}");
+
+        body.ShouldContain("VTI");
+        body.ShouldContain("Vanguard");
+        body.ShouldContain("USD");
+        body.ShouldContain("Symbol");
+        body.ShouldContain("Name");
+        body.ShouldContain($"href=\"/tenants/{TenantId}\"");
+        body.ShouldContain(">Disable<");
+        body.ShouldNotContain(">Enable<");
+        body.ShouldNotContain("name=\"quoteCurrency\"");
+        body.ShouldNotContain(">Delete<");
+        body.ShouldNotContain("Price");
+        body.ShouldNotContain("/holdings");
+        body.ShouldNotContain("/accounts");
+    }
+
+    [Test]
+    public async Task InstrumentDetail_ShowsEnableWhenInactive()
+    {
+        var body = await GetAsync($"/instruments/{SecondInstrumentId}");
+
+        body.ShouldContain("CASH");
+        body.ShouldContain(">Enable<");
+        body.ShouldNotContain(">Disable<");
+    }
+
+    [Test]
     public async Task ReportsPage_ListsCatalog_IncludingInactive_AndDoesNotOfferRunOrSchedule()
     {
         var body = await GetAsync("/reports");
@@ -375,8 +405,15 @@ public class BackOfficePageTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult(Guid.Parse("33333333-3333-3333-3333-333333333333"));
 
-        public Task<InstrumentItem> GetInstrumentAsync(Guid id, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new InstrumentItem(id, TenantId, "VTI", "Vanguard", "USD", true, "rv1"));
+        public Task<InstrumentItem> GetInstrumentAsync(Guid id, CancellationToken cancellationToken = default)
+        {
+            if (id == SecondInstrumentId)
+            {
+                return Task.FromResult(new InstrumentItem(id, TenantId, "CASH", "Cash", "NZD", false, "rv2"));
+            }
+
+            return Task.FromResult(new InstrumentItem(id, TenantId, "VTI", "Vanguard", "USD", true, "rv1"));
+        }
 
         public Task UpdateInstrumentAsync(
             Guid id,
