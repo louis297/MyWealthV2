@@ -77,6 +77,8 @@ public sealed class BffFactory : WebApplicationFactory<BffHost::Program>
             {
                 services.AddSingleton(_api);
             }
+
+            services.AddTransient<IStartupFilter, KestrelBodyRules>();
         });
     }
 
