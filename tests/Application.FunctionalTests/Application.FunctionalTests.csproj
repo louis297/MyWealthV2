@@ -55,4 +55,8 @@
         <ProjectReference Include="..\TestAppHost\TestAppHost.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <Compile Include="..\Common\TestDatabaseRecreator.cs" Link="Common\TestDatabaseRecreator.cs" />
+    </ItemGroup>
+
 </Project>

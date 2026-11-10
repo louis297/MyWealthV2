@@ -1,7 +1,10 @@
 extern alias IdentityApp;
 
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace MyWealthV2.Application.FunctionalTests.Infrastructure;
@@ -18,6 +21,8 @@ public class IdentityFactory(
         builder.UseSetting("Identity:AdviserPortalClientSecret", AdviserPortalTestSecret.Value);
         builder.UseSetting("Identity:BackOfficeClientSecret", BackOfficeTestSecret.Value);
         builder.UseSetting("Identity:CustomerPortalClientSecret", CustomerPortalTestSecret.Value);
+        builder.ConfigureTestServices(services =>
+            services.Configure<PasswordHasherOptions>(o => o.IterationCount = 1));
         if (logs is not null)
         {
             builder.ConfigureLogging(logging => logging.AddProvider(logs));

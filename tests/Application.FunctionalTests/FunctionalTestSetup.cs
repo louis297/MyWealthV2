@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Identity;
+using MyWealthV2.Tests.Common;
 
 namespace MyWealthV2.Application.FunctionalTests;
 
@@ -52,6 +53,7 @@ public class FunctionalTestSetup
 
         var connectionString = (await _app.GetConnectionStringAsync(Services.TestDatabase))!;
         ConnectionString = connectionString;
+        await TestDatabaseRecreator.RecreateAsync(connectionString, cancellationToken);
 
         using (var schemaHost = new WebApiFactory(connectionString))
         {
