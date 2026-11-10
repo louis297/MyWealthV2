@@ -32,6 +32,9 @@ public class Transaction : BaseAuditableEntity
 
     public List<TransactionSecurityLeg> SecurityLegs { get; private set; } = [];
 
+    /// <summary>The rate this Transaction used, when it has one (FX conversions R14).</summary>
+    public TransactionFxDetail? FxDetail { get; private set; }
+
     public static Transaction Post(
         int tenantId,
         int accountId,
@@ -134,6 +137,26 @@ public class Transaction : BaseAuditableEntity
         transaction.AddDomainEvent(new TransactionPosted(transaction));
         return transaction;
     }
+
+    /// <summary>
+    /// Builds an FxConversion: a negative cash leg in the sell currency on the from Account and a
+    /// positive cash leg in the buy currency on the to Account, priced at <paramref name="rate"/>.
+    /// <paramref name="fixedAmount"/> is the side the caller named; its currency says which side it is.
+    /// </summary>
+    public static Transaction PostFxConversion(
+        int tenantId,
+        int fromAccountId,
+        string fromAccountCurrency,
+        int toAccountId,
+        string toAccountCurrency,
+        AppliedFxRate rate,
+        Money fixedAmount,
+        int computedDecimalPlaces,
+        DateTimeOffset bookedAt,
+        string? memo,
+        string? reference,
+        decimal fromCurrentCashSum) =>
+        throw new NotImplementedException();
 
     public static Transaction PostOpeningHoldings(
         int tenantId,
