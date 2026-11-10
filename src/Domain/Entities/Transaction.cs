@@ -91,7 +91,48 @@ public class Transaction : BaseAuditableEntity
         string? reference,
         decimal fromCurrentCashSum)
     {
-        throw new NotImplementedException();
+        if (fromAccountId == toAccountId)
+        {
+            throw new DomainException("The from and to accounts must be different.");
+        }
+
+        var currency = Money.Create(0m, fromAccountCurrency).Currency;
+        if (!string.Equals(currency, Money.Create(0m, toAccountCurrency).Currency, StringComparison.Ordinal))
+        {
+            throw new DomainException("The from and to accounts must have the same currency.");
+        }
+
+        if (!string.Equals(amount.Currency, currency, StringComparison.Ordinal))
+        {
+            throw new DomainException("The amount currency must match the account currency.");
+        }
+
+        if (amount.Amount <= 0)
+        {
+            throw new DomainException("Amount must be greater than 0.");
+        }
+
+        if (fromCurrentCashSum - amount.Amount < 0)
+        {
+            throw new DomainException("Cash balance cannot become negative.");
+        }
+
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            Type = TransactionType.InternalTransfer,
+            BookedAt = bookedAt,
+            Memo = NormaliseMemo(memo),
+            Reference = NormaliseReference(reference),
+            PublicId = Guid.NewGuid(),
+            CashLegs =
+            [
+                TransactionCashLeg.Create(fromAccountId, -amount.Amount, currency),
+                TransactionCashLeg.Create(toAccountId, amount.Amount, currency)
+            ]
+        };
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
     }
 
     public static Transaction PostOpeningHoldings(
