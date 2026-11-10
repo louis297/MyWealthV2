@@ -3,7 +3,7 @@ title: Domain model
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-10-26
+updated: 2026-11-11
 related:
   - README.md
   - glossary.md
@@ -310,7 +310,9 @@ Close requires cash `SUM = 0` and no `Holdings` rows ([features/holdings.md](fea
 | `Transaction` | Aggregate | Business-event header in a tenant. Has no Account and no Customer; it belongs to its leg accounts. Not a capture row that later copies into a journal. |
 | `TransactionCashLeg` | Entity | Cash accounting line on one Account (`AccountId`). One on a cash header, and on `Buy` / `Sell`. At most one per `(Transaction, Account)`. Absent on `OpeningHoldings`, `StockIn`, `StockOut`, `Split`, `Bonus`, and `Scrip`. |
 | `TransactionSecurityLeg` | Entity | Security accounting line on one Account (`AccountId`). Exactly one on `Buy`, `Sell`, `StockIn`, `StockOut`, `Split`, `Bonus`, and `Scrip`. Quantity is signed. |
-| `TransactionType` | Enum | Cash set plus `OpeningHoldings`, `Buy`, `Sell`, `StockIn` (10), `StockOut` (11), `Split` (12), `Bonus` (13), `Scrip` (14), `InternalTransfer` (15), and `Reversal`. |
+| `TransactionFxDetail` | Entity (child of `Transaction`) | The rate a Transaction used: base and quote currency, rate (quote per 1 base), as-of date, source. 0..1 per Transaction, immutable. Exactly one on `FxConversion`; a Reversal of a Transaction with one gets a copy ([features/fx-conversions.md](features/fx-conversions.md)). |
+| `AppliedFxRate` | Value object | Base ≠ quote currency, rate `> 0`, as-of date, source. Input to `Transaction.PostFxConversion`. |
+| `TransactionType` | Enum | Cash set plus `OpeningHoldings`, `Buy`, `Sell`, `StockIn` (10), `StockOut` (11), `Split` (12), `Bonus` (13), `Scrip` (14), `InternalTransfer` (15), `FxConversion` (16), and `Reversal`. |
 | `TransactionPosted` / `TransactionReversed` | Event | Side effects only. Must not write the books. |
 
 Invariants:
@@ -359,6 +361,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-02 | Instrument prices accepted. `IMarketData` implemented by local `InstrumentPrices` table + Twelve Data hourly job. Missing → empty. [features/instrument-prices.md](features/instrument-prices.md). |
 | 2026-11-08 | Instrument price source switched to EODHD. |
 | 2026-11-08 | Instrument price sync runs daily at 12:00 UTC. |
+| 2026-11-11 | FX conversions accepted and landed. `TransactionType.FxConversion = 16`. `Transaction.PostFxConversion` takes an `AppliedFxRate` and the side the caller fixed (`Money` in the sell or buy currency), computes the other side with `Round(…, decimalPlaces, AwayFromZero)` (`ComputeFxConversionAmounts`), and builds two cash legs (`−sell` on the from Account, `+buy` on the to Account) and one `TransactionFxDetail`. Different Accounts, different currencies, rate pair equal to the Account currencies, computed amount not 0, from balance not negative. `Reverse` copies the FX detail. The Domain does not read `Currencies`; Application passes the decimal places. [features/fx-conversions.md](features/fx-conversions.md). |
 | 2026-11-10 | Internal transfers accepted. `TransactionType.InternalTransfer = 15`. `Transaction.PostInternalTransfer` builds exactly two cash legs, `−amount` on the from Account and `+amount` on the to Account: different Accounts, same currency, positive amount, sum zero, from balance not negative. `Reverse` is unchanged. [features/internal-transfers.md](features/internal-transfers.md). |
 
 | 2026-11-02 | Portfolios draft. Model portfolios with base currency and target weights. Full Rebalance (async) on assign and weight change. While assigned, manual security trades rejected. One Active assignment per account. [features/portfolios.md](features/portfolios.md). |

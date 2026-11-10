@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-02
-last_updated: 2026-11-03
+last_updated: 2026-11-11
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -107,7 +107,7 @@ A TenantAdmin or Adviser creates a **Portfolio** (name, base currency, lines of 
 | R15 | Unassign marks the assignment `Removed`. No automatic trades on unassign. The account becomes a free-holdings account again. |
 | R16 | Cross-tenant or wrong-collection id → 404, not 403. Adviser sees only assigned customers. |
 | R17 | SystemAdmin supplies `tenantId` on create/list (same pattern as other Phase-2 resources). |
-| R18 | **Assigned-account trade lock.** While an account has an Active `AccountPortfolioAssignment`, any manual security-changing transaction (`Buy`, `Sell`, `StockIn`, `StockOut`, `Split`, `Bonus`, `Scrip`, `OpeningHoldings`) and a reverse of those types is rejected (400). Only the rebalance command and unassign may change holdings. Cash types remain allowed: `TransferIn`, `TransferOut`, `Interest`, `CloseOut`, `Opening`, and reverse of those. |
+| R18 | **Assigned-account trade lock.** While an account has an Active `AccountPortfolioAssignment`, any manual security-changing transaction (`Buy`, `Sell`, `StockIn`, `StockOut`, `Split`, `Bonus`, `Scrip`, `OpeningHoldings`) and a reverse of those types is rejected (400). Only the rebalance command and unassign may change holdings. Cash types remain allowed: `TransferIn`, `TransferOut`, `InternalTransfer`, `FxConversion`, `Interest`, `CloseOut`, `Opening`, and reverse of those. `InternalTransfer` and `FxConversion` may have the assigned Account on either side and do not trigger a rebalance (amended 2026-11-11, [fx-conversions.md](fx-conversions.md) R24). |
 | R19 | After a cash transfer in, a subsequent rebalance treats all cash above the configured residual as investable and buys to target weights. |
 | R20 | Target weights are stored with 2 decimal places. On create/update the last line absorbs any rounding difference so the sum is exactly 100.00. |
 | R21 | Drift tolerance default: absolute 1% or relative 5% (whichever is more permissive). Used only for future automatic-trigger decisions; not applied during rebalance execution. Minimum trade size default: 100 in portfolio BaseCurrency. Cash residual default: 1% of total investable value in the portfolio BaseCurrency (cash + holdings market value, all converted; or 0 if explicitly set to 0). These are portfolio-level settings. |

@@ -4,7 +4,7 @@ status: accepted
 phase: 2
 language: en
 created: 2026-10-12
-updated: 2026-11-10
+updated: 2026-11-11
 related:
   - README.md
   - frontend-conventions.md
@@ -81,10 +81,11 @@ Session remains the BFF cookie. All API calls go through `/api`. Do not re-intro
 | `/customers/:id` | Same as Phase 1 | Person fields and that customer's accounts, with New account. No firm net-worth breakdowns. |
 | `/customers/:id/accounts/new` | TenantAdmin, Adviser | New account for that customer. `POST /accounts` with `customerId`, name, type, and currency. Omit `tenantId`. |
 | `/accounts` | TenantAdmin, Adviser (assigned) | List of accounts the caller can see. |
-| `/accounts/:id` | Same | Detail: cash balance, holdings list, recent activity, an Amount column with the cash leg on this account (negative on the source of a transfer, positive on the destination), action buttons (TransferIn / TransferOut / Transfer on an Open account; Buy / Sell / StockIn / StockOut / Split / Reverse / Close). |
+| `/accounts/:id` | Same | Detail: cash balance, holdings list, recent activity, an Amount column with the cash leg on this account (negative on the source of a transfer, positive on the destination), a rate line "1 NZD = 0.5912 USD (as of 2026-11-09)" under the amount when the item has `fx`, action buttons (TransferIn / TransferOut / Transfer / Convert on an Open account; Buy / Sell / StockIn / StockOut / Split / Reverse / Close). |
 | `/accounts/:id/holdings` | Same | Holdings projection for the account. |
 | `/accounts/:id/transactions/new` | Same | Create form. Type selector drives the body shape from the Feature Specs. Requires `Idempotency-Key`. |
 | `/accounts/:id/transfer` | Same | Internal transfer form ([internal-transfers](../features/internal-transfers.md) §9). Step 1 Customer: defaults to the source Account's Customer; search box debounced 300 ms (`GET /users/customers?enabledOnly=true&search=`). Step 2 Account: `GET /accounts?customerId=&pageSize=100`; Closed, different-currency and source Accounts stay listed, greyed out with the reason. Positive amount, booked at, memo, reference. Review shows "Transfer 500.00 NZD from <account> (<customer>) to <account> (<customer>)" and a warning line when the Customers differ. Confirm posts `POST /transactions/transfer` with one `Idempotency-Key` per form open, then returns to the source account. |
+| `/accounts/:id/convert` | Same | FX conversion form ([fx-conversions](../features/fx-conversions.md) §9). One step, no Customer picker: `GET /accounts?customerId=<source Customer>&pageSize=100`; Closed, same-currency and source Accounts stay listed, greyed out with the reason; when no Open Account of another currency exists the form says so. "I sell" / "I buy" toggle chooses which amount is typed; the field shows that currency. Live quote `POST /transactions/fx/quote` debounced 300 ms shows "1 NZD = 0.5912 USD (as of 2026-11-09)" and the computed amount; a quote error is shown and blocks Review. Review shows "Convert 845.74 NZD from <account> to 500.00 USD in <account> at 1 NZD = 0.5912 USD (as of 2026-11-09)". Confirm posts `POST /transactions/fx` with the quoted `expectedRate` and one `Idempotency-Key` per form open. On 409 for `expectedRate` the form shows the message, fetches a new quote and asks for Review again. |
 | `/transactions` | Same | Activity list. Optional `accountId` / `customerId` filters. Account and Customer columns list every visible leg account and its Customer; Cash lists each visible cash leg ([leg-accounts](../features/leg-accounts.md) §8.1, amended 2026-11-10). Reverse action on a row, hidden when `reversedByTransactionId` is not null or `type` is `Reversal`. |
 | `/transactions/:id` | Same | Read-only detail. Reverse button is hidden when `reversedByTransactionId` is not null or `type` is `Reversal`. |
 | `/profile` | Unchanged | |
