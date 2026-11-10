@@ -126,6 +126,19 @@ public class BffApiTests
     }
 
     [Test]
+    public async Task NoContentResponse_IsProxiedAs204WithAnEmptyBody()
+    {
+        _api.Scripts["/portfolios/no-content"] = (HttpStatusCode.NoContent, "");
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/portfolios/no-content");
+        request.Headers.TryAddWithoutValidation("Cookie", _sessionCookie);
+
+        var response = await _bff.SendAsync(request);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await response.Content.ReadAsStringAsync()).ShouldBeEmpty();
+    }
+
+    [Test]
     public async Task Get_DoesNotRequireRequestHeader()
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/currencies");

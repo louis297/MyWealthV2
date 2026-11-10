@@ -112,7 +112,10 @@ public static class ApiProxy
                 http.Response.ContentType = contentType.ToString();
             }
 
-            await inbound.Content.CopyToAsync(http.Response.Body, http.RequestAborted);
+            if (inbound.StatusCode is not (HttpStatusCode.NoContent or HttpStatusCode.ResetContent or HttpStatusCode.NotModified))
+            {
+                await inbound.Content.CopyToAsync(http.Response.Body, http.RequestAborted);
+            }
         }
     }
 
