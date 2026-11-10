@@ -7,9 +7,11 @@ public static class FxConversionPricing
     public const int MaxRateAgeDays = 4;
 
     /// <summary>The calendar date of <paramref name="bookedAt"/> in its own offset (same rule as the rate read).</summary>
-    public static DateOnly DateOf(DateTimeOffset bookedAt) => throw new NotImplementedException();
+    public static DateOnly DateOf(DateTimeOffset bookedAt) => DateOnly.FromDateTime(bookedAt.DateTime);
 
-    public static bool IsStale(DateOnly rateAsOfDate, DateTimeOffset bookedAt) => throw new NotImplementedException();
+    public static bool IsStale(DateOnly rateAsOfDate, DateTimeOffset bookedAt) =>
+        DateOf(bookedAt).DayNumber - rateAsOfDate.DayNumber > MaxRateAgeDays;
 
-    public static bool FitsDecimalPlaces(decimal amount, int decimalPlaces) => throw new NotImplementedException();
+    public static bool FitsDecimalPlaces(decimal amount, int decimalPlaces) =>
+        decimal.Round(amount, decimalPlaces) == amount;
 }
