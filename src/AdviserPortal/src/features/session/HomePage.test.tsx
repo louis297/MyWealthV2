@@ -161,21 +161,4 @@ describe("HomePage", () => {
     expect(screen.queryByText("customers workspace")).not.toBeInTheDocument();
     expect(startLogin).not.toHaveBeenCalled();
   });
-
-  it("sends SystemAdmin to /profile instead of a Customers workspace", () => {
-    renderHome(
-      user({
-        role: "systemAdmin",
-        name: "System Admin",
-        email: "system-admin@localhost",
-        tenantId: null,
-        tenantCode: null,
-      }),
-    );
-
-    expect(screen.getByText("profile")).toBeInTheDocument();
-    expect(screen.queryByText("customers workspace")).not.toBeInTheDocument();
-    expect(screen.queryByText("dashboard")).not.toBeInTheDocument();
-    expect(screen.queryByText("session probe")).not.toBeInTheDocument();
-  });
 });

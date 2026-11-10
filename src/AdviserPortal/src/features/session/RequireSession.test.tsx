@@ -132,7 +132,7 @@ describe("RequireSession", () => {
     });
   });
 
-  it("does not call by-code for SystemAdmin", async () => {
+  it("sends a leftover SystemAdmin session to /forbidden and does not call by-code", async () => {
     const { fetchMock } = renderSession(
       user({
         role: "systemAdmin",
@@ -142,7 +142,8 @@ describe("RequireSession", () => {
       }),
     );
 
-    expect(await screen.findByText("home")).toBeInTheDocument();
+    expect(await screen.findByText("forbidden")).toBeInTheDocument();
+    expect(screen.queryByText("home")).not.toBeInTheDocument();
     expect(requestedUrls(fetchMock).some((url) => url.includes("/tenants/by-code/"))).toBe(
       false,
     );

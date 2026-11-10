@@ -119,7 +119,7 @@ describe("ShellLayout", () => {
     expect(screen.queryByRole("link", { name: "Advisers" })).not.toBeInTheDocument();
   });
 
-  it("shows Platform for SystemAdmin with Profile only", () => {
+  it("shows no Platform label and no product links for SystemAdmin", () => {
     renderShell(
       user({
         role: "systemAdmin",
@@ -130,15 +130,11 @@ describe("ShellLayout", () => {
       false,
     );
 
-    expect(screen.getByText("Platform")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Profile" })).toBeInTheDocument();
+    expect(screen.queryByText("Platform")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Profile" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Dashboard" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Accounts" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Transactions" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Customers" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Advisers" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Reports" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Portfolios" })).not.toBeInTheDocument();
   });
 
   it("starts end-session when Sign out is clicked", () => {
