@@ -200,7 +200,8 @@ public class ReverseTransactionCommandHandler(
             query = query.Where(row => row.TenantId == currentUser.TenantId);
         }
 
-        var transaction = await query.SingleOrDefaultAsync(cancellationToken)
+        // The FX detail is copied to the Reversal (FX conversions R17).
+        var transaction = await query.Include(row => row.FxDetail).SingleOrDefaultAsync(cancellationToken)
                           ?? throw new NotFoundException("Transaction", publicId);
 
         var legAccounts = await (
