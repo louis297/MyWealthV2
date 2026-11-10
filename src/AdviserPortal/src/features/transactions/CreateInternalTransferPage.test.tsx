@@ -216,8 +216,10 @@ describe("CreateInternalTransferPage", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1);
     });
-    vi.useRealTimers();
-    expect(await screen.findByRole("button", { name: "Nora North" })).toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    expect(screen.getByRole("button", { name: "Nora North" })).toBeInTheDocument();
     const searches = urls(fetchMock).filter((url) => url.includes("/users/customers?"));
     expect(searches).toHaveLength(1);
     expect(searches[0]).toContain("search=Nora");

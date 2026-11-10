@@ -243,6 +243,14 @@ export function AccountDetailPage() {
               {action}
             </Link>
           ))}
+          {canPostCash(data.status) ? (
+            <Link
+              to={`/accounts/${data.id}/transfer`}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            >
+              Transfer
+            </Link>
+          ) : null}
         </nav>
       ) : null}
       {conflict ? <ConflictNotice /> : null}
@@ -360,6 +368,7 @@ export function AccountDetailPage() {
                     <TableHead>Transaction</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Booked at</TableHead>
+                    <TableHead>Amount</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -372,6 +381,12 @@ export function AccountDetailPage() {
                       </TableCell>
                       <TableCell>{item.type}</TableCell>
                       <TableCell>{item.bookedAt}</TableCell>
+                      <TableCell>
+                        {item.cash
+                          .filter((leg) => leg.accountId === data.id)
+                          .map((leg) => `${leg.amount} ${leg.currency}`)
+                          .join(", ")}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

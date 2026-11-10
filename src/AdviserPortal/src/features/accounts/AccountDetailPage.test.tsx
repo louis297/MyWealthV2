@@ -479,7 +479,7 @@ describe("AccountDetailPage", () => {
               accountId,
               customerId,
               type: "TransferIn",
-              cash: { amount: 80, currency: "NZD" },
+              cash: [{ accountId, customerId, amount: 80, currency: "NZD" }],
               bookedAt: "2026-10-12T09:00:00+13:00",
               memo: "Salary",
               reference: null,
