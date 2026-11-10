@@ -15,6 +15,7 @@ import { CreatePortfolioPage } from "@/features/portfolios/CreatePortfolioPage";
 import { PortfolioDetailPage } from "@/features/portfolios/PortfolioDetailPage";
 import { PortfoliosListPage } from "@/features/portfolios/PortfoliosListPage";
 import { ReportsPage } from "@/features/reports/ReportsPage";
+import { CreateFxConversionPage } from "@/features/transactions/CreateFxConversionPage";
 import { CreateInternalTransferPage } from "@/features/transactions/CreateInternalTransferPage";
 import { CreateTransactionPage } from "@/features/transactions/CreateTransactionPage";
 import { TransactionDetailPage } from "@/features/transactions/TransactionDetailPage";
@@ -70,6 +71,7 @@ export const appRoutes: RouteObject[] = [
               { path: ":id", element: <AccountDetailPage /> },
               { path: ":id/transactions/new", element: <CreateTransactionPage /> },
               { path: ":id/transfer", element: <CreateInternalTransferPage /> },
+              { path: ":id/convert", element: <CreateFxConversionPage /> },
             ],
           },
           {
