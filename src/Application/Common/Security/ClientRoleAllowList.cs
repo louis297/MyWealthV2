@@ -6,7 +6,7 @@ public static class ClientRoleAllowList
 {
     private static readonly Dictionary<string, HashSet<UserRole>> Allowed = new(StringComparer.Ordinal)
     {
-        ["adviser-portal"] = [UserRole.SystemAdmin, UserRole.TenantAdmin, UserRole.Adviser],
+        ["adviser-portal"] = [UserRole.TenantAdmin, UserRole.Adviser],
         ["back-office"] = [UserRole.SystemAdmin],
         ["customer-portal"] = [UserRole.Customer]
     };
