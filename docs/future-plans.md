@@ -43,7 +43,7 @@ Moved to a Feature Spec: [features/fx-conversions.md](features/fx-conversions.md
 
 - An Account keeps one cash currency. A conversion is one Transaction across two Accounts of different currencies, in the same tenant, for the same Customer or two Customers. Cross-currency transfer is the same feature.
 - The server prices the conversion from the cached reference rate and stores the rate used.
-- Manual trades that add a holding require the instrument quote currency to equal the Account currency. Portfolio rebalance and manual `Sell` keep the automatic FX of buy-sell R12 and store the rate. That change is an amendment to buy-sell and portfolios, written after the FX spec.
+- Manual trades that add a holding require the instrument quote currency to equal the Account currency. Portfolio rebalance and manual `Sell` keep the automatic FX of buy-sell R12 and store the rate. That change is an amendment to buy-sell and portfolios: [features/cross-currency-trades.md](features/cross-currency-trades.md) (`draft`).
 
 ---
 

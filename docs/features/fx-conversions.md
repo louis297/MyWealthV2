@@ -13,6 +13,7 @@ related:
   - fx-rates.md
   - buy-sell.md
   - portfolios.md
+  - cross-currency-trades.md
   - reports.md
   - ../adviser-portal/adviser-portal-dashboard.md
   - ../customer-portal/customer-portal.md
@@ -30,7 +31,7 @@ Cash conversion from one currency to another between two Accounts in the same te
 
 This slice adds one `TransactionType`, a create route `POST /transactions/fx`, a read-only quote route `POST /transactions/fx/quote`, and script `0026`. No new policy. Read and reverse reuse the existing `/transactions` routes. An Account still has one cash currency (ADR 0011 §6); this slice does not change the Account model ([future-plans.md](../future-plans.md) §4).
 
-`TransactionFxDetails` is designed so that Buy / Sell with automatic FX can store their rate too. That use is a separate amendment to [buy-sell.md](buy-sell.md) and [portfolios.md](portfolios.md), written after this spec. This slice does not change Buy / Sell.
+`TransactionFxDetails` is designed so that Buy / Sell with automatic FX can store their rate too. That use is a separate amendment to [buy-sell.md](buy-sell.md) and [portfolios.md](portfolios.md): [cross-currency-trades.md](cross-currency-trades.md). This slice does not change Buy / Sell.
 
 ---
 
@@ -320,7 +321,7 @@ No new ADR. ADR 0011 §6 (one cash currency per Account) is unchanged.
 
 Still open, not this slice:
 
-- Buy / Sell amendment: same-currency rule for manual trades that add a holding, exit `Sell` and rebalance with automatic FX, storing their rate in `TransactionFxDetails`, Buy / Sell cash rounding to `DecimalPlaces` ([future-plans.md](../future-plans.md) §2).
+- Buy / Sell amendment: same-currency rule for manual trades that add a holding, manual `Sell` and rebalance with automatic FX, storing their rate in `TransactionFxDetails`, Buy / Sell cash rounding to `DecimalPlaces` ([cross-currency-trades.md](cross-currency-trades.md), draft).
 - Fee or spread, and who configures it.
 - FX columns in the Customer Transactions report.
 - An HTTP read route for `FxRates`.
