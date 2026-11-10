@@ -2,6 +2,7 @@ extern alias WebHost;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,6 +34,10 @@ public class WebApiFactory(
 
         builder.ConfigureTestServices(services =>
         {
+            // Every test reseeds Identity users. One PBKDF2 iteration keeps hashing cheap.
+            // The count is stored in each hash, so IdentityHost still verifies these hashes.
+            services.Configure<PasswordHasherOptions>(o => o.IterationCount = 1);
+
             services.RemoveAll<IReportScheduler>();
             services.AddSingleton<RecordingReportScheduler>();
             services.AddSingleton<IReportScheduler>(sp => sp.GetRequiredService<RecordingReportScheduler>());
