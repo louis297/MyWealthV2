@@ -1,5 +1,7 @@
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Transactions;
+using System.Text.Json;
+using MyWealthV2.Application.Transactions.Commands.CreateInternalTransfer;
 using MyWealthV2.Application.Transactions.Commands.CreateTransaction;
 using MyWealthV2.Application.Transactions.Commands.ReverseTransaction;
 using MyWealthV2.Application.Common.Models;
@@ -18,6 +20,7 @@ public class Transactions : IEndpointGroup
         groupBuilder.MapGet(GetTransactions).RequireAuthorization(Policies.TransactionsRead);
         groupBuilder.MapGet(GetTransaction, "{id}").RequireAuthorization(Policies.TransactionsRead);
         groupBuilder.MapPost(CreateTransaction).RequireAuthorization(Policies.TransactionsCreate);
+        groupBuilder.MapPost(CreateInternalTransfer, "transfer").RequireAuthorization(Policies.TransactionsCreate);
         groupBuilder.MapPost(ReverseTransaction, "{id}/reverse").RequireAuthorization(Policies.TransactionsCreate);
     }
 
@@ -55,6 +58,28 @@ public class Transactions : IEndpointGroup
         command.RequestMethod = httpRequest.Method;
         command.RequestPath = httpRequest.Path.Value ?? "/transactions";
         var result = await sender.Send(command);
+        return Results.Content(result.Body, "application/json", statusCode: result.StatusCode);
+    }
+
+    [EndpointSummary("Create an internal transfer")]
+    [EndpointDescription("Moves cash from one Open account to another Open account with the same currency in the same tenant. Requires Idempotency-Key.")]
+    public static async Task<IResult> CreateInternalTransfer(
+        ISender sender,
+        HttpRequest httpRequest,
+        CreateInternalTransferCommand command)
+    {
+        var key = httpRequest.Headers["Idempotency-Key"].ToString();
+        command.IdempotencyKey = string.IsNullOrWhiteSpace(key) ? null : key;
+        command.RequestMethod = httpRequest.Method;
+        command.RequestPath = httpRequest.Path.Value ?? "/transactions/transfer";
+        var result = await sender.Send(command);
+        if (result.StatusCode == StatusCodes.Status201Created)
+        {
+            using var body = JsonDocument.Parse(result.Body);
+            httpRequest.HttpContext.Response.Headers.Location =
+                $"/transactions/{body.RootElement.GetProperty("id").GetGuid()}";
+        }
+
         return Results.Content(result.Body, "application/json", statusCode: result.StatusCode);
     }
 

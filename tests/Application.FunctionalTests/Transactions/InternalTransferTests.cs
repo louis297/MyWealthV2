@@ -29,7 +29,7 @@ public class InternalTransferTests : TestBase
     public async Task Customer_Returns403()
     {
         var world = await LegAccountsFixture.CreateAsync();
-        var nedTokens = await FunctionalTestSetup.Oidc.SignInAsync("ned@north.example", "Password1!", "north-advisory");
+        var nedTokens = await TestApp.IssueAccessTokenAsync(world.Ned);
 
         (await PostAsync(nedTokens.AccessToken, Body(world.NedAccountId, world.NoraAccountId, 10m)))
             .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
