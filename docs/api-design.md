@@ -3,7 +3,7 @@ title: API design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-10-26
+updated: 2026-11-10
 related:
   - README.md
   - glossary.md
@@ -376,7 +376,7 @@ Field rules: [features/posting.md](features/posting.md) for cash types, [feature
 - Customer → 403.
 - Optional list filters: `accountId`, `customerId`.
 
-**Type-specific create routes.** When a type's create body differs from the common shape (one top-level `accountId`), that type gets its own `POST /transactions/{action}`. Each type has exactly one create route: a type with its own route is rejected by `POST /transactions` (400). Read (`GET /transactions`, `GET /transactions/{id}`) and reverse (`POST /transactions/{id}/reverse`) stay shared by every type. Existing types keep `POST /transactions` until a later decision moves them.
+**Type-specific create routes.** When a type's create body differs from the common shape (one top-level `accountId`), that type gets its own `POST /transactions/{action}`. Each type has exactly one create route: a type with its own route is rejected by `POST /transactions` (400). Read (`GET /transactions`, `GET /transactions/{id}`) and reverse (`POST /transactions/{id}/reverse`) stay shared by every type. Every new type gets its own `POST /transactions/{action}` route, whatever its body shape (decided 2026-11-10). Existing types keep `POST /transactions` until each is moved in its own spec amendment ([future-plans.md](future-plans.md) §3).
 
 Draft, not yet in the table above: `POST /transactions/transfer` (`transactions.create`, 201 `{ id }`) for `InternalTransfer`, and an optional `type` list filter. Field rules: [features/internal-transfers.md](features/internal-transfers.md).
 

@@ -11,6 +11,7 @@ related:
   - features/fx-rates.md
   - features/internal-transfers.md
   - api-design.md
+  - features/fx-conversions.md
 ---
 
 # Future plans
@@ -38,17 +39,11 @@ Questions to settle when this opens:
 
 ## 2. FX conversion trades
 
-Exchange cash from one currency to another, for example NZD to USD before buying a US instrument.
+Moved to a Feature Spec: [features/fx-conversions.md](features/fx-conversions.md) (`draft`). Decided in discussion (2026-11-10):
 
-Today: an Account has one cash currency, and a cash leg must be in its Account's currency. FX rates are cached for valuation ([features/fx-rates.md](features/fx-rates.md)). There is no transaction that converts cash between currencies.
-
-Questions to settle when this opens:
-
-- Shape: a conversion between two Accounts of different currencies (close to a cross-currency transfer), or multi-currency cash inside one Account. The second changes the Account model.
-- Rate: the cached reference rate, a rate entered by the user, or a quoted rate. Whether the rate used is stored on the transaction.
-- Spread or fee, and how it is shown.
-- Reversal: reverse at the original rate.
-- Relation to the deferred cross-currency transfer; they may be one feature.
+- An Account keeps one cash currency. A conversion is one Transaction across two Accounts of different currencies, in the same tenant, for the same Customer or two Customers. Cross-currency transfer is the same feature.
+- The server prices the conversion from the cached reference rate and stores the rate used.
+- Manual trades that add a holding require the instrument quote currency to equal the Account currency. Portfolio rebalance and manual `Sell` keep the automatic FX of buy-sell R12 and store the rate. That change is an amendment to buy-sell and portfolios, written after the FX spec.
 
 ---
 
@@ -56,11 +51,28 @@ Questions to settle when this opens:
 
 Move existing types from `POST /transactions` to their own `POST /transactions/{action}` routes, so each create body is small and has no type-dependent field rules.
 
-Today ([api-design.md](api-design.md) §7.7): the convention exists, and only `InternalTransfer` uses it (`POST /transactions/transfer`, [features/internal-transfers.md](features/internal-transfers.md)). Every other type still creates through `POST /transactions` with a `type` field.
+Decided (2026-11-10): every new `TransactionType` gets its own `POST /transactions/{action}` route ([api-design.md](api-design.md) §7.7). `InternalTransfer` (`/transactions/transfer`) and `FxConversion` (`/transactions/fx`) are the first two. Existing types move off `POST /transactions` step by step, each move in its own spec amendment.
 
-Questions to settle when this opens:
+Questions to settle when a move opens:
 
 - Which types to move, and in what groups (for example buy / sell together, corporate actions together).
 - Transition: how long both routes accept a moved type, given the rule of one create route per type.
 - Portal changes and the BFF allow-list.
 - Whether `POST /transactions` disappears once every type has moved.
+
+---
+
+## 4. Multi-currency cash in one Account
+
+Hold cash in more than one currency inside one Account, for example keeping a USD dividend in USD inside an NZD brokerage Account.
+
+Today: an Account has one cash currency (ADR 0011 §6, posting R8). FX happens through a conversion between two Accounts ([features/fx-conversions.md](features/fx-conversions.md)) or through the automatic FX of portfolio rebalance and `Sell`.
+
+Considered and not chosen (2026-11-10): a portfolio as a group of hidden per-currency sub-accounts. It would need an Account group, automatic opening of sub-accounts, a multi-Account rebalance with FX legs, and a decision on every list, report and net worth view about hidden Accounts. If multi-currency cash is wanted, change the Account model directly (cash legs carry their own currency, balance per `(Account, Currency)`), starting with an amendment to ADR 0011.
+
+Questions to settle when this opens:
+
+- What `Account.Currency` means once cash can be in several currencies (base or reporting currency).
+- Close rule, net worth breakdown and Opening per currency.
+- Whether automatic FX in rebalance and `Sell` is replaced by holding the foreign cash.
+- Dividends in a foreign quote currency (a later Dividend spec needs either this or automatic FX).
