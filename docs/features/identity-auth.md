@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-12
-last_updated: 2026-10-27
+last_updated: 2026-11-11
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -432,6 +432,27 @@ Accepted with [bff-customer-portal.md](bff-customer-portal.md) and [../customer-
 | A19 | Active TenantAdmin / Adviser / SystemAdmin + correct password | Hosted login for client `customer-portal` | No authorization code. Uniform failure. |
 | A20 | Active Customer logged in on `customer-portal` (identity cookie for that scheme set) | Browser opens Adviser Portal (client `adviser-portal`) | Adviser Portal does not silently complete as Customer. Hosted `/login` is shown. |
 | A21 | Both `customer-portal` and `adviser-portal` have a valid identity cookie | Sign out on Customer Portal (`client_id=customer-portal`) | Only the `customer-portal` scheme cookie is cleared. Adviser Portal identity cookie remains. |
+
+### Amendment 2026-11-11 (SystemAdmin leaves `adviser-portal`)
+
+Accepted 2026-11-11. Supersedes the `adviser-portal` row in §1, R20, A5, the §10 sentence “TenantAdmin / Adviser / SystemAdmin on `adviser-portal` still complete the flow”, the 2026-10-01 line “SystemAdmin still receives a code”, and the 2026-10-27 allow-list sentence. Do not rewrite those in place.
+
+**Why.** SystemAdmin was on the `adviser-portal` allow-list so it could get an access token before a Back Office existed. Back Office (amendment 2026-10-25) is now the SystemAdmin client. The Adviser Portal has no SystemAdmin screens.
+
+- Allow-list row: `adviser-portal` → TenantAdmin, Adviser. SystemAdmin with a correct password receives no code. Failure copy stays uniform (R3).
+- `back-office` → SystemAdmin only (unchanged). SystemAdmin still omits `tenantCode` on hosted login. `customer-portal` → Customer only (unchanged).
+- Resource API policies do not change. SystemAdmin keeps every permission in ADR 0013. Back Office and Scalar call the same routes. `webapi` does not read `client_id`.
+- The Adviser Portal SPA treats a leftover SystemAdmin session like a leftover Customer session: `/forbidden`, and no `GET /tenants/by-code/{code}` call.
+- Known gap: the token endpoint does not re-run the allow-list on a refresh grant. A SystemAdmin refresh token issued on `adviser-portal` before this change keeps working until it is revoked or reaches the 14-day absolute lifetime.
+- No new table. No new route. No schema change.
+
+**Acceptance (amendment A22–A24).**
+
+| Id | Given | When | Then |
+| --- | --- | --- | --- |
+| A22 | Seed SystemAdmin + correct password, no `tenantCode` | Hosted login for client `adviser-portal` (direct or through `bff-adviser-portal`) | No authorization code. Uniform failure. No BFF cookie. |
+| A23 | Same person as A22 | Hosted login for client `back-office` | Authorization code issued. Access token works on SystemAdmin routes. |
+| A24 | Leftover SystemAdmin session in the Adviser Portal | Open `/`, `/profile`, or `/session` | `/forbidden`. No Profile page. No `by-code` call. |
 
 ### Amendment 2026-09-14 (R21 — end session)
 

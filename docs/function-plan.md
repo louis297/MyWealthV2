@@ -3,7 +3,7 @@ title: Function plan
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-10-25
+updated: 2026-11-11
 related:
   - README.md
   - glossary.md
@@ -53,7 +53,7 @@ How this file relates to the rest of the tree is in [README.md](README.md). This
 
 | Role | Can log in | Phase 1 UI | Notes |
 | --- | --- | --- | --- |
-| SystemAdmin | Yes, no tenantCode | Back Office ([backoffice/back-office.md](backoffice/back-office.md)). Scalar remains. `adviser-portal` allow-list yes (probe). | Platform-level. No TenantId. Tenant manage is not the Adviser Portal. |
+| SystemAdmin | Yes, no tenantCode | Back Office ([backoffice/back-office.md](backoffice/back-office.md)). Scalar remains. `adviser-portal` allow-list no (identity-auth amendment 2026-11-11). | Platform-level. No TenantId. Tenant manage is not the Adviser Portal. |
 | TenantAdmin | Yes + tenantCode | Adviser Portal | Highest authority inside the tenant. |
 | Adviser | Yes + tenantCode | Adviser Portal | Manages assigned Customers. No ledger yet in Phase 1. |
 | Customer | Yes + tenantCode | Customer Portal (accepted) | Login principal. `adviser-portal` issues no code. Client `customer-portal` is accepted ([customer-portal/customer-portal.md](customer-portal/customer-portal.md)). |

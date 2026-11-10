@@ -41,7 +41,7 @@ Browser
 
 The portal (`adviser-portal`) does not issue tokens. It redirects to `identity`, stores access / refresh after the callback, and calls `webapi` with Bearer.
 
-Phase 1 registers one public OIDC client: `adviser-portal`. IdentityHost allows SystemAdmin, TenantAdmin, and Adviser on that client. A Customer with a correct password does not receive an authorization code for it. Customer Portal is a later second client; it is not registered in Phase 1. Adviser-management resource routes stay 403 for Customer.
+Phase 1 registers one public OIDC client: `adviser-portal`. IdentityHost allows TenantAdmin and Adviser on that client (SystemAdmin removed by identity-auth amendment 2026-11-11; SystemAdmin signs in through `back-office`). A Customer with a correct password does not receive an authorization code for it. Customer Portal is a later second client; it is not registered in Phase 1. Adviser-management resource routes stay 403 for Customer.
 
 ---
 
@@ -90,7 +90,7 @@ Protocol scopes (not permissions): `openid`, `profile`, `offline_access`, `api`.
 
 | Role | How tokens are obtained | Phase 1 resource scope |
 | --- | --- | --- |
-| SystemAdmin | Hosted login on `adviser-portal` (and later Back Office), no tenantCode | `/tenants` manage + `GET /tenants/by-code/{code}`, `/users/tenant-admins`, `/users/me`, `/currencies` |
+| SystemAdmin | Hosted login on `back-office`, no tenantCode. `adviser-portal` issues no code (identity-auth amendment 2026-11-11) | `/tenants` manage + `GET /tenants/by-code/{code}`, `/users/tenant-admins`, `/users/me`, `/currencies` |
 | TenantAdmin | Hosted login on `adviser-portal` + tenantCode | `/users/advisers`, tenant `/users/customers`, `GET /tenants/by-code/{own}`, `/users/me`, `/currencies` |
 | Adviser | Hosted login on `adviser-portal` + tenantCode | Assigned `/users/customers`, `GET /tenants/by-code/{own}`, `/users/me`, `/currencies` |
 | Customer | Login principal; `adviser-portal` issues no code. Tokens wait for `customer-portal` | `/users/me` and `/currencies` only, on a client that allows Customer. `/users/advisers`, `/users/customers`, `/users/tenant-admins`, `/tenants` including by-code → 403 |

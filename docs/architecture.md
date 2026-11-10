@@ -3,7 +3,7 @@ title: Architecture
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-11-01
+updated: 2026-11-11
 related:
   - README.md
   - glossary.md
@@ -70,7 +70,7 @@ Portals:
 
 - **Adviser Portal** — only frontend in Phase 1. OIDC client id `adviser-portal` is held by `bff-adviser-portal`, not by the browser.
 - Customer Portal — second BFF + client on the same authorization server; accepted ([customer-portal/customer-portal.md](customer-portal/customer-portal.md), [features/bff-customer-portal.md](features/bff-customer-portal.md))
-- Back Office — landed ([backoffice/back-office.md](backoffice/back-office.md)). Blazor host `back-office` with MudBlazor (no BFF). Scalar remains. SystemAdmin may still complete `adviser-portal` login (no tenantCode); firm pages stay forbidden.
+- Back Office — landed ([backoffice/back-office.md](backoffice/back-office.md)). Blazor host `back-office` with MudBlazor (no BFF). Scalar remains. Back Office is the only client that issues SystemAdmin a code; `adviser-portal` refuses SystemAdmin (identity-auth amendment 2026-11-11).
 
 Aspire resource names must not be generic (`Frontend`, `Web`). Hosts: `identity`, `webapi`, `adviser-portal`, `bff-adviser-portal`, `customer-portal`, `bff-customer-portal`, `back-office`, `worker`. Phase 1 does **not** split a separate identity **database**.
 
@@ -119,7 +119,7 @@ Hosted in `src/IdentityHost` (ADR 0014). Aspire resource name: `identity`.
 | Refresh | OpenIddict token store. Revoked on logout, password change, and disable. Rotated when presented. No custom `RefreshTokens` table |
 | Scopes | `openid`, `profile`, `offline_access`, `api`. Role and tenant are JWT claims, not scopes. Permissions are not expanded into the token |
 
-The login gate on the authorization server reads domain invariants: tenant enabled, `UserStatus = Active`, valid Identity link, then the client × role allow-list. `adviser-portal` does not issue a code to Customer. `back-office` issues a code only to SystemAdmin. SystemAdmin may complete login with no tenantCode. Adviser-management resource policies stay 403.
+The login gate on the authorization server reads domain invariants: tenant enabled, `UserStatus = Active`, valid Identity link, then the client × role allow-list. `adviser-portal` issues a code only to TenantAdmin and Adviser. `back-office` issues a code only to SystemAdmin. `customer-portal` issues a code only to Customer. SystemAdmin may complete login with no tenantCode. Adviser-management resource policies stay 403.
 
 IdentityHost isolates the two first-party clients with a per-client cookie scheme (identity-auth amendment 2026-10-27). `/connect/authorize` and hosted `/login` authenticate and sign in only against the scheme for the current `client_id`. `/connect/logout` signs out only that scheme. A login on one client does not silently authenticate the other. This is server-side; clients do not send a special parameter.
 

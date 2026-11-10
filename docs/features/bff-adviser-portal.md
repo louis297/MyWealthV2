@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-01
-last_updated: 2026-10-27
+last_updated: 2026-11-11
 related:
   - ../function-plan.md
   - ../architecture.md
@@ -88,7 +88,7 @@ The Adviser Portal browser talks only to the BFF origin: login/logout on the BFF
 | R6 | Refresh lives only in the BFF process (tokens saved by the OIDC handler). The SPA must not call `/connect/token` or `/connect/revocation`. |
 | R7 | On `webapi` 401, the BFF refreshes **once** with the stored refresh token and retries the proxied request. If refresh fails, clear the BFF cookie and return 401 to the SPA. Do not start authorize from an XHR. |
 | R8 | Logout order: sign out the BFF cookie → `POST identity /connect/revocation` (`token_type_hint=refresh_token`) → OpenIddict end-session (`/connect/logout` with `client_id` and `post_logout_redirect_uri`). Do not add `/auth/logout`. identity-auth R21 still owns the identity action. IdentityHost clears only the `adviser-portal` scheme cookie (identity-auth amendment 2026-10-27). |
-| R9 | `ClientId` remains `adviser-portal`. Allow-list unchanged: SystemAdmin, TenantAdmin, Adviser. Customer + correct password → no code, uniform failure (identity-auth R4 / R20). |
+| R9 | `ClientId` remains `adviser-portal`. Allow-list: TenantAdmin, Adviser. SystemAdmin was removed by identity-auth amendment 2026-11-11 and receives no code. Customer + correct password → no code, uniform failure (identity-auth R4 / R20). |
 | R10 | Client is confidential. Secret only in Aspire / host configuration. Authorization code + PKCE stay on. No password grant. |
 | R11 | Redirect registered on the client: `{bffOrigin}/signin-oidc`. Post-logout: `{bffOrigin}/`. `{bffOrigin}` is the BFF https browser entry (the Aspire dashboard link), not a launchSettings port. Development currently shows `https://localhost:7190/`; that port is not the product origin. Upsert a `*.dev.localhost` alias only when that host is itself a browser entry. Do not replace the https entry with the alias. Do not register the BFF http endpoint or the Vite origin. |
 | R12 | Protocol paths on `identity` stay OpenIddict defaults. Callers follow discovery. Do not remap `/connect/*`. BFF paths in §8 are this host, not the issuer. |
@@ -229,7 +229,7 @@ Forward: `Idempotency-Key`, `Content-Type`, `Accept`. Drop browser `Cookie` and 
 | Post-logout | `{bffOrigin}/` |
 | Token store | Encrypted authentication cookie this slice (R22). Not a table. `SessionStore` seam left open |
 | Cookie | `__Host-bff-adviser-portal` (R13) |
-| Allow-list | SystemAdmin, TenantAdmin, Adviser |
+| Allow-list | TenantAdmin, Adviser |
 
 ---
 
@@ -328,7 +328,7 @@ Add `/portfolios` to the BFF prefix allow-list so the Adviser Portal can call th
 
 - Prefix: `/portfolios`
 - Methods: GET, POST, PUT, DELETE (covers list, get, create, update, disable, bulk rebalance, and any future assignment-style paths under this prefix)
-- Who: TenantAdmin, Adviser (same allow-list as other Phase 2 resources). SystemAdmin continues to use Scalar for cross-tenant work.
+- Who: TenantAdmin, Adviser (same allow-list as other Phase 2 resources). SystemAdmin uses Back Office or Scalar for cross-tenant work.
 - No new cookie or client change. Existing `adviser-portal` confidential client is enough.
 
 This amendment is required for the Adviser Portal portfolios cut (`adviser-portal-portfolios.md`).

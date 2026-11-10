@@ -4,7 +4,7 @@ status: accepted
 phase: 1
 language: en
 created: 2026-09-12
-updated: 2026-10-12
+updated: 2026-11-11
 related:
   - README.md
   - frontend-conventions.md
@@ -33,7 +33,7 @@ Tenant **management** (create / rename / reporting currency / disable) is not th
 
 **In repo master.** Shell 2026-09-13. BFF cut `6aae5c7` (slice head `5e85e9c`). Do not rebuild the public-client shell.
 
-Vite stays an Aspire resource. Product origin is `bff-adviser-portal`. The SPA is not an OIDC client. No `/callback`. Session probe is `GET /api/users/me` with credentials. 401 does not refresh in the browser. No React password page. SystemAdmin may use the probe (Development seed).
+Vite stays an Aspire resource. Product origin is `bff-adviser-portal`. The SPA is not an OIDC client. No `/callback`. Session probe is `GET /api/users/me` with credentials. 401 does not refresh in the browser. No React password page. SystemAdmin has no session on this client (identity-auth amendment 2026-11-11); Back Office is the SystemAdmin host.
 
 | Path | Behaviour (landed) |
 | --- | --- |
@@ -51,7 +51,7 @@ People HTTP, amendment A, and amendment B have landed in repo master (`09dc6ec`)
 
 | Step | Spec | Ships |
 | --- | --- | --- |
-| A | [identity-auth](../features/identity-auth.md) | Client × role allow-list on IdentityHost: after password, before the authorization code. `adviser-portal` allows SystemAdmin, TenantAdmin, Adviser. A Customer with a correct password does **not** get a code. Uniform login failure. Customers hosted-login smoke expects failure on this client. |
+| A | [identity-auth](../features/identity-auth.md) | Client × role allow-list on IdentityHost: after password, before the authorization code. `adviser-portal` allows TenantAdmin, Adviser (SystemAdmin removed by identity-auth amendment 2026-11-11). A Customer with a correct password does **not** get a code. Uniform login failure. Customers hosted-login smoke expects failure on this client. |
 | B | [tenants](../features/tenants.md) + [ADR 0013](../adr/0013-roles-authorization-single-user-table.md) | `GET /tenants/by-code/{code}`, policy `tenants.read`. Own-tenant 200 for TenantAdmin / Adviser; other codes 404; Customer 403. |
 
 Reserved, not registered in Phase 1: client `customer-portal` (Customer) and a Back Office client (SystemAdmin only).
@@ -85,7 +85,7 @@ Landed in repo master 2026-09-14. Do not rebuild the OIDC shell to ship these pa
 | Path | Who | Behaviour |
 | --- | --- | --- |
 | `/bff/login` | BFF, not React | Challenge. `returnUrl` is an in-app path. |
-| `/` | Allowed roles | Redirect `/customers`. SystemAdmin does not land on a Customers workspace (C4). |
+| `/` | Allowed roles | Redirect `/customers`. Any other role → `/forbidden` (C4, C5). |
 | `/customers` | TenantAdmin, Adviser | List. |
 | `/customers/new` | Same | Create. |
 | `/customers/:id` | Same | Read-only detail. |
@@ -94,7 +94,7 @@ Landed in repo master 2026-09-14. Do not rebuild the OIDC shell to ship these pa
 | `/advisers/new` | TenantAdmin | Create. |
 | `/advisers/:id` | TenantAdmin | Read-only detail. |
 | `/advisers/:id/edit` | TenantAdmin | Rename. |
-| `/profile` | TenantAdmin, Adviser; SystemAdmin allowed | Name + password. |
+| `/profile` | TenantAdmin, Adviser | Name + password. |
 | `/session` | Dev aid | Landed probe. Not in the product menu. |
 | `/login` | — | Must not be a password page. |
 
@@ -109,7 +109,7 @@ Landed in repo master 2026-09-14. Do not rebuild the OIDC shell to ship these pa
 | Redirect | `{bffOrigin}/signin-oidc` |
 | Post-logout | `{bffOrigin}/` |
 | Token store | Encrypted BFF cookie. Browser: `__Host-bff-adviser-portal` only |
-| Allow-list | SystemAdmin, TenantAdmin, Adviser |
+| Allow-list | TenantAdmin, Adviser |
 | Sign out | `POST /bff/logout` with `X-MyWealth-Request: 1`. BFF revokes refresh, then identity end-session. SPA must not call `startAuthorize` while that is in flight. |
 
 ### Acceptance (cut C)
@@ -121,7 +121,7 @@ Requires A and B in the running hosts. Do not re-test A1–A10 or B1–B11 here 
 | C1 | TenantAdmin, no session | Open `/customers` | Authorize → hosted login → callback → land on `/customers`. No React password page. |
 | C2 | Same session as C1 | Shell | Firm **Name** from `GET /tenants/by-code/{tenantCode}`. Code may appear as secondary. Nav: Customers, Advisers, Profile. |
 | C3 | Adviser session | Shell and `/advisers` | Nav has Customers + Profile, no Advisers. `/advisers` and `/advisers/new` render `/forbidden`, not a fake 404. |
-| C4 | SystemAdmin session | `/`, `/customers`, `/profile`, `/session` | Cookie is set. `/` does not show a Customers workspace. `/customers` and `/advisers` are `/forbidden`. `/profile` and `/session` allowed. No tenant manage screens. BFF does not refuse the cookie. |
+| C4 | SystemAdmin + correct password | Hosted login for this client | Amended 2026-11-11. No code, no BFF cookie (identity-auth A22). A leftover SystemAdmin session sends `/`, `/customers`, `/profile`, and `/session` to `/forbidden` (A24). Back Office is the SystemAdmin host. |
 | C5 | Customer + correct password | Hosted login for this client | Covered by A1. Portal never stores a Customer session. If a leftover token appears, `/forbidden`. |
 | C6 | TenantAdmin | Create customer (`name`, `email`, `password`, `adviserId` of an Active adviser) | `POST /users/customers` includes `adviserId`. 201 → `/customers/{id}`. Password is not shown again. |
 | C7 | Adviser | Create customer | Body **omits** `adviserId`. New row’s `adviserId` is the caller. |
@@ -144,6 +144,6 @@ Suggested commits: [frontend-implementation-notes.md](frontend-implementation-no
 
 ## Still out of Phase 1
 
-Dashboard, Accounts, Transactions, Instruments, Customer Portal, Back Office UI, SystemAdmin tenant screens (Scalar).
+Dashboard, Accounts, Transactions, Instruments, Customer Portal, Back Office UI, SystemAdmin tenant screens (Back Office or Scalar).
 
 Phase 2 Dashboard and ledger pages (including Buy / Sell / Split / Reverse) live in [adviser-portal-dashboard.md](adviser-portal-dashboard.md) (accepted).
