@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Navigate, Outlet, useLocation } from "react-router";
 import { useAppDispatch } from "@/app/hooks";
 import { isSignOutInProgress, startLogin } from "@/features/session/session";
-import { roles, shouldLoadTenant } from "@/features/session/roles";
+import { canUseAdviserPortal, shouldLoadTenant } from "@/features/session/roles";
 import { setCurrentUser, setTenant } from "@/features/session/sessionSlice";
 import { useGetMeQuery, useGetTenantByCodeQuery } from "@/shared/api/api";
 
@@ -41,7 +41,7 @@ export function RequireSession() {
     return <p>Loading session…</p>;
   }
 
-  if (me.role === roles.customer) {
+  if (!canUseAdviserPortal(me.role)) {
     if (location.pathname === "/forbidden") {
       return <Outlet />;
     }

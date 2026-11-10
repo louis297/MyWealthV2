@@ -60,7 +60,7 @@ export const appRoutes: RouteObject[] = [
           { path: "/forbidden", element: <ForbiddenPage /> },
           {
             path: "/profile",
-            element: <RoleGate allow={[roles.tenantAdmin, roles.adviser, roles.systemAdmin]} />,
+            element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
             children: [{ index: true, element: <ProfilePage /> }],
           },
           {

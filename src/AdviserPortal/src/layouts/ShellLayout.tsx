@@ -42,7 +42,6 @@ import {
   canAccessPortfolios,
   canAccessProfile,
   canAccessReports,
-  roles,
 } from "@/features/session/roles";
 import { ModeToggle } from '@/components/mode-toggle';
 
@@ -56,7 +55,7 @@ type ShellNavItem = {
 export function ShellLayout({ children }: { children?: ReactNode }) {
   const me = useAppSelector((state) => state.session.currentUser);
   const tenant = useAppSelector((state) => state.session.tenant);
-  const firmName = me?.role === roles.systemAdmin ? "Platform" : tenant?.name;
+  const firmName = tenant?.name;
   const { pathname } = useLocation();
   const role = me?.role;
 
