@@ -67,7 +67,7 @@ public class BffAllowListTests : TestBase
     }
 
     [Test]
-    public async Task SystemAdmin_GetsASession_AndUsersMe()
+    public async Task SystemAdmin_CorrectPassword_GetsNoCodeAndNoBffCookie()
     {
         var login = await _bff.GetAsync("/bff/login");
         var result = await SubmitAsync(
@@ -75,21 +75,9 @@ public class BffAllowListTests : TestBase
             DevelopmentIdentitySeeder.SystemAdminEmail,
             DevelopmentIdentitySeeder.SystemAdminPassword,
             tenantCode: null);
-        result.Code.ShouldNotBeNullOrWhiteSpace();
 
-        using var callback = new HttpRequestMessage(HttpMethod.Get, result.Callback!.PathAndQuery);
-        callback.Headers.TryAddWithoutValidation("Cookie", CookieHeader(login));
-        var signedIn = await _bff.SendAsync(callback);
-        var session = CookieHeader(signedIn);
-        session.ShouldContain(SessionCookie);
-
-        using var me = new HttpRequestMessage(HttpMethod.Get, "/api/users/me");
-        me.Headers.TryAddWithoutValidation("Cookie", session);
-        var response = await _bff.SendAsync(me);
-
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        json.RootElement.GetProperty("role").GetString().ShouldBe("systemAdmin");
+        result.Code.ShouldBeNull();
+        result.SetCookie.ShouldNotContain(value => value.StartsWith(SessionCookie, StringComparison.Ordinal));
     }
 
     private async Task RegisterOriginAsync()

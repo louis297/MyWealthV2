@@ -7,11 +7,11 @@ namespace MyWealthV2.Application.UnitTests.Common.Security;
 
 public class ClientRoleAllowListTests
 {
-    [TestCase(UserRole.SystemAdmin, true)]
+    [TestCase(UserRole.SystemAdmin, false)]
     [TestCase(UserRole.TenantAdmin, true)]
     [TestCase(UserRole.Adviser, true)]
     [TestCase(UserRole.Customer, false)]
-    public void AdviserPortal_AllowsStaffNotCustomer(UserRole role, bool expected)
+    public void AdviserPortal_AllowsFirmStaffOnly(UserRole role, bool expected)
     {
         ClientRoleAllowList.Allows("adviser-portal", role).ShouldBe(expected);
     }

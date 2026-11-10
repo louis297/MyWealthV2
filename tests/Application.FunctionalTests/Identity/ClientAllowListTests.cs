@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Domain.Enums;
+using MyWealthV2.Infrastructure.Identity;
 using OpenIddict.Abstractions;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 
@@ -28,6 +29,35 @@ public class ClientAllowListTests : TestBase
         var me = await FunctionalTestSetup.WebClient.GetAsync("/users/me");
         me.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         me.Headers.Location.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task SystemAdmin_CorrectPassword_OnAdviserPortal_IssuesNoCode()
+    {
+        (await TestApp.CheckPasswordAsync(
+            DevelopmentIdentitySeeder.SystemAdminEmail,
+            DevelopmentIdentitySeeder.SystemAdminPassword,
+            tenantCode: null)).ShouldBeTrue();
+
+        var login = await FunctionalTestSetup.Oidc.SubmitLoginAsync(
+            DevelopmentIdentitySeeder.SystemAdminEmail,
+            DevelopmentIdentitySeeder.SystemAdminPassword,
+            tenantCode: null);
+
+        login.Code.ShouldBeNull();
+        FailureCopy(login.Body).ShouldBe("Invalid login.");
+        AssertNoRoleLeak(login.Body);
+    }
+
+    [Test]
+    public async Task SystemAdmin_CorrectPassword_OnBackOffice_StillIssuesACode()
+    {
+        var tokens = await FunctionalTestSetup.BackOfficeOidc.SignInAsync(
+            DevelopmentIdentitySeeder.SystemAdminEmail,
+            DevelopmentIdentitySeeder.SystemAdminPassword,
+            tenantCode: null);
+
+        tokens.AccessToken.ShouldNotBeNullOrWhiteSpace();
     }
 
     [Test]
