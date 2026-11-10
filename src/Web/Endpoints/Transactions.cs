@@ -32,9 +32,10 @@ public class Transactions : IEndpointGroup
         int pageSize = 20,
         Guid? tenantId = null,
         Guid? accountId = null,
-        Guid? customerId = null)
+        Guid? customerId = null,
+        string? type = null)
     {
-        var result = await sender.Send(new GetTransactionsQuery(page, pageSize, tenantId, accountId, customerId));
+        var result = await sender.Send(new GetTransactionsQuery(page, pageSize, tenantId, accountId, customerId, type));
         return TypedResults.Ok(result);
     }
 

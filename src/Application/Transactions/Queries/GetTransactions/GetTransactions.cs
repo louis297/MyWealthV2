@@ -13,7 +13,8 @@ public record GetTransactionsQuery(
     int PageSize = 20,
     Guid? TenantId = null,
     Guid? AccountId = null,
-    Guid? CustomerId = null) : IRequest<PagedList<TransactionDto>>;
+    Guid? CustomerId = null,
+    string? Type = null) : IRequest<PagedList<TransactionDto>>;
 
 public class GetTransactionsQueryValidator : AbstractValidator<GetTransactionsQuery>
 {
