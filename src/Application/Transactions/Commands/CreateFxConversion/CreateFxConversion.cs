@@ -220,6 +220,12 @@ public class CreateFxConversionCommandHandler(
         var priced = await FxConversionScope.PriceAsync(
             fxRates, currencies, pair, request.SellAmount, request.BuyAmount, request.BookedAt!.Value, cancellationToken);
 
+        // R12: the caller confirms the rate it was quoted.
+        if (request.ExpectedRate!.Value != priced.Rate.Rate)
+        {
+            throw new ExpectedRateChangedException(priced.Rate.Rate);
+        }
+
         var fromSum = await TransactionCash.SumAsync(db, pair.From.Id, cancellationToken);
         Domain.Entities.Transaction transaction;
         try
