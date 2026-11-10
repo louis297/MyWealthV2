@@ -75,6 +75,25 @@ public class Transaction : BaseAuditableEntity
         return transaction;
     }
 
+    /// <summary>
+    /// Builds an InternalTransfer: a negative cash leg on the from Account and a positive cash leg
+    /// on the to Account, same currency, summing to zero.
+    /// </summary>
+    public static Transaction PostInternalTransfer(
+        int tenantId,
+        int fromAccountId,
+        string fromAccountCurrency,
+        int toAccountId,
+        string toAccountCurrency,
+        Money amount,
+        DateTimeOffset bookedAt,
+        string? memo,
+        string? reference,
+        decimal fromCurrentCashSum)
+    {
+        throw new NotImplementedException();
+    }
+
     public static Transaction PostOpeningHoldings(
         int tenantId,
         int accountId,
