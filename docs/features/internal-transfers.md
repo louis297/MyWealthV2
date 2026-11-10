@@ -1,6 +1,6 @@
 ---
 title: Internal transfers
-status: draft
+status: accepted
 phase: 2
 language: en
 owner: ""
