@@ -168,7 +168,8 @@ public class GetTransactionsQueryHandler(IApplicationDbContext db, ICurrentUser 
                         ? reversedByPublicId
                         : null,
                     RowVersion = Convert.ToBase64String(row.transaction.RowVersion ?? []),
-                    Security = legs.Security[row.transaction.Id].ToList()
+                    Security = legs.Security[row.transaction.Id].ToList(),
+                    Fx = legs.Fx.GetValueOrDefault(row.transaction.Id)
                 };
             }).ToList(),
             Page = request.Page,

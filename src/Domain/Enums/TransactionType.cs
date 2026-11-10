@@ -17,5 +17,6 @@ public enum TransactionType
     Split = 12,
     Bonus = 13,
     Scrip = 14,
-    InternalTransfer = 15
+    InternalTransfer = 15,
+    FxConversion = 16
 }

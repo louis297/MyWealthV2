@@ -269,7 +269,6 @@ No new ADR.
 Still open, not this slice:
 
 - Cross-tenant transfer as a linked pair, if it is ever wanted.
-- Cross-currency transfer and FX conversion ([future-plans.md](../future-plans.md) §2).
 - In-kind transfer.
 - Fees.
 - Account search by Customer name and server-side `currency` / `status` filters on `GET /accounts`.

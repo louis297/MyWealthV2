@@ -61,6 +61,16 @@ public class ProblemDetailsExceptionHandler : IExceptionHandler
                 Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
                 Detail = "This Idempotency-Key was already used for a different request."
             }),
+            ExpectedRateChangedException changed => (StatusCodes.Status409Conflict, (ProblemDetails)new ValidationProblemDetails(
+                new Dictionary<string, string[]>
+                {
+                    ["ExpectedRate"] = [$"{changed.Message} Current rate: {changed.CurrentRate}."]
+                })
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "The rate changed",
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10"
+            }),
             TargetDisabledException tde => (StatusCodes.Status400BadRequest, DisabledProblem(tde)),
             RebalanceException rebalance => (StatusCodes.Status400BadRequest, CodedProblem(rebalance.Code, rebalance.Message)),
             AssignmentConflictException conflict => (StatusCodes.Status409Conflict, new ProblemDetails

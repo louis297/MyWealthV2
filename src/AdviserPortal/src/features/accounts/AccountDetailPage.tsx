@@ -31,6 +31,7 @@ import {
   useRebalanceAccountMutation,
   useUnassignPortfolioMutation,
 } from "@/features/portfolios/portfoliosApi";
+import { rateLine } from "@/features/transactions/fxFormat";
 import { useGetTransactionsQuery } from "@/features/transactions/transactionsApi";
 import { cn } from "cn";
 
@@ -251,6 +252,14 @@ export function AccountDetailPage() {
               Transfer
             </Link>
           ) : null}
+          {canPostCash(data.status) ? (
+            <Link
+              to={`/accounts/${data.id}/convert`}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            >
+              Convert
+            </Link>
+          ) : null}
         </nav>
       ) : null}
       {conflict ? <ConflictNotice /> : null}
@@ -386,6 +395,7 @@ export function AccountDetailPage() {
                           .filter((leg) => leg.accountId === data.id)
                           .map((leg) => `${leg.amount} ${leg.currency}`)
                           .join(", ")}
+                        {item.fx ? <p className="text-muted-foreground text-xs">{rateLine(item.fx)}</p> : null}
                       </TableCell>
                     </TableRow>
                   ))}

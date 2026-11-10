@@ -441,6 +441,10 @@ describe("AccountDetailPage", () => {
         "href",
         `/accounts/${accountId}/transfer`,
       );
+      expect(screen.getByRole("link", { name: "Convert" })).toHaveAttribute(
+        "href",
+        `/accounts/${accountId}/convert`,
+      );
       if (type === "Bank" || type === "Cash") {
         expect(screen.queryByRole("link", { name: "Buy" })).not.toBeInTheDocument();
         expect(screen.queryByRole("link", { name: "Sell" })).not.toBeInTheDocument();
@@ -572,6 +576,7 @@ describe("AccountDetailPage", () => {
     expect(screen.queryByRole("link", { name: "TransferIn" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "TransferOut" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Transfer" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Convert" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Buy" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reopen" })).toBeInTheDocument();
@@ -620,6 +625,51 @@ describe("AccountDetailPage", () => {
     const row = within(activity).getByRole("row", { name: /InternalTransfer/ });
     expect(row).toHaveTextContent("-500 NZD");
     expect(row).not.toHaveTextContent(/(^|[^-])500 NZD/);
+  });
+
+  it("shows the leg on this account and the rate line for an FX conversion", async () => {
+    const usdAccountId = "b3333333-3333-3333-3333-333333333333";
+    renderDetail((url, method) => {
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({
+          items: [
+            {
+              id: "72222222-2222-2222-2222-222222222222",
+              tenantId: account.tenantId,
+              type: "FxConversion",
+              bookedAt: "2026-11-10T09:00:00+13:00",
+              memo: null,
+              reference: null,
+              originalTransactionId: null,
+              reversedByTransactionId: null,
+              rowVersion: "AAAA",
+              cash: [
+                { accountId, customerId, amount: -845.74, currency: "NZD" },
+                { accountId: usdAccountId, customerId, amount: 500, currency: "USD" },
+              ],
+              security: [],
+              fx: { baseCurrency: "NZD", quoteCurrency: "USD", rate: 0.5912, rateAsOfDate: "2026-11-09" },
+            },
+          ],
+          page: 1,
+          pageSize: 20,
+          totalCount: 1,
+        });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json({ ...account, type: "Bank", status: "Open" });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    const activity = await screen.findByRole("table", { name: "Activity" });
+    const row = within(activity).getByRole("row", { name: /FxConversion/ });
+    expect(row).toHaveTextContent("-845.74 NZD");
+    expect(row).not.toHaveTextContent("500 USD");
+    expect(row).toHaveTextContent("1 NZD = 0.5912 USD (as of 2026-11-09)");
   });
 
   it("closes an open account with the current rowVersion and shows Closed", async () => {

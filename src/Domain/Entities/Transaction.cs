@@ -32,6 +32,9 @@ public class Transaction : BaseAuditableEntity
 
     public List<TransactionSecurityLeg> SecurityLegs { get; private set; } = [];
 
+    /// <summary>The rate this Transaction used, when it has one (FX conversions R14).</summary>
+    public TransactionFxDetail? FxDetail { get; private set; }
+
     public static Transaction Post(
         int tenantId,
         int accountId,
@@ -133,6 +136,109 @@ public class Transaction : BaseAuditableEntity
         };
         transaction.AddDomainEvent(new TransactionPosted(transaction));
         return transaction;
+    }
+
+    /// <summary>
+    /// Builds an FxConversion: a negative cash leg in the sell currency on the from Account and a
+    /// positive cash leg in the buy currency on the to Account, priced at <paramref name="rate"/>.
+    /// <paramref name="fixedAmount"/> is the side the caller named; its currency says which side it is.
+    /// </summary>
+    public static Transaction PostFxConversion(
+        int tenantId,
+        int fromAccountId,
+        string fromAccountCurrency,
+        int toAccountId,
+        string toAccountCurrency,
+        AppliedFxRate rate,
+        Money fixedAmount,
+        int computedDecimalPlaces,
+        DateTimeOffset bookedAt,
+        string? memo,
+        string? reference,
+        decimal fromCurrentCashSum)
+    {
+        if (fromAccountId == toAccountId)
+        {
+            throw new DomainException("The from and to accounts must be different.");
+        }
+
+        var sellCurrency = Money.Create(0m, fromAccountCurrency).Currency;
+        var buyCurrency = Money.Create(0m, toAccountCurrency).Currency;
+        if (string.Equals(sellCurrency, buyCurrency, StringComparison.Ordinal))
+        {
+            throw new DomainException("The from and to accounts must have different currencies.");
+        }
+
+        if (!string.Equals(rate.BaseCurrency, sellCurrency, StringComparison.Ordinal)
+            || !string.Equals(rate.QuoteCurrency, buyCurrency, StringComparison.Ordinal))
+        {
+            throw new DomainException("The rate must be for the sell currency to the buy currency.");
+        }
+
+        var (sell, buy) = ComputeFxConversionAmounts(rate, fixedAmount, computedDecimalPlaces);
+
+        if (fromCurrentCashSum - sell < 0)
+        {
+            throw new DomainException("Cash balance cannot become negative.");
+        }
+
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            Type = TransactionType.FxConversion,
+            BookedAt = bookedAt,
+            Memo = NormaliseMemo(memo),
+            Reference = NormaliseReference(reference),
+            PublicId = Guid.NewGuid(),
+            CashLegs =
+            [
+                TransactionCashLeg.Create(fromAccountId, -sell, sellCurrency),
+                TransactionCashLeg.Create(toAccountId, buy, buyCurrency)
+            ],
+            FxDetail = TransactionFxDetail.Create(rate)
+        };
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
+    }
+
+    /// <summary>
+    /// FX conversions R11: the sell and buy amounts for <paramref name="fixedAmount"/> at <paramref name="rate"/>.
+    /// The fixed side is the one in its currency; the other side is rounded to
+    /// <paramref name="computedDecimalPlaces"/>, away from zero.
+    /// </summary>
+    public static (decimal Sell, decimal Buy) ComputeFxConversionAmounts(
+        AppliedFxRate rate,
+        Money fixedAmount,
+        int computedDecimalPlaces)
+    {
+        if (fixedAmount.Amount <= 0)
+        {
+            throw new DomainException("Amount must be greater than 0.");
+        }
+
+        decimal sell;
+        decimal buy;
+        if (string.Equals(fixedAmount.Currency, rate.BaseCurrency, StringComparison.Ordinal))
+        {
+            sell = fixedAmount.Amount;
+            buy = decimal.Round(sell * rate.Rate, computedDecimalPlaces, MidpointRounding.AwayFromZero);
+        }
+        else if (string.Equals(fixedAmount.Currency, rate.QuoteCurrency, StringComparison.Ordinal))
+        {
+            buy = fixedAmount.Amount;
+            sell = decimal.Round(buy / rate.Rate, computedDecimalPlaces, MidpointRounding.AwayFromZero);
+        }
+        else
+        {
+            throw new DomainException("The amount currency must be the sell or the buy currency.");
+        }
+
+        if (sell == 0 || buy == 0)
+        {
+            throw new DomainException("The computed amount rounds to 0.");
+        }
+
+        return (sell, buy);
     }
 
     public static Transaction PostOpeningHoldings(
@@ -465,7 +571,8 @@ public class Transaction : BaseAuditableEntity
             PublicId = Guid.NewGuid(),
             OriginalTransactionId = Id,
             CashLegs = cashLegs,
-            SecurityLegs = reversalLegs ?? []
+            SecurityLegs = reversalLegs ?? [],
+            FxDetail = FxDetail?.Copy()
         };
         ReversedBy = reversal;
         reversal.AddDomainEvent(new TransactionReversed(reversal));

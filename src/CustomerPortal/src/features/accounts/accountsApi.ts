@@ -23,6 +23,13 @@ export type ActivityCash = {
   currency: string;
 };
 
+export type ActivityFx = {
+  baseCurrency: string;
+  quoteCurrency: string;
+  rate: number;
+  rateAsOfDate: string;
+};
+
 export type Activity = {
   id: string;
   type: string;
@@ -30,6 +37,8 @@ export type Activity = {
   memo: string | null;
   /** Legs on the caller's own accounts only. */
   cash: ActivityCash[];
+  /** The rate used by an FX conversion (or its reversal); otherwise null. */
+  fx?: ActivityFx | null;
 };
 
 export const accountsApi = api.injectEndpoints({

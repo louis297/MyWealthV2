@@ -11,6 +11,7 @@ import {
 
 const typeLabels: Record<string, string> = {
   InternalTransfer: "Transfer",
+  FxConversion: "Currency exchange",
 };
 
 function typeLabel(type: string) {
@@ -105,6 +106,11 @@ export function AccountDetailPage() {
                           .filter((leg) => leg.accountId === id)
                           .map((leg) => `${leg.amount} ${leg.currency}`)
                           .join(", ")}
+                        {row.fx ? (
+                          <p className="text-muted-foreground text-xs">
+                            {`1 ${row.fx.baseCurrency} = ${Number(row.fx.rate)} ${row.fx.quoteCurrency} (as of ${row.fx.rateAsOfDate})`}
+                          </p>
+                        ) : null}
                       </TableCell>
                     </TableRow>
                   ))}

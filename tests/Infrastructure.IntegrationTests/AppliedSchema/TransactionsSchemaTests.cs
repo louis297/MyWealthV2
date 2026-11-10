@@ -251,7 +251,7 @@ public class TransactionsSchemaTests
         var type = rows.Single(row => row.Name == "CK_Transactions_Type");
         type.Definition.ShouldContain("[Type]", Case.Insensitive);
         type.Definition.ShouldContain("0");
-        type.Definition.ShouldContain("15");
+        type.Definition.ShouldContain("16");
     }
 
     [Test]
@@ -268,7 +268,7 @@ public class TransactionsSchemaTests
             """;
 
         var definition = (string)(await command.ExecuteScalarAsync())!;
-        definition.ShouldContain("15");
+        definition.ShouldContain("16");
     }
 
     [Test]
@@ -285,11 +285,11 @@ public class TransactionsSchemaTests
             """;
 
         var definition = (string)(await command.ExecuteScalarAsync())!;
-        definition.ShouldContain("15");
+        definition.ShouldContain("16");
     }
 
     [Test]
-    public async Task Apply_AcceptsInternalTransferTypeAndRejectsSixteen()
+    public async Task Apply_AcceptsFxConversionTypeAndRejectsSeventeen()
     {
         await using var db = OpenDb();
         await db.Database.OpenConnectionAsync();
@@ -319,7 +319,8 @@ public class TransactionsSchemaTests
         }
 
         await InsertAsync(15);
-        await Should.ThrowAsync<Microsoft.Data.SqlClient.SqlException>(() => InsertAsync(16));
+        await InsertAsync(16);
+        await Should.ThrowAsync<Microsoft.Data.SqlClient.SqlException>(() => InsertAsync(17));
 
         await transaction.RollbackAsync();
     }

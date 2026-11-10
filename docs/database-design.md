@@ -3,7 +3,7 @@ title: Database design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-09-25
+updated: 2026-11-11
 related:
   - README.md
   - glossary.md
@@ -341,6 +341,7 @@ Beyond PK / unique constraints already listed:
 ...
 0024_leg_accounts.sql                       -- AccountId onto both leg tables (back-filled); drop Transactions.AccountId
 0025_transaction_type_internal_transfer.sql -- CK_Transactions_Type widened to 0–15
+0026_fx_conversions.sql                     -- CK_Transactions_Type widened to 0–16; TransactionFxDetails
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -403,6 +404,8 @@ Amendment 2026-11-10 (leg accounts, [features/leg-accounts.md](features/leg-acco
 
 Amendment 2026-10-13: script `0018_transaction_reversed_by.sql` adds nullable `ReversedByTransactionId` (FK → `Transactions` RESTRICT, unique filtered index `WHERE ReversedByTransactionId IS NOT NULL`). Forward ALTER only. Do not edit `0013`. The original stores `ReversedByTransactionId`; the Reversal stores `OriginalTransactionId`.
 
+Amendment 2026-11-11 (FX conversions, [features/fx-conversions.md](features/fx-conversions.md) §6): script `0026_fx_conversions.sql` widens `CK_Transactions_Type` to 0–16 for `FxConversion` and adds `TransactionFxDetails`: `TransactionId int` (PK and FK → `Transactions` RESTRICT; at most one row per Transaction), `BaseCurrency char(3)` and `QuoteCurrency char(3)` (FK → `Currencies.Code` RESTRICT; CHECK `BaseCurrency <> QuoteCurrency`), `Rate decimal(18,8)` (CHECK `> 0`), `RateAsOfDate date`, `RateSource nvarchar(50)`. No `TenantId`, `PublicId` or `RowVersion`: the row is part of an immutable Transaction. Leg shape is enforced in Domain and Application.
+
 ### 11.5 Holdings (accepted, landed)
 
 Scripts `0014_holdings.sql` and `0015_transaction_type_opening_holdings.sql`. Columns: [features/holdings.md](features/holdings.md) §6. `0016_transaction_type_stock_in_out.sql` widens `CK_Transactions_Type` to 0–11 for `StockIn` (10) and `StockOut` (11). `0017_transaction_type_split.sql` widens that check to 0–14 for `Split` (12), `Bonus` (13), and `Scrip` (14). No new column. No seed in the scripts — `TestSeed` only.
@@ -448,6 +451,7 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-10-12 | `CK_Transactions_Type` widened to 0–14 (`0017`) for Split / Bonus / Scrip. No new table. |
 | 2026-10-13 | `Transactions.ReversedByTransactionId` (`0018`). Bidirectional reverse link. Forward ALTER only. |
 | 2026-11-10 | Leg accounts (`0024`): `AccountId` moves from `Transactions` onto both leg tables, back-filled. Header index becomes `(TenantId, BookedAt)`. |
+| 2026-11-11 | FX conversions (`0026`): `CK_Transactions_Type` widened to 0–16 for `FxConversion`. New table `TransactionFxDetails` (0..1 per Transaction; copied to a Reversal) ([features/fx-conversions.md](features/fx-conversions.md) §6). |
 | 2026-11-10 | Internal transfers (`0025`): `CK_Transactions_Type` widened to 0–15 for `InternalTransfer`. No new table or index. The two-leg shape is enforced in Domain and Application ([features/internal-transfers.md](features/internal-transfers.md) §6). |
 
 ---

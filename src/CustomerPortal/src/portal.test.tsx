@@ -222,6 +222,34 @@ describe("Customer Portal", () => {
     expect(screen.getByRole("columnheader", { name: "Amount" })).toBeInTheDocument();
   });
 
+  it("shows an FX conversion as Currency exchange with this account's leg and the rate line", async () => {
+    renderAt("/accounts/account-1", me, [
+      {
+        id: "72222222-2222-2222-2222-222222222222",
+        tenantId: "22222222-2222-2222-2222-222222222222",
+        type: "FxConversion",
+        bookedAt: "2026-11-10T09:00:00+13:00",
+        memo: null,
+        reference: null,
+        originalTransactionId: null,
+        reversedByTransactionId: null,
+        rowVersion: "AAAA",
+        cash: [
+          { accountId: "account-1", customerId: me.id, amount: -845.74, currency: "NZD" },
+          { accountId: "account-2", customerId: me.id, amount: 500, currency: "USD" },
+        ],
+        security: [],
+        fx: { baseCurrency: "NZD", quoteCurrency: "USD", rate: 0.5912, rateAsOfDate: "2026-11-09" },
+      },
+    ]);
+
+    const row = await screen.findByRole("row", { name: /Currency exchange/ });
+    expect(row).not.toHaveTextContent("FxConversion");
+    expect(row).toHaveTextContent("-845.74 NZD");
+    expect(row).not.toHaveTextContent("500 USD");
+    expect(row).toHaveTextContent("1 NZD = 0.5912 USD (as of 2026-11-09)");
+  });
+
   it("generates a customer report with the caller's id and no schedule controls", async () => {
     const { fetchMock } = renderAt("/reports");
     await openSelect("Report");

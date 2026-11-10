@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-11-02
-last_updated: 2026-11-02
+last_updated: 2026-11-11
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -92,7 +92,7 @@ No new aggregate. `IFxRate` is an existing port (named in domain-model / archite
 
 | Type | Kind | Notes |
 | --- | --- | --- |
-| `IFxRate` | port | `GetRate(from, to, asOf?)`. Same currency = 1. Missing pair → `FxRateNotFoundException`. |
+| `IFxRate` | port | `GetRate(from, to, asOf?)`. Same currency = 1. Missing pair → `FxRateNotFoundException`. `GetRateDetail(from, to, asOf)` (added 2026-11-11 for [fx-conversions.md](fx-conversions.md) R9, R14) returns the same row's rate with its `AsOfDate` and `Source`; the directed pair only, missing → `FxRateNotFoundException`. |
 
 Invariants:
 

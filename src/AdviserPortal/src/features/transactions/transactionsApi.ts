@@ -17,6 +17,14 @@ export type TransactionSecurity = {
   costCurrency: string;
 };
 
+export type TransactionFx = {
+  baseCurrency: string;
+  quoteCurrency: string;
+  /** Quote currency per 1 base currency. */
+  rate: number;
+  rateAsOfDate: string;
+};
+
 export type Transaction = {
   id: string;
   tenantId: string;
@@ -30,6 +38,8 @@ export type Transaction = {
   reversedByTransactionId?: string | null;
   rowVersion: string;
   security: TransactionSecurity[];
+  /** The rate the transaction used (FX conversions and their reversals); otherwise null. */
+  fx?: TransactionFx | null;
 };
 
 export type TransactionListArgs = {
@@ -60,6 +70,31 @@ export type CreateInternalTransferBody = {
   fromAccountId: string;
   toAccountId: string;
   amount: number;
+  bookedAt: string;
+  memo: string | null;
+  reference: string | null;
+};
+
+/** Exactly one of sellAmount / buyAmount. */
+export type FxQuoteBody = {
+  fromAccountId: string;
+  toAccountId: string;
+  sellAmount?: number;
+  buyAmount?: number;
+  bookedAt?: string;
+};
+
+export type FxQuote = {
+  baseCurrency: string;
+  quoteCurrency: string;
+  rate: number;
+  rateAsOfDate: string;
+  sell: { amount: number; currency: string };
+  buy: { amount: number; currency: string };
+};
+
+export type CreateFxConversionBody = FxQuoteBody & {
+  expectedRate: number;
   bookedAt: string;
   memo: string | null;
   reference: string | null;
@@ -115,6 +150,22 @@ export const transactionsApi = api.injectEndpoints({
       }),
       invalidatesTags: ["Transaction", "Account"],
     }),
+    getFxQuote: builder.query<FxQuote, FxQuoteBody>({
+      query: (body) => ({ url: "/transactions/fx/quote", method: "POST", body }),
+      keepUnusedDataFor: 0,
+    }),
+    createFxConversion: builder.mutation<
+      { id: string },
+      { body: CreateFxConversionBody; idempotencyKey: string }
+    >({
+      query: ({ body, idempotencyKey }) => ({
+        url: "/transactions/fx",
+        method: "POST",
+        body,
+        headers: { "Idempotency-Key": idempotencyKey },
+      }),
+      invalidatesTags: ["Transaction", "Account"],
+    }),
     reverseTransaction: builder.mutation<{ id: string }, { id: string; idempotencyKey: string }>({
       query: ({ id, idempotencyKey }) => ({
         url: `/transactions/${id}/reverse`,
@@ -132,5 +183,7 @@ export const {
   useGetTransactionQuery,
   useCreateTransactionMutation,
   useCreateInternalTransferMutation,
+  useGetFxQuoteQuery,
+  useCreateFxConversionMutation,
   useReverseTransactionMutation,
 } = transactionsApi;

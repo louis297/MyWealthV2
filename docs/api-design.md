@@ -3,7 +3,7 @@ title: API design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-10-26
+updated: 2026-11-11
 related:
   - README.md
   - glossary.md
@@ -369,16 +369,20 @@ Field rules: [features/posting.md](features/posting.md) for cash types, [feature
 | GET | `/transactions` | `transactions.read` | 200 envelope |
 | GET | `/transactions/{id}` | `transactions.read` | 200 item |
 | POST | `/transactions` | `transactions.create` | 201 `{ id }` |
+| POST | `/transactions/transfer` | `transactions.create` | 201 `{ id }` |
+| POST | `/transactions/fx` | `transactions.create` | 201 `{ id }` |
+| POST | `/transactions/fx/quote` | `transactions.create` | 200 quote |
 | POST | `/transactions/{id}/reverse` | `transactions.create` | 201 `{ id }` |
 
 - Create and reverse require `Idempotency-Key` ([ADR 0015](adr/0015-idempotency-keys.md)).
 - TenantAdmin / Adviser omit `tenantId`. SystemAdmin list/create require tenant PublicId.
 - Customer → 403.
-- Optional list filters: `accountId`, `customerId`.
+- Optional list filters: `accountId`, `customerId`, `type`.
+- The item has an `fx` object `{ baseCurrency, quoteCurrency, rate, rateAsOfDate }` when the Transaction has an FX detail (an `FxConversion` and its Reversal); otherwise `fx` is `null` ([features/fx-conversions.md](features/fx-conversions.md) R22).
 
-**Type-specific create routes.** When a type's create body differs from the common shape (one top-level `accountId`), that type gets its own `POST /transactions/{action}`. Each type has exactly one create route: a type with its own route is rejected by `POST /transactions` (400). Read (`GET /transactions`, `GET /transactions/{id}`) and reverse (`POST /transactions/{id}/reverse`) stay shared by every type. Existing types keep `POST /transactions` until a later decision moves them.
+**Type-specific create routes.** When a type's create body differs from the common shape (one top-level `accountId`), that type gets its own `POST /transactions/{action}`. Each type has exactly one create route: a type with its own route is rejected by `POST /transactions` (400). Read (`GET /transactions`, `GET /transactions/{id}`) and reverse (`POST /transactions/{id}/reverse`) stay shared by every type. Every new type gets its own `POST /transactions/{action}` route, whatever its body shape (decided 2026-11-10). Existing types keep `POST /transactions` until each is moved in its own spec amendment ([future-plans.md](future-plans.md) §3).
 
-Draft, not yet in the table above: `POST /transactions/transfer` (`transactions.create`, 201 `{ id }`) for `InternalTransfer`, and an optional `type` list filter. Field rules: [features/internal-transfers.md](features/internal-transfers.md).
+Type-specific routes: `POST /transactions/transfer` for `InternalTransfer` ([features/internal-transfers.md](features/internal-transfers.md)); `POST /transactions/fx` for `FxConversion` and the read-only `POST /transactions/fx/quote` ([features/fx-conversions.md](features/fx-conversions.md)). The quote is a `POST` because it takes the create body and the same validation; it writes nothing, takes no `Idempotency-Key` and holds no rate. Create confirms the quoted rate with `expectedRate`; a different stored rate → 409 with `expectedRate` in `errors`.
 
 ---
 
@@ -462,4 +466,5 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-10-26 | Reports: `PUT /reports/{id}` for catalog IsActive. False cascades revoke of all TenantReports for that report. |
 | 2026-10-26 | Reports: `GET /reports/catalog` lists every catalog row for SystemAdmin. Tenant grant list omits inactive rows. Granting an inactive catalog report is 404. |
 | 2026-11-10 | Transactions: type-specific create routes convention (§7.7). Internal transfers draft: `POST /transactions/transfer`, `type` list filter ([features/internal-transfers.md](features/internal-transfers.md)). |
+| 2026-11-11 | FX conversions accepted and landed. `POST /transactions/fx` returns 201 `{ id }` with `Location`, requires `Idempotency-Key` and `expectedRate` (mismatch → 409, `errors.expectedRate`). `POST /transactions/fx/quote` returns 200 with rate, as-of date and both amounts; no write. `POST /transactions` rejects `FxConversion`. The transaction item gains `fx` (null for other types). |
 | 2026-11-10 | Internal transfers accepted. `POST /transactions/transfer` returns 201 `{ id }` with `Location: /transactions/{id}` and requires `Idempotency-Key`. `POST /transactions` rejects `InternalTransfer`. `GET /transactions` takes an optional `type` (exact `TransactionType` name; anything else → 400). |
