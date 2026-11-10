@@ -26,6 +26,9 @@ public sealed class TransactionDto
     /// <summary>Security legs on Accounts the caller can see. Empty when the type has no security leg.</summary>
     public required IReadOnlyList<TransactionSecurityDto> Security { get; init; }
 
+    /// <summary>The rate the Transaction used, when it has an FX detail; otherwise null (FX conversions R22).</summary>
+    public TransactionFxDto? Fx { get; init; }
+
     public static string FormatBookedAt(DateTimeOffset bookedAt) =>
         bookedAt.ToString("yyyy-MM-ddTHH:mm:sszzz");
 }
@@ -54,4 +57,15 @@ public sealed class TransactionSecurityDto
     public required decimal Cost { get; init; }
 
     public required string CostCurrency { get; init; }
+}
+
+public sealed class TransactionFxDto
+{
+    public required string BaseCurrency { get; init; }
+
+    public required string QuoteCurrency { get; init; }
+
+    public required decimal Rate { get; init; }
+
+    public required string RateAsOfDate { get; init; }
 }
