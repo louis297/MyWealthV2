@@ -175,32 +175,7 @@ public class Transaction : BaseAuditableEntity
             throw new DomainException("The rate must be for the sell currency to the buy currency.");
         }
 
-        if (fixedAmount.Amount <= 0)
-        {
-            throw new DomainException("Amount must be greater than 0.");
-        }
-
-        decimal sell;
-        decimal buy;
-        if (string.Equals(fixedAmount.Currency, sellCurrency, StringComparison.Ordinal))
-        {
-            sell = fixedAmount.Amount;
-            buy = decimal.Round(sell * rate.Rate, computedDecimalPlaces, MidpointRounding.AwayFromZero);
-        }
-        else if (string.Equals(fixedAmount.Currency, buyCurrency, StringComparison.Ordinal))
-        {
-            buy = fixedAmount.Amount;
-            sell = decimal.Round(buy / rate.Rate, computedDecimalPlaces, MidpointRounding.AwayFromZero);
-        }
-        else
-        {
-            throw new DomainException("The amount currency must be the sell or the buy currency.");
-        }
-
-        if (sell == 0 || buy == 0)
-        {
-            throw new DomainException("The computed amount rounds to 0.");
-        }
+        var (sell, buy) = ComputeFxConversionAmounts(rate, fixedAmount, computedDecimalPlaces);
 
         if (fromCurrentCashSum - sell < 0)
         {
@@ -224,6 +199,46 @@ public class Transaction : BaseAuditableEntity
         };
         transaction.AddDomainEvent(new TransactionPosted(transaction));
         return transaction;
+    }
+
+    /// <summary>
+    /// FX conversions R11: the sell and buy amounts for <paramref name="fixedAmount"/> at <paramref name="rate"/>.
+    /// The fixed side is the one in its currency; the other side is rounded to
+    /// <paramref name="computedDecimalPlaces"/>, away from zero.
+    /// </summary>
+    public static (decimal Sell, decimal Buy) ComputeFxConversionAmounts(
+        AppliedFxRate rate,
+        Money fixedAmount,
+        int computedDecimalPlaces)
+    {
+        if (fixedAmount.Amount <= 0)
+        {
+            throw new DomainException("Amount must be greater than 0.");
+        }
+
+        decimal sell;
+        decimal buy;
+        if (string.Equals(fixedAmount.Currency, rate.BaseCurrency, StringComparison.Ordinal))
+        {
+            sell = fixedAmount.Amount;
+            buy = decimal.Round(sell * rate.Rate, computedDecimalPlaces, MidpointRounding.AwayFromZero);
+        }
+        else if (string.Equals(fixedAmount.Currency, rate.QuoteCurrency, StringComparison.Ordinal))
+        {
+            buy = fixedAmount.Amount;
+            sell = decimal.Round(buy / rate.Rate, computedDecimalPlaces, MidpointRounding.AwayFromZero);
+        }
+        else
+        {
+            throw new DomainException("The amount currency must be the sell or the buy currency.");
+        }
+
+        if (sell == 0 || buy == 0)
+        {
+            throw new DomainException("The computed amount rounds to 0.");
+        }
+
+        return (sell, buy);
     }
 
     public static Transaction PostOpeningHoldings(
