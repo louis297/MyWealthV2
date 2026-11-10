@@ -9,6 +9,8 @@ related:
   - function-plan.md
   - features/portfolios.md
   - features/fx-rates.md
+  - features/internal-transfers.md
+  - api-design.md
 ---
 
 # Future plans
@@ -47,3 +49,18 @@ Questions to settle when this opens:
 - Spread or fee, and how it is shown.
 - Reversal: reverse at the original rate.
 - Relation to the deferred cross-currency transfer; they may be one feature.
+
+---
+
+## 3. Type-specific transaction create routes
+
+Move existing types from `POST /transactions` to their own `POST /transactions/{action}` routes, so each create body is small and has no type-dependent field rules.
+
+Today ([api-design.md](api-design.md) §7.7): the convention exists, and only `InternalTransfer` uses it (`POST /transactions/transfer`, [features/internal-transfers.md](features/internal-transfers.md)). Every other type still creates through `POST /transactions` with a `type` field.
+
+Questions to settle when this opens:
+
+- Which types to move, and in what groups (for example buy / sell together, corporate actions together).
+- Transition: how long both routes accept a moved type, given the rule of one create route per type.
+- Portal changes and the BFF allow-list.
+- Whether `POST /transactions` disappears once every type has moved.
