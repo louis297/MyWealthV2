@@ -27,7 +27,6 @@ When the user says it is a docs task (for example "It's a docs task", "docs only
 
 - Implement only **`accepted`** specs for the **current phase** (`docs/README.md`, `docs/function-plan.md`, the slice Feature Spec or portal spec).
 - `draft`, `review`, and `note` are not build contracts. Do not create tables, routes, or handlers from them.
-- Do not add Phase-2 ledger tables, routes, or empty spec files (instruments, accounts, holdings, transactions, net worth) until that phase is opened.
 - Schema truth is `database/schema/NNNN_*.sql`, applied by the schema applicator. Do not add EF migrations. Do not use `EnsureDeleted` / `EnsureCreated` as the normal boot path.
 - HTTP ids are `PublicId`. Internal ints never appear on the wire.
 - From Tenants onward, every tenant-scoped slice includes cross-tenant isolation tests (two-tenant fixture; other tenant’s id → 404, not 403).
