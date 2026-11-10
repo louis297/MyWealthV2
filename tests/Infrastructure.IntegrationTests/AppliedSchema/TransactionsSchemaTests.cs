@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using MyWealthV2.Infrastructure.Data;
 using Shouldly;
 
@@ -250,7 +251,7 @@ public class TransactionsSchemaTests
         var type = rows.Single(row => row.Name == "CK_Transactions_Type");
         type.Definition.ShouldContain("[Type]", Case.Insensitive);
         type.Definition.ShouldContain("0");
-        type.Definition.ShouldContain("14");
+        type.Definition.ShouldContain("15");
     }
 
     [Test]
@@ -267,7 +268,7 @@ public class TransactionsSchemaTests
             """;
 
         var definition = (string)(await command.ExecuteScalarAsync())!;
-        definition.ShouldContain("14");
+        definition.ShouldContain("15");
     }
 
     [Test]
@@ -284,7 +285,43 @@ public class TransactionsSchemaTests
             """;
 
         var definition = (string)(await command.ExecuteScalarAsync())!;
-        definition.ShouldContain("14");
+        definition.ShouldContain("15");
+    }
+
+    [Test]
+    public async Task Apply_AcceptsInternalTransferTypeAndRejectsSixteen()
+    {
+        await using var db = OpenDb();
+        await db.Database.OpenConnectionAsync();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        var connection = db.Database.GetDbConnection();
+
+        await using (var tenant = connection.CreateCommand())
+        {
+            tenant.Transaction = transaction.GetDbTransaction();
+            tenant.CommandText = """
+                INSERT INTO [Tenants] ([PublicId], [Name], [Code], [ReportingCurrency], [Created], [LastModified])
+                VALUES (NEWID(), N'Type check tenant', N'TYPECHK', 'NZD', SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET());
+                """;
+            await tenant.ExecuteNonQueryAsync();
+        }
+
+        async Task InsertAsync(int type)
+        {
+            await using var insert = connection.CreateCommand();
+            insert.Transaction = transaction.GetDbTransaction();
+            insert.CommandText = $"""
+                INSERT INTO [Transactions] ([PublicId], [TenantId], [Type], [BookedAt], [Created], [CreatedBy])
+                SELECT NEWID(), [Id], {type}, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test'
+                FROM [Tenants] WHERE [Code] = N'TYPECHK';
+                """;
+            await insert.ExecuteNonQueryAsync();
+        }
+
+        await InsertAsync(15);
+        await Should.ThrowAsync<Microsoft.Data.SqlClient.SqlException>(() => InsertAsync(16));
+
+        await transaction.RollbackAsync();
     }
 
     private static async Task<List<(string Name, string Type, int? Length, int? Precision, int? Scale, string Nullable, int Identity)>> LoadColumns(

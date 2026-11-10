@@ -3,7 +3,7 @@ title: Glossary
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-10-26
+updated: 2026-11-10
 related:
   - function-plan.md
   - domain-model.md
@@ -68,7 +68,8 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | Journal | Older discussion word for the Transaction header. Prefer *Transaction* in new text. | A second table beside Transactions |
 | Signed book amount | Stored signed decimal on a leg, from **that container’s book**. `+` increases that book; `−` decreases it. Balance / quantity is `SUM` of those signs. Read models may flip a sign for display (Credit as liability in net worth). | Debit/credit columns; a new sign rule per Feature Spec; storing outflows as positive and inferring direction from `Type` |
 | Reversal | A new opposite Transaction (`Type = Reversal`). The Reversal points at the original (`OriginalTransactionId`). The original receives a single write of `ReversedByTransactionId` pointing at the Reversal; after that write the original is immutable again. Economic legs are never updated. Cash leg = arithmetic negation of the original signed amount. Already reversed = `ReversedByTransactionId` is not null. Phase 2. | An open `UPDATE`/`DELETE` of the original; an adjustment that does not link both ways; a self-join to discover whether a row is reversed |
-| TransactionType | TransferIn / TransferOut / Interest / Opening / OpeningHoldings / Buy / Sell / StockIn / StockOut / Split / Bonus / Scrip / CloseOut / Reversal. Dividend reserved. Split / Bonus / Scrip are accepted in [features/split.md](features/split.md). | User-defined Category |
+| TransactionType | TransferIn / TransferOut / InternalTransfer / Interest / Opening / OpeningHoldings / Buy / Sell / StockIn / StockOut / Split / Bonus / Scrip / CloseOut / Reversal. Dividend reserved. Split / Bonus / Scrip are accepted in [features/split.md](features/split.md). InternalTransfer is accepted in [features/internal-transfers.md](features/internal-transfers.md). | User-defined Category |
+| InternalTransfer | Cash transfer between two Accounts in the same tenant: one Transaction, a negative cash leg on the from Account and a positive cash leg on the to Account, same currency. The Accounts may belong to two Customers. Created by `POST /transactions/transfer`. Accepted: [features/internal-transfers.md](features/internal-transfers.md). | `TransferIn` / `TransferOut` (one cash leg, off-books counterparty, also used for cross-tenant movement); a pair of unlinked transactions |
 | Category | Optional custom label on a transaction. Not in Phase 1. Not an account type. | Account type |
 | Currency | ISO 4217 three-letter code. One row in the platform catalog. | A C# enum |
 | Currency catalog | `Currencies` table + in-memory `ICurrencyCatalog`. | Joining `Currencies` on every hot path; a per-tenant allow-list |

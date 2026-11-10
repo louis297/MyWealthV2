@@ -340,6 +340,7 @@ Beyond PK / unique constraints already listed:
 0018_transaction_reversed_by.sql            -- ALTER Transactions.ReversedByTransactionId + FK + unique filtered index
 ...
 0024_leg_accounts.sql                       -- AccountId onto both leg tables (back-filled); drop Transactions.AccountId
+0025_transaction_type_internal_transfer.sql -- CK_Transactions_Type widened to 0–15
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -447,6 +448,7 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-10-12 | `CK_Transactions_Type` widened to 0–14 (`0017`) for Split / Bonus / Scrip. No new table. |
 | 2026-10-13 | `Transactions.ReversedByTransactionId` (`0018`). Bidirectional reverse link. Forward ALTER only. |
 | 2026-11-10 | Leg accounts (`0024`): `AccountId` moves from `Transactions` onto both leg tables, back-filled. Header index becomes `(TenantId, BookedAt)`. |
+| 2026-11-10 | Internal transfers (`0025`): `CK_Transactions_Type` widened to 0–15 for `InternalTransfer`. No new table or index. The two-leg shape is enforced in Domain and Application ([features/internal-transfers.md](features/internal-transfers.md) §6). |
 
 ---
 

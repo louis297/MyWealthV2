@@ -68,7 +68,7 @@ function callOf(input: RequestInfo | URL, init?: RequestInit) {
   return { url, method, credentials, headers };
 }
 
-function renderAt(path: string, person = me) {
+function renderAt(path: string, person = me, activity: unknown[] = []) {
   const fetchMock = vi.mocked(fetch);
   fetchMock.mockImplementation(async (input, init) => {
     const { url, method } = callOf(input, init);
@@ -91,7 +91,10 @@ function renderAt(path: string, person = me) {
       return json({ items: [] });
     }
     if (url.includes("/transactions?accountId=")) {
-      return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      return json({ items: activity, page: 1, pageSize: 20, totalCount: activity.length });
+    }
+    if (url.endsWith("/accounts/account-1")) {
+      return json({ id: "account-1", name: "Everyday", type: "Bank", currency: "NZD", status: "Open" });
     }
     if (url.includes("/accounts/missing")) {
       return new Response(JSON.stringify({ detail: "missing" }), { status: 404 });
@@ -193,6 +196,30 @@ describe("Customer Portal", () => {
     expect(await screen.findByText("Not found")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /close/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /new account/i })).not.toBeInTheDocument();
+  });
+
+  it("shows an internal transfer as Transfer with the visible leg amount and no counterparty", async () => {
+    renderAt("/accounts/account-1", me, [
+      {
+        id: "71111111-1111-1111-1111-111111111111",
+        tenantId: "22222222-2222-2222-2222-222222222222",
+        type: "InternalTransfer",
+        bookedAt: "2026-11-10T09:00:00+13:00",
+        memo: null,
+        reference: null,
+        originalTransactionId: null,
+        reversedByTransactionId: null,
+        rowVersion: "AAAA",
+        cash: [{ accountId: "account-1", customerId: me.id, amount: 500, currency: "NZD" }],
+        security: [],
+      },
+    ]);
+
+    const row = await screen.findByRole("row", { name: /Transfer/ });
+    expect(row).toHaveTextContent("Transfer");
+    expect(row).not.toHaveTextContent("InternalTransfer");
+    expect(row).toHaveTextContent("500 NZD");
+    expect(screen.getByRole("columnheader", { name: "Amount" })).toBeInTheDocument();
   });
 
   it("generates a customer report with the caller's id and no schedule controls", async () => {

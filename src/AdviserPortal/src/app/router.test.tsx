@@ -426,6 +426,17 @@ describe("app routes", () => {
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
+  it("sends a Customer opening Transfer to /forbidden", async () => {
+    renderApp(
+      user({ role: "customer", name: "Jordan Lee" }),
+      "/accounts/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/transfer",
+    );
+
+    expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Transfer" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Amount")).not.toBeInTheDocument();
+  });
+
   it("sends SystemAdmin on / to Profile and not a Customers workspace", async () => {
     renderApp(
       user({

@@ -13,7 +13,8 @@ public record GetTransactionsQuery(
     int PageSize = 20,
     Guid? TenantId = null,
     Guid? AccountId = null,
-    Guid? CustomerId = null) : IRequest<PagedList<TransactionDto>>;
+    Guid? CustomerId = null,
+    string? Type = null) : IRequest<PagedList<TransactionDto>>;
 
 public class GetTransactionsQueryValidator : AbstractValidator<GetTransactionsQuery>
 {
@@ -21,6 +22,9 @@ public class GetTransactionsQueryValidator : AbstractValidator<GetTransactionsQu
     {
         RuleFor(query => query.Page).GreaterThanOrEqualTo(1);
         RuleFor(query => query.PageSize).InclusiveBetween(1, 100);
+        RuleFor(query => query.Type)
+            .Must(type => type is null || Enum.GetNames<TransactionType>().Contains(type, StringComparer.Ordinal))
+            .WithMessage("Type must be a transaction type name.");
 
         When(_ => currentUser.Role == UserRole.SystemAdmin, () =>
         {
@@ -96,6 +100,12 @@ public class GetTransactionsQueryHandler(IApplicationDbContext db, ICurrentUser 
                 join customer in db.Users on account.CustomerId equals customer.Id
                 where customer.PublicId == customerPublicId
                 select account.Id);
+        }
+
+        if (request.Type is not null)
+        {
+            var type = Enum.Parse<TransactionType>(request.Type);
+            transactions = transactions.Where(transaction => transaction.Type == type);
         }
 
         var query =

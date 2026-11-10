@@ -310,7 +310,7 @@ Close requires cash `SUM = 0` and no `Holdings` rows ([features/holdings.md](fea
 | `Transaction` | Aggregate | Business-event header in a tenant. Has no Account and no Customer; it belongs to its leg accounts. Not a capture row that later copies into a journal. |
 | `TransactionCashLeg` | Entity | Cash accounting line on one Account (`AccountId`). One on a cash header, and on `Buy` / `Sell`. At most one per `(Transaction, Account)`. Absent on `OpeningHoldings`, `StockIn`, `StockOut`, `Split`, `Bonus`, and `Scrip`. |
 | `TransactionSecurityLeg` | Entity | Security accounting line on one Account (`AccountId`). Exactly one on `Buy`, `Sell`, `StockIn`, `StockOut`, `Split`, `Bonus`, and `Scrip`. Quantity is signed. |
-| `TransactionType` | Enum | Cash set plus `OpeningHoldings`, `Buy`, `Sell`, `StockIn` (10), `StockOut` (11), `Split` (12), `Bonus` (13), `Scrip` (14), and `Reversal`. |
+| `TransactionType` | Enum | Cash set plus `OpeningHoldings`, `Buy`, `Sell`, `StockIn` (10), `StockOut` (11), `Split` (12), `Bonus` (13), `Scrip` (14), `InternalTransfer` (15), and `Reversal`. |
 | `TransactionPosted` / `TransactionReversed` | Event | Side effects only. Must not write the books. |
 
 Invariants:
@@ -359,6 +359,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-02 | Instrument prices accepted. `IMarketData` implemented by local `InstrumentPrices` table + Twelve Data hourly job. Missing → empty. [features/instrument-prices.md](features/instrument-prices.md). |
 | 2026-11-08 | Instrument price source switched to EODHD. |
 | 2026-11-08 | Instrument price sync runs daily at 12:00 UTC. |
+| 2026-11-10 | Internal transfers accepted. `TransactionType.InternalTransfer = 15`. `Transaction.PostInternalTransfer` builds exactly two cash legs, `−amount` on the from Account and `+amount` on the to Account: different Accounts, same currency, positive amount, sum zero, from balance not negative. `Reverse` is unchanged. [features/internal-transfers.md](features/internal-transfers.md). |
 
 | 2026-11-02 | Portfolios draft. Model portfolios with base currency and target weights. Full Rebalance (async) on assign and weight change. While assigned, manual security trades rejected. One Active assignment per account. [features/portfolios.md](features/portfolios.md). |
 | 2026-11-02 | Portfolios accepted. `Portfolio`, `PortfolioLine`, `AccountPortfolioAssignment`. Assign is synchronous. Weight change and bulk rebalance are asynchronous. [features/portfolios.md](features/portfolios.md). |

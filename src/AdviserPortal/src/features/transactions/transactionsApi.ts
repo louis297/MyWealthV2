@@ -36,6 +36,7 @@ export type TransactionListArgs = {
   page?: number;
   accountId?: string;
   customerId?: string;
+  type?: string;
 };
 
 export type CreateSecurityTransactionBody = {
@@ -55,6 +56,15 @@ export type CreateCashTransactionBody = {
   memo: string | null;
 };
 
+export type CreateInternalTransferBody = {
+  fromAccountId: string;
+  toAccountId: string;
+  amount: number;
+  bookedAt: string;
+  memo: string | null;
+  reference: string | null;
+};
+
 export type CreateTransactionBody = CreateSecurityTransactionBody | CreateCashTransactionBody;
 
 export const transactionsApi = api.injectEndpoints({
@@ -70,6 +80,9 @@ export const transactionsApi = api.injectEndpoints({
         if (args?.customerId) {
           params.set("customerId", args.customerId);
         }
+        if (args?.type) {
+          params.set("type", args.type);
+        }
         return `/transactions?${params.toString()}`;
       },
       providesTags: ["Transaction"],
@@ -84,6 +97,18 @@ export const transactionsApi = api.injectEndpoints({
     >({
       query: ({ body, idempotencyKey }) => ({
         url: "/transactions",
+        method: "POST",
+        body,
+        headers: { "Idempotency-Key": idempotencyKey },
+      }),
+      invalidatesTags: ["Transaction", "Account"],
+    }),
+    createInternalTransfer: builder.mutation<
+      { id: string },
+      { body: CreateInternalTransferBody; idempotencyKey: string }
+    >({
+      query: ({ body, idempotencyKey }) => ({
+        url: "/transactions/transfer",
         method: "POST",
         body,
         headers: { "Idempotency-Key": idempotencyKey },
@@ -106,5 +131,6 @@ export const {
   useGetTransactionsQuery,
   useGetTransactionQuery,
   useCreateTransactionMutation,
+  useCreateInternalTransferMutation,
   useReverseTransactionMutation,
 } = transactionsApi;

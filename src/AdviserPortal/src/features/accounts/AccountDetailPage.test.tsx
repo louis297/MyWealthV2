@@ -437,6 +437,10 @@ describe("AccountDetailPage", () => {
         "href",
         `/accounts/${accountId}/transactions/new?type=TransferOut`,
       );
+      expect(screen.getByRole("link", { name: "Transfer" })).toHaveAttribute(
+        "href",
+        `/accounts/${accountId}/transfer`,
+      );
       if (type === "Bank" || type === "Cash") {
         expect(screen.queryByRole("link", { name: "Buy" })).not.toBeInTheDocument();
         expect(screen.queryByRole("link", { name: "Sell" })).not.toBeInTheDocument();
@@ -475,7 +479,7 @@ describe("AccountDetailPage", () => {
               accountId,
               customerId,
               type: "TransferIn",
-              cash: { amount: 80, currency: "NZD" },
+              cash: [{ accountId, customerId, amount: 80, currency: "NZD" }],
               bookedAt: "2026-10-12T09:00:00+13:00",
               memo: "Salary",
               reference: null,
@@ -567,10 +571,55 @@ describe("AccountDetailPage", () => {
     expect(await screen.findByRole("heading", { name: "Everyday spending" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "TransferIn" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "TransferOut" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Transfer" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Buy" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reopen" })).toBeInTheDocument();
     expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("shows the cash leg on this account in activity, negative on the source of a transfer", async () => {
+    const otherAccountId = "b2222222-2222-2222-2222-222222222222";
+    renderDetail((url, method) => {
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({
+          items: [
+            {
+              id: "71111111-1111-1111-1111-111111111111",
+              tenantId: account.tenantId,
+              type: "InternalTransfer",
+              bookedAt: "2026-11-10T09:00:00+13:00",
+              memo: null,
+              reference: null,
+              originalTransactionId: null,
+              reversedByTransactionId: null,
+              rowVersion: "AAAA",
+              cash: [
+                { accountId: otherAccountId, customerId, amount: 500, currency: "NZD" },
+                { accountId, customerId, amount: -500, currency: "NZD" },
+              ],
+              security: [],
+            },
+          ],
+          page: 1,
+          pageSize: 20,
+          totalCount: 1,
+        });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json({ ...account, type: "Bank", status: "Open" });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    const activity = await screen.findByRole("table", { name: "Activity" });
+    expect(within(activity).getByRole("columnheader", { name: "Amount" })).toBeInTheDocument();
+    const row = within(activity).getByRole("row", { name: /InternalTransfer/ });
+    expect(row).toHaveTextContent("-500 NZD");
+    expect(row).not.toHaveTextContent(/(^|[^-])500 NZD/);
   });
 
   it("closes an open account with the current rowVersion and shows Closed", async () => {

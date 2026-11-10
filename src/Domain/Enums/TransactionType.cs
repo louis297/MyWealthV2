@@ -16,5 +16,6 @@ public enum TransactionType
     StockOut = 11,
     Split = 12,
     Bonus = 13,
-    Scrip = 14
+    Scrip = 14,
+    InternalTransfer = 15
 }

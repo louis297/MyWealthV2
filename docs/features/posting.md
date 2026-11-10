@@ -403,6 +403,8 @@ When a later increment opens it: same Customer, same currency first; one header 
 
 Do not implement a silent shortcut in TestSeed that looks like a transfer.
 
+The same-tenant, same-currency, cash-only transfer is drafted in [internal-transfers.md](internal-transfers.md) (`InternalTransfer`).
+
 ---
 
 ## 14. Suggested commits

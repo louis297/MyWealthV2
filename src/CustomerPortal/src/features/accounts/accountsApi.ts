@@ -17,11 +17,19 @@ export type Holding = {
   quantity: number;
 };
 
+export type ActivityCash = {
+  accountId: string;
+  amount: number;
+  currency: string;
+};
+
 export type Activity = {
   id: string;
   type: string;
   bookedAt: string;
   memo: string | null;
+  /** Legs on the caller's own accounts only. */
+  cash: ActivityCash[];
 };
 
 export const accountsApi = api.injectEndpoints({

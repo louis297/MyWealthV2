@@ -4,7 +4,7 @@ status: accepted
 phase: 3
 language: en
 created: 2026-11-02
-updated: 2026-11-02
+updated: 2026-11-10
 related:
   - README.md
   - ../adviser-portal/frontend-conventions.md
@@ -82,7 +82,7 @@ Holdings read reuses `accounts.read` (existing rule). Instrument names and symbo
 | `/` | Customer | Redirect `/dashboard`. |
 | `/dashboard` | Customer | Own net worth. Widgets: per-currency totals, byAccountType, topHoldings. |
 | `/accounts` | Customer | List of own accounts. |
-| `/accounts/:id` | Customer | Read-only detail: cash balance, holdings, activity. |
+| `/accounts/:id` | Customer | Read-only detail: cash balance, holdings, activity. Activity shows the amount of the cash leg on this account. An `InternalTransfer` is labelled "Transfer"; no counterparty is shown ([internal-transfers](../features/internal-transfers.md) §9). |
 | `/reports` | Customer | Customer-scoped reports: list, generate, history, download. |
 | `/profile` | Customer | Name + password. |
 | `/forbidden` | leftover wrong-role | Second line only. Non-Customer must not obtain a cookie. |

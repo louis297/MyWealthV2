@@ -9,6 +9,14 @@ import {
   useGetHoldingsQuery,
 } from "@/features/accounts/accountsApi";
 
+const typeLabels: Record<string, string> = {
+  InternalTransfer: "Transfer",
+};
+
+function typeLabel(type: string) {
+  return typeLabels[type] ?? type;
+}
+
 function isNotFound(error: unknown) {
   return typeof error === "object" && error !== null && "status" in error && error.status === 404;
 }
@@ -84,13 +92,20 @@ export function AccountDetailPage() {
                   <TableRow>
                     <TableHead>Type</TableHead>
                     <TableHead>Booked at</TableHead>
+                    <TableHead>Amount</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {activityItems.map((row) => (
                     <TableRow key={row.id}>
-                      <TableCell>{row.type}</TableCell>
+                      <TableCell>{typeLabel(row.type)}</TableCell>
                       <TableCell>{row.bookedAt}</TableCell>
+                      <TableCell>
+                        {(row.cash ?? [])
+                          .filter((leg) => leg.accountId === id)
+                          .map((leg) => `${leg.amount} ${leg.currency}`)
+                          .join(", ")}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
