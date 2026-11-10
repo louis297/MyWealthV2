@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Fx;
 using MyWealthV2.Infrastructure.Data;
@@ -26,6 +27,25 @@ public sealed class FxRateStore(ApplicationDbContext db, TimeProvider time) : IF
             .ToListAsync(cancellationToken);
 
         return FxRateSelector.Select(source, target, date, rows);
+    }
+
+    public async Task<FxRateReading> GetRateDetailAsync(
+        string from,
+        string to,
+        DateTimeOffset asOf,
+        CancellationToken cancellationToken = default)
+    {
+        var source = from.Trim().ToUpperInvariant();
+        var target = to.Trim().ToUpperInvariant();
+        var date = DateOnly.FromDateTime(asOf.DateTime);
+
+        var row = await db.FxRates.AsNoTracking()
+            .Where(rate => rate.BaseCurrency == source && rate.QuoteCurrency == target && rate.AsOfDate <= date)
+            .OrderByDescending(rate => rate.AsOfDate)
+            .Select(rate => new FxRateReading(rate.Rate, rate.AsOfDate, rate.Source))
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return row ?? throw new FxRateNotFoundException(source, target, date);
     }
 
     public async Task UpsertAsync(
