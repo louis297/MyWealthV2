@@ -14,6 +14,10 @@ export function isRole(value: string | null | undefined): value is Role {
     || value === roles.customer;
 }
 
+export function canUseAdviserPortal(role: string | null | undefined) {
+  return role === roles.tenantAdmin || role === roles.adviser;
+}
+
 export function shouldLoadTenant(role: string | null | undefined, tenantCode: string | null | undefined) {
   return Boolean(tenantCode) && (role === roles.tenantAdmin || role === roles.adviser);
 }
@@ -47,5 +51,5 @@ export function canAccessAdvisers(role: string | null | undefined) {
 }
 
 export function canAccessProfile(role: string | null | undefined) {
-  return role === roles.tenantAdmin || role === roles.adviser || role === roles.systemAdmin;
+  return role === roles.tenantAdmin || role === roles.adviser;
 }

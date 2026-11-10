@@ -4,7 +4,7 @@ status: review
 phase: 1
 language: en
 created: 2026-09-14
-updated: 2026-10-02
+updated: 2026-11-11
 related:
   - README.md
   - adviser-portal.md
@@ -26,6 +26,8 @@ Page-by-page construction notes for the Adviser Portal **pages** cut. Not a back
 ## BFF cut
 
 Landed `6aae5c7`. The browser talks only to `bff-adviser-portal`. The session cookie is `__Host-bff-adviser-portal`. API calls use base `/api` with `credentials: 'include'` and no `Authorization` header. Mutations and sign-out send `X-MyWealth-Request: 1`. Signed-out navigation goes to `GET /bff/login?returnUrl=`. Sign-out is `POST /bff/logout` with that header, then `GET /bff/logout/continue`. There is no SPA `/callback` and no token in `sessionStorage`. `sessionStorage` may hold the sign-out-in-progress flag only (`adviser-portal.signOutInProgress`). The notes below describe the earlier public-client shell. Do not implement from them. Cut record: [adviser-portal-bff-cut.md](adviser-portal-bff-cut.md).
+
+SystemAdmin has no Adviser Portal session since identity-auth amendment 2026-11-11. A leftover SystemAdmin session goes to `/forbidden`, like Customer. The SystemAdmin rows below are updated to match.
 
 - Inventory, role gate, acceptance → [adviser-portal.md](adviser-portal.md)
 - Folder layout, naming, session, API client → [frontend-conventions.md](frontend-conventions.md)
@@ -185,7 +187,7 @@ Hosted login on `identity` remains the only place that collects a password for a
 | `/advisers/new` | TenantAdmin | Create |
 | `/advisers/:id` | TenantAdmin | Read-only detail |
 | `/advisers/:id/edit` | TenantAdmin | Rename |
-| `/profile` | TenantAdmin, Adviser (SystemAdmin allowed) | Name + password |
+| `/profile` | TenantAdmin, Adviser | Name + password |
 | `/session` | Dev aid | Probe. Not in the product menu |
 | `/forbidden` | Authenticated, wrong role | Copy + sign out |
 
@@ -194,7 +196,7 @@ Order:
 1. No access token → authorize (existing)
 2. Token present, no `me` yet → `GET /users/me`
 3. `role === customer` → must not happen after amendment A. If it does, `/forbidden`
-4. `role === systemAdmin` → `/customers` and `/advisers` → `/forbidden`; Profile + `/session` stay
+4. `role === systemAdmin` → must not happen after identity-auth amendment 2026-11-11. If it does, `/forbidden` (every route, including Profile and `/session`)
 5. Adviser hits `/advisers*` → `/forbidden` (API is 403, not 404)
 6. Adviser opens another adviser’s `/customers/:id` → page shows the API 404
 
@@ -202,15 +204,15 @@ Order:
 
 ## 6. Shell
 
-- Top bar: product name, firm **Name** from by-code (SystemAdmin: “Platform”), `tenantCode` as secondary, display name, role, sign out
+- Top bar: product name, firm **Name** from by-code, `tenantCode` as secondary, display name, role, sign out
 - Side nav:
 
 | Item | TenantAdmin | Adviser | SystemAdmin | Customer |
 | --- | --- | --- | --- | --- |
 | Customers | ✓ | ✓ | | |
 | Advisers | ✓ | | | |
-| Profile | ✓ | ✓ | ✓ | |
-| Session probe | not in menu | not in menu | URL only | |
+| Profile | ✓ | ✓ | | |
+| Session probe | not in menu | not in menu | | |
 
 Sign out (locked with C13 / identity-auth R21): clear Redux + `sessionStorage`, `POST /connect/revocation` for the refresh token, then discovery end-session (`/connect/logout`) with `client_id` and `post_logout_redirect_uri={portalOrigin}/`. Do not call `startAuthorize` from `RequireSession`, `HomePage`, or the 401 handler while end-session is running. `completeCallback` must be single-flight so React StrictMode cannot redeem the same code twice (`ID2010`). Keep StrictMode enabled.
 
@@ -353,7 +355,7 @@ Repository must build after each commit. Do not mix IdentityHost or `tenants.rea
 | --- | --- |
 | 13.1 | UI copy in English |
 | 13.3 | Keep probe at `/session`, out of the menu |
-| 13.4 | SystemAdmin: Profile + `/session`; product collections `/forbidden` |
+| 13.4 | Superseded 2026-11-11 (identity-auth amendment): SystemAdmin gets no `adviser-portal` session; a leftover one is `/forbidden` on every route. Was: Profile + `/session`; product collections `/forbidden` |
 | 13.6 | In-app `returnTo` after callback |
 | 13.7 | Password change immediately re-authorizes |
 | 13.8 | Active-only toggle only (no Disabled-only; the API cannot do that) |

@@ -7,7 +7,6 @@ using System.Text.RegularExpressions;
 using System.Web;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
-using MyWealthV2.Infrastructure.Identity;
 using OpenIddict.Abstractions;
 
 namespace MyWealthV2.Application.FunctionalTests.Bff;
@@ -203,11 +202,13 @@ public class BffLogoutTests
             token = Regex.Match(html, "value=\"([^\"]+)\"[^>]*name=\"__RequestVerificationToken\"").Groups[1].Value;
         }
 
+        var staff = await BffStaffLogin.CreateAsync();
+
         using var form = new FormUrlEncodedContent(new Dictionary<string, string?>
         {
-            ["Email"] = DevelopmentIdentitySeeder.SystemAdminEmail,
-            ["Password"] = DevelopmentIdentitySeeder.SystemAdminPassword,
-            ["TenantCode"] = "",
+            ["Email"] = staff.Email,
+            ["Password"] = BffStaffLogin.Password,
+            ["TenantCode"] = staff.TenantCode,
             ["__RequestVerificationToken"] = token
         });
         var posted = await _identity.PostAsync(url, form);

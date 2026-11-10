@@ -6,11 +6,15 @@ using System.Web;
 
 namespace MyWealthV2.Application.FunctionalTests.Infrastructure;
 
-public sealed class OpenIdConnectTestClient(Func<HttpClient> createClient)
+public sealed class OpenIdConnectTestClient(
+    Func<HttpClient> createClient,
+    string clientId = "adviser-portal",
+    string clientSecret = AdviserPortalTestSecret.Value,
+    string redirectUri = "https://localhost/signin-oidc")
 {
-    private const string RedirectUri = "https://localhost/signin-oidc";
-    private const string ClientId = "adviser-portal";
-    private const string ClientSecret = AdviserPortalTestSecret.Value;
+    private readonly string RedirectUri = redirectUri;
+    private readonly string ClientId = clientId;
+    private readonly string ClientSecret = clientSecret;
 
     public HttpClient CreateSessionClient() => CreateClient();
 
@@ -189,7 +193,7 @@ public sealed class OpenIdConnectTestClient(Func<HttpClient> createClient)
         return await CollectLoginResultAsync(identityClient, afterLogin);
     }
 
-    private static async Task<HostedLoginResult> CollectLoginResultAsync(
+    private async Task<HostedLoginResult> CollectLoginResultAsync(
         HttpClient client,
         HttpResponseMessage response)
     {
@@ -247,7 +251,7 @@ public sealed class OpenIdConnectTestClient(Func<HttpClient> createClient)
         throw new InvalidOperationException("Did not reach hosted login.");
     }
 
-    private static async Task<string> FollowForCodeAsync(HttpClient client, HttpResponseMessage response)
+    private async Task<string> FollowForCodeAsync(HttpClient client, HttpResponseMessage response)
     {
         for (var i = 0; i < 8; i++)
         {

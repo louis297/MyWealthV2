@@ -90,7 +90,7 @@ describe("app routes", () => {
     expect(screen.queryByText("advisers")).not.toBeInTheDocument();
   });
 
-  it("sends SystemAdmin on /customers to /forbidden and allows /profile", async () => {
+  it("sends SystemAdmin on /customers to /forbidden", async () => {
     renderApp(
       user({
         role: "systemAdmin",
@@ -437,7 +437,7 @@ describe("app routes", () => {
     expect(screen.queryByLabelText("Amount")).not.toBeInTheDocument();
   });
 
-  it("sends SystemAdmin on / to Profile and not a Customers workspace", async () => {
+  it.each(["/", "/profile", "/session"])("sends SystemAdmin on %s to /forbidden", async (path) => {
     renderApp(
       user({
         role: "systemAdmin",
@@ -445,10 +445,11 @@ describe("app routes", () => {
         tenantId: null,
         tenantCode: null,
       }),
-      "/",
+      path,
     );
 
-    expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Profile" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Customers" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Dashboard" })).not.toBeInTheDocument();
   });

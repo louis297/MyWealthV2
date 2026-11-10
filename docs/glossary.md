@@ -30,7 +30,7 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | Tenant / Firm / Client | A contracted firm on the platform. One firm = one tenant. | End-client **Customer** |
 | TenantCode | Login identifier for a tenant. Phase 1 uses a code; no subdomain routing. | `TenantId` (internal integer key) |
 | User | A person in the domain. All four roles share one Domain `Users` table. | The ASP.NET Identity login row by itself |
-| SystemAdmin | Platform-level operator. Not bound to a tenant. | TenantAdmin |
+| SystemAdmin | Platform-level operator. Not bound to a tenant. Signs in to Back Office only. | TenantAdmin |
 | TenantAdmin | Highest authority inside one tenant. | SystemAdmin |
 | Adviser | Tenant operator who manages assigned customers (and, from Phase 2, their ledger). | Customer |
 | Customer | Account holder. Login principal. Phase 1 client `adviser-portal` issues no code. Client `customer-portal` is accepted ([customer-portal/customer-portal.md](customer-portal/customer-portal.md)). | A business row with no login principal |
