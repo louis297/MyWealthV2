@@ -27,7 +27,7 @@ related:
 
 # FX conversions
 
-Cash conversion from one currency to another between two Accounts in the same tenant, on `webapi`. One Transaction of the new type `FxConversion` has two cash legs: a negative leg in the sell currency on the from Account and a positive leg in the buy currency on the to Account. The server prices the conversion from the cached reference rate (`IFxRate`, [fx-rates.md](fx-rates.md)) and stores the rate it used in a new table `TransactionFxDetails`. The two Accounts may belong to the same Customer or to two Customers of the same tenant, so this slice is also the cross-currency transfer that [internal-transfers.md](internal-transfers.md) left out.
+Cash conversion from one currency to another between two Accounts in the same tenant, on `webapi`. One Transaction of the new type `FxConversion` has two cash legs: a negative leg in the sell currency on the from Account and a positive leg in the buy currency on the to Account. The server prices the conversion from the cached reference rate (`IFxRate`, [fx-rates.md](fx-rates.md)) and stores the rate it used in a new table `TransactionFxDetails`. Both Accounts belong to the same Customer. Moving cash to another Customer in another currency is two steps: convert inside the first Customer, then an `InternalTransfer` in the new currency ([internal-transfers.md](internal-transfers.md)).
 
 This slice adds one `TransactionType`, a create route `POST /transactions/fx`, a read-only quote route `POST /transactions/fx/quote`, and script `0026`. No new policy. Read and reverse reuse the existing `/transactions` routes. An Account still has one cash currency (ADR 0011 §6); this slice does not change the Account model ([future-plans.md](../future-plans.md) §4).
 
@@ -37,7 +37,7 @@ This slice adds one `TransactionType`, a create route `POST /transactions/fx`, a
 
 ## 1. Summary
 
-A TenantAdmin or Adviser converts cash from an Open Account in one currency to an Open Account in another currency, in one tenant, in one command. The caller names either the amount to sell or the amount to buy; the server computes the other side from the stored reference rate. The rule that distinguishes this slice: the rate is server-side, the caller confirms it by sending back the quoted rate, and the rate used is stored with the Transaction.
+A TenantAdmin or Adviser converts cash from an Open Account in one currency to an Open Account in another currency of the same Customer, in one command. The caller names either the amount to sell or the amount to buy; the server computes the other side from the stored reference rate. The rule that distinguishes this slice: the rate is server-side, the caller confirms it by sending back the quoted rate, and the rate used is stored with the Transaction.
 
 ---
 
@@ -59,6 +59,7 @@ A TenantAdmin or Adviser converts cash from an Open Account in one currency to a
 - Fee or spread on the rate
 - A rate entered by the caller
 - A stored, time-limited quote (rate lock)
+- Conversion between two Customers. Convert inside the Customer, then use `InternalTransfer`
 - Cross-tenant conversion
 - Customer-initiated conversion (Customer has no ledger write)
 - An HTTP read route for `FxRates` (fx-rates R14 stays deferred)
@@ -72,7 +73,7 @@ A TenantAdmin or Adviser converts cash from an Open Account in one currency to a
 1. As an Adviser I convert NZD from my Customer's NZD Account into their USD Account so they can buy a US instrument.
 2. As an Adviser I say "sell 1,000.00 NZD" or "buy 500.00 USD", and the server computes the other amount.
 3. As an Adviser I see the rate, its as-of date and both amounts before I confirm, and the conversion uses exactly that rate.
-4. As an Adviser I convert from an Account of one assigned Customer into an Account of another assigned Customer in another currency (cross-currency transfer).
+4. As an Adviser I cannot convert into another Customer's Account; I convert first and then transfer in the new currency.
 5. As an Adviser I reverse a conversion, and both Accounts get the opposite leg at the original rate.
 6. As an Adviser I cannot convert when the rate is missing or too old.
 7. As a Customer I see a conversion that touches one of my Accounts, with the amount on my Account and the rate.
@@ -88,8 +89,8 @@ A TenantAdmin or Adviser converts cash from an Open Account in one currency to a
 | R3 | **Body.** `fromAccountId` and `toAccountId` (Account PublicIds) are required. Exactly one of `sellAmount` and `buyAmount` is present and `> 0`; both or neither → 400. `expectedRate` is required on create. `bookedAt`, `memo`, `reference` follow posting. The body has no `type`, `accountId`, `currency`, `amount`, `rate` or legs array; any of those present → 400. |
 | R4 | **Currencies.** The sell currency is `fromAccount.Currency`. The buy currency is `toAccount.Currency`. They must differ (else 400; same-currency moves use `POST /transactions/transfer`). |
 | R5 | **Different Accounts.** `fromAccountId = toAccountId` → 400. (Implied by R4, still checked and reported on its own.) |
-| R6 | **Same tenant and scope.** As internal-transfers R6: both Accounts are in the command's tenant; another tenant's Account, a missing Account, or (Adviser) an Account of an unassigned Customer → 404 for the whole command. Nothing is written. |
-| R7 | **Customers.** The two Accounts may belong to the same Customer or to two Customers of the tenant. Both Customers must not be Disabled (else 400 `disabled` / `target=user`). |
+| R6 | **Same tenant and scope.** Both Accounts are in the command's tenant; another tenant's Account, a missing Account, or (Adviser) an Account of an unassigned Customer → 404 for the whole command. Nothing is written. |
+| R7 | **Same Customer.** Both Accounts belong to the same Customer. Two different Customers → 400, checked after R6 (an Account the caller cannot see is still 404). The Customer must not be Disabled (else 400 `disabled` / `target=user`). |
 | R8 | **Account types and state.** Any Phase-2 type (Bank, Cash, Brokerage, Other) on either side. Both Accounts must be Open (else 400). Same rule on reverse. |
 | R9 | **Rate.** The server reads `IFxRate.GetRate(sellCurrency, buyCurrency, bookedAt)`: the latest `FxRates` row for that directed pair with `AsOfDate ≤` the date of `bookedAt`, using the same date rule as buy-sell R10. The rate is "buy currency per 1 sell currency". The directed pair is read as stored; the inverse pair is not used. No row → 400. The caller never sends a rate to use. |
 | R10 | **Staleness.** If the date of `bookedAt` minus the rate's `AsOfDate` is more than 4 calendar days → 400. The same limit applies to the quote. |
@@ -103,7 +104,7 @@ A TenantAdmin or Adviser converts cash from an Open Account in one currency to a
 | R18 | **Converting back.** Converting back at today's rate is a new `FxConversion` in the other direction, not a reverse. |
 | R19 | **Idempotency.** `Idempotency-Key` is required on `POST /transactions/fx` (ADR 0015). Missing → 400. Replay with the same hash → original `201 { id }`; same key with a different hash → 409. The request path is part of the hash. A replay returns the original id even if the rate has since changed. |
 | R20 | **Quote.** `POST /transactions/fx/quote` takes the create body without `expectedRate`, `memo`, `reference` (present → 400); `bookedAt` is optional and defaults to now. It runs R1, R3–R11 and returns the rate, its as-of date and both amounts. It does not check the cash `SUM`, does not lock, does not write, and takes no `Idempotency-Key`. A quote is not stored and does not hold the rate. |
-| R21 | **Read.** Get and list follow leg-accounts R7 and internal-transfers R14: the caller sees the conversion if they can see at least one of its two Accounts, and only the legs on Accounts they can see. The item carries `fx` (R22) for every caller who can see the Transaction. `fx` shows the two currencies and the rate, not the other Account or Customer. |
+| R21 | **Read.** Get and list follow leg-accounts R7. Both Accounts belong to one Customer, so a caller who can see the conversion sees both legs. The item carries `fx` (R22). |
 | R22 | **Item `fx`.** The transaction item has an optional `fx` object `{ baseCurrency, quoteCurrency, rate, rateAsOfDate }` when the Transaction has an FX detail row; otherwise `fx` is `null`. `RateSource` is not on the wire. |
 | R23 | **List `type` filter.** `type=FxConversion` works with the existing filter (internal-transfers R15). |
 | R24 | **Portfolios.** A conversion is cash-only, so it is allowed on an Account with an Active portfolio assignment, on either side. It does not enqueue or trigger a rebalance (portfolios R19: a later rebalance invests the cash). Amend portfolios R18 so that its list of allowed cash types names `InternalTransfer` and `FxConversion`. |
@@ -261,11 +262,11 @@ Every other type returns `"fx": null` in this slice. Leg order in `cash` is not 
 
 ### 8.2 Errors
 
-Ordinary validation in `errors`: same Account, same currency, both or neither amount, amount `≤ 0`, too many decimal places, computed amount 0, missing rate, stale rate, Closed Account, forbidden body field, insufficient cash on create or reverse, `FxConversion` sent to `POST /transactions`.
+Ordinary validation in `errors`: same Account, two different Customers, same currency, both or neither amount, amount `≤ 0`, too many decimal places, computed amount 0, missing rate, stale rate, Closed Account, forbidden body field, insufficient cash on create or reverse, `FxConversion` sent to `POST /transactions`.
 
 `409` with `expectedRate` in `errors` when the rate changed (R12). `409` for an idempotency key reused with a different body (R19).
 
-§4.1 `disabled`: `target=tenant` on a disabled tenant, `target=user` when either Customer is Disabled.
+§4.1 `disabled`: `target=tenant` on a disabled tenant, `target=user` when the Customer is Disabled.
 
 Any Account outside the caller's scope or tenant → **404**, not 403.
 
@@ -276,14 +277,14 @@ Any Account outside the caller's scope or tenant → **404**, not 403.
 Adviser Portal. Amend [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) when this spec is accepted.
 
 - Account detail on an Open Account shows **Convert** beside Transfer.
-- **Destination.** Same two-step picker as Transfer (internal-transfers §9): Customer (default the source Account's Customer, searchable), then Account. Here an Account is not selectable when it is Closed, has the **same** currency as the source, or is the source Account; greyed out with the reason.
+- **Destination.** One step, no Customer picker: `GET /accounts?customerId=<source Customer>&pageSize=100`. An Account is not selectable when it is Closed, has the **same** currency as the source, or is the source Account; greyed out with the reason. When no Account of another currency is Open, the form says so and suggests opening one.
 - **Amount.** A toggle "I sell" / "I buy" chooses which amount the Adviser types; the field shows the matching currency. The form does not ask for a sign.
 - **Live quote.** On a valid amount and destination, the form calls `POST /transactions/fx/quote` (debounced ~300 ms) and shows "1 NZD = 0.5912 USD (as of 2026-11-09)" and the computed amount. A quote error (missing or stale rate) is shown on the form and blocks submit.
-- **Confirm.** Summary: "Convert 845.74 NZD from <account> (<customer>) to 500.00 USD in <account> (<customer>) at 1 NZD = 0.5912 USD (as of 2026-11-09)". When the two Customers differ, the summary shows the same extra warning line as Transfer.
+- **Confirm.** Summary: "Convert 845.74 NZD from <account> to 500.00 USD in <account> at 1 NZD = 0.5912 USD (as of 2026-11-09)".
 - **Submit** calls `POST /transactions/fx` with the quoted `expectedRate` and a new `Idempotency-Key` per form open. On 409 for `expectedRate`, the form fetches a new quote and asks the Adviser to confirm again.
 - Transaction lists show the leg on the Account being viewed and the rate line.
 
-Customer Portal: read only, no new page. A conversion shows as "Currency exchange" with the amount of the visible leg and the rate line. No counterparty is shown.
+Customer Portal: read only, no new page. A conversion shows as "Currency exchange" on each of the Customer's two Accounts, with the amount of that Account's leg and the rate line.
 
 ---
 
@@ -293,10 +294,10 @@ Customer Portal: read only, no new page. A conversion shows as "Currency exchang
 | --- | --- |
 | Domain.UnitTests | Factory: fixed sell and fixed buy amounts and rounding of §4.1 (including JPY, 0 decimal places); legs and FX detail of R13–R14; rejects same Account, same currency, amount `≤ 0`, computed amount 0, non-positive rate; Reverse produces the opposite legs and copies the FX detail |
 | Application.UnitTests | Staleness limit at 4 and 5 days (R10); decimal places check (R11) |
-| Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403; happy path fixed sell and fixed buy, same Customer and two Customers (TenantAdmin, Adviser assigned to both); FX detail and item `fx` match the rate row; Adviser unassigned on either side → 404 and nothing written; same Account → 400; same currency → 400; both / neither amount → 400; missing rate → 400; stale rate → 400; `expectedRate` differs → 409 and nothing written; Closed from or to → 400; Disabled Customer on either side → 400 `disabled` / `target=user`; insufficient cash → 400; forbidden body fields → 400; `POST /transactions` with `FxConversion` → 400; missing `Idempotency-Key` → 400, replay → same id, different hash → 409; balances of both Accounts after create and after reverse; reverse uses the original amounts after the rate row changed; reverse after the to Account spent the cash → 400 and nothing written; Opening on either Account after a conversion → 400; allowed on an Account with an Active portfolio assignment and no rebalance enqueued; quote returns the same amounts as create and writes nothing; quote with `memo` → 400; caller who sees one side gets one leg and `fx`; list `type=FxConversion` |
+| Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403; happy path fixed sell and fixed buy (TenantAdmin, assigned Adviser); FX detail and item `fx` match the rate row; Adviser unassigned → 404 and nothing written; two Accounts of two different Customers → 400 and nothing written (also when the Adviser is assigned to both); same Account → 400; same currency → 400; both / neither amount → 400; missing rate → 400; stale rate → 400; `expectedRate` differs → 409 and nothing written; Closed from or to → 400; Disabled Customer → 400 `disabled` / `target=user`; insufficient cash → 400; forbidden body fields → 400; `POST /transactions` with `FxConversion` → 400; missing `Idempotency-Key` → 400, replay → same id, different hash → 409; balances of both Accounts after create and after reverse; reverse uses the original amounts after the rate row changed; reverse after the to Account spent the cash → 400 and nothing written; Opening on either Account after a conversion → 400; allowed on an Account with an Active portfolio assignment and no rebalance enqueued; quote returns the same amounts as create and writes nothing; quote with `memo` → 400; Customer Portal read of the Customer's own conversion shows both legs and `fx`; list `type=FxConversion` |
 | Infrastructure.IntegrationTests | `CK_Transactions_Type` accepts 16 and rejects 17; `TransactionFxDetails` rejects equal currencies, `Rate ≤ 0`, unknown currency, a second row for one Transaction |
 | Application.FunctionalTests (two tenants) | From or to Account in the other tenant → 404 on create and quote, nothing written (TenantAdmin and SystemAdmin); other tenant's conversion id on get / reverse → 404 (`FxConversionIsolationTests`) |
-| Frontend | Picker greys out same-currency Accounts; sell / buy toggle; quote debounced and shown; quote error blocks submit; 409 re-quotes and asks to confirm; warning across Customers |
+| Frontend | Picker greys out same-currency Accounts; sell / buy toggle; quote debounced and shown; quote error blocks submit; 409 re-quotes and asks to confirm; destination list is the source Customer's Accounts only |
 
 ---
 
@@ -307,7 +308,7 @@ No new ADR. ADR 0011 §6 (one cash currency per Account) is unchanged.
 | Item | Lock |
 | --- | --- |
 | Type name | `FxConversion = 16` |
-| Shape | One Transaction, two cash legs on two Accounts of different currencies. Same tenant; same or different Customer. Cross-currency transfer is this type. |
+| Shape | One Transaction, two cash legs on two Accounts of different currencies of the same Customer. Across Customers: convert, then `InternalTransfer`. |
 | Route | `POST /transactions/fx` create; `POST /transactions/fx/quote` read-only quote. Read and reverse on existing routes. `POST /transactions` rejects the type. Every new type gets its own create route (api-design §7.7). |
 | Amount input | Exactly one of `sellAmount` / `buyAmount`; the server computes the other. Both are stored as legs. |
 | Rate | Server-side cached reference rate for the directed pair at `bookedAt`; no caller rate; no fee or spread |
