@@ -41,4 +41,8 @@
         <Content Include="..\..\database\schema\*.sql" Link="schema\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
+    <ItemGroup>
+        <Compile Include="..\Common\TestDatabaseRecreator.cs" Link="Common\TestDatabaseRecreator.cs" />
+    </ItemGroup>
+
 </Project>

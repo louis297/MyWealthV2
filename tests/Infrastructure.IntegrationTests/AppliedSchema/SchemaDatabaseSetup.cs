@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Schema;
 using MyWealthV2.Shared;
+using MyWealthV2.Tests.Common;
 using NUnit.Framework;
 
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
@@ -38,9 +39,10 @@ public class SchemaDatabaseSetup
             .WaitAsync(cancellationToken);
 
         await _app.ResourceNotifications.WaitForResourceHealthyAsync(
-            Services.TestDatabase, cancellationToken);
+            Services.SchemaTestDatabase, cancellationToken);
 
-        ConnectionString = (await _app.GetConnectionStringAsync(Services.TestDatabase))!;
+        ConnectionString = (await _app.GetConnectionStringAsync(Services.SchemaTestDatabase))!;
+        await TestDatabaseRecreator.RecreateAsync(ConnectionString, cancellationToken);
 
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlServer(ConnectionString)

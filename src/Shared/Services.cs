@@ -74,4 +74,11 @@ public static class Services
     /// Application code still reads ConnectionStrings:MyWealthDbV2; tests inject the TestAppHost connection string under that key.
     /// </summary>
     public const string TestDatabase = "MyWealthDbV2-test";
+
+    /// <summary>
+    /// Aspire resource name and SQL database name for Infrastructure.IntegrationTests on the TestAppHost server.
+    /// Separate from <see cref="TestDatabase"/> so test projects that run in parallel against the same
+    /// (persistent) container never reset each other's data.
+    /// </summary>
+    public const string SchemaTestDatabase = "MyWealthDbV2-schema-test";
 }
