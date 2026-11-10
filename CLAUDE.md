@@ -55,7 +55,9 @@ A Feature Spec §12 lists **behaviour** commits. Split each behaviour into a red
 For production code, work test-first. Tests are the executable spec; do not start by writing implementation.
 
 1. **Red**: Write the failing tests for one behaviour from the accepted spec. Run them and confirm they fail **on an assertion**, for the reason you expect. A compile error is not a valid red.
-2. **Green**: Write the minimum production code that makes those tests pass. Run the focused tests, then the test projects the change touches, before you commit. Do not add behaviour the tests do not require.
+2. **Green**: Write the minimum production code that makes those tests pass. Run the focused tests until they pass, then run the full test projects the change touches once, just before you commit. Do not add behaviour the tests do not require.
+
+**Focused runs only while iterating.** In the red and green steps, run only the tests for the behaviour you are working on, with a filter. For example: `dotnet test tests/Application.FunctionalTests --no-build --filter "FullyQualifiedName~Reports"`. Do not run a whole test project on every edit. The full functional suite takes minutes. Run the full projects once before the commit, or start that run in the background and keep working.
 3. **Refactor** (optional): Clean up only while the tests are green. Add no new behaviour. Skip the step if nothing needs cleaning.
 
 Rules:
