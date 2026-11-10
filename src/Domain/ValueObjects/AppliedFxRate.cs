@@ -22,8 +22,34 @@ public class AppliedFxRate : ValueObject
         string quoteCurrency,
         decimal rate,
         DateOnly asOfDate,
-        string source) =>
-        throw new NotImplementedException();
+        string source)
+    {
+        var baseCode = Money.Create(0m, baseCurrency).Currency;
+        var quoteCode = Money.Create(0m, quoteCurrency).Currency;
+        if (string.Equals(baseCode, quoteCode, StringComparison.Ordinal))
+        {
+            throw new DomainException("The base and quote currencies must differ.");
+        }
+
+        if (rate <= 0)
+        {
+            throw new DomainException("Rate must be greater than 0.");
+        }
+
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            throw new DomainException("Rate source is required.");
+        }
+
+        return new AppliedFxRate
+        {
+            BaseCurrency = baseCode,
+            QuoteCurrency = quoteCode,
+            Rate = rate,
+            AsOfDate = asOfDate,
+            Source = source.Trim()
+        };
+    }
 
     protected override IEnumerable<object> GetEqualityComponents()
     {

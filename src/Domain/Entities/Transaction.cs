@@ -155,8 +155,76 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
-        decimal fromCurrentCashSum) =>
-        throw new NotImplementedException();
+        decimal fromCurrentCashSum)
+    {
+        if (fromAccountId == toAccountId)
+        {
+            throw new DomainException("The from and to accounts must be different.");
+        }
+
+        var sellCurrency = Money.Create(0m, fromAccountCurrency).Currency;
+        var buyCurrency = Money.Create(0m, toAccountCurrency).Currency;
+        if (string.Equals(sellCurrency, buyCurrency, StringComparison.Ordinal))
+        {
+            throw new DomainException("The from and to accounts must have different currencies.");
+        }
+
+        if (!string.Equals(rate.BaseCurrency, sellCurrency, StringComparison.Ordinal)
+            || !string.Equals(rate.QuoteCurrency, buyCurrency, StringComparison.Ordinal))
+        {
+            throw new DomainException("The rate must be for the sell currency to the buy currency.");
+        }
+
+        if (fixedAmount.Amount <= 0)
+        {
+            throw new DomainException("Amount must be greater than 0.");
+        }
+
+        decimal sell;
+        decimal buy;
+        if (string.Equals(fixedAmount.Currency, sellCurrency, StringComparison.Ordinal))
+        {
+            sell = fixedAmount.Amount;
+            buy = decimal.Round(sell * rate.Rate, computedDecimalPlaces, MidpointRounding.AwayFromZero);
+        }
+        else if (string.Equals(fixedAmount.Currency, buyCurrency, StringComparison.Ordinal))
+        {
+            buy = fixedAmount.Amount;
+            sell = decimal.Round(buy / rate.Rate, computedDecimalPlaces, MidpointRounding.AwayFromZero);
+        }
+        else
+        {
+            throw new DomainException("The amount currency must be the sell or the buy currency.");
+        }
+
+        if (sell == 0 || buy == 0)
+        {
+            throw new DomainException("The computed amount rounds to 0.");
+        }
+
+        if (fromCurrentCashSum - sell < 0)
+        {
+            throw new DomainException("Cash balance cannot become negative.");
+        }
+
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            Type = TransactionType.FxConversion,
+            BookedAt = bookedAt,
+            Memo = NormaliseMemo(memo),
+            Reference = NormaliseReference(reference),
+            PublicId = Guid.NewGuid(),
+            CashLegs =
+            [
+                TransactionCashLeg.Create(fromAccountId, -sell, sellCurrency),
+                TransactionCashLeg.Create(toAccountId, buy, buyCurrency)
+            ],
+            FxDetail = TransactionFxDetail.Create(rate)
+        };
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
+    }
 
     public static Transaction PostOpeningHoldings(
         int tenantId,
@@ -488,7 +556,8 @@ public class Transaction : BaseAuditableEntity
             PublicId = Guid.NewGuid(),
             OriginalTransactionId = Id,
             CashLegs = cashLegs,
-            SecurityLegs = reversalLegs ?? []
+            SecurityLegs = reversalLegs ?? [],
+            FxDetail = FxDetail?.Copy()
         };
         ReversedBy = reversal;
         reversal.AddDomainEvent(new TransactionReversed(reversal));

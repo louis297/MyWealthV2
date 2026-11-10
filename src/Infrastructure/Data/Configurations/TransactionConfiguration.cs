@@ -39,5 +39,10 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
             .WithOne()
             .HasForeignKey(leg => leg.TransactionId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(transaction => transaction.FxDetail)
+            .WithOne()
+            .HasForeignKey<TransactionFxDetail>(detail => detail.TransactionId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_TransactionFxDetails_Transactions_TransactionId");
     }
 }
