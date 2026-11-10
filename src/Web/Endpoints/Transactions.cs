@@ -6,6 +6,7 @@ using MyWealthV2.Application.Transactions.Commands.CreateInternalTransfer;
 using MyWealthV2.Application.Transactions.Commands.CreateTransaction;
 using MyWealthV2.Application.Transactions.Commands.ReverseTransaction;
 using MyWealthV2.Application.Common.Models;
+using MyWealthV2.Application.Transactions.Queries.GetFxConversionQuote;
 using MyWealthV2.Application.Transactions.Queries.GetTransactionById;
 using MyWealthV2.Application.Transactions.Queries.GetTransactions;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -23,6 +24,7 @@ public class Transactions : IEndpointGroup
         groupBuilder.MapPost(CreateTransaction).RequireAuthorization(Policies.TransactionsCreate);
         groupBuilder.MapPost(CreateInternalTransfer, "transfer").RequireAuthorization(Policies.TransactionsCreate);
         groupBuilder.MapPost(CreateFxConversion, "fx").RequireAuthorization(Policies.TransactionsCreate);
+        groupBuilder.MapPost(GetFxConversionQuote, "fx/quote").RequireAuthorization(Policies.TransactionsCreate);
         groupBuilder.MapPost(ReverseTransaction, "{id}/reverse").RequireAuthorization(Policies.TransactionsCreate);
     }
 
@@ -106,6 +108,16 @@ public class Transactions : IEndpointGroup
         }
 
         return Results.Content(result.Body, "application/json", statusCode: result.StatusCode);
+    }
+
+    [EndpointSummary("Quote an FX conversion")]
+    [EndpointDescription("Returns the stored rate, its as-of date and both amounts for a conversion. Writes nothing and holds no rate.")]
+    public static async Task<Ok<FxConversionQuoteDto>> GetFxConversionQuote(
+        ISender sender,
+        GetFxConversionQuoteQuery query)
+    {
+        var quote = await sender.Send(query);
+        return TypedResults.Ok(quote);
     }
 
     [EndpointSummary("Reverse a transaction")]
