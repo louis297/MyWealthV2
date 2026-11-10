@@ -44,6 +44,17 @@ internal static class TransactionLegReader
                 leg.CostCurrency
             }).ToListAsync(cancellationToken);
 
+        var fxRows = await db.Transactions.AsNoTracking()
+            .Where(transaction => transactionIds.Contains(transaction.Id) && transaction.FxDetail != null)
+            .Select(transaction => new
+            {
+                transaction.Id,
+                transaction.FxDetail!.BaseCurrency,
+                transaction.FxDetail.QuoteCurrency,
+                transaction.FxDetail.Rate,
+                transaction.FxDetail.RateAsOfDate
+            }).ToListAsync(cancellationToken);
+
         return new TransactionLegs(
             cashRows.ToLookup(row => row.TransactionId, row => new TransactionCashDto
             {
@@ -60,10 +71,18 @@ internal static class TransactionLegReader
                 Quantity = row.Quantity,
                 Cost = row.CostAmount,
                 CostCurrency = row.CostCurrency.Trim()
+            }),
+            fxRows.ToDictionary(row => row.Id, row => new TransactionFxDto
+            {
+                BaseCurrency = row.BaseCurrency.Trim(),
+                QuoteCurrency = row.QuoteCurrency.Trim(),
+                Rate = row.Rate,
+                RateAsOfDate = row.RateAsOfDate.ToString("yyyy-MM-dd")
             }));
     }
 }
 
 internal sealed record TransactionLegs(
     ILookup<int, TransactionCashDto> Cash,
-    ILookup<int, TransactionSecurityDto> Security);
+    ILookup<int, TransactionSecurityDto> Security,
+    IReadOnlyDictionary<int, TransactionFxDto> Fx);
