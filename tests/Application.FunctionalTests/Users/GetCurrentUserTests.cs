@@ -21,7 +21,7 @@ public class GetCurrentUserTests : TestBase
     [Test]
     public async Task SystemAdmin_CanReadProfile()
     {
-        var tokens = await FunctionalTestSetup.Oidc.SignInAsync(
+        var tokens = await FunctionalTestSetup.BackOfficeOidc.SignInAsync(
             DevelopmentIdentitySeeder.SystemAdminEmail,
             DevelopmentIdentitySeeder.SystemAdminPassword,
             tenantCode: null);
@@ -54,7 +54,7 @@ public class GetCurrentUserTests : TestBase
     [Test]
     public async Task PasswordChange_LeavesTheRefreshToken()
     {
-        var tokens = await FunctionalTestSetup.Oidc.SignInAsync(
+        var tokens = await FunctionalTestSetup.BackOfficeOidc.SignInAsync(
             DevelopmentIdentitySeeder.SystemAdminEmail,
             DevelopmentIdentitySeeder.SystemAdminPassword,
             tenantCode: null);
@@ -70,14 +70,14 @@ public class GetCurrentUserTests : TestBase
         });
         change.StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
-        var refresh = await FunctionalTestSetup.Oidc.RefreshAsync(tokens.RefreshToken!);
+        var refresh = await FunctionalTestSetup.BackOfficeOidc.RefreshAsync(tokens.RefreshToken!);
         refresh.IsSuccessStatusCode.ShouldBeTrue();
     }
 
     [Test]
     public async Task PutMe_CannotChangeEmail()
     {
-        var tokens = await FunctionalTestSetup.Oidc.SignInAsync(
+        var tokens = await FunctionalTestSetup.BackOfficeOidc.SignInAsync(
             DevelopmentIdentitySeeder.SystemAdminEmail,
             DevelopmentIdentitySeeder.SystemAdminPassword,
             tenantCode: null);
@@ -97,7 +97,7 @@ public class GetCurrentUserTests : TestBase
     [Test]
     public async Task PutMe_StaleRowVersion_Returns409()
     {
-        var tokens = await FunctionalTestSetup.Oidc.SignInAsync(
+        var tokens = await FunctionalTestSetup.BackOfficeOidc.SignInAsync(
             DevelopmentIdentitySeeder.SystemAdminEmail,
             DevelopmentIdentitySeeder.SystemAdminPassword,
             tenantCode: null);

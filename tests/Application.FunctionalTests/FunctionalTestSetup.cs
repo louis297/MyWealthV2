@@ -16,6 +16,7 @@ public class FunctionalTestSetup
     internal static HttpClient WebClient { get; private set; } = null!;
     internal static HttpMessageHandler WebApiHandler { get; private set; } = null!;
     internal static OpenIdConnectTestClient Oidc { get; private set; } = null!;
+    internal static OpenIdConnectTestClient BackOfficeOidc { get; private set; } = null!;
     internal static IdentityFactory Identity { get; private set; } = null!;
     internal static DatabaseResetter? DbResetter { get; private set; }
     internal static string ConnectionString { get; private set; } = null!;
@@ -81,6 +82,16 @@ public class FunctionalTestSetup
             AllowAutoRedirect = false,
             HandleCookies = true
         }));
+
+        BackOfficeOidc = new OpenIdConnectTestClient(
+            () => identityFactory.CreateClient(new WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false,
+                HandleCookies = true
+            }),
+            clientId: "back-office",
+            clientSecret: BackOfficeTestSecret.Value,
+            redirectUri: "https://localhost/back-office/signin-oidc");
     }
 
     [OneTimeTearDown]

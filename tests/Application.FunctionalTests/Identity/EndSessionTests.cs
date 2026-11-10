@@ -1,6 +1,5 @@
 using System.Net;
 using MyWealthV2.Domain.Enums;
-using MyWealthV2.Infrastructure.Identity;
 
 namespace MyWealthV2.Application.FunctionalTests.Identity;
 
@@ -12,12 +11,12 @@ public class EndSessionTests : TestBase
     [Test]
     public async Task RegisteredPostLogoutUri_RedirectsAndClearsHostedLoginCookie()
     {
+        var tenant = await TestApp.CreateTenantAsync("Firm E", "firme");
+        await TestApp.CreatePersonAsync(
+            UserRole.TenantAdmin, "Eve", "eve@firme", "Password1!", tenant.Id);
+
         using var client = FunctionalTestSetup.Oidc.CreateSessionClient();
-        await FunctionalTestSetup.Oidc.SignInAsync(
-            client,
-            DevelopmentIdentitySeeder.SystemAdminEmail,
-            DevelopmentIdentitySeeder.SystemAdminPassword,
-            tenantCode: null);
+        await FunctionalTestSetup.Oidc.SignInAsync(client, "eve@firme", "Password1!", "firme");
 
         var logout = await FunctionalTestSetup.Oidc.EndSessionAsync(client, RegisteredPostLogout);
 

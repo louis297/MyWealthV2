@@ -24,7 +24,7 @@ public class GetCurrenciesTests : TestBase
     [Test]
     public async Task SystemAdmin_Returns200()
     {
-        var tokens = await FunctionalTestSetup.Oidc.SignInAsync(
+        var tokens = await FunctionalTestSetup.BackOfficeOidc.SignInAsync(
             DevelopmentIdentitySeeder.SystemAdminEmail,
             DevelopmentIdentitySeeder.SystemAdminPassword,
             tenantCode: null);
@@ -117,7 +117,7 @@ public class GetCurrenciesTests : TestBase
 
     private static async Task<TokenResponse> SignInSystemAdmin()
     {
-        return await FunctionalTestSetup.Oidc.SignInAsync(
+        return await FunctionalTestSetup.BackOfficeOidc.SignInAsync(
             DevelopmentIdentitySeeder.SystemAdminEmail,
             DevelopmentIdentitySeeder.SystemAdminPassword,
             tenantCode: null);

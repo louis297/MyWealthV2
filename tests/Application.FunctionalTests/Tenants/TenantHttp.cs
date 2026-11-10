@@ -7,7 +7,7 @@ namespace MyWealthV2.Application.FunctionalTests.Tenants;
 internal static class TenantHttp
 {
     public static Task<TokenResponse> SignInSystemAdmin() =>
-        FunctionalTestSetup.Oidc.SignInAsync(
+        FunctionalTestSetup.BackOfficeOidc.SignInAsync(
             DevelopmentIdentitySeeder.SystemAdminEmail,
             DevelopmentIdentitySeeder.SystemAdminPassword,
             tenantCode: null);
