@@ -29,6 +29,9 @@ Do not model these as `StockIn` / `StockOut`. No cash leg. No portal page. No pr
 
 **Status is `accepted`.** Implementation follows this file. `Split` = 12, `Bonus` = 13, `Scrip` = 14. Script `0017_transaction_type_split.sql` widens `CK_Transactions_Type` to 0–14.
 
+
+**Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md). The security leg carries the create body's `accountId`; the header has no Account. The item JSON in §8.1 is replaced by leg-accounts §8.1 (shown below).
+
 ---
 
 ## 1. Summary
@@ -182,11 +185,13 @@ Transaction item (no cash):
 ```json
 {
   "id": "<transaction publicId>",
-  "accountId": "<account publicId>",
   "type": "Split",
   "bookedAt": "2026-10-12T10:00:00+13:00",
+  "cash": [],
   "security": [
     {
+      "accountId": "<account publicId>",
+      "customerId": "<customer publicId>",
       "instrumentId": "<instrument publicId>",
       "quantity": 100,
       "cost": 0.00,
@@ -196,7 +201,7 @@ Transaction item (no cash):
 }
 ```
 
-`quantity` on the item is the signed delta. Item shape stays the one locked in [buy-sell.md](buy-sell.md): optional `cash`, optional `security`. These types omit `cash`.
+`quantity` on the item is the signed delta. Item shape is [leg-accounts.md](leg-accounts.md) §8.1. These types return `cash: []`.
 
 ### 8.2 Errors
 

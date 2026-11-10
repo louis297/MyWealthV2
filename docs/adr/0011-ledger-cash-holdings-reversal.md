@@ -21,6 +21,8 @@ Storage shape for holdings / security legs / Opening of quantity is locked in [f
 
 Phase 2 is open. Instruments, Accounts, posting (`/transactions`, `0013`), and holdings Opening are landed.
 
+**Amendment 2026-11-10 (accepted, landed):** [features/leg-accounts.md](../features/leg-accounts.md). The header has no Account and no Customer; every cash and security leg carries its own `AccountId` (script `0024_leg_accounts.sql`). Rules that read "the transaction's Account" apply to every leg account. Groundwork for cross-account transfer.
+
 ## Context
 
 A single `Type` column that pretends to be both cash and security, plus hand-edited holdings, collapses when a real ledger starts. Updating or deleting an original posting destroys the audit trail.

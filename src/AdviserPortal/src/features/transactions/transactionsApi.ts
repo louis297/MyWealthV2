@@ -2,11 +2,15 @@ import { api } from "@/shared/api/api";
 import type { PagedList } from "@/shared/types/page";
 
 export type TransactionCash = {
+  accountId: string;
+  customerId: string;
   amount: number;
   currency: string;
 };
 
 export type TransactionSecurity = {
+  accountId: string;
+  customerId: string;
   instrumentId: string;
   quantity: number;
   cost: number;
@@ -16,17 +20,16 @@ export type TransactionSecurity = {
 export type Transaction = {
   id: string;
   tenantId: string;
-  accountId: string;
-  customerId: string;
   type: string;
-  cash?: TransactionCash | null;
+  /** Legs on accounts the caller can see; each carries its own account and customer. */
+  cash: TransactionCash[];
   bookedAt: string;
   memo?: string | null;
   reference?: string | null;
   originalTransactionId?: string | null;
   reversedByTransactionId?: string | null;
   rowVersion: string;
-  security?: TransactionSecurity[] | null;
+  security: TransactionSecurity[];
 };
 
 export type TransactionListArgs = {

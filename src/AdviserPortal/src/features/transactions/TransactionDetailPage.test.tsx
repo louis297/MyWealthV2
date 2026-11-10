@@ -14,10 +14,15 @@ const idempotencyKey = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const original = {
   id: originalId,
   tenantId: "22222222-2222-2222-2222-222222222222",
-  accountId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-  customerId: "cccccccccccccccc-cccc-cccc-cccc-cccccccccccc",
   type: "Buy",
-  cash: { amount: -1250, currency: "NZD" },
+  cash: [
+    {
+      accountId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      customerId: "cccccccccccccccc-cccc-cccc-cccc-cccccccccccc",
+      amount: -1250,
+      currency: "NZD",
+    },
+  ],
   bookedAt: "2026-10-11T10:00:00+13:00",
   memo: "Parcel",
   reference: null,
@@ -26,6 +31,8 @@ const original = {
   rowVersion: "AAAA",
   security: [
     {
+      accountId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      customerId: "cccccccccccccccc-cccc-cccc-cccc-cccccccccccc",
       instrumentId: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
       quantity: 50,
       cost: 750,
@@ -301,7 +308,7 @@ describe("TransactionDetailPage", () => {
           detail: "Cannot reverse a transaction while the customer is disabled. Enable the customer first.",
           code: "disabled",
           target: "user",
-          targetId: original.customerId,
+          targetId: original.cash[0].customerId,
         }, 400);
       }
       if (method === "GET") {

@@ -32,9 +32,8 @@ internal static class NetWorthReader
         var accountIds = accounts.Select(account => account.Id).ToList();
         var cashByAccount = await (
             from leg in db.TransactionCashLegs.AsNoTracking()
-            join transaction in db.Transactions.AsNoTracking() on leg.TransactionId equals transaction.Id
-            where accountIds.Contains(transaction.AccountId)
-            group leg by transaction.AccountId
+            where accountIds.Contains(leg.AccountId)
+            group leg by leg.AccountId
             into grouped
             select new { AccountId = grouped.Key, Sum = grouped.Sum(leg => leg.Amount) }
         ).ToDictionaryAsync(row => row.AccountId, row => row.Sum, cancellationToken);

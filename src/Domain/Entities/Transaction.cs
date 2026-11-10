@@ -12,8 +12,6 @@ public class Transaction : BaseAuditableEntity
 
     public int TenantId { get; private set; }
 
-    public int AccountId { get; private set; }
-
     public TransactionType Type { get; private set; }
 
     public DateTimeOffset BookedAt { get; private set; }
@@ -30,7 +28,7 @@ public class Transaction : BaseAuditableEntity
 
     public byte[] RowVersion { get; private set; } = null!;
 
-    public TransactionCashLeg? CashLeg { get; private set; }
+    public List<TransactionCashLeg> CashLegs { get; private set; } = [];
 
     public List<TransactionSecurityLeg> SecurityLegs { get; private set; } = [];
 
@@ -66,13 +64,12 @@ public class Transaction : BaseAuditableEntity
         var transaction = new Transaction
         {
             TenantId = tenantId,
-            AccountId = accountId,
             Type = type,
             BookedAt = bookedAt,
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
             PublicId = Guid.NewGuid(),
-            CashLeg = TransactionCashLeg.Create(amount, currency)
+            CashLegs = [TransactionCashLeg.Create(accountId, amount, currency)]
         };
         transaction.AddDomainEvent(new TransactionPosted(transaction));
         return transaction;
@@ -106,14 +103,13 @@ public class Transaction : BaseAuditableEntity
         var transaction = new Transaction
         {
             TenantId = tenantId,
-            AccountId = accountId,
             Type = TransactionType.OpeningHoldings,
             BookedAt = bookedAt,
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
             PublicId = Guid.NewGuid(),
             SecurityLegs = openingSecurityLegs.Select(t => TransactionSecurityLeg.Create(
-                    t.InstrumentId, t.Quantity, t.Cost, t.QuoteCurrency
+                    accountId, t.InstrumentId, t.Quantity, t.Cost, t.QuoteCurrency
                     )).ToList()
         };
         transaction.AddDomainEvent(new TransactionPosted(transaction));
@@ -146,16 +142,15 @@ public class Transaction : BaseAuditableEntity
         var transaction = new Transaction
         {
             TenantId = tenantId,
-            AccountId = accountId,
             Type = TransactionType.Buy,
             BookedAt = bookedAt,
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
             PublicId = Guid.NewGuid(),
-            CashLeg = TransactionCashLeg.Create(cash, currency),
+            CashLegs = [TransactionCashLeg.Create(accountId, cash, currency)],
             SecurityLegs =
             [
-                TransactionSecurityLeg.Create(instrumentId, quantity, cost, price.Currency)
+                TransactionSecurityLeg.Create(accountId, instrumentId, quantity, cost, price.Currency)
             ]
         };
         transaction.AddDomainEvent(new TransactionPosted(transaction));
@@ -188,16 +183,15 @@ public class Transaction : BaseAuditableEntity
         var transaction = new Transaction
         {
             TenantId = tenantId,
-            AccountId = accountId,
             Type = TransactionType.Sell,
             BookedAt = bookedAt,
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
             PublicId = Guid.NewGuid(),
-            CashLeg = TransactionCashLeg.Create(cash, currency),
+            CashLegs = [TransactionCashLeg.Create(accountId, cash, currency)],
             SecurityLegs =
             [
-                TransactionSecurityLeg.Create(instrumentId, -quantity, -released, price.Currency)
+                TransactionSecurityLeg.Create(accountId, instrumentId, -quantity, -released, price.Currency)
             ]
         };
         transaction.AddDomainEvent(new TransactionPosted(transaction));
@@ -226,7 +220,6 @@ public class Transaction : BaseAuditableEntity
         var transaction = new Transaction
         {
             TenantId = tenantId,
-            AccountId = accountId,
             Type = TransactionType.StockIn,
             BookedAt = bookedAt,
             Memo = NormaliseMemo(memo),
@@ -234,7 +227,7 @@ public class Transaction : BaseAuditableEntity
             PublicId = Guid.NewGuid(),
             SecurityLegs =
             [
-                TransactionSecurityLeg.Create(instrumentId, quantity, cost, currency)
+                TransactionSecurityLeg.Create(accountId, instrumentId, quantity, cost, currency)
             ]
         };
         transaction.AddDomainEvent(new TransactionPosted(transaction));
@@ -261,7 +254,6 @@ public class Transaction : BaseAuditableEntity
         var transaction = new Transaction
         {
             TenantId = tenantId,
-            AccountId = accountId,
             Type = TransactionType.StockOut,
             BookedAt = bookedAt,
             Memo = NormaliseMemo(memo),
@@ -269,7 +261,7 @@ public class Transaction : BaseAuditableEntity
             PublicId = Guid.NewGuid(),
             SecurityLegs =
             [
-                TransactionSecurityLeg.Create(instrumentId, -quantity, -released, currency)
+                TransactionSecurityLeg.Create(accountId, instrumentId, -quantity, -released, currency)
             ]
         };
         transaction.AddDomainEvent(new TransactionPosted(transaction));
@@ -316,7 +308,6 @@ public class Transaction : BaseAuditableEntity
         var transaction = new Transaction
         {
             TenantId = tenantId,
-            AccountId = accountId,
             Type = type,
             BookedAt = bookedAt,
             Memo = NormaliseMemo(memo),
@@ -324,17 +315,21 @@ public class Transaction : BaseAuditableEntity
             PublicId = Guid.NewGuid(),
             SecurityLegs =
             [
-                TransactionSecurityLeg.Create(instrumentId, newQuantity - currentQuantity, 0m, currency)
+                TransactionSecurityLeg.Create(accountId, instrumentId, newQuantity - currentQuantity, 0m, currency)
             ]
         };
         transaction.AddDomainEvent(new TransactionPosted(transaction));
         return transaction;
     }
 
+    /// <summary>
+    /// Builds the Reversal: one opposite leg per original leg, each on that leg's Account.
+    /// Balances are keyed by leg Account (and Instrument for holdings).
+    /// </summary>
     public Transaction Reverse(
         DateTimeOffset bookedAt,
-        decimal currentCashSum,
-        IReadOnlyDictionary<int, decimal>? currentQuantityByInstrument = null)
+        IReadOnlyDictionary<int, decimal> currentCashSumByAccount,
+        IReadOnlyDictionary<(int AccountId, int InstrumentId), decimal>? currentQuantity = null)
     {
         if (Type == TransactionType.Reversal)
         {
@@ -346,16 +341,20 @@ public class Transaction : BaseAuditableEntity
             throw new DomainException("This transaction has already been reversed.");
         }
 
-        TransactionCashLeg? cashLeg = null;
-        if (CashLeg is not null)
+        var cashLegs = CashLegs
+            .Select(leg => TransactionCashLeg.Create(leg.AccountId, -leg.Amount, leg.Currency))
+            .ToList();
+        foreach (var account in cashLegs.GroupBy(leg => leg.AccountId))
         {
-            var opposite = -CashLeg.Amount;
-            if (currentCashSum + opposite < 0)
+            if (!currentCashSumByAccount.TryGetValue(account.Key, out var currentCashSum))
+            {
+                throw new DomainException("Cash balance is required for every leg account.");
+            }
+
+            if (currentCashSum + account.Sum(leg => leg.Amount) < 0)
             {
                 throw new DomainException("Cash balance cannot become negative.");
             }
-
-            cashLeg = TransactionCashLeg.Create(opposite, CashLeg.Currency);
         }
 
         List<TransactionSecurityLeg>? reversalLegs = null;
@@ -365,8 +364,8 @@ public class Transaction : BaseAuditableEntity
             foreach (var leg in SecurityLegs)
             {
                 var current = leg.Quantity;
-                if (currentQuantityByInstrument is not null
-                    && !currentQuantityByInstrument.TryGetValue(leg.InstrumentId, out current))
+                if (currentQuantity is not null
+                    && !currentQuantity.TryGetValue((leg.AccountId, leg.InstrumentId), out current))
                 {
                     throw new DomainException("Holding quantity is required to reverse a security leg.");
                 }
@@ -385,6 +384,7 @@ public class Transaction : BaseAuditableEntity
                 }
 
                 reversalLegs.Add(TransactionSecurityLeg.Create(
+                    leg.AccountId,
                     leg.InstrumentId,
                     -leg.Quantity,
                     -leg.CostAmount,
@@ -392,7 +392,7 @@ public class Transaction : BaseAuditableEntity
             }
         }
 
-        if (cashLeg is null && reversalLegs is null)
+        if (cashLegs.Count == 0 && reversalLegs is null)
         {
             throw new DomainException("A transaction has no cash leg to reverse.");
         }
@@ -400,12 +400,11 @@ public class Transaction : BaseAuditableEntity
         var reversal = new Transaction
         {
             TenantId = TenantId,
-            AccountId = AccountId,
             Type = TransactionType.Reversal,
             BookedAt = bookedAt,
             PublicId = Guid.NewGuid(),
             OriginalTransactionId = Id,
-            CashLeg = cashLeg,
+            CashLegs = cashLegs,
             SecurityLegs = reversalLegs ?? []
         };
         ReversedBy = reversal;

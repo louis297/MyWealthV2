@@ -33,6 +33,9 @@ Model portfolios (target-weight investment schemes) on `webapi`. An Adviser or T
 
 **Status is `accepted`.** Implementation follows this file.
 
+
+**Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md) R17. The R18 trade lock applies when any security leg's Account has an Active assignment. Rebalance still writes ordinary `Buy` / `Sell` on the assigned Account.
+
 ---
 
 ## 1. Summary

@@ -422,9 +422,7 @@ public static class TestSeed
             return;
         }
 
-        var exists = await db.Transactions.AnyAsync(
-            row => row.AccountId == account.Id && row.Reference == DemoBrokerageOpeningReference,
-            cancellationToken);
+        var exists = await ReferenceExistsAsync(db, account.Id, DemoBrokerageOpeningReference, cancellationToken);
         if (exists)
         {
             return;
@@ -492,7 +490,7 @@ public static class TestSeed
             DemoBrokerageFundingReference,
             currentCashSum: await CashSumAsync(db, account.Id, cancellationToken),
             existingTransactionCount: 1);
-        Stamp(transaction, transaction.CashLeg!);
+        Stamp(transaction, transaction.CashLegs.Single());
         db.Transactions.Add(transaction);
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -545,7 +543,7 @@ public static class TestSeed
             memo: "Demo brokerage buy",
             reference: DemoBrokerageBuyReference,
             currentCashSum: await CashSumAsync(db, account.Id, cancellationToken));
-        Stamp(transaction, transaction.CashLeg!);
+        Stamp(transaction, transaction.CashLegs.Single());
         foreach (var leg in transaction.SecurityLegs)
         {
             Stamp(leg);
@@ -617,8 +615,7 @@ public static class TestSeed
 
         var legs = await (
             from leg in db.TransactionSecurityLegs
-            join transaction in db.Transactions on leg.TransactionId equals transaction.Id
-            where transaction.AccountId == account.Id && leg.InstrumentId == vti.Id
+            where leg.AccountId == account.Id && leg.InstrumentId == vti.Id
             select new { leg.Quantity, leg.CostAmount }).ToListAsync(cancellationToken);
         if (legs.Count == 0)
         {
@@ -672,8 +669,7 @@ public static class TestSeed
 
         var legs = await (
             from leg in db.TransactionSecurityLegs
-            join transaction in db.Transactions on leg.TransactionId equals transaction.Id
-            where transaction.AccountId == account.Id && leg.InstrumentId == vti.Id
+            where leg.AccountId == account.Id && leg.InstrumentId == vti.Id
             select new { leg.Quantity, leg.CostAmount, leg.CostCurrency }).ToListAsync(cancellationToken);
         if (legs.Count == 0)
         {
@@ -712,15 +708,17 @@ public static class TestSeed
         string reference,
         CancellationToken cancellationToken) =>
         db.Transactions.AnyAsync(
-            row => row.AccountId == accountId && row.Reference == reference, cancellationToken);
+            row => row.Reference == reference
+                   && (row.CashLegs.Any(leg => leg.AccountId == accountId)
+                       || row.SecurityLegs.Any(leg => leg.AccountId == accountId)),
+            cancellationToken);
 
     private static Task<decimal> CashSumAsync(
         ApplicationDbContext db,
         int accountId,
         CancellationToken cancellationToken) =>
         (from leg in db.TransactionCashLegs
-         join transaction in db.Transactions on leg.TransactionId equals transaction.Id
-         where transaction.AccountId == accountId
+         where leg.AccountId == accountId
          select leg.Amount).SumAsync(cancellationToken);
 
     private static void Stamp(params BaseAuditableEntity[] entities)
@@ -748,9 +746,7 @@ public static class TestSeed
             return;
         }
 
-        var exists = await db.Transactions.AnyAsync(
-            row => row.AccountId == account.Id && row.Reference == DemoEverydayBankTransferReference,
-            cancellationToken);
+        var exists = await ReferenceExistsAsync(db, account.Id, DemoEverydayBankTransferReference, cancellationToken);
         if (exists)
         {
             return;
@@ -771,8 +767,8 @@ public static class TestSeed
         var created = TimeProvider.System.GetUtcNow();
         transaction.Created = created;
         transaction.CreatedBy = CreatedBy;
-        transaction.CashLeg!.Created = created;
-        transaction.CashLeg.CreatedBy = CreatedBy;
+        transaction.CashLegs.Single().Created = created;
+        transaction.CashLegs.Single().CreatedBy = CreatedBy;
         db.Transactions.Add(transaction);
         await db.SaveChangesAsync(cancellationToken);
     }

@@ -19,11 +19,11 @@ public class OpeningHoldingsTests
         var transaction = Post(accountType, (11, 100m, 1500.00m, "USD"));
 
         transaction.TenantId.ShouldBe(1);
-        transaction.AccountId.ShouldBe(2);
+        transaction.SecurityLegs.ShouldAllBe(leg => leg.AccountId == 2);
         transaction.Type.ShouldBe(TransactionType.OpeningHoldings);
         transaction.BookedAt.ShouldBe(BookedAt);
         transaction.PublicId.ShouldNotBe(Guid.Empty);
-        transaction.CashLeg.ShouldBeNull();
+        transaction.CashLegs.ShouldBeEmpty();
         transaction.DomainEvents.OfType<TransactionPosted>().ShouldHaveSingleItem();
 
         TransactionSecurityLeg leg = transaction.SecurityLegs.Single();
@@ -86,7 +86,7 @@ public class OpeningHoldingsTests
             (11, 1m, 10m, "USD"),
             (12, 2m, 0m, "USD"));
 
-        transaction.CashLeg.ShouldBeNull();
+        transaction.CashLegs.ShouldBeEmpty();
         transaction.SecurityLegs.Select(leg => leg.InstrumentId).ShouldBe([11, 12]);
     }
 
@@ -169,12 +169,12 @@ public class OpeningHoldingsTests
         original.ClearDomainEvents();
         var reverseAt = BookedAt.AddDays(1);
 
-        var reversal = original.Reverse(reverseAt, currentCashSum: 0m);
+        var reversal = original.Reverse(reverseAt, currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 0m });
 
         original.Type.ShouldBe(TransactionType.OpeningHoldings);
         original.Memo.ShouldBe("Open VTI");
         original.Reference.ShouldBe("ref");
-        original.CashLeg.ShouldBeNull();
+        original.CashLegs.ShouldBeEmpty();
         original.DomainEvents.ShouldBeEmpty();
         original.SecurityLegs.Select(leg => (leg.InstrumentId, leg.Quantity, leg.CostAmount, leg.CostCurrency))
             .ShouldBe([(11, 100m, 1500.00m, "USD"), (12, 2m, 0m, "USD")]);
@@ -183,12 +183,12 @@ public class OpeningHoldingsTests
         reversal.PublicId.ShouldNotBe(original.PublicId);
         reversal.Type.ShouldBe(TransactionType.Reversal);
         reversal.TenantId.ShouldBe(1);
-        reversal.AccountId.ShouldBe(2);
+        reversal.SecurityLegs.ShouldAllBe(leg => leg.AccountId == 2);
         reversal.BookedAt.ShouldBe(reverseAt);
         reversal.OriginalTransactionId.ShouldBe(7);
         reversal.Memo.ShouldBeNull();
         reversal.Reference.ShouldBeNull();
-        reversal.CashLeg.ShouldBeNull();
+        reversal.CashLegs.ShouldBeEmpty();
         reversal.SecurityLegs.Select(leg => (leg.InstrumentId, leg.Quantity, leg.CostAmount, leg.CostCurrency))
             .ShouldBe([(11, -100m, -1500.00m, "USD"), (12, -2m, 0m, "USD")]);
         reversal.DomainEvents.OfType<TransactionReversed>().ShouldHaveSingleItem();
@@ -200,9 +200,9 @@ public class OpeningHoldingsTests
     {
         var original = Post(AccountType.Brokerage, (11, 100m, 1500m, "USD"));
         original.Id = 7;
-        var reversal = original.Reverse(BookedAt.AddDays(1), currentCashSum: 0m);
+        var reversal = original.Reverse(BookedAt.AddDays(1), currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 0m });
 
-        Should.Throw<DomainException>(() => reversal.Reverse(BookedAt.AddDays(2), currentCashSum: 0m));
+        Should.Throw<DomainException>(() => reversal.Reverse(BookedAt.AddDays(2), currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 0m }));
     }
 
     [Test]
@@ -213,11 +213,11 @@ public class OpeningHoldingsTests
 
         Should.Throw<DomainException>(() => original.Reverse(
             BookedAt.AddDays(1),
-            currentCashSum: 0m,
-            currentQuantityByInstrument: new Dictionary<int, decimal>
+            currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 0m },
+            currentQuantity: new Dictionary<(int, int), decimal>
             {
-                [11] = 100m,
-                [12] = 1m
+                [(2, 11)] = 100m,
+                [(2, 12)] = 1m
             }));
     }
 

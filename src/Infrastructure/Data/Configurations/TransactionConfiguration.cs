@@ -15,14 +15,10 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         builder.Property(transaction => transaction.CreatedBy).HasMaxLength(450).IsRequired();
         builder.Property(transaction => transaction.RowVersion).IsRowVersion();
         builder.HasIndex(transaction => transaction.PublicId).IsUnique();
-        builder.HasIndex(transaction => new { transaction.TenantId, transaction.AccountId, transaction.BookedAt });
+        builder.HasIndex(transaction => new { transaction.TenantId, transaction.BookedAt });
         builder.HasOne<Tenant>()
             .WithMany()
             .HasForeignKey(transaction => transaction.TenantId)
-            .OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<Account>()
-            .WithMany()
-            .HasForeignKey(transaction => transaction.AccountId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Transaction>()
             .WithMany()
@@ -35,9 +31,9 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         builder.HasIndex(transaction => transaction.ReversedByTransactionId)
             .IsUnique()
             .HasFilter("[ReversedByTransactionId] IS NOT NULL");
-        builder.HasOne(transaction => transaction.CashLeg)
+        builder.HasMany(transaction => transaction.CashLegs)
             .WithOne()
-            .HasForeignKey<TransactionCashLeg>(leg => leg.TransactionId)
+            .HasForeignKey(leg => leg.TransactionId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasMany(transaction => transaction.SecurityLegs)
             .WithOne()

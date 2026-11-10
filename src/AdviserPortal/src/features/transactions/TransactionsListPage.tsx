@@ -8,6 +8,7 @@ import {
 } from "@/features/transactions/ReverseTransactionButton";
 import {
   useGetTransactionsQuery,
+  type Transaction,
   type TransactionCash,
   type TransactionSecurity,
 } from "@/features/transactions/transactionsApi";
@@ -17,19 +18,21 @@ function isNotFound(error: unknown) {
   return typeof error === "object" && error !== null && "status" in error && error.status === 404;
 }
 
-function cashText(cash: TransactionCash | null | undefined) {
-  if (!cash) {
-    return "";
-  }
-  return `${cash.amount} ${cash.currency}`;
+function cashText(cash: TransactionCash[]) {
+  return cash.map((leg) => `${leg.amount} ${leg.currency}`).join(", ");
 }
 
-function securityText(security: TransactionSecurity[] | null | undefined) {
-  const leg = security?.[0];
-  if (!leg) {
-    return "";
-  }
-  return `${leg.quantity} ${leg.cost} ${leg.costCurrency}`;
+function securityText(security: TransactionSecurity[]) {
+  return security.map((leg) => `${leg.quantity} ${leg.cost} ${leg.costCurrency}`).join(", ");
+}
+
+/** Distinct leg accounts and customers, in leg order. */
+function legOwners(item: Transaction) {
+  const legs = [...item.cash, ...item.security];
+  return {
+    accountIds: [...new Set(legs.map((leg) => leg.accountId))],
+    customerIds: [...new Set(legs.map((leg) => leg.customerId))],
+  };
 }
 
 export function TransactionsListPage() {
@@ -93,32 +96,43 @@ export function TransactionsListPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(data?.items ?? []).map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>
-                      <Link to={`/transactions/${item.id}`} className={recordLinkClass}>
-                        {item.type}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{item.bookedAt}</TableCell>
-                    <TableCell>
-                      <Link to={`/accounts/${item.accountId}`} className={recordLinkClass}>
-                        {item.accountId}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Link to={`/customers/${item.customerId}`} className={recordLinkClass}>
-                        {item.customerId}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{cashText(item.cash)}</TableCell>
-                    <TableCell>{securityText(item.security)}</TableCell>
-                    <TableCell>{item.memo ?? ""}</TableCell>
-                    <TableCell className="whitespace-normal">
-                      {canReverse(item) ? <ReverseTransactionButton id={item.id} /> : null}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {(data?.items ?? []).map((item) => {
+                  const owners = legOwners(item);
+                  return (
+                    <TableRow key={item.id}>
+                      <TableCell>
+                        <Link to={`/transactions/${item.id}`} className={recordLinkClass}>
+                          {item.type}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{item.bookedAt}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          {owners.accountIds.map((accountId) => (
+                            <Link key={accountId} to={`/accounts/${accountId}`} className={recordLinkClass}>
+                              {accountId}
+                            </Link>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          {owners.customerIds.map((customerId) => (
+                            <Link key={customerId} to={`/customers/${customerId}`} className={recordLinkClass}>
+                              {customerId}
+                            </Link>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell>{cashText(item.cash)}</TableCell>
+                      <TableCell>{securityText(item.security)}</TableCell>
+                      <TableCell>{item.memo ?? ""}</TableCell>
+                      <TableCell className="whitespace-normal">
+                        {canReverse(item) ? <ReverseTransactionButton id={item.id} /> : null}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>

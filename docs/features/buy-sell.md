@@ -31,6 +31,9 @@ Split / Bonus / Scrip are accepted in [split.md](split.md). No portal page. No p
 
 **Status is `accepted` and landed** on repo master `821c715` (2026-10-12). Script `0016_transaction_type_stock_in_out.sql` (`CK_Transactions_Type` widened to 0–11). TestSeed has one `Buy` and one `StockIn` on the demo brokerage. Split / Bonus / Scrip are the next accepted slice on these same tables ([split.md](split.md)).
 
+
+**Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md). Both legs of a `Buy` / `Sell` carry the create body's `accountId`; the header has no Account. R15 "same Account-locked command" means every leg account locked in ascending `Accounts.Id` order. The item JSON in §8.1 is replaced by leg-accounts §8.1 (shown below).
+
 ---
 
 ## 1. Summary
@@ -213,12 +216,20 @@ Transaction **item** always uses objects (Q2 = B). Pure-cash items move off flat
 ```json
 {
   "id": "<transaction publicId>",
-  "accountId": "<account publicId>",
   "type": "Buy",
   "bookedAt": "2026-10-11T10:00:00+13:00",
-  "cash": { "amount": -1250.00, "currency": "NZD" },
+  "cash": [
+    {
+      "accountId": "<account publicId>",
+      "customerId": "<customer publicId>",
+      "amount": -1250.00,
+      "currency": "NZD"
+    }
+  ],
   "security": [
     {
+      "accountId": "<account publicId>",
+      "customerId": "<customer publicId>",
       "instrumentId": "<instrument publicId>",
       "quantity": 50,
       "cost": 750.00,
@@ -228,7 +239,7 @@ Transaction **item** always uses objects (Q2 = B). Pure-cash items move off flat
 }
 ```
 
-Pure-cash item: `cash` present, `security` omitted. `OpeningHoldings` / `StockIn` / `StockOut`: `security` present, `cash` omitted. Do not keep a parallel flat `amount` on the item.
+Pure-cash item: `security: []`. `OpeningHoldings` / `StockIn` / `StockOut`: `cash: []`. Both arrays hold only legs on accounts the caller can see ([leg-accounts.md](leg-accounts.md) R7). Do not keep a parallel flat `amount` on the item.
 
 ### 8.2 Errors
 

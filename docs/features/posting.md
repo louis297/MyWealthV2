@@ -32,6 +32,8 @@ There is **no separate cash-ledger Feature Spec.** Cash legs live here. There is
 
 **Amendment 2026-10-13:** bidirectional reverse link. Keep `OriginalTransactionId` on the Reversal. Add `ReversedByTransactionId` on the original (script `0018_transaction_reversed_by.sql`, forward ALTER only; do not edit `0013`). One limited write of that column when the Reversal is created; after that write the original is immutable again. Economic legs are never updated. Already-reversed is `ReversedByTransactionId IS NOT NULL` — no self-join on list / get.
 
+**Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md) supersedes every rule here that reads "the transaction's Account": the header has no `AccountId`; each cash leg has its own `AccountId` (script `0024`). R5 (one Account), R6–R9, R11 ("same account"), R19, R22 and the §5 / §6 header `AccountId` apply per leg account as restated in leg-accounts R2–R14. The create body still takes top-level `accountId`. The item in §8.1 is replaced by leg-accounts §8.1 (shown below).
+
 ---
 
 ## 1. Summary
@@ -292,10 +294,16 @@ Item:
 {
   "id": "<transaction publicId>",
   "tenantId": "<tenant publicId>",
-  "accountId": "<account publicId>",
-  "customerId": "<customer publicId>",
   "type": "TransferIn",
-  "cash": { "amount": 100.00, "currency": "NZD" },
+  "cash": [
+    {
+      "accountId": "<account publicId>",
+      "customerId": "<customer publicId>",
+      "amount": 100.00,
+      "currency": "NZD"
+    }
+  ],
+  "security": [],
   "bookedAt": "2026-09-24T09:00:00+12:00",
   "memo": "Salary",
   "reference": null,
@@ -305,7 +313,7 @@ Item:
 }
 ```
 
-The transaction item is optional `cash: { amount, currency }` plus optional `security` ([buy-sell.md](buy-sell.md)). `Split` / `Bonus` / `Scrip` omit `cash` ([split.md](split.md)). Do not keep a parallel flat `amount` on the item.
+The transaction item has `cash` and `security` arrays, each leg with its own `accountId` / `customerId` ([leg-accounts.md](leg-accounts.md) §8.1). Security-only types return `cash: []`; cash-only types return `security: []`. Do not keep a parallel flat `amount` on the item.
 
 `originalTransactionId` is set on a Reversal (points at the original). `reversedByTransactionId` is set on the original after reverse (points at the Reversal). Both are null on an unreversed original. Both are returned on list and get. Hide the Reverse button when `reversedByTransactionId` is not null or `type` is `Reversal`.
 

@@ -11,8 +11,7 @@ internal static class TransactionCash
     {
         var sum = await (
             from leg in db.TransactionCashLegs
-            join transaction in db.Transactions on leg.TransactionId equals transaction.Id
-            where transaction.AccountId == accountId
+            where leg.AccountId == accountId
             select (decimal?)leg.Amount).SumAsync(cancellationToken);
         return sum ?? 0m;
     }
@@ -21,5 +20,5 @@ internal static class TransactionCash
         IApplicationDbContext db,
         int accountId,
         CancellationToken cancellationToken) =>
-        db.Transactions.CountAsync(transaction => transaction.AccountId == accountId, cancellationToken);
+        TransactionLegAccounts.Query(db).CountAsync(row => row.AccountId == accountId, cancellationToken);
 }

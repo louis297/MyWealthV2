@@ -14,10 +14,8 @@ const customerId = "cccccccccccccccc-cccc-cccc-cccc-cccccccccccc";
 const transaction = {
   id: transactionId,
   tenantId: "22222222-2222-2222-2222-222222222222",
-  accountId,
-  customerId,
   type: "Buy",
-  cash: { amount: -1250, currency: "NZD" },
+  cash: [{ accountId, customerId, amount: -1250, currency: "NZD" }],
   bookedAt: "2026-10-11T10:00:00+13:00",
   memo: "Parcel",
   reference: null,
@@ -26,6 +24,8 @@ const transaction = {
   rowVersion: "AAAA",
   security: [
     {
+      accountId,
+      customerId,
       instrumentId: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
       quantity: 50,
       cost: 750,
@@ -139,6 +139,55 @@ describe("TransactionsListPage", () => {
     expect(request.headers.get("Authorization")).toBeNull();
     expect(request.credentials).toBe("include");
     expect(requestedUrls(fetchMock).some((item) => item.includes("/connect/"))).toBe(false);
+  });
+
+  it("shows every visible leg account and its cash on a transaction with two legs", async () => {
+    const otherAccountId = "abababab-abab-abab-abab-abababababab";
+    const otherCustomerId = "cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd";
+    const store = configureStore({
+      reducer: {
+        session: sessionSlice.reducer,
+        [api.reducerPath]: api.reducer,
+      },
+      middleware: (getDefault) => getDefault().concat(api.middleware),
+    });
+    store.dispatch(setCurrentUser(user()));
+    vi.mocked(fetch).mockImplementation(async () =>
+      new Response(
+        JSON.stringify({
+          items: [
+            {
+              ...transaction,
+              type: "TransferOut",
+              cash: [
+                { accountId, customerId, amount: -50, currency: "NZD" },
+                { accountId: otherAccountId, customerId: otherCustomerId, amount: 50, currency: "NZD" },
+              ],
+              security: [],
+            },
+          ],
+          page: 1,
+          pageSize: 20,
+          totalCount: 1,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const router = createMemoryRouter(
+      [{ path: "/transactions", element: <TransactionsListPage /> }],
+      { initialEntries: ["/transactions"] },
+    );
+    render(
+      <Provider store={store}>
+        <RouterProvider router={router} />
+      </Provider>,
+    );
+
+    expect(await screen.findByText("TransferOut")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: accountId })).toHaveAttribute("href", `/accounts/${accountId}`);
+    expect(screen.getByRole("link", { name: otherAccountId })).toHaveAttribute("href", `/accounts/${otherAccountId}`);
+    expect(screen.getByRole("link", { name: otherCustomerId })).toHaveAttribute("href", `/customers/${otherCustomerId}`);
+    expect(screen.getByText("-50 NZD, 50 NZD")).toBeInTheDocument();
   });
 
   it("uses the same unscoped list for an Adviser", async () => {

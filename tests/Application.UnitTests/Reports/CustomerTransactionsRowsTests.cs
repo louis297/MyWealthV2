@@ -69,6 +69,29 @@ public class CustomerTransactionsRowsTests
         ]);
     }
 
+    [Test]
+    public void Select_PairsEachReversalRowWithTheOriginalRowOnTheSameAccount()
+    {
+        var from = new DateOnly(2026, 1, 1);
+        var to = new DateOnly(2026, 2, 1);
+        var rows = new[]
+        {
+            Row(1, At(2026, 1, 2), memo: "original-a", accountId: 10),
+            Row(1, At(2026, 1, 2), memo: "original-b", accountId: 20),
+            Row(2, At(2026, 1, 5), originalTransactionId: 1, memo: "reversal-b", accountId: 20),
+            Row(2, At(2026, 1, 5), originalTransactionId: 1, memo: "reversal-a", accountId: 10)
+        };
+
+        var selected = CustomerTransactionsRows.Select(rows, from, to, includeClosedAccounts: false);
+
+        selected.Select(row => row.Memo).ShouldBe([
+            "original-a",
+            "reversal-a",
+            "original-b",
+            "reversal-b"
+        ]);
+    }
+
     private static DateTimeOffset At(int year, int month, int day) =>
         new(year, month, day, 0, 0, 0, TimeSpan.Zero);
 
@@ -77,6 +100,7 @@ public class CustomerTransactionsRowsTests
         DateTimeOffset bookedAt,
         int? originalTransactionId = null,
         bool accountClosed = false,
-        string? memo = null) =>
-        new(id, originalTransactionId, bookedAt, accountClosed, "Cash", "TransferIn", memo);
+        string? memo = null,
+        int accountId = 1) =>
+        new(id, originalTransactionId, bookedAt, accountClosed, "Cash", "TransferIn", memo, accountId);
 }

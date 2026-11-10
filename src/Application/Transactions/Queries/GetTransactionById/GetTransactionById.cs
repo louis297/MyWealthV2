@@ -14,40 +14,24 @@ public class GetTransactionByIdQueryHandler(IApplicationDbContext db, ICurrentUs
 {
     public async Task<TransactionDto> Handle(GetTransactionByIdQuery request, CancellationToken cancellationToken)
     {
-        var assignedAdviserId = AccountScope.AssignedAdviserInternalId(currentUser);
-        var selfCustomerId = AccountScope.SelfCustomerId(currentUser);
-        var query =
-            from transaction in db.Transactions.AsNoTracking()
-            join account in db.Accounts.AsNoTracking() on transaction.AccountId equals account.Id
-            join customer in db.Users.AsNoTracking() on account.CustomerId equals customer.Id
-            join tenant in db.Tenants.AsNoTracking() on transaction.TenantId equals tenant.Id
-            where transaction.PublicId == request.Id
-                  && (assignedAdviserId == null || customer.AdviserId == assignedAdviserId)
-                  && (selfCustomerId == null || customer.Id == selfCustomerId)
-            select new { transaction, account, customer, tenant };
-
+        var header = db.Transactions.AsNoTracking().Where(transaction => transaction.PublicId == request.Id);
         if (currentUser.Role != UserRole.SystemAdmin)
         {
-            query = query.Where(row => row.transaction.TenantId == currentUser.TenantId);
+            header = header.Where(transaction => transaction.TenantId == currentUser.TenantId);
         }
 
-        var row = await query.SingleOrDefaultAsync(cancellationToken)
+        var row = await (
+                      from transaction in header
+                      join tenant in db.Tenants.AsNoTracking() on transaction.TenantId equals tenant.Id
+                      select new { transaction, tenant }).SingleOrDefaultAsync(cancellationToken)
                   ?? throw new NotFoundException("Transaction", request.Id);
 
-        var cashLeg = await db.TransactionCashLegs.AsNoTracking()
-            .SingleOrDefaultAsync(leg => leg.TransactionId == row.transaction.Id, cancellationToken);
-        var security = await (
-            from leg in db.TransactionSecurityLegs.AsNoTracking()
-            join instrument in db.Instruments.AsNoTracking() on leg.InstrumentId equals instrument.Id
-            where leg.TransactionId == row.transaction.Id
-            orderby leg.Id
-            select new TransactionSecurityDto
-            {
-                InstrumentId = instrument.PublicId,
-                Quantity = leg.Quantity,
-                Cost = leg.CostAmount,
-                CostCurrency = leg.CostCurrency.Trim()
-            }).ToListAsync(cancellationToken);
+        var visibleAccountIds = TransactionVisibility.VisibleAccountIds(db, currentUser, row.transaction.TenantId);
+        var legs = await TransactionLegReader.LoadAsync(db, [row.transaction.Id], visibleAccountIds, cancellationToken);
+        if (!legs.Cash[row.transaction.Id].Any() && !legs.Security[row.transaction.Id].Any())
+        {
+            throw new NotFoundException("Transaction", request.Id);
+        }
 
         Guid? originalPublicId = null;
         if (row.transaction.OriginalTransactionId is int originalId)
@@ -71,19 +55,15 @@ public class GetTransactionByIdQueryHandler(IApplicationDbContext db, ICurrentUs
         {
             Id = row.transaction.PublicId,
             TenantId = row.tenant.PublicId,
-            AccountId = row.account.PublicId,
-            CustomerId = row.customer.PublicId,
             Type = row.transaction.Type.ToString(),
-            Cash = cashLeg is null
-                ? null
-                : new TransactionCashDto { Amount = cashLeg.Amount, Currency = cashLeg.Currency.Trim() },
+            Cash = legs.Cash[row.transaction.Id].ToList(),
             BookedAt = TransactionDto.FormatBookedAt(row.transaction.BookedAt),
             Memo = row.transaction.Memo,
             Reference = row.transaction.Reference,
             OriginalTransactionId = originalPublicId,
             ReversedByTransactionId = reversedByPublicId,
             RowVersion = Convert.ToBase64String(row.transaction.RowVersion ?? []),
-            Security = security.Count == 0 ? null : security
+            Security = legs.Security[row.transaction.Id].ToList()
         };
     }
 }

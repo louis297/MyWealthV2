@@ -58,17 +58,11 @@ public class GetTransactionsQueryHandler(IApplicationDbContext db, ICurrentUser 
                        ?? throw new NotFoundException("Tenant", "current");
         }
 
-        var assignedAdviserId = AccountScope.AssignedAdviserInternalId(currentUser);
         var selfCustomerId = AccountScope.SelfCustomerId(currentUser);
-        var query =
-            from transaction in db.Transactions.AsNoTracking()
-            join account in db.Accounts.AsNoTracking() on transaction.AccountId equals account.Id
-            join customer in db.Users.AsNoTracking() on account.CustomerId equals customer.Id
-            join tenant in db.Tenants.AsNoTracking() on transaction.TenantId equals tenant.Id
-            where transaction.TenantId == tenantId
-                  && (assignedAdviserId == null || customer.AdviserId == assignedAdviserId)
-                  && (selfCustomerId == null || customer.Id == selfCustomerId)
-            select new { transaction, account, customer, tenant };
+        var visibleAccountIds = TransactionVisibility.VisibleAccountIds(db, currentUser, tenantId);
+        var transactions = db.Transactions.AsNoTracking()
+            .Where(transaction => transaction.TenantId == tenantId)
+            .WithLegOn(visibleAccountIds);
 
         if (request.AccountId is { } accountPublicId)
         {
@@ -86,7 +80,8 @@ public class GetTransactionsQueryHandler(IApplicationDbContext db, ICurrentUser 
                 }
             }
 
-            query = query.Where(row => row.account.PublicId == accountPublicId);
+            transactions = transactions.WithLegOn(
+                db.Accounts.Where(account => account.PublicId == accountPublicId).Select(account => account.Id));
         }
 
         if (request.CustomerId is { } customerPublicId)
@@ -96,8 +91,17 @@ public class GetTransactionsQueryHandler(IApplicationDbContext db, ICurrentUser 
                 throw new NotFoundException("Customer", customerPublicId);
             }
 
-            query = query.Where(row => row.customer.PublicId == customerPublicId);
+            transactions = transactions.WithLegOn(
+                from account in db.Accounts
+                join customer in db.Users on account.CustomerId equals customer.Id
+                where customer.PublicId == customerPublicId
+                select account.Id);
         }
+
+        var query =
+            from transaction in transactions
+            join tenant in db.Tenants.AsNoTracking() on transaction.TenantId equals tenant.Id
+            select new { transaction, tenant };
 
         var totalCount = await query.CountAsync(cancellationToken);
         var rows = await query
@@ -108,33 +112,7 @@ public class GetTransactionsQueryHandler(IApplicationDbContext db, ICurrentUser 
             .ToListAsync(cancellationToken);
 
         var transactionIds = rows.Select(row => row.transaction.Id).ToList();
-        var cashLegs = await db.TransactionCashLegs.AsNoTracking()
-            .Where(leg => transactionIds.Contains(leg.TransactionId))
-            .ToDictionaryAsync(leg => leg.TransactionId, cancellationToken);
-        var securityRows = await (
-            from leg in db.TransactionSecurityLegs.AsNoTracking()
-            join instrument in db.Instruments.AsNoTracking() on leg.InstrumentId equals instrument.Id
-            where transactionIds.Contains(leg.TransactionId)
-            orderby leg.Id
-            select new
-            {
-                leg.TransactionId,
-                InstrumentId = instrument.PublicId,
-                leg.Quantity,
-                leg.CostAmount,
-                leg.CostCurrency
-            }).ToListAsync(cancellationToken);
-        var securityByTransaction = securityRows
-            .GroupBy(row => row.TransactionId)
-            .ToDictionary(
-                group => group.Key,
-                group => (IReadOnlyList<TransactionSecurityDto>)group.Select(row => new TransactionSecurityDto
-                {
-                    InstrumentId = row.InstrumentId,
-                    Quantity = row.Quantity,
-                    Cost = row.CostAmount,
-                    CostCurrency = row.CostCurrency.Trim()
-                }).ToList());
+        var legs = await TransactionLegReader.LoadAsync(db, transactionIds, visibleAccountIds, cancellationToken);
 
         var originalIds = rows
             .Where(row => row.transaction.OriginalTransactionId is not null)
@@ -162,18 +140,12 @@ public class GetTransactionsQueryHandler(IApplicationDbContext db, ICurrentUser 
         {
             Items = rows.Select(row =>
             {
-                cashLegs.TryGetValue(row.transaction.Id, out var cashLeg);
-                securityByTransaction.TryGetValue(row.transaction.Id, out var security);
                 return new TransactionDto
                 {
                     Id = row.transaction.PublicId,
                     TenantId = row.tenant.PublicId,
-                    AccountId = row.account.PublicId,
-                    CustomerId = row.customer.PublicId,
                     Type = row.transaction.Type.ToString(),
-                    Cash = cashLeg is null
-                        ? null
-                        : new TransactionCashDto { Amount = cashLeg.Amount, Currency = cashLeg.Currency.Trim() },
+                    Cash = legs.Cash[row.transaction.Id].ToList(),
                     BookedAt = TransactionDto.FormatBookedAt(row.transaction.BookedAt),
                     Memo = row.transaction.Memo,
                     Reference = row.transaction.Reference,
@@ -186,7 +158,7 @@ public class GetTransactionsQueryHandler(IApplicationDbContext db, ICurrentUser 
                         ? reversedByPublicId
                         : null,
                     RowVersion = Convert.ToBase64String(row.transaction.RowVersion ?? []),
-                    Security = security is { Count: > 0 } ? security : null
+                    Security = legs.Security[row.transaction.Id].ToList()
                 };
             }).ToList(),
             Page = request.Page,

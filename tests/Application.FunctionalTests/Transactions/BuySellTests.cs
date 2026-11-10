@@ -377,15 +377,17 @@ public class BuySellTests : TestBase
         using var buy = await GetItemAsync(tokens.AccessToken, buyId);
         buy.RootElement.TryGetProperty("amount", out _).ShouldBeFalse();
         buy.RootElement.TryGetProperty("currency", out _).ShouldBeFalse();
-        buy.RootElement.GetProperty("cash").GetProperty("amount").GetDecimal().ShouldBe(-1250.0000m);
-        buy.RootElement.GetProperty("cash").GetProperty("currency").GetString().ShouldBe("NZD");
+        TransactionJson.SingleCash(buy.RootElement).GetProperty("amount").GetDecimal().ShouldBe(-1250.0000m);
+        TransactionJson.SingleCash(buy.RootElement).GetProperty("currency").GetString().ShouldBe("NZD");
         var buyLeg = buy.RootElement.GetProperty("security").EnumerateArray().Single();
+        buyLeg.GetProperty("accountId").GetGuid().ShouldBe(accountId);
+        TransactionJson.SingleCash(buy.RootElement).GetProperty("accountId").GetGuid().ShouldBe(accountId);
         buyLeg.GetProperty("quantity").GetDecimal().ShouldBe(50m);
         buyLeg.GetProperty("cost").GetDecimal().ShouldBe(750.0000m);
         buyLeg.GetProperty("costCurrency").GetString().ShouldBe("USD");
 
         using var stockIn = await GetItemAsync(tokens.AccessToken, stockInId);
-        stockIn.RootElement.TryGetProperty("cash", out _).ShouldBeFalse();
+        TransactionJson.CashLegs(stockIn.RootElement).ShouldBeEmpty();
         stockIn.RootElement.GetProperty("security").EnumerateArray().Single()
             .GetProperty("costCurrency").GetString().ShouldBe("USD");
 
@@ -399,7 +401,7 @@ public class BuySellTests : TestBase
         ids.ShouldContain(stockInId);
         var listedBuy = json.RootElement.GetProperty("items").EnumerateArray()
             .Single(item => item.GetProperty("id").GetGuid() == buyId);
-        listedBuy.GetProperty("cash").GetProperty("amount").GetDecimal().ShouldBe(-1250.0000m);
+        TransactionJson.SingleCash(listedBuy).GetProperty("amount").GetDecimal().ShouldBe(-1250.0000m);
         listedBuy.TryGetProperty("security", out var listedSecurity).ShouldBeTrue();
         listedSecurity.EnumerateArray().Single().GetProperty("costCurrency").GetString().ShouldBe("USD");
     }
@@ -411,7 +413,7 @@ public class BuySellTests : TestBase
         using var item = await GetItemAsync(accessToken, id);
         var security = item.RootElement.GetProperty("security").EnumerateArray().Single();
         return (
-            item.RootElement.GetProperty("cash").GetProperty("amount").GetDecimal(),
+            TransactionJson.SingleCash(item.RootElement).GetProperty("amount").GetDecimal(),
             security.GetProperty("quantity").GetDecimal(),
             security.GetProperty("cost").GetDecimal());
     }
@@ -425,7 +427,7 @@ public class BuySellTests : TestBase
         decimal cost)
     {
         using var original = await GetItemAsync(accessToken, originalId);
-        original.RootElement.GetProperty("cash").GetProperty("amount").GetDecimal().ShouldBe(cash);
+        TransactionJson.SingleCash(original.RootElement).GetProperty("amount").GetDecimal().ShouldBe(cash);
         var originalLeg = original.RootElement.GetProperty("security").EnumerateArray().Single();
         originalLeg.GetProperty("quantity").GetDecimal().ShouldBe(quantity);
         originalLeg.GetProperty("cost").GetDecimal().ShouldBe(cost);
@@ -434,7 +436,7 @@ public class BuySellTests : TestBase
 
         using var reversal = await GetItemAsync(accessToken, reversalId);
         reversal.RootElement.GetProperty("type").GetString().ShouldBe("Reversal");
-        reversal.RootElement.GetProperty("cash").GetProperty("amount").GetDecimal().ShouldBe(-cash);
+        TransactionJson.SingleCash(reversal.RootElement).GetProperty("amount").GetDecimal().ShouldBe(-cash);
         var reversalLeg = reversal.RootElement.GetProperty("security").EnumerateArray().Single();
         reversalLeg.GetProperty("quantity").GetDecimal().ShouldBe(-quantity);
         reversalLeg.GetProperty("cost").GetDecimal().ShouldBe(-cost);

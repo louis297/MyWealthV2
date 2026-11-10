@@ -13,8 +13,11 @@ public class HoldingsSchemaTests
         var securityColumns = await LoadColumns("TransactionSecurityLegs");
         securityColumns.Select(column => column.Name).ShouldBe([
             "Id", "TransactionId", "InstrumentId", "Quantity", "CostAmount", "CostCurrency",
-            "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion"
+            "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion", "AccountId"
         ]);
+        Column(securityColumns, "AccountId").ShouldSatisfyAllConditions(
+            column => column.Type.ShouldBe("int"),
+            column => column.Nullable.ShouldBe("NO"));
         Column(securityColumns, "Id").ShouldSatisfyAllConditions(
             column => column.Type.ShouldBe("int"),
             column => column.Nullable.ShouldBe("NO"),
@@ -102,11 +105,13 @@ public class HoldingsSchemaTests
             ("UQ_Holdings_PublicId", "PublicId")
         ]);
         (await UniqueColumns("TransactionSecurityLegs")).ShouldBe([
-            ("UQ_TransactionSecurityLegs_TransactionId_InstrumentId", "TransactionId"),
-            ("UQ_TransactionSecurityLegs_TransactionId_InstrumentId", "InstrumentId")
+            ("UQ_TransactionSecurityLegs_TransactionId_AccountId_InstrumentId", "TransactionId"),
+            ("UQ_TransactionSecurityLegs_TransactionId_AccountId_InstrumentId", "AccountId"),
+            ("UQ_TransactionSecurityLegs_TransactionId_AccountId_InstrumentId", "InstrumentId")
         ]);
 
         (await ForeignKeys("TransactionSecurityLegs")).ShouldBe([
+            ("FK_TransactionSecurityLegs_Accounts_AccountId", "Accounts", "Id", (byte)0),
             ("FK_TransactionSecurityLegs_Currencies_CostCurrency", "Currencies", "Code", (byte)0),
             ("FK_TransactionSecurityLegs_Instruments_InstrumentId", "Instruments", "Id", (byte)0),
             ("FK_TransactionSecurityLegs_Transactions_TransactionId", "Transactions", "Id", (byte)0)
@@ -144,7 +149,7 @@ public class HoldingsSchemaTests
         security.GetProperty("Quantity").GetColumnType().ShouldBe("decimal(18,8)");
         security.GetProperty("CostAmount").GetColumnType().ShouldBe("decimal(18,4)");
         security.GetProperty("CostCurrency").GetColumnType().ShouldBe("char(3)");
-        UniqueIndexColumns(security).ShouldBe(["TransactionId,InstrumentId"]);
+        UniqueIndexColumns(security).ShouldBe(["TransactionId,AccountId,InstrumentId"]);
         security.GetForeignKeys().Single(key => key.Properties.Single().Name == "TransactionId")
             .DeleteBehavior.ShouldBe(DeleteBehavior.Restrict);
 

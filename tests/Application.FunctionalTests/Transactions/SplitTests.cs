@@ -60,7 +60,7 @@ public class SplitTests : TestBase
 
         using var item = await GetItemAsync(tokens.AccessToken, id);
         item.RootElement.GetProperty("type").GetString().ShouldBe("Split");
-        item.RootElement.TryGetProperty("cash", out _).ShouldBeFalse();
+        TransactionJson.CashLegs(item.RootElement).ShouldBeEmpty();
         var leg = item.RootElement.GetProperty("security").EnumerateArray().Single();
         leg.GetProperty("instrumentId").GetGuid().ShouldBe(instrumentId);
         leg.GetProperty("quantity").GetDecimal().ShouldBe(100m);
