@@ -272,6 +272,8 @@ Amend [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.m
 - In-kind transfer (security legs on two Accounts).
 - Fees — deferred, to be designed with other fee work.
 
+The transfer increment is drafted in [internal-transfers.md](internal-transfers.md): type `InternalTransfer`, route `POST /transactions/transfer`, cash only, same currency. Cross-currency and in-kind transfer stay open.
+
 ---
 
 ## 13. Decided for the transfer increment
