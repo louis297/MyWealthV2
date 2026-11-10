@@ -462,3 +462,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-10-26 | Reports: `PUT /reports/{id}` for catalog IsActive. False cascades revoke of all TenantReports for that report. |
 | 2026-10-26 | Reports: `GET /reports/catalog` lists every catalog row for SystemAdmin. Tenant grant list omits inactive rows. Granting an inactive catalog report is 404. |
 | 2026-11-10 | Transactions: type-specific create routes convention (§7.7). Internal transfers draft: `POST /transactions/transfer`, `type` list filter ([features/internal-transfers.md](features/internal-transfers.md)). |
+| 2026-11-10 | Internal transfers accepted. `POST /transactions/transfer` returns 201 `{ id }` with `Location: /transactions/{id}` and requires `Idempotency-Key`. `POST /transactions` rejects `InternalTransfer`. `GET /transactions` takes an optional `type` (exact `TransactionType` name; anything else → 400). |

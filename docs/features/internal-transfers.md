@@ -27,8 +27,6 @@ Cash transfer between two Accounts in the same tenant, on `webapi`. One Transact
 
 This is the increment that [leg-accounts.md](leg-accounts.md) prepared (§12, §13) and [posting.md](posting.md) §13 deferred. It adds one `TransactionType`, one create route `POST /transactions/transfer`, an optional `type` filter on the transaction list, and script `0025`. No new policy. Read and reverse reuse the existing `/transactions` routes.
 
-**Status is `draft`.** Not a build contract.
-
 ---
 
 ## 1. Summary
@@ -242,7 +240,8 @@ Later (not this slice): one search box that finds Accounts by Account name or Cu
 | --- | --- |
 | Domain.UnitTests | Factory builds two cash legs, `−amount` on from and `+amount` on to; rejects same Account, different currencies, `amount ≤ 0`; Reverse of a transfer produces the opposite leg on each Account |
 | Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403; happy path same Customer and two Customers (TenantAdmin, Adviser assigned to both); Adviser unassigned on either side → 404 and nothing written; same Account → 400; currency mismatch → 400; Closed from or to → 400; Disabled Customer on either side → 400 `disabled` / `target=user`; insufficient cash → 400; forbidden body fields (`type`, `accountId`, `currency`) → 400; `POST /transactions` with `InternalTransfer` → 400; missing `Idempotency-Key` → 400, replay → same id, different hash → 409; cash balances of both Accounts after create and after reverse; reverse after the to Account spent the cash → 400 and nothing written; Opening on an Account that received a transfer → 400; transfer allowed on an Account with an Active portfolio assignment and no rebalance is enqueued; list `type=InternalTransfer` with and without `accountId`; unknown `type` → 400; caller who sees one side gets one leg only |
-| Infrastructure.IntegrationTests | Two-tenant fixture: from or to Account in the other tenant → 404 and nothing written; other tenant's transfer id on get / reverse → 404; `CK_Transactions_Type` accepts 15 |
+| Infrastructure.IntegrationTests | `CK_Transactions_Type` accepts 15 and rejects 16 |
+| Application.FunctionalTests (two tenants) | From or to Account in the other tenant → 404 and nothing written (TenantAdmin and SystemAdmin); other tenant's transfer id on get / reverse → 404. These assert HTTP status codes, so they live with the other transaction isolation tests in the functional layer (`InternalTransferIsolationTests`), not in the schema fixture |
 | Frontend | Picker defaults to the source Customer; Customer search debounced; Closed / different-currency / source Accounts are greyed out with a reason; confirm summary warns when Customers differ |
 
 ---
