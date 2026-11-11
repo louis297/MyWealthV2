@@ -201,7 +201,7 @@ Playwright, run from the GitHub runner against the public hostnames. The cases, 
 
 | # | Account | Proves |
 | --- | --- | --- |
-| S1 | Smoke Adviser sees the Dashboard net worth | TLS, Caddy routing, OIDC through `bff-adviser-portal`, `webapi`, SQL |
+| S1 | Smoke Adviser sees the Dashboard with its net-worth section | TLS, Caddy routing, OIDC through `bff-adviser-portal`, `webapi`, SQL |
 | S2 | Smoke Customer sees their Account | The second OIDC client and Customer scope |
 
 - Both cases only read. They post nothing.
@@ -252,7 +252,7 @@ Found while writing this doc (2026-11-11). Each item needs a Feature Spec or ame
 | 4 | The BFFs serve the SPA only through `DevelopmentSpaProxy` | Serve the built SPA from the BFF in Production, with fallback to `index.html` for client routes. Amendment to [bff-adviser-portal.md](features/bff-adviser-portal.md) and [bff-customer-portal.md](features/bff-customer-portal.md) |
 | 5 | `MapDefaultEndpoints` maps `/health` and `/alive` only in Development | Map them in Production on the internal port only, not routed by Caddy. Wiring |
 | 6 | The SystemAdmin exists only through `DevelopmentIdentitySeeder`. Production has no SystemAdmin | A production bootstrap: create one SystemAdmin from configuration when none exists. Amendment to [identity-auth.md](features/identity-auth.md) |
-| 7 | `TestSeed` runs only in Development. [tenants.md](features/tenants.md) R17 forbids seeding a demo firm | Demo data for visitors. Open decision (§14) |
+| 7 | `TestSeed` runs only in Development. [tenants.md](features/tenants.md) R17 allows seeding only in Development | Demo data for visitors. Open decision (§14) |
 | 8 | The AppHost is Azure-shaped (`AddAzureContainerAppEnvironment`, `AddAzureSqlServer`) | Hand-written compose file for the VPS. The AppHost stays the Development orchestrator. Config |
 | 9 | No Playwright project | Add the smoke test project, its Development seed and its workflow ([smoke-test.md](smoke-test.md) §8) |
 

@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-13
-last_updated: 2026-11-11
+last_updated: 2026-11-12
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -97,7 +97,7 @@ SystemAdmin onboards a firm with `name`, `code`, and an enabled `reportingCurren
 | R14 | No physical delete. FK `Users.TenantId` is RESTRICT. |
 | R15 | List query: `page` (1-based, default 1), `pageSize` (default 20, max 100), optional `isEnabled`, optional `search`. `search` matches Name or Code contains (CI) or `PublicId` exact. Sort: `name` ascending, then `code`. Disabled rows stay on the same list (filter if the caller asks). |
 | R16 | Tenants is a **platform** resource. It has no `TenantId` column. Dual-check isolation of *tenant-owned rows* starts as a reusable two-tenant fixture here and is asserted on later slices. This slice’s own gate is policy 403, not a 404-for-other-tenant pattern. |
-| R17 | Do not seed a demo firm in Development. Tests create tenants. SystemAdmin seed stays identity-auth. |
+| R17 | Functional tests create their own tenants and never rely on seeded ones. Development may seed only the named fixture tenants `demo`, `demo2` (`TestSeed`) and `smoke` ([smoke-test.md](../smoke-test.md) §3). No tenant is seeded outside Development. SystemAdmin seed stays identity-auth. Amended 2026-11-12. |
 
 ---
 
@@ -345,3 +345,14 @@ Records behaviour that landed with [outbox.md](outbox.md) (`e9b8b81`). Supersede
 - Hosted login for that Code fails at once. An existing refresh token keeps working until the event is delivered.
 - Re-enable restores login for people who are still `Active` (unchanged). If the tenant is re-enabled before the event is delivered, the handler still revokes every subject when it runs.
 - Functional tests assert that refresh still succeeds right after disable and after disable + enable, because the functional host does not run the worker. Revocation itself is covered in Infrastructure.IntegrationTests.
+
+---
+
+## Amendment 2026-11-12 (Development fixture tenants)
+
+Supersedes R17 as first written ("Do not seed a demo firm in Development").
+
+- `TestSeed` already seeds `demo` and `demo2` in Development (function-plan "Test seed per slice"). R17 now records that.
+- The smoke tenant `smoke` joins them. Its rows and the condition for seeding it (both smoke passwords configured) are owned by [smoke-test.md](../smoke-test.md) §3.
+- No other tenant is seeded. No tenant is seeded outside Development. In production the smoke tenant is created by hand.
+- Functional tests still create their own tenants and must not depend on any seeded tenant.

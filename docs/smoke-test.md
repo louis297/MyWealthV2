@@ -50,11 +50,12 @@ This doc is `draft`. It is not a build contract.
 
 | # | Account | Steps | Pass when |
 | --- | --- | --- | --- |
-| S1 | Smoke Adviser | Open the Adviser Portal origin → redirected to hosted login → enter TenantCode `smoke`, email, password → back on `/dashboard` | The Dashboard is shown and its per-currency net worth shows `NZD` with `1,000.00` |
+| S1 | Smoke Adviser | Open the Adviser Portal origin → redirected to hosted login → enter TenantCode `smoke`, email, password → back on `/dashboard` | The Dashboard is rendered and its net-worth section is visible |
 | S2 | Smoke Customer | Open the Customer Portal origin → hosted login → open `/accounts` | The account list shows `Smoke Cash` |
 
 - Each case starts in a fresh browser context, so no cookie is shared between S1 and S2.
 - Locators use roles, labels and visible text, not CSS classes. The suite does not lock page markup.
+- The suite checks that the site is on, not that numbers are right. S1 does not assert the net-worth amount; checking values is left to later tests.
 - S1 proves TLS, routing, OIDC through `bff-adviser-portal`, `webapi` and SQL. S2 proves the second OIDC client and Customer scope.
 - Neither case posts anything. They can run any number of times without changing data.
 
@@ -73,7 +74,7 @@ The **smoke tenant** is a tenant used only by this suite. It stays enabled.
 | Account | `Smoke Cash`, type Bank, currency `NZD`, owned by Smoke Customer |
 | Transaction | One `TransferIn` of `NZD 1,000.00` into Smoke Cash |
 
-- The data is **cash only, in the reporting currency**. Net worth then needs no instrument price and no FX rate, so the worker's price and FX refresh never moves the asserted number.
+- The data is **cash only, in the reporting currency**. Net worth then needs no instrument price and no FX rate, so it always renders and stays stable for any later test that checks the amount.
 - Emails and the TenantCode are the same in every environment. Only the passwords and the origins differ.
 - Passwords are long random strings (at least 32 characters). They are never in the repository.
 
@@ -81,7 +82,7 @@ The **smoke tenant** is a tenant used only by this suite. It stays enabled.
 
 **Development.** The Development seed creates the smoke tenant and its rows when both smoke passwords are configured (§5), and skips it with a log line when either is missing. It is idempotent on natural keys (TenantCode, email, account name). It does not reset an existing login's password; to change a local smoke password, recreate the local database. No TenantAdmin is seeded for the smoke tenant.
 
-Conflict to resolve before this doc is accepted: [tenants.md](features/tenants.md) R17 says not to seed a demo firm in Development, but `TestSeed` already seeds `demo` and `demo2`. Seeding the smoke tenant needs the same exception. Amend R17 to allow Development-only seeding of named fixture tenants (`demo`, `demo2`, `smoke`), or move the smoke rows to a seeder of their own with the same rule.
+Seeding the smoke tenant in Development is allowed by [tenants.md](features/tenants.md) R17 (amendment 2026-11-12).
 
 ---
 
@@ -145,7 +146,7 @@ None of these exist yet.
 | # | Change | Kind |
 | --- | --- | --- |
 | 1 | `tests/Smoke.Tests` with S1 and S2 | Test code |
-| 2 | Development seed for the smoke tenant (§3), after the R17 amendment | Seed, Development only |
+| 2 | Development seed for the smoke tenant (§3) | Seed, Development only |
 | 3 | AppHost reads `Smoke:AdviserPassword` / `Smoke:CustomerPassword` and passes them to the seeding host | Wiring |
 | 4 | CI builds `tests/Smoke.Tests` without running it | CI |
 | 5 | `.github/workflows/smoke.yml` (§7) | CI |
