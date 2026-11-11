@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!--
+      Playwright smoke test (docs/smoke-test.md). Not in MyWealthV2.slnx: it needs running hosts.
+      Shares the AppHost UserSecretsId so one user-secrets store feeds both the Development seed and these tests.
+    -->
+    <PropertyGroup>
+        <RootNamespace>MyWealthV2.Smoke.Tests</RootNamespace>
+        <AssemblyName>MyWealthV2.Smoke.Tests</AssemblyName>
+        <IsPackable>false</IsPackable>
+        <UserSecretsId>65140ff7-5cd7-47a7-9a1a-60c37aadd6e7</UserSecretsId>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" />
+        <PackageReference Include="NUnit" />
+        <PackageReference Include="NUnit3TestAdapter" />
+        <PackageReference Include="NUnit.Analyzers">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Microsoft.Playwright.NUnit" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Using Include="NUnit.Framework" />
+    </ItemGroup>
+
+</Project>
