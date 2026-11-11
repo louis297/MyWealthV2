@@ -1,6 +1,6 @@
 ---
 title: Smoke test
-status: draft
+status: accepted
 language: en
 created: 2026-11-12
 updated: 2026-11-12
@@ -23,7 +23,7 @@ The same suite runs in two places:
 - **Locally**, against the Aspire AppHost in Development.
 - **In CD**, from GitHub Actions against the public hostnames after each deploy ([deployment.md](deployment.md) §9).
 
-This doc is `draft`. It is not a build contract.
+This doc is `accepted` (2026-11-12). It is the build contract for §8.
 
 ---
 
@@ -102,8 +102,8 @@ The suite reads the `Smoke` configuration section. Environment variables overrid
 
 | Key | Secret | Local source | CD source |
 | --- | --- | --- | --- |
-| `Smoke:AdviserPortalUrl` | No | Default: the local `bff-adviser-portal` origin | Workflow env, `https://adviser.<domain>` |
-| `Smoke:CustomerPortalUrl` | No | Default: the local `bff-customer-portal` origin | Workflow env, `https://customer.<domain>` |
+| `Smoke:AdviserPortalUrl` | No | Default: the local `bff-adviser-portal` origin | GitHub environment variable `SMOKE_ADVISER_PORTAL_URL` (`https://adviser.<domain>`) |
+| `Smoke:CustomerPortalUrl` | No | Default: the local `bff-customer-portal` origin | GitHub environment variable `SMOKE_CUSTOMER_PORTAL_URL` (`https://customer.<domain>`) |
 | `Smoke:AdviserPassword` | Yes | User secrets | GitHub environment secret `SMOKE_ADVISER_PASSWORD` → env `Smoke__AdviserPassword` |
 | `Smoke:CustomerPassword` | Yes | User secrets | GitHub environment secret `SMOKE_CUSTOMER_PASSWORD` → env `Smoke__CustomerPassword` |
 
