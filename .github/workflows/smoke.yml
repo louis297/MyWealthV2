@@ -1,0 +1,61 @@
+name: Smoke
+
+# Post-deploy smoke test (docs/smoke-test.md §7).
+# Called by the deploy workflow, or run by hand after a rebuild (docs/deployment.md §12).
+# Needs, in GitHub environment `production`:
+#   variables SMOKE_ADVISER_PORTAL_URL, SMOKE_CUSTOMER_PORTAL_URL
+#   secrets   SMOKE_ADVISER_PASSWORD, SMOKE_CUSTOMER_PASSWORD
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+
+    env:
+      Smoke__AdviserPortalUrl: ${{ vars.SMOKE_ADVISER_PORTAL_URL }}
+      Smoke__CustomerPortalUrl: ${{ vars.SMOKE_CUSTOMER_PORTAL_URL }}
+      Smoke__AdviserPassword: ${{ secrets.SMOKE_ADVISER_PASSWORD }}
+      Smoke__CustomerPassword: ${{ secrets.SMOKE_CUSTOMER_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.x'
+
+      - name: Build
+        run: dotnet build tests/Smoke.Tests --configuration Release
+
+      - name: Install Chromium
+        shell: pwsh
+        run: artifacts/bin/Smoke.Tests/release/playwright.ps1 install --with-deps chromium
+
+      - name: Run smoke test
+        run: |
+          dotnet test tests/Smoke.Tests \
+            --no-build \
+            --configuration Release \
+            --logger "trx;LogFileName=smoke-results.trx"
+
+      - name: Upload traces and screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-results
+          path: |
+            artifacts/bin/Smoke.Tests/release/playwright/
+            **/smoke-results.trx
+          retention-days: 7
