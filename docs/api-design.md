@@ -97,7 +97,7 @@ Protocol scopes (not permissions): `openid`, `profile`, `offline_access`, `api`.
 
 Disable / enable for people: `POST /{id}/disable`, `POST /{id}/enable` (`Disabled` ↔ `Active`). Not a physical delete. Disabling an Adviser requires assigned non-disabled Customers to be handled first. Disabling the last TenantAdmin is allowed in Phase 1 (known gap).
 
-Disabling a tenant does **not** bulk-update `User.Status`. Person status is independent; login checks both. After a tenant is disabled, that Code must not complete login and existing refresh must fail.
+Disabling a tenant does **not** bulk-update `User.Status`. Person status is independent; login checks both. After a tenant is disabled, that Code must not complete login, and existing refresh fails once the outbox delivers `TenantDisabled`.
 
 Password change, disable, and logout revoke that subject’s OpenIddict tokens. The User aggregate does not hold tokens.
 
@@ -281,7 +281,7 @@ Lookup: `GET /tenants/by-code/{code}` uses `tenants.read` (SystemAdmin, TenantAd
 - POST body: `name`, `code`, `reportingCurrency`
 - PUT body: `name`, `reportingCurrency`, `rowVersion`
 - `code` is immutable after create (login key). Reporting currency may change in this phase (no ledger balances keyed on it yet).
-- After disable, that Code must not complete login; existing refresh fails. Person `Status` is not bulk-updated.
+- After disable, that Code must not complete login; existing refresh fails once the outbox delivers `TenantDisabled`. Person `Status` is not bulk-updated.
 - Field rules: [features/tenants.md](features/tenants.md).
 
 ### 7.4 People (TenantAdmin / Adviser / Customer)

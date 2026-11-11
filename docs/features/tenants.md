@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-13
-last_updated: 2026-09-21
+last_updated: 2026-11-11
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -334,3 +334,14 @@ The repository should build after each commit.
 6. Two-tenant fixture documented in the test project for later slices
 
 Do not put `/users/tenant-admins` in these commits.
+
+---
+
+## Amendment 2026-11-11 (revocation is delivered by the outbox)
+
+Records behaviour that landed with [outbox.md](outbox.md) (`e9b8b81`). Supersedes the timing in the summary, story 4, R11, the §9 acceptance line "existing refresh fails", the §10 functional row "refresh for those subjects fails", the note under §10, and commit 5 "refresh-fail" in §12. Same rules as the identity-auth amendment of the same date.
+
+- Disable commits `IsActive = false` and the `TenantDisabled` outbox row together. `RevokeTokensOnTenantDisabled` runs when the `worker` delivers the event, not inside the disable request.
+- Hosted login for that Code fails at once. An existing refresh token keeps working until the event is delivered.
+- Re-enable restores login for people who are still `Active` (unchanged). If the tenant is re-enabled before the event is delivered, the handler still revokes every subject when it runs.
+- Functional tests assert that refresh still succeeds right after disable and after disable + enable, because the functional host does not run the worker. Revocation itself is covered in Infrastructure.IntegrationTests.

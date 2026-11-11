@@ -454,6 +454,17 @@ Accepted 2026-11-11. Supersedes the `adviser-portal` row in §1, R20, A5, the §
 | A23 | Same person as A22 | Hosted login for client `back-office` | Authorization code issued. Access token works on SystemAdmin routes. |
 | A24 | Leftover SystemAdmin session in the Adviser Portal | Open `/`, `/profile`, or `/session` | `/forbidden`. No Profile page. No `by-code` call. |
 
+### Amendment 2026-11-11 (revocation is delivered by the outbox)
+
+Records behaviour that landed with [outbox.md](outbox.md) (`e9b8b81`). Do not rewrite R5, story 5 or §10 in place; this amendment supersedes their timing.
+
+- `UserPasswordChanged`, `UserDisabled` and `TenantDisabled` are written to `OutboxMessages` in the same transaction as the change. The `worker` publishes them after commit, and the revocation handlers run then. The change request returns before any token is revoked.
+- Until the event is delivered, an existing refresh token for that subject still works. The token endpoint does not re-check `Users.Status` or the tenant flag on a refresh grant. The window is the outbox poll interval plus retries. A dead-lettered event leaves the refresh token valid until its 14-day absolute lifetime.
+- New hosted login is blocked at once: login and `/connect/authorize` check `LoginEligibility` on every request.
+- Logout is unchanged and synchronous: the presented refresh token is revoked at `/connect/revocation` (A13).
+- Tests: the functional host does not run the outbox worker. Functional tests for password change and disable assert that refresh **still succeeds** right after the call. The revocation handlers and repeat delivery are covered in Infrastructure.IntegrationTests (`RevokeTokensIdempotencyTests`, `RevokeTokensTenantScopeTests`).
+- No new table. No new route. No schema change.
+
 ### Amendment 2026-09-14 (R21 — end session)
 
 Passthrough without an action left `/connect/logout` unhandled. Manual Sign out then bounced through `/callback` and OpenIddict returned `invalid_grant` / `ID2010` (authorization code redeemed twice). No new ADR. No `/auth/logout`.

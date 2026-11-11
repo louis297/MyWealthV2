@@ -116,7 +116,7 @@ Hosted in `src/IdentityHost` (ADR 0014). Aspire resource name: `identity`.
 | Hosted login | Password page on `identity`: email + password + tenantCode (SystemAdmin omits tenantCode) |
 | Client | Three confidential clients. `adviser-portal` is held by `bff-adviser-portal`. `back-office` is held by `src/BackOffice`. `customer-portal` is held by `bff-customer-portal` (accepted). Authorization code + PKCE + refresh. No password grant. |
 | Access | Short-lived JWT. **Asymmetric** signing. Public keys on JWKS |
-| Refresh | OpenIddict token store. Revoked on logout, password change, and disable. Rotated when presented. No custom `RefreshTokens` table |
+| Refresh | OpenIddict token store. Revoked on logout (at once), and on password change and disable (when the outbox delivers the event). Rotated when presented. No custom `RefreshTokens` table |
 | Scopes | `openid`, `profile`, `offline_access`, `api`. Role and tenant are JWT claims, not scopes. Permissions are not expanded into the token |
 
 The login gate on the authorization server reads domain invariants: tenant enabled, `UserStatus = Active`, valid Identity link, then the client × role allow-list. `adviser-portal` issues a code only to TenantAdmin and Adviser. `back-office` issues a code only to SystemAdmin. `customer-portal` issues a code only to Customer. SystemAdmin may complete login with no tenantCode. Adviser-management resource policies stay 403.
@@ -249,7 +249,7 @@ Tenant resolution: login requires tenantCode except for SystemAdmin. The JWT car
 
 API paths and JSON use PublicId only. Internal code still uses `int`.
 
-Password change, disable, and logout revoke that subject’s OpenIddict tokens. The User aggregate does not hold tokens. After a tenant is disabled, that Code must not complete login and existing refresh must fail. Disabling a tenant does **not** bulk-update `User.Status`. Person status is independent; login checks both.
+Password change, disable, and logout revoke that subject’s OpenIddict tokens. The User aggregate does not hold tokens. Logout revokes at once. Password change, person disable and tenant disable revoke when the outbox delivers the domain event ([features/outbox.md](features/outbox.md)); until then an existing refresh token still works, because the token endpoint does not re-check status on a refresh grant. After a tenant is disabled, that Code must not complete login, and existing refresh fails once the event is delivered. Disabling a tenant does **not** bulk-update `User.Status`. Person status is independent; login checks both.
 
 ---
 
