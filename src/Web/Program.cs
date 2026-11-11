@@ -28,6 +28,11 @@ await using (var scope = app.Services.CreateAsyncScope())
     {
         await DevelopmentIdentitySeeder.SeedAsync(scope.ServiceProvider, CancellationToken.None);
         await TestSeed.SeedAsync(scope.ServiceProvider, CancellationToken.None);
+        await DevelopmentSmokeSeeder.SeedAsync(
+            scope.ServiceProvider,
+            app.Configuration[DevelopmentSmokeSeeder.AdviserPasswordKey],
+            app.Configuration[DevelopmentSmokeSeeder.CustomerPasswordKey],
+            CancellationToken.None);
     }
 }
 

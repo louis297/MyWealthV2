@@ -29,6 +29,19 @@ var web = builder.AddProject<Projects.Web>(Services.WebApi)
     .WithEnvironment("Reports__StorageRoot", reportsPath);
     //.WithVolume("reports", "/data/reports", env: "Reports__StorageRoot");
 
+// Smoke tenant passwords (docs/smoke-test.md §5). Set in user secrets as Smoke:AdviserPassword and
+// Smoke:CustomerPassword; tests/Smoke.Tests reads the same store. Missing → webapi skips the smoke seed.
+if (!string.IsNullOrWhiteSpace(builder.Configuration["Smoke:AdviserPassword"])
+    && !string.IsNullOrWhiteSpace(builder.Configuration["Smoke:CustomerPassword"]))
+{
+    var smokeAdviserPassword = builder.AddParameterFromConfiguration(
+        "smoke-adviser-password", "Smoke:AdviserPassword", secret: true);
+    var smokeCustomerPassword = builder.AddParameterFromConfiguration(
+        "smoke-customer-password", "Smoke:CustomerPassword", secret: true);
+    web.WithEnvironment("Smoke__AdviserPassword", smokeAdviserPassword)
+        .WithEnvironment("Smoke__CustomerPassword", smokeCustomerPassword);
+}
+
 var identity = builder.AddProject<Projects.IdentityHost>(Services.Identity)
     .WithReference(databaseServer)
     .WaitFor(web)
