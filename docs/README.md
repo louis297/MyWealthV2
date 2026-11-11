@@ -88,6 +88,7 @@ Implement **accepted** specs for the current phase only. `draft` and `note` are 
 | Doc | Owns | Does not own |
 | --- | --- | --- |
 | [function-plan.md](function-plan.md) | Scope, roles, phase map | Field-level contracts |
+| [deployment.md](deployment.md) | VPS topology, CD pipeline, secrets placement, post-deploy smoke test, rebuild runbook | Feature behaviour; build contracts for the code changes it lists |
 | [future-plans.md](future-plans.md) | Reminder list of large future directions (`note`) | Any build contract, priority or backlog |
 | [glossary.md](glossary.md) | Names | Design arguments |
 | [architecture.md](architecture.md) | Host, layers, ports, cross-cutting | Per-slice commands |
