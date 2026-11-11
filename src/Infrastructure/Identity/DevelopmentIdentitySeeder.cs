@@ -108,7 +108,7 @@ public static class DevelopmentIdentitySeeder
         new(SecondTenantCode, SecondTenantName, SecondTenantAdminEmail, "Tenant Admin 2", SecondAdviserEmail, "Demo Adviser 2"),
     ];
 
-    private static async Task EnsurePersonAsync(
+    internal static async Task EnsurePersonAsync(
         ApplicationDbContext db,
         UserManager<ApplicationUser> userManager,
         UserRole role,
@@ -116,7 +116,8 @@ public static class DevelopmentIdentitySeeder
         string email,
         string password,
         int? tenantId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int? adviserId = null)
     {
         var exists = tenantId is null
             ? await db.DomainUsers.AnyAsync(
@@ -151,6 +152,7 @@ public static class DevelopmentIdentitySeeder
             email,
             identityUser.Id,
             tenantId,
+            adviserId,
             publicId: publicId);
 
         db.DomainUsers.Add(person);

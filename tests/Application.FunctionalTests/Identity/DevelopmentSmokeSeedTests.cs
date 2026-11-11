@@ -12,8 +12,8 @@ namespace MyWealthV2.Application.FunctionalTests.Identity;
 
 public class DevelopmentSmokeSeedTests : TestBase
 {
-    private const string AdviserPassword = "smoke-adviser-password-for-tests-0001";
-    private const string CustomerPassword = "smoke-customer-password-for-tests-0001";
+    private const string AdviserPassword = "Smoke-Adviser-Password-For-Tests-0001!";
+    private const string CustomerPassword = "Smoke-Customer-Password-For-Tests-0001!";
 
     [Test]
     public async Task Seed_SmokeAdviserSignsIn_AndSeesOnlySmokeCash()
