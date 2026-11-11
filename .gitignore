@@ -511,3 +511,6 @@ $RECYCLE.BIN/
 
 #Claude Code local settings
 .claude/settings.local.json
+
+# Local operator docs (not committed)
+local_docs/
