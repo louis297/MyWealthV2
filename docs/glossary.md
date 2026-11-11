@@ -3,7 +3,7 @@ title: Glossary
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-11-11
+updated: 2026-11-12
 related:
   - function-plan.md
   - domain-model.md
@@ -155,8 +155,9 @@ Later portals copy the last BFF row: `bff-customer-portal`, `BffCustomerPortal`,
 | PublicId | UUID column used by API and UI. | Clustered primary key; login short code `TenantCode` |
 | `/users` prefix | Namespace for people resource APIs (`/users/me`, `/users/tenant-admins`, `/users/advisers`, `/users/customers`). Not a parent resource and not a catch-all `GET/POST /users`. | `/users/{id}/advisers`; putting tenants or ledger routes under `/users` |
 | Id | `int` identity on `BaseEntity`. Internal only. | Value exposed in routes or JSON |
-| Smoke tenant | Tenant used only by the post-deploy smoke test. Created by hand in Back Office after the first deploy; stays enabled. See [deployment.md](deployment.md) §10. | A demo tenant for visitors; a tenant created by `TestSeed` |
-| Post-deploy smoke test | Playwright run from GitHub Actions against the public hostnames after each deploy. Reads only. A failure fails the deploy and rolls back the image tag. | The functional test suite; an end-to-end suite of business rules |
+| Smoke tenant | Tenant used only by the smoke test (TenantCode `smoke`). Created by hand in production after the first deploy; seeded in Development when the smoke passwords are configured. Stays enabled. See [smoke-test.md](smoke-test.md) §3. | A demo tenant for visitors; `demo` / `demo2` |
+| Smoke test | Playwright suite `tests/Smoke.Tests` that signs in to each portal and reads one page, to prove the system is on. Reads only. Runs locally and after each deploy. See [smoke-test.md](smoke-test.md). | The functional test suite; an end-to-end suite of business rules |
+| Post-deploy smoke test | The smoke test run from GitHub Actions against the public hostnames after each deploy. A failure fails the deploy and rolls back the image tag. | Running the smoke test on every pull request |
 
 ---
 

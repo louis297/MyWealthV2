@@ -3,9 +3,10 @@ title: Deployment
 status: draft
 language: en
 created: 2026-11-11
-updated: 2026-11-11
+updated: 2026-11-12
 related:
   - README.md
+  - smoke-test.md
   - architecture.md
   - glossary.md
   - features/identity-auth.md
@@ -146,7 +147,7 @@ The compose file and a `.env.example` (names only, no values) live in the reposi
 | Data Protection keys | `identity`, both BFFs, `back-office` | `dataprotection` volume on the VPS, written by the hosts |
 | VPS SSH private key | deploy job | GitHub environment secret `production` |
 | GHCR read token | VPS `docker login` | VPS, set once |
-| Smoke account passwords | post-deploy smoke test | GitHub environment secret `production` |
+| Smoke account passwords | post-deploy smoke test | GitHub environment secret `production` ([smoke-test.md](smoke-test.md) §5) |
 
 - `.env` is created by hand on the VPS, `chmod 600`, owned by the deploy user. GitHub does not hold the runtime secrets. To change one, edit `.env` and run `docker compose up -d`.
 - SystemAdmin credentials never leave the owner. CI never signs in as SystemAdmin.
@@ -196,17 +197,16 @@ A rollback does not undo schema scripts. A script must stay compatible with the 
 
 ## 10. Post-deploy smoke test
 
-Playwright, run from the GitHub runner against the public hostnames.
+Playwright, run from the GitHub runner against the public hostnames. The cases, the smoke tenant, the test project and its secrets are owned by [smoke-test.md](smoke-test.md).
 
-| # | Account | Steps | Proves |
-| --- | --- | --- | --- |
-| S1 | Smoke Adviser | Open `adviser.<domain>` → hosted login with the smoke TenantCode → Dashboard shows the expected net worth | TLS, Caddy routing, OIDC through `bff-adviser-portal`, `webapi`, SQL |
-| S2 | Smoke Customer | Open `customer.<domain>` → hosted login → the expected Account is listed | The second OIDC client and Customer scope |
+| # | Account | Proves |
+| --- | --- | --- |
+| S1 | Smoke Adviser sees the Dashboard net worth | TLS, Caddy routing, OIDC through `bff-adviser-portal`, `webapi`, SQL |
+| S2 | Smoke Customer sees their Account | The second OIDC client and Customer scope |
 
 - Both cases only read. They post nothing.
-- The **smoke tenant** is a tenant used only by these tests. It stays enabled. It is created by hand in Back Office after the first deploy, with one Adviser, one Customer and the data S1 and S2 assert. It is not seeded. Passwords are long random strings stored only as GitHub secrets.
+- In production the smoke tenant is created by hand after the first deploy (§12). It stays enabled.
 - Toggling the smoke tenant on and off around each run was considered and rejected: it needs SystemAdmin credentials in CI, and a cancelled job leaves the tenant enabled anyway.
-- The same tests run locally against the Development seed accounts.
 
 ---
 
@@ -233,7 +233,7 @@ Known gaps, accepted for the showcase (record them in [known-issues/](known-issu
 5. `docker login ghcr.io` with the read token.
 6. Set `IMAGE_TAG` to the current `master` SHA. `docker compose up -d`.
 7. Sign in to Back Office as the bootstrap SystemAdmin (§13 item 6).
-8. Create the smoke tenant, its Adviser, its Customer and the asserted data (§10). Store the passwords as GitHub secrets.
+8. Create the smoke tenant and the asserted data ([smoke-test.md](smoke-test.md) §3). Store the Adviser and Customer passwords as GitHub secrets `SMOKE_ADVISER_PASSWORD` and `SMOKE_CUSTOMER_PASSWORD` in environment `production`.
 9. Run the smoke test workflow by hand.
 
 The runbook is the restore plan. Run it once on a throwaway VPS before the real deploy.
@@ -254,7 +254,7 @@ Found while writing this doc (2026-11-11). Each item needs a Feature Spec or ame
 | 6 | The SystemAdmin exists only through `DevelopmentIdentitySeeder`. Production has no SystemAdmin | A production bootstrap: create one SystemAdmin from configuration when none exists. Amendment to [identity-auth.md](features/identity-auth.md) |
 | 7 | `TestSeed` runs only in Development. [tenants.md](features/tenants.md) R17 forbids seeding a demo firm | Demo data for visitors. Open decision (§14) |
 | 8 | The AppHost is Azure-shaped (`AddAzureContainerAppEnvironment`, `AddAzureSqlServer`) | Hand-written compose file for the VPS. The AppHost stays the Development orchestrator. Config |
-| 9 | No Playwright project | Add the smoke test project (§10). Test code, run by the deploy workflow |
+| 9 | No Playwright project | Add the smoke test project, its Development seed and its workflow ([smoke-test.md](smoke-test.md) §8) |
 
 ---
 

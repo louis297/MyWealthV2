@@ -3,7 +3,7 @@ title: Documentation
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-11-10
+updated: 2026-11-12
 ---
 
 # MyWealthV2 documentation
@@ -88,7 +88,8 @@ Implement **accepted** specs for the current phase only. `draft` and `note` are 
 | Doc | Owns | Does not own |
 | --- | --- | --- |
 | [function-plan.md](function-plan.md) | Scope, roles, phase map | Field-level contracts |
-| [deployment.md](deployment.md) | VPS topology, CD pipeline, secrets placement, post-deploy smoke test, rebuild runbook | Feature behaviour; build contracts for the code changes it lists |
+| [deployment.md](deployment.md) | VPS topology, CD pipeline, secrets placement, rebuild runbook | Feature behaviour; build contracts for the code changes it lists |
+| [smoke-test.md](smoke-test.md) | Smoke test cases, smoke tenant data, test project, smoke secrets | Business rules the functional tests prove |
 | [future-plans.md](future-plans.md) | Reminder list of large future directions (`note`) | Any build contract, priority or backlog |
 | [glossary.md](glossary.md) | Names | Design arguments |
 | [architecture.md](architecture.md) | Host, layers, ports, cross-cutting | Per-slice commands |
