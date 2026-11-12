@@ -10,6 +10,7 @@ using static OpenIddict.Abstractions.OpenIddictConstants;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+builder.AddPublicHostForwardedHeaders();
 builder.AddInfrastructureServices();
 
 builder.Services.AddScoped<IUser, AnonymousUser>();
@@ -90,15 +91,13 @@ builder.Services.AddOpenIddict()
 
 var app = builder.Build();
 
+app.UsePublicHostForwardedHeaders(trustAnyProxyInDevelopment: false);
+
 await using (var scope = app.Services.CreateAsyncScope())
 {
     await OpenIddictSeeder.SeedAsync(scope.ServiceProvider, CancellationToken.None);
 }
 
-if (!app.Environment.IsDevelopment())
-{
-    app.UseHttpsRedirection();
-}
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();

@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.HttpOverrides;
 using MudBlazor.Services;
 using MyWealthV2.BackOffice;
 using MyWealthV2.BackOffice.Components;
@@ -6,6 +5,7 @@ using MyWealthV2.BackOffice.Components;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+builder.AddPublicHostForwardedHeaders();
 builder.AddBackOfficeAuthentication();
 builder.AddPlatformApi();
 builder.Services.AddCascadingAuthenticationState();
@@ -15,16 +15,7 @@ builder.Services.AddRazorComponents()
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-    var forwardedHeaders = new ForwardedHeadersOptions
-    {
-        ForwardedHeaders = ForwardedHeaders.XForwardedProto
-    };
-    forwardedHeaders.KnownIPNetworks.Clear();
-    forwardedHeaders.KnownProxies.Clear();
-    app.UseForwardedHeaders(forwardedHeaders);
-}
+app.UsePublicHostForwardedHeaders(trustAnyProxyInDevelopment: true);
 
 app.UseAuthentication();
 app.UseAuthorization();
