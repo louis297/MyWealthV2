@@ -159,7 +159,7 @@ The table lists the keys the compose file sets. Keys marked † are introduced b
 
 The deploy job copies this folder to `/opt/mywealth` on the VPS on every deploy, so the compose file always comes from the same commit as the images. `.env`, `certs/` and `data/` live only on the VPS and are never in `deploy/`. Because the job overwrites these files, nothing is edited by hand in them on the VPS; anything that differs per server comes from `.env`.
 
-Besides the secrets in §6, `.env` holds: `IMAGE_TAG` and `PREVIOUS_IMAGE_TAG` (written by `deploy.sh`), `GHCR_OWNER`, `DOMAIN`, `ACME_EMAIL`, and `ACME_CA`. `ACME_CA` is empty for the production ACME issuer and set to the Let's Encrypt staging directory for a first start (§12).
+`deploy/.env.example` names every `.env` key, secrets included. Besides the secrets in §6, `.env` holds: `IMAGE_TAG` and `PREVIOUS_IMAGE_TAG` (written by `deploy.sh`), `GHCR_OWNER`, `DOMAIN`, `ACME_EMAIL`, and `ACME_CA`. `ACME_CA` is empty for the production ACME issuer and set to the Let's Encrypt staging directory for a first start (§12).
 
 ---
 
@@ -306,9 +306,9 @@ Found while writing this doc (2026-11-11). Updated 2026-11-12 with the decisions
 | 5 | `MapDefaultEndpoints` maps `/health` and `/alive` only in Development. Chiseled images cannot run `curl` for a compose health check | Landed: outside Development they are mapped on the health port only, matched on the connection's local port. Each host accepts `--healthcheck`, calls its own `/health` and exits ([production-hosting.md](features/production-hosting.md) R12–R15) | Done |
 | 6 | The SystemAdmin exists only through `DevelopmentIdentitySeeder`. Production has no SystemAdmin | `webapi` creates one SystemAdmin from configuration when none exists | Amendment 2026-11-12 to [identity-auth.md](features/identity-auth.md) |
 | 7 | `TestSeed` runs only in Development. [tenants.md](features/tenants.md) R17 allows seeding only in Development | Decided 2026-11-12: no demo data for the first deploy. Recorded in [future-plans.md](future-plans.md) §5 | — |
-| 8 | The AppHost is Azure-shaped (`AddAzureContainerAppEnvironment`, `AddAzureSqlServer`) | The `deploy/` folder (§5). The AppHost stays the Development orchestrator. Config | Config |
+| 8 | The AppHost is Azure-shaped (`AddAzureContainerAppEnvironment`, `AddAzureSqlServer`) | Landed: the `deploy/` folder (§5): `compose.yml`, `.env.example`, `caddy/Dockerfile`, `caddy/Caddyfile`, `deploy.sh`, `rollback.sh`. The AppHost stays the Development orchestrator | Done |
 | 9 | No Playwright project | Landed: `tests/Smoke.Tests`, its Development seed and `.github/workflows/smoke.yml` ([smoke-test.md](smoke-test.md) §8) | Done |
-| 10 | No image publish or deploy workflow | `.github/workflows/deploy.yml` (§9), SPA copy into `wwwroot/`, `wwwroot/` of both BFFs in `.gitignore`. Config | Config |
+| 10 | No image publish or deploy workflow | Landed: `.github/workflows/deploy.yml` (§9), SPA copy into `wwwroot/`, `wwwroot/` of both BFFs in `.gitignore`. Serving that build still waits on item 4 | Done |
 
 Suggested build order: 1, 3, 2, 5 (all in host start-up, mostly ServiceDefaults), then 4, then 6, then 8 and 10, then a rehearsal of §12 on a throwaway VPS.
 
