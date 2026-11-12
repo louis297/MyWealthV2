@@ -6,6 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddPublicHostForwardedHeaders();
+builder.AddPublicHostDataProtection("mywealth-back-office");
 builder.AddBackOfficeAuthentication();
 builder.AddPlatformApi();
 builder.Services.AddCascadingAuthenticationState();

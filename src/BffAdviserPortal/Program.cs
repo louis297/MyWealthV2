@@ -6,6 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddPublicHostForwardedHeaders();
+builder.AddPublicHostDataProtection("mywealth-bff-adviser-portal");
 builder.AddBffAuthentication();
 
 var app = builder.Build();

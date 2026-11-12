@@ -11,6 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddPublicHostForwardedHeaders();
+builder.AddPublicHostDataProtection("mywealth-identity");
 builder.AddInfrastructureServices();
 
 builder.Services.AddScoped<IUser, AnonymousUser>();
