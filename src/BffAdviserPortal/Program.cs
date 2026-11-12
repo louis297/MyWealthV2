@@ -1,27 +1,23 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
-using Microsoft.AspNetCore.HttpOverrides;
 using MyWealthV2.BffAdviserPortal;
+
+if (HealthCheckCommand.IsRequested(args))
+{
+    Environment.ExitCode = await HealthCheckCommand.RunAsync(args);
+    return;
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+builder.AddPublicHostForwardedHeaders();
+builder.AddPublicHostDataProtection("mywealth-bff-adviser-portal");
 builder.AddBffAuthentication();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-    // The Aspire dev proxy is not always a loopback address, so trust X-Forwarded-Proto.
-    // Do not apply X-Forwarded-Host: it rewrites the https://localhost:7190 entry to another name.
-    var forwardedHeaders = new ForwardedHeadersOptions
-    {
-        ForwardedHeaders = ForwardedHeaders.XForwardedProto
-    };
-    forwardedHeaders.KnownIPNetworks.Clear();
-    forwardedHeaders.KnownProxies.Clear();
-    app.UseForwardedHeaders(forwardedHeaders);
-}
+app.UsePublicHostForwardedHeaders(trustAnyProxyInDevelopment: true);
 
 app.UseBffSecurityHeaders();
 app.UseAuthentication();

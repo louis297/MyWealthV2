@@ -1,6 +1,6 @@
 ---
 title: Production hosting
-status: review
+status: accepted
 phase: 3
 language: en
 owner: ""
@@ -155,7 +155,7 @@ Functional tests start hosts with `UseEnvironment("Production")` and supply the 
 | Application.FunctionalTests | Each public host in Production with an empty or invalid `ForwardedHeaders:KnownNetworks` or no `DataProtection:KeysPath` → fails to start — R7, R10 |
 | Application.FunctionalTests | `bff-adviser-portal` in Production with `DataProtection:KeysPath`: a key file appears in that folder; a cookie issued by one factory instance is accepted by a second instance using the same folder — R9, R10 |
 | Application.FunctionalTests | `identity` and `webapi` in Production: a plain `http` request is not redirected (no 307/308); `webapi` response has no `Strict-Transport-Security` header — R11 |
-| Application.FunctionalTests | `webapi` in Production: `GET /health` with `Host: localhost:8081` → 200 `Healthy`; with `Host: localhost:8080` → not the health response (404 or the host's fallback); `/alive` the same — R12, R14 |
+| Application.FunctionalTests | `webapi` in Production: `GET /health` that arrives on local port `8081` → 200 `Healthy`; on local port `8080` → not the health response (404 or the host's fallback); `/alive` the same. The port is the connection's local port, not the `Host` header, because the proxy passes the client's `Host` through — R12, R14 |
 | Application.FunctionalTests | `webapi` in Development: `GET /health` on the default port → 200, as today — R13 |
 | Application.UnitTests (or a ServiceDefaults test project) | Health check client: 200 → exit 0; 503 → exit 1; connection refused → exit 1; no answer within the timeout → exit 1 — R15 |
 

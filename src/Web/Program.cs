@@ -4,6 +4,12 @@ using MyWealthV2.Infrastructure.Data.Schema;
 using MyWealthV2.Infrastructure.Identity;
 using Scalar.AspNetCore;
 
+if (HealthCheckCommand.IsRequested(args))
+{
+    Environment.ExitCode = await HealthCheckCommand.RunAsync(args);
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -36,16 +42,7 @@ await using (var scope = app.Services.CreateAsyncScope())
     }
 }
 
-if (!app.Environment.IsDevelopment())
-{
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
-}
-
-if (!app.Environment.IsDevelopment())
-{
-    app.UseHttpsRedirection();
-}
+// No HTTPS redirection or HSTS here: the reverse proxy owns both (production-hosting R11).
 app.UseFileServer();
 
 app.MapOpenApi();

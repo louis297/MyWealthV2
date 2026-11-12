@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using MyWealthV2.Application.FunctionalTests.Hosting;
 using BffCustomer::MyWealthV2.BffCustomerPortal;
 
 namespace MyWealthV2.Application.FunctionalTests.BffCustomer;
@@ -30,14 +31,25 @@ public sealed class CustomerBffFactory : WebApplicationFactory<BffCustomer::Prog
         _authority = authority.TrimEnd('/');
         _identityHandler = identityHandler;
         _environment = environment;
+        Settings = string.Equals(environment, "Development", StringComparison.Ordinal)
+            ? new Dictionary<string, string>()
+            : ProductionSettings.PublicHost();
         _api = api;
         _apiBaseAddress = apiBaseAddress;
         _publicOrigin = publicOrigin;
     }
 
+    // Extra configuration applied when the host starts. Outside Development it starts with the
+    // production-hosting keys; tests may change or remove entries before the first request.
+    public Dictionary<string, string> Settings { get; }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(_environment);
+        foreach (var (key, value) in Settings)
+        {
+            builder.UseSetting(key, value);
+        }
         builder.UseSetting("Authentication:Authority", _authority);
         builder.UseSetting("Authentication:ClientSecret", CustomerPortalTestSecret.Value);
         if (!string.IsNullOrWhiteSpace(_apiBaseAddress))
@@ -52,6 +64,7 @@ public sealed class CustomerBffFactory : WebApplicationFactory<BffCustomer::Prog
 
         builder.ConfigureTestServices(services =>
         {
+            services.AddTransient<IStartupFilter, TestConnection>();
             services.AddSingleton<IPostConfigureOptions<OpenIdConnectOptions>>(
                 new MyWealthV2.Application.FunctionalTests.Bff.OidcBackchannelPostConfigure(_authority, _identityHandler));
             if (_api is not null)

@@ -7,9 +7,17 @@ using OpenIddict.Abstractions;
 using OpenIddict.Server;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 
+if (HealthCheckCommand.IsRequested(args))
+{
+    Environment.ExitCode = await HealthCheckCommand.RunAsync(args);
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+builder.AddPublicHostForwardedHeaders();
+builder.AddPublicHostDataProtection("mywealth-identity");
 builder.AddInfrastructureServices();
 
 builder.Services.AddScoped<IUser, AnonymousUser>();
@@ -36,6 +44,7 @@ builder.Services.AddCors(options =>
 });
 
 var development = builder.Environment.IsDevelopment();
+var productionCredentials = development ? null : ProductionServerCredentials.Load(builder.Configuration);
 builder.Services
     .AddAuthentication()
     .AddCookie(ClientCookieSchemes.AdviserPortal, options =>
@@ -67,28 +76,35 @@ builder.Services.AddOpenIddict()
         options.DisableSlidingRefreshTokenExpiration();
         options.DisableAccessTokenEncryption();
 
-        options.AddDevelopmentEncryptionCertificate()
-            .AddDevelopmentSigningCertificate();
-
-        options.UseAspNetCore()
+        var aspNetCore = options.UseAspNetCore()
             .EnableAuthorizationEndpointPassthrough()
-            .EnableEndSessionEndpointPassthrough()
-            .DisableTransportSecurityRequirement();
+            .EnableEndSessionEndpointPassthrough();
+
+        if (productionCredentials is null)
+        {
+            options.AddDevelopmentEncryptionCertificate()
+                .AddDevelopmentSigningCertificate();
+            aspNetCore.DisableTransportSecurityRequirement();
+        }
+        else
+        {
+            options.SetIssuer(productionCredentials.Issuer)
+                .AddSigningCertificate(productionCredentials.SigningCertificate)
+                .AddEncryptionCertificate(productionCredentials.EncryptionCertificate);
+        }
 
         options.AddEventHandler(RedirectUriMismatchLogger.Descriptor);
     });
 
 var app = builder.Build();
 
+app.UsePublicHostForwardedHeaders(trustAnyProxyInDevelopment: false);
+
 await using (var scope = app.Services.CreateAsyncScope())
 {
     await OpenIddictSeeder.SeedAsync(scope.ServiceProvider, CancellationToken.None);
 }
 
-if (!app.Environment.IsDevelopment())
-{
-    app.UseHttpsRedirection();
-}
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
