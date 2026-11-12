@@ -158,6 +158,10 @@ Later portals copy the last BFF row: `bff-customer-portal`, `BffCustomerPortal`,
 | Smoke tenant | Tenant used only by the smoke test (TenantCode `smoke`). Created by hand in production after the first deploy; seeded in Development when the smoke passwords are configured. Stays enabled. See [smoke-test.md](smoke-test.md) §3. | A demo tenant for visitors; `demo` / `demo2` |
 | Smoke test | Playwright suite `tests/Smoke.Tests` that signs in to each portal and reads one page, to prove the system is on. Reads only. Runs locally and after each deploy. See [smoke-test.md](smoke-test.md). | The functional test suite; an end-to-end suite of business rules |
 | Post-deploy smoke test | The smoke test run from GitHub Actions against the public hostnames after each deploy. A failure fails the deploy and rolls back the image tag. | Running the smoke test on every pull request |
+| Public host | A host that Caddy forwards browser traffic to: `identity`, `bff-adviser-portal`, `bff-customer-portal`, `back-office`. See [features/production-hosting.md](features/production-hosting.md). | `webapi`, `worker` (internal only) |
+| Health port | Second HTTP port of every host (default `8081`). Outside Development, `/health` and `/alive` answer only there. The reverse proxy never forwards to it. See [features/production-hosting.md](features/production-hosting.md). | The traffic port `8080`; a public status page |
+| Bootstrap SystemAdmin | The first SystemAdmin in a production database, created by `webapi` from configuration when no SystemAdmin exists. See [features/identity-auth.md](features/identity-auth.md) amendment 2026-11-12. | The Development seed SystemAdmin `system-admin@localhost`; a SystemAdmin created on every start |
+| Deploy folder | Repository folder `deploy/`: compose file, Caddy files and deploy scripts, copied to the VPS on every deploy. Holds no secrets. See [deployment.md](deployment.md) §5. | `.env`, `certs/` or `data/` on the VPS |
 
 ---
 

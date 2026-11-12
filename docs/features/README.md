@@ -3,7 +3,7 @@ title: Feature Specs
 status: draft
 language: en
 created: 2026-09-12
-updated: 2026-11-11
+updated: 2026-11-12
 related:
   - ../function-plan.md
   - ../api-design.md
@@ -144,3 +144,15 @@ Second first-party portal. One BFF + one confidential client, same shape as the 
 | [bff-customer-portal](bff-customer-portal.md) | accepted | Customer Portal session | Aspire `bff-customer-portal`; confidential client `customer-portal`; cookie + OIDC + HttpClient proxy; tokens out of the browser; prefix allow-list for self reads + report request | Platform session increment, not a ledger slice. Portal: [../customer-portal/customer-portal.md](../customer-portal/customer-portal.md) |
 
 Required backend amendments (self-scope reads and report request for Customer) are accepted in identity-auth, accounts, posting, net-worth, reports, and holdings. They land with this slice; do not rebuild the resource API.
+
+---
+
+## Platform — production hosting (drafted 2026-11-12)
+
+Host start-up outside Development, for the VPS showcase in [deployment.md](../deployment.md). No resource API, no table.
+
+| Spec | Status | Who | Ships | Why it stays its own slice |
+| --- | --- | --- | --- | --- |
+| [production-hosting](production-hosting.md) | review | Platform (no HTTP caller) | OpenIddict certificates and explicit issuer on `identity`; Data Protection folder and application name per public host; forwarded headers from configured networks; no in-host HTTPS redirection; health endpoints on the health port; `--healthcheck` self-check | Cross-cutting host start-up. Not a resource slice |
+
+Related amendments (2026-11-12, `review`): [bff-adviser-portal](bff-adviser-portal.md) and [bff-customer-portal](bff-customer-portal.md) serve the SPA build; [identity-auth](identity-auth.md) bootstrap SystemAdmin.
