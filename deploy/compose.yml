@@ -1,0 +1,219 @@
+# MyWealth production compose project (docs/deployment.md §3–§8).
+# Lives at /opt/mywealth on the VPS. The deploy job overwrites this file on every deploy:
+# do not edit it on the VPS. Everything that differs per server comes from .env (see .env.example).
+#
+# Only `caddy` publishes ports. Every .NET host listens on 8080 (traffic) and 8081 (health port,
+# never forwarded by Caddy). Bind-mounted folders under certs/ and data/ must belong to UID 1654.
+
+name: mywealth
+
+x-dotnet-environment: &dotnet-environment
+  ASPNETCORE_ENVIRONMENT: Production
+  ASPNETCORE_HTTP_PORTS: "8080;8081"
+
+x-dotnet-service: &dotnet-service
+  restart: unless-stopped
+  networks:
+    - internal
+
+x-healthcheck-timing: &healthcheck-timing
+  interval: 15s
+  timeout: 10s
+  retries: 5
+  start_period: 60s
+
+x-connection-string: &connection-string >-
+  Server=sql,1433;Database=MyWealthDbV2;User Id=sa;Password=${SQL_SA_PASSWORD:?};Encrypt=True;TrustServerCertificate=True
+
+services:
+  sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Express
+      MSSQL_MEMORY_LIMIT_MB: "2048"
+      MSSQL_SA_PASSWORD: ${SQL_SA_PASSWORD:?}
+    volumes:
+      - sql-data:/var/opt/mssql
+    networks:
+      - internal
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -b -Q "SELECT 1" > /dev/null
+      <<: *healthcheck-timing
+
+  webapi:
+    <<: *dotnet-service
+    image: ghcr.io/${GHCR_OWNER:?}/mywealth-webapi:${IMAGE_TAG:?}
+    environment:
+      <<: *dotnet-environment
+      ConnectionStrings__MyWealthDbV2: *connection-string
+      Identity__Authority: https://id.${DOMAIN:?}
+      Reports__StorageRoot: /reports
+      # First start only; remove from .env after the first SystemAdmin sign-in (§12 step 11).
+      Bootstrap__SystemAdmin__Email: ${BOOTSTRAP_SYSTEMADMIN_EMAIL:-}
+      Bootstrap__SystemAdmin__Password: ${BOOTSTRAP_SYSTEMADMIN_PASSWORD:-}
+    volumes:
+      - ./data/reports:/reports
+    depends_on:
+      sql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/app/MyWealthV2.Web", "--healthcheck"]
+      <<: *healthcheck-timing
+
+  identity:
+    <<: *dotnet-service
+    image: ghcr.io/${GHCR_OWNER:?}/mywealth-identity:${IMAGE_TAG:?}
+    environment:
+      <<: *dotnet-environment
+      ConnectionStrings__MyWealthDbV2: *connection-string
+      Identity__AdviserPortalClientSecret: ${ADVISER_PORTAL_CLIENT_SECRET:?}
+      Identity__CustomerPortalClientSecret: ${CUSTOMER_PORTAL_CLIENT_SECRET:?}
+      Identity__BackOfficeClientSecret: ${BACK_OFFICE_CLIENT_SECRET:?}
+      Identity__PortalOrigins__0: https://adviser.${DOMAIN:?}
+      Identity__CustomerPortalOrigins__0: https://customer.${DOMAIN:?}
+      Identity__BackOfficeOrigin: https://admin.${DOMAIN:?}
+      Identity__Issuer: https://id.${DOMAIN:?}/
+      Identity__SigningCertificatePath: /certs/signing.pfx
+      Identity__EncryptionCertificatePath: /certs/encryption.pfx
+      Identity__CertificatePassword: ${IDENTITY_CERTIFICATE_PASSWORD:?}
+      DataProtection__KeysPath: /keys
+      ForwardedHeaders__KnownNetworks__0: 172.30.0.0/24
+    volumes:
+      - ./certs:/certs:ro
+      - ./data/dataprotection/identity:/keys
+    depends_on:
+      webapi:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/app/MyWealthV2.IdentityHost", "--healthcheck"]
+      <<: *healthcheck-timing
+
+  worker:
+    <<: *dotnet-service
+    image: ghcr.io/${GHCR_OWNER:?}/mywealth-worker:${IMAGE_TAG:?}
+    environment:
+      <<: *dotnet-environment
+      ConnectionStrings__MyWealthDbV2: *connection-string
+      Reports__StorageRoot: /reports
+      Eodhd__ApiKey: ${EODHD_API_KEY:?}
+    volumes:
+      - ./data/reports:/reports
+    depends_on:
+      webapi:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/app/MyWealthV2.Worker", "--healthcheck"]
+      <<: *healthcheck-timing
+
+  bff-adviser-portal:
+    <<: *dotnet-service
+    image: ghcr.io/${GHCR_OWNER:?}/mywealth-bff-adviser-portal:${IMAGE_TAG:?}
+    environment:
+      <<: *dotnet-environment
+      Authentication__Authority: https://id.${DOMAIN:?}
+      Authentication__ClientSecret: ${ADVISER_PORTAL_CLIENT_SECRET:?}
+      Authentication__PublicOrigin: https://adviser.${DOMAIN:?}
+      Api__BaseAddress: http://webapi:8080
+      DataProtection__KeysPath: /keys
+      ForwardedHeaders__KnownNetworks__0: 172.30.0.0/24
+    volumes:
+      - ./data/dataprotection/bff-adviser-portal:/keys
+    depends_on:
+      identity:
+        condition: service_healthy
+      webapi:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/app/MyWealthV2.BffAdviserPortal", "--healthcheck"]
+      <<: *healthcheck-timing
+
+  bff-customer-portal:
+    <<: *dotnet-service
+    image: ghcr.io/${GHCR_OWNER:?}/mywealth-bff-customer-portal:${IMAGE_TAG:?}
+    environment:
+      <<: *dotnet-environment
+      Authentication__Authority: https://id.${DOMAIN:?}
+      Authentication__ClientSecret: ${CUSTOMER_PORTAL_CLIENT_SECRET:?}
+      Authentication__PublicOrigin: https://customer.${DOMAIN:?}
+      Api__BaseAddress: http://webapi:8080
+      DataProtection__KeysPath: /keys
+      ForwardedHeaders__KnownNetworks__0: 172.30.0.0/24
+    volumes:
+      - ./data/dataprotection/bff-customer-portal:/keys
+    depends_on:
+      identity:
+        condition: service_healthy
+      webapi:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/app/MyWealthV2.BffCustomerPortal", "--healthcheck"]
+      <<: *healthcheck-timing
+
+  back-office:
+    <<: *dotnet-service
+    image: ghcr.io/${GHCR_OWNER:?}/mywealth-back-office:${IMAGE_TAG:?}
+    environment:
+      <<: *dotnet-environment
+      Authentication__Authority: https://id.${DOMAIN:?}
+      Authentication__ClientSecret: ${BACK_OFFICE_CLIENT_SECRET:?}
+      Authentication__PublicOrigin: https://admin.${DOMAIN:?}
+      Api__BaseAddress: http://webapi:8080
+      DataProtection__KeysPath: /keys
+      ForwardedHeaders__KnownNetworks__0: 172.30.0.0/24
+    volumes:
+      - ./data/dataprotection/back-office:/keys
+    depends_on:
+      identity:
+        condition: service_healthy
+      webapi:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/app/MyWealthV2.BackOffice", "--healthcheck"]
+      <<: *healthcheck-timing
+
+  caddy:
+    build: ./caddy
+    image: mywealth-caddy:local
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?}
+      ACME_EMAIL: ${ACME_EMAIL:?}
+      # Empty for the production ACME issuer; the Let's Encrypt staging directory for a first start (§12).
+      ACME_CA: ${ACME_CA:-}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      internal:
+        # Hosts inside the network reach the public issuer through Caddy, so the issuer always matches (§3).
+        aliases:
+          - id.${DOMAIN:?}
+    depends_on:
+      identity:
+        condition: service_healthy
+      bff-adviser-portal:
+        condition: service_healthy
+      bff-customer-portal:
+        condition: service_healthy
+      back-office:
+        condition: service_healthy
+
+networks:
+  internal:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+volumes:
+  sql-data:
+  caddy-data:
+  caddy-config:
