@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -23,6 +24,15 @@ public static class SystemAdminBootstrap
         IConfiguration configuration,
         CancellationToken cancellationToken)
     {
+        var db = services.GetRequiredService<ApplicationDbContext>();
+
+        // Any status counts: an existing person is never changed, re-enabled or reset.
+        if (await db.DomainUsers.IgnoreQueryFilters()
+                .AnyAsync(user => user.Role == UserRole.SystemAdmin, cancellationToken))
+        {
+            return;
+        }
+
         var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(SystemAdminBootstrap));
         var email = configuration[EmailKey];
         var password = configuration[PasswordKey];
@@ -41,7 +51,6 @@ public static class SystemAdminBootstrap
             name = DefaultName;
         }
 
-        var db = services.GetRequiredService<ApplicationDbContext>();
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
         await DevelopmentIdentitySeeder.EnsurePersonAsync(
             db,
