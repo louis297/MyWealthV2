@@ -13,6 +13,13 @@ internal static class ProductionSettings
         ["Identity:Issuer"] = Issuer,
         ["Identity:SigningCertificatePath"] = certificates.SigningPath,
         ["Identity:EncryptionCertificatePath"] = certificates.EncryptionPath,
-        ["Identity:CertificatePassword"] = TestCertificates.Password
+        ["Identity:CertificatePassword"] = TestCertificates.Password,
+        ["ForwardedHeaders:KnownNetworks:0"] = TrustedNetwork
+    };
+
+    // Defaults for the BFFs and back-office when a factory runs outside Development.
+    public static Dictionary<string, string> PublicHost() => new()
+    {
+        ["ForwardedHeaders:KnownNetworks:0"] = TrustedNetwork
     };
 }
