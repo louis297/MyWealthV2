@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-12
-last_updated: 2026-11-11
+last_updated: 2026-11-12
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -464,6 +464,35 @@ Records behaviour that landed with [outbox.md](outbox.md) (`e9b8b81`). Do not re
 - Logout is unchanged and synchronous: the presented refresh token is revoked at `/connect/revocation` (A13).
 - Tests: the functional host does not run the outbox worker. Functional tests for password change and disable assert that refresh **still succeeds** right after the call. The revocation handlers and repeat delivery are covered in Infrastructure.IntegrationTests (`RevokeTokensIdempotencyTests`, `RevokeTokensTenantScopeTests`).
 - No new table. No new route. No schema change.
+
+### Amendment 2026-11-12 (bootstrap SystemAdmin) — review
+
+Status of this amendment: `review`. It is not a build contract until it is marked accepted. The rest of this file stays accepted. Item 6 of [deployment.md](../deployment.md) §13. Do not rewrite R1–R21 or earlier amendments in place.
+
+**Why.** A SystemAdmin exists only through `DevelopmentIdentitySeeder`. A production database starts with none, so nobody can sign in to Back Office to create the first tenant. SystemAdmins are not created over HTTP (ADR 0013), and the owner should not write identity rows by hand in SQL.
+
+- **Where.** `webapi`, on start, right after the schema applicator and the currency catalog reload, before it listens. `webapi` already owns the schema and the Development seed; `identity` starts only after `webapi` is healthy (deployment §8).
+- **Keys.** `Bootstrap:SystemAdmin:Email` and `Bootstrap:SystemAdmin:Password` (environment `Bootstrap__SystemAdmin__Email`, `Bootstrap__SystemAdmin__Password`). Optional `Bootstrap:SystemAdmin:Name`, default `System Admin`.
+- **Any environment.** The bootstrap runs in every environment. In Development the seeded SystemAdmin already exists, so it does nothing (A27).
+- **One step, idempotent.** It counts SystemAdmins in any `UserStatus`. When at least one exists, it does nothing and does not read the password. It never changes, re-enables or resets an existing person. Only one `webapi` instance runs, so no lock is needed.
+- **Create.** When none exists and both keys are set, it creates one person with role SystemAdmin, no tenant, no adviser, `Status` Active, email confirmed, the given name, email and password. Domain `User` and identity user are written together, the same way the Development seed writes them (dual-write). After that, hosted login for client `back-office` works for that person with no `tenantCode` (unchanged rules).
+- **Fail fast.** Start-up fails before `webapi` listens when exactly one of the two keys is set, the email is not a valid address, or the password fails the Identity password options. Nothing is written in that case. The error names the key and lists the password rule codes; it never contains the password.
+- **Nothing to do.** When none exists and neither key is set, start-up continues and logs a warning that the database has no SystemAdmin.
+- **Logging.** Creation logs the email at Information level. The password never appears in a log, exception or response.
+- **After the first sign-in** the owner removes both values from `.env` (deployment §12). Keeping them is harmless (step above) but leaves a secret on the server for no reason.
+- No new table. No new route. No schema change. The Development seed is unchanged.
+
+**Acceptance (amendment A25–A31).** Infrastructure.IntegrationTests run the bootstrap against a fresh test database; A26 is a functional test.
+
+| Id | Given | When | Then |
+| --- | --- | --- | --- |
+| A25 | No SystemAdmin; both keys set, valid | Bootstrap runs | One SystemAdmin with that email and name, Active, no tenant; domain user and identity user both exist and share the PublicId |
+| A26 | Person from A25 | Hosted login for `back-office` with that email and password, no `tenantCode` | Authorization code issued; access token works on a SystemAdmin route |
+| A27 | One SystemAdmin exists (any status); both keys set with a different email and password | Bootstrap runs | No person created; the existing person's email, password hash and status are unchanged |
+| A28 | No SystemAdmin; only `Email` set (and the reverse) | Bootstrap runs | Throws; message names the missing key; no person created |
+| A29 | No SystemAdmin; password `short` | Bootstrap runs | Throws; message lists the failed password rules and does not contain `short`; no domain user and no identity user |
+| A30 | No SystemAdmin; email `not-an-email` | Bootstrap runs | Throws; no person created |
+| A31 | No SystemAdmin; neither key set | Bootstrap runs | No person created; a warning is logged; no exception |
 
 ### Amendment 2026-09-14 (R21 — end session)
 
