@@ -141,12 +141,12 @@ If a password is missing, the suite fails at start with a message naming the mis
 
 ## 8. Code changes this doc needs
 
-None of these exist yet.
+All landed on `master` (2026-11-12).
 
-| # | Change | Kind |
-| --- | --- | --- |
-| 1 | `tests/Smoke.Tests` with S1 and S2 | Test code |
-| 2 | Development seed for the smoke tenant (§3) | Seed, Development only |
-| 3 | AppHost reads `Smoke:AdviserPassword` / `Smoke:CustomerPassword` and passes them to the seeding host | Wiring |
-| 4 | CI builds `tests/Smoke.Tests` without running it | CI |
-| 5 | `.github/workflows/smoke.yml` (§7) | CI |
+| # | Change | Kind | Landed |
+| --- | --- | --- | --- |
+| 1 | `tests/Smoke.Tests` with S1 and S2 | Test code | `a17c5d6` |
+| 2 | Development seed for the smoke tenant (§3) | Seed, Development only | `385f7f6` |
+| 3 | AppHost reads `Smoke:AdviserPassword` / `Smoke:CustomerPassword` and passes them to the seeding host | Wiring | `5c2966c` |
+| 4 | CI builds `tests/Smoke.Tests` without running it | CI | `cd4a86c` |
+| 5 | `.github/workflows/smoke.yml` (§7) | CI | `8835155` |
