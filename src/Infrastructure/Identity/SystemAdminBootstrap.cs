@@ -1,3 +1,4 @@
+using System.Net.Mail;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -36,7 +37,9 @@ public static class SystemAdminBootstrap
         var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(SystemAdminBootstrap));
         var email = configuration[EmailKey];
         var password = configuration[PasswordKey];
-        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        var hasEmail = !string.IsNullOrWhiteSpace(email);
+        var hasPassword = !string.IsNullOrWhiteSpace(password);
+        if (!hasEmail && !hasPassword)
         {
             logger.LogWarning(
                 "The database has no SystemAdmin. Set {EmailKey} and {PasswordKey} to create one.",
@@ -45,23 +48,59 @@ public static class SystemAdminBootstrap
             return;
         }
 
+        if (!hasEmail || !hasPassword)
+        {
+            var missing = hasEmail ? PasswordKey : EmailKey;
+            throw new InvalidOperationException(
+                $"Bootstrap SystemAdmin: {missing} is not set. Set both {EmailKey} and {PasswordKey}, or neither.");
+        }
+
+        if (!MailAddress.TryCreate(email, out var address) || address.Address != email)
+        {
+            throw new InvalidOperationException($"Bootstrap SystemAdmin: {EmailKey} is not a valid email address.");
+        }
+
+        var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+        var failedRules = await FailedPasswordRulesAsync(userManager, email!, password!);
+        if (failedRules.Count > 0)
+        {
+            // Rule codes only: the value itself must never reach an exception or a log.
+            throw new InvalidOperationException(
+                $"Bootstrap SystemAdmin: {PasswordKey} fails the Identity password rules: {string.Join(", ", failedRules)}.");
+        }
+
         var name = configuration[NameKey];
         if (string.IsNullOrWhiteSpace(name))
         {
             name = DefaultName;
         }
 
-        var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
         await DevelopmentIdentitySeeder.EnsurePersonAsync(
             db,
             userManager,
             UserRole.SystemAdmin,
             name,
-            email,
-            password,
+            email!,
+            password!,
             tenantId: null,
             cancellationToken);
 
         logger.LogInformation("Bootstrap SystemAdmin {Email} created.", email);
+    }
+
+    private static async Task<List<string>> FailedPasswordRulesAsync(
+        UserManager<ApplicationUser> userManager,
+        string email,
+        string password)
+    {
+        var candidate = new ApplicationUser { UserName = email, Email = email };
+        var failed = new List<string>();
+        foreach (var validator in userManager.PasswordValidators)
+        {
+            var result = await validator.ValidateAsync(userManager, candidate, password);
+            failed.AddRange(result.Errors.Select(error => error.Code));
+        }
+
+        return failed;
     }
 }
