@@ -1,6 +1,6 @@
 ---
 title: Production hosting
-status: review
+status: accepted
 phase: 3
 language: en
 owner: ""
