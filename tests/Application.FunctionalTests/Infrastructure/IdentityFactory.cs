@@ -12,12 +12,13 @@ namespace MyWealthV2.Application.FunctionalTests.Infrastructure;
 public class IdentityFactory(
     string connectionString,
     IReadOnlyDictionary<string, string>? extraSettings = null,
-    ILoggerProvider? logs = null) : WebApplicationFactory<IdentityApp::Program>
+    ILoggerProvider? logs = null,
+    string environment = "Development") : WebApplicationFactory<IdentityApp::Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting($"ConnectionStrings:{MyWealthV2.Shared.Services.Database}", connectionString);
-        builder.UseEnvironment("Development");
+        builder.UseEnvironment(environment);
         builder.UseSetting("Identity:AdviserPortalClientSecret", AdviserPortalTestSecret.Value);
         builder.UseSetting("Identity:BackOfficeClientSecret", BackOfficeTestSecret.Value);
         builder.UseSetting("Identity:CustomerPortalClientSecret", CustomerPortalTestSecret.Value);
