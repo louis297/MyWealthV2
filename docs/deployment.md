@@ -231,7 +231,7 @@ Trigger: push to `master` after the CI workflow passes, or manual dispatch.
       - runs `docker compose build caddy`, so a changed Caddy Dockerfile takes effect;
       - runs `docker compose pull` and `docker compose up -d --remove-orphans --wait`, which returns only when every container with a health check is healthy, and fails otherwise;
       - reloads the Caddyfile (`caddy reload`), so a changed Caddyfile takes effect even when the Caddy container is not recreated;
-      - prunes unused images.
+      - removes dangling image layers, and `mywealth-*` app images whose tag is neither `IMAGE_TAG` nor `PREVIOUS_IMAGE_TAG`. The Caddy builder and base images stay, so the next `build caddy` is a cache hit, and the previous tag stays, so a rollback starts without a pull.
 4. Post-deploy smoke test (§10): the deploy workflow calls `.github/workflows/smoke.yml` as a reusable workflow.
 5. If the smoke test fails, a rollback job runs `rollback.sh` over SSH. It deploys `PREVIOUS_IMAGE_TAG` with the same script. The workflow still ends red, so the failure is visible.
 

@@ -43,7 +43,20 @@ docker compose up -d --remove-orphans --wait --wait-timeout 600
 # A changed Caddyfile takes effect even when the caddy container was not recreated.
 docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
 
-# rollback.sh pulls the previous tag again, so unused images can go.
-docker image prune -af
+# Free disk space without deleting what the next build or a rollback needs:
+# - dangling layers only, so the caddy builder and base images stay cached for `build caddy`;
+# - app images of any tag other than IMAGE_TAG and PREVIOUS_IMAGE_TAG, so rollback.sh starts
+#   without a pull. Images in use by a container are never removed.
+docker image prune -f
+owner="$(read_env GHCR_OWNER)"
+keep_current="$(read_env IMAGE_TAG)"
+keep_previous="$(read_env PREVIOUS_IMAGE_TAG)"
+docker image ls --filter "reference=ghcr.io/${owner}/mywealth-*" --format '{{.Repository}}:{{.Tag}}' |
+    while read -r image; do
+        image_tag="${image##*:}"
+        if [[ "$image_tag" != "$keep_current" && "$image_tag" != "$keep_previous" ]]; then
+            docker image rm "$image" > /dev/null || true
+        fi
+    done
 
 echo "deploy.sh: $tag is healthy"
