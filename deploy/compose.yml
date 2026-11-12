@@ -186,10 +186,12 @@ services:
     environment:
       DOMAIN: ${DOMAIN:?}
       ACME_EMAIL: ${ACME_EMAIL:?}
-      # Empty for the production ACME issuer; the Let's Encrypt staging directory for a first start (§12).
-      ACME_CA: ${ACME_CA:-}
+      # Empty in .env means the production ACME issuer; set it to the Let's Encrypt staging
+      # directory for a first start (§12).
+      ACME_CA: ${ACME_CA:-https://acme-v02.api.letsencrypt.org/directory}
     volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # The folder, not the file: deploy.sh reloads Caddy after the deploy job replaces the Caddyfile.
+      - ./caddy:/etc/caddy:ro
       - caddy-data:/data
       - caddy-config:/config
     networks:

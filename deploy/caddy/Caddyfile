@@ -1,0 +1,60 @@
+# Routing, TLS, rate limits and HSTS for the four public hostnames (docs/deployment.md §3, §11).
+# Caddy is the only public entry. It forwards to port 8080 of each host only; the health port 8081
+# is never forwarded. reverse_proxy keeps the original Host and sets X-Forwarded-Proto/-For,
+# which the hosts trust from 172.30.0.0/24 only.
+#
+# DOMAIN, ACME_EMAIL and ACME_CA come from the container environment (compose.yml, .env).
+
+{
+	email {$ACME_EMAIL}
+	acme_ca {$ACME_CA}
+	order rate_limit before basic_auth
+}
+
+(public) {
+	header Strict-Transport-Security "max-age=31536000"
+	encode zstd gzip
+
+	# Loose global limit per client IP on every hostname.
+	rate_limit {
+		zone global {
+			key {remote_host}
+			events 300
+			window 1m
+		}
+	}
+}
+
+id.{$DOMAIN} {
+	import public
+
+	# Hosted login and the token endpoint, per client IP.
+	rate_limit {
+		zone sign_in {
+			match {
+				method POST
+				path /login /connect/token
+			}
+			key {remote_host}
+			events 10
+			window 1m
+		}
+	}
+
+	reverse_proxy identity:8080
+}
+
+adviser.{$DOMAIN} {
+	import public
+	reverse_proxy bff-adviser-portal:8080
+}
+
+customer.{$DOMAIN} {
+	import public
+	reverse_proxy bff-customer-portal:8080
+}
+
+admin.{$DOMAIN} {
+	import public
+	reverse_proxy back-office:8080
+}
