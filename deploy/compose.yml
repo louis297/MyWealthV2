@@ -61,7 +61,7 @@ services:
       sql:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/app/MyWealthV2.Web", "--healthcheck"]
+      test: ["CMD", "dotnet", "/app/MyWealthV2.Web.dll", "--healthcheck"]
       <<: *healthcheck-timing
 
   identity:
@@ -89,7 +89,7 @@ services:
       webapi:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/app/MyWealthV2.IdentityHost", "--healthcheck"]
+      test: ["CMD", "dotnet", "/app/MyWealthV2.IdentityHost.dll", "--healthcheck"]
       <<: *healthcheck-timing
 
   worker:
@@ -106,7 +106,7 @@ services:
       webapi:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/app/MyWealthV2.Worker", "--healthcheck"]
+      test: ["CMD", "dotnet", "/app/MyWealthV2.Worker.dll", "--healthcheck"]
       <<: *healthcheck-timing
 
   bff-adviser-portal:
@@ -128,7 +128,7 @@ services:
       webapi:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/app/MyWealthV2.BffAdviserPortal", "--healthcheck"]
+      test: ["CMD", "dotnet", "/app/MyWealthV2.BffAdviserPortal.dll", "--healthcheck"]
       <<: *healthcheck-timing
 
   bff-customer-portal:
@@ -150,7 +150,7 @@ services:
       webapi:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/app/MyWealthV2.BffCustomerPortal", "--healthcheck"]
+      test: ["CMD", "dotnet", "/app/MyWealthV2.BffCustomerPortal.dll", "--healthcheck"]
       <<: *healthcheck-timing
 
   back-office:
@@ -172,7 +172,7 @@ services:
       webapi:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/app/MyWealthV2.BackOffice", "--healthcheck"]
+      test: ["CMD", "dotnet", "/app/MyWealthV2.BackOffice.dll", "--healthcheck"]
       <<: *healthcheck-timing
 
   caddy:
