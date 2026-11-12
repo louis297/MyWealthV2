@@ -313,7 +313,7 @@ The repository should build after each commit. Agents split each line into red t
 
 ---
 
-## Amendment 2026-11-12 (serve the SPA build) — review
+## Amendment 2026-11-12 (serve the SPA build) — accepted
 
 Status of this amendment: `review`. It is not a build contract until it is marked accepted. The rest of this file stays accepted. Item 4 of [deployment.md](../deployment.md) §13. Do not rewrite §2, §7 or §11 in place; this amendment adds the production path next to the Development proxy.
 

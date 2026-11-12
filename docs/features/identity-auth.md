@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-12
-last_updated: 2026-11-12
+last_updated: 2026-11-13
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -465,9 +465,9 @@ Records behaviour that landed with [outbox.md](outbox.md) (`e9b8b81`). Do not re
 - Tests: the functional host does not run the outbox worker. Functional tests for password change and disable assert that refresh **still succeeds** right after the call. The revocation handlers and repeat delivery are covered in Infrastructure.IntegrationTests (`RevokeTokensIdempotencyTests`, `RevokeTokensTenantScopeTests`).
 - No new table. No new route. No schema change.
 
-### Amendment 2026-11-12 (bootstrap SystemAdmin) — review
+### Amendment 2026-11-12 (bootstrap SystemAdmin)
 
-Status of this amendment: `review`. It is not a build contract until it is marked accepted. The rest of this file stays accepted. Item 6 of [deployment.md](../deployment.md) §13. Do not rewrite R1–R21 or earlier amendments in place.
+Status of this amendment: `accepted` (2026-11-12). It is a build contract. Landed 2026-11-13: `SystemAdminBootstrap` (`src/Infrastructure/Identity`), called from `src/Web/Program.cs` after the Development seed block, so a first Development start finds the seeded SystemAdmin and logs no warning. Item 6 of [deployment.md](../deployment.md) §13. Do not rewrite R1–R21 or earlier amendments in place.
 
 **Why.** A SystemAdmin exists only through `DevelopmentIdentitySeeder`. A production database starts with none, so nobody can sign in to Back Office to create the first tenant. No route creates a SystemAdmin, and the owner should not write identity rows by hand in SQL.
 

@@ -3,7 +3,7 @@ title: Deployment
 status: draft
 language: en
 created: 2026-11-11
-updated: 2026-11-12
+updated: 2026-11-13
 related:
   - README.md
   - smoke-test.md
@@ -129,7 +129,7 @@ flowchart LR
 
 Every host runs with `ASPNETCORE_ENVIRONMENT=Production` and `ASPNETCORE_HTTP_PORTS=8080;8081`. Development seeders, the Hangfire dashboard and the dev SPA proxy therefore stay off.
 
-The table lists the keys the compose file sets. Keys marked † are introduced by [features/production-hosting.md](features/production-hosting.md) and ‡ by the [identity-auth.md](features/identity-auth.md) amendment 2026-11-12. production-hosting.md is `accepted`, so the † names are final. The ‡ names are final when that amendment is accepted.
+The table lists the keys the compose file sets. Keys marked † are introduced by [features/production-hosting.md](features/production-hosting.md) and ‡ by the [identity-auth.md](features/identity-auth.md) amendment 2026-11-12. production-hosting.md and that amendment are `accepted`, so the † and ‡ names are final.
 
 | Host | Keys |
 | --- | --- |
@@ -304,7 +304,7 @@ Found while writing this doc (2026-11-11). Updated 2026-11-12 with the decisions
 | 3 | Forwarded headers are applied only in Development (both BFFs, `back-office`). `identity` has none. `identity` and `webapi` call `UseHttpsRedirection` outside Development, which loops behind a TLS-terminating proxy and redirects the BFFs' plain-HTTP calls to `webapi` | Landed: outside Development, the public hosts trust `X-Forwarded-Proto` and `X-Forwarded-For` from the internal subnet only. `X-Forwarded-Host` is not needed: Caddy keeps the original `Host`. `identity` and `webapi` stop redirecting to HTTPS; `webapi` stops sending HSTS ([production-hosting.md](features/production-hosting.md) R6–R8, R11) | Done |
 | 4 | The BFFs serve the SPA only through `DevelopmentSpaProxy` | Serve the built SPA from `wwwroot` outside Development, with fallback to `index.html` for client routes | Amendments 2026-11-12 to [bff-adviser-portal.md](features/bff-adviser-portal.md) and [bff-customer-portal.md](features/bff-customer-portal.md) |
 | 5 | `MapDefaultEndpoints` maps `/health` and `/alive` only in Development. Chiseled images cannot run `curl` for a compose health check | Landed: outside Development they are mapped on the health port only, matched on the connection's local port. Each host accepts `--healthcheck`, calls its own `/health` and exits ([production-hosting.md](features/production-hosting.md) R12–R15) | Done |
-| 6 | The SystemAdmin exists only through `DevelopmentIdentitySeeder`. Production has no SystemAdmin | `webapi` creates one SystemAdmin from configuration when none exists | Amendment 2026-11-12 to [identity-auth.md](features/identity-auth.md) |
+| 6 | The SystemAdmin exists only through `DevelopmentIdentitySeeder`. Production has no SystemAdmin | Landed: on start, `webapi` creates one SystemAdmin from `Bootstrap__SystemAdmin__*` when none exists, and fails before it listens when that configuration is incomplete or invalid ([identity-auth.md](features/identity-auth.md) amendment 2026-11-12, A25–A31) | Done |
 | 7 | `TestSeed` runs only in Development. [tenants.md](features/tenants.md) R17 allows seeding only in Development | Decided 2026-11-12: no demo data for the first deploy. Recorded in [future-plans.md](future-plans.md) §5 | — |
 | 8 | The AppHost is Azure-shaped (`AddAzureContainerAppEnvironment`, `AddAzureSqlServer`) | Landed: the `deploy/` folder (§5): `compose.yml`, `.env.example`, `caddy/Dockerfile`, `caddy/Caddyfile`, `deploy.sh`, `rollback.sh`. The AppHost stays the Development orchestrator | Done |
 | 9 | No Playwright project | Landed: `tests/Smoke.Tests`, its Development seed and `.github/workflows/smoke.yml` ([smoke-test.md](smoke-test.md) §8) | Done |
