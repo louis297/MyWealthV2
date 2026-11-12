@@ -126,6 +126,69 @@ public class SystemAdminBootstrapTests
         (await SystemAdminsAsync(provider)).ShouldHaveSingleItem().Email.ShouldBe(Email);
     }
 
+    [Test]
+    public async Task NoSystemAdmin_OnlyEmailSet_ThrowsNamingThePasswordKey()
+    {
+        await using var provider = BuildProvider();
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => RunAsync(provider, Settings(Email, password: null)));
+
+        exception.Message.ShouldContain(SystemAdminBootstrap.PasswordKey);
+        await ShouldHaveNoPersonAsync(provider, Email);
+    }
+
+    [Test]
+    public async Task NoSystemAdmin_OnlyPasswordSet_ThrowsNamingTheEmailKey()
+    {
+        await using var provider = BuildProvider();
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => RunAsync(provider, Settings(email: null, Password)));
+
+        exception.Message.ShouldContain(SystemAdminBootstrap.EmailKey);
+        exception.Message.ShouldNotContain(Password);
+        (await SystemAdminsAsync(provider)).ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task NoSystemAdmin_PasswordFailsTheRules_ThrowsWithRuleCodesAndWithoutThePassword()
+    {
+        await using var provider = BuildProvider();
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => RunAsync(provider, Settings(Email, "short")));
+
+        exception.Message.ShouldContain(SystemAdminBootstrap.PasswordKey);
+        exception.Message.ShouldContain("PasswordTooShort");
+        exception.Message.ShouldContain("PasswordRequiresNonAlphanumeric");
+        exception.Message.ShouldContain("PasswordRequiresDigit");
+        exception.Message.ShouldContain("PasswordRequiresUpper");
+        exception.Message.ShouldNotContain("short", Case.Sensitive);
+        await ShouldHaveNoPersonAsync(provider, Email);
+    }
+
+    [Test]
+    public async Task NoSystemAdmin_EmailInvalid_ThrowsNamingTheEmailKey()
+    {
+        await using var provider = BuildProvider();
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => RunAsync(provider, Settings("not-an-email", Password)));
+
+        exception.Message.ShouldContain(SystemAdminBootstrap.EmailKey);
+        exception.Message.ShouldNotContain(Password);
+        await ShouldHaveNoPersonAsync(provider, "not-an-email");
+    }
+
+    private static async Task ShouldHaveNoPersonAsync(ServiceProvider provider, string email)
+    {
+        (await SystemAdminsAsync(provider)).ShouldBeEmpty();
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        (await db.Users.AnyAsync(user => user.Email == email)).ShouldBeFalse();
+    }
+
     private static async Task DisableSystemAdminAsync(ServiceProvider provider)
     {
         await using var scope = provider.CreateAsyncScope();
