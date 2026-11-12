@@ -76,7 +76,7 @@ The **smoke tenant** is a tenant used only by this suite. It stays enabled.
 
 - The data is **cash only, in the reporting currency**. Net worth then needs no instrument price and no FX rate, so it always renders and stays stable for any later test that checks the amount.
 - Emails and the TenantCode are the same in every environment. Only the passwords and the origins differ.
-- Passwords are long random strings (at least 32 characters). They are never in the repository.
+- Passwords are long random strings (at least 32 characters). They are created through the normal create forms, so they must pass the Identity password options: an upper-case letter, a lower-case letter, a digit and a non-alphanumeric character. Plain hex or base64 output does not always have all four; append a fixed suffix such as `-Sm`. They are never in the repository.
 
 **Production.** Created by hand after the first deploy ([deployment.md](deployment.md) §12): SystemAdmin creates the tenant and its TenantAdmin in Back Office; that TenantAdmin creates the Adviser, the Customer, the Account and the `TransferIn` in the Adviser Portal. The TenantAdmin password is kept by the owner, not in GitHub.
 

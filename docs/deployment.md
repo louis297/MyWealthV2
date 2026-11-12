@@ -1,6 +1,6 @@
 ---
 title: Deployment
-status: draft
+status: accepted
 language: en
 created: 2026-11-11
 updated: 2026-11-13
@@ -181,7 +181,8 @@ The deploy job copies this folder to `/opt/mywealth` on the VPS on every deploy,
 GitHub environment `production` also holds two variables that are not secret: `SMOKE_ADVISER_PORTAL_URL` and `SMOKE_CUSTOMER_PORTAL_URL` ([smoke-test.md](smoke-test.md) §5).
 
 - `.env` is created by hand on the VPS from `deploy/.env.example`, `chmod 600`, owned by the deploy user. GitHub does not hold the runtime secrets. To change one, edit `.env` and run `docker compose up -d`.
-- Values in `.env` use letters and digits only. `$` triggers compose interpolation, and quotes or `;` break the SQL connection string.
+- Values in `.env` use letters, digits and `-` only. `$` triggers compose interpolation, and quotes or `;` break the SQL connection string.
+- Passwords that become Identity passwords (`BOOTSTRAP_SYSTEMADMIN_PASSWORD`, and the smoke passwords of [smoke-test.md](smoke-test.md) §3) must pass the Identity password options: 8+ characters with an upper-case letter, a lower-case letter, a digit and a non-alphanumeric character (only `RequiredLength` differs from the ASP.NET Core Identity defaults). A `-` satisfies the last rule and is safe in `.env`. Otherwise `webapi` refuses to start (identity-auth bootstrap amendment), or the create form rejects the password.
 - SystemAdmin credentials never leave the owner. CI never signs in as SystemAdmin.
 - Aspire user secrets are for local Development only. They are not a deployment source.
 - The OpenIddict certificates are self-signed and generated on the VPS: RSA 3072, valid 730 days, key usage `digitalSignature` for signing and `keyEncipherment` for encryption. Only the PFX files are kept.
