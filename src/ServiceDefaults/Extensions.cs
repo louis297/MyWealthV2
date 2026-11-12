@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.ServiceDiscovery;
@@ -15,6 +18,9 @@ namespace Microsoft.Extensions.Hosting;
 // To learn more about using this project, see https://aka.ms/dotnet/aspire/service-defaults
 public static class Extensions
 {
+    public const string HealthPortKey = "Health:Port";
+    public const int DefaultHealthPort = 8081;
+
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         builder.ConfigureOpenTelemetry();
@@ -94,24 +100,32 @@ public static class Extensions
         builder.Services.AddHealthChecks()
             // Add a default liveness check to ensure app is responsive
             .AddCheck("self", () => HealthCheckResult.Healthy(), ["live"]);
+        builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<MatcherPolicy, HealthPortMatcherPolicy>());
 
         return builder;
     }
 
+    public static int ReadHealthPort(IConfiguration configuration) =>
+        configuration.GetValue(HealthPortKey, DefaultHealthPort);
+
+    // Development: /health and /alive on every port. Elsewhere: only on the health port, which the
+    // reverse proxy never forwards to (production-hosting R12–R14).
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
-        // Adding health checks endpoints to applications in non-development environments has security implications.
-        // See https://aka.ms/dotnet/aspire/healthchecks for details before enabling these endpoints in non-development environments.
-        if (app.Environment.IsDevelopment())
-        {
-            // All health checks must pass for app to be considered ready to accept traffic after starting
-            app.MapHealthChecks("/health");
+        // All health checks must pass for app to be considered ready to accept traffic after starting
+        var health = app.MapHealthChecks("/health");
 
-            // Only health checks tagged with the "live" tag must pass for app to be considered alive
-            app.MapHealthChecks("/alive", new HealthCheckOptions
-            {
-                Predicate = r => r.Tags.Contains("live")
-            });
+        // Only health checks tagged with the "live" tag must pass for app to be considered alive
+        var alive = app.MapHealthChecks("/alive", new HealthCheckOptions
+        {
+            Predicate = r => r.Tags.Contains("live")
+        });
+
+        if (!app.Environment.IsDevelopment())
+        {
+            var port = new HealthPortMetadata(ReadHealthPort(app.Configuration));
+            health.WithMetadata(port);
+            alive.WithMetadata(port);
         }
 
         return app;
