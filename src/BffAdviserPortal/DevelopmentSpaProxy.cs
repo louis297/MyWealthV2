@@ -40,7 +40,7 @@ public static class DevelopmentSpaProxy
 
         app.MapFallback(async (HttpContext http) =>
         {
-            if (IsReserved(http.Request.Path))
+            if (SpaReservedPaths.IsReserved(http.Request.Path))
             {
                 http.Response.StatusCode = StatusCodes.Status404NotFound;
                 return;
@@ -49,14 +49,6 @@ public static class DevelopmentSpaProxy
             await forward(http);
         });
     }
-
-    private static bool IsReserved(PathString path) =>
-        path.StartsWithSegments("/api")
-        || path.StartsWithSegments("/bff")
-        || path.StartsWithSegments("/signin-oidc")
-        || path.StartsWithSegments("/signout-callback-oidc")
-        || path.StartsWithSegments("/health")
-        || path.StartsWithSegments("/alive");
 
     private static async Task ForwardAsync(HttpContext http, HttpClient spaClient, Uri spaBase)
     {
