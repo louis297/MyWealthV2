@@ -36,6 +36,7 @@ builder.Services.AddCors(options =>
 });
 
 var development = builder.Environment.IsDevelopment();
+var productionCredentials = development ? null : ProductionServerCredentials.Load(builder.Configuration);
 builder.Services
     .AddAuthentication()
     .AddCookie(ClientCookieSchemes.AdviserPortal, options =>
@@ -67,13 +68,22 @@ builder.Services.AddOpenIddict()
         options.DisableSlidingRefreshTokenExpiration();
         options.DisableAccessTokenEncryption();
 
-        options.AddDevelopmentEncryptionCertificate()
-            .AddDevelopmentSigningCertificate();
-
-        options.UseAspNetCore()
+        var aspNetCore = options.UseAspNetCore()
             .EnableAuthorizationEndpointPassthrough()
-            .EnableEndSessionEndpointPassthrough()
-            .DisableTransportSecurityRequirement();
+            .EnableEndSessionEndpointPassthrough();
+
+        if (productionCredentials is null)
+        {
+            options.AddDevelopmentEncryptionCertificate()
+                .AddDevelopmentSigningCertificate();
+            aspNetCore.DisableTransportSecurityRequirement();
+        }
+        else
+        {
+            options.SetIssuer(productionCredentials.Issuer)
+                .AddSigningCertificate(productionCredentials.SigningCertificate)
+                .AddEncryptionCertificate(productionCredentials.EncryptionCertificate);
+        }
 
         options.AddEventHandler(RedirectUriMismatchLogger.Descriptor);
     });
