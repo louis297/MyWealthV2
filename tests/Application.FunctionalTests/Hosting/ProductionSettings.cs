@@ -14,12 +14,14 @@ internal static class ProductionSettings
         ["Identity:SigningCertificatePath"] = certificates.SigningPath,
         ["Identity:EncryptionCertificatePath"] = certificates.EncryptionPath,
         ["Identity:CertificatePassword"] = TestCertificates.Password,
-        ["ForwardedHeaders:KnownNetworks:0"] = TrustedNetwork
+        ["ForwardedHeaders:KnownNetworks:0"] = TrustedNetwork,
+        ["DataProtection:KeysPath"] = Path.Combine(certificates.Folder, "keys")
     };
 
     // Defaults for the BFFs and back-office when a factory runs outside Development.
     public static Dictionary<string, string> PublicHost() => new()
     {
-        ["ForwardedHeaders:KnownNetworks:0"] = TrustedNetwork
+        ["ForwardedHeaders:KnownNetworks:0"] = TrustedNetwork,
+        ["DataProtection:KeysPath"] = TestFolders.Create("keys")
     };
 }
