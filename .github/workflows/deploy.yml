@@ -1,0 +1,179 @@
+name: Deploy
+
+# CD to the VPS (docs/deployment.md §9).
+# Needs, in GitHub environment `production`:
+#   secrets   VPS_SSH_KEY, VPS_HOST, VPS_USER, VPS_KNOWN_HOSTS
+#   plus what smoke.yml needs (SMOKE_* secrets and variables)
+# Images go to GHCR with the workflow's GITHUB_TOKEN; the VPS pulls with its own read-only token.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      smoke:
+        description: Run the post-deploy smoke test (turn off only for the first deploy, §12 step 8)
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+env:
+  DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+jobs:
+  images:
+    name: Image ${{ matrix.image }}
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - image: mywealth-webapi
+            project: src/Web
+          - image: mywealth-identity
+            project: src/IdentityHost
+          - image: mywealth-worker
+            project: src/Worker
+          - image: mywealth-back-office
+            project: src/BackOffice
+          - image: mywealth-bff-adviser-portal
+            project: src/BffAdviserPortal
+            portal: src/AdviserPortal
+          - image: mywealth-bff-customer-portal
+            project: src/BffCustomerPortal
+            portal: src/CustomerPortal
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.x'
+
+      - name: Setup Node
+        if: matrix.portal
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ${{ matrix.portal }}/package-lock.json
+
+      - name: Build portal into the BFF wwwroot
+        if: matrix.portal
+        run: |
+          npm ci --prefix "${{ matrix.portal }}"
+          npm run build --prefix "${{ matrix.portal }}"
+          rm -rf "${{ matrix.project }}/wwwroot"
+          mkdir -p "${{ matrix.project }}/wwwroot"
+          cp -r "${{ matrix.portal }}/dist/." "${{ matrix.project }}/wwwroot/"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish image
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          dotnet publish "${{ matrix.project }}" \
+            --configuration Release \
+            --os linux --arch x64 \
+            /t:PublishContainer \
+            -p:ContainerFamily=noble-chiseled \
+            -p:ContainerRegistry=ghcr.io \
+            -p:ContainerRepository="$owner/${{ matrix.image }}" \
+            -p:ContainerImageTag="$DEPLOY_SHA"
+
+  deploy:
+    name: Deploy to VPS
+    needs: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    concurrency:
+      group: production
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+
+      - name: Configure SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Copy deploy/ to /opt/mywealth
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: scp -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes -r deploy/. "$VPS_USER@$VPS_HOST:/opt/mywealth/"
+
+      - name: Run deploy.sh
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" "bash /opt/mywealth/deploy.sh $DEPLOY_SHA"
+
+  smoke:
+    name: Post-deploy smoke test
+    needs: deploy
+    if: github.event_name != 'workflow_dispatch' || inputs.smoke
+    uses: ./.github/workflows/smoke.yml
+    secrets: inherit
+
+  rollback:
+    name: Roll back
+    needs: [deploy, smoke]
+    if: failure() && needs.deploy.result == 'success' && needs.smoke.result == 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    concurrency:
+      group: production
+      cancel-in-progress: false
+
+    steps:
+      - name: Configure SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Run rollback.sh
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" "bash /opt/mywealth/rollback.sh"
+
+      # The run still ends red, so the failed deploy stays visible (§9 step 5).

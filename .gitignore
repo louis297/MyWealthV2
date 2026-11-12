@@ -514,3 +514,7 @@ $RECYCLE.BIN/
 
 # Local operator docs (not committed)
 local_docs/
+
+# SPA builds copied in by the deploy workflow (docs/deployment.md §4)
+src/BffAdviserPortal/wwwroot/
+src/BffCustomerPortal/wwwroot/
