@@ -16,20 +16,30 @@ builder.AddPublicHostDataProtection("mywealth-bff-customer-portal");
 builder.AddBffAuthentication();
 
 var app = builder.Build();
+var spaOrigin = builder.Configuration["Spa:DevServerUrl"];
+var serveSpaBuild = string.IsNullOrWhiteSpace(spaOrigin);
 
 app.UsePublicHostForwardedHeaders(trustAnyProxyInDevelopment: true);
 
 app.UseBffSecurityHeaders();
+if (serveSpaBuild)
+{
+    app.UseSpaStaticFiles();
+}
+
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapBffApi();
 app.MapBffLogout();
 
-var spaOrigin = builder.Configuration["Spa:DevServerUrl"];
-if (!string.IsNullOrWhiteSpace(spaOrigin))
+if (serveSpaBuild)
 {
-    DevelopmentSpaProxy.Map(app, spaOrigin);
+    app.MapSpaFallback();
+}
+else
+{
+    DevelopmentSpaProxy.Map(app, spaOrigin!);
 }
 
 app.MapGet("/bff/login", (string? returnUrl) =>
