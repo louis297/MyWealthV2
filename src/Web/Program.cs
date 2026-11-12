@@ -40,6 +40,10 @@ await using (var scope = app.Services.CreateAsyncScope())
             app.Configuration[DevelopmentSmokeSeeder.CustomerPasswordKey],
             CancellationToken.None);
     }
+
+    // Every environment. After the Development seed, so Development always finds its SystemAdmin
+    // (identity-auth amendment 2026-11-12). Throws on bad configuration before the host listens.
+    await SystemAdminBootstrap.RunAsync(scope.ServiceProvider, app.Configuration, CancellationToken.None);
 }
 
 // No HTTPS redirection or HSTS here: the reverse proxy owns both (production-hosting R11).
