@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-11-02
-last_updated: 2026-11-02
+last_updated: 2026-11-12
 related:
   - ../function-plan.md
   - ../architecture.md
@@ -18,6 +18,8 @@ related:
   - ../customer-portal/customer-portal.md
   - ../adviser-portal/frontend-conventions.md
   - bff-adviser-portal.md
+  - production-hosting.md
+  - ../deployment.md
 ---
 
 # Customer Portal BFF
@@ -308,3 +310,44 @@ The repository should build after each commit. Agents split each line into red t
 4. Logout + revocation + end-session (IdentityHost clears only the `customer-portal` scheme).
 5. Functional host tests (no tokens in responses; wrong role no code; prefix 404).
 6. Accept change: status, companion edits.
+
+---
+
+## Amendment 2026-11-12 (serve the SPA build) — review
+
+Status of this amendment: `review`. It is not a build contract until it is marked accepted. The rest of this file stays accepted. Item 4 of [deployment.md](../deployment.md) §13. Do not rewrite §2, §7 or §11 in place; this amendment adds the production path next to the Development proxy.
+
+**Why.** Today ``bff-customer-portal`` serves the SPA only through `DevelopmentSpaProxy` (`Spa:DevServerUrl`). In production there is no Vite server, and Caddy has one upstream per portal origin, so the BFF must serve the built files itself.
+
+| Id | Rule |
+| --- | --- |
+| P1 | When `Spa:DevServerUrl` is set, the BFF uses `DevelopmentSpaProxy` as today. When it is not set, the BFF serves static files from its `wwwroot` folder. |
+| P2 | A `GET` or `HEAD` request for a path that matches a file in `wwwroot` returns that file with its content type. |
+| P3 | A `GET` or `HEAD` request that matches no endpoint and no file, whose last path segment has no file extension, and that is not under a reserved prefix, returns `wwwroot/index.html` with status 200 and `text/html`. This serves client routes such as `/accounts/{id}` and deep links after sign-in. |
+| P4 | Reserved prefixes never fall back to `index.html`: `/api`, `/bff`, `/signin-oidc`, `/signout-callback-oidc`, `/health`, `/alive`. An unknown path under them returns 404. This is the same list `DevelopmentSpaProxy` uses. |
+| P5 | A missing path whose last segment has a file extension (for example `/assets/missing.js`) returns 404, not `index.html`, so a stale script reference never receives HTML. |
+| P6 | Methods other than `GET` and `HEAD` on a non-endpoint path return 404 or 405, never `index.html`. |
+| P7 | `index.html` (direct or through P3) is sent with `Cache-Control: no-cache`. Files under `/assets/` (Vite hashed output) are sent with `Cache-Control: public, max-age=31536000, immutable`. Other files use the static file defaults. |
+| P8 | Static and fallback responses are anonymous. The SPA itself calls `GET /api/users/me` and starts `/bff/login` when it gets 401 (§4 unchanged). |
+| P9 | `UseBffSecurityHeaders` applies to static and fallback responses, as to every other response. |
+| P10 | If `wwwroot/index.html` does not exist and `Spa:DevServerUrl` is not set, P3 returns 404. The host still starts, so its health check and `/bff/*` keep working. |
+
+**Build.** CI runs `npm ci && npm run build` in `src/CustomerPortal` and copies `dist/` into `src/BffCustomerPortal/wwwroot/` before `dotnet publish` (deployment §4, §9). `src/BffCustomerPortal/wwwroot/` is listed in `.gitignore` and never committed. Local `dotnet run` without a Vite server and without a build therefore serves 404 for client routes (P10).
+
+**Out.** A content-security `script-src` policy (still open in §11). Compression (Caddy does it). Pre-compressed files.
+
+**Tests (Application.FunctionalTests).** Start the BFF in Production without `Spa:DevServerUrl`, with a test `wwwroot` that holds an `index.html` and one file under `/assets/`.
+
+| Id | Given | When | Then |
+| --- | --- | --- | --- |
+| P-T1 | Test `wwwroot` | `GET /` and `GET /some/client/route` | 200, `text/html`, body of `index.html`, `Cache-Control: no-cache` |
+| P-T2 | Test `wwwroot` | `GET /assets/app.js` | 200, JavaScript content type, `Cache-Control` with `immutable` |
+| P-T3 | Test `wwwroot` | `GET /assets/missing.js` | 404 |
+| P-T4 | Test `wwwroot` | `GET /bff/unknown`, `GET /api` without session, `GET /health` on the traffic port | Not `index.html` (404 for `/bff/unknown` and `/health`; `/api` keeps its §4 status) |
+| P-T5 | Test `wwwroot` | `POST /some/client/route` | 404 or 405, not `index.html` |
+| P-T6 | Test `wwwroot` | `GET /some/client/route` | Response has the `UseBffSecurityHeaders` headers |
+| P-T7 | No `index.html` | `GET /some/client/route` | 404; `/bff/login` still answers |
+| P-T8 | `Spa:DevServerUrl` set | `GET /some/client/route` | Forwarded to the dev server, as today (existing proxy tests stay green) |
+
+Same rules as the [bff-adviser-portal.md](bff-adviser-portal.md) amendment 2026-11-12. Both BFFs keep their own copy of the code; sharing it is a refactor, not a rule.
+
