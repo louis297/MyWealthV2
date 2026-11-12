@@ -2,6 +2,12 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using MyWealthV2.BffCustomerPortal;
 
+if (HealthCheckCommand.IsRequested(args))
+{
+    Environment.ExitCode = await HealthCheckCommand.RunAsync(args);
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();

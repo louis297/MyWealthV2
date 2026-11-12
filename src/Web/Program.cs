@@ -4,6 +4,12 @@ using MyWealthV2.Infrastructure.Data.Schema;
 using MyWealthV2.Infrastructure.Identity;
 using Scalar.AspNetCore;
 
+if (HealthCheckCommand.IsRequested(args))
+{
+    Environment.ExitCode = await HealthCheckCommand.RunAsync(args);
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.

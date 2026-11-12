@@ -8,6 +8,12 @@ using MyWealthV2.Infrastructure.Data.Schema;
 using MyWealthV2.Infrastructure.MarketData;
 using MyWealthV2.Worker.Reports;
 
+if (HealthCheckCommand.IsRequested(args))
+{
+    Environment.ExitCode = await HealthCheckCommand.RunAsync(args);
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();

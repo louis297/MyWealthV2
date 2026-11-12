@@ -7,6 +7,12 @@ using OpenIddict.Abstractions;
 using OpenIddict.Server;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 
+if (HealthCheckCommand.IsRequested(args))
+{
+    Environment.ExitCode = await HealthCheckCommand.RunAsync(args);
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
