@@ -93,6 +93,55 @@ public class SystemAdminBootstrapTests
         _logs.Entries.ShouldContain(entry => entry.Level == LogLevel.Warning);
     }
 
+    [TestCase(UserStatus.Active)]
+    [TestCase(UserStatus.Disabled)]
+    public async Task SystemAdminExists_OtherKeysSet_ChangesNothing(UserStatus status)
+    {
+        await using var provider = BuildProvider();
+        await RunAsync(provider, Settings(Email, Password));
+        if (status == UserStatus.Disabled)
+        {
+            await DisableSystemAdminAsync(provider);
+        }
+
+        var before = (await SystemAdminsAsync(provider)).ShouldHaveSingleItem();
+        var hashBefore = await PasswordHashAsync(provider, before.IdentityUserId);
+
+        await RunAsync(provider, Settings("other@example.test", "Different1!", name: "Other"));
+
+        var after = (await SystemAdminsAsync(provider)).ShouldHaveSingleItem();
+        after.ShouldBe(before);
+        after.Status.ShouldBe(status);
+        (await PasswordHashAsync(provider, after.IdentityUserId)).ShouldBe(hashBefore);
+    }
+
+    [Test]
+    public async Task SystemAdminExists_PasswordInvalid_DoesNotCheckThePassword()
+    {
+        await using var provider = BuildProvider();
+        await RunAsync(provider, Settings(Email, Password));
+
+        await Should.NotThrowAsync(() => RunAsync(provider, Settings("other@example.test", "short")));
+
+        (await SystemAdminsAsync(provider)).ShouldHaveSingleItem().Email.ShouldBe(Email);
+    }
+
+    private static async Task DisableSystemAdminAsync(ServiceProvider provider)
+    {
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var admin = await db.DomainUsers.IgnoreQueryFilters().SingleAsync(user => user.Role == UserRole.SystemAdmin);
+        admin.Disable();
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task<string?> PasswordHashAsync(ServiceProvider provider, string identityUserId)
+    {
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await db.Users.Where(user => user.Id == identityUserId).Select(user => user.PasswordHash).SingleAsync();
+    }
+
     private static Dictionary<string, string?> Settings(string? email, string? password, string? name = null)
     {
         var settings = new Dictionary<string, string?>();
