@@ -19,6 +19,8 @@ public sealed class CustomerBffFactory : WebApplicationFactory<BffCustomer::Prog
     private readonly IWebApiTransport? _api;
     private readonly string? _apiBaseAddress;
     private readonly string? _publicOrigin;
+    private readonly string? _spaDevServerUrl;
+    private readonly string? _webRoot;
 
     public CustomerBffFactory(
         string authority,
@@ -26,7 +28,9 @@ public sealed class CustomerBffFactory : WebApplicationFactory<BffCustomer::Prog
         string environment = "Development",
         IWebApiTransport? api = null,
         string? apiBaseAddress = null,
-        string? publicOrigin = null)
+        string? publicOrigin = null,
+        string? spaDevServerUrl = null,
+        string? webRoot = null)
     {
         _authority = authority.TrimEnd('/');
         _identityHandler = identityHandler;
@@ -37,6 +41,8 @@ public sealed class CustomerBffFactory : WebApplicationFactory<BffCustomer::Prog
         _api = api;
         _apiBaseAddress = apiBaseAddress;
         _publicOrigin = publicOrigin;
+        _spaDevServerUrl = spaDevServerUrl;
+        _webRoot = webRoot;
     }
 
     // Extra configuration applied when the host starts. Outside Development it starts with the
@@ -55,6 +61,16 @@ public sealed class CustomerBffFactory : WebApplicationFactory<BffCustomer::Prog
         if (!string.IsNullOrWhiteSpace(_apiBaseAddress))
         {
             builder.UseSetting("Api:BaseAddress", _apiBaseAddress);
+        }
+
+        if (!string.IsNullOrWhiteSpace(_spaDevServerUrl))
+        {
+            builder.UseSetting("Spa:DevServerUrl", _spaDevServerUrl);
+        }
+
+        if (!string.IsNullOrWhiteSpace(_webRoot))
+        {
+            builder.UseSetting(WebHostDefaults.WebRootKey, _webRoot);
         }
 
         if (!string.IsNullOrWhiteSpace(_publicOrigin))
