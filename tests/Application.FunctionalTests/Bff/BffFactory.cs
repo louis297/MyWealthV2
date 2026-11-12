@@ -24,6 +24,7 @@ public sealed class BffFactory : WebApplicationFactory<BffHost::Program>
     private readonly string? _spaDevServerUrl;
     private readonly string? _publicOrigin;
     private readonly ILoggerProvider? _logs;
+    private readonly string? _webRoot;
 
     public BffFactory(
         string authority,
@@ -33,7 +34,8 @@ public sealed class BffFactory : WebApplicationFactory<BffHost::Program>
         string? apiBaseAddress = null,
         string? spaDevServerUrl = null,
         string? publicOrigin = null,
-        ILoggerProvider? logs = null)
+        ILoggerProvider? logs = null,
+        string? webRoot = null)
     {
         _authority = authority.TrimEnd('/');
         _identityHandler = identityHandler;
@@ -46,6 +48,7 @@ public sealed class BffFactory : WebApplicationFactory<BffHost::Program>
         _spaDevServerUrl = spaDevServerUrl;
         _publicOrigin = publicOrigin;
         _logs = logs;
+        _webRoot = webRoot;
     }
 
     // Extra configuration applied when the host starts. Outside Development it starts with the
@@ -69,6 +72,11 @@ public sealed class BffFactory : WebApplicationFactory<BffHost::Program>
         if (!string.IsNullOrWhiteSpace(_spaDevServerUrl))
         {
             builder.UseSetting("Spa:DevServerUrl", _spaDevServerUrl);
+        }
+
+        if (!string.IsNullOrWhiteSpace(_webRoot))
+        {
+            builder.UseSetting(WebHostDefaults.WebRootKey, _webRoot);
         }
 
         if (!string.IsNullOrWhiteSpace(_publicOrigin))
