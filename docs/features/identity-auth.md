@@ -469,7 +469,7 @@ Records behaviour that landed with [outbox.md](outbox.md) (`e9b8b81`). Do not re
 
 Status of this amendment: `review`. It is not a build contract until it is marked accepted. The rest of this file stays accepted. Item 6 of [deployment.md](../deployment.md) §13. Do not rewrite R1–R21 or earlier amendments in place.
 
-**Why.** A SystemAdmin exists only through `DevelopmentIdentitySeeder`. A production database starts with none, so nobody can sign in to Back Office to create the first tenant. SystemAdmins are not created over HTTP (ADR 0013), and the owner should not write identity rows by hand in SQL.
+**Why.** A SystemAdmin exists only through `DevelopmentIdentitySeeder`. A production database starts with none, so nobody can sign in to Back Office to create the first tenant. No route creates a SystemAdmin, and the owner should not write identity rows by hand in SQL.
 
 - **Where.** `webapi`, on start, right after the schema applicator and the currency catalog reload, before it listens. `webapi` already owns the schema and the Development seed; `identity` starts only after `webapi` is healthy (deployment §8).
 - **Keys.** `Bootstrap:SystemAdmin:Email` and `Bootstrap:SystemAdmin:Password` (environment `Bootstrap__SystemAdmin__Email`, `Bootstrap__SystemAdmin__Password`). Optional `Bootstrap:SystemAdmin:Name`, default `System Admin`.
