@@ -69,7 +69,15 @@ function user(): CurrentUser {
   };
 }
 
-function renderDetail(options?: { assigned?: boolean; putStatus?: number; putBody?: unknown; inactive?: boolean; missing?: boolean }) {
+function renderDetail(options?: {
+  assigned?: boolean;
+  putStatus?: number;
+  putBody?: unknown;
+  disableStatus?: number;
+  disableBody?: unknown;
+  inactive?: boolean;
+  missing?: boolean;
+}) {
   const store = configureStore({
     reducer: {
       session: sessionSlice.reducer,
@@ -101,6 +109,12 @@ function renderDetail(options?: { assigned?: boolean; putStatus?: number; putBod
       );
     }
     if (path === `/api/portfolios/${portfolioId}/disable` && method === "POST") {
+      if (options?.disableStatus) {
+        return new Response(JSON.stringify(options.disableBody ?? {}), {
+          status: options.disableStatus,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
       disabled = true;
       return new Response("", { status: 204 });
     }
@@ -146,6 +160,28 @@ function renderDetail(options?: { assigned?: boolean; putStatus?: number; putBod
     </Provider>,
   );
   return { fetchMock };
+}
+
+const sharedProblem = {
+  type: "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+  title: "Portfolio is shared",
+  status: 409,
+  detail: "This portfolio is assigned to accounts outside your book. Ask a TenantAdmin to change or disable it.",
+  code: "portfolio_shared",
+};
+
+const staleProblem = {
+  type: "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+  title: "Conflict",
+  status: 409,
+  code: "stale_row_version",
+};
+
+function portfolioGets(fetchMock: ReturnType<typeof vi.mocked<typeof fetch>>) {
+  return fetchMock.mock.calls.filter(([input]) => {
+    const request = input instanceof Request ? input : null;
+    return request?.method === "GET" && new URL(request.url).pathname === `/api/portfolios/${portfolioId}`;
+  }).length;
 }
 
 function putRequest(fetchMock: ReturnType<typeof vi.mocked<typeof fetch>>) {
@@ -344,6 +380,53 @@ describe("PortfolioDetailPage edit", () => {
     expect(new URL(request.url).pathname).toBe(`/api/portfolios/${portfolioId}/rebalance`);
     expect(request.headers.get("X-MyWealth-Request")).toBe("1");
     expect(await screen.findByText("Rebalance queued.")).toBeInTheDocument();
+  });
+
+  it("shows the server detail when an update is refused as portfolio_shared and keeps the edits", async () => {
+    const { fetchMock } = renderDetail({ putStatus: 409, putBody: sharedProblem });
+
+    const nameInput = await screen.findByLabelText("Name");
+    fireEvent.change(nameInput, { target: { value: "Renamed" } });
+    const getsBefore = portfolioGets(fetchMock);
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText(sharedProblem.detail)).toBeInTheDocument();
+    expect(screen.queryByText("This row changed. Reload and try again.")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Name")).toHaveValue("Renamed");
+    expect(portfolioGets(fetchMock)).toBe(getsBefore);
+  });
+
+  it("shows the server detail when a disable is refused as portfolio_shared", async () => {
+    const { fetchMock } = renderDetail({ disableStatus: 409, disableBody: sharedProblem });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Disable" }));
+    const getsBefore = portfolioGets(fetchMock);
+
+    expect(await screen.findByText(sharedProblem.detail)).toBeInTheDocument();
+    expect(screen.queryByText("This row changed. Reload and try again.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Disable" })).toBeInTheDocument();
+    expect(portfolioGets(fetchMock)).toBe(getsBefore);
+  });
+
+  it("shows the conflict notice and reloads on stale_row_version", async () => {
+    const { fetchMock } = renderDetail({ putStatus: 409, putBody: staleProblem });
+
+    expect(await screen.findByRole("heading", { name: "Balanced Growth" })).toBeInTheDocument();
+    const getsBefore = portfolioGets(fetchMock);
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("This row changed. Reload and try again.")).toBeInTheDocument();
+    await vi.waitFor(() => expect(portfolioGets(fetchMock)).toBeGreaterThan(getsBefore));
+  });
+
+  it("shows the server detail for a 409 with a code the page does not know", async () => {
+    renderDetail({ putStatus: 409, putBody: { ...sharedProblem, code: "some_future_code", detail: "Something else." } });
+
+    expect(await screen.findByRole("heading", { name: "Balanced Growth" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Something else.")).toBeInTheDocument();
+    expect(screen.queryByText("This row changed. Reload and try again.")).not.toBeInTheDocument();
   });
 
   it("shows Not found for an unknown portfolio", async () => {
