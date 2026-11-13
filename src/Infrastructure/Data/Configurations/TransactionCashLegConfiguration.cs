@@ -9,7 +9,6 @@ public class TransactionCashLegConfiguration : IEntityTypeConfiguration<Transact
     public void Configure(EntityTypeBuilder<TransactionCashLeg> builder)
     {
         builder.ToTable("TransactionCashLegs");
-        builder.Ignore(leg => leg.TenantId);
         builder.Property(leg => leg.Amount).HasColumnType("decimal(18,4)").IsRequired();
         builder.Property(leg => leg.Currency).HasColumnType("char(3)").IsFixedLength().HasMaxLength(3).IsRequired();
         builder.Property(leg => leg.CreatedBy).HasMaxLength(450).IsRequired();
@@ -23,6 +22,10 @@ public class TransactionCashLegConfiguration : IEntityTypeConfiguration<Transact
         builder.HasOne<Currency>()
             .WithMany()
             .HasForeignKey(leg => leg.Currency)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Tenant>()
+            .WithMany()
+            .HasForeignKey(leg => leg.TenantId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

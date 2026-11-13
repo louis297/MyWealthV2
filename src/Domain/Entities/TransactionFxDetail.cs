@@ -23,9 +23,10 @@ public class TransactionFxDetail
 
     public string RateSource { get; private set; } = string.Empty;
 
-    internal static TransactionFxDetail Create(AppliedFxRate rate) =>
+    internal static TransactionFxDetail Create(int tenantId, AppliedFxRate rate) =>
         new()
         {
+            TenantId = tenantId,
             BaseCurrency = rate.BaseCurrency,
             QuoteCurrency = rate.QuoteCurrency,
             Rate = rate.Rate,
@@ -37,6 +38,7 @@ public class TransactionFxDetail
     internal TransactionFxDetail Copy() =>
         new()
         {
+            TenantId = TenantId,
             BaseCurrency = BaseCurrency,
             QuoteCurrency = QuoteCurrency,
             Rate = Rate,

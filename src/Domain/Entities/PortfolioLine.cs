@@ -16,9 +16,10 @@ public class PortfolioLine : BaseEntity
 
     public int SortOrder { get; private set; }
 
-    internal static PortfolioLine Create(int instrumentId, decimal targetWeight, int sortOrder) =>
+    internal static PortfolioLine Create(int tenantId, int instrumentId, decimal targetWeight, int sortOrder) =>
         new()
         {
+            TenantId = tenantId,
             InstrumentId = instrumentId,
             TargetWeight = targetWeight,
             SortOrder = sortOrder

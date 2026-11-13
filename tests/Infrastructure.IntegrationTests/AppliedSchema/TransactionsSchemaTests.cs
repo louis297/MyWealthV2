@@ -72,7 +72,7 @@ public class TransactionsSchemaTests
 
         columns.Select(column => column.Name).ShouldBe([
             "Id", "TransactionId", "Amount", "Currency",
-            "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion", "AccountId"
+            "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion", "AccountId", "TenantId"
         ]);
 
         Column(columns, "Id").ShouldSatisfyAllConditions(
@@ -83,6 +83,9 @@ public class TransactionsSchemaTests
             column => column.Type.ShouldBe("int"),
             column => column.Nullable.ShouldBe("NO"));
         Column(columns, "AccountId").ShouldSatisfyAllConditions(
+            column => column.Type.ShouldBe("int"),
+            column => column.Nullable.ShouldBe("NO"));
+        Column(columns, "TenantId").ShouldSatisfyAllConditions(
             column => column.Type.ShouldBe("int"),
             column => column.Nullable.ShouldBe("NO"));
         Column(columns, "Amount").ShouldSatisfyAllConditions(
@@ -208,6 +211,7 @@ public class TransactionsSchemaTests
         (await ForeignKeys("TransactionCashLegs")).ShouldBe([
             ("FK_TransactionCashLegs_Accounts_AccountId", "Accounts", "Id", (byte)0),
             ("FK_TransactionCashLegs_Currencies_Currency", "Currencies", "Code", (byte)0),
+            ("FK_TransactionCashLegs_Tenants_TenantId", "Tenants", "Id", (byte)0),
             ("FK_TransactionCashLegs_Transactions_TransactionId", "Transactions", "Id", (byte)0)
         ]);
         (await ForeignKeys("IdempotencyRecords")).ShouldBe([

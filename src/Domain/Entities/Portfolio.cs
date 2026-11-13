@@ -85,7 +85,7 @@ public class Portfolio : BaseAuditableEntity
 
     public void ReplaceLines(IReadOnlyList<(int InstrumentId, decimal TargetWeight)> lines)
     {
-        var next = BuildLines(lines);
+        var next = BuildLines(TenantId, lines);
         if (SameWeights(next))
         {
             return;
@@ -109,7 +109,7 @@ public class Portfolio : BaseAuditableEntity
 
     private void ReplaceLineWeights(IReadOnlyList<(int InstrumentId, decimal TargetWeight)> lines)
     {
-        var next = BuildLines(lines);
+        var next = BuildLines(TenantId, lines);
         _lines.Clear();
         _lines.AddRange(next);
     }
@@ -125,7 +125,9 @@ public class Portfolio : BaseAuditableEntity
             other.InstrumentId == line.InstrumentId && other.TargetWeight == line.TargetWeight));
     }
 
-    private static List<PortfolioLine> BuildLines(IReadOnlyList<(int InstrumentId, decimal TargetWeight)> lines)
+    private static List<PortfolioLine> BuildLines(
+        int tenantId,
+        IReadOnlyList<(int InstrumentId, decimal TargetWeight)> lines)
     {
         if (lines.Count == 0)
         {
@@ -168,7 +170,7 @@ public class Portfolio : BaseAuditableEntity
         var built = new List<PortfolioLine>(lines.Count);
         for (var index = 0; index < lines.Count; index++)
         {
-            built.Add(PortfolioLine.Create(lines[index].InstrumentId, rounded[index], index));
+            built.Add(PortfolioLine.Create(tenantId, lines[index].InstrumentId, rounded[index], index));
         }
 
         return built;

@@ -19,7 +19,7 @@ public class PortfoliosSchemaTests
             "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion"
         ]);
         (await Columns(db, "PortfolioLines")).ShouldBe([
-            "Id", "PortfolioId", "InstrumentId", "TargetWeight", "SortOrder"
+            "Id", "PortfolioId", "InstrumentId", "TargetWeight", "SortOrder", "TenantId"
         ]);
         (await Columns(db, "AccountPortfolioAssignments")).ShouldBe([
             "Id", "PublicId", "TenantId", "AccountId", "PortfolioId", "Status",
@@ -28,7 +28,7 @@ public class PortfoliosSchemaTests
         ]);
 
         (await ForeignKeyTargets(db, "Portfolios")).ShouldBe(["Currencies", "Tenants"], ignoreOrder: true);
-        (await ForeignKeyTargets(db, "PortfolioLines")).ShouldBe(["Instruments", "Portfolios"], ignoreOrder: true);
+        (await ForeignKeyTargets(db, "PortfolioLines")).ShouldBe(["Instruments", "Portfolios", "Tenants"], ignoreOrder: true);
         (await ForeignKeyTargets(db, "AccountPortfolioAssignments")).ShouldBe(
             ["Accounts", "Portfolios", "Tenants"], ignoreOrder: true);
 

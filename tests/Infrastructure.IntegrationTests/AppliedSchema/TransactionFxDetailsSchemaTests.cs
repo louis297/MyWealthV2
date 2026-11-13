@@ -110,8 +110,9 @@ public class TransactionFxDetailsSchemaTests
         insert.Transaction = transaction;
         insert.CommandText = $"""
             INSERT INTO [TransactionFxDetails]
-                ([TransactionId], [BaseCurrency], [QuoteCurrency], [Rate], [RateAsOfDate], [RateSource])
-            VALUES ({transactionId}, '{baseCurrency}', '{quoteCurrency}', {rate}, '2026-11-09', N'Frankfurter');
+                ([TenantId], [TransactionId], [BaseCurrency], [QuoteCurrency], [Rate], [RateAsOfDate], [RateSource])
+            SELECT [TenantId], [Id], '{baseCurrency}', '{quoteCurrency}', {rate}, '2026-11-09', N'Frankfurter'
+            FROM [Transactions] WHERE [Id] = {transactionId};
             """;
         await insert.ExecuteNonQueryAsync();
     }

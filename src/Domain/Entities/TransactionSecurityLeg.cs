@@ -23,6 +23,7 @@ public class TransactionSecurityLeg : BaseAuditableEntity
     public byte[] RowVersion { get; private set; } = null!;
 
     internal static TransactionSecurityLeg Create(
+        int tenantId,
         int accountId,
         int instrumentId,
         decimal quantity,
@@ -31,6 +32,6 @@ public class TransactionSecurityLeg : BaseAuditableEntity
     ) =>
         new()
         {
-            AccountId = accountId, InstrumentId = instrumentId, Quantity = quantity, CostAmount = costAmount, CostCurrency = costCurrency
+            TenantId = tenantId, AccountId = accountId, InstrumentId = instrumentId, Quantity = quantity, CostAmount = costAmount, CostCurrency = costCurrency
         };
 }

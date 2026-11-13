@@ -317,7 +317,7 @@ Close requires cash `SUM = 0` and no `Holdings` rows ([features/holdings.md](fea
 
 Invariants:
 
-- `TenantId` required on the header; `AccountId` required on every leg. Every leg account is in the header's tenant. At least one leg. Write = posted. No `Created` / draft status.
+- `TenantId` required on the header; `AccountId` required on every leg. Every leg and the FX detail carry the header's `TenantId` ([fixes/tenant-composite-keys.md](fixes/tenant-composite-keys.md)). Every leg account is in the header's tenant. At least one leg. Write = posted. No `Created` / draft status.
 - Every existing type builds all its legs on the one `accountId` of the create body. A Reversal builds one opposite leg per original leg, on that leg's Account, and is all-or-nothing across leg accounts ([features/leg-accounts.md](features/leg-accounts.md)).
 - Cash `SUM` of the cash legs on an Account is its cash balance. Not stored on `Account`.
 - After insert, `SUM ≥ 0` for Phase 2 openable types.

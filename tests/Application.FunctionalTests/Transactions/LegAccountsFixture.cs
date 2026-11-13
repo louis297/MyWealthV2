@@ -69,8 +69,8 @@ internal static class LegAccountsFixture
             var account = await db.Accounts.SingleAsync(row => row.PublicId == accountPublicId);
             var currency = account.Currency;
             await db.Database.ExecuteSqlInterpolatedAsync($"""
-                INSERT INTO [TransactionCashLegs] ([TransactionId], [AccountId], [Amount], [Currency], [Created], [CreatedBy], [LastModified], [LastModifiedBy])
-                VALUES ({transactionId}, {account.Id}, {amount}, {currency}, SYSDATETIMEOFFSET(), N'test', SYSDATETIMEOFFSET(), N'test')
+                INSERT INTO [TransactionCashLegs] ([TenantId], [TransactionId], [AccountId], [Amount], [Currency], [Created], [CreatedBy], [LastModified], [LastModifiedBy])
+                VALUES ({tenantId}, {transactionId}, {account.Id}, {amount}, {currency}, SYSDATETIMEOFFSET(), N'test', SYSDATETIMEOFFSET(), N'test')
                 """);
         }
 

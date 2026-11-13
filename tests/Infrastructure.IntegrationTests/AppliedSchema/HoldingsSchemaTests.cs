@@ -13,9 +13,12 @@ public class HoldingsSchemaTests
         var securityColumns = await LoadColumns("TransactionSecurityLegs");
         securityColumns.Select(column => column.Name).ShouldBe([
             "Id", "TransactionId", "InstrumentId", "Quantity", "CostAmount", "CostCurrency",
-            "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion", "AccountId"
+            "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion", "AccountId", "TenantId"
         ]);
         Column(securityColumns, "AccountId").ShouldSatisfyAllConditions(
+            column => column.Type.ShouldBe("int"),
+            column => column.Nullable.ShouldBe("NO"));
+        Column(securityColumns, "TenantId").ShouldSatisfyAllConditions(
             column => column.Type.ShouldBe("int"),
             column => column.Nullable.ShouldBe("NO"));
         Column(securityColumns, "Id").ShouldSatisfyAllConditions(
@@ -114,6 +117,7 @@ public class HoldingsSchemaTests
             ("FK_TransactionSecurityLegs_Accounts_AccountId", "Accounts", "Id", (byte)0),
             ("FK_TransactionSecurityLegs_Currencies_CostCurrency", "Currencies", "Code", (byte)0),
             ("FK_TransactionSecurityLegs_Instruments_InstrumentId", "Instruments", "Id", (byte)0),
+            ("FK_TransactionSecurityLegs_Tenants_TenantId", "Tenants", "Id", (byte)0),
             ("FK_TransactionSecurityLegs_Transactions_TransactionId", "Transactions", "Id", (byte)0)
         ]);
         (await ForeignKeys("Holdings")).ShouldBe([

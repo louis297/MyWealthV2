@@ -18,9 +18,10 @@ public class TransactionCashLeg : BaseAuditableEntity
 
     public byte[] RowVersion { get; private set; } = null!;
 
-    internal static TransactionCashLeg Create(int accountId, decimal amount, string currency) =>
+    internal static TransactionCashLeg Create(int tenantId, int accountId, decimal amount, string currency) =>
         new()
         {
+            TenantId = tenantId,
             AccountId = accountId,
             Amount = amount,
             Currency = currency
