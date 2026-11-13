@@ -3,7 +3,7 @@ title: Architecture
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-11-11
+updated: 2026-11-13
 related:
   - README.md
   - glossary.md
@@ -249,7 +249,7 @@ Tenant resolution: login requires tenantCode except for SystemAdmin. The JWT car
 
 API paths and JSON use PublicId only. Internal code still uses `int`.
 
-Password change, disable, and logout revoke that subject’s OpenIddict tokens. The User aggregate does not hold tokens. Logout revokes at once. Password change, person disable and tenant disable revoke when the outbox delivers the domain event ([features/outbox.md](features/outbox.md)); until then an existing refresh token still works, because the token endpoint does not re-check status on a refresh grant. After a tenant is disabled, that Code must not complete login, and existing refresh fails once the event is delivered. Disabling a tenant does **not** bulk-update `User.Status`. Person status is independent; login checks both.
+Password change, disable, and logout revoke that subject’s OpenIddict tokens. The User aggregate does not hold tokens. Logout revokes at once. Password change, person disable and tenant disable revoke when the outbox delivers the domain event ([features/outbox.md](features/outbox.md)); until then an existing refresh token still works, because the token endpoint does not re-check status on a refresh grant. `webapi` does re-check: the current-user load applies `LoginEligibility` to the person and tenant rows on every request, so an access token for a disabled person or tenant is refused at once, even when the outbox event is late or dead-lettered ([features/identity-auth.md](features/identity-auth.md) amendment 2026-11-13). After a tenant is disabled, that Code must not complete login, and existing refresh fails once the event is delivered. Disabling a tenant does **not** bulk-update `User.Status`. Person status is independent; login checks both.
 
 ---
 

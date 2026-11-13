@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-25
-last_updated: 2026-10-13
+last_updated: 2026-11-13
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -122,7 +122,7 @@ Customer receives 403. No Adviser Portal activity page in this increment.
 | R1 | Missing / dead Bearer → 401, never 302. Policy fail → 403. TenantAdmin / Adviser: other-tenant, unassigned Customer, missing id → 404. SystemAdmin: missing id → 404; another tenant’s transaction id is allowed. |
 | R2 | Path `{id}` and JSON `id` are `PublicId`. Internal ints never appear. Create / reverse return `201 { "id" }` only. |
 | R3 | Routes live at `/transactions`. Not under `/users`. Not nested under `/accounts/{id}` as the collection root (account filter is a query). |
-| R4 | TenantAdmin / Adviser: tenant = token `TenantId`. Create / list must **omit** `tenantId` (400 if present). Missing current tenant → 404. Disabled tenant on **create** → 400 `disabled` / `target=tenant`. List / get do not reject because the tenant is disabled. |
+| R4 | TenantAdmin / Adviser: tenant = token `TenantId`. Create / list must **omit** `tenantId` (400 if present). Missing current tenant → 404. Current tenant disabled → 403 on every verb, reads included (identity-auth amendment 2026-11-13). SystemAdmin naming a disabled tenant on **create** → 400 `disabled` / `target=tenant`. |
 | R4a | SystemAdmin: create and list **require** `tenantId` (tenant PublicId). Omitted → 400. Unknown tenant → 404. Get / reverse use transaction PublicId only and may cross tenants. |
 | R5 | A transaction belongs to one Account in the same tenant. `accountId` is Account PublicId. Missing / other-tenant / Adviser-unassigned Customer of that account → 404. |
 | R6 | Create or reverse while the Account is **Closed** → 400 ordinary `errors`. Reopen the account first. Close / reopen stay on `/accounts`. |

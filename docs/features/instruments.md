@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-18
-last_updated: 2026-09-21
+last_updated: 2026-11-13
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -94,7 +94,7 @@ The catalog is firm-wide, not per-Adviser. Customer receives 403. TenantAdmin / 
 | R1 | Missing / dead Bearer → 401, never 302. Policy fail → 403. For TenantAdmin / Adviser: other-tenant or missing id → 404, not 403. SystemAdmin: missing id → 404; another tenant’s id is allowed. |
 | R2 | Path `{id}` and JSON `id` are `PublicId`. Internal ints never appear. Create returns `201 { "id" }` only. |
 | R3 | Routes live at `/instruments`. Not under `/users`. |
-| R4 | TenantAdmin / Adviser: tenant = current user’s `TenantId`. Create / list body or query must **not** include `tenantId` (400). Missing current tenant → 404. Target tenant disabled on **create** → 400 `disabled` / `target=tenant`. List / get / PUT / disable / enable do not reject because the tenant is disabled. |
+| R4 | TenantAdmin / Adviser: tenant = current user’s `TenantId`. Create / list body or query must **not** include `tenantId` (400). Missing current tenant → 404. Current tenant disabled → 403 on every verb, reads included (identity-auth amendment 2026-11-13). SystemAdmin naming a disabled tenant on **create** → 400 `disabled` / `target=tenant`. |
 | R4a | SystemAdmin: no tenant on the token. Create **requires** `tenantId` (tenant PublicId). List **requires** `tenantId`. Omitted → 400. Unknown tenant → 404. Get / PUT / disable / enable use the instrument PublicId only and may cross tenants. |
 | R5 | Catalog is tenant-scoped. An Adviser sees every instrument in the firm, not only “their” customers’ holdings (holdings do not exist yet). |
 | R6 | `Symbol` is the instrument **code** (ticker-style catalog key), not the display name. Required, trim, stored upper case, compare CI. Length 1–32. Letters, digits, `.`, `-` only. Unique inside the tenant **including disabled rows**. Repeatable across tenants. |
@@ -304,7 +304,7 @@ GET list does not include a price.
 
 Ordinary validation (bad symbol, duplicate symbol, disabled quote currency, extra PUT fields) → 400 `errors`.
 
-Create while the target tenant is disabled → §4.1 `code=disabled`, `target=tenant`.
+SystemAdmin create while the named tenant is disabled → §4.1 `code=disabled`, `target=tenant`. A TenantAdmin / Adviser of a disabled tenant gets 403 first (identity-auth amendment 2026-11-13).
 
 Unknown id → 404. Other-tenant id → 404 for TenantAdmin / Adviser; 200 / 204 for SystemAdmin when the row exists.
 

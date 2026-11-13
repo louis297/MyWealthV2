@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-10
-last_updated: 2026-11-11
+last_updated: 2026-11-13
 related:
   - internal-transfers.md
   - leg-accounts.md
@@ -84,7 +84,7 @@ A TenantAdmin or Adviser converts cash from an Open Account in one currency to a
 
 | ID | Rule |
 | --- | --- |
-| R1 | Unchanged from posting R1–R4a and leg-accounts R1: 401 / 403 / 404, PublicId only, `tenantId` rules for TenantAdmin / Adviser (omit) and SystemAdmin (required on create and quote). Customer → 403. Disabled tenant on create → 400 `disabled` / `target=tenant`. |
+| R1 | Unchanged from posting R1–R4a and leg-accounts R1: 401 / 403 / 404, PublicId only, `tenantId` rules for TenantAdmin / Adviser (omit) and SystemAdmin (required on create and quote). Customer → 403. TenantAdmin / Adviser of a disabled tenant → 403 (identity-auth amendment 2026-11-13). SystemAdmin naming a disabled tenant on create or quote → 400 `disabled` / `target=tenant`. |
 | R2 | **Route.** `POST /transactions/fx` creates an `FxConversion`. `POST /transactions` with `type = FxConversion` → 400. One create route per type (api-design §7.7). |
 | R3 | **Body.** `fromAccountId` and `toAccountId` (Account PublicIds) are required. Exactly one of `sellAmount` and `buyAmount` is present and `> 0`; both or neither → 400. `expectedRate` is required on create. `bookedAt`, `memo`, `reference` follow posting. The body has no `type`, `accountId`, `currency`, `amount`, `rate` or legs array; any of those present → 400. |
 | R4 | **Currencies.** The sell currency is `fromAccount.Currency`. The buy currency is `toAccount.Currency`. They must differ (else 400; same-currency moves use `POST /transactions/transfer`). |
@@ -266,7 +266,7 @@ Ordinary validation in `errors`: same Account, two different Customers, same cur
 
 `409` with `expectedRate` in `errors` when the rate changed (R12). `409` for an idempotency key reused with a different body (R19).
 
-§4.1 `disabled`: `target=tenant` on a disabled tenant, `target=user` when the Customer is Disabled.
+§4.1 `disabled`: `target=tenant` when a SystemAdmin names a disabled tenant (tenant users get 403 first, identity-auth amendment 2026-11-13), `target=user` when the Customer is Disabled.
 
 Any Account outside the caller's scope or tenant → **404**, not 403.
 

@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-13
-last_updated: 2026-09-13
+last_updated: 2026-11-13
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -82,7 +82,7 @@ SystemAdmin adds a TenantAdmin to an **enabled** tenant (`tenantId`, `name`, `em
 | R3 | `Name` required, 1–200, trim, preserve caller casing. |
 | R4 | `Email` required, trim, preserve caller casing, compare CI. Must look like an email. Unique inside the same `TenantId`. The same email may exist in two tenants. Collision with a SystemAdmin’s global email is allowed (different login key: tenantCode present or not). |
 | R5 | Create requires `password`. Identity password options apply (identity-auth: minimum length 8). Lands in `Status = Active` and raises `UserActivated`. No password-less create. |
-| R6 | Create requires `tenantId` (tenant PublicId). Unknown tenant → 404. Tenant exists and `IsActive = false` → **400**, shared disabled error ([api-design.md](../api-design.md) §4.1 and §8.4): `code=disabled`, `target=tenant`. Not 404 (the tenant exists). Not 409. List / get / PUT / disable / enable do not reject because the tenant is disabled. Person `Status` and the tenant flag stay independent. |
+| R6 | Create requires `tenantId` (tenant PublicId). Unknown tenant → 404. Tenant exists and `IsActive = false` → **400**, shared disabled error ([api-design.md](../api-design.md) §4.1 and §8.4): `code=disabled`, `target=tenant`. Not 404 (the tenant exists). Not 409. List / get / PUT / disable / enable (SystemAdmin) do not reject because the tenant is disabled. Person `Status` and the tenant flag stay independent. |
 | R7 | Dual-write order is fixed: `AspNetUsers` first (`UserName` = the person’s PublicId string, `Email` copied from Domain, `TenantId` = tenant internal int), then `Users.IdentityUserId`. Same transaction; an Identity row must not remain if `Users` fails. Responses never include the password. |
 | R8 | `Role` / `TenantId` / `Email` cannot change after create. PUT updates `name` only. Body includes `email` / `tenantId` / `role` / `password` → 400. |
 | R9 | `Status` and `isActive` are not on PUT or create bodies. Disable / enable are `POST …/disable` and `POST …/enable`. |

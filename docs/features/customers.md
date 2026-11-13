@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-14
-last_updated: 2026-09-14
+last_updated: 2026-11-13
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -34,7 +34,7 @@ Landed in GitHub master 2026-09-14 (`b16d059`, hosted-login smoke after create).
 
 A TenantAdmin creates a Customer in **their** tenant (`name`, `email`, `password`, `adviserId`). An Adviser creating a Customer may only assign self (`adviserId` omitted = self; any other id → 400). `tenantId` comes from the current user, not the body. Same-transaction dual write Identity → Domain, lands in `Active`. Email is unique CI inside the tenant. Role / TenantId / Email cannot change. After create, a TenantAdmin may reassign `AdviserId` to another non-disabled Adviser in the same tenant.
 
-Create while the current tenant is disabled → 400 `disabled` / `target=tenant`. Target Adviser Disabled → 400 `disabled` / `target=user`. Cross-tenant, not-assigned, or wrong-collection ids → 404. SystemAdmin / Customer → 403. An Adviser reading another Adviser’s Customer → 404 (not 403; do not leak existence). Every list item includes `status`, `isActive`, and `adviserId`; `enabledOnly` matches currencies (`true` = `IsActive = 1`).
+Every call while the current tenant is disabled → 403 (identity-auth amendment 2026-11-13). Target Adviser Disabled → 400 `disabled` / `target=user`. Cross-tenant, not-assigned, or wrong-collection ids → 404. SystemAdmin / Customer → 403. An Adviser reading another Adviser’s Customer → 404 (not 403; do not leak existence). Every list item includes `status`, `isActive`, and `adviserId`; `enabledOnly` matches currencies (`true` = `IsActive = 1`).
 
 A Customer may complete authorization-server login (tests / reserved). There is no Customer Portal client. `/users/customers` stays 403 for that role. They use `/users/me` and `/currencies` only.
 
@@ -91,7 +91,7 @@ A Customer may complete authorization-server login (tests / reserved). There is 
 | R3 | `Name` required, 1–200, trim, preserve caller casing. |
 | R4 | `Email` required, trim, preserve casing, compare CI, must look like an email. Unique inside the tenant (collision with a TenantAdmin or Adviser is also 400). Repeatable across tenants. |
 | R5 | Create requires `password` (minimum 8). Lands `Active`, raises `UserActivated` + `UserCreated`. No password-less create. Create does **not** raise `CustomerAdviserReassigned`. |
-| R6 | Create does **not** take `tenantId`. Tenant = current user’s TenantId. Missing current tenant (should not happen) → 404. Current tenant `IsActive = false` → 400, `TargetDisabledException("tenant", tenant.PublicId, "Tenant is disabled", "Cannot create a Customer while the tenant is disabled. Enable the tenant first.")`. List / get / PUT / disable / enable do not reject because the tenant is disabled. |
+| R6 | Create does **not** take `tenantId`. Tenant = current user’s TenantId. Missing current tenant (should not happen) → 404. Current tenant `IsActive = false` → 403 on every verb, reads included (identity-auth amendment 2026-11-13). The handler keeps `TargetDisabledException("tenant", tenant.PublicId, "Tenant is disabled", "Cannot create a Customer while the tenant is disabled. Enable the tenant first.")` as a backstop; HTTP callers no longer reach it. |
 | R7 | Dual-write order matches tenant-admins / advisers: Identity first (`UserName` = person PublicId, `TenantId` projection), then `Users`. Same transaction. Responses never include the password. |
 | R8 | Role / TenantId / Email cannot change. PUT updates `name`. A TenantAdmin PUT may also update `adviserId`. Body includes `email` / `tenantId` / `role` / `password` → 400. An Adviser PUT that includes `adviserId` → 400. |
 | R9 | Status and `isActive` are not on PUT or create bodies. Disable / enable are `POST …/disable` and `POST …/enable`. |
@@ -151,7 +151,7 @@ Use existing `IX_Users_AdviserId` and `IX_Users_TenantId_Role` for assigned list
 
 | Kind | Name | Returns | Checks |
 | --- | --- | --- | --- |
-| Command | `CreateCustomer` | PublicId | R3–R7, R15–R16; current tenant; disabled tenant → 400 `disabled`/`tenant`; disabled adviser → 400 `disabled`/`user` |
+| Command | `CreateCustomer` | PublicId | R3–R7, R15–R16; current tenant; disabled tenant → 403 before the handler (backstop 400 `disabled`/`tenant`); disabled adviser → 400 `disabled`/`user` |
 | Command | `UpdateCustomer` | none | R17 load or 404; `rowVersion`; R3 / R8; TenantAdmin `adviserId` change → R15 + `ReassignAdviser` |
 | Command | `DisableCustomer` | none | Same load; already Disabled → 204 skip domain; else `Disable()` |
 | Command | `EnableCustomer` | none | Same load; already Active → 204 |
@@ -260,7 +260,7 @@ disable / enable:
 
 ### 8.4 Errors
 
-Create while the current tenant is disabled uses api-design §4.1:
+Since identity-auth amendment 2026-11-13 an HTTP caller of a disabled tenant gets 403 first. The handler keeps this api-design §4.1 body as a backstop:
 
 ```json
 {
@@ -305,7 +305,7 @@ None in this slice. The Adviser Portal Customers list / form belongs to the late
 | Project | Assert |
 | --- | --- |
 | Domain.UnitTests | `Create(Customer)` sets TenantId and AdviserId, password path → Active + `UserActivated` + `UserCreated`, and does **not** raise `CustomerAdviserReassigned`; `ReassignAdviser` writes the new id and raises the event once (customer + tenant + previous + new); same id → no event; non-Customer `ReassignAdviser` throws; `Disable()` on a Customer matches TenantAdmin |
-| Application.FunctionalTests | No Bearer → 401 not 302; SystemAdmin / Customer → 403 on every verb; TenantAdmin create → 201, get `status=active` and the expected `adviserId`; hosted login against client `adviser-portal` with that tenant code + email + password **fails** (allow-list; Identity `CheckPassword` still succeeds); Adviser omit `adviserId` → 201 assigned to self; Adviser passes another `adviserId` → 400; duplicate email in the same tenant → 400; same email in two tenants → 201; `tenantId` in body → 400; create after current tenant disabled → 400 `disabled`/`tenant`; target Adviser Disabled → 400 `disabled`/`user`; unknown `adviserId` → 404; PUT with `email` → 400; Adviser PUT with `adviserId` → 400; TenantAdmin reassign to another Active Adviser in the tenant → 204; reassign to a Disabled Adviser → 400 `disabled`/`user`; GET this collection with an Adviser or TenantAdmin PublicId → 404; TenantAdmin of A GET/PUT/disable of B’s Customer → 404; Adviser B GET of Adviser A’s Customer → 404; disable → 204 and that subject’s refresh fails; enable → 204; stale `rowVersion` → 409; default paging; omitted `enabledOnly` includes disabled; `enabledOnly=true` is Active only; TenantAdmin `adviserId=` filters; Adviser `adviserId=` of someone else → 400 |
+| Application.FunctionalTests | No Bearer → 401 not 302; SystemAdmin / Customer → 403 on every verb; TenantAdmin create → 201, get `status=active` and the expected `adviserId`; hosted login against client `adviser-portal` with that tenant code + email + password **fails** (allow-list; Identity `CheckPassword` still succeeds); Adviser omit `adviserId` → 201 assigned to self; Adviser passes another `adviserId` → 400; duplicate email in the same tenant → 400; same email in two tenants → 201; `tenantId` in body → 400; get / PUT / create / disable / enable after current tenant disabled → 403; target Adviser Disabled → 400 `disabled`/`user`; unknown `adviserId` → 404; PUT with `email` → 400; Adviser PUT with `adviserId` → 400; TenantAdmin reassign to another Active Adviser in the tenant → 204; reassign to a Disabled Adviser → 400 `disabled`/`user`; GET this collection with an Adviser or TenantAdmin PublicId → 404; TenantAdmin of A GET/PUT/disable of B’s Customer → 404; Adviser B GET of Adviser A’s Customer → 404; disable → 204 and that subject’s refresh fails; enable → 204; stale `rowVersion` → 409; default paging; omitted `enabledOnly` includes disabled; `enabledOnly=true` is Active only; TenantAdmin `adviserId=` filters; Adviser `adviserId=` of someone else → 400 |
 | Infrastructure.IntegrationTests | No new script. Two-tenant fixture: A and B each have an Adviser + Customer; A’s list does not include B; A requesting B’s Customer id → 404; two Advisers in one tenant, A does not see B’s assigned row |
 
 Post-create password is verified with Identity `CheckPassword` (or equivalent). Do not invent a token endpoint on `webapi`. Hosted login on client `adviser-portal` for that Customer must **not** issue a code. `/users/me` as that Customer is not asserted on this client. Amendment 2026-09-14 (identity-auth R4 / R20).
@@ -321,7 +321,7 @@ No new ADR.
 | Scripts / policy | None; existing `customers.manage` **or** `customers.manage-own` |
 | Caller | TenantAdmin: current tenant. Adviser: assigned only |
 | Scope | Cross-tenant / not-assigned / wrong collection → 404 |
-| Create | No body `tenantId`; password → Active; disabled tenant → 400 `disabled`/`tenant`; disabled adviser → 400 `disabled`/`user` |
+| Create | No body `tenantId`; password → Active; disabled tenant → 403; disabled adviser → 400 `disabled`/`user` |
 | Reassign | TenantAdmin only; domain `ReassignAdviser`; pointer change raises `CustomerAdviserReassigned` |
 | Event payload | `CustomerId`, `TenantId`, `PreviousAdviserId`, `NewAdviserId`. No actor / reason / as-of. Create does not raise it. Same adviser does not raise it |
 | Event subscribers | None in this slice; no assignment-history table |

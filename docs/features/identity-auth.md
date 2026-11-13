@@ -494,6 +494,27 @@ Status of this amendment: `accepted` (2026-11-12). It is a build contract. Lande
 | A30 | No SystemAdmin; email `not-an-email` | Bootstrap runs | Throws; no person created |
 | A31 | No SystemAdmin; neither key set | Bootstrap runs | No person created; a warning is logged; no exception |
 
+### Amendment 2026-11-13 (`webapi` re-checks person and tenant status)
+
+Accepted 2026-11-13. Supersedes the §4.1 line “dual check: row TenantId ↔ tenant claims” as the only current-user check, the `GetCurrentUser` checks in §7, and the “until then an existing refresh token still works” consequence of the 2026-11-11 outbox amendment for `webapi` resources. Do not rewrite those in place.
+
+**Why.** Revocation waits for the outbox. A late or dead-lettered `UserDisabled` / `TenantDisabled` left a disabled person, or every person of a disabled tenant, able to call `webapi` with refreshed access tokens for up to 14 days. `webapi` already loads the person row and the tenant row on every request, so it can check them there.
+
+- **Status gate.** The current-user load (`CurrentUserAccess.Resolve`) applies `LoginEligibility.CanComplete` to the loaded person and tenant rows on every request, before the dual tenant check. Person `Status` must be `Active`. A tenant person's tenant must be enabled. SystemAdmin has no tenant, so only its `Status` counts.
+- **Result.** When the gate fails there is no current user. Every route that needs a permission returns **403**, including `/users/me`. Missing or invalid Bearer stays 401.
+- **Disabled tenant.** TenantAdmin, Adviser and Customer of a disabled tenant get 403 on every verb, reads included. The §4.1 `disabled` / `target=tenant` 400 on create is now reached only by a SystemAdmin that names a disabled tenant (`tenantId`). The handler check stays as a backstop.
+- **Unchanged.** The token endpoint still does not re-check status on a refresh grant; revocation still waits for the outbox. Hosted login is unchanged. Disabling a tenant still does not bulk-update `User.Status`.
+- No new table. No new route. No schema change.
+
+**Acceptance (amendment A32–A35).**
+
+| Id | Given | When | Then |
+| --- | --- | --- | --- |
+| A32 | TenantAdmin with a valid access token; the person is then disabled | Any `webapi` route, including `GET /users/me` | 403 |
+| A33 | Adviser or TenantAdmin with a valid access token; the tenant is then disabled | Get, list, create, PUT, disable / enable, close / reopen, post | 403 |
+| A34 | SystemAdmin; a tenant is disabled | Create with that `tenantId` (TenantAdmin, instrument, account, transaction, transfer) | 400 `disabled` / `target=tenant` |
+| A35 | Disabled SystemAdmin with a valid access token | Any SystemAdmin route | 403 |
+
 ### Amendment 2026-09-14 (R21 — end session)
 
 Passthrough without an action left `/connect/logout` unhandled. Manual Sign out then bounced through `/callback` and OpenIddict returned `invalid_grant` / `ID2010` (authorization code redeemed twice). No new ADR. No `/auth/logout`.

@@ -3,7 +3,7 @@ title: API design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-11-11
+updated: 2026-11-13
 related:
   - README.md
   - glossary.md
@@ -97,7 +97,7 @@ Protocol scopes (not permissions): `openid`, `profile`, `offline_access`, `api`.
 
 Disable / enable for people: `POST /{id}/disable`, `POST /{id}/enable` (`Disabled` ↔ `Active`). Not a physical delete. Disabling an Adviser requires assigned non-disabled Customers to be handled first. Disabling the last TenantAdmin is allowed in Phase 1 (known gap).
 
-Disabling a tenant does **not** bulk-update `User.Status`. Person status is independent; login checks both. After a tenant is disabled, that Code must not complete login, and existing refresh fails once the outbox delivers `TenantDisabled`.
+Disabling a tenant does **not** bulk-update `User.Status`. Person status is independent; login checks both. After a tenant is disabled, that Code must not complete login, and existing refresh fails once the outbox delivers `TenantDisabled`. Its people get 403 from `webapi` at once (identity-auth amendment 2026-11-13).
 
 Password change, disable, and logout revoke that subject’s OpenIddict tokens. The User aggregate does not hold tokens.
 
@@ -110,7 +110,8 @@ Password change, disable, and logout revoke that subject’s OpenIddict tokens. 
 | Validation / business rule (Adviser still has Customers, duplicate email, illegal reporting currency, …) | 400 | `webapi` |
 | Target exists but is disabled and the caller tries to create / attach / post on it (§4.1) | 400 `disabled` | `webapi` |
 | Missing / invalid Bearer; calling resources after refresh was revoked | 401 | `webapi` |
-| Tenant disabled, Status ≠ Active, bad password, wrong tenant | Authorization does not complete (login failure to the caller; `webapi` returns 401 only if a dead token is presented) | Gate on `identity`; `webapi` only inspects the token |
+| Tenant disabled, Status ≠ Active, bad password, wrong tenant (at login) | Authorization does not complete (login failure to the caller) | Gate on `identity` |
+| Tenant disabled or Status ≠ Active, with a still-valid access token | 403 on every route that needs a permission (identity-auth amendment 2026-11-13) | `webapi` current-user load |
 | Authenticated but policy fails (including Customer on adviser-management routes) | 403 | `webapi` |
 | Cross-tenant / cross-adviser / missing | 404 | `webapi` |
 | `RowVersion` | 409 | `webapi` |
@@ -281,7 +282,7 @@ Lookup: `GET /tenants/by-code/{code}` uses `tenants.read` (SystemAdmin, TenantAd
 - POST body: `name`, `code`, `reportingCurrency`
 - PUT body: `name`, `reportingCurrency`, `rowVersion`
 - `code` is immutable after create (login key). Reporting currency may change in this phase (no ledger balances keyed on it yet).
-- After disable, that Code must not complete login; existing refresh fails once the outbox delivers `TenantDisabled`. Person `Status` is not bulk-updated.
+- After disable, that Code must not complete login; existing refresh fails once the outbox delivers `TenantDisabled`. Its people get 403 from `webapi` at once. Person `Status` is not bulk-updated.
 - Field rules: [features/tenants.md](features/tenants.md).
 
 ### 7.4 People (TenantAdmin / Adviser / Customer)
@@ -468,3 +469,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-10 | Transactions: type-specific create routes convention (§7.7). Internal transfers draft: `POST /transactions/transfer`, `type` list filter ([features/internal-transfers.md](features/internal-transfers.md)). |
 | 2026-11-11 | FX conversions accepted and landed. `POST /transactions/fx` returns 201 `{ id }` with `Location`, requires `Idempotency-Key` and `expectedRate` (mismatch → 409, `errors.expectedRate`). `POST /transactions/fx/quote` returns 200 with rate, as-of date and both amounts; no write. `POST /transactions` rejects `FxConversion`. The transaction item gains `fx` (null for other types). |
 | 2026-11-10 | Internal transfers accepted. `POST /transactions/transfer` returns 201 `{ id }` with `Location: /transactions/{id}` and requires `Idempotency-Key`. `POST /transactions` rejects `InternalTransfer`. `GET /transactions` takes an optional `type` (exact `TransactionType` name; anything else → 400). |
+| 2026-11-13 | `webapi` re-checks person `Status` and the tenant flag on every request. A disabled person, or any person of a disabled tenant, gets 403 with a still-valid token. §4.1 `target=tenant` on create is reached only by SystemAdmin ([features/identity-auth.md](features/identity-auth.md) amendment 2026-11-13). |

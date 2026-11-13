@@ -273,7 +273,7 @@ TenantAdmin edit may send `adviserId`. An Adviser PUT that includes `adviserId` 
 
 | API | Page |
 | --- | --- |
-| 400 `disabled` / `target=tenant` | Cannot create while the firm is disabled |
+| 400 `disabled` / `target=tenant` | Not expected from the portal: a person of a disabled firm gets 403 first (identity-auth amendment 2026-11-13) |
 | 400 `disabled` / `target=user` | Cannot attach to a disabled adviser |
 | Duplicate email | Field error |
 | Cross-tenant / not assigned / wrong collection | Detail 404 |
@@ -303,7 +303,7 @@ Disable while assigned customers are not Disabled → ordinary 400 (`Reassign or
 | 403 | `/forbidden` or a hidden control the caller deep-linked |
 | 404 | Detail “Not found”; unknown adviser filter → empty list |
 | 409 | Refetch; ask to resubmit |
-| 400 + `code=disabled` + `target=tenant` | Page banner |
+| 400 + `code=disabled` + `target=tenant` | Page banner (backstop only; a disabled firm normally yields 403) |
 | 400 + `code=disabled` + `target=user` | Page banner (create / reassign Customer only) |
 | 400 + `errors` | Field errors; adviser disable-guard uses the detail sentence |
 | Cross-tenant 404 | Never paint as 403 |

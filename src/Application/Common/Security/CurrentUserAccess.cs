@@ -23,6 +23,11 @@ public static class CurrentUserAccess
             return null;
         }
 
+        if (!LoginEligibility.CanComplete(user, tenant))
+        {
+            return null;
+        }
+
         var claimTenantId = EmptyToNull(tenantIdClaim);
         var claimTenantCode = EmptyToNull(tenantCodeClaim);
 

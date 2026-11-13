@@ -267,7 +267,7 @@ Playwright, run from the GitHub runner against the public hostnames. The cases, 
 Known gaps, accepted for the showcase (record them in [known-issues/](known-issues/README.md) when this doc is accepted):
 
 - Hosted login has no account lockout. `Login.cshtml.cs` uses `UserManager.CheckPasswordAsync`, which does not count failures. A per-IP limit does not stop attempts spread over many IPs. Lockout interacts with the uniform failure rule (identity-auth R3) and needs its own amendment.
-- A refresh grant does not re-check user status or the tenant flag. Revocation after disable or password change waits for the outbox ([identity-auth.md](features/identity-auth.md), amendment 2026-11-11). A dead-lettered event leaves a refresh token valid for up to 14 days.
+- A refresh grant does not re-check user status or the tenant flag. Revocation after disable or password change waits for the outbox ([identity-auth.md](features/identity-auth.md), amendment 2026-11-11). A dead-lettered event leaves a refresh token valid for up to 14 days, but `webapi` refuses every access token it mints: the current-user load re-checks person and tenant status on each request.
 - Data Protection keys are stored unencrypted at rest in `data/dataprotection/`. Anyone with root or `docker` access on the VPS can read them, which already gives full control of the hosts.
 
 ---

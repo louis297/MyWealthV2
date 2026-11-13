@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-21
-last_updated: 2026-09-25
+last_updated: 2026-11-13
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -100,7 +100,7 @@ Confirmed 2026-09-21: (1) Adviser may read / open / rename / close / reopen acco
 | R1 | Missing / dead Bearer → 401, never 302. Policy fail → 403. For TenantAdmin / Adviser: other-tenant, unassigned Customer, or missing id → 404, not 403. SystemAdmin: missing id → 404; another tenant’s id is allowed. |
 | R2 | Path `{id}` and JSON `id` are `PublicId`. Internal ints never appear. Create returns `201 { "id" }` only. |
 | R3 | Routes live at `/accounts`. Not under `/users`. Not `/users/customers/{id}/accounts`. |
-| R4 | TenantAdmin / Adviser: tenant = current user’s `TenantId`. Create / list body or query must **not** include `tenantId` (400). Missing current tenant → 404. Target tenant disabled on **create** → 400 `disabled` / `target=tenant`. List / get / PUT / close / reopen do not reject because the tenant is disabled. |
+| R4 | TenantAdmin / Adviser: tenant = current user’s `TenantId`. Create / list body or query must **not** include `tenantId` (400). Missing current tenant → 404. Current tenant disabled → 403 on every verb, reads included (identity-auth amendment 2026-11-13). SystemAdmin naming a disabled tenant on **create** → 400 `disabled` / `target=tenant`. |
 | R4a | SystemAdmin: no tenant on the token. Create **requires** `tenantId` (tenant PublicId). List **requires** `tenantId`. Omitted → 400. Unknown tenant → 404. Get / PUT / close / reopen use the account PublicId only and may cross tenants. |
 | R5 | An account belongs to one Customer in the same tenant. `customerId` is the Customer PublicId. Target must exist, Role = Customer, same tenant; else 404. Adviser: that Customer must be assigned to the caller; else 404. |
 | R6 | Create or reopen while the Customer is Disabled → 400 `disabled` / `target=user` (api-design §4.1). Close / rename / get / list of existing rows still work. |
@@ -326,7 +326,7 @@ List / get item:
 
 Ordinary validation (bad type, reserved type, disabled currency, extra PUT fields, open accounts on Disable Customer) → 400 `errors`.
 
-Create while the target tenant is disabled → §4.1 `code=disabled`, `target=tenant`.
+SystemAdmin create while the named tenant is disabled → §4.1 `code=disabled`, `target=tenant`. A TenantAdmin / Adviser of a disabled tenant gets 403 first (identity-auth amendment 2026-11-13).
 
 Create or reopen while the target Customer is Disabled → §4.1 `code=disabled`, `target=user`.
 
