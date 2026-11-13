@@ -215,13 +215,31 @@ public class CreateInstrumentTests : TestBase
     }
 
     [Test]
-    public async Task DisabledTenant_Returns400DisabledTarget()
+    public async Task DisabledTenant_TenantUser_Returns403()
     {
         var (tenant, tokens) = await InstrumentHttp.SignInAdviser();
         await DisableTenantAsync(tenant.Id);
 
         var response = await InstrumentHttp.Send(
             HttpMethod.Post, "/instruments", tokens.AccessToken, ValidBody());
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Test]
+    public async Task DisabledTenant_SystemAdmin_Returns400DisabledTarget()
+    {
+        var (tenant, _) = await InstrumentHttp.SignInAdviser();
+        await DisableTenantAsync(tenant.Id);
+        var tokens = await InstrumentHttp.SignInSystemAdmin();
+
+        var response = await InstrumentHttp.Send(HttpMethod.Post, "/instruments", tokens.AccessToken, new
+        {
+            tenantId = tenant.PublicId,
+            symbol = "VTI",
+            name = "Vanguard Total Stock Market ETF",
+            quoteCurrency = "USD"
+        });
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());

@@ -2,7 +2,10 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Domain.Enums;
+using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Identity;
 
 namespace MyWealthV2.Application.FunctionalTests.Users;
@@ -33,6 +36,51 @@ public class GetCurrentUserTests : TestBase
         json.RootElement.GetProperty("email").GetString().ShouldBe(DevelopmentIdentitySeeder.SystemAdminEmail);
         json.RootElement.GetProperty("role").GetString().ShouldBe("systemAdmin");
         json.RootElement.GetProperty("tenantId").ValueKind.ShouldBe(JsonValueKind.Null);
+    }
+
+    [Test]
+    public async Task DisabledPerson_WithValidAccessToken_Returns403()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm A", "firma");
+        var person = await TestApp.CreatePersonAsync(
+            UserRole.TenantAdmin,
+            "Alice",
+            "alice@firma",
+            "Password1!",
+            tenant.Id);
+        var tokens = await FunctionalTestSetup.Oidc.SignInAsync("alice@firma", "Password1!", tenant.Code);
+        (await SendAuthorized(HttpMethod.Get, "/users/me", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        await DisablePersonAsync(person.Id);
+
+        (await SendAuthorized(HttpMethod.Get, "/users/me", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Test]
+    public async Task DisabledSystemAdmin_WithValidAccessToken_Returns403()
+    {
+        var tokens = await FunctionalTestSetup.BackOfficeOidc.SignInAsync(
+            DevelopmentIdentitySeeder.SystemAdminEmail,
+            DevelopmentIdentitySeeder.SystemAdminPassword,
+            tenantCode: null);
+        int systemAdminId;
+        using (var scope = FunctionalTestSetup.ScopeFactory.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            systemAdminId = await db.DomainUsers
+                .Where(row => row.Email == DevelopmentIdentitySeeder.SystemAdminEmail)
+                .Select(row => row.Id)
+                .SingleAsync();
+        }
+
+        await DisablePersonAsync(systemAdminId);
+
+        (await SendAuthorized(HttpMethod.Get, "/users/me", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        (await SendAuthorized(HttpMethod.Get, "/tenants", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
     [Test]
@@ -126,6 +174,15 @@ public class GetCurrentUserTests : TestBase
         var response = await FunctionalTestSetup.WebClient.GetAsync("/users/me");
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         response.Headers.Location.ShouldBeNull();
+    }
+
+    private static async Task DisablePersonAsync(int userId)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var user = await db.DomainUsers.SingleAsync(row => row.Id == userId);
+        user.Disable();
+        await db.SaveChangesAsync();
     }
 
     private static async Task<HttpResponseMessage> SendAuthorized(

@@ -80,7 +80,7 @@ public class TransactionRulesTests : TestBase
     }
 
     [Test]
-    public async Task DisabledTenant_CreateReturns400AndGetStillWorks()
+    public async Task DisabledTenant_TenantUser_Returns403()
     {
         var (tenant, _, customer, tokens) = await AccountHttp.SignInAdviser();
         var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId);
@@ -88,15 +88,35 @@ public class TransactionRulesTests : TestBase
         var id = await ReadId(created);
         await DisableTenantAsync(tenant.Id);
 
-        var again = await PostAsync(tokens.AccessToken, accountId, "TransferIn", 5m, "2026-09-24T10:00:00+12:00");
+        (await PostAsync(tokens.AccessToken, accountId, "TransferIn", 5m, "2026-09-24T10:00:00+12:00"))
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        (await TransactionHttp.Send(HttpMethod.Get, $"/transactions/{id}", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        (await TransactionHttp.Send(HttpMethod.Get, "/transactions", tokens.AccessToken))
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Test]
+    public async Task DisabledTenant_SystemAdmin_CreateReturns400AndGetStillWorks()
+    {
+        var (tenant, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId);
+        var created = await PostAsync(tokens.AccessToken, accountId, "TransferIn", 10m, "2026-09-24T09:00:00+12:00");
+        var id = await ReadId(created);
+        await DisableTenantAsync(tenant.Id);
+        var system = await AccountHttp.SignInSystemAdmin();
+
+        var again = await PostAsync(
+            system.AccessToken, accountId, "TransferIn", 5m, "2026-09-24T10:00:00+12:00", tenantId: tenant.PublicId);
         again.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         using var json = JsonDocument.Parse(await again.Content.ReadAsStringAsync());
         json.RootElement.GetProperty("code").GetString().ShouldBe("disabled");
         json.RootElement.GetProperty("target").GetString().ShouldBe("tenant");
 
-        (await TransactionHttp.Send(HttpMethod.Get, $"/transactions/{id}", tokens.AccessToken))
+        (await TransactionHttp.Send(HttpMethod.Get, $"/transactions/{id}", system.AccessToken))
             .StatusCode.ShouldBe(HttpStatusCode.OK);
-        (await TransactionHttp.Send(HttpMethod.Get, "/transactions", tokens.AccessToken))
+        (await TransactionHttp.Send(
+            HttpMethod.Get, $"/transactions?tenantId={tenant.PublicId}", system.AccessToken))
             .StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 

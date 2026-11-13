@@ -264,16 +264,16 @@ public class GetAccountTests : TestBase
     }
 
     [Test]
-    public async Task GetAndListOnDisabledTenant_StillReturn200()
+    public async Task GetAndListOnDisabledTenant_Returns403()
     {
         var (tenant, _, customer, tokens) = await AccountHttp.SignInAdviser();
         var id = await CreateAsync(tokens.AccessToken, customer.PublicId);
         await DisableTenantAsync(tenant.Id);
 
         (await AccountHttp.Send(HttpMethod.Get, $"/accounts/{id}", tokens.AccessToken))
-            .StatusCode.ShouldBe(HttpStatusCode.OK);
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         (await AccountHttp.Send(HttpMethod.Get, "/accounts", tokens.AccessToken))
-            .StatusCode.ShouldBe(HttpStatusCode.OK);
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
     private static async Task<Guid> CreateAsync(

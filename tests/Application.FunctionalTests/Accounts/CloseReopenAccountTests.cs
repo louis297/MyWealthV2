@@ -148,24 +148,19 @@ public class CloseReopenAccountTests : TestBase
     }
 
     [Test]
-    public async Task CloseReopenGetOnDisabledTenant_StillSucceed()
+    public async Task CloseReopenOnDisabledTenant_Returns403()
     {
         var (tenant, _, customer, tokens) = await AccountHttp.SignInAdviser();
         var id = await CreateAsync(tokens.AccessToken, customer.PublicId);
+        var rowVersion = await ReadRowVersion(id, tokens.AccessToken);
         await DisableTenantAsync(tenant.Id);
 
-        var rowVersion = await ReadRowVersion(id, tokens.AccessToken);
         (await AccountHttp.Send(
             HttpMethod.Post, $"/accounts/{id}/close", tokens.AccessToken, new { rowVersion }))
-            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
-
-        using var closed = await ReadItem(id, tokens.AccessToken);
-        closed.RootElement.GetProperty("status").GetString().ShouldBe("Closed");
-
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         (await AccountHttp.Send(
-            HttpMethod.Post, $"/accounts/{id}/reopen", tokens.AccessToken,
-            new { rowVersion = closed.RootElement.GetProperty("rowVersion").GetString() }))
-            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+            HttpMethod.Post, $"/accounts/{id}/reopen", tokens.AccessToken, new { rowVersion }))
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
     private static async Task AssertForbidden(Guid id, string accessToken)

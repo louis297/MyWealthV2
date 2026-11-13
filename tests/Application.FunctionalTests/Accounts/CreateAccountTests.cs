@@ -242,13 +242,32 @@ public class CreateAccountTests : TestBase
     }
 
     [Test]
-    public async Task DisabledTenant_Returns400DisabledTarget()
+    public async Task DisabledTenant_TenantUser_Returns403()
     {
         var (tenant, _, customer, tokens) = await AccountHttp.SignInAdviser();
         await DisableTenantAsync(tenant.Id);
 
         var response = await AccountHttp.Send(
             HttpMethod.Post, "/accounts", tokens.AccessToken, ValidBody(customer.PublicId));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Test]
+    public async Task DisabledTenant_SystemAdmin_Returns400DisabledTarget()
+    {
+        var (tenant, _, customer, _) = await AccountHttp.SignInAdviser();
+        await DisableTenantAsync(tenant.Id);
+        var tokens = await AccountHttp.SignInSystemAdmin();
+
+        var response = await AccountHttp.Send(HttpMethod.Post, "/accounts", tokens.AccessToken, new
+        {
+            tenantId = tenant.PublicId,
+            customerId = customer.PublicId,
+            name = "Everyday spending",
+            type = "Bank",
+            currency = "NZD"
+        });
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());

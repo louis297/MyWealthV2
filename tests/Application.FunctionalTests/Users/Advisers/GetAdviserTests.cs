@@ -195,7 +195,7 @@ public class GetAdviserTests : TestBase
     }
 
     [Test]
-    public async Task GetOnDisabledTenant_StillReturns200()
+    public async Task GetOnDisabledTenant_Returns403()
     {
         var (tenant, tokens) = await AdviserHttp.SignInTenantAdmin();
         var id = await CreateAsync(tokens.AccessToken, "Sam Reed", "sam@north.example");
@@ -203,7 +203,7 @@ public class GetAdviserTests : TestBase
 
         var response = await AdviserHttp.Send(
             HttpMethod.Get, $"/users/advisers/{id}", tokens.AccessToken);
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
     [Test]

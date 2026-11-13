@@ -290,12 +290,12 @@ public class UpdateCustomerTests : TestBase
     }
 
     [Test]
-    public async Task PutOnDisabledTenant_Returns204()
+    public async Task PutOnDisabledTenant_Returns403()
     {
         var (tenant, adviser, tokens) = await CustomerHttp.SignInTenantAdmin();
         var id = await CreateAsync(tokens.AccessToken, adviser.PublicId);
-        await DisableTenantAsync(tenant.Id);
         var rowVersion = await ReadRowVersion(id, tokens.AccessToken);
+        await DisableTenantAsync(tenant.Id);
 
         var response = await CustomerHttp.Send(
             HttpMethod.Put, $"/users/customers/{id}", tokens.AccessToken, new
@@ -303,7 +303,7 @@ public class UpdateCustomerTests : TestBase
                 name = "Jordan Lee Ltd",
                 rowVersion
             });
-        response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
     private static async Task<Guid> CreateAsync(string accessToken, Guid adviserId)

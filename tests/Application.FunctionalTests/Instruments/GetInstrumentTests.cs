@@ -187,16 +187,16 @@ public class GetInstrumentTests : TestBase
     }
 
     [Test]
-    public async Task GetAndListOnDisabledTenant_StillReturn200()
+    public async Task GetAndListOnDisabledTenant_Returns403()
     {
         var (tenant, tokens) = await InstrumentHttp.SignInAdviser();
         var id = await CreateAsync(tokens.AccessToken, "VTI", "Vanguard", "USD");
         await DisableTenantAsync(tenant.Id);
 
         (await InstrumentHttp.Send(HttpMethod.Get, $"/instruments/{id}", tokens.AccessToken))
-            .StatusCode.ShouldBe(HttpStatusCode.OK);
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         (await InstrumentHttp.Send(HttpMethod.Get, "/instruments", tokens.AccessToken))
-            .StatusCode.ShouldBe(HttpStatusCode.OK);
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
     private static async Task<Guid> CreateAsync(

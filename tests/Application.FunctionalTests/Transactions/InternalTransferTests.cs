@@ -158,7 +158,7 @@ public class InternalTransferTests : TestBase
     }
 
     [Test]
-    public async Task DisabledTenant_Returns400TargetTenant()
+    public async Task DisabledTenant_TenantUser_Returns403()
     {
         var world = await LegAccountsFixture.CreateAsync();
         await FundAsync(world, world.NedAccountId, 100m);
@@ -166,6 +166,21 @@ public class InternalTransferTests : TestBase
 
         var response = await PostAsync(
             world.TenantAdmin.AccessToken, Body(world.NedAccountId, world.NoraAccountId, 10m));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Test]
+    public async Task DisabledTenant_SystemAdmin_Returns400TargetTenant()
+    {
+        var world = await LegAccountsFixture.CreateAsync();
+        await FundAsync(world, world.NedAccountId, 100m);
+        await DisableTenantAsync(world.Tenant.Id);
+        var system = await AccountHttp.SignInSystemAdmin();
+        var body = Body(world.NedAccountId, world.NoraAccountId, 10m);
+        body["tenantId"] = world.Tenant.PublicId;
+
+        var response = await PostAsync(system.AccessToken, body);
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());

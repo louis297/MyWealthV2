@@ -188,7 +188,7 @@ public class CreateAdviserTests : TestBase
     }
 
     [Test]
-    public async Task DisabledTenant_Returns400DisabledTarget()
+    public async Task DisabledTenant_Returns403()
     {
         var (tenant, tokens) = await AdviserHttp.SignInTenantAdmin();
         await DisableTenantAsync(tenant.Id);
@@ -196,15 +196,7 @@ public class CreateAdviserTests : TestBase
         var response = await AdviserHttp.Send(
             HttpMethod.Post, "/users/advisers", tokens.AccessToken, ValidBody());
 
-        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        json.RootElement.GetProperty("code").GetString().ShouldBe("disabled");
-        json.RootElement.GetProperty("target").GetString().ShouldBe("tenant");
-        json.RootElement.GetProperty("targetId").GetGuid().ShouldBe(tenant.PublicId);
-        json.RootElement.GetProperty("title").GetString().ShouldBe("Tenant is disabled");
-        json.RootElement.GetProperty("detail").GetString()
-            .ShouldBe("Cannot create an Adviser while the tenant is disabled. Enable the tenant first.");
-        json.RootElement.GetProperty("status").GetInt32().ShouldBe(400);
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
     private static object ValidBody() => new

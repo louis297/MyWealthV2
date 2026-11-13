@@ -207,7 +207,7 @@ public class CreateCustomerTests : TestBase
     }
 
     [Test]
-    public async Task DisabledTenant_Returns400DisabledTarget()
+    public async Task DisabledTenant_Returns403()
     {
         var (tenant, adviser, tokens) = await CustomerHttp.SignInTenantAdmin();
         await DisableTenantAsync(tenant.Id);
@@ -215,15 +215,7 @@ public class CreateCustomerTests : TestBase
         var response = await CustomerHttp.Send(
             HttpMethod.Post, "/users/customers", tokens.AccessToken, ValidBody(adviser.PublicId));
 
-        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        json.RootElement.GetProperty("code").GetString().ShouldBe("disabled");
-        json.RootElement.GetProperty("target").GetString().ShouldBe("tenant");
-        json.RootElement.GetProperty("targetId").GetGuid().ShouldBe(tenant.PublicId);
-        json.RootElement.GetProperty("title").GetString().ShouldBe("Tenant is disabled");
-        json.RootElement.GetProperty("detail").GetString()
-            .ShouldBe("Cannot create a Customer while the tenant is disabled. Enable the tenant first.");
-        json.RootElement.GetProperty("status").GetInt32().ShouldBe(400);
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
     [Test]

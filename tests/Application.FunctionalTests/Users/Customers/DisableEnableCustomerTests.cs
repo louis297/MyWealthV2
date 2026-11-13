@@ -197,22 +197,19 @@ public class DisableEnableCustomerTests : TestBase
     }
 
     [Test]
-    public async Task DisableEnableOnDisabledTenant_Returns204()
+    public async Task DisableEnableOnDisabledTenant_Returns403()
     {
         var (tenant, adviser, tokens) = await CustomerHttp.SignInTenantAdmin();
         var id = await CreateAsync(tokens.AccessToken, adviser.PublicId, "Ned North", "ned@north.example");
+        var rowVersion = await ReadRowVersion(id, tokens.AccessToken);
         await DisableTenantAsync(tenant.Id);
 
-        var rowVersion = await ReadRowVersion(id, tokens.AccessToken);
         (await CustomerHttp.Send(
             HttpMethod.Post, $"/users/customers/{id}/disable", tokens.AccessToken, new { rowVersion }))
-            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
-
-        using var disabled = await ReadItem(id, tokens.AccessToken);
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         (await CustomerHttp.Send(
-            HttpMethod.Post, $"/users/customers/{id}/enable", tokens.AccessToken,
-            new { rowVersion = disabled.RootElement.GetProperty("rowVersion").GetString() }))
-            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+            HttpMethod.Post, $"/users/customers/{id}/enable", tokens.AccessToken, new { rowVersion }))
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
     private static async Task AssertForbidden(Guid id, string accessToken)
