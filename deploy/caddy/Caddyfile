@@ -3,6 +3,12 @@
 # is never forwarded. reverse_proxy keeps the original Host and sets X-Forwarded-Proto/-For,
 # which the hosts trust from 172.30.0.0/24 only.
 #
+# Hosts reach id.{$DOMAIN} through Caddy on the internal network (compose alias), so the global
+# limit skips 172.30.0.0/24; otherwise every host-to-host call from one container shares one key.
+# The gateway 172.30.0.1 stays limited: Docker's userland proxy (IPv6 clients, Docker Desktop)
+# forwards published-port traffic from that address. The subnet must match compose.yml
+# (docs/known-issues/deploy-fixed-docker-subnet.md).
+#
 # DOMAIN, ACME_EMAIL and ACME_CA come from the container environment (compose.yml, .env).
 
 {
@@ -18,6 +24,9 @@
 	# Loose global limit per client IP on every hostname.
 	rate_limit {
 		zone global {
+			match {
+				expression `!remote_ip('172.30.0.0/24') || remote_ip('172.30.0.1/32')`
+			}
 			key {remote_host}
 			events 300
 			window 1m
@@ -28,12 +37,14 @@
 id.{$DOMAIN} {
 	import public
 
-	# Hosted login and the token endpoint, per client IP.
+	# Hosted login, per client IP. /login* also catches /login/, which ASP.NET routing still serves
+	# to the login page. /connect/token is not limited here: every client is confidential and there
+	# is no password grant (identity-auth amendment 2026-11-13, lockout).
 	rate_limit {
 		zone sign_in {
 			match {
 				method POST
-				path /login /connect/token
+				path /login*
 			}
 			key {remote_host}
 			events 10
