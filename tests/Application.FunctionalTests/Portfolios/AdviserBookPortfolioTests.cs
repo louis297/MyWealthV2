@@ -151,4 +151,58 @@ public class AdviserBookPortfolioTests : TestBase
         (await AdviserBookWorld.AcceptedAccountsAsync(response)).ShouldBe([world.AccountA, world.AccountB], ignoreOrder: true);
         AdviserBookWorld.EnqueuedSince(before).ShouldBe([world.AccountA, world.AccountB], ignoreOrder: true);
     }
+
+    [Test]
+    public async Task Disable_SharedPortfolio_Adviser_Returns409AndKeepsEveryAssignment()
+    {
+        var world = await AdviserBookWorld.CreateAsync("book-disable-shared");
+        await world.ShareAsync();
+
+        var response = await PortfolioHttp.Send(HttpMethod.Post, $"/portfolios/{world.PortfolioId}/disable", world.AdviserA.AccessToken, new
+        {
+            rowVersion = await world.RowVersionAsync()
+        });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        (await ProblemResponse.ReadAsync(response)).Code.ShouldBe("portfolio_shared");
+        (await world.GetPortfolioAsync()).GetProperty("isActive").GetBoolean().ShouldBeTrue();
+        (await AssignmentStatusAsync(world.AdviserA, world.AccountA)).ShouldBe(HttpStatusCode.OK);
+        (await AssignmentStatusAsync(world.AdviserB, world.AccountB)).ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Test]
+    public async Task Disable_OnlyInTheBook_Adviser_Returns204AndRemovesTheAssignment()
+    {
+        var world = await AdviserBookWorld.CreateAsync("book-disable-own");
+        await world.AssignAsync(world.AdviserA, world.AccountA);
+
+        var response = await PortfolioHttp.Send(HttpMethod.Post, $"/portfolios/{world.PortfolioId}/disable", world.AdviserA.AccessToken, new
+        {
+            rowVersion = await world.RowVersionAsync()
+        });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await world.GetPortfolioAsync()).GetProperty("isActive").GetBoolean().ShouldBeFalse();
+        (await AssignmentStatusAsync(world.AdviserA, world.AccountA)).ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Test]
+    public async Task Disable_SharedPortfolio_TenantAdmin_Returns204AndRemovesEveryAssignment()
+    {
+        var world = await AdviserBookWorld.CreateAsync("book-disable-admin");
+        await world.ShareAsync();
+
+        var response = await PortfolioHttp.Send(HttpMethod.Post, $"/portfolios/{world.PortfolioId}/disable", world.TenantAdmin.AccessToken, new
+        {
+            rowVersion = await world.RowVersionAsync()
+        });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await world.GetPortfolioAsync()).GetProperty("isActive").GetBoolean().ShouldBeFalse();
+        (await AssignmentStatusAsync(world.AdviserA, world.AccountA)).ShouldBe(HttpStatusCode.NotFound);
+        (await AssignmentStatusAsync(world.AdviserB, world.AccountB)).ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    private static async Task<HttpStatusCode> AssignmentStatusAsync(TokenResponse tokens, Guid accountId) =>
+        (await PortfolioHttp.Send(HttpMethod.Get, $"/accounts/{accountId}/portfolio", tokens.AccessToken)).StatusCode;
 }
