@@ -11,12 +11,14 @@ public sealed record RefreshedTokens(string AccessToken, string RefreshToken, Da
 /// </summary>
 public sealed class RefreshTokenExchange
 {
+    public static readonly TimeSpan Retention = TimeSpan.FromMinutes(30);
+
     private readonly HttpClient _tokens;
     private readonly Func<string> _tokenEndpoint;
     private readonly string _clientId;
     private readonly string _clientSecret;
     private readonly TimeProvider _time;
-    private readonly ConcurrentDictionary<string, RefreshedTokens> _current = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, Remembered> _current = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Lazy<Task<RefreshedTokens?>>> _calls = new(StringComparer.Ordinal);
 
     public RefreshTokenExchange(
@@ -36,7 +38,7 @@ public sealed class RefreshTokenExchange
     public Task<RefreshedTokens?> ExchangeAsync(string refreshToken, CancellationToken cancellationToken = default)
     {
         var presented = LatestRefreshToken(refreshToken);
-        if (_current.TryGetValue(presented, out var cached) && cached.ExpiresAt > _time.GetUtcNow().AddMinutes(1))
+        if (TryRecall(presented, out var cached) && cached.ExpiresAt > _time.GetUtcNow().AddMinutes(1))
         {
             return Task.FromResult<RefreshedTokens?>(cached);
         }
@@ -59,7 +61,7 @@ public sealed class RefreshTokenExchange
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var current = refreshToken;
-        while (seen.Add(current) && _current.TryGetValue(current, out var cached) && cached.RefreshToken != current)
+        while (seen.Add(current) && TryRecall(current, out var cached) && cached.RefreshToken != current)
         {
             current = cached.RefreshToken;
         }
@@ -67,9 +69,42 @@ public sealed class RefreshTokenExchange
         return current;
     }
 
+    private bool TryRecall(string refreshToken, out RefreshedTokens result)
+    {
+        result = null!;
+        if (!_current.TryGetValue(refreshToken, out var remembered))
+        {
+            return false;
+        }
+
+        if (remembered.WrittenAt + Retention <= _time.GetUtcNow())
+        {
+            _current.TryRemove(new KeyValuePair<string, Remembered>(refreshToken, remembered));
+            return false;
+        }
+
+        result = remembered.Result;
+        return true;
+    }
+
+    private void Remember(string refreshToken, RefreshedTokens result)
+    {
+        var now = _time.GetUtcNow();
+        foreach (var entry in _current)
+        {
+            if (entry.Value.WrittenAt + Retention <= now)
+            {
+                _current.TryRemove(entry);
+            }
+        }
+
+        _current[refreshToken] = new Remembered(result, now);
+        _current[result.RefreshToken] = new Remembered(result, now);
+    }
+
     private async Task<RefreshedTokens?> PostAndRememberAsync(string refreshToken)
     {
-        if (_current.TryGetValue(refreshToken, out var cached) && cached.ExpiresAt > _time.GetUtcNow().AddMinutes(1))
+        if (TryRecall(refreshToken, out var cached) && cached.ExpiresAt > _time.GetUtcNow().AddMinutes(1))
         {
             return cached;
         }
@@ -81,8 +116,7 @@ public sealed class RefreshTokenExchange
             return null;
         }
 
-        _current[refreshToken] = result;
-        _current[result.RefreshToken] = result;
+        Remember(refreshToken, result);
         return result;
     }
 
@@ -119,4 +153,6 @@ public sealed class RefreshTokenExchange
 
         return new RefreshedTokens(accessToken, nextRefresh, _time.GetUtcNow().AddSeconds(expiresIn));
     }
+
+    private sealed record Remembered(RefreshedTokens Result, DateTimeOffset WrittenAt);
 }
