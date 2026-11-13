@@ -10,7 +10,10 @@ if (HealthCheckCommand.IsRequested(args))
     return;
 }
 
-var builder = WebApplication.CreateBuilder(args);
+// demo-tenant-seed R1–R3: an operator command, never part of a normal start.
+var seedDemo = DemoTenantSeed.IsRequested(args);
+
+var builder = WebApplication.CreateBuilder(seedDemo ? args[1..] : args);
 
 // Add services to the container.
 builder.AddServiceDefaults();
@@ -29,6 +32,23 @@ await using (var scope = app.Services.CreateAsyncScope())
 
     var catalog = scope.ServiceProvider.GetRequiredService<ICurrencyCatalog>();
     await catalog.ReloadAsync(CancellationToken.None);
+
+    // Seed mode runs no Development seed and no SystemAdmin bootstrap, and never listens (R1, R2).
+    if (seedDemo)
+    {
+        try
+        {
+            await DemoTenantSeed.RunAsync(scope.ServiceProvider, CancellationToken.None);
+            Environment.ExitCode = 0;
+        }
+        catch (Exception exception)
+        {
+            app.Logger.LogError(exception, "Demo seed failed. Nothing was written.");
+            Environment.ExitCode = 1;
+        }
+
+        return;
+    }
 
     if (app.Environment.IsDevelopment())
     {

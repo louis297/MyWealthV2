@@ -18,7 +18,8 @@ public static class DemoTenantSeed
 
     public const string Argument = "--seed-demo";
 
-    public static bool IsRequested(string[] args) => false;
+    public static bool IsRequested(string[] args) =>
+        args.Length > 0 && string.Equals(args[0], Argument, StringComparison.Ordinal);
 
     private const string ReportingCurrency = "USD";
 
