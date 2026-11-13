@@ -155,9 +155,9 @@ Implement as one Application `TargetDisabled` exception (kind + targetId + detai
 
 List filters are separate: currencies and people collections use `enabledOnly` (omitted / `false` = all, `true` = enabled / Active only). Do not retrofit landed `GET /tenants?isEnabled=`.
 
-### 4.2 Problem codes (review, 2026-11-13)
+### 4.2 Problem codes (accepted, 2026-11-13)
 
-Status of this section: `review`. The build contract for it is [features/portfolios.md](features/portfolios.md), amendment 2026-11-13, part 1. Until that amendment is accepted, this section is not implementable.
+Status of this section: `accepted` (2026-11-13). The build contract for it is [features/portfolios.md](features/portfolios.md), amendment 2026-11-13, part 1.
 
 **Why.** One HTTP status already carries several meanings. `webapi` returns 409 for a stale `rowVersion`, a reused `Idempotency-Key`, a changed FX rate, a report that is not ready, and a portfolio already assigned to the account. `POST /transactions/fx` alone can return two different 409s today, and only the first has a field to tell them apart (`errors.expectedRate`). The portfolios amendment 2026-11-13 adds a sixth. A client that branches on the status alone shows the wrong message as soon as one route can return two of them. A **problem code** names the meaning. The status stays the category.
 
@@ -503,4 +503,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-11 | FX conversions accepted and landed. `POST /transactions/fx` returns 201 `{ id }` with `Location`, requires `Idempotency-Key` and `expectedRate` (mismatch → 409, `errors.expectedRate`). `POST /transactions/fx/quote` returns 200 with rate, as-of date and both amounts; no write. `POST /transactions` rejects `FxConversion`. The transaction item gains `fx` (null for other types). |
 | 2026-11-10 | Internal transfers accepted. `POST /transactions/transfer` returns 201 `{ id }` with `Location: /transactions/{id}` and requires `Idempotency-Key`. `POST /transactions` rejects `InternalTransfer`. `GET /transactions` takes an optional `type` (exact `TransactionType` name; anything else → 400). |
 | 2026-11-13 | `webapi` re-checks person `Status` and the tenant flag on every request. A disabled person, or any person of a disabled tenant, gets 403 with a still-valid token. §4.1 `target=tenant` on create is reached only by SystemAdmin ([features/identity-auth.md](features/identity-auth.md) amendment 2026-11-13). |
-| 2026-11-13 | §4.2 problem codes (review): every 409 and every named business 400 carries a stable `code`; one registry; clients branch on `code`. Build contract: [features/portfolios.md](features/portfolios.md) amendment 2026-11-13 part 1. |
+| 2026-11-13 | §4.2 problem codes (accepted): every 409 and every named business 400 carries a stable `code`; one registry; clients branch on `code`. Build contract: [features/portfolios.md](features/portfolios.md) amendment 2026-11-13 part 1. |

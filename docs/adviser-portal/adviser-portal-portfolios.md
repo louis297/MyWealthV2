@@ -23,7 +23,7 @@ Phase 2 portal cut for model portfolios. Consumes the landed portfolios feature 
 
 **Status is `accepted`.**
 
-**Amendment 2026-11-13 (Shared portfolio message, review):** see the amendment at the end of this file. Adds P12. Not a build contract until accepted.
+**Amendment 2026-11-13 (Shared portfolio message, accepted):** see the amendment at the end of this file. Adds P12.
 
 Backend prerequisites (landed):
 
@@ -142,9 +142,9 @@ Backend error codes (missing price, missing FX, insufficient cash) are shown as 
 
 ---
 
-## Amendment 2026-11-13 (Shared portfolio message) — review
+## Amendment 2026-11-13 (Shared portfolio message) — accepted
 
-Status of this amendment: `review`. It is not a build contract until it is accepted. The rest of this file stays accepted. Backend rules: [../features/portfolios.md](../features/portfolios.md), amendment 2026-11-13 (Adviser Book on portfolio-wide commands), PB1–PB8. Do not rewrite P3, P4 or P8 in place.
+Status of this amendment: `accepted` (2026-11-13). It is a build contract. The rest of this file stays accepted. Backend rules: [../features/portfolios.md](../features/portfolios.md), amendment 2026-11-13 (Adviser Book on portfolio-wide commands), PB1–PB8. Do not rewrite P3, P4 or P8 in place.
 
 | ID | Behaviour |
 | --- | --- |

@@ -36,7 +36,7 @@ Model portfolios (target-weight investment schemes) on `webapi`. An Adviser or T
 
 **Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md) R17. The R18 trade lock applies when any security leg's Account has an Active assignment. Rebalance still writes ordinary `Buy` / `Sell` on the assigned Account.
 
-**Amendment 2026-11-13 (Adviser Book on portfolio-wide commands, review):** see the amendment at the end of this file. Part 1 puts a problem `code` on every 409 ([../api-design.md](../api-design.md) §4.2). Part 2, for the Adviser role, filters `POST /portfolios/{id}/rebalance` to the Adviser's Book and refuses `PUT /portfolios/{id}` and `POST /portfolios/{id}/disable` on a Shared portfolio (409 `portfolio_shared`). Not a build contract until accepted.
+**Amendment 2026-11-13 (Adviser Book on portfolio-wide commands, accepted):** see the amendment at the end of this file. Part 1 puts a problem `code` on every 409 ([../api-design.md](../api-design.md) §4.2). Part 2, for the Adviser role, filters `POST /portfolios/{id}/rebalance` to the Adviser's Book and refuses `PUT /portfolios/{id}` and `POST /portfolios/{id}/disable` on a Shared portfolio (409 `portfolio_shared`).
 
 ---
 
@@ -320,9 +320,9 @@ The repository should build after each commit. Agents split each line into red t
 
 ---
 
-## Amendment 2026-11-13 (Adviser Book on portfolio-wide commands) — review
+## Amendment 2026-11-13 (Adviser Book on portfolio-wide commands) — accepted
 
-Status of this amendment: `review`. It is not a build contract until it is accepted. The rest of this file stays accepted. Do not rewrite R16, R22, R23 or §8 in place. No schema script, no new route, no new policy.
+Status of this amendment: `accepted` (2026-11-13). It is a build contract. The rest of this file stays accepted. Do not rewrite R16, R22, R23 or §8 in place. No schema script, no new route, no new policy.
 
 It has two parts. Part 1 is the build contract for [../api-design.md](../api-design.md) §4.2 (problem codes). It lands first, because part 2 adds a second 409 to `PUT /portfolios/{id}` and `POST /portfolios/{id}/disable`, and clients must be able to tell the two apart. Part 2 tightens R16, R22 and R23 and three rows of §8 for the Adviser role only.
 
