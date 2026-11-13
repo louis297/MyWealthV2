@@ -28,11 +28,7 @@ public class RebalancePortfolioCommandHandler(
 
         var portfolio = await query.SingleOrDefaultAsync(cancellationToken)
                         ?? throw new NotFoundException("Portfolio", request.Id);
-        var accountIds = await (
-            from assignment in db.AccountPortfolioAssignments
-            join account in db.Accounts on assignment.AccountId equals account.Id
-            where assignment.PortfolioId == portfolio.Id && assignment.Status == AssignmentStatus.Active
-            select account.PublicId).ToListAsync(cancellationToken);
+        var accountIds = await PortfolioBook.ActiveAccountIdsAsync(db, currentUser, portfolio.Id, cancellationToken);
         var handles = accountIds
             .Select(accountId => new RebalanceAccountHandleDto(accountId, Guid.NewGuid()))
             .ToList();
