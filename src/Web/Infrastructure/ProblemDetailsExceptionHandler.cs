@@ -8,7 +8,8 @@ namespace MyWealthV2.Web.Infrastructure;
 /// <summary>
 /// Converts well-known application exceptions into RFC 9110-compliant <see cref="ProblemDetails"/> responses,
 /// mapping <see cref="ValidationException"/> → 400, <see cref="NotFoundException"/> → 404,
-/// <see cref="UnauthorizedAccessException"/> → 401, and <see cref="ForbiddenAccessException"/> → 403.
+/// <see cref="UnauthorizedAccessException"/> → 401, <see cref="ForbiddenAccessException"/> → 403, and every
+/// <see cref="ProblemException"/> → 400 or 409 with its problem code (api-design §4.2).
 /// Unrecognised exceptions are not handled and fall through to the default middleware.
 /// </summary>
 public class ProblemDetailsExceptionHandler : IExceptionHandler
@@ -41,45 +42,9 @@ public class ProblemDetailsExceptionHandler : IExceptionHandler
                 Title = "Forbidden",
                 Type = "https://tools.ietf.org/html/rfc9110#section-15.5.4"
             }),
-            ConcurrencyException => (StatusCodes.Status409Conflict, new ProblemDetails
-            {
-                Status = StatusCodes.Status409Conflict,
-                Title = "Conflict",
-                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10"
-            }),
-            ReportNotReadyException => (StatusCodes.Status409Conflict, new ProblemDetails
-            {
-                Status = StatusCodes.Status409Conflict,
-                Title = "Conflict",
-                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
-                Detail = "The report is not ready."
-            }),
-            IdempotencyConflictException => (StatusCodes.Status409Conflict, new ProblemDetails
-            {
-                Status = StatusCodes.Status409Conflict,
-                Title = "Conflict",
-                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
-                Detail = "This Idempotency-Key was already used for a different request."
-            }),
-            ExpectedRateChangedException changed => (StatusCodes.Status409Conflict, (ProblemDetails)new ValidationProblemDetails(
-                new Dictionary<string, string[]>
-                {
-                    ["ExpectedRate"] = [$"{changed.Message} Current rate: {changed.CurrentRate}."]
-                })
-            {
-                Status = StatusCodes.Status409Conflict,
-                Title = "The rate changed",
-                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10"
-            }),
+            ProblemException problem => (StatusOf(problem.Kind), CodedProblem(problem)),
             TargetDisabledException tde => (StatusCodes.Status400BadRequest, DisabledProblem(tde)),
             RebalanceException rebalance => (StatusCodes.Status400BadRequest, CodedProblem(rebalance.Code, rebalance.Message)),
-            AssignmentConflictException conflict => (StatusCodes.Status409Conflict, new ProblemDetails
-            {
-                Status = StatusCodes.Status409Conflict,
-                Title = "Conflict",
-                Detail = conflict.Message,
-                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10"
-            }),
             _ => (-1, null)
         };
 
@@ -93,6 +58,34 @@ public class ProblemDetailsExceptionHandler : IExceptionHandler
         httpContext.Response.StatusCode = statusCode;
         await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
         return true;
+    }
+
+    private static int StatusOf(ProblemKind kind) => kind switch
+    {
+        ProblemKind.Conflict => StatusCodes.Status409Conflict,
+        _ => StatusCodes.Status400BadRequest
+    };
+
+    /// <summary>One shape for every problem code (api-design §4.2 C5).</summary>
+    private static ProblemDetails CodedProblem(ProblemException exception)
+    {
+        var status = StatusOf(exception.Kind);
+        var problem = exception.Errors is { } errors
+            ? new ValidationProblemDetails(errors.ToDictionary(pair => pair.Key, pair => pair.Value))
+            : new ProblemDetails();
+        problem.Status = status;
+        problem.Type = status == StatusCodes.Status409Conflict
+            ? "https://tools.ietf.org/html/rfc9110#section-15.5.10"
+            : "https://tools.ietf.org/html/rfc9110#section-15.5.1";
+        problem.Title = exception.Title;
+        problem.Detail = exception.Detail;
+        problem.Extensions["code"] = exception.Code;
+        foreach (var (name, value) in exception.Extensions)
+        {
+            problem.Extensions[name] = value;
+        }
+
+        return problem;
     }
 
     private static ProblemDetails DisabledProblem(TargetDisabledException exception)
