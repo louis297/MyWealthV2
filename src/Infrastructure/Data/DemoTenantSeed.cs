@@ -16,6 +16,10 @@ public static class DemoTenantSeed
 {
     public const string CreatedBy = "system";
 
+    public const string Argument = "--seed-demo";
+
+    public static bool IsRequested(string[] args) => false;
+
     private const string ReportingCurrency = "USD";
 
     public static async Task RunAsync(IServiceProvider services, CancellationToken cancellationToken)
