@@ -544,7 +544,7 @@ Today's code: IdentityHost registers the user store with `AddIdentityCore` and a
 
 ### Amendment 2026-11-13 (hosted login lockout and one hash per attempt)
 
-Status of this amendment: `accepted` (2026-11-13). It is a build contract. Supersedes nothing in R1–R21; it tightens R2 and R3 and closes the lockout gap in [deployment.md](../deployment.md) §11. Do not rewrite those or earlier amendments in place.
+Status of this amendment: `accepted` (2026-11-13). It is a build contract. Landed 2026-11-13: `DummyPasswordHash` (`src/IdentityHost`) and the lockout flow in `Login.cshtml.cs`, lockout options in `src/Infrastructure/DependencyInjection.cs`, Caddy zones in `deploy/caddy/Caddyfile`; A41 and A47 are in `HostedLoginHashTests`, A41 (locked) and A42–A46 in `HostedLoginLockoutTests`. No schema script: every `AspNetUsers` row is created by `UserManager.CreateAsync`, which already writes `LockoutEnabled = 1`. Open gaps: [known-issues/hosted-login-lockout.md](../known-issues/hosted-login-lockout.md). Supersedes nothing in R1–R21; it tightens R2 and R3 and closes the lockout gap in [deployment.md](../deployment.md) §11. Do not rewrite those or earlier amendments in place.
 
 **Why.** Hosted login has three gaps that together make password guessing cheap.
 
