@@ -50,12 +50,17 @@ jobs:
             --configuration Release \
             --logger "trx;LogFileName=smoke-results.trx"
 
-      - name: Upload traces and screenshots
+      # The repository is public, so any signed-in GitHub user can download this artifact.
+      # Screenshots and the trx only. A Playwright trace holds the password and session cookies;
+      # the suite does not record one against a remote host, and this list never uploads one
+      # (docs/smoke-test.md §7).
+      - name: Upload screenshots and test results
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: smoke-results
           path: |
-            artifacts/bin/Smoke.Tests/release/playwright/
+            artifacts/bin/Smoke.Tests/release/playwright/*.png
             **/smoke-results.trx
+            !**/*.trace.zip
           retention-days: 7

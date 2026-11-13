@@ -3,7 +3,7 @@ title: Smoke test
 status: accepted
 language: en
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 related:
   - README.md
   - glossary.md
@@ -91,7 +91,8 @@ Seeding the smoke tenant in Development is allowed by [tenants.md](features/tena
 - Project `tests/Smoke.Tests`, using `Microsoft.Playwright.NUnit` (the repository already uses NUnit). One test class per portal.
 - The project is **not** in `MyWealthV2.slnx`, so `dotnet test MyWealthV2.slnx` in CI does not try to reach live hosts. The CI workflow builds it explicitly (`dotnet build tests/Smoke.Tests`) so it does not rot, and does not run it.
 - Browsers are installed with the Playwright script that the build writes to the output folder (`playwright.ps1 install --with-deps chromium`). Chromium only.
-- On failure the suite keeps a Playwright trace and a screenshot per case under `TestResults/`. CD uploads them as a workflow artifact.
+- On failure the suite keeps a full-page screenshot per case under `playwright/` in the test work directory (`artifacts/bin/Smoke.Tests/<configuration>/playwright/`).
+- It records a Playwright trace (screenshots and snapshots) only when **both** portal URLs are loopback, and keeps it next to the screenshot when a case fails. A trace holds the typed password, the login form body and the session cookies. Against any other host, including production from a developer machine, no trace is recorded (amendment 2026-11-13).
 - Time limits: 30 seconds per navigation, 2 minutes per case. A cold start after deploy is covered by the health wait in [deployment.md](deployment.md) §9, not by long test timeouts.
 
 ---
@@ -134,14 +135,15 @@ If a password is missing, the suite fails at start with a message naming the mis
 ## 7. Running in CD
 
 - Workflow `.github/workflows/smoke.yml`, triggered by `workflow_call` (the deploy workflow, [deployment.md](deployment.md) §9 step 4) and `workflow_dispatch` (by hand, runbook §12 step 9).
-- Job environment `production`. Steps: checkout → set up .NET → build `tests/Smoke.Tests` → install Chromium → `dotnet test tests/Smoke.Tests` → upload `TestResults/` when the job fails.
+- Job environment `production`. Steps: checkout → set up .NET → build `tests/Smoke.Tests` → install Chromium → `dotnet test tests/Smoke.Tests` → upload artifact `smoke-results` when the job fails.
+- `smoke-results` holds the failure screenshots (`*.png`) and `smoke-results.trx` only, kept 7 days. The upload path list names those files and excludes `*.trace.zip`, so a trace is not uploaded even if one is written. The repository is public: any signed-in GitHub user can download the artifact, and GitHub masks secrets in logs but not in artifacts (amendment 2026-11-13).
 - A failed run fails the deploy, and the deploy rolls back the image tag ([deployment.md](deployment.md) §9 step 5).
 
 ---
 
 ## 8. Code changes this doc needs
 
-All landed on `master` (2026-11-12).
+All landed on `master` (rows 1–5 on 2026-11-12, row 6 on 2026-11-13).
 
 | # | Change | Kind | Landed |
 | --- | --- | --- | --- |
@@ -150,3 +152,4 @@ All landed on `master` (2026-11-12).
 | 3 | AppHost reads `Smoke:AdviserPassword` / `Smoke:CustomerPassword` and passes them to the seeding host | Wiring | `5c2966c` |
 | 4 | CI builds `tests/Smoke.Tests` without running it | CI | `cd4a86c` |
 | 5 | `.github/workflows/smoke.yml` (§7) | CI | `8835155` |
+| 6 | Trace only for loopback targets (§4); upload screenshots and trx only (§7) | Test code, CI | 2026-11-13 |

@@ -32,6 +32,14 @@ internal sealed class SmokeSettings
     public static bool TargetsLocalhost =>
         AdviserPortalUrl.IsLoopback || CustomerPortalUrl.IsLoopback;
 
+    /// <summary>
+    /// True only when both portals are local. A Playwright trace holds the typed password,
+    /// the login form body and the session cookies, so it is recorded only for local targets
+    /// (docs/smoke-test.md §4).
+    /// </summary>
+    public static bool TargetsOnlyLocalhost =>
+        AdviserPortalUrl.IsLoopback && CustomerPortalUrl.IsLoopback;
+
     private static Uri Url(string key, string fallback)
     {
         var value = Configuration.Value[key];

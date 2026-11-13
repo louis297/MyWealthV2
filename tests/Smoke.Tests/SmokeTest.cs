@@ -5,11 +5,15 @@ using NUnit.Framework.Interfaces;
 namespace MyWealthV2.Smoke.Tests;
 
 /// <summary>
-/// One fresh browser context per test. Keeps a trace and a screenshot when a test fails.
+/// One fresh browser context per test. Keeps a screenshot when a test fails, and a trace too
+/// when both portals are local. A trace holds the typed password, the login form body and the
+/// session cookies, so it is never recorded against a remote host (docs/smoke-test.md §4).
 /// </summary>
 public abstract class SmokeTest : PageTest
 {
     private static readonly float NavigationTimeout = (float)TimeSpan.FromSeconds(30).TotalMilliseconds;
+
+    private bool _tracing;
 
     public override BrowserNewContextOptions ContextOptions() => new()
     {
@@ -22,7 +26,11 @@ public abstract class SmokeTest : PageTest
     {
         Page.SetDefaultNavigationTimeout(NavigationTimeout);
         Page.SetDefaultTimeout(NavigationTimeout);
-        await Context.Tracing.StartAsync(new TracingStartOptions { Screenshots = true, Snapshots = true });
+        _tracing = SmokeSettings.TargetsOnlyLocalhost;
+        if (_tracing)
+        {
+            await Context.Tracing.StartAsync(new TracingStartOptions { Screenshots = true, Snapshots = true });
+        }
     }
 
     [TearDown]
@@ -31,7 +39,11 @@ public abstract class SmokeTest : PageTest
         var failed = TestContext.CurrentContext.Result.Outcome.Status == TestStatus.Failed;
         if (!failed)
         {
-            await Context.Tracing.StopAsync();
+            if (_tracing)
+            {
+                await Context.Tracing.StopAsync();
+            }
+
             return;
         }
 
@@ -39,11 +51,15 @@ public abstract class SmokeTest : PageTest
         Directory.CreateDirectory(folder);
         var name = TestContext.CurrentContext.Test.Name;
         var screenshot = Path.Combine(folder, $"{name}.png");
-        var trace = Path.Combine(folder, $"{name}.trace.zip");
         await Page.ScreenshotAsync(new PageScreenshotOptions { Path = screenshot, FullPage = true });
-        await Context.Tracing.StopAsync(new TracingStopOptions { Path = trace });
         TestContext.AddTestAttachment(screenshot);
-        TestContext.AddTestAttachment(trace);
+
+        if (_tracing)
+        {
+            var trace = Path.Combine(folder, $"{name}.trace.zip");
+            await Context.Tracing.StopAsync(new TracingStopOptions { Path = trace });
+            TestContext.AddTestAttachment(trace);
+        }
     }
 
     /// <summary>Fills the hosted login form on identity (src/IdentityHost/Pages/Login.cshtml).</summary>
