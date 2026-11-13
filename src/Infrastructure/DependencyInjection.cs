@@ -74,6 +74,10 @@ public static class DependencyInjection
                 options.User.RequireUniqueEmail = false;
                 options.Stores.SchemaVersion = IdentitySchemaVersions.Version2;
                 options.Password.RequiredLength = 8;
+                // Hosted login lockout (identity-auth amendment 2026-11-13, lockout).
+                options.Lockout.AllowedForNewUsers = true;
+                options.Lockout.MaxFailedAccessAttempts = 5;
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
             })
             .AddEntityFrameworkStores<ApplicationDbContext>();
 

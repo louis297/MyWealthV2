@@ -51,11 +51,23 @@ public class LoginModel(
             return Page();
         }
 
-        if (!await userManager.CheckPasswordAsync(identityUser, password))
+        // Not SignInManager.CheckPasswordSignInAsync: it skips the hash for a locked user.
+        var lockedOut = await userManager.IsLockedOutAsync(identityUser);
+        var passwordMatches = await userManager.CheckPasswordAsync(identityUser, password);
+        if (lockedOut)
         {
             Error = UniformFailure;
             return Page();
         }
+
+        if (!passwordMatches)
+        {
+            await userManager.AccessFailedAsync(identityUser);
+            Error = UniformFailure;
+            return Page();
+        }
+
+        await userManager.ResetAccessFailedCountAsync(identityUser);
 
         if (!LoginEligibility.CanComplete(user, await ResolveTenantAsync(user, cancellationToken)))
         {
