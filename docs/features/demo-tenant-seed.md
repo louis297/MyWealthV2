@@ -1,6 +1,6 @@
 ---
 title: Demo tenant seed
-status: review
+status: accepted
 phase: 3
 language: en
 owner: ""
@@ -190,7 +190,7 @@ No new ADR.
 | Writes | Tenant, instruments, grants only. One transaction |
 | Scripts / policy | None |
 
-Amends, once this spec is accepted:
+Amends (accepted 2026-11-14):
 
 - [tenants.md](tenants.md) R17: the demo tenant may be created outside Development, by this command only (amendment 2026-11-14 there).
 - [instruments.md](instruments.md) §2 Out and §9.1 "Not Production": the demo catalog may be written in production by this command.

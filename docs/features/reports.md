@@ -544,9 +544,9 @@ Still open:
 
 ---
 
-## Amendment 2026-11-14 (demo tenant grants in production; pending)
+## Amendment 2026-11-14 (demo tenant grants in production)
 
-Takes effect when [demo-tenant-seed.md](demo-tenant-seed.md) is accepted. Narrows the seed paragraph "Not Production".
+Accepted with [demo-tenant-seed.md](demo-tenant-seed.md). Narrows the seed paragraph "Not Production".
 
 - `webapi --seed-demo` grants `customer-transactions` and `adviser-balances` to tenant `demo` in any environment. A platform-inactive report is not granted. Idempotent on `(TenantId, ReportId)`.
 - Other tenants are still not auto-granted.

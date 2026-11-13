@@ -97,7 +97,7 @@ SystemAdmin onboards a firm with `name`, `code`, and an enabled `reportingCurren
 | R14 | No physical delete. FK `Users.TenantId` is RESTRICT. |
 | R15 | List query: `page` (1-based, default 1), `pageSize` (default 20, max 100), optional `isEnabled`, optional `search`. `search` matches Name or Code contains (CI) or `PublicId` exact. Sort: `name` ascending, then `code`. Disabled rows stay on the same list (filter if the caller asks). |
 | R16 | Tenants is a **platform** resource. It has no `TenantId` column. Dual-check isolation of *tenant-owned rows* starts as a reusable two-tenant fixture here and is asserted on later slices. This slice’s own gate is policy 403, not a 404-for-other-tenant pattern. |
-| R17 | Functional tests create their own tenants and never rely on seeded ones. Development may seed only the named fixture tenants `demo`, `demo2` (`TestSeed`) and `smoke` ([smoke-test.md](../smoke-test.md) §3). No tenant is seeded outside Development. SystemAdmin seed stays identity-auth. Amended 2026-11-12. |
+| R17 | Functional tests create their own tenants and never rely on seeded ones. Development may seed only the named fixture tenants `demo`, `demo2` (`TestSeed`) and `smoke` ([smoke-test.md](../smoke-test.md) §3). Outside Development, only the demo tenant `demo` may be seeded, and only by the operator command `webapi --seed-demo` ([demo-tenant-seed.md](demo-tenant-seed.md)). SystemAdmin seed stays identity-auth. Amended 2026-11-12, 2026-11-14. |
 
 ---
 
@@ -359,9 +359,9 @@ Supersedes R17 as first written ("Do not seed a demo firm in Development").
 
 ---
 
-## Amendment 2026-11-14 (demo tenant outside Development; pending)
+## Amendment 2026-11-14 (demo tenant outside Development)
 
-Takes effect when [demo-tenant-seed.md](demo-tenant-seed.md) is accepted. Until then R17 as amended 2026-11-12 stands.
+Accepted with [demo-tenant-seed.md](demo-tenant-seed.md). Supersedes the R17 sentence "No tenant is seeded outside Development" and the same line in the amendment of 2026-11-12, for the demo tenant only.
 
 - The demo tenant `demo` may be created in any environment, production included, by the operator command `webapi --seed-demo` only. Nothing creates it on start outside Development.
 - That command writes the tenant row, its demo catalog and its two report grants. It seeds no people and no ledger data, and never changes an existing tenant.
