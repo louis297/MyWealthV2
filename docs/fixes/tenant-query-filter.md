@@ -13,7 +13,7 @@ related:
 
 Status: accepted
 
-**Amendment 2026-11-13 (tenant composite keys, review):** [tenant-composite-keys.md](tenant-composite-keys.md) adds `TenantId` to cash legs, security legs, `TransactionFxDetails` and `PortfolioLines`, so the filter will cover them. Not a build contract until accepted.
+**Amendment 2026-11-13 (tenant composite keys, accepted):** [tenant-composite-keys.md](tenant-composite-keys.md) adds `TenantId` to cash legs, security legs, `TransactionFxDetails` and `PortfolioLines`, so the filter will cover them.
 
 ## Problem
 

@@ -16,7 +16,7 @@ Status: accepted
 
 Phase-1 isolation: one shared database + row-level `TenantId` + **dual check** + EF global query filter (safety net) + isolation tests.
 
-**Amendment 2026-11-13 (tenant composite keys, review):** [fixes/tenant-composite-keys.md](../fixes/tenant-composite-keys.md) makes every reference between two tenant rows a tenant composite FK and adds `TenantId` to the child tables that lack it. Not a build contract until accepted.
+**Amendment 2026-11-13 (tenant composite keys, accepted):** [fixes/tenant-composite-keys.md](../fixes/tenant-composite-keys.md) makes every reference between two tenant rows a tenant composite FK and adds `TenantId` to the child tables that lack it.
 
 ## Context
 

@@ -1,6 +1,6 @@
 ---
-title: Fix — Tenant composite foreign keys and TenantId on child tables
-status: review
+title: Fix - Tenant composite foreign keys and TenantId on child tables
+status: accepted
 language: en
 created: 2026-11-13
 updated: 2026-11-13
@@ -15,7 +15,7 @@ related:
 
 # Fix: Tenant composite foreign keys and TenantId on child tables
 
-Status: review. Not a build contract until accepted.
+Status: accepted (2026-11-13). Build contract.
 
 ## Problem
 
