@@ -515,6 +515,33 @@ Accepted 2026-11-13. Supersedes the §4.1 line “dual check: row TenantId ↔ t
 | A34 | SystemAdmin; a tenant is disabled | Create with that `tenantId` (TenantAdmin, instrument, account, transaction, transfer) | 400 `disabled` / `target=tenant` |
 | A35 | Disabled SystemAdmin with a valid access token | Any SystemAdmin route | 403 |
 
+### Amendment 2026-11-13 (identity cookie checks the security stamp) — review
+
+Status of this amendment: `review`. It is not a build contract until it is marked accepted. The rest of this file stays accepted. Supersedes nothing in R1–R21; it closes a gap in R7, story 3 and the §9 line “After password change, run login again”. Do not rewrite those or earlier amendments in place.
+
+**Why.** R7 revokes the subject's tokens after a password change, and the caller must run the authorization-code flow again. But the identity cookie scheme for each client (amendments 2026-10-27, 2026-11-02) is a plain cookie. Nothing compares it with the person's current credentials. `/connect/authorize` re-checks `LoginEligibility` (status and tenant), not the password. So after a password change, any browser that still holds an identity cookie for that person gets a new authorization code silently, and with it a new refresh token. The old password is never asked for. That includes a cookie taken from another device, which is the case a password change is meant to end.
+
+Today's code: IdentityHost registers the user store with `AddIdentityCore` and adds the three client schemes with `AddCookie`. No security-stamp validator runs. Hosted login builds the cookie principal with `SignInManager.CreateUserPrincipalAsync`, so the cookie already carries the security-stamp claim. `UserManager.ChangePasswordAsync` (used by `PUT /users/me/password` on `webapi`) already writes a new `AspNetUsers.SecurityStamp`. Both hosts share `MyWealthDbV2` (R16), so IdentityHost can read the new stamp.
+
+- **Check.** Every time an identity cookie scheme authenticates a request, IdentityHost compares the security-stamp claim in the cookie with `AspNetUsers.SecurityStamp` for that identity user. The check runs on every such request; there is no validation interval. The three schemes (`adviser-portal`, `back-office`, `customer-portal`) all apply it, and any later client scheme does too.
+- **Reject.** When the claim is missing, the stamps differ, or the identity user no longer exists, the cookie is rejected and cleared for that scheme only. `/connect/authorize` then treats the request as unauthenticated and redirects to hosted `/login`. No authorization code is issued. The other clients' cookies are untouched; each one fails the same check when it is next used.
+- **Keep.** When the stamps match, the cookie stays as it is. The check does not re-issue the cookie or extend its lifetime.
+- **What changes the stamp.** Any write through `UserManager` that changes the stamp: today that is the password change. Disable and tenant disable do not change the stamp; `/connect/authorize` already refuses them through `LoginEligibility`. Later flows (reset password, set password from an invite) inherit the check as long as they go through `UserManager`.
+- **Deploy.** Cookies issued before this change already carry the claim and stay valid until the stamp changes. No mass sign-out.
+- **Implementation note.** Do not wire the framework `SecurityStampValidator` as it is. On failure it signs out Identity's default schemes (`Identity.Application` and others), which IdentityHost does not register, and its default interval is 30 minutes. The check belongs in the client cookie schemes' validate-principal event, set once in `ClientCookieSchemes.Configure`.
+- **Unchanged.** Refresh tokens are still revoked through the outbox (amendment 2026-11-11); this amendment does not shorten that window. `webapi` still checks status, not the stamp (amendment 2026-11-13). Hosted login, the allow-list, cookie names, lifetimes and logout (R21) are unchanged.
+- No new table. No new route. No schema change. No new configuration key.
+
+**Acceptance (amendment A36–A40).** Application.FunctionalTests, following `PerClientCookieTests`.
+
+| Id | Given | When | Then |
+| --- | --- | --- | --- |
+| A36 | Active Adviser with a valid `adviser-portal` identity cookie | `PUT /users/me/password` succeeds, then `/connect/authorize` for `adviser-portal` with that cookie | Redirect to hosted `/login`. No authorization code. The `adviser-portal` identity cookie is cleared |
+| A37 | Same as A36 | Hosted login with the **new** password, then authorize | Authorization code issued |
+| A38 | Active Adviser with a valid `adviser-portal` identity cookie; the password is not changed | `/connect/authorize` for `adviser-portal` twice | Code issued both times without `/login` (silent re-authorization still works) |
+| A39 | SystemAdmin with a valid `back-office` identity cookie | Password change, then authorize for `back-office` | Redirect to hosted `/login`. No code |
+| A40 | Active Customer with a valid `customer-portal` identity cookie | Password change, then authorize for `customer-portal` | Redirect to hosted `/login`. No code |
+
 ### Amendment 2026-09-14 (R21 — end session)
 
 Passthrough without an action left `/connect/logout` unhandled. Manual Sign out then bounced through `/callback` and OpenIddict returned `invalid_grant` / `ID2010` (authorization code redeemed twice). No new ADR. No `/auth/logout`.
