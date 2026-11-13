@@ -15,6 +15,8 @@ namespace MyWealthV2.IdentityHost.Pages;
 public class LoginModel(
     UserManager<ApplicationUser> userManager,
     SignInManager<ApplicationUser> signInManager,
+    IPasswordHasher<ApplicationUser> passwordHasher,
+    DummyPasswordHash dummyPasswordHash,
     IApplicationDbContext db,
     ITenantIdAccessor tenantIds) : PageModel
 {
@@ -37,15 +39,25 @@ public class LoginModel(
 
     public async Task<IActionResult> OnPostAsync(string? returnUrl, CancellationToken cancellationToken)
     {
+        // Every POST verifies exactly one password hash, so the response time does not tell
+        // who exists or who is eligible (identity-auth amendment 2026-11-13, lockout).
+        var password = Password ?? string.Empty;
         var user = await ResolveUserAsync(cancellationToken);
-        if (user is null || !LoginEligibility.CanComplete(user, await ResolveTenantAsync(user, cancellationToken)))
+        var identityUser = user is null ? null : await userManager.FindByIdAsync(user.IdentityUserId);
+        if (user is null || identityUser is null)
+        {
+            passwordHasher.VerifyHashedPassword(new ApplicationUser(), dummyPasswordHash.Value, password);
+            Error = UniformFailure;
+            return Page();
+        }
+
+        if (!await userManager.CheckPasswordAsync(identityUser, password))
         {
             Error = UniformFailure;
             return Page();
         }
 
-        var identityUser = await userManager.FindByIdAsync(user.IdentityUserId);
-        if (identityUser is null || !await userManager.CheckPasswordAsync(identityUser, Password))
+        if (!LoginEligibility.CanComplete(user, await ResolveTenantAsync(user, cancellationToken)))
         {
             Error = UniformFailure;
             return Page();

@@ -25,6 +25,7 @@ builder.Services.AddRazorPages();
 builder.Services.AddControllers();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<SignInManager<ApplicationUser>>();
+builder.Services.AddSingleton<DummyPasswordHash>();
 
 var portalOrigins = OpenIddictClientUris.ReadPortalOrigins(builder.Configuration);
 builder.Services.AddCors(options =>
@@ -99,6 +100,8 @@ builder.Services.AddOpenIddict()
 var app = builder.Build();
 
 app.UsePublicHostForwardedHeaders(trustAnyProxyInDevelopment: false);
+
+_ = app.Services.GetRequiredService<DummyPasswordHash>();
 
 await using (var scope = app.Services.CreateAsyncScope())
 {
