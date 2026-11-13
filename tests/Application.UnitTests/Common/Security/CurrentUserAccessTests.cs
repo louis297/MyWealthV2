@@ -130,4 +130,78 @@ public class CurrentUserAccessTests
             tenantIdClaim: Guid.NewGuid().ToString(),
             tenantCodeClaim: "acme").ShouldBeNull();
     }
+
+    [Test]
+    public void DisabledTenantUser_WithMatchingClaims_IsRejected()
+    {
+        var tenant = ActiveTenant(10);
+        var user = TenantAdmin(tenantId: 10);
+        user.Disable();
+
+        CurrentUserAccess.Resolve(
+            user,
+            tenant,
+            tenantIdClaim: tenant.PublicId.ToString(),
+            tenantCodeClaim: "acme").ShouldBeNull();
+    }
+
+    [Test]
+    public void PendingActivationTenantUser_WithMatchingClaims_IsRejected()
+    {
+        var tenant = ActiveTenant(10);
+        var user = TenantAdmin(tenantId: 10, withPassword: false);
+
+        CurrentUserAccess.Resolve(
+            user,
+            tenant,
+            tenantIdClaim: tenant.PublicId.ToString(),
+            tenantCodeClaim: "acme").ShouldBeNull();
+    }
+
+    [Test]
+    public void TenantUser_InDisabledTenant_WithMatchingClaims_IsRejected()
+    {
+        var tenant = ActiveTenant(10);
+        tenant.Disable();
+        var user = TenantAdmin(tenantId: 10);
+
+        CurrentUserAccess.Resolve(
+            user,
+            tenant,
+            tenantIdClaim: tenant.PublicId.ToString(),
+            tenantCodeClaim: "acme").ShouldBeNull();
+    }
+
+    [Test]
+    public void DisabledSystemAdmin_WithEmptyTenantClaims_IsRejected()
+    {
+        var user = User.Create(
+            UserRole.SystemAdmin,
+            name: "Ada",
+            email: "ada@localhost",
+            identityUserId: "id-1");
+        user.Disable();
+
+        CurrentUserAccess.Resolve(
+            user,
+            tenant: null,
+            tenantIdClaim: null,
+            tenantCodeClaim: null).ShouldBeNull();
+    }
+
+    private static Tenant ActiveTenant(int id)
+    {
+        var tenant = Tenant.Create("Acme", "acme", Currency.Create("NZD", "New Zealand Dollar", 2));
+        tenant.Id = id;
+        return tenant;
+    }
+
+    private static User TenantAdmin(int tenantId, bool withPassword = true) =>
+        User.Create(
+            UserRole.TenantAdmin,
+            name: "Bea",
+            email: "bea@acme",
+            identityUserId: "id-2",
+            tenantId: tenantId,
+            withPassword: withPassword);
 }
