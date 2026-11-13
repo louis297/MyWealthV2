@@ -164,7 +164,8 @@ export const portfoliosApi = api.injectEndpoints({
         method: "POST",
         body: { rowVersion },
       }),
-      invalidatesTags: (_result, _error, arg) => [{ type: "Portfolio", id: arg.id }, "Portfolio"],
+      // A refused update or disable changed nothing; stale_row_version reloads explicitly (P12).
+      invalidatesTags: (_result, error, arg) => (error ? [] : [{ type: "Portfolio", id: arg.id }, "Portfolio"]),
     }),
     updatePortfolio: builder.mutation<RebalanceAccepted | null, { id: string; body: UpdatePortfolioBody }>({
       query: ({ id, body }) => ({
@@ -172,7 +173,8 @@ export const portfoliosApi = api.injectEndpoints({
         method: "PUT",
         body,
       }),
-      invalidatesTags: (_result, _error, arg) => [{ type: "Portfolio", id: arg.id }, "Portfolio"],
+      // A refused update or disable changed nothing; stale_row_version reloads explicitly (P12).
+      invalidatesTags: (_result, error, arg) => (error ? [] : [{ type: "Portfolio", id: arg.id }, "Portfolio"]),
     }),
   }),
 });

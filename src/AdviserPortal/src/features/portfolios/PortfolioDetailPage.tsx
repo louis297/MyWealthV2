@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { SelectItem } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useGetInstrumentsQuery } from "@/features/instruments/instrumentsApi";
+import { problemCode, staleRowVersion } from "@/shared/api/problem";
 import {
   useDisablePortfolioMutation,
   useGetAssignedAccountsQuery,
@@ -25,8 +26,9 @@ function isNotFound(error: unknown) {
   return typeof error === "object" && error !== null && "status" in error && error.status === 404;
 }
 
-function isStatus(error: unknown, status: number) {
-  return typeof error === "object" && error !== null && "status" in error && error.status === status;
+/** P12: only a stale rowVersion shows the conflict notice; any other 409 code shows the server detail. */
+function isStaleRowVersion(error: unknown) {
+  return problemCode(error) === staleRowVersion;
 }
 
 function problemMessages(error: unknown): string[] {
@@ -135,7 +137,7 @@ export function PortfolioDetailPage() {
       setConflict(false);
       setMessages([]);
     } catch (error: unknown) {
-      if (isStatus(error, 409)) {
+      if (isStaleRowVersion(error)) {
         setConflict(true);
         setMessages([]);
         void portfolio.refetch();
@@ -180,7 +182,7 @@ export function PortfolioDetailPage() {
       setQueued(Boolean(result && typeof result === "object" && "jobId" in result));
     } catch (error: unknown) {
       setQueued(false);
-      if (isStatus(error, 409)) {
+      if (isStaleRowVersion(error)) {
         setConflict(true);
         setMessages([]);
         void portfolio.refetch();

@@ -116,7 +116,7 @@ function renderDetail(options?: {
         });
       }
       disabled = true;
-      return new Response("", { status: 204 });
+      return new Response(null, { status: 204 });
     }
     if (path === "/api/instruments" && method === "GET") {
       return new Response(JSON.stringify(instruments), { status: 200, headers: { "Content-Type": "application/json" } });
@@ -143,7 +143,7 @@ function renderDetail(options?: {
       );
     }
     if (path === `/api/portfolios/${portfolioId}` && method === "PUT") {
-      return new Response(options?.putBody ? JSON.stringify(options.putBody) : "", {
+      return new Response(options?.putBody ? JSON.stringify(options.putBody) : null, {
         status: options?.putStatus ?? 204,
         headers: options?.putBody ? { "Content-Type": "application/json" } : undefined,
       });
