@@ -210,6 +210,33 @@ public class BackOfficeRefreshTests
     }
 
     [Test]
+    public async Task RotatedRefreshToken_PresentedThirtyMinutesLater_CallsTheTokenEndpoint()
+    {
+        var now = new DateTimeOffset(2026, 11, 7, 12, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTime(now);
+        var tokenEndpoint = new ScriptedHandler();
+        tokenEndpoint.Enqueue(
+            HttpStatusCode.OK,
+            """{"access_token":"next-access","refresh_token":"next-refresh","expires_in":900}""");
+        tokenEndpoint.Enqueue(HttpStatusCode.BadRequest, """{"error":"invalid_grant"}""");
+        var refresh = new BackOfficeTokenRefresh(
+            new HttpClient(tokenEndpoint),
+            () => "http://identity/connect/token",
+            BackOfficeTestSecret.Value,
+            clock);
+
+        (await refresh.ExchangeAsync("old-refresh"))!.RefreshToken.ShouldBe("next-refresh");
+        clock.UtcNow = now.AddMinutes(30);
+
+        var late = await refresh.ExchangeAsync("old-refresh");
+
+        late.ShouldBeNull();
+        tokenEndpoint.Requests.Count.ShouldBe(2);
+        var form = HttpUtility.ParseQueryString(tokenEndpoint.Requests[1].Body);
+        form["refresh_token"].ShouldBe("old-refresh");
+    }
+
+    [Test]
     public void Store_AfterTheResponseStarted_KeepsTheNewAccessToken()
     {
         var http = new DefaultHttpContext();
