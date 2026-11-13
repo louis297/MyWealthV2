@@ -544,7 +544,7 @@ Today's code: IdentityHost registers the user store with `AddIdentityCore` and a
 
 ### Amendment 2026-11-13 (hosted login lockout and one hash per attempt)
 
-Status of this amendment: `review`. Not a build contract until accepted. Supersedes nothing in R1–R21; it tightens R2 and R3 and closes the lockout gap in [deployment.md](../deployment.md) §11. Do not rewrite those or earlier amendments in place.
+Status of this amendment: `accepted` (2026-11-13). It is a build contract. Supersedes nothing in R1–R21; it tightens R2 and R3 and closes the lockout gap in [deployment.md](../deployment.md) §11. Do not rewrite those or earlier amendments in place.
 
 **Why.** Hosted login has three gaps that together make password guessing cheap.
 
