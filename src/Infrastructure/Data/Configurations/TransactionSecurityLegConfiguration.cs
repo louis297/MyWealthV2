@@ -9,6 +9,7 @@ public class TransactionSecurityLegConfiguration : IEntityTypeConfiguration<Tran
     public void Configure(EntityTypeBuilder<TransactionSecurityLeg> builder)
     {
         builder.ToTable("TransactionSecurityLegs");
+        builder.Ignore(leg => leg.TenantId);
         builder.Property(leg => leg.Quantity).HasColumnType("decimal(18,8)").IsRequired();
         builder.Property(leg => leg.CostAmount).HasColumnType("decimal(18,4)").IsRequired();
         builder.Property(leg => leg.CostCurrency).HasColumnType("char(3)").IsFixedLength().HasMaxLength(3).IsRequired();

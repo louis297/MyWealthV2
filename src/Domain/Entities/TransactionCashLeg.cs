@@ -6,6 +6,8 @@ public class TransactionCashLeg : BaseAuditableEntity
     {
     }
 
+    public int TenantId { get; private set; }
+
     public int TransactionId { get; private set; }
 
     public int AccountId { get; private set; }

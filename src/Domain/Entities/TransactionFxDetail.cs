@@ -9,6 +9,8 @@ public class TransactionFxDetail
     {
     }
 
+    public int TenantId { get; private set; }
+
     public int TransactionId { get; private set; }
 
     public string BaseCurrency { get; private set; } = string.Empty;

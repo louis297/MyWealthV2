@@ -6,6 +6,8 @@ public class PortfolioLine : BaseEntity
     {
     }
 
+    public int TenantId { get; private set; }
+
     public int PortfolioId { get; private set; }
 
     public int InstrumentId { get; private set; }

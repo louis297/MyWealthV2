@@ -9,6 +9,7 @@ public class TransactionFxDetailConfiguration : IEntityTypeConfiguration<Transac
     public void Configure(EntityTypeBuilder<TransactionFxDetail> builder)
     {
         builder.ToTable("TransactionFxDetails");
+        builder.Ignore(detail => detail.TenantId);
         builder.HasKey(detail => detail.TransactionId);
         builder.Property(detail => detail.TransactionId).ValueGeneratedNever();
         builder.Property(detail => detail.BaseCurrency).HasColumnType("char(3)").IsFixedLength().HasMaxLength(3).IsRequired();
