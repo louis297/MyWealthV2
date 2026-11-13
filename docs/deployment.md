@@ -24,7 +24,7 @@ related:
 
 # Deployment
 
-How MyWealthV2 runs on one VPS as a public showcase, and how GitHub Actions delivers it. This doc is `draft`. It is not a build contract. Code changes listed in §13 are built from their own spec or amendment, unless they are config or wiring with no logic.
+How MyWealthV2 runs on one VPS as a public showcase, and how GitHub Actions delivers it. This doc is `accepted`. The code changes listed in §13 were built from their own spec or amendment, unless they were config or wiring with no logic. The first deploy followed §12 end to end.
 
 The owner keeps a private operator runbook with the exact shell commands. It follows this doc. When the two disagree, this doc wins and the runbook is updated.
 
@@ -76,7 +76,7 @@ There is no database backup. Every piece of state can be rebuilt from an empty V
 | `worker` | `mywealth-worker` | No | — | Hangfire. Outbox, FX rates, instrument prices, reports. Dashboard stays Development-only |
 | `sql` | SQL Server 2022, Express edition | No | — | `MSSQL_PID=Express`, `MSSQL_MEMORY_LIMIT_MB=2048` |
 
-`<domain>` is the showcase domain. It is not chosen yet.
+`<domain>` is the showcase domain. It is chosen, but this doc does not name it. It lives in `DOMAIN` in `.env` on the VPS and in the smoke URL variables of GitHub environment `production` (§6).
 
 **Ports.** Every .NET host listens on `8080` for traffic and on the health port `8081` for `/health` and `/alive` ([features/production-hosting.md](features/production-hosting.md)). Caddy forwards only to `8080`.
 
@@ -263,13 +263,13 @@ Playwright, run from the GitHub runner against the public hostnames. The cases, 
 - Hosted login locks an identity user for five minutes after five wrong passwords in a row, every role included ([identity-auth.md](features/identity-auth.md), amendment 2026-11-13, lockout). There is no unlock UI; clear a lockout in SQL as in [known-issues/hosted-login-lockout.md](known-issues/hosted-login-lockout.md).
 - HSTS on every public hostname, set by Caddy. The hosts do not redirect to HTTPS themselves; Caddy redirects HTTP to HTTPS.
 - Docker writes its own firewall rules, so a published container port bypasses the host firewall. No service except `caddy` has `ports:`.
-- Firewall on the VPS: allow 22, 80, 443 only. SSH by key only; password login is off for every user, root included. The deploy user is in the `docker` group, which is root-equivalent, and has no `sudo`.
+- Firewall on the VPS: allow 22, 80, 443 only. `caddy` also publishes `443/udp` for HTTP/3. Allowing `443/udp` in the firewall is optional; without it, browsers fall back to HTTP/2 over TCP. SSH by key only; password login is off for every user, root included. The deploy user is in the `docker` group, which is root-equivalent, and has no `sudo`.
 
-Known gaps, accepted for the showcase (record them in [known-issues/](known-issues/README.md) when this doc is accepted):
+Known gaps, accepted for the showcase. Each is recorded in [known-issues/](known-issues/README.md):
 
 - Anyone who knows a tenantCode and an email can keep that account locked, and the smoke accounts are listed in [smoke-test.md](smoke-test.md). A locked smoke account fails the post-deploy smoke test and rolls back the deploy ([known-issues/hosted-login-lockout.md](known-issues/hosted-login-lockout.md)).
-- A refresh grant does not re-check user status or the tenant flag. Revocation after disable or password change waits for the outbox ([identity-auth.md](features/identity-auth.md), amendment 2026-11-11). A dead-lettered event leaves a refresh token valid for up to 14 days, but `webapi` refuses every access token it mints: the current-user load re-checks person and tenant status on each request.
-- Data Protection keys are stored unencrypted at rest in `data/dataprotection/`. Anyone with root or `docker` access on the VPS can read them, which already gives full control of the hosts.
+- A refresh grant does not re-check user status or the tenant flag. Revocation after disable or password change waits for the outbox ([identity-auth.md](features/identity-auth.md), amendment 2026-11-11). A dead-lettered event leaves a refresh token valid for up to 14 days, but after a disable `webapi` refuses every access token it mints: the current-user load re-checks person and tenant status on each request ([known-issues/refresh-grant-skips-status-check.md](known-issues/refresh-grant-skips-status-check.md)).
+- Data Protection keys are stored unencrypted at rest in `data/dataprotection/`. Anyone with root or `docker` access on the VPS can read them, which already gives full control of the hosts ([known-issues/dataprotection-keys-unencrypted.md](known-issues/dataprotection-keys-unencrypted.md)).
 
 ---
 
@@ -318,4 +318,4 @@ Suggested build order: 1, 3, 2, 5 (all in host start-up, mostly ServiceDefaults)
 
 ## 14. Open decisions
 
-- **Domain name** and the four hostnames. The compose file and the Caddyfile take it from `DOMAIN` in `.env`, so nothing in the repository waits for it.
+None. The domain name was the last one. It is chosen and kept out of this doc (§3). The compose file and the Caddyfile take it from `DOMAIN` in `.env`.
