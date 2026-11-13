@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using MyWealthV2.Shared;
 
@@ -22,6 +24,20 @@ public static class BffAuthenticationExtensions
             client.BaseAddress = new Uri(apiBaseAddress);
         });
         builder.Services.AddSingleton<IWebApiTransport, WebApiTransport>();
+        builder.Services.TryAddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton(services =>
+        {
+            var configuration = services.GetRequiredService<IConfiguration>();
+            var oidc = services.GetRequiredService<IOptionsMonitor<OpenIdConnectOptions>>()
+                .Get(OpenIdConnectDefaults.AuthenticationScheme);
+            var tokenEndpoint = (configuration["Authentication:Authority"] ?? oidc.Authority ?? "").TrimEnd('/') + "/connect/token";
+            return new RefreshTokenExchange(
+                oidc.Backchannel,
+                () => tokenEndpoint,
+                Services.CustomerPortal,
+                configuration["Authentication:ClientSecret"] ?? "",
+                services.GetRequiredService<TimeProvider>());
+        });
         builder.Services
             .AddAuthentication(options =>
             {
