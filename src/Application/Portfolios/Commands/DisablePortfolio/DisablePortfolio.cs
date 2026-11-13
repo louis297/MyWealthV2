@@ -1,6 +1,7 @@
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
+using MyWealthV2.Application.Portfolios;
 using MyWealthV2.Domain.Enums;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 
@@ -35,6 +36,7 @@ public class DisablePortfolioCommandHandler(IApplicationDbContext db, ICurrentUs
 
         var portfolio = await query.SingleOrDefaultAsync(cancellationToken)
                         ?? throw new NotFoundException("Portfolio", request.Id);
+        await PortfolioBook.EnsureNotSharedAsync(db, currentUser, portfolio.Id, cancellationToken);
         if (!string.Equals(Convert.ToBase64String(portfolio.RowVersion ?? []), request.RowVersion, StringComparison.Ordinal))
         {
             throw new ConcurrencyException();
