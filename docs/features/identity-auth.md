@@ -515,9 +515,9 @@ Accepted 2026-11-13. Supersedes the §4.1 line “dual check: row TenantId ↔ t
 | A34 | SystemAdmin; a tenant is disabled | Create with that `tenantId` (TenantAdmin, instrument, account, transaction, transfer) | 400 `disabled` / `target=tenant` |
 | A35 | Disabled SystemAdmin with a valid access token | Any SystemAdmin route | 403 |
 
-### Amendment 2026-11-13 (identity cookie checks the security stamp) — review
+### Amendment 2026-11-13 (identity cookie checks the security stamp)
 
-Status of this amendment: `review`. It is not a build contract until it is marked accepted. The rest of this file stays accepted. Supersedes nothing in R1–R21; it closes a gap in R7, story 3 and the §9 line “After password change, run login again”. Do not rewrite those or earlier amendments in place.
+Status of this amendment: `accepted` (2026-11-13). It is a build contract. Not implemented yet. Supersedes nothing in R1–R21; it closes a gap in R7, story 3 and the §9 line “After password change, run login again”. Do not rewrite those or earlier amendments in place.
 
 **Why.** R7 revokes the subject's tokens after a password change, and the caller must run the authorization-code flow again. But the identity cookie scheme for each client (amendments 2026-10-27, 2026-11-02) is a plain cookie. Nothing compares it with the person's current credentials. `/connect/authorize` re-checks `LoginEligibility` (status and tenant), not the password. So after a password change, any browser that still holds an identity cookie for that person gets a new authorization code silently, and with it a new refresh token. The old password is never asked for. That includes a cookie taken from another device, which is the case a password change is meant to end.
 
