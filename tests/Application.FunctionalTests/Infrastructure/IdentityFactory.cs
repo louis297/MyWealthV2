@@ -26,6 +26,8 @@ public class IdentityFactory(
         builder.ConfigureTestServices(services =>
         {
             services.Configure<PasswordHasherOptions>(o => o.IterationCount = 1);
+            services.AddSingleton<PasswordVerificationCounter>();
+            services.AddScoped<IPasswordHasher<MyWealthV2.Infrastructure.Identity.ApplicationUser>, CountingPasswordHasher>();
             services.AddTransient<IStartupFilter, TestConnection>();
         });
         if (logs is not null)
