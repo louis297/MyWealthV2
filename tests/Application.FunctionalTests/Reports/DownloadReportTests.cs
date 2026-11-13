@@ -42,7 +42,11 @@ public class DownloadReportTests : TestBase
         var admin = await FunctionalTestSetup.Oidc.SignInAsync("tess@firm-ready", "Password1!", code);
 
         var queued = await RequestAsync(admin.AccessToken, customer.PublicId);
-        (await GetAsync(admin.AccessToken, queued)).StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        var notReady = await GetAsync(admin.AccessToken, queued);
+        notReady.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        var problem = await ProblemResponse.ReadAsync(notReady);
+        problem.Code.ShouldBe("report_not_ready");
+        problem.Detail.ShouldBe("The report is not ready.");
 
         var failed = await RequestAsync(admin.AccessToken, customer.PublicId);
         await ReplaceParametersAsync(failed, """{"unknown":true}""");

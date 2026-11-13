@@ -54,6 +54,9 @@ public class UpdatePortfolioTests : TestBase
         });
 
         response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        var problem = await ProblemResponse.ReadAsync(response);
+        problem.Code.ShouldBe("stale_row_version");
+        problem.Title.ShouldBe("Conflict");
     }
 
     [Test]

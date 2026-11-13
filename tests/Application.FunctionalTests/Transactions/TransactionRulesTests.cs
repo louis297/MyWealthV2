@@ -159,6 +159,9 @@ public class TransactionRulesTests : TestBase
         var mismatch = await PostAsync(
             tokens.AccessToken, accountId, "TransferIn", 11m, "2026-09-24T09:00:00+12:00", key: key);
         mismatch.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        var problem = await ProblemResponse.ReadAsync(mismatch);
+        problem.Code.ShouldBe("idempotency_key_reused");
+        problem.Detail.ShouldBe("This Idempotency-Key was already used for a different request.");
         (await CountTransactionsAsync(accountId)).ShouldBe(1);
     }
 

@@ -19,6 +19,9 @@ public class FxConversionExpectedRateTests : TestBase
             FxConversionTests.SellBody(world.NzdAccountId, world.UsdAccountId, 10m, expectedRate: expectedRate));
 
         response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        var problem = await ProblemResponse.ReadAsync(response);
+        problem.Code.ShouldBe("rate_changed");
+        problem.Title.ShouldBe("The rate changed");
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         json.RootElement.GetProperty("errors").EnumerateObject()
             .Select(property => property.Name)

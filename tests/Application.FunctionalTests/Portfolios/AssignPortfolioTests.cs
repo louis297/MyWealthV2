@@ -32,6 +32,26 @@ public class AssignPortfolioTests : TestBase
     }
 
     [Test]
+    public async Task SamePortfolioAgain_Returns409WithTheProblemCode()
+    {
+        var (tokens, accountId, portfolioId) = await FundedBrokerageAsync("Again Firm", "again-firm");
+        (await PortfolioHttp.Send(HttpMethod.Post, $"/accounts/{accountId}/portfolio", tokens.AccessToken, new
+        {
+            portfolioId
+        })).StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var response = await PortfolioHttp.Send(HttpMethod.Post, $"/accounts/{accountId}/portfolio", tokens.AccessToken, new
+        {
+            portfolioId
+        });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        var problem = await ProblemResponse.ReadAsync(response);
+        problem.Code.ShouldBe("portfolio_already_assigned");
+        problem.Detail.ShouldBe("Account already has this portfolio assigned.");
+    }
+
+    [Test]
     public async Task Bank_Returns400AndDoesNotAssign()
     {
         var (tokens, portfolioId, customerId, _) = await FundedContextAsync("Bank Firm", "bank-firm");
