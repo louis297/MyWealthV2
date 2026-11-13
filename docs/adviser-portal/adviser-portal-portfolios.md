@@ -148,8 +148,10 @@ Status of this amendment: `review`. It is not a build contract until it is accep
 
 | ID | Behaviour |
 | --- | --- |
-| P12 | When `PUT /portfolios/{id}` or `POST /portfolios/{id}/disable` returns 409 with `code: "portfolio_shared"`, the detail page shows the server `detail` as a message. It does not show the "This row changed. Reload and try again." notice and does not refetch the portfolio. The form keeps the Adviser's edits. A 409 without `code` keeps today's behaviour (conflict notice and refetch). |
+| P12 | The portfolio detail page branches on the problem `code` of a 409 from `PUT /portfolios/{id}` and `POST /portfolios/{id}/disable` ([../api-design.md](../api-design.md) §4.2 C2, C8), not on the status alone. `stale_row_version`: today's behaviour ("This row changed. Reload and try again." notice and refetch). `portfolio_shared`, or any other code: show the server `detail` as a message, do not refetch, and keep the Adviser's edits (§4.2 C7). |
 
 No other page changes. The edit page still lists only the accounts the Adviser can see, so the weight-change confirmation copy is unchanged. Bulk rebalance (P8) needs no change: the 202 lists only accounts in the Adviser's Book. The Disable button and the edit form stay visible to an Adviser; the portal does not try to predict PB3 / PB4, because it cannot see accounts outside the Book.
 
-**Tests.** `PortfolioDetailPage.test.tsx`: a `portfolio_shared` 409 on save and on disable shows the server detail and no conflict notice; a 409 without `code` still shows the conflict notice.
+**Implementation note.** Read the code with one shared helper in `src/AdviserPortal/src/shared/api` (for example `problemCode(error): string | undefined`), so the next page that must branch on `code` reuses it. Do not compare `data.code` inline in each page. Other pages keep branching on `status === 409` until their routes gain a second 409 code (§4.2 C8).
+
+**Tests.** `PortfolioDetailPage.test.tsx`: a `portfolio_shared` 409 on save and on disable shows the server detail and no conflict notice, and the form keeps its edits; a `stale_row_version` 409 still shows the conflict notice and refetches; a 409 with an unknown code shows the server detail. A unit test for the shared helper.

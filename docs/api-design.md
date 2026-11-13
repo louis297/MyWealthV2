@@ -114,7 +114,7 @@ Password change, disable, and logout revoke that subject’s OpenIddict tokens. 
 | Tenant disabled or Status ≠ Active, with a still-valid access token | 403 on every route that needs a permission (identity-auth amendment 2026-11-13) | `webapi` current-user load |
 | Authenticated but policy fails (including Customer on adviser-management routes) | 403 | `webapi` |
 | Cross-tenant / cross-adviser / missing | 404 | `webapi` |
-| `RowVersion` | 409 | `webapi` |
+| State conflict: stale `rowVersion`, reused `Idempotency-Key`, changed FX rate, … | 409 with a problem `code` (§4.2) | `webapi` |
 | Unhandled | 500 | Either host |
 
 Whether login failures distinguish Disabled from bad credentials is **still open** (§9). Until locked, treat them as a uniform failure and do not enumerate the reason. A disabled tenant or Disabled person at **hosted login** is not §4.1: that is a uniform failure on `identity`, not this JSON.
@@ -154,6 +154,39 @@ Phase 1 call site:
 Implement as one Application `TargetDisabled` exception (kind + targetId + detail) mapped once in `webapi`. Do not assemble this JSON in three handlers.
 
 List filters are separate: currencies and people collections use `enabledOnly` (omitted / `false` = all, `true` = enabled / Active only). Do not retrofit landed `GET /tenants?isEnabled=`.
+
+### 4.2 Problem codes (review, 2026-11-13)
+
+Status of this section: `review`. The build contract for it is [features/portfolios.md](features/portfolios.md), amendment 2026-11-13, part 1. Until that amendment is accepted, this section is not implementable.
+
+**Why.** One HTTP status already carries several meanings. `webapi` returns 409 for a stale `rowVersion`, a reused `Idempotency-Key`, a changed FX rate, a report that is not ready, and a portfolio already assigned to the account. `POST /transactions/fx` alone can return two different 409s today, and only the first has a field to tell them apart (`errors.expectedRate`). The portfolios amendment 2026-11-13 adds a sixth. A client that branches on the status alone shows the wrong message as soon as one route can return two of them. A **problem code** names the meaning. The status stays the category.
+
+| Id | Rule |
+| --- | --- |
+| C1 | Every 409 from `webapi` carries a problem `code`. Every 400 that is a named business refusal carries one too (§4.1 `disabled`, the rebalance failure codes). Field validation stays a 400 with `errors` and no `code`. 401, 403 and 404 carry no `code`. |
+| C2 | `status` is the category; `code` is the meaning. A client that needs to treat two refusals differently branches on `code`. Branching on the status alone is allowed only for 401, 403, 404 and field validation 400. |
+| C3 | A code is lower snake_case English and names the condition, not the remedy (`stale_row_version`, not `reload_needed`). Once a code ships it is never renamed, never given a second meaning and never moved to another status. To retire a code, stop returning it and mark its registry row retired. Do not reuse the name. |
+| C4 | One meaning, one code, on every route. Several routes return the same code when the meaning is the same (`stale_row_version` on every `rowVersion` write). Do not add a slice-specific code for a meaning that already has one (same rule as §4.1). |
+| C5 | Body: RFC 9110 ProblemDetails with `status`, `title`, `detail` and `code`. `title` is fixed for the code. `detail` describes this request, is safe to show to the caller, and never names or counts rows the caller cannot read. Other extension fields only when the registry row lists them. Default RFC 9110 `type`; no custom type URIs. |
+| C6 | A spec that adds a code adds its registry row in the same change. It states the status, the meaning and any extra fields. It also lists the client pages on the routes that return it and says whether they need special handling. |
+| C7 | A client that receives a code it does not handle, or a coded 4xx with no special handling, shows `detail` and does nothing else (no refetch, no retry, no form reset). So a new code is safe in every client without a client change. A client change is needed only for special handling, such as refetching after `stale_row_version` or fetching a new quote after `rate_changed`. |
+| C8 | A page that today branches on `status === 409` stays correct while every route it calls returns one 409 code. When a spec adds a second 409 code to a route, the pages that call that route move to branching on `code` in the same change. |
+| C9 | Back end: `webapi` maps coded refusals in one place. Application has one abstract exception for them, `ProblemException`, with `Kind` (`Conflict` → 409, `Rule` → 400), `Code`, `Title`, `Detail` and optional extensions. `ProblemDetailsExceptionHandler` maps every `ProblemException` in one arm. A new code is a new subclass in Application. The handler, the Web layer and other slices do not change. Application never holds HTTP status numbers. |
+
+**Registry.** The only list of problem codes. A code that is not here must not be returned.
+
+| `code` | Status | Meaning | Extra fields | Owner |
+| --- | --- | --- | --- | --- |
+| `stale_row_version` | 409 | The request's `rowVersion` is not the stored one. Reload and try again. | — | §2 Concurrency; every write that takes `rowVersion` |
+| `idempotency_key_reused` | 409 | This `Idempotency-Key` was used before with a different request. | — | [ADR 0015](adr/0015-idempotency-keys.md) |
+| `rate_changed` | 409 | The stored FX rate is not the request's `expectedRate`. | `errors.expectedRate` | [features/fx-conversions.md](features/fx-conversions.md) R12 |
+| `report_not_ready` | 409 | The report execution has no result to download yet. | — | [features/reports.md](features/reports.md) |
+| `portfolio_already_assigned` | 409 | The account's Active assignment is already this portfolio. | — | [features/portfolios.md](features/portfolios.md) §7 `AssignPortfolio` |
+| `portfolio_shared` | 409 | The caller is an Adviser and the portfolio is a Shared portfolio. | — | [features/portfolios.md](features/portfolios.md) amendment 2026-11-13 |
+| `disabled` | 400 | §4.1 | `target`, `targetId` | §4.1 |
+| `missing_price`, `missing_fx`, `insufficient_cash`, `account_not_eligible`, `portfolio_inactive`, `concurrent_modification` | 400 | Rebalance failure | — | [features/portfolios.md](features/portfolios.md) §11 |
+
+The five 409 codes above `portfolio_shared` are added to responses that exist today. Their status, `title`, `detail` and other fields do not change, so the change is additive for every client. The 400 codes already ship with these names.
 
 ---
 
@@ -470,3 +503,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-11 | FX conversions accepted and landed. `POST /transactions/fx` returns 201 `{ id }` with `Location`, requires `Idempotency-Key` and `expectedRate` (mismatch → 409, `errors.expectedRate`). `POST /transactions/fx/quote` returns 200 with rate, as-of date and both amounts; no write. `POST /transactions` rejects `FxConversion`. The transaction item gains `fx` (null for other types). |
 | 2026-11-10 | Internal transfers accepted. `POST /transactions/transfer` returns 201 `{ id }` with `Location: /transactions/{id}` and requires `Idempotency-Key`. `POST /transactions` rejects `InternalTransfer`. `GET /transactions` takes an optional `type` (exact `TransactionType` name; anything else → 400). |
 | 2026-11-13 | `webapi` re-checks person `Status` and the tenant flag on every request. A disabled person, or any person of a disabled tenant, gets 403 with a still-valid token. §4.1 `target=tenant` on create is reached only by SystemAdmin ([features/identity-auth.md](features/identity-auth.md) amendment 2026-11-13). |
+| 2026-11-13 | §4.2 problem codes (review): every 409 and every named business 400 carries a stable `code`; one registry; clients branch on `code`. Build contract: [features/portfolios.md](features/portfolios.md) amendment 2026-11-13 part 1. |
