@@ -25,6 +25,7 @@ public sealed class BffFactory : WebApplicationFactory<BffHost::Program>
     private readonly string? _publicOrigin;
     private readonly ILoggerProvider? _logs;
     private readonly string? _webRoot;
+    private readonly TimeProvider? _time;
 
     public BffFactory(
         string authority,
@@ -35,7 +36,8 @@ public sealed class BffFactory : WebApplicationFactory<BffHost::Program>
         string? spaDevServerUrl = null,
         string? publicOrigin = null,
         ILoggerProvider? logs = null,
-        string? webRoot = null)
+        string? webRoot = null,
+        TimeProvider? time = null)
     {
         _authority = authority.TrimEnd('/');
         _identityHandler = identityHandler;
@@ -49,6 +51,7 @@ public sealed class BffFactory : WebApplicationFactory<BffHost::Program>
         _publicOrigin = publicOrigin;
         _logs = logs;
         _webRoot = webRoot;
+        _time = time;
     }
 
     // Extra configuration applied when the host starts. Outside Development it starts with the
@@ -97,6 +100,11 @@ public sealed class BffFactory : WebApplicationFactory<BffHost::Program>
             if (_api is not null)
             {
                 services.AddSingleton(_api);
+            }
+
+            if (_time is not null)
+            {
+                services.AddSingleton(_time);
             }
 
             services.AddTransient<IStartupFilter, KestrelBodyRules>();

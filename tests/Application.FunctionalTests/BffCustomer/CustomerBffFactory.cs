@@ -21,6 +21,7 @@ public sealed class CustomerBffFactory : WebApplicationFactory<BffCustomer::Prog
     private readonly string? _publicOrigin;
     private readonly string? _spaDevServerUrl;
     private readonly string? _webRoot;
+    private readonly TimeProvider? _time;
 
     public CustomerBffFactory(
         string authority,
@@ -30,7 +31,8 @@ public sealed class CustomerBffFactory : WebApplicationFactory<BffCustomer::Prog
         string? apiBaseAddress = null,
         string? publicOrigin = null,
         string? spaDevServerUrl = null,
-        string? webRoot = null)
+        string? webRoot = null,
+        TimeProvider? time = null)
     {
         _authority = authority.TrimEnd('/');
         _identityHandler = identityHandler;
@@ -43,6 +45,7 @@ public sealed class CustomerBffFactory : WebApplicationFactory<BffCustomer::Prog
         _publicOrigin = publicOrigin;
         _spaDevServerUrl = spaDevServerUrl;
         _webRoot = webRoot;
+        _time = time;
     }
 
     // Extra configuration applied when the host starts. Outside Development it starts with the
@@ -86,6 +89,11 @@ public sealed class CustomerBffFactory : WebApplicationFactory<BffCustomer::Prog
             if (_api is not null)
             {
                 services.AddSingleton(_api);
+            }
+
+            if (_time is not null)
+            {
+                services.AddSingleton(_time);
             }
         });
     }
