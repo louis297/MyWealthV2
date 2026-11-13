@@ -260,6 +260,7 @@ public class DemoTenantSeedTests
         var services = new ServiceCollection();
         services.AddLogging(logging => logging.AddProvider(_logs));
         services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<IUser, NoUser>();
         services.AddScoped<ISaveChangesInterceptor, AuditableEntityInterceptor>();
         services.AddDbContext<ApplicationDbContext>((sp, options) =>
         {
@@ -269,6 +270,14 @@ public class DemoTenantSeedTests
         services.AddScoped<ITenantIdAccessor, TenantIdAccessor>();
         services.AddSingleton<ICurrencyCatalog, CurrencyCatalog>();
         return services.BuildServiceProvider();
+    }
+
+    // No signed-in caller, as in the --seed-demo command.
+    private sealed class NoUser : IUser
+    {
+        public string? Id => null;
+
+        public List<string>? Roles => null;
     }
 
     private sealed record LogEntry(LogLevel Level, string Message);
