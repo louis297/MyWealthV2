@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-13
-last_updated: 2026-11-12
+last_updated: 2026-11-14
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -355,4 +355,15 @@ Supersedes R17 as first written ("Do not seed a demo firm in Development").
 - `TestSeed` already seeds `demo` and `demo2` in Development (function-plan "Test seed per slice"). R17 now records that.
 - The smoke tenant `smoke` joins them. Its rows and the condition for seeding it (both smoke passwords configured) are owned by [smoke-test.md](../smoke-test.md) §3.
 - No other tenant is seeded. No tenant is seeded outside Development. In production the smoke tenant is created by hand.
+- Functional tests still create their own tenants and must not depend on any seeded tenant.
+
+---
+
+## Amendment 2026-11-14 (demo tenant outside Development; pending)
+
+Takes effect when [demo-tenant-seed.md](demo-tenant-seed.md) is accepted. Until then R17 as amended 2026-11-12 stands.
+
+- The demo tenant `demo` may be created in any environment, production included, by the operator command `webapi --seed-demo` only. Nothing creates it on start outside Development.
+- That command writes the tenant row, its demo catalog and its two report grants. It seeds no people and no ledger data, and never changes an existing tenant.
+- `demo2` and `smoke` stay as R17 says: `demo2` is Development only; the smoke tenant is created by hand in production.
 - Functional tests still create their own tenants and must not depend on any seeded tenant.

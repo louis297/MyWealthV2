@@ -3,7 +3,7 @@ title: Feature Specs
 status: draft
 language: en
 created: 2026-09-12
-updated: 2026-11-12
+updated: 2026-11-14
 related:
   - ../function-plan.md
   - ../api-design.md
@@ -153,6 +153,7 @@ Host start-up outside Development, for the VPS showcase in [deployment.md](../de
 
 | Spec | Status | Who | Ships | Why it stays its own slice |
 | --- | --- | --- | --- | --- |
+| [demo-tenant-seed](demo-tenant-seed.md) | review (2026-11-14) | Operator (`webapi --seed-demo`; no HTTP caller) | Demo tenant `demo` with reporting `USD`, the 18-instrument demo catalog and both report grants, in any environment. Idempotent, never changes existing rows. No people, prices or FX. No script | Amends tenants R17. First part of future-plans §5 |
 | [production-hosting](production-hosting.md) | review | Platform (no HTTP caller) | OpenIddict certificates and explicit issuer on `identity`; Data Protection folder and application name per public host; forwarded headers from configured networks; no in-host HTTPS redirection; health endpoints on the health port; `--healthcheck` self-check | Cross-cutting host start-up. Not a resource slice |
 
 Related amendments (2026-11-12, `review`): [bff-adviser-portal](bff-adviser-portal.md) and [bff-customer-portal](bff-customer-portal.md) serve the SPA build; [identity-auth](identity-auth.md) bootstrap SystemAdmin.

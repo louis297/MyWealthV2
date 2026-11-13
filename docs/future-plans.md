@@ -3,7 +3,7 @@ title: Future plans
 status: note
 language: en
 created: 2026-11-10
-updated: 2026-11-12
+updated: 2026-11-14
 related:
   - README.md
   - function-plan.md
@@ -87,14 +87,15 @@ Let visitors of the public showcase try the portals without an invitation.
 
 Today ([deployment.md](deployment.md) §13 item 7): the first deploy has no demo data. Production holds only the smoke tenant, whose passwords are secret. [features/tenants.md](features/tenants.md) R17 allows seeding only in Development.
 
+Specified 2026-11-14 (`review`): [features/demo-tenant-seed.md](features/demo-tenant-seed.md). The operator command `webapi --seed-demo` creates the demo tenant `demo` (reporting `USD`), its 18-instrument catalog and its two report grants in any environment, and amends tenants R17. It seeds no people. The rest of this section is still open.
+
 Direction chosen in discussion (2026-11-12), not yet a spec: a writable demo tenant with shared Adviser and Customer accounts, reset to a known state every night by a `worker` job. A read-only demo would need a new read-only role and a second authorization model, so it was not chosen.
 
 Questions to settle when this opens:
 
-- An amendment to tenants R17, so a demo tenant can be created outside Development, and who creates it (seed on start or the reset job).
+- Whether the nightly reset reuses the demo seed, and how the shared logins are created (the tenant itself is settled by demo-tenant-seed).
 - What the reset does: delete and recreate the demo tenant's rows, or restore a fixed data set, and how it avoids clashing with outbox events still in flight.
 - Demo accounts must not change their own password or email, or one visitor locks the others out. This needs a rule that the change-password and profile routes reject demo accounts.
 - What else a visitor must not do: invite people (email is a no-op anyway), disable the demo tenant's users, or create data large enough to slow the VPS.
 - How the credentials are shown: on the hosted login page, on the portal landing page, or in the repository README.
-- Whether the demo tenant shares the reference data (instruments, prices, FX rates) with real tenants, and which reporting currency it uses so net worth renders with available prices.
 

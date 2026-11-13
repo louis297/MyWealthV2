@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-18
-last_updated: 2026-11-13
+last_updated: 2026-11-14
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -397,3 +397,13 @@ The repository should build after each commit. Agents split each line into red t
 7. `TestSeed` instruments + table prices + idempotent integration test
 
 Do not put holdings or portal pages in these commits.
+
+---
+
+## Amendment 2026-11-14 (demo catalog in production; pending)
+
+Takes effect when [demo-tenant-seed.md](demo-tenant-seed.md) is accepted. Narrows §2 Out "Seeding instruments … in Production" and §9.1 "Not Production".
+
+- The 18-row demo catalog (demo-tenant-seed §5.1) may be written for tenant `demo` in any environment by `webapi --seed-demo`, without prices.
+- `TestSeed` takes the same catalog and keeps its Development-only extras: the disabled `NZD-CASH` row and the fake table prices.
+- Seeding from `0010_instruments.sql` stays out.

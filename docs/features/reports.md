@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-10-12
-last_updated: 2026-10-26
+last_updated: 2026-11-14
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -541,3 +541,12 @@ Still open:
 5. Executions list + download
 6. Event enqueue hook
 7. Adviser Portal: Customer page section + Reports tab
+
+---
+
+## Amendment 2026-11-14 (demo tenant grants in production; pending)
+
+Takes effect when [demo-tenant-seed.md](demo-tenant-seed.md) is accepted. Narrows the seed paragraph "Not Production".
+
+- `webapi --seed-demo` grants `customer-transactions` and `adviser-balances` to tenant `demo` in any environment. A platform-inactive report is not granted. Idempotent on `(TenantId, ReportId)`.
+- Other tenants are still not auto-granted.
