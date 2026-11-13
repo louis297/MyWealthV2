@@ -23,7 +23,7 @@ Phase 2 portal cut for model portfolios. Consumes the landed portfolios feature 
 
 **Status is `accepted`.**
 
-**Amendment 2026-11-13 (Shared portfolio message, accepted):** see the amendment at the end of this file. Adds P12.
+**Amendment 2026-11-13 (Shared portfolio message, accepted, landed):** see the amendment at the end of this file. Adds P12.
 
 Backend prerequisites (landed):
 
@@ -144,7 +144,7 @@ Backend error codes (missing price, missing FX, insufficient cash) are shown as 
 
 ## Amendment 2026-11-13 (Shared portfolio message) — accepted
 
-Status of this amendment: `accepted` (2026-11-13). It is a build contract. The rest of this file stays accepted. Backend rules: [../features/portfolios.md](../features/portfolios.md), amendment 2026-11-13 (Adviser Book on portfolio-wide commands), PB1–PB8. Do not rewrite P3, P4 or P8 in place.
+Status of this amendment: `accepted` (2026-11-13). It is a build contract. Landed 2026-11-13: `problemCode` in `src/AdviserPortal/src/shared/api/problem.ts`, used by `PortfolioDetailPage`. `updatePortfolio` and `disablePortfolio` invalidate the portfolio cache only on success, so a refused call does not reload. The rest of this file stays accepted. Backend rules: [../features/portfolios.md](../features/portfolios.md), amendment 2026-11-13 (Adviser Book on portfolio-wide commands), PB1–PB8. Do not rewrite P3, P4 or P8 in place.
 
 | ID | Behaviour |
 | --- | --- |

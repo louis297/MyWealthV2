@@ -36,7 +36,7 @@ Model portfolios (target-weight investment schemes) on `webapi`. An Adviser or T
 
 **Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md) R17. The R18 trade lock applies when any security leg's Account has an Active assignment. Rebalance still writes ordinary `Buy` / `Sell` on the assigned Account.
 
-**Amendment 2026-11-13 (Adviser Book on portfolio-wide commands, accepted):** see the amendment at the end of this file. Part 1 puts a problem `code` on every 409 ([../api-design.md](../api-design.md) §4.2). Part 2, for the Adviser role, filters `POST /portfolios/{id}/rebalance` to the Adviser's Book and refuses `PUT /portfolios/{id}` and `POST /portfolios/{id}/disable` on a Shared portfolio (409 `portfolio_shared`).
+**Amendment 2026-11-13 (Adviser Book on portfolio-wide commands, accepted, landed):** see the amendment at the end of this file. Part 1 puts a problem `code` on every 409 ([../api-design.md](../api-design.md) §4.2). Part 2, for the Adviser role, filters `POST /portfolios/{id}/rebalance` to the Adviser's Book and refuses `PUT /portfolios/{id}` and `POST /portfolios/{id}/disable` on a Shared portfolio (409 `portfolio_shared`).
 
 ---
 
@@ -322,7 +322,7 @@ The repository should build after each commit. Agents split each line into red t
 
 ## Amendment 2026-11-13 (Adviser Book on portfolio-wide commands) — accepted
 
-Status of this amendment: `accepted` (2026-11-13). It is a build contract. The rest of this file stays accepted. Do not rewrite R16, R22, R23 or §8 in place. No schema script, no new route, no new policy.
+Status of this amendment: `accepted` (2026-11-13). It is a build contract. Landed 2026-11-13: `ProblemException` (`src/Application/Common/Exceptions`) mapped in one arm of `ProblemDetailsExceptionHandler`; `PortfolioBook` (`src/Application/Portfolios`) used by `RebalancePortfolio`, `UpdatePortfolio` and `DisablePortfolio`; `PortfolioSharedException`. PC-T1–PC-T5 extend the existing 409 tests plus `AssignPortfolioTests.SamePortfolioAgain_Returns409WithTheProblemCode`; PB-T1–PB-T11 are in `AdviserBookPortfolioTests` (fixture `AdviserBookWorld`). PC-T1–PC-T5, PB-T1, PB-T2, PB-T4–PB-T6 and PB-T9 failed before the change. The rest of this file stays accepted. Do not rewrite R16, R22, R23 or §8 in place. No schema script, no new route, no new policy.
 
 It has two parts. Part 1 is the build contract for [../api-design.md](../api-design.md) §4.2 (problem codes). It lands first, because part 2 adds a second 409 to `PUT /portfolios/{id}` and `POST /portfolios/{id}/disable`, and clients must be able to tell the two apart. Part 2 tightens R16, R22 and R23 and three rows of §8 for the Adviser role only.
 

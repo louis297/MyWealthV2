@@ -157,7 +157,7 @@ List filters are separate: currencies and people collections use `enabledOnly` (
 
 ### 4.2 Problem codes (accepted, 2026-11-13)
 
-Status of this section: `accepted` (2026-11-13). The build contract for it is [features/portfolios.md](features/portfolios.md), amendment 2026-11-13, part 1.
+Status of this section: `accepted` (2026-11-13). The build contract for it is [features/portfolios.md](features/portfolios.md), amendment 2026-11-13, part 1. Landed 2026-11-13: every code in the registry below is a `ProblemException` subclass.
 
 **Why.** One HTTP status already carries several meanings. `webapi` returns 409 for a stale `rowVersion`, a reused `Idempotency-Key`, a changed FX rate, a report that is not ready, and a portfolio already assigned to the account. `POST /transactions/fx` alone can return two different 409s today, and only the first has a field to tell them apart (`errors.expectedRate`). The portfolios amendment 2026-11-13 adds a sixth. A client that branches on the status alone shows the wrong message as soon as one route can return two of them. A **problem code** names the meaning. The status stays the category.
 
