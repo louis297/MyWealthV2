@@ -165,6 +165,7 @@ public class TenantCompositeKeysSchemaTests
             .Select(key => (key.ForeignKey, key.Parent, (byte)0, ChildColumns(key.ForeignKey), "TenantId,Id"))
             .ToList();
         rows.Select(row => ((string)row[0], (string)row[1], (byte)row[2], (string)row[3], (string)row[4]))
+            .OrderBy(row => row.Item1, StringComparer.Ordinal)
             .ShouldBe(expected);
     }
 
@@ -182,6 +183,7 @@ public class TenantCompositeKeysSchemaTests
             """);
 
         rows.Select(row => ((string)row[0], (string)row[1]))
+            .OrderBy(row => row.Item1, StringComparer.Ordinal)
             .ShouldBe(Parents
                 .Select(parent => ($"UQ_{parent}_TenantId_Id", "TenantId,Id"))
                 .OrderBy(key => key.Item1, StringComparer.Ordinal));

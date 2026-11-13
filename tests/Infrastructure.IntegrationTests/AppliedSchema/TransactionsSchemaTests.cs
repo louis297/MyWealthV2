@@ -205,14 +205,18 @@ public class TransactionsSchemaTests
     {
         (await ForeignKeys("Transactions")).ShouldBe([
             ("FK_Transactions_Tenants_TenantId", "Tenants", "Id", (byte)0),
-            ("FK_Transactions_Transactions_OriginalTransactionId", "Transactions", "Id", (byte)0),
-            ("FK_Transactions_Transactions_ReversedByTransactionId", "Transactions", "Id", (byte)0)
+            ("FK_Transactions_Transactions_TenantId_OriginalTransactionId", "Transactions", "TenantId", (byte)0),
+            ("FK_Transactions_Transactions_TenantId_OriginalTransactionId", "Transactions", "Id", (byte)0),
+            ("FK_Transactions_Transactions_TenantId_ReversedByTransactionId", "Transactions", "TenantId", (byte)0),
+            ("FK_Transactions_Transactions_TenantId_ReversedByTransactionId", "Transactions", "Id", (byte)0)
         ]);
         (await ForeignKeys("TransactionCashLegs")).ShouldBe([
-            ("FK_TransactionCashLegs_Accounts_AccountId", "Accounts", "Id", (byte)0),
+            ("FK_TransactionCashLegs_Accounts_TenantId_AccountId", "Accounts", "TenantId", (byte)0),
+            ("FK_TransactionCashLegs_Accounts_TenantId_AccountId", "Accounts", "Id", (byte)0),
             ("FK_TransactionCashLegs_Currencies_Currency", "Currencies", "Code", (byte)0),
             ("FK_TransactionCashLegs_Tenants_TenantId", "Tenants", "Id", (byte)0),
-            ("FK_TransactionCashLegs_Transactions_TransactionId", "Transactions", "Id", (byte)0)
+            ("FK_TransactionCashLegs_Transactions_TenantId_TransactionId", "Transactions", "TenantId", (byte)0),
+            ("FK_TransactionCashLegs_Transactions_TenantId_TransactionId", "Transactions", "Id", (byte)0)
         ]);
         (await ForeignKeys("IdempotencyRecords")).ShouldBe([
             ("FK_IdempotencyRecords_Tenants_TenantId", "Tenants", "Id", (byte)0)
@@ -460,7 +464,7 @@ public class TransactionsSchemaTests
             FROM sys.foreign_keys fk
             JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
             WHERE fk.parent_object_id = OBJECT_ID(@tableName)
-            ORDER BY fk.name
+            ORDER BY fk.name, fkc.constraint_column_id
             """;
         var table = command.CreateParameter();
         table.ParameterName = "@tableName";

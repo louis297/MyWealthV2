@@ -107,7 +107,7 @@ Existing indexes stay as they are. SQL Server does not need an index on the chil
 
 The schema applicator runs each script without a surrounding transaction. A script that fails halfway leaves some constraints dropped and others not yet added. So `0028` starts with a read-only check and changes nothing if it fails.
 
-- For each row of the composite FK table, count child rows whose parent exists but has a different `TenantId`.
+- For each row of the composite FK table, count child rows with a non-null reference that has no parent row with the same `TenantId`. That is exactly what the composite FK will check, so it also catches an orphan left behind by a disabled FK, not only a parent in another tenant.
 - If any count is above zero, `THROW` with one message that names each failing FK and its row count, for example `0028_tenant_composite_keys: cross-tenant references found: FK_Holdings_Accounts_TenantId_AccountId=2`. Then stop.
 - Only after the check passes: add the parent unique keys, drop the old FKs, add the composite FKs.
 

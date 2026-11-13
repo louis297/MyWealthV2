@@ -114,16 +114,21 @@ public class HoldingsSchemaTests
         ]);
 
         (await ForeignKeys("TransactionSecurityLegs")).ShouldBe([
-            ("FK_TransactionSecurityLegs_Accounts_AccountId", "Accounts", "Id", (byte)0),
+            ("FK_TransactionSecurityLegs_Accounts_TenantId_AccountId", "Accounts", "TenantId", (byte)0),
+            ("FK_TransactionSecurityLegs_Accounts_TenantId_AccountId", "Accounts", "Id", (byte)0),
             ("FK_TransactionSecurityLegs_Currencies_CostCurrency", "Currencies", "Code", (byte)0),
-            ("FK_TransactionSecurityLegs_Instruments_InstrumentId", "Instruments", "Id", (byte)0),
+            ("FK_TransactionSecurityLegs_Instruments_TenantId_InstrumentId", "Instruments", "TenantId", (byte)0),
+            ("FK_TransactionSecurityLegs_Instruments_TenantId_InstrumentId", "Instruments", "Id", (byte)0),
             ("FK_TransactionSecurityLegs_Tenants_TenantId", "Tenants", "Id", (byte)0),
-            ("FK_TransactionSecurityLegs_Transactions_TransactionId", "Transactions", "Id", (byte)0)
+            ("FK_TransactionSecurityLegs_Transactions_TenantId_TransactionId", "Transactions", "TenantId", (byte)0),
+            ("FK_TransactionSecurityLegs_Transactions_TenantId_TransactionId", "Transactions", "Id", (byte)0)
         ]);
         (await ForeignKeys("Holdings")).ShouldBe([
-            ("FK_Holdings_Accounts_AccountId", "Accounts", "Id", (byte)0),
+            ("FK_Holdings_Accounts_TenantId_AccountId", "Accounts", "TenantId", (byte)0),
+            ("FK_Holdings_Accounts_TenantId_AccountId", "Accounts", "Id", (byte)0),
             ("FK_Holdings_Currencies_CostCurrency", "Currencies", "Code", (byte)0),
-            ("FK_Holdings_Instruments_InstrumentId", "Instruments", "Id", (byte)0),
+            ("FK_Holdings_Instruments_TenantId_InstrumentId", "Instruments", "TenantId", (byte)0),
+            ("FK_Holdings_Instruments_TenantId_InstrumentId", "Instruments", "Id", (byte)0),
             ("FK_Holdings_Tenants_TenantId", "Tenants", "Id", (byte)0)
         ]);
 
@@ -258,7 +263,7 @@ public class HoldingsSchemaTests
             FROM sys.foreign_keys fk
             JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
             WHERE fk.parent_object_id = OBJECT_ID(@tableName)
-            ORDER BY fk.name
+            ORDER BY fk.name, fkc.constraint_column_id
             """;
         var table = command.CreateParameter();
         table.ParameterName = "@tableName";

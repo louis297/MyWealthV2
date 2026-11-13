@@ -135,7 +135,7 @@ public class AccountsSchemaTests
             FROM sys.foreign_keys fk
             JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
             WHERE fk.parent_object_id = OBJECT_ID(N'Accounts')
-            ORDER BY fk.name
+            ORDER BY fk.name, fkc.constraint_column_id
             """;
 
         var rows = new List<(string Name, string Referenced, string Column, byte DeleteAction)>();
@@ -152,7 +152,8 @@ public class AccountsSchemaTests
         rows.ShouldBe([
             ("FK_Accounts_Currencies_Currency", "Currencies", "Code", 0),
             ("FK_Accounts_Tenants_TenantId", "Tenants", "Id", 0),
-            ("FK_Accounts_Users_CustomerId", "Users", "Id", 0)
+            ("FK_Accounts_Users_TenantId_CustomerId", "Users", "TenantId", 0),
+            ("FK_Accounts_Users_TenantId_CustomerId", "Users", "Id", 0)
         ]);
     }
 

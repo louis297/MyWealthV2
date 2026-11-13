@@ -161,7 +161,9 @@ public class ReportsSchemaTests
             ("UQ_TenantReports_TenantId_ReportId", "ReportId")
         ]);
         (await UniqueColumns("ReportSchedules")).ShouldBe([
-            ("UQ_ReportSchedules_PublicId", "PublicId")
+            ("UQ_ReportSchedules_PublicId", "PublicId"),
+            ("UQ_ReportSchedules_TenantId_Id", "TenantId"),
+            ("UQ_ReportSchedules_TenantId_Id", "Id")
         ]);
         (await UniqueColumns("ReportExecutions")).ShouldBe([
             ("UQ_ReportExecutions_PublicId", "PublicId")
@@ -197,9 +199,11 @@ public class ReportsSchemaTests
         ]);
         (await ForeignKeys("ReportExecutions")).ShouldBe([
             ("FK_ReportExecutions_Reports_ReportId", "Reports", "Id", (byte)0),
-            ("FK_ReportExecutions_ReportSchedules_ScheduleId", "ReportSchedules", "Id", (byte)0),
+            ("FK_ReportExecutions_ReportSchedules_TenantId_ScheduleId", "ReportSchedules", "TenantId", (byte)0),
+            ("FK_ReportExecutions_ReportSchedules_TenantId_ScheduleId", "ReportSchedules", "Id", (byte)0),
             ("FK_ReportExecutions_Tenants_TenantId", "Tenants", "Id", (byte)0),
-            ("FK_ReportExecutions_Users_TriggeredByUserId", "Users", "Id", (byte)0)
+            ("FK_ReportExecutions_Users_TenantId_TriggeredByUserId", "Users", "TenantId", (byte)0),
+            ("FK_ReportExecutions_Users_TenantId_TriggeredByUserId", "Users", "Id", (byte)0)
         ]);
     }
 
@@ -366,7 +370,7 @@ public class ReportsSchemaTests
             FROM sys.foreign_keys fk
             JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
             WHERE fk.parent_object_id = OBJECT_ID(@tableName)
-            ORDER BY fk.name
+            ORDER BY fk.name, fkc.constraint_column_id
             """;
         var table = command.CreateParameter();
         table.ParameterName = "@tableName";

@@ -86,17 +86,24 @@ public class LegAccountsSchemaTests
             await ApplyAsync(connectionString, script => string.CompareOrdinal(script.Name, LegAccountsScript) < 0);
 
             await ExecuteAsync(connectionString, """
-                ALTER TABLE [Accounts] NOCHECK CONSTRAINT [FK_Accounts_Users_CustomerId];
-
                 INSERT INTO [Tenants] ([PublicId], [Name], [Code], [Created], [LastModified], [ReportingCurrency])
                 VALUES (NEWID(), N'Backfill', N'backfill', SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), 'NZD');
                 DECLARE @tenant int = SCOPE_IDENTITY();
 
+                INSERT INTO [AspNetUsers] ([Id], [EmailConfirmed], [PhoneNumberConfirmed], [TwoFactorEnabled], [LockoutEnabled], [AccessFailedCount], [TenantId])
+                VALUES (N'backfill-adviser', 1, 0, 0, 0, 0, @tenant), (N'backfill-customer', 1, 0, 0, 0, 0, @tenant);
+                INSERT INTO [Users] ([PublicId], [TenantId], [Name], [Email], [Role], [Status], [AdviserId], [IdentityUserId], [Created], [LastModified])
+                VALUES (NEWID(), @tenant, N'Adviser', N'adviser@backfill.example', 2, 1, NULL, N'backfill-adviser', SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET());
+                DECLARE @adviser int = SCOPE_IDENTITY();
+                INSERT INTO [Users] ([PublicId], [TenantId], [Name], [Email], [Role], [Status], [AdviserId], [IdentityUserId], [Created], [LastModified])
+                VALUES (NEWID(), @tenant, N'Customer', N'customer@backfill.example', 3, 1, @adviser, N'backfill-customer', SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET());
+                DECLARE @customer int = SCOPE_IDENTITY();
+
                 INSERT INTO [Accounts] ([PublicId], [TenantId], [CustomerId], [Name], [Type], [Status], [Currency], [Created], [CreatedBy])
-                VALUES (NEWID(), @tenant, 1, N'Bank', 0, 0, 'NZD', SYSDATETIMEOFFSET(), N'test');
+                VALUES (NEWID(), @tenant, @customer, N'Bank', 0, 0, 'NZD', SYSDATETIMEOFFSET(), N'test');
                 DECLARE @bank int = SCOPE_IDENTITY();
                 INSERT INTO [Accounts] ([PublicId], [TenantId], [CustomerId], [Name], [Type], [Status], [Currency], [Created], [CreatedBy])
-                VALUES (NEWID(), @tenant, 1, N'Brokerage', 2, 0, 'NZD', SYSDATETIMEOFFSET(), N'test');
+                VALUES (NEWID(), @tenant, @customer, N'Brokerage', 2, 0, 'NZD', SYSDATETIMEOFFSET(), N'test');
                 DECLARE @brokerage int = SCOPE_IDENTITY();
 
                 INSERT INTO [Instruments] ([PublicId], [TenantId], [Symbol], [Name], [QuoteCurrency], [Created], [CreatedBy])

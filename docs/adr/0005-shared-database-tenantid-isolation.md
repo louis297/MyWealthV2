@@ -26,7 +26,7 @@ A SaaS product must isolate tenants. An EF global query filter plus a JWT claim 
 
 Phase 1 keeps **one shared database (`MyWealthDbV2`) and row-level `TenantId`**, with:
 
-1. Business tables have a **database FK** `TenantId` → `Tenants` (`Users.TenantId` is null only for SystemAdmin).
+1. Business tables have a **database FK** `TenantId` → `Tenants` (`Users.TenantId` is null only for SystemAdmin). Every reference between two tenant rows is a **tenant composite FK** `(TenantId, XId)` → `(TenantId, Id)`, so the database rejects a child that points at another tenant's row ([fixes/tenant-composite-keys.md](../fixes/tenant-composite-keys.md)).
 2. `AspNetUsers.TenantId` is a projection column, nullable, **with no FK** (avoids a cycle with `Users.IdentityUserId` → `AspNetUsers`).
 3. Login carries **tenantCode** (no subdomain routing). The JWT carries tenant PublicId and tenantCode. An EF global query filter on tenant-scoped business entities acts as a safety net. The filter is engaged only when a tenant id is known. SystemAdmin has no tenant, so the filter stays disengaged. `IgnoreQueryFilters()` is the escape hatch while the filter is engaged. Repositories / handlers **tighten to the current tenant again**. Do not trust the filter alone. See [fixes/tenant-query-filter.md](../fixes/tenant-query-filter.md).
 4. Email is unique **inside a tenant**. SystemAdmin email is unique globally.
@@ -44,4 +44,4 @@ Phase 1 keeps **one shared database (`MyWealthDbV2`) and row-level `TenantId`**,
 
 ## Consequences
 
-Still one database and one connection string. Arbitrary `TenantId` values cannot be inserted. Login must resolve `tenantCode + email`. Do not `FindByEmail` across tenants.
+Still one database and one connection string. Arbitrary `TenantId` values cannot be inserted, and a row cannot reference another tenant's row. Login must resolve `tenantCode + email`. Do not `FindByEmail` across tenants.
