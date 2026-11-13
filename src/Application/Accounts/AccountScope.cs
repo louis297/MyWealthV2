@@ -19,10 +19,12 @@ internal static class AccountScope
     public static IQueryable<Account> ManagedAccounts(IApplicationDbContext db, ICurrentUser currentUser)
     {
         var assignedAdviserId = AssignedAdviserInternalId(currentUser);
+        var selfCustomerId = SelfCustomerId(currentUser);
         var query =
             from account in db.Accounts
             join customer in db.Users on account.CustomerId equals customer.Id
-            where assignedAdviserId == null || customer.AdviserId == assignedAdviserId
+            where (assignedAdviserId == null || customer.AdviserId == assignedAdviserId)
+                  && (selfCustomerId == null || customer.Id == selfCustomerId)
             select account;
 
         if (currentUser.Role != UserRole.SystemAdmin)
