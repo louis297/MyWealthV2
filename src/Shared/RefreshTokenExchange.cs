@@ -3,7 +3,11 @@ using System.Text.Json;
 
 namespace MyWealthV2.Shared;
 
-public sealed record RefreshedTokens(string AccessToken, string RefreshToken, DateTimeOffset ExpiresAt);
+public sealed record RefreshedTokens(
+    string AccessToken,
+    string RefreshToken,
+    DateTimeOffset ExpiresAt,
+    string? IdToken = null);
 
 /// <summary>
 /// Refresh single-flight: at most one refresh grant per refresh token is in flight in this process,
@@ -146,12 +150,13 @@ public sealed class RefreshTokenExchange
         var expiresIn = document.RootElement.TryGetProperty("expires_in", out var expires) && expires.TryGetInt32(out var seconds)
             ? seconds
             : 900;
+        var idToken = document.RootElement.TryGetProperty("id_token", out var id) ? id.GetString() : null;
         if (string.IsNullOrEmpty(accessToken) || string.IsNullOrEmpty(nextRefresh))
         {
             return null;
         }
 
-        return new RefreshedTokens(accessToken, nextRefresh, _time.GetUtcNow().AddSeconds(expiresIn));
+        return new RefreshedTokens(accessToken, nextRefresh, _time.GetUtcNow().AddSeconds(expiresIn), idToken);
     }
 
     private sealed record Remembered(RefreshedTokens Result, DateTimeOffset WrittenAt);

@@ -418,7 +418,7 @@ Today's code: `src/BffAdviserPortal/ApiProxy.cs` and `src/BffCustomerPortal/ApiP
 | RF-T3 | After RF-T1 | The refresh token from either response cookie is presented to `/connect/token` | Success (the chain was not revoked) |
 | RF-T4 | RT0 replaced by RT1; time moved past the remembered access expiry | `GET` with C0; `webapi` 401 then 200 | 200. One new grant, and it presents RT1, not RT0 |
 | RF-T5 | RT0 replaced by RT1; time moved 30 minutes past the rotation | `GET` with C0; `webapi` 401 | Token endpoint called with RT0, which fails. 401. Cookie cleared |
-| RF-T6 | Refresh token revoked; `webapi` 401 to every call | Two concurrent `GET` with that cookie, then a third `GET` | The first two: 401, cookie cleared, one grant between them. The third: calls the token endpoint again |
+| RF-T6 | Refresh token revoked; `webapi` 401 to every call | Two concurrent `GET` with that cookie, then a third `GET` | The first two: 401, cookie cleared. The third: calls the token endpoint again. (That concurrent presentations share one grant is proven on the shared class, `ConcurrentPresentations_ExchangeTheRefreshTokenOnce`. Over HTTP the second request may arrive after the failed grant was dropped, so the grant count is not deterministic there.) |
 | RF-T7 | First grant held open | The client aborts the request that started the grant; the grant is released; then `GET` with C0, `webapi` 401 then 200 | 200 with no further grant |
 
 `BackOfficeRefreshTests` stay green after the move. A Back Office case for RF6 is added there: a rotated refresh token presented 30 minutes after the rotation calls the token endpoint.

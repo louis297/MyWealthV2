@@ -1,11 +1,8 @@
 using System.Net;
 using System.Net.Http.Headers;
-using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
 using MyWealthV2.Shared;
 
@@ -167,59 +164,34 @@ public static class ApiProxy
             return null;
         }
 
-        var configuration = http.RequestServices.GetRequiredService<IConfiguration>();
-        var oidc = http.RequestServices.GetRequiredService<IOptionsMonitor<OpenIdConnectOptions>>()
-            .Get(OpenIdConnectDefaults.AuthenticationScheme);
-        var authority = (configuration["Authentication:Authority"] ?? oidc.Authority ?? "").TrimEnd('/');
-        using var message = new HttpRequestMessage(HttpMethod.Post, authority + "/connect/token")
-        {
-            Content = new FormUrlEncodedContent(new Dictionary<string, string?>
-            {
-                ["grant_type"] = "refresh_token",
-                ["refresh_token"] = refreshToken,
-                ["client_id"] = Services.AdviserPortal,
-                ["client_secret"] = configuration["Authentication:ClientSecret"]
-            })
-        };
-
-        using var response = await oidc.Backchannel.SendAsync(message, http.RequestAborted);
-        if (!response.IsSuccessStatusCode)
+        var next = await http.RequestServices.GetRequiredService<RefreshTokenExchange>()
+            .ExchangeAsync(refreshToken, http.RequestAborted);
+        if (next is null)
         {
             return null;
         }
 
-        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(http.RequestAborted));
-        var accessToken = json.RootElement.GetProperty("access_token").GetString();
-        var nextRefresh = json.RootElement.TryGetProperty("refresh_token", out var refresh)
-            ? refresh.GetString()
-            : refreshToken;
-        var idToken = json.RootElement.TryGetProperty("id_token", out var id)
-            ? id.GetString()
-            : await http.GetTokenAsync("id_token");
-        var expiresIn = json.RootElement.TryGetProperty("expires_in", out var expires) && expires.TryGetInt32(out var seconds)
-            ? seconds
-            : 900;
-
+        var idToken = next.IdToken ?? await http.GetTokenAsync("id_token");
         var authenticated = await http.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        if (authenticated.Principal is null || authenticated.Properties is null || string.IsNullOrEmpty(accessToken))
+        if (authenticated.Principal is null || authenticated.Properties is null)
         {
             return null;
         }
 
         authenticated.Properties.StoreTokens(
         [
-            new AuthenticationToken { Name = "access_token", Value = accessToken },
-            new AuthenticationToken { Name = "refresh_token", Value = nextRefresh ?? refreshToken },
+            new AuthenticationToken { Name = "access_token", Value = next.AccessToken },
+            new AuthenticationToken { Name = "refresh_token", Value = next.RefreshToken },
             new AuthenticationToken { Name = "id_token", Value = idToken ?? "" },
             new AuthenticationToken { Name = "token_type", Value = "Bearer" },
-            new AuthenticationToken { Name = "expires_at", Value = DateTimeOffset.UtcNow.AddSeconds(expiresIn).ToString("o") }
+            new AuthenticationToken { Name = "expires_at", Value = next.ExpiresAt.ToString("o") }
         ]);
         authenticated.Properties.IsPersistent = false;
         await http.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,
             authenticated.Principal,
             authenticated.Properties);
-        return accessToken;
+        return next.AccessToken;
     }
 
     private static Task WriteProblem(HttpContext http, int status, string title, string type)
