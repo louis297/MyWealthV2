@@ -4,7 +4,7 @@ status: accepted
 phase: 2
 language: en
 created: 2026-11-02
-updated: 2026-11-03
+updated: 2026-11-13
 related:
   - README.md
   - frontend-conventions.md
@@ -22,6 +22,8 @@ related:
 Phase 2 portal cut for model portfolios. Consumes the landed portfolios feature (`docs/features/portfolios.md`, master @ 4e6f4dc). Backend contracts live in the Feature Spec. This file owns routes, page scope, and behavioural acceptance for the Adviser Portal.
 
 **Status is `accepted`.**
+
+**Amendment 2026-11-13 (Shared portfolio message, review):** see the amendment at the end of this file. Adds P12. Not a build contract until accepted.
 
 Backend prerequisites (landed):
 
@@ -138,3 +140,16 @@ None. Decisions recorded below.
 
 Backend error codes (missing price, missing FX, insufficient cash) are shown as the server message. Do not rewrite them.
 
+---
+
+## Amendment 2026-11-13 (Shared portfolio message) — review
+
+Status of this amendment: `review`. It is not a build contract until it is accepted. The rest of this file stays accepted. Backend rules: [../features/portfolios.md](../features/portfolios.md), amendment 2026-11-13 (Adviser Book on portfolio-wide commands), PB1–PB8. Do not rewrite P3, P4 or P8 in place.
+
+| ID | Behaviour |
+| --- | --- |
+| P12 | When `PUT /portfolios/{id}` or `POST /portfolios/{id}/disable` returns 409 with `code: "portfolio_shared"`, the detail page shows the server `detail` as a message. It does not show the "This row changed. Reload and try again." notice and does not refetch the portfolio. The form keeps the Adviser's edits. A 409 without `code` keeps today's behaviour (conflict notice and refetch). |
+
+No other page changes. The edit page still lists only the accounts the Adviser can see, so the weight-change confirmation copy is unchanged. Bulk rebalance (P8) needs no change: the 202 lists only accounts in the Adviser's Book. The Disable button and the edit form stay visible to an Adviser; the portal does not try to predict PB3 / PB4, because it cannot see accounts outside the Book.
+
+**Tests.** `PortfolioDetailPage.test.tsx`: a `portfolio_shared` 409 on save and on disable shows the server detail and no conflict notice; a 409 without `code` still shows the conflict notice.

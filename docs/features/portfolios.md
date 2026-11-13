@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-02
-last_updated: 2026-11-11
+last_updated: 2026-11-13
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -35,6 +35,8 @@ Model portfolios (target-weight investment schemes) on `webapi`. An Adviser or T
 
 
 **Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md) R17. The R18 trade lock applies when any security leg's Account has an Active assignment. Rebalance still writes ordinary `Buy` / `Sell` on the assigned Account.
+
+**Amendment 2026-11-13 (Adviser Book on portfolio-wide commands, review):** see the amendment at the end of this file. For the Adviser role it filters `POST /portfolios/{id}/rebalance` to the Adviser's Book and refuses `PUT /portfolios/{id}` and `POST /portfolios/{id}/disable` on a Shared portfolio (409 `portfolio_shared`). Not a build contract until accepted.
 
 ---
 
@@ -315,3 +317,81 @@ The repository should build after each commit. Agents split each line into red t
 4. HTTP endpoints + functional tests.
 5. Auto-rebalance on weight change (Hangfire 202) and synchronous assign / single-account rebalance.
 6. TestSeed demo portfolio + assignment.
+
+---
+
+## Amendment 2026-11-13 (Adviser Book on portfolio-wide commands) — review
+
+Status of this amendment: `review`. It is not a build contract until it is accepted. The rest of this file stays accepted. It tightens R16, R22 and R23 and three rows of §8 for the Adviser role only. Do not rewrite R16, R22, R23 or §8 in place. No schema script, no new route, no new policy.
+
+**Why.** R16 says an Adviser sees only assigned Customers, and every single-account command (`POST /accounts/{id}/portfolio`, `DELETE /accounts/{id}/portfolio`, `POST /accounts/{id}/rebalance`, `GET /accounts/{id}/portfolio`) enforces it. A Portfolio is tenant-scoped and has no owner, and the three portfolio-wide commands expand to every Active assignment of the portfolio in the tenant. So an Adviser can act on accounts outside their Book through a portfolio that another Adviser's Customer uses:
+
+| Adviser call | Today | Effect on another Adviser's Customer |
+| --- | --- | --- |
+| `POST /portfolios/{id}/rebalance` | 202 | Enqueues a Full Rebalance of the other account. The body returns that account's PublicId and handle. |
+| `PUT /portfolios/{id}` with new lines | 202 | Changes that account's target. Enqueues its rebalance and returns its PublicId. |
+| `PUT /portfolios/{id}` with new settings only | 204 | Changes `minimumTrade` / `cashResidualPercent`, which the next rebalance of that account uses. |
+| `POST /portfolios/{id}/disable` | 204 | Removes that account's assignment. |
+
+The same Adviser gets 404 from `GET /accounts/{id}` and `POST /accounts/{id}/rebalance` on that account.
+
+Today's code: `src/Application/Portfolios/Commands/RebalancePortfolio/RebalancePortfolio.cs`, `UpdatePortfolio/UpdatePortfolio.cs` and `DisablePortfolio/DisablePortfolio.cs` filter the portfolio by tenant only, then read every Active assignment without `AccountScope.ManagedAccounts`. `RolePermissions` gives Adviser `portfolios.manage` and `transactions.create`.
+
+**Book scope.** In this amendment, an account is in the caller's Book when `AccountScope.ManagedAccounts` returns it: for an Adviser, an account of a Customer whose `AdviserId` is that Adviser. This is the same scope as `GET /accounts/{id}`. No second scope rule.
+
+| Id | Rule |
+| --- | --- |
+| PB1 | **The portfolio stays tenant-scoped.** Every Adviser in the tenant may list, read and assign it (R16, R17 and the assign rules unchanged). There is no owner column. |
+| PB2 | **Bulk rebalance is filtered.** For an Adviser, `POST /portfolios/{id}/rebalance` enqueues only the Active assignments whose Account is in the Adviser's Book. The 202 `accounts` array lists only those. Assignments outside the Book are not enqueued, not listed, and not counted. When none is in the Book, the call returns 202 with an empty `accounts` array, as it does today for a portfolio with no Active assignment. |
+| PB3 | **Update is refused on a Shared portfolio.** For an Adviser, `PUT /portfolios/{id}` on a Shared portfolio returns 409 with `code: "portfolio_shared"`. The whole request is refused: name, lines and settings are not saved, `RowVersion` does not change, and nothing is enqueued. This applies whatever the body changes, including a body that changes nothing. |
+| PB4 | **Disable is refused on a Shared portfolio.** For an Adviser, `POST /portfolios/{id}/disable` on a Shared portfolio returns 409 with `code: "portfolio_shared"`. The portfolio stays Active and every assignment stays Active. |
+| PB5 | **TenantAdmin and SystemAdmin are not limited.** They keep the current behaviour on all three commands: every Active assignment in the portfolio's tenant. |
+| PB6 | **Order of checks.** Validation (400), then the portfolio lookup (404), then `portfolio_shared` (409), then the `rowVersion` check (409 without `code`), then the existing rules. An Adviser who sends a stale `rowVersion` to a Shared portfolio gets `portfolio_shared`, because a reload would not help. |
+| PB7 | **Error shape.** `portfolio_shared` uses the coded problem shape of §11 (`code` extension) with status 409, title `Portfolio is shared`, and detail `This portfolio is assigned to accounts outside your book. Ask a TenantAdmin to change or disable it.` The detail does not name, count or link the other accounts or Advisers. The `rowVersion` 409 keeps its current shape with no `code`; clients tell the two apart by `code`. |
+| PB8 | **Enqueue after a weight change is Book-filtered too.** When an Adviser's `PUT` passes PB3 and lines change, the list of accounts to enqueue is read after the save with the PB2 filter. In the normal case this is every Active assignment, because PB3 passed. It only differs when another Adviser assigned the portfolio between the check and the save (see Left open). |
+
+**Why refuse, not filter, on update and disable.** New lines and settings are stored on the portfolio. Every assigned account trades on them at its next rebalance, whether or not this call enqueues it. Disable removes assignments. Filtering would still change other Advisers' accounts. Bulk rebalance stores nothing, so filtering it is enough.
+
+**Why 409, not 403.** The caller has the role and the policy (R1 keeps 403 for a wrong role). The request fails because of the portfolio's current state, which another person can change (a TenantAdmin, or the other Adviser unassigning). That is a conflict.
+
+**Consequences (accepted).**
+
+- Once Customers of two Advisers use one portfolio, only a TenantAdmin can change or disable it. A Shared portfolio is a firm-level model, and the firm's models belong to the TenantAdmin (story 6).
+- Any Adviser can make a portfolio Shared by assigning it to one of their own accounts. The Advisers who already use it can no longer change it. They can still unassign their own accounts and create a new portfolio. A TenantAdmin can still change it.
+- An Adviser's edit page shows only the accounts in the Adviser's Book (the portal reads `/accounts` and `GET /accounts/{id}/portfolio`, which are already Book-scoped). The weight-change confirmation copy stays correct, because a Shared portfolio is refused before any rebalance.
+
+**Rejected options.**
+
+- *Portfolio owner* (`OwnerAdviserId`; null means firm-level and only a TenantAdmin manages it). Cleanest model, but it needs a schema script, a domain change, every portfolio handler and the portal list and forms. About two to three times this amendment. Revisit if Advisers need private models that other Advisers cannot assign.
+- *Remove `portfolios.manage` from Adviser.* Conflicts with stories 1 and 3 and the accepted portal contract.
+- *Filter update and disable to the Book.* See "Why refuse, not filter" above.
+
+**Left open.** The PB3 / PB4 check and the save are not one atomic step. If another Adviser's assign commits between them, the change is saved and applies to that account at its next rebalance. PB8 keeps it out of the immediate enqueue. The window is one request's duration and needs two Advisers acting on the same portfolio at the same moment. Accepted for this phase. Closing it would need the assign to touch the portfolio's `RowVersion`, or a lock on the portfolio row in both commands.
+
+**Tests.** Application.FunctionalTests. Fixture: one tenant with Advisers A and B, Customer CA (Adviser A) and Customer CB (Adviser B), each with an Open Brokerage account, one active portfolio P. "Shared" means P has Active assignments on both accounts. Assertions on enqueueing read `RecordingRebalanceScheduler`. The existing two-tenant 404 tests stay green.
+
+| Id | Given | When | Then |
+| --- | --- | --- | --- |
+| PB-T1 | P Shared | Adviser A `POST /portfolios/{P}/rebalance` | 202. `accounts` holds only CA's account. Only CA's account is enqueued |
+| PB-T2 | P assigned to CB's account only | Adviser A `POST /portfolios/{P}/rebalance` | 202 with empty `accounts`. Nothing enqueued |
+| PB-T3 | P Shared | TenantAdmin `POST /portfolios/{P}/rebalance` | 202. Both accounts listed and enqueued |
+| PB-T4 | P Shared | Adviser A `PUT /portfolios/{P}` with new lines | 409, `code` = `portfolio_shared`. `GET /portfolios/{P}` returns the old lines and the old `rowVersion`. Nothing enqueued |
+| PB-T5 | P Shared | Adviser A `PUT /portfolios/{P}` with the same lines and a new `minimumTrade` | 409, `code` = `portfolio_shared`. Stored `minimumTrade` unchanged |
+| PB-T6 | P Shared | Adviser A `PUT /portfolios/{P}` with a stale `rowVersion` | 409, `code` = `portfolio_shared` |
+| PB-T7 | P assigned to CA's account only | Adviser A `PUT /portfolios/{P}` with new lines | 202. `accounts` holds CA's account (behaviour unchanged) |
+| PB-T8 | P Shared | TenantAdmin `PUT /portfolios/{P}` with new lines | 202. Both accounts listed and enqueued |
+| PB-T9 | P Shared | Adviser A `POST /portfolios/{P}/disable` | 409, `code` = `portfolio_shared`. P stays active. Adviser B `GET /accounts/{CB account}/portfolio` returns 200 |
+| PB-T10 | P assigned to CA's account only | Adviser A `POST /portfolios/{P}/disable` | 204. P inactive. CA's assignment Removed |
+| PB-T11 | P Shared | TenantAdmin `POST /portfolios/{P}/disable` | 204. Both assignments Removed |
+
+PB-T1, PB-T4, PB-T5 and PB-T9 fail against today's code. The others pin behaviour that must not regress.
+
+Portal: [../adviser-portal/adviser-portal-portfolios.md](../adviser-portal/adviser-portal-portfolios.md), amendment 2026-11-13, P12.
+
+**Suggested commits.** The tree builds after each commit. Each behaviour is split into red and green.
+
+1. Bulk rebalance filtered to the Adviser's Book (PB2, PB-T1–PB-T3).
+2. Update refused on a Shared portfolio (PB3, PB6–PB8, PB-T4–PB-T8).
+3. Disable refused on a Shared portfolio (PB4, PB-T9–PB-T11).
+4. Adviser Portal shows the `portfolio_shared` message (P12).
+5. Mark this amendment landed here and in the portal spec.

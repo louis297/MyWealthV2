@@ -57,6 +57,7 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | Holding | Position of one instrument inside an account (quantity + cost). Phase 2. | A single transaction |
 | Portfolio | Target-weight model of instruments with a mandatory base currency. Accepted. An Adviser assigns at most one Active portfolio to a Brokerage or Other account. | A new Account.Type; a free-form basket |
 | AccountPortfolioAssignment | Link that binds one Account to one Active Portfolio. Accepted. While Active, manual security trades are rejected. | A second holdings book |
+| Shared portfolio | A Portfolio with at least one Active assignment on an Account outside the calling Adviser's Book. An Adviser cannot update or disable it (409 `portfolio_shared`); a TenantAdmin can. Defined per caller, not stored. See [features/portfolios.md](features/portfolios.md), amendment 2026-11-13. | A portfolio with an owner; a cross-tenant portfolio |
 | Instrument | Holdable object from an in-database catalog. Phase 2. | A free-text name stored on Holding |
 | Symbol | Instrument code on the tenant catalog (ticker-style unique key inside one tenant). | Display `Name`; ISIN |
 | QuoteCurrency | Currency used for the instrument’s price, market data, and cost accumulation. | Account booking currency |
