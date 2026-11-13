@@ -3,7 +3,7 @@ title: "ADR 0005: Shared database plus row-level TenantId"
 status: accepted
 language: en
 date: 2026-08-18
-updated: 2026-10-21
+updated: 2026-11-13
 related:
   - ../database-design.md
   - ../architecture.md
@@ -15,6 +15,8 @@ related:
 Status: accepted
 
 Phase-1 isolation: one shared database + row-level `TenantId` + **dual check** + EF global query filter (safety net) + isolation tests.
+
+**Amendment 2026-11-13 (tenant composite keys, review):** [fixes/tenant-composite-keys.md](../fixes/tenant-composite-keys.md) makes every reference between two tenant rows a tenant composite FK and adds `TenantId` to the child tables that lack it. Not a build contract until accepted.
 
 ## Context
 

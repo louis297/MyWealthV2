@@ -88,6 +88,7 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | Market value | Quantity × price (quote currency), then FX if needed. Price comes from `IMarketData` (`InstrumentPrices`). | Cost basis used as if it were net worth |
 | Tenant isolation | A business row belongs to exactly one tenant. Cross-tenant read/write must fail. Dual check (handler `Where`) + EF global query filter as safety net + isolation tests. | Relying only on the EF global query filter |
 | TenantId | Tenant foreign key on business tables. | The string claim in the JWT by itself |
+| Tenant composite FK | A FK from a child's `(TenantId, XId)` to a parent's `(TenantId, Id)`. The database rejects a child that points at another tenant's row. See [fixes/tenant-composite-keys.md](fixes/tenant-composite-keys.md). | A single-column FK, which only proves the parent exists; the FK to `Tenants` |
 
 ---
 

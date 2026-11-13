@@ -3,7 +3,7 @@ title: Fix — Add EF global tenant query filter
 status: accepted
 language: en
 created: 2026-10-21
-updated: 2026-10-21
+updated: 2026-11-13
 related:
   - ../architecture.md
   - ../adr/0005-shared-database-tenantid-isolation.md
@@ -12,6 +12,8 @@ related:
 # Fix: Add EF global tenant query filter
 
 Status: accepted
+
+**Amendment 2026-11-13 (tenant composite keys, review):** [tenant-composite-keys.md](tenant-composite-keys.md) adds `TenantId` to cash legs, security legs, `TransactionFxDetails` and `PortfolioLines`, so the filter will cover them. Not a build contract until accepted.
 
 ## Problem
 

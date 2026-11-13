@@ -3,7 +3,7 @@ title: Database design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-11-11
+updated: 2026-11-13
 related:
   - README.md
   - glossary.md
@@ -19,6 +19,8 @@ This document owns **accepted tables, keys, indexes, constraints, and script ord
 **Product:** MyWealthV2.
 
 Phase 1 scripts create the platform base. Phase 2 accepted and landed: `Instruments` (`0010`), `Accounts` (`0012`), posting (`0013_transactions.sql`, `79129eb`), holdings (`0014`, `0015`), the StockIn / StockOut type check (`0016`), and the Split / Bonus / Scrip type check (`0017`). Do **not** create a second Journal / CashLedger table. There is no custom `RefreshTokens` table; refresh lives in the OpenIddict token store. Demo rows are `TestSeed`, not the schema script.
+
+**Amendment 2026-11-13 (tenant composite keys, review):** [fixes/tenant-composite-keys.md](fixes/tenant-composite-keys.md) proposes scripts `0027_child_tenant_ids.sql` (`TenantId` on cash legs, security legs, `TransactionFxDetails`, `PortfolioLines`) and `0028_tenant_composite_keys.sql` (tenant composite FKs replace single-column FKs between tenant rows). Not a build contract until accepted. §3, §6.6, §7, §9, §11.4 and §11.6 are updated when it is.
 
 ---
 
