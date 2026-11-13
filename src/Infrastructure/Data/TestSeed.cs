@@ -114,26 +114,33 @@ public static class TestSeed
         bool Active,
         decimal? Price);
 
+    // Development-only fake prices for the shared demo catalog (demo-tenant-seed R13).
+    private static readonly Dictionary<string, decimal> DevelopmentPrices = new(StringComparer.Ordinal)
+    {
+        ["VTI"] = 250m,
+        ["AAPL"] = 180m,
+        ["MSFT"] = 400m,
+        ["AIA"] = 8.50m,
+        ["FPH"] = 30m,
+        ["MEL"] = 5.50m,
+        ["BHP"] = 45m,
+        ["CBA"] = 130m,
+        ["WOW"] = 35m,
+        ["SAP"] = 180m,
+        ["AIR"] = 150m,
+        ["OR"] = 400m,
+        ["SHEL"] = 28m,
+        ["HSBA"] = 7m,
+        ["ULVR"] = 45m,
+        ["7203"] = 3000m,
+        ["6758"] = 13000m,
+        ["9984"] = 8000m
+    };
+
     private static readonly SeedInstrument[] Catalog =
     [
-        new("VTI", "Vanguard Total Stock Market ETF", "USD", true, 250m),
-        new("AAPL", "Apple Inc.", "USD", true, 180m),
-        new("MSFT", "Microsoft Corporation", "USD", true, 400m),
-        new("AIA", "Auckland International Airport", "NZD", true, 8.50m),
-        new("FPH", "Fisher & Paykel Healthcare", "NZD", true, 30m),
-        new("MEL", "Meridian Energy", "NZD", true, 5.50m),
-        new("BHP", "BHP Group", "AUD", true, 45m),
-        new("CBA", "Commonwealth Bank of Australia", "AUD", true, 130m),
-        new("WOW", "Woolworths Group", "AUD", true, 35m),
-        new("SAP", "SAP SE", "EUR", true, 180m),
-        new("AIR", "Airbus SE", "EUR", true, 150m),
-        new("OR", "L'Oréal", "EUR", true, 400m),
-        new("SHEL", "Shell plc", "GBP", true, 28m),
-        new("HSBA", "HSBC Holdings", "GBP", true, 7m),
-        new("ULVR", "Unilever", "GBP", true, 45m),
-        new("7203", "Toyota Motor", "JPY", true, 3000m),
-        new("6758", "Sony Group", "JPY", true, 13000m),
-        new("9984", "SoftBank Group", "JPY", true, 8000m),
+        .. DemoCatalog.Instruments.Select(item =>
+            new SeedInstrument(item.Symbol, item.Name, item.QuoteCurrency, true, DevelopmentPrices[item.Symbol])),
         new("NZD-CASH", "Demo disabled cash proxy", "NZD", false, null)
     ];
 
@@ -199,17 +206,13 @@ public static class TestSeed
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private const string CustomerTransactionsCode = "customer-transactions";
-
-    private const string AdviserBalancesCode = "adviser-balances";
-
     private static async Task EnsureReportGrantsAsync(
         ApplicationDbContext db,
         int tenantId,
         CancellationToken cancellationToken)
     {
         var reports = await db.Reports
-            .Where(row => row.Code == CustomerTransactionsCode || row.Code == AdviserBalancesCode)
+            .Where(row => DemoCatalog.ReportCodes.Contains(row.Code))
             .Select(row => row.Id)
             .ToListAsync(cancellationToken);
 

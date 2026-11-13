@@ -14,8 +14,8 @@ public static class DevelopmentIdentitySeeder
     public const string SystemAdminEmail = "system-admin@localhost";
     public const string SystemAdminPassword = "Administrator1!";
 
-    public const string DemoTenantCode = "demo";
-    public const string DemoTenantName = "Demo Advisory";
+    public const string DemoTenantCode = DemoCatalog.TenantCode;
+    public const string DemoTenantName = DemoCatalog.TenantName;
 
     public const string TenantAdminEmail = "tenant-admin@localhost";
     public const string TenantAdminPassword = SystemAdminPassword;
