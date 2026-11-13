@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -200,6 +202,103 @@ public class PerClientCookieTests : TestBase
         (await browser.EmailForAsync(AdviserPortal, adviserPortal)).ShouldBe("tess@firm-both");
     }
 
+    [Test]
+    public async Task PasswordChange_RejectsTheAdviserPortalIdentityCookie()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm Stamp", "firm-stamp");
+        await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Ann", "ann@firm-stamp", "Password1!", tenant.Id);
+
+        using var browser = new IdentityBrowser();
+        var login = await browser.LoginAsync(AdviserPortal, "ann@firm-stamp", "Password1!", "firm-stamp");
+        await ChangePasswordAsync(await browser.AccessTokenForAsync(AdviserPortal, login), "Password1!", "Password2!");
+
+        var after = await browser.AuthorizeAsync(AdviserPortal);
+        after.IsLogin.ShouldBeTrue($"Adviser Portal authorize completed silently after a password change: {after.Location}");
+        after.Code.ShouldBeNull();
+        after.SetCookies.ShouldContain(AdviserPortalCookie);
+    }
+
+    [Test]
+    public async Task PasswordChange_NewPasswordSignsInAgain()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm Stamp New", "firm-stamp-new");
+        await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Ann", "ann@firm-stamp-new", "Password1!", tenant.Id);
+
+        using var browser = new IdentityBrowser();
+        var login = await browser.LoginAsync(AdviserPortal, "ann@firm-stamp-new", "Password1!", "firm-stamp-new");
+        await ChangePasswordAsync(await browser.AccessTokenForAsync(AdviserPortal, login), "Password1!", "Password2!");
+
+        var after = await browser.AuthorizeAsync(AdviserPortal);
+        after.IsLogin.ShouldBeTrue($"Adviser Portal authorize completed silently after a password change: {after.Location}");
+        var code = await browser.SubmitLoginAsync(
+            after.Location, AdviserPortal, "ann@firm-stamp-new", "Password2!", "firm-stamp-new");
+        code.ShouldNotBeNullOrWhiteSpace();
+    }
+
+    [Test]
+    public async Task UnchangedPassword_KeepsSilentAuthorize()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm Stamp Same", "firm-stamp-same");
+        await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Ann", "ann@firm-stamp-same", "Password1!", tenant.Id);
+
+        using var browser = new IdentityBrowser();
+        await browser.LoginAsync(AdviserPortal, "ann@firm-stamp-same", "Password1!", "firm-stamp-same");
+
+        var first = await browser.AuthorizeAsync(AdviserPortal);
+        first.Code.ShouldNotBeNullOrWhiteSpace();
+        var second = await browser.AuthorizeAsync(AdviserPortal);
+        second.Code.ShouldNotBeNullOrWhiteSpace();
+    }
+
+    [Test]
+    public async Task PasswordChange_RejectsTheBackOfficeIdentityCookie()
+    {
+        using var browser = new IdentityBrowser();
+        var login = await browser.LoginAsync(
+            BackOffice,
+            DevelopmentIdentitySeeder.SystemAdminEmail,
+            DevelopmentIdentitySeeder.SystemAdminPassword,
+            tenantCode: null);
+        await ChangePasswordAsync(
+            await browser.AccessTokenForAsync(BackOffice, login),
+            DevelopmentIdentitySeeder.SystemAdminPassword,
+            "Administrator2!");
+
+        var after = await browser.AuthorizeAsync(BackOffice);
+        after.IsLogin.ShouldBeTrue($"Back Office authorize completed silently after a password change: {after.Location}");
+        after.Code.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task PasswordChange_RejectsTheCustomerPortalIdentityCookie()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm Stamp Customer", "firm-stamp-cust");
+        var adviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Ann", "ann@firm-stamp-cust", "Password1!", tenant.Id);
+        await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Cee", "cee@firm-stamp-cust", "Password1!", tenant.Id, adviser.Id);
+
+        using var browser = new IdentityBrowser();
+        var login = await browser.LoginAsync(CustomerPortal, "cee@firm-stamp-cust", "Password1!", "firm-stamp-cust");
+        await ChangePasswordAsync(await browser.AccessTokenForAsync(CustomerPortal, login), "Password1!", "Password2!");
+
+        var after = await browser.AuthorizeAsync(CustomerPortal);
+        after.IsLogin.ShouldBeTrue($"Customer Portal authorize completed silently after a password change: {after.Location}");
+        after.Code.ShouldBeNull();
+    }
+
+    private static async Task ChangePasswordAsync(string accessToken, string currentPassword, string newPassword)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Put, "/users/me/password");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        request.Content = JsonContent.Create(new { currentPassword, newPassword });
+        var response = await FunctionalTestSetup.WebClient.SendAsync(request);
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent, await response.Content.ReadAsStringAsync());
+    }
+
     private sealed class IdentityBrowser : IDisposable
     {
         private readonly HttpClient _client = FunctionalTestSetup.Identity.CreateClient(
@@ -209,21 +308,25 @@ public class PerClientCookieTests : TestBase
                 HandleCookies = true
             });
 
-        public async Task LoginAsync(string clientId, string email, string password, string? tenantCode)
+        public async Task<AuthorizeHit> LoginAsync(string clientId, string email, string password, string? tenantCode)
         {
             var started = await AuthorizeAsync(clientId);
             started.IsLogin.ShouldBeTrue($"Login for {clientId} was already complete: {started.Location}");
             var code = await SubmitLoginAsync(started.Location, clientId, email, password, tenantCode);
             code.ShouldNotBeNullOrWhiteSpace();
+            return started with { Code = code };
         }
 
         public async Task<AuthorizeHit> AuthorizeAsync(string clientId)
         {
             var verifier = Base64Url(RandomNumberGenerator.GetBytes(32));
             var challenge = Base64Url(SHA256.HashData(Encoding.ASCII.GetBytes(verifier)));
-            var authorize = AuthorizeUrl(clientId, challenge);
-            var response = await FollowAsync(_client, authorize, RedirectFor(clientId));
-            return new AuthorizeHit(response.Location, response.Code, verifier);
+            var first = await _client.GetAsync(AuthorizeUrl(clientId, challenge));
+            var setCookies = first.Headers.TryGetValues("Set-Cookie", out var values)
+                ? string.Join('\n', values)
+                : "";
+            var response = await FollowAsync(_client, first, RedirectFor(clientId));
+            return new AuthorizeHit(response.Location, response.Code, verifier, setCookies);
         }
 
         public async Task<string?> SubmitLoginAsync(
@@ -264,6 +367,15 @@ public class PerClientCookieTests : TestBase
 
         public async Task<string> EmailForAsync(string clientId, AuthorizeHit hit)
         {
+            var accessToken = await AccessTokenForAsync(clientId, hit);
+            var payload = accessToken.Split('.')[1];
+            var jsonPayload = Encoding.UTF8.GetString(Base64UrlDecode(payload));
+            using var claims = JsonDocument.Parse(jsonPayload);
+            return claims.RootElement.GetProperty("email").GetString()!;
+        }
+
+        public async Task<string> AccessTokenForAsync(string clientId, AuthorizeHit hit)
+        {
             hit.Code.ShouldNotBeNullOrWhiteSpace();
             using var tokenRequest = new FormUrlEncodedContent(new Dictionary<string, string?>
             {
@@ -280,11 +392,7 @@ public class PerClientCookieTests : TestBase
             tokenResponse.IsSuccessStatusCode.ShouldBeTrue(json);
 
             using var document = JsonDocument.Parse(json);
-            var accessToken = document.RootElement.GetProperty("access_token").GetString()!;
-            var payload = accessToken.Split('.')[1];
-            var jsonPayload = Encoding.UTF8.GetString(Base64UrlDecode(payload));
-            using var claims = JsonDocument.Parse(jsonPayload);
-            return claims.RootElement.GetProperty("email").GetString()!;
+            return document.RootElement.GetProperty("access_token").GetString()!;
         }
 
         public void Dispose() => _client.Dispose();
@@ -376,7 +484,7 @@ public class PerClientCookieTests : TestBase
         private sealed record Followed(int StatusCode, string Body, string Location, string? Code);
     }
 
-    private sealed record AuthorizeHit(string Location, string? Code, string Verifier)
+    private sealed record AuthorizeHit(string Location, string? Code, string Verifier, string SetCookies = "")
     {
         public bool IsLogin =>
             Location.StartsWith("/login", StringComparison.OrdinalIgnoreCase) && string.IsNullOrEmpty(Code);
