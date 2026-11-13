@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-12
-last_updated: 2026-11-13
+last_updated: 2026-11-14
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -401,7 +401,7 @@ Exact cookie names may follow the framework default for a named scheme. They mus
 
 **What does not change.**
 
-- BFF cookie (`__Host-bff-adviser-portal`) and Back Office host cookie stay on their own origins. Access and refresh stay server-side on those hosts.
+- BFF cookie (`__Host-bff-adviser-portal`) and Back Office host cookie stay on their own origins. Access and refresh live in each host's encrypted HttpOnly cookie: only that host can decrypt it, JavaScript cannot read it, and there is no server-side session store.
 - Protocol paths stay OpenIddict defaults. No custom `/auth/login`.
 - Refresh store, lifetimes, and revocation events (password change, person disable, tenant disable) stay as identity-auth.
 - `customer-portal` stays unregistered until the 2026-11-02 amendment. When registered, it gets its own scheme the same way.

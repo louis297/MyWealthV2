@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-11-02
-last_updated: 2026-11-13
+last_updated: 2026-11-14
 related:
   - ../function-plan.md
   - ../architecture.md
@@ -34,7 +34,7 @@ Not a ledger slice. Platform session increment. Do not reopen identity-auth R1�
 
 ## 1. Summary
 
-The Customer Portal browser talks only to the BFF origin: login/logout on the BFF, resource calls under `/api/*`. The BFF is the confidential OIDC client `customer-portal` (secret in Aspire, authorization code + PKCE + refresh). It stores access and refresh tokens server-side, attaches Bearer when proxying to `webapi`, and keeps an HttpOnly session cookie in the browser. `identity` still issues tokens. `webapi` still validates Bearer and never 302s to hosted login.
+The Customer Portal browser talks only to the BFF origin: login/logout on the BFF, resource calls under `/api/*`. The BFF is the confidential OIDC client `customer-portal` (secret in Aspire, authorization code + PKCE + refresh). It keeps the access and refresh tokens in the encrypted HttpOnly session cookie it sets in the browser (only the BFF can decrypt it; JavaScript cannot read it; no server-side session store, R22) and attaches Bearer when proxying to `webapi`. `identity` still issues tokens. `webapi` still validates Bearer and never 302s to hosted login.
 
 The allow-list on IdentityHost is Customer only. A TenantAdmin, Adviser, or SystemAdmin with a correct password receives no authorization code for this client.
 
@@ -104,7 +104,7 @@ The allow-list on IdentityHost is Customer only. A TenantAdmin, Adviser, or Syst
 | R18 | Mutating browser calls (`POST` / `PUT` / `PATCH` / `DELETE` under `/api`, and `POST /bff/logout`) require header `X-MyWealth-Request: 1`. Missing header → **400**, do not proxy. GET does not require it. This is not a second CSRF token. SameSite=Lax stays. |
 | R19 | Do not proxy `/connect/*` to the browser. The SPA has no identity origin in env for protocol calls. |
 | R20 | Proxy only these `webapi` prefixes: `/users`, `/accounts`, `/transactions`, `/net-worth`, `/reports`. Any other `/api/*` path → **404**, not forwarded. Do not forward `/scalar`, `/openapi`, `/health`, `/connect`, `/instruments`, `/tenants`, `/currencies`. Destination is Aspire `webapi` only. |
-| R21 | On the outbound `webapi` request, drop the browser `Cookie` and `Authorization`. Set `Authorization: Bearer <access>` from the server ticket. Forward `Idempotency-Key`, `Content-Type`, `Accept`. |
+| R21 | On the outbound `webapi` request, drop the browser `Cookie` and `Authorization`. Set `Authorization: Bearer <access>` from the ticket in the encrypted session cookie (R22). Forward `Idempotency-Key`, `Content-Type`, `Accept`. |
 | R22 | First slice stores the OIDC ticket in the encrypted authentication cookie (`SaveTokens`). Expose `CookieAuthenticationOptions.SessionStore` so a later amendment can move the ticket to a table without rewriting login or the proxy. No `BffSessions` table in this slice. |
 | R23 | BFF responses include `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and a frame policy of `frame-ancestors 'none'` (or `X-Frame-Options: DENY`). Do not lock `script-src` in this slice. |
 | R24 | Access lifetime stays identity-auth (15 minutes). Refresh stays 14 days absolute. This slice requires refresh rotation: a used refresh is revoked when the next one is issued. Stolen-cookie window is the access lifetime, then rotation or R7 fails the copy. |
@@ -149,7 +149,7 @@ None on `webapi` / `Application`. BFF composition root only:
 | Kind | Name | Returns | Checks |
 | --- | --- | --- | --- |
 | Host | `GET /bff/login` | 302 to `identity` authorize | Anonymous allowed; optional `returnUrl` must be a relative in-app path |
-| Host | OIDC handler `/signin-oidc` | 302 to return path; sets cookie; stores tokens server-side | Single-flight per `code` (no double redeem / OpenIddict `ID2010`) |
+| Host | OIDC handler `/signin-oidc` | 302 to return path; sets the encrypted session cookie that holds the tokens (R22) | Single-flight per `code` (no double redeem / OpenIddict `ID2010`) |
 | Host | `POST /bff/logout` | 302 to end-session then `{bffOrigin}/` | Cookie present or already signed out (idempotent); R8 |
 | Host | ApiProxy `/api/{**path}` | `webapi` status + body | Cookie session required; attach Bearer; R5–R7 |
 | Host | Static / Vite forward | SPA | Anonymous; `/api` and `/bff` and `/signin-oidc` excluded |
@@ -223,7 +223,7 @@ Cross-tenant or wrong-collection resource ids remain **404** from `webapi`, pass
 
 R20. There is no open `/api/{**path}` catch-all. Schedule routes are not in the allow-list for this portal (Customer does not schedule in this slice).
 
-Forward: `Idempotency-Key`, `Content-Type`, `Accept`. Drop browser `Cookie` and `Authorization` (R21). Set `Authorization: Bearer <access>` from the server ticket.
+Forward: `Idempotency-Key`, `Content-Type`, `Accept`. Drop browser `Cookie` and `Authorization` (R21). Set `Authorization: Bearer <access>` from the ticket in the encrypted session cookie (R22).
 
 ### 8.4 Aspire / client
 

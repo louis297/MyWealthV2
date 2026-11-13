@@ -4,7 +4,7 @@ status: accepted
 phase: 1
 language: en
 created: 2026-10-24
-updated: 2026-11-13
+updated: 2026-11-14
 related:
   - README.md
   - ../function-plan.md
@@ -23,7 +23,7 @@ related:
 
 Aspire resource `back-office`. Platform-ops UI for SystemAdmin.
 
-Independent of the Adviser Portal. No BFF. The host is a confidential OpenIddict client; it holds the cookie session and access/refresh tokens server-side, then calls `webapi` with Bearer.
+Independent of the Adviser Portal. No BFF. The host is a confidential OpenIddict client; it keeps the access and refresh tokens in its encrypted HttpOnly session cookie (`SaveTokens`; only the host can decrypt it; JavaScript cannot read it; no server-side session store), then calls `webapi` with Bearer.
 
 Accepted 2026-10-25. SystemAdmin still uses Scalar for the same verbs. The Back Office does not remove or replace the existing resource API surface. The host is landed.
 
@@ -64,7 +64,7 @@ Accepted 2026-10-25. SystemAdmin still uses Scalar for the same verbs. The Back 
 | UI stack | Blazor Web App + Interactive Server. Component library: MudBlazor. No functional change from the accepted page contract |
 | OIDC client | Confidential, `ClientId = back-office`, secret via Aspire parameter (not in git) |
 | Login | Redirect to hosted `/login` on `identity`. SystemAdmin omits `tenantCode` |
-| Session | Cookie on the Back Office host. Access + refresh held server-side |
+| Session | Encrypted HttpOnly cookie on the Back Office host. Access + refresh live in the cookie; no server-side session store |
 | Identity cookie | Isolated. IdentityHost uses a per-client cookie scheme for `back-office`. Login on Adviser Portal does not authenticate Back Office, and the reverse. See identity-auth amendment 2026-10-27. |
 | Resource calls | Typed `HttpClient` to `webapi` with Bearer access token |
 | CORS | None required on `webapi` (server-to-server) |
