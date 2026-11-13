@@ -378,9 +378,9 @@ Status of this amendment: `accepted`. The rest of this file stays accepted. Item
 
 ---
 
-## Amendment 2026-11-13 (refresh single-flight) — review
+## Amendment 2026-11-13 (refresh single-flight) — accepted
 
-Status of this amendment: `review`. Not a build contract until it is accepted. The rest of this file stays accepted. It tightens R7 and R24. It applies to both BFFs ([bff-customer-portal.md](bff-customer-portal.md) points here) and to the refresh exchange in Back Office ([back-office.md](../backoffice/back-office.md) points here). Do not rewrite R7, R22 or R24, or the identity-auth amendment 2026-10-01, in place.
+Status of this amendment: `accepted` (2026-11-13). It is a build contract. The rest of this file stays accepted. It tightens R7 and R24. It applies to both BFFs ([bff-customer-portal.md](bff-customer-portal.md) points here) and to the refresh exchange in Back Office ([back-office.md](../backoffice/back-office.md) points here). Do not rewrite R7, R22 or R24, or the identity-auth amendment 2026-10-01, in place.
 
 **Why.** `ApiProxy.TryRefreshAsync` in both BFFs posts a refresh grant for every proxied request that gets 401 from `webapi`. Nothing joins two such requests. The ticket lives in the browser cookie (R22), so every request the SPA sends before it receives the new cookie carries the same refresh token. IdentityHost rotates refresh tokens and sets the reuse leeway to zero (identity-auth amendment 2026-10-01: issuing a new refresh revokes the one presented). The second grant for the same refresh token is therefore a replay. It fails with `invalid_grant`, and OpenIddict revokes the token chain of that authorization, including the refresh token the first grant has just issued.
 
