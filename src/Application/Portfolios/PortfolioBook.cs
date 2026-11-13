@@ -1,4 +1,5 @@
 using MyWealthV2.Application.Accounts;
+using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Domain.Enums;
 
@@ -20,4 +21,31 @@ internal static class PortfolioBook
          join account in AccountScope.ManagedAccounts(db, currentUser) on assignment.AccountId equals account.Id
          where assignment.PortfolioId == portfolioId && assignment.Status == AssignmentStatus.Active
          select account.PublicId).ToListAsync(cancellationToken);
+
+    /// <summary>
+    /// PB3 / PB4: an Adviser may not change or disable a Shared portfolio, one with an Active assignment on an
+    /// Account outside the Adviser's Book. TenantAdmin and SystemAdmin are not limited (PB5).
+    /// </summary>
+    public static async Task EnsureNotSharedAsync(
+        IApplicationDbContext db,
+        ICurrentUser currentUser,
+        int portfolioId,
+        CancellationToken cancellationToken)
+    {
+        if (currentUser.Role != UserRole.Adviser)
+        {
+            return;
+        }
+
+        var book = AccountScope.ManagedAccounts(db, currentUser).Select(account => account.Id);
+        var shared = await db.AccountPortfolioAssignments.AnyAsync(
+            assignment => assignment.PortfolioId == portfolioId
+                          && assignment.Status == AssignmentStatus.Active
+                          && !book.Contains(assignment.AccountId),
+            cancellationToken);
+        if (shared)
+        {
+            throw new PortfolioSharedException();
+        }
+    }
 }

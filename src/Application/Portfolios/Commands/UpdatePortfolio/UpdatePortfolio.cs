@@ -56,6 +56,7 @@ public class UpdatePortfolioCommandHandler(
     public async Task<RebalanceAcceptedDto?> Handle(UpdatePortfolioCommand request, CancellationToken cancellationToken)
     {
         var portfolio = await LoadAsync(request.Id, cancellationToken);
+        await PortfolioBook.EnsureNotSharedAsync(db, currentUser, portfolio.Id, cancellationToken);
         if (!string.Equals(Convert.ToBase64String(portfolio.RowVersion ?? []), request.RowVersion, StringComparison.Ordinal))
         {
             throw new ConcurrencyException();
@@ -104,11 +105,7 @@ public class UpdatePortfolioCommandHandler(
             return null;
         }
 
-        var accountIds = await (
-            from assignment in db.AccountPortfolioAssignments
-            join account in db.Accounts on assignment.AccountId equals account.Id
-            where assignment.PortfolioId == portfolio.Id && assignment.Status == AssignmentStatus.Active
-            select account.PublicId).ToListAsync(cancellationToken);
+        var accountIds = await PortfolioBook.ActiveAccountIdsAsync(db, currentUser, portfolio.Id, cancellationToken);
         if (accountIds.Count == 0)
         {
             return null;
