@@ -356,7 +356,7 @@ Same rules as the [bff-adviser-portal.md](bff-adviser-portal.md) amendment 2026-
 
 ## Amendment 2026-11-13 (refresh single-flight) — accepted
 
-Status of this amendment: `accepted` (2026-11-13). It is a build contract. The rest of this file stays accepted. The rules, tests and commits live in [bff-adviser-portal.md](bff-adviser-portal.md), amendment 2026-11-13 (refresh single-flight), RF1–RF8 and RF-T1–RF-T7. They apply to `bff-customer-portal` unchanged. Do not copy them here.
+Status of this amendment: `accepted` (2026-11-13). It is a build contract. Landed 2026-11-13 (`CustomerBffRefreshSingleFlightTests`). The rest of this file stays accepted. The rules, tests and commits live in [bff-adviser-portal.md](bff-adviser-portal.md), amendment 2026-11-13 (refresh single-flight), RF1–RF8 and RF-T1–RF-T7. They apply to `bff-customer-portal` unchanged. Do not copy them here.
 
 **Why.** R7 refreshes once per proxied request, with no join between concurrent requests. Together with refresh rotation and a zero reuse leeway (R24, identity-auth amendment 2026-10-01), two requests that hit `webapi` 401 at the same time present the same refresh token twice. The second grant is a replay, OpenIddict revokes the chain, and the person is signed out.
 

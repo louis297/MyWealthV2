@@ -185,7 +185,7 @@ Back Office tests assert routes, role gate, and that the UI client sends the sha
 
 ## Amendment 2026-11-13 (refresh exchange moves to Shared) — accepted
 
-Status of this amendment: `accepted` (2026-11-13). It is a build contract. The rest of this file stays accepted. The owner is [bff-adviser-portal.md](../features/bff-adviser-portal.md), amendment 2026-11-13 (refresh single-flight).
+Status of this amendment: `accepted` (2026-11-13). It is a build contract. Landed 2026-11-13 (`RotatedRefreshToken_PresentedThirtyMinutesLater_CallsTheTokenEndpoint`). The rest of this file stays accepted. The owner is [bff-adviser-portal.md](../features/bff-adviser-portal.md), amendment 2026-11-13 (refresh single-flight).
 
 - The exchange part of `BackOfficeTokenRefresh` (concurrent grants joined, rotated refresh tokens remembered, chain follow) moves to `src/Shared` `RefreshTokenExchange`, so both BFFs use the same code. Back Office keeps `ValidatePrincipalAsync` and `CookieAccessTokens`. Behaviour is unchanged, and `BackOfficeRefreshTests` stay green.
 - New: a remembered rotation is dropped 30 minutes after it is written (RF6). Today the map never drops an entry. One added test: a rotated refresh token presented 30 minutes after the rotation calls the token endpoint.
