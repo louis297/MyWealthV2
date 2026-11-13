@@ -33,5 +33,6 @@ public static class ClientCookieSchemes
         options.Cookie.SecurePolicy = development
             ? CookieSecurePolicy.SameAsRequest
             : CookieSecurePolicy.Always;
+        options.Events.OnValidatePrincipal = IdentityCookieSecurityStamp.ValidateAsync;
     }
 }
