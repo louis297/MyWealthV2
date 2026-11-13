@@ -15,7 +15,7 @@ related:
 
 # Fix: Tenant composite foreign keys and TenantId on child tables
 
-Status: accepted (2026-11-13). Build contract.
+Status: accepted (2026-11-13). Build contract. Landed: B1 `0027`, B2 `0028`, B3 `RebalanceJob`.
 
 ## Problem
 

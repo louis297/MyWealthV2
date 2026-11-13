@@ -13,7 +13,7 @@ related:
 
 Status: accepted
 
-**Amendment 2026-11-13 (tenant composite keys, accepted):** [tenant-composite-keys.md](tenant-composite-keys.md) adds `TenantId` to cash legs, security legs, `TransactionFxDetails` and `PortfolioLines`, so the filter covers them (`0027`). The sentence below about legs staying unfiltered is out of date.
+**Amendment 2026-11-13 (tenant composite keys, accepted, landed):** [tenant-composite-keys.md](tenant-composite-keys.md) adds `TenantId` to cash legs, security legs, `TransactionFxDetails` and `PortfolioLines`, so the filter covers them (`0027`). The sentence below about legs staying unfiltered is out of date.
 
 ## Problem
 
