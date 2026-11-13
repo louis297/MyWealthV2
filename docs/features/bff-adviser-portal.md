@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-01
-last_updated: 2026-11-12
+last_updated: 2026-11-13
 related:
   - ../function-plan.md
   - ../architecture.md
@@ -375,3 +375,58 @@ Status of this amendment: `accepted`. The rest of this file stays accepted. Item
 | P-T7 | No `index.html` | `GET /some/client/route` | 404; `/bff/login` still answers |
 | P-T8 | `Spa:DevServerUrl` set | `GET /some/client/route` | Forwarded to the dev server, as today (existing proxy tests stay green) |
 
+
+---
+
+## Amendment 2026-11-13 (refresh single-flight) — review
+
+Status of this amendment: `review`. Not a build contract until it is accepted. The rest of this file stays accepted. It tightens R7 and R24. It applies to both BFFs ([bff-customer-portal.md](bff-customer-portal.md) points here) and to the refresh exchange in Back Office ([back-office.md](../backoffice/back-office.md) points here). Do not rewrite R7, R22 or R24, or the identity-auth amendment 2026-10-01, in place.
+
+**Why.** `ApiProxy.TryRefreshAsync` in both BFFs posts a refresh grant for every proxied request that gets 401 from `webapi`. Nothing joins two such requests. The ticket lives in the browser cookie (R22), so every request the SPA sends before it receives the new cookie carries the same refresh token. IdentityHost rotates refresh tokens and sets the reuse leeway to zero (identity-auth amendment 2026-10-01: issuing a new refresh revokes the one presented). The second grant for the same refresh token is therefore a replay. It fails with `invalid_grant`, and OpenIddict revokes the token chain of that authorization, including the refresh token the first grant has just issued.
+
+The BFF then clears the cookie and returns 401 (R7), and the SPA 401 handler starts login. So once the 15-minute access token has expired, any page that loads two or more queries in parallel signs the person out. If the first response's cookie is the one the browser keeps, the person is signed out at the next refresh instead, because that refresh token was revoked with the chain. `webapi` validates the JWT locally, so the new access token keeps working until it expires.
+
+The race window is not one instant. It is the full round trip of the first request (`webapi` 401, token endpoint, retry). It also covers any request whose response with the new cookie never reached the browser (the request was aborted, or the person navigated away).
+
+Back Office does not have this race. `BackOfficeTokenRefresh` already joins concurrent grants and remembers rotated tokens (`ConcurrentPresentations_ExchangeTheRefreshTokenOnce`, `SecondPresentationOfARotatedRefreshToken_DoesNotCallTheTokenEndpoint`). However, its memory never drops an entry.
+
+Today's code: `src/BffAdviserPortal/ApiProxy.cs` and `src/BffCustomerPortal/ApiProxy.cs` (`TryRefreshAsync`, a static method with no shared state, cancelled by `RequestAborted`). `src/IdentityHost/Program.cs` (`SetRefreshTokenReuseLeeway(TimeSpan.Zero)`, reference refresh tokens, rolling refresh). `src/BackOffice/BackOfficeTokenRefresh.cs`. No test has reproduced the race yet; RF-T1 is that test.
+
+| Id | Rule |
+| --- | --- |
+| RF1 | **Refresh single-flight.** Within one host process, at most one refresh grant is in flight per refresh token. Every proxied request that needs a refresh with that token waits for that one grant and uses its result. |
+| RF2 | **Rotated tokens are remembered.** After a grant succeeds, the host remembers that the presented refresh token was replaced by the result (new access token, new refresh token, access expiry). A later request that presents the replaced refresh token gets that result from memory and does not call the token endpoint. |
+| RF3 | **Chain follow.** When the remembered access token has expired, or expires within one minute, the host follows the remembered chain to the newest refresh token and refreshes that one under RF1. It never presents a replaced refresh token again. |
+| RF4 | **Failure is not remembered.** A failed grant (non-success status, or no `access_token` or `refresh_token` in the body) is returned to every request that waited for it, then dropped. Each of those requests follows R7: clear the cookie, return 401. The next request with that refresh token calls the token endpoint again. |
+| RF5 | **The request that starts the grant cannot cancel it.** The token-endpoint call does not use the request's `RequestAborted`. A waiting request may stop waiting when its own request is aborted; that does not cancel the grant. A grant whose result the browser never receives still lands in memory under RF2. |
+| RF6 | **Retention.** Each remembered entry is dropped 30 minutes (two access lifetimes) after it is written. Time comes from the host's `TimeProvider`. A replaced refresh token presented after that goes to the token endpoint and fails as a replay (R7). Memory holds only recent rotations, not every rotation since start. |
+| RF7 | **Cookie and retry unchanged.** Every request that uses a refreshed result, whether from the grant or from memory, writes the new ticket to its own response cookie and retries `webapi` once with the new access token. R7 still allows one refresh and one retry per proxied request. |
+| RF8 | **Process memory only.** No table, no distributed cache, no new configuration key. Token values are never logged or used as log properties. |
+
+**Implementation note.** Move the exchange part of `BackOfficeTokenRefresh` (`ExchangeAsync`, the chain follow, the in-flight map, the remembered map and the grant POST) into one class in `src/Shared`, `RefreshTokenExchange`. Both BFFs' `ApiProxy` and Back Office use that class. Each host registers it as a singleton with its own client id, client secret, token endpoint, `HttpClient` and `TimeProvider`. It needs no ASP.NET Core reference (`HttpClient`, `System.Text.Json`, `TimeProvider`), so `src/Shared` stays a plain class library. Back Office keeps `ValidatePrincipalAsync` and `CookieAccessTokens`. `TryRefreshAsync` keeps the cookie write (RF7) and the `id_token` carry-over.
+
+**Unchanged.** IdentityHost reuse leeway stays zero, and rotation stays on (R24). Access and refresh lifetimes. The SPA 401 handler. R7's one refresh and one retry. The ticket stays in the cookie (R22). No refresh before expiry in the BFFs. No new route, table or schema script.
+
+**Left open.** Memory is per process. Two BFF instances behind one origin would not share it, and concurrent requests split across them would race as they do today. Today each BFF runs as one instance (AppHost has no replicas, and `deploy/compose.yml` has one container per BFF). Revisit together with §11 "Production Data Protection key store for a multi-instance BFF" and the session table.
+
+**Tests.** Application.FunctionalTests, in `BffRefreshTests`, for each BFF host. "Concurrent" means the test holds the first refresh grant open until both proxied requests have received their `webapi` 401. It is never timing-based. Retention moves a fake `TimeProvider` registered in the test host; it never waits.
+
+| Id | Given | When | Then |
+| --- | --- | --- | --- |
+| RF-T1 | Signed-in cookie C0; fake `webapi` answers 401 to the first two calls, then 200 | Two concurrent `GET /api/users/me` with C0 | Both 200. Exactly one refresh grant. Both retries carry the same new Bearer. Both responses set the session cookie |
+| RF-T2 | One request with C0 has refreshed (RT0 replaced by RT1) | `GET /api/users/me` with the old C0; `webapi` 401 then 200 | 200. No new refresh grant. The retry Bearer is the access token from the first grant. The response sets the session cookie |
+| RF-T3 | After RF-T1 | The refresh token from either response cookie is presented to `/connect/token` | Success (the chain was not revoked) |
+| RF-T4 | RT0 replaced by RT1; time moved past the remembered access expiry | `GET` with C0; `webapi` 401 then 200 | 200. One new grant, and it presents RT1, not RT0 |
+| RF-T5 | RT0 replaced by RT1; time moved 30 minutes past the rotation | `GET` with C0; `webapi` 401 | Token endpoint called with RT0, which fails. 401. Cookie cleared |
+| RF-T6 | Refresh token revoked; `webapi` 401 to every call | Two concurrent `GET` with that cookie, then a third `GET` | The first two: 401, cookie cleared, one grant between them. The third: calls the token endpoint again |
+| RF-T7 | First grant held open | The client aborts the request that started the grant; the grant is released; then `GET` with C0, `webapi` 401 then 200 | 200 with no further grant |
+
+`BackOfficeRefreshTests` stay green after the move. A Back Office case for RF6 is added there: a rotated refresh token presented 30 minutes after the rotation calls the token endpoint.
+
+**Suggested commits.** The tree builds after each commit. Each behaviour is split into red and green.
+
+1. Move the exchange part of `BackOfficeTokenRefresh` into `src/Shared` `RefreshTokenExchange`; Back Office uses it (refactor; `BackOfficeRefreshTests` green).
+2. Retention (RF6) on the shared class, proven through Back Office.
+3. Adviser Portal BFF: RF-T1–RF-T7 red, then `ApiProxy` uses `RefreshTokenExchange` (green).
+4. Customer Portal BFF: the same.
+5. Mark this amendment landed in this file, `bff-customer-portal.md` and `back-office.md`.

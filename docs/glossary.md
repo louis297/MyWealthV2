@@ -3,7 +3,7 @@ title: Glossary
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-11-12
+updated: 2026-11-13
 related:
   - function-plan.md
   - domain-model.md
@@ -152,6 +152,7 @@ Later portals copy the last BFF row: `bff-customer-portal`, `BffCustomerPortal`,
 | Authorization code + PKCE | Redirect grant. First-party session protocol. BFF uses PKCE with a client secret. | Resource Owner Password Credentials grant |
 | JWT / access token | Short-lived bearer issued by OpenIddict. The portal browser must not store it. | Long-lived access token with no refresh; tokens minted by a resource endpoint or by the BFF |
 | Refresh token | Stored by OpenIddict. Revoked on password change, disable, and logout. Rotated when the BFF presents it. Only the BFF holds the handle. | A custom `RefreshTokens` table |
+| Refresh single-flight | Within one host process, at most one refresh grant per refresh token is in flight. Concurrent requests wait for it, and a later request that presents the replaced refresh token gets the remembered result for 30 minutes. Shared class `RefreshTokenExchange` (`src/Shared`). See bff-adviser-portal amendment 2026-11-13. | Raising the identity reuse leeway; a distributed lock; one grant per proxied request |
 | BFF | Backend for Frontend. First-party portal edge. Resource and project names put `bff` first. `bff-adviser-portal` is accepted. | Putting cookie auth on `webapi`; Duende.BFF; `adviser-portal-bff` |
 | RowVersion | Conflict detection on key tables. HTTP 409. | Last-write-wins with no check |
 | Isolation test | Cross-tenant assertion. CI gate from the Tenants slice onward. | A single shared happy-path test |

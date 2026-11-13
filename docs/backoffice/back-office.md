@@ -4,7 +4,7 @@ status: accepted
 phase: 1
 language: en
 created: 2026-10-24
-updated: 2026-11-09
+updated: 2026-11-13
 related:
   - README.md
   - ../function-plan.md
@@ -180,6 +180,15 @@ Tenant instrument catalog for a chosen tenant. Full field bindings and acceptanc
 ## Tests
 
 Back Office tests assert routes, role gate, and that the UI client sends the shapes expected by the existing Feature Specs. Do not re-prove backend isolation or dual-write here.
+
+---
+
+## Amendment 2026-11-13 (refresh exchange moves to Shared) — review
+
+Status of this amendment: `review`. Not a build contract until it is accepted. The rest of this file stays accepted. The owner is [bff-adviser-portal.md](../features/bff-adviser-portal.md), amendment 2026-11-13 (refresh single-flight).
+
+- The exchange part of `BackOfficeTokenRefresh` (concurrent grants joined, rotated refresh tokens remembered, chain follow) moves to `src/Shared` `RefreshTokenExchange`, so both BFFs use the same code. Back Office keeps `ValidatePrincipalAsync` and `CookieAccessTokens`. Behaviour is unchanged, and `BackOfficeRefreshTests` stay green.
+- New: a remembered rotation is dropped 30 minutes after it is written (RF6). Today the map never drops an entry. One added test: a rotated refresh token presented 30 minutes after the rotation calls the token endpoint.
 
 ---
 

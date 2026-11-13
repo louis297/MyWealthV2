@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-11-02
-last_updated: 2026-11-12
+last_updated: 2026-11-13
 related:
   - ../function-plan.md
   - ../architecture.md
@@ -351,3 +351,13 @@ Status of this amendment: `accepted`. The rest of this file stays accepted. Item
 
 Same rules as the [bff-adviser-portal.md](bff-adviser-portal.md) amendment 2026-11-12. Both BFFs keep their own copy of the code; sharing it is a refactor, not a rule.
 
+
+---
+
+## Amendment 2026-11-13 (refresh single-flight) — review
+
+Status of this amendment: `review`. Not a build contract until it is accepted. The rest of this file stays accepted. The rules, tests and commits live in [bff-adviser-portal.md](bff-adviser-portal.md), amendment 2026-11-13 (refresh single-flight), RF1–RF8 and RF-T1–RF-T7. They apply to `bff-customer-portal` unchanged. Do not copy them here.
+
+**Why.** R7 refreshes once per proxied request, with no join between concurrent requests. Together with refresh rotation and a zero reuse leeway (R24, identity-auth amendment 2026-10-01), two requests that hit `webapi` 401 at the same time present the same refresh token twice. The second grant is a replay, OpenIddict revokes the chain, and the person is signed out.
+
+**Here.** `src/BffCustomerPortal/ApiProxy.cs` `TryRefreshAsync` uses the shared `RefreshTokenExchange` with client `customer-portal`. RF-T1–RF-T7 run against this host as well. R7, R20, R22 and R24 are otherwise unchanged.
