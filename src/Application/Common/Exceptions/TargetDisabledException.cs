@@ -1,23 +1,16 @@
 namespace MyWealthV2.Application.Common.Exceptions;
 
-public sealed class TargetDisabledException : Exception
+/// <summary>The write targets a tenant, user or account that exists but is disabled (api-design §4.1, code <c>disabled</c>).</summary>
+public sealed class TargetDisabledException(string target, Guid targetId, string title, string detail)
+    : ProblemException(ProblemKind.Rule, "disabled", title, detail)
 {
-    public TargetDisabledException(string target, Guid targetId, string title, string detail)
-        : base(detail)
+    public string Target { get; } = target;
+
+    public Guid TargetId { get; } = targetId;
+
+    public override IReadOnlyDictionary<string, object?> Extensions => new Dictionary<string, object?>
     {
-        Target = target;
-        TargetId = targetId;
-        Title = title;
-        Detail = detail;
-    }
-
-    public string Target { get; }
-
-    public Guid TargetId { get; }
-
-    public string Title { get; }
-
-    public string Detail { get; }
-
-    public string Code => "disabled";
+        ["target"] = Target,
+        ["targetId"] = TargetId
+    };
 }

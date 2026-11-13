@@ -43,8 +43,6 @@ public class ProblemDetailsExceptionHandler : IExceptionHandler
                 Type = "https://tools.ietf.org/html/rfc9110#section-15.5.4"
             }),
             ProblemException problem => (StatusOf(problem.Kind), CodedProblem(problem)),
-            TargetDisabledException tde => (StatusCodes.Status400BadRequest, DisabledProblem(tde)),
-            RebalanceException rebalance => (StatusCodes.Status400BadRequest, CodedProblem(rebalance.Code, rebalance.Message)),
             _ => (-1, null)
         };
 
@@ -85,34 +83,6 @@ public class ProblemDetailsExceptionHandler : IExceptionHandler
             problem.Extensions[name] = value;
         }
 
-        return problem;
-    }
-
-    private static ProblemDetails DisabledProblem(TargetDisabledException exception)
-    {
-        var problem = new ProblemDetails
-        {
-            Status = StatusCodes.Status400BadRequest,
-            Type = "https://tools.ietf.org/html/rfc9110#section-15.5.1",
-            Title = exception.Title,
-            Detail = exception.Detail
-        };
-        problem.Extensions["code"] = exception.Code;
-        problem.Extensions["target"] = exception.Target;
-        problem.Extensions["targetId"] = exception.TargetId;
-        return problem;
-    }
-
-    private static ProblemDetails CodedProblem(string code, string detail)
-    {
-        var problem = new ProblemDetails
-        {
-            Status = StatusCodes.Status400BadRequest,
-            Type = "https://tools.ietf.org/html/rfc9110#section-15.5.1",
-            Title = "Rebalance failed",
-            Detail = detail
-        };
-        problem.Extensions["code"] = code;
         return problem;
     }
 }
