@@ -542,6 +542,41 @@ Today's code: IdentityHost registers the user store with `AddIdentityCore` and a
 | A39 | SystemAdmin with a valid `back-office` identity cookie | Password change, then authorize for `back-office` | Redirect to hosted `/login`. No code |
 | A40 | Active Customer with a valid `customer-portal` identity cookie | Password change, then authorize for `customer-portal` | Redirect to hosted `/login`. No code |
 
+### Amendment 2026-11-13 (hosted login lockout and one hash per attempt)
+
+Status of this amendment: `review`. Not a build contract until accepted. Supersedes nothing in R1–R21; it tightens R2 and R3 and closes the lockout gap in [deployment.md](../deployment.md) §11. Do not rewrite those or earlier amendments in place.
+
+**Why.** Hosted login has three gaps that together make password guessing cheap.
+
+1. **No lockout.** `Login.cshtml.cs` checks the password with `UserManager.CheckPasswordAsync`, which does not count failures. Nothing stops attempts on one account spread over many IPs.
+2. **Timing tells who exists.** The page returns early, before any password hash, when the tenantCode is unknown, the email is unknown, or the person is not eligible (`LoginEligibility`). Only an eligible person with a wrong password pays for the hash (PBKDF2, tens of milliseconds). The copy is uniform (R3), but the response time is not, so an attacker can list the active tenantCode + email pairs.
+3. **The edge limit can be skipped.** Caddy limits `POST` on the exact paths `/login` and `/connect/token`. Caddy's `path` matcher folds case, `//` and `..`, but `/login/`, `/login//` and `/login%2F` do not match an exact path, and ASP.NET routing still serves `/login/` to the page. Those requests only meet the loose global limit (about 300 per minute per IP). Separately, `bff-adviser-portal`, `bff-customer-portal` and `back-office` reach `id.<domain>` through Caddy on the internal network (compose alias), so every code redemption and refresh from one host shares one per-IP key of 10 per minute.
+
+Today's code: `AddIdentityCore` in `src/Infrastructure/DependencyInjection.cs` sets no lockout options. `AspNetUsers` already has `LockoutEnd`, `LockoutEnabled` and `AccessFailedCount` (`0003_identity.sql`). All three OIDC clients are confidential and use authorization code + refresh only; there is no password grant (ADR 0014), so `/connect/token` never checks a person's password.
+
+- **One hash per attempt.** Every `POST /login` runs exactly one password-hash verification, whatever the outcome. When no identity user is resolved (unknown tenantCode, unknown email, missing Identity link), IdentityHost verifies the submitted password against a dummy password hash and then fails. The dummy hash is created once at startup by the registered `IPasswordHasher<ApplicationUser>` from a random password, so its cost matches a real hash.
+- **Order of checks.** Resolve tenantCode + email → identity user (R2) → verify the password → lockout → `LoginEligibility` (R3) → client allow-list (R4, R20) → sign in. Eligibility moves after the password check so that a disabled person costs the same as an active one. The response copy for every failure stays `Invalid login.`
+- **Lockout.** Five wrong passwords in a row lock the identity user for five minutes. A wrong password counts whether or not the person is eligible. A correct password while not locked resets the count to zero. While locked, the password is still verified (one hash), the attempt fails with the uniform copy, it is not counted, and it does not extend the lockout. When the lockout ends, the count starts at zero.
+- **Settings.** `IdentityOptions.Lockout`: `AllowedForNewUsers = true`, `MaxFailedAccessAttempts = 5`, `DefaultLockoutTimeSpan = 5 minutes`. Set in code next to the password options; no new configuration key. Five minutes keeps a demo account usable after a few typos.
+- **Who is locked.** Every role, SystemAdmin included. The person is not told that the account is locked (R3). There is no unlock UI; [deployment.md](../deployment.md) gets a runbook line that clears `LockoutEnd` and `AccessFailedCount` in SQL.
+- **Existing rows.** `UserManager.CreateAsync` writes `LockoutEnabled = AllowedForNewUsers`, which already defaults to true. If any existing row has `LockoutEnabled = 0`, a `database/schema/` script sets it to 1. No column changes.
+- **Edge rate limit.** The Caddy `sign_in` zone on `id.<domain>` matches `POST` on `/login*` and no longer matches `/connect/token`. Both the `sign_in` zone and the global zone skip the internal network `172.30.0.0/24`, so host-to-host calls through Caddy are not limited per container. [deployment.md](../deployment.md) §11 changes with the Caddyfile, and the subnet becomes one more place listed in [known-issues/deploy-fixed-docker-subnet.md](../known-issues/deploy-fixed-docker-subnet.md).
+- **Implementation note.** Do not use `SignInManager.CheckPasswordSignInAsync(..., lockoutOnFailure: true)` as it is. For a locked user it returns before hashing, which brings the timing gap back. Use `UserManager.IsLockedOutAsync`, `CheckPasswordAsync`, `AccessFailedAsync` and `ResetAccessFailedCountAsync` in the order above.
+- **Left open (known issues at landing).** Anyone who knows a tenantCode + email can keep that account locked. A failed attempt on an existing identity user writes `AccessFailedCount`, and an unknown tenantCode skips one lookup; both differ by a few milliseconds, far less than a hash. Spread over many IPs, an attacker gets at most five guesses per account every five minutes.
+- **Unchanged.** Hosted login copy, the allow-list, identity cookie schemes and the security-stamp check, logout (R21), and `PUT /users/me/password` on `webapi` (an authenticated call; it does not count failures). No new route. No new table. No new configuration key.
+
+**Acceptance (amendment A41–A47).** Application.FunctionalTests. "One hash" is asserted by counting calls on a wrapper around `IPasswordHasher<ApplicationUser>` in the test host, never by wall-clock time. Lockout expiry is simulated by moving `LockoutEnd` into the past in the database, not by waiting.
+
+| Id | Given | When | Then |
+| --- | --- | --- | --- |
+| A41 | Each of: unknown tenantCode; unknown email; Disabled Adviser; Active Adviser on a disabled tenant; Active Adviser with a wrong password; Active Customer with the correct password on client `adviser-portal`; locked Adviser with the correct password | One `POST /login` | Exactly one password-hash verification. No authorization code. Copy `Invalid login.` |
+| A42 | Active Adviser | Five wrong passwords, then the correct password | The sixth attempt issues no code. Copy `Invalid login.` `LockoutEnd` is about five minutes ahead |
+| A43 | Locked Adviser | Correct password | No code. `LockoutEnd` and `AccessFailedCount` unchanged |
+| A44 | Locked Adviser whose `LockoutEnd` is moved into the past | Correct password | Authorization code issued. `AccessFailedCount` is 0 |
+| A45 | Active Adviser | Four wrong passwords, the correct one, then four wrong ones | Not locked. A further correct password issues a code |
+| A46 | The same email as an Active Adviser in tenant A and in tenant B | Five wrong passwords with tenant B's code | Tenant A's person is not locked; correct password with tenant A's code issues a code |
+| A47 | Unknown email in a known tenant | Five `POST /login` attempts | No `AspNetUsers` row is written |
+
 ### Amendment 2026-09-14 (R21 — end session)
 
 Passthrough without an action left `/connect/logout` unhandled. Manual Sign out then bounced through `/callback` and OpenIddict returned `invalid_grant` / `ID2010` (authorization code redeemed twice). No new ADR. No `/auth/logout`.
