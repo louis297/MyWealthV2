@@ -141,12 +141,19 @@ public class CreateTransactionTests : TestBase
         TransactionJson.SingleCash(item.RootElement).GetProperty("amount").GetDecimal().ShouldBe(100.00m);
         TransactionJson.SingleCash(item.RootElement).GetProperty("currency").GetString().ShouldBe("NZD");
         TransactionJson.SecurityLegs(item.RootElement).ShouldBeEmpty();
-        item.RootElement.GetProperty("bookedAt").GetString().ShouldBe(bookedAt);
+        // fixes/utc-instants.md B1: the request offset is not kept; the instant comes back in UTC with Z.
+        item.RootElement.GetProperty("bookedAt").GetString().ShouldBe("2026-09-23T21:00:00Z");
         item.RootElement.GetProperty("memo").GetString().ShouldBe("Salary");
         item.RootElement.GetProperty("reference").ValueKind.ShouldBe(JsonValueKind.Null);
         item.RootElement.GetProperty("originalTransactionId").ValueKind.ShouldBe(JsonValueKind.Null);
         item.RootElement.GetProperty("reversedByTransactionId").ValueKind.ShouldBe(JsonValueKind.Null);
         item.RootElement.GetProperty("rowVersion").GetString().ShouldNotBeNullOrEmpty();
+
+        var list = await TransactionHttp.Send(HttpMethod.Get, $"/transactions?accountId={accountId}", tokens.AccessToken);
+        list.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var page = JsonDocument.Parse(await list.Content.ReadAsStringAsync());
+        page.RootElement.GetProperty("items").EnumerateArray().Single()
+            .GetProperty("bookedAt").GetString().ShouldBe("2026-09-23T21:00:00Z");
     }
 
     private static async Task<Guid> OpenAccountAsync(string accessToken, Guid customerId)
