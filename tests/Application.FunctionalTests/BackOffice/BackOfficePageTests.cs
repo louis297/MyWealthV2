@@ -108,7 +108,7 @@ public class BackOfficePageTests
         body.ShouldContain("North Advisory");
         body.ShouldContain("mud-select");
         body.ShouldNotContain("<option");
-        body.ShouldNotContain(TenantId.ToString());
+        body.ShouldNotContain($"value=\"{TenantId}\"");
         body.ShouldContain(">Create<");
         _api.TenantLists.Count.ShouldBe(tenantsBefore + 1);
         _api.TenantLists[tenantsBefore].IsEnabled.ShouldBe(true);

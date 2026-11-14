@@ -14,14 +14,12 @@
 <MudPaper Class="pa-4" Outlined="true">
     <EditForm Model="form" OnValidSubmit="Create" FormName="new-tenant-admin">
         <MudStack Spacing="3" Style="max-width: 28rem;">
-            <label>Tenant
-                <select @bind="form.TenantId">
-                    @foreach (var tenant in tenants)
-                    {
-                        <option value="@tenant.Id">@tenant.Name</option>
-                    }
-                </select>
-            </label>
+            <MudSelect T="string" @bind-Value="form.TenantId" Label="Tenant" Variant="Variant.Outlined" ToStringFunc="TenantName">
+                @foreach (var tenant in tenants)
+                {
+                    <MudSelectItem T="string" Value="@tenant.Id.ToString()">@tenant.Name</MudSelectItem>
+                }
+            </MudSelect>
             <MudTextField @bind-Value="form.Name" Label="Name" Variant="Variant.Outlined" />
             <MudTextField @bind-Value="form.Email" Label="Email" Variant="Variant.Outlined" />
             <MudTextField @bind-Value="form.Password" Label="Password" InputType="InputType.Password" Variant="Variant.Outlined" />
@@ -40,6 +38,9 @@
     private readonly FormModel form = new();
     private IReadOnlyList<TenantItem> tenants = [];
     private string? error;
+
+    private string TenantName(string? id) =>
+        tenants.FirstOrDefault(tenant => tenant.Id.ToString() == id)?.Name ?? "";
 
     protected override async Task OnInitializedAsync()
     {
