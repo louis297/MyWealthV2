@@ -158,7 +158,7 @@ describe("AccountDetailPage", () => {
       tenantId: account.tenantId,
       type: "Buy",
       cash: [{ accountId, customerId, amount: -1250, currency: "NZD" }],
-      bookedAt: "2026-10-11T10:00:00+13:00",
+      bookedAt: "2026-10-10T21:00:00Z",
       memo: null,
       reference: null,
       originalTransactionId: null,
@@ -303,7 +303,7 @@ describe("AccountDetailPage", () => {
               tenantId: account.tenantId,
               type: "Sell",
               cash: [{ accountId, customerId, amount: 1250, currency: "NZD" }],
-              bookedAt: "2026-10-11T11:00:00+13:00",
+              bookedAt: "2026-10-10T22:00:00Z",
               memo: null,
               reference: null,
               originalTransactionId: null,
@@ -484,7 +484,7 @@ describe("AccountDetailPage", () => {
               customerId,
               type: "TransferIn",
               cash: [{ accountId, customerId, amount: 80, currency: "NZD" }],
-              bookedAt: "2026-10-12T09:00:00+13:00",
+              bookedAt: "2026-10-11T20:00:00Z",
               memo: "Salary",
               reference: null,
               originalTransactionId: null,
@@ -596,7 +596,7 @@ describe("AccountDetailPage", () => {
               id: "71111111-1111-1111-1111-111111111111",
               tenantId: account.tenantId,
               type: "InternalTransfer",
-              bookedAt: "2026-11-10T09:00:00+13:00",
+              bookedAt: "2026-11-09T20:00:00Z",
               memo: null,
               reference: null,
               originalTransactionId: null,
@@ -640,7 +640,7 @@ describe("AccountDetailPage", () => {
               id: "72222222-2222-2222-2222-222222222222",
               tenantId: account.tenantId,
               type: "FxConversion",
-              bookedAt: "2026-11-10T09:00:00+13:00",
+              bookedAt: "2026-11-09T20:00:00Z",
               memo: null,
               reference: null,
               originalTransactionId: null,
@@ -670,6 +670,7 @@ describe("AccountDetailPage", () => {
     expect(row).toHaveTextContent("-845.74 NZD");
     expect(row).not.toHaveTextContent("500 USD");
     expect(row).toHaveTextContent("1 NZD = 0.5912 USD (as of 2026-11-09)");
+    expect(row).toHaveTextContent("2026-11-10 09:00");
   });
 
   it("closes an open account with the current rowVersion and shows Closed", async () => {

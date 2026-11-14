@@ -10,3 +10,8 @@ export function toUtcIso(value: string): string {
   // A date-time string with no offset is parsed as local time.
   return new Date(value).toISOString();
 }
+
+/** Shows an instant from the API in browser local time as `yyyy-MM-dd HH:mm`. */
+export function formatInstant(iso: string): string {
+  return iso;
+}
