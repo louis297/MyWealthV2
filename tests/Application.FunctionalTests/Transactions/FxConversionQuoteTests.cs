@@ -130,7 +130,7 @@ public class FxConversionQuoteTests : TestBase
     {
         var world = await FxWorld.CreateAsync();
         var body = QuoteSellBody(world.NzdAccountId, world.UsdAccountId, 10m);
-        body["bookedAt"] = "2026-11-14T09:00:00+13:00";
+        body["bookedAt"] = "2026-11-14T09:00:00Z";
 
         (await QuoteAsync(world.Legs.TenantAdmin.AccessToken, body)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }

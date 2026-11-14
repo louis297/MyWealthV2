@@ -11,7 +11,8 @@ public sealed class TransactionDto
     /// <summary>Cash legs on Accounts the caller can see. Empty when the type has no cash leg.</summary>
     public required IReadOnlyList<TransactionCashDto> Cash { get; init; }
 
-    public required string BookedAt { get; init; }
+    /// <summary>Serialised in UTC with Z by the webapi JSON options (fixes/utc-instants.md).</summary>
+    public required DateTimeOffset BookedAt { get; init; }
 
     public string? Memo { get; init; }
 
@@ -28,9 +29,6 @@ public sealed class TransactionDto
 
     /// <summary>The rate the Transaction used, when it has an FX detail; otherwise null (FX conversions R22).</summary>
     public TransactionFxDto? Fx { get; init; }
-
-    public static string FormatBookedAt(DateTimeOffset bookedAt) =>
-        bookedAt.ToString("yyyy-MM-ddTHH:mm:sszzz");
 }
 
 public sealed class TransactionCashDto

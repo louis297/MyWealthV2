@@ -16,14 +16,14 @@ public class TransactionRulesTests : TestBase
         var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
         var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId);
 
-        (await PostAsync(tokens.AccessToken, accountId, "TransferIn", 100m, "2026-09-24T09:00:00+12:00"))
+        (await PostAsync(tokens.AccessToken, accountId, "TransferIn", 100m, "2026-09-24T09:00:00Z"))
             .StatusCode.ShouldBe(HttpStatusCode.Created);
-        (await PostAsync(tokens.AccessToken, accountId, "Interest", -2.50m, "2026-09-24T10:00:00+12:00"))
+        (await PostAsync(tokens.AccessToken, accountId, "Interest", -2.50m, "2026-09-24T10:00:00Z"))
             .StatusCode.ShouldBe(HttpStatusCode.Created);
-        (await PostAsync(tokens.AccessToken, accountId, "TransferOut", -40m, "2026-09-24T11:00:00+12:00"))
+        (await PostAsync(tokens.AccessToken, accountId, "TransferOut", -40m, "2026-09-24T11:00:00Z"))
             .StatusCode.ShouldBe(HttpStatusCode.Created);
 
-        var overdraft = await PostAsync(tokens.AccessToken, accountId, "TransferOut", -80m, "2026-09-24T12:00:00+12:00");
+        var overdraft = await PostAsync(tokens.AccessToken, accountId, "TransferOut", -80m, "2026-09-24T12:00:00Z");
         overdraft.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         (await CountTransactionsAsync(accountId)).ShouldBe(3);
     }
@@ -35,7 +35,7 @@ public class TransactionRulesTests : TestBase
         var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId);
 
         var response = await PostAsync(
-            tokens.AccessToken, accountId, "TransferIn", 10m, "2026-09-24T09:00:00+12:00", currency: "USD");
+            tokens.AccessToken, accountId, "TransferIn", 10m, "2026-09-24T09:00:00Z", currency: "USD");
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         (await CountTransactionsAsync(accountId)).ShouldBe(0);
     }
@@ -50,7 +50,7 @@ public class TransactionRulesTests : TestBase
         var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId);
         var amount = type == "Buy" ? -10m : 10m;
 
-        var response = await PostAsync(tokens.AccessToken, accountId, type, amount, "2026-09-24T09:00:00+12:00");
+        var response = await PostAsync(tokens.AccessToken, accountId, type, amount, "2026-09-24T09:00:00Z");
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
@@ -61,7 +61,7 @@ public class TransactionRulesTests : TestBase
         var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId);
         await CloseAccountAsync(accountId, tokens.AccessToken);
 
-        var response = await PostAsync(tokens.AccessToken, accountId, "TransferIn", 10m, "2026-09-24T09:00:00+12:00");
+        var response = await PostAsync(tokens.AccessToken, accountId, "TransferIn", 10m, "2026-09-24T09:00:00Z");
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
@@ -72,7 +72,7 @@ public class TransactionRulesTests : TestBase
         var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId);
         await DisableCustomerAsync(customer.Id);
 
-        var response = await PostAsync(tokens.AccessToken, accountId, "TransferIn", 10m, "2026-09-24T09:00:00+12:00");
+        var response = await PostAsync(tokens.AccessToken, accountId, "TransferIn", 10m, "2026-09-24T09:00:00Z");
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         json.RootElement.GetProperty("code").GetString().ShouldBe("disabled");
@@ -84,11 +84,11 @@ public class TransactionRulesTests : TestBase
     {
         var (tenant, _, customer, tokens) = await AccountHttp.SignInAdviser();
         var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId);
-        var created = await PostAsync(tokens.AccessToken, accountId, "TransferIn", 10m, "2026-09-24T09:00:00+12:00");
+        var created = await PostAsync(tokens.AccessToken, accountId, "TransferIn", 10m, "2026-09-24T09:00:00Z");
         var id = await ReadId(created);
         await DisableTenantAsync(tenant.Id);
 
-        (await PostAsync(tokens.AccessToken, accountId, "TransferIn", 5m, "2026-09-24T10:00:00+12:00"))
+        (await PostAsync(tokens.AccessToken, accountId, "TransferIn", 5m, "2026-09-24T10:00:00Z"))
             .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         (await TransactionHttp.Send(HttpMethod.Get, $"/transactions/{id}", tokens.AccessToken))
             .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
@@ -101,13 +101,13 @@ public class TransactionRulesTests : TestBase
     {
         var (tenant, _, customer, tokens) = await AccountHttp.SignInAdviser();
         var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId);
-        var created = await PostAsync(tokens.AccessToken, accountId, "TransferIn", 10m, "2026-09-24T09:00:00+12:00");
+        var created = await PostAsync(tokens.AccessToken, accountId, "TransferIn", 10m, "2026-09-24T09:00:00Z");
         var id = await ReadId(created);
         await DisableTenantAsync(tenant.Id);
         var system = await AccountHttp.SignInSystemAdmin();
 
         var again = await PostAsync(
-            system.AccessToken, accountId, "TransferIn", 5m, "2026-09-24T10:00:00+12:00", tenantId: tenant.PublicId);
+            system.AccessToken, accountId, "TransferIn", 5m, "2026-09-24T10:00:00Z", tenantId: tenant.PublicId);
         again.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         using var json = JsonDocument.Parse(await again.Content.ReadAsStringAsync());
         json.RootElement.GetProperty("code").GetString().ShouldBe("disabled");
@@ -125,15 +125,15 @@ public class TransactionRulesTests : TestBase
     {
         var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
         var firstAccount = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Opening book");
-        (await PostAsync(tokens.AccessToken, firstAccount, "Opening", 25m, "2026-09-24T09:00:00+12:00"))
+        (await PostAsync(tokens.AccessToken, firstAccount, "Opening", 25m, "2026-09-24T09:00:00Z"))
             .StatusCode.ShouldBe(HttpStatusCode.Created);
-        (await PostAsync(tokens.AccessToken, firstAccount, "Opening", 5m, "2026-09-24T10:00:00+12:00"))
+        (await PostAsync(tokens.AccessToken, firstAccount, "Opening", 5m, "2026-09-24T10:00:00Z"))
             .StatusCode.ShouldBe(HttpStatusCode.BadRequest);
 
         var secondAccount = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Later book");
-        (await PostAsync(tokens.AccessToken, secondAccount, "TransferIn", 10m, "2026-09-24T09:00:00+12:00"))
+        (await PostAsync(tokens.AccessToken, secondAccount, "TransferIn", 10m, "2026-09-24T09:00:00Z"))
             .StatusCode.ShouldBe(HttpStatusCode.Created);
-        (await PostAsync(tokens.AccessToken, secondAccount, "Opening", 10m, "2026-09-24T10:00:00+12:00"))
+        (await PostAsync(tokens.AccessToken, secondAccount, "Opening", 10m, "2026-09-24T10:00:00Z"))
             .StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
@@ -145,19 +145,19 @@ public class TransactionRulesTests : TestBase
         var key = Guid.NewGuid();
 
         var missing = await PostAsync(
-            tokens.AccessToken, accountId, "TransferIn", 10m, "2026-09-24T09:00:00+12:00", key: Guid.Empty);
+            tokens.AccessToken, accountId, "TransferIn", 10m, "2026-09-24T09:00:00Z", key: Guid.Empty);
         missing.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
 
         var first = await PostAsync(
-            tokens.AccessToken, accountId, "TransferIn", 10m, "2026-09-24T09:00:00+12:00", key: key);
+            tokens.AccessToken, accountId, "TransferIn", 10m, "2026-09-24T09:00:00Z", key: key);
         var id = await ReadId(first);
         var replay = await PostAsync(
-            tokens.AccessToken, accountId, "TransferIn", 10m, "2026-09-24T09:00:00+12:00", key: key);
+            tokens.AccessToken, accountId, "TransferIn", 10m, "2026-09-24T09:00:00Z", key: key);
         replay.StatusCode.ShouldBe(HttpStatusCode.Created);
         (await ReadId(replay)).ShouldBe(id);
 
         var mismatch = await PostAsync(
-            tokens.AccessToken, accountId, "TransferIn", 11m, "2026-09-24T09:00:00+12:00", key: key);
+            tokens.AccessToken, accountId, "TransferIn", 11m, "2026-09-24T09:00:00Z", key: key);
         mismatch.StatusCode.ShouldBe(HttpStatusCode.Conflict);
         var problem = await ProblemResponse.ReadAsync(mismatch);
         problem.Code.ShouldBe("idempotency_key_reused");
@@ -171,20 +171,20 @@ public class TransactionRulesTests : TestBase
         var (tenant, _, customer, adminTokens) = await AccountHttp.SignInTenantAdmin();
         var accountId = await OpenAccountAsync(adminTokens.AccessToken, customer.PublicId);
 
-        (await PostAsync(adminTokens.AccessToken, accountId, "TransferIn", 10m, "2026-09-24T09:00:00+12:00"))
+        (await PostAsync(adminTokens.AccessToken, accountId, "TransferIn", 10m, "2026-09-24T09:00:00Z"))
             .StatusCode.ShouldBe(HttpStatusCode.Created);
         (await PostAsync(
-                adminTokens.AccessToken, accountId, "TransferIn", 5m, "2026-09-24T10:00:00+12:00", tenantId: tenant.PublicId))
+                adminTokens.AccessToken, accountId, "TransferIn", 5m, "2026-09-24T10:00:00Z", tenantId: tenant.PublicId))
             .StatusCode.ShouldBe(HttpStatusCode.BadRequest);
 
         var system = await AccountHttp.SignInSystemAdmin();
-        (await PostAsync(system.AccessToken, accountId, "TransferIn", 5m, "2026-09-24T11:00:00+12:00"))
+        (await PostAsync(system.AccessToken, accountId, "TransferIn", 5m, "2026-09-24T11:00:00Z"))
             .StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         (await PostAsync(
-                system.AccessToken, accountId, "TransferIn", 5m, "2026-09-24T11:00:00+12:00", tenantId: Guid.NewGuid()))
+                system.AccessToken, accountId, "TransferIn", 5m, "2026-09-24T11:00:00Z", tenantId: Guid.NewGuid()))
             .StatusCode.ShouldBe(HttpStatusCode.NotFound);
         (await PostAsync(
-                system.AccessToken, accountId, "TransferIn", 5m, "2026-09-24T11:00:00+12:00", tenantId: tenant.PublicId))
+                system.AccessToken, accountId, "TransferIn", 5m, "2026-09-24T11:00:00Z", tenantId: tenant.PublicId))
             .StatusCode.ShouldBe(HttpStatusCode.Created);
     }
 
@@ -193,7 +193,7 @@ public class TransactionRulesTests : TestBase
     {
         var (north, _, customer, adviserTokens) = await AccountHttp.SignInAdviser();
         var accountId = await OpenAccountAsync(adviserTokens.AccessToken, customer.PublicId);
-        var created = await PostAsync(adviserTokens.AccessToken, accountId, "TransferIn", 10m, "2026-09-24T09:00:00+12:00");
+        var created = await PostAsync(adviserTokens.AccessToken, accountId, "TransferIn", 10m, "2026-09-24T09:00:00Z");
         var id = await ReadId(created);
 
         var (_, _, _, southTokens) = await AccountHttp.SignInTenantAdmin(
@@ -214,7 +214,7 @@ public class TransactionRulesTests : TestBase
         var tenantAdmin = await FunctionalTestSetup.Oidc.SignInAsync("tess@north.example", "Password1!", "north-advisory");
         var otherAccount = await OpenAccountAsync(tenantAdmin.AccessToken, otherCustomer.PublicId, "Pat bank");
         var otherCreated = await PostAsync(
-            tenantAdmin.AccessToken, otherAccount, "TransferIn", 8m, "2026-09-24T08:00:00+12:00");
+            tenantAdmin.AccessToken, otherAccount, "TransferIn", 8m, "2026-09-24T08:00:00Z");
         var otherId = await ReadId(otherCreated);
 
         (await TransactionHttp.Send(HttpMethod.Get, $"/transactions/{otherId}", adviserTokens.AccessToken))
@@ -233,9 +233,9 @@ public class TransactionRulesTests : TestBase
         var firstAccount = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "First");
         var secondAccount = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Second");
         var later = await ReadId(await PostAsync(
-            tokens.AccessToken, firstAccount, "TransferIn", 10m, "2026-09-24T11:00:00+12:00"));
+            tokens.AccessToken, firstAccount, "TransferIn", 10m, "2026-09-24T11:00:00Z"));
         var earlier = await ReadId(await PostAsync(
-            tokens.AccessToken, secondAccount, "TransferIn", 3m, "2026-09-24T09:00:00+12:00"));
+            tokens.AccessToken, secondAccount, "TransferIn", 3m, "2026-09-24T09:00:00Z"));
 
         var list = await TransactionHttp.Send(HttpMethod.Get, "/transactions", tokens.AccessToken);
         list.StatusCode.ShouldBe(HttpStatusCode.OK);

@@ -13,7 +13,7 @@ namespace MyWealthV2.Application.FunctionalTests.Transactions;
 public class InternalTransferTests : TestBase
 {
     private const string TransferPath = "/transactions/transfer";
-    private const string BookedAt = "2026-11-10T09:00:00+13:00";
+    private const string BookedAt = "2026-11-10T09:00:00Z";
 
     [Test]
     public async Task NoBearer_Returns401()

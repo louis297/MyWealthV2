@@ -13,7 +13,7 @@ namespace MyWealthV2.Application.FunctionalTests.Transactions;
 public class FxConversionTests : TestBase
 {
     internal const string FxPath = "/transactions/fx";
-    internal const string BookedAt = "2026-11-10T09:00:00+13:00";
+    internal const string BookedAt = "2026-11-10T09:00:00Z";
     internal const decimal NzdUsd = 0.59120000m;
     internal static readonly DateOnly RateAsOf = new(2026, 11, 9);
 
@@ -225,7 +225,7 @@ public class FxConversionTests : TestBase
         var world = await FxWorld.CreateAsync();
         await world.FundNzdAsync(100m);
         var body = SellBody(world.NzdAccountId, world.UsdAccountId, 10m);
-        body["bookedAt"] = "2026-11-14T09:00:00+13:00"; // 5 days after the 2026-11-09 rate
+        body["bookedAt"] = "2026-11-14T09:00:00Z"; // 5 days after the 2026-11-09 rate
 
         await ShouldRejectAsync(world, body);
     }
@@ -236,7 +236,7 @@ public class FxConversionTests : TestBase
         var world = await FxWorld.CreateAsync();
         await world.FundNzdAsync(100m);
         var body = SellBody(world.NzdAccountId, world.UsdAccountId, 10m);
-        body["bookedAt"] = "2026-11-13T09:00:00+13:00";
+        body["bookedAt"] = "2026-11-13T09:00:00Z";
 
         (await PostAsync(world.Legs.TenantAdmin.AccessToken, body)).StatusCode.ShouldBe(HttpStatusCode.Created);
     }

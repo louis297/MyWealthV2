@@ -3,7 +3,7 @@ title: Database design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-11-13
+updated: 2026-11-14
 related:
   - README.md
   - glossary.md
@@ -58,6 +58,7 @@ Identity password seed goes through `UserManager`. OpenIddict clients may be ins
 | Tables with PublicId | `Tenants`, `Users`, `Instruments`, `Accounts`, `Transactions` |
 | Tables without PublicId | `Currencies` (natural key `Code`), `SchemaVersions`, `UserTokens` (caller holds the raw token; store stores the hash), Identity string keys, OpenIddict package keys |
 | Tenancy | Business tables carry `TenantId`. Null only on `Users` for SystemAdmin. FK `Users.TenantId` → `Tenants`. Child tables of a tenant row carry `TenantId` too (`0027`). Every reference between two tenant rows is a tenant composite FK `(TenantId, XId)` → `(TenantId, Id)` (`0028`). See [fixes/tenant-composite-keys.md](fixes/tenant-composite-keys.md). |
+| Instants | Every `datetimeoffset` column holds offset `+00:00` (UTC). The application converts before it writes; `0029` converted existing `Transactions.BookedAt` rows. Date-only columns (`AsOfDate`, `RateAsOfDate`) are `date`, UTC business dates. See [fixes/utc-instants.md](fixes/utc-instants.md). |
 | Audit | `Created datetimeoffset`, `CreatedBy nvarchar(450)`, `LastModified datetimeoffset`, `LastModifiedBy nvarchar(450)` on `Tenants`, `Users`, `Instruments`, `Accounts`, `Transactions`, and `TransactionCashLegs`. `CreatedBy` stores the actor’s Identity id or a system name. |
 | Concurrency | `RowVersion rowversion` on `Tenants`, `Users`, `Instruments`, `Accounts`, `Transactions`, and `TransactionCashLegs`. Transaction reverse does not require a client `rowVersion`. |
 | Soft delete | Not used. |
@@ -348,6 +349,7 @@ Beyond PK / unique constraints already listed:
 0026_fx_conversions.sql                     -- CK_Transactions_Type widened to 0–16; TransactionFxDetails
 0027_child_tenant_ids.sql                   -- TenantId onto leg tables, TransactionFxDetails, PortfolioLines (back-filled)
 0028_tenant_composite_keys.sql              -- read-only pre-check; UNIQUE (TenantId, Id) on parents; tenant composite FKs replace single-column FKs
+0029_transactions_booked_at_utc.sql         -- SWITCHOFFSET(BookedAt, '+00:00') on rows with a non-zero offset; instant unchanged
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -462,6 +464,7 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-11 | FX conversions (`0026`): `CK_Transactions_Type` widened to 0–16 for `FxConversion`. New table `TransactionFxDetails` (0..1 per Transaction; copied to a Reversal) ([features/fx-conversions.md](features/fx-conversions.md) §6). |
 | 2026-11-13 | Child tenant ids (`0027`): `TenantId` on `TransactionCashLegs`, `TransactionSecurityLegs`, `TransactionFxDetails` and `PortfolioLines`, back-filled from the parent. The tenant query filter now covers them ([fixes/tenant-composite-keys.md](fixes/tenant-composite-keys.md) B1). |
 | 2026-11-13 | Tenant composite keys (`0028`): `UNIQUE (TenantId, Id)` on `Users`, `Accounts`, `Instruments`, `Transactions`, `Portfolios`, `ReportSchedules`. 18 single-column FKs between tenant rows replaced by `(TenantId, XId)` → `(TenantId, Id)`. The script stops before any change if a reference crosses tenants ([fixes/tenant-composite-keys.md](fixes/tenant-composite-keys.md) B2). |
+| 2026-11-14 | UTC instants (`0029`): every `datetimeoffset` holds `+00:00`. Existing `Transactions.BookedAt` rows with another offset are switched to UTC, instant unchanged ([fixes/utc-instants.md](fixes/utc-instants.md) B5). |
 | 2026-11-10 | Internal transfers (`0025`): `CK_Transactions_Type` widened to 0–15 for `InternalTransfer`. No new table or index. The two-leg shape is enforced in Domain and Application ([features/internal-transfers.md](features/internal-transfers.md) §6). |
 
 ---

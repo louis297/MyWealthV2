@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-11
-last_updated: 2026-10-11
+last_updated: 2026-11-14
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -99,7 +99,7 @@ The header is the existing Transaction. Each of these types has exactly one secu
 | R7 | Instrument must exist, same tenant, and `IsActive`. Disabled or missing → 400. |
 | R8 | Type on create in this increment: `Buy`, `Sell`, `StockIn`, `StockOut` (plus the already-accepted cash set and `OpeningHoldings`). `Split` / `Bonus` / `Scrip` are accepted in [split.md](split.md). Unknown → 400. |
 | R9 | Body `security` is an array of exactly one leg. `Buy` / `Sell` leg fields: `instrumentId`, `quantity` `> 0`. No `cost`, no `price`, no `amount`, no `cash` on that create body → 400 if present. `StockIn` also requires `cost` `≥ 0` (client-supplied, quote currency). `StockOut` is `instrumentId` + `quantity` `> 0` only. |
-| R10 | `Buy` / `Sell` only: server calls `IMarketData.TryGetPrice(instrumentId, bookedAt)`. Missing or empty price → 400. Price is not stored on the leg. The port reads `InstrumentPrices`. |
+| R10 | `Buy` / `Sell` only: server calls `IMarketData.TryGetPrice(instrumentId, bookedAt)` for the UTC date of `bookedAt` ([utc-instants](../fixes/utc-instants.md)). Missing or empty price → 400. Price is not stored on the leg. The port reads `InstrumentPrices`. |
 | R11 | `Buy` / `Sell` cost on the security leg is `quantity × price` in the instrument quote currency. Body must not send a currency. `StockIn` cost is the client amount, same quote currency. |
 | R12 | `Buy` / `Sell` cash-leg currency is `Account.Currency`. If the quote currency differs, server calls `IFxRate`. Missing pair → 400, never treat as 1. Same-currency FX is 1. Cash amount is server-computed: `Buy` decreases cash (`amount < 0`); `Sell` increases cash (`amount > 0`). `StockIn` / `StockOut` have no cash leg; a cash / amount field on those bodies → 400. |
 | R13 | Security-leg quantity is stored signed: `Buy` / `StockIn` `+quantity`; `Sell` / `StockOut` `−quantity`. After insert, quantity `SUM` per `(Account, Instrument)` `≥ 0`. Cash `SUM ≥ 0` on non-Credit accounts. |
@@ -107,7 +107,7 @@ The header is the existing Transaction. Each of these types has exactly one secu
 | R15 | Projection upsert in the same Account-locked command. Callers never PUT a holding. `Buy` / `StockIn` add cost. `Sell` / `StockOut` release cost: `released = Round(oldCost × sellQty / oldQty, 4, MidpointRounding.AwayFromZero)`; remaining = oldCost − released. Selling the full quantity leaves remaining 0. Quantity 0 deletes the projection row. Tests assert projection quantity = `SUM` of security-leg quantities and projection cost matches this rule. |
 | R16 | Posted rows are not updated or deleted. Reverse copies the opposite cash amount (if any) and the opposite security quantity and cost. One reversal per original. No client `rowVersion`. Account Open. If the reverse would make cash or quantity `< 0` → 400; original stays. |
 | R17 | `Idempotency-Key` required on create and reverse, same as posting and holdings. |
-| R18 | `bookedAt` required `datetimeoffset`. Memo optional 1–200. Reference optional, stored, no uniqueness. |
+| R18 | `bookedAt` required instant, as [posting](posting.md) R24. Memo optional 1–200. Reference optional, stored, no uniqueness. |
 | R19 | Customer has no ledger-write policy → 403. |
 | R20 | Close still requires cash `SUM = 0` and no `Holdings` row (already locked in holdings R16). Buy / Sell do not change that guard. |
 
@@ -217,7 +217,7 @@ Transaction **item** always uses objects (Q2 = B). Pure-cash items move off flat
 {
   "id": "<transaction publicId>",
   "type": "Buy",
-  "bookedAt": "2026-10-11T10:00:00+13:00",
+  "bookedAt": "2026-10-10T21:00:00Z",
   "cash": [
     {
       "accountId": "<account publicId>",
@@ -309,3 +309,7 @@ The repository should build after each commit. Agents split each line into red t
 2. Application: extend `CreateTransaction` / `ReverseTransaction`; wire `IMarketData` / `IFxRate` (local tables) for Buy/Sell; functional tests (Buy, Sell, StockIn, StockOut, missing price, oversell, cash negative, reverse rejected).
 3. API: bodies; item shape `cash` + `security`; pure-cash item moves to `cash`; isolation tests.
 4. TestSeed one `Buy` and one `StockIn`. Amend posting and holdings type tables and the transaction item shape in the same change that accepts this file.
+
+## Amendment 2026-11-14 (UTC instants)
+
+Accepted with [utc-instants](../fixes/utc-instants.md). R10 prices for the UTC date of `bookedAt`; the `IFxRate` call in R12 uses the same date. R18 follows posting R24. The item example shows the UTC form.

@@ -14,7 +14,7 @@ public class FxConversionPricingTests
     [TestCase(4)]
     public void IsStale_UpToFourCalendarDays_IsFresh(int days)
     {
-        var bookedAt = new DateTimeOffset(2026, 11, 9, 23, 30, 0, TimeSpan.FromHours(13)).AddDays(days);
+        var bookedAt = new DateTimeOffset(2026, 11, 9, 23, 30, 0, TimeSpan.Zero).AddDays(days);
 
         FxConversionPricing.IsStale(AsOf, bookedAt).ShouldBeFalse();
     }
@@ -23,18 +23,27 @@ public class FxConversionPricingTests
     [TestCase(30)]
     public void IsStale_MoreThanFourCalendarDays_IsStale(int days)
     {
-        var bookedAt = new DateTimeOffset(2026, 11, 9, 0, 30, 0, TimeSpan.FromHours(13)).AddDays(days);
+        var bookedAt = new DateTimeOffset(2026, 11, 9, 0, 30, 0, TimeSpan.Zero).AddDays(days);
 
         FxConversionPricing.IsStale(AsOf, bookedAt).ShouldBeTrue();
     }
 
     [Test]
-    public void IsStale_UsesTheCalendarDateOfBookedAtInItsOwnOffset()
+    public void IsStale_UsesTheUtcCalendarDateOfBookedAt()
     {
-        // 2026-11-14 01:00 +13:00 is 2026-11-13 12:00 UTC; the date in its own offset is the 14th: 5 days.
+        // fixes/utc-instants.md B4: 2026-11-14 01:00 +13:00 is 2026-11-13 12:00 UTC, 4 days after the rate.
         var bookedAt = new DateTimeOffset(2026, 11, 14, 1, 0, 0, TimeSpan.FromHours(13));
 
-        FxConversionPricing.IsStale(AsOf, bookedAt).ShouldBeTrue();
+        FxConversionPricing.IsStale(AsOf, bookedAt).ShouldBeFalse();
+    }
+
+    [Test]
+    public void DateOf_IsTheUtcDate()
+    {
+        FxConversionPricing.DateOf(new DateTimeOffset(2026, 11, 14, 1, 0, 0, TimeSpan.FromHours(13)))
+            .ShouldBe(new DateOnly(2026, 11, 13));
+        FxConversionPricing.DateOf(new DateTimeOffset(2026, 11, 13, 20, 0, 0, TimeSpan.FromHours(-5)))
+            .ShouldBe(new DateOnly(2026, 11, 14));
     }
 
     [TestCase(1000, 2, true)]

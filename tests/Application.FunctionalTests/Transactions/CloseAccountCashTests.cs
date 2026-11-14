@@ -54,7 +54,7 @@ public class CloseAccountCashTests : TestBase
             accountId,
             type,
             amount,
-            bookedAt = "2026-09-24T09:00:00+12:00"
+            bookedAt = "2026-09-24T09:00:00Z"
         }, Guid.NewGuid());
     }
 

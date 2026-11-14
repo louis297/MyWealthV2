@@ -23,7 +23,7 @@ public class FxConversionPortfolioTests : TestBase
                 accountId = usdBank,
                 type = "TransferIn",
                 amount = 1000m,
-                bookedAt = "2026-11-10T08:00:00+13:00"
+                bookedAt = "2026-11-10T08:00:00Z"
             }, Guid.NewGuid()))
             .StatusCode.ShouldBe(HttpStatusCode.Created);
         await FxConversionTests.SetRateAsync("USD", "NZD", 1.70000000m, FxConversionTests.RateAsOf);

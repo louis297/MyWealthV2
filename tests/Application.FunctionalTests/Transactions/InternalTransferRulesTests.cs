@@ -18,7 +18,7 @@ public class InternalTransferRulesTests : TestBase
             accountId = world.NedAccountId,
             type = "InternalTransfer",
             amount = 10m,
-            bookedAt = "2026-11-10T09:00:00+13:00"
+            bookedAt = "2026-11-10T09:00:00Z"
         }, Guid.NewGuid());
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
@@ -38,7 +38,7 @@ public class InternalTransferRulesTests : TestBase
             accountId = world.NoraAccountId,
             type = "Opening",
             amount = 50m,
-            bookedAt = "2026-11-10T10:00:00+13:00"
+            bookedAt = "2026-11-10T10:00:00Z"
         }, Guid.NewGuid());
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);

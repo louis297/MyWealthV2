@@ -13,6 +13,7 @@ import {
   type TransactionSecurity,
 } from "@/features/transactions/transactionsApi";
 import { Pager } from "@/shared/components/Pager";
+import { formatInstant } from "@/shared/time/instant";
 
 function isNotFound(error: unknown) {
   return typeof error === "object" && error !== null && "status" in error && error.status === 404;
@@ -105,7 +106,7 @@ export function TransactionsListPage() {
                           {item.type}
                         </Link>
                       </TableCell>
-                      <TableCell>{item.bookedAt}</TableCell>
+                      <TableCell>{formatInstant(item.bookedAt)}</TableCell>
                       <TableCell>
                         <div className="flex flex-col">
                           {owners.accountIds.map((accountId) => (

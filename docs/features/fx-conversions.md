@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-10
-last_updated: 2026-11-13
+last_updated: 2026-11-14
 related:
   - internal-transfers.md
   - leg-accounts.md
@@ -92,8 +92,8 @@ A TenantAdmin or Adviser converts cash from an Open Account in one currency to a
 | R6 | **Same tenant and scope.** Both Accounts are in the command's tenant; another tenant's Account, a missing Account, or (Adviser) an Account of an unassigned Customer → 404 for the whole command. Nothing is written. |
 | R7 | **Same Customer.** Both Accounts belong to the same Customer. Two different Customers → 400, checked after R6 (an Account the caller cannot see is still 404). The Customer must not be Disabled (else 400 `disabled` / `target=user`). |
 | R8 | **Account types and state.** Any Phase-2 type (Bank, Cash, Brokerage, Other) on either side. Both Accounts must be Open (else 400). Same rule on reverse. |
-| R9 | **Rate.** The server reads `IFxRate.GetRateDetail(sellCurrency, buyCurrency, bookedAt)` ([fx-rates.md](fx-rates.md) port, which also returns the as-of date and source): the latest `FxRates` row for that directed pair with `AsOfDate ≤` the date of `bookedAt`, using the same date rule as buy-sell R10. The rate is "buy currency per 1 sell currency". The directed pair is read as stored; the inverse pair is not used. No row → 400. The caller never sends a rate to use. |
-| R10 | **Staleness.** If the date of `bookedAt` minus the rate's `AsOfDate` is more than 4 calendar days → 400. The same limit applies to the quote. |
+| R9 | **Rate.** The server reads `IFxRate.GetRateDetail(sellCurrency, buyCurrency, bookedAt)` ([fx-rates.md](fx-rates.md) port, which also returns the as-of date and source): the latest `FxRates` row for that directed pair with `AsOfDate ≤` the UTC date of `bookedAt` ([utc-instants](../fixes/utc-instants.md)), the same date rule as buy-sell R10. The rate is "buy currency per 1 sell currency". The directed pair is read as stored; the inverse pair is not used. No row → 400. The caller never sends a rate to use. |
+| R10 | **Staleness.** If the UTC date of `bookedAt` minus the rate's `AsOfDate` is more than 4 calendar days → 400. The same limit applies to the quote. |
 | R11 | **Amounts.** The caller's amount must have no more decimal places than its currency's `DecimalPlaces` (sell currency for `sellAmount`, buy currency for `buyAmount`); else 400. Fixed sell: `buy = Round(sellAmount × rate, buyDecimalPlaces, AwayFromZero)`. Fixed buy: `sell = Round(buyAmount ÷ rate, sellDecimalPlaces, AwayFromZero)`. A computed amount of 0 → 400. |
 | R12 | **Expected rate.** `expectedRate` must equal the rate of R9 exactly (`decimal(18,8)`). Different → 409 with the field in `errors`; nothing is written. The client gets a new quote and asks the caller to confirm again. The rate can change between quote and create when the hourly job stores a new row (fx-rates R16). |
 | R13 | **Legs.** Application builds exactly two cash legs: `−sell` in the sell currency on the from Account and `+buy` in the buy currency on the to Account. No security leg. Each leg's currency equals its Account's currency (leg-accounts R9). |
@@ -243,7 +243,7 @@ Item (caller sees both Accounts):
   "id": "<transaction publicId>",
   "tenantId": "<tenant publicId>",
   "type": "FxConversion",
-  "bookedAt": "2026-11-10T09:00:00+13:00",
+  "bookedAt": "2026-11-09T20:00:00Z",
   "memo": "USD for US ETF",
   "reference": null,
   "originalTransactionId": null,
@@ -345,3 +345,7 @@ Only after `accepted`. The tree must build after each commit. Split each behavio
 10. Portfolio interaction (R24) + tests.
 11. Adviser Portal Convert form and quote + frontend tests. Customer Portal label.
 12. Repo docs: this file `accepted`; amend domain-model, database-design, api-design §7.7 and change log, portfolios R18, adviser-portal-dashboard, customer-portal, features README status.
+
+## Amendment 2026-11-14 (UTC instants)
+
+Accepted with [utc-instants](../fixes/utc-instants.md). R9 and R10 use the UTC date of `bookedAt`. A quote or create `bookedAt` with no offset → 400. The item example shows the UTC form.

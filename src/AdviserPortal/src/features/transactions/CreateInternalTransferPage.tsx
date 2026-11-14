@@ -8,6 +8,7 @@ import { type Account, useGetAccountQuery, useGetAccountsQuery } from "@/feature
 import { useGetCustomerQuery, useGetCustomersQuery } from "@/features/customers/customersApi";
 import { useCreateInternalTransferMutation } from "@/features/transactions/transactionsApi";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
+import { toUtcIso } from "@/shared/time/instant";
 import { cn } from "cn";
 
 type ChosenCustomer = { id: string; name: string };
@@ -128,7 +129,7 @@ export function CreateInternalTransferPage() {
           fromAccountId: from.id,
           toAccountId: destination.id,
           amount: amountValue,
-          bookedAt,
+          bookedAt: toUtcIso(bookedAt),
           memo: memo.trim() || null,
           reference: reference.trim() || null,
         },

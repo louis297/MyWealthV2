@@ -204,7 +204,7 @@ describe("Customer Portal", () => {
         id: "71111111-1111-1111-1111-111111111111",
         tenantId: "22222222-2222-2222-2222-222222222222",
         type: "InternalTransfer",
-        bookedAt: "2026-11-10T09:00:00+13:00",
+        bookedAt: "2026-11-09T20:00:00Z",
         memo: null,
         reference: null,
         originalTransactionId: null,
@@ -219,6 +219,7 @@ describe("Customer Portal", () => {
     expect(row).toHaveTextContent("Transfer");
     expect(row).not.toHaveTextContent("InternalTransfer");
     expect(row).toHaveTextContent("500 NZD");
+    expect(row).toHaveTextContent("2026-11-10 09:00");
     expect(screen.getByRole("columnheader", { name: "Amount" })).toBeInTheDocument();
   });
 
@@ -228,7 +229,7 @@ describe("Customer Portal", () => {
         id: "72222222-2222-2222-2222-222222222222",
         tenantId: "22222222-2222-2222-2222-222222222222",
         type: "FxConversion",
-        bookedAt: "2026-11-10T09:00:00+13:00",
+        bookedAt: "2026-11-09T20:00:00Z",
         memo: null,
         reference: null,
         originalTransactionId: null,

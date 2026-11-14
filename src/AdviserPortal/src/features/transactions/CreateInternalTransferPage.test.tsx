@@ -253,7 +253,7 @@ describe("CreateInternalTransferPage", () => {
       fromAccountId: sourceId,
       toAccountId: noraBankId,
       amount: 500,
-      bookedAt: "2026-11-10T09:00",
+      bookedAt: "2026-11-09T20:00:00.000Z",
       memo: null,
       reference: null,
     });

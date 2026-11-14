@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-12
-last_updated: 2026-10-12
+last_updated: 2026-11-14
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -101,7 +101,7 @@ This increment treats the three type names as the same book rule. The name is th
 | R13 | After insert, quantity `SUM` per `(Account, Instrument)` `> 0` and equals the new quantity. Projection cost equals the cost from before the command. |
 | R14 | Posted rows are not updated or deleted. Reverse copies the opposite security quantity and cost `0`. One reversal per original. No client `rowVersion`. Account Open. Reverse that would make quantity `≤ 0` → 400; original stays. |
 | R15 | `Idempotency-Key` required on create and reverse, same as posting. |
-| R16 | `bookedAt` required `datetimeoffset`. Memo optional 1–200. Reference optional, stored, no uniqueness. |
+| R16 | `bookedAt` required instant, as [posting](posting.md) R24. Memo optional 1–200. Reference optional, stored, no uniqueness. |
 | R17 | Customer has no ledger-write policy → 403. |
 | R18 | Close still requires cash `SUM = 0` and no `Holdings` row. These types do not change that guard. |
 
@@ -186,7 +186,7 @@ Transaction item (no cash):
 {
   "id": "<transaction publicId>",
   "type": "Split",
-  "bookedAt": "2026-10-12T10:00:00+13:00",
+  "bookedAt": "2026-10-11T21:00:00Z",
   "cash": [],
   "security": [
     {
@@ -276,3 +276,7 @@ The repository should build after each commit. Agents split each line into red t
 2. Application: extend `CreateTransaction` / `ReverseTransaction`; functional tests.
 3. API bodies and item shape; isolation tests.
 4. TestSeed one `Split`. Amend posting, holdings, and buy-sell type tables in the same change that accepts this file.
+
+## Amendment 2026-11-14 (UTC instants)
+
+Accepted with [utc-instants](../fixes/utc-instants.md). R16 follows posting R24. The item example shows the UTC form.

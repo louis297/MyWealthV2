@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-11-02
-last_updated: 2026-11-11
+last_updated: 2026-11-14
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -137,7 +137,7 @@ Update [database-design.md](../database-design.md) in the same change.
 | Kind | Name | Returns | Checks |
 | --- | --- | --- | --- |
 | Job | `FxRateSyncJob` | void | Active currencies; Frankfurter reachable; upsert |
-| Query | `IFxRate.GetRate` | decimal | Same currency = 1; else latest row with `AsOfDate` ≤ requested date (or today if omitted); no row at all for the pair → `FxRateNotFoundException` |
+| Query | `IFxRate.GetRate` | decimal | Same currency = 1; else latest row with `AsOfDate` ≤ the UTC date of `asOf` (or today's UTC date if omitted); no row at all for the pair → `FxRateNotFoundException` |
 
 ---
 
@@ -228,3 +228,7 @@ The repository should build after each commit. Agents split each line into red t
 2. `IFxRate` infrastructure implementation that reads `FxRates` (same currency = 1; missing fails) + unit tests.
 3. `FxRateSyncJob` + Hangfire recurring registration + test that a failed fetch leaves previous rows.
 4. Documentation updates: database-design.md, architecture.md port note, domain-model.md port note, features/README.md, adr/README.md.
+
+## Amendment 2026-11-14 (UTC instants)
+
+Accepted with [utc-instants](../fixes/utc-instants.md). `GetRate` and `GetRateDetail` read the UTC date of `asOf`, not the date in its own offset.

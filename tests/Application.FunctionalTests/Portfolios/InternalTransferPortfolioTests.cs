@@ -23,7 +23,7 @@ public class InternalTransferPortfolioTests : TestBase
                 accountId = bank,
                 type = "TransferIn",
                 amount = 1000m,
-                bookedAt = "2026-11-10T08:00:00+13:00"
+                bookedAt = "2026-11-10T08:00:00Z"
             }, Guid.NewGuid()))
             .StatusCode.ShouldBe(HttpStatusCode.Created);
         await AssignPortfolioAsync(tokens.AccessToken, brokerage, instrumentId);

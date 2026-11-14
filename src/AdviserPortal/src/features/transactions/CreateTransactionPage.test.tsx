@@ -225,7 +225,7 @@ describe("CreateTransactionPage", () => {
     expect(body).toEqual({
       accountId,
       type: "Buy",
-      bookedAt: "2026-10-11T10:00",
+      bookedAt: "2026-10-10T21:00:00.000Z",
       memo: null,
       reference: null,
       security: [{ instrumentId, quantity: 50 }],
@@ -317,7 +317,7 @@ describe("CreateTransactionPage", () => {
     expect(body).toEqual({
       accountId,
       type: "StockIn",
-      bookedAt: "2026-10-11T10:00",
+      bookedAt: "2026-10-10T21:00:00.000Z",
       memo: null,
       reference: null,
       security: [{ instrumentId, quantity: 20, cost: 300 }],
@@ -373,7 +373,7 @@ describe("CreateTransactionPage", () => {
       const body = await postedBody(fetchMock);
       expect(body).toMatchObject({
         type,
-        bookedAt: "2026-10-12T10:00",
+        bookedAt: "2026-10-11T21:00:00.000Z",
         security: [{ instrumentId, quantity: 200 }],
       });
       const leg = (body.security as Record<string, unknown>[])[0];
@@ -499,7 +499,7 @@ describe("CreateTransactionPage", () => {
       accountId,
       type: "TransferIn",
       amount: 250.5,
-      bookedAt: "2026-10-12T09:00",
+      bookedAt: "2026-10-11T20:00:00.000Z",
       memo: "Salary",
     });
     expect(body).not.toHaveProperty("security");
@@ -540,7 +540,7 @@ describe("CreateTransactionPage", () => {
       accountId,
       type: "TransferOut",
       amount: -40.25,
-      bookedAt: "2026-10-12T09:30",
+      bookedAt: "2026-10-11T20:30:00.000Z",
       memo: null,
     });
     expect(body).not.toHaveProperty("security");

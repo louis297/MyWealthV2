@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-11-02
-last_updated: 2026-11-08
+last_updated: 2026-11-14
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -75,7 +75,7 @@ The worker fetches the latest EOD prices for instruments that are active in any 
 | R3 | Store one price per instrument per as-of date for instruments that are **active** in at least one tenant. Job reads the union of active `Instruments` on every run. Inactive instruments are not fetched; existing rows stay. |
 | R4 | Price is in the instrument’s `QuoteCurrency`. Do not convert on write. Callers that need another currency use `IFxRate`. |
 | R5 | Upsert key is `(InstrumentId, AsOfDate)`. `AsOfDate` is the date the source returns (previous working day on weekends / holidays). On each successful run, if the `AsOfDate` already exists for the instrument, update `Price` and `FetchedAt`; if it is a new date, insert. |
-| R6 | `IMarketData.TryGetPrice(instrumentId, asOf?)` returns the latest row with `AsOfDate` ≤ the requested date (or today if omitted). No row at all for that instrument → empty (`null`). Never invent 0. |
+| R6 | `IMarketData.TryGetPrice(instrumentId, asOf?)` returns the latest row with `AsOfDate` ≤ the UTC date of `asOf` (or today's UTC date if omitted). No row at all for that instrument → empty (`null`). Never invent 0. |
 | R7 | Prices are platform data. No `TenantId` on the price row. The same symbol in two tenants shares the same price (instrument rows are tenant-scoped; price is looked up by `InstrumentId`, so each tenant’s instrument has its own price rows even if the symbol matches). |
 | R8 | On fetch failure the job logs and leaves the previous rows in place. It does not delete. |
 | R9 | Read path never calls the external source. Only the job does. |
@@ -136,7 +136,7 @@ Update [database-design.md](../database-design.md) in the same change.
 | Kind | Name | Returns | Checks |
 | --- | --- | --- | --- |
 | Job | `InstrumentPriceSyncJob` | void | Active instruments; source reachable; upsert |
-| Query | `IMarketData.TryGetPrice` | Money? | Latest row with `AsOfDate` ≤ requested date (or today if omitted); no row → empty |
+| Query | `IMarketData.TryGetPrice` | Money? | Latest row with `AsOfDate` ≤ the UTC date of `asOf` (or today's UTC date if omitted); no row → empty |
 
 ---
 
@@ -256,3 +256,7 @@ Still open, not this slice:
 2026-11-08 — Source switched from Twelve Data to EODHD. Free plan provides global EOD coverage (US free tier on Twelve Data was insufficient for NZ/AU/UK/EU/JP seeds). Endpoint `GET /api/eod/{SYMBOL.EXCHANGE}`. Source column value `'EODHD'`. Aspire parameter `eodhd-api-key` (`Eodhd__ApiKey`). One call = one symbol full history; the job stores the latest bar. Seed symbols use the locked `SYMBOL.EXCHANGE` map. Landed.
 
 2026-11-08 — Schedule changed from hourly (`0 * * * *`) to daily at 12:00 UTC (`0 12 * * *`). Skip-if-today-stored (R14) is unchanged.
+
+## Amendment 2026-11-14 (UTC instants)
+
+Accepted with [utc-instants](../fixes/utc-instants.md). R6 reads the UTC date of `asOf`, not the date in its own offset.

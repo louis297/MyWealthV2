@@ -8,6 +8,7 @@ import {
   useGetCashBalanceQuery,
   useGetHoldingsQuery,
 } from "@/features/accounts/accountsApi";
+import { formatInstant } from "@/shared/time/instant";
 
 const typeLabels: Record<string, string> = {
   InternalTransfer: "Transfer",
@@ -100,7 +101,7 @@ export function AccountDetailPage() {
                   {activityItems.map((row) => (
                     <TableRow key={row.id}>
                       <TableCell>{typeLabel(row.type)}</TableCell>
-                      <TableCell>{row.bookedAt}</TableCell>
+                      <TableCell>{formatInstant(row.bookedAt)}</TableCell>
                       <TableCell>
                         {(row.cash ?? [])
                           .filter((leg) => leg.accountId === id)

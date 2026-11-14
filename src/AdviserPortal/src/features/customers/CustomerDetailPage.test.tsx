@@ -829,7 +829,7 @@ describe("CustomerDetailPage", () => {
     triggerKind: "Manual",
     created: "2026-10-16T08:30:00+00:00",
     parameters: { customerId, from: "2026-01-01", to: "2026-03-31" },
-    asOf: "2026-10-16T09:00:00+00:00",
+    asOf: "2026-10-16T09:00:00Z",
   };
 
   const queuedExecution = {
@@ -888,7 +888,7 @@ describe("CustomerDetailPage", () => {
     expect(screen.getByText("Scheduled")).toBeInTheDocument();
     expect(screen.getByText("Queued")).toBeInTheDocument();
     expect(screen.getByText("2026-01-01 to 2026-03-31")).toBeInTheDocument();
-    expect(screen.getAllByText("2026-10-16T09:00:00+00:00")).toHaveLength(2);
+    expect(screen.getAllByText("2026-10-16 22:00")).toHaveLength(2);
     expect(screen.getByText("2026-04-01 to 2026-05-01")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Download" })).toHaveLength(2);
 

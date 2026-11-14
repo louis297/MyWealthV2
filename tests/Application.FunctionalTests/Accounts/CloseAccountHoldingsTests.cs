@@ -21,7 +21,7 @@ public class CloseAccountHoldingsTests : TestBase
             {
                 accountId,
                 type = "OpeningHoldings",
-                bookedAt = "2026-09-27T09:00:00+12:00",
+                bookedAt = "2026-09-27T09:00:00Z",
                 security = new[] { new { instrumentId, quantity = 10m, cost = 250m } }
             },
             Guid.NewGuid()));

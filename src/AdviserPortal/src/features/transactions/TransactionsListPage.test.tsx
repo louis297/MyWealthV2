@@ -16,7 +16,7 @@ const transaction = {
   tenantId: "22222222-2222-2222-2222-222222222222",
   type: "Buy",
   cash: [{ accountId, customerId, amount: -1250, currency: "NZD" }],
-  bookedAt: "2026-10-11T10:00:00+13:00",
+  bookedAt: "2026-10-10T21:00:00Z",
   memo: "Parcel",
   reference: null,
   originalTransactionId: null,
@@ -118,7 +118,7 @@ describe("TransactionsListPage", () => {
     const { fetchMock } = renderList(user());
 
     expect(await screen.findByText("Buy")).toBeInTheDocument();
-    expect(screen.getByText("2026-10-11T10:00:00+13:00")).toBeInTheDocument();
+    expect(screen.getByText("2026-10-11 10:00")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: accountId })).toHaveAttribute("href", `/accounts/${accountId}`);
     expect(screen.getByRole("link", { name: customerId })).toHaveAttribute("href", `/customers/${customerId}`);
     expect(screen.getByText("-1250 NZD")).toBeInTheDocument();
