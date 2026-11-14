@@ -15,6 +15,7 @@ import {
 } from "@/features/transactions/transactionsApi";
 import { rateLine } from "@/features/transactions/fxFormat";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
+import { toUtcIso } from "@/shared/time/instant";
 import { cn } from "cn";
 
 type Side = "sell" | "buy";
@@ -101,7 +102,7 @@ export function CreateFxConversionPage() {
           fromAccountId: from.id,
           toAccountId: destination.id,
           ...(side === "sell" ? { sellAmount: amountValue } : { buyAmount: amountValue }),
-          ...(bookedAt ? { bookedAt } : {}),
+          ...(bookedAt ? { bookedAt: toUtcIso(bookedAt) } : {}),
         }
       : null;
   const quoteKey = quoteBody ? JSON.stringify(quoteBody) : "";
@@ -171,7 +172,7 @@ export function CreateFxConversionPage() {
           toAccountId: destination.id,
           ...(side === "sell" ? { sellAmount: amountValue } : { buyAmount: amountValue }),
           expectedRate: currentQuote.rate,
-          bookedAt,
+          bookedAt: toUtcIso(bookedAt),
           memo: memo.trim() || null,
           reference: reference.trim() || null,
         },

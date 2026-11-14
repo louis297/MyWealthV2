@@ -8,6 +8,7 @@ import { useGetAccountHoldingsQuery, useGetAccountQuery } from "@/features/accou
 import { useGetAccountPortfolioQuery } from "@/features/portfolios/portfoliosApi";
 import { useGetInstrumentsQuery } from "@/features/instruments/instrumentsApi";
 import { useCreateTransactionMutation } from "@/features/transactions/transactionsApi";
+import { toUtcIso } from "@/shared/time/instant";
 
 const securityTypes = ["Buy", "Sell", "StockIn", "StockOut", "Split", "Bonus", "Scrip"] as const;
 const cashTypes = ["TransferIn", "TransferOut"] as const;
@@ -94,7 +95,7 @@ export function CreateTransactionPage() {
             accountId,
             type,
             amount: Number(amount),
-            bookedAt,
+            bookedAt: toUtcIso(bookedAt),
             memo: trimmedMemo.length === 0 ? null : trimmedMemo,
           },
         }).unwrap();
@@ -104,7 +105,7 @@ export function CreateTransactionPage() {
           body: {
             accountId,
             type,
-            bookedAt,
+            bookedAt: toUtcIso(bookedAt),
             memo: null,
             reference: null,
             security: [
