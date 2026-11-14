@@ -174,6 +174,7 @@ Later portals copy the last BFF row: `bff-customer-portal`, `BffCustomerPortal`,
 | Health port | Second HTTP port of every host (default `8081`). Outside Development, `/health` and `/alive` answer only there. The reverse proxy never forwards to it. See [features/production-hosting.md](features/production-hosting.md). | The traffic port `8080`; a public status page |
 | Bootstrap SystemAdmin | The first SystemAdmin in a production database, created by `webapi` from configuration when no SystemAdmin exists. See [features/identity-auth.md](features/identity-auth.md) amendment 2026-11-12. | The Development seed SystemAdmin `system-admin@localhost`; a SystemAdmin created on every start |
 | Deploy folder | Repository folder `deploy/`: compose file, Caddy files and deploy scripts, copied to the VPS on every deploy. Holds no secrets. See [deployment.md](deployment.md) §5. | `.env`, `certs/` or `data/` on the VPS |
+| Telemetry dashboard | Container `aspire-dashboard` in the production compose project: the standalone Aspire Dashboard that receives OTLP from every .NET host. In memory only; opened through an SSH tunnel. See [deployment.md](deployment.md) §5.1. | The Aspire dashboard that the AppHost starts in Development; the Hangfire dashboard; a public status page |
 
 ---
 

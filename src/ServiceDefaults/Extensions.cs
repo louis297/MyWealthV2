@@ -20,6 +20,8 @@ public static class Extensions
 {
     public const string HealthPortKey = "Health:Port";
     public const int DefaultHealthPort = 8081;
+    public const string HealthEndpointPath = "/health";
+    public const string AlivenessEndpointPath = "/alive";
 
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
@@ -65,7 +67,11 @@ public static class Extensions
             .WithTracing(tracing =>
             {
                 tracing.AddSource(builder.Environment.ApplicationName)
-                    .AddAspNetCoreInstrumentation()
+                    // Health checks call /health every few seconds; tracing them would push real requests
+                    // out of a viewer's trace limit (production-hosting R17).
+                    .AddAspNetCoreInstrumentation(aspNetCore => aspNetCore.Filter = context =>
+                        !context.Request.Path.StartsWithSegments(HealthEndpointPath)
+                        && !context.Request.Path.StartsWithSegments(AlivenessEndpointPath))
                     // Uncomment the following line to enable gRPC instrumentation (requires the OpenTelemetry.Instrumentation.GrpcNetClient package)
                     //.AddGrpcClientInstrumentation()
                     .AddHttpClientInstrumentation();
@@ -113,10 +119,10 @@ public static class Extensions
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
         // All health checks must pass for app to be considered ready to accept traffic after starting
-        var health = app.MapHealthChecks("/health");
+        var health = app.MapHealthChecks(HealthEndpointPath);
 
         // Only health checks tagged with the "live" tag must pass for app to be considered alive
-        var alive = app.MapHealthChecks("/alive", new HealthCheckOptions
+        var alive = app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
         {
             Predicate = r => r.Tags.Contains("live")
         });

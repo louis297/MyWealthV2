@@ -2,7 +2,8 @@
 # Lives at /opt/mywealth on the VPS. The deploy job overwrites this file on every deploy:
 # do not edit it on the VPS. Everything that differs per server comes from .env (see .env.example).
 #
-# Only `caddy` publishes ports. Every .NET host listens on 8080 (traffic) and 8081 (health port,
+# Only `caddy` publishes ports on a public address; `aspire-dashboard` publishes its UI on 127.0.0.1 only
+# (open it through an SSH tunnel, §5.1). Every .NET host listens on 8080 (traffic) and 8081 (health port,
 # never forwarded by Caddy). Bind-mounted folders under certs/ and data/ must belong to UID 1654.
 
 name: mywealth
@@ -10,6 +11,8 @@ name: mywealth
 x-dotnet-environment: &dotnet-environment
   ASPNETCORE_ENVIRONMENT: Production
   ASPNETCORE_HTTP_PORTS: "8080;8081"
+  # Traces, metrics and logs go to the telemetry dashboard (§5.1).
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire-dashboard:18889
 
 x-dotnet-service: &dotnet-service
   restart: unless-stopped
@@ -49,6 +52,7 @@ services:
     image: ghcr.io/${GHCR_OWNER:?}/mywealth-webapi:${IMAGE_TAG:?}
     environment:
       <<: *dotnet-environment
+      OTEL_SERVICE_NAME: webapi
       ConnectionStrings__MyWealthDbV2: *connection-string
       Identity__Authority: https://id.${DOMAIN:?}
       Reports__StorageRoot: /reports
@@ -69,6 +73,7 @@ services:
     image: ghcr.io/${GHCR_OWNER:?}/mywealth-identity:${IMAGE_TAG:?}
     environment:
       <<: *dotnet-environment
+      OTEL_SERVICE_NAME: identity
       ConnectionStrings__MyWealthDbV2: *connection-string
       Identity__AdviserPortalClientSecret: ${ADVISER_PORTAL_CLIENT_SECRET:?}
       Identity__CustomerPortalClientSecret: ${CUSTOMER_PORTAL_CLIENT_SECRET:?}
@@ -97,6 +102,7 @@ services:
     image: ghcr.io/${GHCR_OWNER:?}/mywealth-worker:${IMAGE_TAG:?}
     environment:
       <<: *dotnet-environment
+      OTEL_SERVICE_NAME: worker
       ConnectionStrings__MyWealthDbV2: *connection-string
       Reports__StorageRoot: /reports
       Eodhd__ApiKey: ${EODHD_API_KEY:?}
@@ -114,6 +120,7 @@ services:
     image: ghcr.io/${GHCR_OWNER:?}/mywealth-bff-adviser-portal:${IMAGE_TAG:?}
     environment:
       <<: *dotnet-environment
+      OTEL_SERVICE_NAME: bff-adviser-portal
       Authentication__Authority: https://id.${DOMAIN:?}
       Authentication__ClientSecret: ${ADVISER_PORTAL_CLIENT_SECRET:?}
       Authentication__PublicOrigin: https://adviser.${DOMAIN:?}
@@ -136,6 +143,7 @@ services:
     image: ghcr.io/${GHCR_OWNER:?}/mywealth-bff-customer-portal:${IMAGE_TAG:?}
     environment:
       <<: *dotnet-environment
+      OTEL_SERVICE_NAME: bff-customer-portal
       Authentication__Authority: https://id.${DOMAIN:?}
       Authentication__ClientSecret: ${CUSTOMER_PORTAL_CLIENT_SECRET:?}
       Authentication__PublicOrigin: https://customer.${DOMAIN:?}
@@ -158,6 +166,7 @@ services:
     image: ghcr.io/${GHCR_OWNER:?}/mywealth-back-office:${IMAGE_TAG:?}
     environment:
       <<: *dotnet-environment
+      OTEL_SERVICE_NAME: back-office
       Authentication__Authority: https://id.${DOMAIN:?}
       Authentication__ClientSecret: ${BACK_OFFICE_CLIENT_SECRET:?}
       Authentication__PublicOrigin: https://admin.${DOMAIN:?}
@@ -174,6 +183,17 @@ services:
     healthcheck:
       test: ["CMD", "dotnet", "/app/MyWealthV2.BackOffice.dll", "--healthcheck"]
       <<: *healthcheck-timing
+
+  aspire-dashboard:
+    # Same version as the Aspire packages in Directory.Packages.props. In memory only (§5.1).
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:13.6.5
+    restart: unless-stopped
+    mem_limit: 512m
+    ports:
+      # Loopback only: reach it with `ssh -N -L 18888:127.0.0.1:18888 <deploy-user>@<vps>`.
+      - "127.0.0.1:18888:18888"
+    networks:
+      - internal
 
   caddy:
     build: ./caddy

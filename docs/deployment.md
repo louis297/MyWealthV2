@@ -36,6 +36,8 @@ GitHub Actions builds one container image per .NET host and pushes it to GHCR. I
 
 There is no database backup. Every piece of state can be rebuilt from an empty VPS (§12).
 
+Every .NET host sends traces, metrics and logs over OTLP to a standalone Aspire Dashboard in the same compose project. The owner opens it through an SSH tunnel (§5.1).
+
 ---
 
 ## 2. Scope
@@ -50,6 +52,7 @@ There is no database backup. Every piece of state can be rebuilt from an empty V
 - Security baseline for the public internet
 - Rebuild runbook
 - List of code changes required before the first deploy
+- Telemetry viewer: the Aspire Dashboard, in memory, reached through an SSH tunnel (§5.1)
 
 **Out**
 
@@ -59,7 +62,7 @@ There is no database backup. Every piece of state can be rebuilt from an empty V
 - Azure Container Apps (the AppHost still declares an ACA environment; this deployment does not use it)
 - Email delivery (`NoOpEmailSender` stays; invite and activation do not work in production)
 - Demo data for visitors (deferred, [future-plans.md](future-plans.md) §5)
-- Monitoring and alerting beyond container logs
+- Alerting, uptime monitoring, and telemetry that outlives a restart of the dashboard container
 
 ---
 
@@ -67,7 +70,7 @@ There is no database backup. Every piece of state can be rebuilt from an empty V
 
 | Container | Image | Public | Hostname | Notes |
 | --- | --- | --- | --- | --- |
-| `caddy` | Caddy with the `caddy-ratelimit` module, built on the VPS | Yes (80, 443) | all below | TLS, routing, rate limit. Only container with published ports |
+| `caddy` | Caddy with the `caddy-ratelimit` module, built on the VPS | Yes (80, 443) | all below | TLS, routing, rate limit. Only container with ports published on a public address |
 | `identity` | `mywealth-identity` | Through Caddy | `id.<domain>` | OpenIddict + hosted login |
 | `bff-adviser-portal` | `mywealth-bff-adviser-portal` | Through Caddy | `adviser.<domain>` | Serves the Adviser Portal SPA build and `/bff/*` |
 | `bff-customer-portal` | `mywealth-bff-customer-portal` | Through Caddy | `customer.<domain>` | Serves the Customer Portal SPA build and `/bff/*` |
@@ -75,6 +78,7 @@ There is no database backup. Every piece of state can be rebuilt from an empty V
 | `webapi` | `mywealth-webapi` | No | — | Called by the BFFs and Back Office. Runs the schema applicator on start |
 | `worker` | `mywealth-worker` | No | — | Hangfire. Outbox, FX rates, instrument prices, reports. Dashboard stays Development-only |
 | `sql` | SQL Server 2022, Express edition | No | — | `MSSQL_PID=Express`, `MSSQL_MEMORY_LIMIT_MB=2048` |
+| `aspire-dashboard` | `mcr.microsoft.com/dotnet/aspire-dashboard`, exact version tag | No | — | Telemetry viewer (§5.1). UI published on `127.0.0.1:18888` of the VPS only |
 
 `<domain>` is the showcase domain. It is chosen, but this doc does not name it. It lives in `DOMAIN` in `.env` on the VPS and in the smoke URL variables of GitHub environment `production` (§6).
 
@@ -96,6 +100,7 @@ flowchart LR
             webapi
             worker
             sql[(sql)]
+            dash[aspire-dashboard]
         end
     end
     browser --> caddy
@@ -106,11 +111,12 @@ flowchart LR
     bffa & bffc & bo -. OIDC .-> caddy
     webapi -. JWKS .-> caddy
     webapi & identity & worker --> sql
+    identity & webapi & worker & bffa & bffc & bo -. OTLP .-> dash
 ```
 
 **Issuer and authority.** Tokens carry the public issuer `https://id.<domain>/`, set explicitly on `identity`. Every host that validates tokens or runs OIDC (`webapi`, both BFFs, `back-office`) uses that public URL as `Authentication__Authority` / `Identity__Authority`, not the internal container name, so the issuer always matches. Inside the Docker network, `caddy` carries the network alias `id.<domain>`, so these calls stay on the VPS and still go through TLS.
 
-**Sizing.** About 1–1.5 GB for the six .NET hosts, 2 GB for SQL Server (capped), 0.5 GB for the OS, Docker and Caddy. A 6 GB, 2 vCPU VPS fits with headroom. Add 2 GB of swap.
+**Sizing.** About 1–1.5 GB for the six .NET hosts, 2 GB for SQL Server (capped), up to 512 MB for the dashboard (capped), 0.5 GB for the OS, Docker and Caddy. A 6 GB, 2 vCPU VPS fits with headroom. Add 2 GB of swap.
 
 ---
 
@@ -145,6 +151,7 @@ The table lists the keys the compose file sets. Keys marked † are introduced b
 - `ForwardedHeaders__KnownNetworks__0` is `172.30.0.0/24` (§3).
 - `DataProtection__KeysPath` is `/keys`. Each host mounts its own folder there (§7).
 - `webapi` and `worker` share the `reports` folder, mounted at the same `Reports__StorageRoot`.
+- Every .NET host also gets `OTEL_EXPORTER_OTLP_ENDPOINT` = `http://aspire-dashboard:18889` and `OTEL_SERVICE_NAME` = its container name from §3 (§5.1).
 
 **Repository folder `deploy/`.** Holds everything the VPS needs that is not secret:
 
@@ -160,6 +167,18 @@ The table lists the keys the compose file sets. Keys marked † are introduced b
 The deploy job copies this folder to `/opt/mywealth` on the VPS on every deploy, so the compose file always comes from the same commit as the images. `.env`, `certs/` and `data/` live only on the VPS and are never in `deploy/`. Because the job overwrites these files, nothing is edited by hand in them on the VPS; anything that differs per server comes from `.env`.
 
 `deploy/.env.example` names every `.env` key, secrets included. Besides the secrets in §6, `.env` holds: `IMAGE_TAG` and `PREVIOUS_IMAGE_TAG` (written by `deploy.sh`), `GHCR_OWNER`, `DOMAIN`, `ACME_EMAIL`, and `ACME_CA`. `ACME_CA` is empty for the production ACME issuer and set to the Let's Encrypt staging directory for a first start (§12).
+
+### 5.1 Telemetry
+
+The hosts already collect traces, metrics and logs through ServiceDefaults. They export over OTLP only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. In Development the AppHost sets it; in production the compose file does.
+
+- **Viewer.** One `aspire-dashboard` container. The image tag is an exact version, the same as the Aspire packages in `Directory.Packages.props`, never `latest`.
+- **Ingest.** The hosts send OTLP over gRPC to `aspire-dashboard:18889` on the internal network. That endpoint has no authentication. Any container on the internal network can write telemetry to it, and every container there is ours. It is not published.
+- **Service names.** `OTEL_SERVICE_NAME` is the container name (`webapi`, `identity`, `worker`, `bff-adviser-portal`, `bff-customer-portal`, `back-office`), so the dashboard shows the same names as §3 and the Aspire dashboard in Development.
+- **Health checks.** Requests to `/health` and `/alive` produce no trace ([production-hosting.md](features/production-hosting.md) R17), so the compose health checks do not fill the trace limit.
+- **Access.** The UI port `18888` is published on `127.0.0.1` of the VPS only. The owner opens an SSH tunnel from their own computer, `ssh -N -L 18888:127.0.0.1:18888 <deploy-user>@<vps>`, and browses `http://localhost:18888`. The dashboard keeps its default browser-token login. The token is printed in the container log on each start (`docker compose logs aspire-dashboard`). Caddy never forwards to the dashboard.
+- **Retention.** In memory only, with the dashboard's default per-resource limits (10,000 log entries, 10,000 traces, 50,000 metric points). When a limit is reached, the oldest entries go first. A restart of the container (VPS reboot, Docker restart, a change to its own compose entry or image tag) empties it. A deploy that changes only `IMAGE_TAG` does not recreate it.
+- **Resources.** `mem_limit: 512m`. No health check: the image has no shell, and the hosts do not wait for it. A missing dashboard costs only telemetry; the hosts drop what they cannot send.
 
 ---
 
@@ -200,6 +219,8 @@ Everything lives under `/opt/mywealth` on the VPS, owned by the deploy user, exc
 | `data/dataprotection/<host>/` | Bind mount, one folder per host | ASP.NET Core Data Protection key ring of that host | Everyone signs in again |
 | `certs/` | Bind mount, read-only | OpenIddict PFX files | Generate new ones; tokens issued earlier stop validating; everyone signs in again |
 | `caddy-data`, `caddy-config` | Named volumes | TLS certificates from the ACME issuer, Caddy state | Caddy requests new ones |
+
+The `aspire-dashboard` container has no volume. Its telemetry is not state (§5.1).
 
 - The `<host>` folders are `identity`, `bff-adviser-portal`, `bff-customer-portal` and `back-office`. Each host mounts only its own folder at `/keys`, so no host can read another host's keys.
 - The .NET hosts run as UID 1654. `data/reports/`, every `data/dataprotection/<host>/` and `certs/` must belong to UID 1654, or the host fails on first read or write.
@@ -257,12 +278,12 @@ Playwright, run from the GitHub runner against the public hostnames. The cases, 
 
 ## 11. Security baseline
 
-- Caddy is the only container with published ports. `webapi`, `worker` and `sql` are never reachable from outside. Scalar on `webapi` is therefore not public.
+- Caddy is the only container with ports published on a public address. `webapi`, `worker`, `sql` and `aspire-dashboard` are never reachable from outside. Scalar on `webapi` is therefore not public.
 - Health endpoints answer only on the health port `8081`, which Caddy never forwards to. On port `8080` they return 404.
 - Caddy rate-limits `POST /login*` on `id.<domain>` per client IP (about 10 per minute). The wildcard also catches `/login/`, which ASP.NET routing serves to the same page. `/connect/token` is not limited there: every OIDC client is confidential and there is no password grant. A loose global limit per IP applies on every host (about 300 per minute). It skips the internal network `172.30.0.0/24`, because the hosts reach `id.<domain>` through Caddy (§3), but not the gateway `172.30.0.1`, the source address of traffic that Docker's userland proxy forwards (IPv6 clients). The stock Caddy image has no rate limiting, so `deploy/caddy/Dockerfile` builds Caddy with the `caddy-ratelimit` module. Rate limiting is not added inside the hosts in this deploy.
 - Hosted login locks an identity user for five minutes after five wrong passwords in a row, every role included ([identity-auth.md](features/identity-auth.md), amendment 2026-11-13, lockout). There is no unlock UI; clear a lockout in SQL as in [known-issues/hosted-login-lockout.md](known-issues/hosted-login-lockout.md).
 - HSTS on every public hostname, set by Caddy. The hosts do not redirect to HTTPS themselves; Caddy redirects HTTP to HTTPS.
-- Docker writes its own firewall rules, so a published container port bypasses the host firewall. No service except `caddy` has `ports:`.
+- Docker writes its own firewall rules, so a published container port bypasses the host firewall. No service except `caddy` and `aspire-dashboard` has `ports:`. `aspire-dashboard` publishes only `127.0.0.1:18888`, so the host firewall needs no rule for it. Docker Engine 28 or later is required: earlier versions let other machines on the provider's network reach ports published on `127.0.0.1`.
 - Firewall on the VPS: allow 22, 80, 443 only. `caddy` also publishes `443/udp` for HTTP/3. Allowing `443/udp` in the firewall is optional; without it, browsers fall back to HTTP/2 over TCP. SSH by key only; password login is off for every user, root included. The deploy user is in the `docker` group, which is root-equivalent, and has no `sudo`.
 
 Known gaps, accepted for the showcase. Each is recorded in [known-issues/](known-issues/README.md):
@@ -278,7 +299,7 @@ Known gaps, accepted for the showcase. Each is recorded in [known-issues/](known
 The operator runbook holds the commands. This list is the order and the outcome of each step.
 
 1. Install the OS updates, create the deploy user with key-only SSH, turn off password login, configure the firewall (§11) and 2 GB of swap.
-2. Install Docker from Docker's own package repository, with the compose plugin. Add the deploy user to the `docker` group. Cap container logs (`json-file`, 20 MB × 5).
+2. Install Docker Engine 28 or later from Docker's own package repository, with the compose plugin (§11). Add the deploy user to the `docker` group. Cap container logs (`json-file`, 20 MB × 5).
 3. Point the four hostnames at the VPS. Wait until all four resolve before Caddy starts; failed ACME validations count against the issuer's rate limit.
 4. Create `/opt/mywealth` with `certs/`, `data/reports/` and one `data/dataprotection/<host>/` per host (§7). Give `certs/` and `data/` to UID 1654.
 5. Create `.env` from `deploy/.env.example` (§6). Keep a copy in the owner's password manager.
