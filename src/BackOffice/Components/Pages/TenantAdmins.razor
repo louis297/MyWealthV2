@@ -1,5 +1,6 @@
 @page "/tenant-admins"
 @inject IPlatformApi Api
+@inject NavigationManager Navigation
 
 <PageTitle>Tenant admins</PageTitle>
 
@@ -9,25 +10,23 @@
 </MudStack>
 
 <MudPaper Class="pa-4 mb-4" Outlined="true">
-    <form method="get" action="/tenant-admins" class="bo-filter">
-        <label>Tenant
-            <select name="tenantId">
-                <option value="" selected="@string.IsNullOrEmpty(TenantId)">All tenants</option>
+    <EditForm Model="filter" OnSubmit="ApplyFilter" FormName="tenant-admin-filter">
+        <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="3" AlignItems="AlignItems.Center">
+            <MudSelect T="string" @bind-Value="filter.TenantId" Label="Tenant" Variant="Variant.Outlined" Margin="Margin.Dense" ToStringFunc="TenantLabel" Style="min-width: 16rem;">
+                <MudSelectItem T="string" Value="@("all")">All tenants</MudSelectItem>
                 @foreach (var tenant in tenants)
                 {
-                    <option value="@tenant.Id" selected="@(TenantId == tenant.Id.ToString())">@tenant.Name</option>
+                    <MudSelectItem T="string" Value="@tenant.Id.ToString()">@tenant.Name</MudSelectItem>
                 }
-            </select>
-        </label>
-        <label>Search <input name="search" value="@Search" /></label>
-        <label>Status
-            <select name="enabledOnly">
-                <option value="" selected="@(string.IsNullOrEmpty(EnabledOnly))">All</option>
-                <option value="true" selected="@(EnabledOnly == "true")">Active</option>
-            </select>
-        </label>
-        <button type="submit">Filter</button>
-    </form>
+            </MudSelect>
+            <MudTextField T="string" @bind-Value="filter.Search" Label="Search" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Style="min-width: 14rem;" />
+            <MudSelect T="string" @bind-Value="filter.Status" Label="Status" Variant="Variant.Outlined" Margin="Margin.Dense" ToStringFunc="StatusLabel" Style="min-width: 10rem;">
+                <MudSelectItem T="string" Value="@("all")">All</MudSelectItem>
+                <MudSelectItem T="string" Value="@("true")">Active</MudSelectItem>
+            </MudSelect>
+            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Filter</MudButton>
+        </MudStack>
+    </EditForm>
 </MudPaper>
 
 @if (error is not null)
@@ -68,23 +67,50 @@ else if (list is not null)
     [SupplyParameterFromQuery(Name = "enabledOnly")]
     public string? EnabledOnly { get; set; }
 
-    private IReadOnlyList<TenantItem> tenants = [];
+    private readonly FilterModel filter = new();
+    private IReadOnlyList<TenantItem>? tenantsLoaded;
+    private IReadOnlyList<TenantItem> tenants => tenantsLoaded ?? [];
     private TenantAdminPage? list;
     private string? error;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
+        Guid? tenant = Guid.TryParse(TenantId, out var parsed) ? parsed : null;
+        bool? enabled = bool.TryParse(EnabledOnly, out var flag) ? flag : null;
+        filter.TenantId = tenant?.ToString() ?? "all";
+        filter.Search = Search ?? "";
+        filter.Status = enabled is true ? "true" : "all";
+        error = null;
         try
         {
-            var tenantPage = await Api.ListTenantsAsync(1, 100, null, null);
-            tenants = tenantPage.Items;
-            Guid? tenant = Guid.TryParse(TenantId, out var parsed) ? parsed : null;
-            bool? enabled = bool.TryParse(EnabledOnly, out var flag) ? flag : null;
+            tenantsLoaded ??= (await Api.ListTenantsAsync(1, 100, null, null)).Items;
             list = await Api.ListTenantAdminsAsync(1, 20, tenant, enabled, Search);
         }
         catch (PlatformApiException exception)
         {
             error = exception.Message;
         }
+    }
+
+    private void ApplyFilter() =>
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
+        {
+            ["tenantId"] = filter.TenantId == "all" ? null : filter.TenantId,
+            ["search"] = string.IsNullOrWhiteSpace(filter.Search) ? null : filter.Search.Trim(),
+            ["enabledOnly"] = filter.Status == "all" ? null : filter.Status
+        }));
+
+    private string TenantLabel(string? value) =>
+        value == "all"
+            ? "All tenants"
+            : tenants.FirstOrDefault(tenant => tenant.Id.ToString() == value)?.Name ?? "";
+
+    private static string StatusLabel(string? value) => value == "true" ? "Active" : "All";
+
+    private sealed class FilterModel
+    {
+        public string TenantId { get; set; } = "all";
+        public string Search { get; set; } = "";
+        public string Status { get; set; } = "all";
     }
 }

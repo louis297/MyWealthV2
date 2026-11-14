@@ -1,5 +1,6 @@
 @page "/tenants"
 @inject IPlatformApi Api
+@inject NavigationManager Navigation
 
 <PageTitle>Tenants</PageTitle>
 
@@ -9,17 +10,17 @@
 </MudStack>
 
 <MudPaper Class="pa-4 mb-4" Outlined="true">
-    <form method="get" action="/tenants" class="bo-filter">
-        <label>Search <input name="search" value="@Search" /></label>
-        <label>Status
-            <select name="isEnabled">
-                <option value="" selected="@(string.IsNullOrEmpty(IsEnabled))">All</option>
-                <option value="true" selected="@(IsEnabled == "true")">Active</option>
-                <option value="false" selected="@(IsEnabled == "false")">Disabled</option>
-            </select>
-        </label>
-        <button type="submit">Filter</button>
-    </form>
+    <EditForm Model="filter" OnSubmit="ApplyFilter" FormName="tenant-filter">
+        <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="3" AlignItems="AlignItems.Center">
+            <MudTextField T="string" @bind-Value="filter.Search" Label="Search" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Style="min-width: 14rem;" />
+            <MudSelect T="string" @bind-Value="filter.Status" Label="Status" Variant="Variant.Outlined" Margin="Margin.Dense" ToStringFunc="StatusLabel" Style="min-width: 10rem;">
+                <MudSelectItem T="string" Value="@("all")">All</MudSelectItem>
+                <MudSelectItem T="string" Value="@("true")">Active</MudSelectItem>
+                <MudSelectItem T="string" Value="@("false")">Disabled</MudSelectItem>
+            </MudSelect>
+            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Filter</MudButton>
+        </MudStack>
+    </EditForm>
 </MudPaper>
 
 @if (error is not null)
@@ -57,11 +58,15 @@ else if (list is not null)
     [SupplyParameterFromQuery(Name = "isEnabled")]
     public string? IsEnabled { get; set; }
 
+    private readonly FilterModel filter = new();
     private TenantPage? list;
     private string? error;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
+        filter.Search = Search ?? "";
+        filter.Status = IsEnabled is "true" or "false" ? IsEnabled : "all";
+        error = null;
         try
         {
             bool? enabled = bool.TryParse(IsEnabled, out var parsed) ? parsed : null;
@@ -71,5 +76,25 @@ else if (list is not null)
         {
             error = exception.Message;
         }
+    }
+
+    private void ApplyFilter() =>
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
+        {
+            ["search"] = string.IsNullOrWhiteSpace(filter.Search) ? null : filter.Search.Trim(),
+            ["isEnabled"] = filter.Status == "all" ? null : filter.Status
+        }));
+
+    private static string StatusLabel(string? value) => value switch
+    {
+        "true" => "Active",
+        "false" => "Disabled",
+        _ => "All"
+    };
+
+    private sealed class FilterModel
+    {
+        public string Search { get; set; } = "";
+        public string Status { get; set; } = "all";
     }
 }
