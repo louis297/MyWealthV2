@@ -57,7 +57,7 @@ public class GetTransactionByIdQueryHandler(IApplicationDbContext db, ICurrentUs
             TenantId = row.tenant.PublicId,
             Type = row.transaction.Type.ToString(),
             Cash = legs.Cash[row.transaction.Id].ToList(),
-            BookedAt = TransactionDto.FormatBookedAt(row.transaction.BookedAt),
+            BookedAt = row.transaction.BookedAt,
             Memo = row.transaction.Memo,
             Reference = row.transaction.Reference,
             OriginalTransactionId = originalPublicId,
