@@ -72,6 +72,47 @@ public class BackOfficePageTests
     }
 
     [Test]
+    public async Task TenantAdminDetail_ShowsTheTenantNameLinkedToTheTenant()
+    {
+        var body = await GetAsync($"/tenant-admins/{PersonId}");
+
+        body.ShouldContain("North Advisory");
+        body.ShouldContain($"href=\"/tenants/{TenantId}\"");
+        body.ShouldNotContain($">{TenantId}<");
+    }
+
+    [Test]
+    public async Task TenantAdmins_FilterPicksAnyTenantByName()
+    {
+        var tenantsBefore = _api.TenantLists.Count;
+        var listsBefore = _api.TenantAdminLists.Count;
+
+        var body = await GetAsync($"/tenant-admins?tenantId={TenantId}");
+
+        body.ShouldContain("North Advisory");
+        body.ShouldContain("All tenants");
+        body.ShouldContain($"<option value=\"{TenantId}\"");
+        body.ShouldNotContain("<input name=\"tenantId\"");
+        _api.TenantLists.Count.ShouldBe(tenantsBefore + 1);
+        _api.TenantLists[tenantsBefore].IsEnabled.ShouldBeNull();
+        _api.TenantAdminLists[listsBefore].ShouldBe(TenantId);
+    }
+
+    [Test]
+    public async Task TenantAdminNew_PicksAnEnabledTenantByName()
+    {
+        var tenantsBefore = _api.TenantLists.Count;
+
+        var body = await GetAsync($"/tenant-admins/new?tenantId={TenantId}");
+
+        body.ShouldContain("North Advisory");
+        body.ShouldContain($"<option value=\"{TenantId}\"");
+        body.ShouldContain(">Create<");
+        _api.TenantLists.Count.ShouldBe(tenantsBefore + 1);
+        _api.TenantLists[tenantsBefore].IsEnabled.ShouldBe(true);
+    }
+
+    [Test]
     public async Task Configuration_ListsActiveReports_HidesInactive_AndDoesNotOfferRunOrSchedule()
     {
         var body = await GetAsync($"/tenants/{TenantId}/config");
@@ -314,8 +355,13 @@ public class BackOfficePageTests
         public Task EnableTenantAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 
-        public Task<TenantAdminPage> ListTenantAdminsAsync(int page, int pageSize, Guid? tenantId, bool? enabledOnly, string? search, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new TenantAdminPage([], page, pageSize, 0));
+        public List<Guid?> TenantAdminLists { get; } = [];
+
+        public Task<TenantAdminPage> ListTenantAdminsAsync(int page, int pageSize, Guid? tenantId, bool? enabledOnly, string? search, CancellationToken cancellationToken = default)
+        {
+            TenantAdminLists.Add(tenantId);
+            return Task.FromResult(new TenantAdminPage([], page, pageSize, 0));
+        }
 
         public Task<TenantAdminItem> GetTenantAdminAsync(Guid id, CancellationToken cancellationToken = default) =>
             Task.FromResult(new TenantAdminItem(id, TenantId, "Alex", "alex@firm", "active", true, "rv1"));
