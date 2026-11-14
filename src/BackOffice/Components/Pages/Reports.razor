@@ -30,15 +30,17 @@ else
                 <td>@report.Scope</td>
                 <td>@(report.IsActive ? "Active" : "Inactive")</td>
                 <td>
-                    @foreach (var trigger in KnownTriggers)
-                    {
-                        <label class="me-3">
-                            <input type="checkbox"
-                                   checked="@report.AllowedTriggers.Contains(trigger)"
-                                   @onchange="args => ToggleTrigger(report, trigger, args.Value is true)" />
-                            @trigger
-                        </label>
-                    }
+                    <MudStack Row="true" Spacing="0">
+                        @foreach (var trigger in KnownTriggers)
+                        {
+                            <MudCheckBox T="bool"
+                                         Value="@report.AllowedTriggers.Contains(trigger)"
+                                         ValueChanged="@((bool selected) => ToggleTrigger(report, trigger, selected))"
+                                         Label="@trigger"
+                                         Size="Size.Small"
+                                         Dense="true" />
+                        }
+                    </MudStack>
                 </td>
                 <td>
                     @if (report.IsActive)
