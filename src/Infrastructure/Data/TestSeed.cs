@@ -513,7 +513,7 @@ public static class TestSeed
         var vti = await db.Instruments.SingleOrDefaultAsync(
             row => row.TenantId == tenantId && row.Symbol == "VTI", cancellationToken);
         var bookedAt = new DateTimeOffset(2026, 1, 15, 10, 30, 0, TimeSpan.FromHours(13));
-        var asOf = DateOnly.FromDateTime(bookedAt.DateTime);
+        var asOf = DateOnly.FromDateTime(bookedAt.UtcDateTime);
         var stored = vti is null
             ? null
             : await db.InstrumentPrices.AsNoTracking()

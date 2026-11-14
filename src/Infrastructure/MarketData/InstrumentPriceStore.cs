@@ -15,7 +15,7 @@ public sealed class InstrumentPriceStore(ApplicationDbContext db, TimeProvider t
     {
         var date = asOf is null
             ? DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime)
-            : DateOnly.FromDateTime(asOf.Value.DateTime);
+            : DateOnly.FromDateTime(asOf.Value.UtcDateTime);
         var row = db.InstrumentPrices.AsNoTracking()
             .Where(price => price.InstrumentId == instrumentId && price.AsOfDate <= date)
             .OrderByDescending(price => price.AsOfDate)

@@ -19,7 +19,7 @@ public sealed class FxRateStore(ApplicationDbContext db, TimeProvider time) : IF
         var target = to.Trim().ToUpperInvariant();
         var date = asOf is null
             ? DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime)
-            : DateOnly.FromDateTime(asOf.Value.DateTime);
+            : DateOnly.FromDateTime(asOf.Value.UtcDateTime);
 
         var rows = await db.FxRates.AsNoTracking()
             .Where(row => row.BaseCurrency == source && row.QuoteCurrency == target)
@@ -37,7 +37,7 @@ public sealed class FxRateStore(ApplicationDbContext db, TimeProvider time) : IF
     {
         var source = from.Trim().ToUpperInvariant();
         var target = to.Trim().ToUpperInvariant();
-        var date = DateOnly.FromDateTime(asOf.DateTime);
+        var date = DateOnly.FromDateTime(asOf.UtcDateTime);
 
         var row = await db.FxRates.AsNoTracking()
             .Where(rate => rate.BaseCurrency == source && rate.QuoteCurrency == target && rate.AsOfDate <= date)
