@@ -310,12 +310,14 @@ describe("CreateFxConversionPage", () => {
     expect(created).toHaveLength(1);
     expect(created[0].url).toBe("http://localhost:3000/api/transactions/fx");
     expect(created[0].headers.get("Idempotency-Key")).toBe(idempotencyKey);
+    const quotes = posts(fetchMock, "/transactions/fx/quote");
+    expect(JSON.parse(await quotes[quotes.length - 1].clone().text()).bookedAt).toBe("2026-11-09T20:00:00.000Z");
     expect(JSON.parse(await created[0].clone().text())).toEqual({
       fromAccountId: sourceId,
       toAccountId: usdId,
       buyAmount: 500,
       expectedRate: 0.5912,
-      bookedAt: "2026-11-10T09:00",
+      bookedAt: "2026-11-09T20:00:00.000Z",
       memo: null,
       reference: null,
     });

@@ -547,7 +547,7 @@ describe("AccountDetailPage", () => {
       accountId,
       type: "TransferIn",
       amount: 80,
-      bookedAt: "2026-10-12T09:00",
+      bookedAt: "2026-10-11T20:00:00.000Z",
       memo: "Salary",
     });
     expect(post?.headers.get("Idempotency-Key")).toMatch(
