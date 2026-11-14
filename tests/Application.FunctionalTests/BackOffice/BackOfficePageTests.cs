@@ -89,13 +89,43 @@ public class BackOfficePageTests
 
         var body = await GetAsync($"/tenant-admins?tenantId={TenantId}");
 
-        body.ShouldContain("North Advisory");
-        body.ShouldContain("All tenants");
-        body.ShouldContain($"<option value=\"{TenantId}\"");
-        body.ShouldNotContain("<input name=\"tenantId\"");
+        body.ShouldContain("value=\"North Advisory\"");
+        body.ShouldContain("mud-select");
+        body.ShouldNotContain("<select");
+        body.ShouldNotContain("method=\"get\"");
+        body.ShouldNotContain($"value=\"{TenantId}\"");
         _api.TenantLists.Count.ShouldBe(tenantsBefore + 1);
         _api.TenantLists[tenantsBefore].IsEnabled.ShouldBeNull();
         _api.TenantAdminLists[listsBefore].ShouldBe(TenantId);
+    }
+
+    [Test]
+    public async Task TenantAdmins_WithoutTenant_ListsEveryTenant()
+    {
+        var listsBefore = _api.TenantAdminLists.Count;
+
+        var body = await GetAsync("/tenant-admins?enabledOnly=true");
+
+        body.ShouldContain("value=\"All tenants\"");
+        body.ShouldContain("value=\"Active\"");
+        _api.TenantAdminLists[listsBefore].ShouldBeNull();
+    }
+
+    [Test]
+    public async Task Tenants_FilterUsesMudBlazorFieldsAndPassesTheQuery()
+    {
+        var tenantsBefore = _api.TenantLists.Count;
+
+        var body = await GetAsync("/tenants?isEnabled=false&search=north");
+
+        body.ShouldContain("mud-select");
+        body.ShouldNotContain("<select");
+        body.ShouldNotContain("method=\"get\"");
+        body.ShouldContain("value=\"north\"");
+        body.ShouldContain("value=\"Disabled\"");
+        var call = _api.TenantLists[tenantsBefore];
+        call.IsEnabled.ShouldBe(false);
+        call.Search.ShouldBe("north");
     }
 
     [Test]
@@ -178,9 +208,12 @@ public class BackOfficePageTests
         body.ShouldContain(">Open<");
         body.ShouldContain($"href=\"/instruments/{InstrumentId}\"");
         body.ShouldContain($"href=\"/instruments/new?tenantId={TenantId}\"");
-        body.ShouldContain("name=\"tenantId\"");
-        body.ShouldContain("name=\"search\"");
-        body.ShouldContain("name=\"enabledOnly\"");
+        body.ShouldContain("mud-select");
+        body.ShouldNotContain("<select");
+        body.ShouldNotContain("method=\"get\"");
+        body.ShouldContain("value=\"North Advisory\"");
+        body.ShouldContain("value=\"vti\"");
+        body.ShouldContain("value=\"Active\"");
         body.ShouldNotContain(">Delete<");
         body.ShouldNotContain("Price");
         body.ShouldNotContain("/holdings");
