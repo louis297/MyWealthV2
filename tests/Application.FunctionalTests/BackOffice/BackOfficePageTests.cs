@@ -106,7 +106,9 @@ public class BackOfficePageTests
         var body = await GetAsync($"/tenant-admins/new?tenantId={TenantId}");
 
         body.ShouldContain("North Advisory");
-        body.ShouldContain($"<option value=\"{TenantId}\"");
+        body.ShouldContain("mud-select");
+        body.ShouldNotContain("<option");
+        body.ShouldNotContain(TenantId.ToString());
         body.ShouldContain(">Create<");
         _api.TenantLists.Count.ShouldBe(tenantsBefore + 1);
         _api.TenantLists[tenantsBefore].IsEnabled.ShouldBe(true);
@@ -219,7 +221,9 @@ public class BackOfficePageTests
         var body = await GetAsync($"/instruments/new?tenantId={TenantId}");
 
         body.ShouldContain("North Advisory");
-        body.ShouldContain(TenantId.ToString());
+        body.ShouldContain("mud-select");
+        body.ShouldNotContain("<option");
+        body.ShouldContain($"href=\"/instruments?tenantId={TenantId}\"");
         body.ShouldContain("Symbol");
         body.ShouldContain("Name");
         body.ShouldContain("NZD");
