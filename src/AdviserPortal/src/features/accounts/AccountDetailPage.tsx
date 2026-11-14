@@ -33,6 +33,7 @@ import {
 } from "@/features/portfolios/portfoliosApi";
 import { rateLine } from "@/features/transactions/fxFormat";
 import { useGetTransactionsQuery } from "@/features/transactions/transactionsApi";
+import { formatInstant } from "@/shared/time/instant";
 import { cn } from "cn";
 
 function isStatus(error: unknown, status: number) {
@@ -389,7 +390,7 @@ export function AccountDetailPage() {
                         </Link>
                       </TableCell>
                       <TableCell>{item.type}</TableCell>
-                      <TableCell>{item.bookedAt}</TableCell>
+                      <TableCell>{formatInstant(item.bookedAt)}</TableCell>
                       <TableCell>
                         {item.cash
                           .filter((leg) => leg.accountId === data.id)

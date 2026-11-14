@@ -11,6 +11,7 @@ import {
   type ReportScope,
 } from "@/features/reports/reportsApi";
 import { Pager } from "@/shared/components/Pager";
+import { formatInstant } from "@/shared/time/instant";
 
 function summary(parameters: ReportParameters): string | null {
   if (typeof parameters.from === "string" && typeof parameters.to === "string") {
@@ -137,7 +138,7 @@ export function ReportHistory({
             <span>{item.triggerKind}</span>
             <span>{item.created.slice(0, 10)}</span>
             {range ? <span>{range}</span> : null}
-            {item.asOf ? <span>{item.asOf}</span> : null}
+            {item.asOf ? <span>{formatInstant(item.asOf)}</span> : null}
             {item.status === "Succeeded" ? (
               <Button type="button" variant="outline" size="sm" onClick={() => void onDownload(item.id)}>
                 Download
