@@ -12,7 +12,7 @@
         <MudSpacer />
         <form method="post" action="/sign-out" class="bo-sign-out">
             <AntiforgeryToken />
-            <button type="submit">Sign out</button>
+            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" Color="Color.Inherit">Sign out</MudButton>
         </form>
     </MudAppBar>
     <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="0" Variant="DrawerVariant.Responsive">
