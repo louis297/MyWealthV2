@@ -86,6 +86,9 @@ public static class DependencyInjection
         builder.Services.ConfigureHttpJsonOptions(options =>
             options.SerializerOptions.Converters.Add(new UtcInstantJsonConverter()));
 
+        // An unreadable body reaches ProblemDetailsExceptionHandler in every environment, not only Development.
+        builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
+
         // Customise default API behaviour
         builder.Services.Configure<ApiBehaviorOptions>(options =>
             options.SuppressModelStateInvalidFilter = true);

@@ -9,7 +9,8 @@ namespace MyWealthV2.Web.Infrastructure;
 /// Converts well-known application exceptions into RFC 9110-compliant <see cref="ProblemDetails"/> responses,
 /// mapping <see cref="ValidationException"/> → 400, <see cref="NotFoundException"/> → 404,
 /// <see cref="UnauthorizedAccessException"/> → 401, <see cref="ForbiddenAccessException"/> → 403, and every
-/// <see cref="ProblemException"/> → 400 or 409 with its problem code (api-design §4.2).
+/// <see cref="ProblemException"/> → 400 or 409 with its problem code (api-design §4.2), and a request body that
+/// cannot be read → 400 (an instant without an offset → <c>errors.&lt;Field&gt;</c>, fixes/utc-instants.md).
 /// Unrecognised exceptions are not handled and fall through to the default middleware.
 /// </summary>
 public class ProblemDetailsExceptionHandler : IExceptionHandler
@@ -43,6 +44,21 @@ public class ProblemDetailsExceptionHandler : IExceptionHandler
                 Type = "https://tools.ietf.org/html/rfc9110#section-15.5.4"
             }),
             ProblemException problem => (StatusOf(problem.Kind), CodedProblem(problem)),
+            BadHttpRequestException { InnerException: InstantFormatException instant } =>
+                (StatusCodes.Status400BadRequest, new ValidationProblemDetails(new Dictionary<string, string[]>
+                {
+                    [FieldOf(instant.Path)] = [instant.Message]
+                })
+                {
+                    Status = StatusCodes.Status400BadRequest,
+                    Type = "https://tools.ietf.org/html/rfc9110#section-15.5.1"
+                }),
+            BadHttpRequestException bad => (bad.StatusCode, new ProblemDetails
+            {
+                Status = bad.StatusCode,
+                Title = "Bad request",
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.1"
+            }),
             _ => (-1, null)
         };
 
@@ -56,6 +72,13 @@ public class ProblemDetailsExceptionHandler : IExceptionHandler
         httpContext.Response.StatusCode = statusCode;
         await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
         return true;
+    }
+
+    /// <summary>The JSON path without <c>$.</c>, first letter upper-case: the key the required rule uses (<c>$.bookedAt</c> → <c>BookedAt</c>).</summary>
+    private static string FieldOf(string? path)
+    {
+        var name = path is null ? string.Empty : path.StartsWith("$.", StringComparison.Ordinal) ? path[2..] : path.TrimStart('$');
+        return name.Length == 0 ? string.Empty : char.ToUpperInvariant(name[0]) + name[1..];
     }
 
     private static int StatusOf(ProblemKind kind) => kind switch
