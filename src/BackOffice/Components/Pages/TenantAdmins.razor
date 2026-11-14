@@ -10,7 +10,15 @@
 
 <MudPaper Class="pa-4 mb-4" Outlined="true">
     <form method="get" action="/tenant-admins" class="bo-filter">
-        <label>Tenant <input name="tenantId" value="@TenantId" /></label>
+        <label>Tenant
+            <select name="tenantId">
+                <option value="" selected="@string.IsNullOrEmpty(TenantId)">All tenants</option>
+                @foreach (var tenant in tenants)
+                {
+                    <option value="@tenant.Id" selected="@(TenantId == tenant.Id.ToString())">@tenant.Name</option>
+                }
+            </select>
+        </label>
         <label>Search <input name="search" value="@Search" /></label>
         <label>Status
             <select name="enabledOnly">
@@ -60,6 +68,7 @@ else if (list is not null)
     [SupplyParameterFromQuery(Name = "enabledOnly")]
     public string? EnabledOnly { get; set; }
 
+    private IReadOnlyList<TenantItem> tenants = [];
     private TenantAdminPage? list;
     private string? error;
 
@@ -67,6 +76,8 @@ else if (list is not null)
     {
         try
         {
+            var tenantPage = await Api.ListTenantsAsync(1, 100, null, null);
+            tenants = tenantPage.Items;
             Guid? tenant = Guid.TryParse(TenantId, out var parsed) ? parsed : null;
             bool? enabled = bool.TryParse(EnabledOnly, out var flag) ? flag : null;
             list = await Api.ListTenantAdminsAsync(1, 20, tenant, enabled, Search);

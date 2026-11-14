@@ -14,7 +14,14 @@
 <MudPaper Class="pa-4" Outlined="true">
     <EditForm Model="form" OnValidSubmit="Create" FormName="new-tenant-admin">
         <MudStack Spacing="3" Style="max-width: 28rem;">
-            <MudTextField @bind-Value="form.TenantId" Label="Tenant" Variant="Variant.Outlined" />
+            <label>Tenant
+                <select @bind="form.TenantId">
+                    @foreach (var tenant in tenants)
+                    {
+                        <option value="@tenant.Id">@tenant.Name</option>
+                    }
+                </select>
+            </label>
             <MudTextField @bind-Value="form.Name" Label="Name" Variant="Variant.Outlined" />
             <MudTextField @bind-Value="form.Email" Label="Email" Variant="Variant.Outlined" />
             <MudTextField @bind-Value="form.Password" Label="Password" InputType="InputType.Password" Variant="Variant.Outlined" />
@@ -31,21 +38,33 @@
     public string? TenantQuery { get; set; }
 
     private readonly FormModel form = new();
+    private IReadOnlyList<TenantItem> tenants = [];
     private string? error;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        if (!string.IsNullOrWhiteSpace(TenantQuery))
+        try
         {
-            form.TenantId = TenantQuery;
+            var tenantPage = await Api.ListTenantsAsync(1, 100, true, null);
+            tenants = tenantPage.Items;
         }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+            return;
+        }
+
+        var requested = Guid.TryParse(TenantQuery, out var parsed)
+            ? tenants.FirstOrDefault(tenant => tenant.Id == parsed)
+            : null;
+        form.TenantId = (requested ?? tenants.FirstOrDefault())?.Id.ToString() ?? "";
     }
 
     private async Task Create()
     {
-        if (!Guid.TryParse(form.TenantId, out var tenantId))
+        if (!Guid.TryParse(form.TenantId, out var tenantId) || tenants.All(tenant => tenant.Id != tenantId))
         {
-            error = "Tenant must be a PublicId.";
+            error = "Choose an active tenant.";
             return;
         }
 

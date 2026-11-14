@@ -23,7 +23,7 @@
             </div>
             <div>
                 <MudText Typo="Typo.caption">Tenant</MudText>
-                <MudLink Href="@($"/tenants/{item.TenantId}")">@item.TenantId</MudLink>
+                <MudLink Href="@($"/tenants/{item.TenantId}")">@(tenantName ?? "Open tenant")</MudLink>
             </div>
             <div>
                 <MudText Typo="Typo.caption">Status</MudText>
@@ -53,6 +53,7 @@
     public Guid Id { get; set; }
 
     private TenantAdminItem? item;
+    private string? tenantName;
     private readonly FormModel form = new();
     private string? error;
 
@@ -62,6 +63,8 @@
         {
             item = await Api.GetTenantAdminAsync(Id);
             form.Name = item.Name;
+            var tenant = await Api.GetTenantAsync(item.TenantId);
+            tenantName = tenant.Name;
         }
         catch (PlatformApiException exception)
         {
