@@ -7,13 +7,20 @@ import type { Tenant } from "@/shared/types/tenant";
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: `${typeof window === "undefined" ? "" : window.location.origin}/api`,
   credentials: "include",
-  prepareHeaders: (headers, { type }) => {
-    if (type === "mutation") {
+  prepareHeaders: (headers, { type, arg }) => {
+    // The BFF rejects POST, PUT, PATCH and DELETE without this header, including
+    // POST queries such as the FX quote, so decide by method as well as by type.
+    if (type === "mutation" || isMutatingMethod(arg)) {
       headers.set("X-MyWealth-Request", "1");
     }
     return headers;
   },
 });
+
+function isMutatingMethod(arg: string | FetchArgs): boolean {
+  const method = typeof arg === "string" ? "GET" : (arg.method ?? "GET").toUpperCase();
+  return method !== "GET" && method !== "HEAD";
+}
 
 const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (
   args,
