@@ -3,7 +3,7 @@ title: Future plans
 status: note
 language: en
 created: 2026-11-10
-updated: 2026-11-14
+updated: 2026-11-15
 related:
   - README.md
   - function-plan.md
@@ -14,6 +14,9 @@ related:
   - features/fx-conversions.md
   - deployment.md
   - features/tenants.md
+  - adr/0016-bff-for-first-party-portals.md
+  - features/identity-auth.md
+  - adviser-portal/adviser-portal.md
 ---
 
 # Future plans
@@ -99,3 +102,32 @@ Questions to settle when this opens:
 - What else a visitor must not do: invite people (email is a no-op anyway), disable the demo tenant's users, or create data large enough to slow the VPS.
 - How the credentials are shown: on the hosted login page, on the portal landing page, or in the repository README.
 
+---
+
+## 6. Adviser mobile app
+
+A native mobile app for Advisers, built with React Native (Expo), next to the Adviser Portal web app.
+
+Today: the Adviser Portal is a browser SPA (ADR 0003) behind `bff-adviser-portal` (ADR 0016). It has no mobile layout acceptance ([adviser-portal/frontend-implementation-notes.md](adviser-portal/frontend-implementation-notes.md) 13.24).
+
+Direction from discussion (2026-11-15), not planned for now:
+
+- Keep the web Adviser Portal. The app adds a second front end; it does not replace the SPA. The portal is desktop-shaped (tables, sidebar, dialogs, portfolio weights, report schedules), so the app starts with a read-heavy subset: Dashboard, Customers, net worth, viewing reports. Admin flows stay on the web.
+- Keep it in this repository, for example `src/AdviserMobile/`, with npm workspaces and a shared package for the non-UI TypeScript: the RTK Query `*Api.ts` slices, shared types, `problem.ts`, `roles.ts`, `cron.ts`. The design docs stay the single source of truth, and an API change and its app change land in one change. The same package can end the `components/ui` duplication between the Adviser and Customer portals. Split into its own repository only if a separate team or release owner appears.
+- Rough size: `webapi` needs almost no change (it already validates Bearer through JWKS, and ADR 0016 lets non-portal callers reach it directly). `identity` needs a new client. The UI (about 7.4k lines of `.tsx`) and most component tests are a rewrite, because shadcn, Base UI, Tailwind, lucide-react and React Router are DOM-only. About 1.3k lines of non-UI TypeScript are reusable; only the base query changes.
+
+Sign-in shape (needs a new ADR next to ADR 0016):
+
+- A new **public** OIDC client (working name `adviser-mobile`), authorization code + PKCE, no client secret (RFC 8252).
+- Hosted login on `identity` opens in the system browser (ASWebAuthenticationSession / Custom Tabs). The redirect is a custom scheme or a universal link.
+- Tokens are kept in the OS secure store (Keychain / Keystore). The app calls `webapi` directly with Bearer and refreshes on 401. There is no BFF for the app.
+- Code touched: `OpenIddictSeeder` (it only seeds confidential clients today), `ClientCookieSchemes`, `ClientRoleAllowList`, logout and revocation.
+
+Questions to settle when this opens:
+
+- Whether a responsive web portal or a PWA is enough. A native app is worth it only for push notifications, biometric unlock, offline use or a store listing.
+- API compatibility: old app versions stay installed, so breaking `webapi` changes need a support window or versioning. This affects §3 (moving types off `POST /transactions`).
+- Which pages the first release has, and which roles may use the client.
+- Report download: today it uses the BFF cookie and a browser `Blob`. The app needs a Bearer download and the system share sheet.
+- Local development: a device or emulator reaching `identity` over https.
+- Build and release: EAS builds, signing, store review, over-the-air updates, a separate CI path filter, and the domain files for universal links ([deployment.md](deployment.md)).
