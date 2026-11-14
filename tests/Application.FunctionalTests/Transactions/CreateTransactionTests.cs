@@ -15,7 +15,7 @@ public class CreateTransactionTests : TestBase
             accountId = Guid.NewGuid(),
             type = "TransferIn",
             amount = 100.00m,
-            bookedAt = "2026-09-24T09:00:00+12:00"
+            bookedAt = "2026-09-24T09:00:00Z"
         });
         var get = await TransactionHttp.Send(HttpMethod.Get, "/transactions", accessToken: null);
 
@@ -39,7 +39,7 @@ public class CreateTransactionTests : TestBase
             accountId = Guid.NewGuid(),
             type = "TransferIn",
             amount = 100.00m,
-            bookedAt = "2026-09-24T09:00:00+12:00"
+            bookedAt = "2026-09-24T09:00:00Z"
         };
 
         var post = await TransactionHttp.Send(
@@ -98,7 +98,7 @@ public class CreateTransactionTests : TestBase
             accountId,
             type = "TransferIn",
             amount = 25.00m,
-            bookedAt = "2026-09-24T09:00:00+12:00"
+            bookedAt = "2026-09-24T09:00:00Z"
         }, Guid.NewGuid());
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());

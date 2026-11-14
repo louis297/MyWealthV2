@@ -10,7 +10,7 @@ namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
 public class OpeningHoldingsTests : TestBase
 {
-    private const string BookedAt = "2026-09-27T09:00:00+12:00";
+    private const string BookedAt = "2026-09-27T09:00:00Z";
 
     [Test]
     public async Task Adviser_OpeningHoldingsOnBrokerage_Returns201AndGetHasSecurityWithoutCashAmount()
@@ -200,12 +200,12 @@ public class OpeningHoldingsTests : TestBase
 
         (await PostOpeningAsync(tokens.AccessToken, holdingsFirst, new[] { Leg(instrumentId) }))
             .StatusCode.ShouldBe(HttpStatusCode.Created);
-        (await PostCashOpeningAsync(tokens.AccessToken, holdingsFirst, "2026-09-27T10:00:00+12:00"))
+        (await PostCashOpeningAsync(tokens.AccessToken, holdingsFirst, "2026-09-27T10:00:00Z"))
             .StatusCode.ShouldBe(HttpStatusCode.BadRequest);
 
         var cashFirst = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "Cash first");
         var otherInstrument = await CreateInstrumentAsync(tokens.AccessToken, "VXUS", "USD");
-        (await PostCashOpeningAsync(tokens.AccessToken, cashFirst, "2026-09-27T09:00:00+12:00"))
+        (await PostCashOpeningAsync(tokens.AccessToken, cashFirst, "2026-09-27T09:00:00Z"))
             .StatusCode.ShouldBe(HttpStatusCode.Created);
         (await PostOpeningAsync(tokens.AccessToken, cashFirst, new[] { Leg(otherInstrument) }))
             .StatusCode.ShouldBe(HttpStatusCode.Created);

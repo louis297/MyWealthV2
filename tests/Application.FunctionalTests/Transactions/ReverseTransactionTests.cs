@@ -45,7 +45,7 @@ public class ReverseTransactionTests : TestBase
         var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId);
         var originalId = await ReadId(await PostAsync(tokens.AccessToken, accountId, "TransferIn", 100m));
         var unreversedId = await ReadId(await PostAsync(
-            tokens.AccessToken, accountId, "TransferIn", 15m, "2026-09-24T10:00:00+12:00"));
+            tokens.AccessToken, accountId, "TransferIn", 15m, "2026-09-24T10:00:00Z"));
         var reversalId = await ReadId(await ReverseAsync(tokens.AccessToken, originalId));
 
         var response = await TransactionHttp.Send(
@@ -73,7 +73,7 @@ public class ReverseTransactionTests : TestBase
         var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
         var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId);
         var first = await ReadId(await PostAsync(tokens.AccessToken, accountId, "TransferIn", 40m));
-        var second = await ReadId(await PostAsync(tokens.AccessToken, accountId, "TransferIn", 15m, "2026-09-24T10:00:00+12:00"));
+        var second = await ReadId(await PostAsync(tokens.AccessToken, accountId, "TransferIn", 15m, "2026-09-24T10:00:00Z"));
         var key = Guid.NewGuid();
 
         (await ReverseAsync(tokens.AccessToken, first, Guid.Empty)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
@@ -107,7 +107,7 @@ public class ReverseTransactionTests : TestBase
         var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId);
         var depositId = await ReadId(await PostAsync(tokens.AccessToken, accountId, "TransferIn", 30m));
         var withdrawalId = await ReadId(await PostAsync(
-            tokens.AccessToken, accountId, "TransferOut", -30m, "2026-09-24T10:00:00+12:00"));
+            tokens.AccessToken, accountId, "TransferOut", -30m, "2026-09-24T10:00:00Z"));
         (await CloseAsync(accountId, tokens.AccessToken)).StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
         (await ReverseAsync(tokens.AccessToken, withdrawalId)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
@@ -161,7 +161,7 @@ public class ReverseTransactionTests : TestBase
         Guid accountId,
         string type,
         decimal amount,
-        string bookedAt = "2026-09-24T09:00:00+12:00") =>
+        string bookedAt = "2026-09-24T09:00:00Z") =>
         await TransactionHttp.Send(HttpMethod.Post, "/transactions", accessToken, new
         {
             accountId,

@@ -52,7 +52,7 @@ internal static class LegAccountsFixture
         using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var publicId = Guid.NewGuid();
-        var bookedAt = new DateTimeOffset(2026, 11, 10, 9, 0, 0, TimeSpan.FromHours(13));
+        var bookedAt = new DateTimeOffset(2026, 11, 10, 9, 0, 0, TimeSpan.Zero);
         var typeValue = (int)type;
 
         await db.Database.ExecuteSqlInterpolatedAsync($"""

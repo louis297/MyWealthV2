@@ -40,7 +40,7 @@ public class FxConversionRulesTests : TestBase
             accountId = onFrom ? world.NzdAccountId : world.UsdAccountId,
             type = "Opening",
             amount = 50m,
-            bookedAt = "2026-11-10T10:00:00+13:00"
+            bookedAt = "2026-11-10T10:00:00Z"
         }, Guid.NewGuid());
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);

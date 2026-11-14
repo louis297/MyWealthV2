@@ -23,14 +23,14 @@ public class AccountCashBalanceTests : TestBase
             accountId,
             type = "TransferIn",
             amount = 100.00m,
-            bookedAt = "2026-09-24T09:00:00+12:00"
+            bookedAt = "2026-09-24T09:00:00Z"
         }, Guid.NewGuid())).StatusCode.ShouldBe(HttpStatusCode.Created);
         (await TransactionHttp.Send(HttpMethod.Post, "/transactions", tokens.AccessToken, new
         {
             accountId,
             type = "TransferOut",
             amount = -25.00m,
-            bookedAt = "2026-09-24T10:00:00+12:00"
+            bookedAt = "2026-09-24T10:00:00Z"
         }, Guid.NewGuid())).StatusCode.ShouldBe(HttpStatusCode.Created);
 
         var after = await ReadAccount(tokens.AccessToken, accountId);
@@ -54,7 +54,7 @@ public class AccountCashBalanceTests : TestBase
             accountId,
             type = "TransferIn",
             amount = 40.00m,
-            bookedAt = "2026-09-24T09:00:00+12:00"
+            bookedAt = "2026-09-24T09:00:00Z"
         }, Guid.NewGuid())).StatusCode.ShouldBe(HttpStatusCode.Created);
 
         var anonymous = await AccountHttp.Send(HttpMethod.Get, $"/accounts/{accountId}/cash-balance", accessToken: null);

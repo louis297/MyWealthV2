@@ -11,7 +11,7 @@ namespace MyWealthV2.Application.FunctionalTests.Accounts;
 
 public class GetAccountHoldingsTests : TestBase
 {
-    private const string BookedAt = "2026-09-27T09:00:00+12:00";
+    private const string BookedAt = "2026-09-27T09:00:00Z";
 
     [Test]
     public async Task Get_ReturnsHoldingItemsWithoutAPrice()

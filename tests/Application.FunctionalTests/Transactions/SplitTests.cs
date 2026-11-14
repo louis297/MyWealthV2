@@ -8,7 +8,7 @@ namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
 public class SplitTests : TestBase
 {
-    private const string BookedAt = "2026-10-12T10:00:00+13:00";
+    private const string BookedAt = "2026-10-12T10:00:00Z";
 
     [Test]
     public async Task WithoutBearer_Returns401WithoutRedirect()

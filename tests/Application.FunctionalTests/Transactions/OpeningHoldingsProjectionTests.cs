@@ -10,7 +10,7 @@ namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
 public class OpeningHoldingsProjectionTests : TestBase
 {
-    private const string BookedAt = "2026-09-27T09:00:00+12:00";
+    private const string BookedAt = "2026-09-27T09:00:00Z";
 
     [Test]
     public async Task Create_UpsertsOneHoldingPerInstrumentEqualToTheLegSums()
@@ -94,7 +94,7 @@ public class OpeningHoldingsProjectionTests : TestBase
         var bnd = await CreateInstrumentAsync(tokens.AccessToken, "BND", "USD");
         var first = await ReadId(await PostOpeningAsync(tokens.AccessToken, accountId, new[] { Leg(vti, 10m, 100m) }));
         var second = await ReadId(await PostOpeningAsync(
-            tokens.AccessToken, accountId, new[] { Leg(bnd, 3m, 30m) }, "2026-09-27T10:00:00+12:00"));
+            tokens.AccessToken, accountId, new[] { Leg(bnd, 3m, 30m) }, "2026-09-27T10:00:00Z"));
         var key = Guid.NewGuid();
 
         (await ReverseAsync(tokens.AccessToken, first, Guid.Empty)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);

@@ -380,7 +380,7 @@ public class GetNetWorthTests : TestBase
             accountId,
             type = "TransferIn",
             amount,
-            bookedAt = "2026-10-12T09:00:00+13:00"
+            bookedAt = "2026-10-12T09:00:00Z"
         }, Guid.NewGuid());
 
     private static async Task<Guid> CreateInstrumentAsync(string accessToken, string symbol, string quoteCurrency)
@@ -402,7 +402,7 @@ public class GetNetWorthTests : TestBase
         {
             accountId,
             type = "OpeningHoldings",
-            bookedAt = "2026-10-12T09:00:00+13:00",
+            bookedAt = "2026-10-12T09:00:00Z",
             security = new[] { new { instrumentId, quantity, cost = 1m } }
         }, Guid.NewGuid());
 
