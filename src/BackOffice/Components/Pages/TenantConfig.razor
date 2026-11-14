@@ -32,11 +32,11 @@ else
                 <td>
                     @if (report.Granted)
                     {
-                        <button type="button" class="bo-action bo-action-danger" @onclick="() => Disable(report.Id)">Disable</button>
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Error" OnClick="() => Disable(report.Id)">Disable</MudButton>
                     }
                     else
                     {
-                        <button type="button" class="bo-action bo-action-success" @onclick="() => Enable(report.Id)">Enable</button>
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Success" OnClick="() => Enable(report.Id)">Enable</MudButton>
                     }
                 </td>
             </tr>

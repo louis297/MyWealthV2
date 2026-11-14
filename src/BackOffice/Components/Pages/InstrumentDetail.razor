@@ -37,11 +37,11 @@
 
     @if (item.IsActive)
     {
-        <button type="button" class="bo-action bo-action-danger" @onclick="Disable">Disable</button>
+        <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="Disable">Disable</MudButton>
     }
     else
     {
-        <button type="button" class="bo-action bo-action-success" @onclick="Enable">Enable</button>
+        <MudButton Variant="Variant.Outlined" Color="Color.Success" OnClick="Enable">Enable</MudButton>
     }
 }
 

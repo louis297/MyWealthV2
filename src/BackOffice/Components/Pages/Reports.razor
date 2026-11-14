@@ -43,11 +43,11 @@ else
                 <td>
                     @if (report.IsActive)
                     {
-                        <button type="button" class="bo-action bo-action-danger" @onclick="() => SetActive(report.Id, false)">Disable</button>
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Error" OnClick="() => SetActive(report.Id, false)">Disable</MudButton>
                     }
                     else
                     {
-                        <button type="button" class="bo-action bo-action-success" @onclick="() => SetActive(report.Id, true)">Enable</button>
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Success" OnClick="() => SetActive(report.Id, true)">Enable</MudButton>
                     }
                 </td>
             </tr>
