@@ -68,7 +68,7 @@ public class Transaction : BaseAuditableEntity
         {
             TenantId = tenantId,
             Type = type,
-            BookedAt = bookedAt,
+            BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
             PublicId = Guid.NewGuid(),
@@ -124,7 +124,7 @@ public class Transaction : BaseAuditableEntity
         {
             TenantId = tenantId,
             Type = TransactionType.InternalTransfer,
-            BookedAt = bookedAt,
+            BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
             PublicId = Guid.NewGuid(),
@@ -186,7 +186,7 @@ public class Transaction : BaseAuditableEntity
         {
             TenantId = tenantId,
             Type = TransactionType.FxConversion,
-            BookedAt = bookedAt,
+            BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
             PublicId = Guid.NewGuid(),
@@ -270,7 +270,7 @@ public class Transaction : BaseAuditableEntity
         {
             TenantId = tenantId,
             Type = TransactionType.OpeningHoldings,
-            BookedAt = bookedAt,
+            BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
             PublicId = Guid.NewGuid(),
@@ -309,7 +309,7 @@ public class Transaction : BaseAuditableEntity
         {
             TenantId = tenantId,
             Type = TransactionType.Buy,
-            BookedAt = bookedAt,
+            BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
             PublicId = Guid.NewGuid(),
@@ -350,7 +350,7 @@ public class Transaction : BaseAuditableEntity
         {
             TenantId = tenantId,
             Type = TransactionType.Sell,
-            BookedAt = bookedAt,
+            BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
             PublicId = Guid.NewGuid(),
@@ -387,7 +387,7 @@ public class Transaction : BaseAuditableEntity
         {
             TenantId = tenantId,
             Type = TransactionType.StockIn,
-            BookedAt = bookedAt,
+            BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
             PublicId = Guid.NewGuid(),
@@ -421,7 +421,7 @@ public class Transaction : BaseAuditableEntity
         {
             TenantId = tenantId,
             Type = TransactionType.StockOut,
-            BookedAt = bookedAt,
+            BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
             PublicId = Guid.NewGuid(),
@@ -475,7 +475,7 @@ public class Transaction : BaseAuditableEntity
         {
             TenantId = tenantId,
             Type = type,
-            BookedAt = bookedAt,
+            BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
             PublicId = Guid.NewGuid(),
@@ -568,7 +568,7 @@ public class Transaction : BaseAuditableEntity
         {
             TenantId = TenantId,
             Type = TransactionType.Reversal,
-            BookedAt = bookedAt,
+            BookedAt = bookedAt.ToUniversalTime(),
             PublicId = Guid.NewGuid(),
             OriginalTransactionId = Id,
             CashLegs = cashLegs,
