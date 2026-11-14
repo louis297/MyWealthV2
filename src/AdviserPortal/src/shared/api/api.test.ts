@@ -2,6 +2,7 @@ import { configureStore } from "@reduxjs/toolkit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { customersApi } from "@/features/customers/customersApi";
 import { sessionSlice } from "@/features/session/sessionSlice";
+import { transactionsApi } from "@/features/transactions/transactionsApi";
 import { api } from "@/shared/api/api";
 
 const me = {
@@ -92,6 +93,30 @@ describe("BFF API client", () => {
     expect(fetchMock.mock.calls.some((call) => String(requestOf(call[0]).url).includes("/connect/"))).toBe(
       false,
     );
+  });
+
+  it("sends X-MyWealth-Request on a POST query such as the FX quote", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const store = createStore();
+    await store.dispatch(
+      transactionsApi.endpoints.getFxQuote.initiate({
+        fromAccountId: "from",
+        toAccountId: "to",
+        sellAmount: 100,
+      }),
+    );
+
+    const request = requestOf(fetchMock.mock.calls[0][0]);
+    expect(request.url).toBe("http://localhost:3000/api/transactions/fx/quote");
+    expect(request.method).toBe("POST");
+    expect(request.headers.get("X-MyWealth-Request")).toBe("1");
   });
 
   it("on 401 sends the browser to /bff/login and does not refresh", async () => {
