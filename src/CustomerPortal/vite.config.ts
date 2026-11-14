@@ -1,3 +1,6 @@
+// fixes/utc-instants.md: tests convert local time, so they pin one zone (+13:00 in summer).
+process.env.TZ = "Pacific/Auckland";
+
 import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
