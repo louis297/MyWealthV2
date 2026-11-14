@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-25
-last_updated: 2026-11-13
+last_updated: 2026-11-14
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -143,7 +143,7 @@ Customer receives 403. No Adviser Portal activity page in this increment.
 | R21 | `POST /transactions` and `POST /transactions/{id}/reverse` require `Idempotency-Key` (ADR 0015). Missing → 400. Replay same hash → original `201 { id }`. Same key different hash → 409. |
 | R22 | Create / reverse do not take Account `rowVersion` from the client. Reverse does **not** take the original transaction `rowVersion`. Server locks the Account row while inserting and summing. |
 | R23 | Optional `memo`: trim; if present, 1–200. Optional `reference`: stored nullable, no uniqueness in this increment. |
-| R24 | `bookedAt` is required `datetimeoffset` (offset stored). Audit `Created` is separate. |
+| R24 | `bookedAt` is a required instant with `Z` or an offset. No offset → 400 `errors.BookedAt`. Stored and returned in UTC (`Z`); the request offset is not kept ([utc-instants](../fixes/utc-instants.md)). Audit `Created` is separate. |
 
 Policies (register when accepted; map in `RolePermissions`):
 
@@ -304,7 +304,7 @@ Item:
     }
   ],
   "security": [],
-  "bookedAt": "2026-09-24T09:00:00+12:00",
+  "bookedAt": "2026-09-23T21:00:00Z",
   "memo": "Salary",
   "reference": null,
   "originalTransactionId": null,
@@ -374,7 +374,7 @@ Idempotency: [ADR 0015](../adr/0015-idempotency-keys.md) (`proposed`). Expand [A
 | Legs | Header + `TransactionCashLegs` (one cash leg now). Not cash columns on the header. Header **and** cash-leg rows have Created/CreatedBy/LastModified/LastModifiedBy + `RowVersion`. Reverse does not require any `rowVersion`. |
 | Mutation | No `UPDATE`/`DELETE` of posted transactions, **except** the single `ReversedByTransactionId` write on reverse (script `0018`). After that write the original is immutable again. Economic legs are never updated. |
 | Line sign | Glossary **Signed book amount**. |
-| `bookedAt` | Required `datetimeoffset`. |
+| `bookedAt` | Required instant with `Z` or an offset (R24). Returned in UTC. |
 | Opening / types / memo / reference / idempotency / concurrency | R19–R24 and the type table in §5. |
 | Customer | No ledger-write policy. |
 | SystemAdmin | `tenantId` on list/create. |
@@ -417,3 +417,7 @@ Only after `accepted`. Tree must build after each commit. Split each line red th
 4. Cash-zero guard on `CloseAccount` + `CloseOut` / `Opening` rules + tests.
 5. `ReverseTransaction` + tests.
 6. Account `cashBalance` fields + `/cash-balance` + TestSeed + repo docs (this file `accepted`, ADR 0011 / 0015, domain-model, database-design, api-design, accounts R16 + item JSON).
+
+## Amendment 2026-11-14 (UTC instants)
+
+Accepted with [utc-instants](../fixes/utc-instants.md). R24 no longer stores the request offset: `bookedAt` must carry `Z` or an offset, is converted to UTC, and is returned with `Z`. The item example shows the UTC form.

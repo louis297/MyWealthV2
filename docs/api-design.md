@@ -3,7 +3,7 @@ title: API design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-11-13
+updated: 2026-11-14
 related:
   - README.md
   - glossary.md
@@ -53,6 +53,7 @@ Minimal API, TypedResults, endpoints dispatch MediatR only. Paths are kebab-case
 | --- | --- |
 | Resource id | Paths and JSON use `PublicId` only. Internal `int` keys never appear in routes or JSON. Create response `{ id }` is the PublicId |
 | Currency | Three-letter upper-case ISO code, not an enum |
+| Instants | A request instant (`DateTimeOffset`, for example `bookedAt`) carries `Z` or an offset; the server converts it to UTC. No offset → 400 (§4). Every response instant is UTC with `Z`: `yyyy-MM-ddTHH:mm:ssZ`, with fraction digits only when not zero. Date-only values (`rateAsOfDate`, report `from` / `to`) are `yyyy-MM-dd` and carry no zone. See [fixes/utc-instants.md](fixes/utc-instants.md) |
 | Login key | Non-SystemAdmin must send tenantCode on the **hosted login** page, not in a resource-API body |
 | Tokens | Short-lived JWT access; refresh in the OpenIddict store. The resource API does **not** issue tokens and does **not** expose `/auth/refresh` |
 | Concurrency | Writes to Tenant / User accept `rowVersion`; conflict → 409 |
@@ -108,6 +109,8 @@ Password change, disable, and logout revoke that subject’s OpenIddict tokens. 
 | Case | HTTP | Who |
 | --- | --- | --- |
 | Validation / business rule (Adviser still has Customers, duplicate email, illegal reporting currency, …) | 400 | `webapi` |
+| Request instant with no offset, or not an ISO 8601 date and time | 400, `errors.<Field>` (for example `errors.BookedAt`) | `webapi` |
+| Any other body that cannot be read (malformed JSON, wrong type) | 400 (415 for a wrong content type), `ProblemDetails` titled `Bad request`, in every environment | `webapi` |
 | Target exists but is disabled and the caller tries to create / attach / post on it (§4.1) | 400 `disabled` | `webapi` |
 | Missing / invalid Bearer; calling resources after refresh was revoked | 401 | `webapi` |
 | Tenant disabled, Status ≠ Active, bad password, wrong tenant (at login) | Authorization does not complete (login failure to the caller) | Gate on `identity` |
@@ -503,4 +506,5 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-11 | FX conversions accepted and landed. `POST /transactions/fx` returns 201 `{ id }` with `Location`, requires `Idempotency-Key` and `expectedRate` (mismatch → 409, `errors.expectedRate`). `POST /transactions/fx/quote` returns 200 with rate, as-of date and both amounts; no write. `POST /transactions` rejects `FxConversion`. The transaction item gains `fx` (null for other types). |
 | 2026-11-10 | Internal transfers accepted. `POST /transactions/transfer` returns 201 `{ id }` with `Location: /transactions/{id}` and requires `Idempotency-Key`. `POST /transactions` rejects `InternalTransfer`. `GET /transactions` takes an optional `type` (exact `TransactionType` name; anything else → 400). |
 | 2026-11-13 | `webapi` re-checks person `Status` and the tenant flag on every request. A disabled person, or any person of a disabled tenant, gets 403 with a still-valid token. §4.1 `target=tenant` on create is reached only by SystemAdmin ([features/identity-auth.md](features/identity-auth.md) amendment 2026-11-13). |
+| 2026-11-14 | §2 Instants and §4 rows: a request instant needs `Z` or an offset and is converted to UTC; responses use `Z`; an unreadable body gets a `ProblemDetails` in every environment ([fixes/utc-instants.md](fixes/utc-instants.md)). |
 | 2026-11-13 | §4.2 problem codes (accepted): every 409 and every named business 400 carries a stable `code`; one registry; clients branch on `code`. Build contract: [features/portfolios.md](features/portfolios.md) amendment 2026-11-13 part 1. |

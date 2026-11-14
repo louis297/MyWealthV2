@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-28
-last_updated: 2026-10-11
+last_updated: 2026-11-14
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -115,7 +115,7 @@ Cash position stays the `SUM` of cash legs. An `OpeningHoldings` header has no c
 | R15 | Posted rows are not updated or deleted. Reverse copies the opposite security quantity and cost. One reversal per original. No client `rowVersion`. Account Open. Result must stay `≥ 0`. |
 | R16 | `CloseAccount` rejects unless cash `SUM = 0` and no `Holdings` row remains for that account. Amends accounts R16. `Account.Close()` writes neither cash nor holdings. |
 | R17 | `Idempotency-Key` required on create and reverse, same as posting. |
-| R18 | `bookedAt` required `datetimeoffset`. Memo optional 1–200. Reference optional, stored, no uniqueness. |
+| R18 | `bookedAt` required instant, as [posting](posting.md) R24. Memo optional 1–200. Reference optional, stored, no uniqueness. |
 | R19 | Customer has no ledger-write policy → 403. Holdings read is `accounts.read`, so a caller who can see the account can see its positions. No `holdings.create`. |
 | R20 | Account list and item do not embed holdings. |
 
@@ -266,3 +266,7 @@ Only after this file is `accepted`. Tree must build after each commit.
 3. `CreateTransaction` for `OpeningHoldings` + policies reused + functional tests.
 4. Reverse of `OpeningHoldings` + projection upsert / delete-at-zero.
 5. Close-flat guard + `GET /accounts/{id}/holdings` + TestSeed.
+
+## Amendment 2026-11-14 (UTC instants)
+
+Accepted with [utc-instants](../fixes/utc-instants.md). R18 follows posting R24.

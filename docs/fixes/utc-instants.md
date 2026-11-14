@@ -1,6 +1,6 @@
 ---
 title: Fix - UTC instants on the wire, in storage and for business dates
-status: review
+status: accepted
 language: en
 created: 2026-11-14
 updated: 2026-11-14
@@ -19,7 +19,7 @@ related:
 
 # Fix: UTC instants on the wire, in storage and for business dates
 
-Status: review. Not a build contract until it is `accepted`.
+Status: accepted (2026-11-14). Build contract.
 
 ## Problem
 
@@ -125,7 +125,7 @@ Vitest: the transactions list and account detail show `2026-10-11 10:00` for `20
 
 Vitest: account detail shows `bookedAt` in local time.
 
-## Doc changes when this is accepted
+## Doc changes (applied on acceptance, 2026-11-14)
 
 - [posting](../features/posting.md): R24 and the `bookedAt` field row read "required instant with `Z` or an offset; stored and returned in UTC" and link this fix. Response examples use `Z`.
 - [fx-conversions](../features/fx-conversions.md): R9 and R10 read "the UTC date of `bookedAt`". Response examples use `Z`.

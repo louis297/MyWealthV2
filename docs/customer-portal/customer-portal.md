@@ -4,7 +4,7 @@ status: accepted
 phase: 3
 language: en
 created: 2026-11-02
-updated: 2026-11-11
+updated: 2026-11-14
 related:
   - README.md
   - ../adviser-portal/frontend-conventions.md
@@ -111,6 +111,10 @@ Unchanged from the BFF. Probe is `GET /api/users/me`. 401 does not refresh in th
 | Sign out | `POST /bff/logout` with `X-MyWealth-Request: 1`. BFF revokes refresh, then identity end-session. SPA must not call `startAuthorize` while that is in flight. |
 
 ---
+
+## Instants
+
+Show every instant from the API (`bookedAt`) in browser local time with `formatInstant` (`shared/time/instant.ts`, local `yyyy-MM-dd HH:mm`). Date-only values (`rateAsOfDate`, report `from` / `to`) stay strings. Tests pin `TZ=Pacific/Auckland` in `vite.config.ts`. See [fixes/utc-instants.md](../fixes/utc-instants.md).
 
 ## API calls used by the portal
 

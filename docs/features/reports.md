@@ -377,9 +377,9 @@ Each item is:
   "reportId": "uuid",
   "status": "Queued",
   "triggerKind": "Manual",
-  "created": "2026-10-16T08:30:00+00:00",
+  "created": "2026-10-16T08:30:00Z",
   "parameters": { },
-  "asOf": "2026-10-16T08:30:00+00:00"
+  "asOf": "2026-10-16T08:30:00Z"
 }
 ```
 
@@ -412,7 +412,7 @@ Parameters:
 
 Rules:
 
-- Filter on `bookedAt`: `from` ≤ `bookedAt` < `to` (date interpreted in UTC for the first cut; timezone lock can follow).
+- Filter on `bookedAt`: `from` ≤ `bookedAt` < `to` (`from` and `to` are UTC days, [utc-instants](../fixes/utc-instants.md)).
 - Include all transaction types in range.
 - Reversals are marked (type or flag) and listed immediately after their original transaction.
 - Suggested columns: bookedAt, account, type, cash amount, instrument, quantity, memo.
@@ -524,7 +524,6 @@ Still open:
 
 - Concrete events
 - Whether Customer will ever get `reports.customer.create`
-- Date-boundary timezone (first cut: UTC day)
 - Exact reversal mark in the PDF (type label vs also flag the original)
 - Hangfire Dashboard auth beyond Development
 - Overlapping runs of the same schedule (allowed for now)
@@ -550,3 +549,7 @@ Accepted with [demo-tenant-seed.md](demo-tenant-seed.md). Narrows the seed parag
 
 - `webapi --seed-demo` grants `customer-transactions` and `adviser-balances` to tenant `demo` in any environment. A platform-inactive report is not granted. Idempotent on `(TenantId, ReportId)`.
 - Other tenants are still not auto-granted.
+
+## Amendment 2026-11-14 (UTC instants)
+
+Accepted with [utc-instants](../fixes/utc-instants.md). Report days are UTC days; the open timezone item is closed. Instants in responses use `Z`.

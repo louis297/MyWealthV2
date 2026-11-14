@@ -3,7 +3,7 @@ title: Frontend conventions
 status: review
 language: en
 created: 2026-09-12
-updated: 2026-10-01
+updated: 2026-11-14
 related:
   - README.md
   - adviser-portal.md
@@ -54,6 +54,7 @@ Feature code lives under `features/<name>/` (`session`, then `profile`, `custome
 - No SPA `/callback`. Keep React StrictMode.
 - Sign out is `POST /bff/logout` with `X-MyWealth-Request: 1`. No portal `/auth/logout`. No SPA call to `/connect/revocation`.
 - Do not treat a cross-tenant 404 as 403.
+- Instants ([fixes/utc-instants.md](../fixes/utc-instants.md)): send every `datetime-local` value through `toUtcIso` (`shared/time/instant.ts`), which converts browser local time to a UTC ISO string. Show every instant from the API with `formatInstant` (browser local `yyyy-MM-dd HH:mm`). Date-only values (`rateAsOfDate`, report `from` / `to`, `created` dates) stay strings; never pass them to `new Date`. Tests pin `TZ=Pacific/Auckland` in `vite.config.ts`.
 
 ## Style
 
