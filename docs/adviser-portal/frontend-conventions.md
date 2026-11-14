@@ -49,7 +49,7 @@ Feature code lives under `features/<name>/` (`session`, then `profile`, `custome
 ## API
 
 - One client in `shared/api`. Base URL `/api` on the BFF origin. `credentials: 'include'`.
-- Do not set `Authorization`. Mutating calls send `X-MyWealth-Request: 1`.
+- Do not set `Authorization`. Every `POST`, `PUT`, `PATCH` or `DELETE` call sends `X-MyWealth-Request: 1`. Decide by HTTP method, not by RTK endpoint type: a query that POSTs (the FX quote) needs the header too. Without it the BFF answers 400 with an empty body and does not forward the call.
 - On 401, do not call `identity`. The BFF already refreshed once. Clear local user state and send the browser to `/bff/login` unless sign-out is already in progress.
 - No SPA `/callback`. Keep React StrictMode.
 - Sign out is `POST /bff/logout` with `X-MyWealth-Request: 1`. No portal `/auth/logout`. No SPA call to `/connect/revocation`.
