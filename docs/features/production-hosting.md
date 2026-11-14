@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-11-12
-last_updated: 2026-11-12
+last_updated: 2026-11-14
 related:
   - ../deployment.md
   - ../architecture.md
@@ -21,6 +21,8 @@ related:
 How the .NET hosts start outside Development, behind the TLS-terminating reverse proxy of [deployment.md](../deployment.md). Covers items 1, 2, 3 and 5 of deployment §13: OpenIddict certificates and issuer on `identity`, Data Protection key persistence, forwarded headers and HTTPS redirection, and health endpoints with a container health check. No resource API, no table, no schema script. Development behaviour does not change, except that hosts set an explicit Data Protection application name (R9).
 
 Serving the SPA build from the BFFs is the 2026-11-12 amendment of [bff-adviser-portal.md](bff-adviser-portal.md) and [bff-customer-portal.md](bff-customer-portal.md). The bootstrap SystemAdmin is the 2026-11-12 amendment of [identity-auth.md](identity-auth.md).
+
+Amendment 2026-11-14: R17. The compose health check calls `/health` every 15 seconds on each host. Each call became a trace and pushed real request traces out of a telemetry viewer's per-resource limit.
 
 ---
 
@@ -84,6 +86,7 @@ Outside Development, `identity` signs and encrypts with certificates from files 
 | R14 | `/health` runs every registered check; `/alive` runs only checks tagged `live`, as today. The response body is the default health check text (`Healthy` / `Unhealthy`). No detail is exposed. |
 | R15 | Every host (`identity`, `webapi`, `worker`, both BFFs, `back-office`) checks its first argument before it builds the web host. When it is `--healthcheck`, the process sends `GET http://localhost:{Health:Port}/health` with a 5-second timeout, writes one line to standard output, and exits with code `0` on HTTP 200 and `1` on any other status, a timeout or a connection error. It does not start the web host, read the database or run the schema applicator. |
 | R16 | Configuration keys of this spec are read through the normal configuration chain, so environment variables (`Identity__Issuer`, `ForwardedHeaders__KnownNetworks__0`, …) set them. |
+| R17 | In every environment, a request whose path is `/health` or `/alive`, or starts with either segment, produces no ASP.NET Core trace. The filter matches the path on any port. Every other request is traced as before. Metrics and logs do not change. (Amendment 2026-11-14.) |
 
 ---
 
@@ -157,6 +160,7 @@ Functional tests start hosts with `UseEnvironment("Production")` and supply the 
 | Application.FunctionalTests | `identity` and `webapi` in Production: a plain `http` request is not redirected (no 307/308); `webapi` response has no `Strict-Transport-Security` header — R11 |
 | Application.FunctionalTests | `webapi` in Production: `GET /health` that arrives on local port `8081` → 200 `Healthy`; on local port `8080` → not the health response (404 or the host's fallback); `/alive` the same. The port is the connection's local port, not the `Host` header, because the proxy passes the client's `Host` through — R12, R14 |
 | Application.FunctionalTests | `webapi` in Development: `GET /health` on the default port → 200, as today — R13 |
+| Application.FunctionalTests | `webapi` in Production with a recording trace processor: `GET /health` and `GET /alive` on the health port record no server trace; a request to another path on the traffic port records one — R17 |
 | Application.UnitTests (or a ServiceDefaults test project) | Health check client: 200 → exit 0; 503 → exit 1; connection refused → exit 1; no answer within the timeout → exit 1 — R15 |
 
 The `--healthcheck` argument branch in each `Program` is wiring. It is proven by building the images and running the compose health checks on the rehearsal VPS (deployment §12).
@@ -194,3 +198,4 @@ The repository should build after each commit. Agents split each line into red t
 3. Data Protection application name and key folder for the public hosts (R9, R10)
 4. Health endpoints on the health port outside Development (R12–R14)
 5. `--healthcheck` self-check in every host (R15)
+6. No traces for health endpoint requests (R17, amendment 2026-11-14)
