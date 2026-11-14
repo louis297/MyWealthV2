@@ -114,6 +114,7 @@ Consumes existing endpoints plus the catalog IsActive write. Field rules and val
 - Update: rename only (email and tenant immutable)
 - Disable / Enable: existing verbs (last-admin disable allowed)
 - Display `status` and `isActive`
+- Tenant fields show the tenant Name, never the PublicId. The list filter is a tenant picker over every tenant (`GET /tenants`, no `isEnabled`), with an "All tenants" option. The create form is a tenant picker over enabled tenants only (`GET /tenants?isEnabled=true`). The detail page loads `GET /tenants/{tenantId}` and shows the Name as a link to the tenant detail. The PublicId is still what the page sends on the wire
 
 ### Tenant configuration
 
