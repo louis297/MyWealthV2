@@ -21,9 +21,37 @@ public class FxRateReadTests
         try
         {
             var fx = new FxRateStore(db, TimeProvider.System);
-            var booked = new DateTimeOffset(2026, 10, 11, 10, 0, 0, TimeSpan.FromHours(13));
+            var booked = new DateTimeOffset(2026, 10, 11, 0, 30, 0, TimeSpan.Zero);
             (await fx.GetRateAsync("usd", "nzd", booked)).ShouldBe(1.60000000m);
             (await fx.GetRateAsync("NZD", "NZD", booked)).ShouldBe(1m);
+        }
+        finally
+        {
+            await DeletePairAsync(db);
+        }
+    }
+
+    // fixes/utc-instants.md B4: the requested date is the UTC date of asOf, not the date in its own offset.
+    [Test]
+    public async Task GetRate_AndGetRateDetail_ReadTheUtcDateOfAsOf()
+    {
+        await using var db = Open();
+        await DeletePairAsync(db);
+        db.FxRates.AddRange(
+            Rate("USD", "NZD", 1.50000000m, new DateOnly(2026, 10, 10)),
+            Rate("USD", "NZD", 1.60000000m, new DateOnly(2026, 10, 11)));
+        await db.SaveChangesAsync();
+
+        try
+        {
+            var fx = new FxRateStore(db, TimeProvider.System);
+            var nzMorning = new DateTimeOffset(2026, 10, 11, 10, 0, 0, TimeSpan.FromHours(13));
+            var utcSameDay = new DateTimeOffset(2026, 10, 11, 0, 30, 0, TimeSpan.Zero);
+
+            (await fx.GetRateAsync("USD", "NZD", nzMorning)).ShouldBe(1.50000000m);
+            (await fx.GetRateAsync("USD", "NZD", utcSameDay)).ShouldBe(1.60000000m);
+            (await fx.GetRateDetailAsync("USD", "NZD", nzMorning)).AsOfDate.ShouldBe(new DateOnly(2026, 10, 10));
+            (await fx.GetRateDetailAsync("USD", "NZD", utcSameDay)).AsOfDate.ShouldBe(new DateOnly(2026, 10, 11));
         }
         finally
         {
