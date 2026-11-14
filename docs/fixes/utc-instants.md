@@ -19,7 +19,7 @@ related:
 
 # Fix: UTC instants on the wire, in storage and for business dates
 
-Status: accepted (2026-11-14). Build contract.
+Status: accepted (2026-11-14). Build contract. Landed: B1–B4 (`webapi` converter, handler, `Transaction` factories, UTC business date), B5 `0029`, B6–B8 (portal helpers).
 
 ## Problem
 
