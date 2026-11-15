@@ -11,3 +11,8 @@ export function formatAmount(value: number, decimalPlaces?: number): string {
     maximumFractionDigits: 10,
   }).format(value);
 }
+
+/** Adds ledger amounts (at most 4 decimals) without binary float drift. */
+export function sumAmounts(amounts: number[]): number {
+  return amounts.reduce((total, amount) => total + Math.round(amount * 10000), 0) / 10000;
+}
