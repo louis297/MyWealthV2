@@ -55,10 +55,15 @@ export function TransactionDetailPage() {
                         <p>{formatAmount(leg.amount, places(leg.currency))}</p>
                         {leg.fee ? (
                           <p className="text-muted-foreground text-xs">
-                            {`${leg.fee.kind} ${formatMoney(leg.fee.amount, leg.fee.currency, places(leg.fee.currency))} on ${formatMoney(leg.fee.basisAmount, leg.fee.currency, places(leg.fee.currency))}`}{" "}
-                            <Link to={`/fees/trade/${leg.fee.scheduleId}`} className={recordLinkClass}>
-                              View schedule
-                            </Link>
+                            {`${leg.fee.kind} ${formatMoney(leg.fee.amount, leg.fee.currency, places(leg.fee.currency))} on ${formatMoney(leg.fee.basisAmount, leg.fee.currency, places(leg.fee.currency))}`}
+                            {leg.fee.scheduleId ? (
+                              <>
+                                {" "}
+                                <Link to={`/fees/trade/${leg.fee.scheduleId}`} className={recordLinkClass}>
+                                  View schedule
+                                </Link>
+                              </>
+                            ) : null}
                           </p>
                         ) : null}
                       </TableCell>
