@@ -56,6 +56,7 @@ public sealed class CustomerTransactionsReportGenerator(
         var accountsById = accounts.ToDictionary(row => row.Id);
         var sources = new List<CustomerTransactionSource>(transactions.Count);
         var cashByRow = new Dictionary<(int Id, int AccountId), string>();
+        var feeByRow = new Dictionary<(int Id, int AccountId), string>();
         var instrumentByRow = new Dictionary<(int Id, int AccountId), string>();
         var quantityByRow = new Dictionary<(int Id, int AccountId), string>();
         foreach (var transaction in transactions)
@@ -78,7 +79,10 @@ public sealed class CustomerTransactionsReportGenerator(
                     transaction.Type.ToString(),
                     transaction.Memo,
                     accountId));
-                cashByRow[key] = FormatCash(transaction.CashLegs.SingleOrDefault(leg => leg.AccountId == accountId));
+                // The cash amount is the sum of the account's cash legs; the Fee column sums its Fee legs (trade-fees R22).
+                var cashLegs = transaction.CashLegs.Where(leg => leg.AccountId == accountId).ToList();
+                cashByRow[key] = FormatCash(cashLegs);
+                feeByRow[key] = FormatCash(cashLegs.Where(leg => leg.Role == CashLegRole.Fee).ToList());
                 var legs = transaction.SecurityLegs
                     .Where(leg => leg.AccountId == accountId)
                     .OrderBy(leg => leg.Id)
@@ -103,7 +107,8 @@ public sealed class CustomerTransactionsReportGenerator(
                 cashByRow[(row.Id, row.AccountId)],
                 instrumentByRow[(row.Id, row.AccountId)],
                 quantityByRow[(row.Id, row.AccountId)],
-                row.Memo))
+                row.Memo,
+                feeByRow[(row.Id, row.AccountId)]))
             .ToList();
 
         return CustomerTransactionsPdf.Render(new CustomerTransactionsPdfModel(
@@ -116,16 +121,18 @@ public sealed class CustomerTransactionsReportGenerator(
             rows));
     }
 
-    private string FormatCash(TransactionCashLeg? leg)
+    /// <summary>The sum of the legs in their (one) Account currency; empty when there is no leg.</summary>
+    private string FormatCash(IReadOnlyList<TransactionCashLeg> legs)
     {
-        if (leg is null)
+        if (legs.Count == 0)
         {
             return string.Empty;
         }
 
-        var currency = currencies.TryGet(leg.Currency)
-                       ?? throw new InvalidOperationException($"Currency {leg.Currency} is not in the catalog.");
-        return CashAmountText.Format(leg.Amount, leg.Currency, currency.DecimalPlaces);
+        var code = legs[0].Currency;
+        var currency = currencies.TryGet(code)
+                       ?? throw new InvalidOperationException($"Currency {code} is not in the catalog.");
+        return CashAmountText.Format(legs.Sum(leg => leg.Amount), code, currency.DecimalPlaces);
     }
 
     private static string Symbol(IReadOnlyDictionary<int, string> symbols, int instrumentId)

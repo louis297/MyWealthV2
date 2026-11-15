@@ -19,12 +19,29 @@ internal static class TransactionLegReader
             orderby leg.Id
             select new
             {
+                leg.Id,
                 leg.TransactionId,
                 AccountId = account.PublicId,
                 CustomerId = customer.PublicId,
+                leg.Role,
                 leg.Amount,
                 leg.Currency
             }).ToListAsync(cancellationToken);
+
+        var feeRows = await (
+            from detail in db.TransactionFeeDetails.AsNoTracking()
+            join schedule in db.TradeFeeSchedules.AsNoTracking() on detail.TradeFeeScheduleId equals schedule.Id into schedules
+            from schedule in schedules.DefaultIfEmpty()
+            where transactionIds.Contains(detail.TransactionId)
+            select new
+            {
+                detail.CashLegId,
+                detail.Kind,
+                ScheduleId = schedule == null ? (Guid?)null : schedule.PublicId,
+                detail.BasisAmount,
+                detail.FeeAmount,
+                detail.Currency
+            }).ToDictionaryAsync(row => row.CashLegId, cancellationToken);
 
         var securityRows = await (
             from leg in db.TransactionSecurityLegs.AsNoTracking()
@@ -60,8 +77,19 @@ internal static class TransactionLegReader
             {
                 AccountId = row.AccountId,
                 CustomerId = row.CustomerId,
+                Role = row.Role.ToString(),
                 Amount = row.Amount,
-                Currency = row.Currency.Trim()
+                Currency = row.Currency.Trim(),
+                Fee = feeRows.TryGetValue(row.Id, out var fee)
+                    ? new TransactionFeeDto
+                    {
+                        Kind = fee.Kind.ToString(),
+                        ScheduleId = fee.ScheduleId,
+                        BasisAmount = fee.BasisAmount,
+                        Amount = fee.FeeAmount,
+                        Currency = fee.Currency.Trim()
+                    }
+                    : null
             }),
             securityRows.ToLookup(row => row.TransactionId, row => new TransactionSecurityDto
             {
