@@ -438,4 +438,4 @@ Tests:
 | Domain.UnitTests | `FeeCalculation` for the R8 worked examples: band slices sum to the amount; band fees sum to `banded`; `limitApplied` for minimum, cap and neither; `fee` equals the fee a posted trade gets for the same gross. |
 | Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403; Adviser and TenantAdmin → 200; `tenantId` in the body → 400; R5 shape errors → 400 with the same field names as create; `amounts` empty, more than 5, `≤ 0` or with 5 decimals → 400; no row is written. |
 
-Suggested commit: `FeeCalculation` and the preview query with tests (R30–R33), after commit 1 of §12. [api-design.md](../api-design.md) §7.9 lists the route marked as a draft amendment; drop that mark when this amendment is accepted.
+Suggested commit: `FeeCalculation` and the preview query with tests (R30–R33), after commit 1 of §12. [api-design.md](../api-design.md) §7.9 lists the route.

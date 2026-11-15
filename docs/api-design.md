@@ -502,7 +502,7 @@ Back Office tenant configuration lists the active catalog and calls the existing
 | POST | `/fees/trade-schedules` | `fees.manage` | 201 `{ id }` |
 | PUT | `/fees/trade-schedules/{id}` | `fees.manage` | 204 |
 | DELETE | `/fees/trade-schedules/{id}` | `fees.manage` | 204 |
-| POST | `/fees/trade-schedules/preview` | `fees.read` | 200 fee preview (draft amendment, [features/trade-fees.md](features/trade-fees.md) R30–R33; no write) |
+| POST | `/fees/trade-schedules/preview` | `fees.read` | 200 fee preview ([features/trade-fees.md](features/trade-fees.md) R30–R33; no write) |
 
 Field rules: [features/trade-fees.md](features/trade-fees.md). Update or delete of a schedule row in effect → 409 `fee_schedule_in_effect`. Every cash leg in the transaction item carries `role` (`Principal` or `Fee`) and `fee` (the fee detail on a `Fee` leg, null otherwise).
 

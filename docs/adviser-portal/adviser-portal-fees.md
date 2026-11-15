@@ -26,9 +26,9 @@ Backend prerequisites (accepted, must land first):
 - Policies `fees.read` (TenantAdmin, Adviser) and `fees.manage` (TenantAdmin) ([api-design.md](../api-design.md) §3.1).
 - Problem codes `fee_schedule_in_effect` and `stale_row_version` on `PUT` ([api-design.md](../api-design.md) §4.2).
 - Transaction item: every cash leg carries `role` and `fee` (trade-fees §8.1).
-- `POST /fees/trade-schedules/preview` (`fees.read`; trade-fees amendment 2026-11-15, R30–R33, draft: accept it with this file).
+- `POST /fees/trade-schedules/preview` (`fees.read`; trade-fees amendment 2026-11-15, R30–R33).
 
-Session stays the BFF cookie. All calls go through `/api`. The BFF prefix allow-list adds `/fees`: [bff-adviser-portal.md](../features/bff-adviser-portal.md) amendment 2026-11-15 (draft), accepted with this file.
+Session stays the BFF cookie. All calls go through `/api`. The BFF prefix allow-list adds `/fees`: [bff-adviser-portal.md](../features/bff-adviser-portal.md) amendment 2026-11-15.
 
 ---
 
