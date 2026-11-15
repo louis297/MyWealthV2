@@ -12,7 +12,8 @@ public sealed record CustomerTransactionsPdfRow(
     string Cash,
     string Instrument,
     string Quantity,
-    string? Memo);
+    string? Memo,
+    string Fee = "");
 
 public sealed record CustomerTransactionsPdfModel(
     string TenantName,
