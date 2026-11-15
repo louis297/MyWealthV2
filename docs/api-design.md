@@ -132,8 +132,8 @@ A spec that adds a permission or changes a grant updates this table in the chang
 | `reports.customer.create` | | ✓ | ✓ | ✓ | [reports](features/reports.md); Customer: Customer Portal amendment 2026-11-02 |
 | `reports.book.read` | | ✓ | ✓ | | [reports](features/reports.md) |
 | `reports.book.create` | | ✓ | ✓ | | [reports](features/reports.md) |
-| `fees.read` | ✓ | ✓ | ✓ | | [trade-fees](features/trade-fees.md) (accepted, not landed) |
-| `fees.manage` | ✓ | ✓ | | | [trade-fees](features/trade-fees.md) (accepted, not landed) |
+| `fees.read` | ✓ | ✓ | ✓ | | [trade-fees](features/trade-fees.md) (landed) |
+| `fees.manage` | ✓ | ✓ | | | [trade-fees](features/trade-fees.md) (landed) |
 
 ---
 

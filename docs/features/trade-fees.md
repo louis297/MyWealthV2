@@ -29,7 +29,7 @@ Amendment to [buy-sell.md](buy-sell.md), [posting.md](posting.md), [holdings.md]
 
 This is step 1 of the business domain roadmap ([future-plans.md](../future-plans.md) §1). Decisions from discussion on 2026-11-15.
 
-**Status is `accepted` (2026-11-15).** Not landed. The amendments to buy-sell, posting, holdings, leg-accounts, portfolios, reports, api-design, database-design, domain-model, the glossary and the portal page contracts are written in those files in the same change.
+**Status is `accepted` (2026-11-15).** Backend landed 2026-11-15 on `webapi` (script `0030`, `/fees/trade-schedules`, the fee preview, the fee leg, reverse, readers, rebalance, TestSeed) together with the Adviser Portal BFF `/fees` prefix. The Adviser Portal pages ([adviser-portal-fees.md](../adviser-portal/adviser-portal-fees.md)) are not landed. The amendments to buy-sell, posting, holdings, leg-accounts, portfolios, reports, api-design, database-design, domain-model, the glossary and the portal page contracts are written in those files in the same change.
 
 ---
 
@@ -351,6 +351,12 @@ No new ADR. Decisions 2026-11-15.
 | Callers | TenantAdmin manages; Adviser reads; SystemAdmin manages through the API; Customer none. |
 | Routes | `/fees/trade-schedules` under the `/fees` namespace prefix. Fee transactions stay under `/transactions`. |
 | Scripts / policy | `0030_trade_fees.sql`. `fees.read` / `fees.manage`. |
+
+Implementation notes (2026-11-15, landing):
+
+- R15: a fee that converts to 0 at the leg's rounding (a tiny fee with a tiny rate) books no `Fee` leg and no fee detail, so the R18 invariant holds.
+- R27 applies to every rebalance, with or without a schedule: a plain plan that would leave cash below zero (for example from FX rounding) now scales the buys instead of failing. Bisection returns the largest feasible factor, which may be a little above the exact ratio because cash legs are rounded to 4 decimals.
+- A SystemAdmin who names a disabled tenant on create gets 400 `disabled` / `target=tenant`, as in [posting.md](posting.md) R4.
 
 Still open, not this slice:
 
