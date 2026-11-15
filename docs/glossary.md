@@ -3,7 +3,7 @@ title: Glossary
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-11-14
+updated: 2026-11-15
 related:
   - function-plan.md
   - domain-model.md
@@ -76,6 +76,12 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | FX detail | The rate a Transaction used: base and quote currency, rate, rate as-of date and source, stored 0..1 per Transaction in `TransactionFxDetails` and copied to its Reversal. Accepted: [features/fx-conversions.md](features/fx-conversions.md). | A row in `FxRates` (the cache the rate was read from); a quote |
 | Applied FX rate | Domain value object `AppliedFxRate`: the rate a Transaction is priced at, with base and quote currency (different), rate `> 0` (quote per 1 base), as-of date and source. Read from `FxRates` by Application and passed to the Domain factory; stored as the FX detail. Accepted: [features/fx-conversions.md](features/fx-conversions.md). | A rate typed by the caller; the `FxRates` row itself |
 | FX quote | Read-only answer to `POST /transactions/fx/quote`: rate, as-of date and both amounts for a proposed FxConversion. Not stored; does not hold the rate. The create call confirms it with `expectedRate`. | A rate lock; a stored quote resource |
+| Cash leg role | Role of a cash leg inside its Transaction: `Principal` (the economic amount of the type) or `Fee` (a trade fee). At most one cash leg per `(Transaction, Account, role)`. Draft: [features/trade-fees.md](features/trade-fees.md). | A Transaction type; a category |
+| Trade fee | Server-computed fee on a `Buy` or `Sell`, booked as a `Fee` cash leg on the trade's Account. A `Buy` fee adds to the holding cost; a `Sell` fee only reduces cash. Called "transaction fee" in the roadmap. Draft: [features/trade-fees.md](features/trade-fees.md). | An advisory fee; a standalone fee Transaction; an FX spread |
+| Trade fee schedule | Tenant row per quote currency, effective from a date: fee bands, a minimum and an optional cap. In effect once its date is on or before the cut-off date, then never changed; pending before that. Draft: [features/trade-fees.md](features/trade-fees.md). | A platform price list; a per-Customer rate |
+| Fee band | One `(from, ratePercent)` step of a schedule. Bands are marginal: each rate applies only to the part of the amount inside its band, like income tax. | A whole-amount tier; a volume tier |
+| Gross amount | `quantity × price` of a trade in the instrument quote currency, before any fee. | The net cash of the trade |
+| Fee detail | The fee a Transaction carries: schedule used, gross amount, fee and quote currency, stored 0..1 per Transaction in `TransactionFeeDetails` and copied to its Reversal. Draft: [features/trade-fees.md](features/trade-fees.md). | The `Fee` cash leg itself |
 | Category | Optional custom label on a transaction. Not in Phase 1. Not an account type. | Account type |
 | Currency | ISO 4217 three-letter code. One row in the platform catalog. | A C# enum |
 | Currency catalog | `Currencies` table + in-memory `ICurrencyCatalog`. | Joining `Currencies` on every hot path; a per-tenant allow-list |

@@ -3,7 +3,7 @@ title: Feature Specs
 status: draft
 language: en
 created: 2026-09-12
-updated: 2026-11-14
+updated: 2026-11-15
 related:
   - ../function-plan.md
   - ../api-design.md
@@ -131,7 +131,7 @@ One domain. Background execution lives in the general-purpose `worker` (ADR 0017
 | [fx-rates](fx-rates.md) | accepted (2026-11-02) | Platform (worker job; any Application caller of `IFxRate`) | Hourly Hangfire job pulls Frankfurter daily rates for active catalog currencies when today's source date is not already stored. Table `FxRates`. Script `0021_fx_rates.sql`. ADR 0019 accepted. HTTP read surface deferred. | Platform rate cache. Consumers (net-worth fold, instrument prices) are later. |
 | [instrument-prices](instrument-prices.md) | accepted (2026-11-02) | Platform (worker job; any Application caller of `IMarketData`) | Daily Hangfire job at 12:00 UTC pulls EODHD EOD prices for active instruments when today's source date is not already stored. Table `InstrumentPrices`. Script `0022_instrument_prices.sql`. No new ADR (follows ADR 0019). HTTP read surface deferred. | Platform price cache. `IMarketData` reads the table. |
 
-Invitation / Activation and Fees are deferred.
+Invitation / Activation is deferred. Fees moved to the business domain roadmap (below).
 
 ---
 
@@ -144,6 +144,16 @@ Second first-party portal. One BFF + one confidential client, same shape as the 
 | [bff-customer-portal](bff-customer-portal.md) | accepted | Customer Portal session | Aspire `bff-customer-portal`; confidential client `customer-portal`; cookie + OIDC + HttpClient proxy; tokens out of the browser; prefix allow-list for self reads + report request | Platform session increment, not a ledger slice. Portal: [../customer-portal/customer-portal.md](../customer-portal/customer-portal.md) |
 
 Required backend amendments (self-scope reads and report request for Customer) are accepted in identity-auth, accounts, posting, net-worth, reports, and holdings. They land with this slice; do not rebuild the resource API.
+
+---
+
+## Business domain — fees (drafted 2026-11-15)
+
+Roadmap in [future-plans.md](../future-plans.md) §1. Each step amends the ledger specs it touches.
+
+| Spec | Status | Who | Ships | Why it stays its own slice |
+| --- | --- | --- | --- | --- |
+| [trade-fees](trade-fees.md) | draft | TenantAdmin (manage); Adviser (read); SystemAdmin (manage through the API); Customer none | Tenant trade fee schedules per quote currency (marginal bands, minimum, cap, effective-dated); `Fee` cash leg and fee detail on every `Buy` / `Sell`; fee-aware rebalance with buy scaling. Script `0030`. Policies `fees.read` / `fees.manage` | First roadmap step. Amends buy-sell, posting, holdings, leg-accounts, portfolios and reports |
 
 ---
 

@@ -11,6 +11,7 @@ related:
   - features/buy-sell.md
   - features/leg-accounts.md
   - features/instrument-prices.md
+  - features/trade-fees.md
   - features/portfolios.md
   - features/fx-rates.md
   - features/internal-transfers.md
@@ -43,14 +44,14 @@ Scope of the direction:
 
 Fees are split into two topics at different points of the order:
 
-- **Transaction fee:** an extra cash leg on a Transaction (brokerage on a trade, FX spread, transfer fee). It only depends on posting.
+- **Transaction fee** (trade fee in the spec): an extra cash leg on a Transaction (brokerage on a trade, FX spread, transfer fee). It only depends on posting.
 - **Advisory fee:** computed over a period from account value, then posted as its own Transaction. It depends on historical valuation.
 
 Order. Each step depends only on earlier steps:
 
 | Step | Topic | Why here | Depends on |
 | --- | --- | --- | --- |
-| 1 | Transaction fee leg | Changes the posting leg shape. Income events add similar deduction legs, so the shape is settled first. Closes the fee work deferred in buy-sell, fx-conversions, internal-transfers and leg-accounts. | posting, buy-sell |
+| 1 | Transaction fee leg ([features/trade-fees.md](features/trade-fees.md), `draft`) | Changes the posting leg shape. Income events add similar deduction legs, so the shape is settled first. Closes the fee work deferred in buy-sell, fx-conversions, internal-transfers and leg-accounts. | posting, buy-sell |
 | 2 | Income events | Dividend and interest, with imputation credit, RWT and foreign withholding tax. Every tax report needs them. Foreign-currency dividends need an answer from §5 or automatic FX. | Step 1 |
 | 3 | Historical valuation | Prices and FX rates as of a date, and holding snapshots. Every period report needs them. Closes the open daily snapshots in [function-plan.md](function-plan.md) §5.4. | instrument-prices, fx-rates |
 | 4 | Advisory fee | Tiered or blended rates, daily accrual, pro rata for part periods, billing in advance or in arrears, and what happens when cash is short. | Step 3 |
