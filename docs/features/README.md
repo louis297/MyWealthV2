@@ -153,7 +153,7 @@ Roadmap in [future-plans.md](../future-plans.md) §1. Each step amends the ledge
 
 | Spec | Status | Who | Ships | Why it stays its own slice |
 | --- | --- | --- | --- | --- |
-| [trade-fees](trade-fees.md) | accepted (2026-11-15) | TenantAdmin (manage); Adviser (read); SystemAdmin (manage through the API); Customer none | Tenant trade fee schedules per quote currency (marginal bands, minimum, cap, effective-dated); `Fee` cash leg and fee detail on every `Buy` / `Sell`; fee-aware rebalance with buy scaling. Script `0030`. Policies `fees.read` / `fees.manage` | First roadmap step. Amends buy-sell, posting, holdings, leg-accounts, portfolios and reports |
+| [trade-fees](trade-fees.md) | accepted (2026-11-15) | TenantAdmin (manage); Adviser (read); SystemAdmin (manage through the API); Customer none | Tenant trade fee schedules per quote currency (marginal bands, minimum, cap, effective-dated); `Fee` cash leg and fee detail on every `Buy` / `Sell`; fee-aware rebalance with buy scaling; fee preview route (draft amendment). Script `0030`. Policies `fees.read` / `fees.manage` | First roadmap step. Amends buy-sell, posting, holdings, leg-accounts, portfolios and reports |
 
 ---
 

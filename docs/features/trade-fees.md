@@ -373,3 +373,69 @@ The repository should build after each commit. Agents split each line into red t
 5. Item `role` and `fee`; Customer Transactions Report Fee column (R22, R23).
 6. Fee-aware rebalance and buy scaling (R24–R29).
 7. TestSeed schedule. Amend buy-sell, posting, holdings, leg-accounts, portfolios, reports, api-design, database-design and domain-model in the change that accepts this file.
+
+---
+
+## Amendment 2026-11-15 (fee preview) — draft
+
+Status of this amendment: `draft`. The rest of this file stays accepted. It adds a read-only route that computes trade fees for a schedule that is not saved, so the Adviser Portal form can show the fee without repeating R8 in TypeScript ([adviser-portal-fees.md](../adviser-portal/adviser-portal-fees.md)). Same pattern as `POST /transactions/fx/quote`: a POST that computes and writes nothing.
+
+| ID | Rule |
+| --- | --- |
+| R30 | `POST /fees/trade-schedules/preview`, policy `fees.read` (TenantAdmin, Adviser, SystemAdmin). Customer → 403. Current tenant disabled → 403 (R4). The body has no `tenantId` for any caller (400 if present): the route reads no tenant data. No `Idempotency-Key`. 200 on success. |
+| R31 | Body: `quoteCurrency`, `minimum`, `cap`, `bands` with the R5 shape and the same `errors` field names, plus `amounts`: 1 to 5 values, each `> 0` with at most 4 decimals. `effectiveFrom` is not part of the body. Violations → 400 `errors`. |
+| R32 | For each amount, the response uses the same Domain calculation as a posted trade (R8, `TradeFeeSchedule.FeeFor`), not a second implementation. Per amount: `amount`, `bands` (only bands whose `from` is below the amount: `from`, `ratePercent`, `slice` = the part of the amount inside the band, `fee` = `ratePercent / 100 × slice`), `banded` (sum of the band fees), `limitApplied` (`"minimum"`, `"cap"` or `null`) and `fee`. `slice`, band `fee` and `banded` are exact, not rounded; only `fee` is rounded (R8). |
+| R33 | The route writes nothing, reads no schedule row and no trade, and does not look at the cut-off date. Its result is not a quote for any trade. |
+
+Domain: `FeeFor` returns a `FeeCalculation` value object (band slices, banded amount, limit applied, fee). Posted trades keep only the fee and the basis amount (R18); the preview returns the whole object.
+
+Routing: `{id}` routes under `/fees/trade-schedules` take a GUID only, so `preview` is never read as an id.
+
+Request and response:
+
+```json
+{
+  "quoteCurrency": "NZD",
+  "minimum": 10.00,
+  "cap": null,
+  "bands": [
+    { "from": 0, "ratePercent": 0.5 },
+    { "from": 10000.00, "ratePercent": 0.3 }
+  ],
+  "amounts": [1000.00, 15000.00]
+}
+```
+
+```json
+{
+  "currency": "NZD",
+  "items": [
+    {
+      "amount": 1000.00,
+      "bands": [{ "from": 0, "ratePercent": 0.5, "slice": 1000.00, "fee": 5.00 }],
+      "banded": 5.00,
+      "limitApplied": "minimum",
+      "fee": 10.00
+    },
+    {
+      "amount": 15000.00,
+      "bands": [
+        { "from": 0, "ratePercent": 0.5, "slice": 10000.00, "fee": 50.00 },
+        { "from": 10000.00, "ratePercent": 0.3, "slice": 5000.00, "fee": 15.00 }
+      ],
+      "banded": 65.00,
+      "limitApplied": null,
+      "fee": 65.00
+    }
+  ]
+}
+```
+
+Tests:
+
+| Project | Assert |
+| --- | --- |
+| Domain.UnitTests | `FeeCalculation` for the R8 worked examples: band slices sum to the amount; band fees sum to `banded`; `limitApplied` for minimum, cap and neither; `fee` equals the fee a posted trade gets for the same gross. |
+| Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403; Adviser and TenantAdmin → 200; `tenantId` in the body → 400; R5 shape errors → 400 with the same field names as create; `amounts` empty, more than 5, `≤ 0` or with 5 decimals → 400; no row is written. |
+
+Suggested commit: `FeeCalculation` and the preview query with tests (R30–R33), after commit 1 of §12. [api-design.md](../api-design.md) §7.9 lists the route marked as a draft amendment; drop that mark when this amendment is accepted.

@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-01
-last_updated: 2026-11-14
+last_updated: 2026-11-15
 related:
   - ../function-plan.md
   - ../architecture.md
@@ -334,6 +334,20 @@ Add `/portfolios` to the BFF prefix allow-list so the Adviser Portal can call th
 - No new cookie or client change. Existing `adviser-portal` confidential client is enough.
 
 This amendment is required for the Adviser Portal portfolios cut (`adviser-portal-portfolios.md`).
+
+---
+
+## Amendment 2026-11-15 (fees prefix) — draft
+
+Status of this amendment: `draft`. Accept it together with [adviser-portal-fees.md](../adviser-portal/adviser-portal-fees.md).
+
+Add `/fees` to the BFF prefix allow-list so the Adviser Portal can call the fee routes of [trade-fees.md](trade-fees.md) through `/api`.
+
+- Prefix: `/fees`
+- Methods: GET, POST, PUT, DELETE (list, get, create, preview, update, delete of trade fee schedules, and later fee resources under the same namespace)
+- Who: TenantAdmin, Adviser. Permissions are checked by `webapi` (`fees.read` / `fees.manage`, [api-design.md](../api-design.md) §3.1); the BFF does not filter by role.
+- No new cookie or client change.
+- The Customer Portal BFF does not add `/fees`: Customer has no fee permission.
 
 ---
 

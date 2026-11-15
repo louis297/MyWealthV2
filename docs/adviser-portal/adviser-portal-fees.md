@@ -26,8 +26,9 @@ Backend prerequisites (accepted, must land first):
 - Policies `fees.read` (TenantAdmin, Adviser) and `fees.manage` (TenantAdmin) ([api-design.md](../api-design.md) §3.1).
 - Problem codes `fee_schedule_in_effect` and `stale_row_version` on `PUT` ([api-design.md](../api-design.md) §4.2).
 - Transaction item: every cash leg carries `role` and `fee` (trade-fees §8.1).
+- `POST /fees/trade-schedules/preview` (`fees.read`; trade-fees amendment 2026-11-15, R30–R33, draft: accept it with this file).
 
-Session stays the BFF cookie. All calls go through `/api`. The BFF prefix allow-list must add `/fees` (amendment to [bff-adviser-portal.md](../features/bff-adviser-portal.md) when this cut is accepted).
+Session stays the BFF cookie. All calls go through `/api`. The BFF prefix allow-list adds `/fees`: [bff-adviser-portal.md](../features/bff-adviser-portal.md) amendment 2026-11-15 (draft), accepted with this file.
 
 ---
 
@@ -39,12 +40,14 @@ Session stays the BFF cookie. All calls go through `/api`. The BFF prefix allow-
 - Create a trade fee schedule. TenantAdmin.
 - Edit or delete a pending schedule. TenantAdmin.
 - Read-only schedule detail. TenantAdmin and Adviser.
+- Fee preview on the create / edit form and on the detail page, computed by `webapi`. TenantAdmin and Adviser.
 - Fees on existing ledger pages: transaction detail, transactions list, account detail activity, and a note on the `Buy` / `Sell` form.
 
 **Out**
 
 - Other fee kinds and their tabs (advisory fees are roadmap step 4).
-- A fee preview calculator on the form (see Still open).
+- A fee calculation in TypeScript. The portal never computes a fee; it shows what the preview route returns.
+- A quote for a real trade on the `Buy` / `Sell` form (needs price and FX; not in the backend).
 - Fees in the rebalance result or on the portfolio pages (trade-fees §2 Out).
 - Customer Portal fee display.
 - Back Office pages. SystemAdmin uses Scalar.
@@ -112,6 +115,18 @@ Edit and Delete are offered only when `inEffect` is false. The server decides; t
 
 The page checks these rules before sending, and still shows any server `errors` against the same fields.
 
+### Fee preview (`POST /fees/trade-schedules/preview`)
+
+A panel below the bands on the create and edit forms, and on the detail page.
+
+| Item | Binding |
+| --- | --- |
+| Trade amounts | Up to 5 inputs. Prefilled with 1,000, 10,000 and 100,000 in the form's currency; the user may change, add or remove them. Sent as `amounts`. |
+| Schedule | Form: the current form values (`quoteCurrency`, `minimum`, `cap`, `bands`). Detail: the loaded row's values. No `effectiveFrom`, no `rowVersion`. |
+| Result | One row per amount: amount, fee, and "minimum applied" / "cap applied" from `limitApplied`. Expanding a row shows `bands`: from, rate, slice, band fee, and `banded`. |
+
+Requests start 300 ms after the last change to the form or the amounts. A newer request replaces an older one; a late response from an older request is dropped. While the form fails its own checks, no request is sent and the panel shows the incomplete-form message. A 400 from the preview shows its `errors` under the matching form fields, the same as on submit.
+
 ### Fees on ledger pages
 
 | Page | Change |
@@ -142,12 +157,16 @@ The page checks these rules before sending, and still shows any server `errors` 
 | F13 | Transaction detail, transactions list and account activity show fees as in "Fees on ledger pages". A transaction without a `Fee` leg looks as before. |
 | F14 | Unknown or other-tenant schedule id → "Not found" on that URL, not 403. |
 | F15 | Every call goes through the BFF `/api` prefix. No token storage in the SPA. |
+| F16 | The create and edit forms show the preview for the current values. Changing a band, the minimum, the cap or an amount sends one preview request after 300 ms; an older response that arrives late does not overwrite a newer one. |
+| F17 | The preview shows each amount's fee, "minimum applied" or "cap applied", and an expandable band breakdown, all from the response. The page does no fee arithmetic. |
+| F18 | The detail page shows the preview for the stored row, for TenantAdmin and Adviser. |
+| F19 | While the form fails its own checks, no preview request is sent. A preview 400 puts its `errors` under the form fields. |
 
 ---
 
 ## Tests
 
-Portal tests assert the nav and route role gates, the state labels from fixed `effectiveFrom` / `inEffect` / today inputs, the band editor rules, the endpoints and bodies sent by create / edit / delete, the handling of both 409 codes, and the fee rendering on the three ledger pages. Do not re-prove the fee calculation, the cut-off date or tenant isolation here.
+Portal tests assert the nav and route role gates, the state labels from fixed `effectiveFrom` / `inEffect` / today inputs, the band editor rules, the endpoints and bodies sent by create / edit / delete / preview, the preview debounce and late-response rule, the handling of both 409 codes, and the fee rendering on the three ledger pages. Do not re-prove the fee calculation, the cut-off date or tenant isolation here.
 
 ---
 
@@ -162,9 +181,15 @@ Portal tests assert the nav and route role gates, the state labels from fixed `e
 | "From" not ascending | Each band must start above the one before it. |
 | Cap below minimum | The cap must be at least the minimum. |
 | Too many bands | A schedule can have at most 10 bands. |
+| Preview while the form is incomplete | Complete the bands, minimum and cap to see a preview. |
+| Too many preview amounts | You can preview up to 5 amounts. |
 
 ---
 
 ## Still open
 
-- **Fee preview.** A box on the form ("Fee for a trade of [amount]") would make marginal bands easy to check. There is no backend preview route, so the portal would repeat the R8 formula in TypeScript. Decide: leave it out (this draft), or add it with tests that reuse the Feature Spec's worked examples.
+None.
+
+## Locked decisions (2026-11-15)
+
+- **Fee preview** is computed by `webapi` (trade-fees amendment R30–R33), not in TypeScript: one calculation for previews and posted trades, and C# `decimal` instead of JS floating point. Policy `fees.read`, so an Adviser can preview on the read-only detail page.
