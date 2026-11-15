@@ -208,4 +208,54 @@ public class TradeFeeTests
         transferIn.FeeDetails.ShouldBeEmpty();
         stockIn.FeeDetails.ShouldBeEmpty();
     }
+
+    [Test]
+    public void Reverse_OfABuyWithAFee_CopiesRolesAndTheFeeDetail_AndRefundsTheFee()
+    {
+        var buy = Buy(50m, 25.00m, Schedule());
+        buy.Id = 40;
+
+        var reversal = buy.Reverse(BookedAt.AddDays(1), new Dictionary<int, decimal> { [AccountId] = 0m });
+
+        Leg(reversal, CashLegRole.Principal).Amount.ShouldBe(1250m);
+        Leg(reversal, CashLegRole.Principal).FeeDetail.ShouldBeNull();
+        var fee = Leg(reversal, CashLegRole.Fee);
+        fee.Amount.ShouldBe(10m);
+        fee.AccountId.ShouldBe(AccountId);
+        var detail = fee.FeeDetail.ShouldNotBeNull();
+        detail.ShouldNotBeSameAs(Leg(buy, CashLegRole.Fee).FeeDetail);
+        detail.Kind.ShouldBe(FeeKind.Brokerage);
+        detail.TradeFeeScheduleId.ShouldBe(ScheduleId);
+        detail.BasisAmount.ShouldBe(1250m);
+        detail.FeeAmount.ShouldBe(10m);
+        detail.Currency.ShouldBe("NZD");
+        reversal.FeeDetails.ShouldBe([detail]);
+        reversal.SecurityLegs.Single().CostAmount.ShouldBe(-1260m);
+    }
+
+    [Test]
+    public void Reverse_OfASellWithAFee_CashCheckCountsTheRefund()
+    {
+        var sell = Sell(50m, 25.00m, Schedule());
+        sell.Id = 41;
+
+        Should.Throw<DomainException>(() => sell.Reverse(BookedAt.AddDays(1), new Dictionary<int, decimal> { [AccountId] = 1239m }));
+        var reversal = sell.Reverse(BookedAt.AddDays(1), new Dictionary<int, decimal> { [AccountId] = 1240m });
+
+        Leg(reversal, CashLegRole.Principal).Amount.ShouldBe(-1250m);
+        Leg(reversal, CashLegRole.Fee).Amount.ShouldBe(10m);
+        reversal.FeeDetails.ShouldHaveSingleItem().FeeAmount.ShouldBe(10m);
+    }
+
+    [Test]
+    public void Reverse_WithoutAFee_HasOnlyPrincipalLegs()
+    {
+        var buy = Buy(50m, 25.00m, null);
+        buy.Id = 42;
+
+        var reversal = buy.Reverse(BookedAt.AddDays(1), new Dictionary<int, decimal> { [AccountId] = 0m });
+
+        reversal.CashLegs.ShouldHaveSingleItem().Role.ShouldBe(CashLegRole.Principal);
+        reversal.FeeDetails.ShouldBeEmpty();
+    }
 }

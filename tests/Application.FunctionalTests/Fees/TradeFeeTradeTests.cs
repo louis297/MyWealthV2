@@ -143,6 +143,28 @@ public class TradeFeeTradeTests : TestBase
         (await CashAmountsAsync(south.AccessToken, await ReadIdAsync(buy))).ShouldBe([-1250m]);
     }
 
+    [Test]
+    public async Task Reverse_RefundsTheFeeInFull_AndCopiesTheFeeDetail()
+    {
+        var (_, _, customer, admin) = await AccountHttp.SignInTenantAdmin();
+        var (accountId, instrumentId) = await FeeHttp.TradingAccountAsync(admin.AccessToken, customer.PublicId);
+        var scheduleId = await FeeHttp.CreateScheduleAsync(admin.AccessToken, "USD", FeeHttp.Today.AddDays(1));
+        var buyId = await ReadIdAsync(
+            await FeeHttp.PostTradeAsync(admin.AccessToken, accountId, "Buy", instrumentId, 50m, FeeHttp.At(FeeHttp.Today.AddDays(2))));
+
+        var reverse = await TransactionHttp.Send(HttpMethod.Post, $"/transactions/{buyId}/reverse", admin.AccessToken, null, Guid.NewGuid());
+
+        var reversalId = await ReadIdAsync(reverse);
+        (await CashAmountsAsync(admin.AccessToken, reversalId)).ShouldBe([1250m, 10m], ignoreOrder: true);
+        (await CashBalanceAsync(admin.AccessToken, accountId)).ShouldBe(100000m);
+        (await FeeDetailsAsync()).ShouldBe([(0, 1250m, 10m, "USD"), (0, 1250m, 10m, "USD")]);
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var schedule = await db.TradeFeeSchedules.IgnoreQueryFilters().SingleAsync(row => row.PublicId == scheduleId);
+        (await db.TransactionFeeDetails.IgnoreQueryFilters().Select(row => row.TradeFeeScheduleId).ToListAsync())
+            .ShouldAllBe(id => id == schedule.Id);
+    }
+
     internal static async Task<Guid> ReadIdAsync(HttpResponseMessage response)
     {
         response.StatusCode.ShouldBe(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
