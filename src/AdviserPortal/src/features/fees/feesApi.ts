@@ -51,6 +51,9 @@ export type TradeFeePreview = {
   items: TradeFeePreviewItem[];
 };
 
+/** R11: the create fields without `quoteCurrency`, plus `rowVersion`. */
+export type UpdateTradeScheduleBody = Omit<CreateTradeScheduleBody, "quoteCurrency"> & { rowVersion: string };
+
 export const feesApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getAllTradeSchedules: builder.query<TradeFeeSchedule[], void>({
@@ -80,6 +83,11 @@ export const feesApi = api.injectEndpoints({
       // A refused delete changed nothing; the page reloads the row itself on fee_schedule_in_effect (F9).
       invalidatesTags: (_result, error) => (error ? [] : ["FeeSchedule"]),
     }),
+    updateTradeSchedule: builder.mutation<void, { id: string; body: UpdateTradeScheduleBody }>({
+      query: ({ id, body }) => ({ url: `/fees/trade-schedules/${id}`, method: "PUT", body }),
+      // A refused update changed nothing; both 409 codes reload the row explicitly (F8, F9).
+      invalidatesTags: (_result, error) => (error ? [] : ["FeeSchedule"]),
+    }),
     createTradeSchedule: builder.mutation<{ id: string }, CreateTradeScheduleBody>({
       query: (body) => ({ url: "/fees/trade-schedules", method: "POST", body }),
       invalidatesTags: (_result, error) => (error ? [] : ["FeeSchedule"]),
@@ -98,4 +106,5 @@ export const {
   useDeleteTradeScheduleMutation,
   useGetTradeScheduleQuery,
   usePreviewTradeFeesQuery,
+  useUpdateTradeScheduleMutation,
 } = feesApi;

@@ -68,6 +68,7 @@ export function TradeScheduleForm({
   submitLabel,
   serverErrors,
   generalErrors,
+  submitDisabled = false,
   onSubmit,
 }: {
   initial: ScheduleDraft;
@@ -75,6 +76,8 @@ export function TradeScheduleForm({
   submitLabel: string;
   serverErrors: FieldErrors;
   generalErrors: string[];
+  /** Set while the loaded rowVersion is stale, so the old version is never resent (F8). */
+  submitDisabled?: boolean;
   onSubmit: (draft: ScheduleDraft) => void;
 }) {
   const [draft, setDraft] = useState(initial);
@@ -109,6 +112,9 @@ export function TradeScheduleForm({
 
   function submit(event: FormEvent) {
     event.preventDefault();
+    if (submitDisabled) {
+      return;
+    }
     setSubmitted(true);
     const errors = draftErrors(draft, { decimalPlaces, earliest, required: true, effectiveFrom: true });
     if (hasErrors(errors)) {
@@ -239,7 +245,7 @@ export function TradeScheduleForm({
               )}
             </FieldSet>
             <FeePreviewPanel preview={preview} decimalPlaces={decimalPlaces} />
-            <Button type="submit" className="self-start">
+            <Button type="submit" className="self-start" disabled={submitDisabled}>
               {submitLabel}
             </Button>
           </form>
