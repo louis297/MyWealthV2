@@ -204,14 +204,14 @@ public class TradeFeesSchemaTests
                 tenant.Id, usd, new DateOnly(2026, 12, 1), 10m, 250m,
                 [new FeeBand(0m, 0.5m), new FeeBand(10000m, 0.3m)], new DateOnly(2026, 11, 15));
             schedule.CreatedBy = "test";
-            db.Set<TradeFeeSchedule>().Add(schedule);
+            db.TradeFeeSchedules.Add(schedule);
             await db.SaveChangesAsync();
             publicId = schedule.PublicId;
         }
 
         await using (var db = new ApplicationDbContext(options))
         {
-            var loaded = await db.Set<TradeFeeSchedule>().AsNoTracking()
+            var loaded = await db.TradeFeeSchedules.AsNoTracking()
                 .Include(schedule => schedule.BandRows)
                 .SingleAsync(schedule => schedule.PublicId == publicId);
 

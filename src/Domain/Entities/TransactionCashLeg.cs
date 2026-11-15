@@ -12,11 +12,16 @@ public class TransactionCashLeg : BaseAuditableEntity
 
     public int AccountId { get; private set; }
 
+    public CashLegRole Role { get; private set; }
+
     public decimal Amount { get; private set; }
 
     public string Currency { get; private set; } = string.Empty;
 
     public byte[] RowVersion { get; private set; } = null!;
+
+    /// <summary>The fee behind a <see cref="CashLegRole.Fee"/> leg; null on a <see cref="CashLegRole.Principal"/> leg.</summary>
+    public TransactionFeeDetail? FeeDetail { get; private set; }
 
     internal static TransactionCashLeg Create(int tenantId, int accountId, decimal amount, string currency) =>
         new()

@@ -35,6 +35,9 @@ public class Transaction : BaseAuditableEntity
     /// <summary>The rate this Transaction used, when it has one (FX conversions R14).</summary>
     public TransactionFxDetail? FxDetail { get; private set; }
 
+    /// <summary>One per <see cref="CashLegRole.Fee"/> cash leg (trade-fees R18).</summary>
+    public List<TransactionFeeDetail> FeeDetails { get; private set; } = [];
+
     public static Transaction Post(
         int tenantId,
         int accountId,

@@ -26,6 +26,12 @@ public interface IApplicationDbContext
 
     DbSet<AccountPortfolioAssignment> AccountPortfolioAssignments { get; }
 
+    DbSet<TradeFeeSchedule> TradeFeeSchedules { get; }
+
+    DbSet<TradeFeeBand> TradeFeeBands { get; }
+
+    DbSet<TransactionFeeDetail> TransactionFeeDetails { get; }
+
     DbSet<IdempotencyRecord> IdempotencyRecords { get; }
 
     DbSet<Report> Reports { get; }
