@@ -190,6 +190,50 @@ public class TestSeedAccountsTests
         holding.CostAmount.ShouldBe(3800m);
     }
 
+    [Test]
+    public async Task Seed_AddsOneUsdTradeFeeScheduleAfterTheCutOff()
+    {
+        await using var db = OpenDb();
+        var tenant = await EnsureDemoTenantAsync(db);
+        var adviser = await EnsurePersonAsync(
+            db, tenant, UserRole.Adviser, "Demo Adviser", DevelopmentIdentitySeeder.AdviserEmail);
+        await EnsurePersonAsync(
+            db, tenant, UserRole.Customer, "Demo Customer", "customer@localhost", adviser.Id);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        await TestSeed.SeedAsync(db, CancellationToken.None);
+        var first = await LoadSchedulesAsync(db, tenant.Id);
+        await TestSeed.SeedAsync(db, CancellationToken.None);
+        var second = await LoadSchedulesAsync(db, tenant.Id);
+
+        var schedule = first.ShouldHaveSingleItem();
+        second.Select(row => row.PublicId).ShouldBe([schedule.PublicId]);
+        schedule.QuoteCurrency.ShouldBe("USD");
+        schedule.Minimum.ShouldBeGreaterThan(0m);
+        schedule.Bands.Count.ShouldBe(2);
+        schedule.CreatedBy.ShouldBe(TestSeed.CreatedBy);
+        schedule.EffectiveFrom.ShouldBeGreaterThan(today);
+        var latestTrade = await (
+                from leg in db.TransactionSecurityLegs
+                join transaction in db.Transactions on leg.TransactionId equals transaction.Id
+                join instrument in db.Instruments on leg.InstrumentId equals instrument.Id
+                where transaction.TenantId == tenant.Id
+                      && (transaction.Type == TransactionType.Buy || transaction.Type == TransactionType.Sell)
+                      && instrument.QuoteCurrency == "USD"
+                select (DateTimeOffset?)transaction.BookedAt)
+            .MaxAsync();
+        if (latestTrade is { } booked)
+        {
+            schedule.EffectiveFrom.ShouldBeGreaterThan(DateOnly.FromDateTime(booked.UtcDateTime));
+        }
+    }
+
+    private static Task<List<TradeFeeSchedule>> LoadSchedulesAsync(ApplicationDbContext db, int tenantId) =>
+        db.TradeFeeSchedules.AsNoTracking()
+            .Include(row => row.BandRows)
+            .Where(row => row.TenantId == tenantId)
+            .ToListAsync();
+
     private static async Task<List<(TransactionType Type, decimal Amount, string Currency)>> LoadCashAsync(
         ApplicationDbContext db,
         int accountId,

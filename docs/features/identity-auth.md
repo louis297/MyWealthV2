@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-12
-last_updated: 2026-11-14
+last_updated: 2026-11-15
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -103,15 +103,7 @@ A person may complete authorization only for a client that allows that `Users.Ro
 
 `RolePermissions` (ADR 0013). This slice registers the map. Customer APIs ship later.
 
-| Permission | SystemAdmin | TenantAdmin | Adviser | Customer |
-| --- | --- | --- | --- | --- |
-| `tenants.manage` | ✓ | | | |
-| `tenants.read` | ✓ | ✓ | ✓ | |
-| `tenant-admins.manage` | ✓ | | | |
-| `advisers.manage` | | ✓ | | |
-| `customers.manage` | | ✓ | | |
-| `customers.manage-own` | | | ✓ | |
-| `users.me` | ✓ | ✓ | ✓ | ✓ |
+Phase 1 names: `tenants.manage`, `tenants.read`, `tenant-admins.manage`, `advisers.manage`, `customers.manage`, `customers.manage-own`, `users.me`. Grants per role are in the role permission table, [api-design.md](../api-design.md) §3.1 (moved there 2026-11-15).
 
 ### 4.1 From token to permission
 

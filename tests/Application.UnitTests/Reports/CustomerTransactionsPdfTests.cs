@@ -72,6 +72,37 @@ public class CustomerTransactionsPdfTests
         undo.ShouldBeGreaterThan(reversal);
     }
 
+    [Test]
+    public void Render_ShowsTheFeeColumn()
+    {
+        var pdf = CustomerTransactionsPdf.Render(new CustomerTransactionsPdfModel(
+            "Firm Queue",
+            new DateTimeOffset(2026, 3, 31, 14, 5, 6, TimeSpan.Zero),
+            "Cee",
+            new DateOnly(2026, 1, 1),
+            new DateOnly(2026, 3, 31),
+            IncludeClosedAccounts: false,
+            [
+                new CustomerTransactionsPdfRow(
+                    new DateTimeOffset(2026, 1, 2, 9, 0, 0, TimeSpan.Zero),
+                    "Broker",
+                    "Buy",
+                    "-1260.00 USD",
+                    "VTI",
+                    "50",
+                    "first buy",
+                    Fee: "-10.00 USD")
+            ]));
+
+        var text = Read(pdf);
+        var cash = text.IndexOf("Cash", StringComparison.Ordinal);
+        var fee = text.IndexOf("Fee", StringComparison.Ordinal);
+        var instrument = text.IndexOf("Instrument", StringComparison.Ordinal);
+        fee.ShouldBeGreaterThan(cash);
+        instrument.ShouldBeGreaterThan(fee);
+        text.IndexOf("-10.00 USD", StringComparison.Ordinal).ShouldBeGreaterThan(text.IndexOf("-1260.00 USD", StringComparison.Ordinal));
+    }
+
     internal static string Read(byte[] pdf)
     {
         using var document = PdfDocument.Open(pdf);

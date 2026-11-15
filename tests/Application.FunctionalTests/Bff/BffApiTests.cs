@@ -187,6 +187,37 @@ public class BffApiTests
         _api.Calls.ShouldContain(call => call.Path == "/portfolios");
     }
 
+    [Test]
+    public async Task Session_ProxiesFeeSchedules()
+    {
+        // bff-adviser-portal amendment 2026-11-15: /fees is on the prefix allow-list.
+        _api.Scripts["/fees/trade-schedules"] = (HttpStatusCode.OK, """{"items":[],"page":1,"pageSize":100,"totalCount":0}""");
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/fees/trade-schedules?pageSize=100");
+        request.Headers.TryAddWithoutValidation("Cookie", _sessionCookie);
+        var response = await _bff.SendAsync(request);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).ShouldBe("""{"items":[],"page":1,"pageSize":100,"totalCount":0}""");
+        _api.Calls.ShouldContain(call => call.Path == "/fees/trade-schedules");
+    }
+
+    [Test]
+    public async Task Session_ProxiesTheFeePreviewPost()
+    {
+        _api.Scripts["/fees/trade-schedules/preview"] = (HttpStatusCode.OK, """{"currency":"NZD","items":[]}""");
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/fees/trade-schedules/preview");
+        request.Headers.TryAddWithoutValidation("Cookie", _sessionCookie);
+        request.Headers.TryAddWithoutValidation(RequestHeader, "1");
+        request.Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json");
+
+        var response = await _bff.SendAsync(request);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).ShouldBe("""{"currency":"NZD","items":[]}""");
+        _api.Calls.ShouldContain(call => call.Path == "/fees/trade-schedules/preview" && call.Method == HttpMethod.Post);
+    }
+
     [TestCase("/api/health")]
     [TestCase("/api/scalar")]
     public async Task UnknownApiPrefix_Is404AndNotForwarded(string path)

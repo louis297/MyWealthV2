@@ -19,8 +19,9 @@ function isNotFound(error: unknown) {
   return typeof error === "object" && error !== null && "status" in error && error.status === 404;
 }
 
+/** One entry per visible cash leg; a `Fee` leg is labelled "fee" (adviser-portal-fees F13). */
 function cashText(cash: TransactionCash[]) {
-  return cash.map((leg) => `${leg.amount} ${leg.currency}`).join(", ");
+  return cash.map((leg) => `${leg.role === "Fee" ? "fee " : ""}${leg.amount} ${leg.currency}`).join(", ");
 }
 
 function securityText(security: TransactionSecurity[]) {

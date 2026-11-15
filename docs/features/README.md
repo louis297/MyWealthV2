@@ -3,7 +3,7 @@ title: Feature Specs
 status: draft
 language: en
 created: 2026-09-12
-updated: 2026-11-14
+updated: 2026-11-15
 related:
   - ../function-plan.md
   - ../api-design.md
@@ -131,7 +131,7 @@ One domain. Background execution lives in the general-purpose `worker` (ADR 0017
 | [fx-rates](fx-rates.md) | accepted (2026-11-02) | Platform (worker job; any Application caller of `IFxRate`) | Hourly Hangfire job pulls Frankfurter daily rates for active catalog currencies when today's source date is not already stored. Table `FxRates`. Script `0021_fx_rates.sql`. ADR 0019 accepted. HTTP read surface deferred. | Platform rate cache. Consumers (net-worth fold, instrument prices) are later. |
 | [instrument-prices](instrument-prices.md) | accepted (2026-11-02) | Platform (worker job; any Application caller of `IMarketData`) | Daily Hangfire job at 12:00 UTC pulls EODHD EOD prices for active instruments when today's source date is not already stored. Table `InstrumentPrices`. Script `0022_instrument_prices.sql`. No new ADR (follows ADR 0019). HTTP read surface deferred. | Platform price cache. `IMarketData` reads the table. |
 
-Invitation / Activation and Fees are deferred.
+Invitation / Activation is deferred. Fees moved to the business domain roadmap (below).
 
 ---
 
@@ -147,13 +147,23 @@ Required backend amendments (self-scope reads and report request for Customer) a
 
 ---
 
+## Business domain — fees (opened 2026-11-15)
+
+Roadmap in [future-plans.md](../future-plans.md) §1. Each step amends the ledger specs it touches.
+
+| Spec | Status | Who | Ships | Why it stays its own slice |
+| --- | --- | --- | --- | --- |
+| [trade-fees](trade-fees.md) | accepted (2026-11-15); backend and Adviser Portal pages landed | TenantAdmin (manage); Adviser (read); SystemAdmin (manage through the API); Customer none | Tenant trade fee schedules per quote currency (marginal bands, minimum, cap, effective-dated); `Fee` cash leg and fee detail on every `Buy` / `Sell`; fee-aware rebalance with buy scaling; fee preview route. Script `0030`. Policies `fees.read` / `fees.manage` | First roadmap step. Amends buy-sell, posting, holdings, leg-accounts, portfolios and reports |
+
+---
+
 ## Platform — production hosting (drafted 2026-11-12)
 
 Host start-up outside Development, for the VPS showcase in [deployment.md](../deployment.md). No resource API, no table.
 
 | Spec | Status | Who | Ships | Why it stays its own slice |
 | --- | --- | --- | --- | --- |
-| [demo-tenant-seed](demo-tenant-seed.md) | accepted (2026-11-14; landed on master) | Operator (`webapi --seed-demo`; no HTTP caller) | Demo tenant `demo` with reporting `USD`, the 18-instrument demo catalog and both report grants, in any environment. Idempotent, never changes existing rows. No people, prices or FX. No script | Amends tenants R17. First part of future-plans §5 |
+| [demo-tenant-seed](demo-tenant-seed.md) | accepted (2026-11-14; landed on master) | Operator (`webapi --seed-demo`; no HTTP caller) | Demo tenant `demo` with reporting `USD`, the 18-instrument demo catalog and both report grants, in any environment. Idempotent, never changes existing rows. No people, prices or FX. No script | Amends tenants R17. First part of future-plans §6 |
 | [production-hosting](production-hosting.md) | review | Platform (no HTTP caller) | OpenIddict certificates and explicit issuer on `identity`; Data Protection folder and application name per public host; forwarded headers from configured networks; no in-host HTTPS redirection; health endpoints on the health port; `--healthcheck` self-check | Cross-cutting host start-up. Not a resource slice |
 
 Related amendments (2026-11-12, `review`): [bff-adviser-portal](bff-adviser-portal.md) and [bff-customer-portal](bff-customer-portal.md) serve the SPA build; [identity-auth](identity-auth.md) bootstrap SystemAdmin.

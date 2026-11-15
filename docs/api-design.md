@@ -3,7 +3,7 @@ title: API design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-11-14
+updated: 2026-11-15
 related:
   - README.md
   - glossary.md
@@ -62,6 +62,7 @@ Minimal API, TypedResults, endpoints dispatch MediatR only. Paths are kebab-case
 | CORS | Loose in Development; tighten in production without blocking Phase 1 |
 | Docs | `[EndpointSummary]` / `[EndpointDescription]` on every action |
 | People paths | `/users` is a **namespace prefix**, not a parent resource. People collections hang under it. Do not nest advisers / customers under `/users/{id}`. Tenants, currencies, and ledger routes stay outside this prefix |
+| Fee paths | `/fees` is a namespace prefix for fee configuration and calculation, like `/users`; it is not a resource. Fee transactions stay under `/transactions` (§7.9) |
 
 Success codes:
 
@@ -101,6 +102,38 @@ Disable / enable for people: `POST /{id}/disable`, `POST /{id}/enable` (`Disable
 Disabling a tenant does **not** bulk-update `User.Status`. Person status is independent; login checks both. After a tenant is disabled, that Code must not complete login, and existing refresh fails once the outbox delivers `TenantDisabled`. Its people get 403 from `webapi` at once (identity-auth amendment 2026-11-13).
 
 Password change, disable, and logout revoke that subject’s OpenIddict tokens. The User aggregate does not hold tokens.
+
+### 3.1 Role permissions
+
+The only role × permission table. It matches `RolePermissions` in `src/Application/Common/Security/RolePermissions.cs`. A permission lets a role call the endpoint; the handler still checks the scope (tenant, the Adviser's assigned Customers, the Customer's own rows). Permissions are not claims in the JWT ([ADR 0013](adr/0013-roles-authorization-single-user-table.md)).
+
+A spec that adds a permission or changes a grant updates this table in the change that accepts it. Other docs link here and do not copy it.
+
+| Permission | SystemAdmin | TenantAdmin | Adviser | Customer | Owner |
+| --- | --- | --- | --- | --- | --- |
+| `tenants.manage` | ✓ | | | | [tenants](features/tenants.md) |
+| `tenants.read` | ✓ | ✓ | ✓ | | [tenants](features/tenants.md) |
+| `tenant-admins.manage` | ✓ | | | | [tenant-admins](features/tenant-admins.md) |
+| `advisers.manage` | | ✓ | | | [advisers](features/advisers.md) |
+| `customers.manage` | | ✓ | | | [customers](features/customers.md) |
+| `customers.manage-own` | | | ✓ | | [customers](features/customers.md) |
+| `users.me` | ✓ | ✓ | ✓ | ✓ | [identity-auth](features/identity-auth.md) |
+| `instruments.read` | ✓ | ✓ | ✓ | | [instruments](features/instruments.md) |
+| `instruments.create` | ✓ | ✓ | ✓ | | [instruments](features/instruments.md) |
+| `instruments.manage` | ✓ | ✓ | | | [instruments](features/instruments.md) |
+| `accounts.read` | ✓ | ✓ | ✓ | ✓ | [accounts](features/accounts.md); Customer: Customer Portal amendment 2026-11-02 |
+| `accounts.create` | ✓ | ✓ | ✓ | | [accounts](features/accounts.md) |
+| `accounts.manage` | ✓ | ✓ | ✓ | | [accounts](features/accounts.md) |
+| `transactions.read` | ✓ | ✓ | ✓ | ✓ | [posting](features/posting.md); Customer: Customer Portal amendment 2026-11-02 |
+| `transactions.create` | ✓ | ✓ | ✓ | | [posting](features/posting.md) |
+| `portfolios.read` | ✓ | ✓ | ✓ | | [portfolios](features/portfolios.md) |
+| `portfolios.manage` | ✓ | ✓ | ✓ | | [portfolios](features/portfolios.md) |
+| `reports.customer.read` | | ✓ | ✓ | ✓ | [reports](features/reports.md) |
+| `reports.customer.create` | | ✓ | ✓ | ✓ | [reports](features/reports.md); Customer: Customer Portal amendment 2026-11-02 |
+| `reports.book.read` | | ✓ | ✓ | | [reports](features/reports.md) |
+| `reports.book.create` | | ✓ | ✓ | | [reports](features/reports.md) |
+| `fees.read` | ✓ | ✓ | ✓ | | [trade-fees](features/trade-fees.md) (landed) |
+| `fees.manage` | ✓ | ✓ | | | [trade-fees](features/trade-fees.md) (landed) |
 
 ---
 
@@ -186,6 +219,7 @@ Status of this section: `accepted` (2026-11-13). The build contract for it is [f
 | `report_not_ready` | 409 | The report execution has no result to download yet. | — | [features/reports.md](features/reports.md) |
 | `portfolio_already_assigned` | 409 | The account's Active assignment is already this portfolio. | — | [features/portfolios.md](features/portfolios.md) §7 `AssignPortfolio` |
 | `portfolio_shared` | 409 | The caller is an Adviser and the portfolio is a Shared portfolio. | — | [features/portfolios.md](features/portfolios.md) amendment 2026-11-13 |
+| `fee_schedule_in_effect` | 409 | The trade fee schedule row may already apply to a posted trade, so it cannot be updated or deleted. Add a new row instead. | — | [features/trade-fees.md](features/trade-fees.md) R11 |
 | `disabled` | 400 | §4.1 | `target`, `targetId` | §4.1 |
 | `missing_price`, `missing_fx`, `insufficient_cash`, `account_not_eligible`, `portfolio_inactive`, `concurrent_modification` | 400 | Rebalance failure | — | [features/portfolios.md](features/portfolios.md) §11 |
 
@@ -258,6 +292,7 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Transactions | `/transactions` | list / get / create / reverse | `transactions.read` / `transactions.create` |
 | Net worth | `/net-worth`, `/users/customers/{id}/net-worth` | GET | `accounts.read` |
 | Portfolios | `/portfolios`, `/accounts/{id}/portfolio`, `/accounts/{id}/rebalance` | list / get / create / update / disable; assign / unassign / rebalance. See features/portfolios.md | `portfolios.read` / `portfolios.manage` + `transactions.create` |
+| Fees | `/fees/trade-schedules` (namespace `/fees`) | list / get / create / update / delete. See features/trade-fees.md | `fees.read` / `fees.manage` |
 | Reports | `/reports` | list / request / schedules / executions / download | `reports.customer.read` / `reports.customer.create` / `reports.book.read` / `reports.book.create` |
 
 Path `{id}` is always PublicId.
@@ -417,7 +452,7 @@ Field rules: [features/posting.md](features/posting.md) for cash types, [feature
 - Optional list filters: `accountId`, `customerId`, `type`.
 - The item has an `fx` object `{ baseCurrency, quoteCurrency, rate, rateAsOfDate }` when the Transaction has an FX detail (an `FxConversion` and its Reversal); otherwise `fx` is `null` ([features/fx-conversions.md](features/fx-conversions.md) R22).
 
-**Type-specific create routes.** When a type's create body differs from the common shape (one top-level `accountId`), that type gets its own `POST /transactions/{action}`. Each type has exactly one create route: a type with its own route is rejected by `POST /transactions` (400). Read (`GET /transactions`, `GET /transactions/{id}`) and reverse (`POST /transactions/{id}/reverse`) stay shared by every type. Every new type gets its own `POST /transactions/{action}` route, whatever its body shape (decided 2026-11-10). Existing types keep `POST /transactions` until each is moved in its own spec amendment ([future-plans.md](future-plans.md) §3).
+**Type-specific create routes.** When a type's create body differs from the common shape (one top-level `accountId`), that type gets its own `POST /transactions/{action}`. Each type has exactly one create route: a type with its own route is rejected by `POST /transactions` (400). Read (`GET /transactions`, `GET /transactions/{id}`) and reverse (`POST /transactions/{id}/reverse`) stay shared by every type. Every new type gets its own `POST /transactions/{action}` route, whatever its body shape (decided 2026-11-10). Existing types keep `POST /transactions` until each is moved in its own spec amendment ([future-plans.md](future-plans.md) §4).
 
 Type-specific routes: `POST /transactions/transfer` for `InternalTransfer` ([features/internal-transfers.md](features/internal-transfers.md)); `POST /transactions/fx` for `FxConversion` and the read-only `POST /transactions/fx/quote` ([features/fx-conversions.md](features/fx-conversions.md)). The quote is a `POST` because it takes the create body and the same validation; it writes nothing, takes no `Idempotency-Key` and holds no rate. Create confirms the quoted rate with `expectedRate`; a different stored rate → 409 with `expectedRate` in `errors`.
 
@@ -453,6 +488,23 @@ Customer has `reports.customer.read` only. TenantAdmin and Adviser have all four
 BFF allow-list adds the `/reports` prefix. `GET /reports/catalog` and `PUT /reports/{id}` sit on that prefix and reject non-SystemAdmin callers with 403. The Adviser Portal does not call them.
 
 Back Office tenant configuration lists the active catalog and calls the existing grant `POST` and revoke `DELETE`. It does not show a platform-inactive report. Catalog `IsActive` and `AllowedTriggers` are written with `PUT /reports/{id}` (`tenants.manage`). The platform page lists `GET /reports/catalog`. Disabling cascades a revoke of every tenant grant for that report. Scalar can call the same verbs.
+
+---
+
+### 7.9 Fees
+
+`/fees` is a namespace prefix, like `/users`: there is no `GET /fees`. Fee configuration and calculation resources hang under it. Fee transactions do not: a standalone fee type gets its own `POST /transactions/{action}` route (§7.7).
+
+| Method | Route | Policy | Success |
+| --- | --- | --- | --- |
+| GET | `/fees/trade-schedules` | `fees.read` | 200 envelope |
+| GET | `/fees/trade-schedules/{id}` | `fees.read` | 200 item |
+| POST | `/fees/trade-schedules` | `fees.manage` | 201 `{ id }` |
+| PUT | `/fees/trade-schedules/{id}` | `fees.manage` | 204 |
+| DELETE | `/fees/trade-schedules/{id}` | `fees.manage` | 204 |
+| POST | `/fees/trade-schedules/preview` | `fees.read` | 200 fee preview ([features/trade-fees.md](features/trade-fees.md) R30–R33; no write) |
+
+Field rules: [features/trade-fees.md](features/trade-fees.md). Update or delete of a schedule row in effect → 409 `fee_schedule_in_effect`. Every cash leg in the transaction item carries `role` (`Principal` or `Fee`) and `fee` (the fee detail on a `Fee` leg, null otherwise).
 
 ---
 
@@ -508,3 +560,5 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-13 | `webapi` re-checks person `Status` and the tenant flag on every request. A disabled person, or any person of a disabled tenant, gets 403 with a still-valid token. §4.1 `target=tenant` on create is reached only by SystemAdmin ([features/identity-auth.md](features/identity-auth.md) amendment 2026-11-13). |
 | 2026-11-14 | §2 Instants and §4 rows: a request instant needs `Z` or an offset and is converted to UTC; responses use `Z`; an unreadable body gets a `ProblemDetails` in every environment ([fixes/utc-instants.md](fixes/utc-instants.md)). |
 | 2026-11-13 | §4.2 problem codes (accepted): every 409 and every named business 400 carries a stable `code`; one registry; clients branch on `code`. Build contract: [features/portfolios.md](features/portfolios.md) amendment 2026-11-13 part 1. |
+| 2026-11-15 | Trade fees accepted: `/fees` namespace and `/fees/trade-schedules` (`fees.read` / `fees.manage`, §7.9); problem code `fee_schedule_in_effect`; cash legs in the transaction item gain `role` and `fee` ([features/trade-fees.md](features/trade-fees.md)). |
+| 2026-11-15 | §3.1 role permission table: the one table of grants, matching `RolePermissions`. Moved from ADR 0013 and the instruments, accounts, posting and identity-auth specs; adds the portfolios, reports and fees rows and the Customer Portal grants that were missing there. |

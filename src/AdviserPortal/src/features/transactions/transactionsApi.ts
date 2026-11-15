@@ -1,11 +1,26 @@
 import { api } from "@/shared/api/api";
 import type { PagedList } from "@/shared/types/page";
 
+/** trade-fees §8.1: the fee detail of a `Fee` cash leg. `amount` and `basisAmount` are in the quote currency. */
+export type TransactionFee = {
+  kind: string;
+  /** The schedule used. Null for a fee kind without a schedule. */
+  scheduleId: string | null;
+  basisAmount: number;
+  amount: number;
+  currency: string;
+};
+
 export type TransactionCash = {
   accountId: string;
   customerId: string;
+  /** `Principal` or `Fee` (trade-fees §8.1). */
+  role: string;
+  /** In the Account currency. */
   amount: number;
   currency: string;
+  /** Set on a `Fee` leg; null on a `Principal` leg. */
+  fee: TransactionFee | null;
 };
 
 export type TransactionSecurity = {

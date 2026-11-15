@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-02
-last_updated: 2026-11-13
+last_updated: 2026-11-15
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -37,6 +37,8 @@ Model portfolios (target-weight investment schemes) on `webapi`. An Adviser or T
 **Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md) R17. The R18 trade lock applies when any security leg's Account has an Active assignment. Rebalance still writes ordinary `Buy` / `Sell` on the assigned Account.
 
 **Amendment 2026-11-13 (Adviser Book on portfolio-wide commands, accepted, landed):** see the amendment at the end of this file. Part 1 puts a problem `code` on every 409 ([../api-design.md](../api-design.md) §4.2). Part 2, for the Adviser role, filters `POST /portfolios/{id}/rebalance` to the Adviser's Book and refuses `PUT /portfolios/{id}` and `POST /portfolios/{id}/disable` on a Shared portfolio (409 `portfolio_shared`).
+
+**Amendment 2026-11-15 (trade fees, accepted):** [trade-fees.md](trade-fees.md) R24–R29. Rebalance-generated `Buy` / `Sell` carry trade fees like manual ones; the planner computes each trade's fee from the schedule that applies on the rebalance's UTC date. R8 targets and sells are unchanged, and fees come out of the cash residual first. R11 changes: when planned cash would be negative, every buy is scaled by one factor found by bisection and buys below the minimum trade size are dropped; the rebalance fails with `insufficient_cash` only when sell fees alone make cash negative.
 
 ---
 

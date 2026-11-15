@@ -29,7 +29,7 @@ An operator runs a one-shot command on `webapi`, `--seed-demo`, to create the de
 
 The **demo seed** is an explicit command, not a start-up step. It creates tenant `demo` (`Demo Advisory`, reporting currency `USD`), the 18 instruments of the **demo catalog**, and grants for both first-phase reports. It is idempotent on natural keys and never changes a row that already exists. Prices and FX rates come from the existing worker jobs, not from this command.
 
-This is the first part of [future-plans.md](../future-plans.md) §5 (demo data for visitors). The shared demo logins and the nightly reset are still open there.
+This is the first part of [future-plans.md](../future-plans.md) §6 (demo data for visitors). The shared demo logins and the nightly reset are still open there.
 
 ---
 
@@ -46,7 +46,7 @@ This is the first part of [future-plans.md](../future-plans.md) §5 (demo data f
 **Out**
 
 - Running the seed on start in any environment, or from `deploy.sh` or the deploy workflow
-- People: TenantAdmin, Adviser, Customer, or any login for visitors ([future-plans.md](../future-plans.md) §5)
+- People: TenantAdmin, Adviser, Customer, or any login for visitors ([future-plans.md](../future-plans.md) §6)
 - Accounts, Transactions, Holdings, Portfolios, report schedules
 - Instrument prices and FX rates. The worker jobs own both ([instrument-prices.md](instrument-prices.md), [fx-rates.md](fx-rates.md))
 - Changing or repairing an existing tenant, instrument or grant
@@ -196,7 +196,7 @@ Amends (accepted 2026-11-14):
 - [instruments.md](instruments.md) §2 Out and §9.1 "Not Production": the demo catalog may be written in production by this command.
 - [reports.md](reports.md) seed paragraph "Not Production": the demo tenant's two grants may be written in production by this command.
 
-Still open, not this slice ([future-plans.md](../future-plans.md) §5):
+Still open, not this slice ([future-plans.md](../future-plans.md) §6):
 
 - Shared Adviser and Customer logins for visitors, and which routes they may not call
 - The nightly reset job and whether it reuses this seed

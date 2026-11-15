@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-11
-last_updated: 2026-11-14
+last_updated: 2026-11-15
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -33,6 +33,8 @@ Split / Bonus / Scrip are accepted in [split.md](split.md). No portal page. No p
 
 
 **Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md). Both legs of a `Buy` / `Sell` carry the create body's `accountId`; the header has no Account. R15 "same Account-locked command" means every leg account locked in ascending `Accounts.Id` order. The item JSON in §8.1 is replaced by leg-accounts §8.1 (shown below).
+
+**Amendment 2026-11-15 (trade fees, accepted):** [trade-fees.md](trade-fees.md). Every `Buy` / `Sell` looks up the tenant's trade fee schedule for the instrument's quote currency and the UTC date of `bookedAt`. When the fee is above 0, the trade gets a second cash leg with role `Fee` on the same Account and a fee detail of kind `Brokerage` (trade-fees R7, R14, R18). R9: a `fee` field on the create body → 400. R11: `Buy` cost is `gross + fee`; the `Sell` release in R15 is unchanged. R12: the fee leg uses the principal's rate and rounding. R13: the cash check counts the fee leg. R16: reverse copies the fee leg and its fee detail. Every cash leg in the item carries `role` and `fee` (trade-fees §8.1). "Fees" in §2 Out and §12 is replaced by trade-fees §2 Out.
 
 ---
 

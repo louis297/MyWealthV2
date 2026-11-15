@@ -3,7 +3,7 @@ title: Documentation
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-11-12
+updated: 2026-11-15
 ---
 
 # MyWealthV2 documentation
@@ -24,7 +24,7 @@ Phase 1 platform contracts stay accepted. Do not reopen them.
 
 **Feature map:** [function-plan.md](function-plan.md) and [features/README.md](features/README.md).
 
-Landed Phase 2 slices (accepted + implementation on master): instruments, accounts, posting, holdings, buy/sell, split/bonus/scrip, net-worth, portfolios.
+Landed Phase 2 slices (accepted + implementation on master): instruments, accounts, posting, holdings, buy/sell, split/bonus/scrip, net-worth, portfolios, trade fees (backend and the Adviser Portal fees pages).
 
 Accepted Phase 3 platform slices: reports, outbox, FX rates, instrument prices. Customer Portal accepted.
 

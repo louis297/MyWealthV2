@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-25
-last_updated: 2026-11-14
+last_updated: 2026-11-15
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -33,6 +33,8 @@ There is **no separate cash-ledger Feature Spec.** Cash legs live here. There is
 **Amendment 2026-10-13:** bidirectional reverse link. Keep `OriginalTransactionId` on the Reversal. Add `ReversedByTransactionId` on the original (script `0018_transaction_reversed_by.sql`, forward ALTER only; do not edit `0013`). One limited write of that column when the Reversal is created; after that write the original is immutable again. Economic legs are never updated. Already-reversed is `ReversedByTransactionId IS NOT NULL` — no self-join on list / get.
 
 **Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md) supersedes every rule here that reads "the transaction's Account": the header has no `AccountId`; each cash leg has its own `AccountId` (script `0024`). R5 (one Account), R6–R9, R11 ("same account"), R19, R22 and the §5 / §6 header `AccountId` apply per leg account as restated in leg-accounts R2–R14. The create body still takes top-level `accountId`. The item in §8.1 is replaced by leg-accounts §8.1 (shown below).
+
+**Amendment 2026-11-15 (trade fees, accepted):** [trade-fees.md](trade-fees.md). Every cash leg has a role, `Principal` or `Fee` (script `0030`); existing legs are `Principal`. The cash types in this file build only `Principal` legs. The cash `SUM` and every balance rule still add all cash legs. Every cash leg in the item carries `role` and `fee` (`fee: null` on a `Principal` leg).
 
 ---
 
@@ -147,10 +149,7 @@ Customer receives 403. No Adviser Portal activity page in this increment.
 
 Policies (register when accepted; map in `RolePermissions`):
 
-| Policy | TenantAdmin | Adviser | SystemAdmin | Customer |
-| --- | --- | --- | --- | --- |
-| `transactions.read` | ✓ | ✓ | ✓ | |
-| `transactions.create` | ✓ | ✓ | ✓ | |
+`transactions.read`, `transactions.create`. Grants per role are in the role permission table, [api-design.md](../api-design.md) §3.1 (moved there 2026-11-15).
 
 Adviser scope is **assigned Customers** of the transaction’s Account (404 if not). Same width as `accounts.*`. Reverse uses `transactions.create`.
 

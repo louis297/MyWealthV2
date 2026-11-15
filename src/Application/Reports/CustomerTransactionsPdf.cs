@@ -12,7 +12,8 @@ public sealed record CustomerTransactionsPdfRow(
     string Cash,
     string Instrument,
     string Quantity,
-    string? Memo);
+    string? Memo,
+    string Fee = "");
 
 public sealed record CustomerTransactionsPdfModel(
     string TenantName,
@@ -65,6 +66,7 @@ public static class CustomerTransactionsPdf
                                 columns.RelativeColumn();
                                 columns.RelativeColumn();
                                 columns.RelativeColumn();
+                                columns.RelativeColumn();
                                 columns.RelativeColumn(2);
                             });
                             table.Header(header =>
@@ -73,6 +75,7 @@ public static class CustomerTransactionsPdf
                                 header.Cell().Text("Account").Bold();
                                 header.Cell().Text("Type").Bold();
                                 header.Cell().Text("Cash").Bold();
+                                header.Cell().Text("Fee").Bold();
                                 header.Cell().Text("Instrument").Bold();
                                 header.Cell().Text("Quantity").Bold();
                                 header.Cell().Text("Memo").Bold();
@@ -85,6 +88,7 @@ public static class CustomerTransactionsPdf
                                 table.Cell().Text(row.AccountName);
                                 table.Cell().Text(row.Type);
                                 table.Cell().Text(row.Cash);
+                                table.Cell().Text(row.Fee);
                                 table.Cell().Text(row.Instrument);
                                 table.Cell().Text(row.Quantity);
                                 table.Cell().Text(row.Memo ?? string.Empty);

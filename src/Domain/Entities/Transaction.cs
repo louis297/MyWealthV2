@@ -35,6 +35,9 @@ public class Transaction : BaseAuditableEntity
     /// <summary>The rate this Transaction used, when it has one (FX conversions R14).</summary>
     public TransactionFxDetail? FxDetail { get; private set; }
 
+    /// <summary>One per <see cref="CashLegRole.Fee"/> cash leg (trade-fees R18).</summary>
+    public List<TransactionFeeDetail> FeeDetails { get; private set; } = [];
+
     public static Transaction Post(
         int tenantId,
         int accountId,
@@ -294,13 +297,16 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
-        decimal currentCashSum)
+        decimal currentCashSum,
+        TradeFeeSchedule? feeSchedule = null,
+        int quoteDecimalPlaces = 2)
     {
         EnsureSecurityAccount(accountType);
         EnsurePriced(price);
         var cost = RoundMoney(quantity * price.Amount);
         var cash = -RoundMoney(cost * fxRate);
-        if (currentCashSum + cash < 0)
+        var brokerage = BrokerageFee(feeSchedule, cost, price.Currency, fxRate, quoteDecimalPlaces);
+        if (currentCashSum + cash + (brokerage?.Leg ?? 0m) < 0)
         {
             throw new DomainException("Cash balance cannot become negative.");
         }
@@ -316,9 +322,11 @@ public class Transaction : BaseAuditableEntity
             CashLegs = [TransactionCashLeg.Create(tenantId, accountId, cash, currency)],
             SecurityLegs =
             [
-                TransactionSecurityLeg.Create(tenantId, accountId, instrumentId, quantity, cost, price.Currency)
+                TransactionSecurityLeg.Create(
+                    tenantId, accountId, instrumentId, quantity, cost + (brokerage?.Fee ?? 0m), price.Currency)
             ]
         };
+        transaction.AddBrokerageLeg(accountId, currency, brokerage);
         transaction.AddDomainEvent(new TransactionPosted(transaction));
         return transaction;
     }
@@ -337,14 +345,21 @@ public class Transaction : BaseAuditableEntity
         string? reference,
         decimal currentCashSum,
         decimal currentQuantity,
-        decimal currentCost)
+        decimal currentCost,
+        TradeFeeSchedule? feeSchedule = null,
+        int quoteDecimalPlaces = 2)
     {
         EnsureSecurityAccount(accountType);
         EnsurePriced(price);
-        _ = currentCashSum;
         EnsureCanRelease(quantity, currentQuantity);
         var released = ReleaseCost(currentCost, quantity, currentQuantity);
         var cash = RoundMoney(quantity * price.Amount * fxRate);
+        var brokerage = BrokerageFee(feeSchedule, RoundMoney(quantity * price.Amount), price.Currency, fxRate, quoteDecimalPlaces);
+        if (brokerage is not null && currentCashSum + cash + brokerage.Leg < 0)
+        {
+            throw new DomainException("Cash balance cannot become negative.");
+        }
+
         var currency = Money.Create(0m, accountCurrency).Currency;
         var transaction = new Transaction
         {
@@ -360,6 +375,7 @@ public class Transaction : BaseAuditableEntity
                 TransactionSecurityLeg.Create(tenantId, accountId, instrumentId, -quantity, -released, price.Currency)
             ]
         };
+        transaction.AddBrokerageLeg(accountId, currency, brokerage);
         transaction.AddDomainEvent(new TransactionPosted(transaction));
         return transaction;
     }
@@ -507,9 +523,8 @@ public class Transaction : BaseAuditableEntity
             throw new DomainException("This transaction has already been reversed.");
         }
 
-        var cashLegs = CashLegs
-            .Select(leg => TransactionCashLeg.Create(TenantId, leg.AccountId, -leg.Amount, leg.Currency))
-            .ToList();
+        // Roles and fee details are copied; the schedule is not read again (trade-fees R19).
+        var cashLegs = CashLegs.Select(leg => leg.ReversalLeg()).ToList();
         foreach (var account in cashLegs.GroupBy(leg => leg.AccountId))
         {
             if (!currentCashSumByAccount.TryGetValue(account.Key, out var currentCashSum))
@@ -573,7 +588,8 @@ public class Transaction : BaseAuditableEntity
             OriginalTransactionId = Id,
             CashLegs = cashLegs,
             SecurityLegs = reversalLegs ?? [],
-            FxDetail = FxDetail?.Copy()
+            FxDetail = FxDetail?.Copy(),
+            FeeDetails = cashLegs.Select(leg => leg.FeeDetail).OfType<TransactionFeeDetail>().ToList()
         };
         ReversedBy = reversal;
         reversal.AddDomainEvent(new TransactionReversed(reversal));
@@ -614,6 +630,66 @@ public class Transaction : BaseAuditableEntity
 
     private static decimal RoundMoney(decimal amount) =>
         decimal.Round(amount, 4, MidpointRounding.AwayFromZero);
+
+    /// <summary>
+    /// The brokerage on a <c>Buy</c> / <c>Sell</c> (trade-fees R8, R14, R15): the fee in the quote currency and the
+    /// negative fee leg in the Account currency, converted with the principal's rate and rounding. Null when there is
+    /// no schedule or the fee is 0.
+    /// </summary>
+    private static BrokerageCharge? BrokerageFee(
+        TradeFeeSchedule? schedule,
+        decimal gross,
+        string quoteCurrency,
+        decimal fxRate,
+        int quoteDecimalPlaces)
+    {
+        if (schedule is null)
+        {
+            return null;
+        }
+
+        if (!string.Equals(schedule.QuoteCurrency, quoteCurrency, StringComparison.Ordinal))
+        {
+            throw new DomainException("The trade fee schedule is for another quote currency.");
+        }
+
+        var fee = schedule.FeeFor(gross, quoteDecimalPlaces).Fee;
+        var leg = -RoundMoney(fee * fxRate);
+        return fee > 0m && leg < 0m ? new BrokerageCharge(schedule.Id, gross, fee, quoteCurrency, leg) : null;
+    }
+
+    /// <summary>
+    /// The cash a <c>Buy</c> / <c>Sell</c> would book on its Account: principal plus the brokerage leg, with the same
+    /// rounding as <see cref="PostBuy"/> and <see cref="PostSell"/>. The rebalance planner uses it (trade-fees R25).
+    /// </summary>
+    internal static decimal TradeCash(
+        bool buy,
+        decimal quantity,
+        decimal price,
+        string quoteCurrency,
+        decimal fxRate,
+        TradeFeeSchedule? feeSchedule,
+        int quoteDecimalPlaces)
+    {
+        var gross = RoundMoney(quantity * price);
+        var principal = buy ? -RoundMoney(gross * fxRate) : RoundMoney(quantity * price * fxRate);
+        return principal + (BrokerageFee(feeSchedule, gross, quoteCurrency, fxRate, quoteDecimalPlaces)?.Leg ?? 0m);
+    }
+
+    private void AddBrokerageLeg(int accountId, string accountCurrency, BrokerageCharge? brokerage)
+    {
+        if (brokerage is null)
+        {
+            return;
+        }
+
+        var detail = TransactionFeeDetail.Create(
+            TenantId, FeeKind.Brokerage, brokerage.ScheduleId, brokerage.Gross, brokerage.Fee, brokerage.QuoteCurrency);
+        CashLegs.Add(TransactionCashLeg.CreateFee(TenantId, accountId, brokerage.Leg, accountCurrency, detail));
+        FeeDetails.Add(detail);
+    }
+
+    private sealed record BrokerageCharge(int ScheduleId, decimal Gross, decimal Fee, string QuoteCurrency, decimal Leg);
 
     private static decimal ReleaseCost(decimal oldCost, decimal sellQuantity, decimal oldQuantity) =>
         sellQuantity == oldQuantity

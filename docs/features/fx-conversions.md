@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-10
-last_updated: 2026-11-14
+last_updated: 2026-11-15
 related:
   - internal-transfers.md
   - leg-accounts.md
@@ -29,7 +29,7 @@ related:
 
 Cash conversion from one currency to another between two Accounts in the same tenant, on `webapi`. One Transaction of the new type `FxConversion` has two cash legs: a negative leg in the sell currency on the from Account and a positive leg in the buy currency on the to Account. The server prices the conversion from the cached reference rate (`IFxRate`, [fx-rates.md](fx-rates.md)) and stores the rate it used in a new table `TransactionFxDetails`. Both Accounts belong to the same Customer. Moving cash to another Customer in another currency is two steps: convert inside the first Customer, then an `InternalTransfer` in the new currency ([internal-transfers.md](internal-transfers.md)).
 
-This slice adds one `TransactionType`, a create route `POST /transactions/fx`, a read-only quote route `POST /transactions/fx/quote`, and script `0026`. No new policy. Read and reverse reuse the existing `/transactions` routes. An Account still has one cash currency (ADR 0011 §6); this slice does not change the Account model ([future-plans.md](../future-plans.md) §4).
+This slice adds one `TransactionType`, a create route `POST /transactions/fx`, a read-only quote route `POST /transactions/fx/quote`, and script `0026`. No new policy. Read and reverse reuse the existing `/transactions` routes. An Account still has one cash currency (ADR 0011 §6); this slice does not change the Account model ([future-plans.md](../future-plans.md) §5).
 
 `TransactionFxDetails` is designed so that Buy / Sell with automatic FX can store their rate too. That use is a separate amendment to [buy-sell.md](buy-sell.md) and [portfolios.md](portfolios.md): [cross-currency-trades.md](cross-currency-trades.md). This slice does not change Buy / Sell.
 
@@ -54,9 +54,9 @@ A TenantAdmin or Adviser converts cash from an Open Account in one currency to a
 
 **Out**
 
-- Changing Buy / Sell automatic FX, the manual same-currency rule, or storing the rate on Buy / Sell (next amendment; [future-plans.md](../future-plans.md) §2)
-- Multi-currency cash in one Account ([future-plans.md](../future-plans.md) §4)
-- Fee or spread on the rate
+- Changing Buy / Sell automatic FX, the manual same-currency rule, or storing the rate on Buy / Sell (next amendment; [future-plans.md](../future-plans.md) §3)
+- Multi-currency cash in one Account ([future-plans.md](../future-plans.md) §5)
+- Fee or spread on the rate (decided 2026-11-15: no FX fee in [trade-fees.md](trade-fees.md); an FX fee would be a later fee kind)
 - A rate entered by the caller
 - A stored, time-limited quote (rate lock)
 - Conversion between two Customers. Convert inside the Customer, then use `InternalTransfer`
@@ -64,7 +64,7 @@ A TenantAdmin or Adviser converts cash from an Open Account in one currency to a
 - Customer-initiated conversion (Customer has no ledger write)
 - An HTTP read route for `FxRates` (fx-rates R14 stays deferred)
 - FX columns in the Customer Transactions report
-- Moving existing types to their own create routes ([future-plans.md](../future-plans.md) §3)
+- Moving existing types to their own create routes ([future-plans.md](../future-plans.md) §4)
 
 ---
 
@@ -323,7 +323,7 @@ No new ADR. ADR 0011 §6 (one cash currency per Account) is unchanged.
 Still open, not this slice:
 
 - Buy / Sell amendment: same-currency rule for manual trades that add a holding, manual `Sell` and rebalance with automatic FX, storing their rate in `TransactionFxDetails`, Buy / Sell cash rounding to `DecimalPlaces` ([cross-currency-trades.md](cross-currency-trades.md), draft).
-- Fee or spread, and who configures it.
+- Fee or spread, and who configures it. Not in [trade-fees.md](trade-fees.md) (2026-11-15); an FX fee would be a later fee kind with its own schedule.
 - FX columns in the Customer Transactions report.
 - An HTTP read route for `FxRates`.
 

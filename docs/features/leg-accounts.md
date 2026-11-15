@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-10
-last_updated: 2026-11-10
+last_updated: 2026-11-15
 related:
   - posting.md
   - holdings.md
@@ -29,6 +29,8 @@ Structural amendment to the Transaction aggregate on `webapi`. The Transaction h
 This is groundwork for cross-account transfer ([posting.md](posting.md) §13), which is the **next** increment and is not specified here. No new `TransactionType`, no new route, no new policy. Every existing type keeps its leg composition, and in this increment every leg of one Transaction still books into the same Account. The transaction item JSON changes shape now (per-leg `accountId`) so the portals change once, not twice.
 
 **Status is `accepted` (2026-11-10) and landed** on branch `feature/leg-accounts`. Script `0024_leg_accounts.sql`. The amendments to [posting.md](posting.md), [holdings.md](holdings.md), [buy-sell.md](buy-sell.md), [split.md](split.md), [net-worth.md](net-worth.md), [portfolios.md](portfolios.md), [reports.md](reports.md), the portal specs, ADR 0011, domain-model, database-design, api-design and the glossary landed with the implementation.
+
+**Amendment 2026-11-15 (trade fees, accepted):** [trade-fees.md](trade-fees.md). Cash legs gain a role. The rule "at most one cash leg per `(Transaction, Account)`" now applies to `Principal` legs; a `Buy` / `Sell` may also have one `Fee` leg on the same Account (script `0030` replaces the unique key with a filtered one). Transfers still have no fee leg.
 
 ---
 
@@ -67,7 +69,7 @@ Visibility and authority are derived from leg accounts:
 **Out**
 
 - Cross-account transfer, the new transfer type and its name, and the create body for it — next increment
-- Fees on a transfer — later, designed together with other fee work
+- Fees on a transfer. Decided 2026-11-15: none in [trade-fees.md](trade-fees.md); a transfer or withdrawal fee is a standalone fee (roadmap step 4, [future-plans.md](../future-plans.md) §1)
 - Cross-currency transfer
 - Any change to the create body of existing types (top-level `accountId` stays)
 - Any change to `TransactionType`, its sign rules, or its leg composition
@@ -270,7 +272,7 @@ Amend [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.m
 - Name and create body of the cross-account transfer type. Recommendation from discussion: do not reuse `TransferIn` / `TransferOut`, because one header has one `Type` and a linked transfer is both directions.
 - Cross-currency transfer.
 - In-kind transfer (security legs on two Accounts).
-- Fees — deferred, to be designed with other fee work.
+- Fees on transfers — none; see [trade-fees.md](trade-fees.md) §2 Out.
 
 The transfer increment is drafted in [internal-transfers.md](internal-transfers.md): type `InternalTransfer`, route `POST /transactions/transfer`, cash only, same currency. Cross-currency and in-kind transfer stay open.
 
@@ -284,7 +286,7 @@ Recorded here so the next spec does not reopen them:
 - A cross-tenant movement is two separate, unlinked Transactions: a `TransferOut` in one tenant and a `TransferIn` in the other. No reference between them. This agrees with posting R18.
 - An Adviser creates or reverses a transfer only if both Customers are assigned to them (R6).
 - The other side's legs are hidden from a caller who cannot see that Account (R7).
-- A transfer has no fee leg until fees are designed.
+- A transfer has no fee leg ([trade-fees.md](trade-fees.md) §2 Out).
 
 ---
 

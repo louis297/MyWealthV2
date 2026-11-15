@@ -22,6 +22,7 @@ import {
   useGetAccountQuery,
   useReopenAccountMutation,
 } from "@/features/accounts/accountsApi";
+import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
 import { useGetInstrumentsQuery } from "@/features/instruments/instrumentsApi";
 import {
   useAssignPortfolioMutation,
@@ -32,7 +33,8 @@ import {
   useUnassignPortfolioMutation,
 } from "@/features/portfolios/portfoliosApi";
 import { rateLine } from "@/features/transactions/fxFormat";
-import { useGetTransactionsQuery } from "@/features/transactions/transactionsApi";
+import { type TransactionCash, useGetTransactionsQuery } from "@/features/transactions/transactionsApi";
+import { formatMoney, sumAmounts } from "@/shared/format/money";
 import { formatInstant } from "@/shared/time/instant";
 import { cn } from "cn";
 
@@ -56,6 +58,28 @@ function problemMessages(error: unknown): string[] {
 
 const cashActions = ["TransferIn", "TransferOut"] as const;
 const securityActions = ["Buy", "Sell", "StockIn", "StockOut", "Split", "Bonus", "Scrip"] as const;
+
+/**
+ * trade-fees R22: the activity row shows the sum of this account's cash legs, and the `Fee` legs in it
+ * on a second line (adviser-portal-fees F13).
+ */
+function ActivityAmount({ legs, decimalPlaces }: { legs: TransactionCash[]; decimalPlaces: number | undefined }) {
+  if (legs.length === 0) {
+    return null;
+  }
+  const currency = legs[0].currency;
+  const fees = legs.filter((leg) => leg.role === "Fee");
+  return (
+    <>
+      {`${sumAmounts(legs.map((leg) => leg.amount))} ${currency}`}
+      {fees.length > 0 ? (
+        <p className="text-muted-foreground text-xs">
+          {`incl. fee ${formatMoney(Math.abs(sumAmounts(fees.map((leg) => leg.amount))), currency, decimalPlaces)}`}
+        </p>
+      ) : null}
+    </>
+  );
+}
 
 function isNotFound(error: unknown) {
   return typeof error === "object" && error !== null && "status" in error && error.status === 404;
@@ -91,6 +115,7 @@ export function AccountDetailPage() {
   const [assignPortfolio] = useAssignPortfolioMutation();
   const [unassignPortfolio] = useUnassignPortfolioMutation();
   const [rebalanceAccount] = useRebalanceAccountMutation();
+  const currencies = useGetCurrenciesQuery();
   const [portfolioId, setPortfolioId] = useState("");
   const [assignStatus, setAssignStatus] = useState<string | null>(null);
   const [messages, setMessages] = useState<string[]>([]);
@@ -392,10 +417,10 @@ export function AccountDetailPage() {
                       <TableCell>{item.type}</TableCell>
                       <TableCell>{formatInstant(item.bookedAt)}</TableCell>
                       <TableCell>
-                        {item.cash
-                          .filter((leg) => leg.accountId === data.id)
-                          .map((leg) => `${leg.amount} ${leg.currency}`)
-                          .join(", ")}
+                        <ActivityAmount
+                          legs={item.cash.filter((leg) => leg.accountId === data.id)}
+                          decimalPlaces={currencies.data?.find((currency) => currency.code === data.currency)?.decimalPlaces}
+                        />
                         {item.fx ? <p className="text-muted-foreground text-xs">{rateLine(item.fx)}</p> : null}
                       </TableCell>
                     </TableRow>

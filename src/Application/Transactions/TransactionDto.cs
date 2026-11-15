@@ -37,6 +37,27 @@ public sealed class TransactionCashDto
 
     public required Guid CustomerId { get; init; }
 
+    /// <summary><c>Principal</c> or <c>Fee</c> (trade-fees §8.1).</summary>
+    public required string Role { get; init; }
+
+    /// <summary>In the Account currency.</summary>
+    public required decimal Amount { get; init; }
+
+    public required string Currency { get; init; }
+
+    /// <summary>The fee detail on a <c>Fee</c> leg; null on a <c>Principal</c> leg (trade-fees §8.1).</summary>
+    public TransactionFeeDto? Fee { get; init; }
+}
+
+/// <summary>A <c>Fee</c> leg's fee detail. <see cref="Amount"/> is in the quote currency (trade-fees R18).</summary>
+public sealed class TransactionFeeDto
+{
+    public required string Kind { get; init; }
+
+    public Guid? ScheduleId { get; init; }
+
+    public required decimal BasisAmount { get; init; }
+
     public required decimal Amount { get; init; }
 
     public required string Currency { get; init; }

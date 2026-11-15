@@ -12,11 +12,16 @@ public class TransactionCashLeg : BaseAuditableEntity
 
     public int AccountId { get; private set; }
 
+    public CashLegRole Role { get; private set; }
+
     public decimal Amount { get; private set; }
 
     public string Currency { get; private set; } = string.Empty;
 
     public byte[] RowVersion { get; private set; } = null!;
+
+    /// <summary>The fee behind a <see cref="CashLegRole.Fee"/> leg; null on a <see cref="CashLegRole.Principal"/> leg.</summary>
+    public TransactionFeeDetail? FeeDetail { get; private set; }
 
     internal static TransactionCashLeg Create(int tenantId, int accountId, decimal amount, string currency) =>
         new()
@@ -25,5 +30,41 @@ public class TransactionCashLeg : BaseAuditableEntity
             AccountId = accountId,
             Amount = amount,
             Currency = currency
+        };
+
+    /// <summary>The opposite leg for a Reversal: same Account, role and fee detail values (trade-fees R19).</summary>
+    internal TransactionCashLeg ReversalLeg()
+    {
+        if (Role == CashLegRole.Fee && FeeDetail is null)
+        {
+            throw new DomainException("A fee leg needs its fee detail to be reversed.");
+        }
+
+        return new TransactionCashLeg
+        {
+            TenantId = TenantId,
+            AccountId = AccountId,
+            Role = Role,
+            Amount = -Amount,
+            Currency = Currency,
+            FeeDetail = FeeDetail?.Copy()
+        };
+    }
+
+    /// <summary>A <see cref="CashLegRole.Fee"/> leg with its fee detail (trade-fees R18).</summary>
+    internal static TransactionCashLeg CreateFee(
+        int tenantId,
+        int accountId,
+        decimal amount,
+        string currency,
+        TransactionFeeDetail detail) =>
+        new()
+        {
+            TenantId = tenantId,
+            AccountId = accountId,
+            Role = CashLegRole.Fee,
+            Amount = amount,
+            Currency = currency,
+            FeeDetail = detail
         };
 }

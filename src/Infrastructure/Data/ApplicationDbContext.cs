@@ -73,6 +73,12 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<AccountPortfolioAssignment> AccountPortfolioAssignments => Set<AccountPortfolioAssignment>();
 
+    public DbSet<TradeFeeSchedule> TradeFeeSchedules => Set<TradeFeeSchedule>();
+
+    public DbSet<TradeFeeBand> TradeFeeBands => Set<TradeFeeBand>();
+
+    public DbSet<TransactionFeeDetail> TransactionFeeDetails => Set<TransactionFeeDetail>();
+
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     public DbSet<Report> Reports => Set<Report>();

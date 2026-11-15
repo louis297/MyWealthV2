@@ -53,3 +53,12 @@ export function canAccessAdvisers(role: string | null | undefined) {
 export function canAccessProfile(role: string | null | undefined) {
   return role === roles.tenantAdmin || role === roles.adviser;
 }
+
+export function canAccessFees(role: string | null | undefined) {
+  return role === roles.tenantAdmin || role === roles.adviser;
+}
+
+/** fees.manage: create, edit and delete trade fee schedules (adviser-portal-fees F4). */
+export function canManageFees(role: string | null | undefined) {
+  return role === roles.tenantAdmin;
+}

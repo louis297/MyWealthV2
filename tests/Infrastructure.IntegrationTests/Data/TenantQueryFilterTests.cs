@@ -29,7 +29,10 @@ public class TenantQueryFilterTests
         typeof(TransactionCashLeg),
         typeof(TransactionSecurityLeg),
         typeof(TransactionFxDetail),
-        typeof(PortfolioLine)
+        typeof(PortfolioLine),
+        typeof(TradeFeeSchedule),
+        typeof(TradeFeeBand),
+        typeof(TransactionFeeDetail)
     ];
 
     private static readonly Type[] UnfilteredTypes =
@@ -119,7 +122,9 @@ public class TenantQueryFilterTests
 
         foreach (var type in FilteredTypes)
         {
-            db.Model.FindEntityType(type)!.GetDeclaredQueryFilters().ShouldNotBeEmpty($"expected a filter on {type.Name}");
+            var entityType = db.Model.FindEntityType(type);
+            entityType.ShouldNotBeNull($"expected {type.Name} in the model");
+            entityType.GetDeclaredQueryFilters().ShouldNotBeEmpty($"expected a filter on {type.Name}");
         }
 
         foreach (var type in UnfilteredTypes)

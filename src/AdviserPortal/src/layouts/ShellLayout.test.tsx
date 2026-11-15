@@ -101,6 +101,7 @@ describe("ShellLayout", () => {
     expect(screen.getByRole("link", { name: "Profile" })).toHaveAttribute("href", "/profile");
     expect(screen.getByRole("link", { name: "Reports" })).toHaveAttribute("href", "/reports");
     expect(screen.getByRole("link", { name: "Portfolios" })).toHaveAttribute("href", "/portfolios");
+    expect(screen.getByRole("link", { name: "Fees" })).toHaveAttribute("href", "/fees");
     expect(screen.queryByRole("link", { name: /session/i })).not.toBeInTheDocument();
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
@@ -119,6 +120,17 @@ describe("ShellLayout", () => {
     expect(screen.queryByRole("link", { name: "Advisers" })).not.toBeInTheDocument();
   });
 
+  it.each([
+    ["TenantAdmin", "tenantAdmin"],
+    ["Adviser", "adviser"],
+  ] as const)("shows Fees right after Portfolios for %s (adviser-portal-fees F1)", (_label, role) => {
+    renderShell(user({ role }));
+
+    const labels = screen.getAllByRole("link").map((link) => link.textContent);
+    expect(labels.indexOf("Fees")).toBe(labels.indexOf("Portfolios") + 1);
+    expect(screen.getByRole("link", { name: "Fees" })).toHaveAttribute("href", "/fees");
+  });
+
   it("shows no Platform label and no product links for SystemAdmin", () => {
     renderShell(
       user({
@@ -135,6 +147,7 @@ describe("ShellLayout", () => {
     expect(screen.queryByRole("link", { name: "Dashboard" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Customers" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Advisers" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Fees" })).not.toBeInTheDocument();
   });
 
   it("starts end-session when Sign out is clicked", () => {

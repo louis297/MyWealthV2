@@ -72,7 +72,7 @@ public class TransactionsSchemaTests
 
         columns.Select(column => column.Name).ShouldBe([
             "Id", "TransactionId", "Amount", "Currency",
-            "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion", "AccountId", "TenantId"
+            "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion", "AccountId", "TenantId", "Role"
         ]);
 
         Column(columns, "Id").ShouldSatisfyAllConditions(
@@ -178,9 +178,10 @@ public class TransactionsSchemaTests
     public async Task Apply_AddsUniqueKeysAndBookedAtIndex()
     {
         (await UniqueColumns("Transactions")).ShouldContain(("UQ_Transactions_PublicId", "PublicId"));
+        // Trade fees (0030): one Principal leg per (Transaction, Account) is a filtered unique index, not a constraint.
         (await UniqueColumns("TransactionCashLegs")).ShouldBe([
-            ("UQ_TransactionCashLegs_TransactionId_AccountId", "TransactionId"),
-            ("UQ_TransactionCashLegs_TransactionId_AccountId", "AccountId")
+            ("UQ_TransactionCashLegs_TenantId_Id", "TenantId"),
+            ("UQ_TransactionCashLegs_TenantId_Id", "Id")
         ]);
         (await UniqueColumns("IdempotencyRecords")).ShouldBe([
             ("UQ_IdempotencyRecords_TenantId_Key", "TenantId"),

@@ -13,7 +13,16 @@ public class TransactionCashLegConfiguration : IEntityTypeConfiguration<Transact
         builder.Property(leg => leg.Currency).HasColumnType("char(3)").IsFixedLength().HasMaxLength(3).IsRequired();
         builder.Property(leg => leg.CreatedBy).HasMaxLength(450).IsRequired();
         builder.Property(leg => leg.RowVersion).IsRowVersion();
-        builder.HasIndex(leg => new { leg.TransactionId, leg.AccountId }).IsUnique();
+        builder.Property(leg => leg.Role).IsRequired();
+        builder.HasIndex(leg => new { leg.TransactionId, leg.AccountId })
+            .IsUnique()
+            .HasFilter("[Role] = 0")
+            .HasDatabaseName("IX_TransactionCashLegs_TransactionId_AccountId_Principal");
+        builder.HasOne(leg => leg.FeeDetail)
+            .WithOne()
+            .HasForeignKey<TransactionFeeDetail>(detail => detail.CashLegId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_TransactionFeeDetails_TransactionCashLegs_TenantId_CashLegId");
         builder.HasIndex(leg => leg.AccountId).IncludeProperties(leg => leg.Amount);
         builder.HasOne<Account>()
             .WithMany()

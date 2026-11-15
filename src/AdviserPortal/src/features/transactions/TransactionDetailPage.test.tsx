@@ -1,11 +1,12 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { sessionSlice, setCurrentUser, type CurrentUser } from "@/features/session/sessionSlice";
 import { TransactionDetailPage } from "@/features/transactions/TransactionDetailPage";
 import { api } from "@/shared/api/api";
+import { renderFees, stubBrowser, type Handler } from "@/test/fees";
 
 const originalId = "dddddddd-dddd-dddd-dddd-dddddddddddd";
 const reverseId = "99999999-9999-9999-9999-999999999999";
@@ -53,6 +54,11 @@ function user(): CurrentUser {
     adviserId: "ffffffff-ffff-ffff-ffff-ffffffffffff",
     rowVersion: "AAAA",
   };
+}
+
+/** The page also loads the currency catalog for decimal places; mocks that answer every URL skip it. */
+function isCurrencies(input: RequestInfo | URL) {
+  return (input instanceof Request ? input.url : String(input)).includes("/currencies");
 }
 
 function json(body: unknown, status = 200) {
@@ -150,7 +156,7 @@ describe("TransactionDetailPage", () => {
     });
     store.dispatch(setCurrentUser(user()));
 
-    vi.mocked(fetch).mockImplementation(async () => json({
+    vi.mocked(fetch).mockImplementation(async (input) => isCurrencies(input) ? json([]) : json({
       ...original,
       reversedByTransactionId: reverseId,
     }));
@@ -182,7 +188,7 @@ describe("TransactionDetailPage", () => {
     });
     store.dispatch(setCurrentUser(user()));
 
-    vi.mocked(fetch).mockImplementation(async () => json({
+    vi.mocked(fetch).mockImplementation(async (input) => isCurrencies(input) ? json([]) : json({
       ...original,
       id: reverseId,
       type: "Reversal",
@@ -263,6 +269,9 @@ describe("TransactionDetailPage", () => {
     store.dispatch(setCurrentUser(user()));
     vi.mocked(fetch).mockImplementation(async (input, init) => {
       const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+      if (isCurrencies(input)) {
+        return json([]);
+      }
       if (method === "POST") {
         return json({
           status: 400,
@@ -301,6 +310,9 @@ describe("TransactionDetailPage", () => {
     store.dispatch(setCurrentUser(user()));
     vi.mocked(fetch).mockImplementation(async (input, init) => {
       const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+      if (isCurrencies(input)) {
+        return json([]);
+      }
       if (method === "POST") {
         return json({
           status: 400,
@@ -332,5 +344,86 @@ describe("TransactionDetailPage", () => {
     expect(screen.getByText(originalId)).toBeInTheDocument();
     expect(screen.queryByText(reverseId)).not.toBeInTheDocument();
     expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+});
+
+describe("TransactionDetailPage cash legs (adviser-portal-fees F13)", () => {
+  const accountId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+  const customerId = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+  const scheduleId = "abababab-abab-abab-abab-abababababab";
+  const path = `/transactions/${originalId}`;
+  const routes = [{ path: "/transactions/:id", element: <TransactionDetailPage /> }];
+
+  function serve(cash: unknown[]): Handler {
+    return (request) =>
+      request.method === "GET" && request.url.endsWith(path) ? json({ ...original, cash }) : undefined;
+  }
+
+  beforeEach(() => {
+    stubBrowser(path);
+  });
+
+  it("lists each visible cash leg with its account, role, amount and currency", async () => {
+    renderFees(
+      user(),
+      routes,
+      path,
+      serve([{ accountId, customerId, role: "Principal", amount: -1250, currency: "NZD", fee: null }]),
+    );
+
+    const legs = within(await screen.findByRole("table", { name: "Cash legs" }));
+    const row = within(legs.getByText("Principal").closest("tr") as HTMLElement);
+    expect(row.getByRole("link", { name: accountId })).toHaveAttribute("href", `/accounts/${accountId}`);
+    expect(row.getByText("-1,250.00")).toBeInTheDocument();
+    expect(row.getByText("NZD")).toBeInTheDocument();
+    expect(screen.queryByText(/Brokerage/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "View schedule" })).not.toBeInTheDocument();
+  });
+
+  it("shows a Fee leg's fee below its amount with a link to the schedule", async () => {
+    renderFees(
+      user(),
+      routes,
+      path,
+      serve([
+        { accountId, customerId, role: "Principal", amount: -1250, currency: "NZD", fee: null },
+        {
+          accountId,
+          customerId,
+          role: "Fee",
+          amount: -16.92,
+          currency: "NZD",
+          fee: { kind: "Brokerage", scheduleId, basisAmount: 1250, amount: 10, currency: "USD" },
+        },
+      ]),
+    );
+
+    const legs = within(await screen.findByRole("table", { name: "Cash legs" }));
+    const row = within(legs.getByText("Fee").closest("tr") as HTMLElement);
+    expect(row.getByText("-16.92")).toBeInTheDocument();
+    expect(row.getByText("Brokerage 10.00 USD on 1,250.00 USD")).toBeInTheDocument();
+    expect(row.getByRole("link", { name: "View schedule" })).toHaveAttribute("href", `/fees/trade/${scheduleId}`);
+  });
+
+  it("shows a fee without a schedule link when the fee has no schedule", async () => {
+    renderFees(
+      user(),
+      routes,
+      path,
+      serve([
+        {
+          accountId,
+          customerId,
+          role: "Fee",
+          amount: -10,
+          currency: "NZD",
+          fee: { kind: "Brokerage", scheduleId: null, basisAmount: 1250, amount: 10, currency: "NZD" },
+        },
+      ]),
+    );
+
+    const legs = within(await screen.findByRole("table", { name: "Cash legs" }));
+    expect(legs.getByText("Brokerage 10.00 NZD on 1,250.00 NZD")).toBeInTheDocument();
+    expect(legs.queryByRole("link", { name: "View schedule" })).not.toBeInTheDocument();
   });
 });

@@ -82,26 +82,90 @@ public static class RebalancePlanner
         // before an underweight buy, or the buy fails while the balance is temporarily negative.
         trades = trades.Where(trade => !trade.Buy).Concat(trades.Where(trade => trade.Buy)).ToList();
 
-        var cash = input.Cash;
-        foreach (var trade in trades)
+        // Fees come out of the cash residual first (trade-fees R26). A shortfall scales every buy by one factor k,
+        // the largest in [0, 1) that keeps planned cash ≥ 0, found by bisection (R27).
+        var sells = trades.Where(trade => !trade.Buy).ToList();
+        var buys = trades.Where(trade => trade.Buy).ToList();
+        if (PlannedCash(input, sells, buys, 1m) < 0m)
         {
-            cash += trade.Buy
-                ? -RoundMoney(RoundMoney(trade.Quantity * trade.Price) * trade.QuoteToAccount)
-                : RoundMoney(trade.Quantity * trade.Price * trade.QuoteToAccount);
-        }
+            var atZero = PlannedCash(input, sells, buys, 0m);
+            if (atZero < 0m)
+            {
+                var accountShortfall = -atZero;
+                var baseShortfall = accountShortfall * Rate(input.AccountCurrency, input.BaseCurrency, input.AccountToBase);
+                var quote = trades.Last().QuoteCurrency;
+                return Fail(
+                    "insufficient_cash",
+                    $"Shortfall {baseShortfall:0.00} {input.BaseCurrency} ({accountShortfall:0.00} {input.AccountCurrency}) quote {quote}.");
+            }
 
-        if (cash < 0m)
-        {
-            var accountShortfall = -cash;
-            var baseShortfall = accountShortfall * Rate(input.AccountCurrency, input.BaseCurrency, input.AccountToBase);
-            var quote = trades.Last(trade => trade.Buy).QuoteCurrency;
-            return Fail(
-                "insufficient_cash",
-                $"Shortfall {baseShortfall:0.00} {input.BaseCurrency} ({accountShortfall:0.00} {input.AccountCurrency}) quote {quote}.");
+            var lo = 0m;
+            var hi = 1m;
+            for (var step = 0; step < 40; step++)
+            {
+                var mid = (lo + hi) / 2m;
+                if (PlannedCash(input, sells, buys, mid) >= 0m)
+                {
+                    lo = mid;
+                }
+                else
+                {
+                    hi = mid;
+                }
+            }
+
+            // A scaled buy of zero, or below the minimum trade in base currency, is dropped (R28).
+            var toBase = targets.ToDictionary(target => target.InstrumentId, target => target.ToBase);
+            var scaled = buys
+                .Select(trade => trade with { Quantity = Scale(trade.Quantity, lo) })
+                .Where(trade => trade.Quantity > 0m
+                                && trade.Quantity * trade.Price * toBase[trade.InstrumentId] >= input.MinimumTrade)
+                .ToList();
+            trades = sells.Concat(scaled).ToList();
+            if (trades.Count == 0)
+            {
+                return new RebalancePlan(RebalanceStatus.NoChange, null, null, []);
+            }
         }
 
         return new RebalancePlan(RebalanceStatus.Success, null, null, trades);
     }
+
+    /// <summary>Cash after every sell and every buy scaled by <paramref name="k"/>, fees included (R26, R27).</summary>
+    private static decimal PlannedCash(
+        RebalanceInput input,
+        IReadOnlyList<RebalanceTrade> sells,
+        IReadOnlyList<RebalanceTrade> buys,
+        decimal k)
+    {
+        var cash = input.Cash;
+        foreach (var sell in sells)
+        {
+            cash += Cash(input, sell, sell.Quantity);
+        }
+
+        foreach (var buy in buys)
+        {
+            var quantity = Scale(buy.Quantity, k);
+            if (quantity > 0m)
+            {
+                cash += Cash(input, buy, quantity);
+            }
+        }
+
+        return cash;
+    }
+
+    private static decimal Cash(RebalanceInput input, RebalanceTrade trade, decimal quantity)
+    {
+        PlannerFeeSchedule? fee = null;
+        input.FeeSchedules?.TryGetValue(trade.QuoteCurrency, out fee);
+        return Transaction.TradeCash(
+            trade.Buy, quantity, trade.Price, trade.QuoteCurrency, trade.QuoteToAccount, fee?.Schedule, fee?.DecimalPlaces ?? 2);
+    }
+
+    private static decimal Scale(decimal quantity, decimal k) =>
+        decimal.Round(k * quantity, 8, MidpointRounding.AwayFromZero);
 
     private static RebalancePlan? QuoteProblem(
         string symbol,
@@ -191,7 +255,11 @@ public sealed record RebalanceInput(
     decimal MinimumTrade,
     decimal CashResidualPercent,
     IReadOnlyList<PlannerHolding> Holdings,
-    IReadOnlyList<PlannerTarget> Targets);
+    IReadOnlyList<PlannerTarget> Targets,
+    IReadOnlyDictionary<string, PlannerFeeSchedule>? FeeSchedules = null);
+
+/// <summary>The trade fee schedule that applies on the rebalance's UTC date for one quote currency (trade-fees R25).</summary>
+public sealed record PlannerFeeSchedule(TradeFeeSchedule Schedule, int DecimalPlaces);
 
 public sealed record PlannerHolding(
     int InstrumentId,

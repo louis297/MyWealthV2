@@ -207,6 +207,11 @@ export function CreateTransactionPage() {
                       onChange={(event) => setQuantity(event.target.value)}
                       required
                     />
+                    {type === "Buy" || type === "Sell" ? (
+                      <p className="text-sm text-muted-foreground">
+                        Brokerage is added by the server from the trade fee schedule.
+                      </p>
+                    ) : null}
                     {type === "StockIn" ? (
                       <TextField
                         id="transaction-cost"

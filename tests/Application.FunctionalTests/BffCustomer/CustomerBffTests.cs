@@ -110,6 +110,8 @@ public class CustomerBffTests : TestBase
         (await _bff.GetAsync("/api/tenants")).StatusCode.ShouldBe(HttpStatusCode.NotFound);
         (await _bff.GetAsync("/api/reports/schedules")).StatusCode.ShouldBe(HttpStatusCode.NotFound);
         (await _bff.GetAsync("/api/currencies")).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        // Customer has no fee permission; the Customer Portal BFF does not add /fees (bff-adviser-portal amendment 2026-11-15).
+        (await _bff.GetAsync("/api/fees/trade-schedules")).StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
     [Test]
