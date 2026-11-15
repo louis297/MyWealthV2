@@ -7,6 +7,7 @@ import {
   LandmarkIcon,
   LayoutDashboardIcon,
   LogOutIcon,
+  ReceiptIcon,
   UserRoundCogIcon,
   UserRoundIcon,
   UsersIcon,
@@ -39,6 +40,7 @@ import {
   canAccessTransactions,
   canAccessCustomers,
   canAccessDashboard,
+  canAccessFees,
   canAccessPortfolios,
   canAccessProfile,
   canAccessReports,
@@ -77,6 +79,12 @@ export function ShellLayout({ children }: { children?: ReactNode }) {
       label: "Portfolios",
       icon: BriefcaseIcon,
       visible: canAccessPortfolios(role),
+    },
+    {
+      to: "/fees",
+      label: "Fees",
+      icon: ReceiptIcon,
+      visible: canAccessFees(role),
     },
     {
       to: "/accounts",

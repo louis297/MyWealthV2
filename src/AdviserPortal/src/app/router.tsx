@@ -1,4 +1,4 @@
-import { createBrowserRouter, type RouteObject } from "react-router";
+import { createBrowserRouter, Navigate, type RouteObject } from "react-router";
 import { AdviserDetailPage } from "@/features/advisers/AdviserDetailPage";
 import { AdvisersListPage } from "@/features/advisers/AdvisersListPage";
 import { CreateAdviserPage } from "@/features/advisers/CreateAdviserPage";
@@ -11,6 +11,10 @@ import { CustomerDetailPage } from "@/features/customers/CustomerDetailPage";
 import { CustomersListPage } from "@/features/customers/CustomersListPage";
 import { EditCustomerPage } from "@/features/customers/EditCustomerPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
+import { CreateTradeSchedulePage } from "@/features/fees/CreateTradeSchedulePage";
+import { EditTradeSchedulePage } from "@/features/fees/EditTradeSchedulePage";
+import { FeesTradePage } from "@/features/fees/FeesTradePage";
+import { TradeScheduleDetailPage } from "@/features/fees/TradeScheduleDetailPage";
 import { CreatePortfolioPage } from "@/features/portfolios/CreatePortfolioPage";
 import { PortfolioDetailPage } from "@/features/portfolios/PortfolioDetailPage";
 import { PortfoliosListPage } from "@/features/portfolios/PortfoliosListPage";
@@ -54,6 +58,22 @@ export const appRoutes: RouteObject[] = [
               { index: true, element: <PortfoliosListPage /> },
               { path: "new", element: <CreatePortfolioPage /> },
               { path: ":id", element: <PortfolioDetailPage /> },
+            ],
+          },
+          {
+            path: "/fees",
+            element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
+            children: [
+              { index: true, element: <Navigate to="/fees/trade" replace /> },
+              { path: "trade", element: <FeesTradePage /> },
+              { path: "trade/:id", element: <TradeScheduleDetailPage /> },
+              {
+                element: <RoleGate allow={[roles.tenantAdmin]} />,
+                children: [
+                  { path: "trade/new", element: <CreateTradeSchedulePage /> },
+                  { path: "trade/:id/edit", element: <EditTradeSchedulePage /> },
+                ],
+              },
             ],
           },
           { path: "/session", element: <SessionProbePage /> },
