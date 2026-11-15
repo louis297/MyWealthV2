@@ -49,7 +49,7 @@ A TenantAdmin or Adviser moves cash from one Open Account to another Open Accoun
 **Out**
 
 - Cross-tenant transfer. A movement across tenants stays two unlinked Transactions: `TransferOut` in one tenant, `TransferIn` in the other (leg-accounts §13, posting R18)
-- Cross-currency transfer (see [future-plans.md](../future-plans.md) §2)
+- Cross-currency transfer (see [future-plans.md](../future-plans.md) §3)
 - In-kind transfer (security legs on two Accounts)
 - Fees on a transfer
 - A counterparty field on the transaction item
@@ -57,7 +57,7 @@ A TenantAdmin or Adviser moves cash from one Open Account to another Open Accoun
 - Automatic rebalance after a transfer
 - Customer-initiated transfer (Customer has no ledger write)
 - Account search that matches Customer name, and `currency` / `status` filters on `GET /accounts` (later; §9)
-- Moving existing types to their own create routes (api-design §7.7 convention; see [future-plans.md](../future-plans.md) §3)
+- Moving existing types to their own create routes (api-design §7.7 convention; see [future-plans.md](../future-plans.md) §4)
 
 ---
 

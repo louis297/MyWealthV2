@@ -7,6 +7,10 @@ updated: 2026-11-15
 related:
   - README.md
   - function-plan.md
+  - features/posting.md
+  - features/buy-sell.md
+  - features/leg-accounts.md
+  - features/instrument-prices.md
   - features/portfolios.md
   - features/fx-rates.md
   - features/internal-transfers.md
@@ -21,13 +25,55 @@ related:
 
 # Future plans
 
-A reminder list of large directions the product may take. This file is not a build contract, not a backlog, and not a priority order. Do not implement, create tables, or create routes from anything here. Each item needs its own discussion and Feature Spec before any work starts.
+A reminder list of large directions the product may take. This file is not a build contract and not a backlog. Only §1 gives an order, and that order is for discussion, not implementation. Do not implement, create tables, or create routes from anything here. Each item needs its own discussion and Feature Spec before any work starts.
 
 Names used here are working descriptions. They are not glossary terms until a spec adopts them.
 
 ---
 
-## 1. Automatic rebalance
+## 1. Business domain roadmap
+
+Decided in discussion (2026-11-15): pause new technical infrastructure and move to the business side of the wealth platform. MyWealthV2 stays a learning project. The goal is finance domain knowledge for a developer, shown by reports that follow real rules, not a release.
+
+Scope of the direction:
+
+- **Jurisdiction:** New Zealand. Rule sources are IRD guidance, the FMA and the GIPS standards. Each tax rule is checked against the primary source when its spec is written. This note does not settle any rate or threshold.
+- **Focus:** algorithmic topics first, where published worked examples can become tests. Content-type reports (what a client statement must contain, adviser conduct duties) come later.
+- **Not the main line:** a general ledger. A one-off exercise that maps existing postings to debit and credit entries and a trial balance may check that the ledger is consistent. It does not add a GL module.
+
+Fees are split into two topics at different points of the order:
+
+- **Transaction fee:** an extra cash leg on a Transaction (brokerage on a trade, FX spread, transfer fee). It only depends on posting.
+- **Advisory fee:** computed over a period from account value, then posted as its own Transaction. It depends on historical valuation.
+
+Order. Each step depends only on earlier steps:
+
+| Step | Topic | Why here | Depends on |
+| --- | --- | --- | --- |
+| 1 | Transaction fee leg | Changes the posting leg shape. Income events add similar deduction legs, so the shape is settled first. Closes the fee work deferred in buy-sell, fx-conversions, internal-transfers and leg-accounts. | posting, buy-sell |
+| 2 | Income events | Dividend and interest, with imputation credit, RWT and foreign withholding tax. Every tax report needs them. Foreign-currency dividends need an answer from §5 or automatic FX. | Step 1 |
+| 3 | Historical valuation | Prices and FX rates as of a date, and holding snapshots. Every period report needs them. Closes the open daily snapshots in [function-plan.md](function-plan.md) §5.4. | instrument-prices, fx-rates |
+| 4 | Advisory fee | Tiered or blended rates, daily accrual, pro rata for part periods, billing in advance or in arrears, and what happens when cash is short. | Step 3 |
+| 5 | Performance report | Time-weighted return (TWR) and money-weighted return (MWR), gross and net of fees. | Steps 3, 4 |
+| 6 | FIF tax report | Main goal. FDR and CV methods, the de minimis test, the quick sale adjustment, exempt ASX-listed shares, and the NZ tax year (1 April to 31 March). FIF reports published by NZ investment platforms can serve as test oracles. | Steps 2, 3 |
+
+Working method: work each topic out by hand in a spreadsheet with a real or synthetic data set before its spec is written. The worked numbers become the tests.
+
+Questions to settle when step 1 opens:
+
+- Which leg carries the fee, and in which currency.
+- Whether a trade fee adds to the holding cost.
+- How a reversal treats the fee.
+
+To check against IRD when the related step opens:
+
+- Whether brokerage is part of the cost base, and how the CV method treats it (steps 1, 6).
+- GST on advisory fees (step 4).
+- Whether individuals can deduct advisory fees (steps 4, 6).
+
+---
+
+## 2. Automatic rebalance
 
 Rebalance assigned accounts without an Adviser clicking Rebalance.
 
@@ -42,7 +88,7 @@ Questions to settle when this opens:
 
 ---
 
-## 2. FX conversion trades
+## 3. FX conversion trades
 
 Moved to a Feature Spec: [features/fx-conversions.md](features/fx-conversions.md) (`draft`). Decided in discussion (2026-11-10):
 
@@ -52,7 +98,7 @@ Moved to a Feature Spec: [features/fx-conversions.md](features/fx-conversions.md
 
 ---
 
-## 3. Type-specific transaction create routes
+## 4. Type-specific transaction create routes
 
 Move existing types from `POST /transactions` to their own `POST /transactions/{action}` routes, so each create body is small and has no type-dependent field rules.
 
@@ -67,7 +113,7 @@ Questions to settle when a move opens:
 
 ---
 
-## 4. Multi-currency cash in one Account
+## 5. Multi-currency cash in one Account
 
 Hold cash in more than one currency inside one Account, for example keeping a USD dividend in USD inside an NZD brokerage Account.
 
@@ -84,7 +130,7 @@ Questions to settle when this opens:
 
 ---
 
-## 5. Demo data for visitors
+## 6. Demo data for visitors
 
 Let visitors of the public showcase try the portals without an invitation.
 
@@ -104,7 +150,7 @@ Questions to settle when this opens:
 
 ---
 
-## 6. Adviser mobile app
+## 7. Adviser mobile app
 
 A native mobile app for Advisers, built with React Native (Expo), next to the Adviser Portal web app.
 
@@ -126,7 +172,7 @@ Sign-in shape (needs a new ADR next to ADR 0016):
 Questions to settle when this opens:
 
 - Whether a responsive web portal or a PWA is enough. A native app is worth it only for push notifications, biometric unlock, offline use or a store listing.
-- API compatibility: old app versions stay installed, so breaking `webapi` changes need a support window or versioning. This affects §3 (moving types off `POST /transactions`).
+- API compatibility: old app versions stay installed, so breaking `webapi` changes need a support window or versioning. This affects §4 (moving types off `POST /transactions`).
 - Which pages the first release has, and which roles may use the client.
 - Report download: today it uses the BFF cookie and a browser `Blob`. The app needs a Bearer download and the system share sheet.
 - Local development: a device or emulator reaching `identity` over https.

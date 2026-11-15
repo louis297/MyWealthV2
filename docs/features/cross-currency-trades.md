@@ -45,7 +45,7 @@ A manual trade that adds a holding must be in the Account's currency; to buy a U
 
 **Out**
 
-- Multi-currency cash in one Account ([future-plans.md](../future-plans.md) §4)
+- Multi-currency cash in one Account ([future-plans.md](../future-plans.md) §5)
 - Back-filling FX details on posted `Buy` / `Sell`
 - A quote route for `Buy` / `Sell`
 - Fee or spread
@@ -181,7 +181,7 @@ No new ADR.
 Still open, not this slice:
 
 - Whether `Account.Currency` must equal the portfolio `BaseCurrency` on assign (not required today).
-- Foreign-currency dividends ([future-plans.md](../future-plans.md) §4).
+- Foreign-currency dividends ([future-plans.md](../future-plans.md) §5).
 
 ---
 
