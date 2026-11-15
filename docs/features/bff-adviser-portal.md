@@ -337,9 +337,7 @@ This amendment is required for the Adviser Portal portfolios cut (`adviser-porta
 
 ---
 
-## Amendment 2026-11-15 (fees prefix) — draft
-
-Status of this amendment: `draft`. Accept it together with [adviser-portal-fees.md](../adviser-portal/adviser-portal-fees.md).
+## Amendment 2026-11-15 (fees prefix) — accepted
 
 Add `/fees` to the BFF prefix allow-list so the Adviser Portal can call the fee routes of [trade-fees.md](trade-fees.md) through `/api`.
 

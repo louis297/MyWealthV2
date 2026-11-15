@@ -376,9 +376,9 @@ The repository should build after each commit. Agents split each line into red t
 
 ---
 
-## Amendment 2026-11-15 (fee preview) — draft
+## Amendment 2026-11-15 (fee preview) — accepted
 
-Status of this amendment: `draft`. The rest of this file stays accepted. It adds a read-only route that computes trade fees for a schedule that is not saved, so the Adviser Portal form can show the fee without repeating R8 in TypeScript ([adviser-portal-fees.md](../adviser-portal/adviser-portal-fees.md)). Same pattern as `POST /transactions/fx/quote`: a POST that computes and writes nothing.
+The rest of this file stays accepted. It adds a read-only route that computes trade fees for a schedule that is not saved, so the Adviser Portal form can show the fee without repeating R8 in TypeScript ([adviser-portal-fees.md](../adviser-portal/adviser-portal-fees.md)). Same pattern as `POST /transactions/fx/quote`: a POST that computes and writes nothing.
 
 | ID | Rule |
 | --- | --- |

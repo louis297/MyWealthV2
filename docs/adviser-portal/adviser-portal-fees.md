@@ -1,6 +1,6 @@
 ---
 title: Adviser Portal — Fees
-status: draft
+status: accepted
 phase: 2
 language: en
 created: 2026-11-15
