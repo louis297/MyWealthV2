@@ -404,4 +404,26 @@ describe("TransactionDetailPage cash legs (adviser-portal-fees F13)", () => {
     expect(row.getByText("Brokerage 10.00 USD on 1,250.00 USD")).toBeInTheDocument();
     expect(row.getByRole("link", { name: "View schedule" })).toHaveAttribute("href", `/fees/trade/${scheduleId}`);
   });
+
+  it("shows a fee without a schedule link when the fee has no schedule", async () => {
+    renderFees(
+      user(),
+      routes,
+      path,
+      serve([
+        {
+          accountId,
+          customerId,
+          role: "Fee",
+          amount: -10,
+          currency: "NZD",
+          fee: { kind: "Brokerage", scheduleId: null, basisAmount: 1250, amount: 10, currency: "NZD" },
+        },
+      ]),
+    );
+
+    const legs = within(await screen.findByRole("table", { name: "Cash legs" }));
+    expect(legs.getByText("Brokerage 10.00 NZD on 1,250.00 NZD")).toBeInTheDocument();
+    expect(legs.queryByRole("link", { name: "View schedule" })).not.toBeInTheDocument();
+  });
 });
