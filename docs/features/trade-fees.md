@@ -25,7 +25,7 @@ related:
 
 # Trade fees
 
-Amendment to [buy-sell.md](buy-sell.md), [posting.md](posting.md), [holdings.md](holdings.md), [leg-accounts.md](leg-accounts.md), [portfolios.md](portfolios.md) and [reports.md](reports.md) on `webapi`. It adds a tenant **trade fee schedule** per quote currency (marginal fee bands, a minimum and an optional cap, effective-dated) and a server-computed **trade fee** on every `Buy` / `Sell`, booked as a second cash leg with role `Fee`. New resource `/trade-fee-schedules`, new policies `fees.read` / `fees.manage`, script `0030_trade_fees.sql`. Portfolio rebalance becomes fee-aware.
+Amendment to [buy-sell.md](buy-sell.md), [posting.md](posting.md), [holdings.md](holdings.md), [leg-accounts.md](leg-accounts.md), [portfolios.md](portfolios.md) and [reports.md](reports.md) on `webapi`. It adds a tenant **trade fee schedule** per quote currency (marginal fee bands, a minimum and an optional cap, effective-dated) and a server-computed **trade fee** on every `Buy` / `Sell`, booked as a second cash leg with role `Fee` and fee kind `Brokerage`. New resource `/fees/trade-schedules` under a new `/fees` namespace, new policies `fees.read` / `fees.manage`, script `0030_trade_fees.sql`. Portfolio rebalance becomes fee-aware.
 
 This is step 1 of the business domain roadmap ([future-plans.md](../future-plans.md) §1). Decisions from discussion on 2026-11-15.
 
@@ -41,9 +41,9 @@ A TenantAdmin sets, per quote currency, a trade fee schedule: marginal bands of 
 
 **In**
 
-- Domain: `CashLegRole` (`Principal`, `Fee`) on `TransactionCashLeg`. `TradeFeeSchedule` aggregate with `FeeBands` value object and the fee calculation (R8). `TransactionFeeDetail` entity. `PostBuy` / `PostSell` take the applicable schedule and add the fee leg and detail. `Reverse` copies the role and the fee detail.
+- Domain: `CashLegRole` (`Principal`, `Fee`) on `TransactionCashLeg`. `FeeKind` (`Brokerage`). `TradeFeeSchedule` aggregate with `FeeBands` value object and the fee calculation (R8). `TransactionFeeDetail` entity, one per `Fee` leg. `PostBuy` / `PostSell` take the applicable schedule and add the fee leg and detail. `Reverse` copies the role and the fee detail.
 - Application: create / update / delete / list / get of trade fee schedules. `CreateTransaction` looks up the applicable schedule for `Buy` / `Sell`. Rebalance planner reads schedules and scales buys (R26–R29).
-- HTTP: `/trade-fee-schedules`. Transaction item: `role` on every cash leg, `fee` object on the item.
+- HTTP: `/fees/trade-schedules`. Transaction item: `role` on every cash leg, `fee` object on every `Fee` leg.
 - Reports: Customer Transactions Report shows the net cash and the fee (R22).
 - Policies `fees.read` / `fees.manage`.
 - Script `0030_trade_fees.sql`.
@@ -52,10 +52,12 @@ A TenantAdmin sets, per quote currency, a trade fee schedule: marginal bands of 
 **Out**
 
 - A standalone `Fee` transaction type (cancellation fee, withdrawal fee, securities transfer-out fee, advisory fee). Designed with roadmap step 4.
+- Fee kinds other than `Brokerage` (FX fee, exchange fee, advisory fee and others). The shape allows them (R18); each needs its own spec.
 - Fees on any other type: `TransferIn`, `TransferOut`, `InternalTransfer`, `FxConversion` (no spread, no FX fee), `StockIn`, `StockOut`, `OpeningHoldings`, `Split`, `Bonus`, `Scrip`, cash `Opening`, `Interest`, `CloseOut`.
 - Volume-based fee tiers (rate depends on traded volume over a period).
 - Client-supplied fee amounts or a per-trade fee override.
-- Platform default schedules inherited by tenants. Per-Customer or per-portfolio negotiated rates.
+- Platform default schedules inherited by tenants.
+- Per-Customer, per-Account or per-portfolio rates for trade fees (decided 2026-11-15: brokerage is agreed per firm, not per model portfolio). Which schedule applies to which Account is a roadmap step 4 question for advisory fees.
 - GST on fees.
 - Realized gain reports. Lots.
 - Order lifecycle (placed, filled, cancelled, settled).
@@ -107,14 +109,14 @@ A TenantAdmin sets, per quote currency, a trade fee schedule: marginal bands of 
 
 | ID | Rule |
 | --- | --- |
-| R14 | Every `Buy` / `Sell`, from `POST /transactions` or from rebalance, looks up the applicable schedule (R7). When one exists and `fee > 0`, the Transaction gets one cash leg with role `Fee` on the same Account as the principal cash leg, and one fee detail (R18). When there is no schedule or `fee = 0`, it gets neither. The create body does not change; a `fee` field in it → 400. |
+| R14 | Every `Buy` / `Sell`, from `POST /transactions` or from rebalance, looks up the applicable schedule (R7). When one exists and `fee > 0`, the Transaction gets one cash leg with role `Fee` on the same Account as the principal cash leg, with a fee detail of kind `Brokerage` (R18). When there is no schedule or `fee = 0`, it gets neither. At most one `Brokerage` fee per Transaction. The create body does not change; a `fee` field in it → 400. |
 | R15 | The principal cash leg keeps role `Principal` and today's amount ([buy-sell.md](buy-sell.md) R12). The fee cash leg is `−Round(fee × rate)` in the Account currency, with the same rate and the same rounding as the principal leg: 4 decimals today, the Account currency's `DecimalPlaces` once [cross-currency-trades.md](cross-currency-trades.md) R9 is accepted. Same currency → rate 1. The fee leg is negative on both `Buy` and `Sell`. |
 | R16 | **Cost.** `Buy` security-leg cost = `gross + fee` in the quote currency. `Sell` release is unchanged ([buy-sell.md](buy-sell.md) R15); the fee only reduces cash. |
 | R17 | **Cash check.** Cash `SUM` after all legs `≥ 0` ([buy-sell.md](buy-sell.md) R13). A `Sell` whose fee exceeds its principal is allowed when the check holds. |
-| R18 | **Fee detail.** One `TransactionFeeDetails` row per Transaction with a fee leg: the schedule used, `gross`, `fee` and the quote currency. Written in the same unit of work. Never updated. |
-| R19 | **Reverse.** Reverse of a `Buy` / `Sell` copies every cash leg with its role and the opposite amount, and copies the fee detail. The schedule is not read again; the fee is refunded in full. A broker charge for cancelling a trade is a standalone fee (out of scope). |
+| R18 | **Fee detail.** Every `Fee` cash leg has exactly one `TransactionFeeDetails` row, and no other leg has one: fee kind, the schedule used, the basis amount (`gross` for `Brokerage`), `fee` and the quote currency. At most one fee per `(Transaction, kind)`. A `Principal` leg stays at most one per `(Transaction, Account)`. Written in the same unit of work. Never updated. A Transaction may carry several `Fee` legs of different kinds; this slice only creates `Brokerage`. |
+| R19 | **Reverse.** Reverse of a `Buy` / `Sell` copies every cash leg with its role and the opposite amount, and copies each `Fee` leg's fee detail onto the matching new leg. The schedule is not read again; the fee is refunded in full. A broker charge for cancelling a trade is a standalone fee (out of scope). |
 | R20 | **Other types** never have a `Fee` leg. The Domain refuses it. |
-| R21 | **Existing rows.** Posted cash legs become role `Principal`. Posted `Buy` / `Sell` have no fee detail and show `fee: null`. No back-fill of fees. |
+| R21 | **Existing rows.** Posted cash legs become role `Principal`. Posted `Buy` / `Sell` have no `Fee` leg. No back-fill of fees. |
 
 ### 4.4 Readers
 
@@ -141,17 +143,18 @@ A TenantAdmin sets, per quote currency, a trade fee schedule: marginal bands of 
 | Type | Kind | Notes |
 | --- | --- | --- |
 | `CashLegRole` | Enum | `Principal` = 0, `Fee` = 1. |
-| `TransactionCashLeg` | Entity (existing) | Adds `Role`. At most one per `(Transaction, Account, Role)`. |
+| `TransactionCashLeg` | Entity (existing) | Adds `Role`. `Principal`: at most one per `(Transaction, Account)`. `Fee`: carries one `TransactionFeeDetail`. |
+| `FeeKind` | Enum | `Brokerage` = 0. Later kinds are added by their own specs. |
 | `TradeFeeSchedule` | Aggregate | Tenant, quote currency (immutable), `EffectiveFrom`, `Minimum`, `Cap`, `FeeBands`. `FeeFor(gross, decimalPlaces)` implements R8. Update and delete take the cut-off date and refuse a row in effect. |
 | `FeeBands` | Value object | Ordered `(From, RatePercent)` pairs; R5 shape. `Apply(amount)` returns the banded amount. Written to be reused by advisory fees (roadmap step 4). |
-| `TransactionFeeDetail` | Entity | 0..1 per Transaction. Schedule id, gross, fee, currency. Copied to a Reversal. |
+| `TransactionFeeDetail` | Entity | Exactly one per `Fee` cash leg. Kind, schedule id, basis amount, fee, currency. At most one per `(Transaction, kind)`. Copied to a Reversal's matching leg. |
 | `Transaction` | Aggregate (existing) | `PostBuy` / `PostSell` take an optional `TradeFeeSchedule` and the quote currency's decimal places. `Reverse` copies roles and the fee detail. |
 
 Invariants:
 
-- A Transaction has a `Fee` cash leg if and only if it has a fee detail, and only on `Buy`, `Sell`, or a Reversal of one.
-- Fee detail `fee` converted with the trade's rate (R15) equals the opposite of the `Fee` leg amount.
-- On a `Buy`, security-leg cost = fee detail `gross + fee`.
+- A cash leg has a fee detail if and only if its role is `Fee`. In this slice `Fee` legs appear only on `Buy`, `Sell`, or a Reversal of one.
+- A fee detail's `fee` converted with the trade's rate (R15) equals the opposite of its leg's amount.
+- On a `Buy`, security-leg cost = `Brokerage` basis amount + fee.
 - A posted schedule row in effect never changes (R12).
 
 Domain events: existing `TransactionPosted` / `TransactionReversed`. No schedule events.
@@ -164,12 +167,12 @@ Update [domain-model.md](../domain-model.md) when this spec is accepted.
 
 | Table | Change | Index / FK |
 | --- | --- | --- |
-| `TransactionCashLegs` | alter: add `Role int NOT NULL` default 0, CHECK 0–1 | Drop `UQ_TransactionCashLegs_TransactionId_AccountId`; add `UQ_TransactionCashLegs_TransactionId_AccountId_Role` |
+| `TransactionCashLegs` | alter: add `Role int NOT NULL` default 0, CHECK 0–1 | Drop `UQ_TransactionCashLegs_TransactionId_AccountId`; add filtered unique index `(TransactionId, AccountId) WHERE Role = 0`; add UQ `(TenantId, Id)` for the fee detail FK |
 | `TradeFeeSchedules` | add: `Id`, `PublicId`, `TenantId`, `QuoteCurrency char(3)`, `EffectiveFrom date`, `MinimumAmount decimal(18,4)`, `CapAmount decimal(18,4) NULL`, audit columns, `RowVersion` | UQ `PublicId`; UQ `(TenantId, QuoteCurrency, EffectiveFrom)`; FK Tenants, Currencies; CHECK minimum `≥ 0`; CHECK cap null or (`> 0` and `≥` minimum) |
 | `TradeFeeBands` | add: `Id`, `TenantId`, `TradeFeeScheduleId`, `FromAmount decimal(18,4)`, `RatePercent decimal(7,4)` | UQ `(TradeFeeScheduleId, FromAmount)`; FK `(TenantId, TradeFeeScheduleId)` → schedule, as in `0028_tenant_composite_keys.sql`; CHECK from `≥ 0`; CHECK rate 0–100 |
-| `TransactionFeeDetails` | add: `TransactionId` (PK), `TenantId`, `TradeFeeScheduleId`, `GrossAmount decimal(18,4)`, `FeeAmount decimal(18,4)`, `Currency char(3)` | FK `(TenantId, TransactionId)` → Transactions; FK schedule (RESTRICT); FK Currencies; CHECK gross `> 0`, fee `> 0`. No `PublicId`, no `RowVersion` (part of an immutable Transaction, like `TransactionFxDetails`) |
+| `TransactionFeeDetails` | add: `CashLegId` (PK), `TenantId`, `TransactionId`, `Kind int`, `TradeFeeScheduleId NULL`, `BasisAmount decimal(18,4)`, `FeeAmount decimal(18,4)`, `Currency char(3)` | FK `(TenantId, CashLegId)` → TransactionCashLegs; FK `(TenantId, TransactionId)` → Transactions; UQ `(TransactionId, Kind)`; FK schedule (RESTRICT); FK Currencies; CHECK `Kind` 0–0; CHECK `Kind <> 0 OR TradeFeeScheduleId IS NOT NULL`; CHECK basis `> 0`, fee `> 0`. No `PublicId`, no `RowVersion` (part of an immutable Transaction, like `TransactionFxDetails`). Later kinds widen the `Kind` check and add their own schedule column |
 
-Script: `database/schema/0030_trade_fees.sql`. Existing cash legs get role 0 from the default. Do not add EF migrations. Update [database-design.md](../database-design.md) when this spec is accepted.
+Script: `database/schema/0030_trade_fees.sql`. Existing cash legs get role 0 from the default. That the fee detail's `TransactionId` matches its leg's, and that only `Fee` legs have one, is enforced in Domain. Do not add EF migrations. Update [database-design.md](../database-design.md) when this spec is accepted.
 
 ---
 
@@ -194,11 +197,13 @@ The cut-off date (R9) is computed in Application from posted `Buy` / `Sell` legs
 
 | Method | Route | Policy | Success | Failure |
 | --- | --- | --- | --- | --- |
-| GET | `/trade-fee-schedules` | `fees.read` | 200 list envelope | 400 / 401 / 403 / 404 |
-| GET | `/trade-fee-schedules/{id}` | `fees.read` | 200 item | 401 / 403 / 404 |
-| POST | `/trade-fee-schedules` | `fees.manage` | 201 `{ "id" }` | 400 / 401 / 403 / 404 |
-| PUT | `/trade-fee-schedules/{id}` | `fees.manage` | 204 | 400 / 401 / 403 / 404 / 409 |
-| DELETE | `/trade-fee-schedules/{id}` | `fees.manage` | 204 | 401 / 403 / 404 / 409 |
+| GET | `/fees/trade-schedules` | `fees.read` | 200 list envelope | 400 / 401 / 403 / 404 |
+| GET | `/fees/trade-schedules/{id}` | `fees.read` | 200 item | 401 / 403 / 404 |
+| POST | `/fees/trade-schedules` | `fees.manage` | 201 `{ "id" }` | 400 / 401 / 403 / 404 |
+| PUT | `/fees/trade-schedules/{id}` | `fees.manage` | 204 | 400 / 401 / 403 / 404 / 409 |
+| DELETE | `/fees/trade-schedules/{id}` | `fees.manage` | 204 | 401 / 403 / 404 / 409 |
+
+`/fees` is a namespace prefix, like `/users` ([api-design.md](../api-design.md) §2): there is no `GET /fees`. Fee configuration and calculation resources live under it (later `/fees/advisory-schedules`). Fee **transactions** do not: a standalone fee type gets its own `POST /transactions/{action}` route (api-design §7.7). The Adviser Portal BFF allow-list adds the `/fees` prefix with the portal spec.
 
 List: optional `quoteCurrency`; SystemAdmin adds `tenantId`. Sort `quoteCurrency`, then `effectiveFrom`. Envelope `{ items, page, pageSize, totalCount }`; page default 1, size default 20, max 100. No `Idempotency-Key` (configuration, not a ledger write).
 
@@ -254,14 +259,22 @@ Schedule item:
       "customerId": "<customer publicId>",
       "role": "Principal",
       "amount": -1250.00,
-      "currency": "NZD"
+      "currency": "NZD",
+      "fee": null
     },
     {
       "accountId": "<account publicId>",
       "customerId": "<customer publicId>",
       "role": "Fee",
       "amount": -10.00,
-      "currency": "NZD"
+      "currency": "NZD",
+      "fee": {
+        "kind": "Brokerage",
+        "scheduleId": "<schedule publicId>",
+        "basisAmount": 1250.00,
+        "amount": 10.00,
+        "currency": "NZD"
+      }
     }
   ],
   "security": [
@@ -273,17 +286,11 @@ Schedule item:
       "cost": 1260.00,
       "costCurrency": "NZD"
     }
-  ],
-  "fee": {
-    "scheduleId": "<schedule publicId>",
-    "grossAmount": 1250.00,
-    "amount": 10.00,
-    "currency": "NZD"
-  }
+  ]
 }
 ```
 
-Every cash leg on every type carries `role`. `fee` is null when the Transaction has no fee detail.
+Every cash leg on every type carries `role` and `fee`. `fee` is the leg's fee detail on a `Fee` leg and null on a `Principal` leg. `fee.amount` is in the quote currency; the leg `amount` is in the Account currency.
 
 ### 8.2 Errors
 
@@ -295,9 +302,9 @@ New problem code, added to the registry in [api-design.md](../api-design.md) §4
 | --- | --- | --- | --- |
 | `fee_schedule_in_effect` | 409 | The schedule row may already apply to a posted trade, so it cannot be updated or deleted. Add a new row instead. | — |
 
-A stale `rowVersion` on update → 409 `stale_row_version`. Pages that call `PUT /trade-fee-schedules/{id}` branch on `code` (api-design C8). Cross-tenant or missing id → 404.
+A stale `rowVersion` on update → 409 `stale_row_version`. Pages that call `PUT /fees/trade-schedules/{id}` branch on `code` (api-design C8). Cross-tenant or missing id → 404.
 
-Add `/trade-fee-schedules` to the resource catalog in [api-design.md](../api-design.md) §6 when this spec is accepted.
+Add the `/fees` namespace and `/fees/trade-schedules` to the resource catalog in [api-design.md](../api-design.md) §6 when this spec is accepted.
 
 ---
 
@@ -315,8 +322,8 @@ None in this slice.
 | Project | Assert |
 | --- | --- |
 | Domain.UnitTests | R8 worked examples: single band; two bands with `gross` below, on and above the edge; minimum binds; cap binds; rounding for `DecimalPlaces` 2 and 0; fee non-decreasing across a band edge. R5 shape refusals. `Buy` cost = gross + fee; `Sell` release unchanged; fee leg negative on both; cash check includes the fee; no fee leg when fee is 0 or no schedule. Reverse copies roles and fee detail. Other types refuse a `Fee` leg. Pending vs in effect for update / delete. Buy scaling: largest feasible `k`; dropped buys below minimum trade; `insufficient_cash` at `k = 0`; no scaling and no change when fees fit in the residual. |
-| Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403 on every verb; Adviser write → 403, read 200; TenantAdmin create / update / delete pending; update or delete in effect → 409 `fee_schedule_in_effect`; `effectiveFrom` not after the cut-off date → 400 (today, and after a future-dated `Buy`); duplicate date → 400; stale `rowVersion` → 409 `stale_row_version`; SystemAdmin without `tenantId` → 400. `Buy` / `Sell` with a schedule show the fee leg, cost and `fee`; the schedule that applies is the one for the trade's UTC date; reverse refunds the fee; `fee` field on a create body → 400; a cross-currency `Sell` converts the fee with the principal's rate. Rebalance with fees succeeds where the plain plan would go negative. Customer Transactions Report shows the net cash and the Fee column. |
-| Infrastructure.IntegrationTests | Two-tenant fixture: other tenant's schedule id → 404 on get / update / delete; a trade uses only its own tenant's schedules. Script: existing cash legs read as `Principal`; the role unique key allows one `Principal` and one `Fee` leg per `(Transaction, Account)`. TestSeed idempotent. |
+| Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403 on every verb; Adviser write → 403, read 200; TenantAdmin create / update / delete pending; update or delete in effect → 409 `fee_schedule_in_effect`; `effectiveFrom` not after the cut-off date → 400 (today, and after a future-dated `Buy`); duplicate date → 400; stale `rowVersion` → 409 `stale_row_version`; SystemAdmin without `tenantId` → 400. `Buy` / `Sell` with a schedule show the `Fee` leg with its `fee` object and the cost; the schedule that applies is the one for the trade's UTC date; reverse refunds the fee; `fee` field on a create body → 400; a cross-currency `Sell` converts the fee with the principal's rate. Rebalance with fees succeeds where the plain plan would go negative. Customer Transactions Report shows the net cash and the Fee column. |
+| Infrastructure.IntegrationTests | Two-tenant fixture: other tenant's schedule id → 404 on get / update / delete; a trade uses only its own tenant's schedules. Script: existing cash legs read as `Principal`; a second `Principal` leg on the same `(Transaction, Account)` is refused; a `Principal` and a `Fee` leg on the same Account are allowed; a second fee of the same kind on one Transaction is refused. TestSeed idempotent. |
 
 TestSeed (Development / TestAppHost only): one schedule for the demo brokerage instruments' quote currency, effective the day after the cut-off date at seed time (so it obeys R10), with a minimum and two bands.
 
@@ -328,9 +335,10 @@ No new ADR. Decisions 2026-11-15.
 
 | Item | Lock |
 | --- | --- |
-| Where the fee lives | A second cash leg with role `Fee`, same Account as the principal. Not a separate Transaction, not a net amount plus a side table only. |
+| Where the fee lives | A cash leg with role `Fee`, same Account as the principal, with one fee detail per `Fee` leg. Not a separate Transaction, not a net amount plus a side table only. |
+| Fee kinds | Coarse leg role (`Principal`, `Fee`, later `Tax`); the kind lives on the fee detail. One fee per `(Transaction, kind)`. Only `Brokerage` in this slice. Each fee kind has its own schedule shape; they share `FeeBands`, not one generic schedule table. |
 | Fee source | Server-computed from the tenant schedule. No client amount, no override. |
-| Schedule level | Tenant, per quote currency. No platform default. |
+| Schedule level | Tenant, per quote currency. No platform default. No per-portfolio, per-Account or per-Customer rate. |
 | Bands | Marginal. Not whole-amount bands (cliff at the edge, breaks the rebalance bisection). Not volume-based. |
 | Effective dating | Append-only in effect; pending rows editable; cut-off date R9; stop charging with a zero row. |
 | Cost | `Buy` fee capitalised into cost. `Sell` fee reduces cash only. |
@@ -339,6 +347,7 @@ No new ADR. Decisions 2026-11-15.
 | Types | `Buy` and `Sell` only. |
 | Rebalance | Fees from the residual first; then every buy scaled by one factor `k` (bisection); buys below minimum trade dropped. |
 | Callers | TenantAdmin manages; Adviser reads; SystemAdmin manages through the API; Customer none. |
+| Routes | `/fees/trade-schedules` under the `/fees` namespace prefix. Fee transactions stay under `/transactions`. |
 | Scripts / policy | `0030_trade_fees.sql`. `fees.read` / `fees.manage`. |
 
 Still open, not this slice:
