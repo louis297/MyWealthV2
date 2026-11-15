@@ -3,7 +3,7 @@ title: Function plan
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-11-11
+updated: 2026-11-15
 related:
   - README.md
   - glossary.md
@@ -227,7 +227,7 @@ Phase 3 focuses on the Reports domain. Smaller platform pieces (Invitation / Act
 Still later (not Phase 3):
 
 - Invitation / Activation delivery
-- Fees
+- Fees. Trade fees on `Buy` / `Sell` accepted 2026-11-15 ([features/trade-fees.md](features/trade-fees.md)). Advisory and standalone fees are roadmap step 4 ([future-plans.md](future-plans.md) §1)
 - KYC / AML, IRD, tax residency
 - Households / joint / trusts
 - Advice documents / SoA

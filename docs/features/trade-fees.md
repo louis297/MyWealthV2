@@ -1,6 +1,6 @@
 ---
 title: Trade fees
-status: draft
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -28,6 +28,8 @@ related:
 Amendment to [buy-sell.md](buy-sell.md), [posting.md](posting.md), [holdings.md](holdings.md), [leg-accounts.md](leg-accounts.md), [portfolios.md](portfolios.md) and [reports.md](reports.md) on `webapi`. It adds a tenant **trade fee schedule** per quote currency (marginal fee bands, a minimum and an optional cap, effective-dated) and a server-computed **trade fee** on every `Buy` / `Sell`, booked as a second cash leg with role `Fee` and fee kind `Brokerage`. New resource `/fees/trade-schedules` under a new `/fees` namespace, new policies `fees.read` / `fees.manage`, script `0030_trade_fees.sql`. Portfolio rebalance becomes fee-aware.
 
 This is step 1 of the business domain roadmap ([future-plans.md](../future-plans.md) §1). Decisions from discussion on 2026-11-15.
+
+**Status is `accepted` (2026-11-15).** Not landed. The amendments to buy-sell, posting, holdings, leg-accounts, portfolios, reports, api-design, database-design, domain-model, the glossary and the portal page contracts are written in those files in the same change.
 
 ---
 

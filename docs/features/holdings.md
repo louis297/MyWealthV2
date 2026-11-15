@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-28
-last_updated: 2026-11-14
+last_updated: 2026-11-15
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -32,6 +32,8 @@ Buy / Sell / StockIn / StockOut are accepted in [buy-sell.md](buy-sell.md). Spli
 
 
 **Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md). Each security leg carries its own `AccountId`; the header has none (script `0024`). Security legs are unique per `(TransactionId, AccountId, InstrumentId)`. The projection key is the leg's `(AccountId, InstrumentId)` (R14). "Same Account-locked command" means every leg account locked in ascending `Accounts.Id` order. Bank / Cash refusal is checked per security leg's Account. Item JSON: leg-accounts §8.1.
+
+**Amendment 2026-11-15 (trade fees, accepted):** [trade-fees.md](trade-fees.md) R16. A `Buy` adds `gross + fee` to the holding cost. Release on `Sell` / `StockOut` is unchanged. No other type that changes a holding has a fee.
 
 ---
 

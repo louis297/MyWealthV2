@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-10
-last_updated: 2026-11-10
+last_updated: 2026-11-15
 related:
   - fx-conversions.md
   - buy-sell.md
@@ -76,7 +76,7 @@ A manual trade that adds a holding must be in the Account's currency; to buy a U
 | R6 | **Portfolio lock.** Portfolios R18 is unchanged: while an assignment is Active, manual `Sell` is still rejected. R3 is the way out after unassign (portfolios R15) or disable (portfolios R22). |
 | R7 | **FX detail.** Every `Buy` / `Sell` whose cash leg used a rate other than the same-currency 1 gets one `TransactionFxDetails` row: `BaseCurrency` = instrument quote currency, `QuoteCurrency` = Account currency, `Rate`, `RateAsOfDate`, `RateSource` of the `FxRates` row used. Written in the same unit of work. Same-currency trades have no row and `fx: null`. |
 | R8 | **Staleness.** The automatic FX in R3 and R5 uses the staleness limit of fx-conversions R10 (more than 4 calendar days between the rate's as-of date and `bookedAt`). Manual `Sell` → 400. Rebalance fails for that Account with code `stale_fx`; no transactions are written (portfolios R10, R13). |
-| R9 | **Cash rounding.** The `Buy` / `Sell` cash leg is rounded to the Account currency's `DecimalPlaces`, `MidpointRounding.AwayFromZero`, for every trade with or without FX. Replaces the 4-decimal rounding of the cash amount. Security-leg cost and released cost keep 4 decimals in the quote currency (buy-sell R11, R15). |
+| R9 | **Cash rounding.** The `Buy` / `Sell` cash leg is rounded to the Account currency's `DecimalPlaces`, `MidpointRounding.AwayFromZero`, for every trade with or without FX. Replaces the 4-decimal rounding of the cash amount. Security-leg cost and released cost keep 4 decimals in the quote currency (buy-sell R11, R15). The `Fee` cash leg of [trade-fees.md](trade-fees.md) R15 follows the same rounding. |
 | R10 | **Reverse.** Reverse of a `Buy` / `Sell` copies the opposite cash and security legs, as today, and copies the FX detail when there is one. The current rate is not read. Posted trades without an FX detail reverse as before. |
 | R11 | **Existing data.** Posted `Buy` / `Sell` with a mismatch and no FX detail stay as they are and show `fx: null`. Existing mismatched holdings are sold with R3. No back-fill. |
 | R12 | **Valuation.** Net worth and portfolio valuation are unchanged (market value in quote currency; rebalance converts quote → base with `IFxRate`). |

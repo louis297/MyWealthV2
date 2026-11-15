@@ -3,7 +3,7 @@ title: API design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-11-14
+updated: 2026-11-15
 related:
   - README.md
   - glossary.md
@@ -62,6 +62,7 @@ Minimal API, TypedResults, endpoints dispatch MediatR only. Paths are kebab-case
 | CORS | Loose in Development; tighten in production without blocking Phase 1 |
 | Docs | `[EndpointSummary]` / `[EndpointDescription]` on every action |
 | People paths | `/users` is a **namespace prefix**, not a parent resource. People collections hang under it. Do not nest advisers / customers under `/users/{id}`. Tenants, currencies, and ledger routes stay outside this prefix |
+| Fee paths | `/fees` is a namespace prefix for fee configuration and calculation, like `/users`; it is not a resource. Fee transactions stay under `/transactions` (§7.9) |
 
 Success codes:
 
@@ -186,6 +187,7 @@ Status of this section: `accepted` (2026-11-13). The build contract for it is [f
 | `report_not_ready` | 409 | The report execution has no result to download yet. | — | [features/reports.md](features/reports.md) |
 | `portfolio_already_assigned` | 409 | The account's Active assignment is already this portfolio. | — | [features/portfolios.md](features/portfolios.md) §7 `AssignPortfolio` |
 | `portfolio_shared` | 409 | The caller is an Adviser and the portfolio is a Shared portfolio. | — | [features/portfolios.md](features/portfolios.md) amendment 2026-11-13 |
+| `fee_schedule_in_effect` | 409 | The trade fee schedule row may already apply to a posted trade, so it cannot be updated or deleted. Add a new row instead. | — | [features/trade-fees.md](features/trade-fees.md) R11 |
 | `disabled` | 400 | §4.1 | `target`, `targetId` | §4.1 |
 | `missing_price`, `missing_fx`, `insufficient_cash`, `account_not_eligible`, `portfolio_inactive`, `concurrent_modification` | 400 | Rebalance failure | — | [features/portfolios.md](features/portfolios.md) §11 |
 
@@ -258,6 +260,7 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Transactions | `/transactions` | list / get / create / reverse | `transactions.read` / `transactions.create` |
 | Net worth | `/net-worth`, `/users/customers/{id}/net-worth` | GET | `accounts.read` |
 | Portfolios | `/portfolios`, `/accounts/{id}/portfolio`, `/accounts/{id}/rebalance` | list / get / create / update / disable; assign / unassign / rebalance. See features/portfolios.md | `portfolios.read` / `portfolios.manage` + `transactions.create` |
+| Fees | `/fees/trade-schedules` (namespace `/fees`) | list / get / create / update / delete. See features/trade-fees.md | `fees.read` / `fees.manage` |
 | Reports | `/reports` | list / request / schedules / executions / download | `reports.customer.read` / `reports.customer.create` / `reports.book.read` / `reports.book.create` |
 
 Path `{id}` is always PublicId.
@@ -456,6 +459,22 @@ Back Office tenant configuration lists the active catalog and calls the existing
 
 ---
 
+### 7.9 Fees
+
+`/fees` is a namespace prefix, like `/users`: there is no `GET /fees`. Fee configuration and calculation resources hang under it. Fee transactions do not: a standalone fee type gets its own `POST /transactions/{action}` route (§7.7).
+
+| Method | Route | Policy | Success |
+| --- | --- | --- | --- |
+| GET | `/fees/trade-schedules` | `fees.read` | 200 envelope |
+| GET | `/fees/trade-schedules/{id}` | `fees.read` | 200 item |
+| POST | `/fees/trade-schedules` | `fees.manage` | 201 `{ id }` |
+| PUT | `/fees/trade-schedules/{id}` | `fees.manage` | 204 |
+| DELETE | `/fees/trade-schedules/{id}` | `fees.manage` | 204 |
+
+Field rules: [features/trade-fees.md](features/trade-fees.md). Update or delete of a schedule row in effect → 409 `fee_schedule_in_effect`. Every cash leg in the transaction item carries `role` (`Principal` or `Fee`) and `fee` (the fee detail on a `Fee` leg, null otherwise).
+
+---
+
 ## 8. Explicitly out (until a later phase promotes them)
 
 
@@ -508,3 +527,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-13 | `webapi` re-checks person `Status` and the tenant flag on every request. A disabled person, or any person of a disabled tenant, gets 403 with a still-valid token. §4.1 `target=tenant` on create is reached only by SystemAdmin ([features/identity-auth.md](features/identity-auth.md) amendment 2026-11-13). |
 | 2026-11-14 | §2 Instants and §4 rows: a request instant needs `Z` or an offset and is converted to UTC; responses use `Z`; an unreadable body gets a `ProblemDetails` in every environment ([fixes/utc-instants.md](fixes/utc-instants.md)). |
 | 2026-11-13 | §4.2 problem codes (accepted): every 409 and every named business 400 carries a stable `code`; one registry; clients branch on `code`. Build contract: [features/portfolios.md](features/portfolios.md) amendment 2026-11-13 part 1. |
+| 2026-11-15 | Trade fees accepted: `/fees` namespace and `/fees/trade-schedules` (`fees.read` / `fees.manage`, §7.9); problem code `fee_schedule_in_effect`; cash legs in the transaction item gain `role` and `fee` ([features/trade-fees.md](features/trade-fees.md)). |

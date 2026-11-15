@@ -3,7 +3,7 @@ title: Domain model
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-11-11
+updated: 2026-11-15
 related:
   - README.md
   - glossary.md
@@ -308,10 +308,12 @@ Close requires cash `SUM = 0` and no `Holdings` rows ([features/holdings.md](fea
 | Type | Kind | Notes |
 | --- | --- | --- |
 | `Transaction` | Aggregate | Business-event header in a tenant. Has no Account and no Customer; it belongs to its leg accounts. Not a capture row that later copies into a journal. |
-| `TransactionCashLeg` | Entity | Cash accounting line on one Account (`AccountId`). One on a cash header, and on `Buy` / `Sell`. At most one per `(Transaction, Account)`. Absent on `OpeningHoldings`, `StockIn`, `StockOut`, `Split`, `Bonus`, and `Scrip`. |
+| `TransactionCashLeg` | Entity | Cash accounting line on one Account (`AccountId`). Has a role: `Principal` (one on a cash header, and on `Buy` / `Sell`; at most one per `(Transaction, Account)`) or `Fee` (a trade fee on `Buy` / `Sell` and their Reversals, with one fee detail; [features/trade-fees.md](features/trade-fees.md)). Absent on `OpeningHoldings`, `StockIn`, `StockOut`, `Split`, `Bonus`, and `Scrip`. |
 | `TransactionSecurityLeg` | Entity | Security accounting line on one Account (`AccountId`). Exactly one on `Buy`, `Sell`, `StockIn`, `StockOut`, `Split`, `Bonus`, and `Scrip`. Quantity is signed. |
 | `TransactionFxDetail` | Entity (child of `Transaction`) | The rate a Transaction used: base and quote currency, rate (quote per 1 base), as-of date, source. 0..1 per Transaction, immutable. Exactly one on `FxConversion`; a Reversal of a Transaction with one gets a copy ([features/fx-conversions.md](features/fx-conversions.md)). |
 | `AppliedFxRate` | Value object | Base ≠ quote currency, rate `> 0`, as-of date, source. Input to `Transaction.PostFxConversion`. |
+| `TransactionFeeDetail` | Entity (child of a `Fee` cash leg) | How the fee was computed: kind, schedule, basis amount, fee, currency. Exactly one per `Fee` leg, at most one per `(Transaction, kind)`, immutable, copied to the Reversal's matching leg. |
+| `CashLegRole` / `FeeKind` | Enums | `Principal` / `Fee`. `Brokerage` is the only fee kind so far. |
 | `TransactionType` | Enum | Cash set plus `OpeningHoldings`, `Buy`, `Sell`, `StockIn` (10), `StockOut` (11), `Split` (12), `Bonus` (13), `Scrip` (14), `InternalTransfer` (15), `FxConversion` (16), and `Reversal`. |
 | `TransactionPosted` / `TransactionReversed` | Event | Side effects only. Must not write the books. |
 
@@ -322,14 +324,23 @@ Invariants:
 - Cash `SUM` of the cash legs on an Account is its cash balance. Not stored on `Account`.
 - After insert, `SUM ≥ 0` for Phase 2 openable types.
 - Posted header and legs are not `UPDATE`d / `DELETE`d, **except** a single write of `ReversedByTransactionId` on the original when a Reversal is created. After that write the original is immutable again. Economic legs are never updated. Reversal is a new row with the opposite cash amount and the opposite security quantity and cost. The Reversal stores `OriginalTransactionId`; the original stores `ReversedByTransactionId`.
-- `Buy` security cost is `quantity × price` in the quote currency. Cash is that cost times FX, negative, in the account currency.
-- `Sell` and `StockOut` store the released average cost on the security leg (`Round(oldCost × qty / oldQty, 4, AwayFromZero)`; the full quantity releases the whole cost). `Sell` cash is `quantity × price × FX`, positive. `StockOut` has no cash leg.
+- `Buy` security cost is `quantity × price` in the quote currency. Cash is that cost times FX, negative, in the account currency. With a trade fee, cost is `quantity × price + fee`, and a separate negative `Fee` leg carries the fee times FX ([features/trade-fees.md](features/trade-fees.md) R14–R16).
+- `Sell` and `StockOut` store the released average cost on the security leg (`Round(oldCost × qty / oldQty, 4, AwayFromZero)`; the full quantity releases the whole cost). `Sell` cash is `quantity × price × FX`, positive; a trade fee is a separate negative `Fee` leg and does not change the release. `StockOut` has no cash leg.
 - `StockIn` stores the client cost and has no cash leg.
 - `Split`, `Bonus`, and `Scrip` store the signed quantity delta and cost `0`. Holding total cost is unchanged. They do not call average-cost release and they do not create a holding.
 - Cash `Opening`: at most one per account; only while no other transaction exists; `amount > 0`.
 - Closed account rejects new transactions. `Account.Close()` does not write cash.
 
 Field rules: [features/posting.md](features/posting.md), [features/holdings.md](features/holdings.md), [features/buy-sell.md](features/buy-sell.md), [features/split.md](features/split.md), and [features/leg-accounts.md](features/leg-accounts.md).
+
+### 8.7 Trade fee schedule (accepted — trade-fees slice)
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `TradeFeeSchedule` | Aggregate | Tenant, quote currency (immutable), effective-from date, minimum, optional cap, `FeeBands`. `FeeFor(gross, decimalPlaces)` computes the fee. Only a pending row (effective-from after the cut-off date) may be updated or deleted. |
+| `FeeBands` | Value object | Marginal `(from, ratePercent)` steps; first `from` is 0, ascending. Reused by later fee kinds. |
+
+Invariant: no schedule write changes which row applies to a posted `Buy` / `Sell`, or that row's values. Field rules: [features/trade-fees.md](features/trade-fees.md).
 
 ---
 
@@ -366,6 +377,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 
 | 2026-11-02 | Portfolios draft. Model portfolios with base currency and target weights. Full Rebalance (async) on assign and weight change. While assigned, manual security trades rejected. One Active assignment per account. [features/portfolios.md](features/portfolios.md). |
 | 2026-11-02 | Portfolios accepted. `Portfolio`, `PortfolioLine`, `AccountPortfolioAssignment`. Assign is synchronous. Weight change and bulk rebalance are asynchronous. [features/portfolios.md](features/portfolios.md). |
+| 2026-11-15 | Trade fees accepted. `CashLegRole`, `FeeKind`, `TransactionFeeDetail`, `TradeFeeSchedule`, `FeeBands`. [features/trade-fees.md](features/trade-fees.md). |
 
 ---
 

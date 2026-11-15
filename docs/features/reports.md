@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-10-12
-last_updated: 2026-11-14
+last_updated: 2026-11-15
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -34,6 +34,8 @@ Both support manual trigger and editable recurring schedules in the first phase.
 
 
 **Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md) R20. The Customer Transactions report has one row per leg account of the Customer: a transaction appears in each of the Customer's accounts it books into, with that account's cash and security legs. The closed-account filter and the reversal-after-original ordering apply per account row.
+
+**Amendment 2026-11-15 (trade fees, accepted):** [trade-fees.md](trade-fees.md) R22. In the Customer Transactions report, the cash amount of an account row is the sum of that account's cash legs, and a new Fee column shows the sum of its `Fee` legs (empty when none). The Adviser Balances report is unchanged: it already sums every cash leg.
 
 ---
 
@@ -415,7 +417,7 @@ Rules:
 - Filter on `bookedAt`: `from` ≤ `bookedAt` < `to` (`from` and `to` are UTC days, [utc-instants](../fixes/utc-instants.md)).
 - Include all transaction types in range.
 - Reversals are marked (type or flag) and listed immediately after their original transaction.
-- Suggested columns: bookedAt, account, type, cash amount, instrument, quantity, memo.
+- Suggested columns: bookedAt, account, type, cash amount, fee, instrument, quantity, memo (fee column: trade-fees R22).
 - Empty range still produces a PDF that states there are no rows.
 - Closed-account filter uses the account’s status at generation time.
 

@@ -3,7 +3,7 @@ title: Database design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-11-14
+updated: 2026-11-15
 related:
   - README.md
   - glossary.md
@@ -350,6 +350,7 @@ Beyond PK / unique constraints already listed:
 0027_child_tenant_ids.sql                   -- TenantId onto leg tables, TransactionFxDetails, PortfolioLines (back-filled)
 0028_tenant_composite_keys.sql              -- read-only pre-check; UNIQUE (TenantId, Id) on parents; tenant composite FKs replace single-column FKs
 0029_transactions_booked_at_utc.sql         -- SWITCHOFFSET(BookedAt, '+00:00') on rows with a non-zero offset; instant unchanged
+0030_trade_fees.sql                         -- TransactionCashLegs.Role; TradeFeeSchedules, TradeFeeBands, TransactionFeeDetails
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -416,6 +417,8 @@ Amendment 2026-11-11 (FX conversions, [features/fx-conversions.md](features/fx-c
 
 Amendment 2026-11-13 (tenant composite keys, [fixes/tenant-composite-keys.md](fixes/tenant-composite-keys.md)): script `0027_child_tenant_ids.sql` adds `TenantId int NOT NULL` (FK → `Tenants` RESTRICT) to `TransactionCashLegs`, `TransactionSecurityLegs` and `TransactionFxDetails`, back-filled from the header. The header's `TenantId` is copied onto every leg and the FX detail by the Domain. Forward only; `0013`, `0014`, `0024` and `0026` are not edited.
 
+Amendment 2026-11-15 (trade fees, [features/trade-fees.md](features/trade-fees.md) §6): script `0030_trade_fees.sql` adds `Role int NOT NULL` (default 0 = `Principal`, CHECK 0–1) to `TransactionCashLegs`, replaces the unique `(TransactionId, AccountId)` with a filtered unique index `WHERE Role = 0`, adds `UNIQUE (TenantId, Id)` on `TransactionCashLegs`, and adds `TransactionFeeDetails`: one row per `Fee` cash leg (PK and FK `CashLegId`), `TenantId`, `TransactionId`, `Kind int` (CHECK 0–0, `Brokerage`), `TradeFeeScheduleId` (FK RESTRICT; required for `Brokerage`), `BasisAmount` and `FeeAmount decimal(18,4)` (CHECK `> 0`), `Currency char(3)`; UQ `(TransactionId, Kind)`. No `PublicId` or `RowVersion`. Forward only.
+
 ### 11.5 Holdings (accepted, landed)
 
 Scripts `0014_holdings.sql` and `0015_transaction_type_opening_holdings.sql`. Columns: [features/holdings.md](features/holdings.md) §6. `0016_transaction_type_stock_in_out.sql` widens `CK_Transactions_Type` to 0–11 for `StockIn` (10) and `StockOut` (11). `0017_transaction_type_split.sql` widens that check to 0–14 for `Split` (12), `Bonus` (13), and `Scrip` (14). No new column. No seed in the scripts — `TestSeed` only.
@@ -434,6 +437,15 @@ Script `0023_portfolios.sql`:
 - `AccountPortfolioAssignments` — TenantId, AccountId, PortfolioId, Status (Active/Removed), AssignedAt, AssignedBy, LastRebalanceAt, LastRebalanceStatus, LastRebalanceMessage; filtered unique on AccountId where Status = Active
 
 No seed in the script. Development / TestAppHost `TestSeed` adds one demo portfolio and one assignment, and does not post rebalance trades.
+
+### 11.7 Trade fee schedules (accepted)
+
+Feature spec: [features/trade-fees.md](features/trade-fees.md) (accepted 2026-11-15). Script `0030_trade_fees.sql`:
+
+- `TradeFeeSchedules` — TenantId, PublicId, QuoteCurrency (FK `Currencies`), EffectiveFrom (`date`), MinimumAmount, CapAmount (nullable), audit, RowVersion. UQ `(TenantId, QuoteCurrency, EffectiveFrom)`. CHECK minimum `≥ 0`; cap null or `> 0` and `≥` minimum.
+- `TradeFeeBands` — TenantId, TradeFeeScheduleId (tenant composite FK), FromAmount, RatePercent `decimal(7,4)`. UQ `(TradeFeeScheduleId, FromAmount)`. CHECK from `≥ 0`, rate 0–100.
+
+No seed in the script. Development / TestAppHost `TestSeed` adds one schedule.
 
 ## 12. Still not a schema decision
 
@@ -466,6 +478,7 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-13 | Tenant composite keys (`0028`): `UNIQUE (TenantId, Id)` on `Users`, `Accounts`, `Instruments`, `Transactions`, `Portfolios`, `ReportSchedules`. 18 single-column FKs between tenant rows replaced by `(TenantId, XId)` → `(TenantId, Id)`. The script stops before any change if a reference crosses tenants ([fixes/tenant-composite-keys.md](fixes/tenant-composite-keys.md) B2). |
 | 2026-11-14 | UTC instants (`0029`): every `datetimeoffset` holds `+00:00`. Existing `Transactions.BookedAt` rows with another offset are switched to UTC, instant unchanged ([fixes/utc-instants.md](fixes/utc-instants.md) B5). |
 | 2026-11-10 | Internal transfers (`0025`): `CK_Transactions_Type` widened to 0–15 for `InternalTransfer`. No new table or index. The two-leg shape is enforced in Domain and Application ([features/internal-transfers.md](features/internal-transfers.md) §6). |
+| 2026-11-15 | Trade fees (`0030`): `TransactionCashLegs.Role`, filtered unique `(TransactionId, AccountId) WHERE Role = 0`, `TradeFeeSchedules`, `TradeFeeBands`, `TransactionFeeDetails` ([features/trade-fees.md](features/trade-fees.md) §6). |
 
 ---
 

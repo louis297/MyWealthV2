@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-10
-last_updated: 2026-11-13
+last_updated: 2026-11-15
 related:
   - leg-accounts.md
   - posting.md
@@ -51,7 +51,7 @@ A TenantAdmin or Adviser moves cash from one Open Account to another Open Accoun
 - Cross-tenant transfer. A movement across tenants stays two unlinked Transactions: `TransferOut` in one tenant, `TransferIn` in the other (leg-accounts §13, posting R18)
 - Cross-currency transfer (see [future-plans.md](../future-plans.md) §3)
 - In-kind transfer (security legs on two Accounts)
-- Fees on a transfer
+- Fees on a transfer (decided 2026-11-15: none in [trade-fees.md](trade-fees.md); a transfer fee is a standalone fee, roadmap step 4)
 - A counterparty field on the transaction item
 - `GET /transfers` or any transfer-only read route
 - Automatic rebalance after a transfer

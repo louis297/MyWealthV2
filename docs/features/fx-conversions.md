@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-10
-last_updated: 2026-11-14
+last_updated: 2026-11-15
 related:
   - internal-transfers.md
   - leg-accounts.md
@@ -56,7 +56,7 @@ A TenantAdmin or Adviser converts cash from an Open Account in one currency to a
 
 - Changing Buy / Sell automatic FX, the manual same-currency rule, or storing the rate on Buy / Sell (next amendment; [future-plans.md](../future-plans.md) §3)
 - Multi-currency cash in one Account ([future-plans.md](../future-plans.md) §5)
-- Fee or spread on the rate
+- Fee or spread on the rate (decided 2026-11-15: no FX fee in [trade-fees.md](trade-fees.md); an FX fee would be a later fee kind)
 - A rate entered by the caller
 - A stored, time-limited quote (rate lock)
 - Conversion between two Customers. Convert inside the Customer, then use `InternalTransfer`
@@ -323,7 +323,7 @@ No new ADR. ADR 0011 §6 (one cash currency per Account) is unchanged.
 Still open, not this slice:
 
 - Buy / Sell amendment: same-currency rule for manual trades that add a holding, manual `Sell` and rebalance with automatic FX, storing their rate in `TransactionFxDetails`, Buy / Sell cash rounding to `DecimalPlaces` ([cross-currency-trades.md](cross-currency-trades.md), draft).
-- Fee or spread, and who configures it.
+- Fee or spread, and who configures it. Not in [trade-fees.md](trade-fees.md) (2026-11-15); an FX fee would be a later fee kind with its own schedule.
 - FX columns in the Customer Transactions report.
 - An HTTP read route for `FxRates`.
 

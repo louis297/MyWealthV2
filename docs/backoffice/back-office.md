@@ -4,7 +4,7 @@ status: accepted
 phase: 1
 language: en
 created: 2026-10-24
-updated: 2026-11-14
+updated: 2026-11-15
 related:
   - README.md
   - ../function-plan.md
@@ -198,6 +198,6 @@ Status of this amendment: `accepted` (2026-11-13). It is a build contract. Lande
 - Advisers (requires policy amendment: grant `advisers.manage` to SystemAdmin and accept `tenantId` on create)
 - Cross-tenant ledger inspection (Accounts, Transactions, Holdings, Net worth)
 - Portfolios catalog management (same SystemAdmin + `tenantId` pattern as instruments; page contract not yet written)
-- Further tenant configuration (fees, invitation settings, etc.) as those slices land
+- Further tenant configuration (invitation settings, etc.) as those slices land. Trade fee schedules: no Back Office page for now (decided 2026-11-15); SystemAdmin uses `/fees/trade-schedules` through Scalar ([features/trade-fees.md](../features/trade-fees.md) §9)
 
 These stay out until their own page slices are written.
