@@ -300,6 +300,24 @@ describe("CreateTransactionPage", () => {
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
+  it.each(["Buy", "Sell"])("tells the user the server adds brokerage on a %s (adviser-portal-fees)", async (type) => {
+    renderForm();
+
+    await chooseOption("Type", type);
+
+    expect(await screen.findByText("Brokerage is added by the server from the trade fee schedule.")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/fee/i)).not.toBeInTheDocument();
+  });
+
+  it("shows no brokerage note on a StockIn", async () => {
+    renderForm();
+
+    await chooseOption("Type", "StockIn");
+
+    expect(await screen.findByLabelText("Cost")).toBeInTheDocument();
+    expect(screen.queryByText("Brokerage is added by the server from the trade fee schedule.")).not.toBeInTheDocument();
+  });
+
   it("posts StockIn with client cost and no cash", async () => {
     const { fetchMock } = renderForm();
 
