@@ -18,7 +18,7 @@ related:
 
 # Adviser Portal — Fees
 
-Portal cut for trade fees. Consumes [features/trade-fees.md](../features/trade-fees.md) (accepted 2026-11-15; backend landed 2026-11-15, these pages are not). Backend contracts live in the Feature Spec. This file owns routes, page scope, field bindings and behavioural acceptance in the Adviser Portal.
+Portal cut for trade fees. Consumes [features/trade-fees.md](../features/trade-fees.md) (accepted 2026-11-15; backend and these pages landed 2026-11-15). Backend contracts live in the Feature Spec. This file owns routes, page scope, field bindings and behavioural acceptance in the Adviser Portal.
 
 Backend prerequisites (accepted, must land first):
 
@@ -131,7 +131,7 @@ Requests start 300 ms after the last change to the form or the amounts. A newer 
 
 | Page | Change |
 | --- | --- |
-| `/transactions/:id` | Cash legs table gains a Role column. The page has no cash legs table yet (it shows the id, the type and the reverse button), so this cut adds the table: account, role, amount and currency per visible cash leg. A `Fee` leg shows its `fee` object below the amount: "Brokerage 10.00 NZD on 1,250.00 NZD", and a link to `/fees/trade/{fee.scheduleId}`. |
+| `/transactions/:id` | Cash legs table gains a Role column. The page has no cash legs table yet (it shows the id, the type and the reverse button), so this cut adds the table: account, role, amount and currency per visible cash leg. A `Fee` leg shows its `fee` object below the amount: "Brokerage 10.00 NZD on 1,250.00 NZD", and a link to `/fees/trade/{fee.scheduleId}` when `scheduleId` is set (the item field is nullable for fee kinds without a schedule). |
 | `/transactions` | The Cash column keeps one entry per visible cash leg and labels a `Fee` leg "fee", for example "-1250.00 NZD, fee -10.00 NZD". |
 | `/accounts/:id` activity | The Amount is the sum of the account's cash legs on that row (trade-fees R22). When the row has a `Fee` leg, a second line under the amount reads "incl. fee 10.00 NZD", in the same style as the rate line. |
 | `Buy` / `Sell` form | One line of help text: "Brokerage is added by the server from the trade fee schedule." No fee field. |

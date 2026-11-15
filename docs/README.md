@@ -24,7 +24,7 @@ Phase 1 platform contracts stay accepted. Do not reopen them.
 
 **Feature map:** [function-plan.md](function-plan.md) and [features/README.md](features/README.md).
 
-Landed Phase 2 slices (accepted + implementation on master): instruments, accounts, posting, holdings, buy/sell, split/bonus/scrip, net-worth, portfolios, trade fees (backend; the Adviser Portal fees pages are not landed).
+Landed Phase 2 slices (accepted + implementation on master): instruments, accounts, posting, holdings, buy/sell, split/bonus/scrip, net-worth, portfolios, trade fees (backend and the Adviser Portal fees pages).
 
 Accepted Phase 3 platform slices: reports, outbox, FX rates, instrument prices. Customer Portal accepted.
 
