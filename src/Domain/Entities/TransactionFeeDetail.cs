@@ -25,4 +25,21 @@ public class TransactionFeeDetail
     public decimal FeeAmount { get; private set; }
 
     public string Currency { get; private set; } = string.Empty;
+
+    internal static TransactionFeeDetail Create(
+        int tenantId,
+        FeeKind kind,
+        int? scheduleId,
+        decimal basisAmount,
+        decimal feeAmount,
+        string currency) =>
+        new()
+        {
+            TenantId = tenantId,
+            Kind = kind,
+            TradeFeeScheduleId = scheduleId,
+            BasisAmount = basisAmount,
+            FeeAmount = feeAmount,
+            Currency = currency
+        };
 }

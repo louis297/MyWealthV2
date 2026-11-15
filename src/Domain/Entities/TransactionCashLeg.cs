@@ -31,4 +31,21 @@ public class TransactionCashLeg : BaseAuditableEntity
             Amount = amount,
             Currency = currency
         };
+
+    /// <summary>A <see cref="CashLegRole.Fee"/> leg with its fee detail (trade-fees R18).</summary>
+    internal static TransactionCashLeg CreateFee(
+        int tenantId,
+        int accountId,
+        decimal amount,
+        string currency,
+        TransactionFeeDetail detail) =>
+        new()
+        {
+            TenantId = tenantId,
+            AccountId = accountId,
+            Role = CashLegRole.Fee,
+            Amount = amount,
+            Currency = currency,
+            FeeDetail = detail
+        };
 }

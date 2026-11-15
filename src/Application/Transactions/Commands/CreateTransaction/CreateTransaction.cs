@@ -1,3 +1,4 @@
+using MyWealthV2.Application.Fees.TradeSchedules;
 using System.Text.Json;
 using FluentValidation.Results;
 using MyWealthV2.Application.Accounts;
@@ -44,6 +45,9 @@ public class CreateTransactionCommand : IRequest<IdempotentResult>
 
     public decimal? Ratio { get; init; }
 
+    /// <summary>Not part of the body: brokerage is computed by the server (trade-fees R14).</summary>
+    public decimal? Fee { get; init; }
+
     public sealed class OpeningHoldingSecurity
     {
         public Guid InstrumentId { get; init; }
@@ -78,6 +82,9 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
     public CreateTransactionCommandValidator(ICurrentUser currentUser)
     {
         RuleFor(command => command.AccountId).NotEmpty();
+        RuleFor(command => command.Fee)
+            .Null()
+            .WithMessage("Fee cannot be set. Brokerage is added by the server from the trade fee schedule.");
         RuleFor(command => command.Type)
             .Must(type => type is not null && AllowedTypes.Contains(type))
             .WithMessage("Type must be TransferIn, TransferOut, Interest, CloseOut, Opening, OpeningHoldings, Buy, Sell, StockIn, StockOut, Split, Bonus, or Scrip.");
@@ -206,7 +213,8 @@ public class CreateTransactionCommandHandler(
     IApplicationDbContext db,
     ICurrentUser currentUser,
     IMarketData marketData,
-    IFxRate fxRates)
+    IFxRate fxRates,
+    ICurrencyCatalog catalog)
     : IRequestHandler<CreateTransactionCommand, IdempotentResult>
 {
     public async Task<IdempotentResult> Handle(CreateTransactionCommand request, CancellationToken cancellationToken)
@@ -495,6 +503,9 @@ public class CreateTransactionCommandHandler(
         var holding = await db.Holdings.SingleOrDefaultAsync(
             row => row.AccountId == loaded.Account.Id && row.InstrumentId == instrument.Id,
             cancellationToken);
+        var feeSchedule = await ApplicableTradeFeeSchedule.ForAsync(
+            db, tenant.Id, quote, ApplicableTradeFeeSchedule.DateOf(request.BookedAt!.Value), cancellationToken);
+        var quoteDecimalPlaces = catalog.TryGet(quote)?.DecimalPlaces ?? 2;
         return type == TransactionType.Buy
             ? Domain.Entities.Transaction.PostBuy(
                 tenant.Id,
@@ -508,7 +519,9 @@ public class CreateTransactionCommandHandler(
                 request.BookedAt!.Value,
                 request.Memo,
                 request.Reference,
-                currentCashSum)
+                currentCashSum,
+                feeSchedule,
+                quoteDecimalPlaces)
             : Domain.Entities.Transaction.PostSell(
                 tenant.Id,
                 loaded.Account.Id,
@@ -523,7 +536,9 @@ public class CreateTransactionCommandHandler(
                 request.Reference,
                 currentCashSum,
                 holding?.Quantity ?? 0m,
-                holding?.CostAmount ?? 0m);
+                holding?.CostAmount ?? 0m,
+                feeSchedule,
+                quoteDecimalPlaces);
     }
 
     private async Task<Domain.Entities.Transaction> PostStockAsync(
