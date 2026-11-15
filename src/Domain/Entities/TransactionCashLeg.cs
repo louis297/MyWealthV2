@@ -32,6 +32,25 @@ public class TransactionCashLeg : BaseAuditableEntity
             Currency = currency
         };
 
+    /// <summary>The opposite leg for a Reversal: same Account, role and fee detail values (trade-fees R19).</summary>
+    internal TransactionCashLeg ReversalLeg()
+    {
+        if (Role == CashLegRole.Fee && FeeDetail is null)
+        {
+            throw new DomainException("A fee leg needs its fee detail to be reversed.");
+        }
+
+        return new TransactionCashLeg
+        {
+            TenantId = TenantId,
+            AccountId = AccountId,
+            Role = Role,
+            Amount = -Amount,
+            Currency = Currency,
+            FeeDetail = FeeDetail?.Copy()
+        };
+    }
+
     /// <summary>A <see cref="CashLegRole.Fee"/> leg with its fee detail (trade-fees R18).</summary>
     internal static TransactionCashLeg CreateFee(
         int tenantId,

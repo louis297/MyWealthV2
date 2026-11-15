@@ -42,4 +42,8 @@ public class TransactionFeeDetail
             FeeAmount = feeAmount,
             Currency = currency
         };
+
+    /// <summary>A new row with the same values, for the matching leg of a Reversal (trade-fees R19).</summary>
+    internal TransactionFeeDetail Copy() =>
+        Create(TenantId, Kind, TradeFeeScheduleId, BasisAmount, FeeAmount, Currency);
 }

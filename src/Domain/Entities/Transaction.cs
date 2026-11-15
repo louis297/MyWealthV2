@@ -523,9 +523,8 @@ public class Transaction : BaseAuditableEntity
             throw new DomainException("This transaction has already been reversed.");
         }
 
-        var cashLegs = CashLegs
-            .Select(leg => TransactionCashLeg.Create(TenantId, leg.AccountId, -leg.Amount, leg.Currency))
-            .ToList();
+        // Roles and fee details are copied; the schedule is not read again (trade-fees R19).
+        var cashLegs = CashLegs.Select(leg => leg.ReversalLeg()).ToList();
         foreach (var account in cashLegs.GroupBy(leg => leg.AccountId))
         {
             if (!currentCashSumByAccount.TryGetValue(account.Key, out var currentCashSum))
@@ -589,7 +588,8 @@ public class Transaction : BaseAuditableEntity
             OriginalTransactionId = Id,
             CashLegs = cashLegs,
             SecurityLegs = reversalLegs ?? [],
-            FxDetail = FxDetail?.Copy()
+            FxDetail = FxDetail?.Copy(),
+            FeeDetails = cashLegs.Select(leg => leg.FeeDetail).OfType<TransactionFeeDetail>().ToList()
         };
         ReversedBy = reversal;
         reversal.AddDomainEvent(new TransactionReversed(reversal));
