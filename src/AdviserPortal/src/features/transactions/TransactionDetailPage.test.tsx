@@ -56,6 +56,11 @@ function user(): CurrentUser {
   };
 }
 
+/** The page also loads the currency catalog for decimal places; mocks that answer every URL skip it. */
+function isCurrencies(input: RequestInfo | URL) {
+  return (input instanceof Request ? input.url : String(input)).includes("/currencies");
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -151,7 +156,7 @@ describe("TransactionDetailPage", () => {
     });
     store.dispatch(setCurrentUser(user()));
 
-    vi.mocked(fetch).mockImplementation(async () => json({
+    vi.mocked(fetch).mockImplementation(async (input) => isCurrencies(input) ? json([]) : json({
       ...original,
       reversedByTransactionId: reverseId,
     }));
@@ -183,7 +188,7 @@ describe("TransactionDetailPage", () => {
     });
     store.dispatch(setCurrentUser(user()));
 
-    vi.mocked(fetch).mockImplementation(async () => json({
+    vi.mocked(fetch).mockImplementation(async (input) => isCurrencies(input) ? json([]) : json({
       ...original,
       id: reverseId,
       type: "Reversal",
@@ -264,6 +269,9 @@ describe("TransactionDetailPage", () => {
     store.dispatch(setCurrentUser(user()));
     vi.mocked(fetch).mockImplementation(async (input, init) => {
       const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+      if (isCurrencies(input)) {
+        return json([]);
+      }
       if (method === "POST") {
         return json({
           status: 400,
@@ -302,6 +310,9 @@ describe("TransactionDetailPage", () => {
     store.dispatch(setCurrentUser(user()));
     vi.mocked(fetch).mockImplementation(async (input, init) => {
       const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+      if (isCurrencies(input)) {
+        return json([]);
+      }
       if (method === "POST") {
         return json({
           status: 400,
