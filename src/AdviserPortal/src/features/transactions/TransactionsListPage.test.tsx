@@ -61,7 +61,7 @@ function requestedUrls(fetchMock: ReturnType<typeof vi.mocked<typeof fetch>>) {
   });
 }
 
-function renderList(me: CurrentUser, path = "/transactions", status = 200) {
+function renderList(me: CurrentUser, path = "/transactions", status = 200, items: unknown[] = [transaction]) {
   const store = configureStore({
     reducer: {
       session: sessionSlice.reducer,
@@ -75,7 +75,7 @@ function renderList(me: CurrentUser, path = "/transactions", status = 200) {
   fetchMock.mockImplementation(async () =>
     new Response(
       status === 200
-        ? JSON.stringify({ items: [transaction], page: 1, pageSize: 20, totalCount: 1 })
+        ? JSON.stringify({ items, page: 1, pageSize: 20, totalCount: items.length })
         : "",
       {
         status,
@@ -297,5 +297,26 @@ describe("TransactionsListPage", () => {
     expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/transactions");
     expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("labels a Fee leg in the Cash column (adviser-portal-fees F13)", async () => {
+    renderList(user(), "/transactions", 200, [
+      {
+        ...transaction,
+        cash: [
+          { accountId, customerId, role: "Principal", amount: -1250, currency: "NZD", fee: null },
+          {
+            accountId,
+            customerId,
+            role: "Fee",
+            amount: -10,
+            currency: "NZD",
+            fee: { kind: "Brokerage", scheduleId: transactionId, basisAmount: 1250, amount: 10, currency: "NZD" },
+          },
+        ],
+      },
+    ]);
+
+    expect(await screen.findByText("-1250 NZD, fee -10 NZD")).toBeInTheDocument();
   });
 });

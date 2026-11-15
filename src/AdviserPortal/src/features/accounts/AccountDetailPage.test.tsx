@@ -58,6 +58,11 @@ function user(overrides: Partial<CurrentUser> = {}): CurrentUser {
   };
 }
 
+const currencyCatalog = [
+  { code: "NZD", name: "New Zealand dollar", decimalPlaces: 2, isActive: true },
+  { code: "USD", name: "US dollar", decimalPlaces: 2, isActive: true },
+];
+
 function renderDetail(
   fetchImpl: (url: string, method: string, body?: string) => Response,
 ) {
@@ -80,6 +85,9 @@ function renderDetail(
         : input instanceof Request
           ? await input.clone().text()
           : undefined;
+    if (url.includes("/currencies") && method === "GET") {
+      return new Response(JSON.stringify(currencyCatalog), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
     return fetchImpl(url, method, body);
   });
 
@@ -625,6 +633,62 @@ describe("AccountDetailPage", () => {
     const row = within(activity).getByRole("row", { name: /InternalTransfer/ });
     expect(row).toHaveTextContent("-500 NZD");
     expect(row).not.toHaveTextContent(/(^|[^-])500 NZD/);
+  });
+
+  it("shows the sum of this account's cash legs and the fee included (adviser-portal-fees F13)", async () => {
+    const fee = { kind: "Brokerage", scheduleId: "abababab-abab-abab-abab-abababababab", basisAmount: 1250, amount: 10, currency: "NZD" };
+    renderDetail((url, method) => {
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        const base = {
+          tenantId: account.tenantId,
+          bookedAt: "2026-11-09T20:00:00Z",
+          memo: null,
+          reference: null,
+          originalTransactionId: null,
+          reversedByTransactionId: null,
+          rowVersion: "AAAA",
+          security: [],
+        };
+        return json({
+          items: [
+            {
+              ...base,
+              id: "73333333-3333-3333-3333-333333333333",
+              type: "Buy",
+              cash: [
+                { accountId, customerId, role: "Principal", amount: -1250, currency: "NZD", fee: null },
+                { accountId, customerId, role: "Fee", amount: -10, currency: "NZD", fee },
+              ],
+            },
+            {
+              ...base,
+              id: "74444444-4444-4444-4444-444444444444",
+              type: "Sell",
+              cash: [{ accountId, customerId, role: "Principal", amount: 800, currency: "NZD", fee: null }],
+            },
+          ],
+          page: 1,
+          pageSize: 20,
+          totalCount: 2,
+        });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json({ ...account, type: "Brokerage", status: "Open" });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    const activity = await screen.findByRole("table", { name: "Activity" });
+    const buy = within(activity).getByRole("row", { name: /Buy/ });
+    expect(buy).toHaveTextContent("-1260 NZD");
+    expect(buy).not.toHaveTextContent("-1250 NZD");
+    expect(within(buy).getByText("incl. fee 10.00 NZD")).toBeInTheDocument();
+    const sell = within(activity).getByRole("row", { name: /Sell/ });
+    expect(sell).toHaveTextContent("800 NZD");
+    expect(sell).not.toHaveTextContent("incl. fee");
   });
 
   it("shows the leg on this account and the rate line for an FX conversion", async () => {
