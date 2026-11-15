@@ -156,8 +156,8 @@ describe("Fee preview on the schedule form", () => {
     expect(screen.queryByRole("table", { name: "Bands for 100,000.00 NZD" })).not.toBeInTheDocument();
     fireEvent.click(third.getByRole("button", { name: "Show bands for 100,000.00 NZD" }));
     const bands = within(screen.getByRole("table", { name: "Bands for 100,000.00 NZD" }));
-    const second = within(bands.getByText("10,000.00 NZD").closest("tr") as HTMLElement);
-    expect(second.getByText("0.3%")).toBeInTheDocument();
+    const second = within(bands.getByText("0.3%").closest("tr") as HTMLElement);
+    expect(second.getByText("10,000.00 NZD")).toBeInTheDocument();
     expect(second.getByText("90,000.00 NZD")).toBeInTheDocument();
     expect(second.getByText("6.789 NZD")).toBeInTheDocument();
     expect(bands.getByText("1.2345 NZD")).toBeInTheDocument();

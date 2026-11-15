@@ -28,6 +28,29 @@ export type CreateTradeScheduleBody = {
   bands: FeeBand[];
 };
 
+/** R31: the schedule fields of a create body, without `effectiveFrom`, plus 1 to 5 amounts. */
+export type TradeFeePreviewBody = {
+  quoteCurrency: string;
+  minimum: number;
+  cap: number | null;
+  bands: FeeBand[];
+  amounts: number[];
+};
+
+/** R32. `slice`, band `fee` and `banded` are exact; only `fee` is rounded. */
+export type TradeFeePreviewItem = {
+  amount: number;
+  bands: { from: number; ratePercent: number; slice: number; fee: number }[];
+  banded: number;
+  limitApplied: "minimum" | "cap" | null;
+  fee: number;
+};
+
+export type TradeFeePreview = {
+  currency: string;
+  items: TradeFeePreviewItem[];
+};
+
 export const feesApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getAllTradeSchedules: builder.query<TradeFeeSchedule[], void>({
@@ -52,7 +75,16 @@ export const feesApi = api.injectEndpoints({
       query: (body) => ({ url: "/fees/trade-schedules", method: "POST", body }),
       invalidatesTags: (_result, error) => (error ? [] : ["FeeSchedule"]),
     }),
+    // A POST that computes and writes nothing (R33), so it is a query; the base query adds the BFF header.
+    previewTradeFees: builder.query<TradeFeePreview, TradeFeePreviewBody>({
+      query: (body) => ({ url: "/fees/trade-schedules/preview", method: "POST", body }),
+      keepUnusedDataFor: 0,
+    }),
   }),
 });
 
-export const { useGetAllTradeSchedulesQuery, useCreateTradeScheduleMutation } = feesApi;
+export const {
+  useGetAllTradeSchedulesQuery,
+  useCreateTradeScheduleMutation,
+  usePreviewTradeFeesQuery,
+} = feesApi;

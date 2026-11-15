@@ -6,8 +6,10 @@ import { Field, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet 
 import { Input } from "@/components/ui/input";
 import { SelectItem } from "@/components/ui/select";
 import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
+import { FeePreviewPanel, type PreviewSchedule, useFeePreview } from "@/features/fees/FeePreview";
 import {
   draftErrors,
+  draftValues,
   type DraftBand,
   type FieldErrors,
   hasErrors,
@@ -21,6 +23,16 @@ export const utcDaysHelp =
 
 export function emptyDraft(): ScheduleDraft {
   return { quoteCurrency: "", effectiveFrom: "", minimum: "", cap: "", bands: [{ key: "band-0", from: "0", ratePercent: "" }] };
+}
+
+/** The form values the preview sends, or null while the schedule fields fail the form's checks (F19). */
+function previewSchedule(draft: ScheduleDraft, decimalPlaces: number | undefined, earliest: string): PreviewSchedule | null {
+  const errors = draftErrors(draft, { decimalPlaces, earliest, required: true, effectiveFrom: false });
+  if (hasErrors(errors)) {
+    return null;
+  }
+  const { quoteCurrency, minimum, cap, bands } = draftValues(draft);
+  return { quoteCurrency, minimum, cap, bands };
 }
 
 function FormField({
@@ -72,9 +84,10 @@ export function TradeScheduleForm({
   const decimalPlaces = currencies.data?.find((item) => item.code === draft.quoteCurrency)?.decimalPlaces;
   const earliest = nextDay(todayUtc());
   const ownErrors = draftErrors(draft, { decimalPlaces, earliest, required: submitted, effectiveFrom: true });
+  const preview = useFeePreview(previewSchedule(draft, decimalPlaces, earliest));
 
   function errorsFor(key: string) {
-    return ownErrors[key] ?? serverErrors[key];
+    return ownErrors[key] ?? serverErrors[key] ?? preview.fieldErrors[key];
   }
 
   function update(patch: Partial<ScheduleDraft>) {
@@ -225,6 +238,7 @@ export function TradeScheduleForm({
                 <p className="text-sm text-muted-foreground">A schedule can have at most 10 bands.</p>
               )}
             </FieldSet>
+            <FeePreviewPanel preview={preview} decimalPlaces={decimalPlaces} />
             <Button type="submit" className="self-start">
               {submitLabel}
             </Button>
