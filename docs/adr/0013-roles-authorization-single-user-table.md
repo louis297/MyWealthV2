@@ -3,7 +3,7 @@ title: "ADR 0013: Four roles, code-mapped policies, one table per layer"
 status: accepted
 language: en
 date: 2026-09-01
-updated: 2026-09-20
+updated: 2026-11-15
 related:
   - 0005-shared-database-tenantid-isolation.md
   - 0006-email-password-jwt-authentication.md
@@ -48,48 +48,15 @@ Creating any login-capable role: same transaction, `AspNetUsers` first, then `Us
 - `Customer` → `TenantId` required, `AdviserId` required and a same-tenant Adviser
 - All four roles require `IdentityUserId`
 
-### Phase 1 permissions
+### Permissions
 
-| Permission | SystemAdmin | TenantAdmin | Adviser | Customer |
-| --- | --- | --- | --- | --- |
-| `tenants.manage` | ✓ | | | |
-| `tenants.read` | ✓ | ✓ | ✓ | |
-| `tenant-admins.manage` | ✓ | | | |
-| `advisers.manage` | | ✓ | | |
-| `customers.manage` | | ✓ | | |
-| `customers.manage-own` | | | ✓ | |
-| `users.me` | ✓ | ✓ | ✓ | ✓ |
+The role permission table lives in [api-design.md](../api-design.md) §3.1 (moved there 2026-11-15). This ADR keeps the decision: four roles, named policies, `Role → permission` in code (`RolePermissions`), scope checks in the handler. A spec that adds a permission or changes a grant updates that table in the change that accepts it.
 
-### Phase 2 permissions (instruments)
+Amendment 2026-11-15: the per-slice permission tables that were here (Phase 1, instruments, accounts, transactions) moved to that table. They had stopped at transactions: portfolios and reports were never added, and the Customer Portal grants of 2026-11-02 were missing. Scope notes that stay true:
 
-Ledger names were not registered in Phase 1. The instruments slice adds:
-
-| Permission | SystemAdmin | TenantAdmin | Adviser | Customer |
-| --- | --- | --- | --- | --- |
-| `instruments.read` | ✓ | ✓ | ✓ | |
-| `instruments.create` | ✓ | ✓ | ✓ | |
-| `instruments.manage` | ✓ | ✓ | | |
-
-SystemAdmin has no `TenantId`. List and create take the target tenant PublicId. Field rules: [features/instruments.md](../features/instruments.md). Landed in repo 2026-09-20 `9ea2f2a`. Phase 1 people routes do not gain SystemAdmin verbs in this amendment.
-
-### Phase 2 permissions (accounts)
-
-| Permission | SystemAdmin | TenantAdmin | Adviser | Customer |
-| --- | --- | --- | --- | --- |
-| `accounts.read` | ✓ | ✓ | ✓ | |
-| `accounts.create` | ✓ | ✓ | ✓ | |
-| `accounts.manage` | ✓ | ✓ | ✓ | |
-
-Adviser account scope is assigned Customers in the handler. Field rules: [features/accounts.md](../features/accounts.md). Landed in the repo 2026-09-21.
-
-### Phase 2 permissions (transactions)
-
-| Permission | SystemAdmin | TenantAdmin | Adviser | Customer |
-| --- | --- | --- | --- | --- |
-| `transactions.read` | ✓ | ✓ | ✓ | |
-| `transactions.create` | ✓ | ✓ | ✓ | |
-
-Adviser scope is assigned Customers of the transaction’s Account. Reverse uses `transactions.create`. Field rules: [features/posting.md](../features/posting.md). Accepted and landed 2026-09-25.
+- SystemAdmin has no `TenantId`. On Phase 2 resources, list and create take the target tenant's PublicId ([function-plan.md](../function-plan.md) §5.3).
+- Adviser scope on accounts, transactions and holdings is the Adviser's assigned Customers, checked in the handler.
+- Customer scope is the caller's own rows, checked in the handler.
 
 The `/users` HTTP namespace (`/users/advisers` and so on) is an API convention. It is not this ADR’s authorization model.
 

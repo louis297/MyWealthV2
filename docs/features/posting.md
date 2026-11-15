@@ -149,10 +149,7 @@ Customer receives 403. No Adviser Portal activity page in this increment.
 
 Policies (register when accepted; map in `RolePermissions`):
 
-| Policy | TenantAdmin | Adviser | SystemAdmin | Customer |
-| --- | --- | --- | --- | --- |
-| `transactions.read` | ✓ | ✓ | ✓ | |
-| `transactions.create` | ✓ | ✓ | ✓ | |
+`transactions.read`, `transactions.create`. Grants per role are in the role permission table, [api-design.md](../api-design.md) §3.1 (moved there 2026-11-15).
 
 Adviser scope is **assigned Customers** of the transaction’s Account (404 if not). Same width as `accounts.*`. Reverse uses `transactions.create`.
 

@@ -103,6 +103,38 @@ Disabling a tenant does **not** bulk-update `User.Status`. Person status is inde
 
 Password change, disable, and logout revoke that subject’s OpenIddict tokens. The User aggregate does not hold tokens.
 
+### 3.1 Role permissions
+
+The only role × permission table. It matches `RolePermissions` in `src/Application/Common/Security/RolePermissions.cs`. A permission lets a role call the endpoint; the handler still checks the scope (tenant, the Adviser's assigned Customers, the Customer's own rows). Permissions are not claims in the JWT ([ADR 0013](adr/0013-roles-authorization-single-user-table.md)).
+
+A spec that adds a permission or changes a grant updates this table in the change that accepts it. Other docs link here and do not copy it.
+
+| Permission | SystemAdmin | TenantAdmin | Adviser | Customer | Owner |
+| --- | --- | --- | --- | --- | --- |
+| `tenants.manage` | ✓ | | | | [tenants](features/tenants.md) |
+| `tenants.read` | ✓ | ✓ | ✓ | | [tenants](features/tenants.md) |
+| `tenant-admins.manage` | ✓ | | | | [tenant-admins](features/tenant-admins.md) |
+| `advisers.manage` | | ✓ | | | [advisers](features/advisers.md) |
+| `customers.manage` | | ✓ | | | [customers](features/customers.md) |
+| `customers.manage-own` | | | ✓ | | [customers](features/customers.md) |
+| `users.me` | ✓ | ✓ | ✓ | ✓ | [identity-auth](features/identity-auth.md) |
+| `instruments.read` | ✓ | ✓ | ✓ | | [instruments](features/instruments.md) |
+| `instruments.create` | ✓ | ✓ | ✓ | | [instruments](features/instruments.md) |
+| `instruments.manage` | ✓ | ✓ | | | [instruments](features/instruments.md) |
+| `accounts.read` | ✓ | ✓ | ✓ | ✓ | [accounts](features/accounts.md); Customer: Customer Portal amendment 2026-11-02 |
+| `accounts.create` | ✓ | ✓ | ✓ | | [accounts](features/accounts.md) |
+| `accounts.manage` | ✓ | ✓ | ✓ | | [accounts](features/accounts.md) |
+| `transactions.read` | ✓ | ✓ | ✓ | ✓ | [posting](features/posting.md); Customer: Customer Portal amendment 2026-11-02 |
+| `transactions.create` | ✓ | ✓ | ✓ | | [posting](features/posting.md) |
+| `portfolios.read` | ✓ | ✓ | ✓ | | [portfolios](features/portfolios.md) |
+| `portfolios.manage` | ✓ | ✓ | ✓ | | [portfolios](features/portfolios.md) |
+| `reports.customer.read` | | ✓ | ✓ | ✓ | [reports](features/reports.md) |
+| `reports.customer.create` | | ✓ | ✓ | ✓ | [reports](features/reports.md); Customer: Customer Portal amendment 2026-11-02 |
+| `reports.book.read` | | ✓ | ✓ | | [reports](features/reports.md) |
+| `reports.book.create` | | ✓ | ✓ | | [reports](features/reports.md) |
+| `fees.read` | ✓ | ✓ | ✓ | | [trade-fees](features/trade-fees.md) (accepted, not landed) |
+| `fees.manage` | ✓ | ✓ | | | [trade-fees](features/trade-fees.md) (accepted, not landed) |
+
 ---
 
 ## 4. Errors
@@ -528,3 +560,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-14 | §2 Instants and §4 rows: a request instant needs `Z` or an offset and is converted to UTC; responses use `Z`; an unreadable body gets a `ProblemDetails` in every environment ([fixes/utc-instants.md](fixes/utc-instants.md)). |
 | 2026-11-13 | §4.2 problem codes (accepted): every 409 and every named business 400 carries a stable `code`; one registry; clients branch on `code`. Build contract: [features/portfolios.md](features/portfolios.md) amendment 2026-11-13 part 1. |
 | 2026-11-15 | Trade fees accepted: `/fees` namespace and `/fees/trade-schedules` (`fees.read` / `fees.manage`, §7.9); problem code `fee_schedule_in_effect`; cash legs in the transaction item gain `role` and `fee` ([features/trade-fees.md](features/trade-fees.md)). |
+| 2026-11-15 | §3.1 role permission table: the one table of grants, matching `RolePermissions`. Moved from ADR 0013 and the instruments, accounts, posting and identity-auth specs; adds the portfolios, reports and fees rows and the Customer Portal grants that were missing there. |

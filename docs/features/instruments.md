@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-18
-last_updated: 2026-11-14
+last_updated: 2026-11-15
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -115,11 +115,7 @@ The catalog is firm-wide, not per-Adviser. Customer receives 403. TenantAdmin / 
 
 Policies (register now; map in `RolePermissions`):
 
-| Policy | TenantAdmin | Adviser | SystemAdmin | Customer |
-| --- | --- | --- | --- | --- |
-| `instruments.read` | ✓ | ✓ | ✓ | |
-| `instruments.create` | ✓ | ✓ | ✓ | |
-| `instruments.manage` | ✓ | | ✓ | |
+`instruments.read`, `instruments.create`, `instruments.manage`. Grants per role are in the role permission table, [api-design.md](../api-design.md) §3.1 (moved there 2026-11-15).
 
 ---
 

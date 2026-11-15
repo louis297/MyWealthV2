@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-21
-last_updated: 2026-11-13
+last_updated: 2026-11-15
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -122,11 +122,7 @@ Confirmed 2026-09-21: (1) Adviser may read / open / rename / close / reopen acco
 
 Policies (register now; map in `RolePermissions`):
 
-| Policy | TenantAdmin | Adviser | SystemAdmin | Customer |
-| --- | --- | --- | --- | --- |
-| `accounts.read` | ✓ | ✓ | ✓ | |
-| `accounts.create` | ✓ | ✓ | ✓ | |
-| `accounts.manage` | ✓ | ✓ | ✓ | |
+`accounts.read`, `accounts.create`, `accounts.manage`. Grants per role are in the role permission table, [api-design.md](../api-design.md) §3.1 (moved there 2026-11-15).
 
 Adviser `manage` is assigned-Customer scope in the handler (same 404 rule as read / create). This is wider than instruments `manage` because the Adviser operates the Customer’s book. Catalog rename / disable stays TenantAdmin-only.
 
