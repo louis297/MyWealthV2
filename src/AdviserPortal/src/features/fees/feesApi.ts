@@ -1,4 +1,6 @@
+import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { api } from "@/shared/api/api";
+import type { PagedList } from "@/shared/types/page";
 
 /** trade-fees §8.1. `from` is in the quote currency; `ratePercent` 0.5 means 0.5 %. */
 export type FeeBand = {
@@ -21,7 +23,21 @@ export type TradeFeeSchedule = {
 export const feesApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getAllTradeSchedules: builder.query<TradeFeeSchedule[], void>({
-      queryFn: () => ({ data: [] }),
+      // adviser-portal-fees: page through the envelope 100 rows at a time until every row is loaded.
+      async queryFn(_arg, _api, _extra, baseQuery) {
+        const items: TradeFeeSchedule[] = [];
+        for (let page = 1; ; page += 1) {
+          const result = await baseQuery(`/fees/trade-schedules?pageSize=100&page=${page}`);
+          if (result.error) {
+            return { error: result.error as FetchBaseQueryError };
+          }
+          const data = result.data as PagedList<TradeFeeSchedule>;
+          items.push(...data.items);
+          if (items.length >= data.totalCount || data.items.length === 0) {
+            return { data: items };
+          }
+        }
+      },
       providesTags: ["FeeSchedule"],
     }),
   }),
