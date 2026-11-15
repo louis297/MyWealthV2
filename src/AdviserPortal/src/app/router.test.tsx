@@ -74,6 +74,7 @@ function renderApp(me: CurrentUser, path: string) {
       <RouterProvider router={router} />
     </Provider>,
   );
+  return router;
 }
 
 describe("app routes", () => {
@@ -452,5 +453,59 @@ describe("app routes", () => {
     expect(screen.queryByRole("heading", { name: "Profile" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Customers" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Dashboard" })).not.toBeInTheDocument();
+  });
+
+  describe("fees (adviser-portal-fees F1, F4)", () => {
+    const scheduleId = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
+    const systemAdmin = () =>
+      user({ role: "systemAdmin", name: "System Admin", tenantId: null, tenantCode: null });
+
+    it.each([
+      ["TenantAdmin", user()],
+      ["Adviser", user({ role: "adviser", name: "Sam Reed" })],
+    ])("redirects %s from /fees to /fees/trade", async (_label, me) => {
+      const router = renderApp(me, "/fees");
+
+      expect(await screen.findByRole("heading", { name: "Fees" })).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe("/fees/trade");
+    });
+
+    it("lets TenantAdmin open the create form", async () => {
+      renderApp(user(), "/fees/trade/new");
+      expect(await screen.findByRole("heading", { name: "New trade fee schedule" })).toBeInTheDocument();
+    });
+
+    it("lets an Adviser open a schedule detail", async () => {
+      renderApp(user({ role: "adviser", name: "Sam Reed" }), `/fees/trade/${scheduleId}`);
+
+      expect(await screen.findByRole("heading", { name: "Trade fee schedule" })).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
+    });
+
+    it.each(["/fees/trade/new", `/fees/trade/${scheduleId}/edit`])(
+      "sends an Adviser on %s to /forbidden",
+      async (path) => {
+        renderApp(user({ role: "adviser", name: "Sam Reed" }), path);
+
+        expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
+        expect(screen.queryByRole("heading", { name: /trade fee schedule/i })).not.toBeInTheDocument();
+      },
+    );
+
+    it.each(["/fees", "/fees/trade", `/fees/trade/${scheduleId}`])(
+      "sends SystemAdmin on %s to /forbidden",
+      async (path) => {
+        renderApp(systemAdmin(), path);
+
+        expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
+        expect(screen.queryByRole("heading", { name: "Fees" })).not.toBeInTheDocument();
+      },
+    );
+
+    it("sends a Customer on /fees/trade to /forbidden", async () => {
+      renderApp(user({ role: "customer", name: "Jordan Lee" }), "/fees/trade");
+
+      expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
+    });
   });
 });
