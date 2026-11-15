@@ -191,7 +191,11 @@ public sealed record RebalanceInput(
     decimal MinimumTrade,
     decimal CashResidualPercent,
     IReadOnlyList<PlannerHolding> Holdings,
-    IReadOnlyList<PlannerTarget> Targets);
+    IReadOnlyList<PlannerTarget> Targets,
+    IReadOnlyDictionary<string, PlannerFeeSchedule>? FeeSchedules = null);
+
+/// <summary>The trade fee schedule that applies on the rebalance's UTC date for one quote currency (trade-fees R25).</summary>
+public sealed record PlannerFeeSchedule(TradeFeeSchedule Schedule, int DecimalPlaces);
 
 public sealed record PlannerHolding(
     int InstrumentId,

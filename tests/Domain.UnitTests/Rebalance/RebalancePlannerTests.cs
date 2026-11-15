@@ -1,5 +1,7 @@
+using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Rebalance;
+using MyWealthV2.Domain.ValueObjects;
 using NUnit.Framework;
 using Shouldly;
 
@@ -166,8 +168,9 @@ public class RebalancePlannerTests
     }
 
     [Test]
-    public void Plan_FailsWhenCashCannotFundTheBuys()
+    public void Plan_ScalesTheBuysWhenCashCannotFundThem()
     {
+        // Trade fees R27 (amends portfolios R11): a shortfall scales the buys instead of failing.
         var plan = RebalancePlanner.Plan(new RebalanceInput(
             "NZD",
             "NZD",
@@ -178,19 +181,144 @@ public class RebalancePlannerTests
             [],
             [Target(2, "AIA", "USD", 100m, 10m, 1m, 2m)]));
 
-        plan.Status.ShouldBe(RebalanceStatus.Failed);
-        plan.Code.ShouldBe("insufficient_cash");
-        plan.Message.ShouldNotBeNull().ShouldContain("USD");
-        plan.Message.ShouldContain("NZD");
+        plan.Status.ShouldBe(RebalanceStatus.Success);
+        plan.Trades.Select(trade => (trade.Symbol, trade.Buy, trade.Quantity)).ShouldBe([("AIA", true, 5m)]);
+    }
+
+    [Test]
+    public void Plan_WithFees_TheResidualAbsorbsTheFeeWithoutScaling()
+    {
+        var plan = RebalancePlanner.Plan(Input(
+            cash: 10000m,
+            residual: 1m,
+            holdings: [],
+            targets: [Target(2, "AIA", "NZD", 100m, 10m, 1m, 1m)],
+            fees: Fees(minimum: 10m)));
+
+        plan.Status.ShouldBe(RebalanceStatus.Success);
+        plan.Trades.Single().Quantity.ShouldBe(990m);
+    }
+
+    [Test]
+    public void Plan_WithFees_ScalesEveryBuyByOneFactorAndLeavesCashJustAboveZero()
+    {
+        var schedule = Schedule(minimum: 10m);
+        var plan = RebalancePlanner.Plan(Input(
+            cash: 10000m,
+            residual: 0m,
+            holdings: [],
+            targets:
+            [
+                Target(2, "AIA", "NZD", 50m, 10m, 1m, 1m),
+                Target(3, "FPH", "NZD", 50m, 10m, 1m, 1m)
+            ],
+            fees: Fees(schedule)));
+
+        plan.Status.ShouldBe(RebalanceStatus.Success);
+        plan.Trades.ShouldAllBe(trade => trade.Buy);
+        var buys = plan.Trades;
+        buys.Count.ShouldBe(2);
+        buys[0].Quantity.ShouldBe(buys[1].Quantity);
+        buys[0].Quantity.ShouldBeLessThan(500m);
+        var cash = 10000m - buys.Sum(trade =>
+            decimal.Round(trade.Quantity * trade.Price, 4, MidpointRounding.AwayFromZero)
+            + schedule.FeeFor(decimal.Round(trade.Quantity * trade.Price, 4, MidpointRounding.AwayFromZero), 2).Fee);
+        cash.ShouldBeGreaterThanOrEqualTo(0m);
+        cash.ShouldBeLessThan(0.5m);
+    }
+
+    [Test]
+    public void Plan_WithFees_DropsAScaledBuyBelowTheMinimumTrade()
+    {
+        var plan = RebalancePlanner.Plan(Input(
+            cash: 10000m,
+            residual: 0m,
+            holdings: [],
+            targets:
+            [
+                Target(2, "AIA", "NZD", 98m, 10m, 1m, 1m),
+                Target(3, "FPH", "NZD", 2m, 10m, 1m, 1m)
+            ],
+            minimumTrade: 199m,
+            fees: Fees(minimum: 50m)));
+
+        plan.Status.ShouldBe(RebalanceStatus.Success);
+        var buy = plan.Trades.ShouldHaveSingleItem();
+        buy.Symbol.ShouldBe("AIA");
+        buy.Quantity.ShouldBeLessThan(980m);
+        buy.Quantity.ShouldBeGreaterThan(970m);
+    }
+
+    [Test]
+    public void Plan_WithFees_NoBuyLeftAfterScaling_IsNoChange()
+    {
+        var plan = RebalancePlanner.Plan(Input(
+            cash: 100m,
+            residual: 0m,
+            holdings: [],
+            targets: [Target(2, "AIA", "NZD", 100m, 10m, 1m, 1m)],
+            minimumTrade: 1m,
+            fees: Fees(minimum: 100m)));
+
+        plan.Status.ShouldBe(RebalanceStatus.NoChange);
         plan.Trades.ShouldBeEmpty();
     }
+
+    [Test]
+    public void Plan_SellFeesAboveCashAndSellProceeds_FailsWithInsufficientCash()
+    {
+        var plan = RebalancePlanner.Plan(Input(
+            cash: 0m,
+            residual: 0m,
+            holdings: [Holding(1, "VTI", "NZD", 1m, 1m, 1m, 1m)],
+            targets: [Target(2, "AIA", "NZD", 100m, 10m, 1m, 1m)],
+            minimumTrade: 0m,
+            fees: Fees(minimum: 10m)));
+
+        plan.Status.ShouldBe(RebalanceStatus.Failed);
+        plan.Code.ShouldBe("insufficient_cash");
+        plan.Message.ShouldNotBeNull().ShouldContain("NZD");
+        plan.Trades.ShouldBeEmpty();
+    }
+
+    [Test]
+    public void Plan_WithFees_OnlyTheTradesQuoteCurrencyScheduleApplies()
+    {
+        var plan = RebalancePlanner.Plan(Input(
+            cash: 10000m,
+            residual: 0m,
+            holdings: [],
+            targets: [Target(2, "AIA", "NZD", 100m, 10m, 1m, 1m)],
+            fees: new Dictionary<string, PlannerFeeSchedule>
+            {
+                ["USD"] = new(Schedule(minimum: 500m, currency: "USD"), 2)
+            }));
+
+        plan.Status.ShouldBe(RebalanceStatus.Success);
+        plan.Trades.Single().Quantity.ShouldBe(1000m);
+    }
+
+    private static TradeFeeSchedule Schedule(decimal minimum, string currency = "NZD")
+    {
+        var schedule = TradeFeeSchedule.Create(
+            1, Currency.Create(currency, currency, 2), new DateOnly(2026, 12, 1), minimum, null,
+            [new FeeBand(0m, 0.5m)], new DateOnly(2026, 11, 15));
+        schedule.Id = 9;
+        return schedule;
+    }
+
+    private static IReadOnlyDictionary<string, PlannerFeeSchedule> Fees(decimal minimum) => Fees(Schedule(minimum));
+
+    private static IReadOnlyDictionary<string, PlannerFeeSchedule> Fees(TradeFeeSchedule schedule) =>
+        new Dictionary<string, PlannerFeeSchedule> { [schedule.QuoteCurrency] = new(schedule, 2) };
 
     private static RebalanceInput Input(
         decimal cash,
         decimal residual,
         PlannerHolding[] holdings,
         PlannerTarget[] targets,
-        decimal minimumTrade = 100m) =>
+        decimal minimumTrade = 100m,
+        IReadOnlyDictionary<string, PlannerFeeSchedule>? fees = null) =>
         new(
             "NZD",
             "NZD",
@@ -199,7 +327,8 @@ public class RebalancePlannerTests
             minimumTrade,
             residual,
             holdings,
-            targets);
+            targets,
+            fees);
 
     private static PlannerHolding Holding(
         int id,
