@@ -182,7 +182,13 @@ public class RebalancePlannerTests
             [Target(2, "AIA", "USD", 100m, 10m, 1m, 2m)]));
 
         plan.Status.ShouldBe(RebalanceStatus.Success);
-        plan.Trades.Select(trade => (trade.Symbol, trade.Buy, trade.Quantity)).ShouldBe([("AIA", true, 5m)]);
+        var buy = plan.Trades.ShouldHaveSingleItem();
+        (buy.Symbol, buy.Buy).ShouldBe(("AIA", true));
+        // The largest quantity whose cash (rounded to 4 decimals) still fits: 5 plus what rounds away.
+        buy.Quantity.ShouldBeGreaterThanOrEqualTo(5m);
+        buy.Quantity.ShouldBeLessThan(5.00001m);
+        decimal.Round(decimal.Round(buy.Quantity * 10m, 4, MidpointRounding.AwayFromZero) * 2m, 4, MidpointRounding.AwayFromZero)
+            .ShouldBeLessThanOrEqualTo(100m);
     }
 
     [Test]

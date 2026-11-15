@@ -52,7 +52,7 @@ public class RebalanceJobTenantScopeTests
     }
 
     private static RebalanceJob NewJob(ApplicationDbContext db, TenantIdAccessor accessor) =>
-        new(new AccountRebalancer(db, new NoMarketData(), new NoFxRate(), TimeProvider.System), db, accessor);
+        new(new AccountRebalancer(db, new NoMarketData(), new NoFxRate(), new NoCatalog(), TimeProvider.System), db, accessor);
 
     private static async Task<string> IdentityAsync(ApplicationDbContext db, Tenant tenant)
     {
@@ -88,5 +88,16 @@ public class RebalanceJobTenantScopeTests
 
         public Task<FxRateReading> GetRateDetailAsync(string from, string to, DateTimeOffset asOf, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("Not used.");
+    }
+
+    private sealed class NoCatalog : ICurrencyCatalog
+    {
+        public Currency? TryGet(string code) => null;
+
+        public IReadOnlyList<Currency> List(bool enabledOnly = false) => [];
+
+        public bool IsActive(string code) => false;
+
+        public Task ReloadAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

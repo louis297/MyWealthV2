@@ -658,6 +658,24 @@ public class Transaction : BaseAuditableEntity
         return fee > 0m && leg < 0m ? new BrokerageCharge(schedule.Id, gross, fee, quoteCurrency, leg) : null;
     }
 
+    /// <summary>
+    /// The cash a <c>Buy</c> / <c>Sell</c> would book on its Account: principal plus the brokerage leg, with the same
+    /// rounding as <see cref="PostBuy"/> and <see cref="PostSell"/>. The rebalance planner uses it (trade-fees R25).
+    /// </summary>
+    internal static decimal TradeCash(
+        bool buy,
+        decimal quantity,
+        decimal price,
+        string quoteCurrency,
+        decimal fxRate,
+        TradeFeeSchedule? feeSchedule,
+        int quoteDecimalPlaces)
+    {
+        var gross = RoundMoney(quantity * price);
+        var principal = buy ? -RoundMoney(gross * fxRate) : RoundMoney(quantity * price * fxRate);
+        return principal + (BrokerageFee(feeSchedule, gross, quoteCurrency, fxRate, quoteDecimalPlaces)?.Leg ?? 0m);
+    }
+
     private void AddBrokerageLeg(int accountId, string accountCurrency, BrokerageCharge? brokerage)
     {
         if (brokerage is null)

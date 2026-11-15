@@ -5,6 +5,7 @@ using MyWealthV2.Application.Accounts;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
+using MyWealthV2.Application.Fees.TradeSchedules;
 using MyWealthV2.Application.Transactions;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
@@ -39,6 +40,7 @@ public class AccountRebalancer(
     IApplicationDbContext db,
     IMarketData marketData,
     IFxRate fxRates,
+    ICurrencyCatalog catalog,
     TimeProvider time)
 {
     public async Task<RebalanceResultDto> RebalanceAsync(Guid accountId, Guid handle, CancellationToken cancellationToken)
@@ -86,13 +88,13 @@ public class AccountRebalancer(
             throw new RebalanceException("portfolio_inactive", "The portfolio is disabled.");
         }
 
-        var plan = await BuildPlanAsync(account, portfolio, cancellationToken);
+        var now = time.GetUtcNow();
+        var plan = await BuildPlanAsync(account, portfolio, now, cancellationToken);
         if (plan.Status == RebalanceStatus.Failed)
         {
             throw new RebalanceException(plan.Code!, plan.Message!);
         }
 
-        var now = time.GetUtcNow();
         if (plan.Trades.Count > 0)
         {
             var cash = await TransactionCash.SumAsync(db, account.Id, cancellationToken);
@@ -103,17 +105,20 @@ public class AccountRebalancer(
                     cancellationToken);
                 var price = Money.Create(trade.Price, trade.QuoteCurrency);
                 var reference = $"rb:{handle:N}:{(trade.Buy ? "B" : "S")}:{trade.InstrumentId}";
+                PlannerFeeSchedule? fee = null;
+                plan.FeeSchedules?.TryGetValue(trade.QuoteCurrency, out fee);
                 Domain.Entities.Transaction transaction;
                 try
                 {
                     transaction = trade.Buy
                         ? Domain.Entities.Transaction.PostBuy(
                             account.TenantId, account.Id, account.Type, account.Currency, trade.InstrumentId,
-                            trade.Quantity, price, trade.QuoteToAccount, now, "Rebalance", reference, cash)
+                            trade.Quantity, price, trade.QuoteToAccount, now, "Rebalance", reference, cash,
+                            fee?.Schedule, fee?.DecimalPlaces ?? 2)
                         : Domain.Entities.Transaction.PostSell(
                             account.TenantId, account.Id, account.Type, account.Currency, trade.InstrumentId,
                             trade.Quantity, price, trade.QuoteToAccount, now, "Rebalance", reference, cash,
-                            holding?.Quantity ?? 0m, holding?.CostAmount ?? 0m);
+                            holding?.Quantity ?? 0m, holding?.CostAmount ?? 0m, fee?.Schedule, fee?.DecimalPlaces ?? 2);
                 }
                 catch (DomainException exception)
                 {
@@ -143,9 +148,10 @@ public class AccountRebalancer(
         return new RebalanceResultDto(plan.Status.ToString());
     }
 
-    private async Task<RebalancePlan> BuildPlanAsync(
+    private async Task<FeePlan> BuildPlanAsync(
         Account account,
         Portfolio portfolio,
+        DateTimeOffset now,
         CancellationToken cancellationToken)
     {
         var holdingRows = await (
@@ -176,7 +182,12 @@ public class AccountRebalancer(
 
         decimal? accountToBase = await RateAsync(account.Currency, portfolio.BaseCurrency, cancellationToken);
         var cash = await TransactionCash.SumAsync(db, account.Id, cancellationToken);
-        return RebalancePlanner.Plan(new RebalanceInput(
+        var feeSchedules = await FeeSchedulesAsync(
+            account.TenantId,
+            holdings.Select(row => row.QuoteCurrency).Concat(targets.Select(row => row.QuoteCurrency)),
+            now,
+            cancellationToken);
+        var plan = RebalancePlanner.Plan(new RebalanceInput(
             portfolio.BaseCurrency,
             account.Currency,
             cash,
@@ -184,7 +195,44 @@ public class AccountRebalancer(
             portfolio.MinimumTrade,
             portfolio.CashResidualPercent,
             holdings,
-            targets));
+            targets,
+            feeSchedules));
+        return new FeePlan(plan, feeSchedules);
+    }
+
+    /// <summary>
+    /// The schedule that applies on the rebalance's UTC date for each quote currency (trade-fees R25). The same
+    /// schedules are passed to <c>PostBuy</c> / <c>PostSell</c>, so posted fees match the plan.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<string, PlannerFeeSchedule>> FeeSchedulesAsync(
+        int tenantId,
+        IEnumerable<string> quoteCurrencies,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var result = new Dictionary<string, PlannerFeeSchedule>(StringComparer.OrdinalIgnoreCase);
+        var date = ApplicableTradeFeeSchedule.DateOf(now);
+        foreach (var quote in quoteCurrencies.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var schedule = await ApplicableTradeFeeSchedule.ForAsync(db, tenantId, quote, date, cancellationToken);
+            if (schedule is not null)
+            {
+                result[quote] = new PlannerFeeSchedule(schedule, catalog.TryGet(quote)?.DecimalPlaces ?? 2);
+            }
+        }
+
+        return result;
+    }
+
+    private sealed record FeePlan(RebalancePlan Plan, IReadOnlyDictionary<string, PlannerFeeSchedule> FeeSchedules)
+    {
+        public RebalanceStatus Status => Plan.Status;
+
+        public string? Code => Plan.Code;
+
+        public string? Message => Plan.Message;
+
+        public IReadOnlyList<RebalanceTrade> Trades => Plan.Trades;
     }
 
     private async Task<PlannerHolding> QuoteAsync(
