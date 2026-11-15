@@ -60,7 +60,7 @@ export function problem(status: number, body: Record<string, unknown>) {
   });
 }
 
-export type Handler = (request: Request) => Response | Promise<Response> | undefined;
+export type Handler = (request: Request) => Response | undefined | Promise<Response | undefined>;
 
 /**
  * Renders `routes` at `path` with a fresh store. `handler` answers each fetch; anything it leaves
