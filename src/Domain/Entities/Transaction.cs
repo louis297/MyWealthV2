@@ -297,7 +297,9 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
-        decimal currentCashSum)
+        decimal currentCashSum,
+        TradeFeeSchedule? feeSchedule = null,
+        int quoteDecimalPlaces = 2)
     {
         EnsureSecurityAccount(accountType);
         EnsurePriced(price);
@@ -340,7 +342,9 @@ public class Transaction : BaseAuditableEntity
         string? reference,
         decimal currentCashSum,
         decimal currentQuantity,
-        decimal currentCost)
+        decimal currentCost,
+        TradeFeeSchedule? feeSchedule = null,
+        int quoteDecimalPlaces = 2)
     {
         EnsureSecurityAccount(accountType);
         EnsurePriced(price);
