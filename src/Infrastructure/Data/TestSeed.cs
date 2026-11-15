@@ -1,3 +1,4 @@
+using MyWealthV2.Application.Fees.TradeSchedules;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -166,6 +167,40 @@ public static class TestSeed
         }
 
         await EnsureAccountsAsync(db, tenant.Id, firm.CustomerEmail, cancellationToken);
+        await EnsureTradeFeeScheduleAsync(db, tenant.Id, cancellationToken);
+    }
+
+    /// <summary>
+    /// One USD trade fee schedule (the demo brokerage and VTI are USD): 0.5% to 10,000 then 0.3%, minimum 10. It
+    /// starts the day after the cut-off date at seed time, so it obeys trade-fees R10 and no seeded trade has a fee.
+    /// </summary>
+    private static async Task EnsureTradeFeeScheduleAsync(
+        ApplicationDbContext db,
+        int tenantId,
+        CancellationToken cancellationToken)
+    {
+        const string currency = "USD";
+        var exists = await db.TradeFeeSchedules.AnyAsync(
+            row => row.TenantId == tenantId && row.QuoteCurrency == currency, cancellationToken);
+        if (exists)
+        {
+            return;
+        }
+
+        var cutOff = await TradeFeeCutOff.ForAsync(
+            db, tenantId, currency, TradeFeeCutOff.Today(TimeProvider.System), cancellationToken);
+        var schedule = TradeFeeSchedule.Create(
+            tenantId,
+            Currency.Create(currency, "United States Dollar", 2),
+            cutOff.AddDays(1),
+            10m,
+            null,
+            [new FeeBand(0m, 0.5m), new FeeBand(10000m, 0.3m)],
+            cutOff);
+        schedule.Created = TimeProvider.System.GetUtcNow();
+        schedule.CreatedBy = CreatedBy;
+        db.TradeFeeSchedules.Add(schedule);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private static async Task EnsureCatalogAsync(

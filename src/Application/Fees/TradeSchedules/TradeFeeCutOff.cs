@@ -7,7 +7,7 @@ namespace MyWealthV2.Application.Fees.TradeSchedules;
 /// The cut-off date for a tenant and quote currency (trade-fees R9): the later of today (UTC) and the latest UTC date
 /// of <c>bookedAt</c> of any <c>Buy</c> / <c>Sell</c> on an instrument quoted in that currency. Reversals do not count.
 /// </summary>
-internal static class TradeFeeCutOff
+public static class TradeFeeCutOff
 {
     public static DateOnly Today(TimeProvider time) => DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
 
