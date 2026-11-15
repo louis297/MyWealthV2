@@ -177,3 +177,18 @@ Questions to settle when this opens:
 - Report download: today it uses the BFF cookie and a browser `Blob`. The app needs a Bearer download and the system share sheet.
 - Local development: a device or emulator reaching `identity` over https.
 - Build and release: EAS builds, signing, store review, over-the-air updates, a separate CI path filter, and the domain files for universal links ([deployment.md](deployment.md)).
+
+---
+
+## 8. Platform billing
+
+The platform charges each tenant for using MyWealthV2.
+
+Recorded in discussion (2026-11-15), not planned for now. This is different from the fees in §1. Those are booked in a Customer's ledger. Platform billing is the platform company's own receivable from a tenant: a business-to-business invoice that never touches a Customer ledger.
+
+Questions to settle when this opens:
+
+- Pricing model: a subscription, a charge per open Account, basis points on the assets the tenant manages, or a mix.
+- Invoices: numbering, GST invoice content, credit notes.
+- Where the platform's own books live. This is where double-entry accounting (general ledger, receivables, revenue recognition) is used, which §1 keeps out of the Customer ledger.
+- Whether a wrap-style platform administration fee, deducted from Customer cash, is also wanted. That one is a standalone fee in the Customer ledger (§1 step 4), not platform billing.
