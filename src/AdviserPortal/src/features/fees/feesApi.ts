@@ -20,6 +20,14 @@ export type TradeFeeSchedule = {
   rowVersion: string;
 };
 
+export type CreateTradeScheduleBody = {
+  quoteCurrency: string;
+  effectiveFrom: string;
+  minimum: number;
+  cap: number | null;
+  bands: FeeBand[];
+};
+
 export const feesApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getAllTradeSchedules: builder.query<TradeFeeSchedule[], void>({
@@ -40,7 +48,11 @@ export const feesApi = api.injectEndpoints({
       },
       providesTags: ["FeeSchedule"],
     }),
+    createTradeSchedule: builder.mutation<{ id: string }, CreateTradeScheduleBody>({
+      query: (body) => ({ url: "/fees/trade-schedules", method: "POST", body }),
+      invalidatesTags: (_result, error) => (error ? [] : ["FeeSchedule"]),
+    }),
   }),
 });
 
-export const { useGetAllTradeSchedulesQuery } = feesApi;
+export const { useGetAllTradeSchedulesQuery, useCreateTradeScheduleMutation } = feesApi;

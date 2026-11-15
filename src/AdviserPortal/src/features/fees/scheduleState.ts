@@ -33,3 +33,9 @@ export function scheduleStates(items: TradeFeeSchedule[], today: string): Map<st
 export function todayUtc(now: Date = new Date()): string {
   return now.toISOString().slice(0, 10);
 }
+
+/** The UTC day after `date` (`yyyy-MM-dd`). Date arithmetic in UTC only, so no local offset moves it. */
+export function nextDay(date: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+}
