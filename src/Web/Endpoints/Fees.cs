@@ -20,6 +20,7 @@ public class Fees : IEndpointGroup
         groupBuilder.MapGet(GetTradeFeeSchedules).RequireAuthorization(Policies.FeesRead);
         groupBuilder.MapGet(GetTradeFeeSchedule, "{id:guid}").RequireAuthorization(Policies.FeesRead);
         groupBuilder.MapPost(CreateTradeFeeSchedule).RequireAuthorization(Policies.FeesManage);
+        groupBuilder.MapPost(PreviewTradeFees, "preview").RequireAuthorization(Policies.FeesRead);
         groupBuilder.MapPut(UpdateTradeFeeSchedule, "{id:guid}").RequireAuthorization(Policies.FeesManage);
         groupBuilder.MapDelete(DeleteTradeFeeSchedule, "{id:guid}").RequireAuthorization(Policies.FeesManage);
     }
@@ -53,6 +54,14 @@ public class Fees : IEndpointGroup
     {
         var id = await sender.Send(command);
         return TypedResults.Created($"/fees/trade-schedules/{id}", new CreatedTradeFeeScheduleDto(id));
+    }
+
+    [EndpointSummary("Preview trade fees")]
+    [EndpointDescription("Computes the trade fee for up to 5 amounts under a schedule that is not saved. Writes nothing; not a quote for any trade.")]
+    public static async Task<Ok<TradeFeePreviewDto>> PreviewTradeFees(ISender sender, PreviewTradeFeesQuery query)
+    {
+        var preview = await sender.Send(query);
+        return TypedResults.Ok(preview);
     }
 
     [EndpointSummary("Update a trade fee schedule")]
