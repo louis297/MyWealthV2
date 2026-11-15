@@ -71,6 +71,15 @@ export const feesApi = api.injectEndpoints({
       },
       providesTags: ["FeeSchedule"],
     }),
+    getTradeSchedule: builder.query<TradeFeeSchedule, string>({
+      query: (id) => `/fees/trade-schedules/${id}`,
+      providesTags: (_result, _error, id) => [{ type: "FeeSchedule", id }],
+    }),
+    deleteTradeSchedule: builder.mutation<void, string>({
+      query: (id) => ({ url: `/fees/trade-schedules/${id}`, method: "DELETE" }),
+      // A refused delete changed nothing; the page reloads the row itself on fee_schedule_in_effect (F9).
+      invalidatesTags: (_result, error) => (error ? [] : ["FeeSchedule"]),
+    }),
     createTradeSchedule: builder.mutation<{ id: string }, CreateTradeScheduleBody>({
       query: (body) => ({ url: "/fees/trade-schedules", method: "POST", body }),
       invalidatesTags: (_result, error) => (error ? [] : ["FeeSchedule"]),
@@ -86,5 +95,7 @@ export const feesApi = api.injectEndpoints({
 export const {
   useGetAllTradeSchedulesQuery,
   useCreateTradeScheduleMutation,
+  useDeleteTradeScheduleMutation,
+  useGetTradeScheduleQuery,
   usePreviewTradeFeesQuery,
 } = feesApi;

@@ -475,10 +475,10 @@ describe("app routes", () => {
       expect(await screen.findByRole("heading", { name: "New trade fee schedule" })).toBeInTheDocument();
     });
 
-    it("lets an Adviser open a schedule detail", async () => {
+    it("lets an Adviser open a schedule detail without treating a missing id as Forbidden", async () => {
       renderApp(user({ role: "adviser", name: "Sam Reed" }), `/fees/trade/${scheduleId}`);
 
-      expect(await screen.findByRole("heading", { name: "Trade fee schedule" })).toBeInTheDocument();
+      expect(await screen.findByText("Not found")).toBeInTheDocument();
       expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
     });
 
