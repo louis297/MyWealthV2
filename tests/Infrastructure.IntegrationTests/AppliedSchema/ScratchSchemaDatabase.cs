@@ -148,6 +148,27 @@ internal sealed class ScratchSchemaDatabase : IAsyncDisposable
             """;
     }
 
+    /// <summary>
+    /// SQL that adds trade fee rows (schema <c>0030</c> and later) to a tenant inserted by <see cref="TenantRows"/>:
+    /// a USD trade fee schedule with one band and a <c>Fee</c> cash leg (no fee detail) on the Buy.
+    /// Variables: <c>@{prefix}_feeschedule</c> and <c>@{prefix}_feeleg</c>.
+    /// </summary>
+    public static string FeeRows(string prefix)
+    {
+        var t = $"@{prefix}_tenant";
+        return $"""
+            INSERT INTO [TradeFeeSchedules] ([PublicId], [TenantId], [QuoteCurrency], [EffectiveFrom], [MinimumAmount], [CapAmount], [Created], [CreatedBy])
+            VALUES (NEWID(), {t}, 'USD', '2026-12-01', 10, NULL, SYSDATETIMEOFFSET(), N'test');
+            DECLARE @{prefix}_feeschedule int = SCOPE_IDENTITY();
+            INSERT INTO [TradeFeeBands] ([TenantId], [TradeFeeScheduleId], [FromAmount], [RatePercent])
+            VALUES ({t}, @{prefix}_feeschedule, 0, 0.5);
+            INSERT INTO [TransactionCashLegs] ([TenantId], [TransactionId], [AccountId], [Role], [Amount], [Currency], [Created], [CreatedBy])
+            VALUES ({t}, @{prefix}_buy, @{prefix}_brokerage, 1, -10, 'NZD', SYSDATETIMEOFFSET(), N'test');
+            DECLARE @{prefix}_feeleg int = SCOPE_IDENTITY();
+
+            """;
+    }
+
     /// <summary><see cref="TenantRows"/> for the schema after <c>0026</c>, before <c>0027</c>.</summary>
     public static string TenantRowsBefore0027(string prefix) => TenantRows(prefix, prefix, childTenantIds: false);
 

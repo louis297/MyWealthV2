@@ -64,6 +64,22 @@ public class TenantCompositeKeysSchemaTests
             INSERT INTO [TransactionFxDetails] ([TenantId], [TransactionId], [BaseCurrency], [QuoteCurrency], [Rate], [RateAsOfDate], [RateSource])
             VALUES (@a_tenant, @{p}_buy, 'NZD', 'USD', 0.5, '2026-11-12', N'Frankfurter');
             """),
+        ("FK_TradeFeeBands_TradeFeeSchedules_TenantId_TradeFeeScheduleId", "TradeFeeSchedules", """
+            INSERT INTO [TradeFeeBands] ([TenantId], [TradeFeeScheduleId], [FromAmount], [RatePercent])
+            VALUES (@a_tenant, @{p}_feeschedule, 1000, 0.3);
+            """),
+        ("FK_TransactionFeeDetails_TransactionCashLegs_TenantId_CashLegId", "TransactionCashLegs", """
+            INSERT INTO [TransactionFeeDetails] ([CashLegId], [TenantId], [TransactionId], [Kind], [TradeFeeScheduleId], [BasisAmount], [FeeAmount], [Currency])
+            VALUES (@{p}_feeleg, @a_tenant, @a_buy, 0, @a_feeschedule, 10, 10, 'USD');
+            """),
+        ("FK_TransactionFeeDetails_Transactions_TenantId_TransactionId", "Transactions", """
+            INSERT INTO [TransactionFeeDetails] ([CashLegId], [TenantId], [TransactionId], [Kind], [TradeFeeScheduleId], [BasisAmount], [FeeAmount], [Currency])
+            VALUES (@a_feeleg, @a_tenant, @{p}_buy, 0, @a_feeschedule, 10, 10, 'USD');
+            """),
+        ("FK_TransactionFeeDetails_TradeFeeSchedules_TenantId_TradeFeeScheduleId", "TradeFeeSchedules", """
+            INSERT INTO [TransactionFeeDetails] ([CashLegId], [TenantId], [TransactionId], [Kind], [TradeFeeScheduleId], [BasisAmount], [FeeAmount], [Currency])
+            VALUES (@a_feeleg, @a_tenant, @a_buy, 0, @{p}_feeschedule, 10, 10, 'USD');
+            """),
         ("FK_PortfolioLines_Portfolios_TenantId_PortfolioId", "Portfolios", """
             INSERT INTO [PortfolioLines] ([TenantId], [PortfolioId], [InstrumentId], [TargetWeight], [SortOrder])
             VALUES (@a_tenant, @{p}_portfolio, @a_instrument, 10, 1);
@@ -113,7 +129,7 @@ public class TenantCompositeKeysSchemaTests
     ];
 
     private static readonly string[] Parents =
-        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules"];
+        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs"];
 
     private static IEnumerable<TestCaseData> CompositeKeyCases() =>
         CompositeKeys.Select(key => new TestCaseData(key.ForeignKey).SetName($"Insert_ChildPointingAtOtherTenant_IsRejected({key.ForeignKey})"));
@@ -247,6 +263,8 @@ public class TenantCompositeKeysSchemaTests
             command.CommandText =
                 ScratchSchemaDatabase.TenantRows("a", Guid.NewGuid().ToString("N")[..12])
                 + ScratchSchemaDatabase.TenantRows("b", Guid.NewGuid().ToString("N")[..12])
+                + ScratchSchemaDatabase.FeeRows("a")
+                + ScratchSchemaDatabase.FeeRows("b")
                 + $"""
                    DECLARE @identity nvarchar(450) = CONVERT(nvarchar(450), NEWID());
                    DECLARE @report int = (SELECT [Id] FROM [Reports] WHERE [Code] = N'adviser-balances');
