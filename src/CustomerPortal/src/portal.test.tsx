@@ -68,7 +68,7 @@ function callOf(input: RequestInfo | URL, init?: RequestInit) {
   return { url, method, credentials, headers };
 }
 
-function renderAt(path: string, person = me, activity: unknown[] = []) {
+function renderAt(path: string, person = me, activity: unknown[] = [], custodyMode = "External") {
   const fetchMock = vi.mocked(fetch);
   fetchMock.mockImplementation(async (input, init) => {
     const { url, method } = callOf(input, init);
@@ -94,14 +94,14 @@ function renderAt(path: string, person = me, activity: unknown[] = []) {
       return json({ items: activity, page: 1, pageSize: 20, totalCount: activity.length });
     }
     if (url.endsWith("/accounts/account-1")) {
-      return json({ id: "account-1", name: "Everyday", type: "Bank", currency: "NZD", status: "Open" });
+      return json({ id: "account-1", name: "Everyday", type: "Bank", custodyMode, currency: "NZD", status: "Open" });
     }
     if (url.includes("/accounts/missing")) {
       return new Response(JSON.stringify({ detail: "missing" }), { status: 404 });
     }
     if (url.includes("/accounts?")) {
       return json({
-        items: [{ id: "account-1", name: "Everyday", type: "Bank", currency: "NZD", cashBalance: 100, status: "Open" }],
+        items: [{ id: "account-1", name: "Everyday", type: "Bank", custodyMode, currency: "NZD", cashBalance: 100, status: "Open" }],
         page: 1,
         pageSize: 20,
         totalCount: 1,
@@ -189,6 +189,27 @@ describe("Customer Portal", () => {
     renderAt("/dashboard", { ...me, role: "tenantAdmin", name: "Tess" });
     expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
+  });
+
+  it("shows the custody label next to the type on the accounts list", async () => {
+    renderAt("/accounts");
+
+    expect(await screen.findByRole("link", { name: "Everyday" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Custody" })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "Held elsewhere" })).toBeInTheDocument();
+    expect(screen.queryByText("External")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["External", "Held elsewhere"],
+    ["Custodial", "Held on platform"],
+    ["Vault", "Vault"],
+  ])("shows custody mode %s on the account page as %s", async (custodyMode, label) => {
+    renderAt("/accounts/account-1", me, [], custodyMode);
+
+    expect(await screen.findByRole("heading", { name: "Everyday" })).toBeInTheDocument();
+    expect(screen.getByText("Custody")).toBeInTheDocument();
+    expect(screen.getByText(label)).toBeInTheDocument();
   });
 
   it("shows not found for another account and no write controls", async () => {

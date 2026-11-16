@@ -5,6 +5,7 @@ export type Account = {
   id: string;
   name: string;
   type: string;
+  custodyMode: string;
   currency: string;
   cashBalance: number;
   status: string;
