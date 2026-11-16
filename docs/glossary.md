@@ -1,6 +1,6 @@
 ---
 title: Glossary
-status: draft
+status: accepted
 language: en
 created: 2026-09-05
 updated: 2026-11-16
