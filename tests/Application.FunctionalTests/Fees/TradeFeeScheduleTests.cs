@@ -195,8 +195,7 @@ public class TradeFeeScheduleTests : TestBase
         var (_, _, customer, admin) = await AccountHttp.SignInTenantAdmin();
         var (accountId, instrumentId) = await FeeHttp.TradingAccountAsync(admin.AccessToken, customer.PublicId);
         var tradeDate = FeeHttp.Today.AddDays(20);
-        (await FeeHttp.PostTradeAsync(admin.AccessToken, accountId, "Buy", instrumentId, 2m, FeeHttp.At(tradeDate)))
-            .StatusCode.ShouldBe(HttpStatusCode.Created);
+        await FeeHttp.InsertBuyAsync(accountId, instrumentId, 2m, tradeDate);
 
         var onTradeDate = await FeeHttp.Send(HttpMethod.Post, Schedules, admin.AccessToken, FeeHttp.ScheduleBody("USD", tradeDate));
         onTradeDate.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
@@ -318,8 +317,7 @@ public class TradeFeeScheduleTests : TestBase
         var (_, _, customer, admin) = await AccountHttp.SignInTenantAdmin();
         var (accountId, instrumentId) = await FeeHttp.TradingAccountAsync(admin.AccessToken, customer.PublicId);
         var id = await FeeHttp.CreateScheduleAsync(admin.AccessToken, "USD", FeeHttp.Today.AddDays(5));
-        (await FeeHttp.PostTradeAsync(admin.AccessToken, accountId, "Buy", instrumentId, 2m, FeeHttp.At(FeeHttp.Today.AddDays(6))))
-            .StatusCode.ShouldBe(HttpStatusCode.Created);
+        await FeeHttp.InsertBuyAsync(accountId, instrumentId, 2m, FeeHttp.Today.AddDays(6));
         using (var item = await FeeHttp.GetScheduleAsync(admin.AccessToken, id))
         {
             item.RootElement.GetProperty("inEffect").GetBoolean().ShouldBeTrue();
@@ -452,8 +450,7 @@ public class TradeFeeScheduleTests : TestBase
             "South Advisory", "south-advisory", "tess@south.example",
             adviserEmail: "ann@south.example", customerEmail: "ned@south.example");
         var (accountId, instrumentId) = await FeeHttp.TradingAccountAsync(south.AccessToken, southCustomer.PublicId);
-        (await FeeHttp.PostTradeAsync(south.AccessToken, accountId, "Buy", instrumentId, 2m, FeeHttp.At(FeeHttp.Today.AddDays(20))))
-            .StatusCode.ShouldBe(HttpStatusCode.Created);
+        await FeeHttp.InsertBuyAsync(accountId, instrumentId, 2m, FeeHttp.Today.AddDays(20));
 
         await FeeHttp.CreateScheduleAsync(north.AccessToken, "USD", FeeHttp.Today.AddDays(1));
     }

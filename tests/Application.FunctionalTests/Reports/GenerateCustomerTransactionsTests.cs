@@ -49,7 +49,7 @@ public class GenerateCustomerTransactionsTests : TestBase
         (await PostCashAsync(admin.AccessToken, closed, -3.00m, "2026-04-01T01:00:00Z", "closed-out"))
             .StatusCode.ShouldBe(HttpStatusCode.Created);
         await CloseAsync(admin.AccessToken, closed);
-        (await PostCashAsync(admin.AccessToken, everyday, 4.00m, "2099-01-01T00:00:00Z", "outside-window"))
+        (await PostCashAsync(admin.AccessToken, everyday, 4.00m, "2025-12-31T00:00:00Z", "outside-window"))
             .StatusCode.ShouldBe(HttpStatusCode.Created);
 
         var created = await TenantHttp.Send(

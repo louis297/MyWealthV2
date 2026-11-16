@@ -138,6 +138,7 @@ Before the red commit, one test-only commit changes the Fees functional tests, s
 
 - `TradeFeeTradeTests` (6 trades) and `TradeFeeReaderTests` (4 trades) create a schedule from tomorrow over HTTP and then post a trade dated after it, only to get a fee on the trade. They insert the schedule directly with an `effectiveFrom` of today or earlier instead, and post the trade with a `bookedAt` that is not in the future. `TradeFeeRebalanceTests.AddScheduleStartingTodayAsync` already inserts a schedule this way; it moves to `FeeHttp`.
 - Three tests in `TradeFeeScheduleTests` prove the trade-date branch of trade-fees R9: `Create_NotAfterAFutureDatedBuy_Returns400_OtherCurrenciesAreNotAffected`, `UpdateAndDelete_InEffect_Return409FeeScheduleInEffect` and `OtherTenantsTrades_DoNotMoveTheCutOff`. They insert the future-dated `Buy` directly through `Transaction.PostBuy`, as a row posted before this fix. Their assertions do not change.
+- `GenerateCustomerTransactionsTests` posts its "outside-window" `TransferIn` at `2099-01-01`. It posts it on `2025-12-31` instead, before the report's `from` date, so the row is still outside the window.
 
 That commit passes on its own. Then:
 
