@@ -89,7 +89,7 @@ public class Accounts : IEndpointGroup
     }
 
     [EndpointSummary("Rename an account")]
-    [EndpointDescription("Updates the account display name. Type and currency cannot change.")]
+    [EndpointDescription("Updates the account display name. Type, custody mode and currency cannot change.")]
     public static async Task<NoContent> UpdateAccount(ISender sender, Guid id, UpdateAccountCommand command)
     {
         command.Id = id;
