@@ -33,7 +33,7 @@ public sealed class AccountDto
         CustomerId = customer.PublicId,
         Name = account.Name,
         Type = account.Type.ToString(),
-        CustodyMode = string.Empty,
+        CustodyMode = account.CustodyMode.ToString(),
         Currency = account.Currency,
         CashBalance = cashBalance,
         Status = account.Status.ToString(),

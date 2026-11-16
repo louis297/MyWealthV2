@@ -30,6 +30,9 @@ public class GetAccountsQueryValidator : AbstractValidator<GetAccountsQuery>
         RuleFor(query => query.Type)
             .Must(type => type is null || Enum.TryParse<AccountType>(type, ignoreCase: false, out _))
             .WithMessage("Type must be an account type name.");
+        RuleFor(query => query.CustodyMode)
+            .Must(custodyMode => custodyMode is null || Enum.GetNames<CustodyMode>().Contains(custodyMode))
+            .WithMessage("CustodyMode must be External or Custodial.");
 
         When(_ => currentUser.Role == UserRole.SystemAdmin, () =>
         {
@@ -91,6 +94,12 @@ public class GetAccountsQueryHandler(IApplicationDbContext db, ICurrentUser curr
         if (request.Type is not null && Enum.TryParse<AccountType>(request.Type, ignoreCase: false, out var type))
         {
             query = query.Where(row => row.account.Type == type);
+        }
+
+        if (request.CustodyMode is not null)
+        {
+            var custodyMode = Enum.Parse<CustodyMode>(request.CustodyMode);
+            query = query.Where(row => row.account.CustodyMode == custodyMode);
         }
 
         var search = request.Search?.Trim();
