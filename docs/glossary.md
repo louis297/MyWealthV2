@@ -3,7 +3,7 @@ title: Glossary
 status: accepted
 language: en
 created: 2026-09-05
-updated: 2026-11-16
+updated: 2026-11-17
 related:
   - function-plan.md
   - domain-model.md
@@ -50,6 +50,9 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | Account | Value container under a Customer (bank, cash, brokerage, property, liability, …). Phase 2. | An Identity login |
 | Account.Currency | Currency of that account’s cash ledger. Immutable after open. | Instrument quote currency; tenant reporting currency |
 | Account.Type | Capability gate on the container. Immutable after open. Phase 2 selectable: Bank, Cash, Brokerage, Other. | A product module; a stand-in that uses Other for Property or Credit |
+| Custody mode | `Account.CustodyMode`: who holds the assets of an Account, and so where its numbers come from. `External` or `Custodial`. Set at open, immutable. Independent of `Account.Type`. ADR 0020; [features/account-custody-mode.md](features/account-custody-mode.md) (`review`). | `Account.Type`; a setting on the Tenant; "book type" (Book is an Adviser's set of Customers) |
+| External account | An Account with custody mode `External`. The assets are held outside the platform; the platform records what happened elsewhere, with numbers the caller supplies. Every Account opened before script `0031` is External. | An account the platform has a data connection to; the off-books counterparty of a `TransferIn` / `TransferOut`; a Closed account |
+| Custodial account | An Account with custody mode `Custodial`. The assets are held by the platform and the platform executes the trades, so the platform's ledger is the authoritative record. Reserved: it cannot be opened until a later spec adds its rules. | A `Brokerage` account (that is the type); a legal structure such as individual, joint or trust |
 | AccountStatus | `Open` / `Closed`. Source of truth for an account. HTTP close / reopen. | Instrument disable; `UserStatus` |
 | Account.IsActive | Derived filter bit. `1` iff `Status = Open`. Inactive accounts drop out of later net worth. | A writable body field; `IsEnabled` |
 | Cash ledger | Cash entries and balance in the account’s booking currency. Phase 2. Owned by the posting spec, not a separate Feature Spec. | Holding quantity |
