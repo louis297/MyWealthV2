@@ -46,6 +46,7 @@ const account = {
   customerId,
   name: "Everyday spending",
   type: "Bank",
+  custodyMode: "External",
   currency: "NZD",
   status: "Open",
   isActive: true,
@@ -187,6 +188,8 @@ describe("CustomerDetailPage", () => {
     );
     expect(screen.getByText("1250.5")).toBeInTheDocument();
     expect(screen.getByText("Bank")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Custody" })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "External" })).toBeInTheDocument();
     expect(screen.getByText("NZD")).toBeInTheDocument();
     expect(screen.getByText("Open")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "New account" })).toHaveAttribute(

@@ -136,6 +136,7 @@ describe("CreateAccountPage", () => {
       customerId,
       name: "Everyday spending",
       type: "Bank",
+      custodyMode: "External",
       currency: "NZD",
     });
 
@@ -161,9 +162,11 @@ describe("CreateAccountPage", () => {
       customerId,
       name: "Everyday spending",
       type: "Bank",
+      custodyMode: "External",
       currency: "NZD",
     });
     expect(body).not.toHaveProperty("tenantId");
+    expect(screen.queryByLabelText(/custody/i)).toBeNull();
   });
 
   it("shows a validation error and stays on the form", async () => {

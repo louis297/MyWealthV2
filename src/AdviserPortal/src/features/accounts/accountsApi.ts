@@ -7,6 +7,7 @@ export type Account = {
   customerId: string;
   name: string;
   type: string;
+  custodyMode: string;
   currency: string;
   cashBalance: number;
   status: string;
