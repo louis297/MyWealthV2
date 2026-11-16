@@ -45,6 +45,7 @@ public class CreateAccountTests : TestBase
             customerId = customer.PublicId,
             name = "  Everyday spending  ",
             type = "Bank",
+            custodyMode = "External",
             currency = "nzd"
         });
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
@@ -61,6 +62,7 @@ public class CreateAccountTests : TestBase
         item.RootElement.GetProperty("customerId").GetGuid().ShouldBe(customer.PublicId);
         item.RootElement.GetProperty("name").GetString().ShouldBe("Everyday spending");
         item.RootElement.GetProperty("type").GetString().ShouldBe("Bank");
+        item.RootElement.GetProperty("custodyMode").GetString().ShouldBe("External");
         item.RootElement.GetProperty("currency").GetString().ShouldBe("NZD");
         item.RootElement.GetProperty("status").GetString().ShouldBe("Open");
         item.RootElement.GetProperty("isActive").GetBoolean().ShouldBeTrue();
@@ -101,6 +103,7 @@ public class CreateAccountTests : TestBase
             customerId = customer.PublicId,
             name = "Everyday spending",
             type = "Bank",
+            custodyMode = "External",
             currency = "NZD"
         });
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
@@ -123,6 +126,7 @@ public class CreateAccountTests : TestBase
             customerId = customer.PublicId,
             name = "Everyday spending",
             type = "Bank",
+            custodyMode = "External",
             currency = "NZD"
         });
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
@@ -139,6 +143,7 @@ public class CreateAccountTests : TestBase
             customerId = customer.PublicId,
             name = "Everyday spending",
             type = "Bank",
+            custodyMode = "External",
             currency = "NZD"
         });
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
@@ -155,6 +160,7 @@ public class CreateAccountTests : TestBase
             customerId = customer.PublicId,
             name = "Everyday spending",
             type = "Bank",
+            custodyMode = "External",
             currency = "NZD"
         });
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
@@ -184,6 +190,7 @@ public class CreateAccountTests : TestBase
             customerId = customer.PublicId,
             name = "House",
             type = "Property",
+            custodyMode = "External",
             currency = "NZD"
         })).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
 
@@ -192,6 +199,7 @@ public class CreateAccountTests : TestBase
             customerId = customer.PublicId,
             name = "Card",
             type = "Credit",
+            custodyMode = "External",
             currency = "NZD"
         })).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
@@ -206,6 +214,7 @@ public class CreateAccountTests : TestBase
             customerId = customer.PublicId,
             name = "Everyday spending",
             type = "Vault",
+            custodyMode = "External",
             currency = "NZD"
         });
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
@@ -236,6 +245,7 @@ public class CreateAccountTests : TestBase
             customerId = customer.PublicId,
             name = "Everyday spending",
             type = "Bank",
+            custodyMode = "External",
             currency = "XXX"
         });
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
@@ -266,6 +276,7 @@ public class CreateAccountTests : TestBase
             customerId = customer.PublicId,
             name = "Everyday spending",
             type = "Bank",
+            custodyMode = "External",
             currency = "NZD"
         });
 
@@ -302,6 +313,7 @@ public class CreateAccountTests : TestBase
             customerId = customer.PublicId,
             name = "Everyday spending",
             type = "Bank",
+            custodyMode = "External",
             currency = "NZD",
             status = "Closed"
         })).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
@@ -311,6 +323,7 @@ public class CreateAccountTests : TestBase
             customerId = customer.PublicId,
             name = "Everyday spending",
             type = "Bank",
+            custodyMode = "External",
             currency = "NZD",
             isActive = false
         })).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
@@ -331,6 +344,7 @@ public class CreateAccountTests : TestBase
         customerId,
         name = "Everyday spending",
         type = "Bank",
+        custodyMode = "External",
         currency = "NZD"
     };
 

@@ -67,6 +67,7 @@ internal static class AccountHttp
             customerId,
             name,
             type,
+            custodyMode = "External",
             currency
         });
         response.StatusCode.ShouldBe(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());

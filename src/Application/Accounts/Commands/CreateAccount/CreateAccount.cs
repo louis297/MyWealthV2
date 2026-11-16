@@ -20,6 +20,8 @@ public class CreateAccountCommand : IRequest<Guid>
 
     public required string Type { get; init; }
 
+    public string? CustodyMode { get; init; }
+
     public required string Currency { get; init; }
 
     public string? Status { get; init; }
