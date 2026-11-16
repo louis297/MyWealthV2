@@ -245,16 +245,7 @@ public class GenerateCustomerTransactionsTests : TestBase
 
     private static async Task<Guid> OpenAccountAsync(string accessToken, Guid customerId, string name, string type)
     {
-        var response = await AccountHttp.Send(HttpMethod.Post, "/accounts", accessToken, new
-        {
-            customerId,
-            name,
-            type,
-            currency = "NZD"
-        });
-        response.StatusCode.ShouldBe(HttpStatusCode.Created);
-        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        return json.RootElement.GetProperty("id").GetGuid();
+        return await AccountHttp.OpenAccountAsync(accessToken, customerId, name, type);
     }
 
     private static async Task<Guid> CreateInstrumentAsync(string accessToken, string symbol)

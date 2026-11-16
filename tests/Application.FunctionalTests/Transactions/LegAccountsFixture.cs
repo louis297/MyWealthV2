@@ -129,15 +129,6 @@ internal static class LegAccountsFixture
 
     private static async Task<Guid> OpenAccountAsync(string accessToken, Guid customerId, string name)
     {
-        var response = await AccountHttp.Send(HttpMethod.Post, "/accounts", accessToken, new
-        {
-            customerId,
-            name,
-            type = "Bank",
-            currency = "NZD"
-        });
-        response.StatusCode.ShouldBe(HttpStatusCode.Created);
-        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        return json.RootElement.GetProperty("id").GetGuid();
+        return await AccountHttp.OpenAccountAsync(accessToken, customerId, name);
     }
 }

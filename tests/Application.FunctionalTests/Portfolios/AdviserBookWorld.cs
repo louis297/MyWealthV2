@@ -161,16 +161,8 @@ internal sealed class AdviserBookWorld
 
     private static async Task<Guid> CreateFundedAccountAsync(string accessToken, Guid customerId)
     {
-        var response = await Accounts.AccountHttp.Send(HttpMethod.Post, "/accounts", accessToken, new
-        {
-            customerId,
-            name = "Model",
-            type = "Brokerage",
-            currency = "NZD"
-        });
-        response.StatusCode.ShouldBe(HttpStatusCode.Created);
-        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        var accountId = json.RootElement.GetProperty("id").GetGuid();
+        var accountId = await Accounts.AccountHttp.OpenAccountAsync(
+            accessToken, customerId, name: "Model", type: "Brokerage");
         (await Transactions.TransactionHttp.Send(HttpMethod.Post, "/transactions", accessToken, new
         {
             accountId,

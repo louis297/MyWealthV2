@@ -318,16 +318,7 @@ public class InternalTransferTests : TestBase
         string currency = "NZD",
         string type = "Bank")
     {
-        var response = await AccountHttp.Send(HttpMethod.Post, "/accounts", accessToken, new
-        {
-            customerId,
-            name,
-            type,
-            currency
-        });
-        response.StatusCode.ShouldBe(HttpStatusCode.Created);
-        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        return json.RootElement.GetProperty("id").GetGuid();
+        return await AccountHttp.OpenAccountAsync(accessToken, customerId, name, type, currency);
     }
 
     private static async Task ShouldRejectAsync(LegAccountsWorld world, object body)
