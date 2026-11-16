@@ -22,8 +22,8 @@ public class TenantCompositeKeysSchemaTests
             VALUES (NEWID(), @a_tenant, N'New customer', N'new@a.example', 3, 1, @{p}_adviser, @identity, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET());
             """),
         ("FK_Accounts_Users_TenantId_CustomerId", "Users", """
-            INSERT INTO [Accounts] ([PublicId], [TenantId], [CustomerId], [Name], [Type], [Status], [Currency], [Created], [CreatedBy])
-            VALUES (NEWID(), @a_tenant, @{p}_customer, N'New', 0, 0, 'NZD', SYSDATETIMEOFFSET(), N'test');
+            INSERT INTO [Accounts] ([PublicId], [TenantId], [CustomerId], [Name], [Type], [CustodyMode], [Status], [Currency], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @{p}_customer, N'New', 0, 0, 0, 'NZD', SYSDATETIMEOFFSET(), N'test');
             """),
         ("FK_Holdings_Accounts_TenantId_AccountId", "Accounts", """
             INSERT INTO [Holdings] ([PublicId], [TenantId], [AccountId], [InstrumentId], [Quantity], [CostAmount], [CostCurrency], [Created], [CreatedBy])
@@ -224,8 +224,8 @@ public class TenantCompositeKeysSchemaTests
         await using var db = await ScratchSchemaDatabase.CreateAsync("TenantCompositeKeysPrecheck");
         await db.ApplyBeforeAsync(TenantCompositeKeysScript);
         await db.ExecuteAsync(
-            ScratchSchemaDatabase.TenantRows("a", Guid.NewGuid().ToString("N")[..12])
-            + ScratchSchemaDatabase.TenantRows("b", Guid.NewGuid().ToString("N")[..12])
+            ScratchSchemaDatabase.TenantRows("a", Guid.NewGuid().ToString("N")[..12], custodyMode: false)
+            + ScratchSchemaDatabase.TenantRows("b", Guid.NewGuid().ToString("N")[..12], custodyMode: false)
             + """
               INSERT INTO [Holdings] ([PublicId], [TenantId], [AccountId], [InstrumentId], [Quantity], [CostAmount], [CostCurrency], [Created], [CreatedBy])
               VALUES (NEWID(), @a_tenant, @b_brokerage, @a_instrument, 1, 10, 'USD', SYSDATETIMEOFFSET(), N'test');

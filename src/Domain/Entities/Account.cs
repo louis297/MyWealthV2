@@ -47,6 +47,7 @@ public class Account : BaseAuditableEntity
             CustomerId = customerId,
             Name = NormaliseName(name),
             Type = type,
+            CustodyMode = custodyMode,
             Currency = currency.Code,
             PublicId = publicId ?? Guid.NewGuid(),
             Status = AccountStatus.Open

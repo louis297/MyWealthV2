@@ -308,9 +308,9 @@ public class AccountsSchemaTests
         await using var command = db.Database.GetDbConnection().CreateCommand();
         command.CommandText = """
             INSERT INTO [Accounts]
-                ([PublicId], [TenantId], [CustomerId], [Name], [Type], [Status], [Currency], [Created], [CreatedBy])
+                ([PublicId], [TenantId], [CustomerId], [Name], [Type], [CustodyMode], [Status], [Currency], [Created], [CreatedBy])
             VALUES
-                (NEWID(), @tenantId, @customerId, @name, @type, @status, 'NZD', SYSDATETIMEOFFSET(), N'system')
+                (NEWID(), @tenantId, @customerId, @name, @type, 0, @status, 'NZD', SYSDATETIMEOFFSET(), N'system')
             """;
         AddParameter(command, "@tenantId", tenantId);
         AddParameter(command, "@customerId", customerId);

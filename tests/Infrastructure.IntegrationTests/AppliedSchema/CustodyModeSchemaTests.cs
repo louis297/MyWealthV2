@@ -89,7 +89,7 @@ public class CustodyModeSchemaTests
     {
         await using var db = await ScratchSchemaDatabase.CreateAsync("CustodyModeBackfill");
         await db.ApplyBeforeAsync(CustodyModeScript);
-        await db.ExecuteAsync(ScratchSchemaDatabase.TenantRows("a", Guid.NewGuid().ToString("N")[..12]));
+        await db.ExecuteAsync(ScratchSchemaDatabase.TenantRows("a", Guid.NewGuid().ToString("N")[..12], custodyMode: false));
         var before = await db.ReadAsync("SELECT [Id] FROM [Accounts] ORDER BY [Id]");
 
         await db.ApplyAllAsync();
