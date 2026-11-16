@@ -99,7 +99,10 @@ public class CreateInternalTransferCommandValidator : AbstractValidator<CreateIn
     }
 }
 
-public class CreateInternalTransferCommandHandler(IApplicationDbContext db, ICurrentUser currentUser)
+public class CreateInternalTransferCommandHandler(
+    IApplicationDbContext db,
+    ICurrentUser currentUser,
+    ICurrencyCatalog currencies)
     : IRequestHandler<CreateInternalTransferCommand, IdempotentResult>
 {
     private const string DefaultPath = "/transactions/transfer";
@@ -207,6 +210,8 @@ public class CreateInternalTransferCommandHandler(IApplicationDbContext db, ICur
                     "The from and to accounts must have the same currency.")
             ]);
         }
+
+        CashAmountPlaces.EnsureFits(currencies, fromCurrency, request.Amount!.Value);
 
         var fromSum = await TransactionCash.SumAsync(db, from.Account.Id, cancellationToken);
         Domain.Entities.Transaction transaction;
