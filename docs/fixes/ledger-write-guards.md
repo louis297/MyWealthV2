@@ -3,7 +3,7 @@ title: Fix - Reversal order, cash decimal places and future bookedAt
 status: accepted
 language: en
 created: 2026-11-16
-updated: 2026-11-16
+updated: 2026-11-17
 related:
   - ../features/posting.md
   - ../features/holdings.md
@@ -22,7 +22,7 @@ related:
 
 # Fix: Reversal order, cash decimal places and future bookedAt
 
-Status: accepted (2026-11-16). Build contract. Not landed.
+Status: accepted (2026-11-16). Build contract. Landed: B1 (`Transaction.Reverse` and the `ReverseTransaction` handler), B2 (`CreateTransaction` and `CreateInternalTransfer` handlers), B3 (`BookedAtRules` in the four validators).
 
 Three guards on ledger writes in `webapi`. No script, no new route, no new policy, no new problem code, no portal change.
 
