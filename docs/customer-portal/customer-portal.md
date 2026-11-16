@@ -4,7 +4,7 @@ status: accepted
 phase: 3
 language: en
 created: 2026-11-02
-updated: 2026-11-15
+updated: 2026-11-17
 related:
   - README.md
   - ../adviser-portal/frontend-conventions.md
@@ -12,6 +12,7 @@ related:
   - ../features/identity-auth.md
   - ../features/bff-customer-portal.md
   - ../features/accounts.md
+  - ../features/account-custody-mode.md
   - ../features/holdings.md
   - ../features/posting.md
   - ../features/net-worth.md
@@ -174,6 +175,22 @@ Requires the BFF and the backend amendments above. Do not re-test Adviser Portal
 | C10 | Customer | Sign out | BFF cookie cleared. Refresh revoked. IdentityHost end-session clears only the `customer-portal` scheme cookie. Next visit is hosted `/login`. No token keys in `sessionStorage`. |
 | C11 | Deep link `/accounts/{id}` while signed out | After callback | Returns to that path when it is an in-app path. |
 | C12 | Customer | Profile password change | 204 then the app clears the session and starts authorize again. |
+
+---
+
+## Amendment 2026-11-17 (account custody mode) — review
+
+Status of this amendment: `review`. Accept it together with [account-custody-mode](../features/account-custody-mode.md). Until then the pages above are unchanged.
+
+The account item from `GET /accounts` and `GET /accounts/{id}` gains `custodyMode` (`External` / `Custodial`). The Customer already receives it with `accounts.read`; no backend grant changes.
+
+- `/accounts` and `/accounts/:id`: show "Custody" next to "Type".
+- The text is a label, not the enum name: `External` → "Held elsewhere", `Custodial` → "Held on platform". A value the portal does not know is shown as received.
+- No grouping of accounts by custody mode and no explanatory sentence yet. Both belong to a later read-model slice.
+
+| Id | Given | When | Then |
+| --- | --- | --- | --- |
+| C13 | Customer with an External account | Accounts list and account page | "Custody" shows "Held elsewhere" next to the account type. |
 
 ---
 

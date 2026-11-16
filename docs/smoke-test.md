@@ -3,7 +3,7 @@ title: Smoke test
 status: accepted
 language: en
 created: 2026-11-12
-updated: 2026-11-13
+updated: 2026-11-17
 related:
   - README.md
   - glossary.md
@@ -71,7 +71,7 @@ The **smoke tenant** is a tenant used only by this suite. It stays enabled.
 | TenantAdmin | `smoke-admin@localhost` — needed only to create the rows below by hand in production |
 | Adviser | `Smoke Adviser`, `smoke-adviser@localhost` |
 | Customer | `Smoke Customer`, `smoke-customer@localhost`, assigned to Smoke Adviser |
-| Account | `Smoke Cash`, type Bank, currency `NZD`, owned by Smoke Customer |
+| Account | `Smoke Cash`, type Bank, currency `NZD`, owned by Smoke Customer. Custody mode `External` once [account custody mode](features/account-custody-mode.md) (`review`) lands: script `0031` sets it on an existing row, the Development seed passes it, and the New account form sends it |
 | Transaction | One `TransferIn` of `NZD 1,000.00` into Smoke Cash |
 
 - The data is **cash only, in the reporting currency**. Net worth then needs no instrument price and no FX rate, so it always renders and stays stable for any later test that checks the amount.
