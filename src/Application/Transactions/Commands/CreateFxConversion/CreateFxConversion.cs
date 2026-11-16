@@ -68,7 +68,7 @@ public class CreateFxConversionCommand : IRequest<IdempotentResult>
 
 public class CreateFxConversionCommandValidator : AbstractValidator<CreateFxConversionCommand>
 {
-    public CreateFxConversionCommandValidator(ICurrentUser currentUser)
+    public CreateFxConversionCommandValidator(ICurrentUser currentUser, TimeProvider time)
     {
         RuleFor(command => command.FromAccountId).NotEmpty();
         RuleFor(command => command.ToAccountId).NotEmpty();
@@ -92,7 +92,7 @@ public class CreateFxConversionCommandValidator : AbstractValidator<CreateFxConv
             .NotNull()
             .GreaterThan(0)
             .WithMessage("Expected rate is required. Get a quote first.");
-        RuleFor(command => command.BookedAt).NotNull();
+        RuleFor(command => command.BookedAt).NotNull().NotInTheFuture(time);
         RuleFor(command => command.Memo)
             .Must(memo => memo is null || memo.Trim().Length is >= 1 and <= 200)
             .WithMessage("Memo must be 1 to 200 characters.");

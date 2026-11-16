@@ -79,7 +79,7 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
         "Buy", "Sell", "StockIn", "StockOut", "Split", "Bonus", "Scrip"
     ];
 
-    public CreateTransactionCommandValidator(ICurrentUser currentUser)
+    public CreateTransactionCommandValidator(ICurrentUser currentUser, TimeProvider time)
     {
         RuleFor(command => command.AccountId).NotEmpty();
         RuleFor(command => command.Fee)
@@ -88,7 +88,7 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
         RuleFor(command => command.Type)
             .Must(type => type is not null && AllowedTypes.Contains(type))
             .WithMessage("Type must be TransferIn, TransferOut, Interest, CloseOut, Opening, OpeningHoldings, Buy, Sell, StockIn, StockOut, Split, Bonus, or Scrip.");
-        RuleFor(command => command.BookedAt).NotNull();
+        RuleFor(command => command.BookedAt).NotNull().NotInTheFuture(time);
         RuleFor(command => command.Memo)
             .Must(memo => memo is null || memo.Trim().Length is >= 1 and <= 200)
             .WithMessage("Memo must be 1 to 200 characters.");

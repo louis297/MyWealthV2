@@ -55,7 +55,7 @@ public class CreateInternalTransferCommand : IRequest<IdempotentResult>
 
 public class CreateInternalTransferCommandValidator : AbstractValidator<CreateInternalTransferCommand>
 {
-    public CreateInternalTransferCommandValidator(ICurrentUser currentUser)
+    public CreateInternalTransferCommandValidator(ICurrentUser currentUser, TimeProvider time)
     {
         RuleFor(command => command.FromAccountId).NotEmpty();
         RuleFor(command => command.ToAccountId).NotEmpty();
@@ -67,7 +67,7 @@ public class CreateInternalTransferCommandValidator : AbstractValidator<CreateIn
             .NotNull()
             .GreaterThan(0)
             .WithMessage("Amount must be greater than 0.");
-        RuleFor(command => command.BookedAt).NotNull();
+        RuleFor(command => command.BookedAt).NotNull().NotInTheFuture(time);
         RuleFor(command => command.Memo)
             .Must(memo => memo is null || memo.Trim().Length is >= 1 and <= 200)
             .WithMessage("Memo must be 1 to 200 characters.");

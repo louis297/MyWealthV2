@@ -11,5 +11,6 @@ public static class BookedAtRules
     public static IRuleBuilderOptions<T, DateTimeOffset?> NotInTheFuture<T>(
         this IRuleBuilder<T, DateTimeOffset?> rule,
         TimeProvider time) =>
-        rule.Must(_ => true).WithMessage(FutureMessage);
+        rule.Must(bookedAt => bookedAt is null || bookedAt.Value <= time.GetUtcNow() + FutureAllowance)
+            .WithMessage(FutureMessage);
 }
