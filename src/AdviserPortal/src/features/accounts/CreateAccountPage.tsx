@@ -44,6 +44,7 @@ export function CreateAccountPage() {
         customerId,
         name: name.trim(),
         type,
+        custodyMode: "External",
         currency,
       }).unwrap();
       void navigate(`/accounts/${created.id}`);

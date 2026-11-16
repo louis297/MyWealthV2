@@ -114,6 +114,33 @@ public class UpdateAccountTests : TestBase
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
+    [TestCase("External")]
+    [TestCase("Custodial")]
+    public async Task PutWithCustodyMode_Returns400AndKeepsTheName(string custodyMode)
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInTenantAdmin();
+        var id = await CreateAsync(tokens.AccessToken, customer.PublicId);
+        var rowVersion = await ReadRowVersion(id, tokens.AccessToken);
+
+        var response = await AccountHttp.Send(
+            HttpMethod.Put, $"/accounts/{id}", tokens.AccessToken, new
+            {
+                name = "Renamed",
+                custodyMode,
+                rowVersion
+            });
+
+        var content = await response.Content.ReadAsStringAsync();
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest, content);
+        using var json = JsonDocument.Parse(content);
+        json.RootElement.GetProperty("errors").EnumerateObject()
+            .Select(property => property.Name)
+            .ShouldContain(name => string.Equals(name, "CustodyMode", StringComparison.OrdinalIgnoreCase));
+        using var item = await ReadItem(id, tokens.AccessToken);
+        item.RootElement.GetProperty("name").GetString().ShouldBe("Everyday spending");
+        item.RootElement.GetProperty("custodyMode").GetString().ShouldBe("External");
+    }
+
     [Test]
     public async Task PutWithCurrency_Returns400()
     {
@@ -234,16 +261,7 @@ public class UpdateAccountTests : TestBase
 
     private static async Task<Guid> CreateAsync(string accessToken, Guid customerId)
     {
-        var response = await AccountHttp.Send(HttpMethod.Post, "/accounts", accessToken, new
-        {
-            customerId,
-            name = "Everyday spending",
-            type = "Bank",
-            currency = "NZD"
-        });
-        response.StatusCode.ShouldBe(HttpStatusCode.Created);
-        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        return json.RootElement.GetProperty("id").GetGuid();
+        return await AccountHttp.OpenAccountAsync(accessToken, customerId);
     }
 
     private static async Task<string> ReadRowVersion(Guid id, string accessToken)

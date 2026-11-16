@@ -152,16 +152,7 @@ public class AssignPortfolioTests : TestBase
 
     private static async Task<Guid> CreateAccountAsync(string accessToken, Guid customerId, string type, string name)
     {
-        var response = await Accounts.AccountHttp.Send(HttpMethod.Post, "/accounts", accessToken, new
-        {
-            customerId,
-            name,
-            type,
-            currency = "NZD"
-        });
-        response.StatusCode.ShouldBe(HttpStatusCode.Created);
-        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        return json.RootElement.GetProperty("id").GetGuid();
+        return await Accounts.AccountHttp.OpenAccountAsync(accessToken, customerId, name, type);
     }
 
     private static async Task<int> TransactionCountAsync(string accessToken, Guid accountId)

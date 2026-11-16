@@ -60,16 +60,7 @@ public class GetAccountPortfolioTests : TestBase
     private static async Task<Guid> AssignedBrokerageAsync(
         string accessToken, Guid customerId, Guid portfolioId, string name)
     {
-        var account = await Accounts.AccountHttp.Send(HttpMethod.Post, "/accounts", accessToken, new
-        {
-            customerId,
-            name,
-            type = "Brokerage",
-            currency = "NZD"
-        });
-        account.StatusCode.ShouldBe(HttpStatusCode.Created);
-        using var accountJson = JsonDocument.Parse(await account.Content.ReadAsStringAsync());
-        var accountId = accountJson.RootElement.GetProperty("id").GetGuid();
+        var accountId = await Accounts.AccountHttp.OpenAccountAsync(accessToken, customerId, name, type: "Brokerage");
 
         var funded = await Transactions.TransactionHttp.Send(
             HttpMethod.Post,

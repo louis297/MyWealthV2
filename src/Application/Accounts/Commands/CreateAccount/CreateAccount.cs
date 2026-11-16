@@ -20,6 +20,8 @@ public class CreateAccountCommand : IRequest<Guid>
 
     public required string Type { get; init; }
 
+    public string? CustodyMode { get; init; }
+
     public required string Currency { get; init; }
 
     public string? Status { get; init; }
@@ -40,6 +42,9 @@ public class CreateAccountCommandValidator : AbstractValidator<CreateAccountComm
         RuleFor(command => command.Type)
             .Must(type => type is not null && Phase2Types.Contains(type))
             .WithMessage("Type must be Bank, Cash, Brokerage, or Other.");
+        RuleFor(command => command.CustodyMode)
+            .Must(custodyMode => custodyMode == nameof(CustodyMode.External))
+            .WithMessage("CustodyMode must be External. Custodial cannot be opened yet.");
         RuleFor(command => command.Currency).NotEmpty();
         RuleFor(command => command.Status)
             .Must(status => status is null)
@@ -102,7 +107,8 @@ public class CreateAccountCommandHandler(
         }
 
         var type = Enum.Parse<AccountType>(request.Type);
-        var account = Account.Create(tenant.Id, customer.Id, request.Name, type, currency);
+        var custodyMode = Enum.Parse<CustodyMode>(request.CustodyMode!);
+        var account = Account.Create(tenant.Id, customer.Id, request.Name, type, custodyMode, currency);
         db.Accounts.Add(account);
         await db.SaveChangesAsync(cancellationToken);
         return account.PublicId;

@@ -16,6 +16,8 @@ public class Account : BaseAuditableEntity
 
     public AccountType Type { get; private set; }
 
+    public CustodyMode CustodyMode { get; private set; }
+
     public AccountStatus Status { get; private set; }
 
     public string Currency { get; private set; } = string.Empty;
@@ -33,6 +35,7 @@ public class Account : BaseAuditableEntity
         int customerId,
         string name,
         AccountType type,
+        CustodyMode custodyMode,
         Currency currency,
         Guid? publicId = null)
     {
@@ -44,6 +47,7 @@ public class Account : BaseAuditableEntity
             CustomerId = customerId,
             Name = NormaliseName(name),
             Type = type,
+            CustodyMode = custodyMode,
             Currency = currency.Code,
             PublicId = publicId ?? Guid.NewGuid(),
             Status = AccountStatus.Open

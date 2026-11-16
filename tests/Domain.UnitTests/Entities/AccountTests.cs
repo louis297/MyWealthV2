@@ -12,7 +12,7 @@ public class AccountTests
     [Test]
     public void Create_StoresTypeAndCurrencyAndOpens()
     {
-        var account = Account.Create(1, 2, "Everyday spending", AccountType.Bank, Nzd());
+        var account = Account.Create(1, 2, "Everyday spending", AccountType.Bank, CustodyMode.External, Nzd());
 
         account.TenantId.ShouldBe(1);
         account.CustomerId.ShouldBe(2);
@@ -26,7 +26,7 @@ public class AccountTests
     [Test]
     public void Create_RaisesAccountOpened()
     {
-        var account = Account.Create(1, 2, "Everyday spending", AccountType.Bank, Nzd());
+        var account = Account.Create(1, 2, "Everyday spending", AccountType.Bank, CustodyMode.External, Nzd());
 
         account.DomainEvents.OfType<AccountOpened>().ShouldHaveSingleItem();
     }
@@ -34,7 +34,7 @@ public class AccountTests
     [Test]
     public void Create_TrimsNameAndPreservesCasing()
     {
-        var account = Account.Create(1, 2, "  Everyday Spending  ", AccountType.Cash, Nzd());
+        var account = Account.Create(1, 2, "  Everyday Spending  ", AccountType.Cash, CustodyMode.External, Nzd());
 
         account.Name.ShouldBe("Everyday Spending");
     }
@@ -42,8 +42,8 @@ public class AccountTests
     [Test]
     public void Create_AllowsReservedTypesOnTheEntity()
     {
-        var property = Account.Create(1, 2, "House", AccountType.Property, Nzd());
-        var credit = Account.Create(1, 2, "Card", AccountType.Credit, Nzd());
+        var property = Account.Create(1, 2, "House", AccountType.Property, CustodyMode.External, Nzd());
+        var credit = Account.Create(1, 2, "Card", AccountType.Credit, CustodyMode.External, Nzd());
 
         property.Type.ShouldBe(AccountType.Property);
         credit.Type.ShouldBe(AccountType.Credit);
@@ -52,7 +52,7 @@ public class AccountTests
     [Test]
     public void TypeAndCurrency_CannotChange()
     {
-        var account = Account.Create(1, 2, "Everyday spending", AccountType.Bank, Nzd());
+        var account = Account.Create(1, 2, "Everyday spending", AccountType.Bank, CustodyMode.External, Nzd());
 
         account.Rename("Renamed");
 
@@ -60,10 +60,32 @@ public class AccountTests
         account.Currency.ShouldBe("NZD");
     }
 
+    [TestCase(CustodyMode.External)]
+    [TestCase(CustodyMode.Custodial)]
+    public void Create_StoresTheGivenCustodyMode(CustodyMode custodyMode)
+    {
+        var account = Account.Create(1, 2, "Everyday spending", AccountType.Brokerage, custodyMode, Nzd());
+
+        account.CustodyMode.ShouldBe(custodyMode);
+    }
+
+    [Test]
+    public void CustodyMode_SurvivesRenameCloseAndReopen()
+    {
+        var account = Account.Create(1, 2, "Everyday spending", AccountType.Brokerage, CustodyMode.Custodial, Nzd());
+
+        account.Rename("Renamed");
+        account.CustodyMode.ShouldBe(CustodyMode.Custodial);
+        account.Close();
+        account.CustodyMode.ShouldBe(CustodyMode.Custodial);
+        account.Reopen();
+        account.CustodyMode.ShouldBe(CustodyMode.Custodial);
+    }
+
     [Test]
     public void Rename_DoesNotRaiseEvents()
     {
-        var account = Account.Create(1, 2, "Everyday spending", AccountType.Bank, Nzd());
+        var account = Account.Create(1, 2, "Everyday spending", AccountType.Bank, CustodyMode.External, Nzd());
         account.ClearDomainEvents();
 
         account.Rename("  Everyday  ");
@@ -75,7 +97,7 @@ public class AccountTests
     [Test]
     public void Close_RaisesAccountClosed()
     {
-        var account = Account.Create(1, 2, "Everyday spending", AccountType.Bank, Nzd());
+        var account = Account.Create(1, 2, "Everyday spending", AccountType.Bank, CustodyMode.External, Nzd());
         account.ClearDomainEvents();
 
         account.Close();
@@ -88,7 +110,7 @@ public class AccountTests
     [Test]
     public void Close_WhenAlreadyClosed_IsNoOp()
     {
-        var account = Account.Create(1, 2, "Everyday spending", AccountType.Bank, Nzd());
+        var account = Account.Create(1, 2, "Everyday spending", AccountType.Bank, CustodyMode.External, Nzd());
         account.Close();
         account.ClearDomainEvents();
 
@@ -101,7 +123,7 @@ public class AccountTests
     [Test]
     public void Reopen_FlipsAndRaisesAccountReopenedOnce()
     {
-        var account = Account.Create(1, 2, "Everyday spending", AccountType.Bank, Nzd());
+        var account = Account.Create(1, 2, "Everyday spending", AccountType.Bank, CustodyMode.External, Nzd());
         account.Close();
         account.ClearDomainEvents();
 
@@ -115,7 +137,7 @@ public class AccountTests
     [Test]
     public void Reopen_WhenAlreadyOpen_IsNoOp()
     {
-        var account = Account.Create(1, 2, "Everyday spending", AccountType.Bank, Nzd());
+        var account = Account.Create(1, 2, "Everyday spending", AccountType.Bank, CustodyMode.External, Nzd());
         account.ClearDomainEvents();
 
         account.Reopen();
@@ -127,14 +149,14 @@ public class AccountTests
     [Test]
     public void Create_RejectsBlankName()
     {
-        Should.Throw<DomainException>(() => Account.Create(1, 2, " ", AccountType.Bank, Nzd()));
-        Should.Throw<DomainException>(() => Account.Create(1, 2, "", AccountType.Bank, Nzd()));
+        Should.Throw<DomainException>(() => Account.Create(1, 2, " ", AccountType.Bank, CustodyMode.External, Nzd()));
+        Should.Throw<DomainException>(() => Account.Create(1, 2, "", AccountType.Bank, CustodyMode.External, Nzd()));
     }
 
     [Test]
     public void Rename_RejectsBlankName()
     {
-        var account = Account.Create(1, 2, "Everyday spending", AccountType.Bank, Nzd());
+        var account = Account.Create(1, 2, "Everyday spending", AccountType.Bank, CustodyMode.External, Nzd());
 
         Should.Throw<DomainException>(() => account.Rename(" "));
         Should.Throw<DomainException>(() => account.Rename(""));
@@ -143,7 +165,7 @@ public class AccountTests
     [Test]
     public void Create_RejectsEmptyCurrency()
     {
-        Should.Throw<DomainException>(() => Account.Create(1, 2, "Everyday spending", AccountType.Bank, null!));
+        Should.Throw<DomainException>(() => Account.Create(1, 2, "Everyday spending", AccountType.Bank, CustodyMode.External, null!));
     }
 
     private static Currency Nzd() => Currency.Create("NZD", "New Zealand Dollar", 2);

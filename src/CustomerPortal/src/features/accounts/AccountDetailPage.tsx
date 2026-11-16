@@ -8,6 +8,7 @@ import {
   useGetCashBalanceQuery,
   useGetHoldingsQuery,
 } from "@/features/accounts/accountsApi";
+import { custodyLabel } from "@/features/accounts/custodyLabel";
 import { formatInstant } from "@/shared/time/instant";
 
 const typeLabels: Record<string, string> = {
@@ -51,6 +52,7 @@ export function AccountDetailPage() {
               <StatusBadge status={account.data.status} />
             </DetailItem>
             <DetailItem label="Type">{account.data.type}</DetailItem>
+            <DetailItem label="Custody">{custodyLabel(account.data.custodyMode)}</DetailItem>
             {cash.data ? (
               <DetailItem label="Cash balance">
                 {cash.data.cashBalance} {cash.data.currency}

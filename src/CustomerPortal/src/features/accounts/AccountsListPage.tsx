@@ -3,6 +3,7 @@ import { Muted, Page, PageHeading, recordLinkClass, StatusBadge } from "@/compon
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useGetAccountsQuery } from "@/features/accounts/accountsApi";
+import { custodyLabel } from "@/features/accounts/custodyLabel";
 
 export function AccountsListPage() {
   const { data, isLoading, isError } = useGetAccountsQuery();
@@ -21,6 +22,7 @@ export function AccountsListPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
+                  <TableHead>Custody</TableHead>
                   <TableHead>Currency</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -32,6 +34,7 @@ export function AccountsListPage() {
                       <Link to={`/accounts/${account.id}`} className={recordLinkClass}>{account.name}</Link>
                     </TableCell>
                     <TableCell>{account.type}</TableCell>
+                    <TableCell>{custodyLabel(account.custodyMode)}</TableCell>
                     <TableCell>{account.currency}</TableCell>
                     <TableCell>
                       <StatusBadge status={account.status} />

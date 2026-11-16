@@ -7,6 +7,7 @@ export type Account = {
   customerId: string;
   name: string;
   type: string;
+  custodyMode: string;
   currency: string;
   cashBalance: number;
   status: string;
@@ -25,6 +26,8 @@ export type CreateAccountBody = {
   customerId: string;
   name: string;
   type: string;
+  // Only External can be opened until the Custodial rules exist (account-custody-mode R4).
+  custodyMode: "External";
   currency: string;
 };
 

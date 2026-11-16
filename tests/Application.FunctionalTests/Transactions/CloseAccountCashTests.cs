@@ -69,15 +69,6 @@ public class CloseAccountCashTests : TestBase
 
     private static async Task<Guid> OpenAccountAsync(string accessToken, Guid customerId)
     {
-        var response = await AccountHttp.Send(HttpMethod.Post, "/accounts", accessToken, new
-        {
-            customerId,
-            name = "Everyday spending",
-            type = "Bank",
-            currency = "NZD"
-        });
-        response.StatusCode.ShouldBe(HttpStatusCode.Created);
-        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        return json.RootElement.GetProperty("id").GetGuid();
+        return await AccountHttp.OpenAccountAsync(accessToken, customerId);
     }
 }

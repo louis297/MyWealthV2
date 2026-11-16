@@ -362,16 +362,7 @@ public class GetNetWorthTests : TestBase
     private static async Task<Guid> OpenAccountAsync(
         string accessToken, Guid customerId, string name, string type, string currency)
     {
-        var response = await AccountHttp.Send(HttpMethod.Post, "/accounts", accessToken, new
-        {
-            customerId,
-            name,
-            type,
-            currency
-        });
-        response.StatusCode.ShouldBe(HttpStatusCode.Created);
-        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        return json.RootElement.GetProperty("id").GetGuid();
+        return await AccountHttp.OpenAccountAsync(accessToken, customerId, name, type, currency);
     }
 
     private static Task<HttpResponseMessage> PostCashAsync(string accessToken, Guid accountId, decimal amount) =>

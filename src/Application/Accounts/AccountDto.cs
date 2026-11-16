@@ -14,6 +14,8 @@ public sealed class AccountDto
 
     public required string Type { get; init; }
 
+    public required string CustodyMode { get; init; }
+
     public required string Currency { get; init; }
 
     public required decimal CashBalance { get; init; }
@@ -31,6 +33,7 @@ public sealed class AccountDto
         CustomerId = customer.PublicId,
         Name = account.Name,
         Type = account.Type.ToString(),
+        CustodyMode = account.CustodyMode.ToString(),
         Currency = account.Currency,
         CashBalance = cashBalance,
         Status = account.Status.ToString(),

@@ -18,6 +18,8 @@ public class UpdateAccountCommand : IRequest
 
     public string? Currency { get; init; }
 
+    public string? CustodyMode { get; init; }
+
     public string? Status { get; init; }
 
     public bool? IsActive { get; init; }
@@ -41,6 +43,9 @@ public class UpdateAccountCommandValidator : AbstractValidator<UpdateAccountComm
         RuleFor(command => command.Currency)
             .Must(currency => currency is null)
             .WithMessage("Currency cannot be changed.");
+        RuleFor(command => command.CustodyMode)
+            .Must(custodyMode => custodyMode is null)
+            .WithMessage("CustodyMode cannot be changed.");
         RuleFor(command => command.Status)
             .Must(status => status is null)
             .WithMessage("Status cannot be changed.");

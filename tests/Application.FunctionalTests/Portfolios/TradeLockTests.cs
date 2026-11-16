@@ -105,15 +105,8 @@ public class TradeLockTests : TestBase
             await TestPrices.UpsertAsync(db, instrumentId, 10m, "NZD");
         }
 
-        var account = await Accounts.AccountHttp.Send(HttpMethod.Post, "/accounts", tokens.AccessToken, new
-        {
-            customerId = customer.PublicId,
-            name = "Model",
-            type = "Brokerage",
-            currency = "NZD"
-        });
-        using var accountJson = JsonDocument.Parse(await account.Content.ReadAsStringAsync());
-        var accountId = accountJson.RootElement.GetProperty("id").GetGuid();
+        var accountId = await Accounts.AccountHttp.OpenAccountAsync(
+            tokens.AccessToken, customer.PublicId, name: "Model", type: "Brokerage");
         var funded = await Transactions.TransactionHttp.Send(HttpMethod.Post, "/transactions", tokens.AccessToken, new
         {
             accountId,

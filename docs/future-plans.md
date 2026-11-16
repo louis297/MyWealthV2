@@ -3,7 +3,7 @@ title: Future plans
 status: note
 language: en
 created: 2026-11-10
-updated: 2026-11-15
+updated: 2026-11-17
 related:
   - README.md
   - function-plan.md
@@ -22,11 +22,13 @@ related:
   - adr/0016-bff-for-first-party-portals.md
   - features/identity-auth.md
   - adviser-portal/adviser-portal.md
+  - features/account-custody-mode.md
+  - adr/0020-account-custody-mode.md
 ---
 
 # Future plans
 
-A reminder list of large directions the product may take. This file is not a build contract and not a backlog. Only §1 gives an order, and that order is for discussion, not implementation. Do not implement, create tables, or create routes from anything here. Each item needs its own discussion and Feature Spec before any work starts.
+A reminder list of large directions the product may take. This file is not a build contract and not a backlog. Only §1 and §9 give an order, and that order is for discussion, not implementation. Do not implement, create tables, or create routes from anything here. Each item needs its own discussion and Feature Spec before any work starts.
 
 Names used here are working descriptions. They are not glossary terms until a spec adopts them.
 
@@ -193,3 +195,41 @@ Questions to settle when this opens:
 - Invoices: numbering, GST invoice content, credit notes.
 - Where the platform's own books live. This is where double-entry accounting (general ledger, receivables, revenue recognition) is used, which §1 keeps out of the Customer ledger.
 - Whether a wrap-style platform administration fee, deducted from Customer cash, is also wanted. That one is a standalone fee in the Customer ledger (§1 step 4), not platform billing.
+
+---
+
+## 9. Custody modes
+
+Tell apart the accounts the platform holds and trades from the accounts that only record assets held elsewhere.
+
+Decided in discussion (2026-11-16), recorded in [ADR 0020](adr/0020-account-custody-mode.md) (accepted 2026-11-17): every Account has a custody mode, `External` or `Custodial`, on the Account and not on the Tenant. This comes before any work that turns hand-entered transactions into platform-side flows, because each such flow replaces a manual type on Custodial accounts only.
+
+Slices. Only the first has a spec. Slices 3 to 5 do not depend on each other:
+
+| Slice | Content | Behaviour change |
+| --- | --- | --- |
+| 1 | The attribute on the Account. Only `External` can be opened; `Custodial` is a reserved value. [features/account-custody-mode.md](features/account-custody-mode.md) (accepted, landed 2026-11-17) | None |
+| 2 | Custodial accounts can be opened, with all of their rules in one spec: which account types they may have, which manual transaction types they refuse, the same custody mode on every leg account of a Transaction, and portfolio assignment and rebalance by custody mode | Most of the change |
+| 3 | A tenant setting for which custody modes may be opened. Optional | Small |
+| 4 | External accounts take the caller's numbers: executed price and fee on `Buy` / `Sell`, both amounts on an `FxConversion`. Server pricing and trade fee schedules then apply to Custodial accounts only | Medium |
+| 5 | Read side: net worth, the two reports and the portal pages show the two modes as two groups | Read only |
+
+After slice 2, some writes on a Custodial account are still entered by hand or are missing. Each later item replaces one of them:
+
+- Deposits and withdrawals matched to a bank statement, replacing hand-entered `TransferIn` / `TransferOut`.
+- An interest job and income events (§1 step 2), replacing hand-entered `Interest`.
+- Corporate action events, replacing hand-entered `Split` / `Bonus` / `Scrip`.
+- In-kind transfer and migration batches, replacing `Opening`, `OpeningHoldings`, `StockIn` and `StockOut`.
+- Orders, replacing the immediate `Buy` / `Sell`.
+- A controlled manual adjustment as the only hand-entered write.
+- A simulator of the outside parties (a bank first, then a broker) to drive these flows without real connections.
+- Rebuilding an account's position by replaying its transactions in order. Deferred until after the items above are under way.
+
+Related: the advisory fee (§1 step 4) and platform billing (§8) can then use Custodial accounts as their base.
+
+Questions to settle when slice 2 opens:
+
+- Whether the server sets `bookedAt` on a Custodial account. It stops backdating without a replay, but a hand-entered deposit could not be dated yesterday, and history could only be built by the seed.
+- What happens to existing portfolio assignments. After slice 1 every account is External, so either the assignments are removed, or accounts with an Active assignment are turned into Custodial ones by the script and keep hand-entered history.
+- Whether to accept that a Custodial holding cannot record a split until corporate action events exist.
+- Whether a valuation-only record for property and loans replaces the `Other`, `Property` and `Credit` account types.

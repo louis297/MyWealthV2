@@ -1,5 +1,7 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Infrastructure.Identity;
@@ -47,6 +49,30 @@ internal static class AccountHttp
             UserRole.Customer, "Ned North", customerEmail, "Password1!", tenant.Id, adviser.Id);
         var tokens = await FunctionalTestSetup.Oidc.SignInAsync(email, password, tenantCode);
         return (tenant, adviser, customer, tokens);
+    }
+
+    /// <summary>
+    /// Opens an account through <c>POST /accounts</c> and returns its PublicId. Every functional test that
+    /// needs an account opens it here, so a change to the create body lands in one place.
+    /// </summary>
+    public static async Task<Guid> OpenAccountAsync(
+        string accessToken,
+        Guid customerId,
+        string name = "Everyday spending",
+        string type = "Bank",
+        string currency = "NZD")
+    {
+        var response = await Send(HttpMethod.Post, "/accounts", accessToken, new
+        {
+            customerId,
+            name,
+            type,
+            custodyMode = "External",
+            currency
+        });
+        response.StatusCode.ShouldBe(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return json.RootElement.GetProperty("id").GetGuid();
     }
 
     public static async Task<HttpResponseMessage> Send(

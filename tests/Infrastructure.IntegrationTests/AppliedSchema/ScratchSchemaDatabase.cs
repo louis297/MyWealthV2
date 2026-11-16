@@ -81,10 +81,13 @@ internal sealed class ScratchSchemaDatabase : IAsyncDisposable
     /// Variables are named after <paramref name="prefix"/>: <c>@{prefix}_tenant</c>, <c>_adviser</c>,
     /// <c>_customer</c>, <c>_brokerage</c>, <c>_bank</c>, <c>_instrument</c>, <c>_other</c>, <c>_buy</c>,
     /// <c>_fx</c>, <c>_portfolio</c> and <c>_schedule</c>. <paramref name="code"/> makes the tenant and
-    /// identity rows unique. Set <paramref name="childTenantIds"/> to false for the schema before <c>0027</c>.
+    /// identity rows unique. Set <paramref name="childTenantIds"/> to false for the schema before <c>0027</c>, and
+    /// <paramref name="custodyMode"/> to false for the schema before <c>0031</c>.
     /// </summary>
-    public static string TenantRows(string prefix, string code, bool childTenantIds = true)
+    public static string TenantRows(string prefix, string code, bool childTenantIds = true, bool custodyMode = true)
     {
+        var custodyColumn = custodyMode ? "[CustodyMode], " : "";
+        var custodyValue = custodyMode ? "0, " : "";
         var t = $"@{prefix}_tenant";
         var tenantColumn = childTenantIds ? "[TenantId], " : "";
         var tenantValue = childTenantIds ? $"{t}, " : "";
@@ -103,11 +106,11 @@ internal sealed class ScratchSchemaDatabase : IAsyncDisposable
             VALUES (NEWID(), {t}, N'Customer', N'customer@{code}.example', 3, 1, @{prefix}_adviser, N'{code}-customer', SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET());
             DECLARE @{prefix}_customer int = SCOPE_IDENTITY();
 
-            INSERT INTO [Accounts] ([PublicId], [TenantId], [CustomerId], [Name], [Type], [Status], [Currency], [Created], [CreatedBy])
-            VALUES (NEWID(), {t}, @{prefix}_customer, N'Brokerage', 2, 0, 'NZD', SYSDATETIMEOFFSET(), N'test');
+            INSERT INTO [Accounts] ([PublicId], [TenantId], [CustomerId], [Name], [Type], {custodyColumn}[Status], [Currency], [Created], [CreatedBy])
+            VALUES (NEWID(), {t}, @{prefix}_customer, N'Brokerage', 2, {custodyValue}0, 'NZD', SYSDATETIMEOFFSET(), N'test');
             DECLARE @{prefix}_brokerage int = SCOPE_IDENTITY();
-            INSERT INTO [Accounts] ([PublicId], [TenantId], [CustomerId], [Name], [Type], [Status], [Currency], [Created], [CreatedBy])
-            VALUES (NEWID(), {t}, @{prefix}_customer, N'USD Bank', 0, 0, 'USD', SYSDATETIMEOFFSET(), N'test');
+            INSERT INTO [Accounts] ([PublicId], [TenantId], [CustomerId], [Name], [Type], {custodyColumn}[Status], [Currency], [Created], [CreatedBy])
+            VALUES (NEWID(), {t}, @{prefix}_customer, N'USD Bank', 0, {custodyValue}0, 'USD', SYSDATETIMEOFFSET(), N'test');
             DECLARE @{prefix}_bank int = SCOPE_IDENTITY();
 
             INSERT INTO [Instruments] ([PublicId], [TenantId], [Symbol], [Name], [QuoteCurrency], [Created], [CreatedBy])
@@ -170,7 +173,7 @@ internal sealed class ScratchSchemaDatabase : IAsyncDisposable
     }
 
     /// <summary><see cref="TenantRows"/> for the schema after <c>0026</c>, before <c>0027</c>.</summary>
-    public static string TenantRowsBefore0027(string prefix) => TenantRows(prefix, prefix, childTenantIds: false);
+    public static string TenantRowsBefore0027(string prefix) => TenantRows(prefix, prefix, childTenantIds: false, custodyMode: false);
 
     private async Task ApplyAsync(Func<SchemaScript, bool> include)
     {

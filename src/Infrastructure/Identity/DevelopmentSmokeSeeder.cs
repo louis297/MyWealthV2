@@ -74,7 +74,7 @@ public static class DevelopmentSmokeSeeder
             row => row.CustomerId == customer.Id && row.Name == AccountName, cancellationToken);
         if (account is null)
         {
-            account = Account.Create(tenant.Id, customer.Id, AccountName, AccountType.Bank, nzd);
+            account = Account.Create(tenant.Id, customer.Id, AccountName, AccountType.Bank, CustodyMode.External, nzd);
             account.Created = TimeProvider.System.GetUtcNow();
             account.CreatedBy = CreatedBy;
             db.Accounts.Add(account);

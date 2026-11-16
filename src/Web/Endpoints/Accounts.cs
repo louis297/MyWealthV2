@@ -54,10 +54,11 @@ public class Accounts : IEndpointGroup
         string? search = null,
         Guid? tenantId = null,
         Guid? customerId = null,
-        string? type = null)
+        string? type = null,
+        string? custodyMode = null)
     {
         var result = await sender.Send(
-            new GetAccountsQuery(page, pageSize, enabledOnly, search, tenantId, customerId, type));
+            new GetAccountsQuery(page, pageSize, enabledOnly, search, tenantId, customerId, type, custodyMode));
         return TypedResults.Ok(result);
     }
 
@@ -88,7 +89,7 @@ public class Accounts : IEndpointGroup
     }
 
     [EndpointSummary("Rename an account")]
-    [EndpointDescription("Updates the account display name. Type and currency cannot change.")]
+    [EndpointDescription("Updates the account display name. Type, custody mode and currency cannot change.")]
     public static async Task<NoContent> UpdateAccount(ISender sender, Guid id, UpdateAccountCommand command)
     {
         command.Id = id;

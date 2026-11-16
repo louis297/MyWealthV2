@@ -3,7 +3,7 @@ title: Domain model
 status: accepted
 language: en
 created: 2026-09-11
-updated: 2026-11-16
+updated: 2026-11-17
 related:
   - README.md
   - glossary.md
@@ -17,7 +17,7 @@ This document owns **aggregates, value objects, invariants, and domain events**.
 
 **Product:** MyWealthV2.
 
-Same rule as the function plan: if a later phase will use it and today’s model would have to change, write the final model now. If later use or shape is not decided, wait. Write now: a complete `UserStatus` machine whose invite transition has no Phase-1 entry; Customer as a login principal; `Money` with no balance column. Wait: a single `Transactions.Type` that pretends to be both cash and securities; ledger tables whose storage is still open.
+Same rule as the function plan: if a later phase will use it and today's model would have to change, write the final model now. If later use or shape is not decided, wait. Write now: a complete `UserStatus` machine whose invite transition has no Phase-1 entry; Customer as a login principal; `Money` with no balance column. Wait: a single `Transactions.Type` that pretends to be both cash and securities; ledger tables whose storage is still open.
 
 The session protocol (OpenIddict, authorization code + PKCE, refresh) lives on the authorization server / in Infrastructure. It is **not** a domain aggregate. The domain only answers whether a person may be issued a session (tenant enabled, `UserStatus`, role, identity link).
 
@@ -135,7 +135,7 @@ PendingActivation ──disable──► Disabled
 - Only `Active` may complete authorization-server login. `PendingActivation` and `Disabled` may not.
 - `Users.IsActive` is derived from that machine (`Active` → 1; otherwise 0). List `enabledOnly=true` uses the bit. Login still reads `Status`, not the bit alone.
 - Phase 1 admin APIs may create with a password and land in `Active` (invitation delivery is not built; that is not an excuse to collapse the machine to a boolean).
-- Disable, re-enable, and password change run on the resource API. The authorization server reads Status and tenant enabled at login. Password change / disable / logout revoke that subject’s OpenIddict tokens — an application consequence driven by domain events. The User aggregate does not hold tokens.
+- Disable, re-enable, and password change run on the resource API. The authorization server reads Status and tenant enabled at login. Password change / disable / logout revoke that subject's OpenIddict tokens — an application consequence driven by domain events. The User aggregate does not hold tokens.
 
 Disable guards:
 
@@ -148,7 +148,7 @@ Disable guards:
 
 - Code is ISO 4217, three letters, upper case.
 - `DecimalPlaces` is the ISO minor-unit count for input / display / validation (JPY = 0, NZD = 2). It is not the SQL scale of a money column. Phase-2 amount columns stay `decimal(18,4)` for every currency.
-- `IsActive` is a **platform** flag on the catalog row. It is not bound to a tenant. One change is visible to every tenant’s picker; existing `ReportingCurrency` values are left alone.
+- `IsActive` is a **platform** flag on the catalog row. It is not bound to a tenant. One change is visible to every tenant's picker; existing `ReportingCurrency` values are left alone.
 - A disabled currency cannot be used as a **new** `ReportingCurrency`. Tenants that already reference it keep the historical value.
 - Phase 1 has no currency write API. The catalog is read-only. Seed: NZD, AUD, USD, EUR, GBP, JPY.
 - `Money` does not look up the catalog and does not round to `DecimalPlaces`.
@@ -178,7 +178,7 @@ Do not add a fifth role in Phase 1. Ledger permission names are registered when 
 
 Raise even if there is no subscriber yet. The application uses these events to revoke tokens and write audit.
 
-Events are written to `OutboxMessages` in the same database transaction as the business changes (ADR 0018, accepted). Implementation follows [features/outbox.md](../features/outbox.md). `Payload` is the serialised domain event. `TenantId` is also stored as a column. Delivery is at-least-once from the background worker via MediatR. A handler failure does not roll back the original change; the side effect is eventually consistent and retryable. Token revocation after a user disable, a password change, or a tenant disable is one of those side effects. See [adr/0018-transactional-outbox.md](adr/0018-transactional-outbox.md) and [fixes/domain-event-dispatch.md](fixes/domain-event-dispatch.md).
+Events are written to `OutboxMessages` in the same database transaction as the business changes (ADR 0018, accepted). Implementation follows [features/outbox.md](features/outbox.md). `Payload` is the serialised domain event. `TenantId` is also stored as a column. Delivery is at-least-once from the background worker via MediatR. A handler failure does not roll back the original change; the side effect is eventually consistent and retryable. Token revocation after a user disable, a password change, or a tenant disable is one of those side effects. See [adr/0018-transactional-outbox.md](adr/0018-transactional-outbox.md) and [fixes/domain-event-dispatch.md](fixes/domain-event-dispatch.md).
 
 | Event | When |
 | --- | --- |
@@ -288,6 +288,7 @@ Field rules: [features/instruments.md](features/instruments.md). Landed in repo 
 | `Account` | Aggregate | Container under a Customer. Not a cash row. |
 | `AccountStatus` | Enum | `Open`, `Closed` |
 | `AccountType` | Enum | `Bank`, `Cash`, `Brokerage`, `Other`, `Property`, `Credit` |
+| `CustodyMode` | Enum | `External`, `Custodial`. [features/account-custody-mode.md](features/account-custody-mode.md), ADR 0020. |
 | `AccountOpened` / `AccountClosed` / `AccountReopened` | Event | Rename raises nothing. |
 
 Invariants:
@@ -298,8 +299,9 @@ Invariants:
 - `Status` is the machine. `IsActive` is derived (`Open` → 1, `Closed` → 0), persisted computed.
 - HTTP close / reopen. No physical delete.
 - Disable Customer rejects while any account is active.
+- `CustodyMode` is set on create and immutable, like `Type` and `Currency`. It is independent of `Type`. `Create` accepts both values; Application lets a caller select `External` only, and `Custodial` stays reserved until a later spec adds its rules. No other invariant reads it yet.
 
-Field rules: [features/accounts.md](features/accounts.md). Landed in the repo 2026-09-21.
+Field rules: [features/accounts.md](features/accounts.md). Landed in the repo 2026-09-21. Custody mode: [features/account-custody-mode.md](features/account-custody-mode.md) (landed 2026-11-17).
 
 Close requires cash `SUM = 0` and no `Holdings` rows ([features/holdings.md](features/holdings.md)).
 
@@ -380,6 +382,9 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-02 | Portfolios accepted. `Portfolio`, `PortfolioLine`, `AccountPortfolioAssignment`. Assign is synchronous. Weight change and bulk rebalance are asynchronous. [features/portfolios.md](features/portfolios.md). |
 | 2026-11-15 | Trade fees accepted. `CashLegRole`, `FeeKind`, `TransactionFeeDetail`, `TradeFeeSchedule`, `FeeBands`. [features/trade-fees.md](features/trade-fees.md). |
 | 2026-11-16 | Ledger write guards accepted. `Transaction.Reverse` refuses a Transaction with a security leg that is not the latest security activity on each of its holdings. [fixes/ledger-write-guards.md](fixes/ledger-write-guards.md). |
+| 2026-11-17 | Account custody mode in `review`. `CustodyMode` enum (`External`, `Custodial`) and immutable `Account.CustodyMode`; no behaviour depends on it. Recorded in §8.5 with a `review` mark. [features/account-custody-mode.md](features/account-custody-mode.md), ADR 0020. |
+| 2026-11-17 | Account custody mode accepted, with ADR 0020. The `review` marks in §8.5 are dropped. |
+| 2026-11-17 | Account custody mode landed: `CustodyMode` enum and `Account.CustodyMode`. |
 
 ---
 

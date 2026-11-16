@@ -33,6 +33,7 @@ export function AccountsListPage() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
+                <TableHead>Custody</TableHead>
                 <TableHead>Currency</TableHead>
                 <TableHead>Cash balance</TableHead>
                 <TableHead>Status</TableHead>
@@ -47,6 +48,7 @@ export function AccountsListPage() {
                     </Link>
                   </TableCell>
                   <TableCell>{item.type}</TableCell>
+                  <TableCell>{item.custodyMode}</TableCell>
                   <TableCell>{item.currency}</TableCell>
                   <TableCell>{item.cashBalance}</TableCell>
                   <TableCell>

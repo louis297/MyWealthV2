@@ -4,7 +4,7 @@ status: accepted
 phase: 2
 language: en
 created: 2026-10-12
-updated: 2026-11-16
+updated: 2026-11-17
 related:
   - README.md
   - frontend-conventions.md
@@ -13,6 +13,7 @@ related:
   - ../function-plan.md
   - ../features/net-worth.md
   - ../features/accounts.md
+  - ../features/account-custody-mode.md
   - ../features/holdings.md
   - ../features/posting.md
   - ../features/instruments.md
@@ -119,6 +120,23 @@ Unchanged from the BFF cut. Probe is still `GET /api/users/me`. 401 does not ref
 | D12 | Adviser posts StockIn / StockOut (no cash) and Split / Bonus / Scrip (new total quantity, cost unchanged). Wrong body fields → 400. |
 | D13 | Adviser reverses a posted Buy / Sell / Split. Original remains; new reverse transaction appears. The Reverse button is hidden when `reversedByTransactionId` is not null or `type` is `Reversal`. Already reversed → 400. A security transaction that is not the latest security activity on its holding → 400; the page shows the sentence the same way ([ledger-write-guards](../fixes/ledger-write-guards.md)). Idempotency-Key required; replay returns the same id. |
 | D14 | Forms omit `tenantId` for TenantAdmin / Adviser. Closed account or Disabled Customer on create / reverse → 400. Bank / Cash refuse security types. |
+
+---
+
+## Amendment 2026-11-17 (account custody mode) — accepted, landed
+
+Status of this amendment: `accepted` (2026-11-17), together with [account-custody-mode](../features/account-custody-mode.md).
+
+Every account has a custody mode, `External` or `Custodial`. Only `External` can be opened in that slice, and no page behaviour depends on the value.
+
+- `/customers/:id/accounts/new`: `POST /accounts` also sends `custodyMode: "External"`. The form has no custody control; the selector arrives when Custodial accounts can be opened.
+- `/accounts`, the accounts table on `/customers/:id`, and `/accounts/:id`: show "Custody" next to "Type". The text is the enum name from the item's `custodyMode`, as for Type.
+- No filter control for custody mode. Action buttons and write forms do not read it.
+
+| ID | Behaviour |
+| --- | --- |
+| D15 | The New account form posts `custodyMode: "External"` together with `customerId`, name, type and currency. The form shows no custody control. |
+| D16 | The accounts list, the accounts table on the customer page and the account page show each account's custody mode next to its type. |
 
 ---
 

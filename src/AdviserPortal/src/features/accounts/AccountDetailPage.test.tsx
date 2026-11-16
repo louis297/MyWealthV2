@@ -18,6 +18,7 @@ const account = {
   customerId,
   name: "Everyday spending",
   type: "Brokerage",
+  custodyMode: "External",
   currency: "NZD",
   status: "Open",
   isActive: true,
@@ -135,6 +136,8 @@ describe("AccountDetailPage", () => {
     expect(await screen.findByRole("heading", { name: "Everyday spending" })).toBeInTheDocument();
     expect(screen.getByText("1250.5")).toBeInTheDocument();
     expect(screen.getByText("Brokerage")).toBeInTheDocument();
+    expect(screen.getByText("Custody")).toBeInTheDocument();
+    expect(screen.getByText("External")).toBeInTheDocument();
     expect(screen.queryByText("Forbidden")).not.toBeInTheDocument();
     expect(document.querySelector('input[type="password"]')).toBeNull();
 
