@@ -15,7 +15,8 @@ public record GetAccountsQuery(
     string? Search = null,
     Guid? TenantId = null,
     Guid? CustomerId = null,
-    string? Type = null) : IRequest<PagedList<AccountDto>>;
+    string? Type = null,
+    string? CustodyMode = null) : IRequest<PagedList<AccountDto>>;
 
 public class GetAccountsQueryValidator : AbstractValidator<GetAccountsQuery>
 {
