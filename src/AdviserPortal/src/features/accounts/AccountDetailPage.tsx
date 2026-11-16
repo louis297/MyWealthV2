@@ -294,6 +294,7 @@ export function AccountDetailPage() {
         <CardContent>
           <DetailGrid>
             <DetailItem label="Type">{data.type}</DetailItem>
+            <DetailItem label="Custody">{data.custodyMode}</DetailItem>
             <DetailItem label="Currency">{data.currency}</DetailItem>
             <DetailItem label="Status">
               <StatusBadge status={data.status} />
