@@ -25,7 +25,7 @@ public class RebalanceJobTenantScopeTests
         var customer = User.Create(UserRole.Customer, "Customer", $"c-{Guid.NewGuid():N}@example", await IdentityAsync(db, tenantA), tenantA.Id, adviserA.Id);
         db.DomainUsers.Add(customer);
         await db.SaveChangesAsync();
-        var account = Account.Create(tenantA.Id, customer.Id, "Brokerage", AccountType.Brokerage, Currency.Create("NZD", "New Zealand Dollar", 2));
+        var account = Account.Create(tenantA.Id, customer.Id, "Brokerage", AccountType.Brokerage, CustodyMode.External, Currency.Create("NZD", "New Zealand Dollar", 2));
         account.CreatedBy = "test";
         db.Accounts.Add(account);
         await db.SaveChangesAsync();

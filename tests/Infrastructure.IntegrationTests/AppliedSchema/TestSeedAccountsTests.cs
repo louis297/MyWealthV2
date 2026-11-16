@@ -56,6 +56,34 @@ public class TestSeedAccountsTests
     }
 
     [Test]
+    public async Task Seed_OpensEveryDemoAccountAsExternal()
+    {
+        await using var db = OpenDb();
+        var tenant = await EnsureDemoTenantAsync(db);
+        var adviser = await EnsurePersonAsync(
+            db, tenant, UserRole.Adviser, "Demo Adviser", DevelopmentIdentitySeeder.AdviserEmail);
+        await EnsurePersonAsync(
+            db, tenant, UserRole.Customer, "Demo Customer", "customer@localhost", adviser.Id);
+        await TestSeed.SeedAsync(db, CancellationToken.None);
+        await TestSeed.SeedAsync(db, CancellationToken.None);
+        var customer = await db.DomainUsers.SingleAsync(
+            row => row.TenantId == tenant.Id && row.Email == "customer@localhost");
+
+        // Read the column itself, so the test proves what is stored, not an entity default.
+        var rows = await ScratchSchemaDatabase.ReadAsync(SchemaDatabaseSetup.ConnectionString, $"""
+            SELECT [Name], [CustodyMode] FROM [Accounts] WHERE [CustomerId] = {customer.Id} ORDER BY [Name]
+            """);
+
+        rows.Select(row => (string)row[0]).ShouldBe([
+            "Demo brokerage",
+            "Demo cash tin",
+            "Demo closed other",
+            "Demo everyday bank"
+        ]);
+        rows.ShouldAllBe(row => (int)row[1] == (int)CustodyMode.External);
+    }
+
+    [Test]
     public async Task Seed_AddsOneTransferInOnTheDemoEverydayBank()
     {
         await using var db = OpenDb();

@@ -63,6 +63,7 @@ public class DevelopmentSmokeSeedTests : TestBase
         var account = await db.Accounts.SingleAsync(row => row.CustomerId == customer.Id);
         account.Name.ShouldBe(DevelopmentSmokeSeeder.AccountName);
         account.Type.ShouldBe(AccountType.Bank);
+        account.CustodyMode.ShouldBe(CustodyMode.External);
 
         var legs = await db.Transactions
             .Where(row => row.TenantId == tenant.Id)

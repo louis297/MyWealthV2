@@ -10,6 +10,7 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
     {
         builder.ToTable("Accounts");
         builder.Property(account => account.Name).HasMaxLength(200).IsRequired();
+        builder.Ignore(account => account.CustodyMode);
         builder.Property(account => account.PublicId).IsRequired();
         builder.Property(account => account.Currency).HasColumnType("char(3)").IsFixedLength().IsRequired();
         builder.Property(account => account.IsActive)

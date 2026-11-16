@@ -148,8 +148,8 @@ public class TenantQueryFilterTests
 
         var nzd = Currency.Create("NZD", "New Zealand Dollar", 2);
         var usd = Currency.Create("USD", "US Dollar", 2);
-        var brokerage = Account.Create(tenant.Id, customer.Id, "Brokerage", AccountType.Brokerage, nzd);
-        var usdBank = Account.Create(tenant.Id, customer.Id, "USD Bank", AccountType.Bank, usd);
+        var brokerage = Account.Create(tenant.Id, customer.Id, "Brokerage", AccountType.Brokerage, CustodyMode.External, nzd);
+        var usdBank = Account.Create(tenant.Id, customer.Id, "USD Bank", AccountType.Bank, CustodyMode.External, usd);
         var instrument = Instrument.Create(tenant.Id, $"I{suffix}"[..8].ToUpperInvariant(), "Instrument", usd);
         db.Accounts.AddRange(brokerage, usdBank);
         db.Instruments.Add(instrument);

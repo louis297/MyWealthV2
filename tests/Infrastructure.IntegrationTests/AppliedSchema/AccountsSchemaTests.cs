@@ -35,7 +35,7 @@ public class AccountsSchemaTests
 
         columns.Select(column => column.Name).ShouldBe([
             "Id", "PublicId", "TenantId", "CustomerId", "Name", "Type", "Status", "Currency", "IsActive",
-            "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion"
+            "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion", "CustodyMode"
         ]);
 
         Column(columns, "Id").ShouldSatisfyAllConditions(
@@ -75,6 +75,9 @@ public class AccountsSchemaTests
         Column(columns, "LastModifiedBy").Nullable.ShouldBe("YES");
         Column(columns, "RowVersion").Type.ShouldBe("timestamp");
         Column(columns, "RowVersion").Nullable.ShouldBe("NO");
+        Column(columns, "CustodyMode").ShouldSatisfyAllConditions(
+            column => column.Type.ShouldBe("int"),
+            column => column.Nullable.ShouldBe("NO"));
     }
 
     [Test]

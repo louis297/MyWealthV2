@@ -102,7 +102,7 @@ public class CreateAccountCommandHandler(
         }
 
         var type = Enum.Parse<AccountType>(request.Type);
-        var account = Account.Create(tenant.Id, customer.Id, request.Name, type, currency);
+        var account = Account.Create(tenant.Id, customer.Id, request.Name, type, CustodyMode.External, currency);
         db.Accounts.Add(account);
         await db.SaveChangesAsync(cancellationToken);
         return account.PublicId;

@@ -828,7 +828,7 @@ public static class TestSeed
             return;
         }
 
-        var account = Account.Create(tenantId, customerId, name, type, currency);
+        var account = Account.Create(tenantId, customerId, name, type, CustodyMode.External, currency);
         if (closed)
         {
             account.Close();
