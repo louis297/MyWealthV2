@@ -507,11 +507,14 @@ public class Transaction : BaseAuditableEntity
     /// <summary>
     /// Builds the Reversal: one opposite leg per original leg, each on that leg's Account.
     /// Balances are keyed by leg Account (and Instrument for holdings).
+    /// <paramref name="hasLaterSecurityActivity"/> is true when a live later security leg exists on one of
+    /// this Transaction's holdings (fixes/ledger-write-guards.md Decision 1).
     /// </summary>
     public Transaction Reverse(
         DateTimeOffset bookedAt,
         IReadOnlyDictionary<int, decimal> currentCashSumByAccount,
-        IReadOnlyDictionary<(int AccountId, int InstrumentId), decimal>? currentQuantity = null)
+        IReadOnlyDictionary<(int AccountId, int InstrumentId), decimal>? currentQuantity = null,
+        bool hasLaterSecurityActivity = false)
     {
         if (Type == TransactionType.Reversal)
         {
