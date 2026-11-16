@@ -23,7 +23,7 @@ Phase 2 is open. Instruments, Accounts, posting (`/transactions`, `0013`), and h
 
 **Amendment 2026-11-10 (accepted, landed):** [features/leg-accounts.md](../features/leg-accounts.md). The header has no Account and no Customer; every cash and security leg carries its own `AccountId` (script `0024_leg_accounts.sql`). Rules that read "the transaction's Account" apply to every leg account. Groundwork for cross-account transfer.
 
-**Amendment 2026-11-17 (proposed):** [ADR 0020](0020-account-custody-mode.md) adds a custody mode (`External` / `Custodial`) to the account container in item 6. It is set at open and immutable, like `Type` and `Currency`. Not in force until ADR 0020 is accepted.
+**Amendment 2026-11-17 (accepted):** [ADR 0020](0020-account-custody-mode.md) adds a custody mode (`External` / `Custodial`) to the account container in item 6. It is set at open and immutable, like `Type` and `Currency`.
 
 ## Context
 

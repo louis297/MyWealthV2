@@ -1,6 +1,6 @@
 ---
 title: "ADR 0020: Custody mode on the Account"
-status: proposed
+status: accepted
 language: en
 date: 2026-11-17
 updated: 2026-11-17
@@ -15,7 +15,7 @@ related:
 
 # ADR 0020: Custody mode on the Account
 
-Status: proposed
+Status: accepted (2026-11-17)
 
 ## Context
 

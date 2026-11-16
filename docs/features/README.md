@@ -159,11 +159,11 @@ Roadmap in [future-plans.md](../future-plans.md) §1. Each step amends the ledge
 
 ## Ledger — custody modes (opened 2026-11-17)
 
-Decision in [ADR 0020](../adr/0020-account-custody-mode.md) (`proposed`): every Account is `External` or `Custodial`. The work is cut into slices; the list is in [future-plans.md](../future-plans.md) §9. Only the first slice has a spec. Do not add files for the later ones until they are discussed.
+Decision in [ADR 0020](../adr/0020-account-custody-mode.md) (accepted 2026-11-17): every Account is `External` or `Custodial`. The work is cut into slices; the list is in [future-plans.md](../future-plans.md) §9. Only the first slice has a spec. Do not add files for the later ones until they are discussed.
 
 | Spec | Status | Who | Ships | Why it stays its own slice |
 | --- | --- | --- | --- | --- |
-| [account-custody-mode](account-custody-mode.md) | review (2026-11-17) | Same callers as accounts | `Account.CustodyMode` (`External` / `Custodial`), set at open and immutable; required `custodyMode` on `POST /accounts`, refused on PUT, on the account item, optional list filter; only `External` can be selected, `Custodial` is reserved; existing accounts become `External`; both portals show it. Script `0031`. No new route or policy | Structural groundwork with no behaviour change, like leg-accounts. The Custodial rules are the next increment |
+| [account-custody-mode](account-custody-mode.md) | accepted (2026-11-17) | Same callers as accounts | `Account.CustodyMode` (`External` / `Custodial`), set at open and immutable; required `custodyMode` on `POST /accounts`, refused on PUT, on the account item, optional list filter; only `External` can be selected, `Custodial` is reserved; existing accounts become `External`; both portals show it. Script `0031`. No new route or policy | Structural groundwork with no behaviour change, like leg-accounts. The Custodial rules are the next increment |
 
 ---
 

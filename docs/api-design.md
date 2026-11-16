@@ -433,7 +433,7 @@ Field rules: [features/accounts.md](features/accounts.md).
 - Close rejected while cash `SUM ≠ 0` (posting amendment).
 - `GET /accounts/{id}/cash-balance` → `{ accountId, currency, cashBalance }` (`accounts.read`).
 - Create on a disabled tenant → §4.1 `target=tenant`. Create or reopen on a Disabled Customer → §4.1 `target=user`.
-- Amendment 2026-11-17 (account custody mode, `review`; field rules in [features/account-custody-mode.md](features/account-custody-mode.md)): the item also includes `custodyMode` (`External` / `Custodial`). `POST /accounts` requires `custodyMode`; only `External` can be selected, and a missing, reserved or unknown value is a field 400 with no problem code. A PUT body that includes `custodyMode` → 400. `GET /accounts` takes an optional `custodyMode` filter. Not in force until that spec is accepted.
+- Amendment 2026-11-17 (account custody mode, accepted; field rules in [features/account-custody-mode.md](features/account-custody-mode.md)): the item also includes `custodyMode` (`External` / `Custodial`). `POST /accounts` requires `custodyMode`; only `External` can be selected, and a missing, reserved or unknown value is a field 400 with no problem code. A PUT body that includes `custodyMode` → 400. `GET /accounts` takes an optional `custodyMode` filter.
 
 ### 7.7 Transactions
 
@@ -567,3 +567,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-15 | §3.1 role permission table: the one table of grants, matching `RolePermissions`. Moved from ADR 0013 and the instruments, accounts, posting and identity-auth specs; adds the portfolios, reports and fees rows and the Customer Portal grants that were missing there. |
 | 2026-11-16 | §4 rows: a `bookedAt` in the future and a cash `amount` with too many decimal places are field 400s. A reverse of a security transaction that is not the latest security activity on its holding is an ordinary 400. No new problem code ([fixes/ledger-write-guards.md](fixes/ledger-write-guards.md)). |
 | 2026-11-17 | §7.6: account custody mode in `review`. `custodyMode` on the account item, required on `POST /accounts`, refused on PUT, optional list filter. No new route, policy or problem code ([features/account-custody-mode.md](features/account-custody-mode.md)). |
+| 2026-11-17 | §7.6: account custody mode accepted. |

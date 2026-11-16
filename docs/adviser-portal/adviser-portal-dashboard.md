@@ -123,9 +123,9 @@ Unchanged from the BFF cut. Probe is still `GET /api/users/me`. 401 does not ref
 
 ---
 
-## Amendment 2026-11-17 (account custody mode) — review
+## Amendment 2026-11-17 (account custody mode) — accepted
 
-Status of this amendment: `review`. Accept it together with [account-custody-mode](../features/account-custody-mode.md). Until then the pages above are unchanged.
+Status of this amendment: `accepted` (2026-11-17), together with [account-custody-mode](../features/account-custody-mode.md).
 
 Every account has a custody mode, `External` or `Custodial`. Only `External` can be opened in that slice, and no page behaviour depends on the value.
 

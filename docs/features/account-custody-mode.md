@@ -1,6 +1,6 @@
 ---
 title: Account custody mode
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -29,7 +29,7 @@ This slice adds the attribute and carries it through every layer: Domain, databa
 
 The rules for Custodial accounts are the **next** increment and are not specified here. No new route, no new policy, no new `TransactionType`, no problem code. Script `0031_accounts_custody_mode.sql`.
 
-**Status is `review`.** Not a build contract until it is `accepted`. The amendments this spec makes to accepted docs are marked `review` in those docs and take effect when this spec is accepted.
+**Status is `accepted` (2026-11-17).** Not landed. ADR 0020 is accepted with it. The amendments to accounts, ADR 0011, domain-model, database-design, api-design, smoke-test, the glossary and the two portal page contracts are in force from the same change.
 
 ---
 
@@ -278,7 +278,7 @@ Fan-out in the functional tests. Twenty-eight test files post to `/accounts`, an
 
 ## 11. Locked in this spec
 
-New ADR: [adr/0020-account-custody-mode.md](../adr/0020-account-custody-mode.md) (`proposed`). Accept it together with this spec.
+ADR: [adr/0020-account-custody-mode.md](../adr/0020-account-custody-mode.md) (`accepted` 2026-11-17, together with this spec).
 
 | Item | Lock |
 | --- | --- |
@@ -293,7 +293,7 @@ New ADR: [adr/0020-account-custody-mode.md](../adr/0020-account-custody-mode.md)
 | Script | `0031_accounts_custody_mode.sql`, forward only, no default left on the column |
 | Routes and policies | None added |
 
-To confirm before this spec is accepted. Each is written into the rules above as stated here:
+Confirmed when this spec was accepted (2026-11-17). Each is written into the rules above as stated here:
 
 1. **`custodyMode` is required on create** (R3), instead of defaulting to `External` when omitted. The cost is the test-only commit in §12.
 2. **Every existing account becomes `External`** (R10).
@@ -320,6 +320,6 @@ Only after `accepted`. The repository should build after each commit. Agents spl
 5. Customer Portal: the two pages show the label + frontend tests.
 6. `POST /accounts` requires `custodyMode` and accepts only `External` (R3–R5) + functional tests. The shared test method from commit 1 starts sending `External`.
 7. `PUT /accounts/{id}` refuses `custodyMode` (R6) + functional tests.
-8. Repo docs: this file and ADR 0020 `accepted` and landed; drop the `review` marks from the amendments in accounts, the portal specs, ADR 0011, domain-model, database-design, api-design, smoke-test and the glossary.
+8. Repo docs: mark this file landed. (This file, ADR 0020 and the amendments in accounts, the portal specs, ADR 0011, domain-model, database-design, api-design, smoke-test and the glossary were accepted on 2026-11-17, before commit 1.)
 
 Do not put any Custodial rule, tenant setting or read-model grouping in these commits.

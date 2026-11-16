@@ -65,7 +65,7 @@ Identity password seed goes through `UserManager`. OpenIddict clients may be ins
 | Status + IsActive | Rows that have a **status machine** store both: `Status` (source of truth) and `IsActive` (filter bit). `IsActive` is **derived**, never written by HTTP. Preferred SQL: persisted computed column from `Status`. Catalog rows (Tenant, Currency, Instrument) have `IsActive` only — no status machine. Never `IsEnabled`. |
 | Money | No money columns in Phase 1. When the ledger exists: `decimal(18,4)` + `char(3)` FK to `Currencies`. |
 | Strings | `nvarchar` + explicit max length. Email / Name / Code uniqueness is case-insensitive (`SQL_Latin1_General_CP1_CI_AS` or an equivalent CI collation). |
-| Enums | `int` on `Users.Role`, `Users.Status`, `UserTokens.Purpose`, `Accounts.Type`, `Accounts.Status`, `Transactions.Type`. Also `Accounts.CustodyMode` (`0031`, `review`). |
+| Enums | `int` on `Users.Role`, `Users.Status`, `UserTokens.Purpose`, `Accounts.Type`, `Accounts.Status`, `Transactions.Type`. Also `Accounts.CustodyMode` (`0031`). |
 | Delete | `RESTRICT` (no cascade) on Phase-1 business FKs. |
 
 ---
@@ -351,7 +351,7 @@ Beyond PK / unique constraints already listed:
 0028_tenant_composite_keys.sql              -- read-only pre-check; UNIQUE (TenantId, Id) on parents; tenant composite FKs replace single-column FKs
 0029_transactions_booked_at_utc.sql         -- SWITCHOFFSET(BookedAt, '+00:00') on rows with a non-zero offset; instant unchanged
 0030_trade_fees.sql                         -- TransactionCashLegs.Role; TradeFeeSchedules, TradeFeeBands, TransactionFeeDetails
-0031_accounts_custody_mode.sql              -- review, not written yet: Accounts.CustodyMode (existing rows 0 = External); CHECK 0–1; no default left
+0031_accounts_custody_mode.sql              -- accepted, not written yet: Accounts.CustodyMode (existing rows 0 = External); CHECK 0–1; no default left
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -406,7 +406,7 @@ People list items may include `isActive` alongside `status` after `0011`. Filter
 
 Script `0012_accounts.sql`. Columns: [features/accounts.md](features/accounts.md) §6. `Status` Open=0 / Closed=1. `IsActive` persisted computed (`Status = 0` → 1). No balance or institution columns. Landed in the repo 2026-09-21. No seed in the script — `TestSeed` only.
 
-Amendment 2026-11-17 (account custody mode, `review`; [features/account-custody-mode.md](features/account-custody-mode.md) §6): script `0031_accounts_custody_mode.sql` adds `CustodyMode int NOT NULL` to `Accounts` (0 External, 1 Custodial) with CHECK 0–1. The script adds the column with a default of 0 so that existing rows become External, then drops the default: an insert that does not name the column fails. No new index and no FK. Forward only; `0012` is not edited. Not a build contract until that spec is accepted.
+Amendment 2026-11-17 (account custody mode, accepted; [features/account-custody-mode.md](features/account-custody-mode.md) §6): script `0031_accounts_custody_mode.sql` adds `CustodyMode int NOT NULL` to `Accounts` (0 External, 1 Custodial) with CHECK 0–1. The script adds the column with a default of 0 so that existing rows become External, then drops the default: an insert that does not name the column fails. No new index and no FK. Forward only; `0012` is not edited.
 
 ### 11.4 Transactions (accepted spec; landed)
 
@@ -483,6 +483,7 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-10 | Internal transfers (`0025`): `CK_Transactions_Type` widened to 0–15 for `InternalTransfer`. No new table or index. The two-leg shape is enforced in Domain and Application ([features/internal-transfers.md](features/internal-transfers.md) §6). |
 | 2026-11-15 | Trade fees (`0030`): `TransactionCashLegs.Role`, filtered unique `(TransactionId, AccountId) WHERE Role = 0`, `TradeFeeSchedules`, `TradeFeeBands`, `TransactionFeeDetails` ([features/trade-fees.md](features/trade-fees.md) §6). |
 | 2026-11-17 | Account custody mode in `review` (`0031`, not written yet): `Accounts.CustodyMode int NOT NULL`, existing rows back-filled to 0, CHECK 0–1, no default left ([features/account-custody-mode.md](features/account-custody-mode.md) §6). |
+| 2026-11-17 | Account custody mode accepted. `0031` is a build contract. |
 
 ---
 

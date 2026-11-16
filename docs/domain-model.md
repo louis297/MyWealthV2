@@ -288,7 +288,7 @@ Field rules: [features/instruments.md](features/instruments.md). Landed in repo 
 | `Account` | Aggregate | Container under a Customer. Not a cash row. |
 | `AccountStatus` | Enum | `Open`, `Closed` |
 | `AccountType` | Enum | `Bank`, `Cash`, `Brokerage`, `Other`, `Property`, `Credit` |
-| `CustodyMode` | Enum | `External`, `Custodial`. `review`: [features/account-custody-mode.md](features/account-custody-mode.md), ADR 0020. Not in force until that spec is accepted. |
+| `CustodyMode` | Enum | `External`, `Custodial`. [features/account-custody-mode.md](features/account-custody-mode.md), ADR 0020. |
 | `AccountOpened` / `AccountClosed` / `AccountReopened` | Event | Rename raises nothing. |
 
 Invariants:
@@ -299,9 +299,9 @@ Invariants:
 - `Status` is the machine. `IsActive` is derived (`Open` → 1, `Closed` → 0), persisted computed.
 - HTTP close / reopen. No physical delete.
 - Disable Customer rejects while any account is active.
-- (`review`, account custody mode) `CustodyMode` is set on create and immutable, like `Type` and `Currency`. It is independent of `Type`. `Create` accepts both values; Application lets a caller select `External` only, and `Custodial` stays reserved until a later spec adds its rules. No other invariant reads it yet.
+- `CustodyMode` is set on create and immutable, like `Type` and `Currency`. It is independent of `Type`. `Create` accepts both values; Application lets a caller select `External` only, and `Custodial` stays reserved until a later spec adds its rules. No other invariant reads it yet.
 
-Field rules: [features/accounts.md](features/accounts.md). Landed in the repo 2026-09-21. Custody mode: [features/account-custody-mode.md](features/account-custody-mode.md) (`review`).
+Field rules: [features/accounts.md](features/accounts.md). Landed in the repo 2026-09-21. Custody mode: [features/account-custody-mode.md](features/account-custody-mode.md) (accepted).
 
 Close requires cash `SUM = 0` and no `Holdings` rows ([features/holdings.md](features/holdings.md)).
 
@@ -383,6 +383,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-15 | Trade fees accepted. `CashLegRole`, `FeeKind`, `TransactionFeeDetail`, `TradeFeeSchedule`, `FeeBands`. [features/trade-fees.md](features/trade-fees.md). |
 | 2026-11-16 | Ledger write guards accepted. `Transaction.Reverse` refuses a Transaction with a security leg that is not the latest security activity on each of its holdings. [fixes/ledger-write-guards.md](fixes/ledger-write-guards.md). |
 | 2026-11-17 | Account custody mode in `review`. `CustodyMode` enum (`External`, `Custodial`) and immutable `Account.CustodyMode`; no behaviour depends on it. Recorded in §8.5 with a `review` mark. [features/account-custody-mode.md](features/account-custody-mode.md), ADR 0020. |
+| 2026-11-17 | Account custody mode accepted, with ADR 0020. The `review` marks in §8.5 are dropped. |
 
 ---
 

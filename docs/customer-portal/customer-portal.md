@@ -178,9 +178,9 @@ Requires the BFF and the backend amendments above. Do not re-test Adviser Portal
 
 ---
 
-## Amendment 2026-11-17 (account custody mode) — review
+## Amendment 2026-11-17 (account custody mode) — accepted
 
-Status of this amendment: `review`. Accept it together with [account-custody-mode](../features/account-custody-mode.md). Until then the pages above are unchanged.
+Status of this amendment: `accepted` (2026-11-17), together with [account-custody-mode](../features/account-custody-mode.md).
 
 The account item from `GET /accounts` and `GET /accounts/{id}` gains `custodyMode` (`External` / `Custodial`). The Customer already receives it with `accounts.read`; no backend grant changes.
 

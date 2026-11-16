@@ -202,13 +202,13 @@ Questions to settle when this opens:
 
 Tell apart the accounts the platform holds and trades from the accounts that only record assets held elsewhere.
 
-Decided in discussion (2026-11-16), recorded in [ADR 0020](adr/0020-account-custody-mode.md) (`proposed`): every Account has a custody mode, `External` or `Custodial`, on the Account and not on the Tenant. This comes before any work that turns hand-entered transactions into platform-side flows, because each such flow replaces a manual type on Custodial accounts only.
+Decided in discussion (2026-11-16), recorded in [ADR 0020](adr/0020-account-custody-mode.md) (accepted 2026-11-17): every Account has a custody mode, `External` or `Custodial`, on the Account and not on the Tenant. This comes before any work that turns hand-entered transactions into platform-side flows, because each such flow replaces a manual type on Custodial accounts only.
 
 Slices. Only the first has a spec. Slices 3 to 5 do not depend on each other:
 
 | Slice | Content | Behaviour change |
 | --- | --- | --- |
-| 1 | The attribute on the Account. Only `External` can be opened; `Custodial` is a reserved value. [features/account-custody-mode.md](features/account-custody-mode.md) (`review`) | None |
+| 1 | The attribute on the Account. Only `External` can be opened; `Custodial` is a reserved value. [features/account-custody-mode.md](features/account-custody-mode.md) (accepted) | None |
 | 2 | Custodial accounts can be opened, with all of their rules in one spec: which account types they may have, which manual transaction types they refuse, the same custody mode on every leg account of a Transaction, and portfolio assignment and rebalance by custody mode | Most of the change |
 | 3 | A tenant setting for which custody modes may be opened. Optional | Small |
 | 4 | External accounts take the caller's numbers: executed price and fee on `Buy` / `Sell`, both amounts on an `FxConversion`. Server pricing and trade fee schedules then apply to Custodial accounts only | Medium |
