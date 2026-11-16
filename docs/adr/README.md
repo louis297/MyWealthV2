@@ -3,7 +3,7 @@ title: Architecture decision records
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-11-01
+updated: 2026-11-17
 ---
 
 # Architecture decision records
@@ -35,5 +35,6 @@ Write an ADR when the choice would surprise a later reader: host, identity, sche
 | [0017](0017-background-worker.md) | Background worker for async tasks (Hangfire) | accepted |
 | [0018](0018-transactional-outbox.md) | Transactional outbox for domain events | accepted |
 | [0019](0019-fx-rate-source-and-refresh.md) | FX rate source and refresh (Frankfurter, hourly, pairs) | accepted |
+| [0020](0020-account-custody-mode.md) | Custody mode on the Account (`External` / `Custodial`), not on the Tenant | proposed |
 
-0010 is accepted and expanded with [features/instruments.md](../features/instruments.md) (landed `9ea2f2a`). Account container: [features/accounts.md](../features/accounts.md) (landed). Posting / cash book: [features/posting.md](../features/posting.md) (landed `79129eb`). Idempotency: ADR 0015 (`accepted`). 0011 remains direction for holdings / security legs. 0016 is **accepted and landed** (`78d7eb4`…`5e85e9c`) with [features/bff-adviser-portal.md](../features/bff-adviser-portal.md). 0018 is **accepted**; implementation follows [features/outbox.md](../features/outbox.md) (accepted). 0019 is **accepted**; implementation follows [features/fx-rates.md](../features/fx-rates.md) (accepted).
+0010 is accepted and expanded with [features/instruments.md](../features/instruments.md) (landed `9ea2f2a`). Account container: [features/accounts.md](../features/accounts.md) (landed). Posting / cash book: [features/posting.md](../features/posting.md) (landed `79129eb`). Idempotency: ADR 0015 (`accepted`). 0011 remains direction for holdings / security legs. 0016 is **accepted and landed** (`78d7eb4`…`5e85e9c`) with [features/bff-adviser-portal.md](../features/bff-adviser-portal.md). 0018 is **accepted**; implementation follows [features/outbox.md](../features/outbox.md) (accepted). 0019 is **accepted**; implementation follows [features/fx-rates.md](../features/fx-rates.md) (accepted). 0020 is **proposed**; its first slice is [features/account-custody-mode.md](../features/account-custody-mode.md) (`review`).
