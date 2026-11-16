@@ -178,7 +178,7 @@ Requires the BFF and the backend amendments above. Do not re-test Adviser Portal
 
 ---
 
-## Amendment 2026-11-17 (account custody mode) — accepted
+## Amendment 2026-11-17 (account custody mode) — accepted, landed
 
 Status of this amendment: `accepted` (2026-11-17), together with [account-custody-mode](../features/account-custody-mode.md).
 

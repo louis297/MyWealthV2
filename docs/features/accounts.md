@@ -33,7 +33,7 @@ This slice does not persist a balance column. [posting.md](posting.md) (accepted
 
 Landed in GitHub `louis297/MyWealthV2` master 2026-09-21, last slice commit `3e8b8f3`. Slice commits `1b7f4af` … `3e8b8f3` (`0012_accounts.sql`, `/accounts`, Disable-Customer guard, TestSeed). Depends on accepted [instruments](instruments.md) (landed `9ea2f2a`) and the IsActive rename (`bbd0f26`, `0011`) only as prior slices. Accounts do not reference `InstrumentId`.
 
-**Amendment 2026-11-17 (account custody mode, accepted):** [account-custody-mode.md](account-custody-mode.md), [ADR 0020](../adr/0020-account-custody-mode.md). Every Account gains a custody mode, `External` or `Custodial`, set on create and immutable like `Type` and `Currency` (script `0031`).
+**Amendment 2026-11-17 (account custody mode, accepted, landed):** [account-custody-mode.md](account-custody-mode.md), [ADR 0020](../adr/0020-account-custody-mode.md). Every Account gains a custody mode, `External` or `Custodial`, set on create and immutable like `Type` and `Currency` (script `0031`).
 
 - R8 / R9 / R14: `POST /accounts` requires `custodyMode`. Only `External` can be selected; `Custodial` is reserved and returns 400, like `Property` and `Credit`. A PUT body that includes `custodyMode` → 400.
 - R17 and §8.1: every list and get item includes `custodyMode`. `GET /accounts` takes an optional `custodyMode` filter.

@@ -163,7 +163,7 @@ Decision in [ADR 0020](../adr/0020-account-custody-mode.md) (accepted 2026-11-17
 
 | Spec | Status | Who | Ships | Why it stays its own slice |
 | --- | --- | --- | --- | --- |
-| [account-custody-mode](account-custody-mode.md) | accepted (2026-11-17) | Same callers as accounts | `Account.CustodyMode` (`External` / `Custodial`), set at open and immutable; required `custodyMode` on `POST /accounts`, refused on PUT, on the account item, optional list filter; only `External` can be selected, `Custodial` is reserved; existing accounts become `External`; both portals show it. Script `0031`. No new route or policy | Structural groundwork with no behaviour change, like leg-accounts. The Custodial rules are the next increment |
+| [account-custody-mode](account-custody-mode.md) | accepted (2026-11-17; landed on `feature/account-custody-mode`) | Same callers as accounts | `Account.CustodyMode` (`External` / `Custodial`), set at open and immutable; required `custodyMode` on `POST /accounts`, refused on PUT, on the account item, optional list filter; only `External` can be selected, `Custodial` is reserved; existing accounts become `External`; both portals show it. Script `0031`. No new route or policy | Structural groundwork with no behaviour change, like leg-accounts. The Custodial rules are the next increment |
 
 ---
 

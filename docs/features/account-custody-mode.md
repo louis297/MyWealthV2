@@ -29,7 +29,7 @@ This slice adds the attribute and carries it through every layer: Domain, databa
 
 The rules for Custodial accounts are the **next** increment and are not specified here. No new route, no new policy, no new `TransactionType`, no problem code. Script `0031_accounts_custody_mode.sql`.
 
-**Status is `accepted` (2026-11-17).** Not landed. ADR 0020 is accepted with it. The amendments to accounts, ADR 0011, domain-model, database-design, api-design, smoke-test, the glossary and the two portal page contracts are in force from the same change.
+**Status is `accepted` (2026-11-17) and landed** on branch `feature/account-custody-mode`: script `0031_accounts_custody_mode.sql`, `Account.CustodyMode`, the create / PUT / item / filter rules, both portals and the seeds. ADR 0020 is accepted with it. The amendments to accounts, ADR 0011, domain-model, database-design, api-design, smoke-test, the glossary and the two portal page contracts landed with the implementation.
 
 ---
 
@@ -272,6 +272,8 @@ Page contracts: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-d
 | Adviser Portal | The New account form posts `custodyMode: "External"`; the accounts list, the customer page and the account page render the custody mode |
 | Customer Portal | The accounts list and the account page render the label for the custody mode |
 
+Where the two-tenant test lives: the `custodyMode` filter is applied in the `GetAccounts` handler, so the two-tenant case is proved over HTTP in Application.FunctionalTests (`AccountCustodyModeReadTests`), next to the other account isolation tests, not in Infrastructure.IntegrationTests.
+
 Fan-out in the functional tests. Twenty-eight test files post to `/accounts`, and sixteen of them have their own `OpenAccountAsync`. Before the field becomes required, one test-only commit moves plain account opening to a single shared method on `AccountHttp` (§12, commit 1). That commit is a pure refactor and passes on its own. Tests that assert on the create request itself (`CreateAccountTests` and similar) keep their own bodies and add the field when R3 lands.
 
 ---
@@ -320,6 +322,6 @@ Only after `accepted`. The repository should build after each commit. Agents spl
 5. Customer Portal: the two pages show the label + frontend tests.
 6. `POST /accounts` requires `custodyMode` and accepts only `External` (R3–R5) + functional tests. The shared test method from commit 1 starts sending `External`.
 7. `PUT /accounts/{id}` refuses `custodyMode` (R6) + functional tests.
-8. Repo docs: mark this file landed. (This file, ADR 0020 and the amendments in accounts, the portal specs, ADR 0011, domain-model, database-design, api-design, smoke-test and the glossary were accepted on 2026-11-17, before commit 1.)
+8. Repo docs: mark this file landed (done 2026-11-17). (This file, ADR 0020 and the amendments in accounts, the portal specs, ADR 0011, domain-model, database-design, api-design, smoke-test and the glossary were accepted on 2026-11-17, before commit 1.)
 
 Do not put any Custodial rule, tenant setting or read-model grouping in these commits.

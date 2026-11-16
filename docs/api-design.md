@@ -568,3 +568,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-16 | §4 rows: a `bookedAt` in the future and a cash `amount` with too many decimal places are field 400s. A reverse of a security transaction that is not the latest security activity on its holding is an ordinary 400. No new problem code ([fixes/ledger-write-guards.md](fixes/ledger-write-guards.md)). |
 | 2026-11-17 | §7.6: account custody mode in `review`. `custodyMode` on the account item, required on `POST /accounts`, refused on PUT, optional list filter. No new route, policy or problem code ([features/account-custody-mode.md](features/account-custody-mode.md)). |
 | 2026-11-17 | §7.6: account custody mode accepted. |
+| 2026-11-17 | §7.6: account custody mode landed. |

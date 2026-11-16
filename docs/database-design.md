@@ -351,7 +351,7 @@ Beyond PK / unique constraints already listed:
 0028_tenant_composite_keys.sql              -- read-only pre-check; UNIQUE (TenantId, Id) on parents; tenant composite FKs replace single-column FKs
 0029_transactions_booked_at_utc.sql         -- SWITCHOFFSET(BookedAt, '+00:00') on rows with a non-zero offset; instant unchanged
 0030_trade_fees.sql                         -- TransactionCashLegs.Role; TradeFeeSchedules, TradeFeeBands, TransactionFeeDetails
-0031_accounts_custody_mode.sql              -- accepted, not written yet: Accounts.CustodyMode (existing rows 0 = External); CHECK 0–1; no default left
+0031_accounts_custody_mode.sql              -- Accounts.CustodyMode (existing rows 0 = External); CHECK 0–1; no default left
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -484,6 +484,7 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-15 | Trade fees (`0030`): `TransactionCashLegs.Role`, filtered unique `(TransactionId, AccountId) WHERE Role = 0`, `TradeFeeSchedules`, `TradeFeeBands`, `TransactionFeeDetails` ([features/trade-fees.md](features/trade-fees.md) §6). |
 | 2026-11-17 | Account custody mode in `review` (`0031`, not written yet): `Accounts.CustodyMode int NOT NULL`, existing rows back-filled to 0, CHECK 0–1, no default left ([features/account-custody-mode.md](features/account-custody-mode.md) §6). |
 | 2026-11-17 | Account custody mode accepted. `0031` is a build contract. |
+| 2026-11-17 | Account custody mode landed: `0031_accounts_custody_mode.sql` written and applied. |
 
 ---
 
