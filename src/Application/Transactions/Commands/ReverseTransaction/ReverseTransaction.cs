@@ -129,10 +129,12 @@ public class ReverseTransactionCommandHandler(
         }
 
         var currentQuantities = await CurrentQuantitiesAsync(loaded, cancellationToken);
+        var hasLaterSecurityActivity = await HasLaterSecurityActivityAsync(loaded.Transaction, cancellationToken);
         Domain.Entities.Transaction reversal;
         try
         {
-            reversal = loaded.Transaction.Reverse(time.GetUtcNow(), currentSums, currentQuantities);
+            reversal = loaded.Transaction.Reverse(
+                time.GetUtcNow(), currentSums, currentQuantities, hasLaterSecurityActivity);
         }
         catch (DomainException exception)
         {
@@ -248,6 +250,41 @@ public class ReverseTransactionCommandHandler(
         }
 
         return quantities;
+    }
+
+    /// <summary>
+    /// True when a live security leg written after <paramref name="original"/> exists on one of its
+    /// <c>(Account, Instrument)</c> pairs. Live: its Transaction is not a Reversal and has not been reversed
+    /// (fixes/ledger-write-guards.md Decision 1). Runs after the leg Accounts are locked.
+    /// </summary>
+    private async Task<bool> HasLaterSecurityActivityAsync(
+        Domain.Entities.Transaction original,
+        CancellationToken cancellationToken)
+    {
+        if (original.SecurityLegs.Count == 0)
+        {
+            return false;
+        }
+
+        var holdings = original.SecurityLegs
+            .Select(leg => (leg.AccountId, leg.InstrumentId))
+            .ToHashSet();
+        var accountIds = holdings.Select(holding => holding.AccountId).Distinct().ToList();
+        var instrumentIds = holdings.Select(holding => holding.InstrumentId).Distinct().ToList();
+
+        var later = await (
+            from leg in db.TransactionSecurityLegs.AsNoTracking()
+            join transaction in db.Transactions.AsNoTracking() on leg.TransactionId equals transaction.Id
+            where accountIds.Contains(leg.AccountId)
+                  && instrumentIds.Contains(leg.InstrumentId)
+                  && transaction.Id > original.Id
+                  && transaction.Type != TransactionType.Reversal
+                  && transaction.ReversedByTransactionId == null
+            select new { leg.AccountId, leg.InstrumentId })
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        return later.Any(row => holdings.Contains((row.AccountId, row.InstrumentId)));
     }
 
     private Task<IdempotencyRecord?> FindRecordAsync(int tenantId, Guid key, CancellationToken cancellationToken) =>

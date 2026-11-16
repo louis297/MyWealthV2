@@ -526,6 +526,13 @@ public class Transaction : BaseAuditableEntity
             throw new DomainException("This transaction has already been reversed.");
         }
 
+        // The cost a later Sell or StockOut released depends on this leg, so only the latest
+        // security activity on a holding can be reversed (fixes/ledger-write-guards.md Decision 1).
+        if (SecurityLegs.Count > 0 && hasLaterSecurityActivity)
+        {
+            throw new DomainException("A later transaction changed this holding. Reverse the later transactions first.");
+        }
+
         // Roles and fee details are copied; the schedule is not read again (trade-fees R19).
         var cashLegs = CashLegs.Select(leg => leg.ReversalLeg()).ToList();
         foreach (var account in cashLegs.GroupBy(leg => leg.AccountId))
