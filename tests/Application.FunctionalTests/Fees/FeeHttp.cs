@@ -2,10 +2,13 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Application.FunctionalTests.Accounts;
 using MyWealthV2.Application.FunctionalTests.Instruments;
 using MyWealthV2.Application.FunctionalTests.Transactions;
+using MyWealthV2.Domain.Entities;
+using MyWealthV2.Domain.ValueObjects;
 using MyWealthV2.Infrastructure.Data;
 
 namespace MyWealthV2.Application.FunctionalTests.Fees;
@@ -16,6 +19,16 @@ internal static class FeeHttp
     public const string Schedules = "/fees/trade-schedules";
 
     public static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
+
+    /// <summary>
+    /// A schedule start in the past, after the funding and "before" trades of the fee tests (October 2026).
+    /// A trade cannot be dated in the future (fixes/ledger-write-guards.md Decision 6), so the fee tests
+    /// insert their schedule directly from this date instead of creating it after the cut-off over HTTP.
+    /// </summary>
+    public static readonly DateOnly ScheduleFrom = new(2026, 11, 1);
+
+    /// <summary>A trade instant on which a schedule from <see cref="ScheduleFrom"/> is in effect.</summary>
+    public static string TradeAt => At(ScheduleFrom.AddDays(1));
 
     public static async Task<HttpResponseMessage> Send(
         HttpMethod method,
@@ -68,6 +81,34 @@ internal static class FeeHttp
         response.StatusCode.ShouldBe(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         return json.RootElement.GetProperty("id").GetGuid();
+    }
+
+    /// <summary>
+    /// Inserts a schedule directly, as the API only accepts dates after the cut-off (trade-fees R9).
+    /// Default: 0.5% to 10,000 then 0.3%, minimum 10, no cap.
+    /// </summary>
+    public static async Task<Guid> AddScheduleAsync(
+        int tenantId,
+        string currency,
+        DateOnly effectiveFrom,
+        decimal minimum = 10.00m,
+        params FeeBand[] bands)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var catalogCurrency = await db.Set<Currency>().AsNoTracking().SingleAsync(row => row.Code == currency);
+        var schedule = TradeFeeSchedule.Create(
+            tenantId,
+            catalogCurrency,
+            effectiveFrom,
+            minimum,
+            null,
+            bands.Length == 0 ? [new FeeBand(0m, 0.5m), new FeeBand(10000.00m, 0.3m)] : bands,
+            effectiveFrom.AddDays(-1));
+        schedule.CreatedBy = "test";
+        db.TradeFeeSchedules.Add(schedule);
+        await db.SaveChangesAsync();
+        return schedule.PublicId;
     }
 
     public static async Task<Guid> CreateScheduleAsync(string accessToken, object body)
@@ -166,6 +207,37 @@ internal static class FeeHttp
         await SetPriceAsync(instrumentId, 25.00m, currency);
         (await PostCashAsync(accessToken, accountId, cash)).StatusCode.ShouldBe(HttpStatusCode.Created);
         return (accountId, instrumentId);
+    }
+
+    /// <summary>
+    /// Inserts a Buy at 25.00 directly, without a fee, as a row posted before a future bookedAt was refused
+    /// (fixes/ledger-write-guards.md Decision 9). Only the cut-off date reads it; the holding is not projected.
+    /// </summary>
+    public static async Task InsertBuyAsync(Guid accountPublicId, Guid instrumentPublicId, decimal quantity, DateOnly tradeDate)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var account = await db.Accounts.SingleAsync(row => row.PublicId == accountPublicId);
+        var instrument = await db.Instruments.SingleAsync(row => row.PublicId == instrumentPublicId);
+        var cash = await db.TransactionCashLegs.Where(leg => leg.AccountId == account.Id).SumAsync(leg => leg.Amount);
+        var buy = Transaction.PostBuy(
+            account.TenantId,
+            account.Id,
+            account.Type,
+            account.Currency,
+            instrument.Id,
+            quantity,
+            Money.Create(25.00m, instrument.QuoteCurrency.Trim()),
+            fxRate: 1m,
+            DateTimeOffset.Parse(At(tradeDate)),
+            memo: null,
+            reference: null,
+            currentCashSum: cash);
+        buy.CreatedBy = "test";
+        buy.CashLegs.ForEach(leg => leg.CreatedBy = "test");
+        buy.SecurityLegs.ForEach(leg => leg.CreatedBy = "test");
+        db.Transactions.Add(buy);
+        await db.SaveChangesAsync();
     }
 
     /// <summary>An instant at 10:00 UTC on <paramref name="date"/>.</summary>

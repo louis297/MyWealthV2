@@ -71,7 +71,7 @@ public sealed record FxQuoteAmountDto(decimal Amount, string Currency);
 
 public class GetFxConversionQuoteQueryValidator : AbstractValidator<GetFxConversionQuoteQuery>
 {
-    public GetFxConversionQuoteQueryValidator(ICurrentUser currentUser)
+    public GetFxConversionQuoteQueryValidator(ICurrentUser currentUser, TimeProvider time)
     {
         RuleFor(query => query.FromAccountId).NotEmpty();
         RuleFor(query => query.ToAccountId).NotEmpty();
@@ -91,6 +91,7 @@ public class GetFxConversionQuoteQueryValidator : AbstractValidator<GetFxConvers
             .GreaterThan(0)
             .When(query => query.BuyAmount is not null)
             .WithMessage("Buy amount must be greater than 0.");
+        RuleFor(query => query.BookedAt).NotInTheFuture(time);
 
         RuleFor(query => query.ExpectedRate).Null().WithMessage("ExpectedRate cannot be set on a quote.");
         RuleFor(query => query.Memo).Null().WithMessage("Memo cannot be set on a quote.");

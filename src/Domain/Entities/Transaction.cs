@@ -507,11 +507,14 @@ public class Transaction : BaseAuditableEntity
     /// <summary>
     /// Builds the Reversal: one opposite leg per original leg, each on that leg's Account.
     /// Balances are keyed by leg Account (and Instrument for holdings).
+    /// <paramref name="hasLaterSecurityActivity"/> is true when a live later security leg exists on one of
+    /// this Transaction's holdings (fixes/ledger-write-guards.md Decision 1).
     /// </summary>
     public Transaction Reverse(
         DateTimeOffset bookedAt,
         IReadOnlyDictionary<int, decimal> currentCashSumByAccount,
-        IReadOnlyDictionary<(int AccountId, int InstrumentId), decimal>? currentQuantity = null)
+        IReadOnlyDictionary<(int AccountId, int InstrumentId), decimal>? currentQuantity = null,
+        bool hasLaterSecurityActivity = false)
     {
         if (Type == TransactionType.Reversal)
         {
@@ -521,6 +524,13 @@ public class Transaction : BaseAuditableEntity
         if (ReversedByTransactionId is not null || ReversedBy is not null)
         {
             throw new DomainException("This transaction has already been reversed.");
+        }
+
+        // The cost a later Sell or StockOut released depends on this leg, so only the latest
+        // security activity on a holding can be reversed (fixes/ledger-write-guards.md Decision 1).
+        if (SecurityLegs.Count > 0 && hasLaterSecurityActivity)
+        {
+            throw new DomainException("A later transaction changed this holding. Reverse the later transactions first.");
         }
 
         // Roles and fee details are copied; the schedule is not read again (trade-fees R19).

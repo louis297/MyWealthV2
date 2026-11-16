@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-28
-last_updated: 2026-11-15
+last_updated: 2026-11-16
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -34,6 +34,8 @@ Buy / Sell / StockIn / StockOut are accepted in [buy-sell.md](buy-sell.md). Spli
 **Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md). Each security leg carries its own `AccountId`; the header has none (script `0024`). Security legs are unique per `(TransactionId, AccountId, InstrumentId)`. The projection key is the leg's `(AccountId, InstrumentId)` (R14). "Same Account-locked command" means every leg account locked in ascending `Accounts.Id` order. Bank / Cash refusal is checked per security leg's Account. Item JSON: leg-accounts §8.1.
 
 **Amendment 2026-11-15 (trade fees, accepted):** [trade-fees.md](trade-fees.md) R16. A `Buy` adds `gross + fee` to the holding cost. Release on `Sell` / `StockOut` is unchanged. No other type that changes a holding has a fee.
+
+**Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R15: a Transaction with a security leg can be reversed only while it is the latest security activity on each of its holdings. R18 follows posting R24, which now refuses a `bookedAt` in the future.
 
 ---
 
@@ -114,7 +116,7 @@ Cash position stays the `SUM` of cash legs. An `OpeningHoldings` header has no c
 | R12 | No auto zero row. Create Account does not insert a holding. |
 | R13 | After insert, quantity `SUM` per `(Account, Instrument)` `≥ 0`. Stored quantity is `decimal(18,8)`. Cost amount is `decimal(18,4)`. |
 | R14 | Projection upsert in the same Account-locked command. Callers never PUT a holding. Quantity 0 deletes the projection row. Tests assert projection quantity = `SUM` of security-leg quantities. |
-| R15 | Posted rows are not updated or deleted. Reverse copies the opposite security quantity and cost. One reversal per original. No client `rowVersion`. Account Open. Result must stay `≥ 0`. |
+| R15 | Posted rows are not updated or deleted. Reverse copies the opposite security quantity and cost. One reversal per original. No client `rowVersion`. Account Open. Result must stay `≥ 0`. Only the latest security activity on a holding can be reversed: a live later security leg on the same `(Account, Instrument)` → 400 ([ledger-write-guards](../fixes/ledger-write-guards.md)). |
 | R16 | `CloseAccount` rejects unless cash `SUM = 0` and no `Holdings` row remains for that account. Amends accounts R16. `Account.Close()` writes neither cash nor holdings. |
 | R17 | `Idempotency-Key` required on create and reverse, same as posting. |
 | R18 | `bookedAt` required instant, as [posting](posting.md) R24. Memo optional 1–200. Reference optional, stored, no uniqueness. |

@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-10
-last_updated: 2026-11-15
+last_updated: 2026-11-16
 related:
   - leg-accounts.md
   - posting.md
@@ -26,6 +26,8 @@ related:
 Cash transfer between two Accounts in the same tenant, on `webapi`. One Transaction of the new type `InternalTransfer` has two cash legs: a negative leg on the source Account and a positive leg on the destination Account. The two Accounts may belong to the same Customer or to two Customers of the same tenant.
 
 This is the increment that [leg-accounts.md](leg-accounts.md) prepared (§12, §13) and [posting.md](posting.md) §13 deferred. It adds one `TransactionType`, one create route `POST /transactions/transfer`, an optional `type` filter on the transaction list, and script `0025`. No new policy. Read and reverse reuse the existing `/transactions` routes.
+
+**Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R3 and R7: `amount` has no more decimal places than the Accounts' currency's `DecimalPlaces`, else 400 `errors.Amount`. R3: a `bookedAt` later than the server clock plus 5 minutes → 400 `errors.BookedAt`.
 
 ---
 

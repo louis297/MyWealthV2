@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-11
-last_updated: 2026-11-15
+last_updated: 2026-11-16
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -35,6 +35,8 @@ Split / Bonus / Scrip are accepted in [split.md](split.md). No portal page. No p
 **Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md). Both legs of a `Buy` / `Sell` carry the create body's `accountId`; the header has no Account. R15 "same Account-locked command" means every leg account locked in ascending `Accounts.Id` order. The item JSON in §8.1 is replaced by leg-accounts §8.1 (shown below).
 
 **Amendment 2026-11-15 (trade fees, accepted):** [trade-fees.md](trade-fees.md). Every `Buy` / `Sell` looks up the tenant's trade fee schedule for the instrument's quote currency and the UTC date of `bookedAt`. When the fee is above 0, the trade gets a second cash leg with role `Fee` on the same Account and a fee detail of kind `Brokerage` (trade-fees R7, R14, R18). R9: a `fee` field on the create body → 400. R11: `Buy` cost is `gross + fee`; the `Sell` release in R15 is unchanged. R12: the fee leg uses the principal's rate and rounding. R13: the cash check counts the fee leg. R16: reverse copies the fee leg and its fee detail. Every cash leg in the item carries `role` and `fee` (trade-fees §8.1). "Fees" in §2 Out and §12 is replaced by trade-fees §2 Out.
+
+**Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R16: a `Buy`, `Sell`, `StockIn` or `StockOut` can be reversed only while it is the latest security activity on its holding. R18 follows posting R24, which now refuses a `bookedAt` in the future.
 
 ---
 
@@ -107,7 +109,7 @@ The header is the existing Transaction. Each of these types has exactly one secu
 | R13 | Security-leg quantity is stored signed: `Buy` / `StockIn` `+quantity`; `Sell` / `StockOut` `−quantity`. After insert, quantity `SUM` per `(Account, Instrument)` `≥ 0`. Cash `SUM ≥ 0` on non-Credit accounts. |
 | R14 | `Sell` / `StockOut` quantity must not exceed the current holding quantity for that instrument (400). No holding → 400. `Buy` / `StockIn` may be the first security activity for that instrument (creates the holding). |
 | R15 | Projection upsert in the same Account-locked command. Callers never PUT a holding. `Buy` / `StockIn` add cost. `Sell` / `StockOut` release cost: `released = Round(oldCost × sellQty / oldQty, 4, MidpointRounding.AwayFromZero)`; remaining = oldCost − released. Selling the full quantity leaves remaining 0. Quantity 0 deletes the projection row. Tests assert projection quantity = `SUM` of security-leg quantities and projection cost matches this rule. |
-| R16 | Posted rows are not updated or deleted. Reverse copies the opposite cash amount (if any) and the opposite security quantity and cost. One reversal per original. No client `rowVersion`. Account Open. If the reverse would make cash or quantity `< 0` → 400; original stays. |
+| R16 | Posted rows are not updated or deleted. Reverse copies the opposite cash amount (if any) and the opposite security quantity and cost. One reversal per original. No client `rowVersion`. Account Open. If the reverse would make cash or quantity `< 0` → 400; original stays. Only the latest security activity on a holding can be reversed: a live later security leg on the same `(Account, Instrument)` → 400 ([ledger-write-guards](../fixes/ledger-write-guards.md)). |
 | R17 | `Idempotency-Key` required on create and reverse, same as posting and holdings. |
 | R18 | `bookedAt` required instant, as [posting](posting.md) R24. Memo optional 1–200. Reference optional, stored, no uniqueness. |
 | R19 | Customer has no ledger-write policy → 403. |

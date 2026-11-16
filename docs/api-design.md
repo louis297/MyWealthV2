@@ -1,9 +1,9 @@
 ---
 title: API design
-status: draft
+status: accepted
 language: en
 created: 2026-09-11
-updated: 2026-11-15
+updated: 2026-11-16
 related:
   - README.md
   - glossary.md
@@ -143,6 +143,8 @@ A spec that adds a permission or changes a grant updates this table in the chang
 | --- | --- | --- |
 | Validation / business rule (Adviser still has Customers, duplicate email, illegal reporting currency, …) | 400 | `webapi` |
 | Request instant with no offset, or not an ISO 8601 date and time | 400, `errors.<Field>` (for example `errors.BookedAt`) | `webapi` |
+| `bookedAt` later than the server clock plus 5 minutes ([fixes/ledger-write-guards.md](fixes/ledger-write-guards.md)) | 400, `errors.BookedAt` | `webapi` |
+| Cash `amount` with more decimal places than the Account currency's `DecimalPlaces` ([fixes/ledger-write-guards.md](fixes/ledger-write-guards.md)) | 400, `errors.Amount` | `webapi` |
 | Any other body that cannot be read (malformed JSON, wrong type) | 400 (415 for a wrong content type), `ProblemDetails` titled `Bad request`, in every environment | `webapi` |
 | Target exists but is disabled and the caller tries to create / attach / post on it (§4.1) | 400 `disabled` | `webapi` |
 | Missing / invalid Bearer; calling resources after refresh was revoked | 401 | `webapi` |
@@ -562,3 +564,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-13 | §4.2 problem codes (accepted): every 409 and every named business 400 carries a stable `code`; one registry; clients branch on `code`. Build contract: [features/portfolios.md](features/portfolios.md) amendment 2026-11-13 part 1. |
 | 2026-11-15 | Trade fees accepted: `/fees` namespace and `/fees/trade-schedules` (`fees.read` / `fees.manage`, §7.9); problem code `fee_schedule_in_effect`; cash legs in the transaction item gain `role` and `fee` ([features/trade-fees.md](features/trade-fees.md)). |
 | 2026-11-15 | §3.1 role permission table: the one table of grants, matching `RolePermissions`. Moved from ADR 0013 and the instruments, accounts, posting and identity-auth specs; adds the portfolios, reports and fees rows and the Customer Portal grants that were missing there. |
+| 2026-11-16 | §4 rows: a `bookedAt` in the future and a cash `amount` with too many decimal places are field 400s. A reverse of a security transaction that is not the latest security activity on its holding is an ordinary 400. No new problem code ([fixes/ledger-write-guards.md](fixes/ledger-write-guards.md)). |

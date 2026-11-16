@@ -79,7 +79,7 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
         "Buy", "Sell", "StockIn", "StockOut", "Split", "Bonus", "Scrip"
     ];
 
-    public CreateTransactionCommandValidator(ICurrentUser currentUser)
+    public CreateTransactionCommandValidator(ICurrentUser currentUser, TimeProvider time)
     {
         RuleFor(command => command.AccountId).NotEmpty();
         RuleFor(command => command.Fee)
@@ -88,7 +88,7 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
         RuleFor(command => command.Type)
             .Must(type => type is not null && AllowedTypes.Contains(type))
             .WithMessage("Type must be TransferIn, TransferOut, Interest, CloseOut, Opening, OpeningHoldings, Buy, Sell, StockIn, StockOut, Split, Bonus, or Scrip.");
-        RuleFor(command => command.BookedAt).NotNull();
+        RuleFor(command => command.BookedAt).NotNull().NotInTheFuture(time);
         RuleFor(command => command.Memo)
             .Must(memo => memo is null || memo.Trim().Length is >= 1 and <= 200)
             .WithMessage("Memo must be 1 to 200 characters.");
@@ -323,9 +323,18 @@ public class CreateTransactionCommandHandler(
             currency = accountCurrency;
         }
 
+        var type = Enum.Parse<TransactionType>(request.Type!);
+
+        // CloseOut is exempt: its amount must equal the cash SUM, which a Buy or Sell can leave with
+        // more decimals than the currency has (fixes/ledger-write-guards.md Decision 5).
+        if (type is TransactionType.TransferIn or TransactionType.TransferOut
+            or TransactionType.Interest or TransactionType.Opening)
+        {
+            CashAmountPlaces.EnsureFits(catalog, Money.Create(0m, currency).Currency, request.Amount!.Value);
+        }
+
         var currentSum = await TransactionCash.SumAsync(db, loaded.Account.Id, cancellationToken);
         var existingCount = await TransactionCash.CountAsync(db, loaded.Account.Id, cancellationToken);
-        var type = Enum.Parse<TransactionType>(request.Type!);
         await PortfolioTradeLock.RejectIfAssignedAsync(db, loaded.Account.Id, type, cancellationToken);
         Domain.Entities.Transaction transaction;
         try

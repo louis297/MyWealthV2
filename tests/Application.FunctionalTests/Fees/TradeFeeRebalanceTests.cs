@@ -33,7 +33,7 @@ public class TradeFeeRebalanceTests : TestBase
         portfolio.StatusCode.ShouldBe(HttpStatusCode.Created);
         using var portfolioJson = JsonDocument.Parse(await portfolio.Content.ReadAsStringAsync());
         var portfolioId = portfolioJson.RootElement.GetProperty("id").GetGuid();
-        await AddScheduleStartingTodayAsync(tenant.Id, "NZD", minimum: 50m);
+        await FeeHttp.AddScheduleAsync(tenant.Id, "NZD", FeeHttp.Today, minimum: 50m, new FeeBand(0m, 0.5m));
 
         var response = await PortfolioHttp.Send(HttpMethod.Post, $"/accounts/{accountId}/portfolio", adviser.AccessToken, new
         {
@@ -51,18 +51,5 @@ public class TradeFeeRebalanceTests : TestBase
         details[0].Fee.ShouldBe(50m);
         details[0].Basis.ShouldBeLessThan(10000m);
         details[0].Basis.ShouldBeGreaterThan(9900m);
-    }
-
-    /// <summary>A schedule from today (UTC) inserted directly: the API only accepts dates after the cut-off.</summary>
-    private static async Task AddScheduleStartingTodayAsync(int tenantId, string currency, decimal minimum)
-    {
-        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var catalogCurrency = await db.Set<Currency>().AsNoTracking().SingleAsync(row => row.Code == currency);
-        var schedule = TradeFeeSchedule.Create(
-            tenantId, catalogCurrency, FeeHttp.Today, minimum, null, [new FeeBand(0m, 0.5m)], FeeHttp.Today.AddDays(-1));
-        schedule.CreatedBy = "test";
-        db.TradeFeeSchedules.Add(schedule);
-        await db.SaveChangesAsync();
     }
 }
