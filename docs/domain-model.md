@@ -17,7 +17,7 @@ This document owns **aggregates, value objects, invariants, and domain events**.
 
 **Product:** MyWealthV2.
 
-Same rule as the function plan: if a later phase will use it and today’s model would have to change, write the final model now. If later use or shape is not decided, wait. Write now: a complete `UserStatus` machine whose invite transition has no Phase-1 entry; Customer as a login principal; `Money` with no balance column. Wait: a single `Transactions.Type` that pretends to be both cash and securities; ledger tables whose storage is still open.
+Same rule as the function plan: if a later phase will use it and today's model would have to change, write the final model now. If later use or shape is not decided, wait. Write now: a complete `UserStatus` machine whose invite transition has no Phase-1 entry; Customer as a login principal; `Money` with no balance column. Wait: a single `Transactions.Type` that pretends to be both cash and securities; ledger tables whose storage is still open.
 
 The session protocol (OpenIddict, authorization code + PKCE, refresh) lives on the authorization server / in Infrastructure. It is **not** a domain aggregate. The domain only answers whether a person may be issued a session (tenant enabled, `UserStatus`, role, identity link).
 
@@ -135,7 +135,7 @@ PendingActivation ──disable──► Disabled
 - Only `Active` may complete authorization-server login. `PendingActivation` and `Disabled` may not.
 - `Users.IsActive` is derived from that machine (`Active` → 1; otherwise 0). List `enabledOnly=true` uses the bit. Login still reads `Status`, not the bit alone.
 - Phase 1 admin APIs may create with a password and land in `Active` (invitation delivery is not built; that is not an excuse to collapse the machine to a boolean).
-- Disable, re-enable, and password change run on the resource API. The authorization server reads Status and tenant enabled at login. Password change / disable / logout revoke that subject’s OpenIddict tokens — an application consequence driven by domain events. The User aggregate does not hold tokens.
+- Disable, re-enable, and password change run on the resource API. The authorization server reads Status and tenant enabled at login. Password change / disable / logout revoke that subject's OpenIddict tokens — an application consequence driven by domain events. The User aggregate does not hold tokens.
 
 Disable guards:
 
@@ -148,7 +148,7 @@ Disable guards:
 
 - Code is ISO 4217, three letters, upper case.
 - `DecimalPlaces` is the ISO minor-unit count for input / display / validation (JPY = 0, NZD = 2). It is not the SQL scale of a money column. Phase-2 amount columns stay `decimal(18,4)` for every currency.
-- `IsActive` is a **platform** flag on the catalog row. It is not bound to a tenant. One change is visible to every tenant’s picker; existing `ReportingCurrency` values are left alone.
+- `IsActive` is a **platform** flag on the catalog row. It is not bound to a tenant. One change is visible to every tenant's picker; existing `ReportingCurrency` values are left alone.
 - A disabled currency cannot be used as a **new** `ReportingCurrency`. Tenants that already reference it keep the historical value.
 - Phase 1 has no currency write API. The catalog is read-only. Seed: NZD, AUD, USD, EUR, GBP, JPY.
 - `Money` does not look up the catalog and does not round to `DecimalPlaces`.
@@ -178,7 +178,7 @@ Do not add a fifth role in Phase 1. Ledger permission names are registered when 
 
 Raise even if there is no subscriber yet. The application uses these events to revoke tokens and write audit.
 
-Events are written to `OutboxMessages` in the same database transaction as the business changes (ADR 0018, accepted). Implementation follows [features/outbox.md](../features/outbox.md). `Payload` is the serialised domain event. `TenantId` is also stored as a column. Delivery is at-least-once from the background worker via MediatR. A handler failure does not roll back the original change; the side effect is eventually consistent and retryable. Token revocation after a user disable, a password change, or a tenant disable is one of those side effects. See [adr/0018-transactional-outbox.md](adr/0018-transactional-outbox.md) and [fixes/domain-event-dispatch.md](fixes/domain-event-dispatch.md).
+Events are written to `OutboxMessages` in the same database transaction as the business changes (ADR 0018, accepted). Implementation follows [features/outbox.md](features/outbox.md). `Payload` is the serialised domain event. `TenantId` is also stored as a column. Delivery is at-least-once from the background worker via MediatR. A handler failure does not roll back the original change; the side effect is eventually consistent and retryable. Token revocation after a user disable, a password change, or a tenant disable is one of those side effects. See [adr/0018-transactional-outbox.md](adr/0018-transactional-outbox.md) and [fixes/domain-event-dispatch.md](fixes/domain-event-dispatch.md).
 
 | Event | When |
 | --- | --- |
