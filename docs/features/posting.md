@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-25
-last_updated: 2026-11-15
+last_updated: 2026-11-16
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -35,6 +35,8 @@ There is **no separate cash-ledger Feature Spec.** Cash legs live here. There is
 **Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md) supersedes every rule here that reads "the transaction's Account": the header has no `AccountId`; each cash leg has its own `AccountId` (script `0024`). R5 (one Account), R6–R9, R11 ("same account"), R19, R22 and the §5 / §6 header `AccountId` apply per leg account as restated in leg-accounts R2–R14. The create body still takes top-level `accountId`. The item in §8.1 is replaced by leg-accounts §8.1 (shown below).
 
 **Amendment 2026-11-15 (trade fees, accepted):** [trade-fees.md](trade-fees.md). Every cash leg has a role, `Principal` or `Fee` (script `0030`); existing legs are `Principal`. The cash types in this file build only `Principal` legs. The cash `SUM` and every balance rule still add all cash legs. Every cash leg in the item carries `role` and `fee` (`fee: null` on a `Principal` leg).
+
+**Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R8: the caller's `amount` must fit the Account currency's `DecimalPlaces`; `CloseOut` is exempt. R11: a Transaction with a security leg can be reversed only while it is the latest security activity on each of its holdings. R24: a `bookedAt` in the future is refused.
 
 ---
 
@@ -129,10 +131,10 @@ Customer receives 403. No Adviser Portal activity page in this increment.
 | R5 | A transaction belongs to one Account in the same tenant. `accountId` is Account PublicId. Missing / other-tenant / Adviser-unassigned Customer of that account → 404. |
 | R6 | Create or reverse while the Account is **Closed** → 400 ordinary `errors`. Reopen the account first. Close / reopen stay on `/accounts`. |
 | R7 | Create or reverse while the Customer is Disabled → 400 `disabled` / `target=user`. List / get of existing rows still work. |
-| R8 | Cash amount is a signed book amount in `Account.Currency` only. Body must not send a different currency. Store `decimal(18,4)` + `char(3)`. Application uses Domain `Money` for currency equality; direction lives on the signed decimal, not inside `Money`. |
+| R8 | Cash amount is a signed book amount in `Account.Currency` only. Body must not send a different currency. Store `decimal(18,4)` + `char(3)`. Application uses Domain `Money` for currency equality; direction lives on the signed decimal, not inside `Money`. The caller's `amount` has no more decimal places than the Account currency's `DecimalPlaces`, else 400 `errors.Amount`; `CloseOut` is exempt, because its amount must equal the current `SUM` ([ledger-write-guards](../fixes/ledger-write-guards.md)). |
 | R9 | After insert, cash `SUM` for that account must be `≥ 0`. Phase 2 opens no Credit accounts. Violation → 400. Compute in the same command (lock the Account row or equivalent). No persisted balance column. |
 | R10 | Posted header and legs are not `UPDATE`d or `DELETE`d, **except** a single write of `ReversedByTransactionId` on the original when a Reversal is created. After that write the original is immutable again. Economic legs are never updated. Correction is a new transaction with `Type = Reversal` and `originalTransactionId` set. |
-| R11 | Reversal must target a posted transaction in the same account. Already reversed (`ReversedByTransactionId` is not null) → 400. One reversal per original. Reversal of a Reversal is out (`ReversedByTransactionId` on a Reversal stays null). |
+| R11 | Reversal must target a posted transaction in the same account. Already reversed (`ReversedByTransactionId` is not null) → 400. One reversal per original. Reversal of a Reversal is out (`ReversedByTransactionId` on a Reversal stays null). A Transaction with a security leg can be reversed only while it is the latest security activity on each of its holdings, else 400 ([ledger-write-guards](../fixes/ledger-write-guards.md)). |
 | R12 | `CloseAccount`: if cash `SUM ≠ 0` → 400 ordinary `errors`. `SUM = 0` (including never booked) may close. Amends accounts R16. Do not bulk-insert on close. Do not write cash inside `Account.Close()`. |
 | R13 | Closed accounts stay readable. Net worth (later) excludes them. Balance APIs still return the `SUM` (expected 0 after a successful close). |
 | R14 | List envelope `{ items, page, pageSize, totalCount }`; page default 1, size default 20, max 100. Optional `accountId`, optional `customerId`. Neither set → tenant scope (Adviser = assigned Customers). Sort `bookedAt` then id. |
@@ -145,7 +147,7 @@ Customer receives 403. No Adviser Portal activity page in this increment.
 | R21 | `POST /transactions` and `POST /transactions/{id}/reverse` require `Idempotency-Key` (ADR 0015). Missing → 400. Replay same hash → original `201 { id }`. Same key different hash → 409. |
 | R22 | Create / reverse do not take Account `rowVersion` from the client. Reverse does **not** take the original transaction `rowVersion`. Server locks the Account row while inserting and summing. |
 | R23 | Optional `memo`: trim; if present, 1–200. Optional `reference`: stored nullable, no uniqueness in this increment. |
-| R24 | `bookedAt` is a required instant with `Z` or an offset. No offset → 400 `errors.BookedAt`. Stored and returned in UTC (`Z`); the request offset is not kept ([utc-instants](../fixes/utc-instants.md)). Audit `Created` is separate. |
+| R24 | `bookedAt` is a required instant with `Z` or an offset. No offset → 400 `errors.BookedAt`. Stored and returned in UTC (`Z`); the request offset is not kept ([utc-instants](../fixes/utc-instants.md)). Later than the server clock plus 5 minutes → 400 `errors.BookedAt` ([ledger-write-guards](../fixes/ledger-write-guards.md)). Audit `Created` is separate. |
 
 Policies (register when accepted; map in `RolePermissions`):
 

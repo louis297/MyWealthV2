@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-10
-last_updated: 2026-11-15
+last_updated: 2026-11-16
 related:
   - internal-transfers.md
   - leg-accounts.md
@@ -32,6 +32,8 @@ Cash conversion from one currency to another between two Accounts in the same te
 This slice adds one `TransactionType`, a create route `POST /transactions/fx`, a read-only quote route `POST /transactions/fx/quote`, and script `0026`. No new policy. Read and reverse reuse the existing `/transactions` routes. An Account still has one cash currency (ADR 0011 §6); this slice does not change the Account model ([future-plans.md](../future-plans.md) §5).
 
 `TransactionFxDetails` is designed so that Buy / Sell with automatic FX can store their rate too. That use is a separate amendment to [buy-sell.md](buy-sell.md) and [portfolios.md](portfolios.md): [cross-currency-trades.md](cross-currency-trades.md). This slice does not change Buy / Sell.
+
+**Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R3 and R20: a `bookedAt` later than the server clock plus 5 minutes → 400 `errors.BookedAt`, on create and on the quote. R11 is unchanged; the same decimal place rule now also covers the other cash types.
 
 ---
 

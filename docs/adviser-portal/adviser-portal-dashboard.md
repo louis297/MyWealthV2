@@ -4,7 +4,7 @@ status: accepted
 phase: 2
 language: en
 created: 2026-10-12
-updated: 2026-11-15
+updated: 2026-11-16
 related:
   - README.md
   - frontend-conventions.md
@@ -117,7 +117,7 @@ Unchanged from the BFF cut. Probe is still `GET /api/users/me`. 401 does not ref
 | D10 | Adviser posts a Buy on an Open Brokerage account. Server prices the security leg; cash and quantity update. Missing price → form shows the 400. |
 | D11 | Adviser posts a Sell that would take quantity or cash negative → 400; original stays. Successful Sell reduces quantity at average cost and increases cash. |
 | D12 | Adviser posts StockIn / StockOut (no cash) and Split / Bonus / Scrip (new total quantity, cost unchanged). Wrong body fields → 400. |
-| D13 | Adviser reverses a posted Buy / Sell / Split. Original remains; new reverse transaction appears. The Reverse button is hidden when `reversedByTransactionId` is not null or `type` is `Reversal`. Already reversed → 400. Idempotency-Key required; replay returns the same id. |
+| D13 | Adviser reverses a posted Buy / Sell / Split. Original remains; new reverse transaction appears. The Reverse button is hidden when `reversedByTransactionId` is not null or `type` is `Reversal`. Already reversed → 400. A security transaction that is not the latest security activity on its holding → 400; the page shows the sentence the same way ([ledger-write-guards](../fixes/ledger-write-guards.md)). Idempotency-Key required; replay returns the same id. |
 | D14 | Forms omit `tenantId` for TenantAdmin / Adviser. Closed account or Disabled Customer on create / reverse → 400. Bank / Cash refuse security types. |
 
 ---

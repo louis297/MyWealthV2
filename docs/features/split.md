@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-12
-last_updated: 2026-11-14
+last_updated: 2026-11-16
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -31,6 +31,8 @@ Do not model these as `StockIn` / `StockOut`. No cash leg. No portal page. No pr
 
 
 **Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md). The security leg carries the create body's `accountId`; the header has no Account. The item JSON in §8.1 is replaced by leg-accounts §8.1 (shown below).
+
+**Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R14: a `Split`, `Bonus` or `Scrip` can be reversed only while it is the latest security activity on its holding. R16 follows posting R24, which now refuses a `bookedAt` in the future.
 
 ---
 
@@ -99,7 +101,7 @@ This increment treats the three type names as the same book rule. The name is th
 | R11 | Body quantity is the new total, `decimal(18,8)`, `> 0`, and not equal to the current quantity (400 if equal). Delta = new − old. Stored security-leg quantity is the signed delta. A reverse split is a smaller new quantity. |
 | R12 | No cash leg. Holding **total cost is unchanged**. Average cost becomes total cost / new quantity. The security leg stores cost `0` in the quote currency (nothing was added or released). |
 | R13 | After insert, quantity `SUM` per `(Account, Instrument)` `> 0` and equals the new quantity. Projection cost equals the cost from before the command. |
-| R14 | Posted rows are not updated or deleted. Reverse copies the opposite security quantity and cost `0`. One reversal per original. No client `rowVersion`. Account Open. Reverse that would make quantity `≤ 0` → 400; original stays. |
+| R14 | Posted rows are not updated or deleted. Reverse copies the opposite security quantity and cost `0`. One reversal per original. No client `rowVersion`. Account Open. Reverse that would make quantity `≤ 0` → 400; original stays. Only the latest security activity on a holding can be reversed: a live later security leg on the same `(Account, Instrument)` → 400 ([ledger-write-guards](../fixes/ledger-write-guards.md)). |
 | R15 | `Idempotency-Key` required on create and reverse, same as posting. |
 | R16 | `bookedAt` required instant, as [posting](posting.md) R24. Memo optional 1–200. Reference optional, stored, no uniqueness. |
 | R17 | Customer has no ledger-write policy → 403. |

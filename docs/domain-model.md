@@ -3,7 +3,7 @@ title: Domain model
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-11-15
+updated: 2026-11-16
 related:
   - README.md
   - glossary.md
@@ -330,6 +330,7 @@ Invariants:
 - `Split`, `Bonus`, and `Scrip` store the signed quantity delta and cost `0`. Holding total cost is unchanged. They do not call average-cost release and they do not create a holding.
 - Cash `Opening`: at most one per account; only while no other transaction exists; `amount > 0`.
 - Closed account rejects new transactions. `Account.Close()` does not write cash.
+- A Transaction with a security leg can be reversed only while it is the latest security activity on each of its holdings: no live later security leg on the same `(Account, Instrument)`. Application passes that fact to `Reverse`, which refuses otherwise. A cash-only Transaction is not affected ([fixes/ledger-write-guards.md](fixes/ledger-write-guards.md)).
 
 Field rules: [features/posting.md](features/posting.md), [features/holdings.md](features/holdings.md), [features/buy-sell.md](features/buy-sell.md), [features/split.md](features/split.md), and [features/leg-accounts.md](features/leg-accounts.md).
 
@@ -378,6 +379,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-02 | Portfolios draft. Model portfolios with base currency and target weights. Full Rebalance (async) on assign and weight change. While assigned, manual security trades rejected. One Active assignment per account. [features/portfolios.md](features/portfolios.md). |
 | 2026-11-02 | Portfolios accepted. `Portfolio`, `PortfolioLine`, `AccountPortfolioAssignment`. Assign is synchronous. Weight change and bulk rebalance are asynchronous. [features/portfolios.md](features/portfolios.md). |
 | 2026-11-15 | Trade fees accepted. `CashLegRole`, `FeeKind`, `TransactionFeeDetail`, `TradeFeeSchedule`, `FeeBands`. [features/trade-fees.md](features/trade-fees.md). |
+| 2026-11-16 | Ledger write guards accepted. `Transaction.Reverse` refuses a Transaction with a security leg that is not the latest security activity on each of its holdings. [fixes/ledger-write-guards.md](fixes/ledger-write-guards.md). |
 
 ---
 
