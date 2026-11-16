@@ -114,6 +114,33 @@ public class UpdateAccountTests : TestBase
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
+    [TestCase("External")]
+    [TestCase("Custodial")]
+    public async Task PutWithCustodyMode_Returns400AndKeepsTheName(string custodyMode)
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInTenantAdmin();
+        var id = await CreateAsync(tokens.AccessToken, customer.PublicId);
+        var rowVersion = await ReadRowVersion(id, tokens.AccessToken);
+
+        var response = await AccountHttp.Send(
+            HttpMethod.Put, $"/accounts/{id}", tokens.AccessToken, new
+            {
+                name = "Renamed",
+                custodyMode,
+                rowVersion
+            });
+
+        var content = await response.Content.ReadAsStringAsync();
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest, content);
+        using var json = JsonDocument.Parse(content);
+        json.RootElement.GetProperty("errors").EnumerateObject()
+            .Select(property => property.Name)
+            .ShouldContain(name => string.Equals(name, "CustodyMode", StringComparison.OrdinalIgnoreCase));
+        using var item = await ReadItem(id, tokens.AccessToken);
+        item.RootElement.GetProperty("name").GetString().ShouldBe("Everyday spending");
+        item.RootElement.GetProperty("custodyMode").GetString().ShouldBe("External");
+    }
+
     [Test]
     public async Task PutWithCurrency_Returns400()
     {
