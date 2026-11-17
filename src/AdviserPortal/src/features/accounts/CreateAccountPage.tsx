@@ -4,10 +4,16 @@ import { Messages, Page, PageHeading, SelectField, TextField } from "@/component
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { SelectItem } from "@/components/ui/select";
-import { useCreateAccountMutation } from "@/features/accounts/accountsApi";
+import { type CustodyMode, useCreateAccountMutation } from "@/features/accounts/accountsApi";
 import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
 
 const accountTypes = ["Bank", "Cash", "Brokerage", "Other"] as const;
+
+// D17: nothing is preselected. A Custodial account is always Brokerage (custody-modes R3).
+const custodyOptions: { value: CustodyMode; label: string }[] = [
+  { value: "External", label: "External — held elsewhere" },
+  { value: "Custodial", label: "Custodial — held on the platform" },
+];
 
 function problemMessages(error: unknown): string[] {
   if (typeof error !== "object" || error === null || !("data" in error)) {
@@ -28,6 +34,7 @@ export function CreateAccountPage() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [type, setType] = useState<string>(accountTypes[0]);
+  const [custodyMode, setCustodyMode] = useState<CustodyMode | "">("");
   const [currency, setCurrency] = useState("");
   const [messages, setMessages] = useState<string[]>([]);
   const [createAccount] = useCreateAccountMutation();
@@ -35,7 +42,7 @@ export function CreateAccountPage() {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!customerId) {
+    if (!customerId || custodyMode === "") {
       return;
     }
 
@@ -44,7 +51,7 @@ export function CreateAccountPage() {
         customerId,
         name: name.trim(),
         type,
-        custodyMode: "External",
+        custodyMode,
         currency,
       }).unwrap();
       void navigate(`/accounts/${created.id}`);
@@ -61,7 +68,36 @@ export function CreateAccountPage() {
         <CardContent>
           <form className="flex flex-col gap-4" onSubmit={(event) => void onSubmit(event)}>
             <TextField id="account-name" label="Name" value={name} onChange={(event) => setName(event.target.value)} required />
-            <SelectField id="account-type" label="Type" value={type} onChange={(event) => setType(event.target.value)} required>
+            <fieldset className="flex flex-col gap-2">
+              <legend className="mb-2 text-sm font-medium">Custody</legend>
+              <div role="radiogroup" aria-label="Custody" aria-required="true" className="flex flex-col gap-2">
+                {custodyOptions.map((option) => (
+                  <label key={option.value} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="account-custody"
+                      value={option.value}
+                      checked={custodyMode === option.value}
+                      onChange={() => {
+                        setCustodyMode(option.value);
+                        if (option.value === "Custodial") {
+                          setType("Brokerage");
+                        }
+                      }}
+                    />
+                    {option.label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <SelectField
+              id="account-type"
+              label="Type"
+              value={type}
+              onChange={(event) => setType(event.target.value)}
+              required
+              disabled={custodyMode === "Custodial"}
+            >
               {accountTypes.map((item) => (
                 <SelectItem key={item} value={item}>
                   {item}
@@ -82,7 +118,9 @@ export function CreateAccountPage() {
                 </SelectItem>
               ))}
             </SelectField>
-            <Button type="submit">Create account</Button>
+            <Button type="submit" disabled={custodyMode === ""}>
+              Create account
+            </Button>
           </form>
         </CardContent>
       </Card>

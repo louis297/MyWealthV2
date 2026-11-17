@@ -1,6 +1,8 @@
 import { api } from "@/shared/api/api";
 import type { PagedList } from "@/shared/types/page";
 
+export type CustodyMode = "External" | "Custodial";
+
 export type Account = {
   id: string;
   tenantId: string;
@@ -26,8 +28,7 @@ export type CreateAccountBody = {
   customerId: string;
   name: string;
   type: string;
-  // Only External can be opened until the Custodial rules exist (account-custody-mode R4).
-  custodyMode: "External";
+  custodyMode: CustodyMode;
   currency: string;
 };
 
