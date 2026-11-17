@@ -47,7 +47,7 @@ Landed in GitHub `louis297/MyWealthV2` master 2026-09-21, last slice commit `3e8
 - R8: `Custodial` can be selected on `POST /accounts`. A Custodial account has type `Brokerage`; `Custodial` with `Bank`, `Cash` or `Other` → 400 with `errors.Type`. `Property` and `Credit` stay reserved.
 - §5: `Account.Create` refuses `Custodial` with a type other than `Brokerage`. The capability matrix gains a second dimension: an External account may be Bank, Cash, Brokerage or Other; a Custodial account is Brokerage only.
 - R16, close and reopen: unchanged for both custody modes. A Custodial account still closes only with cash `SUM = 0` and no holdings.
-- §9.1: a fifth demo account, "Demo custodial brokerage" (Brokerage, Custodial, USD). The four existing demo accounts stay External.
+- §9.1: a fifth demo account, "Demo custodial brokerage" (Brokerage, Custodial, USD), on every TestSeed firm like the other four. The four existing demo accounts stay External.
 - What a Custodial account accepts (transaction types, `bookedAt`, transfers, portfolios) is in custody-modes §4, not in this file.
 
 ---

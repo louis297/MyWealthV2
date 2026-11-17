@@ -182,7 +182,7 @@ Why the server sets the time: a caller who can choose `bookedAt` on a Custodial 
 | ID | Rule |
 | --- | --- |
 | R14 | **Assign.** Only an Open **Custodial** account may be assigned a portfolio. This replaces the type test in portfolios R4 ("Brokerage or Other"); a Custodial account is always `Brokerage` (R3). An External account of any type, or a Closed account → 400 `account_not_eligible` with the message `Only an open Custodial account can be assigned a portfolio.` No assignment is written. |
-| R15 | **Rebalance.** `POST /accounts/{id}/rebalance` and the rebalance job require an Open Custodial account with an Active assignment, else `account_not_eligible` (400 on the synchronous call; a recorded failure in the job). This replaces the same type test in `RebalanceAccount`. |
+| R15 | **Rebalance.** `POST /accounts/{id}/rebalance` and the rebalance job require an Open Custodial account with an Active assignment, else `account_not_eligible` with the message `The account is not an open Custodial account with an active portfolio.` (400 on the synchronous call; a recorded failure in the job). This replaces the same type test in `RebalanceAccount`. |
 | R16 | **Existing assignments.** After [account-custody-mode](account-custody-mode.md) every existing account is External. Script `0032` sets every Active assignment on an External account to `Removed`. It writes no trade and leaves holdings as they are, the same outcome as an unassign (portfolios R15). After the script, an Active assignment exists only on a Custodial account, and R14 keeps it so. The portfolio-wide commands (`PUT /portfolios/{id}`, `POST /portfolios/{id}/rebalance`, `POST /portfolios/{id}/disable`) act on Active assignments and need no change. |
 | R17 | **Trade lock.** Portfolios R18 is unchanged. On a Custodial account the matrix (R5) already refuses `StockIn`, `StockOut`, `Split`, `Bonus`, `Scrip` and `OpeningHoldings`, and R6 runs first, so the lock decides only `Buy`, `Sell` and the reverse of a `Buy` or `Sell`. `TransferIn`, `TransferOut`, `CloseOut`, `InternalTransfer` and `FxConversion` stay allowed on an assigned account. |
 
@@ -384,14 +384,22 @@ None. The account pages already show "Held on platform" for a Custodial account 
 
 ### 9.1 Seeds
 
-`TestSeed` (Development and TestAppHost; demo tenant only), idempotent as today:
+`TestSeed` (Development and TestAppHost), idempotent as today. Like the four accounts of accounts §9.1, the account is created for every TestSeed firm (`demo` and the Development fixture `demo2`), each on its own demo Customer:
 
 | Name | Type | Custody mode | Currency | Status |
 | --- | --- | --- | --- | --- |
 | Demo custodial brokerage | Brokerage | Custodial | USD | Open |
 
-- Owned by the demo Customer, next to the four accounts of accounts §9.1, which stay External.
-- Transactions, built through the Domain factories with the seed's own dates: one `TransferIn` of `USD 20,000.00`, then one `Buy` of `VTI` and one `Buy` of `AAPL`, priced from the seeded `InstrumentPrices` like the existing demo `Buy`. Each is idempotent on its `reference`.
+- Owned by the firm's demo Customer, next to the four accounts of accounts §9.1, which stay External.
+- Transactions, built through the Domain factories with the seed's own dates, priced from the seeded `InstrumentPrices` (as of 2026-01-01) like the existing demo `Buy`. Each is idempotent on its `reference`:
+
+| Booked at | Type | Detail | Reference |
+| --- | --- | --- | --- |
+| 2026-01-20 10:00 +13:00 | `TransferIn` | `USD 20,000.00` | `TestSeed-DemoCustodial-Funding` |
+| 2026-01-20 10:30 +13:00 | `Buy` | `VTI` × 40 at 250 = `USD 10,000.00` | `TestSeed-DemoCustodial-BuyVti` |
+| 2026-01-20 11:00 +13:00 | `Buy` | `AAPL` × 20 at 180 = `USD 3,600.00` | `TestSeed-DemoCustodial-BuyAapl` |
+
+- The cash balance after the seed is `USD 6,400.00`. No seeded trade carries a fee: the seeded trade fee schedule starts after the seed date. The `Holdings` rows for `VTI` and `AAPL` are synced like those of "Demo brokerage".
 - The `Demo Growth` assignment is created on this account, and no longer on "Demo brokerage". The seed still posts no rebalance trades. `AAPL` is not in `Demo Growth`, so the first rebalance in a demo has something to sell.
 - "Demo brokerage" stays External and keeps its hand-entered demo data (`OpeningHoldings`, `StockIn`, `Split`). On a database that existed before this slice, script `0032` has removed its assignment; the seed does not write it again.
 - The Development smoke seed (`Smoke Cash`) and the demo seed ([demo-tenant-seed.md](demo-tenant-seed.md)) do not change.
@@ -408,7 +416,7 @@ None. The account pages already show "Held on platform" for a Custodial account 
 | Application.FunctionalTests — same custody mode | Transfer External → Custodial and Custodial → External → 400 with `errors.ToAccountId`, no Transaction; Custodial → Custodial → 201 and its reverse → 201; the same four cases for `POST /transactions/fx`; the quote between two modes → 400 |
 | Application.FunctionalTests — `bookedAt` | Custodial `TransferIn` without `bookedAt` → 201, and the item's `bookedAt` lies between the instants the test took before and after the call; with `bookedAt` (now, in the past, in the future) → 400 with `errors.BookedAt` and nothing written; the same for a transfer and a conversion between Custodial accounts; the quote with `bookedAt` → 400, without → 200; a replay with the same `Idempotency-Key` returns the same id and writes one Transaction. External: no `bookedAt` → 400 and a past `bookedAt` → 201 (existing tests) |
 | Application.FunctionalTests — portfolios | Assign to an Open Custodial account → 200 and `Buy` trades; assign to an External Brokerage and to an External Other account → 400 `account_not_eligible`, no assignment row; rebalance of an External account that has an Active assignment (row inserted by the test, as from before the script) → 400 `account_not_eligible`. On an assigned Custodial account: manual `Buy`, `Sell` and the reverse of a rebalance `Buy` → 400 from the trade lock; `TransferIn`, `TransferOut`, a transfer and a conversion → 201 |
-| Infrastructure.IntegrationTests | Script `0032` on a scratch database (as for `0024` and `0031`): an Active assignment on an External account becomes Removed with `LastModified` set; a Removed row is not touched; an Active assignment on a Custodial account stays Active; `Holdings` and `Transactions` row counts are unchanged; a second run changes nothing. `TestSeed`: the five demo accounts exist, four External and one Custodial; the Custodial one has its three transactions and the Active `Demo Growth` assignment; "Demo brokerage" has no Active assignment; a second run adds nothing |
+| Infrastructure.IntegrationTests | Script `0032` on a scratch database (as for `0024` and `0031`): an Active assignment on an External account becomes Removed with `LastModified` set; a Removed row is not touched; an Active assignment on a Custodial account stays Active; `Holdings` and `Transactions` row counts are unchanged; a second run changes nothing. `TestSeed`: the five demo accounts exist, four External and one Custodial; the Custodial one has its three transactions, its two holdings and the Active `Demo Growth` assignment; "Demo brokerage" has no Active assignment; a second run adds nothing |
 | Adviser Portal | New account form: no option preselected, submit is blocked until one is chosen, Custodial fixes Type to Brokerage, and the POST carries the chosen `custodyMode`. Account page and transaction form: a Custodial account offers only the allowed types and no "Booked at" input, and the POST has no `bookedAt`; an External account is unchanged. Transfer and convert pickers grey out an account with a different custody mode. The Assign control is present on a Custodial account and absent on an External one |
 
 Where the two-tenant tests live: every new rule is applied in a handler after the Account lookup, so the cross-tenant cases are proved over HTTP in Application.FunctionalTests, next to the existing isolation tests of each route.
@@ -421,6 +429,9 @@ Fan-out in the functional tests:
 - Twelve functional test files use the portfolio routes. The ones that assign a portfolio open their accounts as Custodial and fund them with `TransferIn` without `bookedAt`. None of them builds a position with `OpeningHoldings` or `StockIn`. This moves in one test-only commit before the eligibility rule changes (§12, commit 6): a Custodial Brokerage account also passes today's "Brokerage or Other" test, so that commit passes on its own.
 - `InternalTransferPortfolioTests` and `FxConversionPortfolioTests` make both Accounts Custodial.
 - `TradeLockTests` covers a manual `Buy` and the reverse of a `Buy` on an assigned account. Both are still decided by the trade lock (R17), so its assertions do not change.
+- The seed account lists in `TestSeedSmokeTests` and `DevelopmentSeedSecondFirmTests` (functional) and `TestSeedAccountsTests` (integration) gain "Demo custodial brokerage"; `Seed_OpensEveryDemoAccountAsExternal` becomes "four External and one Custodial". These change in §12 commit 5.
+- `RebalanceJobTenantScopeTests` (integration) builds an External account with an Active assignment; it opens a Custodial account in §12 commit 6.
+- The Domain unit tests and integration tests that call `PostInternalTransfer` or `PostFxConversion` pass the two custody modes from §12 commit 3.
 - The Fees tests already insert a schedule that starts today and book trades at the current time ([ledger-write-guards](../fixes/ledger-write-guards.md) B3), so a `Buy` on a Custodial account gets a fee without a future date.
 
 ---
