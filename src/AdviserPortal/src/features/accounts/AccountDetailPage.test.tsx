@@ -26,6 +26,9 @@ const account = {
   rowVersion: "AAAA",
 };
 
+// P13: portfolios are assigned to Custodial accounts only (custody-modes R14).
+const custodialAccount = { ...account, custodyMode: "Custodial" };
+
 const holding = {
   id: "hhhhhhhh-hhhh-hhhh-hhhh-hhhhhhhhhhhh",
   accountId,
@@ -1062,7 +1065,7 @@ describe("AccountDetailPage", () => {
         return json({ items: [] });
       }
       if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
-        return json(account);
+        return json(custodialAccount);
       }
       if (url.includes("/transactions") && method === "GET") {
         return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
@@ -1111,7 +1114,7 @@ describe("AccountDetailPage", () => {
         return json({ items: [] });
       }
       if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
-        return json(account);
+        return json(custodialAccount);
       }
       if (url.includes("/transactions") && method === "GET") {
         return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
@@ -1182,7 +1185,7 @@ describe("AccountDetailPage", () => {
         return json({ items: [] });
       }
       if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
-        return json({ ...account, type: "Other" });
+        return json(custodialAccount);
       }
       if (url.includes("/transactions") && method === "GET") {
         return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
@@ -1207,11 +1210,13 @@ describe("AccountDetailPage", () => {
     expect(await screen.findByText("NoChange")).toBeInTheDocument();
   });
 
-  it("does not offer assign on Bank, Cash, or Closed accounts", async () => {
+  it("does not offer assign on External or Closed accounts (P13)", async () => {
     for (const next of [
       { ...account, type: "Bank" },
       { ...account, type: "Cash" },
-      { ...account, type: "Brokerage", status: "Closed" },
+      { ...account, type: "Brokerage" },
+      { ...account, type: "Other" },
+      { ...custodialAccount, status: "Closed" },
     ]) {
       cleanup();
       renderDetail((url, method) => {
@@ -1240,7 +1245,7 @@ describe("AccountDetailPage", () => {
         return json({ items: [] });
       }
       if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
-        return json(account);
+        return json(custodialAccount);
       }
       if (url.includes("/transactions") && method === "GET") {
         return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
@@ -1272,7 +1277,7 @@ describe("AccountDetailPage", () => {
         return json({ items: [holding] });
       }
       if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
-        return json(account);
+        return json(custodialAccount);
       }
       if (url.includes("/transactions") && method === "GET") {
         return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
@@ -1313,7 +1318,7 @@ describe("AccountDetailPage", () => {
         return json({ items: [] });
       }
       if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
-        return json(account);
+        return json(custodialAccount);
       }
       if (url.includes("/transactions") && method === "GET") {
         return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
@@ -1347,7 +1352,7 @@ describe("AccountDetailPage", () => {
         return json({ items: [] });
       }
       if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
-        return json(account);
+        return json(custodialAccount);
       }
       if (url.includes("/transactions") && method === "GET") {
         return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
@@ -1375,7 +1380,7 @@ describe("AccountDetailPage", () => {
         return json({ items: [] });
       }
       if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
-        return json(account);
+        return json(custodialAccount);
       }
       if (url.includes("/transactions") && method === "GET") {
         return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
@@ -1420,7 +1425,7 @@ describe("AccountDetailPage", () => {
         return json({ items: [holding] });
       }
       if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
-        return json(account);
+        return json(custodialAccount);
       }
       if (url.includes("/transactions") && method === "GET") {
         return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
