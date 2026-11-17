@@ -300,8 +300,9 @@ Invariants:
 - HTTP close / reopen. No physical delete.
 - Disable Customer rejects while any account is active.
 - `CustodyMode` is set on create and immutable, like `Type` and `Currency`. It is independent of `Type`. `Create` accepts both values; Application lets a caller select `External` only, and `Custodial` stays reserved until a later spec adds its rules. No other invariant reads it yet.
+- (`review`, custody modes) A Custodial account is a `Brokerage` account: `Create` refuses `Custodial` with any other type, and Application lets a caller select it. An External account may have any openable type. An Active `AccountPortfolioAssignment` is on a Custodial account. This replaces the line above when [features/custody-modes.md](features/custody-modes.md) is accepted.
 
-Field rules: [features/accounts.md](features/accounts.md). Landed in the repo 2026-09-21. Custody mode: [features/account-custody-mode.md](features/account-custody-mode.md) (landed 2026-11-17).
+Field rules: [features/accounts.md](features/accounts.md). Landed in the repo 2026-09-21. Custody mode: [features/account-custody-mode.md](features/account-custody-mode.md) (landed 2026-11-17). Custodial account rules: [features/custody-modes.md](features/custody-modes.md) (`review`).
 
 Close requires cash `SUM = 0` and no `Holdings` rows ([features/holdings.md](features/holdings.md)).
 
@@ -333,6 +334,7 @@ Invariants:
 - Cash `Opening`: at most one per account; only while no other transaction exists; `amount > 0`.
 - Closed account rejects new transactions. `Account.Close()` does not write cash.
 - A Transaction with a security leg can be reversed only while it is the latest security activity on each of its holdings: no live later security leg on the same `(Account, Instrument)`. Application passes that fact to `Reverse`, which refuses otherwise. A cash-only Transaction is not affected ([fixes/ledger-write-guards.md](fixes/ledger-write-guards.md)).
+- (`review`, custody modes) Every leg account of a Transaction has the same custody mode. `PostInternalTransfer` and `PostFxConversion` take both Accounts' custody modes and refuse different ones; every other type has one leg account, and `Reverse` copies each leg's Account. `CustodyRules.AllowsManualEntry(custodyMode, type)` holds the manual entry matrix: what a caller may enter on an Account of each custody mode. Application calls it; the factories do not, and they keep their `bookedAt` parameter, so the server-set booking time of a Custodial account is an Application rule ([features/custody-modes.md](features/custody-modes.md)). Not in force until that spec is accepted.
 
 Field rules: [features/posting.md](features/posting.md), [features/holdings.md](features/holdings.md), [features/buy-sell.md](features/buy-sell.md), [features/split.md](features/split.md), and [features/leg-accounts.md](features/leg-accounts.md).
 
@@ -385,6 +387,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-17 | Account custody mode in `review`. `CustodyMode` enum (`External`, `Custodial`) and immutable `Account.CustodyMode`; no behaviour depends on it. Recorded in §8.5 with a `review` mark. [features/account-custody-mode.md](features/account-custody-mode.md), ADR 0020. |
 | 2026-11-17 | Account custody mode accepted, with ADR 0020. The `review` marks in §8.5 are dropped. |
 | 2026-11-17 | Account custody mode landed: `CustodyMode` enum and `Account.CustodyMode`. |
+| 2026-11-17 | Custody modes in `review`: the rules for Custodial accounts. A Custodial account is `Brokerage`; `CustodyRules` holds the manual entry matrix; every leg account of a Transaction has the same custody mode. Recorded in §8.5 and §8.6 with a `review` mark. [features/custody-modes.md](features/custody-modes.md). |
 
 ---
 

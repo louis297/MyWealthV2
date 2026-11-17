@@ -352,6 +352,7 @@ Beyond PK / unique constraints already listed:
 0029_transactions_booked_at_utc.sql         -- SWITCHOFFSET(BookedAt, '+00:00') on rows with a non-zero offset; instant unchanged
 0030_trade_fees.sql                         -- TransactionCashLegs.Role; TradeFeeSchedules, TradeFeeBands, TransactionFeeDetails
 0031_accounts_custody_mode.sql              -- Accounts.CustodyMode (existing rows 0 = External); CHECK 0–1; no default left
+0032_remove_external_portfolio_assignments.sql -- review, not written yet: data only; Active assignments on External accounts become Removed
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -441,6 +442,8 @@ Script `0023_portfolios.sql`:
 
 No seed in the script. Development / TestAppHost `TestSeed` adds one demo portfolio and one assignment, and does not post rebalance trades.
 
+Amendment 2026-11-17 (custody modes, `review`; [features/custody-modes.md](features/custody-modes.md) §6): script `0032_remove_external_portfolio_assignments.sql` changes data only. Every `AccountPortfolioAssignments` row with `Status = 0` (Active) whose Account has `CustodyMode = 0` (External) gets `Status = 1` (Removed), with `LastModified` and `LastModifiedBy` filled. No table, column, index or constraint changes; holdings and transactions are not touched. One `UPDATE`, safe to run again. After it, an Active assignment exists only on a Custodial account; that is kept by Application, not by a constraint. `TestSeed` then puts the demo assignment on a Custodial demo account. Not a build contract until that spec is accepted.
+
 ### 11.7 Trade fee schedules (accepted)
 
 Feature spec: [features/trade-fees.md](features/trade-fees.md) (accepted 2026-11-15). Script `0030_trade_fees.sql`:
@@ -485,6 +488,7 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-17 | Account custody mode in `review` (`0031`, not written yet): `Accounts.CustodyMode int NOT NULL`, existing rows back-filled to 0, CHECK 0–1, no default left ([features/account-custody-mode.md](features/account-custody-mode.md) §6). |
 | 2026-11-17 | Account custody mode accepted. `0031` is a build contract. |
 | 2026-11-17 | Account custody mode landed: `0031_accounts_custody_mode.sql` written and applied. |
+| 2026-11-17 | Custody modes in `review` (`0032`, not written yet): data-only script that sets Active portfolio assignments on External accounts to Removed. No schema change ([features/custody-modes.md](features/custody-modes.md) §6). |
 
 ---
 
