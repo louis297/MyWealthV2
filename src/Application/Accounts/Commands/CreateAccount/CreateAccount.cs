@@ -43,8 +43,13 @@ public class CreateAccountCommandValidator : AbstractValidator<CreateAccountComm
             .Must(type => type is not null && Phase2Types.Contains(type))
             .WithMessage("Type must be Bank, Cash, Brokerage, or Other.");
         RuleFor(command => command.CustodyMode)
-            .Must(custodyMode => custodyMode == nameof(CustodyMode.External))
-            .WithMessage("CustodyMode must be External. Custodial cannot be opened yet.");
+            .Must(custodyMode => custodyMode is nameof(CustodyMode.External) or nameof(CustodyMode.Custodial))
+            .WithMessage("CustodyMode must be External or Custodial.");
+        RuleFor(command => command.Type)
+            .Must(type => type == nameof(AccountType.Brokerage))
+            .When(command => command.CustodyMode == nameof(CustodyMode.Custodial)
+                             && command.Type is not null && Phase2Types.Contains(command.Type))
+            .WithMessage(Account.CustodialTypeMessage);
         RuleFor(command => command.Currency).NotEmpty();
         RuleFor(command => command.Status)
             .Must(status => status is null)
