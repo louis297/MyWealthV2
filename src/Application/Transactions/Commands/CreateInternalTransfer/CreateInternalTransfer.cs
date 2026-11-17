@@ -67,7 +67,7 @@ public class CreateInternalTransferCommandValidator : AbstractValidator<CreateIn
             .NotNull()
             .GreaterThan(0)
             .WithMessage("Amount must be greater than 0.");
-        RuleFor(command => command.BookedAt).NotNull().NotInTheFuture(time);
+        RuleFor(command => command.BookedAt).NotInTheFuture(time);
         RuleFor(command => command.Memo)
             .Must(memo => memo is null || memo.Trim().Length is >= 1 and <= 200)
             .WithMessage("Memo must be 1 to 200 characters.");
@@ -102,7 +102,8 @@ public class CreateInternalTransferCommandValidator : AbstractValidator<CreateIn
 public class CreateInternalTransferCommandHandler(
     IApplicationDbContext db,
     ICurrentUser currentUser,
-    ICurrencyCatalog currencies)
+    ICurrencyCatalog currencies,
+    TimeProvider time)
     : IRequestHandler<CreateInternalTransferCommand, IdempotentResult>
 {
     private const string DefaultPath = "/transactions/transfer";
@@ -221,6 +222,9 @@ public class CreateInternalTransferCommandHandler(
             ]);
         }
 
+        // Custody modes R10, R11.
+        var bookedAt = BookedAtByCustody.Resolve(from.Account.CustodyMode, request.BookedAt, time);
+
         CashAmountPlaces.EnsureFits(currencies, fromCurrency, request.Amount!.Value);
 
         var fromSum = await TransactionCash.SumAsync(db, from.Account.Id, cancellationToken);
@@ -236,7 +240,7 @@ public class CreateInternalTransferCommandHandler(
                 to.Account.Currency,
                 to.Account.CustodyMode,
                 Money.Create(request.Amount!.Value, fromCurrency),
-                request.BookedAt!.Value,
+                bookedAt,
                 request.Memo,
                 request.Reference,
                 fromSum);

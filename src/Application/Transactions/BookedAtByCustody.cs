@@ -1,4 +1,6 @@
+using FluentValidation.Results;
 using MyWealthV2.Domain.Enums;
+using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationException;
 
 namespace MyWealthV2.Application.Transactions;
 
@@ -20,6 +22,21 @@ public static class BookedAtByCustody
         CustodyMode custodyMode,
         DateTimeOffset? requested,
         TimeProvider time,
-        bool requiredWhenExternal = true) =>
-        requested ?? default;
+        bool requiredWhenExternal = true)
+    {
+        if (custodyMode == CustodyMode.Custodial)
+        {
+            return requested is null ? time.GetUtcNow() : throw Refuse(CustodialMessage);
+        }
+
+        if (requested is not null)
+        {
+            return requested.Value;
+        }
+
+        return requiredWhenExternal ? throw Refuse(RequiredMessage) : time.GetUtcNow();
+    }
+
+    private static ValidationException Refuse(string message) =>
+        new([new ValidationFailure("BookedAt", message)]);
 }
