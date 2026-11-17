@@ -4,7 +4,7 @@ status: accepted
 phase: 2
 language: en
 created: 2026-11-02
-updated: 2026-11-13
+updated: 2026-11-17
 related:
   - README.md
   - frontend-conventions.md
@@ -15,6 +15,7 @@ related:
   - ../features/accounts.md
   - ../features/holdings.md
   - ../features/bff-adviser-portal.md
+  - ../features/custody-modes.md
 ---
 
 # Adviser Portal — Portfolios
@@ -24,6 +25,8 @@ Phase 2 portal cut for model portfolios. Consumes the landed portfolios feature 
 **Status is `accepted`.**
 
 **Amendment 2026-11-13 (Shared portfolio message, accepted, landed):** see the amendment at the end of this file. Adds P12.
+
+**Amendment 2026-11-17 (custody modes, `review`):** see the amendment at the end of this file. Adds P13, which replaces the account test in P5. Not in force until [custody-modes](../features/custody-modes.md) is accepted.
 
 Backend prerequisites (landed):
 
@@ -155,3 +158,20 @@ No other page changes. The edit page still lists only the accounts the Adviser c
 **Implementation note.** Read the code with one shared helper in `src/AdviserPortal/src/shared/api` (for example `problemCode(error): string | undefined`), so the next page that must branch on `code` reuses it. Do not compare `data.code` inline in each page. Other pages keep branching on `status === 409` until their routes gain a second 409 code (§4.2 C8).
 
 **Tests.** `PortfolioDetailPage.test.tsx`: a `portfolio_shared` 409 on save and on disable shows the server detail and no conflict notice, and the form keeps its edits; a `stale_row_version` 409 still shows the conflict notice and refetches; a 409 with an unknown code shows the server detail. A unit test for the shared helper.
+
+---
+
+## Amendment 2026-11-17 (custody modes) — review
+
+Status of this amendment: `review`. Accept it together with [custody-modes](../features/custody-modes.md). Until then the pages above are unchanged. Backend rules: custody-modes R14–R17 and [../features/portfolios.md](../features/portfolios.md), amendment 2026-11-17. Do not rewrite P5 or P9 in place.
+
+| ID | Behaviour |
+| --- | --- |
+| P13 | The Assign control is offered on an Open **Custodial** account with no Active assignment. An External account of any type, and a Closed account, do not offer it. This replaces "Open Brokerage or Other account" in P5; the rest of P5 is unchanged. If the call still returns 400 `account_not_eligible`, the page shows the server message. |
+
+- The message for "Assign on ineligible account" in the table above becomes: "Only open Custodial accounts can be assigned a portfolio."
+- P9 is unchanged. On a Custodial account StockIn, StockOut, Split, Bonus, Scrip and OpeningHoldings are not offered at all ([adviser-portal-dashboard](adviser-portal-dashboard.md) D18), so the trade lock disables Buy and Sell. TransferIn, TransferOut, Transfer and Convert stay available on an assigned account.
+- An External account that had an Active assignment before script `0032` shows no assignment afterwards. `GET /accounts/{id}/portfolio` answers as for any account without one. Its holdings stay, and its manual trade buttons are available again.
+- P6, P7, P8 and P12 are unchanged.
+
+**Tests.** The account page offers the Assign control on a Custodial account and not on an External Brokerage or Other account. The other portfolio tests use a Custodial account.
