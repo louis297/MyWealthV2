@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-11
-last_updated: 2026-11-16
+last_updated: 2026-11-17
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -21,6 +21,7 @@ related:
   - accounts.md
   - posting.md
   - holdings.md
+  - custody-modes.md
 ---
 
 # Buy / Sell / Stock in-out
@@ -37,6 +38,8 @@ Split / Bonus / Scrip are accepted in [split.md](split.md). No portal page. No p
 **Amendment 2026-11-15 (trade fees, accepted):** [trade-fees.md](trade-fees.md). Every `Buy` / `Sell` looks up the tenant's trade fee schedule for the instrument's quote currency and the UTC date of `bookedAt`. When the fee is above 0, the trade gets a second cash leg with role `Fee` on the same Account and a fee detail of kind `Brokerage` (trade-fees R7, R14, R18). R9: a `fee` field on the create body → 400. R11: `Buy` cost is `gross + fee`; the `Sell` release in R15 is unchanged. R12: the fee leg uses the principal's rate and rounding. R13: the cash check counts the fee leg. R16: reverse copies the fee leg and its fee detail. Every cash leg in the item carries `role` and `fee` (trade-fees §8.1). "Fees" in §2 Out and §12 is replaced by trade-fees §2 Out.
 
 **Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R16: a `Buy`, `Sell`, `StockIn` or `StockOut` can be reversed only while it is the latest security activity on its holding. R18 follows posting R24, which now refuses a `bookedAt` in the future.
+
+**Amendment 2026-11-17 (custody modes, `review`):** [custody-modes.md](custody-modes.md). Not a build contract until that spec is accepted. R8: `Buy` and `Sell` are allowed on both custody modes and are priced by the server on both. `StockIn` and `StockOut` are refused on a Custodial account (400 with `errors.Type`). R10, R12 and R18: on a Custodial account the booking time is the server clock, a body that sends `bookedAt` → 400, and the price and the FX rate are read for that instant. An External account is unchanged; caller-supplied prices there are a later slice.
 
 ---
 

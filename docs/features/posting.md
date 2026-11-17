@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-25
-last_updated: 2026-11-16
+last_updated: 2026-11-17
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -20,6 +20,7 @@ related:
   - accounts.md
   - instruments.md
   - customers.md
+  - custody-modes.md
 ---
 
 # Posting
@@ -37,6 +38,8 @@ There is **no separate cash-ledger Feature Spec.** Cash legs live here. There is
 **Amendment 2026-11-15 (trade fees, accepted):** [trade-fees.md](trade-fees.md). Every cash leg has a role, `Principal` or `Fee` (script `0030`); existing legs are `Principal`. The cash types in this file build only `Principal` legs. The cash `SUM` and every balance rule still add all cash legs. Every cash leg in the item carries `role` and `fee` (`fee: null` on a `Principal` leg).
 
 **Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R8: the caller's `amount` must fit the Account currency's `DecimalPlaces`; `CloseOut` is exempt. R11: a Transaction with a security leg can be reversed only while it is the latest security activity on each of its holdings. R24: a `bookedAt` in the future is refused.
+
+**Amendment 2026-11-17 (custody modes, `review`):** [custody-modes.md](custody-modes.md). Not a build contract until that spec is accepted. R16 and the §5 type table: on a Custodial account `POST /transactions` refuses `Interest` and cash `Opening` (400 with `errors.Type`); `TransferIn`, `TransferOut` and `CloseOut` stay allowed. R24: on a Custodial account the server sets `bookedAt` from its clock, and a body that sends `bookedAt` → 400 with `errors.BookedAt`; on an External account `bookedAt` stays required and the rest of R24 is unchanged. Reverse (R11) is allowed on both custody modes. Nothing else changes for an External account.
 
 ---
 
