@@ -8,6 +8,7 @@ import { type Account, useGetAccountQuery, useGetAccountsQuery } from "@/feature
 import { useGetCustomerQuery, useGetCustomersQuery } from "@/features/customers/customersApi";
 import { useCreateInternalTransferMutation } from "@/features/transactions/transactionsApi";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
+import { bookedWhenPosted, differentCustodyMode, isCustodial } from "@/features/accounts/custodyRules";
 import { toUtcIso } from "@/shared/time/instant";
 import { cn } from "cn";
 
@@ -23,6 +24,9 @@ function ineligibleReason(candidate: Account, source: Account): string | null {
   }
   if (candidate.currency !== source.currency) {
     return "Different currency";
+  }
+  if (candidate.custodyMode !== source.custodyMode) {
+    return differentCustodyMode;
   }
   return null;
 }
@@ -91,6 +95,7 @@ export function CreateInternalTransferPage() {
   }
 
   const from = source.data;
+  const custodial = isCustodial(from);
   const candidates = accounts.data?.items ?? [];
   const destination = candidates.find((item) => item.id === toAccountId && ineligibleReason(item, from) === null);
   const crossCustomer = destinationCustomerId !== from.customerId;
@@ -111,7 +116,7 @@ export function CreateInternalTransferPage() {
     if (!(Number.isFinite(amountValue) && amountValue > 0)) {
       problems.push("Amount must be greater than 0.");
     }
-    if (!bookedAt) {
+    if (!custodial && !bookedAt) {
       problems.push("Booked at is required.");
     }
     setMessages(problems);
@@ -129,7 +134,7 @@ export function CreateInternalTransferPage() {
           fromAccountId: from.id,
           toAccountId: destination.id,
           amount: amountValue,
-          bookedAt: toUtcIso(bookedAt),
+          ...(custodial ? {} : { bookedAt: toUtcIso(bookedAt) }),
           memo: memo.trim() || null,
           reference: reference.trim() || null,
         },
@@ -216,16 +221,20 @@ export function CreateInternalTransferPage() {
                 setReviewing(false);
               }}
             />
-            <TextField
-              id="transfer-booked-at"
-              label="Booked at"
-              type="datetime-local"
-              value={bookedAt}
-              onChange={(event) => {
-                setBookedAt(event.target.value);
-                setReviewing(false);
-              }}
-            />
+            {custodial ? (
+              <Muted>{bookedWhenPosted}</Muted>
+            ) : (
+              <TextField
+                id="transfer-booked-at"
+                label="Booked at"
+                type="datetime-local"
+                value={bookedAt}
+                onChange={(event) => {
+                  setBookedAt(event.target.value);
+                  setReviewing(false);
+                }}
+              />
+            )}
             <TextField
               id="transfer-memo"
               label="Memo"

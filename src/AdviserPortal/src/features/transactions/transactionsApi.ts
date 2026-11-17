@@ -64,10 +64,11 @@ export type TransactionListArgs = {
   type?: string;
 };
 
+/** `bookedAt` is sent for an External account only; the server sets it on a Custodial one (custody-modes R10). */
 export type CreateSecurityTransactionBody = {
   accountId: string;
   type: string;
-  bookedAt: string;
+  bookedAt?: string;
   memo: string | null;
   reference: string | null;
   security: { instrumentId: string; quantity: number; cost?: number }[];
@@ -77,7 +78,7 @@ export type CreateCashTransactionBody = {
   accountId: string;
   type: "TransferIn" | "TransferOut";
   amount: number;
-  bookedAt: string;
+  bookedAt?: string;
   memo: string | null;
 };
 
@@ -85,7 +86,7 @@ export type CreateInternalTransferBody = {
   fromAccountId: string;
   toAccountId: string;
   amount: number;
-  bookedAt: string;
+  bookedAt?: string;
   memo: string | null;
   reference: string | null;
 };
@@ -110,7 +111,7 @@ export type FxQuote = {
 
 export type CreateFxConversionBody = FxQuoteBody & {
   expectedRate: number;
-  bookedAt: string;
+  bookedAt?: string;
   memo: string | null;
   reference: string | null;
 };

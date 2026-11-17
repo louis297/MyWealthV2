@@ -22,6 +22,7 @@ import {
   useGetAccountQuery,
   useReopenAccountMutation,
 } from "@/features/accounts/accountsApi";
+import { allowsManualEntry } from "@/features/accounts/custodyRules";
 import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
 import { useGetInstrumentsQuery } from "@/features/instruments/instrumentsApi";
 import {
@@ -241,7 +242,7 @@ export function AccountDetailPage() {
   const actions = [
     ...(canPostCash(data.status) ? cashActions : []),
     ...(canPostSecurity(data.type, data.status) && !locked ? securityActions : []),
-  ];
+  ].filter((action) => allowsManualEntry(data.custodyMode, action));
 
   return (
     <Page>
