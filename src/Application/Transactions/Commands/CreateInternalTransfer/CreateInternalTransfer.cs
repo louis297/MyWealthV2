@@ -211,6 +211,16 @@ public class CreateInternalTransferCommandHandler(
             ]);
         }
 
+        // Custody modes R8.
+        if (from.Account.CustodyMode != to.Account.CustodyMode)
+        {
+            throw new ValidationException([
+                new ValidationFailure(
+                    nameof(CreateInternalTransferCommand.ToAccountId),
+                    Domain.Entities.Transaction.DifferentCustodyModesMessage)
+            ]);
+        }
+
         CashAmountPlaces.EnsureFits(currencies, fromCurrency, request.Amount!.Value);
 
         var fromSum = await TransactionCash.SumAsync(db, from.Account.Id, cancellationToken);

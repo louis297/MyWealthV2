@@ -81,6 +81,17 @@ public class Transaction : BaseAuditableEntity
         return transaction;
     }
 
+    /// <summary>Custody modes I2: every leg account of one Transaction has the same custody mode.</summary>
+    public const string DifferentCustodyModesMessage = "Both accounts must have the same custody mode.";
+
+    private static void EnsureSameCustodyMode(CustodyMode fromCustodyMode, CustodyMode toCustodyMode)
+    {
+        if (fromCustodyMode != toCustodyMode)
+        {
+            throw new DomainException(DifferentCustodyModesMessage);
+        }
+    }
+
     /// <summary>
     /// Builds an InternalTransfer: a negative cash leg on the from Account and a positive cash leg
     /// on the to Account, same currency, summing to zero.
@@ -103,6 +114,8 @@ public class Transaction : BaseAuditableEntity
         {
             throw new DomainException("The from and to accounts must be different.");
         }
+
+        EnsureSameCustodyMode(fromCustodyMode, toCustodyMode);
 
         var currency = Money.Create(0m, fromAccountCurrency).Currency;
         if (!string.Equals(currency, Money.Create(0m, toAccountCurrency).Currency, StringComparison.Ordinal))
@@ -168,6 +181,8 @@ public class Transaction : BaseAuditableEntity
         {
             throw new DomainException("The from and to accounts must be different.");
         }
+
+        EnsureSameCustodyMode(fromCustodyMode, toCustodyMode);
 
         var sellCurrency = Money.Create(0m, fromAccountCurrency).Currency;
         var buyCurrency = Money.Create(0m, toAccountCurrency).Currency;
