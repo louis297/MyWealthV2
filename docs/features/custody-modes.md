@@ -38,7 +38,7 @@ This slice lets a caller open a **Custodial** account and ships every rule that 
 
 No new route, no new policy, no new `TransactionType`, no problem code. Script `0032_remove_external_portfolio_assignments.sql` changes data only.
 
-**Status is `accepted` (2026-11-17).** Not landed. The amendment notes in the specs above, in the two Adviser Portal page contracts, in domain-model, database-design, api-design, the glossary and the known issue are in force from the same change.
+**Status is `accepted` (2026-11-17) and landed** on branch `feature/custody-modes`: Custodial accounts open as `Brokerage` only, the manual entry matrix (`CustodyRules`), the same custody mode on transfer, conversion and quote, the server-set `bookedAt`, portfolios on Custodial accounts only with script `0032_remove_external_portfolio_assignments.sql`, the Custodial demo account in `TestSeed`, and the Adviser Portal forms. The amendment notes in the specs above, in the two Adviser Portal page contracts, in domain-model, database-design, api-design, the glossary and the known issue landed with the implementation.
 
 ---
 
@@ -488,6 +488,6 @@ The repository should build after each commit. Agents split each behaviour into 
 8. Adviser Portal: Custody choice on the New account form (D17) + frontend tests.
 9. Adviser Portal: types, "Booked at" and account pickers by custody mode (D18–D20) + frontend tests.
 10. Adviser Portal: Assign control on Custodial accounts only (P13) + frontend tests.
-11. Repo docs: mark this file landed. (This file and the amendments in the ledger specs, the portal contracts, domain-model, database-design, api-design, the glossary and the known issue were accepted on 2026-11-17, before commit 1.)
+11. Repo docs: mark this file landed (done 2026-11-17). (This file and the amendments in the ledger specs, the portal contracts, domain-model, database-design, api-design, the glossary and the known issue were accepted on 2026-11-17, before commit 1.)
 
 Do not put a tenant setting, caller-supplied prices, or read-model grouping in these commits.

@@ -36,7 +36,7 @@ This slice adds one `TransactionType`, a create route `POST /transactions/fx`, a
 
 **Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R3 and R20: a `bookedAt` later than the server clock plus 5 minutes → 400 `errors.BookedAt`, on create and on the quote. R11 is unchanged; the same decimal place rule now also covers the other cash types.
 
-**Amendment 2026-11-17 (custody modes, accepted):** [custody-modes.md](custody-modes.md). R8 gains a condition: both Accounts have the same custody mode, else 400 with `errors.ToAccountId`, on create and on the quote. R3 and R20: when both Accounts are Custodial the server sets `bookedAt`; a create or quote body that sends it → 400. R9 and R10 then read the rate and check its staleness for the server's instant. §5: the factory takes both custody modes and refuses different ones. §9: the account picker greys out an Account with a different custody mode. The reference rate and `expectedRate` are unchanged on both custody modes.
+**Amendment 2026-11-17 (custody modes, accepted, landed):** [custody-modes.md](custody-modes.md). R8 gains a condition: both Accounts have the same custody mode, else 400 with `errors.ToAccountId`, on create and on the quote. R3 and R20: when both Accounts are Custodial the server sets `bookedAt`; a create or quote body that sends it → 400. R9 and R10 then read the rate and check its staleness for the server's instant. §5: the factory takes both custody modes and refuses different ones. §9: the account picker greys out an Account with a different custody mode. The reference rate and `expectedRate` are unchanged on both custody modes.
 
 ---
 

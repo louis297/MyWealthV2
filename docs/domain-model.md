@@ -389,6 +389,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-17 | Account custody mode landed: `CustodyMode` enum and `Account.CustodyMode`. |
 | 2026-11-17 | Custody modes in `review`: the rules for Custodial accounts. A Custodial account is `Brokerage`; `CustodyRules` holds the manual entry matrix; every leg account of a Transaction has the same custody mode. Recorded in §8.5 and §8.6 with a `review` mark. [features/custody-modes.md](features/custody-modes.md). |
 | 2026-11-17 | Custody modes accepted. The `review` marks in §8.5 and §8.6 are dropped; the Custodial rules replace the line that kept `Custodial` reserved. |
+| 2026-11-17 | Custody modes landed: `Account.Create` refuses Custodial with a type other than Brokerage, `CustodyRules` in Domain, and the custody modes on `PostInternalTransfer` and `PostFxConversion`. |
 
 ---
 

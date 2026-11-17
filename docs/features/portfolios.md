@@ -41,7 +41,7 @@ Model portfolios (target-weight investment schemes) on `webapi`. An Adviser or T
 
 **Amendment 2026-11-15 (trade fees, accepted):** [trade-fees.md](trade-fees.md) R24–R29. Rebalance-generated `Buy` / `Sell` carry trade fees like manual ones; the planner computes each trade's fee from the schedule that applies on the rebalance's UTC date. R8 targets and sells are unchanged, and fees come out of the cash residual first. R11 changes: when planned cash would be negative, every buy is scaled by one factor found by bisection and buys below the minimum trade size are dropped; the rebalance fails with `insufficient_cash` only when sell fees alone make cash negative.
 
-**Amendment 2026-11-17 (custody modes, accepted):** [custody-modes.md](custody-modes.md).
+**Amendment 2026-11-17 (custody modes, accepted, landed):** [custody-modes.md](custody-modes.md).
 
 - R4 becomes: only an Open **Custodial** account may be assigned a portfolio. An External account of any type → 400 `account_not_eligible`. The same test replaces "Brokerage or Other" in single-account rebalance. The "Account types" lock in §11 and the `account_not_eligible` row follow.
 - Existing assignments: script `0032` sets every Active assignment on an External account to `Removed`, with no trades, like R15. After it an Active assignment exists only on a Custodial account.

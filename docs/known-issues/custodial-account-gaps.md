@@ -13,7 +13,7 @@ related:
 
 # Known issue: Custodial accounts still rely on hand entry, and some writes are missing
 
-**Status: open.** It applies from the day [custody-modes](../features/custody-modes.md) lands. That spec is accepted (2026-11-17); until it is built no Custodial account can be opened, and nothing below can happen.
+**Status: open.** It applies since [custody-modes](../features/custody-modes.md) landed (2026-11-17), the change that lets a Custodial account be opened.
 
 ## Problem
 

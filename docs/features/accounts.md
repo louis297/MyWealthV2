@@ -42,7 +42,7 @@ Landed in GitHub `louis297/MyWealthV2` master 2026-09-21, last slice commit `3e8
 - §9.1: the four demo accounts are `External`. Existing accounts become `External`.
 - No behaviour depends on the custody mode. Close, reopen, the Disable-Customer guard and every rule in this file are unchanged.
 
-**Amendment 2026-11-17 (custody modes, accepted):** [custody-modes.md](custody-modes.md). It is the increment that lets a Custodial account be opened.
+**Amendment 2026-11-17 (custody modes, accepted, landed):** [custody-modes.md](custody-modes.md). It is the increment that lets a Custodial account be opened.
 
 - R8: `Custodial` can be selected on `POST /accounts`. A Custodial account has type `Brokerage`; `Custodial` with `Bank`, `Cash` or `Other` → 400 with `errors.Type`. `Property` and `Credit` stay reserved.
 - §5: `Account.Create` refuses `Custodial` with a type other than `Brokerage`. The capability matrix gains a second dimension: an External account may be Bank, Cash, Brokerage or Other; a Custodial account is Brokerage only.
@@ -369,16 +369,19 @@ If the demo tenant exists and the demo Adviser (`adviser@localhost`) exists but 
 
 Then ensure accounts idempotent on `(CustomerId, Name)`:
 
-| Name | Type | Currency | Status | IsActive |
-| --- | --- | --- | --- | --- |
-| Demo everyday bank | Bank | NZD | Open | true |
-| Demo brokerage | Brokerage | USD | Open | true |
-| Demo cash tin | Cash | NZD | Open | true |
-| Demo closed other | Other | NZD | Closed | false |
+| Name | Type | Custody mode | Currency | Status | IsActive |
+| --- | --- | --- | --- | --- | --- |
+| Demo everyday bank | Bank | External | NZD | Open | true |
+| Demo brokerage | Brokerage | External | USD | Open | true |
+| Demo cash tin | Cash | External | NZD | Open | true |
+| Demo closed other | Other | External | NZD | Closed | false |
+| Demo custodial brokerage | Brokerage | Custodial | USD | Open | true |
+
+The Custodial account's transactions, holdings and `Demo Growth` assignment are in [custody-modes.md](custody-modes.md) §9.1.
 
 CreatedBy = `TestSeed.CreatedBy` (`system`).
 
-Functional tests do **not** rely on these rows for isolation; they create their own accounts and Customers. One smoke test may assert the four names exist after a host start that includes the demo tenant.
+Functional tests do **not** rely on these rows for isolation; they create their own accounts and Customers. One smoke test may assert the five names exist after a host start that includes the demo tenant.
 
 ---
 

@@ -141,7 +141,7 @@ Every account has a custody mode, `External` or `Custodial`. Only `External` can
 
 ---
 
-## Amendment 2026-11-17 (custody modes) — accepted
+## Amendment 2026-11-17 (custody modes) — accepted, landed
 
 Status of this amendment: `accepted` (2026-11-17), together with [custody-modes](../features/custody-modes.md).
 

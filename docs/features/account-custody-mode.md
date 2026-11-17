@@ -32,7 +32,7 @@ The rules for Custodial accounts are the **next** increment and are not specifie
 
 **Status is `accepted` (2026-11-17) and landed** on branch `feature/account-custody-mode`: script `0031_accounts_custody_mode.sql`, `Account.CustodyMode`, the create / PUT / item / filter rules, both portals and the seeds. ADR 0020 is accepted with it. The amendments to accounts, ADR 0011, domain-model, database-design, api-design, smoke-test, the glossary and the two portal page contracts landed with the implementation.
 
-**Amendment 2026-11-17 (custody modes, accepted):** the next increment is specified in [custody-modes.md](custody-modes.md). It supersedes these parts of this file: R4, R5 and R11 (`Custodial` can be selected, as a `Brokerage` account only, and the Domain holds that pairing), R9 (rules then read the custody mode), the last sentence of R8 (the `Custodial` filter returns rows), the invariant "this slice adds no rule that combines them" in §5, and the New account form without a custody control in §9. R2, R3, R6, R7, R10 and script `0031` are unchanged.
+**Amendment 2026-11-17 (custody modes, accepted, landed):** the next increment is specified in [custody-modes.md](custody-modes.md). It supersedes these parts of this file: R4, R5 and R11 (`Custodial` can be selected, as a `Brokerage` account only, and the Domain holds that pairing), R9 (rules then read the custody mode), the last sentence of R8 (the `Custodial` filter returns rows), the invariant "this slice adds no rule that combines them" in §5, and the New account form without a custody control in §9. R2, R3, R6, R7, R10 and script `0031` are unchanged.
 
 ---
 

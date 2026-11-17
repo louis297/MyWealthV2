@@ -33,7 +33,7 @@ This is groundwork for cross-account transfer ([posting.md](posting.md) §13), w
 
 **Amendment 2026-11-15 (trade fees, accepted):** [trade-fees.md](trade-fees.md). Cash legs gain a role. The rule "at most one cash leg per `(Transaction, Account)`" now applies to `Principal` legs; a `Buy` / `Sell` may also have one `Fee` leg on the same Account (script `0030` replaces the unique key with a filtered one). Transfers still have no fee leg.
 
-**Amendment 2026-11-17 (custody modes, accepted):** [custody-modes.md](custody-modes.md). New invariant: every leg account of one Transaction has the same custody mode (custody-modes R8, R9). It is checked where a Transaction can have two leg accounts, on `InternalTransfer` and `FxConversion`; a Reversal copies each leg's Account and keeps it. R21: `bookedAt` is set by the server when the leg accounts are Custodial. R17 (portfolio trade lock) is unchanged.
+**Amendment 2026-11-17 (custody modes, accepted, landed):** [custody-modes.md](custody-modes.md). New invariant: every leg account of one Transaction has the same custody mode (custody-modes R8, R9). It is checked where a Transaction can have two leg accounts, on `InternalTransfer` and `FxConversion`; a Reversal copies each leg's Account and keeps it. R21: `bookedAt` is set by the server when the leg accounts are Custodial. R17 (portfolio trade lock) is unchanged.
 
 ---
 
