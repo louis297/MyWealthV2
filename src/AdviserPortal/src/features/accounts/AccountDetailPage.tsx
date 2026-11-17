@@ -22,7 +22,7 @@ import {
   useGetAccountQuery,
   useReopenAccountMutation,
 } from "@/features/accounts/accountsApi";
-import { allowsManualEntry } from "@/features/accounts/custodyRules";
+import { allowsManualEntry, isCustodial } from "@/features/accounts/custodyRules";
 import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
 import { useGetInstrumentsQuery } from "@/features/instruments/instrumentsApi";
 import {
@@ -102,9 +102,8 @@ export function AccountDetailPage() {
     { accountId: id },
     { skip: !id || !account.data },
   );
-  const eligible = Boolean(
-    account.data && account.data.status === "Open" && (account.data.type === "Brokerage" || account.data.type === "Other"),
-  );
+  // P13: only an Open Custodial account can hold a portfolio (custody-modes R14).
+  const eligible = Boolean(account.data && account.data.status === "Open" && isCustodial(account.data));
   const assignment = useGetAccountPortfolioQuery(id ?? "", { skip: !id || !eligible });
   const targetPortfolio = useGetPortfolioQuery(assignment.data?.portfolioId ?? "", {
     skip: assignment.data?.status !== "Active",
