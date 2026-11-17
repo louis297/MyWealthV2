@@ -36,6 +36,24 @@ public class InternalTransferTests
         transaction.DomainEvents.OfType<TransactionPosted>().ShouldHaveSingleItem();
     }
 
+    [TestCase(CustodyMode.External, CustodyMode.Custodial)]
+    [TestCase(CustodyMode.Custodial, CustodyMode.External)]
+    public void PostInternalTransfer_RejectsDifferentCustodyModes(CustodyMode from, CustodyMode to)
+    {
+        Should.Throw<DomainException>(() => Transfer(10m, fromCustodyMode: from, toCustodyMode: to))
+            .Message.ShouldBe("Both accounts must have the same custody mode.");
+    }
+
+    [TestCase(CustodyMode.External)]
+    [TestCase(CustodyMode.Custodial)]
+    public void PostInternalTransfer_WithEqualCustodyModes_BuildsBothLegs(CustodyMode mode)
+    {
+        var transaction = Transfer(10m, fromCustodyMode: mode, toCustodyMode: mode);
+
+        transaction.CashLegs.Select(leg => (leg.AccountId, leg.Amount))
+            .ShouldBe([(FromAccountId, -10m), (ToAccountId, 10m)]);
+    }
+
     [Test]
     public void PostInternalTransfer_RejectsTheSameAccount()
     {
@@ -105,13 +123,17 @@ public class InternalTransferTests
         int toAccountId = ToAccountId,
         string toCurrency = "NZD",
         string amountCurrency = "NZD",
-        decimal fromCashSum = 1000m) =>
+        decimal fromCashSum = 1000m,
+        CustodyMode fromCustodyMode = CustodyMode.External,
+        CustodyMode toCustodyMode = CustodyMode.External) =>
         Transaction.PostInternalTransfer(
             tenantId: 1,
             fromAccountId: FromAccountId,
             fromAccountCurrency: "NZD",
+            fromCustodyMode: fromCustodyMode,
             toAccountId: toAccountId,
             toAccountCurrency: toCurrency,
+            toCustodyMode: toCustodyMode,
             amount: Money.Create(amount, amountCurrency),
             bookedAt: BookedAt,
             memo: "Move to savings",

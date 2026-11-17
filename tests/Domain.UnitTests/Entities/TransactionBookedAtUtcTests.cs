@@ -17,9 +17,9 @@ public class TransactionBookedAtUtcTests
             1, 2, TransactionType.TransferIn, 100m, "NZD", BookedAt, null, null,
             currentCashSum: 0m, existingTransactionCount: 0));
         yield return Case("PostInternalTransfer", () => Transaction.PostInternalTransfer(
-            1, 2, "NZD", 3, "NZD", Money.Create(10m, "NZD"), BookedAt, null, null, fromCurrentCashSum: 100m));
+            1, 2, "NZD", CustodyMode.External, 3, "NZD", CustodyMode.External, Money.Create(10m, "NZD"), BookedAt, null, null, fromCurrentCashSum: 100m));
         yield return Case("PostFxConversion", () => Transaction.PostFxConversion(
-            1, 2, "NZD", 3, "USD",
+            1, 2, "NZD", CustodyMode.External, 3, "USD", CustodyMode.External,
             AppliedFxRate.Create("NZD", "USD", 0.5912m, new DateOnly(2026, 11, 13), "Frankfurter"),
             Money.Create(100m, "NZD"), 2, BookedAt, null, null, fromCurrentCashSum: 500m));
         yield return Case("PostOpeningHoldings", () => Transaction.PostOpeningHoldings(
