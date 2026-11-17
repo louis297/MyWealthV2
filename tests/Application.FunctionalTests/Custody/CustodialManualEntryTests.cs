@@ -108,7 +108,7 @@ public class CustodialManualEntryTests : TestBase
         var accountId = await OpenExternalAsync(tokens.AccessToken, customer.PublicId);
         var instrumentId = await CreateInstrumentAsync(tokens.AccessToken);
 
-        var response = await PostAsync(tokens.AccessToken, RefusedBody(type, accountId, instrumentId));
+        var response = await PostAsync(tokens.AccessToken, RefusedBody(type, accountId, instrumentId).WithBookedAt());
 
         response.StatusCode.ShouldBe(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
     }

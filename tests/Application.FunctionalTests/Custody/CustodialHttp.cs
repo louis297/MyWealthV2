@@ -28,17 +28,23 @@ internal static class CustodialHttp
         AccountHttp.OpenAccountAsync(accessToken, customerId, name, type, currency);
 
     /// <summary>
-    /// Posts a body to a transaction create route as a caller would for a Custodial account. Until custody
-    /// modes R10 lands the create routes still require <c>bookedAt</c>, so it is added here, in one place.
+    /// Posts a body to a transaction create route as it is sent. A Custodial body carries no <c>bookedAt</c>
+    /// (custody modes R10); a caller that posts to an External account adds it.
     /// </summary>
     public static Task<HttpResponseMessage> PostAsync(
         string accessToken,
         Dictionary<string, object?> body,
         string path = "/transactions",
-        Guid? idempotencyKey = null)
+        Guid? idempotencyKey = null) =>
+        TransactionHttp.Send(HttpMethod.Post, path, accessToken, body, idempotencyKey ?? Guid.NewGuid());
+
+    /// <summary>The body with a <c>bookedAt</c>, as an External account requires.</summary>
+    public static Dictionary<string, object?> WithBookedAt(
+        this Dictionary<string, object?> body,
+        string bookedAt = "2026-10-11T10:00:00Z")
     {
-        body.TryAdd("bookedAt", DateTimeOffset.UtcNow.ToString("o"));
-        return TransactionHttp.Send(HttpMethod.Post, path, accessToken, body, idempotencyKey ?? Guid.NewGuid());
+        body["bookedAt"] = bookedAt;
+        return body;
     }
 
     public static Dictionary<string, object?> Cash(Guid accountId, string type, decimal amount) => new()
@@ -55,8 +61,15 @@ internal static class CustodialHttp
         ["security"] = new[] { new { instrumentId, quantity } }
     };
 
-    public static Task<HttpResponseMessage> FundAsync(string accessToken, Guid accountId, decimal amount) =>
-        PostAsync(accessToken, Cash(accountId, "TransferIn", amount));
+    /// <summary>A <c>TransferIn</c>. Pass <paramref name="external"/> for an External account, which needs a bookedAt.</summary>
+    public static Task<HttpResponseMessage> FundAsync(
+        string accessToken,
+        Guid accountId,
+        decimal amount,
+        bool external = false) =>
+        PostAsync(accessToken, external
+            ? Cash(accountId, "TransferIn", amount).WithBookedAt()
+            : Cash(accountId, "TransferIn", amount));
 
     public static async Task<Guid> CreateInstrumentAsync(
         string accessToken,

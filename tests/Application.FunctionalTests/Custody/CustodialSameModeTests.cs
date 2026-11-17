@@ -22,7 +22,8 @@ public class CustodialSameModeTests : TestBase
         var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
         var fromId = await OpenAsync(tokens.AccessToken, customer.PublicId, from, "From", "NZD");
         var toId = await OpenAsync(tokens.AccessToken, customer.PublicId, to, "To", "NZD");
-        (await FundAsync(tokens.AccessToken, fromId, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await FundAsync(tokens.AccessToken, fromId, 100m, external: from == "External")).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
 
         var response = await PostAsync(tokens.AccessToken, TransferBody(fromId, toId, 40m), TransferPath);
 
@@ -113,9 +114,10 @@ public class CustodialSameModeTests : TestBase
             "South Co", "south-co", "ann@south.example", customerEmail: "ned@south.example");
         var fromA = await OpenExternalAsync(tokensA.AccessToken, customerA.PublicId, currency: "NZD");
         var toB = await OpenCustodialAsync(tokensB.AccessToken, customerB.PublicId, currency: "NZD");
-        (await FundAsync(tokensA.AccessToken, fromA, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await FundAsync(tokensA.AccessToken, fromA, 100m, external: true)).StatusCode.ShouldBe(HttpStatusCode.Created);
 
-        var response = await PostAsync(tokensA.AccessToken, TransferBody(fromA, toB, 40m), TransferPath);
+        var response = await PostAsync(
+            tokensA.AccessToken, TransferBody(fromA, toB, 40m).WithBookedAt(), TransferPath);
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound, await response.Content.ReadAsStringAsync());
         (await TransactionCountAsync(toB)).ShouldBe(0);
@@ -136,7 +138,8 @@ public class CustodialSameModeTests : TestBase
         await FxConversionTests.SetRateAsync("NZD", "USD", NzdUsd, DateOnly.FromDateTime(DateTime.UtcNow));
         var fromId = await OpenAsync(accessToken, customerId, from, "NZD side", "NZD");
         var toId = await OpenAsync(accessToken, customerId, to, "USD side", "USD");
-        (await FundAsync(accessToken, fromId, 1000m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await FundAsync(accessToken, fromId, 1000m, external: from == "External")).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
         return (fromId, toId);
     }
 
