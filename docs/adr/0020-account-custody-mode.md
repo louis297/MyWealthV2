@@ -77,5 +77,5 @@ The first slice adds the attribute only: [features/account-custody-mode.md](../f
 ## Links
 
 - Feature spec: [features/account-custody-mode.md](../features/account-custody-mode.md)
-- Rules for Custodial accounts (item 5): [features/custody-modes.md](../features/custody-modes.md), `review` since 2026-11-17. It proposes that the server sets the booking time on a Custodial account, the point item 5 left to that spec. This ADR does not change.
+- Rules for Custodial accounts (item 5): [features/custody-modes.md](../features/custody-modes.md), accepted 2026-11-17. It decides that the server sets the booking time on a Custodial account, the point item 5 left to that spec. This ADR does not change.
 - Related ADRs: 0011 (account container, item 6), 0005 (tenancy)

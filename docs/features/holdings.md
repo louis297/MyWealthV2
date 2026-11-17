@@ -38,7 +38,7 @@ Buy / Sell / StockIn / StockOut are accepted in [buy-sell.md](buy-sell.md). Spli
 
 **Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R15: a Transaction with a security leg can be reversed only while it is the latest security activity on each of its holdings. R18 follows posting R24, which now refuses a `bookedAt` in the future.
 
-**Amendment 2026-11-17 (custody modes, `review`):** [custody-modes.md](custody-modes.md). Not a build contract until that spec is accepted. R8: `OpeningHoldings` is refused on a Custodial account (400 with `errors.Type`). A Custodial account starts empty and gets its positions from `Buy`. R6 is unchanged; a Custodial account is always `Brokerage`. R18 follows posting R24 as amended there. The projection, the cost rule and the holdings read are the same for both custody modes.
+**Amendment 2026-11-17 (custody modes, accepted):** [custody-modes.md](custody-modes.md). R8: `OpeningHoldings` is refused on a Custodial account (400 with `errors.Type`). A Custodial account starts empty and gets its positions from `Buy`. R6 is unchanged; a Custodial account is always `Brokerage`. R18 follows posting R24 as amended there. The projection, the cost rule and the holdings read are the same for both custody modes.
 
 ---
 

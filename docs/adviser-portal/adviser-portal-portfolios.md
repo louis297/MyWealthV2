@@ -26,7 +26,7 @@ Phase 2 portal cut for model portfolios. Consumes the landed portfolios feature 
 
 **Amendment 2026-11-13 (Shared portfolio message, accepted, landed):** see the amendment at the end of this file. Adds P12.
 
-**Amendment 2026-11-17 (custody modes, `review`):** see the amendment at the end of this file. Adds P13, which replaces the account test in P5. Not in force until [custody-modes](../features/custody-modes.md) is accepted.
+**Amendment 2026-11-17 (custody modes, accepted):** see the amendment at the end of this file. Adds P13, which replaces the account test in P5 ([custody-modes](../features/custody-modes.md)).
 
 Backend prerequisites (landed):
 
@@ -161,9 +161,9 @@ No other page changes. The edit page still lists only the accounts the Adviser c
 
 ---
 
-## Amendment 2026-11-17 (custody modes) — review
+## Amendment 2026-11-17 (custody modes) — accepted
 
-Status of this amendment: `review`. Accept it together with [custody-modes](../features/custody-modes.md). Until then the pages above are unchanged. Backend rules: custody-modes R14–R17 and [../features/portfolios.md](../features/portfolios.md), amendment 2026-11-17. Do not rewrite P5 or P9 in place.
+Status of this amendment: `accepted` (2026-11-17), together with [custody-modes](../features/custody-modes.md). Backend rules: custody-modes R14–R17 and [../features/portfolios.md](../features/portfolios.md), amendment 2026-11-17. Do not rewrite P5 or P9 in place.
 
 | ID | Behaviour |
 | --- | --- |

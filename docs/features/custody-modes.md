@@ -1,6 +1,6 @@
 ---
 title: Custody modes
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -38,7 +38,7 @@ This slice lets a caller open a **Custodial** account and ships every rule that 
 
 No new route, no new policy, no new `TransactionType`, no problem code. Script `0032_remove_external_portfolio_assignments.sql` changes data only.
 
-**Status is `review`.** Not a build contract. The amendment notes in the specs above, in the two Adviser Portal page contracts, and in domain-model, database-design and api-design carry a `review` mark and are not in force until this file is accepted.
+**Status is `accepted` (2026-11-17).** Not landed. The amendment notes in the specs above, in the two Adviser Portal page contracts, in domain-model, database-design, api-design, the glossary and the known issue are in force from the same change.
 
 ---
 
@@ -454,7 +454,7 @@ No new ADR. [ADR 0020](../adr/0020-account-custody-mode.md) item 5 gave the dire
 | Routes, policies, problem codes | None added |
 | Delivery | All rules of §4 land in one merge |
 
-To confirm when this spec is accepted. Each is written into the rules above as stated here:
+Confirmed when this spec was accepted (2026-11-17). Each is written into the rules above as stated here:
 
 1. **The server sets `bookedAt` on a Custodial account** (R10–R13). The alternative is to keep the caller's `bookedAt` on both modes and refuse only a future time, as today.
 2. **Existing portfolio assignments are removed** (R16), and every existing account stays External. The alternative is to turn the Brokerage accounts that have an Active assignment into Custodial accounts in the script, which keeps the demo data connected but puts hand-entered history into Custodial accounts.
@@ -474,7 +474,7 @@ Still open, not this slice:
 
 ## 12. Suggested commits
 
-Only after `accepted`. The repository should build after each commit. Agents split each behaviour into red then green.
+The repository should build after each commit. Agents split each behaviour into red then green.
 
 `Custodial` becomes selectable in commit 1 and its rules follow in commits 2 to 7. The branch is merged and deployed as a whole; do not merge or deploy a prefix of it.
 
@@ -488,6 +488,6 @@ Only after `accepted`. The repository should build after each commit. Agents spl
 8. Adviser Portal: Custody choice on the New account form (D17) + frontend tests.
 9. Adviser Portal: types, "Booked at" and account pickers by custody mode (D18–D20) + frontend tests.
 10. Adviser Portal: Assign control on Custodial accounts only (P13) + frontend tests.
-11. Repo docs: mark this file landed; drop the `review` marks in the amended specs, the portal contracts, domain-model, database-design, api-design and the glossary.
+11. Repo docs: mark this file landed. (This file and the amendments in the ledger specs, the portal contracts, domain-model, database-design, api-design, the glossary and the known issue were accepted on 2026-11-17, before commit 1.)
 
 Do not put a tenant setting, caller-supplied prices, or read-model grouping in these commits.

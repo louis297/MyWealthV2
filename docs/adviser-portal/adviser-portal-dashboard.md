@@ -141,9 +141,9 @@ Every account has a custody mode, `External` or `Custodial`. Only `External` can
 
 ---
 
-## Amendment 2026-11-17 (custody modes) — review
+## Amendment 2026-11-17 (custody modes) — accepted
 
-Status of this amendment: `review`. Accept it together with [custody-modes](../features/custody-modes.md). Until then the pages above are unchanged.
+Status of this amendment: `accepted` (2026-11-17), together with [custody-modes](../features/custody-modes.md).
 
 A Custodial account can be opened, and the write forms follow the account's custody mode. Backend rules: custody-modes §4. D17 replaces D15. D18–D20 extend D10–D14 and the transfer and convert rows of the route table. D16 is unchanged.
 

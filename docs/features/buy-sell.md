@@ -39,7 +39,7 @@ Split / Bonus / Scrip are accepted in [split.md](split.md). No portal page. No p
 
 **Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R16: a `Buy`, `Sell`, `StockIn` or `StockOut` can be reversed only while it is the latest security activity on its holding. R18 follows posting R24, which now refuses a `bookedAt` in the future.
 
-**Amendment 2026-11-17 (custody modes, `review`):** [custody-modes.md](custody-modes.md). Not a build contract until that spec is accepted. R8: `Buy` and `Sell` are allowed on both custody modes and are priced by the server on both. `StockIn` and `StockOut` are refused on a Custodial account (400 with `errors.Type`). R10, R12 and R18: on a Custodial account the booking time is the server clock, a body that sends `bookedAt` → 400, and the price and the FX rate are read for that instant. An External account is unchanged; caller-supplied prices there are a later slice.
+**Amendment 2026-11-17 (custody modes, accepted):** [custody-modes.md](custody-modes.md). R8: `Buy` and `Sell` are allowed on both custody modes and are priced by the server on both. `StockIn` and `StockOut` are refused on a Custodial account (400 with `errors.Type`). R10, R12 and R18: on a Custodial account the booking time is the server clock, a body that sends `bookedAt` → 400, and the price and the FX rate are read for that instant. An External account is unchanged; caller-supplied prices there are a later slice.
 
 ---
 

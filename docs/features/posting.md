@@ -39,7 +39,7 @@ There is **no separate cash-ledger Feature Spec.** Cash legs live here. There is
 
 **Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R8: the caller's `amount` must fit the Account currency's `DecimalPlaces`; `CloseOut` is exempt. R11: a Transaction with a security leg can be reversed only while it is the latest security activity on each of its holdings. R24: a `bookedAt` in the future is refused.
 
-**Amendment 2026-11-17 (custody modes, `review`):** [custody-modes.md](custody-modes.md). Not a build contract until that spec is accepted. R16 and the §5 type table: on a Custodial account `POST /transactions` refuses `Interest` and cash `Opening` (400 with `errors.Type`); `TransferIn`, `TransferOut` and `CloseOut` stay allowed. R24: on a Custodial account the server sets `bookedAt` from its clock, and a body that sends `bookedAt` → 400 with `errors.BookedAt`; on an External account `bookedAt` stays required and the rest of R24 is unchanged. Reverse (R11) is allowed on both custody modes. Nothing else changes for an External account.
+**Amendment 2026-11-17 (custody modes, accepted):** [custody-modes.md](custody-modes.md). R16 and the §5 type table: on a Custodial account `POST /transactions` refuses `Interest` and cash `Opening` (400 with `errors.Type`); `TransferIn`, `TransferOut` and `CloseOut` stay allowed. R24: on a Custodial account the server sets `bookedAt` from its clock, and a body that sends `bookedAt` → 400 with `errors.BookedAt`; on an External account `bookedAt` stays required and the rest of R24 is unchanged. Reverse (R11) is allowed on both custody modes. Nothing else changes for an External account.
 
 ---
 

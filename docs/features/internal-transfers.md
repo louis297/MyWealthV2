@@ -30,7 +30,7 @@ This is the increment that [leg-accounts.md](leg-accounts.md) prepared (§12, §
 
 **Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R3 and R7: `amount` has no more decimal places than the Accounts' currency's `DecimalPlaces`, else 400 `errors.Amount`. R3: a `bookedAt` later than the server clock plus 5 minutes → 400 `errors.BookedAt`.
 
-**Amendment 2026-11-17 (custody modes, `review`):** [custody-modes.md](custody-modes.md). Not a build contract until that spec is accepted. R8 gains a condition: the from Account and the to Account have the same custody mode, else 400 with `errors.ToAccountId`. A movement between a Custodial and an External account is a `TransferOut` on one and, if recorded, a `TransferIn` on the other, not linked. R3: when both Accounts are Custodial the server sets `bookedAt`, and a body that sends it → 400. §5: the factory takes both custody modes and refuses different ones. §9: the destination picker greys out an Account with a different custody mode.
+**Amendment 2026-11-17 (custody modes, accepted):** [custody-modes.md](custody-modes.md). R8 gains a condition: the from Account and the to Account have the same custody mode, else 400 with `errors.ToAccountId`. A movement between a Custodial and an External account is a `TransferOut` on one and, if recorded, a `TransferIn` on the other, not linked. R3: when both Accounts are Custodial the server sets `bookedAt`, and a body that sends it → 400. §5: the factory takes both custody modes and refuses different ones. §9: the destination picker greys out an Account with a different custody mode.
 
 ---
 

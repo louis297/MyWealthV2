@@ -34,7 +34,7 @@ This is step 1 of the business domain roadmap ([future-plans.md](../future-plans
 
 **Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). A `Buy` / `Sell` can no longer be booked in the future. R9 is unchanged: the latest trade date can still be after today inside the 5 minute allowance around UTC midnight, and for rows posted before that fix. A schedule created over HTTP starts tomorrow at the earliest (R10), so it applies to trades from tomorrow on. The Fees functional tests that dated a trade in the future to get a fee change with that fix (its B3).
 
-**Amendment 2026-11-17 (custody modes, `review`):** [custody-modes.md](custody-modes.md). Not a build contract until that spec is accepted. No rule in this file changes. A trade fee is charged on `Buy` / `Sell` on both custody modes; limiting schedules to Custodial accounts is a later slice. On a Custodial account the trade is booked at the server clock, so R7 picks the schedule for today's UTC date. A schedule created over HTTP starts tomorrow at the earliest (R10) and applies to Custodial trades from then on.
+**Amendment 2026-11-17 (custody modes, accepted):** [custody-modes.md](custody-modes.md). No rule in this file changes. A trade fee is charged on `Buy` / `Sell` on both custody modes; limiting schedules to Custodial accounts is a later slice. On a Custodial account the trade is booked at the server clock, so R7 picks the schedule for today's UTC date. A schedule created over HTTP starts tomorrow at the earliest (R10) and applies to Custodial trades from then on.
 
 ---
 
