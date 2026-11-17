@@ -60,14 +60,15 @@ internal static class AccountHttp
         Guid customerId,
         string name = "Everyday spending",
         string type = "Bank",
-        string currency = "NZD")
+        string currency = "NZD",
+        string custodyMode = "External")
     {
         var response = await Send(HttpMethod.Post, "/accounts", accessToken, new
         {
             customerId,
             name,
             type,
-            custodyMode = "External",
+            custodyMode,
             currency
         });
         response.StatusCode.ShouldBe(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
