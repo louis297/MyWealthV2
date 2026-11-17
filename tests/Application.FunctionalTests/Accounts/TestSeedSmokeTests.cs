@@ -10,7 +10,7 @@ namespace MyWealthV2.Application.FunctionalTests.Accounts;
 public class TestSeedSmokeTests : TestBase
 {
     [Test]
-    public async Task DemoTenant_HasFourSeedAccounts()
+    public async Task DemoTenant_HasFiveSeedAccounts()
     {
         var tenant = await TestApp.CreateTenantAsync(
             DevelopmentIdentitySeeder.DemoTenantName,
@@ -44,6 +44,7 @@ public class TestSeedSmokeTests : TestBase
             "Demo brokerage",
             "Demo cash tin",
             "Demo closed other",
+            "Demo custodial brokerage",
             "Demo everyday bank"
         ]);
     }
