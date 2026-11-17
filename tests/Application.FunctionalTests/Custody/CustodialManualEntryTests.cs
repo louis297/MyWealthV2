@@ -91,7 +91,9 @@ public class CustodialManualEntryTests : TestBase
 
         var response = await PostAsync(tokens.AccessToken, RefusedBody(type, accountId, instrumentId), idempotencyKey: key);
 
-        (await ErrorsAsync(response)).ShouldContainKeyAndValue("Type", [message]);
+        var errors = await ErrorsAsync(response);
+        errors.ShouldContainKey("Type");
+        errors["Type"].ShouldBe([message]);
         (await TransactionCountAsync(accountId)).ShouldBe(0);
         (await IdempotencyRecordExistsAsync(key)).ShouldBeFalse();
     }

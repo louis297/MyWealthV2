@@ -5,6 +5,7 @@ using MyWealthV2.Application.Accounts;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
+using MyWealthV2.Domain.Custody;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Exceptions;
@@ -308,6 +309,17 @@ public class CreateTransactionCommandHandler(
                 "Cannot create a transaction while the customer is disabled. Enable the customer first.");
         }
 
+        var type = Enum.Parse<TransactionType>(request.Type!);
+
+        // Custody modes R5, R6: the manual entry matrix, before every type-specific check.
+        var refusal = CustodyRules.RefusalMessage(loaded.Account.CustodyMode, type);
+        if (refusal is not null)
+        {
+            throw new ValidationException([
+                new ValidationFailure(nameof(CreateTransactionCommand.Type), refusal)
+            ]);
+        }
+
         var currency = loaded.Account.Currency;
         if (request.Currency is not null)
         {
@@ -322,8 +334,6 @@ public class CreateTransactionCommandHandler(
 
             currency = accountCurrency;
         }
-
-        var type = Enum.Parse<TransactionType>(request.Type!);
 
         // CloseOut is exempt: its amount must equal the cash SUM, which a Buy or Sell can leave with
         // more decimals than the currency has (fixes/ledger-write-guards.md Decision 5).
