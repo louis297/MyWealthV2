@@ -47,6 +47,13 @@ internal static class CustodialHttp
         return body;
     }
 
+    /// <summary>The body without its <c>bookedAt</c>, as a Custodial account requires.</summary>
+    public static Dictionary<string, object?> WithoutBookedAt(this Dictionary<string, object?> body)
+    {
+        body.Remove("bookedAt");
+        return body;
+    }
+
     public static Dictionary<string, object?> Cash(Guid accountId, string type, decimal amount) => new()
     {
         ["accountId"] = accountId,

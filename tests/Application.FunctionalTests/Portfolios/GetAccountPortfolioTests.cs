@@ -60,7 +60,7 @@ public class GetAccountPortfolioTests : TestBase
     private static async Task<Guid> AssignedBrokerageAsync(
         string accessToken, Guid customerId, Guid portfolioId, string name)
     {
-        var accountId = await Accounts.AccountHttp.OpenAccountAsync(accessToken, customerId, name, type: "Brokerage");
+        var accountId = await Accounts.AccountHttp.OpenAccountAsync(accessToken, customerId, name, type: "Brokerage", custodyMode: "Custodial");
 
         var funded = await Transactions.TransactionHttp.Send(
             HttpMethod.Post,
@@ -71,7 +71,6 @@ public class GetAccountPortfolioTests : TestBase
                 accountId,
                 type = "TransferIn",
                 amount = 10000m,
-                bookedAt = "2026-01-02T00:00:00Z",
                 currency = "NZD"
             },
             Guid.NewGuid());

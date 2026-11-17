@@ -95,7 +95,8 @@ public class AssignPortfolioTests : TestBase
         bool withPrice = true)
     {
         var (tokens, portfolioId, customerId, instrumentId) = await FundedContextAsync(tenantName, tenantCode, withPrice);
-        var accountId = await CreateAccountAsync(tokens.AccessToken, customerId, "Brokerage", "Model");
+        var accountId = await Accounts.AccountHttp.OpenAccountAsync(
+            tokens.AccessToken, customerId, "Model", "Brokerage", custodyMode: "Custodial");
         var funded = await Transactions.TransactionHttp.Send(
             HttpMethod.Post,
             "/transactions",
@@ -105,7 +106,6 @@ public class AssignPortfolioTests : TestBase
                 accountId,
                 type = "TransferIn",
                 amount = 10000m,
-                bookedAt = "2026-01-02T00:00:00Z",
                 currency = "NZD"
             },
             Guid.NewGuid());

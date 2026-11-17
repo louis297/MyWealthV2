@@ -23,7 +23,6 @@ public class RebalanceEnqueueTests : TestBase
             accountId,
             type = "TransferIn",
             amount = 10000m,
-            bookedAt = "2026-01-02T00:00:00Z",
             currency = "NZD"
         }, Guid.NewGuid())).StatusCode.ShouldBe(HttpStatusCode.Created);
 
@@ -91,6 +90,7 @@ public class RebalanceEnqueueTests : TestBase
 
     private static async Task<Guid> CreateAccountAsync(string accessToken, Guid customerId)
     {
-        return await Accounts.AccountHttp.OpenAccountAsync(accessToken, customerId, name: "Model", type: "Brokerage");
+        return await Accounts.AccountHttp.OpenAccountAsync(
+            accessToken, customerId, name: "Model", type: "Brokerage", custodyMode: "Custodial");
     }
 }
