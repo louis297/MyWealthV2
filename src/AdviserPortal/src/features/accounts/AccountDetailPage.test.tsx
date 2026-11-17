@@ -569,6 +569,30 @@ describe("AccountDetailPage", () => {
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
+  it.each([
+    ["Custodial", ["TransferIn", "TransferOut", "Buy", "Sell", "Transfer", "Convert"]],
+    [
+      "External",
+      ["TransferIn", "TransferOut", "Buy", "Sell", "StockIn", "StockOut", "Split", "Bonus", "Scrip", "Transfer", "Convert"],
+    ],
+  ])("offers the manual entry matrix actions on a %s Brokerage account (D18)", async (custodyMode, expected) => {
+    renderDetail((url, method) => {
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json({ ...account, custodyMode });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    const nav = await screen.findByRole("navigation", { name: "Transaction actions" });
+    expect(within(nav).getAllByRole("link").map((link) => link.textContent)).toEqual(expected);
+  });
+
   it("hides transfer actions when the account is closed", async () => {
     renderDetail((url, method) => {
       if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {

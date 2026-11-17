@@ -23,6 +23,7 @@ function account(id: string, name: string, overrides: Record<string, unknown> = 
     customerId: nedId,
     name,
     type: "Bank",
+    custodyMode: "External",
     currency: "NZD",
     status: "Open",
     isActive: true,
@@ -318,6 +319,51 @@ describe("CreateFxConversionPage", () => {
       buyAmount: 500,
       expectedRate: 0.5912,
       bookedAt: "2026-11-09T20:00:00.000Z",
+      memo: null,
+      reference: null,
+    });
+  });
+
+  const custodialAccounts = [
+    account(sourceId, "Ned managed", { type: "Brokerage", custodyMode: "Custodial" }),
+    account(savingsId, "Ned external USD", { currency: "USD" }),
+    account(closedUsdId, "Ned old USD", { currency: "USD", status: "Closed", isActive: false }),
+    account(usdId, "Ned USD", { type: "Brokerage", custodyMode: "Custodial", currency: "USD" }),
+  ];
+
+  it("greys out an Account with a different custody mode (D20)", async () => {
+    renderForm({ accounts: custodialAccounts });
+
+    const list = await screen.findByRole("radiogroup", { name: "Destination account" });
+    const external = await within(list).findByRole("radio", { name: /Ned external USD/ });
+    expect(external).toBeDisabled();
+    expect(external.closest("label")).toHaveTextContent("Different custody mode");
+    expect(within(list).getByRole("radio", { name: /Ned USD/ })).toBeEnabled();
+  });
+
+  it("quotes and posts a Custodial conversion with no Booked at input and no bookedAt (D19)", async () => {
+    const { fetchMock } = renderForm({ accounts: custodialAccounts });
+
+    fireEvent.click(await screen.findByRole("radio", { name: /Ned USD/ }));
+    expect(screen.getByText("Booked when posted.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Booked at")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Amount/), { target: { value: "1000" } });
+    await screen.findByText(/You get 591\.20 USD/, {}, { timeout: 2000 });
+    fireEvent.click(screen.getByRole("button", { name: "Review conversion" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm conversion" }));
+
+    expect(await screen.findByText("account detail")).toBeInTheDocument();
+    const quotes = posts(fetchMock, "/transactions/fx/quote");
+    expect(quotes.length).toBeGreaterThan(0);
+    for (const quote of quotes) {
+      expect(JSON.parse(await quote.clone().text())).not.toHaveProperty("bookedAt");
+    }
+    const created = posts(fetchMock, "/transactions/fx");
+    expect(JSON.parse(await created[0].clone().text())).toEqual({
+      fromAccountId: sourceId,
+      toAccountId: usdId,
+      sellAmount: 1000,
+      expectedRate: 0.5912,
       memo: null,
       reference: null,
     });
