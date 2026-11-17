@@ -23,6 +23,7 @@ related:
   - features/identity-auth.md
   - adviser-portal/adviser-portal.md
   - features/account-custody-mode.md
+  - features/custody-modes.md
   - adr/0020-account-custody-mode.md
 ---
 
@@ -204,12 +205,12 @@ Tell apart the accounts the platform holds and trades from the accounts that onl
 
 Decided in discussion (2026-11-16), recorded in [ADR 0020](adr/0020-account-custody-mode.md) (accepted 2026-11-17): every Account has a custody mode, `External` or `Custodial`, on the Account and not on the Tenant. This comes before any work that turns hand-entered transactions into platform-side flows, because each such flow replaces a manual type on Custodial accounts only.
 
-Slices. Only the first has a spec. Slices 3 to 5 do not depend on each other:
+Slices. The first two have a spec. Slices 3 to 5 do not depend on each other:
 
 | Slice | Content | Behaviour change |
 | --- | --- | --- |
 | 1 | The attribute on the Account. Only `External` can be opened; `Custodial` is a reserved value. [features/account-custody-mode.md](features/account-custody-mode.md) (accepted, landed 2026-11-17) | None |
-| 2 | Custodial accounts can be opened, with all of their rules in one spec: which account types they may have, which manual transaction types they refuse, the same custody mode on every leg account of a Transaction, and portfolio assignment and rebalance by custody mode | Most of the change |
+| 2 | Custodial accounts can be opened, with all of their rules in one spec: which account types they may have, which manual transaction types they refuse, the same custody mode on every leg account of a Transaction, who sets `bookedAt`, and portfolio assignment and rebalance by custody mode. [features/custody-modes.md](features/custody-modes.md) (`review`) | Most of the change |
 | 3 | A tenant setting for which custody modes may be opened. Optional | Small |
 | 4 | External accounts take the caller's numbers: executed price and fee on `Buy` / `Sell`, both amounts on an `FxConversion`. Server pricing and trade fee schedules then apply to Custodial accounts only | Medium |
 | 5 | Read side: net worth, the two reports and the portal pages show the two modes as two groups | Read only |
@@ -227,9 +228,13 @@ After slice 2, some writes on a Custodial account are still entered by hand or a
 
 Related: the advisory fee (§1 step 4) and platform billing (§8) can then use Custodial accounts as their base.
 
-Questions to settle when slice 2 opens:
+Questions that the slice 2 spec answers. Its answers are in `review` and are confirmed when that spec is accepted ([features/custody-modes.md](features/custody-modes.md) §11):
 
-- Whether the server sets `bookedAt` on a Custodial account. It stops backdating without a replay, but a hand-entered deposit could not be dated yesterday, and history could only be built by the seed.
-- What happens to existing portfolio assignments. After slice 1 every account is External, so either the assignments are removed, or accounts with an Active assignment are turned into Custodial ones by the script and keep hand-entered history.
-- Whether to accept that a Custodial holding cannot record a split until corporate action events exist.
+- Whether the server sets `bookedAt` on a Custodial account. Proposed: yes. It stops backdating without a replay, but a hand-entered deposit cannot be dated yesterday, and history can only be built by the seed.
+- What happens to existing portfolio assignments. Proposed: a script removes them, and every existing account stays External. The other option turns accounts with an Active assignment into Custodial ones and keeps hand-entered history in them.
+- Whether to accept that a Custodial holding cannot record a split until corporate action events exist. Proposed: yes, recorded in [known-issues/custodial-account-gaps.md](known-issues/custodial-account-gaps.md).
+- Whether `CloseOut` is refused on a Custodial account. Proposed: no, it stays until an account closure flow exists, because it is the only type that can clear a balance smaller than the currency's minor unit.
+
+Still open:
+
 - Whether a valuation-only record for property and loans replaces the `Other`, `Property` and `Credit` account types.
