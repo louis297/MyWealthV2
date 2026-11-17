@@ -373,17 +373,20 @@ public static class TestSeed
         var nzd = Currency.Create("NZD", "New Zealand Dollar", 2);
 
         await EnsureAccountAsync(
-            db, tenantId, customer.Id, "Demo everyday bank", AccountType.Bank, nzd, closed: false,
+            db, tenantId, customer.Id, "Demo everyday bank", AccountType.Bank, CustodyMode.External, nzd, closed: false,
             cancellationToken);
         await EnsureAccountAsync(
-            db, tenantId, customer.Id, "Demo brokerage", AccountType.Brokerage, usd, closed: false,
+            db, tenantId, customer.Id, "Demo brokerage", AccountType.Brokerage, CustodyMode.External, usd, closed: false,
             cancellationToken);
         await EnsureAccountAsync(
-            db, tenantId, customer.Id, "Demo cash tin", AccountType.Cash, nzd, closed: false,
+            db, tenantId, customer.Id, "Demo cash tin", AccountType.Cash, CustodyMode.External, nzd, closed: false,
             cancellationToken);
         await EnsureAccountAsync(
-            db, tenantId, customer.Id, "Demo closed other", AccountType.Other, nzd, closed: true,
+            db, tenantId, customer.Id, "Demo closed other", AccountType.Other, CustodyMode.External, nzd, closed: true,
             cancellationToken);
+        await EnsureAccountAsync(
+            db, tenantId, customer.Id, DemoCustodialName, AccountType.Brokerage, CustodyMode.Custodial, usd,
+            closed: false, cancellationToken);
         await EnsureDemoEverydayTransferAsync(db, tenantId, customer.Id, cancellationToken);
         await EnsureDemoBrokerageOpeningAsync(db, tenantId, customer.Id, cancellationToken);
         await EnsureDemoBrokerageFundingAsync(db, tenantId, customer.Id, cancellationToken);
@@ -391,8 +394,119 @@ public static class TestSeed
         await EnsureDemoBrokerageStockInAsync(db, tenantId, customer.Id, cancellationToken);
         await EnsureDemoBrokerageSplitAsync(db, tenantId, customer.Id, cancellationToken);
         await SyncDemoBrokerageHoldingAsync(db, tenantId, customer.Id, cancellationToken);
+        await EnsureDemoCustodialAsync(db, tenantId, customer.Id, cancellationToken);
         await EnsureDemoPortfolioAsync(db, tenantId, customer.Id, cancellationToken);
     }
+
+    private const string DemoCustodialName = "Demo custodial brokerage";
+    private const string DemoCustodialFundingReference = "TestSeed-DemoCustodial-Funding";
+    private const string DemoCustodialBuyVtiReference = "TestSeed-DemoCustodial-BuyVti";
+    private const string DemoCustodialBuyAaplReference = "TestSeed-DemoCustodial-BuyAapl";
+
+    /// <summary>
+    /// Custody modes §9.1: the Custodial demo account is funded with one TransferIn and buys VTI and AAPL at the
+    /// seeded prices, then its Holdings rows are synced. Each transaction is idempotent on its reference.
+    /// </summary>
+    private static async Task EnsureDemoCustodialAsync(
+        ApplicationDbContext db,
+        int tenantId,
+        int customerId,
+        CancellationToken cancellationToken)
+    {
+        var account = await DemoCustodialAsync(db, customerId, cancellationToken);
+        if (account is null)
+        {
+            return;
+        }
+
+        var nzdt = TimeSpan.FromHours(13);
+        if (!await ReferenceExistsAsync(db, account.Id, DemoCustodialFundingReference, cancellationToken))
+        {
+            var funding = Transaction.Post(
+                tenantId,
+                account.Id,
+                TransactionType.TransferIn,
+                20000m,
+                account.Currency,
+                new DateTimeOffset(2026, 1, 20, 10, 0, 0, nzdt),
+                "Demo custodial funding",
+                DemoCustodialFundingReference,
+                currentCashSum: await CashSumAsync(db, account.Id, cancellationToken),
+                existingTransactionCount: 0);
+            Stamp(funding, funding.CashLegs.Single());
+            db.Transactions.Add(funding);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        await EnsureDemoCustodialBuyAsync(
+            db, tenantId, account, "VTI", 40m, new DateTimeOffset(2026, 1, 20, 10, 30, 0, nzdt),
+            DemoCustodialBuyVtiReference, cancellationToken);
+        await EnsureDemoCustodialBuyAsync(
+            db, tenantId, account, "AAPL", 20m, new DateTimeOffset(2026, 1, 20, 11, 0, 0, nzdt),
+            DemoCustodialBuyAaplReference, cancellationToken);
+        await SyncHoldingAsync(db, tenantId, account, "VTI", cancellationToken);
+        await SyncHoldingAsync(db, tenantId, account, "AAPL", cancellationToken);
+    }
+
+    private static async Task EnsureDemoCustodialBuyAsync(
+        ApplicationDbContext db,
+        int tenantId,
+        Account account,
+        string symbol,
+        decimal quantity,
+        DateTimeOffset bookedAt,
+        string reference,
+        CancellationToken cancellationToken)
+    {
+        if (await ReferenceExistsAsync(db, account.Id, reference, cancellationToken))
+        {
+            return;
+        }
+
+        var instrument = await db.Instruments.SingleOrDefaultAsync(
+            row => row.TenantId == tenantId && row.Symbol == symbol, cancellationToken);
+        var asOf = DateOnly.FromDateTime(bookedAt.UtcDateTime);
+        var stored = instrument is null
+            ? null
+            : await db.InstrumentPrices.AsNoTracking()
+                .Where(row => row.InstrumentId == instrument.Id && row.AsOfDate <= asOf)
+                .OrderByDescending(row => row.AsOfDate)
+                .FirstOrDefaultAsync(cancellationToken);
+        if (instrument is null || stored is null
+            || !string.Equals(instrument.QuoteCurrency.Trim(), account.Currency.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var transaction = Transaction.PostBuy(
+            tenantId,
+            account.Id,
+            account.Type,
+            account.Currency,
+            instrument.Id,
+            quantity,
+            Money.Create(stored.Price, instrument.QuoteCurrency.Trim()),
+            fxRate: 1m,
+            bookedAt,
+            memo: "Demo custodial buy",
+            reference: reference,
+            currentCashSum: await CashSumAsync(db, account.Id, cancellationToken));
+        Stamp(transaction, transaction.CashLegs.Single());
+        foreach (var leg in transaction.SecurityLegs)
+        {
+            Stamp(leg);
+        }
+
+        db.Transactions.Add(transaction);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static Task<Account?> DemoCustodialAsync(
+        ApplicationDbContext db,
+        int customerId,
+        CancellationToken cancellationToken) =>
+        db.Accounts.SingleOrDefaultAsync(
+            row => row.CustomerId == customerId && row.Name == DemoCustodialName, cancellationToken);
 
     private static async Task EnsureDemoPortfolioAsync(
         ApplicationDbContext db,
@@ -423,7 +537,7 @@ public static class TestSeed
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        var account = await DemoBrokerageAsync(db, customerId, cancellationToken);
+        var account = await DemoCustodialAsync(db, customerId, cancellationToken);
         if (account is null)
         {
             return;
@@ -698,16 +812,26 @@ public static class TestSeed
             return;
         }
 
-        var vti = await db.Instruments.SingleOrDefaultAsync(
-            row => row.TenantId == tenantId && row.Symbol == "VTI", cancellationToken);
-        if (vti is null)
+        await SyncHoldingAsync(db, tenantId, account, "VTI", cancellationToken);
+    }
+
+    private static async Task SyncHoldingAsync(
+        ApplicationDbContext db,
+        int tenantId,
+        Account account,
+        string symbol,
+        CancellationToken cancellationToken)
+    {
+        var instrument = await db.Instruments.SingleOrDefaultAsync(
+            row => row.TenantId == tenantId && row.Symbol == symbol, cancellationToken);
+        if (instrument is null)
         {
             return;
         }
 
         var legs = await (
             from leg in db.TransactionSecurityLegs
-            where leg.AccountId == account.Id && leg.InstrumentId == vti.Id
+            where leg.AccountId == account.Id && leg.InstrumentId == instrument.Id
             select new { leg.Quantity, leg.CostAmount, leg.CostCurrency }).ToListAsync(cancellationToken);
         if (legs.Count == 0)
         {
@@ -718,10 +842,10 @@ public static class TestSeed
         var cost = legs.Sum(leg => leg.CostAmount);
         var currency = legs[0].CostCurrency;
         var holding = await db.Holdings.SingleOrDefaultAsync(
-            row => row.AccountId == account.Id && row.InstrumentId == vti.Id, cancellationToken);
+            row => row.AccountId == account.Id && row.InstrumentId == instrument.Id, cancellationToken);
         if (holding is null)
         {
-            holding = Holding.Create(tenantId, account.Id, vti.Id, quantity, cost, currency);
+            holding = Holding.Create(tenantId, account.Id, instrument.Id, quantity, cost, currency);
             Stamp(holding);
             db.Holdings.Add(holding);
         }
@@ -817,6 +941,7 @@ public static class TestSeed
         int customerId,
         string name,
         AccountType type,
+        CustodyMode custodyMode,
         Currency currency,
         bool closed,
         CancellationToken cancellationToken)
@@ -828,7 +953,7 @@ public static class TestSeed
             return;
         }
 
-        var account = Account.Create(tenantId, customerId, name, type, CustodyMode.External, currency);
+        var account = Account.Create(tenantId, customerId, name, type, custodyMode, currency);
         if (closed)
         {
             account.Close();
