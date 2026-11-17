@@ -67,6 +67,7 @@ public class DevelopmentSeedSecondFirmTests : TestBase
                 "Demo brokerage",
                 "Demo cash tin",
                 "Demo closed other",
+                "Demo custodial brokerage",
                 "Demo everyday bank"
             ]);
             firstAccountIds = items.Select(item => item.GetProperty("id").GetString()!).OrderBy(id => id).ToList();
@@ -101,7 +102,7 @@ public class DevelopmentSeedSecondFirmTests : TestBase
             var currencies = json.RootElement.GetProperty("currencies").EnumerateArray().ToList();
             currencies.Select(row => row.GetProperty("currency").GetString()).ShouldBe(["NZD", "USD"]);
             AssertCurrency(currencies[0], "NZD", cash: 100m, holdings: 0m);
-            AssertCurrency(currencies[1], "USD", cash: 500m, holdings: 8000m);
+            AssertCurrency(currencies[1], "USD", cash: 6900m, holdings: 21600m);
             json.RootElement.GetProperty("breakdowns").GetProperty("byCustomer").EnumerateArray()
                 .Select(row => row.GetProperty("name").GetString())
                 .ShouldBe([TestSeed.SecondCustomerName]);

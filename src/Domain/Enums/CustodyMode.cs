@@ -8,6 +8,6 @@ public enum CustodyMode
     /// <summary>The assets are held outside the platform; the platform records what happened elsewhere.</summary>
     External = 0,
 
-    /// <summary>The assets are held by the platform, which executes the trades. Reserved: cannot be opened yet.</summary>
+    /// <summary>The assets are held by the platform, which executes the trades. Always a Brokerage account.</summary>
     Custodial = 1
 }

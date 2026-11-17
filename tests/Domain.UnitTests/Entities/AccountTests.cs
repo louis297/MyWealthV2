@@ -168,5 +168,37 @@ public class AccountTests
         Should.Throw<DomainException>(() => Account.Create(1, 2, "Everyday spending", AccountType.Bank, CustodyMode.External, null!));
     }
 
+    [Test]
+    public void Create_CustodialBrokerage_IsCreated()
+    {
+        var account = Account.Create(1, 2, "Managed", AccountType.Brokerage, CustodyMode.Custodial, Nzd());
+
+        account.Type.ShouldBe(AccountType.Brokerage);
+        account.CustodyMode.ShouldBe(CustodyMode.Custodial);
+    }
+
+    [TestCase(AccountType.Bank)]
+    [TestCase(AccountType.Cash)]
+    [TestCase(AccountType.Other)]
+    [TestCase(AccountType.Property)]
+    [TestCase(AccountType.Credit)]
+    public void Create_CustodialWithATypeOtherThanBrokerage_Throws(AccountType type)
+    {
+        Should.Throw<DomainException>(() => Account.Create(1, 2, "Managed", type, CustodyMode.Custodial, Nzd()))
+            .Message.ShouldBe("A Custodial account must be a Brokerage account.");
+    }
+
+    [TestCase(AccountType.Bank)]
+    [TestCase(AccountType.Cash)]
+    [TestCase(AccountType.Brokerage)]
+    [TestCase(AccountType.Other)]
+    public void Create_ExternalWithEachOpenableType_IsCreated(AccountType type)
+    {
+        var account = Account.Create(1, 2, "Held elsewhere", type, CustodyMode.External, Nzd());
+
+        account.Type.ShouldBe(type);
+        account.CustodyMode.ShouldBe(CustodyMode.External);
+    }
+
     private static Currency Nzd() => Currency.Create("NZD", "New Zealand Dollar", 2);
 }

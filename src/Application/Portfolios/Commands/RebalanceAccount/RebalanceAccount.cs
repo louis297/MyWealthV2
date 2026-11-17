@@ -74,10 +74,12 @@ public class AccountRebalancer(
         var assignment = await db.AccountPortfolioAssignments.SingleOrDefaultAsync(
             row => row.AccountId == account.Id && row.Status == AssignmentStatus.Active,
             cancellationToken);
-        if (assignment is null || account.Status != AccountStatus.Open
-            || account.Type is not (AccountType.Brokerage or AccountType.Other))
+        // Custody modes R15.
+        if (assignment is null || account.Status != AccountStatus.Open || account.CustodyMode != CustodyMode.Custodial)
         {
-            throw new RebalanceException("account_not_eligible", "The account is not an open brokerage or other account with an active portfolio.");
+            throw new RebalanceException(
+                "account_not_eligible",
+                "The account is not an open Custodial account with an active portfolio.");
         }
 
         var portfolio = await db.Portfolios.Include(row => row.Lines)

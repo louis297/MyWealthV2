@@ -21,6 +21,7 @@ related:
   - ../features/split.md
   - ../features/bff-adviser-portal.md
   - ../adr/0003-react-redux-typescript-vite-tailwind-frontend.md
+  - ../features/custody-modes.md
 ---
 
 # Adviser Portal — Dashboard and ledger pages
@@ -137,6 +138,23 @@ Every account has a custody mode, `External` or `Custodial`. Only `External` can
 | --- | --- |
 | D15 | The New account form posts `custodyMode: "External"` together with `customerId`, name, type and currency. The form shows no custody control. |
 | D16 | The accounts list, the accounts table on the customer page and the account page show each account's custody mode next to its type. |
+
+---
+
+## Amendment 2026-11-17 (custody modes) — accepted, landed
+
+Status of this amendment: `accepted` (2026-11-17), together with [custody-modes](../features/custody-modes.md).
+
+A Custodial account can be opened, and the write forms follow the account's custody mode. Backend rules: custody-modes §4. D17 replaces D15. D18–D20 extend D10–D14 and the transfer and convert rows of the route table. D16 is unchanged.
+
+| ID | Behaviour |
+| --- | --- |
+| D17 | The New account form (`/customers/:id/accounts/new`) has a required "Custody" choice with two options: "External — held elsewhere" and "Custodial — held on the platform". Nothing is preselected, and the form cannot be submitted until one is chosen. Choosing Custodial sets Type to Brokerage and disables the Type control; choosing External enables it again. `POST /accounts` carries the chosen `custodyMode`. |
+| D18 | The action buttons on `/accounts/:id` and the type selector on `/accounts/:id/transactions/new` offer only the types the manual entry matrix allows for the account's custody mode (custody-modes R5). On a Custodial account: TransferIn, TransferOut, CloseOut, Transfer, Convert, Buy, Sell, Reverse and Close. StockIn, StockOut, Split, Bonus, Scrip, Opening, OpeningHoldings and Interest are not offered. An External account offers what it offers today. The portal keeps its own copy of the list; when the server still refuses a type, the form shows the sentence of the 400. |
+| D19 | On a Custodial account the transaction form, the transfer form and the convert form have no "Booked at" input and send no `bookedAt`. The quote request of the convert form sends none either. The forms show "Booked when posted." where the input was. On an External account the input stays and is required. |
+| D20 | On `/accounts/:id/transfer` and `/accounts/:id/convert`, an Account whose custody mode differs from the source Account's stays listed, greyed out, with the reason "Different custody mode", like the existing Closed and currency reasons. |
+
+Portfolio controls on the account page: [adviser-portal-portfolios](adviser-portal-portfolios.md) amendment 2026-11-17 (P13).
 
 ---
 

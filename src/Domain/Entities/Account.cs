@@ -30,6 +30,9 @@ public class Account : BaseAuditableEntity
 
     public byte[] RowVersion { get; private set; } = null!;
 
+    /// <summary>Custody modes R3: a Custodial account is a Brokerage account.</summary>
+    public const string CustodialTypeMessage = "A Custodial account must be a Brokerage account.";
+
     public static Account Create(
         int tenantId,
         int customerId,
@@ -40,6 +43,10 @@ public class Account : BaseAuditableEntity
         Guid? publicId = null)
     {
         EnsureCurrency(currency);
+        if (custodyMode == CustodyMode.Custodial && type != AccountType.Brokerage)
+        {
+            throw new DomainException(CustodialTypeMessage);
+        }
 
         var account = new Account
         {

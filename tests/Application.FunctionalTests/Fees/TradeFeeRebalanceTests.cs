@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Application.FunctionalTests.Accounts;
+using MyWealthV2.Application.FunctionalTests.Custody;
 using MyWealthV2.Application.FunctionalTests.Portfolios;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.ValueObjects;
@@ -17,10 +18,11 @@ public class TradeFeeRebalanceTests : TestBase
     public async Task Assign_WithAFeeThatThePlainPlanCannotFund_ScalesTheBuyAndPostsTheFee()
     {
         var (tenant, _, customer, adviser) = await AccountHttp.SignInAdviser();
-        var accountId = await FeeHttp.OpenAccountAsync(adviser.AccessToken, customer.PublicId, "Brokerage", "NZD");
+        var accountId = await AccountHttp.OpenAccountAsync(
+            adviser.AccessToken, customer.PublicId, "Brokerage NZD", "Brokerage", "NZD", "Custodial");
         var instrumentId = await FeeHttp.CreateInstrumentAsync(adviser.AccessToken, "AIA", "NZD");
         await FeeHttp.SetPriceAsync(instrumentId, 10m, "NZD");
-        (await FeeHttp.PostCashAsync(adviser.AccessToken, accountId, 10000m, "2026-01-02T00:00:00Z")).StatusCode
+        (await CustodialHttp.FundAsync(adviser.AccessToken, accountId, 10000m)).StatusCode
             .ShouldBe(HttpStatusCode.Created);
         var portfolio = await PortfolioHttp.Send(HttpMethod.Post, "/portfolios", adviser.AccessToken, new
         {

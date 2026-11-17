@@ -5,6 +5,7 @@ using MyWealthV2.Application.Accounts;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
+using MyWealthV2.Domain.Custody;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Exceptions;
@@ -88,7 +89,7 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
         RuleFor(command => command.Type)
             .Must(type => type is not null && AllowedTypes.Contains(type))
             .WithMessage("Type must be TransferIn, TransferOut, Interest, CloseOut, Opening, OpeningHoldings, Buy, Sell, StockIn, StockOut, Split, Bonus, or Scrip.");
-        RuleFor(command => command.BookedAt).NotNull().NotInTheFuture(time);
+        RuleFor(command => command.BookedAt).NotInTheFuture(time);
         RuleFor(command => command.Memo)
             .Must(memo => memo is null || memo.Trim().Length is >= 1 and <= 200)
             .WithMessage("Memo must be 1 to 200 characters.");
@@ -214,7 +215,8 @@ public class CreateTransactionCommandHandler(
     ICurrentUser currentUser,
     IMarketData marketData,
     IFxRate fxRates,
-    ICurrencyCatalog catalog)
+    ICurrencyCatalog catalog,
+    TimeProvider time)
     : IRequestHandler<CreateTransactionCommand, IdempotentResult>
 {
     public async Task<IdempotentResult> Handle(CreateTransactionCommand request, CancellationToken cancellationToken)
@@ -308,6 +310,20 @@ public class CreateTransactionCommandHandler(
                 "Cannot create a transaction while the customer is disabled. Enable the customer first.");
         }
 
+        var type = Enum.Parse<TransactionType>(request.Type!);
+
+        // Custody modes R5, R6: the manual entry matrix, before every type-specific check.
+        var refusal = CustodyRules.RefusalMessage(loaded.Account.CustodyMode, type);
+        if (refusal is not null)
+        {
+            throw new ValidationException([
+                new ValidationFailure(nameof(CreateTransactionCommand.Type), refusal)
+            ]);
+        }
+
+        // Custody modes R10, R11: the server books a Custodial transaction; External needs the caller's instant.
+        var bookedAt = BookedAtByCustody.Resolve(loaded.Account.CustodyMode, request.BookedAt, time);
+
         var currency = loaded.Account.Currency;
         if (request.Currency is not null)
         {
@@ -322,8 +338,6 @@ public class CreateTransactionCommandHandler(
 
             currency = accountCurrency;
         }
-
-        var type = Enum.Parse<TransactionType>(request.Type!);
 
         // CloseOut is exempt: its amount must equal the cash SUM, which a Buy or Sell can leave with
         // more decimals than the currency has (fixes/ledger-write-guards.md Decision 5).
@@ -378,7 +392,7 @@ public class CreateTransactionCommandHandler(
                     tenant.Id,
                     loaded.Account.Id,
                     loaded.Account.Type,
-                    request.BookedAt!.Value,
+                    bookedAt,
                     request.Memo,
                     request.Reference,
                     legs);
@@ -386,15 +400,15 @@ public class CreateTransactionCommandHandler(
             else if (type is TransactionType.Buy or TransactionType.Sell)
             {
                 transaction = await PostPricedAsync(
-                    request, tenant, loaded, type, currency, currentSum, cancellationToken);
+                    request, bookedAt, tenant, loaded, type, currency, currentSum, cancellationToken);
             }
             else if (type is TransactionType.StockIn or TransactionType.StockOut)
             {
-                transaction = await PostStockAsync(request, tenant, loaded, type, cancellationToken);
+                transaction = await PostStockAsync(request, bookedAt, tenant, loaded, type, cancellationToken);
             }
             else if (type is TransactionType.Split or TransactionType.Bonus or TransactionType.Scrip)
             {
-                transaction = await PostSplitAsync(request, tenant, loaded, type, cancellationToken);
+                transaction = await PostSplitAsync(request, bookedAt, tenant, loaded, type, cancellationToken);
             }
             else
             {
@@ -404,7 +418,7 @@ public class CreateTransactionCommandHandler(
                     type,
                     request.Amount!.Value,
                     currency,
-                    request.BookedAt!.Value,
+                    bookedAt,
                     request.Memo,
                     request.Reference,
                     currentSum,
@@ -466,6 +480,7 @@ public class CreateTransactionCommandHandler(
 
     private async Task<Domain.Entities.Transaction> PostPricedAsync(
         CreateTransactionCommand request,
+        DateTimeOffset bookedAt,
         Tenant tenant,
         (Account Account, User Customer) loaded,
         TransactionType type,
@@ -484,7 +499,7 @@ public class CreateTransactionCommandHandler(
             ]);
         }
 
-        var price = marketData.TryGetPrice(instrument.Id, request.BookedAt);
+        var price = marketData.TryGetPrice(instrument.Id, bookedAt);
         var quote = instrument.QuoteCurrency.Trim().ToUpperInvariant();
         if (price is null || price.Amount <= 0 || !string.Equals(price.Currency, quote, StringComparison.Ordinal))
         {
@@ -499,7 +514,7 @@ public class CreateTransactionCommandHandler(
         {
             try
             {
-                fxRate = await fxRates.GetRateAsync(quote, bookingCurrency, request.BookedAt, cancellationToken);
+                fxRate = await fxRates.GetRateAsync(quote, bookingCurrency, bookedAt, cancellationToken);
             }
             catch (FxRateNotFoundException)
             {
@@ -513,7 +528,7 @@ public class CreateTransactionCommandHandler(
             row => row.AccountId == loaded.Account.Id && row.InstrumentId == instrument.Id,
             cancellationToken);
         var feeSchedule = await ApplicableTradeFeeSchedule.ForAsync(
-            db, tenant.Id, quote, ApplicableTradeFeeSchedule.DateOf(request.BookedAt!.Value), cancellationToken);
+            db, tenant.Id, quote, ApplicableTradeFeeSchedule.DateOf(bookedAt), cancellationToken);
         var quoteDecimalPlaces = catalog.TryGet(quote)?.DecimalPlaces ?? 2;
         return type == TransactionType.Buy
             ? Domain.Entities.Transaction.PostBuy(
@@ -525,7 +540,7 @@ public class CreateTransactionCommandHandler(
                 item.Quantity,
                 price,
                 fxRate,
-                request.BookedAt!.Value,
+                bookedAt,
                 request.Memo,
                 request.Reference,
                 currentCashSum,
@@ -540,7 +555,7 @@ public class CreateTransactionCommandHandler(
                 item.Quantity,
                 price,
                 fxRate,
-                request.BookedAt!.Value,
+                bookedAt,
                 request.Memo,
                 request.Reference,
                 currentCashSum,
@@ -552,6 +567,7 @@ public class CreateTransactionCommandHandler(
 
     private async Task<Domain.Entities.Transaction> PostStockAsync(
         CreateTransactionCommand request,
+        DateTimeOffset bookedAt,
         Tenant tenant,
         (Account Account, User Customer) loaded,
         TransactionType type,
@@ -579,7 +595,7 @@ public class CreateTransactionCommandHandler(
                 item.Quantity,
                 item.Cost!.Value,
                 quote,
-                request.BookedAt!.Value,
+                bookedAt,
                 request.Memo,
                 request.Reference);
         }
@@ -594,7 +610,7 @@ public class CreateTransactionCommandHandler(
             instrument.Id,
             item.Quantity,
             quote,
-            request.BookedAt!.Value,
+            bookedAt,
             request.Memo,
             request.Reference,
             holding?.Quantity ?? 0m,
@@ -603,6 +619,7 @@ public class CreateTransactionCommandHandler(
 
     private async Task<Domain.Entities.Transaction> PostSplitAsync(
         CreateTransactionCommand request,
+        DateTimeOffset bookedAt,
         Tenant tenant,
         (Account Account, User Customer) loaded,
         TransactionType type,
@@ -630,7 +647,7 @@ public class CreateTransactionCommandHandler(
             instrument.Id,
             item.Quantity,
             instrument.QuoteCurrency,
-            request.BookedAt!.Value,
+            bookedAt,
             request.Memo,
             request.Reference,
             holding?.Quantity ?? 0m,

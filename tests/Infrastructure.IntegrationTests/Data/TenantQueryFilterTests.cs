@@ -159,7 +159,7 @@ public class TenantQueryFilterTests
             tenant.Id, brokerage.Id, AccountType.Brokerage, "NZD", instrument.Id, 1m,
             Money.Create(10m, "USD"), 2m, DateTimeOffset.UtcNow, null, null, 1000m);
         var fx = Transaction.PostFxConversion(
-            tenant.Id, brokerage.Id, "NZD", usdBank.Id, "USD",
+            tenant.Id, brokerage.Id, "NZD", CustodyMode.External, usdBank.Id, "USD", CustodyMode.External,
             AppliedFxRate.Create("NZD", "USD", 0.5m, new DateOnly(2026, 11, 12), "Frankfurter"),
             Money.Create(100m, "NZD"), 2, DateTimeOffset.UtcNow, null, null, 1000m);
         var portfolio = Portfolio.Create(tenant.Id, $"Portfolio {suffix}", nzd, [(instrument.Id, 100m)]);

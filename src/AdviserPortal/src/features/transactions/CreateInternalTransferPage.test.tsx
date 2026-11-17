@@ -25,6 +25,7 @@ function account(id: string, customerId: string, name: string, overrides: Record
     customerId,
     name,
     type: "Bank",
+    custodyMode: "External",
     currency: "NZD",
     status: "Open",
     isActive: true,
@@ -89,7 +90,7 @@ function requestUrl(input: RequestInfo | URL) {
   return String(input);
 }
 
-function renderForm() {
+function renderForm(accounts = nedAccounts) {
   const store = configureStore({
     reducer: {
       session: sessionSlice.reducer,
@@ -110,7 +111,7 @@ function renderForm() {
       return new Response("", { status: 404 });
     }
     if (url.endsWith(`/accounts/${sourceId}`)) {
-      return json(nedAccounts[0]);
+      return json(accounts[0]);
     }
     if (url.endsWith(`/users/customers/${nedId}`)) {
       return json(ned);
@@ -122,7 +123,7 @@ function renderForm() {
     }
     if (url.includes("/accounts?")) {
       const customerId = new URL(url).searchParams.get("customerId");
-      const items = customerId === nedId ? nedAccounts : customerId === noraId ? noraAccounts : [];
+      const items = customerId === nedId ? accounts : customerId === noraId ? noraAccounts : [];
       return json({ items, page: 1, pageSize: 100, totalCount: items.length });
     }
     return new Response("", { status: 404 });
@@ -268,6 +269,45 @@ describe("CreateInternalTransferPage", () => {
       await screen.findByText("Transfer 25.00 NZD from Ned bank (Ned North) to Ned savings (Ned North)"),
     ).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  const custodialAccounts = [
+    account(sourceId, nedId, "Ned managed", { type: "Brokerage", custodyMode: "Custodial" }),
+    account(savingsId, nedId, "Ned savings"),
+    account(audId, nedId, "Ned managed two", { type: "Brokerage", custodyMode: "Custodial" }),
+  ];
+
+  it("greys out an Account with a different custody mode (D20)", async () => {
+    renderForm(custodialAccounts);
+
+    const list = await screen.findByRole("radiogroup", { name: "Destination account" });
+    const savings = await within(list).findByRole("radio", { name: /Ned savings/ });
+    expect(savings).toBeDisabled();
+    expect(savings.closest("label")).toHaveTextContent("Different custody mode");
+    expect(within(list).getByRole("radio", { name: /Ned managed two/ })).toBeEnabled();
+  });
+
+  it("posts a Custodial transfer with no Booked at input and no bookedAt (D19)", async () => {
+    const { fetchMock } = renderForm(custodialAccounts);
+
+    fireEvent.click(await screen.findByRole("radio", { name: /Ned managed two/ }));
+    expect(screen.getByText("Booked when posted.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Booked at")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "40" } });
+    fireEvent.click(screen.getByRole("button", { name: "Review transfer" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm transfer" }));
+
+    expect(await screen.findByText("account detail")).toBeInTheDocument();
+    const post = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.method === "POST");
+    expect(JSON.parse(await post!.clone().text())).toEqual({
+      fromAccountId: sourceId,
+      toAccountId: audId,
+      amount: 40,
+      memo: null,
+      reference: null,
+    });
   });
 
   it.each(["0", "-5", "abc"])("rejects a non-positive amount %s without posting", async (amount) => {

@@ -159,11 +159,12 @@ Roadmap in [future-plans.md](../future-plans.md) §1. Each step amends the ledge
 
 ## Ledger — custody modes (opened 2026-11-17)
 
-Decision in [ADR 0020](../adr/0020-account-custody-mode.md) (accepted 2026-11-17): every Account is `External` or `Custodial`. The work is cut into slices; the list is in [future-plans.md](../future-plans.md) §9. Only the first slice has a spec. Do not add files for the later ones until they are discussed.
+Decision in [ADR 0020](../adr/0020-account-custody-mode.md) (accepted 2026-11-17): every Account is `External` or `Custodial`. The work is cut into slices; the list is in [future-plans.md](../future-plans.md) §9. The first two slices have a spec. Do not add files for the later ones until they are discussed.
 
 | Spec | Status | Who | Ships | Why it stays its own slice |
 | --- | --- | --- | --- | --- |
 | [account-custody-mode](account-custody-mode.md) | accepted (2026-11-17; landed on `feature/account-custody-mode`) | Same callers as accounts | `Account.CustodyMode` (`External` / `Custodial`), set at open and immutable; required `custodyMode` on `POST /accounts`, refused on PUT, on the account item, optional list filter; only `External` can be selected, `Custodial` is reserved; existing accounts become `External`; both portals show it. Script `0031`. No new route or policy | Structural groundwork with no behaviour change, like leg-accounts. The Custodial rules are the next increment |
+| [custody-modes](custody-modes.md) | accepted (2026-11-17; landed on `feature/custody-modes`) | Same callers as accounts, posting and portfolios | A Custodial account can be opened, as `Brokerage` only. Manual entry matrix: a Custodial account refuses `Interest`, `Opening`, `OpeningHoldings`, `StockIn`, `StockOut`, `Split`, `Bonus` and `Scrip`. Every leg account of a Transaction has the same custody mode. The server sets `bookedAt` on a Custodial account. Portfolio assignment and rebalance on Custodial accounts only; script `0032` removes the Active assignments on External accounts. Adviser Portal forms follow the custody mode. No new route, policy or type | Cross-cutting: it amends accounts, posting, holdings, buy-sell, split, leg-accounts, internal-transfers, fx-conversions, portfolios and trade-fees. Its rules must land together, so they are one spec |
 
 ---
 

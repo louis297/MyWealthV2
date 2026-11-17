@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-12
-last_updated: 2026-11-16
+last_updated: 2026-11-17
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -19,6 +19,7 @@ related:
   - posting.md
   - holdings.md
   - buy-sell.md
+  - custody-modes.md
 ---
 
 # Split / Bonus / Scrip
@@ -33,6 +34,8 @@ Do not model these as `StockIn` / `StockOut`. No cash leg. No portal page. No pr
 **Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md). The security leg carries the create body's `accountId`; the header has no Account. The item JSON in §8.1 is replaced by leg-accounts §8.1 (shown below).
 
 **Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R14: a `Split`, `Bonus` or `Scrip` can be reversed only while it is the latest security activity on its holding. R16 follows posting R24, which now refuses a `bookedAt` in the future.
+
+**Amendment 2026-11-17 (custody modes, accepted, landed):** [custody-modes.md](custody-modes.md). R8: `Split`, `Bonus` and `Scrip` are refused on a Custodial account (400 with `errors.Type`) until corporate action events exist. Until then a Custodial holding in an instrument that splits shows a wrong market value ([known issue](../known-issues/custodial-account-gaps.md)). An External account is unchanged.
 
 ---
 

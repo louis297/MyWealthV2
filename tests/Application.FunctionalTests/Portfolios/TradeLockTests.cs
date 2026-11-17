@@ -22,7 +22,6 @@ public class TradeLockTests : TestBase
                 accountId,
                 type = "TransferIn",
                 amount = 50m,
-                bookedAt = "2026-02-01T00:00:00Z",
                 currency = "NZD"
             },
             Guid.NewGuid());
@@ -36,7 +35,6 @@ public class TradeLockTests : TestBase
             {
                 accountId,
                 type = "Buy",
-                bookedAt = "2026-02-01T00:00:00Z",
                 security = new[] { new { instrumentId, quantity = 1m } }
             },
             Guid.NewGuid());
@@ -55,7 +53,6 @@ public class TradeLockTests : TestBase
             {
                 accountId,
                 type = "Buy",
-                bookedAt = "2026-02-01T00:00:00Z",
                 security = new[] { new { instrumentId, quantity = 1m } }
             },
             Guid.NewGuid());
@@ -106,13 +103,12 @@ public class TradeLockTests : TestBase
         }
 
         var accountId = await Accounts.AccountHttp.OpenAccountAsync(
-            tokens.AccessToken, customer.PublicId, name: "Model", type: "Brokerage");
+            tokens.AccessToken, customer.PublicId, name: "Model", type: "Brokerage", custodyMode: "Custodial");
         var funded = await Transactions.TransactionHttp.Send(HttpMethod.Post, "/transactions", tokens.AccessToken, new
         {
             accountId,
             type = "TransferIn",
             amount = 10000m,
-            bookedAt = "2026-01-02T00:00:00Z",
             currency = "NZD"
         }, Guid.NewGuid());
         funded.StatusCode.ShouldBe(HttpStatusCode.Created);

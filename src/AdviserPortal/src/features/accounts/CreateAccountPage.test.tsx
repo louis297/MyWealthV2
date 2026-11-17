@@ -89,7 +89,11 @@ async function postCall(fetchMock: ReturnType<typeof vi.mocked<typeof fetch>>) {
   return call?.[0] as Request;
 }
 
+const external = "External — held elsewhere";
+const custodial = "Custodial — held on the platform";
+
 async function fillAndSubmit() {
+  fireEvent.click(await screen.findByRole("radio", { name: external }));
   await openSelect("Type");
   expect((await screen.findAllByRole("option")).map((option) => option.textContent?.trim())).toEqual([
     "Bank",
@@ -166,7 +170,63 @@ describe("CreateAccountPage", () => {
       currency: "NZD",
     });
     expect(body).not.toHaveProperty("tenantId");
-    expect(screen.queryByLabelText(/custody/i)).toBeNull();
+  });
+
+  it("offers a required Custody choice with nothing preselected", async () => {
+    const { fetchMock } = renderCreate(user());
+
+    const group = await screen.findByRole("radiogroup", { name: "Custody" });
+    expect(group).toBeInTheDocument();
+    const radios = screen.getAllByRole("radio");
+    expect(radios.map((radio) => radio.getAttribute("aria-label") ?? radio.closest("label")?.textContent?.trim())).toEqual([
+      external,
+      custodial,
+    ]);
+    radios.forEach((radio) => expect(radio).not.toBeChecked());
+
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Everyday spending" } });
+    await chooseOption("Currency", "NZD");
+    expect(screen.getByRole("button", { name: "Create account" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+    expect(await postCall(fetchMock)).toBeUndefined();
+
+    fireEvent.click(screen.getByRole("radio", { name: external }));
+    expect(screen.getByRole("button", { name: "Create account" })).toBeEnabled();
+  });
+
+  it("fixes Type to Brokerage for a Custodial account and posts the chosen custody mode", async () => {
+    const { fetchMock } = renderCreate(user());
+
+    fireEvent.click(await screen.findByRole("radio", { name: custodial }));
+
+    const type = screen.getByLabelText("Type");
+    expect(type).toHaveTextContent("Brokerage");
+    expect(type).toHaveAttribute("data-disabled");
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Managed portfolio" } });
+    await chooseOption("Currency", "USD");
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+    expect(await screen.findByText("account detail")).toBeInTheDocument();
+    const request = await postCall(fetchMock);
+    expect(JSON.parse(await request.clone().text())).toEqual({
+      customerId,
+      name: "Managed portfolio",
+      type: "Brokerage",
+      custodyMode: "Custodial",
+      currency: "USD",
+    });
+  });
+
+  it("enables Type again when External is chosen after Custodial", async () => {
+    renderCreate(user());
+
+    fireEvent.click(await screen.findByRole("radio", { name: custodial }));
+    expect(screen.getByLabelText("Type")).toHaveAttribute("data-disabled");
+    fireEvent.click(screen.getByRole("radio", { name: external }));
+
+    expect(screen.getByLabelText("Type")).not.toHaveAttribute("data-disabled");
+    await chooseOption("Type", "Cash");
+    expect(screen.getByLabelText("Type")).toHaveTextContent("Cash");
   });
 
   it("shows a validation error and stays on the form", async () => {

@@ -163,6 +163,7 @@ export function SelectField({
   value,
   onChange,
   required,
+  disabled,
   children,
 }: {
   id: string;
@@ -171,6 +172,7 @@ export function SelectField({
   value?: string;
   onChange?: (event: { target: { value: string } }) => void;
   required?: boolean;
+  disabled?: boolean;
   children?: ReactNode;
 }) {
   const selected = value === "" || value == null ? null : value;
@@ -183,6 +185,7 @@ export function SelectField({
         value={selected}
         onValueChange={(next) => onChange?.({ target: { value: next == null ? "" : String(next) } })}
         required={required}
+        disabled={disabled}
       >
         <SelectTrigger id={id} className={cn("w-full", className)}>
           <SelectValue />

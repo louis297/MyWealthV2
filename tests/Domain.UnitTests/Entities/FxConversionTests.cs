@@ -197,7 +197,7 @@ public class FxConversionTests
     public void Reverse_OfAnotherType_HasNoFxDetail()
     {
         var original = Transaction.PostInternalTransfer(
-            1, FromAccountId, "NZD", ToAccountId, "NZD", Money.Create(10m, "NZD"), BookedAt, null, null, 100m);
+            1, FromAccountId, "NZD", CustodyMode.External, ToAccountId, "NZD", CustodyMode.External, Money.Create(10m, "NZD"), BookedAt, null, null, 100m);
         original.Id = 8;
 
         var reversal = original.Reverse(
@@ -205,6 +205,25 @@ public class FxConversionTests
             new Dictionary<int, decimal> { [FromAccountId] = 90m, [ToAccountId] = 10m });
 
         reversal.FxDetail.ShouldBeNull();
+    }
+
+    [TestCase(CustodyMode.External, CustodyMode.Custodial)]
+    [TestCase(CustodyMode.Custodial, CustodyMode.External)]
+    public void PostFxConversion_RejectsDifferentCustodyModes(CustodyMode from, CustodyMode to)
+    {
+        Should.Throw<DomainException>(() =>
+                Convert(Money.Create(100m, "NZD"), fromCustodyMode: from, toCustodyMode: to))
+            .Message.ShouldBe("Both accounts must have the same custody mode.");
+    }
+
+    [TestCase(CustodyMode.External)]
+    [TestCase(CustodyMode.Custodial)]
+    public void PostFxConversion_WithEqualCustodyModes_BuildsBothLegs(CustodyMode mode)
+    {
+        var transaction = Convert(Money.Create(100m, "NZD"), fromCustodyMode: mode, toCustodyMode: mode);
+
+        transaction.CashLegs.Select(leg => (leg.AccountId, leg.Amount, leg.Currency))
+            .ShouldBe([(FromAccountId, -100m, "NZD"), (ToAccountId, 59.12m, "USD")]);
     }
 
     private static AppliedFxRate Rate(string baseCurrency, string quoteCurrency, decimal rate) =>
@@ -217,13 +236,17 @@ public class FxConversionTests
         string toCurrency = "USD",
         AppliedFxRate? rate = null,
         int computedDecimalPlaces = 2,
-        decimal fromCashSum = 5000m) =>
+        decimal fromCashSum = 5000m,
+        CustodyMode fromCustodyMode = CustodyMode.External,
+        CustodyMode toCustodyMode = CustodyMode.External) =>
         Transaction.PostFxConversion(
             tenantId: 1,
             fromAccountId: FromAccountId,
             fromAccountCurrency: fromCurrency,
+            fromCustodyMode: fromCustodyMode,
             toAccountId: toAccountId,
             toAccountCurrency: toCurrency,
+            toCustodyMode: toCustodyMode,
             rate: rate ?? Rate("NZD", "USD", 0.59120000m),
             fixedAmount: fixedAmount,
             computedDecimalPlaces: computedDecimalPlaces,

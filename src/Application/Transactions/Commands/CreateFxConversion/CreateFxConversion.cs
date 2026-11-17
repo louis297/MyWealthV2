@@ -92,7 +92,7 @@ public class CreateFxConversionCommandValidator : AbstractValidator<CreateFxConv
             .NotNull()
             .GreaterThan(0)
             .WithMessage("Expected rate is required. Get a quote first.");
-        RuleFor(command => command.BookedAt).NotNull().NotInTheFuture(time);
+        RuleFor(command => command.BookedAt).NotInTheFuture(time);
         RuleFor(command => command.Memo)
             .Must(memo => memo is null || memo.Trim().Length is >= 1 and <= 200)
             .WithMessage("Memo must be 1 to 200 characters.");
@@ -131,7 +131,8 @@ public class CreateFxConversionCommandHandler(
     IApplicationDbContext db,
     ICurrentUser currentUser,
     IFxRate fxRates,
-    ICurrencyCatalog currencies)
+    ICurrencyCatalog currencies,
+    TimeProvider time)
     : IRequestHandler<CreateFxConversionCommand, IdempotentResult>
 {
     private const string DefaultPath = "/transactions/fx";
@@ -217,8 +218,10 @@ public class CreateFxConversionCommandHandler(
             ]);
         }
 
+        // Custody modes R10, R11. Both accounts share one custody mode (R8, checked in LoadPairAsync).
+        var bookedAt = BookedAtByCustody.Resolve(pair.From.CustodyMode, request.BookedAt, time);
         var priced = await FxConversionScope.PriceAsync(
-            fxRates, currencies, pair, request.SellAmount, request.BuyAmount, request.BookedAt!.Value, cancellationToken);
+            fxRates, currencies, pair, request.SellAmount, request.BuyAmount, bookedAt, cancellationToken);
 
         // R12: the caller confirms the rate it was quoted.
         if (request.ExpectedRate!.Value != priced.Rate.Rate)
@@ -234,12 +237,14 @@ public class CreateFxConversionCommandHandler(
                 tenant.Id,
                 pair.From.Id,
                 pair.From.Currency,
+                pair.From.CustodyMode,
                 pair.To.Id,
                 pair.To.Currency,
+                pair.To.CustodyMode,
                 priced.Rate,
                 priced.FixedAmount,
                 priced.ComputedDecimalPlaces,
-                request.BookedAt!.Value,
+                bookedAt,
                 request.Memo,
                 request.Reference,
                 fromSum);

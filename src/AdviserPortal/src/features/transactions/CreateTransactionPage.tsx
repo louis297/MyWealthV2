@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { SelectItem } from "@/components/ui/select";
 import { useGetAccountHoldingsQuery, useGetAccountQuery } from "@/features/accounts/accountsApi";
+import { allowsManualEntry, bookedWhenPosted, isCustodial } from "@/features/accounts/custodyRules";
 import { useGetAccountPortfolioQuery } from "@/features/portfolios/portfoliosApi";
 import { useGetInstrumentsQuery } from "@/features/instruments/instrumentsApi";
 import { useCreateTransactionMutation } from "@/features/transactions/transactionsApi";
@@ -65,6 +66,7 @@ export function CreateTransactionPage() {
   const [bookedAt, setBookedAt] = useState("");
   const [messages, setMessages] = useState<string[]>([]);
   const account = useGetAccountQuery(accountId ?? "", { skip: !accountId });
+  const custodial = isCustodial(account.data);
   const assignment = useGetAccountPortfolioQuery(accountId ?? "", { skip: !accountId });
   const holdings = useGetAccountHoldingsQuery(accountId ?? "", { skip: !accountId });
   const instruments = useGetInstrumentsQuery();
@@ -80,6 +82,7 @@ export function CreateTransactionPage() {
     }
 
     const trimmedMemo = memo.trim();
+    const booking = custodial ? {} : { bookedAt: toUtcIso(bookedAt) };
     if (isCashType(type)) {
       const signError = cashSignError(type, Number(amount));
       if (signError) {
@@ -95,7 +98,7 @@ export function CreateTransactionPage() {
             accountId,
             type,
             amount: Number(amount),
-            bookedAt: toUtcIso(bookedAt),
+            ...booking,
             memo: trimmedMemo.length === 0 ? null : trimmedMemo,
           },
         }).unwrap();
@@ -105,7 +108,7 @@ export function CreateTransactionPage() {
           body: {
             accountId,
             type,
-            bookedAt: toUtcIso(bookedAt),
+            ...booking,
             memo: null,
             reference: null,
             security: [
@@ -131,7 +134,7 @@ export function CreateTransactionPage() {
   const offeredTypes = [
     ...(offerSecurity ? securityTypes : []),
     ...(offerCash ? cashTypes : []),
-  ];
+  ].filter((item) => !account.data || allowsManualEntry(account.data.custodyMode, item));
   const cashType = isCashType(type);
   const securityBlocked = assignment.isSuccess && assignment.data?.status === "Active" && !cashType;
 
@@ -223,14 +226,18 @@ export function CreateTransactionPage() {
                     ) : null}
                   </>
                 )}
-                <TextField
-                  id="transaction-booked-at"
-                  label="Booked at"
-                  type="datetime-local"
-                  value={bookedAt}
-                  onChange={(event) => setBookedAt(event.target.value)}
-                  required
-                />
+                {custodial ? (
+                  <Muted>{bookedWhenPosted}</Muted>
+                ) : (
+                  <TextField
+                    id="transaction-booked-at"
+                    label="Booked at"
+                    type="datetime-local"
+                    value={bookedAt}
+                    onChange={(event) => setBookedAt(event.target.value)}
+                    required
+                  />
+                )}
                 <Button type="submit">Post transaction</Button>
               </>
             )}

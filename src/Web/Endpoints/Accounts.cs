@@ -132,7 +132,7 @@ public class Accounts : IEndpointGroup
     }
 
     [EndpointSummary("Assign a portfolio")]
-    [EndpointDescription("Assigns one portfolio to an open Brokerage or Other account and rebalances it.")]
+    [EndpointDescription("Assigns one portfolio to an open Custodial account and rebalances it.")]
     public static async Task<Ok<RebalanceResultDto>> AssignPortfolio(
         ISender sender,
         Guid id,

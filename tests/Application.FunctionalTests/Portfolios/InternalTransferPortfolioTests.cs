@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
+using MyWealthV2.Application.FunctionalTests.Custody;
 using MyWealthV2.Application.FunctionalTests.Transactions;
 using MyWealthV2.Infrastructure.Data;
 
@@ -15,15 +16,14 @@ public class InternalTransferPortfolioTests : TestBase
         var (_, _, customer, tokens) = await Accounts.AccountHttp.SignInAdviser(
             "Transfer Firm", "transfer-firm", "ann@transfer-firm", customerEmail: "ned@transfer-firm");
         var instrumentId = await CreateInstrumentAsync(tokens.AccessToken);
-        var brokerage = await InternalTransferTests.OpenAccountAsync(
-            tokens.AccessToken, customer.PublicId, "Model", type: "Brokerage");
-        var bank = await InternalTransferTests.OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Bank");
+        // Custody modes R8, R14: both accounts are Custodial, so the portfolio can be assigned and they can trade.
+        var brokerage = await CustodialHttp.OpenCustodialAsync(tokens.AccessToken, customer.PublicId, "Model", "NZD");
+        var bank = await CustodialHttp.OpenCustodialAsync(tokens.AccessToken, customer.PublicId, "Cash brokerage", "NZD");
         (await TransactionHttp.Send(HttpMethod.Post, "/transactions", tokens.AccessToken, new
             {
                 accountId = bank,
                 type = "TransferIn",
-                amount = 1000m,
-                bookedAt = "2026-11-10T08:00:00Z"
+                amount = 1000m
             }, Guid.NewGuid()))
             .StatusCode.ShouldBe(HttpStatusCode.Created);
         await AssignPortfolioAsync(tokens.AccessToken, brokerage, instrumentId);
@@ -31,9 +31,9 @@ public class InternalTransferPortfolioTests : TestBase
         var before = scheduler.Enqueued.Count;
 
         await LegAccountsFixture.ReadIdAsync(await InternalTransferTests.PostAsync(
-            tokens.AccessToken, InternalTransferTests.Body(bank, brokerage, 600m)));
+            tokens.AccessToken, InternalTransferTests.Body(bank, brokerage, 600m).WithoutBookedAt()));
         var outId = await LegAccountsFixture.ReadIdAsync(await InternalTransferTests.PostAsync(
-            tokens.AccessToken, InternalTransferTests.Body(brokerage, bank, 100m)));
+            tokens.AccessToken, InternalTransferTests.Body(brokerage, bank, 100m).WithoutBookedAt()));
         await LegAccountsFixture.ReadIdAsync(await LegAccountsFixture.ReverseAsync(tokens.AccessToken, outId));
 
         (await InternalTransferTests.CashBalanceAsync(tokens.AccessToken, brokerage)).ShouldBe(600m);

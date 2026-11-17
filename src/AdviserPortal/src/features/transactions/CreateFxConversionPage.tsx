@@ -15,6 +15,7 @@ import {
 } from "@/features/transactions/transactionsApi";
 import { rateLine } from "@/features/transactions/fxFormat";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
+import { bookedWhenPosted, differentCustodyMode, isCustodial } from "@/features/accounts/custodyRules";
 import { toUtcIso } from "@/shared/time/instant";
 import { cn } from "cn";
 
@@ -30,6 +31,9 @@ function ineligibleReason(candidate: Account, source: Account): string | null {
   }
   if (candidate.currency === source.currency) {
     return "Same currency";
+  }
+  if (candidate.custodyMode !== source.custodyMode) {
+    return differentCustodyMode;
   }
   return null;
 }
@@ -89,6 +93,7 @@ export function CreateFxConversionPage() {
   const [createFxConversion, { isLoading }] = useCreateFxConversionMutation();
 
   const from = source.data;
+  const custodial = isCustodial(from);
   const candidates = accounts.data?.items ?? [];
   const destination = from
     ? candidates.find((item) => item.id === toAccountId && ineligibleReason(item, from) === null)
@@ -102,7 +107,7 @@ export function CreateFxConversionPage() {
           fromAccountId: from.id,
           toAccountId: destination.id,
           ...(side === "sell" ? { sellAmount: amountValue } : { buyAmount: amountValue }),
-          ...(bookedAt ? { bookedAt: toUtcIso(bookedAt) } : {}),
+          ...(!custodial && bookedAt ? { bookedAt: toUtcIso(bookedAt) } : {}),
         }
       : null;
   const quoteKey = quoteBody ? JSON.stringify(quoteBody) : "";
@@ -150,7 +155,7 @@ export function CreateFxConversionPage() {
     if (!amountValid) {
       problems.push("Amount must be greater than 0.");
     }
-    if (!bookedAt) {
+    if (!custodial && !bookedAt) {
       problems.push("Booked at is required.");
     }
     if (!currentQuote) {
@@ -172,7 +177,7 @@ export function CreateFxConversionPage() {
           toAccountId: destination.id,
           ...(side === "sell" ? { sellAmount: amountValue } : { buyAmount: amountValue }),
           expectedRate: currentQuote.rate,
-          bookedAt: toUtcIso(bookedAt),
+          ...(custodial ? {} : { bookedAt: toUtcIso(bookedAt) }),
           memo: memo.trim() || null,
           reference: reference.trim() || null,
         },
@@ -268,16 +273,20 @@ export function CreateFxConversionPage() {
               </div>
             ) : null}
             <Messages messages={quoteMessages} />
-            <TextField
-              id="convert-booked-at"
-              label="Booked at"
-              type="datetime-local"
-              value={bookedAt}
-              onChange={(event) => {
-                setBookedAt(event.target.value);
-                resetReview();
-              }}
-            />
+            {custodial ? (
+              <Muted>{bookedWhenPosted}</Muted>
+            ) : (
+              <TextField
+                id="convert-booked-at"
+                label="Booked at"
+                type="datetime-local"
+                value={bookedAt}
+                onChange={(event) => {
+                  setBookedAt(event.target.value);
+                  resetReview();
+                }}
+              />
+            )}
             <TextField
               id="convert-memo"
               label="Memo"

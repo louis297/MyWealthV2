@@ -34,7 +34,8 @@ internal static class FxConversionScope
 
     /// <summary>
     /// R6: both Accounts resolve in the tenant and the caller's scope, else 404.
-    /// R7: then both belong to one Customer (else 400), who is not Disabled.
+    /// R7: then both belong to one Customer (else 400), who is not Disabled. Custody modes R8: both have the
+    /// same custody mode (else 400).
     /// </summary>
     public static async Task<FxAccountPair> LoadPairAsync(
         IApplicationDbContext db,
@@ -53,6 +54,14 @@ internal static class FxConversionScope
                 new ValidationFailure(
                     "ToAccountId",
                     "The from and to accounts must belong to the same customer. Convert first, then transfer.")
+            ]);
+        }
+
+        // Custody modes R8: create and quote.
+        if (from.Account.CustodyMode != to.Account.CustodyMode)
+        {
+            throw new ValidationException([
+                new ValidationFailure("ToAccountId", Transaction.DifferentCustodyModesMessage)
             ]);
         }
 

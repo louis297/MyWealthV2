@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
+using MyWealthV2.Application.FunctionalTests.Custody;
 using MyWealthV2.Application.FunctionalTests.Transactions;
 using MyWealthV2.Infrastructure.Data;
 
@@ -15,28 +16,29 @@ public class FxConversionPortfolioTests : TestBase
         var (_, _, customer, tokens) = await Accounts.AccountHttp.SignInAdviser(
             "Convert Firm", "convert-firm", "ann@convert-firm", customerEmail: "ned@convert-firm");
         var instrumentId = await CreateInstrumentAsync(tokens.AccessToken);
-        var brokerage = await InternalTransferTests.OpenAccountAsync(
-            tokens.AccessToken, customer.PublicId, "Model", type: "Brokerage");
-        var usdBank = await InternalTransferTests.OpenAccountAsync(tokens.AccessToken, customer.PublicId, "USD bank", "USD");
+        // Custody modes R8, R14: both accounts are Custodial, so the portfolio can be assigned and they can trade.
+        var brokerage = await CustodialHttp.OpenCustodialAsync(tokens.AccessToken, customer.PublicId, "Model", "NZD");
+        var usdBank = await CustodialHttp.OpenCustodialAsync(tokens.AccessToken, customer.PublicId, "USD brokerage", "USD");
         (await TransactionHttp.Send(HttpMethod.Post, "/transactions", tokens.AccessToken, new
             {
                 accountId = usdBank,
                 type = "TransferIn",
-                amount = 1000m,
-                bookedAt = "2026-11-10T08:00:00Z"
+                amount = 1000m
             }, Guid.NewGuid()))
             .StatusCode.ShouldBe(HttpStatusCode.Created);
-        await FxConversionTests.SetRateAsync("USD", "NZD", 1.70000000m, FxConversionTests.RateAsOf);
-        await FxConversionTests.SetRateAsync("NZD", "USD", FxConversionTests.NzdUsd, FxConversionTests.RateAsOf);
+        // A Custodial conversion is booked at the server clock (custody modes R10), so the rate is today's.
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        await FxConversionTests.SetRateAsync("USD", "NZD", 1.70000000m, today);
+        await FxConversionTests.SetRateAsync("NZD", "USD", FxConversionTests.NzdUsd, today);
         await AssignPortfolioAsync(tokens.AccessToken, brokerage, instrumentId);
         var scheduler = FunctionalTestSetup.WebApiServices.GetRequiredService<RecordingRebalanceScheduler>();
         var before = scheduler.Enqueued.Count;
 
         await LegAccountsFixture.ReadIdAsync(await FxConversionTests.PostAsync(
             tokens.AccessToken,
-            FxConversionTests.SellBody(usdBank, brokerage, 600m, expectedRate: 1.70000000m)));
+            FxConversionTests.SellBody(usdBank, brokerage, 600m, expectedRate: 1.70000000m).WithoutBookedAt()));
         var outId = await LegAccountsFixture.ReadIdAsync(await FxConversionTests.PostAsync(
-            tokens.AccessToken, FxConversionTests.SellBody(brokerage, usdBank, 100m)));
+            tokens.AccessToken, FxConversionTests.SellBody(brokerage, usdBank, 100m).WithoutBookedAt()));
         await LegAccountsFixture.ReadIdAsync(await LegAccountsFixture.ReverseAsync(tokens.AccessToken, outId));
 
         (await InternalTransferTests.CashBalanceAsync(tokens.AccessToken, brokerage)).ShouldBe(1020m);

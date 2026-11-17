@@ -11,7 +11,7 @@ namespace MyWealthV2.Application.FunctionalTests.NetWorth;
 public class TestSeedSmokeTests : TestBase
 {
     [Test]
-    public async Task DemoAdviser_SeesSeededCashAndVtiMarketValue()
+    public async Task DemoAdviser_SeesSeededCashAndHoldingsMarketValue()
     {
         var tenant = await TestApp.CreateTenantAsync(
             DevelopmentIdentitySeeder.DemoTenantName,
@@ -41,7 +41,8 @@ public class TestSeedSmokeTests : TestBase
         var currencies = root.GetProperty("currencies").EnumerateArray().ToList();
         currencies.Select(row => row.GetProperty("currency").GetString()).ShouldBe(["NZD", "USD"]);
         AssertCurrency(currencies[0], "NZD", cash: 100m, holdings: 0m);
-        AssertCurrency(currencies[1], "USD", cash: 500m, holdings: 8000m);
+        // USD: "Demo brokerage" 500 cash + VTI 8,000; "Demo custodial brokerage" 6,400 cash + VTI 10,000 + AAPL 3,600.
+        AssertCurrency(currencies[1], "USD", cash: 6900m, holdings: 21600m);
 
         var byCustomer = root.GetProperty("breakdowns").GetProperty("byCustomer").EnumerateArray().ToList();
         byCustomer.Select(row => row.GetProperty("name").GetString()).ShouldBe(["Demo Customer"]);
@@ -49,11 +50,14 @@ public class TestSeedSmokeTests : TestBase
         var byType = root.GetProperty("breakdowns").GetProperty("byAccountType").EnumerateArray().ToList();
         byType.Select(row => row.GetProperty("type").GetString()).ShouldBe(["Bank", "Brokerage", "Cash"]);
 
-        var top = root.GetProperty("breakdowns").GetProperty("topHoldings").EnumerateArray().Single();
-        top.GetProperty("symbol").GetString().ShouldBe("VTI");
-        top.GetProperty("quantity").GetDecimal().ShouldBe(32m);
-        top.GetProperty("marketValue").GetDecimal().ShouldBe(8000m);
-        top.GetProperty("currency").GetString().ShouldBe("USD");
+        var top = root.GetProperty("breakdowns").GetProperty("topHoldings").EnumerateArray().ToList();
+        top.Select(row => row.GetProperty("symbol").GetString()).ShouldBe(["VTI", "AAPL"]);
+        top[0].GetProperty("quantity").GetDecimal().ShouldBe(72m);
+        top[0].GetProperty("marketValue").GetDecimal().ShouldBe(18000m);
+        top[0].GetProperty("currency").GetString().ShouldBe("USD");
+        top[1].GetProperty("quantity").GetDecimal().ShouldBe(20m);
+        top[1].GetProperty("marketValue").GetDecimal().ShouldBe(3600m);
+        top[1].GetProperty("currency").GetString().ShouldBe("USD");
     }
 
     private static void AssertCurrency(JsonElement row, string currency, decimal cash, decimal holdings)

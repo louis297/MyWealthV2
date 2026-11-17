@@ -6,7 +6,10 @@ using MyWealthV2.Infrastructure.Data;
 
 namespace MyWealthV2.Application.FunctionalTests.Accounts;
 
-/// <summary>Account custody mode R3 to R5: <c>POST /accounts</c> requires <c>custodyMode</c> and accepts only External.</summary>
+/// <summary>
+/// Account custody mode R3: <c>POST /accounts</c> requires <c>custodyMode</c>. Custody modes R2 to R4: it accepts
+/// External with any openable type and Custodial with Brokerage only.
+/// </summary>
 public class AccountCustodyModeCreateTests : TestBase
 {
     [Test]
@@ -50,11 +53,11 @@ public class AccountCustodyModeCreateTests : TestBase
         (await CountAccountsAsync(customer.Id)).ShouldBe(0);
     }
 
-    [TestCase("Custodial")]
     [TestCase("external")]
+    [TestCase("custodial")]
     [TestCase("nope")]
     [TestCase("0")]
-    public async Task Adviser_NotExternal_Returns400AndWritesNothing(string custodyMode)
+    public async Task Adviser_NotAnExactCustodyModeName_Returns400AndWritesNothing(string custodyMode)
     {
         var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
 
@@ -63,6 +66,72 @@ public class AccountCustodyModeCreateTests : TestBase
 
         await AssertCustodyModeErrorAsync(response);
         (await CountAccountsAsync(customer.Id)).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task Adviser_CustodialBrokerage_Returns201AndGetReturnsCustodial()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+
+        var response = await AccountHttp.Send(HttpMethod.Post, "/accounts", tokens.AccessToken,
+            Body(customer.PublicId, "Custodial", "Brokerage"));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
+        (await ReadCustodyModeAsync(response, tokens.AccessToken)).ShouldBe("Custodial");
+    }
+
+    [Test]
+    public async Task TenantAdmin_CustodialBrokerage_Returns201()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInTenantAdmin();
+
+        var response = await AccountHttp.Send(HttpMethod.Post, "/accounts", tokens.AccessToken,
+            Body(customer.PublicId, "Custodial", "Brokerage"));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
+        (await ReadCustodyModeAsync(response, tokens.AccessToken)).ShouldBe("Custodial");
+    }
+
+    [TestCase("Bank")]
+    [TestCase("Cash")]
+    [TestCase("Other")]
+    public async Task Adviser_CustodialWithATypeOtherThanBrokerage_Returns400OnTypeAndWritesNothing(string type)
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+
+        var response = await AccountHttp.Send(HttpMethod.Post, "/accounts", tokens.AccessToken,
+            Body(customer.PublicId, "Custodial", type));
+
+        await AssertCustodialTypeErrorAsync(response);
+        (await CountAccountsAsync(customer.Id)).ShouldBe(0);
+    }
+
+    [TestCase("Bank")]
+    [TestCase("Cash")]
+    [TestCase("Other")]
+    public async Task TenantAdmin_CustodialWithATypeOtherThanBrokerage_Returns400OnType(string type)
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInTenantAdmin();
+
+        var response = await AccountHttp.Send(HttpMethod.Post, "/accounts", tokens.AccessToken,
+            Body(customer.PublicId, "Custodial", type));
+
+        await AssertCustodialTypeErrorAsync(response);
+        (await CountAccountsAsync(customer.Id)).ShouldBe(0);
+    }
+
+    [TestCase("Bank")]
+    [TestCase("Cash")]
+    [TestCase("Brokerage")]
+    [TestCase("Other")]
+    public async Task Adviser_ExternalWithEachOpenableType_Returns201(string type)
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+
+        var response = await AccountHttp.Send(HttpMethod.Post, "/accounts", tokens.AccessToken,
+            Body(customer.PublicId, "External", type));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
     }
 
     [Test]
@@ -79,7 +148,7 @@ public class AccountCustodyModeCreateTests : TestBase
             type = "Bank",
             currency = "NZD"
         }));
-        await AssertCustodyModeErrorAsync(await AccountHttp.Send(HttpMethod.Post, "/accounts", tokens.AccessToken, new
+        await AssertCustodialTypeErrorAsync(await AccountHttp.Send(HttpMethod.Post, "/accounts", tokens.AccessToken, new
         {
             tenantId = tenant.PublicId,
             customerId = customer.PublicId,
@@ -89,6 +158,18 @@ public class AccountCustodyModeCreateTests : TestBase
             currency = "NZD"
         }));
         (await CountAccountsAsync(customer.Id)).ShouldBe(0);
+
+        var custodial = await AccountHttp.Send(HttpMethod.Post, "/accounts", tokens.AccessToken, new
+        {
+            tenantId = tenant.PublicId,
+            customerId = customer.PublicId,
+            name = "Managed portfolio",
+            type = "Brokerage",
+            custodyMode = "Custodial",
+            currency = "NZD"
+        });
+        custodial.StatusCode.ShouldBe(HttpStatusCode.Created, await custodial.Content.ReadAsStringAsync());
+        (await ReadCustodyModeAsync(custodial, tokens.AccessToken)).ShouldBe("Custodial");
 
         var created = await AccountHttp.Send(HttpMethod.Post, "/accounts", tokens.AccessToken, new
         {
@@ -103,14 +184,26 @@ public class AccountCustodyModeCreateTests : TestBase
         (await ReadCustodyModeAsync(created, tokens.AccessToken)).ShouldBe("External");
     }
 
-    private static object Body(Guid customerId, string? custodyMode) => new
+    private static object Body(Guid customerId, string? custodyMode, string type = "Bank") => new
     {
         customerId,
         name = "Everyday spending",
-        type = "Bank",
+        type,
         custodyMode,
         currency = "NZD"
     };
+
+    private static async Task AssertCustodialTypeErrorAsync(HttpResponseMessage response)
+    {
+        var content = await response.Content.ReadAsStringAsync();
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest, content);
+        using var json = JsonDocument.Parse(content);
+        json.RootElement.TryGetProperty("code", out _).ShouldBeFalse();
+        var type = json.RootElement.GetProperty("errors").EnumerateObject()
+            .Single(property => string.Equals(property.Name, "Type", StringComparison.OrdinalIgnoreCase));
+        type.Value.EnumerateArray().Select(message => message.GetString())
+            .ShouldContain("A Custodial account must be a Brokerage account.");
+    }
 
     private static async Task AssertCustodyModeErrorAsync(HttpResponseMessage response)
     {

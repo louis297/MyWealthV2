@@ -29,11 +29,12 @@ public class AssignPortfolioCommandHandler(
         var account = await AccountScope.ManagedAccounts(db, currentUser)
             .SingleOrDefaultAsync(row => row.PublicId == request.AccountId, cancellationToken)
             ?? throw new NotFoundException("Account", request.AccountId);
-        if (account.Status != AccountStatus.Open || account.Type is not (AccountType.Brokerage or AccountType.Other))
+        // Custody modes R14: a Custodial account is always Brokerage (R3), so the custody mode replaces the type test.
+        if (account.Status != AccountStatus.Open || account.CustodyMode != CustodyMode.Custodial)
         {
             throw new RebalanceException(
                 "account_not_eligible",
-                "Only an open Brokerage or Other account can be assigned a portfolio.");
+                "Only an open Custodial account can be assigned a portfolio.");
         }
 
         var portfolio = await db.Portfolios.SingleOrDefaultAsync(

@@ -19,6 +19,7 @@ const account = {
   customerId: "cccccccccccccccc-cccc-cccc-cccc-cccccccccccc",
   name: "Demo brokerage",
   type: "Brokerage",
+  custodyMode: "External",
   currency: "NZD",
   status: "Open",
   isActive: true,
@@ -674,6 +675,65 @@ describe("CreateTransactionPage", () => {
     expect(screen.queryByText("account detail")).not.toBeInTheDocument();
     expect(router.state.location.pathname).toBe(`/accounts/${accountId}/transactions/new`);
     expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("offers only the manual entry matrix types on a Custodial account (D18)", async () => {
+    renderForm(user(), 201, "Price is not available.", { custodyMode: "Custodial" });
+
+    await screen.findByText("Booked when posted.");
+    await openSelect("Type");
+    await waitFor(() => {
+      expect(screen.getAllByRole("option").map((option) => option.textContent?.trim())).toEqual([
+        "Buy",
+        "Sell",
+        "TransferIn",
+        "TransferOut",
+      ]);
+    });
+  });
+
+  it("posts a Custodial Buy with no Booked at input and no bookedAt (D19)", async () => {
+    const { fetchMock } = renderForm(user(), 201, "Price is not available.", { custodyMode: "Custodial" });
+
+    expect(await screen.findByText("Booked when posted.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Booked at")).not.toBeInTheDocument();
+    await chooseOption("Type", "Buy");
+    await chooseOption("Instrument", "DEMO Demo Fund");
+    fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(await screen.findByText("account detail")).toBeInTheDocument();
+    const post = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.method === "POST");
+    expect(JSON.parse(await post!.clone().text())).toEqual({
+      accountId,
+      type: "Buy",
+      memo: null,
+      reference: null,
+      security: [{ instrumentId, quantity: 50 }],
+    });
+  });
+
+  it("posts a Custodial TransferIn with no bookedAt (D19)", async () => {
+    const { fetchMock } = renderForm(
+      user(), 201, "Price is not available.", { custodyMode: "Custodial" }, "errors", "?type=TransferIn",
+    );
+
+    expect(await screen.findByText("Booked when posted.")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "100" } });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(await screen.findByText("account detail")).toBeInTheDocument();
+    const post = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.method === "POST");
+    expect(JSON.parse(await post!.clone().text())).toEqual({
+      accountId,
+      type: "TransferIn",
+      amount: 100,
+      memo: null,
+    });
   });
 
   it("offers only cash transfers on an open Bank account", async () => {

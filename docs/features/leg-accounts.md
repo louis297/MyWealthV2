@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-10
-last_updated: 2026-11-15
+last_updated: 2026-11-17
 related:
   - posting.md
   - holdings.md
@@ -20,6 +20,7 @@ related:
   - ../database-design.md
   - ../api-design.md
   - ../glossary.md
+  - custody-modes.md
 ---
 
 # Leg accounts
@@ -31,6 +32,8 @@ This is groundwork for cross-account transfer ([posting.md](posting.md) §13), w
 **Status is `accepted` (2026-11-10) and landed** on branch `feature/leg-accounts`. Script `0024_leg_accounts.sql`. The amendments to [posting.md](posting.md), [holdings.md](holdings.md), [buy-sell.md](buy-sell.md), [split.md](split.md), [net-worth.md](net-worth.md), [portfolios.md](portfolios.md), [reports.md](reports.md), the portal specs, ADR 0011, domain-model, database-design, api-design and the glossary landed with the implementation.
 
 **Amendment 2026-11-15 (trade fees, accepted):** [trade-fees.md](trade-fees.md). Cash legs gain a role. The rule "at most one cash leg per `(Transaction, Account)`" now applies to `Principal` legs; a `Buy` / `Sell` may also have one `Fee` leg on the same Account (script `0030` replaces the unique key with a filtered one). Transfers still have no fee leg.
+
+**Amendment 2026-11-17 (custody modes, accepted, landed):** [custody-modes.md](custody-modes.md). New invariant: every leg account of one Transaction has the same custody mode (custody-modes R8, R9). It is checked where a Transaction can have two leg accounts, on `InternalTransfer` and `FxConversion`; a Reversal copies each leg's Account and keeps it. R21: `bookedAt` is set by the server when the leg accounts are Custodial. R17 (portfolio trade lock) is unchanged.
 
 ---
 

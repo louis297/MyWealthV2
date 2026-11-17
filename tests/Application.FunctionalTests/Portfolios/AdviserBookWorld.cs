@@ -8,7 +8,7 @@ namespace MyWealthV2.Application.FunctionalTests.Portfolios;
 
 /// <summary>
 /// Portfolios amendment 2026-11-13 part 2 fixture. One tenant, Advisers A and B, Customer CA (Adviser A) and
-/// Customer CB (Adviser B), each with a funded Open Brokerage account, and one active portfolio P created by A.
+/// Customer CB (Adviser B), each with a funded Open Custodial Brokerage account, and one active portfolio P created by A.
 /// </summary>
 internal sealed class AdviserBookWorld
 {
@@ -162,13 +162,12 @@ internal sealed class AdviserBookWorld
     private static async Task<Guid> CreateFundedAccountAsync(string accessToken, Guid customerId)
     {
         var accountId = await Accounts.AccountHttp.OpenAccountAsync(
-            accessToken, customerId, name: "Model", type: "Brokerage");
+            accessToken, customerId, name: "Model", type: "Brokerage", custodyMode: "Custodial");
         (await Transactions.TransactionHttp.Send(HttpMethod.Post, "/transactions", accessToken, new
         {
             accountId,
             type = "TransferIn",
             amount = 10000m,
-            bookedAt = "2026-01-02T00:00:00Z",
             currency = "NZD"
         }, Guid.NewGuid())).StatusCode.ShouldBe(HttpStatusCode.Created);
         return accountId;

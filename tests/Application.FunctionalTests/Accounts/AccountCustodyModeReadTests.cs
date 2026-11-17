@@ -50,21 +50,39 @@ public class AccountCustodyModeReadTests : TestBase
     }
 
     [Test]
-    public async Task CustodyModeFilter_ExternalReturnsTheCallersAccounts_CustodialReturnsAnEmptyPage()
+    public async Task CustodyModeFilter_EachModeReturnsOnlyTheCallersAccountsOfThatMode()
     {
         var (_, _, customer, tokens) = await AccountHttp.SignInTenantAdmin();
         var bankId = await AccountHttp.OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Ned bank");
         var cashId = await AccountHttp.OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Ned cash", "Cash");
+        var custodialId = await AccountHttp.OpenAccountAsync(
+            tokens.AccessToken, customer.PublicId, "Ned managed", "Brokerage", custodyMode: "Custodial");
 
         (await ReadItemsAsync("/accounts?custodyMode=External", tokens.AccessToken))
             .Select(item => item.Id)
             .ShouldBe([bankId, cashId], ignoreOrder: true);
 
-        var custodial = await AccountHttp.Send(HttpMethod.Get, "/accounts?custodyMode=Custodial", tokens.AccessToken);
-        custodial.StatusCode.ShouldBe(HttpStatusCode.OK);
-        using var json = JsonDocument.Parse(await custodial.Content.ReadAsStringAsync());
-        json.RootElement.GetProperty("totalCount").GetInt32().ShouldBe(0);
-        json.RootElement.GetProperty("items").GetArrayLength().ShouldBe(0);
+        (await ReadItemsAsync("/accounts?custodyMode=Custodial", tokens.AccessToken))
+            .ShouldBe([(custodialId, "Custodial")]);
+    }
+
+    [Test]
+    public async Task CustodyModeFilter_Custodial_ReturnsNoAccountOfAnotherTenant()
+    {
+        var (_, _, customerA, tokensA) = await AccountHttp.SignInTenantAdmin(
+            "North Advisory", "north-advisory", "tess@north.example");
+        var (_, _, customerB, tokensB) = await AccountHttp.SignInAdviser(
+            "South Co", "south-co", "ann@south.example", customerEmail: "ned@south.example");
+        var idA = await AccountHttp.OpenAccountAsync(
+            tokensA.AccessToken, customerA.PublicId, "North managed", "Brokerage", custodyMode: "Custodial");
+        await AccountHttp.OpenAccountAsync(
+            tokensB.AccessToken, customerB.PublicId, "South managed", "Brokerage", custodyMode: "Custodial");
+
+        (await ReadItemsAsync("/accounts?custodyMode=Custodial", tokensA.AccessToken))
+            .Select(item => item.Id)
+            .ShouldBe([idA]);
+        (await ReadItemsAsync($"/accounts?custodyMode=Custodial&customerId={customerB.PublicId}", tokensA.AccessToken))
+            .ShouldBeEmpty();
     }
 
     [TestCase("nope")]

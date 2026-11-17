@@ -28,6 +28,7 @@ public class TestSeedAccountsTests
             "Demo brokerage",
             "Demo cash tin",
             "Demo closed other",
+            "Demo custodial brokerage",
             "Demo everyday bank"
         ]);
         second.Select(row => row.PublicId).ShouldBe(first.Select(row => row.PublicId));
@@ -43,6 +44,12 @@ public class TestSeedAccountsTests
         brokerage.Currency.ShouldBe("USD");
         brokerage.Status.ShouldBe(AccountStatus.Open);
 
+        var custodial = first.Single(row => row.Name == "Demo custodial brokerage");
+        custodial.Type.ShouldBe(AccountType.Brokerage);
+        custodial.CustodyMode.ShouldBe(CustodyMode.Custodial);
+        custodial.Currency.ShouldBe("USD");
+        custodial.Status.ShouldBe(AccountStatus.Open);
+
         var cash = first.Single(row => row.Name == "Demo cash tin");
         cash.Type.ShouldBe(AccountType.Cash);
         cash.Currency.ShouldBe("NZD");
@@ -56,7 +63,7 @@ public class TestSeedAccountsTests
     }
 
     [Test]
-    public async Task Seed_OpensEveryDemoAccountAsExternal()
+    public async Task Seed_OpensFourExternalAccountsAndOneCustodial()
     {
         await using var db = OpenDb();
         var tenant = await EnsureDemoTenantAsync(db);
@@ -78,10 +85,111 @@ public class TestSeedAccountsTests
             "Demo brokerage",
             "Demo cash tin",
             "Demo closed other",
+            "Demo custodial brokerage",
             "Demo everyday bank"
         ]);
-        rows.ShouldAllBe(row => (int)row[1] == (int)CustodyMode.External);
+        rows.Select(row => (int)row[1]).ShouldBe([
+            (int)CustodyMode.External,
+            (int)CustodyMode.External,
+            (int)CustodyMode.External,
+            (int)CustodyMode.Custodial,
+            (int)CustodyMode.External
+        ]);
     }
+
+    [Test]
+    public async Task Seed_AddsFundingAndTwoBuysOnTheDemoCustodialBrokerage()
+    {
+        await using var db = OpenDb();
+        var tenant = await EnsureDemoTenantAsync(db);
+        var adviser = await EnsurePersonAsync(
+            db, tenant, UserRole.Adviser, "Demo Adviser", DevelopmentIdentitySeeder.AdviserEmail);
+        await EnsurePersonAsync(
+            db, tenant, UserRole.Customer, "Demo Customer", "customer@localhost", adviser.Id);
+        await TestSeed.SeedAsync(db, CancellationToken.None);
+        await TestSeed.SeedAsync(db, CancellationToken.None);
+
+        var account = (await db.Accounts.SingleOrDefaultAsync(
+            row => row.TenantId == tenant.Id && row.Name == "Demo custodial brokerage")).ShouldNotBeNull();
+        var vti = await db.Instruments.SingleAsync(row => row.TenantId == tenant.Id && row.Symbol == "VTI");
+        var aapl = await db.Instruments.SingleAsync(row => row.TenantId == tenant.Id && row.Symbol == "AAPL");
+        var nzdt = TimeSpan.FromHours(13);
+
+        var funding = await LoadCashAsync(db, account.Id, "TestSeed-DemoCustodial-Funding");
+        funding.Count.ShouldBe(1);
+        funding[0].Type.ShouldBe(TransactionType.TransferIn);
+        funding[0].Amount.ShouldBe(20000m);
+        funding[0].Currency.Trim().ShouldBe("USD");
+        (await BookedAtAsync(db, account.Id, "TestSeed-DemoCustodial-Funding"))
+            .ShouldBe(new DateTimeOffset(2026, 1, 20, 10, 0, 0, nzdt));
+
+        var buyVti = await LoadSecurityAsync(db, account.Id, "TestSeed-DemoCustodial-BuyVti");
+        buyVti.Count.ShouldBe(1);
+        buyVti[0].Type.ShouldBe(TransactionType.Buy);
+        buyVti[0].CashAmount.ShouldBe(-10000m);
+        buyVti[0].Quantity.ShouldBe(40m);
+        buyVti[0].CostAmount.ShouldBe(10000m);
+        (await BookedAtAsync(db, account.Id, "TestSeed-DemoCustodial-BuyVti"))
+            .ShouldBe(new DateTimeOffset(2026, 1, 20, 10, 30, 0, nzdt));
+
+        var buyAapl = await LoadSecurityAsync(db, account.Id, "TestSeed-DemoCustodial-BuyAapl");
+        buyAapl.Count.ShouldBe(1);
+        buyAapl[0].Type.ShouldBe(TransactionType.Buy);
+        buyAapl[0].CashAmount.ShouldBe(-3600m);
+        buyAapl[0].Quantity.ShouldBe(20m);
+        buyAapl[0].CostAmount.ShouldBe(3600m);
+        (await BookedAtAsync(db, account.Id, "TestSeed-DemoCustodial-BuyAapl"))
+            .ShouldBe(new DateTimeOffset(2026, 1, 20, 11, 0, 0, nzdt));
+
+        var legs = await db.TransactionCashLegs.Where(row => row.AccountId == account.Id).ToListAsync();
+        legs.Count.ShouldBe(3);
+        legs.ShouldAllBe(row => row.Role != CashLegRole.Fee);
+        legs.Sum(row => row.Amount).ShouldBe(6400m);
+
+        var holdings = await db.Holdings.Where(row => row.AccountId == account.Id).ToListAsync();
+        holdings.Count.ShouldBe(2);
+        var vtiHolding = holdings.Single(row => row.InstrumentId == vti.Id);
+        vtiHolding.Quantity.ShouldBe(40m);
+        vtiHolding.CostAmount.ShouldBe(10000m);
+        var aaplHolding = holdings.Single(row => row.InstrumentId == aapl.Id);
+        aaplHolding.Quantity.ShouldBe(20m);
+        aaplHolding.CostAmount.ShouldBe(3600m);
+    }
+
+    [Test]
+    public async Task Seed_AssignsDemoGrowthToTheCustodialAccountAndNotToTheDemoBrokerage()
+    {
+        await using var db = OpenDb();
+        var tenant = await EnsureDemoTenantAsync(db);
+        var adviser = await EnsurePersonAsync(
+            db, tenant, UserRole.Adviser, "Demo Adviser", DevelopmentIdentitySeeder.AdviserEmail);
+        await EnsurePersonAsync(
+            db, tenant, UserRole.Customer, "Demo Customer", "customer@localhost", adviser.Id);
+        await TestSeed.SeedAsync(db, CancellationToken.None);
+        await TestSeed.SeedAsync(db, CancellationToken.None);
+
+        var custodial = (await db.Accounts.SingleOrDefaultAsync(
+            row => row.TenantId == tenant.Id && row.Name == "Demo custodial brokerage")).ShouldNotBeNull();
+        var brokerage = await db.Accounts.SingleAsync(
+            row => row.TenantId == tenant.Id && row.Name == "Demo brokerage");
+        var growth = await db.Portfolios.SingleAsync(row => row.TenantId == tenant.Id && row.Name == "Demo Growth");
+
+        var active = await db.AccountPortfolioAssignments
+            .Where(row => row.AccountId == custodial.Id && row.Status == AssignmentStatus.Active)
+            .ToListAsync();
+        active.ShouldHaveSingleItem().PortfolioId.ShouldBe(growth.Id);
+        (await db.AccountPortfolioAssignments.AnyAsync(
+                row => row.AccountId == brokerage.Id && row.Status == AssignmentStatus.Active))
+            .ShouldBeFalse();
+    }
+
+    private static Task<DateTimeOffset> BookedAtAsync(ApplicationDbContext db, int accountId, string reference) =>
+        db.Transactions
+            .Where(row => (row.CashLegs.Any(leg => leg.AccountId == accountId)
+                           || row.SecurityLegs.Any(leg => leg.AccountId == accountId))
+                          && row.Reference == reference)
+            .Select(row => row.BookedAt)
+            .SingleAsync();
 
     [Test]
     public async Task Seed_AddsOneTransferInOnTheDemoEverydayBank()
