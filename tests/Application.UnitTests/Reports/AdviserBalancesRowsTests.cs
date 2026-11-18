@@ -182,6 +182,96 @@ public class AdviserBalancesRowsTests
         ]);
     }
 
+    [Test]
+    public void Select_PutsTheAccountsCustodyModeOnEveryLine()
+    {
+        var managed = Guid.Parse("40000000-0000-0000-0000-000000000001");
+        var elsewhere = Guid.Parse("40000000-0000-0000-0000-000000000002");
+        var vti = Guid.Parse("50000000-0000-0000-0000-000000000001");
+
+        var selection = AdviserBalancesRows.Select(
+            [
+                Account(managed, "Managed", 5m, custodyMode: "Custodial", holdings:
+                [
+                    Holding(vti, "VTI", 1m, 10m, price: 4m, priceCurrency: "USD")
+                ]),
+                Account(elsewhere, "Elsewhere", 7m)
+            ],
+            includeClosedAccounts: false);
+
+        selection.Lines.Select(line => $"{line.AccountName} {line.GetType().Name} {line.CustodyMode}").ShouldBe(
+        [
+            "Elsewhere AdviserCashLine External",
+            "Managed AdviserCashLine Custodial",
+            "Managed AdviserHoldingLine Custodial"
+        ]);
+        selection.Lines.OfType<AdviserCashLine>().Select(line => line.CustodyMode).ShouldBe(["External", "Custodial"]);
+        selection.Lines.OfType<AdviserHoldingLine>().Single().CustodyMode.ShouldBe("Custodial");
+    }
+
+    [Test]
+    public void Select_SubtotalsPerCustodyModeThenAllAccounts()
+    {
+        var managed = Guid.Parse("40000000-0000-0000-0000-000000000011");
+        var elsewhereNzd = Guid.Parse("40000000-0000-0000-0000-000000000012");
+        var elsewhereUsd = Guid.Parse("40000000-0000-0000-0000-000000000013");
+        var aia = Guid.Parse("50000000-0000-0000-0000-000000000011");
+        var vti = Guid.Parse("50000000-0000-0000-0000-000000000012");
+
+        // The worked example of custody-mode-grouping §4.2.
+        var selection = AdviserBalancesRows.Select(
+            [
+                Account(managed, "Managed", 1000m, custodyMode: "Custodial", holdings:
+                [
+                    Holding(aia, "AIA", 100m, 4000m, price: 50m, priceCurrency: "NZD", quoteCurrency: "NZD")
+                ]),
+                Account(elsewhereNzd, "Elsewhere NZD", 2500m),
+                Account(elsewhereUsd, "Elsewhere USD", 0m, currency: "USD", holdings:
+                [
+                    Holding(vti, "VTI", 40m, 700m, price: 20m, priceCurrency: "USD")
+                ])
+            ],
+            includeClosedAccounts: false);
+
+        selection.ModeSubtotals.Select(block => block.CustodyMode).ShouldBe(["Custodial", "External"]);
+        selection.ModeSubtotals[0].Subtotals.ShouldBe([new AdviserBalanceSubtotal("NZD", 1000m, 5000m)]);
+        selection.ModeSubtotals[1].Subtotals.ShouldBe(
+        [
+            new AdviserBalanceSubtotal("NZD", 2500m, 0m),
+            new AdviserBalanceSubtotal("USD", 0m, 800m)
+        ]);
+        selection.Subtotals.ShouldBe(
+        [
+            new AdviserBalanceSubtotal("NZD", 3500m, 5000m),
+            new AdviserBalanceSubtotal("USD", 0m, 800m)
+        ]);
+    }
+
+    [Test]
+    public void Select_ACustodyModeWithoutLinesHasNoBlock()
+    {
+        var empty = Guid.Parse("40000000-0000-0000-0000-000000000021");
+        var elsewhere = Guid.Parse("40000000-0000-0000-0000-000000000022");
+        var closed = Guid.Parse("40000000-0000-0000-0000-000000000023");
+
+        var selection = AdviserBalancesRows.Select(
+            [
+                Account(empty, "Empty managed", 0m, custodyMode: "Custodial"),
+                Account(closed, "Closed managed", 9m, closed: true, custodyMode: "Custodial"),
+                Account(elsewhere, "Elsewhere", 3m)
+            ],
+            includeClosedAccounts: false);
+
+        selection.ModeSubtotals.Count.ShouldBe(1);
+        selection.ModeSubtotals[0].CustodyMode.ShouldBe("External");
+        selection.ModeSubtotals[0].Subtotals.ShouldBe([new AdviserBalanceSubtotal("NZD", 3m, 0m)]);
+
+        var none = AdviserBalancesRows.Select([Account(empty, "Empty managed", 0m, custodyMode: "Custodial")], false);
+        none.Lines.ShouldBeEmpty();
+        none.ModeSubtotals.ShouldBeEmpty();
+        none.Subtotals.ShouldBeEmpty();
+    }
+
     private static string Describe(AdviserBalanceLine line) => line switch
     {
         AdviserCashLine cash =>
@@ -209,13 +299,15 @@ public class AdviserBalancesRowsTests
         IReadOnlyList<AdviserBalanceHolding>? holdings = null,
         Guid? customerId = null,
         string customerName = "Cee",
-        string currency = "NZD") =>
+        string currency = "NZD",
+        string custodyMode = "External") =>
         new(
             customerId ?? CustomerId,
             customerName,
             accountId,
             name,
             "Bank",
+            custodyMode,
             currency,
             cash,
             closed,

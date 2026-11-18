@@ -30,7 +30,7 @@ public sealed class CustomerTransactionsReportGenerator(
 
         var accounts = await db.Accounts.AsNoTracking()
             .Where(row => row.TenantId == execution.TenantId && row.CustomerId == customer.Id)
-            .Select(row => new AccountRow(row.Id, row.Name, row.Status))
+            .Select(row => new AccountRow(row.Id, row.Name, row.Status, row.CustodyMode))
             .ToListAsync(cancellationToken);
         var accountIds = accounts.Select(row => row.Id).ToList();
         var transactions = accountIds.Count == 0
@@ -78,7 +78,8 @@ public sealed class CustomerTransactionsReportGenerator(
                     account.Name,
                     transaction.Type.ToString(),
                     transaction.Memo,
-                    accountId));
+                    accountId,
+                    account.CustodyMode.ToString()));
                 // The cash amount is the sum of the account's cash legs; the Fee column sums its Fee legs (trade-fees R22).
                 var cashLegs = transaction.CashLegs.Where(leg => leg.AccountId == accountId).ToList();
                 cashByRow[key] = FormatCash(cashLegs);
@@ -108,7 +109,8 @@ public sealed class CustomerTransactionsReportGenerator(
                 instrumentByRow[(row.Id, row.AccountId)],
                 quantityByRow[(row.Id, row.AccountId)],
                 row.Memo,
-                feeByRow[(row.Id, row.AccountId)]))
+                feeByRow[(row.Id, row.AccountId)],
+                CustodyLabel(row.CustodyMode)))
             .ToList();
 
         return CustomerTransactionsPdf.Render(new CustomerTransactionsPdfModel(
@@ -118,8 +120,17 @@ public sealed class CustomerTransactionsReportGenerator(
             binding.From,
             binding.To,
             binding.IncludeClosedAccounts,
-            rows));
+            rows,
+            selected.Any(row => row.CustodyMode == nameof(CustodyMode.External))));
     }
+
+    /// <summary>The Customer Portal label of a custody mode (custody-mode-grouping R14).</summary>
+    private static string CustodyLabel(string custodyMode) => custodyMode switch
+    {
+        nameof(CustodyMode.Custodial) => "Held on platform",
+        nameof(CustodyMode.External) => "Held elsewhere",
+        _ => custodyMode
+    };
 
     /// <summary>The sum of the legs in their (one) Account currency; empty when there is no leg.</summary>
     private string FormatCash(IReadOnlyList<TransactionCashLeg> legs)
@@ -145,5 +156,5 @@ public sealed class CustomerTransactionsReportGenerator(
         return symbol;
     }
 
-    private sealed record AccountRow(int Id, string Name, AccountStatus Status);
+    private sealed record AccountRow(int Id, string Name, AccountStatus Status, CustodyMode CustodyMode);
 }

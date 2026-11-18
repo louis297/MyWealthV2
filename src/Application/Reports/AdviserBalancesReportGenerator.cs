@@ -45,6 +45,7 @@ public sealed class AdviserBalancesReportGenerator(
                 account.PublicId,
                 account.Name,
                 account.Type,
+                account.CustodyMode,
                 account.Status,
                 account.Currency,
                 customer.PublicId,
@@ -89,6 +90,7 @@ public sealed class AdviserBalancesReportGenerator(
             account.AccountId,
             account.AccountName,
             account.Type.ToString(),
+            account.CustodyMode.ToString(),
             account.Currency.Trim(),
             cashByAccount.GetValueOrDefault(account.Id),
             account.Status == AccountStatus.Closed,
@@ -98,11 +100,11 @@ public sealed class AdviserBalancesReportGenerator(
 
         var selection = AdviserBalancesRows.Select(sources, binding.IncludeClosedAccounts);
         var rows = selection.Lines.Select(ToPdfRow).ToList();
-        var subtotals = selection.Subtotals
-            .Select(subtotal => new AdviserBalancesPdfSubtotal(
-                subtotal.Currency,
-                FormatMoney(subtotal.Cash, subtotal.Currency),
-                FormatMoney(subtotal.MarketValue, subtotal.Currency)))
+        var subtotals = selection.Subtotals.Select(ToPdfSubtotal).ToList();
+        var modeSubtotals = selection.ModeSubtotals
+            .Select(block => new AdviserBalancesPdfSubtotalBlock(
+                block.CustodyMode,
+                block.Subtotals.Select(ToPdfSubtotal).ToList()))
             .ToList();
 
         return AdviserBalancesPdf.Render(new AdviserBalancesPdfModel(
@@ -112,8 +114,14 @@ public sealed class AdviserBalancesReportGenerator(
             time.GetUtcNow(),
             binding.IncludeClosedAccounts,
             rows,
-            subtotals));
+            subtotals,
+            modeSubtotals));
     }
+
+    private AdviserBalancesPdfSubtotal ToPdfSubtotal(AdviserBalanceSubtotal subtotal) => new(
+        subtotal.Currency,
+        FormatMoney(subtotal.Cash, subtotal.Currency),
+        FormatMoney(subtotal.MarketValue, subtotal.Currency));
 
     private AdviserBalanceHolding ToHolding(HoldingRow holding)
     {
@@ -135,10 +143,12 @@ public sealed class AdviserBalancesReportGenerator(
             cash.CustomerName,
             cash.AccountName,
             cash.AccountType,
+            cash.CustodyMode,
             FormatMoney(cash.Balance, cash.Currency)),
         AdviserHoldingLine holding => new AdviserBalancesPdfHoldingRow(
             holding.CustomerName,
             holding.AccountName,
+            holding.CustodyMode,
             holding.Symbol,
             holding.Quantity.ToString("0.################", CultureInfo.InvariantCulture),
             FormatMoney(holding.CostAmount, holding.CostCurrency),
@@ -159,6 +169,7 @@ public sealed class AdviserBalancesReportGenerator(
         Guid AccountId,
         string AccountName,
         AccountType Type,
+        CustodyMode CustodyMode,
         AccountStatus Status,
         string Currency,
         Guid CustomerId,

@@ -8,7 +8,8 @@ public sealed record CustomerTransactionSource(
     string AccountName,
     string Type,
     string? Memo,
-    int AccountId);
+    int AccountId,
+    string CustodyMode);
 
 public static class CustomerTransactionsRows
 {

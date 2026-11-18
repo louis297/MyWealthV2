@@ -103,6 +103,73 @@ public class CustomerTransactionsPdfTests
         text.IndexOf("-10.00 USD", StringComparison.Ordinal).ShouldBeGreaterThan(text.IndexOf("-1260.00 USD", StringComparison.Ordinal));
     }
 
+    private const string Note =
+        "Held elsewhere: recorded by your adviser from outside statements. The platform has not checked these figures.";
+
+    [Test]
+    public void Render_ShowsTheCustodyColumnAfterTheAccount_AndTheNoteWhenARowIsHeldElsewhere()
+    {
+        var pdf = CustomerTransactionsPdf.Render(Model(
+            [
+                Row("Managed", "1.00 USD", "Held on platform", "managed in"),
+                Row("Everyday", "2.00 NZD", "Held elsewhere", "everyday in")
+            ],
+            showExternalNote: true));
+
+        var text = Read(pdf);
+        var account = text.IndexOf("Account", text.IndexOf("Booked at", StringComparison.Ordinal), StringComparison.Ordinal);
+        var custody = text.IndexOf("Custody", StringComparison.Ordinal);
+        custody.ShouldBeGreaterThan(account);
+        text.IndexOf("Type", custody, StringComparison.Ordinal).ShouldBeGreaterThan(custody);
+
+        var managed = text.IndexOf("Managed", StringComparison.Ordinal);
+        var onPlatform = text.IndexOf("Held on platform", StringComparison.Ordinal);
+        var managedCash = text.IndexOf("1.00 USD", StringComparison.Ordinal);
+        onPlatform.ShouldBeGreaterThan(managed);
+        managedCash.ShouldBeGreaterThan(onPlatform);
+        var elsewhere = text.IndexOf("Held elsewhere", managedCash, StringComparison.Ordinal);
+        elsewhere.ShouldBeGreaterThan(text.IndexOf("Everyday", StringComparison.Ordinal));
+
+        text.ShouldContain(Note);
+        text.IndexOf(Note, StringComparison.Ordinal).ShouldBeGreaterThan(text.IndexOf("everyday in", StringComparison.Ordinal));
+    }
+
+    [Test]
+    public void Render_HasNoNoteWithoutARowHeldElsewhere()
+    {
+        var withoutNote = Read(CustomerTransactionsPdf.Render(Model([Row("Managed", "1.00 USD", "Held on platform", "in")])));
+        withoutNote.ShouldContain("Held on platform");
+        withoutNote.ShouldNotContain("The platform has not checked these figures.");
+
+        var empty = Read(CustomerTransactionsPdf.Render(Model([])));
+        empty.ShouldContain("No transactions in this range.");
+        empty.ShouldNotContain("The platform has not checked these figures.");
+    }
+
+    private static CustomerTransactionsPdfModel Model(
+        IReadOnlyList<CustomerTransactionsPdfRow> rows,
+        bool showExternalNote = false) =>
+        new(
+            "Firm Queue",
+            new DateTimeOffset(2026, 3, 31, 14, 5, 6, TimeSpan.Zero),
+            "Cee",
+            new DateOnly(2026, 1, 1),
+            new DateOnly(2026, 3, 31),
+            IncludeClosedAccounts: false,
+            rows,
+            showExternalNote);
+
+    private static CustomerTransactionsPdfRow Row(string account, string cash, string custody, string memo) =>
+        new(
+            new DateTimeOffset(2026, 1, 2, 9, 0, 0, TimeSpan.Zero),
+            account,
+            "TransferIn",
+            cash,
+            "",
+            "",
+            memo,
+            Custody: custody);
+
     internal static string Read(byte[] pdf)
     {
         using var document = PdfDocument.Open(pdf);

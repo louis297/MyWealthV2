@@ -51,6 +51,17 @@ public class TestSeedSmokeTests : TestBase
         var byType = root.GetProperty("breakdowns").GetProperty("byAccountType").EnumerateArray().ToList();
         byType.Select(row => row.GetProperty("type").GetString()).ShouldBe(["Bank", "Brokerage", "Cash"]);
 
+        // Custodial: "Demo custodial brokerage". External: the NZD bank and "Demo brokerage" (custody-mode-grouping R4).
+        var byMode = root.GetProperty("breakdowns").GetProperty("byCustodyMode").EnumerateArray().ToList();
+        byMode.Select(row => row.GetProperty("custodyMode").GetString()).ShouldBe(["Custodial", "External"]);
+        var custodial = byMode[0].GetProperty("currencies").EnumerateArray().ToList();
+        custodial.Count.ShouldBe(1);
+        AssertCurrency(custodial[0], "USD", cash: 6400m, holdings: 13600m);
+        var external = byMode[1].GetProperty("currencies").EnumerateArray().ToList();
+        external.Select(row => row.GetProperty("currency").GetString()).ShouldBe(["NZD", "USD"]);
+        AssertCurrency(external[0], "NZD", cash: 100m, holdings: 0m);
+        AssertCurrency(external[1], "USD", cash: 500m, holdings: 8000m);
+
         var top = root.GetProperty("breakdowns").GetProperty("topHoldings").EnumerateArray().ToList();
         top.Select(row => row.GetProperty("symbol").GetString()).ShouldBe(["VTI", "AAPL"]);
         top[0].GetProperty("quantity").GetDecimal().ShouldBe(72m);

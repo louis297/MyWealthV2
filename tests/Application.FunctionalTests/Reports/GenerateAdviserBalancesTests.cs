@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Application.FunctionalTests.Accounts;
+using MyWealthV2.Application.FunctionalTests.Custody;
 using MyWealthV2.Application.FunctionalTests.Instruments;
 using MyWealthV2.Application.FunctionalTests.Tenants;
 using MyWealthV2.Application.FunctionalTests.Transactions;
@@ -165,6 +166,54 @@ public class GenerateAdviserBalancesTests : TestBase
         text.ShouldContain("Old book");
         text.ShouldContain("8.00 NZD");
         text.ShouldContain("NZD cash 8.00 NZD market value 0.00 NZD");
+    }
+
+    [Test]
+    public async Task Execute_ShowsTheCustodyModeAndSubtotalsPerCustodyMode()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm Book Custody", "firm-book-custody");
+        await TestApp.CreatePersonAsync(
+            UserRole.TenantAdmin, "Tess", "tess@firm-book-custody", "Password1!", tenant.Id);
+        var adviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Ann", "ann@firm-book-custody", "Password1!", tenant.Id);
+        var customer = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Cee", "cee@firm-book-custody", "Password1!", tenant.Id, adviser.Id);
+        await GrantAsync(tenant.PublicId);
+        var admin = await FunctionalTestSetup.Oidc.SignInAsync(
+            "tess@firm-book-custody", "Password1!", "firm-book-custody");
+        var managed = await CustodialHttp.OpenCustodialAsync(admin.AccessToken, customer.PublicId, "Managed book");
+        var everyday = await OpenAccountAsync(admin.AccessToken, customer.PublicId, "Everyday book", "Bank", "NZD");
+        (await CustodialHttp.FundAsync(admin.AccessToken, managed, 40m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await PostCashAsync(admin.AccessToken, everyday, 8m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var created = await TenantHttp.Send(
+            HttpMethod.Post,
+            "/reports/request",
+            admin.AccessToken,
+            new { reportId = AdviserBalancesId, parameters = new { adviserId = adviser.PublicId } });
+        created.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        using var json = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+        var executionId = json.RootElement.GetProperty("id").GetGuid();
+
+        await using var scope = FunctionalTestSetup.WebApiServices.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<ReportJob>().Execute(executionId);
+
+        (await ReadExecutionAsync(executionId)).Status.ShouldBe("Succeeded");
+        var path = Path.Combine(ReportStoragePaths.Root, tenant.PublicId.ToString("D"), $"{executionId:D}.pdf");
+        var text = ReadPdf(await File.ReadAllBytesAsync(path));
+        text.ShouldContain("Custody");
+        var subtotals = text.IndexOf("Subtotals", StringComparison.Ordinal);
+        subtotals.ShouldBeGreaterThan(text.IndexOf("Custodial", StringComparison.Ordinal));
+        var custodialBlock = text.IndexOf("Custodial", subtotals, StringComparison.Ordinal);
+        var custodialLine = text.IndexOf("USD cash 40.00 USD market value 0.00 USD", subtotals, StringComparison.Ordinal);
+        var externalBlock = text.IndexOf("External", subtotals, StringComparison.Ordinal);
+        var externalLine = text.IndexOf("NZD cash 8.00 NZD market value 0.00 NZD", subtotals, StringComparison.Ordinal);
+        var allBlock = text.IndexOf("All accounts", subtotals, StringComparison.Ordinal);
+        custodialBlock.ShouldBeGreaterThan(subtotals);
+        custodialLine.ShouldBeGreaterThan(custodialBlock);
+        externalBlock.ShouldBeGreaterThan(custodialLine);
+        externalLine.ShouldBeGreaterThan(externalBlock);
+        allBlock.ShouldBeGreaterThan(externalLine);
     }
 
     private static string ReadPdf(byte[] pdf)

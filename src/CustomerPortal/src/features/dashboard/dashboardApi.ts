@@ -13,6 +13,8 @@ export type NetWorth = {
   breakdowns: {
     byCustomer: { customerId: string; name: string; currencies: NetWorthCurrency[] }[];
     byAccountType: { type: string; currencies: NetWorthCurrency[] }[];
+    /** One entry per custody mode with an Open account, Custodial first (custody-mode-grouping R4). */
+    byCustodyMode: { custodyMode: string; currencies: NetWorthCurrency[] }[];
     topHoldings: {
       instrumentId: string;
       symbol: string;

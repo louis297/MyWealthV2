@@ -102,5 +102,5 @@ public class CustomerTransactionsRowsTests
         bool accountClosed = false,
         string? memo = null,
         int accountId = 1) =>
-        new(id, originalTransactionId, bookedAt, accountClosed, "Cash", "TransferIn", memo, accountId);
+        new(id, originalTransactionId, bookedAt, accountClosed, "Cash", "TransferIn", memo, accountId, "External");
 }
