@@ -4,7 +4,7 @@ status: accepted
 phase: 3
 language: en
 created: 2026-11-02
-updated: 2026-11-17
+updated: 2026-11-18
 related:
   - README.md
   - ../adviser-portal/frontend-conventions.md
@@ -13,6 +13,7 @@ related:
   - ../features/bff-customer-portal.md
   - ../features/accounts.md
   - ../features/account-custody-mode.md
+  - ../features/custody-mode-grouping.md
   - ../features/holdings.md
   - ../features/posting.md
   - ../features/net-worth.md
@@ -186,11 +187,33 @@ The account item from `GET /accounts` and `GET /accounts/{id}` gains `custodyMod
 
 - `/accounts` and `/accounts/:id`: show "Custody" next to "Type".
 - The text is a label, not the enum name: `External` → "Held elsewhere", `Custodial` → "Held on platform". A value the portal does not know is shown as received.
-- No grouping of accounts by custody mode and no explanatory sentence yet. Both belong to a later read-model slice.
+- No grouping of accounts by custody mode and no explanatory sentence yet. Both belong to a later read-model slice. (Superseded by the amendment 2026-11-18 below once it is accepted.)
 
 | Id | Given | When | Then |
 | --- | --- | --- | --- |
 | C13 | Customer with an External account | Accounts list and account page | "Custody" shows "Held elsewhere" next to the account type. |
+
+---
+
+## Amendment 2026-11-18 (grouping by custody mode) — review
+
+Status of this amendment: `review`, together with [custody-mode-grouping](../features/custody-mode-grouping.md). Not in force until that spec is accepted. It closes the last item of the 2026-11-17 amendment ("No grouping of accounts by custody mode and no explanatory sentence yet"). No backend grant changes and the BFF does not change: `GET /accounts` already takes `custodyMode`, and the net-worth reads gain `breakdowns.byCustodyMode`.
+
+The note, used word for word wherever it appears (the same sentence is in the Customer Transactions PDF, custody-mode-grouping R15):
+
+> Held elsewhere: recorded by your adviser from outside statements. The platform has not checked these figures.
+
+| Call | When | Notes |
+| --- | --- | --- |
+| `GET /accounts?custodyMode=Custodial&page=1&pageSize=100` | Accounts list, "Held on platform" group | Replaces the single list request |
+| `GET /accounts?custodyMode=External&page=1&pageSize=100` | Accounts list, "Held elsewhere" group | Replaces the single list request |
+
+| Id | Given | When | Then |
+| --- | --- | --- | --- |
+| C14 | Customer with a Custodial and an External account | Dashboard | Below the per-currency totals and above "By account type", a section "Held on platform and elsewhere" with a "Held on platform" row and a "Held elsewhere" row, each listing `assets.total` per currency from `byCustodyMode`. The note is under the "Held elsewhere" row. |
+| C15 | Customer with accounts of one custody mode only | Dashboard | Only that row is shown; the note only with "Held elsewhere". No accounts → the section shows "No balances." |
+| C16 | Customer | Accounts list | Two groups, "Held on platform" first, then "Held elsewhere", from the two filtered requests. A group with no accounts is not shown; both empty → "No accounts.". The note is under the "Held elsewhere" heading. The table columns are unchanged (C13). |
+| C17 | Customer | Account page | An External account shows the note under the "Custody" field. A Custodial account shows no note. |
 
 ---
 

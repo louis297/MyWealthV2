@@ -24,6 +24,7 @@ related:
   - ../features/custody-modes.md
   - ../features/tenant-custody-modes.md
   - ../features/external-caller-numbers.md
+  - ../features/custody-mode-grouping.md
 ---
 
 # Adviser Portal — Dashboard and ledger pages
@@ -180,6 +181,19 @@ Status of this amendment: `accepted` (2026-11-18), together with [external-calle
 | D23 | On an External source account, `/accounts/:id/convert` has no "I sell" / "I buy" toggle and sends no quote request. It has two required inputs, "Sell (<from currency>)" and "Buy (<to currency>)". Once both are valid it shows the implied rate as display text, "1 NZD = 0.5912 USD", rounded to 4 decimals. Review shows "Convert 845.74 NZD from <account> to 500.00 USD in <account> at 1 NZD = 0.5912 USD". Confirm posts `POST /transactions/fx` with `sellAmount`, `buyAmount`, `bookedAt` and no `expectedRate`, with one `Idempotency-Key` per form open; there is no 409 re-quote step. On a Custodial source account the form is unchanged. |
 
 The rate line under the amount on `/accounts/:id` already appears for any item with `fx`; an External `Buy` / `Sell` with a rate shows it without a change.
+
+---
+
+## Amendment 2026-11-18 (grouping by custody mode) — review
+
+Status of this amendment: `review`, together with [custody-mode-grouping](../features/custody-mode-grouping.md). Not in force until that spec is accepted. D24 and D25 extend D2 and D3; the other sections of the Dashboard do not change. The BFF does not change.
+
+| ID | Behaviour |
+| --- | --- |
+| D24 | `/dashboard` shows two figures below the per-currency totals and above "By customer": "Funds under management" and "External assets". Each lists, per currency, `assets.total` of the `Custodial` or the `External` entry of `breakdowns.byCustodyMode` from `GET /net-worth`. |
+| D25 | A custody mode with no entry in `byCustodyMode` shows "None." under its figure. The figures show no note; the "not checked" note is for the Customer only. |
+
+The Reports page does not change. The Adviser Balances and Customer Transactions PDFs gain a Custody column (custody-mode-grouping R10, R14); that is server output.
 
 ---
 
