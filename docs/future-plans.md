@@ -27,6 +27,7 @@ related:
   - adr/0020-account-custody-mode.md
   - features/tenant-custody-modes.md
   - features/external-caller-numbers.md
+  - features/custody-mode-grouping.md
 ---
 
 # Future plans
@@ -207,7 +208,7 @@ Tell apart the accounts the platform holds and trades from the accounts that onl
 
 Decided in discussion (2026-11-16), recorded in [ADR 0020](adr/0020-account-custody-mode.md) (accepted 2026-11-17): every Account has a custody mode, `External` or `Custodial`, on the Account and not on the Tenant. This comes before any work that turns hand-entered transactions into platform-side flows, because each such flow replaces a manual type on Custodial accounts only.
 
-Slices. The first four have a spec. Slices 3 to 5 do not depend on each other:
+Slices. All five have a spec. Slices 3 to 5 do not depend on each other:
 
 | Slice | Content | Behaviour change |
 | --- | --- | --- |
@@ -215,7 +216,7 @@ Slices. The first four have a spec. Slices 3 to 5 do not depend on each other:
 | 2 | Custodial accounts can be opened, with all of their rules in one spec: which account types they may have, which manual transaction types they refuse, the same custody mode on every leg account of a Transaction, who sets `bookedAt`, and portfolio assignment and rebalance by custody mode. [features/custody-modes.md](features/custody-modes.md) (accepted, landed 2026-11-17) | Most of the change |
 | 3 | A tenant setting for which custody modes may be opened, checked when an account is opened. [features/tenant-custody-modes.md](features/tenant-custody-modes.md) (accepted, landed 2026-11-18) | Small |
 | 4 | External accounts take the caller's numbers: executed price and fee on `Buy` / `Sell`, both amounts on an `FxConversion`. Server pricing, trade fee schedules and the reference rate then apply to Custodial accounts only. [features/external-caller-numbers.md](features/external-caller-numbers.md) (accepted, landed 2026-11-18) | Medium |
-| 5 | Read side: net worth, the two reports and the portal pages show the two modes as two groups | Read only |
+| 5 | Read side: net worth, the two reports and the portal pages show the two modes as two groups; the Custodial group is the funds under management, and the Customer is told that External figures are not checked by the platform. [features/custody-mode-grouping.md](features/custody-mode-grouping.md) (`review`) | Read only |
 
 After slice 2, some writes on a Custodial account are still entered by hand or are missing. Each later item replaces one of them:
 
