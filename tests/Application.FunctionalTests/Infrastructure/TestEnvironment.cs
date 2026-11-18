@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using MyWealthV2.Tests.Common;
+using OpenIddict.Server;
 
 namespace MyWealthV2.Application.FunctionalTests.Infrastructure;
 
@@ -71,6 +73,13 @@ internal sealed class TestEnvironment : IAsyncDisposable
         var identity = new IdentityFactory(connectionString);
         var identityHandler = identity.Server.CreateHandler();
         var identityAuthority = identity.ClientOptions.BaseAddress!.ToString().TrimEnd('/');
+
+        // In Development, IdentityHost takes its signing and encryption certificates from the user
+        // certificate store and creates them the first time its server options are read. On a machine
+        // with an empty store (CI), hosts that start in parallel would each create a certificate, and a
+        // host could then sign with one certificate and publish another. Reading the options here makes
+        // the default environment, which starts alone, create them before any parallel host starts.
+        _ = identity.Services.GetRequiredService<IOptionsMonitor<OpenIddictServerOptions>>().CurrentValue;
 
         var webApi = new WebApiFactory(connectionString, identityAuthority, identityHandler);
         _ = webApi.Services;
