@@ -63,8 +63,10 @@ public class EnteredTradeFeesSchemaTests
     [Test]
     public async Task Save_BuyWithAnEnteredFeeAndACallerRate_ReloadsBothDetails()
     {
+        await using var scratch = await ScratchSchemaDatabase.CreateAsync("EnteredTradeFeesEf");
+        await scratch.ApplyAllAsync();
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseSqlServer(SchemaDatabaseSetup.ConnectionString)
+            .UseSqlServer(scratch.ConnectionString)
             .Options;
         Guid publicId;
         await using (var db = new ApplicationDbContext(options))

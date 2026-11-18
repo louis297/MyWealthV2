@@ -36,7 +36,7 @@ public class FxConversionWithAmountsTests
     [Test]
     public void ZeroDecimalCurrency_DerivesTheRateToEightDecimals()
     {
-        var transaction = Convert(Money.Create(100000m, "JPY"), Money.Create(612.40m, "USD"), fromCurrency: "JPY");
+        var transaction = Convert(Money.Create(100000m, "JPY"), Money.Create(612.40m, "USD"), fromCurrency: "JPY", fromCashSum: 100000m);
 
         transaction.FxDetail!.Rate.ShouldBe(0.00612400m);
     }
