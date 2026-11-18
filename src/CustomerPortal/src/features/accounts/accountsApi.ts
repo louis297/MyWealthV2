@@ -44,8 +44,9 @@ export type Activity = {
 
 export const accountsApi = api.injectEndpoints({
   endpoints: (builder) => ({
-    getAccounts: builder.query<PagedList<Account>, void>({
-      query: () => "/accounts?page=1&pageSize=20",
+    /** One custody group of the caller's accounts (customer-portal C16). */
+    getAccounts: builder.query<PagedList<Account>, string>({
+      query: (custodyMode) => `/accounts?custodyMode=${encodeURIComponent(custodyMode)}&page=1&pageSize=100`,
       providesTags: ["Account"],
     }),
     getAccount: builder.query<Account, string>({

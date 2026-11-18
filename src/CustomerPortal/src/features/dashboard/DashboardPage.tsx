@@ -2,6 +2,7 @@ import { useAppSelector } from "@/app/hooks";
 import { Muted, Page, PageHeading, Section } from "@/components/portal";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { custodyLabel, externalNote } from "@/features/accounts/custodyLabel";
 import { useGetCustomerNetWorthQuery } from "@/features/dashboard/dashboardApi";
 
 export function DashboardPage() {
@@ -15,6 +16,11 @@ export function DashboardPage() {
   if (isError || !data) {
     return <Muted>Net worth is not available.</Muted>;
   }
+
+  // Custodial first, then External (customer-portal C14, C15).
+  const custodyRows = ["Custodial", "External"].flatMap((mode) =>
+    data.breakdowns.byCustodyMode.filter((row) => row.custodyMode === mode),
+  );
 
   return (
     <Page>
@@ -50,6 +56,37 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       )}
+      <Section title="Held on platform and elsewhere">
+        {custodyRows.length === 0 ? <Muted>No balances.</Muted> : (
+          <Card className="gap-0 py-0">
+            <CardContent className="px-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Custody</TableHead>
+                    <TableHead>Assets</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {custodyRows.map((row) => (
+                    <TableRow key={row.custodyMode}>
+                      <TableCell>
+                        <span>{custodyLabel(row.custodyMode)}</span>
+                        {row.custodyMode === "External" ? (
+                          <span className="mt-1 block text-xs whitespace-normal text-muted-foreground">{externalNote}</span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell>
+                        {row.currencies.map((currency) => `${currency.currency} ${currency.assets.total}`).join(", ")}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+      </Section>
       <Section title="By account type">
         {data.breakdowns.byAccountType.length === 0 ? <Muted>No balances.</Muted> : (
           <Card className="gap-0 py-0">
