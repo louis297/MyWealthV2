@@ -37,7 +37,14 @@ Custodial accounts do not change. Server pricing, trade fee schedules, the refer
 
 No new route, no new policy, no new `TransactionType`, no problem code. One new body field (`fxRate` on `POST /transactions`). Script `0034_entered_trade_fees.sql` drops one CHECK.
 
-**Status is `accepted` (2026-11-18).** Not landed. The amendments in buy-sell, trade-fees, fx-conversions, cross-currency-trades and custody-modes, in the two Adviser Portal page contracts, in domain-model, database-design, api-design and the glossary are in force from the same change.
+**Status is `accepted` (2026-11-18) and landed** on branch `feature/external-caller-numbers`: script `0034_entered_trade_fees.sql`, the entered fee and caller rate on `PostBuy` / `PostSell`, `PostFxConversionWithAmounts`, the custody-mode branches in `CreateTransaction`, `CreateFxConversion` and `GetFxConversionQuote`, and the Adviser Portal Buy / Sell, convert and fees pages. The amendments in buy-sell, trade-fees, fx-conversions, cross-currency-trades and custody-modes, in the two Adviser Portal page contracts, in domain-model, database-design, api-design and the glossary are in force.
+
+Implementation notes (2026-11-18), where the rules left a message open:
+
+- `fee` or `fxRate` on a `TransactionType` other than `Buy` / `Sell`: `fee` keeps today's message; `fxRate` → `FxRate can only be set on a buy or sell.` (R4).
+- R17, a rate that rounds to 0 or does not fit `decimal(18,8)`: `The rate from the two amounts must be greater than 0 and below 10,000,000,000.` on `errors.BuyAmount`.
+- R20, a Custodial conversion without `expectedRate`: `Expected rate is required. Get a quote first.` on `errors.ExpectedRate`. Before this slice the validator sent FluentValidation's default text for a missing value and this message only for a value `≤ 0`; a value `≤ 0` now gets `Expected rate must be greater than 0.`
+- The Domain refuses an entered fee together with a schedule (`A trade fee comes from a trade fee schedule or is entered, not both.`) and an `AppliedFxRate` that does not match the trade (`The rate must be for the price currency to the account currency.`, `The rate must be the one the cash legs use.`). No HTTP caller can reach these.
 
 ---
 
@@ -434,6 +441,6 @@ Only after `accepted`. The repository should build after each commit. Agents spl
 4. External conversions take both amounts; the quote refuses External Accounts (R15–R20) + functional tests, including two-tenant. `BookedAtOffsetTests` and `FutureBookedAtTests` change body here.
 5. Adviser Portal: Buy / Sell inputs on External accounts (D22) + frontend tests.
 6. Adviser Portal: the External convert form (D23) and the fees pages (F20, F21) + frontend tests.
-7. Repo docs: mark this file landed. (This file and the amendments in buy-sell, trade-fees, fx-conversions, cross-currency-trades, custody-modes, the two portal page contracts, domain-model, database-design, api-design and the glossary were accepted on 2026-11-18, before commit 1.)
+7. Repo docs: mark this file landed (done 2026-11-18). (This file and the amendments in buy-sell, trade-fees, fx-conversions, cross-currency-trades, custody-modes, the two portal page contracts, domain-model, database-design, api-design and the glossary were accepted on 2026-11-18, before commit 1.)
 
 Do not put read-model grouping, the rest of cross-currency-trades, or any change to Custodial accounts in these commits.

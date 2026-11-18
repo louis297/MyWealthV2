@@ -495,7 +495,7 @@ Do not put a tenant setting, caller-supplied prices, or read-model grouping in t
 
 ---
 
-## Amendment 2026-11-18 (External caller numbers) — accepted
+## Amendment 2026-11-18 (External caller numbers) — accepted, landed
 
 Status of this amendment: `accepted` (2026-11-18), together with [external-caller-numbers.md](external-caller-numbers.md).
 

@@ -170,7 +170,7 @@ Status of this amendment: `accepted` (2026-11-18), together with [tenant-custody
 
 ---
 
-## Amendment 2026-11-18 (External caller numbers) — accepted
+## Amendment 2026-11-18 (External caller numbers) — accepted, landed
 
 Status of this amendment: `accepted` (2026-11-18), together with [external-caller-numbers](../features/external-caller-numbers.md). D22 replaces "Server prices the security leg" in D10 on External accounts; D23 replaces the convert row for External accounts. On a Custodial account both stay as written. The BFF does not change.
 

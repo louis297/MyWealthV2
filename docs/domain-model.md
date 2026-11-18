@@ -397,6 +397,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-18 | Tenant custody modes landed: `Tenant.SetAllowedCustodyModes`, `Allows` and `AllowedCustodyModes`; `CreateAccount` checks the setting. |
 | 2026-11-18 | External caller numbers in `review`: entered fee and `AppliedFxRate` on `PostBuy` / `PostSell`; `PostFxConversionWithAmounts`. Recorded in §8.6 with a `review` mark. [features/external-caller-numbers.md](features/external-caller-numbers.md). |
 | 2026-11-18 | External caller numbers accepted. The `review` mark in §8.6 is dropped. |
+| 2026-11-18 | External caller numbers landed: `enteredFee` and `appliedRate` on `PostBuy` / `PostSell`, `PostFxConversionWithAmounts`, `AppliedFxRate.CallerSource`. |
 
 ---
 
