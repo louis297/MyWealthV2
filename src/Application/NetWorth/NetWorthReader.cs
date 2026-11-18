@@ -21,7 +21,7 @@ internal static class NetWorthReader
                   && account.IsActive
                   && (customerId == null || account.CustomerId == customerId)
                   && (assignedAdviserId == null || customer.AdviserId == assignedAdviserId)
-            select new AccountRow(account.Id, account.Currency, account.Type, customer.PublicId, customer.Name)
+            select new AccountRow(account.Id, account.Currency, account.Type, account.CustodyMode, customer.PublicId, customer.Name)
         ).ToListAsync(cancellationToken);
 
         if (accounts.Count == 0)
@@ -79,7 +79,15 @@ internal static class NetWorthReader
                         Currencies = CurrenciesFor(group, priced, cashByAccount)
                     })
                     .ToList(),
-                ByCustodyMode = [],
+                ByCustodyMode = accounts
+                    .GroupBy(account => account.CustodyMode)
+                    .OrderBy(group => group.Key.ToString(), StringComparer.Ordinal)
+                    .Select(group => new NetWorthCustodyModeBreakdownDto
+                    {
+                        CustodyMode = group.Key.ToString(),
+                        Currencies = CurrenciesFor(group, priced, cashByAccount)
+                    })
+                    .ToList(),
                 TopHoldings = priced
                     .GroupBy(holding => holding.InstrumentId)
                     .Select(group => new NetWorthTopHoldingDto
@@ -164,7 +172,13 @@ internal static class NetWorthReader
         };
     }
 
-    private sealed record AccountRow(int Id, string Currency, AccountType Type, Guid CustomerId, string CustomerName);
+    private sealed record AccountRow(
+        int Id,
+        string Currency,
+        AccountType Type,
+        CustodyMode CustodyMode,
+        Guid CustomerId,
+        string CustomerName);
 
     private sealed record HoldingRow(
         int AccountId,
