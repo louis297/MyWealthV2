@@ -70,6 +70,7 @@ Rules:
 - **Bug fixes** start with a test that reproduces the bug (red), then the fix (green).
 - **Exempt from test-first**: docs, config, CI, DI or wiring with no logic of its own, generated files, pure renames or moves, and refactors already covered by green tests. Still build and run the affected tests before you commit.
 - **Spikes**: if you need to try out an unknown API or library before you can write a sensible test, you may spike it. Tell the user it is a spike, do not commit it, then throw it away and start the red step.
+- **Parallel functional fixtures** (a default, not a hard rule): mark a new `TestBase` fixture `[Parallelizable]`. It then runs on its own database and test hosts. Leave the attribute off when parallel running is awkward, for example when the fixture changes state that the per-test database reset does not clear (OpenIddict client rows, process-wide settings or listeners, fixed paths on disk), or when it does not derive from `TestBase`. Do not rework a fixture only to make it parallel. `tests/Application.FunctionalTests/Parallelism.cs` has the details.
 
 ## Stop and hand off (mandatory)
 
