@@ -22,7 +22,7 @@ const tenant = {
   name: "North Advisory",
   code: "north-advisory",
   reportingCurrency: "GBP",
-  isEnabled: true,
+  isActive: true,
   rowVersion: "AAAA",
   created: "2026-09-14T00:00:00+00:00",
 };

@@ -5,7 +5,7 @@ export type Tenant = {
   reportingCurrency: string;
   // tenant-custody-modes R5: always in the order External, Custodial.
   allowedCustodyModes: ("External" | "Custodial")[];
-  isEnabled: boolean;
+  isActive: boolean;
   rowVersion: string;
   created: string;
 };

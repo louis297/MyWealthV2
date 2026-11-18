@@ -39,7 +39,7 @@ function tenant(allowedCustodyModes: Tenant["allowedCustodyModes"] = ["External"
     code: "north-advisory",
     reportingCurrency: "NZD",
     allowedCustodyModes,
-    isEnabled: true,
+    isActive: true,
     rowVersion: "AAAA",
     created: "2026-09-14T00:00:00+00:00",
   };
