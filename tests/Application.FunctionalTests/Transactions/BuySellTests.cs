@@ -72,7 +72,7 @@ public class BuySellTests : TestBase
         await SetPriceAsync(instrumentId, 10m, "USD");
         (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 100m)).StatusCode
             .ShouldBe(HttpStatusCode.Created);
-        var buyId = await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 2m));
+        var buyId = await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 2m, price: 10m));
         var (cash, quantity, cost) = await ReadEconomicLegsAsync(tokens.AccessToken, buyId);
 
         var reversal = await TransactionHttp.Send(
@@ -99,9 +99,9 @@ public class BuySellTests : TestBase
         await SetPriceAsync(instrumentId, 10m, "USD");
         (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 100m)).StatusCode
             .ShouldBe(HttpStatusCode.Created);
-        (await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 2m)).StatusCode
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 2m, price: 10m)).StatusCode
             .ShouldBe(HttpStatusCode.Created);
-        var sellId = await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Sell", instrumentId, 1m));
+        var sellId = await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Sell", instrumentId, 1m, price: 10m));
         var (cash, quantity, cost) = await ReadEconomicLegsAsync(tokens.AccessToken, sellId);
 
         var reversalId = await ReadId(await TransactionHttp.Send(
@@ -122,8 +122,8 @@ public class BuySellTests : TestBase
         await SetPriceAsync(instrumentId, 10m, "USD");
         (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 100m)).StatusCode
             .ShouldBe(HttpStatusCode.Created);
-        var buyId = await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 2m));
-        (await PostSecurityAsync(tokens.AccessToken, accountId, "Sell", instrumentId, 1m)).StatusCode
+        var buyId = await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 2m, price: 10m));
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "Sell", instrumentId, 1m, price: 10m)).StatusCode
             .ShouldBe(HttpStatusCode.Created);
 
         var reversal = await TransactionHttp.Send(
@@ -145,9 +145,9 @@ public class BuySellTests : TestBase
         await SetPriceAsync(instrumentId, 10m, "USD");
         (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 100m)).StatusCode
             .ShouldBe(HttpStatusCode.Created);
-        (await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 2m)).StatusCode
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 2m, price: 10m)).StatusCode
             .ShouldBe(HttpStatusCode.Created);
-        var sellId = await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Sell", instrumentId, 2m));
+        var sellId = await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Sell", instrumentId, 2m, price: 10m));
         (await PostCashAsync(tokens.AccessToken, accountId, "TransferOut", -100m)).StatusCode
             .ShouldBe(HttpStatusCode.Created);
 
@@ -206,14 +206,14 @@ public class BuySellTests : TestBase
         var accountId = await OpenAccountAsync(tokens.AccessToken, customer.PublicId, "Brokerage", "USD");
         var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
         await SetPriceAsync(instrumentId, 10m, "USD");
-        (await PostSecurityAsync(tokens.AccessToken, accountId, "Sell", instrumentId, 1m)).StatusCode
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "Sell", instrumentId, 1m, price: 10m)).StatusCode
             .ShouldBe(HttpStatusCode.BadRequest);
         (await PostSecurityAsync(tokens.AccessToken, accountId, "StockOut", instrumentId, 1m)).StatusCode
             .ShouldBe(HttpStatusCode.BadRequest);
 
         (await PostSecurityAsync(tokens.AccessToken, accountId, "StockIn", instrumentId, 1m, 10m)).StatusCode
             .ShouldBe(HttpStatusCode.Created);
-        (await PostSecurityAsync(tokens.AccessToken, accountId, "Sell", instrumentId, 2m)).StatusCode
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "Sell", instrumentId, 2m, price: 10m)).StatusCode
             .ShouldBe(HttpStatusCode.BadRequest);
         (await PostSecurityAsync(tokens.AccessToken, accountId, "StockOut", instrumentId, 2m)).StatusCode
             .ShouldBe(HttpStatusCode.BadRequest);
@@ -232,7 +232,7 @@ public class BuySellTests : TestBase
         (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 10m)).StatusCode
             .ShouldBe(HttpStatusCode.Created);
 
-        (await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 2m)).StatusCode
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 2m, price: 10m)).StatusCode
             .ShouldBe(HttpStatusCode.BadRequest);
         (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(10m);
         (await HoldingCountAsync(tokens.AccessToken, accountId)).ShouldBe(0);
@@ -249,7 +249,7 @@ public class BuySellTests : TestBase
         (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 100m)).StatusCode
             .ShouldBe(HttpStatusCode.Created);
 
-        (await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 1m)).StatusCode
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 1m, price: 10m)).StatusCode
             .ShouldBe(HttpStatusCode.BadRequest);
     }
 
@@ -264,7 +264,7 @@ public class BuySellTests : TestBase
         (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 100m)).StatusCode
             .ShouldBe(HttpStatusCode.Created);
 
-        (await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 1m)).StatusCode
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 1m, price: 10m)).StatusCode
             .ShouldBe(HttpStatusCode.BadRequest);
         (await PostSecurityAsync(tokens.AccessToken, accountId, "StockIn", instrumentId, 1m, 10m)).StatusCode
             .ShouldBe(HttpStatusCode.BadRequest);
@@ -343,12 +343,12 @@ public class BuySellTests : TestBase
             .ShouldBe(HttpStatusCode.Created);
         var key = Guid.NewGuid();
 
-        var id = await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 1m, key: key));
-        var replay = await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 1m, key: key);
+        var id = await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 1m, key: key, price: 10m));
+        var replay = await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 1m, key: key, price: 10m);
         replay.StatusCode.ShouldBe(HttpStatusCode.Created);
         (await ReadId(replay)).ShouldBe(id);
 
-        var mismatch = await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 2m, key: key);
+        var mismatch = await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 2m, key: key, price: 10m);
         mismatch.StatusCode.ShouldBe(HttpStatusCode.Conflict);
         (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(90m);
     }
@@ -370,9 +370,9 @@ public class BuySellTests : TestBase
         var southInstrument = await CreateInstrumentAsync(southTokens.AccessToken, "AIA", "USD");
         await SetPriceAsync(southInstrument, 8m, "USD");
 
-        (await PostSecurityAsync(tokens.AccessToken, southAccount, "Buy", instrumentId, 1m)).StatusCode
+        (await PostSecurityAsync(tokens.AccessToken, southAccount, "Buy", instrumentId, 1m, price: 10m)).StatusCode
             .ShouldBe(HttpStatusCode.NotFound);
-        (await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", southInstrument, 1m)).StatusCode
+        (await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", southInstrument, 1m, price: 10m)).StatusCode
             .ShouldBe(HttpStatusCode.NotFound);
         (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(100m);
     }
@@ -387,7 +387,7 @@ public class BuySellTests : TestBase
         await SetRateAsync("USD", "NZD", 5m / 3m);
         (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 2000m)).StatusCode
             .ShouldBe(HttpStatusCode.Created);
-        var buyId = await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 50m));
+        var buyId = await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 50m, price: 15m, fxRate: 1.66666667m));
         var stockInId = await ReadId(await PostSecurityAsync(
             tokens.AccessToken, accountId, "StockIn", instrumentId, 4m, 800m));
 
@@ -525,7 +525,10 @@ public class BuySellTests : TestBase
         return TransactionHttp.Send(HttpMethod.Post, "/transactions", accessToken, body, Guid.NewGuid());
     }
 
-    /// <summary>A security body. A Custodial account is booked by the server and takes no <c>bookedAt</c>.</summary>
+    /// <summary>
+    /// A security body. A Custodial account is booked by the server and takes no <c>bookedAt</c>; an External
+    /// <c>Buy</c> / <c>Sell</c> carries the executed price (external-caller-numbers R5) and, across currencies, the rate.
+    /// </summary>
     private static Task<HttpResponseMessage> PostSecurityAsync(
         string accessToken,
         Guid accountId,
@@ -534,7 +537,9 @@ public class BuySellTests : TestBase
         decimal quantity,
         decimal? cost = null,
         Guid? key = null,
-        bool custodial = false)
+        bool custodial = false,
+        decimal? price = null,
+        decimal? fxRate = null)
     {
         var body = new Dictionary<string, object?>
         {
@@ -542,14 +547,19 @@ public class BuySellTests : TestBase
             ["type"] = type,
             ["security"] = new[]
             {
-                cost is null
-                    ? (object)new { instrumentId, quantity }
-                    : new { instrumentId, quantity, cost }
+                cost is not null ? new { instrumentId, quantity, cost }
+                    : price is not null ? new { instrumentId, quantity, price }
+                    : (object)new { instrumentId, quantity }
             }
         };
         if (!custodial)
         {
             body["bookedAt"] = BookedAt;
+        }
+
+        if (fxRate is not null)
+        {
+            body["fxRate"] = fxRate;
         }
 
         return TransactionHttp.Send(HttpMethod.Post, "/transactions", accessToken, body, key ?? Guid.NewGuid());

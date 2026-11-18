@@ -46,8 +46,17 @@ public class CreateTransactionCommand : IRequest<IdempotentResult>
 
     public decimal? Ratio { get; init; }
 
-    /// <summary>Not part of the body: brokerage is computed by the server (trade-fees R14).</summary>
+    /// <summary>
+    /// The brokerage the outside broker charged on an External <c>Buy</c> / <c>Sell</c>, in the instrument's quote
+    /// currency (external-caller-numbers R6). Refused on a Custodial account, where the server computes it (trade-fees R14).
+    /// </summary>
     public decimal? Fee { get; init; }
+
+    /// <summary>
+    /// Account currency per 1 quote currency on an External <c>Buy</c> / <c>Sell</c> across currencies
+    /// (external-caller-numbers R7). Refused on a Custodial account.
+    /// </summary>
+    public decimal? FxRate { get; init; }
 
     public sealed class OpeningHoldingSecurity
     {

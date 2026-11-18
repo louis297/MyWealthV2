@@ -79,9 +79,9 @@ public class ReverseOrderTests : TestBase
         var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
         await SetPriceAsync(instrumentId, 10m, "USD");
         (await PostCashAsync(tokens.AccessToken, accountId, 10000m)).StatusCode.ShouldBe(HttpStatusCode.Created);
-        var firstBuy = await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 100m));
-        await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 100m));
-        await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Sell", instrumentId, 100m));
+        var firstBuy = await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 100m, price: 10m));
+        await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 100m, price: 10m));
+        await ReadId(await PostSecurityAsync(tokens.AccessToken, accountId, "Sell", instrumentId, 100m, price: 10m));
         var before = await CountTransactionsAsync(accountId);
 
         var response = await ReverseAsync(tokens.AccessToken, firstBuy);
@@ -194,7 +194,8 @@ public class ReverseOrderTests : TestBase
         string type,
         Guid instrumentId,
         decimal quantity,
-        decimal? cost = null) =>
+        decimal? cost = null,
+        decimal? price = null) =>
         TransactionHttp.Send(HttpMethod.Post, "/transactions", accessToken, new
         {
             accountId,
@@ -202,9 +203,9 @@ public class ReverseOrderTests : TestBase
             bookedAt = BookedAt,
             security = new[]
             {
-                cost is null
-                    ? (object)new { instrumentId, quantity }
-                    : new { instrumentId, quantity, cost }
+                cost is not null ? new { instrumentId, quantity, cost }
+                    : price is not null ? new { instrumentId, quantity, price }
+                    : (object)new { instrumentId, quantity }
             }
         }, Guid.NewGuid());
 
