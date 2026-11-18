@@ -1,6 +1,6 @@
 ---
 title: Tenant custody modes
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -28,7 +28,7 @@ Amendment to [tenants.md](tenants.md) and to account open in [accounts.md](accou
 
 SystemAdmin sets the **allowed custody modes** of a Tenant on `POST /tenants` and `PUT /tenants/{id}`, and in the Back Office. `POST /accounts` refuses a custody mode the Tenant does not allow. Nothing else reads the setting. Script `0033_tenants_allowed_custody_modes.sql`. No new route, no new policy, no problem code.
 
-**Status is `review`.** Not a build contract until it is `accepted`.
+**Status is `accepted` (2026-11-18).** Not landed. The amendments in tenants, accounts and demo-tenant-seed, in the Back Office and Adviser Portal page contracts, in domain-model, database-design, api-design and the glossary are in force from the same change.
 
 ---
 
@@ -136,7 +136,7 @@ Invariants:
 
 The duplicate and empty 400s of R3 are raised by the validator with their field key before the Domain is called; the Domain check is the backstop for callers that do not go through HTTP.
 
-Update [domain-model.md](../domain-model.md) §4.1 when this spec is accepted.
+Recorded in [domain-model.md](../domain-model.md) §4.1.
 
 ---
 
@@ -158,7 +158,7 @@ Existing data:
 - Every environment: all Tenants allow both after the script. No behaviour changes until SystemAdmin narrows one.
 - Functional tests create their own tenants and are not affected by the back-fill.
 
-Update [database-design.md](../database-design.md) §6.5 and §9 when this spec is accepted.
+Recorded in [database-design.md](../database-design.md) §6.5 and §9.
 
 ---
 
@@ -255,7 +255,7 @@ Keep the resource catalog in [api-design.md](../api-design.md) §7.3 pointing he
 
 ## 9. UI
 
-Page contracts: [back-office.md](../backoffice/back-office.md) (BO14, BO15) and [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D21), amended in the same change that accepts this spec. The Adviser Portal BFF does not change: `GET /tenants/by-code/{code}` is already proxied.
+Page contracts: [back-office.md](../backoffice/back-office.md) (BO14, BO15) and [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D21), amended and accepted together with this spec. The Adviser Portal BFF does not change: `GET /tenants/by-code/{code}` is already proxied.
 
 **Back Office**
 
@@ -326,7 +326,7 @@ No new ADR. [ADR 0020](../adr/0020-account-custody-mode.md) item 1 decided that 
 | Routes, policies, problem codes, events | None added |
 | Back Office place | Tenant detail page, not the configuration page |
 
-To confirm when this spec is accepted. Each is written into the rules above as stated here:
+Confirmed when this spec was accepted (2026-11-18). Each is written into the rules above as stated here:
 
 1. **`allowedCustodyModes` is required on `POST /tenants`** (R3). It makes the operator state the setting for a new firm. The alternative is to make it optional with a default of both: the setting can be changed at any time and narrowing it has no effect on existing data, so a default is less risky here than it was for `Account.CustodyMode`.
 2. **Narrowing does not block reopen** (R9). A Closed account of a mode the Tenant no longer allows can be reopened. The alternative is to treat reopen as an open and refuse it.
@@ -351,6 +351,6 @@ The repository should build after each commit. Agents split each behaviour into 
 3. `POST /accounts` checks the Tenant's setting (R7–R10) + functional tests, including two-tenant and narrowing. `TestApp.CreateTenantAsync` gains the optional parameter.
 4. Back Office: the setting on the New tenant form and the tenant detail page (BO14, BO15) + page tests.
 5. Adviser Portal: the New account form offers the firm's allowed custody modes (D21) + frontend tests.
-6. Repo docs: mark this file landed.
+6. Repo docs: mark this file landed. (This file and the amendments in tenants, accounts, demo-tenant-seed, the two portal page contracts, domain-model, database-design, api-design and the glossary were accepted on 2026-11-18, before commit 1.)
 
 Do not put caller-supplied prices, read-model grouping, or any other tenant flag in these commits.

@@ -106,7 +106,7 @@ Authorization (named policies, `RolePermissions`, handler scope checks) is not a
 - A tenant may be re-enabled. Login with that Code works again only if the person’s `Status` is still `Active`.
 - `RowVersion` conflict → HTTP 409.
 - `Rename` changes `Name` (non-empty; uniqueness is application). `Enable` / `Disable` flip `IsActive` and raise `TenantEnabled` / `TenantDisabled` only when the flag actually changes. `Create` raises `TenantCreated`.
-- (`review`, tenant custody modes) A Tenant has **allowed custody modes**, `External`, `Custodial` or both, never none. `Create` allows both and keeps its signature. `SetAllowedCustodyModes` replaces the set and refuses an empty one; `Allows(CustodyMode)` reads it. No event. An account is opened only in a mode its Tenant allows at the time of open; Application holds that check, and narrowing the setting changes no existing account ([features/tenant-custody-modes.md](features/tenant-custody-modes.md)). Not in force until that spec is accepted.
+- (tenant custody modes) A Tenant has **allowed custody modes**, `External`, `Custodial` or both, never none. `Create` allows both and keeps its signature. `SetAllowedCustodyModes` replaces the set and refuses an empty one; `Allows(CustodyMode)` reads it. No event. An account is opened only in a mode its Tenant allows at the time of open; Application holds that check, and narrowing the setting changes no existing account ([features/tenant-custody-modes.md](features/tenant-custody-modes.md)).
 
 ### 4.2 Person
 
@@ -392,6 +392,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-17 | Custody modes accepted. The `review` marks in §8.5 and §8.6 are dropped; the Custodial rules replace the line that kept `Custodial` reserved. |
 | 2026-11-17 | Custody modes landed: `Account.Create` refuses Custodial with a type other than Brokerage, `CustodyRules` in Domain, and the custody modes on `PostInternalTransfer` and `PostFxConversion`. |
 | 2026-11-18 | Tenant custody modes in `review`: allowed custody modes on the Tenant, checked when an account is opened. Recorded in §4.1 with a `review` mark. [features/tenant-custody-modes.md](features/tenant-custody-modes.md). |
+| 2026-11-18 | Tenant custody modes accepted. The `review` mark in §4.1 is dropped. |
 
 ---
 

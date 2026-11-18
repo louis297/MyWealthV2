@@ -216,9 +216,9 @@ The repository should build after each commit. Agents split each line into red t
 
 ---
 
-## Amendment 2026-11-18 (allowed custody modes) — review
+## Amendment 2026-11-18 (allowed custody modes) — accepted
 
-Status of this amendment: `review`. Accept it together with [tenant-custody-modes.md](tenant-custody-modes.md). Until then this file is unchanged.
+Status of this amendment: `accepted` (2026-11-18), together with [tenant-custody-modes.md](tenant-custody-modes.md).
 
 - R4: the demo tenant the command creates allows both custody modes. It is still created through `Tenant.Create`, which allows both; the seed code does not change.
 - R5: an existing `demo` tenant is not changed, and that includes its allowed custody modes. A `demo` tenant that existed before script `0033` allows both from the back-fill.

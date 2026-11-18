@@ -371,9 +371,9 @@ Accepted with [demo-tenant-seed.md](demo-tenant-seed.md). Supersedes the R17 sen
 
 ---
 
-## Amendment 2026-11-18 (allowed custody modes) — review
+## Amendment 2026-11-18 (allowed custody modes) — accepted
 
-Status of this amendment: `review`. Accept it together with [tenant-custody-modes.md](tenant-custody-modes.md). Until then this file is unchanged. That spec owns the field rules; this list says what changes here.
+Status of this amendment: `accepted` (2026-11-18), together with [tenant-custody-modes.md](tenant-custody-modes.md). That spec owns the field rules; this list says what changes here.
 
 - §2 Out "Quotas, billing, branding, per-tenant currency allow-lists" still holds. The allowed custody modes are the one per-tenant setting [ADR 0020](../adr/0020-account-custody-mode.md) item 1 allows.
 - §6: the slice that ships this adds script `0033_tenants_allowed_custody_modes.sql`: `Tenants.AllowsExternalAccounts` and `Tenants.AllowsCustodialAccounts`, `bit NOT NULL`, DEFAULT 1, CHECK at least one. Existing tenants allow both.

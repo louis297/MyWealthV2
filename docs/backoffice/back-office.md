@@ -194,9 +194,9 @@ Status of this amendment: `accepted` (2026-11-13). It is a build contract. Lande
 
 ---
 
-## Amendment 2026-11-18 (allowed custody modes) — review
+## Amendment 2026-11-18 (allowed custody modes) — accepted
 
-Status of this amendment: `review`. Accept it together with [tenant-custody-modes.md](../features/tenant-custody-modes.md). Until then the Tenants pages above are unchanged. No new route.
+Status of this amendment: `accepted` (2026-11-18), together with [tenant-custody-modes.md](../features/tenant-custody-modes.md). No new route.
 
 - `/tenants/new`: a required "Custody modes" group with two checkboxes, "External accounts" and "Custodial accounts", both checked when the form opens. `POST /tenants` carries the checked values as `allowedCustodyModes`.
 - `/tenants/{id}`: shows the allowed custody modes next to the reporting currency. The edit form has the same two checkboxes, set from the item, and every `PUT /tenants/{id}` carries `allowedCustodyModes` with name, reporting currency and `rowVersion`. Under the group: "Changing this affects only new accounts."

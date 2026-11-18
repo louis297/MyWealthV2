@@ -159,9 +159,9 @@ Portfolio controls on the account page: [adviser-portal-portfolios](adviser-port
 
 ---
 
-## Amendment 2026-11-18 (tenant custody modes) — review
+## Amendment 2026-11-18 (tenant custody modes) — accepted
 
-Status of this amendment: `review`. Accept it together with [tenant-custody-modes](../features/tenant-custody-modes.md). Until then D17 is unchanged. D21 narrows D17 to the custody modes the firm allows. The BFF does not change.
+Status of this amendment: `accepted` (2026-11-18), together with [tenant-custody-modes](../features/tenant-custody-modes.md). D21 narrows D17 to the custody modes the firm allows. The BFF does not change.
 
 | ID | Behaviour |
 | --- | --- |

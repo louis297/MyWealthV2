@@ -212,7 +212,7 @@ Slices. The first three have a spec. Slices 3 to 5 do not depend on each other:
 | --- | --- | --- |
 | 1 | The attribute on the Account. Only `External` can be opened; `Custodial` is a reserved value. [features/account-custody-mode.md](features/account-custody-mode.md) (accepted, landed 2026-11-17) | None |
 | 2 | Custodial accounts can be opened, with all of their rules in one spec: which account types they may have, which manual transaction types they refuse, the same custody mode on every leg account of a Transaction, who sets `bookedAt`, and portfolio assignment and rebalance by custody mode. [features/custody-modes.md](features/custody-modes.md) (accepted, landed 2026-11-17) | Most of the change |
-| 3 | A tenant setting for which custody modes may be opened, checked when an account is opened. [features/tenant-custody-modes.md](features/tenant-custody-modes.md) (`review`) | Small |
+| 3 | A tenant setting for which custody modes may be opened, checked when an account is opened. [features/tenant-custody-modes.md](features/tenant-custody-modes.md) (accepted 2026-11-18) | Small |
 | 4 | External accounts take the caller's numbers: executed price and fee on `Buy` / `Sell`, both amounts on an `FxConversion`. Server pricing and trade fee schedules then apply to Custodial accounts only | Medium |
 | 5 | Read side: net worth, the two reports and the portal pages show the two modes as two groups | Read only |
 
