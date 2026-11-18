@@ -253,6 +253,7 @@ describe("AccountDetailPage", () => {
 
     await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
+    fireEvent.change(screen.getByLabelText("Price per unit (NZD)"), { target: { value: "25" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T10:00" },
     });
@@ -360,6 +361,7 @@ describe("AccountDetailPage", () => {
 
     await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "40" } });
+    fireEvent.change(screen.getByLabelText("Price per unit (NZD)"), { target: { value: "31.25" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T11:00" },
     });
@@ -381,7 +383,7 @@ describe("AccountDetailPage", () => {
       security: Record<string, unknown>[];
     };
     expect(body.type).toBe("Sell");
-    expect(body.security).toEqual([{ instrumentId, quantity: 40 }]);
+    expect(body.security).toEqual([{ instrumentId, quantity: 40, price: 31.25 }]);
     expect(body.security[0]).not.toHaveProperty("cost");
     expect(body).not.toHaveProperty("tenantId");
     expect(document.querySelector('input[type="password"]')).toBeNull();

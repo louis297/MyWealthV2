@@ -182,6 +182,12 @@ function renderForm(
   return { fetchMock, router };
 }
 
+/** D22: the executed price and the FX rate an External Buy / Sell of the USD instrument needs. */
+function fillCallerNumbers() {
+  fireEvent.change(screen.getByLabelText("Price per unit (USD)"), { target: { value: "25" } });
+  fireEvent.change(screen.getByLabelText("FX rate (1 USD = ? NZD)"), { target: { value: "1.6" } });
+}
+
 describe("CreateTransactionPage", () => {
   beforeEach(() => {
     sessionStorage.clear();
@@ -369,6 +375,7 @@ describe("CreateTransactionPage", () => {
 
     await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
+    fillCallerNumbers();
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T10:00" },
     });
@@ -493,6 +500,7 @@ describe("CreateTransactionPage", () => {
 
     await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
+    fillCallerNumbers();
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T10:00" },
     });
@@ -528,6 +536,7 @@ describe("CreateTransactionPage", () => {
 
     await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
+    fillCallerNumbers();
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T10:00" },
     });
@@ -551,6 +560,7 @@ describe("CreateTransactionPage", () => {
 
     await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
+    fillCallerNumbers();
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T10:00" },
     });

@@ -35,21 +35,47 @@ function isNotFound(error: unknown) {
   return typeof error === "object" && error !== null && "status" in error && error.status === 404;
 }
 
-function problemMessages(error: unknown): string[] {
+/** The body fields whose 400 is shown at their input (D22), by the error key the server sends. */
+const fieldKeys = { price: "security[0].price", fee: "fee", fxRate: "fxrate" } as const;
+type FieldErrors = Partial<Record<keyof typeof fieldKeys, string[]>>;
+
+function problem(error: unknown): { messages: string[]; fields: FieldErrors } {
   if (isNotFound(error)) {
-    return ["Not found"];
+    return { messages: ["Not found"], fields: {} };
   }
   if (typeof error !== "object" || error === null || !("data" in error)) {
-    return [];
+    return { messages: [], fields: {} };
   }
   const data = (error as { data?: { errors?: Record<string, string[]>; detail?: string } }).data;
   if (data?.errors) {
-    return Object.values(data.errors).flat();
+    const fields: FieldErrors = {};
+    const messages: string[] = [];
+    for (const [key, values] of Object.entries(data.errors)) {
+      const field = (Object.keys(fieldKeys) as (keyof typeof fieldKeys)[])
+        .find((name) => fieldKeys[name] === key.toLowerCase());
+      if (field) {
+        fields[field] = values;
+      } else {
+        messages.push(...values);
+      }
+    }
+    return { messages, fields };
   }
   if (data?.detail) {
-    return [data.detail];
+    return { messages: [data.detail], fields: {} };
   }
-  return [];
+  return { messages: [], fields: {} };
+}
+
+function FieldError({ id, messages }: { id: string; messages?: string[] }) {
+  if (!messages || messages.length === 0) {
+    return null;
+  }
+  return (
+    <p id={id} className="text-sm text-destructive">
+      {messages.join(" ")}
+    </p>
+  );
 }
 
 export function CreateTransactionPage() {
@@ -61,6 +87,10 @@ export function CreateTransactionPage() {
   const [instrumentId, setInstrumentId] = useState("");
   const [quantity, setQuantity] = useState("");
   const [cost, setCost] = useState("");
+  const [price, setPrice] = useState("");
+  const [fee, setFee] = useState("");
+  const [fxRate, setFxRate] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
   const [bookedAt, setBookedAt] = useState("");
@@ -71,6 +101,13 @@ export function CreateTransactionPage() {
   const holdings = useGetAccountHoldingsQuery(accountId ?? "", { skip: !accountId });
   const instruments = useGetInstrumentsQuery();
   const [createTransaction] = useCreateTransactionMutation();
+  const pickedInstrument = (instruments.data?.items ?? []).find((item) => item.id === instrumentId);
+  const quoteCurrency = pickedInstrument?.quoteCurrency;
+  const accountCurrency = account.data?.currency;
+  const pricedType = type === "Buy" || type === "Sell";
+  // D22: an External trade carries the caller's numbers; the inputs appear once an instrument is picked.
+  const callerNumbers = pricedType && !custodial && quoteCurrency !== undefined;
+  const crossCurrency = callerNumbers && accountCurrency !== undefined && quoteCurrency !== accountCurrency;
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -90,6 +127,7 @@ export function CreateTransactionPage() {
         return;
       }
     }
+    setFieldErrors({});
     try {
       if (isCashType(type)) {
         await createTransaction({
@@ -116,14 +154,19 @@ export function CreateTransactionPage() {
                 instrumentId,
                 quantity: Number(quantity),
                 ...(type === "StockIn" ? { cost: Number(cost) } : {}),
+                ...(callerNumbers ? { price: Number(price) } : {}),
               },
             ],
+            ...(callerNumbers && fee.trim().length > 0 ? { fee: Number(fee) } : {}),
+            ...(crossCurrency ? { fxRate: Number(fxRate) } : {}),
           },
         }).unwrap();
       }
       void navigate(`/accounts/${accountId}`);
     } catch (error: unknown) {
-      setMessages(problemMessages(error));
+      const result = problem(error);
+      setMessages(result.messages);
+      setFieldErrors(result.fields);
     }
   }
 
@@ -210,7 +253,41 @@ export function CreateTransactionPage() {
                       onChange={(event) => setQuantity(event.target.value)}
                       required
                     />
-                    {type === "Buy" || type === "Sell" ? (
+                    {callerNumbers ? (
+                      <>
+                        <TextField
+                          id="transaction-price"
+                          label={`Price per unit (${quoteCurrency})`}
+                          value={price}
+                          onChange={(event) => setPrice(event.target.value)}
+                          aria-describedby={fieldErrors.price ? "transaction-price-error" : undefined}
+                          required
+                        />
+                        <FieldError id="transaction-price-error" messages={fieldErrors.price} />
+                        <TextField
+                          id="transaction-fee"
+                          label={`Fee (${quoteCurrency})`}
+                          value={fee}
+                          onChange={(event) => setFee(event.target.value)}
+                          aria-describedby={fieldErrors.fee ? "transaction-fee-error" : undefined}
+                        />
+                        <FieldError id="transaction-fee-error" messages={fieldErrors.fee} />
+                        {crossCurrency ? (
+                          <>
+                            <TextField
+                              id="transaction-fx-rate"
+                              label={`FX rate (1 ${quoteCurrency} = ? ${accountCurrency})`}
+                              value={fxRate}
+                              onChange={(event) => setFxRate(event.target.value)}
+                              aria-describedby={fieldErrors.fxRate ? "transaction-fx-rate-error" : undefined}
+                              required
+                            />
+                            <FieldError id="transaction-fx-rate-error" messages={fieldErrors.fxRate} />
+                          </>
+                        ) : null}
+                      </>
+                    ) : null}
+                    {pricedType && custodial ? (
                       <p className="text-sm text-muted-foreground">
                         Brokerage is added by the server from the trade fee schedule.
                       </p>

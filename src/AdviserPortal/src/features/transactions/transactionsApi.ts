@@ -64,14 +64,20 @@ export type TransactionListArgs = {
   type?: string;
 };
 
-/** `bookedAt` is sent for an External account only; the server sets it on a Custodial one (custody-modes R10). */
+/**
+ * `bookedAt` is sent for an External account only; the server sets it on a Custodial one (custody-modes R10).
+ * An External `Buy` / `Sell` carries the executed `price`, an optional `fee` and, across currencies, `fxRate`
+ * (external-caller-numbers R5–R7); a Custodial one carries none of them.
+ */
 export type CreateSecurityTransactionBody = {
   accountId: string;
   type: string;
   bookedAt?: string;
   memo: string | null;
   reference: string | null;
-  security: { instrumentId: string; quantity: number; cost?: number }[];
+  security: { instrumentId: string; quantity: number; cost?: number; price?: number }[];
+  fee?: number;
+  fxRate?: number;
 };
 
 export type CreateCashTransactionBody = {
