@@ -79,6 +79,7 @@ internal static class NetWorthReader
                         Currencies = CurrenciesFor(group, priced, cashByAccount)
                     })
                     .ToList(),
+                ByCustodyMode = [],
                 TopHoldings = priced
                     .GroupBy(holding => holding.InstrumentId)
                     .Select(group => new NetWorthTopHoldingDto

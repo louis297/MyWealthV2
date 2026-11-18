@@ -126,7 +126,7 @@ public class GetNetWorthTests : TestBase
         oneJson.RootElement.GetProperty("currencies").GetRawText()
             .ShouldBe(firmJson.RootElement.GetProperty("currencies").GetRawText());
         oneJson.RootElement.GetProperty("breakdowns").EnumerateObject().Select(property => property.Name)
-            .ShouldBe(["byCustomer", "byAccountType", "topHoldings"]);
+            .ShouldBe(["byCustomer", "byAccountType", "byCustodyMode", "topHoldings"]);
 
         (await AccountHttp.Send(
             HttpMethod.Get, $"/users/customers/{Guid.NewGuid()}/net-worth", tokens.AccessToken))

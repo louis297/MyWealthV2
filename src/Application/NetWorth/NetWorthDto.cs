@@ -16,6 +16,7 @@ public sealed class NetWorthDto
         {
             ByCustomer = [],
             ByAccountType = [],
+            ByCustodyMode = [],
             TopHoldings = []
         }
     };
@@ -52,6 +53,8 @@ public sealed class NetWorthBreakdownsDto
 
     public required IReadOnlyList<NetWorthAccountTypeBreakdownDto> ByAccountType { get; init; }
 
+    public required IReadOnlyList<NetWorthCustodyModeBreakdownDto> ByCustodyMode { get; init; }
+
     public required IReadOnlyList<NetWorthTopHoldingDto> TopHoldings { get; init; }
 }
 
@@ -67,6 +70,13 @@ public sealed class NetWorthCustomerBreakdownDto
 public sealed class NetWorthAccountTypeBreakdownDto
 {
     public required string Type { get; init; }
+
+    public required IReadOnlyList<NetWorthCurrencyDto> Currencies { get; init; }
+}
+
+public sealed class NetWorthCustodyModeBreakdownDto
+{
+    public required string CustodyMode { get; init; }
 
     public required IReadOnlyList<NetWorthCurrencyDto> Currencies { get; init; }
 }
