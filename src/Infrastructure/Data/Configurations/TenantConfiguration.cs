@@ -15,6 +15,7 @@ public class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.Property(tenant => tenant.ReportingCurrency).HasColumnType("char(3)").IsFixedLength().IsRequired();
         builder.Property(tenant => tenant.IsActive).IsRequired();
         builder.Property(tenant => tenant.RowVersion).IsRowVersion();
+        builder.Ignore(tenant => tenant.AllowedCustodyModes);
         builder.HasIndex(tenant => tenant.PublicId).IsUnique();
         builder.HasIndex(tenant => tenant.Name).IsUnique();
         builder.HasIndex(tenant => tenant.Code).IsUnique();

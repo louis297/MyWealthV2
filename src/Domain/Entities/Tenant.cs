@@ -1,3 +1,4 @@
+using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Events;
 using MyWealthV2.Domain.Exceptions;
 
@@ -74,6 +75,16 @@ public class Tenant : BaseAuditableEntity
         IsActive = false;
         AddDomainEvent(new TenantDisabled(this));
     }
+
+    /// <summary>The custody modes new Accounts of this Tenant may be opened with, External before Custodial.</summary>
+    public IReadOnlyList<CustodyMode> AllowedCustodyModes => [];
+
+    /// <summary>Replaces the allowed custody modes (tenant-custody-modes R2). An empty set is refused.</summary>
+    public void SetAllowedCustodyModes(IReadOnlyCollection<CustodyMode> modes)
+    {
+    }
+
+    public bool Allows(CustodyMode mode) => false;
 
     private static void EnsureReportingCurrency(Currency currency)
     {
