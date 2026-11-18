@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Domain.Entities;
+using MyWealthV2.Domain.Enums;
 using MyWealthV2.Infrastructure.Currencies;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Interceptors;
@@ -50,6 +51,7 @@ public class DemoTenantSeedTests
         tenant.ReportingCurrency.ShouldBe("USD");
         tenant.IsActive.ShouldBeTrue();
         tenant.CreatedBy.ShouldBe("system");
+        tenant.AllowedCustodyModes.ShouldBe([CustodyMode.External, CustodyMode.Custodial]);
 
         var instruments = await db.Instruments.AsNoTracking()
             .Where(row => row.TenantId == tenant.Id)
@@ -80,8 +82,8 @@ public class DemoTenantSeedTests
     public async Task ExistingDemoTenant_KeepsItsRowsAndAddsWhatIsMissing()
     {
         await _database.ExecuteAsync("""
-            INSERT INTO [Tenants] ([PublicId], [Name], [Code], [Created], [LastModified], [ReportingCurrency], [IsActive])
-            VALUES (NEWID(), N'Renamed Demo', N'demo', SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), 'NZD', 0);
+            INSERT INTO [Tenants] ([PublicId], [Name], [Code], [Created], [LastModified], [ReportingCurrency], [IsActive], [AllowsExternalAccounts], [AllowsCustodialAccounts])
+            VALUES (NEWID(), N'Renamed Demo', N'demo', SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), 'NZD', 0, 1, 0);
             DECLARE @t int = SCOPE_IDENTITY();
             INSERT INTO [Instruments] ([PublicId], [TenantId], [Symbol], [Name], [QuoteCurrency], [IsActive], [Created], [CreatedBy], [LastModified])
             VALUES (NEWID(), @t, N'VTI', N'Edited name', 'USD', 0, SYSDATETIMEOFFSET(), N'someone', SYSDATETIMEOFFSET());
@@ -98,6 +100,7 @@ public class DemoTenantSeedTests
         tenant.Name.ShouldBe("Renamed Demo");
         tenant.ReportingCurrency.ShouldBe("NZD");
         tenant.IsActive.ShouldBeFalse();
+        tenant.AllowedCustodyModes.ShouldBe([CustodyMode.External]);
 
         var vti = await db.Instruments.AsNoTracking().SingleAsync(row => row.Symbol == "VTI");
         vti.Name.ShouldBe("Edited name");

@@ -17,6 +17,8 @@ public class UpdateTenantCommand : IRequest
 
     public string? ReportingCurrency { get; init; }
 
+    public IReadOnlyList<string>? AllowedCustodyModes { get; init; }
+
     public string? RowVersion { get; init; }
 
     public string? Code { get; init; }
@@ -33,6 +35,9 @@ public class UpdateTenantCommandValidator : AbstractValidator<UpdateTenantComman
         RuleFor(command => command.Code)
             .Must(code => code is null)
             .WithMessage("Code cannot be changed.");
+        RuleFor(command => command.AllowedCustodyModes)
+            .MustBeAllowedCustodyModes()
+            .When(command => command.AllowedCustodyModes is not null);
     }
 }
 
@@ -84,6 +89,11 @@ public class UpdateTenantCommandHandler(IApplicationDbContext db, ICurrencyCatal
 
                 tenant.SetReportingCurrency(currency);
             }
+        }
+
+        if (request.AllowedCustodyModes is not null)
+        {
+            tenant.SetAllowedCustodyModes(AllowedCustodyModesRule.Parse(request.AllowedCustodyModes));
         }
 
         await db.SaveChangesAsync(cancellationToken);

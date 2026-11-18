@@ -16,6 +16,8 @@ public class CreateTenantCommand : IRequest<Guid>
     public required string Code { get; init; }
 
     public required string ReportingCurrency { get; init; }
+
+    public IReadOnlyList<string>? AllowedCustodyModes { get; init; }
 }
 
 public class CreateTenantCommandValidator : AbstractValidator<CreateTenantCommand>
@@ -35,6 +37,7 @@ public class CreateTenantCommandValidator : AbstractValidator<CreateTenantComman
             })
             .WithMessage("Code must be 2 to 50 characters in [a-z0-9-].");
         RuleFor(command => command.ReportingCurrency).NotEmpty();
+        RuleFor(command => command.AllowedCustodyModes).MustBeAllowedCustodyModes();
     }
 }
 
@@ -70,6 +73,7 @@ public class CreateTenantCommandHandler(IApplicationDbContext db, ICurrencyCatal
         }
 
         var tenant = Tenant.Create(name, code, currency);
+        tenant.SetAllowedCustodyModes(AllowedCustodyModesRule.Parse(request.AllowedCustodyModes!));
         db.Tenants.Add(tenant);
         await db.SaveChangesAsync(cancellationToken);
         return tenant.PublicId;

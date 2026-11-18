@@ -1,4 +1,5 @@
 using MyWealthV2.Domain.Entities;
+using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Events;
 using MyWealthV2.Domain.Exceptions;
 using NUnit.Framework;
@@ -127,6 +128,74 @@ public class TenantTests
         tenant.SetReportingCurrency(Currency.Create("AUD", "Australian Dollar", 2));
 
         tenant.ReportingCurrency.ShouldBe("AUD");
+    }
+
+    [Test]
+    public void Create_AllowsExternalAndCustodial()
+    {
+        var tenant = Tenant.Create("Acme", "acme", Nzd());
+
+        tenant.Allows(CustodyMode.External).ShouldBeTrue();
+        tenant.Allows(CustodyMode.Custodial).ShouldBeTrue();
+        tenant.AllowedCustodyModes.ShouldBe([CustodyMode.External, CustodyMode.Custodial]);
+    }
+
+    [Test]
+    public void SetAllowedCustodyModes_CustodialOnly_AllowsCustodialOnly()
+    {
+        var tenant = Tenant.Create("Acme", "acme", Nzd());
+
+        tenant.SetAllowedCustodyModes([CustodyMode.Custodial]);
+
+        tenant.Allows(CustodyMode.External).ShouldBeFalse();
+        tenant.Allows(CustodyMode.Custodial).ShouldBeTrue();
+        tenant.AllowedCustodyModes.ShouldBe([CustodyMode.Custodial]);
+    }
+
+    [Test]
+    public void SetAllowedCustodyModes_BothInAnyOrder_ListsThemInEnumOrder()
+    {
+        var tenant = Tenant.Create("Acme", "acme", Nzd());
+        tenant.SetAllowedCustodyModes([CustodyMode.External]);
+
+        tenant.SetAllowedCustodyModes([CustodyMode.Custodial, CustodyMode.External]);
+
+        tenant.Allows(CustodyMode.External).ShouldBeTrue();
+        tenant.Allows(CustodyMode.Custodial).ShouldBeTrue();
+        tenant.AllowedCustodyModes.ShouldBe([CustodyMode.External, CustodyMode.Custodial]);
+    }
+
+    [Test]
+    public void SetAllowedCustodyModes_RepeatedMode_CountsOnce()
+    {
+        var tenant = Tenant.Create("Acme", "acme", Nzd());
+
+        tenant.SetAllowedCustodyModes([CustodyMode.External, CustodyMode.External]);
+
+        tenant.AllowedCustodyModes.ShouldBe([CustodyMode.External]);
+        tenant.Allows(CustodyMode.Custodial).ShouldBeFalse();
+    }
+
+    [Test]
+    public void SetAllowedCustodyModes_Empty_ThrowsAndKeepsTheSetting()
+    {
+        var tenant = Tenant.Create("Acme", "acme", Nzd());
+        tenant.SetAllowedCustodyModes([CustodyMode.Custodial]);
+
+        Should.Throw<DomainException>(() => tenant.SetAllowedCustodyModes([]));
+
+        tenant.AllowedCustodyModes.ShouldBe([CustodyMode.Custodial]);
+    }
+
+    [Test]
+    public void SetAllowedCustodyModes_RaisesNoDomainEvent()
+    {
+        var tenant = Tenant.Create("Acme", "acme", Nzd());
+        tenant.ClearDomainEvents();
+
+        tenant.SetAllowedCustodyModes([CustodyMode.External]);
+
+        tenant.DomainEvents.ShouldBeEmpty();
     }
 
     private static Currency Nzd() => Currency.Create("NZD", "New Zealand Dollar", 2);

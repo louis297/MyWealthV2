@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-11-14
-last_updated: 2026-11-14
+last_updated: 2026-11-18
 related:
   - ../deployment.md
   - ../future-plans.md
@@ -15,6 +15,7 @@ related:
   - instrument-prices.md
   - fx-rates.md
   - reports.md
+  - tenant-custody-modes.md
   - production-hosting.md
   - ../known-issues/eodhd-nz-jp-coverage.md
 ---
@@ -212,3 +213,13 @@ The repository should build after each commit. Agents split each line into red t
 2. `DemoTenantSeed`: tenant, instruments and grants, idempotent, one transaction (R4–R12) + integration tests
 3. `webapi --seed-demo` argument check and entry point: run the seed, exit 0 or 1, do not listen (R1–R3) + unit test
 4. [deployment.md](../deployment.md) §12 runbook step and §13 item 7 updated (docs)
+
+---
+
+## Amendment 2026-11-18 (allowed custody modes) — accepted, landed
+
+Status of this amendment: `accepted` (2026-11-18), together with [tenant-custody-modes.md](tenant-custody-modes.md).
+
+- R4: the demo tenant the command creates allows both custody modes. It is still created through `Tenant.Create`, which allows both; the seed code does not change.
+- R5: an existing `demo` tenant is not changed, and that includes its allowed custody modes. A `demo` tenant that existed before script `0033` allows both from the back-fill.
+- §10: the integration test for a new run also asserts that `demo` allows both; the test with an existing `demo` tenant also asserts that a narrowed setting stays as it was.

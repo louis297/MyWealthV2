@@ -216,7 +216,8 @@ public class GetTenantByCodeTests : TestBase
             {
                 name = "Other Firm",
                 code = "other-firm",
-                reportingCurrency = "NZD"
+                reportingCurrency = "NZD",
+                allowedCustodyModes = new[] { "External", "Custodial" }
             }))
             .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         (await TenantHttp.Send(HttpMethod.Put, $"/tenants/{tenantId}", accessToken, new

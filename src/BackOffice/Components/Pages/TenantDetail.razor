@@ -25,6 +25,10 @@
                 <MudText Typo="Typo.caption">Code</MudText>
                 <MudText Typo="Typo.body1">@item.Code</MudText>
             </div>
+            <div>
+                <MudText Typo="Typo.caption">Allowed custody modes</MudText>
+                <MudText Typo="Typo.body1">@string.Join(", ", item.AllowedCustodyModes)</MudText>
+            </div>
             <EditForm Model="form" OnValidSubmit="Save" FormName="edit-tenant">
                 <MudStack Spacing="3">
                     <MudTextField @bind-Value="form.Name" Label="Name" Variant="Variant.Outlined" />
@@ -34,7 +38,15 @@
                             <MudSelectItem T="string" Value="@currency.Code">@currency.Code</MudSelectItem>
                         }
                     </MudSelect>
-                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Save</MudButton>
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.subtitle2">Custody modes</MudText>
+                        <MudCheckBox T="bool" @bind-Value="custody.AllowsExternal" Label="External accounts"
+                                     UserAttributes="@(new Dictionary<string, object?> { ["data-custody-mode"] = CustodyModeChoice.External })" />
+                        <MudCheckBox T="bool" @bind-Value="custody.AllowsCustodial" Label="Custodial accounts"
+                                     UserAttributes="@(new Dictionary<string, object?> { ["data-custody-mode"] = CustodyModeChoice.Custodial })" />
+                        <MudText Typo="Typo.caption">Changing this affects only new accounts.</MudText>
+                    </MudStack>
+                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!custody.CanSubmit)">Save</MudButton>
                 </MudStack>
             </EditForm>
         </MudStack>
@@ -57,6 +69,7 @@
     private TenantItem? item;
     private IReadOnlyList<CurrencyItem> currencies = [];
     private readonly FormModel form = new();
+    private CustodyModeChoice custody = CustodyModeChoice.Both();
     private string? error;
 
     protected override async Task OnInitializedAsync()
@@ -67,6 +80,7 @@
             currencies = await Api.ListCurrenciesAsync();
             form.Name = item.Name;
             form.ReportingCurrency = item.ReportingCurrency;
+            custody = CustodyModeChoice.From(item.AllowedCustodyModes);
         }
         catch (PlatformApiException exception)
         {
@@ -76,14 +90,14 @@
 
     private async Task Save()
     {
-        if (item is null)
+        if (item is null || !custody.CanSubmit)
         {
             return;
         }
 
         try
         {
-            await Api.UpdateTenantAsync(Id, form.Name, form.ReportingCurrency, item.RowVersion);
+            await Api.UpdateTenantAsync(Id, form.Name, form.ReportingCurrency, custody.ToList(), item.RowVersion);
             item = await Api.GetTenantAsync(Id);
             error = null;
         }

@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-13
-last_updated: 2026-11-14
+last_updated: 2026-11-18
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -17,6 +17,7 @@ related:
   - ../adr/0013-roles-authorization-single-user-table.md
   - currencies.md
   - identity-auth.md
+  - tenant-custody-modes.md
 ---
 
 # Tenants
@@ -367,3 +368,17 @@ Accepted with [demo-tenant-seed.md](demo-tenant-seed.md). Supersedes the R17 sen
 - That command writes the tenant row, its demo catalog and its two report grants. It seeds no people and no ledger data, and never changes an existing tenant.
 - `demo2` and `smoke` stay as R17 says: `demo2` is Development only; the smoke tenant is created by hand in production.
 - Functional tests still create their own tenants and must not depend on any seeded tenant.
+
+---
+
+## Amendment 2026-11-18 (allowed custody modes) — accepted, landed
+
+Status of this amendment: `accepted` (2026-11-18), together with [tenant-custody-modes.md](tenant-custody-modes.md). That spec owns the field rules; this list says what changes here.
+
+- §2 Out "Quotas, billing, branding, per-tenant currency allow-lists" still holds. The allowed custody modes are the one per-tenant setting [ADR 0020](../adr/0020-account-custody-mode.md) item 1 allows.
+- §6: the slice that ships this adds script `0033_tenants_allowed_custody_modes.sql`: `Tenants.AllowsExternalAccounts` and `Tenants.AllowsCustodialAccounts`, `bit NOT NULL`, DEFAULT 1, CHECK at least one. Existing tenants allow both.
+- §5: `Tenant.Create` keeps its signature and allows both. `SetAllowedCustodyModes` (refuses an empty set) and `Allows(CustodyMode)` are added. No event.
+- §8.1: the item on list, get-by-id and by-code carries `allowedCustodyModes`, in the order `External`, `Custodial`.
+- §8.3: `POST /tenants` requires `allowedCustodyModes` (array of enum names, exact case, non-empty, no repeats; else 400 `errors.AllowedCustodyModes`). `PUT /tenants/{id}` may carry it; omitted or `null` leaves the setting unchanged.
+- Disable and enable do not touch the setting.
+- Only `POST /accounts` reads the setting (tenant-custody-modes R7). Narrowing it changes no existing account.

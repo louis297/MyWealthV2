@@ -5,6 +5,7 @@ public sealed record TenantItem(
     string Name,
     string Code,
     string ReportingCurrency,
+    IReadOnlyList<string> AllowedCustodyModes,
     bool IsActive,
     string RowVersion);
 

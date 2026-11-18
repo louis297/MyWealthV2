@@ -12,6 +12,8 @@ public sealed class TenantDto
 
     public required string ReportingCurrency { get; init; }
 
+    public required IReadOnlyList<string> AllowedCustodyModes { get; init; }
+
     public required bool IsActive { get; init; }
 
     public required string RowVersion { get; init; }
@@ -24,6 +26,7 @@ public sealed class TenantDto
         Name = tenant.Name,
         Code = tenant.Code,
         ReportingCurrency = tenant.ReportingCurrency,
+        AllowedCustodyModes = tenant.AllowedCustodyModes.Select(mode => mode.ToString()).ToList(),
         IsActive = tenant.IsActive,
         RowVersion = Convert.ToBase64String(tenant.RowVersion ?? []),
         Created = tenant.Created

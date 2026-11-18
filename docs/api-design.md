@@ -3,7 +3,7 @@ title: API design
 status: accepted
 language: en
 created: 2026-09-11
-updated: 2026-11-17
+updated: 2026-11-18
 related:
   - README.md
   - glossary.md
@@ -357,6 +357,7 @@ Lookup: `GET /tenants/by-code/{code}` uses `tenants.read` (SystemAdmin, TenantAd
 - `code` is immutable after create (login key). Reporting currency may change in this phase (no ledger balances keyed on it yet).
 - After disable, that Code must not complete login; existing refresh fails once the outbox delivers `TenantDisabled`. Its people get 403 from `webapi` at once. Person `Status` is not bulk-updated.
 - Field rules: [features/tenants.md](features/tenants.md).
+- Amendment 2026-11-18 (tenant custody modes, accepted, landed; field rules in [features/tenant-custody-modes.md](features/tenant-custody-modes.md)): POST body adds required `allowedCustodyModes` (array of `External` / `Custodial`, non-empty, no repeats); PUT body may carry it (omitted = unchanged); the item on list, get and by-code carries it. Bad shape → 400 `errors.AllowedCustodyModes`. `POST /accounts` with a custody mode the Tenant does not allow → 400 `errors.CustodyMode`. No new route, policy or problem code.
 
 ### 7.4 People (TenantAdmin / Adviser / Customer)
 
@@ -574,3 +575,6 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-17 | §7.6, §7.7: custody modes in `review`. A Custodial account can be opened (`Brokerage` only); manual entry matrix, same custody mode on both Accounts of a transfer or conversion, and server-set `bookedAt` on Custodial accounts; portfolio assignment and rebalance on Custodial accounts only. No new route, policy or problem code ([features/custody-modes.md](features/custody-modes.md)). |
 | 2026-11-17 | §7.6, §7.7: custody modes accepted. |
 | 2026-11-17 | §7.6, §7.7: custody modes landed. |
+| 2026-11-18 | §7.3: tenant custody modes in `review`. `allowedCustodyModes` on the tenant bodies and item; `POST /accounts` checks it. No new route, policy or problem code ([features/tenant-custody-modes.md](features/tenant-custody-modes.md)). |
+| 2026-11-18 | §7.3: tenant custody modes accepted. |
+| 2026-11-18 | §7.3: tenant custody modes landed. |

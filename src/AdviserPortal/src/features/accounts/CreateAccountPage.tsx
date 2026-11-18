@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from "react";
 import { useNavigate, useParams } from "react-router";
+import { useAppSelector } from "@/app/hooks";
 import { Messages, Page, PageHeading, SelectField, TextField } from "@/components/portal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,23 +11,33 @@ import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
 const accountTypes = ["Bank", "Cash", "Brokerage", "Other"] as const;
 
 // D17: nothing is preselected. A Custodial account is always Brokerage (custody-modes R3).
+// D21: only the firm's allowed custody modes are offered; one allowed mode is already selected.
 const custodyOptions: { value: CustodyMode; label: string }[] = [
   { value: "External", label: "External — held elsewhere" },
   { value: "Custodial", label: "Custodial — held on the platform" },
 ];
 
-function problemMessages(error: unknown): string[] {
+type ProblemMessages = { custody: string[]; other: string[] };
+
+// A refused custody mode (tenant-custody-modes R7) is shown at the Custody choice; every other message on top.
+function problemMessages(error: unknown): ProblemMessages {
+  const none: ProblemMessages = { custody: [], other: [] };
   if (typeof error !== "object" || error === null || !("data" in error)) {
-    return [];
+    return none;
   }
   const data = (error as { data?: { errors?: Record<string, string[]>; detail?: string } }).data;
   if (data?.errors) {
-    return Object.values(data.errors).flat();
+    const entries = Object.entries(data.errors);
+    const isCustody = ([key]: [string, string[]]) => key.toLowerCase() === "custodymode";
+    return {
+      custody: entries.filter(isCustody).flatMap(([, values]) => values),
+      other: entries.filter((entry) => !isCustody(entry)).flatMap(([, values]) => values),
+    };
   }
   if (data?.detail) {
-    return [data.detail];
+    return { custody: [], other: [data.detail] };
   }
-  return [];
+  return none;
 }
 
 export function CreateAccountPage() {
@@ -36,13 +47,24 @@ export function CreateAccountPage() {
   const [type, setType] = useState<string>(accountTypes[0]);
   const [custodyMode, setCustodyMode] = useState<CustodyMode | "">("");
   const [currency, setCurrency] = useState("");
-  const [messages, setMessages] = useState<string[]>([]);
+  const [messages, setMessages] = useState<ProblemMessages>({ custody: [], other: [] });
   const [createAccount] = useCreateAccountMutation();
   const { data: currencies } = useGetCurrenciesQuery();
+  const firm = useAppSelector((state) => state.session.tenant);
+
+  // Until the tenant item has loaded, no custody option is offered.
+  const options = firm ? custodyOptions.filter((option) => firm.allowedCustodyModes.includes(option.value)) : [];
+  const [onlyOption] = options.length === 1 ? options : [];
+  const selectedCustody: CustodyMode | "" = onlyOption
+    ? onlyOption.value
+    : options.some((option) => option.value === custodyMode)
+      ? custodyMode
+      : "";
+  const selectedType = selectedCustody === "Custodial" ? "Brokerage" : type;
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!customerId || custodyMode === "") {
+    if (!customerId || selectedCustody === "") {
       return;
     }
 
@@ -50,8 +72,8 @@ export function CreateAccountPage() {
       const created = await createAccount({
         customerId,
         name: name.trim(),
-        type,
-        custodyMode,
+        type: selectedType,
+        custodyMode: selectedCustody,
         currency,
       }).unwrap();
       void navigate(`/accounts/${created.id}`);
@@ -63,7 +85,7 @@ export function CreateAccountPage() {
   return (
     <Page className="max-w-lg">
       <PageHeading title="New account" />
-      <Messages messages={messages} />
+      <Messages messages={messages.other} />
       <Card>
         <CardContent>
           <form className="flex flex-col gap-4" onSubmit={(event) => void onSubmit(event)}>
@@ -71,13 +93,13 @@ export function CreateAccountPage() {
             <fieldset className="flex flex-col gap-2">
               <legend className="mb-2 text-sm font-medium">Custody</legend>
               <div role="radiogroup" aria-label="Custody" aria-required="true" className="flex flex-col gap-2">
-                {custodyOptions.map((option) => (
+                {options.map((option) => (
                   <label key={option.value} className="flex items-center gap-2 text-sm">
                     <input
                       type="radio"
                       name="account-custody"
                       value={option.value}
-                      checked={custodyMode === option.value}
+                      checked={selectedCustody === option.value}
                       onChange={() => {
                         setCustodyMode(option.value);
                         if (option.value === "Custodial") {
@@ -89,14 +111,15 @@ export function CreateAccountPage() {
                   </label>
                 ))}
               </div>
+              <Messages messages={messages.custody} />
             </fieldset>
             <SelectField
               id="account-type"
               label="Type"
-              value={type}
+              value={selectedType}
               onChange={(event) => setType(event.target.value)}
               required
-              disabled={custodyMode === "Custodial"}
+              disabled={selectedCustody === "Custodial"}
             >
               {accountTypes.map((item) => (
                 <SelectItem key={item} value={item}>
@@ -118,7 +141,7 @@ export function CreateAccountPage() {
                 </SelectItem>
               ))}
             </SelectField>
-            <Button type="submit" disabled={custodyMode === ""}>
+            <Button type="submit" disabled={selectedCustody === ""}>
               Create account
             </Button>
           </form>

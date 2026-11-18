@@ -26,9 +26,9 @@ public class BackOfficeApiTests
         var platform = Create(api);
 
         await platform.ListTenantsAsync(1, 20, true, "north");
-        await platform.GetTenantAsync(TenantId);
-        await platform.CreateTenantAsync("North", "north", "nzd");
-        await platform.UpdateTenantAsync(TenantId, "North Ltd", "AUD", "rv1");
+        var item = await platform.GetTenantAsync(TenantId);
+        await platform.CreateTenantAsync("North", "north", "nzd", ["External"]);
+        await platform.UpdateTenantAsync(TenantId, "North Ltd", "AUD", ["Custodial"], "rv1");
         await platform.DisableTenantAsync(TenantId, "rv1");
         await platform.EnableTenantAsync(TenantId, "rv2");
 
@@ -38,10 +38,13 @@ public class BackOfficeApiTests
         Body(api.Requests[2]).GetProperty("name").GetString().ShouldBe("North");
         Body(api.Requests[2]).GetProperty("code").GetString().ShouldBe("north");
         Body(api.Requests[2]).GetProperty("reportingCurrency").GetString().ShouldBe("nzd");
+        Modes(Body(api.Requests[2])).ShouldBe(["External"]);
+        item.AllowedCustodyModes.ShouldBe(["External", "Custodial"]);
         AssertRequest(api.Requests[3], "PUT", $"/tenants/{TenantId}");
         Body(api.Requests[3]).GetProperty("name").GetString().ShouldBe("North Ltd");
         Body(api.Requests[3]).GetProperty("reportingCurrency").GetString().ShouldBe("AUD");
         Body(api.Requests[3]).GetProperty("rowVersion").GetString().ShouldBe("rv1");
+        Modes(Body(api.Requests[3])).ShouldBe(["Custodial"]);
         Body(api.Requests[3]).TryGetProperty("code", out _).ShouldBeFalse();
         AssertRequest(api.Requests[4], "POST", $"/tenants/{TenantId}/disable");
         Body(api.Requests[4]).GetProperty("rowVersion").GetString().ShouldBe("rv1");
@@ -247,9 +250,14 @@ public class BackOfficeApiTests
         return document.RootElement.Clone();
     }
 
+    private static string?[] Modes(JsonElement body) =>
+        body.TryGetProperty("allowedCustodyModes", out var modes)
+            ? modes.EnumerateArray().Select(mode => mode.GetString()).ToArray()
+            : [];
+
     private static string TenantJson() =>
         $$"""
-        {"id":"{{TenantId}}","name":"North","code":"north","reportingCurrency":"NZD","isActive":true,"rowVersion":"rv1","created":"2026-10-25T00:00:00+00:00"}
+        {"id":"{{TenantId}}","name":"North","code":"north","reportingCurrency":"NZD","allowedCustodyModes":["External","Custodial"],"isActive":true,"rowVersion":"rv1","created":"2026-10-25T00:00:00+00:00"}
         """;
 
     private static string InstrumentJson(Guid id) =>

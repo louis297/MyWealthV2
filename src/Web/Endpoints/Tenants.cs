@@ -96,7 +96,7 @@ public class Tenants : IEndpointGroup
     }
 
     [EndpointSummary("Create a tenant")]
-    [EndpointDescription("Creates a firm. Does not create any people. SystemAdmin only.")]
+    [EndpointDescription("Creates a firm with its allowed custody modes (External, Custodial or both). Does not create any people. SystemAdmin only.")]
     public static async Task<Created<CreatedTenantDto>> CreateTenant(ISender sender, CreateTenantCommand command)
     {
         var id = await sender.Send(command);
@@ -104,7 +104,7 @@ public class Tenants : IEndpointGroup
     }
 
     [EndpointSummary("Update a tenant")]
-    [EndpointDescription("Renames a tenant and/or changes reporting currency. Code is immutable. SystemAdmin only.")]
+    [EndpointDescription("Renames a tenant and/or changes reporting currency and allowed custody modes (omitted = unchanged; affects only new accounts). Code is immutable. SystemAdmin only.")]
     public static async Task<NoContent> UpdateTenant(ISender sender, Guid id, UpdateTenantCommand command)
     {
         command.Id = id;

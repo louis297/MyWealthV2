@@ -1,12 +1,13 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateAccountPage } from "@/features/accounts/CreateAccountPage";
-import { sessionSlice, setCurrentUser, type CurrentUser } from "@/features/session/sessionSlice";
+import { sessionSlice, setCurrentUser, setTenant, type CurrentUser } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
 import { chooseOption, openSelect, pickOption } from "@/test/chooseOption";
+import type { Tenant } from "@/shared/types/tenant";
 
 const customerId = "cccccccccccccccc-cccc-cccc-cccc-cccccccccccc";
 const accountId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
@@ -31,7 +32,20 @@ function user(overrides: Partial<CurrentUser> = {}): CurrentUser {
   };
 }
 
-function renderCreate(me: CurrentUser, postResponse?: Response) {
+function tenant(allowedCustodyModes: Tenant["allowedCustodyModes"] = ["External", "Custodial"]): Tenant {
+  return {
+    id: "22222222-2222-2222-2222-222222222222",
+    name: "North Advisory",
+    code: "north-advisory",
+    reportingCurrency: "NZD",
+    allowedCustodyModes,
+    isActive: true,
+    rowVersion: "AAAA",
+    created: "2026-09-14T00:00:00+00:00",
+  };
+}
+
+function renderCreate(me: CurrentUser, postResponse?: Response, firm: Tenant | null = tenant()) {
   const store = configureStore({
     reducer: {
       session: sessionSlice.reducer,
@@ -40,6 +54,9 @@ function renderCreate(me: CurrentUser, postResponse?: Response) {
     middleware: (getDefault) => getDefault().concat(api.middleware),
   });
   store.dispatch(setCurrentUser(me));
+  if (firm) {
+    store.dispatch(setTenant(firm));
+  }
 
   const fetchMock = vi.mocked(fetch);
   fetchMock.mockImplementation(async (input) => {
@@ -265,5 +282,85 @@ describe("CreateAccountPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "New account" })).toBeInTheDocument();
     expect(screen.queryByText("account detail")).not.toBeInTheDocument();
+  });
+  describe("the firm's allowed custody modes (D21)", () => {
+    it("offers External alone, already selected, with Type enabled, and posts External", async () => {
+      const { fetchMock } = renderCreate(user(), undefined, tenant(["External"]));
+
+      const radio = await screen.findByRole("radio", { name: external });
+      expect(screen.getAllByRole("radio")).toEqual([radio]);
+      expect(radio).toBeChecked();
+      expect(screen.getByLabelText("Type")).not.toHaveAttribute("data-disabled");
+
+      await chooseOption("Type", "Cash");
+      fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Petty cash" } });
+      await chooseOption("Currency", "NZD");
+      expect(screen.getByRole("button", { name: "Create account" })).toBeEnabled();
+      fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+      expect(await screen.findByText("account detail")).toBeInTheDocument();
+      const request = await postCall(fetchMock);
+      expect(JSON.parse(await request.clone().text())).toEqual({
+        customerId,
+        name: "Petty cash",
+        type: "Cash",
+        custodyMode: "External",
+        currency: "NZD",
+      });
+    });
+
+    it("offers Custodial alone, already selected, with Type fixed to Brokerage", async () => {
+      const { fetchMock } = renderCreate(user(), undefined, tenant(["Custodial"]));
+
+      const radio = await screen.findByRole("radio", { name: custodial });
+      expect(screen.getAllByRole("radio")).toEqual([radio]);
+      expect(radio).toBeChecked();
+      const type = screen.getByLabelText("Type");
+      expect(type).toHaveTextContent("Brokerage");
+      expect(type).toHaveAttribute("data-disabled");
+
+      fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Managed portfolio" } });
+      await chooseOption("Currency", "USD");
+      fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+      expect(await screen.findByText("account detail")).toBeInTheDocument();
+      const request = await postCall(fetchMock);
+      expect(JSON.parse(await request.clone().text())).toEqual({
+        customerId,
+        name: "Managed portfolio",
+        type: "Brokerage",
+        custodyMode: "Custodial",
+        currency: "USD",
+      });
+    });
+
+    it("shows no custody option and cannot be submitted until the tenant has loaded", async () => {
+      const { fetchMock } = renderCreate(user(), undefined, null);
+
+      expect(await screen.findByRole("radiogroup", { name: "Custody" })).toBeInTheDocument();
+      expect(screen.queryAllByRole("radio")).toEqual([]);
+      fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Everyday spending" } });
+      await chooseOption("Currency", "NZD");
+      expect(screen.getByRole("button", { name: "Create account" })).toBeDisabled();
+      fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+      expect(await postCall(fetchMock)).toBeUndefined();
+    });
+
+    it("shows a refused custody mode at the Custody choice", async () => {
+      renderCreate(
+        user(),
+        new Response(
+          JSON.stringify({ errors: { CustodyMode: ["The tenant does not allow External accounts."] } }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+      await fillAndSubmit();
+
+      const custody = screen.getByRole("group", { name: "Custody" });
+      expect(await within(custody).findByText("The tenant does not allow External accounts.")).toBeInTheDocument();
+      expect(screen.getAllByText("The tenant does not allow External accounts.")).toHaveLength(1);
+      expect(screen.queryByText("account detail")).not.toBeInTheDocument();
+    });
   });
 });

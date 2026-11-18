@@ -18,7 +18,8 @@ public class CreateTenantTests : TestBase
         {
             name = "North Advisory",
             code = "North-Advisory",
-            reportingCurrency = "nzd"
+            reportingCurrency = "nzd",
+            allowedCustodyModes = new[] { "External", "Custodial" }
         });
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
@@ -74,7 +75,8 @@ public class CreateTenantTests : TestBase
         {
             name = "North Advisory",
             code = "North-Advisory",
-            reportingCurrency = "nzd"
+            reportingCurrency = "nzd",
+            allowedCustodyModes = new[] { "External", "Custodial" }
         });
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
 
@@ -104,7 +106,8 @@ public class CreateTenantTests : TestBase
         {
             name = "north advisory",
             code = "other-code",
-            reportingCurrency = "NZD"
+            reportingCurrency = "NZD",
+            allowedCustodyModes = new[] { "External", "Custodial" }
         });
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
@@ -120,7 +123,8 @@ public class CreateTenantTests : TestBase
         {
             name = "Other Firm",
             code = "North-Advisory",
-            reportingCurrency = "NZD"
+            reportingCurrency = "NZD",
+            allowedCustodyModes = new[] { "External", "Custodial" }
         });
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
@@ -134,7 +138,8 @@ public class CreateTenantTests : TestBase
         {
             name = "North Advisory",
             code = "north-advisory",
-            reportingCurrency = "ZZZ"
+            reportingCurrency = "ZZZ",
+            allowedCustodyModes = new[] { "External", "Custodial" }
         });
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
@@ -148,7 +153,8 @@ public class CreateTenantTests : TestBase
         {
             name = "North Advisory",
             code = "north-advisory",
-            reportingCurrency = "XXX"
+            reportingCurrency = "XXX",
+            allowedCustodyModes = new[] { "External", "Custodial" }
         });
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
@@ -157,7 +163,8 @@ public class CreateTenantTests : TestBase
     {
         name = "North Advisory",
         code = "north-advisory",
-        reportingCurrency = "NZD"
+        reportingCurrency = "NZD",
+        allowedCustodyModes = new[] { "External", "Custodial" }
     };
 
     private static async Task InsertDisabledXxx()

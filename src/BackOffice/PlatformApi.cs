@@ -38,12 +38,13 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         string name,
         string code,
         string reportingCurrency,
+        IReadOnlyList<string> allowedCustodyModes,
         CancellationToken cancellationToken = default)
     {
         var created = await ReadAsync<Created>(
             HttpMethod.Post,
             "/tenants",
-            JsonSerializer.Serialize(new { name, code, reportingCurrency }, Json),
+            JsonSerializer.Serialize(new { name, code, reportingCurrency, allowedCustodyModes }, Json),
             cancellationToken);
         return created.Id;
     }
@@ -52,12 +53,13 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         Guid id,
         string name,
         string reportingCurrency,
+        IReadOnlyList<string> allowedCustodyModes,
         string rowVersion,
         CancellationToken cancellationToken = default) =>
         SendExpectingSuccessAsync(
             HttpMethod.Put,
             $"/tenants/{id}",
-            JsonSerializer.Serialize(new { name, reportingCurrency, rowVersion }, Json),
+            JsonSerializer.Serialize(new { name, reportingCurrency, allowedCustodyModes, rowVersion }, Json),
             cancellationToken);
 
     public Task DisableTenantAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
