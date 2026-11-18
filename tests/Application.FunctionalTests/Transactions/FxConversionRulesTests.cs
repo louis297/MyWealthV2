@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text.Json;
-using MyWealthV2.Application.FunctionalTests.Custody;
 
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
@@ -35,7 +34,7 @@ public class FxConversionRulesTests : TestBase
         await world.FundNzdAsync(100m);
         await LegAccountsFixture.ReadIdAsync(await FxConversionTests.PostAsync(
             world.Legs.TenantAdmin.AccessToken,
-            FxConversionTests.SellBody(world.NzdAccountId, world.UsdAccountId, 10m).WithBookedAt(FxConversionTests.BookedAt)));
+            FxConversionTests.ExternalBody(world.NzdAccountId, world.UsdAccountId, 10m, 5.91m)));
 
         var response = await TransactionHttp.Send(HttpMethod.Post, "/transactions", world.Legs.TenantAdmin.AccessToken, new
         {

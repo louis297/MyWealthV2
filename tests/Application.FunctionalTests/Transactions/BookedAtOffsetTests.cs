@@ -79,7 +79,7 @@ public class BookedAtOffsetTests : TestBase
             ["bookedAt"] = FxConversionTests.BookedAt
         },
         "/transactions/transfer" => InternalTransferTests.Body(world.NzdAccountId, savings, 10m),
-        "/transactions/fx" => FxConversionTests.SellBody(world.NzdAccountId, world.UsdAccountId, 10m),
+        "/transactions/fx" => FxConversionTests.ExternalBody(world.NzdAccountId, world.UsdAccountId, 10m, 5.91m),
         _ => new()
         {
             ["fromAccountId"] = world.NzdAccountId,

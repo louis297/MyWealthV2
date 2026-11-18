@@ -419,6 +419,27 @@ public class FxConversionTests : TestBase
             ["reference"] = null
         };
 
+    /// <summary>
+    /// A conversion body between External Accounts (external-caller-numbers R15): both amounts as on the statement,
+    /// no <c>expectedRate</c>, booked at <see cref="BookedAt"/>.
+    /// </summary>
+    internal static Dictionary<string, object?> ExternalBody(
+        Guid fromAccountId,
+        Guid toAccountId,
+        decimal sellAmount,
+        decimal buyAmount,
+        string? memo = null) =>
+        new()
+        {
+            ["fromAccountId"] = fromAccountId,
+            ["toAccountId"] = toAccountId,
+            ["sellAmount"] = sellAmount,
+            ["buyAmount"] = buyAmount,
+            ["bookedAt"] = BookedAt,
+            ["memo"] = memo,
+            ["reference"] = null
+        };
+
     internal static Dictionary<string, object?> BuyBody(
         Guid fromAccountId,
         Guid toAccountId,
