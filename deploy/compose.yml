@@ -59,6 +59,8 @@ services:
       # First start only; remove from .env after the first SystemAdmin sign-in (§12 step 11).
       Bootstrap__SystemAdmin__Email: ${BOOTSTRAP_SYSTEMADMIN_EMAIL:-}
       Bootstrap__SystemAdmin__Password: ${BOOTSTRAP_SYSTEMADMIN_PASSWORD:-}
+      # MediatR and AutoMapper read it from the environment. Without it they only log a license warning.
+      LUCKYPENNY_LICENSE_KEY: ${LUCKYPENNY_LICENSE_KEY:-}
     volumes:
       - ./data/reports:/reports
     depends_on:
