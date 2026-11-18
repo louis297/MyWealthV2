@@ -86,7 +86,7 @@ public static class AdviserBalancesRows
                     account.AccountId,
                     account.AccountName,
                     account.AccountType,
-                    string.Empty,
+                    account.CustodyMode,
                     account.Currency,
                     account.CashBalance));
             }
@@ -102,7 +102,7 @@ public static class AdviserBalancesRows
                     account.CustomerName,
                     account.AccountId,
                     account.AccountName,
-                    string.Empty,
+                    account.CustodyMode,
                     holding.InstrumentId,
                     holding.Symbol,
                     holding.Quantity,
@@ -113,8 +113,16 @@ public static class AdviserBalancesRows
             }
         }
 
-        return new AdviserBalancesSelection(lines, Subtotals(lines), []);
+        return new AdviserBalancesSelection(lines, Subtotals(lines), ModeSubtotals(lines));
     }
+
+    /// <summary>One block per custody mode that has a line, ordered by name (custody-mode-grouping R12).</summary>
+    private static IReadOnlyList<AdviserBalanceModeSubtotals> ModeSubtotals(IReadOnlyList<AdviserBalanceLine> lines) =>
+        lines
+            .GroupBy(line => line.CustodyMode)
+            .OrderBy(group => group.Key, StringComparer.Ordinal)
+            .Select(group => new AdviserBalanceModeSubtotals(group.Key, Subtotals(group.ToList())))
+            .ToList();
 
     private static IReadOnlyList<AdviserBalanceSubtotal> Subtotals(IReadOnlyList<AdviserBalanceLine> lines)
     {

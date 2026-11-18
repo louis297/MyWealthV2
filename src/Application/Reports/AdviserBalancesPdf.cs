@@ -81,12 +81,14 @@ public static class AdviserBalancesPdf
                                 columns.RelativeColumn();
                                 columns.RelativeColumn();
                                 columns.RelativeColumn();
+                                columns.RelativeColumn();
                             });
                             table.Header(header =>
                             {
                                 header.Cell().Text("Customer").Bold();
                                 header.Cell().Text("Account").Bold();
                                 header.Cell().Text("Type").Bold();
+                                header.Cell().Text("Custody").Bold();
                                 header.Cell().Text("Instrument").Bold();
                                 header.Cell().Text("Quantity").Bold();
                                 header.Cell().Text("Cost").Bold();
@@ -101,6 +103,7 @@ public static class AdviserBalancesPdf
                                         table.Cell().Text(cash.Customer);
                                         table.Cell().Text(cash.Account);
                                         table.Cell().Text(cash.AccountType);
+                                        table.Cell().Text(cash.Custody);
                                         table.Cell().Text(string.Empty);
                                         table.Cell().Text(string.Empty);
                                         table.Cell().Text(string.Empty);
@@ -111,6 +114,7 @@ public static class AdviserBalancesPdf
                                         table.Cell().Text(holding.Customer);
                                         table.Cell().Text(holding.Account);
                                         table.Cell().Text(string.Empty);
+                                        table.Cell().Text(holding.Custody);
                                         table.Cell().Text(holding.Instrument);
                                         table.Cell().Text(holding.Quantity);
                                         table.Cell().Text(holding.Cost);
@@ -125,15 +129,29 @@ public static class AdviserBalancesPdf
                     if (model.Subtotals.Count > 0)
                     {
                         column.Item().PaddingTop(12).Text("Subtotals").Bold();
-                        foreach (var subtotal in model.Subtotals)
+                        foreach (var block in model.ModeSubtotals)
                         {
-                            column.Item().Text(
-                                $"{subtotal.Currency} cash {subtotal.Cash} market value {subtotal.MarketValue}");
+                            SubtotalBlock(column, block.Title, block.Subtotals);
                         }
+
+                        SubtotalBlock(column, "All accounts", model.Subtotals);
                     }
                 });
             });
         }).GeneratePdf();
+    }
+
+    private static void SubtotalBlock(
+        ColumnDescriptor column,
+        string title,
+        IReadOnlyList<AdviserBalancesPdfSubtotal> subtotals)
+    {
+        column.Item().PaddingTop(4).Text(title).SemiBold();
+        foreach (var subtotal in subtotals)
+        {
+            column.Item().Text(
+                $"{subtotal.Currency} cash {subtotal.Cash} market value {subtotal.MarketValue}");
+        }
     }
 
     private static string Format(DateTimeOffset value) =>
