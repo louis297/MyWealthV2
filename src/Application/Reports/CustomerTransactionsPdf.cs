@@ -13,7 +13,8 @@ public sealed record CustomerTransactionsPdfRow(
     string Instrument,
     string Quantity,
     string? Memo,
-    string Fee = "");
+    string Fee = "",
+    string Custody = "");
 
 public sealed record CustomerTransactionsPdfModel(
     string TenantName,
@@ -22,7 +23,8 @@ public sealed record CustomerTransactionsPdfModel(
     DateOnly From,
     DateOnly To,
     bool IncludeClosedAccounts,
-    IReadOnlyList<CustomerTransactionsPdfRow> Rows);
+    IReadOnlyList<CustomerTransactionsPdfRow> Rows,
+    bool ShowExternalNote = false);
 
 public static class CustomerTransactionsPdf
 {

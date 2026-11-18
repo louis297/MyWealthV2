@@ -30,7 +30,7 @@ public sealed class CustomerTransactionsReportGenerator(
 
         var accounts = await db.Accounts.AsNoTracking()
             .Where(row => row.TenantId == execution.TenantId && row.CustomerId == customer.Id)
-            .Select(row => new AccountRow(row.Id, row.Name, row.Status))
+            .Select(row => new AccountRow(row.Id, row.Name, row.Status, row.CustodyMode))
             .ToListAsync(cancellationToken);
         var accountIds = accounts.Select(row => row.Id).ToList();
         var transactions = accountIds.Count == 0
@@ -78,7 +78,8 @@ public sealed class CustomerTransactionsReportGenerator(
                     account.Name,
                     transaction.Type.ToString(),
                     transaction.Memo,
-                    accountId));
+                    accountId,
+                    account.CustodyMode.ToString()));
                 // The cash amount is the sum of the account's cash legs; the Fee column sums its Fee legs (trade-fees R22).
                 var cashLegs = transaction.CashLegs.Where(leg => leg.AccountId == accountId).ToList();
                 cashByRow[key] = FormatCash(cashLegs);
@@ -145,5 +146,5 @@ public sealed class CustomerTransactionsReportGenerator(
         return symbol;
     }
 
-    private sealed record AccountRow(int Id, string Name, AccountStatus Status);
+    private sealed record AccountRow(int Id, string Name, AccountStatus Status, CustodyMode CustodyMode);
 }

@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Application.FunctionalTests.Accounts;
+using MyWealthV2.Application.FunctionalTests.Custody;
 using MyWealthV2.Application.FunctionalTests.Instruments;
 using MyWealthV2.Application.FunctionalTests.Tenants;
 using MyWealthV2.Application.FunctionalTests.Transactions;
@@ -190,6 +191,51 @@ public class GenerateCustomerTransactionsTests : TestBase
         text.ShouldContain("Saver");
         text.ShouldContain("-20.00 NZD");
         text.Replace("-20.00 NZD", string.Empty).ShouldContain("20.00 NZD");
+    }
+
+    [Test]
+    public async Task Execute_ShowsEachRowsCustodyMode_AndTheNoteForRowsHeldElsewhere()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm Custody Rows", "firm-custody-rows");
+        await TestApp.CreatePersonAsync(
+            UserRole.TenantAdmin, "Tess", "tess@firm-custody-rows", "Password1!", tenant.Id);
+        var adviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Ann", "ann@firm-custody-rows", "Password1!", tenant.Id);
+        var customer = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Cy Custody", "cy@firm-custody-rows", "Password1!", tenant.Id, adviser.Id);
+        await GrantAsync(tenant.PublicId);
+        var admin = await FunctionalTestSetup.Oidc.SignInAsync(
+            "tess@firm-custody-rows", "Password1!", "firm-custody-rows");
+        var managed = await CustodialHttp.OpenCustodialAsync(admin.AccessToken, customer.PublicId, "Managed");
+        var everyday = await OpenAccountAsync(admin.AccessToken, customer.PublicId, "Everyday", "Bank");
+        (await CustodialHttp.FundAsync(admin.AccessToken, managed, 40m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await CustodialHttp.FundAsync(admin.AccessToken, everyday, 8m, external: true)).StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var created = await TenantHttp.Send(
+            HttpMethod.Post,
+            "/reports/request",
+            admin.AccessToken,
+            new
+            {
+                reportId = CustomerTransactionsId,
+                parameters = new { customerId = customer.PublicId, from = "2026-01-01", to = "2099-01-01" }
+            });
+        created.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        using var json = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+        var executionId = json.RootElement.GetProperty("id").GetGuid();
+        await using var scope = FunctionalTestSetup.WebApiServices.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<ReportJob>().Execute(executionId);
+
+        (await ReadExecutionAsync(executionId)).Status.ShouldBe("Succeeded");
+        var path = Path.Combine(ReportStoragePaths.Root, tenant.PublicId.ToString("D"), $"{executionId:D}.pdf");
+        var text = ReadPdf(await File.ReadAllBytesAsync(path));
+        text.ShouldContain("Custody");
+        var everydayRow = text.IndexOf("Everyday", StringComparison.Ordinal);
+        var managedRow = text.IndexOf("Managed", StringComparison.Ordinal);
+        text.IndexOf("Held elsewhere", everydayRow, StringComparison.Ordinal).ShouldBeGreaterThan(everydayRow);
+        text.IndexOf("Held on platform", managedRow, StringComparison.Ordinal).ShouldBeGreaterThan(managedRow);
+        text.ShouldContain(
+            "Held elsewhere: recorded by your adviser from outside statements. The platform has not checked these figures.");
     }
 
     private static async Task<Guid> QueueAdviserBalancesAsync(int tenantId)
