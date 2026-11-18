@@ -28,7 +28,7 @@ Amendment to [tenants.md](tenants.md) and to account open in [accounts.md](accou
 
 SystemAdmin sets the **allowed custody modes** of a Tenant on `POST /tenants` and `PUT /tenants/{id}`, and in the Back Office. `POST /accounts` refuses a custody mode the Tenant does not allow. Nothing else reads the setting. Script `0033_tenants_allowed_custody_modes.sql`. No new route, no new policy, no problem code.
 
-**Status is `accepted` (2026-11-18).** Not landed. The amendments in tenants, accounts and demo-tenant-seed, in the Back Office and Adviser Portal page contracts, in domain-model, database-design, api-design and the glossary are in force from the same change.
+**Status is `accepted` (2026-11-18) and landed** on branch `feature/tenant-custody-modes`: `Tenant.SetAllowedCustodyModes` and `Allows`, script `0033_tenants_allowed_custody_modes.sql`, `allowedCustodyModes` on the tenant routes and item, the check on `POST /accounts`, the Back Office tenant pages and the Adviser Portal New account form. The amendments in tenants, accounts and demo-tenant-seed, in the Back Office and Adviser Portal page contracts, in domain-model, database-design, api-design and the glossary are in force from the same change.
 
 ---
 
@@ -302,7 +302,7 @@ Where the two-tenant tests live: R7 runs in the `CreateAccount` handler after th
 
 Fan-out in the tests:
 
-- The `POST /tenants` bodies in `CreateTenantTests` (9), `GetTenantByCodeTests` (1) and `BackOfficeApiTests` (1) add `allowedCustodyModes`. They change in §12 commit 2, in the same commit as the required field.
+- The `POST /tenants` bodies in `CreateTenantTests` (9), `GetTenantByCodeTests` (1) and `BackOfficeApiTests` (1) add `allowedCustodyModes`. The first ten change in §12 commit 2, in the same commit as the required field. `BackOfficeApiTests` drives the Back Office `PlatformApi` against a scripted handler, so its body changes in commit 4 with the `IPlatformApi` signature.
 - `TestApp.CreateTenantAsync` keeps building through `Tenant.Create`, so its callers allow both and do not change. It gains an optional parameter for the allowed custody modes, used by the new open and narrowing tests.
 - The Back Office `IPlatformApi` `CreateTenantAsync` and `UpdateTenantAsync` gain the setting; the fake in `BackOfficePageTests` follows.
 - The Adviser Portal `Tenant` type gains `allowedCustodyModes`.
@@ -351,6 +351,6 @@ The repository should build after each commit. Agents split each behaviour into 
 3. `POST /accounts` checks the Tenant's setting (R7–R10) + functional tests, including two-tenant and narrowing. `TestApp.CreateTenantAsync` gains the optional parameter.
 4. Back Office: the setting on the New tenant form and the tenant detail page (BO14, BO15) + page tests.
 5. Adviser Portal: the New account form offers the firm's allowed custody modes (D21) + frontend tests.
-6. Repo docs: mark this file landed. (This file and the amendments in tenants, accounts, demo-tenant-seed, the two portal page contracts, domain-model, database-design, api-design and the glossary were accepted on 2026-11-18, before commit 1.)
+6. Repo docs: mark this file landed (done 2026-11-18). (This file and the amendments in tenants, accounts, demo-tenant-seed, the two portal page contracts, domain-model, database-design, api-design and the glossary were accepted on 2026-11-18, before commit 1.)
 
 Do not put caller-supplied prices, read-model grouping, or any other tenant flag in these commits.

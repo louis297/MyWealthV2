@@ -216,7 +216,7 @@ The repository should build after each commit. Agents split each line into red t
 
 ---
 
-## Amendment 2026-11-18 (allowed custody modes) — accepted
+## Amendment 2026-11-18 (allowed custody modes) — accepted, landed
 
 Status of this amendment: `accepted` (2026-11-18), together with [tenant-custody-modes.md](tenant-custody-modes.md).
 

@@ -371,7 +371,7 @@ Accepted with [demo-tenant-seed.md](demo-tenant-seed.md). Supersedes the R17 sen
 
 ---
 
-## Amendment 2026-11-18 (allowed custody modes) — accepted
+## Amendment 2026-11-18 (allowed custody modes) — accepted, landed
 
 Status of this amendment: `accepted` (2026-11-18), together with [tenant-custody-modes.md](tenant-custody-modes.md). That spec owns the field rules; this list says what changes here.
 

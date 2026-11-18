@@ -194,7 +194,7 @@ Status of this amendment: `accepted` (2026-11-13). It is a build contract. Lande
 
 ---
 
-## Amendment 2026-11-18 (allowed custody modes) — accepted
+## Amendment 2026-11-18 (allowed custody modes) — accepted, landed
 
 Status of this amendment: `accepted` (2026-11-18), together with [tenant-custody-modes.md](../features/tenant-custody-modes.md). No new route.
 

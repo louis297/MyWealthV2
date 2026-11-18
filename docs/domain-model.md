@@ -393,6 +393,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-17 | Custody modes landed: `Account.Create` refuses Custodial with a type other than Brokerage, `CustodyRules` in Domain, and the custody modes on `PostInternalTransfer` and `PostFxConversion`. |
 | 2026-11-18 | Tenant custody modes in `review`: allowed custody modes on the Tenant, checked when an account is opened. Recorded in §4.1 with a `review` mark. [features/tenant-custody-modes.md](features/tenant-custody-modes.md). |
 | 2026-11-18 | Tenant custody modes accepted. The `review` mark in §4.1 is dropped. |
+| 2026-11-18 | Tenant custody modes landed: `Tenant.SetAllowedCustodyModes`, `Allows` and `AllowedCustodyModes`; `CreateAccount` checks the setting. |
 
 ---
 

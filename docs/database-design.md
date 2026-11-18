@@ -219,7 +219,7 @@ Client seed: SQL insert or startup seed. Both are allowed.
 | RowVersion | rowversion | no | |
 | Created / CreatedBy / LastModified / LastModifiedBy | audit | | |
 
-Amendment 2026-11-18 (tenant custody modes, accepted; [features/tenant-custody-modes.md](features/tenant-custody-modes.md) §6): script `0033_tenants_allowed_custody_modes.sql` adds `AllowsExternalAccounts bit NOT NULL` and `AllowsCustodialAccounts bit NOT NULL`, each with a named DEFAULT 1 that stays after the script, and `CK_Tenants_AllowedCustodyModes` (at least one is 1). Existing rows allow both. No index and no FK; no rule ties `Accounts.CustodyMode` to these columns, because narrowing the setting leaves existing accounts alone.
+Amendment 2026-11-18 (tenant custody modes, accepted, landed; [features/tenant-custody-modes.md](features/tenant-custody-modes.md) §6): script `0033_tenants_allowed_custody_modes.sql` adds `AllowsExternalAccounts bit NOT NULL` and `AllowsCustodialAccounts bit NOT NULL`, each with a named DEFAULT 1 that stays after the script, and `CK_Tenants_AllowedCustodyModes` (at least one is 1). Existing rows allow both. No index and no FK; no rule ties `Accounts.CustodyMode` to these columns, because narrowing the setting leaves existing accounts alone.
 
 `Code` is treated as immutable after create by the Tenants slice (no update API). The column itself is ordinary.
 
@@ -355,7 +355,7 @@ Beyond PK / unique constraints already listed:
 0030_trade_fees.sql                         -- TransactionCashLegs.Role; TradeFeeSchedules, TradeFeeBands, TransactionFeeDetails
 0031_accounts_custody_mode.sql              -- Accounts.CustodyMode (existing rows 0 = External); CHECK 0–1; no default left
 0032_remove_external_portfolio_assignments.sql -- data only; Active assignments on External accounts become Removed
-0033_tenants_allowed_custody_modes.sql      -- accepted, not written yet: Tenants.AllowsExternalAccounts / AllowsCustodialAccounts (DEFAULT 1 kept); CHECK at least one
+0033_tenants_allowed_custody_modes.sql      -- Tenants.AllowsExternalAccounts / AllowsCustodialAccounts (DEFAULT 1 kept); CHECK at least one
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -496,6 +496,7 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-17 | Custody modes landed: `0032_remove_external_portfolio_assignments.sql` written and applied. |
 | 2026-11-18 | Tenant custody modes in `review` (`0033`, not written yet): two bit columns on `Tenants` for the allowed custody modes, existing rows allow both, defaults kept, CHECK at least one ([features/tenant-custody-modes.md](features/tenant-custody-modes.md) §6). |
 | 2026-11-18 | Tenant custody modes accepted. `0033` is a build contract. |
+| 2026-11-18 | Tenant custody modes landed: `0033_tenants_allowed_custody_modes.sql` written and applied. |
 
 ---
 
