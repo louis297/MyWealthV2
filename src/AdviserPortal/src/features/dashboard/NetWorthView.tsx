@@ -10,10 +10,21 @@ export function NetWorthView({ data }: { data: NetWorth }) {
   const byCustomer = data.breakdowns.byCustomer;
   const byAccountType = data.breakdowns.byAccountType;
   const topHoldings = data.breakdowns.topHoldings;
+  const byCustodyMode = data.breakdowns.byCustodyMode;
 
   return (
     <div className="flex flex-col gap-6">
       {currencies.length === 0 ? <Muted>No balances.</Muted> : <CurrencyTable currencies={currencies} />}
+      <div className="grid gap-6 md:grid-cols-2">
+        <CustodyFigure
+          title="Funds under management"
+          entry={byCustodyMode.find((row) => row.custodyMode === "Custodial")}
+        />
+        <CustodyFigure
+          title="External assets"
+          entry={byCustodyMode.find((row) => row.custodyMode === "External")}
+        />
+      </div>
       <Section title="By customer">
         {byCustomer.length === 0 ? <Muted>None.</Muted> : (
           <TableCard>
@@ -95,6 +106,32 @@ export function NetWorthView({ data }: { data: NetWorth }) {
         )}
       </Section>
     </div>
+  );
+}
+
+/** One custody mode's assets per currency (custody-mode-grouping D24, D25). */
+function CustodyFigure({ title, entry }: { title: string; entry?: NetWorth["breakdowns"]["byCustodyMode"][number] }) {
+  return (
+    <Section title={title}>
+      {!entry || entry.currencies.length === 0 ? <Muted>None.</Muted> : (
+        <TableCard>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Currency</TableHead>
+              <TableHead>Assets</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {entry.currencies.map((row) => (
+              <TableRow key={row.currency}>
+                <TableCell>{row.currency}</TableCell>
+                <TableCell>{row.assets.total}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </TableCard>
+      )}
+    </Section>
   );
 }
 
