@@ -24,6 +24,7 @@ const tenant: Tenant = {
   name: "North Advisory",
   code: "north-advisory",
   reportingCurrency: "GBP",
+  allowedCustodyModes: ["External", "Custodial"],
   isEnabled: true,
   rowVersion: "AAAA",
   created: "2026-09-14T00:00:00+00:00",
