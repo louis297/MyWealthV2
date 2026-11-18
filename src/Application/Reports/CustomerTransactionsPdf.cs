@@ -28,6 +28,10 @@ public sealed record CustomerTransactionsPdfModel(
 
 public static class CustomerTransactionsPdf
 {
+    /// <summary>The note under the table when a row is on an External account (custody-mode-grouping R15).</summary>
+    public const string ExternalNote =
+        "Held elsewhere: recorded by your adviser from outside statements. The platform has not checked these figures.";
+
     public static byte[] Render(CustomerTransactionsPdfModel model)
     {
         QuestPDF.Settings.License = LicenseType.Community;
@@ -70,11 +74,13 @@ public static class CustomerTransactionsPdf
                                 columns.RelativeColumn();
                                 columns.RelativeColumn();
                                 columns.RelativeColumn(2);
+                                columns.RelativeColumn();
                             });
                             table.Header(header =>
                             {
                                 header.Cell().Text("Booked at").Bold();
                                 header.Cell().Text("Account").Bold();
+                                header.Cell().Text("Custody").Bold();
                                 header.Cell().Text("Type").Bold();
                                 header.Cell().Text("Cash").Bold();
                                 header.Cell().Text("Fee").Bold();
@@ -88,6 +94,7 @@ public static class CustomerTransactionsPdf
                                     .ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
                                 table.Cell().Text(booked);
                                 table.Cell().Text(row.AccountName);
+                                table.Cell().Text(row.Custody);
                                 table.Cell().Text(row.Type);
                                 table.Cell().Text(row.Cash);
                                 table.Cell().Text(row.Fee);
@@ -96,6 +103,11 @@ public static class CustomerTransactionsPdf
                                 table.Cell().Text(row.Memo ?? string.Empty);
                             }
                         });
+
+                        if (model.ShowExternalNote)
+                        {
+                            column.Item().PaddingTop(8).Text(ExternalNote);
+                        }
                     }
                 });
             });
