@@ -7,6 +7,7 @@ using MyWealthV2.Infrastructure.Data;
 
 namespace MyWealthV2.Application.FunctionalTests.Users.Customers;
 
+[Parallelizable]
 public class UpdateCustomerTests : TestBase
 {
     [Test]

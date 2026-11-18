@@ -10,6 +10,7 @@ using MyWealthV2.Infrastructure.Data.Entities;
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
 /// <summary>FX conversions R1, R3–R5, R7–R11, R13–R15, R19: POST /transactions/fx create, idempotency and validation.</summary>
+[Parallelizable]
 public class FxConversionTests : TestBase
 {
     internal const string FxPath = "/transactions/fx";

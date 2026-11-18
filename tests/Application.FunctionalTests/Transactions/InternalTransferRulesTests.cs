@@ -4,6 +4,7 @@ using System.Text.Json;
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
 /// <summary>Internal transfers R2, R11: one create route per type; a transfer leg counts as another transaction.</summary>
+[Parallelizable]
 public class InternalTransferRulesTests : TestBase
 {
     [Test]

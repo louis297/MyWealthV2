@@ -7,6 +7,7 @@ using MyWealthV2.Infrastructure.Data;
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
 /// <summary>fixes/ledger-write-guards.md B3: a bookedAt later than the server clock plus 5 minutes is refused.</summary>
+[Parallelizable]
 public class FutureBookedAtTests : TestBase
 {
     private static readonly string[] CreateRoutes = ["/transactions", "/transactions/transfer", "/transactions/fx"];

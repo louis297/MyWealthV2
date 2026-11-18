@@ -7,6 +7,7 @@ using static MyWealthV2.Application.FunctionalTests.Custody.CustodialHttp;
 namespace MyWealthV2.Application.FunctionalTests.Custody;
 
 /// <summary>Custody modes R5 to R7: the manual entry matrix on <c>POST /transactions</c> and reverse.</summary>
+[Parallelizable]
 public class CustodialManualEntryTests : TestBase
 {
     [Test]

@@ -9,6 +9,7 @@ using MyWealthV2.Infrastructure.Data;
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
 /// <summary>fixes/ledger-write-guards.md B1: reverse only the latest live security activity on each holding.</summary>
+[Parallelizable]
 public class ReverseOrderTests : TestBase
 {
     private const string BookedAt = "2026-10-11T10:00:00Z";

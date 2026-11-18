@@ -12,6 +12,7 @@ namespace MyWealthV2.Application.FunctionalTests.Custody;
 /// Tenant custody modes R9: narrowing a Tenant's allowed custody modes changes no existing account. Every route
 /// on an existing Custodial account keeps working; only a new Custodial open is refused.
 /// </summary>
+[Parallelizable]
 public class TenantCustodyModesNarrowingTests : TestBase
 {
     private const string TransferPath = "/transactions/transfer";

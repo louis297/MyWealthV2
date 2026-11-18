@@ -12,6 +12,7 @@ using MyWealthV2.Infrastructure.Data.Entities;
 
 namespace MyWealthV2.Application.FunctionalTests.NetWorth;
 
+[Parallelizable]
 public class GetNetWorthTests : TestBase
 {
     [Test]

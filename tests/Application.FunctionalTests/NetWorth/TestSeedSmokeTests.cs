@@ -8,6 +8,7 @@ using MyWealthV2.Infrastructure.Identity;
 
 namespace MyWealthV2.Application.FunctionalTests.NetWorth;
 
+[Parallelizable]
 public class TestSeedSmokeTests : TestBase
 {
     [Test]

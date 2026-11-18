@@ -6,6 +6,7 @@ using MyWealthV2.Application.FunctionalTests.Accounts;
 namespace MyWealthV2.Application.FunctionalTests.Hosting;
 
 // fixes/utc-instants.md B1: every instant in a response is UTC with Z.
+[Parallelizable]
 public partial class UtcInstantTests : TestBase
 {
     [Test]

@@ -8,6 +8,7 @@ using MyWealthV2.Domain.Enums;
 
 namespace MyWealthV2.Application.FunctionalTests.Tenants;
 
+[Parallelizable]
 public class GetTenantByCodeTests : TestBase
 {
     [Test]

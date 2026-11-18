@@ -5,6 +5,7 @@ using MyWealthV2.Domain.Enums;
 
 namespace MyWealthV2.Application.FunctionalTests.Tenants;
 
+[Parallelizable]
 public class DisableEnableTenantTests : TestBase
 {
     [Test]

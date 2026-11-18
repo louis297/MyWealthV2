@@ -1,29 +1,39 @@
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Identity;
-using MyWealthV2.Tests.Common;
 
 namespace MyWealthV2.Application.FunctionalTests;
 
 [SetUpFixture]
 public class FunctionalTestSetup
 {
-    internal static IServiceScopeFactory ScopeFactory { get; private set; } = null!;
-    internal static IServiceProvider WebApiServices => _factory!.Services;
-    internal static HttpClient WebClient { get; private set; } = null!;
-    internal static HttpMessageHandler WebApiHandler { get; private set; } = null!;
-    internal static OpenIdConnectTestClient Oidc { get; private set; } = null!;
-    internal static OpenIdConnectTestClient BackOfficeOidc { get; private set; } = null!;
-    internal static IdentityFactory Identity { get; private set; } = null!;
-    internal static DatabaseResetter? DbResetter { get; private set; }
-    internal static string ConnectionString { get; private set; } = null!;
+    internal static IServiceScopeFactory ScopeFactory => Current.ScopeFactory;
+    internal static IServiceProvider WebApiServices => Current.WebApi.Services;
+    internal static HttpClient WebClient => Current.WebClient;
+    internal static HttpMessageHandler WebApiHandler => Current.WebApiHandler;
+    internal static OpenIdConnectTestClient Oidc => Current.Oidc;
+    internal static OpenIdConnectTestClient BackOfficeOidc => Current.BackOfficeOidc;
+    internal static IdentityFactory Identity => Current.Identity;
+    internal static DatabaseResetter? DbResetter => _default is null ? null : Current.DbResetter;
+    internal static string ConnectionString => Current.ConnectionString;
 
-    private static WebApiFactory? _factory;
-    private static IdentityFactory? _identityFactory;
+    private static TestEnvironment? _default;
+    private static TestEnvironmentPool? _pool;
     private static DistributedApplication? _app;
+
+    // The environment the calling test runs against: the one its [Parallelizable] fixture leased,
+    // or the default environment that all other fixtures share one at a time.
+    private static TestEnvironment Current =>
+        TestBase.CurrentFixture?.Environment
+        ?? _default
+        ?? throw new InvalidOperationException("The functional test environment has not started.");
+
+    internal static Task<TestEnvironment> LeaseEnvironmentAsync() =>
+        _pool!.LeaseAsync(CancellationToken.None);
+
+    internal static void ReturnEnvironment(TestEnvironment environment) => _pool!.Return(environment);
 
     [OneTimeSetUp]
     public async Task OneTimeSetUp()
@@ -53,55 +63,15 @@ public class FunctionalTestSetup
             Services.TestDatabase, cancellationToken);
 
         var connectionString = (await _app.GetConnectionStringAsync(Services.TestDatabase))!;
-        ConnectionString = connectionString;
-        await TestDatabaseRecreator.RecreateAsync(connectionString, cancellationToken);
-
-        using (var schemaHost = new WebApiFactory(connectionString))
-        {
-            _ = schemaHost.Services;
-        }
-
-        var identityFactory = new IdentityFactory(connectionString);
-        _identityFactory = identityFactory;
-        Identity = identityFactory;
-        var identityHandler = identityFactory.Server.CreateHandler();
-        var identityAuthority = identityFactory.ClientOptions.BaseAddress!.ToString().TrimEnd('/');
-
-        _factory = new WebApiFactory(connectionString, identityAuthority, identityHandler);
-        ScopeFactory = _factory.Services.GetRequiredService<IServiceScopeFactory>();
-        DbResetter = await DatabaseResetter.CreateAsync(connectionString);
-
-        WebApiHandler = _factory.Server.CreateHandler();
-        WebClient = _factory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            AllowAutoRedirect = false
-        });
-
-        Oidc = new OpenIdConnectTestClient(() => identityFactory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            AllowAutoRedirect = false,
-            HandleCookies = true
-        }));
-
-        BackOfficeOidc = new OpenIdConnectTestClient(
-            () => identityFactory.CreateClient(new WebApplicationFactoryClientOptions
-            {
-                AllowAutoRedirect = false,
-                HandleCookies = true
-            }),
-            clientId: "back-office",
-            clientSecret: BackOfficeTestSecret.Value,
-            redirectUri: "https://localhost/back-office/signin-oidc");
+        _default = await TestEnvironment.CreateAsync(connectionString, cancellationToken);
+        _pool = new TestEnvironmentPool(connectionString);
     }
 
     [OneTimeTearDown]
     public async Task OneTimeTearDown()
     {
-        WebClient?.Dispose();
-        WebApiHandler?.Dispose();
-        if (DbResetter is not null) await DbResetter.DisposeAsync();
-        if (_factory is not null) await _factory.DisposeAsync();
-        if (_identityFactory is not null) await _identityFactory.DisposeAsync();
+        if (_pool is not null) await _pool.DisposeAsync();
+        if (_default is not null) await _default.DisposeAsync();
         if (_app is not null) await _app.DisposeAsync();
     }
 

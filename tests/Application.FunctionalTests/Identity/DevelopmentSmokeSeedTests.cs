@@ -10,6 +10,7 @@ using MyWealthV2.Infrastructure.Identity;
 
 namespace MyWealthV2.Application.FunctionalTests.Identity;
 
+[Parallelizable]
 public class DevelopmentSmokeSeedTests : TestBase
 {
     private const string AdviserPassword = "Smoke-Adviser-Password-For-Tests-0001!";

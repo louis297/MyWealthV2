@@ -4,6 +4,7 @@ using System.Text.Json;
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
 /// <summary>FX conversions R2, R16: one create route per type; a conversion leg counts as another transaction.</summary>
+[Parallelizable]
 public class FxConversionRulesTests : TestBase
 {
     [Test]

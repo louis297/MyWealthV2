@@ -9,6 +9,7 @@ using MyWealthV2.Infrastructure.Identity;
 
 namespace MyWealthV2.Application.FunctionalTests.Users.Customers;
 
+[Parallelizable]
 public class CreateCustomerTests : TestBase
 {
     [Test]

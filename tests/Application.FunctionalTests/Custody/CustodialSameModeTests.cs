@@ -7,6 +7,7 @@ using static MyWealthV2.Application.FunctionalTests.Custody.CustodialHttp;
 namespace MyWealthV2.Application.FunctionalTests.Custody;
 
 /// <summary>Custody modes R8, R9: both Accounts of a transfer, a conversion or a quote have the same custody mode.</summary>
+[Parallelizable]
 public class CustodialSameModeTests : TestBase
 {
     private const string TransferPath = "/transactions/transfer";

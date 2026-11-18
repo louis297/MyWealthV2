@@ -8,6 +8,7 @@ using MyWealthV2.Infrastructure.Data;
 namespace MyWealthV2.Application.FunctionalTests.Portfolios;
 
 /// <summary>Internal transfers R16: cash-only, allowed on an assigned Account, no automatic rebalance.</summary>
+[Parallelizable]
 public class InternalTransferPortfolioTests : TestBase
 {
     [Test]

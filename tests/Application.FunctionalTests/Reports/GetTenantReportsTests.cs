@@ -8,6 +8,7 @@ using MyWealthV2.Infrastructure.Data;
 
 namespace MyWealthV2.Application.FunctionalTests.Reports;
 
+[Parallelizable]
 public class GetTenantReportsTests : TestBase
 {
     [Test]

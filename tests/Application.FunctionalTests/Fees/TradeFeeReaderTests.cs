@@ -11,6 +11,7 @@ using UglyToad.PdfPig;
 namespace MyWealthV2.Application.FunctionalTests.Fees;
 
 /// <summary>Trade fees R22, §8.1: cash leg <c>role</c> and <c>fee</c> in the item, and the report Fee column.</summary>
+[Parallelizable]
 public class TradeFeeReaderTests : TestBase
 {
     private static readonly Guid CustomerTransactionsId = Guid.Parse("8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11");

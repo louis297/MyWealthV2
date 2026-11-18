@@ -16,6 +16,7 @@ using UglyToad.PdfPig;
 
 namespace MyWealthV2.Application.FunctionalTests.Reports;
 
+[Parallelizable]
 public class GenerateAdviserBalancesTests : TestBase
 {
     private static readonly Guid AdviserBalancesId = Guid.Parse("5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22");

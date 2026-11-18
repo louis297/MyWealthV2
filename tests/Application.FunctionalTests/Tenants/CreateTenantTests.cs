@@ -9,6 +9,7 @@ using MyWealthV2.Infrastructure.Identity;
 
 namespace MyWealthV2.Application.FunctionalTests.Tenants;
 
+[Parallelizable]
 public class CreateTenantTests : TestBase
 {
     [Test]

@@ -7,6 +7,7 @@ using MyWealthV2.Domain.Enums;
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
 /// <summary>FX conversions R17: reverse at the original amounts and rate, copies the FX detail, all or nothing.</summary>
+[Parallelizable]
 public class FxConversionReverseTests : TestBase
 {
     [Test]

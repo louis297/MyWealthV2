@@ -14,6 +14,7 @@ using UglyToad.PdfPig;
 
 namespace MyWealthV2.Application.FunctionalTests.Reports;
 
+[Parallelizable]
 public class GenerateCustomerTransactionsTests : TestBase
 {
     private static readonly Guid CustomerTransactionsId = Guid.Parse("8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11");

@@ -9,6 +9,7 @@ using MyWealthV2.Infrastructure.Data;
 
 namespace MyWealthV2.Application.FunctionalTests.Accounts;
 
+[Parallelizable]
 public class GetAccountHoldingsTests : TestBase
 {
     private const string BookedAt = "2026-09-27T09:00:00Z";

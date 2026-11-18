@@ -3,6 +3,7 @@ using System.Text.Json;
 
 namespace MyWealthV2.Application.FunctionalTests.Users.Advisers;
 
+[Parallelizable]
 public class CreateAdviserLoginTests : TestBase
 {
     [Test]

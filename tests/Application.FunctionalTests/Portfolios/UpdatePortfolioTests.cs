@@ -4,6 +4,7 @@ using MyWealthV2.Domain.Enums;
 
 namespace MyWealthV2.Application.FunctionalTests.Portfolios;
 
+[Parallelizable]
 public class UpdatePortfolioTests : TestBase
 {
     [Test]

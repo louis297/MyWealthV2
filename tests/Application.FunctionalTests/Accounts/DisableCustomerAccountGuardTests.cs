@@ -4,6 +4,7 @@ using MyWealthV2.Application.FunctionalTests.Users.Customers;
 
 namespace MyWealthV2.Application.FunctionalTests.Accounts;
 
+[Parallelizable]
 public class DisableCustomerAccountGuardTests : TestBase
 {
     [Test]

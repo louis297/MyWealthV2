@@ -9,6 +9,7 @@ using MyWealthV2.Infrastructure.Data;
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
 /// <summary>fixes/ledger-write-guards.md B2: a caller's cash amount fits the Account currency's decimal places.</summary>
+[Parallelizable]
 public class CashAmountDecimalPlacesTests : TestBase
 {
     private const string BookedAt = "2026-11-10T09:00:00Z";

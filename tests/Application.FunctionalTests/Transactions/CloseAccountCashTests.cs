@@ -4,6 +4,7 @@ using MyWealthV2.Application.FunctionalTests.Accounts;
 
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
+[Parallelizable]
 public class CloseAccountCashTests : TestBase
 {
     [Test]

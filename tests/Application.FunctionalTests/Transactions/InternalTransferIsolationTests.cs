@@ -4,6 +4,7 @@ using MyWealthV2.Application.FunctionalTests.Accounts;
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
 /// <summary>Internal transfers R6: authority on both Accounts and cross-tenant isolation (404, not 403).</summary>
+[Parallelizable]
 public class InternalTransferIsolationTests : TestBase
 {
     [TestCase(true)]

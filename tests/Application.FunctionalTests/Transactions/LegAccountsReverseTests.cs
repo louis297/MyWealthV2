@@ -5,6 +5,7 @@ using MyWealthV2.Domain.Enums;
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
 /// <summary>Leg accounts R6, R8, R10, R12: reverse covers every leg account, all or nothing.</summary>
+[Parallelizable]
 public class LegAccountsReverseTests : TestBase
 {
     [Test]

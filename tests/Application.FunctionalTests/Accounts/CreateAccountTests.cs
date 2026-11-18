@@ -8,6 +8,7 @@ using MyWealthV2.Infrastructure.Data;
 
 namespace MyWealthV2.Application.FunctionalTests.Accounts;
 
+[Parallelizable]
 public class CreateAccountTests : TestBase
 {
     [Test]

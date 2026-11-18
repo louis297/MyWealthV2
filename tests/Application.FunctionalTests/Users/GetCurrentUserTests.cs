@@ -10,6 +10,7 @@ using MyWealthV2.Infrastructure.Identity;
 
 namespace MyWealthV2.Application.FunctionalTests.Users;
 
+[Parallelizable]
 public class GetCurrentUserTests : TestBase
 {
     [Test]

@@ -3,6 +3,7 @@ using MyWealthV2.Domain.Enums;
 
 namespace MyWealthV2.Application.FunctionalTests.Identity;
 
+[Parallelizable]
 public class EndSessionTests : TestBase
 {
     private const string RegisteredPostLogout = "https://localhost/";
