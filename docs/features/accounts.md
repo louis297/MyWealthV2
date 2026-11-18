@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-21
-last_updated: 2026-11-17
+last_updated: 2026-11-18
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -22,6 +22,7 @@ related:
   - account-custody-mode.md
   - ../adr/0020-account-custody-mode.md
   - custody-modes.md
+  - tenant-custody-modes.md
 ---
 
 # Accounts
@@ -49,6 +50,11 @@ Landed in GitHub `louis297/MyWealthV2` master 2026-09-21, last slice commit `3e8
 - R16, close and reopen: unchanged for both custody modes. A Custodial account still closes only with cash `SUM = 0` and no holdings.
 - §9.1: a fifth demo account, "Demo custodial brokerage" (Brokerage, Custodial, USD), on every TestSeed firm like the other four. The four existing demo accounts stay External.
 - What a Custodial account accepts (transaction types, `bookedAt`, transfers, portfolios) is in custody-modes §4, not in this file.
+
+**Amendment 2026-11-18 (tenant custody modes, `review`):** [tenant-custody-modes.md](tenant-custody-modes.md). Not in force until that spec is accepted.
+
+- R8: `POST /accounts` with a `custodyMode` the account's Tenant does not allow → 400 with `errors.CustodyMode`. The check runs in the handler after the Tenant, the Customer and the currency checks; the validator rules on `type` and `custodyMode` still run first.
+- Close, reopen, rename and every other rule in this file do not read the Tenant's setting. A Tenant that stops allowing a custody mode keeps its existing accounts of that mode, and they may still be reopened.
 
 ---
 
