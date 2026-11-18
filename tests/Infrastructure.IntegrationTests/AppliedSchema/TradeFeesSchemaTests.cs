@@ -123,9 +123,16 @@ public class TradeFeesSchemaTests
     private static IEnumerable<TestCaseData> InvalidDetails()
     {
         yield return new TestCaseData(1, "@a_feeschedule", "1250", "10").SetName("Insert_FeeDetail_UnknownKind_IsRejected");
-        yield return new TestCaseData(0, "NULL", "1250", "10").SetName("Insert_FeeDetail_BrokerageWithoutSchedule_IsRejected");
         yield return new TestCaseData(0, "@a_feeschedule", "0", "10").SetName("Insert_FeeDetail_ZeroBasis_IsRejected");
         yield return new TestCaseData(0, "@a_feeschedule", "1250", "0").SetName("Insert_FeeDetail_ZeroFee_IsRejected");
+    }
+
+    /// <summary>A fee the caller entered on an External account has no schedule (external-caller-numbers §6, script 0034).</summary>
+    [Test]
+    public async Task Insert_FeeDetail_BrokerageWithoutSchedule_Succeeds()
+    {
+        (await RunAsync(Detail(0, "NULL", "1250", "10") + "SELECT COUNT(*) FROM [TransactionFeeDetails] WHERE [CashLegId] = @a_feeleg;"))
+            .ShouldBe(1);
     }
 
     [TestCaseSource(nameof(InvalidDetails))]
