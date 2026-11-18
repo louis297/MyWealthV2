@@ -13,3 +13,7 @@ export function bandsText(bands: FeeBand[], decimalPlaces?: number): string {
     })
     .join(" · ");
 }
+
+/** F20: trade fee schedules apply to trades on Custodial accounts only (external-caller-numbers R22). */
+export const custodialOnlyLine =
+  "Schedules apply to trades on Custodial accounts. A trade on an External account carries the fee entered with it.";

@@ -38,6 +38,11 @@ function ineligibleReason(candidate: Account, source: Account): string | null {
   return null;
 }
 
+function positive(text: string): number | null {
+  const value = Number(text);
+  return text.trim() !== "" && Number.isFinite(value) && value > 0 ? value : null;
+}
+
 function errorStatus(error: unknown): number | undefined {
   if (typeof error === "object" && error !== null && "status" in error && typeof error.status === "number") {
     return error.status;
@@ -85,6 +90,8 @@ export function CreateFxConversionPage() {
   const [toAccountId, setToAccountId] = useState("");
   const [side, setSide] = useState<Side>("sell");
   const [amount, setAmount] = useState("");
+  const [sellText, setSellText] = useState("");
+  const [buyText, setBuyText] = useState("");
   const [bookedAt, setBookedAt] = useState("");
   const [memo, setMemo] = useState("");
   const [reference, setReference] = useState("");
@@ -100,14 +107,20 @@ export function CreateFxConversionPage() {
     : undefined;
   const amountValue = Number(amount);
   const amountValid = amount.trim() !== "" && Number.isFinite(amountValue) && amountValue > 0;
+  // D23: between External Accounts the caller enters both amounts; there is no quote (external-caller-numbers R19).
+  const sellValue = positive(sellText);
+  const buyValue = positive(buyText);
+  const impliedRate =
+    from && destination && sellValue !== null && buyValue !== null
+      ? `1 ${from.currency} = ${(buyValue / sellValue).toFixed(4)} ${destination.currency}`
+      : null;
 
   const quoteBody: FxQuoteBody | null =
-    from && destination && amountValid
+    custodial && from && destination && amountValid
       ? {
           fromAccountId: from.id,
           toAccountId: destination.id,
           ...(side === "sell" ? { sellAmount: amountValue } : { buyAmount: amountValue }),
-          ...(!custodial && bookedAt ? { bookedAt: toUtcIso(bookedAt) } : {}),
         }
       : null;
   const quoteKey = quoteBody ? JSON.stringify(quoteBody) : "";
@@ -152,11 +165,19 @@ export function CreateFxConversionPage() {
     if (!destination) {
       problems.push("Choose a destination account.");
     }
+    if (!custodial) {
+      if (sellValue === null || buyValue === null) {
+        problems.push("Sell and buy amounts must be greater than 0.");
+      }
+      if (!bookedAt) {
+        problems.push("Booked at is required.");
+      }
+      setMessages(problems);
+      setReviewing(problems.length === 0);
+      return;
+    }
     if (!amountValid) {
       problems.push("Amount must be greater than 0.");
-    }
-    if (!custodial && !bookedAt) {
-      problems.push("Booked at is required.");
     }
     if (!currentQuote) {
       problems.push("Wait for the quote.");
@@ -166,21 +187,36 @@ export function CreateFxConversionPage() {
   }
 
   async function onConfirm() {
-    if (!destination || !currentQuote || !from) {
+    if (!destination || !from) {
+      return;
+    }
+    if (custodial && !currentQuote) {
+      return;
+    }
+    if (!custodial && (sellValue === null || buyValue === null)) {
       return;
     }
     try {
       await createFxConversion({
         idempotencyKey,
-        body: {
-          fromAccountId: from.id,
-          toAccountId: destination.id,
-          ...(side === "sell" ? { sellAmount: amountValue } : { buyAmount: amountValue }),
-          expectedRate: currentQuote.rate,
-          ...(custodial ? {} : { bookedAt: toUtcIso(bookedAt) }),
-          memo: memo.trim() || null,
-          reference: reference.trim() || null,
-        },
+        body: custodial
+          ? {
+              fromAccountId: from.id,
+              toAccountId: destination.id,
+              ...(side === "sell" ? { sellAmount: amountValue } : { buyAmount: amountValue }),
+              expectedRate: currentQuote!.rate,
+              memo: memo.trim() || null,
+              reference: reference.trim() || null,
+            }
+          : {
+              fromAccountId: from.id,
+              toAccountId: destination.id,
+              sellAmount: sellValue!,
+              buyAmount: buyValue!,
+              bookedAt: toUtcIso(bookedAt),
+              memo: memo.trim() || null,
+              reference: reference.trim() || null,
+            },
       }).unwrap();
       navigate(`/accounts/${from.id}`);
     } catch (error: unknown) {
@@ -235,44 +271,76 @@ export function CreateFxConversionPage() {
       <Section title="Details">
         <Card>
           <CardContent className="flex flex-col gap-4">
-            <div role="radiogroup" aria-label="Conversion side" className="flex gap-4 text-sm">
-              {(["sell", "buy"] as const).map((value) => (
-                <label key={value} className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="convert-side"
-                    value={value}
-                    checked={side === value}
-                    onChange={() => {
-                      setSide(value);
-                      resetReview();
-                    }}
-                  />
-                  <span>{value === "sell" ? "I sell" : "I buy"}</span>
-                </label>
-              ))}
-            </div>
-            <TextField
-              id="convert-amount"
-              label={`Amount (${typedCurrency})`}
-              inputMode="decimal"
-              value={amount}
-              onChange={(event) => {
-                setAmount(event.target.value);
-                resetReview();
-              }}
-            />
-            {currentQuote ? (
-              <div className="flex flex-col gap-1 text-sm" aria-live="polite">
-                <p>{rateLine(currentQuote)}</p>
-                <p>
-                  {side === "sell"
-                    ? `You get ${format(currentQuote.buy.amount, currentQuote.buy.currency)}`
-                    : `You pay ${format(currentQuote.sell.amount, currentQuote.sell.currency)}`}
-                </p>
-              </div>
-            ) : null}
-            <Messages messages={quoteMessages} />
+            {custodial ? (
+              <>
+                <div role="radiogroup" aria-label="Conversion side" className="flex gap-4 text-sm">
+                  {(["sell", "buy"] as const).map((value) => (
+                    <label key={value} className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="convert-side"
+                        value={value}
+                        checked={side === value}
+                        onChange={() => {
+                          setSide(value);
+                          resetReview();
+                        }}
+                      />
+                      <span>{value === "sell" ? "I sell" : "I buy"}</span>
+                    </label>
+                  ))}
+                </div>
+                <TextField
+                  id="convert-amount"
+                  label={`Amount (${typedCurrency})`}
+                  inputMode="decimal"
+                  value={amount}
+                  onChange={(event) => {
+                    setAmount(event.target.value);
+                    resetReview();
+                  }}
+                />
+                {currentQuote ? (
+                  <div className="flex flex-col gap-1 text-sm" aria-live="polite">
+                    <p>{rateLine(currentQuote)}</p>
+                    <p>
+                      {side === "sell"
+                        ? `You get ${format(currentQuote.buy.amount, currentQuote.buy.currency)}`
+                        : `You pay ${format(currentQuote.sell.amount, currentQuote.sell.currency)}`}
+                    </p>
+                  </div>
+                ) : null}
+                <Messages messages={quoteMessages} />
+              </>
+            ) : (
+              <>
+                <TextField
+                  id="convert-sell"
+                  label={`Sell (${from.currency})`}
+                  inputMode="decimal"
+                  value={sellText}
+                  onChange={(event) => {
+                    setSellText(event.target.value);
+                    resetReview();
+                  }}
+                />
+                <TextField
+                  id="convert-buy"
+                  label={`Buy (${destination?.currency ?? "…"})`}
+                  inputMode="decimal"
+                  value={buyText}
+                  onChange={(event) => {
+                    setBuyText(event.target.value);
+                    resetReview();
+                  }}
+                />
+                {impliedRate ? (
+                  <p className="text-sm" aria-live="polite">
+                    {impliedRate}
+                  </p>
+                ) : null}
+              </>
+            )}
             {custodial ? (
               <Muted>{bookedWhenPosted}</Muted>
             ) : (
@@ -301,10 +369,12 @@ export function CreateFxConversionPage() {
               onChange={(event) => setReference(event.target.value)}
               maxLength={100}
             />
-            {reviewing && destination && currentQuote ? (
+            {reviewing && destination && (currentQuote || (!custodial && impliedRate)) ? (
               <div className="flex flex-col gap-3">
                 <p className="text-sm font-medium">
-                  {`Convert ${format(currentQuote.sell.amount, currentQuote.sell.currency)} from ${from.name} to ${format(currentQuote.buy.amount, currentQuote.buy.currency)} in ${destination.name} at ${rateLine(currentQuote)}`}
+                  {currentQuote && custodial
+                    ? `Convert ${format(currentQuote.sell.amount, currentQuote.sell.currency)} from ${from.name} to ${format(currentQuote.buy.amount, currentQuote.buy.currency)} in ${destination.name} at ${rateLine(currentQuote)}`
+                    : `Convert ${format(sellValue!, from.currency)} from ${from.name} to ${format(buyValue!, destination.currency)} in ${destination.name} at ${impliedRate}`}
                 </p>
                 <div className="flex gap-2">
                   <Button type="button" disabled={isLoading} onClick={() => void onConfirm()}>

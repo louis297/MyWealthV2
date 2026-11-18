@@ -115,8 +115,12 @@ export type FxQuote = {
   buy: { amount: number; currency: string };
 };
 
+/**
+ * Between Custodial Accounts: one amount and the quoted `expectedRate`. Between External Accounts: both amounts and
+ * no `expectedRate` (external-caller-numbers R15, R16).
+ */
 export type CreateFxConversionBody = FxQuoteBody & {
-  expectedRate: number;
+  expectedRate?: number;
   bookedAt?: string;
   memo: string | null;
   reference: string | null;
