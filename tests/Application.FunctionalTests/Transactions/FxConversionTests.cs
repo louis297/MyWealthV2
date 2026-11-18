@@ -3,20 +3,31 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Application.FunctionalTests.Accounts;
+using MyWealthV2.Application.FunctionalTests.Custody;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Entities;
 
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
-/// <summary>FX conversions R1, R3–R5, R7–R11, R13–R15, R19: POST /transactions/fx create, idempotency and validation.</summary>
+/// <summary>
+/// FX conversions R1, R3–R5, R7–R11, R13–R15, R19: POST /transactions/fx create, idempotency and validation.
+/// The reference rate applies between Custodial Accounts (external-caller-numbers R20), which the server books now.
+/// </summary>
 [Parallelizable]
 public class FxConversionTests : TestBase
 {
     internal const string FxPath = "/transactions/fx";
+
+    /// <summary>The booking instant of a conversion between the External Accounts of <see cref="FxWorld.CreateExternalAsync"/>.</summary>
     internal const string BookedAt = "2026-11-10T09:00:00Z";
     internal const decimal NzdUsd = 0.59120000m;
-    internal static readonly DateOnly RateAsOf = new(2026, 11, 9);
+
+    /// <summary>The as-of date of the world's rate: today, as a Custodial conversion is booked now.</summary>
+    internal static DateOnly RateAsOf => DateOnly.FromDateTime(DateTime.UtcNow);
+
+    /// <summary>The as-of date of the rate of <see cref="FxWorld.CreateExternalAsync"/>, the day before <see cref="BookedAt"/>.</summary>
+    internal static readonly DateOnly ExternalRateAsOf = new(2026, 11, 9);
 
     [Test]
     public async Task NoBearer_Returns401()
@@ -86,8 +97,8 @@ public class FxConversionTests : TestBase
     {
         var world = await FxWorld.CreateAsync();
         await world.FundNzdAsync(2000m);
-        await SetRateAsync("NZD", "USD", 0.58000000m, new DateOnly(2026, 11, 8));
-        await SetRateAsync("NZD", "USD", 0.60000000m, new DateOnly(2026, 11, 11));
+        await SetRateAsync("NZD", "USD", 0.58000000m, RateAsOf.AddDays(-1));
+        await SetRateAsync("NZD", "USD", 0.60000000m, RateAsOf.AddDays(1));
 
         var id = await LegAccountsFixture.ReadIdAsync(await PostAsync(
             world.Legs.TenantAdmin.AccessToken, SellBody(world.NzdAccountId, world.UsdAccountId, 100m)));
@@ -100,8 +111,7 @@ public class FxConversionTests : TestBase
     {
         var world = await FxWorld.CreateAsync();
         await world.FundNzdAsync(100m);
-        var noraUsd = await InternalTransferTests.OpenAccountAsync(
-            world.Legs.TenantAdmin.AccessToken, world.Legs.Nora.PublicId, "Nora USD", "USD");
+        var noraUsd = await world.OpenAccountAsync(world.Legs.Nora.PublicId, "Nora USD", "USD");
 
         await ShouldRejectAsync(world, SellBody(world.NzdAccountId, noraUsd, 10m));
     }
@@ -113,8 +123,7 @@ public class FxConversionTests : TestBase
         await world.FundNzdAsync(100m);
         var nell = await TestApp.CreatePersonAsync(
             UserRole.Customer, "Nell North", "nell@north.example", "Password1!", world.Legs.Tenant.Id, world.Legs.Ned.AdviserId);
-        var nellUsd = await InternalTransferTests.OpenAccountAsync(
-            world.Legs.TenantAdmin.AccessToken, nell.PublicId, "Nell USD", "USD");
+        var nellUsd = await world.OpenAccountAsync(nell.PublicId, "Nell USD", "USD");
 
         await ShouldRejectAsync(world, SellBody(world.NzdAccountId, nellUsd, 10m), world.Legs.Ann.AccessToken);
     }
@@ -133,8 +142,7 @@ public class FxConversionTests : TestBase
     {
         var world = await FxWorld.CreateAsync();
         await world.FundNzdAsync(100m);
-        var savings = await InternalTransferTests.OpenAccountAsync(
-            world.Legs.TenantAdmin.AccessToken, world.Legs.Ned.PublicId, "Ned savings");
+        var savings = await world.OpenAccountAsync(world.Legs.Ned.PublicId, "Ned savings");
 
         await ShouldRejectAsync(world, SellBody(world.NzdAccountId, savings, 10m));
     }
@@ -189,7 +197,7 @@ public class FxConversionTests : TestBase
         await world.FundNzdAsync(100m);
 
         // 0.01 NZD × 0.5912 = 0.005912 → 0.01 USD; use a rate that rounds to 0.
-        await SetRateAsync("NZD", "USD", 0.10000000m, new DateOnly(2026, 11, 10));
+        await SetRateAsync("NZD", "USD", 0.10000000m, RateAsOf);
         var body = SellBody(world.NzdAccountId, world.UsdAccountId, 0.01m, expectedRate: 0.10000000m);
 
         await ShouldRejectAsync(world, body);
@@ -200,8 +208,7 @@ public class FxConversionTests : TestBase
     {
         var world = await FxWorld.CreateAsync();
         await world.FundNzdAsync(100m);
-        var aud = await InternalTransferTests.OpenAccountAsync(
-            world.Legs.TenantAdmin.AccessToken, world.Legs.Ned.PublicId, "Ned AUD", "AUD");
+        var aud = await world.OpenAccountAsync(world.Legs.Ned.PublicId, "Ned AUD", "AUD");
 
         await ShouldRejectAsync(world, SellBody(world.NzdAccountId, aud, 10m));
     }
@@ -211,8 +218,7 @@ public class FxConversionTests : TestBase
     {
         var world = await FxWorld.CreateAsync();
         await InsertUsdAsync(world, 100m);
-        var aud = await InternalTransferTests.OpenAccountAsync(
-            world.Legs.TenantAdmin.AccessToken, world.Legs.Ned.PublicId, "Ned AUD", "AUD");
+        var aud = await world.OpenAccountAsync(world.Legs.Ned.PublicId, "Ned AUD", "AUD");
 
         // Only AUD → USD is stored; USD → AUD is not derived from it (R9).
         await SetRateAsync("AUD", "USD", 0.65000000m, RateAsOf);
@@ -225,10 +231,10 @@ public class FxConversionTests : TestBase
     {
         var world = await FxWorld.CreateAsync();
         await world.FundNzdAsync(100m);
-        var body = SellBody(world.NzdAccountId, world.UsdAccountId, 10m);
-        body["bookedAt"] = "2026-11-14T09:00:00Z"; // 5 days after the 2026-11-09 rate
+        await DeleteRatesAsync();
+        await SetRateAsync("NZD", "USD", NzdUsd, RateAsOf.AddDays(-5));
 
-        await ShouldRejectAsync(world, body);
+        await ShouldRejectAsync(world, SellBody(world.NzdAccountId, world.UsdAccountId, 10m));
     }
 
     [Test]
@@ -236,10 +242,11 @@ public class FxConversionTests : TestBase
     {
         var world = await FxWorld.CreateAsync();
         await world.FundNzdAsync(100m);
-        var body = SellBody(world.NzdAccountId, world.UsdAccountId, 10m);
-        body["bookedAt"] = "2026-11-13T09:00:00Z";
+        await DeleteRatesAsync();
+        await SetRateAsync("NZD", "USD", NzdUsd, RateAsOf.AddDays(-4));
 
-        (await PostAsync(world.Legs.TenantAdmin.AccessToken, body)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await PostAsync(world.Legs.TenantAdmin.AccessToken, SellBody(world.NzdAccountId, world.UsdAccountId, 10m)))
+            .StatusCode.ShouldBe(HttpStatusCode.Created);
     }
 
     [Test]
@@ -354,7 +361,7 @@ public class FxConversionTests : TestBase
         var key = Guid.NewGuid();
         var id = await LegAccountsFixture.ReadIdAsync(await PostAsync(world.Legs.TenantAdmin.AccessToken, body, key));
 
-        await SetRateAsync("NZD", "USD", 0.60000000m, new DateOnly(2026, 11, 10));
+        await SetRateAsync("NZD", "USD", 0.60000000m, RateAsOf);
 
         (await LegAccountsFixture.ReadIdAsync(await PostAsync(world.Legs.TenantAdmin.AccessToken, body, key)))
             .ShouldBe(id);
@@ -365,12 +372,11 @@ public class FxConversionTests : TestBase
     {
         var world = await FxWorld.CreateAsync();
         await world.FundNzdAsync(100m);
-        var savings = await InternalTransferTests.OpenAccountAsync(
-            world.Legs.TenantAdmin.AccessToken, world.Legs.Ned.PublicId, "Ned savings");
+        var savings = await world.OpenAccountAsync(world.Legs.Ned.PublicId, "Ned savings");
         var key = Guid.NewGuid();
         (await InternalTransferTests.PostAsync(
                 world.Legs.TenantAdmin.AccessToken,
-                InternalTransferTests.Body(world.NzdAccountId, savings, 10m),
+                InternalTransferTests.Body(world.NzdAccountId, savings, 10m).WithoutBookedAt(),
                 key))
             .StatusCode.ShouldBe(HttpStatusCode.Created);
 
@@ -396,6 +402,7 @@ public class FxConversionTests : TestBase
             .StatusCode.ShouldBe(HttpStatusCode.Created);
     }
 
+    /// <summary>A sell body between Custodial Accounts: no <c>bookedAt</c>. An External caller adds one.</summary>
     internal static Dictionary<string, object?> SellBody(
         Guid fromAccountId,
         Guid toAccountId,
@@ -408,7 +415,6 @@ public class FxConversionTests : TestBase
             ["toAccountId"] = toAccountId,
             ["sellAmount"] = sellAmount,
             ["expectedRate"] = expectedRate,
-            ["bookedAt"] = BookedAt,
             ["memo"] = memo,
             ["reference"] = null
         };
@@ -424,7 +430,6 @@ public class FxConversionTests : TestBase
             ["toAccountId"] = toAccountId,
             ["buyAmount"] = buyAmount,
             ["expectedRate"] = expectedRate,
-            ["bookedAt"] = BookedAt,
             ["memo"] = null,
             ["reference"] = null
         };
@@ -459,6 +464,13 @@ public class FxConversionTests : TestBase
         }
 
         await db.SaveChangesAsync();
+    }
+
+    internal static async Task DeleteRatesAsync()
+    {
+        await using var scope = FunctionalTestSetup.ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await db.Database.ExecuteSqlRawAsync("DELETE FROM [FxRates]");
     }
 
     internal static async Task<(string Base, string Quote, decimal Rate, DateOnly AsOf, string Source)?> FxDetailAsync(
@@ -515,22 +527,41 @@ public class FxConversionTests : TestBase
 }
 
 /// <summary>
-/// The leg-accounts world plus a USD Bank account for Ned and the NZD → USD rate 0.5912 as of 2026-11-09.
-/// Ned's NZD account is <see cref="NzdAccountId"/>.
+/// The leg-accounts world plus an NZD and a USD account for Ned and the NZD → USD rate 0.5912.
+/// <see cref="CreateAsync"/>: Custodial Brokerage accounts, the rate as of today (the server books the conversion now).
+/// <see cref="CreateExternalAsync"/>: Ned's External NZD Bank account of the leg-accounts world, an External USD Bank
+/// account and the rate as of 2026-11-09, for conversions booked at <see cref="FxConversionTests.BookedAt"/>.
 /// </summary>
-internal sealed record FxWorld(LegAccountsWorld Legs, Guid UsdAccountId)
+internal sealed record FxWorld(LegAccountsWorld Legs, Guid NzdAccountId, Guid UsdAccountId, bool Custodial)
 {
-    public Guid NzdAccountId => Legs.NedAccountId;
-
     public static async Task<FxWorld> CreateAsync()
+    {
+        var legs = await LegAccountsFixture.CreateAsync();
+        var nzd = await OpenCustodialAsync(legs, legs.Ned.PublicId, "Ned NZD", "NZD");
+        var usd = await OpenCustodialAsync(legs, legs.Ned.PublicId, "Ned USD", "USD");
+        await FxConversionTests.SetRateAsync("NZD", "USD", FxConversionTests.NzdUsd, FxConversionTests.RateAsOf);
+        return new FxWorld(legs, nzd, usd, Custodial: true);
+    }
+
+    public static async Task<FxWorld> CreateExternalAsync()
     {
         var legs = await LegAccountsFixture.CreateAsync();
         var usd = await InternalTransferTests.OpenAccountAsync(
             legs.TenantAdmin.AccessToken, legs.Ned.PublicId, "Ned USD", "USD");
-        await FxConversionTests.SetRateAsync("NZD", "USD", FxConversionTests.NzdUsd, FxConversionTests.RateAsOf);
-        return new FxWorld(legs, usd);
+        await FxConversionTests.SetRateAsync(
+            "NZD", "USD", FxConversionTests.NzdUsd, FxConversionTests.ExternalRateAsOf);
+        return new FxWorld(legs, legs.NedAccountId, usd, Custodial: false);
     }
+
+    /// <summary>Opens another account in the world's custody mode.</summary>
+    public Task<Guid> OpenAccountAsync(Guid customerId, string name, string currency = "NZD") =>
+        Custodial
+            ? OpenCustodialAsync(Legs, customerId, name, currency)
+            : InternalTransferTests.OpenAccountAsync(Legs.TenantAdmin.AccessToken, customerId, name, currency);
 
     public Task FundNzdAsync(decimal amount) =>
         LegAccountsFixture.InsertCashTransactionAsync(Legs.Tenant.Id, TransactionType.TransferIn, (NzdAccountId, amount));
+
+    private static Task<Guid> OpenCustodialAsync(LegAccountsWorld legs, Guid customerId, string name, string currency) =>
+        AccountHttp.OpenAccountAsync(legs.TenantAdmin.AccessToken, customerId, name, "Brokerage", currency, "Custodial");
 }

@@ -4,7 +4,10 @@ using MyWealthV2.Application.FunctionalTests.Accounts;
 
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
-/// <summary>FX conversions R20: POST /transactions/fx/quote is read-only and runs R1, R3–R11.</summary>
+/// <summary>
+/// FX conversions R20: POST /transactions/fx/quote is read-only and runs R1, R3–R11. A quote applies between
+/// Custodial Accounts (external-caller-numbers R19), which the server prices for now.
+/// </summary>
 [Parallelizable]
 public class FxConversionQuoteTests : TestBase
 {
@@ -43,7 +46,7 @@ public class FxConversionQuoteTests : TestBase
         root.GetProperty("baseCurrency").GetString().ShouldBe("NZD");
         root.GetProperty("quoteCurrency").GetString().ShouldBe("USD");
         root.GetProperty("rate").GetDecimal().ShouldBe(FxConversionTests.NzdUsd);
-        root.GetProperty("rateAsOfDate").GetString().ShouldBe("2026-11-09");
+        root.GetProperty("rateAsOfDate").GetString().ShouldBe(FxConversionTests.RateAsOf.ToString("yyyy-MM-dd"));
         root.GetProperty("sell").GetProperty("amount").GetDecimal().ShouldBe(1000.00m);
         root.GetProperty("sell").GetProperty("currency").GetString().ShouldBe("NZD");
         root.GetProperty("buy").GetProperty("amount").GetDecimal().ShouldBe(591.20m);
@@ -86,13 +89,13 @@ public class FxConversionQuoteTests : TestBase
     }
 
     [Test]
-    public async Task BookedAtOmitted_UsesNow()
+    public async Task ReadsTheRateForNow()
     {
         var world = await FxWorld.CreateAsync();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        await FxConversionTests.SetRateAsync("NZD", "USD", 0.58000000m, today.AddDays(-1));
         await FxConversionTests.SetRateAsync("NZD", "USD", 0.60000000m, today);
         var body = QuoteSellBody(world.NzdAccountId, world.UsdAccountId, 10m);
-        body.Remove("bookedAt");
 
         var response = await QuoteAsync(world.Legs.TenantAdmin.AccessToken, body);
 
@@ -130,8 +133,9 @@ public class FxConversionQuoteTests : TestBase
     public async Task StaleRate_Returns400()
     {
         var world = await FxWorld.CreateAsync();
+        await FxConversionTests.DeleteRatesAsync();
+        await FxConversionTests.SetRateAsync("NZD", "USD", FxConversionTests.NzdUsd, FxConversionTests.RateAsOf.AddDays(-5));
         var body = QuoteSellBody(world.NzdAccountId, world.UsdAccountId, 10m);
-        body["bookedAt"] = "2026-11-14T09:00:00Z";
 
         (await QuoteAsync(world.Legs.TenantAdmin.AccessToken, body)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
@@ -140,8 +144,7 @@ public class FxConversionQuoteTests : TestBase
     public async Task MissingRate_Returns400()
     {
         var world = await FxWorld.CreateAsync();
-        var aud = await InternalTransferTests.OpenAccountAsync(
-            world.Legs.TenantAdmin.AccessToken, world.Legs.Ned.PublicId, "Ned AUD", "AUD");
+        var aud = await world.OpenAccountAsync(world.Legs.Ned.PublicId, "Ned AUD", "AUD");
 
         (await QuoteAsync(world.Legs.TenantAdmin.AccessToken, QuoteSellBody(world.NzdAccountId, aud, 10m)))
             .StatusCode.ShouldBe(HttpStatusCode.BadRequest);
@@ -151,10 +154,8 @@ public class FxConversionQuoteTests : TestBase
     public async Task SameCurrencyOrTwoCustomers_Returns400()
     {
         var world = await FxWorld.CreateAsync();
-        var savings = await InternalTransferTests.OpenAccountAsync(
-            world.Legs.TenantAdmin.AccessToken, world.Legs.Ned.PublicId, "Ned savings");
-        var noraUsd = await InternalTransferTests.OpenAccountAsync(
-            world.Legs.TenantAdmin.AccessToken, world.Legs.Nora.PublicId, "Nora USD", "USD");
+        var savings = await world.OpenAccountAsync(world.Legs.Ned.PublicId, "Ned savings");
+        var noraUsd = await world.OpenAccountAsync(world.Legs.Nora.PublicId, "Nora USD", "USD");
 
         (await QuoteAsync(world.Legs.TenantAdmin.AccessToken, QuoteSellBody(world.NzdAccountId, savings, 10m)))
             .StatusCode.ShouldBe(HttpStatusCode.BadRequest);
@@ -205,8 +206,7 @@ public class FxConversionQuoteTests : TestBase
         {
             ["fromAccountId"] = fromAccountId,
             ["toAccountId"] = toAccountId,
-            ["sellAmount"] = sellAmount,
-            ["bookedAt"] = FxConversionTests.BookedAt
+            ["sellAmount"] = sellAmount
         };
 
     private static Dictionary<string, object?> QuoteBuyBody(Guid fromAccountId, Guid toAccountId, decimal buyAmount) =>
@@ -214,8 +214,7 @@ public class FxConversionQuoteTests : TestBase
         {
             ["fromAccountId"] = fromAccountId,
             ["toAccountId"] = toAccountId,
-            ["buyAmount"] = buyAmount,
-            ["bookedAt"] = FxConversionTests.BookedAt
+            ["buyAmount"] = buyAmount
         };
 
     private static Task<HttpResponseMessage> QuoteAsync(string? accessToken, object body) =>

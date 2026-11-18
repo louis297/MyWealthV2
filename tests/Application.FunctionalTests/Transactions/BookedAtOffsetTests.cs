@@ -22,7 +22,7 @@ public class BookedAtOffsetTests : TestBase
     [TestCaseSource(nameof(Rejected))]
     public async Task BookedAtWithoutAnOffset_Returns400(string route, string bookedAt)
     {
-        var world = await FxWorld.CreateAsync();
+        var world = await FxWorld.CreateExternalAsync();
         await world.FundNzdAsync(1000m);
         var savings = await InternalTransferTests.OpenAccountAsync(
             world.Legs.TenantAdmin.AccessToken, world.Legs.Ned.PublicId, "Ned savings");

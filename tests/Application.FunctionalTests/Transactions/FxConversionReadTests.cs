@@ -91,7 +91,7 @@ public class FxConversionReadTests : TestBase
         fx.GetProperty("baseCurrency").GetString().ShouldBe("NZD");
         fx.GetProperty("quoteCurrency").GetString().ShouldBe("USD");
         fx.GetProperty("rate").GetDecimal().ShouldBe(FxConversionTests.NzdUsd);
-        fx.GetProperty("rateAsOfDate").GetString().ShouldBe("2026-11-09");
+        fx.GetProperty("rateAsOfDate").GetString().ShouldBe(FxConversionTests.RateAsOf.ToString("yyyy-MM-dd"));
         fx.TryGetProperty("rateSource", out _).ShouldBeFalse();
     }
 

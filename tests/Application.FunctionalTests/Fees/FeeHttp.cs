@@ -21,14 +21,11 @@ internal static class FeeHttp
     public static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
 
     /// <summary>
-    /// A schedule start in the past, after the funding and "before" trades of the fee tests (October 2026).
-    /// A trade cannot be dated in the future (fixes/ledger-write-guards.md Decision 6), so the fee tests
-    /// insert their schedule directly from this date instead of creating it after the cut-off over HTTP.
+    /// A schedule start in the past. A trade cannot be dated in the future (fixes/ledger-write-guards.md
+    /// Decision 6), so tests insert their schedule directly from a past date instead of creating it after
+    /// the cut-off over HTTP. A Custodial trade is booked now, so any start on or before today applies.
     /// </summary>
     public static readonly DateOnly ScheduleFrom = new(2026, 11, 1);
-
-    /// <summary>A trade instant on which a schedule from <see cref="ScheduleFrom"/> is in effect.</summary>
-    public static string TradeAt => At(ScheduleFrom.AddDays(1));
 
     public static async Task<HttpResponseMessage> Send(
         HttpMethod method,
@@ -170,22 +167,24 @@ internal static class FeeHttp
             bookedAt
         }, Guid.NewGuid());
 
+    /// <summary>
+    /// A server-priced trade on a Custodial account: no <c>bookedAt</c>, the server clock books it, so the
+    /// schedule in effect on today's UTC date applies (custody-modes R10; external-caller-numbers R22).
+    /// </summary>
     public static Task<HttpResponseMessage> PostTradeAsync(
         string accessToken,
         Guid accountId,
         string type,
         Guid instrumentId,
-        decimal quantity,
-        string bookedAt) =>
+        decimal quantity) =>
         TransactionHttp.Send(HttpMethod.Post, "/transactions", accessToken, new
         {
             accountId,
             type,
-            bookedAt,
             security = new[] { new { instrumentId, quantity } }
         }, Guid.NewGuid());
 
-    /// <summary>A funded USD brokerage Account with a USD instrument priced at 25.00.</summary>
+    /// <summary>A funded Custodial brokerage Account in <paramref name="currency"/> with an instrument priced at 25.00.</summary>
     public static async Task<(Guid AccountId, Guid InstrumentId)> TradingAccountAsync(
         string accessToken,
         Guid customerId,
@@ -193,12 +192,25 @@ internal static class FeeHttp
         string currency = "USD",
         decimal cash = 100000m)
     {
-        var accountId = await OpenAccountAsync(accessToken, customerId, "Brokerage", currency);
+        var accountId = await OpenCustodialAsync(accessToken, customerId, currency);
         var instrumentId = await CreateInstrumentAsync(accessToken, symbol, currency);
         await SetPriceAsync(instrumentId, 25.00m, currency);
-        (await PostCashAsync(accessToken, accountId, cash)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await FundCustodialAsync(accessToken, accountId, cash)).StatusCode.ShouldBe(HttpStatusCode.Created);
         return (accountId, instrumentId);
     }
+
+    /// <summary>A Custodial brokerage Account, where the server prices trades and charges the schedule's fee.</summary>
+    public static Task<Guid> OpenCustodialAsync(string accessToken, Guid customerId, string currency) =>
+        AccountHttp.OpenAccountAsync(accessToken, customerId, "Custodial " + currency, "Brokerage", currency, "Custodial");
+
+    /// <summary>A <c>TransferIn</c> on a Custodial account, booked by the server.</summary>
+    public static Task<HttpResponseMessage> FundCustodialAsync(string accessToken, Guid accountId, decimal amount) =>
+        TransactionHttp.Send(HttpMethod.Post, "/transactions", accessToken, new
+        {
+            accountId,
+            type = "TransferIn",
+            amount
+        }, Guid.NewGuid());
 
     /// <summary>
     /// Inserts a Buy at 25.00 directly, without a fee, as a row posted before a future bookedAt was refused

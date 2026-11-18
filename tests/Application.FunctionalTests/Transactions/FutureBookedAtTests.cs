@@ -68,7 +68,7 @@ public class FutureBookedAtTests : TestBase
     /// <summary>The FX world, funded, with a rate as of today so that a conversion booked now is not stale.</summary>
     private static async Task<(FxWorld World, Guid Savings)> WorldAsync()
     {
-        var world = await FxWorld.CreateAsync();
+        var world = await FxWorld.CreateExternalAsync();
         await world.FundNzdAsync(1000m);
         await FxConversionTests.SetRateAsync(
             "NZD", "USD", FxConversionTests.NzdUsd, DateOnly.FromDateTime(DateTime.UtcNow));
