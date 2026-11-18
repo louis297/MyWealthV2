@@ -3,7 +3,7 @@ title: Deployment
 status: accepted
 language: en
 created: 2026-11-11
-updated: 2026-11-14
+updated: 2026-11-18
 related:
   - README.md
   - smoke-test.md
@@ -139,7 +139,7 @@ The table lists the keys the compose file sets. Keys marked † are introduced b
 
 | Host | Keys |
 | --- | --- |
-| `webapi` | `ConnectionStrings__MyWealthDbV2`, `Identity__Authority`, `Reports__StorageRoot`, `Bootstrap__SystemAdmin__Email` ‡, `Bootstrap__SystemAdmin__Password` ‡ |
+| `webapi` | `ConnectionStrings__MyWealthDbV2`, `Identity__Authority`, `Reports__StorageRoot`, `Bootstrap__SystemAdmin__Email` ‡, `Bootstrap__SystemAdmin__Password` ‡, `LUCKYPENNY_LICENSE_KEY` |
 | `identity` | `ConnectionStrings__MyWealthDbV2`, `Identity__AdviserPortalClientSecret`, `Identity__CustomerPortalClientSecret`, `Identity__BackOfficeClientSecret`, `Identity__PortalOrigins__0`, `Identity__CustomerPortalOrigins__0`, `Identity__BackOfficeOrigin`, `Identity__Issuer` †, `Identity__SigningCertificatePath` †, `Identity__EncryptionCertificatePath` †, `Identity__CertificatePassword` †, `DataProtection__KeysPath` †, `ForwardedHeaders__KnownNetworks__0` † |
 | `bff-adviser-portal` | `Authentication__Authority`, `Authentication__ClientSecret`, `Authentication__PublicOrigin`, `Api__BaseAddress`, `DataProtection__KeysPath` †, `ForwardedHeaders__KnownNetworks__0` † |
 | `bff-customer-portal` | same keys as `bff-adviser-portal`, with its own secret and origin |
@@ -151,6 +151,7 @@ The table lists the keys the compose file sets. Keys marked † are introduced b
 - `ForwardedHeaders__KnownNetworks__0` is `172.30.0.0/24` (§3).
 - `DataProtection__KeysPath` is `/keys`. Each host mounts its own folder there (§7).
 - `webapi` and `worker` share the `reports` folder, mounted at the same `Reports__StorageRoot`.
+- `LUCKYPENNY_LICENSE_KEY` is read by MediatR and AutoMapper themselves, not by our configuration. Only `webapi` registers them. When it is empty they log a license warning on start and keep working.
 - Every .NET host also gets `OTEL_EXPORTER_OTLP_ENDPOINT` = `http://aspire-dashboard:18889` and `OTEL_SERVICE_NAME` = its container name from §3 (§5.1).
 
 **Repository folder `deploy/`.** Holds everything the VPS needs that is not secret:
@@ -189,6 +190,7 @@ The hosts already collect traces, metrics and logs through ServiceDefaults. They
 | Three OIDC client secrets | `identity` and the matching client host | `.env` on the VPS |
 | SQL `sa` password | `sql`, and the connection string of `webapi`, `identity`, `worker` | `.env` on the VPS |
 | EODHD API key | `worker` | `.env` on the VPS |
+| Lucky Penny license key (MediatR, AutoMapper) | `webapi` | `.env` on the VPS. The token copied from the Lucky Penny account page; the downloadable license file is not used |
 | OpenIddict signing and encryption certificates | `identity` | `certs/` on the VPS: `signing.pfx`, `encryption.pfx` |
 | OpenIddict certificate password (one password for both PFX files) | `identity` | `.env` on the VPS |
 | Bootstrap SystemAdmin email and password | `webapi`, first start only | `.env` on the VPS. Removed after the first sign-in (§12) |
@@ -200,7 +202,7 @@ The hosts already collect traces, metrics and logs through ServiceDefaults. They
 GitHub environment `production` also holds two variables that are not secret: `SMOKE_ADVISER_PORTAL_URL` and `SMOKE_CUSTOMER_PORTAL_URL` ([smoke-test.md](smoke-test.md) §5).
 
 - `.env` is created by hand on the VPS from `deploy/.env.example`, `chmod 600`, owned by the deploy user. GitHub does not hold the runtime secrets. To change one, edit `.env` and run `docker compose up -d`.
-- Values in `.env` use letters, digits and `-` only. `$` triggers compose interpolation, and quotes or `;` break the SQL connection string.
+- Values in `.env` use letters, digits and `-` only. `$` triggers compose interpolation, and quotes or `;` break the SQL connection string. The exception is `LUCKYPENNY_LICENSE_KEY`: it is a JWT, pasted as issued. Its `.` and `_` are safe because compose interpolates only `$` and the value never enters the connection string.
 - Passwords that become Identity passwords (`BOOTSTRAP_SYSTEMADMIN_PASSWORD`, and the smoke passwords of [smoke-test.md](smoke-test.md) §3) must pass the Identity password options: 8+ characters with an upper-case letter, a lower-case letter, a digit and a non-alphanumeric character (only `RequiredLength` differs from the ASP.NET Core Identity defaults). A `-` satisfies the last rule and is safe in `.env`. Otherwise `webapi` refuses to start (identity-auth bootstrap amendment), or the create form rejects the password.
 - SystemAdmin credentials never leave the owner. CI never signs in as SystemAdmin.
 - Aspire user secrets are for local Development only. They are not a deployment source.
