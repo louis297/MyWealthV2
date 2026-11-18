@@ -13,11 +13,29 @@ public sealed class CustodyModeChoice
 
     public bool AllowsCustodial { get; set; }
 
-    public bool CanSubmit => true;
+    public bool CanSubmit => AllowsExternal || AllowsCustodial;
 
-    public static CustodyModeChoice Both() => new();
+    public static CustodyModeChoice Both() => new() { AllowsExternal = true, AllowsCustodial = true };
 
-    public static CustodyModeChoice From(IReadOnlyList<string> modes) => new();
+    public static CustodyModeChoice From(IReadOnlyList<string> modes) => new()
+    {
+        AllowsExternal = modes.Contains(External),
+        AllowsCustodial = modes.Contains(Custodial)
+    };
 
-    public IReadOnlyList<string> ToList() => [];
+    public IReadOnlyList<string> ToList()
+    {
+        var modes = new List<string>(2);
+        if (AllowsExternal)
+        {
+            modes.Add(External);
+        }
+
+        if (AllowsCustodial)
+        {
+            modes.Add(Custodial);
+        }
+
+        return modes;
+    }
 }

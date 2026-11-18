@@ -22,8 +22,15 @@
                     <MudSelectItem T="string" Value="@currency.Code">@currency.Code</MudSelectItem>
                 }
             </MudSelect>
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.subtitle2">Custody modes</MudText>
+                <MudCheckBox T="bool" @bind-Value="custody.AllowsExternal" Label="External accounts"
+                             UserAttributes="@(new Dictionary<string, object?> { ["data-custody-mode"] = CustodyModeChoice.External })" />
+                <MudCheckBox T="bool" @bind-Value="custody.AllowsCustodial" Label="Custodial accounts"
+                             UserAttributes="@(new Dictionary<string, object?> { ["data-custody-mode"] = CustodyModeChoice.Custodial })" />
+            </MudStack>
             <MudStack Row="true" Spacing="2">
-                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Create</MudButton>
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!custody.CanSubmit)">Create</MudButton>
                 <MudButton Variant="Variant.Text" Href="/tenants">Cancel</MudButton>
             </MudStack>
         </MudStack>
@@ -32,6 +39,7 @@
 
 @code {
     private readonly FormModel form = new();
+    private readonly CustodyModeChoice custody = CustodyModeChoice.Both();
     private IReadOnlyList<CurrencyItem> currencies = [];
     private string? error;
 
@@ -43,9 +51,14 @@
 
     private async Task Create()
     {
+        if (!custody.CanSubmit)
+        {
+            return;
+        }
+
         try
         {
-            var id = await Api.CreateTenantAsync(form.Name, form.Code, form.ReportingCurrency, []);
+            var id = await Api.CreateTenantAsync(form.Name, form.Code, form.ReportingCurrency, custody.ToList());
             Navigation.NavigateTo($"/tenants/{id}");
         }
         catch (PlatformApiException exception)
