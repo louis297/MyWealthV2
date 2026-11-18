@@ -6,9 +6,9 @@ public interface IPlatformApi
 
     Task<TenantItem> GetTenantAsync(Guid id, CancellationToken cancellationToken = default);
 
-    Task<Guid> CreateTenantAsync(string name, string code, string reportingCurrency, CancellationToken cancellationToken = default);
+    Task<Guid> CreateTenantAsync(string name, string code, string reportingCurrency, IReadOnlyList<string> allowedCustodyModes, CancellationToken cancellationToken = default);
 
-    Task UpdateTenantAsync(Guid id, string name, string reportingCurrency, string rowVersion, CancellationToken cancellationToken = default);
+    Task UpdateTenantAsync(Guid id, string name, string reportingCurrency, IReadOnlyList<string> allowedCustodyModes, string rowVersion, CancellationToken cancellationToken = default);
 
     Task DisableTenantAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default);
 

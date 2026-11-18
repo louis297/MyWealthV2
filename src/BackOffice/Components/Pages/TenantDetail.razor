@@ -83,7 +83,7 @@
 
         try
         {
-            await Api.UpdateTenantAsync(Id, form.Name, form.ReportingCurrency, item.RowVersion);
+            await Api.UpdateTenantAsync(Id, form.Name, form.ReportingCurrency, [], item.RowVersion);
             item = await Api.GetTenantAsync(Id);
             error = null;
         }

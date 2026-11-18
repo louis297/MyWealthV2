@@ -45,7 +45,7 @@
     {
         try
         {
-            var id = await Api.CreateTenantAsync(form.Name, form.Code, form.ReportingCurrency);
+            var id = await Api.CreateTenantAsync(form.Name, form.Code, form.ReportingCurrency, []);
             Navigation.NavigateTo($"/tenants/{id}");
         }
         catch (PlatformApiException exception)

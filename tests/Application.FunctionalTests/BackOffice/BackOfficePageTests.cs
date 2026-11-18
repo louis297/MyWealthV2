@@ -52,6 +52,31 @@ public class BackOfficePageTests
     }
 
     [Test]
+    public async Task TenantNew_OffersBothCustodyModesCheckedOnOpen_AndCreateIsEnabled()
+    {
+        var body = await GetAsync("/tenants/new");
+
+        body.ShouldContain("Custody modes");
+        body.ShouldContain("External accounts");
+        body.ShouldContain("Custodial accounts");
+        CustodyBox(body, "External").ShouldContain(" checked");
+        CustodyBox(body, "Custodial").ShouldContain(" checked");
+        SubmitButton(body, "Create").ShouldNotContain(" disabled");
+    }
+
+    [Test]
+    public async Task TenantDetail_SetsTheCustodyModeBoxesFromTheItem_AndSaysItAffectsOnlyNewAccounts()
+    {
+        var body = await GetAsync($"/tenants/{TenantId}");
+
+        body.ShouldContain("Allowed custody modes");
+        CustodyBox(body, "External").ShouldContain(" checked");
+        CustodyBox(body, "Custodial").ShouldNotContain(" checked");
+        body.ShouldContain("Changing this affects only new accounts.");
+        SubmitButton(body, "Save").ShouldNotContain(" disabled");
+    }
+
+    [Test]
     public async Task TenantDetail_ShowsCodeAsText_AndHasNoDelete()
     {
         var body = await GetAsync($"/tenants/{TenantId}");
@@ -323,6 +348,20 @@ public class BackOfficePageTests
         body.ShouldNotContain("/reports/schedules");
     }
 
+    private static string CustodyBox(string body, string mode)
+    {
+        var match = Regex.Match(body, $"<input[^>]*data-custody-mode=\"{mode}\"[^>]*>");
+        match.Success.ShouldBeTrue($"no {mode} custody mode box");
+        return match.Value;
+    }
+
+    private static string SubmitButton(string body, string label)
+    {
+        var match = Regex.Match(body, $"<button[^>]*type=\"submit\"[^>]*><span class=\"mud-button-label\">{label}<");
+        match.Success.ShouldBeTrue($"no {label} button");
+        return match.Value;
+    }
+
     private async Task<string> GetAsync(string path)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, path);
@@ -371,19 +410,19 @@ public class BackOfficePageTests
         {
             TenantLists.Add(new TenantListRequest(page, pageSize, isEnabled, search));
             return Task.FromResult(new TenantPage(
-                [new TenantItem(TenantId, "North Advisory", "north-advisory", "NZD", true, "rv1")],
+                [new TenantItem(TenantId, "North Advisory", "north-advisory", "NZD", ["External", "Custodial"], true, "rv1")],
                 page,
                 pageSize,
                 1));
         }
 
         public Task<TenantItem> GetTenantAsync(Guid id, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new TenantItem(id, "North Advisory", "north-advisory", "NZD", true, "rv1"));
+            Task.FromResult(new TenantItem(id, "North Advisory", "north-advisory", "NZD", ["External"], true, "rv1"));
 
-        public Task<Guid> CreateTenantAsync(string name, string code, string reportingCurrency, CancellationToken cancellationToken = default) =>
+        public Task<Guid> CreateTenantAsync(string name, string code, string reportingCurrency, IReadOnlyList<string> allowedCustodyModes, CancellationToken cancellationToken = default) =>
             Task.FromResult(TenantId);
 
-        public Task UpdateTenantAsync(Guid id, string name, string reportingCurrency, string rowVersion, CancellationToken cancellationToken = default) =>
+        public Task UpdateTenantAsync(Guid id, string name, string reportingCurrency, IReadOnlyList<string> allowedCustodyModes, string rowVersion, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 
         public Task DisableTenantAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default) =>

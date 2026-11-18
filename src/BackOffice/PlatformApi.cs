@@ -38,6 +38,7 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         string name,
         string code,
         string reportingCurrency,
+        IReadOnlyList<string> allowedCustodyModes,
         CancellationToken cancellationToken = default)
     {
         var created = await ReadAsync<Created>(
@@ -52,6 +53,7 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         Guid id,
         string name,
         string reportingCurrency,
+        IReadOnlyList<string> allowedCustodyModes,
         string rowVersion,
         CancellationToken cancellationToken = default) =>
         SendExpectingSuccessAsync(
