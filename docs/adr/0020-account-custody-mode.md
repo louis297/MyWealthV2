@@ -10,6 +10,7 @@ related:
   - ../features/account-custody-mode.md
   - ../features/custody-modes.md
   - ../features/tenant-custody-modes.md
+  - ../features/external-caller-numbers.md
   - ../features/accounts.md
   - ../glossary.md
   - ../future-plans.md
@@ -80,4 +81,5 @@ The first slice adds the attribute only: [features/account-custody-mode.md](../f
 - Feature spec: [features/account-custody-mode.md](../features/account-custody-mode.md)
 - Rules for Custodial accounts (item 5): [features/custody-modes.md](../features/custody-modes.md), accepted 2026-11-17. It decides that the server sets the booking time on a Custodial account, the point item 5 left to that spec. This ADR does not change.
 - The tenant setting of item 1: [features/tenant-custody-modes.md](../features/tenant-custody-modes.md), accepted and landed 2026-11-18. This ADR does not change.
+- Caller numbers on External accounts (the `External` row of the decision table): [features/external-caller-numbers.md](../features/external-caller-numbers.md) (`review`). This ADR does not change.
 - Related ADRs: 0011 (account container, item 6), 0005 (tenancy)
