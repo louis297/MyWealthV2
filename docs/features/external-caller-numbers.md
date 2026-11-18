@@ -1,6 +1,6 @@
 ---
 title: Caller numbers on External accounts
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -37,7 +37,7 @@ Custodial accounts do not change. Server pricing, trade fee schedules, the refer
 
 No new route, no new policy, no new `TransactionType`, no problem code. One new body field (`fxRate` on `POST /transactions`). Script `0034_entered_trade_fees.sql` drops one CHECK.
 
-**Status is `review` (2026-11-18).** Not a build contract. The amendment notes in buy-sell, trade-fees, fx-conversions, cross-currency-trades and custody-modes, in the two Adviser Portal page contracts, in domain-model, database-design, api-design and the glossary are marked `review` and are not in force until this spec is accepted.
+**Status is `accepted` (2026-11-18).** Not landed. The amendments in buy-sell, trade-fees, fx-conversions, cross-currency-trades and custody-modes, in the two Adviser Portal page contracts, in domain-model, database-design, api-design and the glossary are in force from the same change.
 
 ---
 
@@ -195,7 +195,7 @@ Invariants:
 
 Where I3 is held: the factories do not read the custody mode to choose the source of a number. The handlers do (R2), the same split as custody-modes R7 and R13: the test seed and a later simulator build Transactions through the factories directly. The Domain refuses a trade with both a schedule and an entered fee, which no caller can produce.
 
-Update [domain-model.md](../domain-model.md) §8.6 when this spec is accepted.
+Recorded in [domain-model.md](../domain-model.md) §8.6.
 
 ---
 
@@ -214,7 +214,7 @@ Script: `database/schema/0034_entered_trade_fees.sql`. Forward only. Do not add 
 
 Existing data: none changed (R21). Functional tests create their own rows.
 
-Update [database-design.md](../database-design.md) §9, §11.4 and §13 when this spec is accepted.
+Recorded in [database-design.md](../database-design.md) §9, §11.4 and §13.
 
 ---
 
@@ -343,7 +343,7 @@ Keep the resource catalog in [api-design.md](../api-design.md) §7.7 pointing he
 
 ## 9. UI
 
-Page contracts: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D22, D23) and [adviser-portal-fees.md](../adviser-portal/adviser-portal-fees.md) (F20, F21), amended in the same change that accepts this spec. The Adviser Portal BFF does not change.
+Page contracts: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D22, D23) and [adviser-portal-fees.md](../adviser-portal/adviser-portal-fees.md) (F20, F21), amended and accepted together with this spec. The Adviser Portal BFF does not change.
 
 **Adviser Portal**
 
@@ -406,7 +406,7 @@ No new ADR. [ADR 0020](../adr/0020-account-custody-mode.md) already says the cal
 | Script | `0034_entered_trade_fees.sql`: drop `CK_TransactionFeeDetails_BrokerageSchedule` |
 | Routes, policies, problem codes, types, events | None added |
 
-To confirm when this spec is accepted. The rules above are written with the first option of each:
+Confirmed when this spec was accepted (2026-11-18). The rules above are written with the first option of each:
 
 1. **A cross-currency External trade takes `fxRate`, not a settlement amount** (R7). The rate is stored exactly as entered and the existing formulas apply. The alternative is a required `settlementAmount` (the principal in the Account currency, as on the contract note) with the rate derived from it, as R17 does for a conversion; the cash leg would then match the statement to the cent, but the fee would need its own conversion rule.
 2. **The entered fee is in the instrument's quote currency** (R6), like the server fee, so cost stays gross + fee in one currency. The alternative is the Account currency, the amount the broker actually debited; cost would then need the fee converted back.
@@ -434,6 +434,6 @@ Only after `accepted`. The repository should build after each commit. Agents spl
 4. External conversions take both amounts; the quote refuses External Accounts (R15–R20) + functional tests, including two-tenant. `BookedAtOffsetTests` and `FutureBookedAtTests` change body here.
 5. Adviser Portal: Buy / Sell inputs on External accounts (D22) + frontend tests.
 6. Adviser Portal: the External convert form (D23) and the fees pages (F20, F21) + frontend tests.
-7. Repo docs: mark this file landed; drop the `review` marks in the amended files.
+7. Repo docs: mark this file landed. (This file and the amendments in buy-sell, trade-fees, fx-conversions, cross-currency-trades, custody-modes, the two portal page contracts, domain-model, database-design, api-design and the glossary were accepted on 2026-11-18, before commit 1.)
 
 Do not put read-model grouping, the rest of cross-currency-trades, or any change to Custodial accounts in these commits.

@@ -166,9 +166,9 @@ Requests start 300 ms after the last change to the form or the amounts. A newer 
 
 ---
 
-## Amendment 2026-11-18 (External caller numbers) — review
+## Amendment 2026-11-18 (External caller numbers) — accepted
 
-Status of this amendment: `review`. Accept it together with [external-caller-numbers](../features/external-caller-numbers.md). Until then this file is unchanged. Schedules then apply to trades on Custodial accounts only.
+Status of this amendment: `accepted` (2026-11-18), together with [external-caller-numbers](../features/external-caller-numbers.md). Schedules then apply to trades on Custodial accounts only.
 
 | ID | Behaviour |
 | --- | --- |

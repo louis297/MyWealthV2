@@ -25,7 +25,7 @@ Amendment to [buy-sell.md](buy-sell.md), [holdings.md](holdings.md) and [portfol
 
 Depends on [fx-conversions.md](fx-conversions.md): the table, the item `fx` object and the staleness limit come from there. Accept and land that spec first.
 
-**Amendment 2026-11-18 (External caller numbers, `review`):** [external-caller-numbers.md](external-caller-numbers.md) R23. When that spec is accepted, every rule of this draft applies to Custodial accounts only. On an External account a `Buy` or `Sell` in another currency is allowed with the caller's `fxRate` and stores an FX detail with source `Caller`; `StockIn` and `OpeningHoldings` keep today's behaviour; R8 (staleness) and R9 (cash rounding) do not apply there. Rework this draft for Custodial accounts before it goes to review.
+**Amendment 2026-11-18 (External caller numbers, accepted):** [external-caller-numbers.md](external-caller-numbers.md) R23. Every rule of this draft applies to Custodial accounts only. On an External account a `Buy` or `Sell` in another currency is allowed with the caller's `fxRate` and stores an FX detail with source `Caller`; `StockIn` and `OpeningHoldings` keep today's behaviour; R8 (staleness) and R9 (cash rounding) do not apply there. Rework this draft for Custodial accounts before it goes to review.
 
 ---
 

@@ -495,9 +495,9 @@ Do not put a tenant setting, caller-supplied prices, or read-model grouping in t
 
 ---
 
-## Amendment 2026-11-18 (External caller numbers) — review
+## Amendment 2026-11-18 (External caller numbers) — accepted
 
-Status of this amendment: `review`. Accept it together with [external-caller-numbers.md](external-caller-numbers.md). Until then this file is unchanged.
+Status of this amendment: `accepted` (2026-11-18), together with [external-caller-numbers.md](external-caller-numbers.md).
 
 - §1 table, row "Price, FX rate, trade fee on `Buy` / `Sell`": External becomes **Caller** (executed `price`, optional `fee`, `fxRate` across currencies). A new row "`FxConversion` amounts and rate": External — both amounts from the caller, rate derived, no `expectedRate`, no quote; Custodial — one amount and the reference rate (unchanged).
 - I3 holds in both directions: the server decides the numbers on a Custodial account, the caller on an External account.
