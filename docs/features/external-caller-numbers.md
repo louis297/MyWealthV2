@@ -343,17 +343,17 @@ Keep the resource catalog in [api-design.md](../api-design.md) §7.7 pointing he
 
 ## 9. UI
 
-Page contracts: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D22, D23) and [adviser-portal-fees.md](../adviser-portal/adviser-portal-fees.md) (F20), amended in the same change that accepts this spec. The Adviser Portal BFF does not change.
+Page contracts: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D22, D23) and [adviser-portal-fees.md](../adviser-portal/adviser-portal-fees.md) (F20, F21), amended in the same change that accepts this spec. The Adviser Portal BFF does not change.
 
 **Adviser Portal**
 
 - Buy / Sell form on an **External** account (`/accounts/:id/transactions/new`): a required "Price" input labelled with the instrument's quote currency ("Price per unit (USD)"), an optional "Fee" input in the same currency, and, when the instrument's quote currency differs from the Account currency, a required "FX rate" input labelled "1 USD = ? NZD". The inputs appear once an instrument is picked. The POST carries `security[0].price`, `fee` (left out when blank) and `fxRate`. The form does no cash or cost arithmetic; the posted transaction shows the legs.
-- Buy / Sell form on a **Custodial** account: unchanged, no price, fee or rate input.
+- Buy / Sell form on a **Custodial** account: unchanged, no price, fee or rate input, and the help text "Brokerage is added by the server from the trade fee schedule." stays. On an External account that help text is not shown.
 - Convert form on an **External** account (`/accounts/:id/convert`): no "I sell" / "I buy" toggle and no quote call. Two required inputs, "Sell (NZD)" and "Buy (USD)", each in its Account's currency. Once both are valid the form shows the implied rate as display text, "1 NZD = 0.5912 USD", rounded to 4 decimals. Review shows "Convert 845.74 NZD from <account> to 500.00 USD in <account> at 1 NZD = 0.5912 USD". Confirm posts both amounts, no `expectedRate`, with one `Idempotency-Key` per form open. "Booked at" stays required (D19). There is no 409 path.
 - Convert form on a **Custodial** account: unchanged (live quote, `expectedRate`, re-quote on 409).
 - The destination picker of the convert form is unchanged (D20 greys out the other custody mode).
 - The account page and the transaction pages already show the rate line under the amount when the item has `fx`. An External `Buy` / `Sell` with a rate shows it the same way. No change.
-- Fees pages (`/fees/trade-schedules` list and detail): one line under the page title, "Schedules apply to trades on Custodial accounts. A trade on an External account carries the fee entered with it."
+- Fees pages (`/fees/trade` list and `/fees/trade/:id` detail): one line under the page title, "Schedules apply to trades on Custodial accounts. A trade on an External account carries the fee entered with it." The transaction detail already shows a `Fee` leg without a schedule link when `fee.scheduleId` is `null` (adviser-portal-fees, "Fees on ledger pages"); no change there.
 
 **Customer Portal**
 
@@ -375,7 +375,7 @@ No seed code changes. The `TestSeed` `Buy` on "Demo brokerage" (External) is bui
 | Application.FunctionalTests — External conversions | Both amounts → 201, legs equal the amounts, item `fx` rate `0.59119824`, `rateAsOfDate` the `bookedAt` date; no `FxRates` row for the pair → still 201; one amount → 400 on the missing field; `expectedRate` → 400; too many decimals on either amount → 400; insufficient cash → 400; reverse → 201 with the original amounts and FX detail. Quote between two External Accounts → 400 `errors.FromAccountId`; between External and Custodial → 400 `errors.ToAccountId` (existing). Between two Custodial Accounts: both amounts → 400 and no `expectedRate` → 400 (existing messages), the quote → 200 |
 | Application.FunctionalTests — two tenants | Another tenant's External account or instrument on an External `Buy` with `price` → 404, not 400; another tenant's External Account on a two-amount conversion → 404 |
 | Infrastructure.IntegrationTests | Script `0034` on a scratch database (as for `0031`): an insert into `TransactionFeeDetails` with kind 0 and `TradeFeeScheduleId` NULL succeeds after the script; existing rows are unchanged. EF round-trip: an External `Buy` with an entered fee and a rate reloads with a fee detail without schedule and a `Caller` FX detail |
-| Adviser Portal | External account: Buy / Sell form shows Price and Fee after an instrument is picked, and FX rate only when currencies differ; the POST carries `price`, `fee` only when filled, and `fxRate`; a 400 on `Security[0].Price`, `Fee` or `FxRate` is shown at its input. Custodial account: no such inputs and none in the POST. Convert form on an External account: two amount inputs, no toggle, no quote request, implied rate text, the POST carries both amounts and no `expectedRate`. Convert form on a Custodial account: unchanged. Fees pages show the line of §9 |
+| Adviser Portal | External account: Buy / Sell form shows Price and Fee after an instrument is picked, and FX rate only when currencies differ; the POST carries `price`, `fee` only when filled, and `fxRate`; a 400 on `Security[0].Price`, `Fee` or `FxRate` is shown at its input. Custodial account: no such inputs and none in the POST. Convert form on an External account: two amount inputs, no toggle, no quote request, implied rate text, the POST carries both amounts and no `expectedRate`. Convert form on a Custodial account: unchanged. Fees pages show the line of §9; the Buy / Sell help text only on a Custodial account |
 
 Where the two-tenant tests live: every new rule runs in a handler after the Account lookup, so the cross-tenant cases are proved over HTTP in Application.FunctionalTests, next to the existing isolation tests of each route.
 
@@ -432,7 +432,7 @@ Only after `accepted`. The repository should build after each commit. Agents spl
 3. External `Buy` / `Sell` take `price`, `fee` and `fxRate` (R4–R14, R22) + functional tests, including two-tenant. The External `Buy` / `Sell` bodies in the other suites add `price` here.
 4. External conversions take both amounts; the quote refuses External Accounts (R15–R20) + functional tests, including two-tenant. `BookedAtOffsetTests` and `FutureBookedAtTests` change body here.
 5. Adviser Portal: Buy / Sell inputs on External accounts (D22) + frontend tests.
-6. Adviser Portal: the External convert form (D23) and the fees page line (F20) + frontend tests.
+6. Adviser Portal: the External convert form (D23) and the fees pages (F20, F21) + frontend tests.
 7. Repo docs: mark this file landed; drop the `review` marks in the amended files.
 
 Do not put read-model grouping, the rest of cross-currency-trades, or any change to Custodial accounts in these commits.
