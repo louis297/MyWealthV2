@@ -20,6 +20,10 @@ public class Tenant : BaseAuditableEntity
 
     public bool IsActive { get; private set; }
 
+    public bool AllowsExternalAccounts { get; private set; }
+
+    public bool AllowsCustodialAccounts { get; private set; }
+
     public byte[] RowVersion { get; private set; } = null!;
 
     public static Tenant Create(string name, string code, Currency reportingCurrency, Guid? publicId = null)
@@ -32,6 +36,8 @@ public class Tenant : BaseAuditableEntity
             Code = code,
             PublicId = publicId ?? Guid.NewGuid(),
             IsActive = true,
+            AllowsExternalAccounts = true,
+            AllowsCustodialAccounts = true,
             ReportingCurrency = reportingCurrency.Code
         };
         tenant.AddDomainEvent(new TenantCreated(tenant));
@@ -77,14 +83,29 @@ public class Tenant : BaseAuditableEntity
     }
 
     /// <summary>The custody modes new Accounts of this Tenant may be opened with, External before Custodial.</summary>
-    public IReadOnlyList<CustodyMode> AllowedCustodyModes => [];
+    public IReadOnlyList<CustodyMode> AllowedCustodyModes =>
+        Enum.GetValues<CustodyMode>().Where(Allows).ToList();
 
     /// <summary>Replaces the allowed custody modes (tenant-custody-modes R2). An empty set is refused.</summary>
     public void SetAllowedCustodyModes(IReadOnlyCollection<CustodyMode> modes)
     {
+        var external = modes?.Contains(CustodyMode.External) ?? false;
+        var custodial = modes?.Contains(CustodyMode.Custodial) ?? false;
+        if (!external && !custodial)
+        {
+            throw new DomainException("A tenant must allow at least one custody mode.");
+        }
+
+        AllowsExternalAccounts = external;
+        AllowsCustodialAccounts = custodial;
     }
 
-    public bool Allows(CustodyMode mode) => false;
+    public bool Allows(CustodyMode mode) => mode switch
+    {
+        CustodyMode.External => AllowsExternalAccounts,
+        CustodyMode.Custodial => AllowsCustodialAccounts,
+        _ => false
+    };
 
     private static void EnsureReportingCurrency(Currency currency)
     {
