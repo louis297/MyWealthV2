@@ -28,6 +28,7 @@ related:
   - features/tenant-custody-modes.md
   - features/external-caller-numbers.md
   - features/custody-mode-grouping.md
+  - custodial-roadmap.md
 ---
 
 # Future plans
@@ -218,7 +219,7 @@ Slices. All five have a spec. Slices 3 to 5 do not depend on each other:
 | 4 | External accounts take the caller's numbers: executed price and fee on `Buy` / `Sell`, both amounts on an `FxConversion`. Server pricing, trade fee schedules and the reference rate then apply to Custodial accounts only. [features/external-caller-numbers.md](features/external-caller-numbers.md) (accepted, landed 2026-11-18) | Medium |
 | 5 | Read side: net worth, the two reports and the portal pages show the two modes as two groups; the Custodial group is the funds under management, and the Customer is told that External figures are not checked by the platform. [features/custody-mode-grouping.md](features/custody-mode-grouping.md) (accepted 2026-11-18, landed 2026-11-19) | Read only |
 
-After slice 2, some writes on a Custodial account are still entered by hand or are missing. Each later item replaces one of them:
+After slice 2, some writes on a Custodial account are still entered by hand or are missing. Each later item replaces one of them. The plan for these items, their order, the decisions they need and the simulator is [custodial-roadmap.md](custodial-roadmap.md) (`note`, 2026-11-19):
 
 - Deposits and withdrawals matched to a bank statement, replacing hand-entered `TransferIn` / `TransferOut`.
 - An interest job and income events (§1 step 2), replacing hand-entered `Interest`.
