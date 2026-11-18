@@ -59,6 +59,12 @@ describe("FeesTradePage", () => {
     vi.useRealTimers();
   });
 
+  it("says under the title that schedules apply to Custodial accounts only (F20)", async () => {
+    renderFees(feeUser(), routes, "/fees/trade", listHandler(rows));
+
+    expect(await screen.findByText("Schedules apply to trades on Custodial accounts. A trade on an External account carries the fee entered with it.")).toBeInTheDocument();
+  });
+
   it("groups schedules by quote currency in code order, newest first (F2)", async () => {
     renderFees(feeUser(), routes, "/fees/trade", listHandler(rows));
 
