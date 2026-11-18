@@ -8,6 +8,7 @@ using RouteHandlerOptions = Microsoft.AspNetCore.Routing.RouteHandlerOptions;
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
 // fixes/utc-instants.md B2: a request instant must carry Z or an offset; the server converts it to UTC.
+[Parallelizable]
 public class BookedAtOffsetTests : TestBase
 {
     private static readonly string[] Routes =

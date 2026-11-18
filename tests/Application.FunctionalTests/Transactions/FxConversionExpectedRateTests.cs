@@ -4,6 +4,7 @@ using System.Text.Json;
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
 /// <summary>FX conversions R12: expectedRate must equal the stored rate; else 409 and nothing is written.</summary>
+[Parallelizable]
 public class FxConversionExpectedRateTests : TestBase
 {
     [TestCase(0.59130000)]

@@ -5,6 +5,7 @@ using MyWealthV2.Domain.Enums;
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
 /// <summary>Internal transfers R12: reverse puts the opposite leg on both Accounts, all or nothing.</summary>
+[Parallelizable]
 public class InternalTransferReverseTests : TestBase
 {
     [Test]

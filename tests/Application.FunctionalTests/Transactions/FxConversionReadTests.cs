@@ -4,6 +4,7 @@ using System.Text.Json;
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
 /// <summary>FX conversions R21–R23: item `fx`, both legs for a caller who sees the Customer, list type filter.</summary>
+[Parallelizable]
 public class FxConversionReadTests : TestBase
 {
     [Test]

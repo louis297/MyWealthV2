@@ -5,6 +5,7 @@ using MyWealthV2.Domain.Enums;
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
 /// <summary>Leg accounts R7 and R18: read visibility via any leg account, other legs omitted.</summary>
+[Parallelizable]
 public class LegAccountsReadTests : TestBase
 {
     [Test]

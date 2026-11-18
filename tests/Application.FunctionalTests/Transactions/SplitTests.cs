@@ -6,6 +6,7 @@ using MyWealthV2.Domain.Enums;
 
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
+[Parallelizable]
 public class SplitTests : TestBase
 {
     private const string BookedAt = "2026-10-12T10:00:00Z";

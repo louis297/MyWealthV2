@@ -4,6 +4,7 @@ using System.Text.Json;
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
 /// <summary>Internal transfers R14, R15: list type filter and per-caller legs.</summary>
+[Parallelizable]
 public class InternalTransferListTests : TestBase
 {
     [Test]

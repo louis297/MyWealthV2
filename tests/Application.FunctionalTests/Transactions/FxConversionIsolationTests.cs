@@ -5,6 +5,7 @@ using MyWealthV2.Domain.Enums;
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
 /// <summary>FX conversions R6: authority on both Accounts and cross-tenant isolation (404, not 403).</summary>
+[Parallelizable]
 public class FxConversionIsolationTests : TestBase
 {
     [Test]
