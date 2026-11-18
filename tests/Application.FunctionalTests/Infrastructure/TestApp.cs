@@ -80,9 +80,21 @@ public static class TestApp
         _roles = null;
     }
 
-    public static async Task<Tenant> CreateTenantAsync(string name, string code)
+    /// <summary>
+    /// Creates a Tenant through the Domain factory. It allows both custody modes unless
+    /// <paramref name="allowedCustodyModes"/> narrows it (tenant-custody-modes R6).
+    /// </summary>
+    public static async Task<Tenant> CreateTenantAsync(
+        string name,
+        string code,
+        IReadOnlyCollection<CustodyMode>? allowedCustodyModes = null)
     {
         var tenant = Tenant.Create(name, code, Currency.Create("NZD", "New Zealand Dollar", 2));
+        if (allowedCustodyModes is not null)
+        {
+            tenant.SetAllowedCustodyModes(allowedCustodyModes);
+        }
+
         await AddAsync(tenant);
         return tenant;
     }

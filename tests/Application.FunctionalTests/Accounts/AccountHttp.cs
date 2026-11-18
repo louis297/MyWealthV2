@@ -22,9 +22,10 @@ internal static class AccountHttp
         string email = "tess@north.example",
         string password = "Password1!",
         string adviserEmail = "ann@north.example",
-        string customerEmail = "ned@north.example")
+        string customerEmail = "ned@north.example",
+        IReadOnlyCollection<CustodyMode>? allowedCustodyModes = null)
     {
-        var tenant = await TestApp.CreateTenantAsync(tenantName, tenantCode);
+        var tenant = await TestApp.CreateTenantAsync(tenantName, tenantCode, allowedCustodyModes);
         await TestApp.CreatePersonAsync(
             UserRole.TenantAdmin, "Tess Admin", email, password, tenant.Id);
         var adviser = await TestApp.CreatePersonAsync(
@@ -40,9 +41,10 @@ internal static class AccountHttp
         string tenantCode = "north-advisory",
         string email = "ann@north.example",
         string password = "Password1!",
-        string customerEmail = "ned@north.example")
+        string customerEmail = "ned@north.example",
+        IReadOnlyCollection<CustodyMode>? allowedCustodyModes = null)
     {
-        var tenant = await TestApp.CreateTenantAsync(tenantName, tenantCode);
+        var tenant = await TestApp.CreateTenantAsync(tenantName, tenantCode, allowedCustodyModes);
         var adviser = await TestApp.CreatePersonAsync(
             UserRole.Adviser, "Ann Adviser", email, password, tenant.Id);
         var customer = await TestApp.CreatePersonAsync(
