@@ -111,8 +111,16 @@ public class CreateAccountCommandHandler(
             ]);
         }
 
-        var type = Enum.Parse<AccountType>(request.Type);
         var custodyMode = Enum.Parse<CustodyMode>(request.CustodyMode!);
+        if (!tenant.Allows(custodyMode))
+        {
+            throw new ValidationException([
+                new ValidationFailure(nameof(CreateAccountCommand.CustodyMode),
+                    $"The tenant does not allow {custodyMode} accounts.")
+            ]);
+        }
+
+        var type = Enum.Parse<AccountType>(request.Type);
         var account = Account.Create(tenant.Id, customer.Id, request.Name, type, custodyMode, currency);
         db.Accounts.Add(account);
         await db.SaveChangesAsync(cancellationToken);
