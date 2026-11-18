@@ -11,17 +11,22 @@ public sealed record AdviserBalancesPdfCashRow(
     string Customer,
     string Account,
     string AccountType,
+    string Custody,
     string Balance) : AdviserBalancesPdfRow;
 
 public sealed record AdviserBalancesPdfHoldingRow(
     string Customer,
     string Account,
+    string Custody,
     string Instrument,
     string Quantity,
     string Cost,
     string MarketValue) : AdviserBalancesPdfRow;
 
 public sealed record AdviserBalancesPdfSubtotal(string Currency, string Cash, string MarketValue);
+
+/// <summary>A titled block of subtotals: one custody mode (custody-mode-grouping R12).</summary>
+public sealed record AdviserBalancesPdfSubtotalBlock(string Title, IReadOnlyList<AdviserBalancesPdfSubtotal> Subtotals);
 
 public sealed record AdviserBalancesPdfModel(
     string TenantName,
@@ -30,7 +35,8 @@ public sealed record AdviserBalancesPdfModel(
     DateTimeOffset GeneratedAt,
     bool IncludeClosedAccounts,
     IReadOnlyList<AdviserBalancesPdfRow> Rows,
-    IReadOnlyList<AdviserBalancesPdfSubtotal> Subtotals);
+    IReadOnlyList<AdviserBalancesPdfSubtotal> Subtotals,
+    IReadOnlyList<AdviserBalancesPdfSubtotalBlock> ModeSubtotals);
 
 public static class AdviserBalancesPdf
 {

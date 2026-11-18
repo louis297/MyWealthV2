@@ -6,6 +6,7 @@ public sealed record AdviserBalanceAccount(
     Guid AccountId,
     string AccountName,
     string AccountType,
+    string CustodyMode,
     string Currency,
     decimal CashBalance,
     bool Closed,
@@ -25,7 +26,8 @@ public abstract record AdviserBalanceLine(
     Guid CustomerId,
     string CustomerName,
     Guid AccountId,
-    string AccountName);
+    string AccountName,
+    string CustodyMode);
 
 public sealed record AdviserCashLine(
     Guid CustomerId,
@@ -33,27 +35,33 @@ public sealed record AdviserCashLine(
     Guid AccountId,
     string AccountName,
     string AccountType,
+    string CustodyMode,
     string Currency,
-    decimal Balance) : AdviserBalanceLine(CustomerId, CustomerName, AccountId, AccountName);
+    decimal Balance) : AdviserBalanceLine(CustomerId, CustomerName, AccountId, AccountName, CustodyMode);
 
 public sealed record AdviserHoldingLine(
     Guid CustomerId,
     string CustomerName,
     Guid AccountId,
     string AccountName,
+    string CustodyMode,
     Guid InstrumentId,
     string Symbol,
     decimal Quantity,
     decimal CostAmount,
     string CostCurrency,
     decimal MarketValue,
-    string MarketCurrency) : AdviserBalanceLine(CustomerId, CustomerName, AccountId, AccountName);
+    string MarketCurrency) : AdviserBalanceLine(CustomerId, CustomerName, AccountId, AccountName, CustodyMode);
 
 public sealed record AdviserBalanceSubtotal(string Currency, decimal Cash, decimal MarketValue);
 
+/// <summary>The per-currency subtotals of the lines of one custody mode (custody-mode-grouping R12).</summary>
+public sealed record AdviserBalanceModeSubtotals(string CustodyMode, IReadOnlyList<AdviserBalanceSubtotal> Subtotals);
+
 public sealed record AdviserBalancesSelection(
     IReadOnlyList<AdviserBalanceLine> Lines,
-    IReadOnlyList<AdviserBalanceSubtotal> Subtotals);
+    IReadOnlyList<AdviserBalanceSubtotal> Subtotals,
+    IReadOnlyList<AdviserBalanceModeSubtotals> ModeSubtotals);
 
 public static class AdviserBalancesRows
 {
@@ -78,6 +86,7 @@ public static class AdviserBalancesRows
                     account.AccountId,
                     account.AccountName,
                     account.AccountType,
+                    string.Empty,
                     account.Currency,
                     account.CashBalance));
             }
@@ -93,6 +102,7 @@ public static class AdviserBalancesRows
                     account.CustomerName,
                     account.AccountId,
                     account.AccountName,
+                    string.Empty,
                     holding.InstrumentId,
                     holding.Symbol,
                     holding.Quantity,
@@ -103,7 +113,7 @@ public static class AdviserBalancesRows
             }
         }
 
-        return new AdviserBalancesSelection(lines, Subtotals(lines));
+        return new AdviserBalancesSelection(lines, Subtotals(lines), []);
     }
 
     private static IReadOnlyList<AdviserBalanceSubtotal> Subtotals(IReadOnlyList<AdviserBalanceLine> lines)

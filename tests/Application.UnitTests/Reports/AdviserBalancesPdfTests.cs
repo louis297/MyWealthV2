@@ -34,9 +34,9 @@ public class AdviserBalancesPdfTests
     {
         var pdf = AdviserBalancesPdf.Render(Model(
             [
-                new AdviserBalancesPdfCashRow("Ann Customer", "Everyday", "Bank", "10.00 NZD"),
-                new AdviserBalancesPdfHoldingRow("Ann Customer", "Everyday", "VTI", "12.5", "100.00 USD", "250.00 USD"),
-                new AdviserBalancesPdfCashRow("Cee", "Broker", "Brokerage", "3.00 USD")
+                new AdviserBalancesPdfCashRow("Ann Customer", "Everyday", "Bank", "External", "10.00 NZD"),
+                new AdviserBalancesPdfHoldingRow("Ann Customer", "Everyday", "External", "VTI", "12.5", "100.00 USD", "250.00 USD"),
+                new AdviserBalancesPdfCashRow("Cee", "Broker", "Brokerage", "External", "3.00 USD")
             ],
             [
                 new AdviserBalancesPdfSubtotal("NZD", "10.00 NZD", "0.00 NZD"),
@@ -69,10 +69,56 @@ public class AdviserBalancesPdfTests
         usdSubtotal.ShouldBeGreaterThan(nzdSubtotal);
     }
 
+    [Test]
+    public void Render_ShowsTheCustodyColumnAndSubtotalsPerCustodyModeThenAllAccounts()
+    {
+        var pdf = AdviserBalancesPdf.Render(Model(
+            [
+                new AdviserBalancesPdfCashRow("Ann Customer", "Managed", "Brokerage", "Custodial", "1,000.00 NZD"),
+                new AdviserBalancesPdfHoldingRow("Ann Customer", "Managed", "Custodial", "AIA", "100", "4,000.00 NZD", "5,000.00 NZD"),
+                new AdviserBalancesPdfCashRow("Ann Customer", "Everyday", "Bank", "External", "2,500.00 NZD")
+            ],
+            [new AdviserBalancesPdfSubtotal("NZD", "3,500.00 NZD", "5,000.00 NZD")],
+            modeSubtotals:
+            [
+                new AdviserBalancesPdfSubtotalBlock("Custodial", [new AdviserBalancesPdfSubtotal("NZD", "1,000.00 NZD", "5,000.00 NZD")]),
+                new AdviserBalancesPdfSubtotalBlock("External", [new AdviserBalancesPdfSubtotal("NZD", "2,500.00 NZD", "0.00 NZD")])
+            ]));
+
+        var text = Read(pdf);
+        var type = text.IndexOf("Type", StringComparison.Ordinal);
+        var custody = text.IndexOf("Custody", StringComparison.Ordinal);
+        var instrument = text.IndexOf("Instrument", StringComparison.Ordinal);
+        type.ShouldBeGreaterThanOrEqualTo(0);
+        custody.ShouldBeGreaterThan(type);
+        instrument.ShouldBeGreaterThan(custody);
+
+        var managedCash = text.IndexOf("1,000.00 NZD", StringComparison.Ordinal);
+        var managedCustody = text.IndexOf("Custodial", StringComparison.Ordinal);
+        managedCustody.ShouldBeGreaterThan(custody);
+        managedCustody.ShouldBeLessThan(managedCash);
+
+        var subtotals = text.IndexOf("Subtotals", StringComparison.Ordinal);
+        var custodialBlock = text.IndexOf("Custodial", subtotals, StringComparison.Ordinal);
+        var custodialLine = text.IndexOf("NZD cash 1,000.00 NZD market value 5,000.00 NZD", subtotals, StringComparison.Ordinal);
+        var externalBlock = text.IndexOf("External", subtotals, StringComparison.Ordinal);
+        var externalLine = text.IndexOf("NZD cash 2,500.00 NZD market value 0.00 NZD", subtotals, StringComparison.Ordinal);
+        var allBlock = text.IndexOf("All accounts", subtotals, StringComparison.Ordinal);
+        var allLine = text.IndexOf("NZD cash 3,500.00 NZD market value 5,000.00 NZD", subtotals, StringComparison.Ordinal);
+        subtotals.ShouldBeGreaterThan(managedCash);
+        custodialBlock.ShouldBeGreaterThan(subtotals);
+        custodialLine.ShouldBeGreaterThan(custodialBlock);
+        externalBlock.ShouldBeGreaterThan(custodialLine);
+        externalLine.ShouldBeGreaterThan(externalBlock);
+        allBlock.ShouldBeGreaterThan(externalLine);
+        allLine.ShouldBeGreaterThan(allBlock);
+    }
+
     private static AdviserBalancesPdfModel Model(
         IReadOnlyList<AdviserBalancesPdfRow> rows,
         IReadOnlyList<AdviserBalancesPdfSubtotal> subtotals,
-        bool includeClosedAccounts = false) =>
+        bool includeClosedAccounts = false,
+        IReadOnlyList<AdviserBalancesPdfSubtotalBlock>? modeSubtotals = null) =>
         new(
             "Firm Book",
             "Ann",
@@ -80,7 +126,8 @@ public class AdviserBalancesPdfTests
             GeneratedAt,
             includeClosedAccounts,
             rows,
-            subtotals);
+            subtotals,
+            modeSubtotals ?? []);
 
     private static string Read(byte[] pdf)
     {
