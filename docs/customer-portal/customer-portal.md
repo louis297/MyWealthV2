@@ -187,7 +187,7 @@ The account item from `GET /accounts` and `GET /accounts/{id}` gains `custodyMod
 
 - `/accounts` and `/accounts/:id`: show "Custody" next to "Type".
 - The text is a label, not the enum name: `External` → "Held elsewhere", `Custodial` → "Held on platform". A value the portal does not know is shown as received.
-- No grouping of accounts by custody mode and no explanatory sentence yet. Both belong to a later read-model slice. (Superseded by the amendment 2026-11-18 below once it is accepted.)
+- No grouping of accounts by custody mode and no explanatory sentence yet. Both belong to a later read-model slice. (Superseded by the amendment 2026-11-18 below.)
 
 | Id | Given | When | Then |
 | --- | --- | --- | --- |
@@ -195,9 +195,9 @@ The account item from `GET /accounts` and `GET /accounts/{id}` gains `custodyMod
 
 ---
 
-## Amendment 2026-11-18 (grouping by custody mode) — review
+## Amendment 2026-11-18 (grouping by custody mode) — accepted
 
-Status of this amendment: `review`, together with [custody-mode-grouping](../features/custody-mode-grouping.md). Not in force until that spec is accepted. It closes the last item of the 2026-11-17 amendment ("No grouping of accounts by custody mode and no explanatory sentence yet"). No backend grant changes and the BFF does not change: `GET /accounts` already takes `custodyMode`, and the net-worth reads gain `breakdowns.byCustodyMode`.
+Status of this amendment: `accepted` (2026-11-18), together with [custody-mode-grouping](../features/custody-mode-grouping.md). It closes the last item of the 2026-11-17 amendment ("No grouping of accounts by custody mode and no explanatory sentence yet"). No backend grant changes and the BFF does not change: `GET /accounts` already takes `custodyMode`, and the net-worth reads gain `breakdowns.byCustodyMode`.
 
 The note, used word for word wherever it appears (the same sentence is in the Customer Transactions PDF, custody-mode-grouping R15):
 

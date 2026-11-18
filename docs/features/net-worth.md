@@ -32,7 +32,7 @@ Read model of current net worth on `webapi`. No new table. No write path. Aggreg
 
 **Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md) R19. Cash per Account is the `SUM` of cash legs whose `AccountId` is that Account. Holdings still come from the projection. Aggregation is otherwise unchanged.
 
-**Amendment 2026-11-18 (grouping by custody mode, `review`):** [custody-mode-grouping.md](custody-mode-grouping.md) R4–R9. Not in force until that spec is accepted. Both reads gain `breakdowns.byCustodyMode`: one entry `{ custodyMode, currencies }` per custody mode that has an Open account in scope, `Custodial` then `External`, with the currency shape of §8.1. Per currency, the entries add up to the top-level values. The `Custodial` entry is the scope's funds under management. Values, the other breakdowns, the routes and the policy do not change.
+**Amendment 2026-11-18 (grouping by custody mode, accepted):** [custody-mode-grouping.md](custody-mode-grouping.md) R4–R9. Both reads gain `breakdowns.byCustodyMode`: one entry `{ custodyMode, currencies }` per custody mode that has an Open account in scope, `Custodial` then `External`, with the currency shape of §8.1. Per currency, the entries add up to the top-level values. The `Custodial` entry is the scope's funds under management. Values, the other breakdowns, the routes and the policy do not change.
 
 ---
 

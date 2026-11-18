@@ -1,6 +1,6 @@
 ---
 title: Grouping by custody mode
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -32,7 +32,7 @@ Since slice 1 every account has a custody mode, and the account pages show it. T
 
 Read only. No write rule changes, no value is computed differently, no script, no new route, no new policy, no new query parameter. One new response field: `breakdowns.byCustodyMode` on the two net-worth reads.
 
-**Status is `review`.** Not a build contract until it is `accepted`.
+**Status is `accepted` (2026-11-18).** Implementation follows this file. The amendments in net-worth, reports, the Adviser Portal Dashboard and Customer Portal page contracts, api-design and the glossary are in force.
 
 ---
 
@@ -225,7 +225,7 @@ Keep the resource catalog in [api-design.md](../api-design.md) pointing here for
 
 ## 9. UI
 
-Page contracts: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D24, D25) and [customer-portal.md](../customer-portal/customer-portal.md) (C14–C17), amended with this spec. Neither BFF changes: `/net-worth`, `/users` and `/accounts` are already proxied.
+Page contracts: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D24, D25) and [customer-portal.md](../customer-portal/customer-portal.md) (C14–C17), amended and accepted together with this spec. Neither BFF changes: `/net-worth`, `/users` and `/accounts` are already proxied.
 
 **Adviser Portal**
 
@@ -276,7 +276,7 @@ No new ADR. [ADR 0020](../adr/0020-account-custody-mode.md) said net worth still
 | Customer Portal | Dashboard rows, grouped accounts list, note on External figures |
 | Routes, policies, parameters, scripts, problem codes | None added |
 
-To confirm when this spec is accepted. The rules above are written with the first option of each:
+Confirmed when this spec was accepted (2026-11-18). The rules above are written with the first option of each:
 
 1. **`byCustodyMode` lists only the modes present** (R5), like `byAccountType`. The alternative is always two entries, with empty `currencies` for a mode that has no Open account; the portals would not need a missing-entry case.
 2. **The Adviser Balances Report keeps its customer order and adds subtotals per mode** (R11, R12). The alternative is two sections, Custodial lines then External lines, each sorted by customer; one Customer's accounts would then be split across the report.
