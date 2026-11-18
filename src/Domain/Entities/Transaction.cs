@@ -224,6 +224,25 @@ public class Transaction : BaseAuditableEntity
     }
 
     /// <summary>
+    /// External caller numbers R17, R18: an FxConversion from both amounts as the caller entered them.
+    /// </summary>
+    public static Transaction PostFxConversionWithAmounts(
+        int tenantId,
+        int fromAccountId,
+        string fromAccountCurrency,
+        CustodyMode fromCustodyMode,
+        int toAccountId,
+        string toAccountCurrency,
+        CustodyMode toCustodyMode,
+        Money sell,
+        Money buy,
+        DateTimeOffset bookedAt,
+        string? memo,
+        string? reference,
+        decimal fromCurrentCashSum) =>
+        throw new NotImplementedException();
+
+    /// <summary>
     /// FX conversions R11: the sell and buy amounts for <paramref name="fixedAmount"/> at <paramref name="rate"/>.
     /// The fixed side is the one in its currency; the other side is rounded to
     /// <paramref name="computedDecimalPlaces"/>, away from zero.
@@ -318,7 +337,9 @@ public class Transaction : BaseAuditableEntity
         string? reference,
         decimal currentCashSum,
         TradeFeeSchedule? feeSchedule = null,
-        int quoteDecimalPlaces = 2)
+        int quoteDecimalPlaces = 2,
+        decimal? enteredFee = null,
+        AppliedFxRate? appliedRate = null)
     {
         EnsureSecurityAccount(accountType);
         EnsurePriced(price);
@@ -366,7 +387,9 @@ public class Transaction : BaseAuditableEntity
         decimal currentQuantity,
         decimal currentCost,
         TradeFeeSchedule? feeSchedule = null,
-        int quoteDecimalPlaces = 2)
+        int quoteDecimalPlaces = 2,
+        decimal? enteredFee = null,
+        AppliedFxRate? appliedRate = null)
     {
         EnsureSecurityAccount(accountType);
         EnsurePriced(price);
