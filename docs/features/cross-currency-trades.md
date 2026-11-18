@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-10
-last_updated: 2026-11-15
+last_updated: 2026-11-18
 related:
   - fx-conversions.md
   - buy-sell.md
@@ -16,6 +16,7 @@ related:
   - ../adviser-portal/adviser-portal-portfolios.md
   - ../future-plans.md
   - ../glossary.md
+  - external-caller-numbers.md
 ---
 
 # Cross-currency trades
@@ -23,6 +24,8 @@ related:
 Amendment to [buy-sell.md](buy-sell.md), [holdings.md](holdings.md) and [portfolios.md](portfolios.md) on `webapi`. It sets when a security trade may have an instrument quote currency that differs from its Account's currency, and it stores the rate of every automatic FX in `TransactionFxDetails` ([fx-conversions.md](fx-conversions.md) §6). No new type, no new route, no new policy, no script.
 
 Depends on [fx-conversions.md](fx-conversions.md): the table, the item `fx` object and the staleness limit come from there. Accept and land that spec first.
+
+**Amendment 2026-11-18 (External caller numbers, accepted, landed):** [external-caller-numbers.md](external-caller-numbers.md) R23. Every rule of this draft applies to Custodial accounts only. On an External account a `Buy` or `Sell` in another currency is allowed with the caller's `fxRate` and stores an FX detail with source `Caller`; `StockIn` and `OpeningHoldings` keep today's behaviour; R8 (staleness) and R9 (cash rounding) do not apply there. Rework this draft for Custodial accounts before it goes to review.
 
 ---
 

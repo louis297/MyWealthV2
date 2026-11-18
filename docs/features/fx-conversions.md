@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-10
-last_updated: 2026-11-17
+last_updated: 2026-11-18
 related:
   - internal-transfers.md
   - leg-accounts.md
@@ -24,6 +24,7 @@ related:
   - ../future-plans.md
   - ../glossary.md
   - custody-modes.md
+  - external-caller-numbers.md
 ---
 
 # FX conversions
@@ -37,6 +38,8 @@ This slice adds one `TransactionType`, a create route `POST /transactions/fx`, a
 **Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R3 and R20: a `bookedAt` later than the server clock plus 5 minutes → 400 `errors.BookedAt`, on create and on the quote. R11 is unchanged; the same decimal place rule now also covers the other cash types.
 
 **Amendment 2026-11-17 (custody modes, accepted, landed):** [custody-modes.md](custody-modes.md). R8 gains a condition: both Accounts have the same custody mode, else 400 with `errors.ToAccountId`, on create and on the quote. R3 and R20: when both Accounts are Custodial the server sets `bookedAt`; a create or quote body that sends it → 400. R9 and R10 then read the rate and check its staleness for the server's instant. §5: the factory takes both custody modes and refuses different ones. §9: the account picker greys out an Account with a different custody mode. The reference rate and `expectedRate` are unchanged on both custody modes.
+
+**Amendment 2026-11-18 (External caller numbers, accepted, landed):** [external-caller-numbers.md](external-caller-numbers.md). Between two External Accounts: R3 — both `sellAmount` and `buyAmount` are required and `expectedRate` → 400; R9, R10, R12 do not apply: the rate is `Round(buyAmount ÷ sellAmount, 8, AwayFromZero)` and no `FxRates` row is read; R11 — each amount within its currency's `DecimalPlaces`, nothing computed; R14 — the FX detail has that rate, the UTC date of `bookedAt` as `RateAsOfDate` and source `Caller`; R20 — the quote → 400 `errors.FromAccountId`. Between two Custodial Accounts nothing changes. §9: the convert form on an External account takes two amounts and calls no quote.
 
 ---
 

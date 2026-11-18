@@ -37,7 +37,7 @@ public class FxConversionExpectedRateTests : TestBase
     {
         var world = await FxWorld.CreateAsync();
         await world.FundNzdAsync(100m);
-        await FxConversionTests.SetRateAsync("NZD", "USD", 0.60000000m, new DateOnly(2026, 11, 10));
+        await FxConversionTests.SetRateAsync("NZD", "USD", 0.60000000m, FxConversionTests.RateAsOf);
 
         (await FxConversionTests.PostAsync(
                 world.Legs.TenantAdmin.AccessToken,

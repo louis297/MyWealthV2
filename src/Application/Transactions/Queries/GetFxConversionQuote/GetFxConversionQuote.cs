@@ -145,6 +145,17 @@ public class GetFxConversionQuoteQueryHandler(
         // Custody modes R12: a Custodial quote takes no bookedAt; an External quote still defaults to now.
         var bookedAt = BookedAtByCustody.Resolve(
             pair.From.CustodyMode, request.BookedAt, time, requiredWhenExternal: false);
+
+        // External caller numbers R19: a quote applies between Custodial Accounts only.
+        if (pair.From.CustodyMode == CustodyMode.External)
+        {
+            throw new ValidationException([
+                new ValidationFailure(
+                    nameof(GetFxConversionQuoteQuery.FromAccountId),
+                    "A quote applies to Custodial accounts only. On an External account enter both amounts.")
+            ]);
+        }
+
         var priced = await FxConversionScope.PriceAsync(
             fxRates, currencies, pair, request.SellAmount, request.BuyAmount, bookedAt, cancellationToken);
 

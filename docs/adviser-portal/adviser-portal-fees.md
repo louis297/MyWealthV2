@@ -4,7 +4,7 @@ status: accepted
 phase: 2
 language: en
 created: 2026-11-15
-updated: 2026-11-15
+updated: 2026-11-18
 related:
   - README.md
   - frontend-conventions.md
@@ -14,6 +14,8 @@ related:
   - ../features/trade-fees.md
   - ../features/bff-adviser-portal.md
   - ../api-design.md
+  - ../features/custody-modes.md
+  - ../features/external-caller-numbers.md
 ---
 
 # Adviser Portal — Fees
@@ -161,6 +163,17 @@ Requests start 300 ms after the last change to the form or the amounts. A newer 
 | F17 | The preview shows each amount's fee, "minimum applied" or "cap applied", and an expandable band breakdown, all from the response. The page does no fee arithmetic. |
 | F18 | The detail page shows the preview for the stored row, for TenantAdmin and Adviser. |
 | F19 | While the form fails its own checks, no preview request is sent. A preview 400 puts its `errors` under the form fields. |
+
+---
+
+## Amendment 2026-11-18 (External caller numbers) — accepted, landed
+
+Status of this amendment: `accepted` (2026-11-18), together with [external-caller-numbers](../features/external-caller-numbers.md). Schedules then apply to trades on Custodial accounts only.
+
+| ID | Behaviour |
+| --- | --- |
+| F20 | `/fees/trade` and `/fees/trade/:id` show one line under the page title: "Schedules apply to trades on Custodial accounts. A trade on an External account carries the fee entered with it." |
+| F21 | The `Buy` / `Sell` form shows the help text "Brokerage is added by the server from the trade fee schedule." on a Custodial account only. On an External account the form has a Fee input instead ([adviser-portal-dashboard](adviser-portal-dashboard.md) D22). A `Fee` leg with `fee.scheduleId` null shows no schedule link on `/transactions/:id`, as "Fees on ledger pages" already says. |
 
 ---
 

@@ -10,7 +10,7 @@ public class FxConversionRulesTests : TestBase
     [Test]
     public async Task PostTransactions_WithFxConversionType_Returns400()
     {
-        var world = await FxWorld.CreateAsync();
+        var world = await FxWorld.CreateExternalAsync();
         await world.FundNzdAsync(100m);
         var before = await LegAccountsFixture.CountTransactionsAsync(world.Legs.Tenant.Id);
 
@@ -30,11 +30,11 @@ public class FxConversionRulesTests : TestBase
     [TestCase(false)]
     public async Task Opening_OnEitherAccountAfterAConversion_Returns400(bool onFrom)
     {
-        var world = await FxWorld.CreateAsync();
+        var world = await FxWorld.CreateExternalAsync();
         await world.FundNzdAsync(100m);
         await LegAccountsFixture.ReadIdAsync(await FxConversionTests.PostAsync(
             world.Legs.TenantAdmin.AccessToken,
-            FxConversionTests.SellBody(world.NzdAccountId, world.UsdAccountId, 10m)));
+            FxConversionTests.ExternalBody(world.NzdAccountId, world.UsdAccountId, 10m, 5.91m)));
 
         var response = await TransactionHttp.Send(HttpMethod.Post, "/transactions", world.Legs.TenantAdmin.AccessToken, new
         {

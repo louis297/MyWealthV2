@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
-import { bandsText } from "@/features/fees/feeText";
+import { bandsText, custodialOnlyLine } from "@/features/fees/feeText";
 import { useGetAllTradeSchedulesQuery, type TradeFeeSchedule } from "@/features/fees/feesApi";
 import { scheduleStates, todayUtc } from "@/features/fees/scheduleState";
 import { canManageFees } from "@/features/session/roles";
@@ -38,6 +38,7 @@ export function FeesTradePage() {
     <Page>
       <PageHeading
         title="Fees"
+        description={custodialOnlyLine}
         actions={
           canManageFees(role) ? (
             <Link to="/fees/trade/new" className={cn(buttonVariants({ size: "sm" }))}>

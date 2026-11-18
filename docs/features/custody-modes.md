@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-17
-last_updated: 2026-11-17
+last_updated: 2026-11-18
 related:
   - account-custody-mode.md
   - accounts.md
@@ -28,6 +28,7 @@ related:
   - ../api-design.md
   - ../glossary.md
   - ../future-plans.md
+  - external-caller-numbers.md
 ---
 
 # Custody modes
@@ -491,3 +492,14 @@ The repository should build after each commit. Agents split each behaviour into 
 11. Repo docs: mark this file landed (done 2026-11-17). (This file and the amendments in the ledger specs, the portal contracts, domain-model, database-design, api-design, the glossary and the known issue were accepted on 2026-11-17, before commit 1.)
 
 Do not put a tenant setting, caller-supplied prices, or read-model grouping in these commits.
+
+---
+
+## Amendment 2026-11-18 (External caller numbers) — accepted, landed
+
+Status of this amendment: `accepted` (2026-11-18), together with [external-caller-numbers.md](external-caller-numbers.md).
+
+- §1 table, row "Price, FX rate, trade fee on `Buy` / `Sell`": External becomes **Caller** (executed `price`, optional `fee`, `fxRate` across currencies). A new row "`FxConversion` amounts and rate": External — both amounts from the caller, rate derived, no `expectedRate`, no quote; Custodial — one amount and the reference rate (unchanged).
+- I3 holds in both directions: the server decides the numbers on a Custodial account, the caller on an External account.
+- R18 is unchanged. R19: the sentence "`Buy` / `Sell` on an External account are still priced by the server and still carry the trade fee" is replaced by external-caller-numbers §4.2 and §4.4.
+- The manual entry matrix (R5), the same custody mode (R8) and `bookedAt` (R10–R13) do not change.

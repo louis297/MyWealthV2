@@ -40,6 +40,9 @@ const allAccounts = [
   account(usdId, "Ned USD", { currency: "USD" }),
 ];
 
+/** The same Accounts as Custodial Brokerage accounts: a quote and expectedRate apply (external-caller-numbers R19, R20). */
+const quotedAccounts = allAccounts.map((item) => ({ ...item, type: "Brokerage", custodyMode: "Custodial" }));
+
 const ned = {
   id: nedId,
   tenantId,
@@ -173,7 +176,6 @@ function posts(fetchMock: ReturnType<typeof vi.mocked<typeof fetch>>, suffix: st
 async function chooseUsdAndType(amount: string) {
   fireEvent.click(await screen.findByRole("radio", { name: /Ned USD/ }));
   fireEvent.change(screen.getByLabelText(/Amount/), { target: { value: amount } });
-  fireEvent.change(screen.getByLabelText("Booked at"), { target: { value: "2026-11-10T09:00" } });
 }
 
 describe("CreateFxConversionPage", () => {
@@ -229,7 +231,7 @@ describe("CreateFxConversionPage", () => {
   });
 
   it("debounces the quote and shows the rate and the computed amount", async () => {
-    const { fetchMock } = renderForm();
+    const { fetchMock } = renderForm({ accounts: quotedAccounts });
     fireEvent.click(await screen.findByRole("radio", { name: /Ned USD/ }));
     vi.useFakeTimers();
 
@@ -264,7 +266,7 @@ describe("CreateFxConversionPage", () => {
   });
 
   it("switches to I buy, sends buyAmount and shows the sell amount", async () => {
-    const { fetchMock } = renderForm();
+    const { fetchMock } = renderForm({ accounts: quotedAccounts });
     fireEvent.click(await screen.findByRole("radio", { name: /Ned USD/ }));
     fireEvent.click(screen.getByRole("radio", { name: "I buy" }));
     expect(screen.getByLabelText(/Amount/).closest("div")).toHaveTextContent("USD");
@@ -279,6 +281,7 @@ describe("CreateFxConversionPage", () => {
 
   it("shows a quote error and blocks submit", async () => {
     const { fetchMock } = renderForm({
+      accounts: quotedAccounts,
       quote: () => json({ errors: { BookedAt: ["No NZD to USD rate is available on or before 2026-11-10."] } }, 400),
     });
     await chooseUsdAndType("1000");
@@ -290,12 +293,11 @@ describe("CreateFxConversionPage", () => {
     expect(posts(fetchMock, "/transactions/fx")).toHaveLength(0);
   });
 
-  it("confirms with a summary and posts the quoted expectedRate with an Idempotency-Key", async () => {
-    const { fetchMock } = renderForm();
+  it("confirms a Custodial conversion with a summary and posts the quoted expectedRate with an Idempotency-Key", async () => {
+    const { fetchMock } = renderForm({ accounts: quotedAccounts });
     fireEvent.click(await screen.findByRole("radio", { name: /Ned USD/ }));
     fireEvent.click(screen.getByRole("radio", { name: "I buy" }));
     fireEvent.change(screen.getByLabelText(/Amount/), { target: { value: "500" } });
-    fireEvent.change(screen.getByLabelText("Booked at"), { target: { value: "2026-11-10T09:00" } });
     await screen.findByText(/You pay 845\.74 NZD/, {}, { timeout: 2000 });
 
     fireEvent.click(screen.getByRole("button", { name: "Review conversion" }));
@@ -311,17 +313,77 @@ describe("CreateFxConversionPage", () => {
     expect(created).toHaveLength(1);
     expect(created[0].url).toBe("http://localhost:3000/api/transactions/fx");
     expect(created[0].headers.get("Idempotency-Key")).toBe(idempotencyKey);
-    const quotes = posts(fetchMock, "/transactions/fx/quote");
-    expect(JSON.parse(await quotes[quotes.length - 1].clone().text()).bookedAt).toBe("2026-11-09T20:00:00.000Z");
     expect(JSON.parse(await created[0].clone().text())).toEqual({
       fromAccountId: sourceId,
       toAccountId: usdId,
       buyAmount: 500,
       expectedRate: 0.5912,
-      bookedAt: "2026-11-09T20:00:00.000Z",
       memo: null,
       reference: null,
     });
+  });
+
+  it("takes both amounts on an External account with no toggle and no quote (D23)", async () => {
+    const { fetchMock } = renderForm();
+    fireEvent.click(await screen.findByRole("radio", { name: /Ned USD/ }));
+
+    expect(screen.queryByRole("radio", { name: "I sell" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "I buy" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Amount/)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Sell (NZD)"), { target: { value: "845.74" } });
+    expect(screen.queryByText(/1 NZD =/)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Buy (USD)"), { target: { value: "500.00" } });
+
+    expect(await screen.findByText("1 NZD = 0.5912 USD")).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(posts(fetchMock, "/transactions/fx/quote")).toHaveLength(0);
+  });
+
+  it("reviews and posts both amounts, bookedAt and no expectedRate on an External account (D23)", async () => {
+    const { fetchMock } = renderForm();
+    fireEvent.click(await screen.findByRole("radio", { name: /Ned USD/ }));
+    fireEvent.change(screen.getByLabelText("Sell (NZD)"), { target: { value: "845.74" } });
+    fireEvent.change(screen.getByLabelText("Buy (USD)"), { target: { value: "500" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Review conversion" }));
+    expect(await screen.findByText("Booked at is required.")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Booked at"), { target: { value: "2026-11-18T11:30" } });
+    fireEvent.click(screen.getByRole("button", { name: "Review conversion" }));
+    expect(
+      await screen.findByText("Convert 845.74 NZD from Ned bank to 500.00 USD in Ned USD at 1 NZD = 0.5912 USD"),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm conversion" }));
+
+    expect(await screen.findByText("account detail")).toBeInTheDocument();
+    const created = posts(fetchMock, "/transactions/fx");
+    expect(created).toHaveLength(1);
+    expect(created[0].headers.get("Idempotency-Key")).toBe(idempotencyKey);
+    expect(JSON.parse(await created[0].clone().text())).toEqual({
+      fromAccountId: sourceId,
+      toAccountId: usdId,
+      sellAmount: 845.74,
+      buyAmount: 500,
+      bookedAt: "2026-11-17T22:30:00.000Z",
+      memo: null,
+      reference: null,
+    });
+    expect(posts(fetchMock, "/transactions/fx/quote")).toHaveLength(0);
+  });
+
+  it("shows a 400 on an External conversion and stays on the form (D23)", async () => {
+    const { fetchMock } = renderForm({
+      create: () => json({ errors: { BuyAmount: ["Buy amount can have at most 2 decimal places."] } }, 400),
+    });
+    fireEvent.click(await screen.findByRole("radio", { name: /Ned USD/ }));
+    fireEvent.change(screen.getByLabelText("Sell (NZD)"), { target: { value: "845.74" } });
+    fireEvent.change(screen.getByLabelText("Buy (USD)"), { target: { value: "500" } });
+    fireEvent.change(screen.getByLabelText("Booked at"), { target: { value: "2026-11-18T11:30" } });
+    fireEvent.click(screen.getByRole("button", { name: "Review conversion" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm conversion" }));
+
+    expect(await screen.findByText("Buy amount can have at most 2 decimal places.")).toBeInTheDocument();
+    expect(screen.queryByText("account detail")).not.toBeInTheDocument();
+    expect(posts(fetchMock, "/transactions/fx/quote")).toHaveLength(0);
   });
 
   const custodialAccounts = [
@@ -373,6 +435,7 @@ describe("CreateFxConversionPage", () => {
     let rate = 0.5912;
     let attempts = 0;
     const { fetchMock } = renderForm({
+      accounts: quotedAccounts,
       quote: (body) => json(quoteFor(body, rate)),
       create: () => {
         attempts += 1;

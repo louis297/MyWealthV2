@@ -14,6 +14,7 @@ import { problemErrors } from "@/features/fees/scheduleDraft";
 import { canManageFees } from "@/features/session/roles";
 import { feeScheduleInEffect, problemCode } from "@/shared/api/problem";
 import { formatMoney } from "@/shared/format/money";
+import { custodialOnlyLine } from "@/features/fees/feeText";
 import { cn } from "cn";
 
 function isNotFound(error: unknown) {
@@ -74,6 +75,7 @@ export function TradeScheduleDetailPage() {
     <Page className="max-w-2xl">
       <PageHeading
         title="Trade fee schedule"
+        description={custodialOnlyLine}
         actions={
           manage && pending ? (
             <>

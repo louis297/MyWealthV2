@@ -87,32 +87,9 @@ internal static class FxConversionScope
         DateTimeOffset bookedAt,
         CancellationToken cancellationToken)
     {
-        var sellCurrency = Money.Create(0m, pair.From.Currency).Currency;
-        var buyCurrency = Money.Create(0m, pair.To.Currency).Currency;
-        if (string.Equals(sellCurrency, buyCurrency, StringComparison.Ordinal))
-        {
-            throw new ValidationException([
-                new ValidationFailure(
-                    "ToAccountId",
-                    "The from and to accounts must have different currencies. Use POST /transactions/transfer.")
-            ]);
-        }
-
+        var (sellCurrency, buyCurrency) = CheckAmounts(currencies, pair, sellAmount, buyAmount);
         var sellPlaces = DecimalPlaces(currencies, sellCurrency);
         var buyPlaces = DecimalPlaces(currencies, buyCurrency);
-        if (sellAmount is { } sell && !FxConversionPricing.FitsDecimalPlaces(sell, sellPlaces))
-        {
-            throw new ValidationException([
-                new ValidationFailure("SellAmount", $"Sell amount can have at most {sellPlaces} decimal places.")
-            ]);
-        }
-
-        if (buyAmount is { } buy && !FxConversionPricing.FitsDecimalPlaces(buy, buyPlaces))
-        {
-            throw new ValidationException([
-                new ValidationFailure("BuyAmount", $"Buy amount can have at most {buyPlaces} decimal places.")
-            ]);
-        }
 
         FxRateReading reading;
         try
@@ -141,6 +118,46 @@ internal static class FxConversionScope
         return sellAmount is { } fixedSell
             ? new FxPrice(rate, Money.Create(fixedSell, sellCurrency), buyPlaces)
             : new FxPrice(rate, Money.Create(buyAmount!.Value, buyCurrency), sellPlaces);
+    }
+
+    /// <summary>
+    /// R4 and R11 (external-caller-numbers R15): different currencies, and each amount the caller sent within its
+    /// currency's decimal places. Returns the sell and buy currencies.
+    /// </summary>
+    public static (string SellCurrency, string BuyCurrency) CheckAmounts(
+        ICurrencyCatalog currencies,
+        FxAccountPair pair,
+        decimal? sellAmount,
+        decimal? buyAmount)
+    {
+        var sellCurrency = Money.Create(0m, pair.From.Currency).Currency;
+        var buyCurrency = Money.Create(0m, pair.To.Currency).Currency;
+        if (string.Equals(sellCurrency, buyCurrency, StringComparison.Ordinal))
+        {
+            throw new ValidationException([
+                new ValidationFailure(
+                    "ToAccountId",
+                    "The from and to accounts must have different currencies. Use POST /transactions/transfer.")
+            ]);
+        }
+
+        var sellPlaces = DecimalPlaces(currencies, sellCurrency);
+        var buyPlaces = DecimalPlaces(currencies, buyCurrency);
+        if (sellAmount is { } sell && !FxConversionPricing.FitsDecimalPlaces(sell, sellPlaces))
+        {
+            throw new ValidationException([
+                new ValidationFailure("SellAmount", $"Sell amount can have at most {sellPlaces} decimal places.")
+            ]);
+        }
+
+        if (buyAmount is { } buy && !FxConversionPricing.FitsDecimalPlaces(buy, buyPlaces))
+        {
+            throw new ValidationException([
+                new ValidationFailure("BuyAmount", $"Buy amount can have at most {buyPlaces} decimal places.")
+            ]);
+        }
+
+        return (sellCurrency, buyCurrency);
     }
 
     private static int DecimalPlaces(ICurrencyCatalog currencies, string code) =>

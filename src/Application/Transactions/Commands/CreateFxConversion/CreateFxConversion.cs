@@ -76,10 +76,8 @@ public class CreateFxConversionCommandValidator : AbstractValidator<CreateFxConv
             .Must((command, to) => to != command.FromAccountId)
             .When(command => command.FromAccountId is not null && command.ToAccountId is not null)
             .WithMessage("The from and to accounts must be different.");
-        RuleFor(command => command)
-            .Must(command => command.SellAmount is null != command.BuyAmount is null)
-            .WithName(nameof(CreateFxConversionCommand.SellAmount))
-            .WithMessage("Send exactly one of sellAmount and buyAmount.");
+        // External caller numbers R15, R16: which amounts and whether expectedRate are required depend on the
+        // custody mode, which the handler checks once the Accounts are loaded. Here only their shape.
         RuleFor(command => command.SellAmount)
             .GreaterThan(0)
             .When(command => command.SellAmount is not null)
@@ -89,9 +87,9 @@ public class CreateFxConversionCommandValidator : AbstractValidator<CreateFxConv
             .When(command => command.BuyAmount is not null)
             .WithMessage("Buy amount must be greater than 0.");
         RuleFor(command => command.ExpectedRate)
-            .NotNull()
             .GreaterThan(0)
-            .WithMessage("Expected rate is required. Get a quote first.");
+            .When(command => command.ExpectedRate is not null)
+            .WithMessage("Expected rate must be greater than 0.");
         RuleFor(command => command.BookedAt).NotInTheFuture(time);
         RuleFor(command => command.Memo)
             .Must(memo => memo is null || memo.Trim().Length is >= 1 and <= 200)
@@ -220,41 +218,9 @@ public class CreateFxConversionCommandHandler(
 
         // Custody modes R10, R11. Both accounts share one custody mode (R8, checked in LoadPairAsync).
         var bookedAt = BookedAtByCustody.Resolve(pair.From.CustodyMode, request.BookedAt, time);
-        var priced = await FxConversionScope.PriceAsync(
-            fxRates, currencies, pair, request.SellAmount, request.BuyAmount, bookedAt, cancellationToken);
-
-        // R12: the caller confirms the rate it was quoted.
-        if (request.ExpectedRate!.Value != priced.Rate.Rate)
-        {
-            throw new ExpectedRateChangedException(priced.Rate.Rate);
-        }
-
-        var fromSum = await TransactionCash.SumAsync(db, pair.From.Id, cancellationToken);
-        Domain.Entities.Transaction transaction;
-        try
-        {
-            transaction = Domain.Entities.Transaction.PostFxConversion(
-                tenant.Id,
-                pair.From.Id,
-                pair.From.Currency,
-                pair.From.CustodyMode,
-                pair.To.Id,
-                pair.To.Currency,
-                pair.To.CustodyMode,
-                priced.Rate,
-                priced.FixedAmount,
-                priced.ComputedDecimalPlaces,
-                bookedAt,
-                request.Memo,
-                request.Reference,
-                fromSum);
-        }
-        catch (DomainException exception)
-        {
-            throw new ValidationException([
-                new ValidationFailure(string.Empty, exception.Message)
-            ]);
-        }
+        var transaction = pair.From.CustodyMode == CustodyMode.External
+            ? await PostExternalAsync(request, tenant, pair, bookedAt, cancellationToken)
+            : await PostCustodialAsync(request, tenant, pair, bookedAt, cancellationToken);
 
         db.Transactions.Add(transaction);
         var body = JsonSerializer.Serialize(new { id = transaction.PublicId });
@@ -277,6 +243,141 @@ public class CreateFxConversionCommandHandler(
         }
 
         return new IdempotentResult(201, body);
+    }
+
+    private const string BothAmountsMessage = "An External conversion needs both sellAmount and buyAmount.";
+
+    /// <summary>
+    /// External caller numbers R15–R18: between External Accounts the caller enters both amounts; the rate is derived
+    /// from them and no stored rate is read.
+    /// </summary>
+    private async Task<Domain.Entities.Transaction> PostExternalAsync(
+        CreateFxConversionCommand request,
+        Tenant tenant,
+        FxAccountPair pair,
+        DateTimeOffset bookedAt,
+        CancellationToken cancellationToken)
+    {
+        var failures = new List<ValidationFailure>();
+        if (request.SellAmount is null)
+        {
+            failures.Add(new ValidationFailure(nameof(CreateFxConversionCommand.SellAmount), BothAmountsMessage));
+        }
+
+        if (request.BuyAmount is null)
+        {
+            failures.Add(new ValidationFailure(nameof(CreateFxConversionCommand.BuyAmount), BothAmountsMessage));
+        }
+
+        if (request.ExpectedRate is not null)
+        {
+            failures.Add(new ValidationFailure(
+                nameof(CreateFxConversionCommand.ExpectedRate),
+                "expectedRate cannot be set on an External conversion. The rate comes from the two amounts."));
+        }
+
+        if (failures.Count > 0)
+        {
+            throw new ValidationException(failures);
+        }
+
+        var (sellCurrency, buyCurrency) = FxConversionScope.CheckAmounts(
+            currencies, pair, request.SellAmount, request.BuyAmount);
+        var sell = request.SellAmount!.Value;
+        var buy = request.BuyAmount!.Value;
+        if (!Domain.Entities.Transaction.FitsStoredFxRate(Domain.Entities.Transaction.FxRateFromAmounts(sell, buy)))
+        {
+            throw new ValidationException([
+                new ValidationFailure(
+                    nameof(CreateFxConversionCommand.BuyAmount),
+                    Domain.Entities.Transaction.FxRateFromAmountsOutOfRangeMessage)
+            ]);
+        }
+
+        var fromSum = await TransactionCash.SumAsync(db, pair.From.Id, cancellationToken);
+        try
+        {
+            return Domain.Entities.Transaction.PostFxConversionWithAmounts(
+                tenant.Id,
+                pair.From.Id,
+                pair.From.Currency,
+                pair.From.CustodyMode,
+                pair.To.Id,
+                pair.To.Currency,
+                pair.To.CustodyMode,
+                Money.Create(sell, sellCurrency),
+                Money.Create(buy, buyCurrency),
+                bookedAt,
+                request.Memo,
+                request.Reference,
+                fromSum);
+        }
+        catch (DomainException exception)
+        {
+            throw new ValidationException([
+                new ValidationFailure(string.Empty, exception.Message)
+            ]);
+        }
+    }
+
+    /// <summary>FX conversions R3, R9–R12 between Custodial Accounts: one amount, the reference rate, the quoted rate.</summary>
+    private async Task<Domain.Entities.Transaction> PostCustodialAsync(
+        CreateFxConversionCommand request,
+        Tenant tenant,
+        FxAccountPair pair,
+        DateTimeOffset bookedAt,
+        CancellationToken cancellationToken)
+    {
+        if (request.SellAmount is null == request.BuyAmount is null)
+        {
+            throw new ValidationException([
+                new ValidationFailure(
+                    nameof(CreateFxConversionCommand.SellAmount), "Send exactly one of sellAmount and buyAmount.")
+            ]);
+        }
+
+        if (request.ExpectedRate is null)
+        {
+            throw new ValidationException([
+                new ValidationFailure(
+                    nameof(CreateFxConversionCommand.ExpectedRate), "Expected rate is required. Get a quote first.")
+            ]);
+        }
+
+        var priced = await FxConversionScope.PriceAsync(
+            fxRates, currencies, pair, request.SellAmount, request.BuyAmount, bookedAt, cancellationToken);
+
+        // R12: the caller confirms the rate it was quoted.
+        if (request.ExpectedRate.Value != priced.Rate.Rate)
+        {
+            throw new ExpectedRateChangedException(priced.Rate.Rate);
+        }
+
+        var fromSum = await TransactionCash.SumAsync(db, pair.From.Id, cancellationToken);
+        try
+        {
+            return Domain.Entities.Transaction.PostFxConversion(
+                tenant.Id,
+                pair.From.Id,
+                pair.From.Currency,
+                pair.From.CustodyMode,
+                pair.To.Id,
+                pair.To.Currency,
+                pair.To.CustodyMode,
+                priced.Rate,
+                priced.FixedAmount,
+                priced.ComputedDecimalPlaces,
+                bookedAt,
+                request.Memo,
+                request.Reference,
+                fromSum);
+        }
+        catch (DomainException exception)
+        {
+            throw new ValidationException([
+                new ValidationFailure(string.Empty, exception.Message)
+            ]);
+        }
     }
 
     private static IdempotentResult ReplayOrConflict(IdempotencyRecord existing, string hash)

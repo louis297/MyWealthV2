@@ -53,8 +53,9 @@ public class FutureBookedAtTests : TestBase
             await TransactionHttp.Send(HttpMethod.Post, QuoteRoute, world.Legs.TenantAdmin.AccessToken, body));
     }
 
+    /// <summary>External caller numbers R19: a quote between External Accounts is refused once bookedAt is resolved.</summary>
     [Test]
-    public async Task Quote_WithoutBookedAt_Returns200()
+    public async Task Quote_WithoutBookedAt_BetweenExternalAccounts_Returns400OnFromAccountId()
     {
         var (world, savings) = await WorldAsync();
         var body = BodyFor(QuoteRoute, world, savings);
@@ -62,13 +63,17 @@ public class FutureBookedAtTests : TestBase
 
         var response = await TransactionHttp.Send(HttpMethod.Post, QuoteRoute, world.Legs.TenantAdmin.AccessToken, body);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        var content = await response.Content.ReadAsStringAsync();
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest, content);
+        using var json = JsonDocument.Parse(content);
+        json.RootElement.GetProperty("errors").EnumerateObject()
+            .Select(property => property.Name.ToLowerInvariant()).ShouldBe(["fromaccountid"]);
     }
 
     /// <summary>The FX world, funded, with a rate as of today so that a conversion booked now is not stale.</summary>
     private static async Task<(FxWorld World, Guid Savings)> WorldAsync()
     {
-        var world = await FxWorld.CreateAsync();
+        var world = await FxWorld.CreateExternalAsync();
         await world.FundNzdAsync(1000m);
         await FxConversionTests.SetRateAsync(
             "NZD", "USD", FxConversionTests.NzdUsd, DateOnly.FromDateTime(DateTime.UtcNow));
@@ -87,7 +92,7 @@ public class FutureBookedAtTests : TestBase
             ["bookedAt"] = FxConversionTests.BookedAt
         },
         "/transactions/transfer" => InternalTransferTests.Body(world.NzdAccountId, savings, 10m),
-        "/transactions/fx" => FxConversionTests.SellBody(world.NzdAccountId, world.UsdAccountId, 10m),
+        "/transactions/fx" => FxConversionTests.ExternalBody(world.NzdAccountId, world.UsdAccountId, 10m, 5.91m),
         _ => new()
         {
             ["fromAccountId"] = world.NzdAccountId,

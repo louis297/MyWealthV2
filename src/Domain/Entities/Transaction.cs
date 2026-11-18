@@ -224,6 +224,95 @@ public class Transaction : BaseAuditableEntity
     }
 
     /// <summary>
+    /// External caller numbers R17, R18: an FxConversion from both amounts as the caller entered them.
+    /// </summary>
+    public static Transaction PostFxConversionWithAmounts(
+        int tenantId,
+        int fromAccountId,
+        string fromAccountCurrency,
+        CustodyMode fromCustodyMode,
+        int toAccountId,
+        string toAccountCurrency,
+        CustodyMode toCustodyMode,
+        Money sell,
+        Money buy,
+        DateTimeOffset bookedAt,
+        string? memo,
+        string? reference,
+        decimal fromCurrentCashSum)
+    {
+        if (fromAccountId == toAccountId)
+        {
+            throw new DomainException("The from and to accounts must be different.");
+        }
+
+        EnsureSameCustodyMode(fromCustodyMode, toCustodyMode);
+
+        var sellCurrency = Money.Create(0m, fromAccountCurrency).Currency;
+        var buyCurrency = Money.Create(0m, toAccountCurrency).Currency;
+        if (string.Equals(sellCurrency, buyCurrency, StringComparison.Ordinal))
+        {
+            throw new DomainException("The from and to accounts must have different currencies.");
+        }
+
+        if (!string.Equals(sell.Currency, sellCurrency, StringComparison.Ordinal)
+            || !string.Equals(buy.Currency, buyCurrency, StringComparison.Ordinal))
+        {
+            throw new DomainException(
+                "The sell amount must be in the from account's currency and the buy amount in the to account's currency.");
+        }
+
+        if (sell.Amount <= 0 || buy.Amount <= 0)
+        {
+            throw new DomainException("Amount must be greater than 0.");
+        }
+
+        var rate = FxRateFromAmounts(sell.Amount, buy.Amount);
+        if (!FitsStoredFxRate(rate))
+        {
+            throw new DomainException(FxRateFromAmountsOutOfRangeMessage);
+        }
+
+        if (fromCurrentCashSum - sell.Amount < 0)
+        {
+            throw new DomainException("Cash balance cannot become negative.");
+        }
+
+        var applied = AppliedFxRate.Create(
+            sellCurrency, buyCurrency, rate, DateOnly.FromDateTime(bookedAt.UtcDateTime), AppliedFxRate.CallerSource);
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            Type = TransactionType.FxConversion,
+            BookedAt = bookedAt.ToUniversalTime(),
+            Memo = NormaliseMemo(memo),
+            Reference = NormaliseReference(reference),
+            PublicId = Guid.NewGuid(),
+            CashLegs =
+            [
+                TransactionCashLeg.Create(tenantId, fromAccountId, -sell.Amount, sellCurrency),
+                TransactionCashLeg.Create(tenantId, toAccountId, buy.Amount, buyCurrency)
+            ],
+            FxDetail = TransactionFxDetail.Create(tenantId, applied)
+        };
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
+    }
+
+    /// <summary>The largest rate <c>TransactionFxDetails.Rate</c> (<c>decimal(18,8)</c>) holds.</summary>
+    public const decimal MaxStoredFxRate = 9_999_999_999.99999999m;
+
+    public const string FxRateFromAmountsOutOfRangeMessage =
+        "The rate from the two amounts must be greater than 0 and below 10,000,000,000.";
+
+    /// <summary>External caller numbers R17: buy currency per 1 sell currency, rounded to 8 decimals away from zero.</summary>
+    public static decimal FxRateFromAmounts(decimal sellAmount, decimal buyAmount) =>
+        decimal.Round(buyAmount / sellAmount, 8, MidpointRounding.AwayFromZero);
+
+    /// <summary>A rate above 0 that fits <c>TransactionFxDetails.Rate</c>.</summary>
+    public static bool FitsStoredFxRate(decimal rate) => rate > 0 && rate <= MaxStoredFxRate;
+
+    /// <summary>
     /// FX conversions R11: the sell and buy amounts for <paramref name="fixedAmount"/> at <paramref name="rate"/>.
     /// The fixed side is the one in its currency; the other side is rounded to
     /// <paramref name="computedDecimalPlaces"/>, away from zero.
@@ -318,18 +407,22 @@ public class Transaction : BaseAuditableEntity
         string? reference,
         decimal currentCashSum,
         TradeFeeSchedule? feeSchedule = null,
-        int quoteDecimalPlaces = 2)
+        int quoteDecimalPlaces = 2,
+        decimal? enteredFee = null,
+        AppliedFxRate? appliedRate = null)
     {
         EnsureSecurityAccount(accountType);
         EnsurePriced(price);
+        var currency = Money.Create(0m, accountCurrency).Currency;
+        EnsureTradeRate(appliedRate, price.Currency, currency, fxRate);
         var cost = RoundMoney(quantity * price.Amount);
         var cash = -RoundMoney(cost * fxRate);
-        var brokerage = BrokerageFee(feeSchedule, cost, price.Currency, fxRate, quoteDecimalPlaces);
+        var brokerage = TradeFee(feeSchedule, enteredFee, cost, price.Currency, fxRate, quoteDecimalPlaces);
         if (currentCashSum + cash + (brokerage?.Leg ?? 0m) < 0)
         {
             throw new DomainException("Cash balance cannot become negative.");
         }
-        var currency = Money.Create(0m, accountCurrency).Currency;
+
         var transaction = new Transaction
         {
             TenantId = tenantId,
@@ -343,7 +436,8 @@ public class Transaction : BaseAuditableEntity
             [
                 TransactionSecurityLeg.Create(
                     tenantId, accountId, instrumentId, quantity, cost + (brokerage?.Fee ?? 0m), price.Currency)
-            ]
+            ],
+            FxDetail = appliedRate is null ? null : TransactionFxDetail.Create(tenantId, appliedRate)
         };
         transaction.AddBrokerageLeg(accountId, currency, brokerage);
         transaction.AddDomainEvent(new TransactionPosted(transaction));
@@ -366,20 +460,24 @@ public class Transaction : BaseAuditableEntity
         decimal currentQuantity,
         decimal currentCost,
         TradeFeeSchedule? feeSchedule = null,
-        int quoteDecimalPlaces = 2)
+        int quoteDecimalPlaces = 2,
+        decimal? enteredFee = null,
+        AppliedFxRate? appliedRate = null)
     {
         EnsureSecurityAccount(accountType);
         EnsurePriced(price);
         EnsureCanRelease(quantity, currentQuantity);
+        var currency = Money.Create(0m, accountCurrency).Currency;
+        EnsureTradeRate(appliedRate, price.Currency, currency, fxRate);
         var released = ReleaseCost(currentCost, quantity, currentQuantity);
         var cash = RoundMoney(quantity * price.Amount * fxRate);
-        var brokerage = BrokerageFee(feeSchedule, RoundMoney(quantity * price.Amount), price.Currency, fxRate, quoteDecimalPlaces);
+        var brokerage = TradeFee(
+            feeSchedule, enteredFee, RoundMoney(quantity * price.Amount), price.Currency, fxRate, quoteDecimalPlaces);
         if (brokerage is not null && currentCashSum + cash + brokerage.Leg < 0)
         {
             throw new DomainException("Cash balance cannot become negative.");
         }
 
-        var currency = Money.Create(0m, accountCurrency).Currency;
         var transaction = new Transaction
         {
             TenantId = tenantId,
@@ -392,7 +490,8 @@ public class Transaction : BaseAuditableEntity
             SecurityLegs =
             [
                 TransactionSecurityLeg.Create(tenantId, accountId, instrumentId, -quantity, -released, price.Currency)
-            ]
+            ],
+            FxDetail = appliedRate is null ? null : TransactionFxDetail.Create(tenantId, appliedRate)
         };
         transaction.AddBrokerageLeg(accountId, currency, brokerage);
         transaction.AddDomainEvent(new TransactionPosted(transaction));
@@ -718,7 +817,63 @@ public class Transaction : BaseAuditableEntity
         FeeDetails.Add(detail);
     }
 
-    private sealed record BrokerageCharge(int ScheduleId, decimal Gross, decimal Fee, string QuoteCurrency, decimal Leg);
+    /// <summary>
+    /// The trade's fee: from the schedule the server read, or entered by the caller (external-caller-numbers R6),
+    /// never both. None when neither is given or the fee rounds to 0.
+    /// </summary>
+    private static BrokerageCharge? TradeFee(
+        TradeFeeSchedule? schedule,
+        decimal? enteredFee,
+        decimal gross,
+        string quoteCurrency,
+        decimal fxRate,
+        int quoteDecimalPlaces)
+    {
+        if (enteredFee is null)
+        {
+            return BrokerageFee(schedule, gross, quoteCurrency, fxRate, quoteDecimalPlaces);
+        }
+
+        if (schedule is not null)
+        {
+            throw new DomainException("A trade fee comes from a trade fee schedule or is entered, not both.");
+        }
+
+        if (enteredFee.Value < 0)
+        {
+            throw new DomainException("Fee cannot be negative.");
+        }
+
+        var leg = -RoundMoney(enteredFee.Value * fxRate);
+        return enteredFee.Value > 0m && leg < 0m
+            ? new BrokerageCharge(null, gross, enteredFee.Value, quoteCurrency, leg)
+            : null;
+    }
+
+    /// <summary>
+    /// External caller numbers I2: a trade's FX detail is for its price currency to its account currency, at the rate
+    /// its cash legs use.
+    /// </summary>
+    private static void EnsureTradeRate(AppliedFxRate? rate, string priceCurrency, string accountCurrency, decimal fxRate)
+    {
+        if (rate is null)
+        {
+            return;
+        }
+
+        if (!string.Equals(rate.BaseCurrency, priceCurrency, StringComparison.Ordinal)
+            || !string.Equals(rate.QuoteCurrency, accountCurrency, StringComparison.Ordinal))
+        {
+            throw new DomainException("The rate must be for the price currency to the account currency.");
+        }
+
+        if (rate.Rate != fxRate)
+        {
+            throw new DomainException("The rate must be the one the cash legs use.");
+        }
+    }
+
+    private sealed record BrokerageCharge(int? ScheduleId, decimal Gross, decimal Fee, string QuoteCurrency, decimal Leg);
 
     private static decimal ReleaseCost(decimal oldCost, decimal sellQuantity, decimal oldQuantity) =>
         sellQuantity == oldQuantity

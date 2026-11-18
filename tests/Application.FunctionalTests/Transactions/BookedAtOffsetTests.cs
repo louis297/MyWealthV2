@@ -22,7 +22,7 @@ public class BookedAtOffsetTests : TestBase
     [TestCaseSource(nameof(Rejected))]
     public async Task BookedAtWithoutAnOffset_Returns400(string route, string bookedAt)
     {
-        var world = await FxWorld.CreateAsync();
+        var world = await FxWorld.CreateExternalAsync();
         await world.FundNzdAsync(1000m);
         var savings = await InternalTransferTests.OpenAccountAsync(
             world.Legs.TenantAdmin.AccessToken, world.Legs.Ned.PublicId, "Ned savings");
@@ -79,7 +79,7 @@ public class BookedAtOffsetTests : TestBase
             ["bookedAt"] = FxConversionTests.BookedAt
         },
         "/transactions/transfer" => InternalTransferTests.Body(world.NzdAccountId, savings, 10m),
-        "/transactions/fx" => FxConversionTests.SellBody(world.NzdAccountId, world.UsdAccountId, 10m),
+        "/transactions/fx" => FxConversionTests.ExternalBody(world.NzdAccountId, world.UsdAccountId, 10m, 5.91m),
         _ => new()
         {
             ["fromAccountId"] = world.NzdAccountId,

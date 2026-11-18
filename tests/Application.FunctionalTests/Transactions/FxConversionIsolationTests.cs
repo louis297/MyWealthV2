@@ -29,8 +29,7 @@ public class FxConversionIsolationTests : TestBase
     {
         var world = await FxWorld.CreateAsync();
         await world.FundNzdAsync(100m);
-        var noraUsd = await InternalTransferTests.OpenAccountAsync(
-            world.Legs.TenantAdmin.AccessToken, world.Legs.Nora.PublicId, "Nora USD", "USD");
+        var noraUsd = await world.OpenAccountAsync(world.Legs.Nora.PublicId, "Nora USD", "USD");
 
         (await FxConversionTests.PostAsync(
                 world.Legs.Ann.AccessToken,
@@ -97,6 +96,7 @@ public class FxConversionIsolationTests : TestBase
         (await LegAccountsFixture.CountTransactionsAsync(world.Legs.Tenant.Id)).ShouldBe(before);
     }
 
+    /// <summary>South Advisory with a Custodial USD account, the custody mode of <see cref="FxWorld.CreateAsync"/>.</summary>
     internal static async Task<(int TenantId, Guid AccountId, string TenantAdminToken)> SouthAsync()
     {
         var (tenant, _, customer, tokens) = await AccountHttp.SignInTenantAdmin(
@@ -105,8 +105,8 @@ public class FxConversionIsolationTests : TestBase
             "tess@south.example",
             adviserEmail: "ann@south.example",
             customerEmail: "ned@south.example");
-        var accountId = await InternalTransferTests.OpenAccountAsync(
-            tokens.AccessToken, customer.PublicId, "South USD", "USD");
+        var accountId = await AccountHttp.OpenAccountAsync(
+            tokens.AccessToken, customer.PublicId, "South USD", "Brokerage", "USD", "Custodial");
         return (tenant.Id, accountId, tokens.AccessToken);
     }
 }

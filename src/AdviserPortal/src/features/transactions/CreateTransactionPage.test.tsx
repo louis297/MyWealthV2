@@ -37,6 +37,15 @@ const instrument = {
   rowVersion: "AAAA",
 };
 
+const localInstrumentId = "eeeeeeee-eeee-eeee-eeee-111111111111";
+const localInstrument = {
+  ...instrument,
+  id: localInstrumentId,
+  symbol: "LOCAL",
+  name: "Local Fund",
+  quoteCurrency: "NZD",
+};
+
 function user(overrides: Partial<CurrentUser> = {}): CurrentUser {
   return {
     id: "11111111-1111-1111-1111-111111111111",
@@ -89,6 +98,7 @@ function renderForm(
   search = "",
   accountStatus = 200,
   assigned = false,
+  fieldErrors: Record<string, string[]> | null = null,
 ) {
   const store = configureStore({
     reducer: {
@@ -104,7 +114,7 @@ function renderForm(
     const url = requestUrl(input);
     const method = init?.method ?? (input instanceof Request ? input.method : "GET");
     if (url.includes("/instruments") && method === "GET") {
-      return json({ items: [instrument], page: 1, pageSize: 100, totalCount: 1 });
+      return json({ items: [instrument, localInstrument], page: 1, pageSize: 100, totalCount: 2 });
     }
     if (url.endsWith(`/accounts/${accountId}/portfolio`) && method === "GET") {
       return assigned
@@ -147,7 +157,7 @@ function renderForm(
           type: "https://tools.ietf.org/html/rfc9110#section-15.5.1",
           title: "One or more validation errors occurred.",
           status: 400,
-          errors: { "": [problem] },
+          errors: fieldErrors ?? { "": [problem] },
         }, 400);
       }
       return json({ id: createdId }, 201);
@@ -172,6 +182,12 @@ function renderForm(
   return { fetchMock, router };
 }
 
+/** D22: the executed price and the FX rate an External Buy / Sell of the USD instrument needs. */
+function fillCallerNumbers() {
+  fireEvent.change(screen.getByLabelText("Price per unit (USD)"), { target: { value: "25" } });
+  fireEvent.change(screen.getByLabelText("FX rate (1 USD = ? NZD)"), { target: { value: "1.6" } });
+}
+
 describe("CreateTransactionPage", () => {
   beforeEach(() => {
     sessionStorage.clear();
@@ -186,13 +202,16 @@ describe("CreateTransactionPage", () => {
     });
   });
 
-  it("posts a Buy without a client price and returns to the account", async () => {
+  it("posts an External Buy with the executed price, the fee and the FX rate and returns to the account (D22)", async () => {
     const { fetchMock, router } = renderForm();
 
     expect(await screen.findByRole("heading", { name: "New transaction" })).toBeInTheDocument();
     await chooseOption("Type", "Buy");
     await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
+    fireEvent.change(screen.getByLabelText("Price per unit (USD)"), { target: { value: "180.00" } });
+    fireEvent.change(screen.getByLabelText("Fee (USD)"), { target: { value: "9.95" } });
+    fireEvent.change(screen.getByLabelText("FX rate (1 USD = ? NZD)"), { target: { value: "1.69147" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T10:00" },
     });
@@ -229,15 +248,77 @@ describe("CreateTransactionPage", () => {
       bookedAt: "2026-10-10T21:00:00.000Z",
       memo: null,
       reference: null,
-      security: [{ instrumentId, quantity: 50 }],
+      security: [{ instrumentId, quantity: 50, price: 180 }],
+      fee: 9.95,
+      fxRate: 1.69147,
     });
     expect(body).not.toHaveProperty("tenantId");
     expect(body).not.toHaveProperty("amount");
     expect(body).not.toHaveProperty("cash");
     expect(body).not.toHaveProperty("currency");
-    expect(body).not.toHaveProperty("price");
     expect(body).not.toHaveProperty("cost");
     expect(body).not.toHaveProperty("ratio");
+  });
+
+  it("shows Price and Fee only once an instrument is picked on an External account (D22)", async () => {
+    renderForm();
+
+    await chooseOption("Type", "Sell");
+    expect(screen.queryByLabelText(/Price per unit/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Fee/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/FX rate/)).not.toBeInTheDocument();
+
+    await chooseOption("Instrument", "DEMO Demo Fund");
+
+    expect(screen.getByLabelText("Price per unit (USD)")).toBeRequired();
+    expect(screen.getByLabelText("Fee (USD)")).not.toBeRequired();
+    expect(screen.getByLabelText("FX rate (1 USD = ? NZD)")).toBeRequired();
+    expect(screen.queryByText("Brokerage is added by the server from the trade fee schedule.")).not.toBeInTheDocument();
+  });
+
+  it("asks for no FX rate and sends none when the instrument is in the account currency (D22)", async () => {
+    const { fetchMock } = renderForm();
+
+    await chooseOption("Type", "Sell");
+    await chooseOption("Instrument", "LOCAL Local Fund");
+    expect(screen.getByLabelText("Price per unit (NZD)")).toBeInTheDocument();
+    expect(screen.getByLabelText("Fee (NZD)")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/FX rate/)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "40" } });
+    fireEvent.change(screen.getByLabelText("Price per unit (NZD)"), { target: { value: "2.50" } });
+    fireEvent.change(screen.getByLabelText("Booked at"), { target: { value: "2026-11-18T11:30" } });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(await screen.findByText("account detail")).toBeInTheDocument();
+    const body = await postedBody(fetchMock);
+    expect(body.security).toEqual([{ instrumentId: localInstrumentId, quantity: 40, price: 2.5 }]);
+    expect(body).not.toHaveProperty("fee");
+    expect(body).not.toHaveProperty("fxRate");
+  });
+
+  it("shows a 400 on Security[0].Price, Fee or FxRate at its input (D22)", async () => {
+    const { router } = renderForm(user(), 400, "", {}, "errors", "", 200, false, {
+      "Security[0].Price": ["Price can have at most 8 decimal places."],
+      Fee: ["Fee can have at most 2 decimal places."],
+      FxRate: ["FxRate must be greater than 0."],
+    });
+
+    await chooseOption("Type", "Buy");
+    await chooseOption("Instrument", "DEMO Demo Fund");
+    fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText("Price per unit (USD)"), { target: { value: "1.123456789" } });
+    fireEvent.change(screen.getByLabelText("Fee (USD)"), { target: { value: "1.005" } });
+    fireEvent.change(screen.getByLabelText("FX rate (1 USD = ? NZD)"), { target: { value: "0.1" } });
+    fireEvent.change(screen.getByLabelText("Booked at"), { target: { value: "2026-11-18T11:30" } });
+    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+    expect(await screen.findByText("Price can have at most 8 decimal places.")).toHaveAttribute("id", "transaction-price-error");
+    expect(screen.getByLabelText("Price per unit (USD)")).toHaveAttribute("aria-describedby", "transaction-price-error");
+    expect(screen.getByText("Fee can have at most 2 decimal places.")).toHaveAttribute("id", "transaction-fee-error");
+    expect(screen.getByLabelText("Fee (USD)")).toHaveAttribute("aria-describedby", "transaction-fee-error");
+    expect(screen.getByText("FxRate must be greater than 0.")).toHaveAttribute("id", "transaction-fx-rate-error");
+    expect(screen.getByLabelText("FX rate (1 USD = ? NZD)")).toHaveAttribute("aria-describedby", "transaction-fx-rate-error");
+    expect(router.state.location.pathname).toBe(`/accounts/${accountId}/transactions/new`);
   });
 
   it("stays on the form when the server has no price", async () => {
@@ -245,6 +326,8 @@ describe("CreateTransactionPage", () => {
 
     await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
+    fireEvent.change(screen.getByLabelText("Price per unit (USD)"), { target: { value: "25" } });
+    fireEvent.change(screen.getByLabelText("FX rate (1 USD = ? NZD)"), { target: { value: "1.6" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T10:00" },
     });
@@ -265,6 +348,8 @@ describe("CreateTransactionPage", () => {
     await chooseOption("Type", "Sell");
     await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "200" } });
+    fireEvent.change(screen.getByLabelText("Price per unit (USD)"), { target: { value: "25" } });
+    fireEvent.change(screen.getByLabelText("FX rate (1 USD = ? NZD)"), { target: { value: "1.6" } });
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T10:00" },
     });
@@ -290,6 +375,7 @@ describe("CreateTransactionPage", () => {
 
     await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
+    fillCallerNumbers();
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T10:00" },
     });
@@ -301,13 +387,16 @@ describe("CreateTransactionPage", () => {
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
-  it.each(["Buy", "Sell"])("tells the user the server adds brokerage on a %s (adviser-portal-fees)", async (type) => {
-    renderForm();
+  it.each(["Buy", "Sell"])("tells the user the server adds brokerage on a Custodial %s (F21)", async (type) => {
+    renderForm(user(), 201, "Price is not available.", { custodyMode: "Custodial" });
 
     await chooseOption("Type", type);
+    await chooseOption("Instrument", "DEMO Demo Fund");
 
     expect(await screen.findByText("Brokerage is added by the server from the trade fee schedule.")).toBeInTheDocument();
     expect(screen.queryByLabelText(/fee/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Price per unit/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/FX rate/)).not.toBeInTheDocument();
   });
 
   it("shows no brokerage note on a StockIn", async () => {
@@ -411,6 +500,7 @@ describe("CreateTransactionPage", () => {
 
     await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
+    fillCallerNumbers();
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T10:00" },
     });
@@ -446,6 +536,7 @@ describe("CreateTransactionPage", () => {
 
     await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
+    fillCallerNumbers();
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T10:00" },
     });
@@ -469,6 +560,7 @@ describe("CreateTransactionPage", () => {
 
     await chooseOption("Instrument", "DEMO Demo Fund");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
+    fillCallerNumbers();
     fireEvent.change(screen.getByLabelText("Booked at"), {
       target: { value: "2026-10-11T10:00" },
     });

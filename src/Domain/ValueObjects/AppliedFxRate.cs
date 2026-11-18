@@ -7,6 +7,9 @@ public class AppliedFxRate : ValueObject
     {
     }
 
+    /// <summary>The source of a rate the caller entered on an External account (external-caller-numbers R10, R18).</summary>
+    public const string CallerSource = "Caller";
+
     public string BaseCurrency { get; private set; } = string.Empty;
 
     public string QuoteCurrency { get; private set; } = string.Empty;

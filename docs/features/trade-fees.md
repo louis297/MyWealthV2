@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-15
-last_updated: 2026-11-17
+last_updated: 2026-11-18
 related:
   - ../future-plans.md
   - ../glossary.md
@@ -22,6 +22,7 @@ related:
   - cross-currency-trades.md
   - currencies.md
   - custody-modes.md
+  - external-caller-numbers.md
 ---
 
 # Trade fees
@@ -35,6 +36,8 @@ This is step 1 of the business domain roadmap ([future-plans.md](../future-plans
 **Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). A `Buy` / `Sell` can no longer be booked in the future. R9 is unchanged: the latest trade date can still be after today inside the 5 minute allowance around UTC midnight, and for rows posted before that fix. A schedule created over HTTP starts tomorrow at the earliest (R10), so it applies to trades from tomorrow on. The Fees functional tests that dated a trade in the future to get a fee change with that fix (its B3).
 
 **Amendment 2026-11-17 (custody modes, accepted, landed):** [custody-modes.md](custody-modes.md). No rule in this file changes. A trade fee is charged on `Buy` / `Sell` on both custody modes; limiting schedules to Custodial accounts is a later slice. On a Custodial account the trade is booked at the server clock, so R7 picks the schedule for today's UTC date. A schedule created over HTTP starts tomorrow at the earliest (R10) and applies to Custodial trades from then on.
+
+**Amendment 2026-11-18 (External caller numbers, accepted, landed):** [external-caller-numbers.md](external-caller-numbers.md). R7 and R14 apply to `Buy` / `Sell` on Custodial accounts only. On an External account the schedule is not read: the caller may send `fee` (the outside broker's brokerage, in the quote currency, `≥ 0`, within its `DecimalPlaces`), and R14's "a `fee` field → 400" holds on Custodial accounts only. An entered fee above 0 gets a `Fee` leg by R15 and R16 and a fee detail by R18 with **no schedule** (`fee.scheduleId: null`); script `0034` drops `CK_TransactionFeeDetails_BrokerageSchedule`. R9 (cut-off date) still counts every `Buy` / `Sell`; R12 still holds for the schedules that posted trades used. R19 copies a fee detail without a schedule like any other.
 
 ---
 

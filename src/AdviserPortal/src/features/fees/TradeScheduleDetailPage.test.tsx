@@ -50,6 +50,12 @@ describe("TradeScheduleDetailPage", () => {
     vi.restoreAllMocks();
   });
 
+  it("says under the title that schedules apply to Custodial accounts only (F20)", async () => {
+    renderFees(feeUser(), routes, path, serve([schedule()]));
+
+    expect(await screen.findByText("Schedules apply to trades on Custodial accounts. A trade on an External account carries the fee entered with it.")).toBeInTheDocument();
+  });
+
   it("shows the stored row read-only", async () => {
     renderFees(feeUser(), routes, path, serve([schedule({ cap: 250 })]));
 

@@ -46,8 +46,17 @@ public class CreateTransactionCommand : IRequest<IdempotentResult>
 
     public decimal? Ratio { get; init; }
 
-    /// <summary>Not part of the body: brokerage is computed by the server (trade-fees R14).</summary>
+    /// <summary>
+    /// The brokerage the outside broker charged on an External <c>Buy</c> / <c>Sell</c>, in the instrument's quote
+    /// currency (external-caller-numbers R6). Refused on a Custodial account, where the server computes it (trade-fees R14).
+    /// </summary>
     public decimal? Fee { get; init; }
+
+    /// <summary>
+    /// Account currency per 1 quote currency on an External <c>Buy</c> / <c>Sell</c> across currencies
+    /// (external-caller-numbers R7). Refused on a Custodial account.
+    /// </summary>
+    public decimal? FxRate { get; init; }
 
     public sealed class OpeningHoldingSecurity
     {
@@ -72,6 +81,9 @@ public class CreateTransactionCommand : IRequest<IdempotentResult>
 
 public class CreateTransactionCommandValidator : AbstractValidator<CreateTransactionCommand>
 {
+    internal const string FeeRefusedMessage =
+        "Fee cannot be set. Brokerage is added by the server from the trade fee schedule.";
+
     private static readonly string[] CashTypes = ["TransferIn", "TransferOut", "Interest", "CloseOut", "Opening"];
     private static readonly string[] PricedTypes = ["Buy", "Sell"];
     private static readonly string[] AllowedTypes =
@@ -83,9 +95,15 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
     public CreateTransactionCommandValidator(ICurrentUser currentUser, TimeProvider time)
     {
         RuleFor(command => command.AccountId).NotEmpty();
-        RuleFor(command => command.Fee)
-            .Null()
-            .WithMessage("Fee cannot be set. Brokerage is added by the server from the trade fee schedule.");
+        When(command => !PricedTypes.Contains(command.Type ?? ""), () =>
+        {
+            RuleFor(command => command.Fee)
+                .Null()
+                .WithMessage(FeeRefusedMessage);
+            RuleFor(command => command.FxRate)
+                .Null()
+                .WithMessage("FxRate can only be set on a buy or sell.");
+        });
         RuleFor(command => command.Type)
             .Must(type => type is not null && AllowedTypes.Contains(type))
             .WithMessage("Type must be TransferIn, TransferOut, Interest, CloseOut, Opening, OpeningHoldings, Buy, Sell, StockIn, StockOut, Split, Bonus, or Scrip.");
@@ -136,8 +154,22 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
                 leg.RuleFor(item => item.InstrumentId).NotEmpty();
                 leg.RuleFor(item => item.Quantity).GreaterThan(0);
                 leg.RuleFor(item => item.Cost).Null().WithMessage("Cost cannot be set on a buy or sell.");
-                leg.RuleFor(item => item.Price).Null().WithMessage("Price cannot be set on a buy or sell.");
+                // External caller numbers R5: the shape of the executed price; whether it is required or refused
+                // depends on the custody mode, which the handler checks.
+                leg.RuleFor(item => item.Price)
+                    .GreaterThan(0).WithMessage("Price must be greater than 0.")
+                    .Must(price => FxConversionPricing.FitsDecimalPlaces(price!.Value, 8))
+                    .WithMessage("Price can have at most 8 decimal places.")
+                    .When(item => item.Price is not null);
             });
+            RuleFor(command => command.Fee)
+                .GreaterThanOrEqualTo(0).WithMessage("Fee cannot be negative.")
+                .When(command => command.Fee is not null);
+            RuleFor(command => command.FxRate)
+                .GreaterThan(0).WithMessage("FxRate must be greater than 0.")
+                .Must(rate => FxConversionPricing.FitsDecimalPlaces(rate!.Value, 8))
+                .WithMessage("FxRate can have at most 8 decimal places.")
+                .When(command => command.FxRate is not null);
         });
 
         When(command => command.Type is "StockIn" or "StockOut", () =>
@@ -237,6 +269,8 @@ public class CreateTransactionCommandHandler(
                 currency = request.Currency,
                 tenantId = request.TenantId,
                 ratio = request.Ratio,
+                fee = request.Fee,
+                fxRate = request.FxRate,
                 security = request.Security?.Select(leg => new
                 {
                     instrumentId = leg.InstrumentId,
@@ -499,8 +533,20 @@ public class CreateTransactionCommandHandler(
             ]);
         }
 
-        var price = marketData.TryGetPrice(instrument.Id, bookedAt);
         var quote = instrument.QuoteCurrency.Trim().ToUpperInvariant();
+        var quoteDecimalPlaces = catalog.TryGet(quote)?.DecimalPlaces ?? 2;
+        var holding = await db.Holdings.SingleOrDefaultAsync(
+            row => row.AccountId == loaded.Account.Id && row.InstrumentId == instrument.Id,
+            cancellationToken);
+        if (loaded.Account.CustodyMode == CustodyMode.External)
+        {
+            return PostExternalTrade(
+                request, item, instrument.Id, bookedAt, tenant, loaded, type, accountCurrency, quote,
+                quoteDecimalPlaces, currentCashSum, holding);
+        }
+
+        RefuseCallerNumbers(request, item);
+        var price = marketData.TryGetPrice(instrument.Id, bookedAt);
         if (price is null || price.Amount <= 0 || !string.Equals(price.Currency, quote, StringComparison.Ordinal))
         {
             throw new ValidationException([
@@ -524,12 +570,8 @@ public class CreateTransactionCommandHandler(
             }
         }
 
-        var holding = await db.Holdings.SingleOrDefaultAsync(
-            row => row.AccountId == loaded.Account.Id && row.InstrumentId == instrument.Id,
-            cancellationToken);
         var feeSchedule = await ApplicableTradeFeeSchedule.ForAsync(
             db, tenant.Id, quote, ApplicableTradeFeeSchedule.DateOf(bookedAt), cancellationToken);
-        var quoteDecimalPlaces = catalog.TryGet(quote)?.DecimalPlaces ?? 2;
         return type == TransactionType.Buy
             ? Domain.Entities.Transaction.PostBuy(
                 tenant.Id,
@@ -563,6 +605,134 @@ public class CreateTransactionCommandHandler(
                 holding?.CostAmount ?? 0m,
                 feeSchedule,
                 quoteDecimalPlaces);
+    }
+
+    private const string PriceKey = "Security[0].Price";
+
+    /// <summary>
+    /// External caller numbers R5–R10: an External <c>Buy</c> / <c>Sell</c> uses the caller's executed price, fee and
+    /// FX rate. No stored price, rate or trade fee schedule is read.
+    /// </summary>
+    private static Domain.Entities.Transaction PostExternalTrade(
+        CreateTransactionCommand request,
+        CreateTransactionCommand.OpeningHoldingSecurity item,
+        int instrumentId,
+        DateTimeOffset bookedAt,
+        Tenant tenant,
+        (Account Account, User Customer) loaded,
+        TransactionType type,
+        string accountCurrency,
+        string quote,
+        int quoteDecimalPlaces,
+        decimal currentCashSum,
+        Holding? holding)
+    {
+        var bookingCurrency = Money.Create(0m, accountCurrency).Currency;
+        var crossCurrency = !string.Equals(quote, bookingCurrency, StringComparison.Ordinal);
+        var failures = new List<ValidationFailure>();
+        if (item.Price is null)
+        {
+            failures.Add(new ValidationFailure(
+                PriceKey, "Price is required on an External account. Enter the executed price."));
+        }
+
+        if (request.Fee is { } fee && !FxConversionPricing.FitsDecimalPlaces(fee, quoteDecimalPlaces))
+        {
+            failures.Add(new ValidationFailure(
+                nameof(CreateTransactionCommand.Fee), $"Fee can have at most {quoteDecimalPlaces} decimal places."));
+        }
+
+        if (crossCurrency && request.FxRate is null)
+        {
+            failures.Add(new ValidationFailure(
+                nameof(CreateTransactionCommand.FxRate),
+                "FxRate is required when the instrument currency differs from the account currency."));
+        }
+        else if (!crossCurrency && request.FxRate is not null)
+        {
+            failures.Add(new ValidationFailure(
+                nameof(CreateTransactionCommand.FxRate),
+                "FxRate cannot be set when the instrument currency is the account currency."));
+        }
+
+        if (failures.Count > 0)
+        {
+            throw new ValidationException(failures);
+        }
+
+        var price = Money.Create(item.Price!.Value, quote);
+        var fxRate = request.FxRate ?? 1m;
+        var appliedRate = crossCurrency
+            ? AppliedFxRate.Create(
+                quote, bookingCurrency, fxRate, FxConversionPricing.DateOf(bookedAt), AppliedFxRate.CallerSource)
+            : null;
+        return type == TransactionType.Buy
+            ? Domain.Entities.Transaction.PostBuy(
+                tenant.Id,
+                loaded.Account.Id,
+                loaded.Account.Type,
+                bookingCurrency,
+                instrumentId,
+                item.Quantity,
+                price,
+                fxRate,
+                bookedAt,
+                request.Memo,
+                request.Reference,
+                currentCashSum,
+                feeSchedule: null,
+                quoteDecimalPlaces,
+                request.Fee,
+                appliedRate)
+            : Domain.Entities.Transaction.PostSell(
+                tenant.Id,
+                loaded.Account.Id,
+                loaded.Account.Type,
+                bookingCurrency,
+                instrumentId,
+                item.Quantity,
+                price,
+                fxRate,
+                bookedAt,
+                request.Memo,
+                request.Reference,
+                currentCashSum,
+                holding?.Quantity ?? 0m,
+                holding?.CostAmount ?? 0m,
+                feeSchedule: null,
+                quoteDecimalPlaces,
+                request.Fee,
+                appliedRate);
+    }
+
+    /// <summary>External caller numbers R13: a Custodial account refuses the caller's price, fee and FX rate.</summary>
+    private static void RefuseCallerNumbers(
+        CreateTransactionCommand request,
+        CreateTransactionCommand.OpeningHoldingSecurity item)
+    {
+        var failures = new List<ValidationFailure>();
+        if (item.Price is not null)
+        {
+            failures.Add(new ValidationFailure(PriceKey, "Price cannot be set on a buy or sell."));
+        }
+
+        if (request.Fee is not null)
+        {
+            failures.Add(new ValidationFailure(
+                nameof(CreateTransactionCommand.Fee), CreateTransactionCommandValidator.FeeRefusedMessage));
+        }
+
+        if (request.FxRate is not null)
+        {
+            failures.Add(new ValidationFailure(
+                nameof(CreateTransactionCommand.FxRate),
+                "FxRate cannot be set on a Custodial account. The server reads the rate."));
+        }
+
+        if (failures.Count > 0)
+        {
+            throw new ValidationException(failures);
+        }
     }
 
     private async Task<Domain.Entities.Transaction> PostStockAsync(

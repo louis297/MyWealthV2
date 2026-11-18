@@ -336,6 +336,7 @@ Invariants:
 - Closed account rejects new transactions. `Account.Close()` does not write cash.
 - A Transaction with a security leg can be reversed only while it is the latest security activity on each of its holdings: no live later security leg on the same `(Account, Instrument)`. Application passes that fact to `Reverse`, which refuses otherwise. A cash-only Transaction is not affected ([fixes/ledger-write-guards.md](fixes/ledger-write-guards.md)).
 - Every leg account of a Transaction has the same custody mode. `PostInternalTransfer` and `PostFxConversion` take both Accounts' custody modes and refuse different ones; every other type has one leg account, and `Reverse` copies each leg's Account. `CustodyRules.AllowsManualEntry(custodyMode, type)` holds the manual entry matrix: what a caller may enter on an Account of each custody mode. Application calls it; the factories do not, and they keep their `bookedAt` parameter, so the server-set booking time of a Custodial account is an Application rule ([features/custody-modes.md](features/custody-modes.md)).
+- (External caller numbers) `PostBuy` / `PostSell` take an optional entered fee (quote currency, `≥ 0`) in place of a schedule, never both; its fee detail has no schedule. They take an optional `AppliedFxRate`, stored as the trade's FX detail; its base is the price currency, its quote the Account currency and its rate the one the cash legs used. `PostFxConversionWithAmounts` builds an `FxConversion` from both amounts: legs equal to them, rate `Round(buy ÷ sell, 8, AwayFromZero)`, FX detail source `Caller`. The factories do not read the custody mode to choose where a number comes from; Application does (External: the caller, Custodial: the server) ([features/external-caller-numbers.md](features/external-caller-numbers.md)).
 
 Field rules: [features/posting.md](features/posting.md), [features/holdings.md](features/holdings.md), [features/buy-sell.md](features/buy-sell.md), [features/split.md](features/split.md), and [features/leg-accounts.md](features/leg-accounts.md).
 
@@ -394,6 +395,9 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-18 | Tenant custody modes in `review`: allowed custody modes on the Tenant, checked when an account is opened. Recorded in §4.1 with a `review` mark. [features/tenant-custody-modes.md](features/tenant-custody-modes.md). |
 | 2026-11-18 | Tenant custody modes accepted. The `review` mark in §4.1 is dropped. |
 | 2026-11-18 | Tenant custody modes landed: `Tenant.SetAllowedCustodyModes`, `Allows` and `AllowedCustodyModes`; `CreateAccount` checks the setting. |
+| 2026-11-18 | External caller numbers in `review`: entered fee and `AppliedFxRate` on `PostBuy` / `PostSell`; `PostFxConversionWithAmounts`. Recorded in §8.6 with a `review` mark. [features/external-caller-numbers.md](features/external-caller-numbers.md). |
+| 2026-11-18 | External caller numbers accepted. The `review` mark in §8.6 is dropped. |
+| 2026-11-18 | External caller numbers landed: `enteredFee` and `appliedRate` on `PostBuy` / `PostSell`, `PostFxConversionWithAmounts`, `AppliedFxRate.CallerSource`. |
 
 ---
 

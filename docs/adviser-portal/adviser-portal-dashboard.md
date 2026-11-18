@@ -23,6 +23,7 @@ related:
   - ../adr/0003-react-redux-typescript-vite-tailwind-frontend.md
   - ../features/custody-modes.md
   - ../features/tenant-custody-modes.md
+  - ../features/external-caller-numbers.md
 ---
 
 # Adviser Portal — Dashboard and ledger pages
@@ -166,6 +167,19 @@ Status of this amendment: `accepted` (2026-11-18), together with [tenant-custody
 | ID | Behaviour |
 | --- | --- |
 | D21 | The New account form offers only the custody modes in the firm's `allowedCustodyModes`, from the tenant item the shell loads with `GET /tenants/by-code/{code}`. Two allowed: D17 as written, nothing preselected. One allowed: that option alone, already selected; if it is Custodial, Type is Brokerage and the Type control is disabled. Until the tenant item has loaded, no custody option is shown and the form cannot be submitted. A 400 with `errors.CustodyMode` (the setting changed after the page loaded) is shown at the Custody choice. |
+
+---
+
+## Amendment 2026-11-18 (External caller numbers) — accepted, landed
+
+Status of this amendment: `accepted` (2026-11-18), together with [external-caller-numbers](../features/external-caller-numbers.md). D22 replaces "Server prices the security leg" in D10 on External accounts; D23 replaces the convert row for External accounts. On a Custodial account both stay as written. The BFF does not change.
+
+| ID | Behaviour |
+| --- | --- |
+| D22 | On an External account, the Buy and Sell forms on `/accounts/:id/transactions/new` show, once an instrument is picked, a required "Price per unit (<quote currency>)" input, an optional "Fee (<quote currency>)" input and, only when the instrument's quote currency differs from the Account currency, a required "FX rate" input labelled "1 <quote currency> = ? <Account currency>". The POST carries `security[0].price`, `fee` (left out when blank) and `fxRate`. The form does no cash or cost arithmetic. A 400 on `Security[0].Price`, `Fee` or `FxRate` is shown at its input. On a Custodial account the forms have none of these inputs and send none of these fields. |
+| D23 | On an External source account, `/accounts/:id/convert` has no "I sell" / "I buy" toggle and sends no quote request. It has two required inputs, "Sell (<from currency>)" and "Buy (<to currency>)". Once both are valid it shows the implied rate as display text, "1 NZD = 0.5912 USD", rounded to 4 decimals. Review shows "Convert 845.74 NZD from <account> to 500.00 USD in <account> at 1 NZD = 0.5912 USD". Confirm posts `POST /transactions/fx` with `sellAmount`, `buyAmount`, `bookedAt` and no `expectedRate`, with one `Idempotency-Key` per form open; there is no 409 re-quote step. On a Custodial source account the form is unchanged. |
+
+The rate line under the amount on `/accounts/:id` already appears for any item with `fx`; an External `Buy` / `Sell` with a rate shows it without a change.
 
 ---
 
