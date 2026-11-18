@@ -26,6 +26,11 @@ export type NetWorth = {
       type: string;
       currencies: NetWorthCurrency[];
     }[];
+    /** One entry per custody mode with an Open account in scope, Custodial first (custody-mode-grouping R4). */
+    byCustodyMode: {
+      custodyMode: string;
+      currencies: NetWorthCurrency[];
+    }[];
     topHoldings: {
       instrumentId: string;
       symbol: string;

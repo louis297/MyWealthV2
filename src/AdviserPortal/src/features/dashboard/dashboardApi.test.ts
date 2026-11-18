@@ -23,6 +23,7 @@ const netWorth = {
   breakdowns: {
     byCustomer: [],
     byAccountType: [],
+    byCustodyMode: [],
     topHoldings: [],
   },
 };

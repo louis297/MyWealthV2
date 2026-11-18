@@ -35,7 +35,7 @@ const customer = {
 const emptyNetWorth = {
   asOf: "2026-10-12T16:00:00.000Z",
   currencies: [],
-  breakdowns: { byCustomer: [], byAccountType: [], topHoldings: [] },
+  breakdowns: { byCustomer: [], byAccountType: [], byCustodyMode: [], topHoldings: [] },
 };
 
 const accountId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
@@ -64,7 +64,7 @@ const customerNetWorth = {
       net: 6000,
     },
   ],
-  breakdowns: { byCustomer: [], byAccountType: [], topHoldings: [] },
+  breakdowns: { byCustomer: [], byAccountType: [], byCustodyMode: [], topHoldings: [] },
 };
 
 function json(body: unknown, status = 200) {
@@ -246,6 +246,12 @@ describe("CustomerDetailPage", () => {
             byAccountType: [
               {
                 type: "Brokerage",
+                currencies: customerNetWorth.currencies,
+              },
+            ],
+            byCustodyMode: [
+              {
+                custodyMode: "Custodial",
                 currencies: customerNetWorth.currencies,
               },
             ],

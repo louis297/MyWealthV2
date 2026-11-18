@@ -26,6 +26,7 @@ const netWorth = {
   breakdowns: {
     byCustomer: [],
     byAccountType: [],
+    byCustodyMode: [],
     topHoldings: [],
   },
 };
@@ -62,6 +63,7 @@ const withBreakdowns = {
         ],
       },
     ],
+    byCustodyMode: [],
     topHoldings: [
       {
         instrumentId: "dddddddd-dddd-dddd-dddd-dddddddddddd",
@@ -130,6 +132,26 @@ function renderDashboard(body: unknown) {
 
   return { fetchMock, router };
 }
+
+function currency(code: string, cash: number, holdings: number) {
+  return {
+    currency: code,
+    assets: { cash, holdings, total: cash + holdings },
+    liabilities: { total: 0 },
+    net: cash + holdings,
+  };
+}
+
+const withCustodyModes = {
+  ...netWorth,
+  breakdowns: {
+    ...netWorth.breakdowns,
+    byCustodyMode: [
+      { custodyMode: "Custodial", currencies: [currency("NZD", 1000, 5000)] },
+      { custodyMode: "External", currencies: [currency("NZD", 2500, 0), currency("USD", 0, 800)] },
+    ],
+  },
+};
 
 describe("DashboardPage", () => {
   beforeEach(() => {
@@ -222,11 +244,49 @@ describe("DashboardPage", () => {
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
+  it("shows funds under management and external assets per currency below the totals", async () => {
+    renderDashboard(withCustodyModes);
+
+    const managedHeading = await screen.findByRole("heading", { name: "Funds under management" });
+    const managed = managedHeading.closest("section")!;
+    const managedNzd = within(managed).getByRole("row", { name: /NZD/ });
+    expect(within(managedNzd).getByText("6000")).toBeInTheDocument();
+    expect(within(managed).queryByText("USD")).not.toBeInTheDocument();
+
+    const externalHeading = screen.getByRole("heading", { name: "External assets" });
+    const external = externalHeading.closest("section")!;
+    expect(within(within(external).getByRole("row", { name: /NZD/ })).getByText("2500")).toBeInTheDocument();
+    expect(within(within(external).getByRole("row", { name: /USD/ })).getByText("800")).toBeInTheDocument();
+
+    const totals = screen.getAllByRole("table")[0];
+    const byCustomer = screen.getByRole("heading", { name: "By customer" });
+    expect(totals.compareDocumentPosition(managedHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(managedHeading.compareDocumentPosition(externalHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(externalHeading.compareDocumentPosition(byCustomer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByText(/has not checked/)).not.toBeInTheDocument();
+  });
+
+  it("shows None. under a custody mode that has no entry", async () => {
+    renderDashboard({
+      ...netWorth,
+      breakdowns: {
+        ...netWorth.breakdowns,
+        byCustodyMode: [{ custodyMode: "External", currencies: [currency("NZD", 2500, 0)] }],
+      },
+    });
+
+    const managed = (await screen.findByRole("heading", { name: "Funds under management" })).closest("section")!;
+    expect(within(managed).getByText("None.")).toBeInTheDocument();
+    expect(within(managed).queryByRole("row")).not.toBeInTheDocument();
+    const external = screen.getByRole("heading", { name: "External assets" }).closest("section")!;
+    expect(within(external).getByText("2500")).toBeInTheDocument();
+  });
+
   it("shows no balances when the read has no currencies", async () => {
     renderDashboard({
       ...netWorth,
       currencies: [],
-      breakdowns: { byCustomer: [], byAccountType: [], topHoldings: [] },
+      breakdowns: { byCustomer: [], byAccountType: [], byCustodyMode: [], topHoldings: [] },
     });
 
     expect(await screen.findByText("No balances.")).toBeInTheDocument();
