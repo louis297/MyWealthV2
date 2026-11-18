@@ -1,5 +1,5 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -32,6 +32,7 @@ const netWorth = {
   ],
   breakdowns: {
     byCustomer: [{ customerId: me.id, name: "Someone else", currencies: [] }],
+    byCustodyMode: [],
     byAccountType: [
       {
         type: "Bank",
@@ -68,7 +69,18 @@ function callOf(input: RequestInfo | URL, init?: RequestInit) {
   return { url, method, credentials, headers };
 }
 
-function renderAt(path: string, person = me, activity: unknown[] = [], custodyMode = "External") {
+type AccountItem = { id: string; name: string; type: string; custodyMode: string; currency: string; cashBalance: number; status: string };
+
+function renderAt(
+  path: string,
+  person = me,
+  activity: unknown[] = [],
+  custodyMode = "External",
+  options: { netWorth?: unknown; accounts?: AccountItem[] } = {},
+) {
+  const accounts = options.accounts ?? [
+    { id: "account-1", name: "Everyday", type: "Bank", custodyMode, currency: "NZD", cashBalance: 100, status: "Open" },
+  ];
   const fetchMock = vi.mocked(fetch);
   fetchMock.mockImplementation(async (input, init) => {
     const { url, method } = callOf(input, init);
@@ -82,7 +94,7 @@ function renderAt(path: string, person = me, activity: unknown[] = [], custodyMo
       return json(person);
     }
     if (url.includes(`/users/customers/${person.id}/net-worth`)) {
-      return json(netWorth);
+      return json(options.netWorth ?? netWorth);
     }
     if (url.includes("/accounts/") && url.endsWith("/cash-balance")) {
       return json({ accountId: "account-1", currency: "NZD", cashBalance: 100 });
@@ -100,12 +112,9 @@ function renderAt(path: string, person = me, activity: unknown[] = [], custodyMo
       return new Response(JSON.stringify({ detail: "missing" }), { status: 404 });
     }
     if (url.includes("/accounts?")) {
-      return json({
-        items: [{ id: "account-1", name: "Everyday", type: "Bank", custodyMode, currency: "NZD", cashBalance: 100, status: "Open" }],
-        page: 1,
-        pageSize: 20,
-        totalCount: 1,
-      });
+      const mode = new URL(url, "http://localhost").searchParams.get("custodyMode");
+      const items = mode ? accounts.filter((account) => account.custodyMode === mode) : accounts;
+      return json({ items, page: 1, pageSize: 100, totalCount: items.length });
     }
     if (url.includes("/reports?scope=Customer")) {
       return json([
@@ -210,6 +219,115 @@ describe("Customer Portal", () => {
     expect(await screen.findByRole("heading", { name: "Everyday" })).toBeInTheDocument();
     expect(screen.getByText("Custody")).toBeInTheDocument();
     expect(screen.getByText(label)).toBeInTheDocument();
+  });
+
+  const note = "Held elsewhere: recorded by your adviser from outside statements. The platform has not checked these figures.";
+
+  function currency(code: string, cash: number, holdings: number) {
+    return {
+      currency: code,
+      assets: { cash, holdings, total: cash + holdings },
+      liabilities: { total: 0 },
+      net: cash + holdings,
+    };
+  }
+
+  function withCustodyModes(byCustodyMode: unknown[]) {
+    return { ...netWorth, breakdowns: { ...netWorth.breakdowns, byCustodyMode } };
+  }
+
+  it("shows held on platform and held elsewhere on the dashboard with the note under held elsewhere", async () => {
+    renderAt("/dashboard", me, [], "External", {
+      netWorth: withCustodyModes([
+        { custodyMode: "Custodial", currencies: [currency("NZD", 1000, 5000)] },
+        { custodyMode: "External", currencies: [currency("NZD", 2500, 0), currency("USD", 0, 800)] },
+      ]),
+    });
+
+    const heading = await screen.findByRole("heading", { name: "Held on platform and elsewhere" });
+    const section = heading.closest("section")!;
+    const rows = within(section).getAllByRole("row").slice(1);
+    expect(rows.map((row) => within(row).getAllByRole("cell")[0].firstChild?.textContent)).toEqual([
+      "Held on platform",
+      "Held elsewhere",
+    ]);
+    expect(within(rows[0]).getByText("NZD 6000")).toBeInTheDocument();
+    expect(within(rows[0]).queryByText(note)).not.toBeInTheDocument();
+    expect(within(rows[1]).getByText("NZD 2500, USD 800")).toBeInTheDocument();
+    expect(within(rows[1]).getByText(note)).toBeInTheDocument();
+
+    const byType = screen.getByRole("heading", { name: "By account type" });
+    expect(heading.compareDocumentPosition(byType) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("shows only the custody modes the customer has on the dashboard", async () => {
+    renderAt("/dashboard", me, [], "External", {
+      netWorth: withCustodyModes([{ custodyMode: "Custodial", currencies: [currency("NZD", 70, 0)] }]),
+    });
+
+    const section = (await screen.findByRole("heading", { name: "Held on platform and elsewhere" })).closest("section")!;
+    expect(within(section).getByText("Held on platform")).toBeInTheDocument();
+    expect(within(section).queryByText("Held elsewhere")).not.toBeInTheDocument();
+    expect(screen.queryByText(note)).not.toBeInTheDocument();
+  });
+
+  it("shows no balances in the custody section when there is no entry", async () => {
+    renderAt("/dashboard", me, [], "External", { netWorth: withCustodyModes([]) });
+
+    const section = (await screen.findByRole("heading", { name: "Held on platform and elsewhere" })).closest("section")!;
+    expect(within(section).getByText("No balances.")).toBeInTheDocument();
+    expect(within(section).queryByRole("row")).not.toBeInTheDocument();
+  });
+
+  it("lists accounts in two groups from two filtered requests with the note under held elsewhere", async () => {
+    const { fetchMock } = renderAt("/accounts", me, [], "External", {
+      accounts: [
+        { id: "account-1", name: "Everyday", type: "Bank", custodyMode: "External", currency: "NZD", cashBalance: 100, status: "Open" },
+        { id: "account-2", name: "Managed", type: "Brokerage", custodyMode: "Custodial", currency: "USD", cashBalance: 70, status: "Open" },
+      ],
+    });
+
+    const onPlatform = await screen.findByRole("heading", { name: "Held on platform" });
+    const elsewhere = await screen.findByRole("heading", { name: "Held elsewhere" });
+    expect(onPlatform.compareDocumentPosition(elsewhere) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const platformSection = onPlatform.closest("section")!;
+    const elsewhereSection = elsewhere.closest("section")!;
+    expect(within(platformSection).getByRole("link", { name: "Managed" })).toBeInTheDocument();
+    expect(within(platformSection).queryByRole("link", { name: "Everyday" })).not.toBeInTheDocument();
+    expect(within(platformSection).queryByText(note)).not.toBeInTheDocument();
+    expect(within(elsewhereSection).getByRole("link", { name: "Everyday" })).toBeInTheDocument();
+    expect(within(elsewhereSection).getByText(note)).toBeInTheDocument();
+
+    const accountUrls = urls(fetchMock).filter((url) => url.includes("/accounts?"));
+    expect(accountUrls.some((url) => url.includes("custodyMode=Custodial") && url.includes("pageSize=100"))).toBe(true);
+    expect(accountUrls.some((url) => url.includes("custodyMode=External") && url.includes("pageSize=100"))).toBe(true);
+    expect(accountUrls.every((url) => url.includes("custodyMode="))).toBe(true);
+  });
+
+  it("hides an empty account group and shows no accounts when both are empty", async () => {
+    renderAt("/accounts");
+
+    expect(await screen.findByRole("heading", { name: "Held elsewhere" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Held on platform" })).not.toBeInTheDocument();
+    cleanup();
+
+    renderAt("/accounts", me, [], "External", { accounts: [] });
+    expect(await screen.findByText("No accounts.")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Held elsewhere" })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["External", true],
+    ["Custodial", false],
+  ])("shows the note on the account page of a %s account: %s", async (custodyMode, shown) => {
+    renderAt("/accounts/account-1", me, [], custodyMode);
+
+    expect(await screen.findByRole("heading", { name: "Everyday" })).toBeInTheDocument();
+    if (shown) {
+      expect(screen.getByText(note)).toBeInTheDocument();
+    } else {
+      expect(screen.queryByText(note)).not.toBeInTheDocument();
+    }
   });
 
   it("shows not found for another account and no write controls", async () => {
