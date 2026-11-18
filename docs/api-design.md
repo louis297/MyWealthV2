@@ -292,7 +292,7 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Instruments | `/instruments` | list / get / create / update / disable / enable | `instruments.read` / `instruments.create` / `instruments.manage` |
 | Accounts | `/accounts` | list / get / create / update / close / reopen; `GET …/cash-balance` | `accounts.read` / `accounts.create` / `accounts.manage` |
 | Transactions | `/transactions` | list / get / create / reverse | `transactions.read` / `transactions.create` |
-| Net worth | `/net-worth`, `/users/customers/{id}/net-worth` | GET | `accounts.read` |
+| Net worth | `/net-worth`, `/users/customers/{id}/net-worth` | GET. See features/net-worth.md; `breakdowns.byCustodyMode` in features/custody-mode-grouping.md (`review`) | `accounts.read` |
 | Portfolios | `/portfolios`, `/accounts/{id}/portfolio`, `/accounts/{id}/rebalance` | list / get / create / update / disable; assign / unassign / rebalance. See features/portfolios.md | `portfolios.read` / `portfolios.manage` + `transactions.create` |
 | Fees | `/fees/trade-schedules` (namespace `/fees`) | list / get / create / update / delete. See features/trade-fees.md | `fees.read` / `fees.manage` |
 | Reports | `/reports` | list / request / schedules / executions / download | `reports.customer.read` / `reports.customer.create` / `reports.book.read` / `reports.book.create` |
@@ -469,6 +469,8 @@ Type-specific routes: `POST /transactions/transfer` for `InternalTransfer` ([fea
 
 Field rules: [features/reports.md](features/reports.md). Accepted.
 
+Grouping by custody mode (`review`, [features/custody-mode-grouping.md](features/custody-mode-grouping.md)) changes the content of the two PDFs only: a Custody column in both, subtotals per custody mode in Adviser Balances, a note on External rows in Customer Transactions. The routes do not change.
+
 | Method | Route | Policy | Success |
 | --- | --- | --- | --- |
 | GET | `/reports/catalog` | `tenants.manage` | 200 every catalog row, including inactive, ordered by code. No `granted` |
@@ -582,3 +584,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-18 | §7.7: External caller numbers in `review`. Caller `price`, `fee` and `fxRate` on External `Buy` / `Sell`; both amounts and no `expectedRate` or quote on External conversions. No new route, policy or problem code ([features/external-caller-numbers.md](features/external-caller-numbers.md)). |
 | 2026-11-18 | §7.7: External caller numbers accepted. |
 | 2026-11-18 | §7.7: External caller numbers landed. |
+| 2026-11-18 | §7 catalog, §7.8: grouping by custody mode in `review`. `breakdowns.byCustodyMode` on both net-worth reads; a Custody column and subtotals per custody mode in the Adviser Balances PDF; a Custody column and a note in the Customer Transactions PDF. No new route, policy, parameter or problem code ([features/custody-mode-grouping.md](features/custody-mode-grouping.md)). |
