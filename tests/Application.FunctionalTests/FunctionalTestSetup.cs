@@ -20,11 +20,20 @@ public class FunctionalTestSetup
     internal static string ConnectionString => Current.ConnectionString;
 
     private static TestEnvironment? _default;
+    private static TestEnvironmentPool? _pool;
     private static DistributedApplication? _app;
 
-    // The environment the calling test runs against.
+    // The environment the calling test runs against: the one its [Parallelizable] fixture leased,
+    // or the default environment that all other fixtures share one at a time.
     private static TestEnvironment Current =>
-        _default ?? throw new InvalidOperationException("The functional test environment has not started.");
+        TestBase.CurrentFixture?.Environment
+        ?? _default
+        ?? throw new InvalidOperationException("The functional test environment has not started.");
+
+    internal static Task<TestEnvironment> LeaseEnvironmentAsync() =>
+        _pool!.LeaseAsync(CancellationToken.None);
+
+    internal static void ReturnEnvironment(TestEnvironment environment) => _pool!.Return(environment);
 
     [OneTimeSetUp]
     public async Task OneTimeSetUp()
@@ -55,11 +64,13 @@ public class FunctionalTestSetup
 
         var connectionString = (await _app.GetConnectionStringAsync(Services.TestDatabase))!;
         _default = await TestEnvironment.CreateAsync(connectionString, cancellationToken);
+        _pool = new TestEnvironmentPool(connectionString);
     }
 
     [OneTimeTearDown]
     public async Task OneTimeTearDown()
     {
+        if (_pool is not null) await _pool.DisposeAsync();
         if (_default is not null) await _default.DisposeAsync();
         if (_app is not null) await _app.DisposeAsync();
     }

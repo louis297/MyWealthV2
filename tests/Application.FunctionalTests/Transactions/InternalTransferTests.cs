@@ -10,6 +10,7 @@ using MyWealthV2.Infrastructure.Data;
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
 /// <summary>Internal transfers R1–R10, R13: POST /transactions/transfer create, idempotency and validation.</summary>
+[Parallelizable]
 public class InternalTransferTests : TestBase
 {
     private const string TransferPath = "/transactions/transfer";

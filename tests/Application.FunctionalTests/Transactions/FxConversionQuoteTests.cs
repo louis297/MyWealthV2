@@ -5,6 +5,7 @@ using MyWealthV2.Application.FunctionalTests.Accounts;
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
 /// <summary>FX conversions R20: POST /transactions/fx/quote is read-only and runs R1, R3–R11.</summary>
+[Parallelizable]
 public class FxConversionQuoteTests : TestBase
 {
     private const string QuotePath = "/transactions/fx/quote";
