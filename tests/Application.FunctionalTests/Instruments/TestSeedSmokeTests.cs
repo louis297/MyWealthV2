@@ -7,6 +7,7 @@ using MyWealthV2.Infrastructure.Identity;
 
 namespace MyWealthV2.Application.FunctionalTests.Instruments;
 
+[Parallelizable]
 public class TestSeedSmokeTests : TestBase
 {
     [Test]

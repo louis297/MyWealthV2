@@ -8,6 +8,7 @@ using MyWealthV2.Infrastructure.Data;
 namespace MyWealthV2.Application.FunctionalTests.Portfolios;
 
 /// <summary>FX conversions R24: cash-only, allowed on an assigned Account on either side, no automatic rebalance.</summary>
+[Parallelizable]
 public class FxConversionPortfolioTests : TestBase
 {
     [Test]

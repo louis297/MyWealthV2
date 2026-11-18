@@ -3,6 +3,7 @@ using System.Net;
 namespace MyWealthV2.Application.FunctionalTests.Portfolios;
 
 /// <summary>Portfolios amendment 2026-11-13 part 2: Adviser Book on portfolio-wide commands (PB-T1–PB-T11).</summary>
+[Parallelizable]
 public class AdviserBookPortfolioTests : TestBase
 {
     [Test]

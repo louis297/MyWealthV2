@@ -12,6 +12,7 @@ using MyWealthV2.Infrastructure.Data;
 namespace MyWealthV2.Application.FunctionalTests.Fees;
 
 /// <summary>Trade fees R24–R29: rebalance trades carry fees, and the buys are scaled to leave cash for them.</summary>
+[Parallelizable]
 public class TradeFeeRebalanceTests : TestBase
 {
     [Test]

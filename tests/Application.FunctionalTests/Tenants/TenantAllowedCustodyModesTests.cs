@@ -6,6 +6,7 @@ using MyWealthV2.Domain.Enums;
 namespace MyWealthV2.Application.FunctionalTests.Tenants;
 
 // tenant-custody-modes R3–R5: allowedCustodyModes on POST /tenants, PUT /tenants/{id} and the tenant item.
+[Parallelizable]
 public class TenantAllowedCustodyModesTests : TestBase
 {
     private const string ShapeMessage = "AllowedCustodyModes must list External, Custodial or both, each once.";

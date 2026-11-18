@@ -5,6 +5,7 @@ using MyWealthV2.Domain.Enums;
 namespace MyWealthV2.Application.FunctionalTests.Accounts;
 
 /// <summary>Account custody mode R7 and R8: the item carries <c>custodyMode</c>, and the list filters on it.</summary>
+[Parallelizable]
 public class AccountCustodyModeReadTests : TestBase
 {
     [Test]

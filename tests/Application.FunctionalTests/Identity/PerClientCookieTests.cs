@@ -12,6 +12,7 @@ using MyWealthV2.Infrastructure.Identity;
 
 namespace MyWealthV2.Application.FunctionalTests.Identity;
 
+[Parallelizable]
 public class PerClientCookieTests : TestBase
 {
     private const string AdviserPortal = "adviser-portal";

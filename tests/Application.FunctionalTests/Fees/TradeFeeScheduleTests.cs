@@ -9,6 +9,7 @@ using MyWealthV2.Infrastructure.Data;
 namespace MyWealthV2.Application.FunctionalTests.Fees;
 
 /// <summary>Trade fees R1–R13: <c>/fees/trade-schedules</c>.</summary>
+[Parallelizable]
 public class TradeFeeScheduleTests : TestBase
 {
     private const string Schedules = FeeHttp.Schedules;

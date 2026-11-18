@@ -8,6 +8,7 @@ using MyWealthV2.Infrastructure.Data;
 namespace MyWealthV2.Application.FunctionalTests.Fees;
 
 /// <summary>Trade fees amendment 2026-11-15, R30–R33: <c>POST /fees/trade-schedules/preview</c>.</summary>
+[Parallelizable]
 public class TradeFeePreviewTests : TestBase
 {
     private const string Preview = FeeHttp.Schedules + "/preview";

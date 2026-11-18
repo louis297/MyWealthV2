@@ -7,6 +7,7 @@ using static MyWealthV2.Application.FunctionalTests.Custody.CustodialHttp;
 namespace MyWealthV2.Application.FunctionalTests.Custody;
 
 /// <summary>Custody modes R10–R12: the server sets bookedAt on a Custodial account; External keeps it required.</summary>
+[Parallelizable]
 public class CustodialBookedAtTests : TestBase
 {
     private const string TransferPath = "/transactions/transfer";

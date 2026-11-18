@@ -7,6 +7,7 @@ using MyWealthV2.Infrastructure.Data;
 
 namespace MyWealthV2.Application.FunctionalTests.Portfolios;
 
+[Parallelizable]
 public class AssignPortfolioTests : TestBase
 {
     [Test]

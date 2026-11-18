@@ -10,6 +10,7 @@ namespace MyWealthV2.Application.FunctionalTests.Accounts;
 /// Account custody mode R3: <c>POST /accounts</c> requires <c>custodyMode</c>. Custody modes R2 to R4: it accepts
 /// External with any openable type and Custodial with Brokerage only.
 /// </summary>
+[Parallelizable]
 public class AccountCustodyModeCreateTests : TestBase
 {
     [Test]

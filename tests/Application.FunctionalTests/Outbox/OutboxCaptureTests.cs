@@ -7,6 +7,7 @@ using MyWealthV2.Infrastructure.Data;
 
 namespace MyWealthV2.Application.FunctionalTests.Outbox;
 
+[Parallelizable]
 public class OutboxCaptureTests : TestBase
 {
     [Test]

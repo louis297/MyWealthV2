@@ -5,6 +5,7 @@ using MyWealthV2.Domain.Enums;
 
 namespace MyWealthV2.Application.FunctionalTests.Accounts;
 
+[Parallelizable]
 public class AccountCashBalanceTests : TestBase
 {
     [Test]

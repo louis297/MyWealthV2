@@ -5,6 +5,7 @@ using MyWealthV2.Application.FunctionalTests.Transactions;
 
 namespace MyWealthV2.Application.FunctionalTests.Accounts;
 
+[Parallelizable]
 public class CloseAccountHoldingsTests : TestBase
 {
     [Test]

@@ -8,6 +8,7 @@ using MyWealthV2.Infrastructure.Data;
 namespace MyWealthV2.Application.FunctionalTests.Identity;
 
 /// <summary>identity-auth amendment 2026-11-13 (lockout): every hosted login POST verifies exactly one hash (A41, A47).</summary>
+[Parallelizable]
 public class HostedLoginHashTests : TestBase
 {
     private const string Password = "Password1!";

@@ -8,6 +8,7 @@ using MyWealthV2.Infrastructure.Identity;
 namespace MyWealthV2.Application.FunctionalTests.Identity;
 
 /// <summary>identity-auth amendment 2026-11-13 (lockout): five wrong passwords lock the identity user for five minutes (A41–A46).</summary>
+[Parallelizable]
 public class HostedLoginLockoutTests : TestBase
 {
     private const string Password = "Password1!";

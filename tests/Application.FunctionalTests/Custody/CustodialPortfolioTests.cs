@@ -12,6 +12,7 @@ using static MyWealthV2.Application.FunctionalTests.Custody.CustodialHttp;
 namespace MyWealthV2.Application.FunctionalTests.Custody;
 
 /// <summary>Custody modes R14, R15: portfolios are assigned to and rebalanced on Open Custodial accounts only.</summary>
+[Parallelizable]
 public class CustodialPortfolioTests : TestBase
 {
     private const string AssignMessage = "Only an open Custodial account can be assigned a portfolio.";

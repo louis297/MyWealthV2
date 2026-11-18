@@ -11,6 +11,7 @@ using MyWealthV2.Infrastructure.Data.Entities;
 namespace MyWealthV2.Application.FunctionalTests.Fees;
 
 /// <summary>Trade fees R7, R14–R18: the <c>Fee</c> cash leg on <c>Buy</c> / <c>Sell</c> from <c>POST /transactions</c>.</summary>
+[Parallelizable]
 public class TradeFeeTradeTests : TestBase
 {
     private const string Before = "2026-10-12T10:00:00Z";
