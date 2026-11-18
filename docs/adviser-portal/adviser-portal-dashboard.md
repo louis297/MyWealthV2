@@ -4,7 +4,7 @@ status: accepted
 phase: 2
 language: en
 created: 2026-10-12
-updated: 2026-11-17
+updated: 2026-11-18
 related:
   - README.md
   - frontend-conventions.md
@@ -22,6 +22,7 @@ related:
   - ../features/bff-adviser-portal.md
   - ../adr/0003-react-redux-typescript-vite-tailwind-frontend.md
   - ../features/custody-modes.md
+  - ../features/tenant-custody-modes.md
 ---
 
 # Adviser Portal — Dashboard and ledger pages
@@ -155,6 +156,16 @@ A Custodial account can be opened, and the write forms follow the account's cust
 | D20 | On `/accounts/:id/transfer` and `/accounts/:id/convert`, an Account whose custody mode differs from the source Account's stays listed, greyed out, with the reason "Different custody mode", like the existing Closed and currency reasons. |
 
 Portfolio controls on the account page: [adviser-portal-portfolios](adviser-portal-portfolios.md) amendment 2026-11-17 (P13).
+
+---
+
+## Amendment 2026-11-18 (tenant custody modes) — review
+
+Status of this amendment: `review`. Accept it together with [tenant-custody-modes](../features/tenant-custody-modes.md). Until then D17 is unchanged. D21 narrows D17 to the custody modes the firm allows. The BFF does not change.
+
+| ID | Behaviour |
+| --- | --- |
+| D21 | The New account form offers only the custody modes in the firm's `allowedCustodyModes`, from the tenant item the shell loads with `GET /tenants/by-code/{code}`. Two allowed: D17 as written, nothing preselected. One allowed: that option alone, already selected; if it is Custodial, Type is Brokerage and the Type control is disabled. Until the tenant item has loaded, no custody option is shown and the form cannot be submitted. A 400 with `errors.CustodyMode` (the setting changed after the page loaded) is shown at the Custody choice. |
 
 ---
 

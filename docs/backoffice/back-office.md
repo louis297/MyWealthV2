@@ -4,7 +4,7 @@ status: accepted
 phase: 1
 language: en
 created: 2026-10-24
-updated: 2026-11-15
+updated: 2026-11-18
 related:
   - README.md
   - ../function-plan.md
@@ -16,6 +16,7 @@ related:
   - ../features/reports.md
   - ../features/instruments.md
   - back-office-instruments.md
+  - ../features/tenant-custody-modes.md
   - ../adr/0014-openiddict-authorization-code-pkce.md
 ---
 
@@ -190,6 +191,22 @@ Status of this amendment: `accepted` (2026-11-13). It is a build contract. Lande
 
 - The exchange part of `BackOfficeTokenRefresh` (concurrent grants joined, rotated refresh tokens remembered, chain follow) moves to `src/Shared` `RefreshTokenExchange`, so both BFFs use the same code. Back Office keeps `ValidatePrincipalAsync` and `CookieAccessTokens`. Behaviour is unchanged, and `BackOfficeRefreshTests` stay green.
 - New: a remembered rotation is dropped 30 minutes after it is written (RF6). Today the map never drops an entry. One added test: a rotated refresh token presented 30 minutes after the rotation calls the token endpoint.
+
+---
+
+## Amendment 2026-11-18 (allowed custody modes) — review
+
+Status of this amendment: `review`. Accept it together with [tenant-custody-modes.md](../features/tenant-custody-modes.md). Until then the Tenants pages above are unchanged. No new route.
+
+- `/tenants/new`: a required "Custody modes" group with two checkboxes, "External accounts" and "Custodial accounts", both checked when the form opens. `POST /tenants` carries the checked values as `allowedCustodyModes`.
+- `/tenants/{id}`: shows the allowed custody modes next to the reporting currency. The edit form has the same two checkboxes, set from the item, and every `PUT /tenants/{id}` carries `allowedCustodyModes` with name, reporting currency and `rowVersion`. Under the group: "Changing this affects only new accounts."
+- The setting is on the detail page, not on `/tenants/{id}/config`, because `PUT /tenants/{id}` writes it together with the name and `rowVersion` the detail page already holds.
+- `/tenants` list: no new column.
+
+| ID | Behaviour |
+| --- | --- |
+| BO14 | New tenant: both custody mode boxes are checked on open. Create is disabled while neither is checked. The POST carries exactly the checked values. A 400 on `errors.AllowedCustodyModes` is shown on the form |
+| BO15 | Tenant detail: the boxes reflect the item's `allowedCustodyModes`. Save sends `allowedCustodyModes` with name, reporting currency and `rowVersion`, and is disabled while neither is checked. The page shows "Changing this affects only new accounts." |
 
 ---
 
