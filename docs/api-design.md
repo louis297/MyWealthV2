@@ -3,7 +3,7 @@ title: API design
 status: accepted
 language: en
 created: 2026-09-11
-updated: 2026-11-18
+updated: 2026-11-19
 related:
   - README.md
   - glossary.md
@@ -586,3 +586,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-18 | §7.7: External caller numbers landed. |
 | 2026-11-18 | §7 catalog, §7.8: grouping by custody mode in `review`. `breakdowns.byCustodyMode` on both net-worth reads; a Custody column and subtotals per custody mode in the Adviser Balances PDF; a Custody column and a note in the Customer Transactions PDF. No new route, policy, parameter or problem code ([features/custody-mode-grouping.md](features/custody-mode-grouping.md)). |
 | 2026-11-18 | §7 catalog, §7.8: grouping by custody mode accepted. |
+| 2026-11-19 | §7 catalog, §7.8: grouping by custody mode landed. |

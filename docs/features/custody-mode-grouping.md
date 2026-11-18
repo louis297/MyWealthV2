@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-18
-last_updated: 2026-11-18
+last_updated: 2026-11-19
 related:
   - account-custody-mode.md
   - custody-modes.md
@@ -32,7 +32,14 @@ Since slice 1 every account has a custody mode, and the account pages show it. T
 
 Read only. No write rule changes, no value is computed differently, no script, no new route, no new policy, no new query parameter. One new response field: `breakdowns.byCustodyMode` on the two net-worth reads.
 
-**Status is `accepted` (2026-11-18).** Implementation follows this file. The amendments in net-worth, reports, the Adviser Portal Dashboard and Customer Portal page contracts, api-design and the glossary are in force.
+**Status is `accepted` (2026-11-18) and landed** (2026-11-19) on branch `feature/custody-mode-grouping`: `breakdowns.byCustodyMode` in the net-worth reader, the Custody column and the subtotals per custody mode in the Adviser Balances Report, the Custody column and the note in the Customer Transactions Report, the two Dashboard figures in the Adviser Portal, and the Dashboard rows, grouped accounts list and account page note in the Customer Portal. The amendments in net-worth, reports, the Adviser Portal Dashboard and Customer Portal page contracts, api-design and the glossary are in force.
+
+Implementation notes (2026-11-19), where the rules left a detail open:
+
+- Adviser Balances PDF: the subtotal block headings are the enum names (`Custodial`, `External`) and "All accounts", each under the existing "Subtotals" heading. The row builder returns the mode blocks beside today's per-currency subtotals, which stay the "All accounts" block.
+- Customer Transactions: the row builder passes its source records through unchanged, so the custody mode of each row is proved by a functional generation test (`GenerateCustomerTransactionsTests`), not by a row-builder unit test. A functional generation test also proves the Adviser Balances wiring.
+- Adviser Portal: each figure is a table with Currency and Assets columns.
+- Customer Portal: the Dashboard section is a table with Custody and Assets columns; the note sits under "Held elsewhere" in the Custody cell. On the accounts list the note is under the "Held elsewhere" heading, above the table.
 
 ---
 
@@ -167,7 +174,7 @@ None. No script. `Accounts.CustodyMode` (script `0031`) is read.
 | Internal | Customer Transactions generator | Selects `Account.CustodyMode` for each account row (R14). The PDF model gains the Custody column and the note (R15) |
 | Command / query | Every other | Unchanged |
 
-The row selection and the subtotals of the Adviser Balances Report stay in its pure row builder, which has unit tests today; the custody mode is one more field on its input. The same holds for the Customer Transactions row builder.
+The row selection and the subtotals of the Adviser Balances Report stay in its pure row builder, which has unit tests today; the custody mode is one more field on its input. The Customer Transactions row builder only passes the custody mode through on its input records.
 
 ---
 
@@ -249,9 +256,10 @@ No change. `TestSeed` already has an External account ("Demo brokerage") and a C
 
 | Project | Assert |
 | --- | --- |
-| Application.UnitTests | Adviser Balances row builder: every cash and holding line carries its account's custody mode; mode subtotals per currency for the §4.2 accounts (Custodial NZD cash `1,000.00` / market value `5,000.00`; External NZD `2,500.00` / `0`, USD `0` / `800.00`); the "All accounts" subtotals equal today's; a mode with no lines has no block; a zero-cash External account with no holdings adds no line and no block. Adviser Balances PDF: "Custody" column header and cell text, the subtotal block headings and their order. Customer Transactions row builder: each row carries its account row's custody mode; a transaction between two accounts of the Customer gives two rows with their own modes. Customer Transactions PDF: "Custody" column with "Held on platform" / "Held elsewhere"; the R15 note present with one External row and absent with none and on an empty range |
+| Application.UnitTests | Adviser Balances row builder: every cash and holding line carries its account's custody mode; mode subtotals per currency for the §4.2 accounts (Custodial NZD cash `1,000.00` / market value `5,000.00`; External NZD `2,500.00` / `0`, USD `0` / `800.00`); the "All accounts" subtotals equal today's; a mode with no lines has no block; a zero-cash External account with no holdings adds no line and no block. Adviser Balances PDF: "Custody" column header and cell text, the subtotal block headings and their order. Customer Transactions PDF: "Custody" column with "Held on platform" / "Held elsewhere"; the R15 note present with one External row and absent with none and on an empty range |
 | Application.FunctionalTests — net worth | Firm read with one Custodial and one External account → two entries, `Custodial` first, values of each account; the §4.2 example → the §8.1 `byCustodyMode` and the partition of R6; External accounts only → one `External` entry; an Open account with no legs → an entry with zeros; a Closed Custodial account → no `Custodial` entry from it; Adviser scope → only assigned Customers' accounts in the entries; Customer route and Customer self read → own accounts only; no accounts → empty array. `TestSeedSmokeTests`: the demo tenant has both entries |
 | Application.FunctionalTests — two tenants | Another tenant's Custodial account adds nothing to any entry; another tenant's Customer id on the Customer route → 404 (existing) |
+| Application.FunctionalTests — reports | Adviser Balances generated for a Custodial and an External account: the PDF has the Custody column and the `Custodial`, `External` and "All accounts" blocks in that order. Customer Transactions generated for the same: each row shows "Held on platform" or "Held elsewhere" and the note is present |
 | Adviser Portal | Dashboard renders "Funds under management" and "External assets" from `byCustodyMode`, per currency `assets.total`; a missing entry → "None."; the other sections are unchanged |
 | Customer Portal | Dashboard renders the two rows and the note under "Held elsewhere"; a missing entry is not shown. Accounts list sends the two filtered requests and renders two groups in order with the note under "Held elsewhere"; an empty group is not shown; both empty → "No accounts.". Account page shows the note for an External account only |
 

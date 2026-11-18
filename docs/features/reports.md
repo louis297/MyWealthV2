@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-10-12
-last_updated: 2026-11-18
+last_updated: 2026-11-19
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -38,7 +38,7 @@ Both support manual trigger and editable recurring schedules in the first phase.
 
 **Amendment 2026-11-15 (trade fees, accepted):** [trade-fees.md](trade-fees.md) R22. In the Customer Transactions report, the cash amount of an account row is the sum of that account's cash legs, and a new Fee column shows the sum of its `Fee` legs (empty when none). The Adviser Balances report is unchanged: it already sums every cash leg.
 
-**Amendment 2026-11-18 (grouping by custody mode, accepted):** [custody-mode-grouping.md](custody-mode-grouping.md) R10–R16. Adviser Balances: every cash and holding line has a "Custody" column (enum name) after "Type"; the line order is unchanged; the subtotals become one block per custody mode present (`Custodial`, then `External`) followed by an "All accounts" block with today's per-currency totals. Customer Transactions: a "Custody" column after "Account" with the labels "Held on platform" / "Held elsewhere", and, when any row is on an External account, the note "Held elsewhere: recorded by your adviser from outside statements. The platform has not checked these figures." under the table. Parameters, scope rules and routes do not change.
+**Amendment 2026-11-18 (grouping by custody mode, accepted, landed):** [custody-mode-grouping.md](custody-mode-grouping.md) R10–R16. Adviser Balances: every cash and holding line has a "Custody" column (enum name) after "Type"; the line order is unchanged; the subtotals become one block per custody mode present (`Custodial`, then `External`) followed by an "All accounts" block with today's per-currency totals. Customer Transactions: a "Custody" column after "Account" with the labels "Held on platform" / "Held elsewhere", and, when any row is on an External account, the note "Held elsewhere: recorded by your adviser from outside statements. The platform has not checked these figures." under the table. Parameters, scope rules and routes do not change.
 
 ---
 

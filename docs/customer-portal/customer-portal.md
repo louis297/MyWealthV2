@@ -4,7 +4,7 @@ status: accepted
 phase: 3
 language: en
 created: 2026-11-02
-updated: 2026-11-18
+updated: 2026-11-19
 related:
   - README.md
   - ../adviser-portal/frontend-conventions.md
@@ -195,7 +195,7 @@ The account item from `GET /accounts` and `GET /accounts/{id}` gains `custodyMod
 
 ---
 
-## Amendment 2026-11-18 (grouping by custody mode) — accepted
+## Amendment 2026-11-18 (grouping by custody mode) — accepted, landed
 
 Status of this amendment: `accepted` (2026-11-18), together with [custody-mode-grouping](../features/custody-mode-grouping.md). It closes the last item of the 2026-11-17 amendment ("No grouping of accounts by custody mode and no explanatory sentence yet"). No backend grant changes and the BFF does not change: `GET /accounts` already takes `custodyMode`, and the net-worth reads gain `breakdowns.byCustodyMode`.
 

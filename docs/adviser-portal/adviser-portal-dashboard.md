@@ -4,7 +4,7 @@ status: accepted
 phase: 2
 language: en
 created: 2026-10-12
-updated: 2026-11-18
+updated: 2026-11-19
 related:
   - README.md
   - frontend-conventions.md
@@ -184,7 +184,7 @@ The rate line under the amount on `/accounts/:id` already appears for any item w
 
 ---
 
-## Amendment 2026-11-18 (grouping by custody mode) — accepted
+## Amendment 2026-11-18 (grouping by custody mode) — accepted, landed
 
 Status of this amendment: `accepted` (2026-11-18), together with [custody-mode-grouping](../features/custody-mode-grouping.md). D24 and D25 extend D2 and D3; the other sections of the Dashboard do not change. The BFF does not change.
 
