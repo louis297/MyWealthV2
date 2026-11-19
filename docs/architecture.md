@@ -3,7 +3,7 @@ title: Architecture
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-11-13
+updated: 2026-11-19
 related:
   - README.md
   - glossary.md
@@ -267,6 +267,8 @@ Password change, disable, and logout revoke that subject’s OpenIddict tokens. 
 
 Do not add a port whose surface is still open. Do add a port (or value object) when later use is certain and omitting it would force a Phase-1 redesign (`Money`, `ICurrencyCatalog`, no-op `IEmailSender`).
 
+Outside parties (proposed, [ADR 0021](adr/0021-outside-parties-behind-ports.md)): a bank, broker, custodian or issuer gets one port per party role, added by the flow spec that needs it (the first with roadmap B3). The `worker` pulls each feed on a schedule, stores the inbound records and the feed cursor first, and a flow processes stored records afterwards. `webapi` handlers never call an outside party. The simulator host (`simulator`, [features/simulator.md](features/simulator.md), `draft`) is one adapter behind those ports, with its own database; no host list in this document includes it until that spec is accepted.
+
 ---
 
 ## 7. Tests
@@ -377,3 +379,4 @@ Locked conclusions follow function-plan §0 and these ADRs. The `docs/adr/` fold
 | 2026-11-08 | Instrument price sync runs daily at 12:00 UTC. |
 | 2026-11-02 | [features/portfolios.md](features/portfolios.md) drafted. Full Rebalance model portfolios. Async job + per-account handle. Assigned accounts reject manual security trades. |
 | 2026-11-02 | [features/portfolios.md](features/portfolios.md) accepted. Assign and single-account rebalance are synchronous. Weight change and bulk rebalance return 202. Disable unassigns every Active assignment. |
+| 2026-11-19 | ADR 0021 proposed: outside parties behind ports, pulled by the `worker`, stored before use. Simulator host spec [features/simulator.md](features/simulator.md) drafted. Pointer in §6; hosts, solution map and ADR table change when they are accepted. |

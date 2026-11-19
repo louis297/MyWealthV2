@@ -22,6 +22,8 @@ related:
   - adr/0018-transactional-outbox.md
   - adr/0013-roles-authorization-single-user-table.md
   - features/transaction-source.md
+  - adr/0021-outside-parties-behind-ports.md
+  - features/simulator.md
 ---
 
 # Custodial accounts roadmap
@@ -156,6 +158,7 @@ No simulator needed. These make the later flows small.
 - **What:** an ADR that fixes P1–P4, P9 and P10: ports per outside party, pull by the `worker`, inbound records stored first and idempotent, a stored cursor per feed, booking at processing time with outside dates in detail rows.
 - **Changes:** documentation only. The first port arrives with B3.
 - **Depends on:** nothing. Write it before B3.
+- **ADR:** [0021](adr/0021-outside-parties-behind-ports.md) (`proposed` 2026-11-19). It also fixes, at decision level, the simulator host of S0 (D8, D10, D16, D17, D19) and adds rules this section did not list: no outside call on the `webapi` request path, processing as a separate step after the pull commits, outgoing calls idempotent on the instruction's PublicId, no automatic Hangfire retries on pull jobs, and no shared code between the platform adapter and the simulator except a test-only scenario library.
 
 ### F3. Controlled adjustment, first version
 
@@ -361,6 +364,7 @@ A separate project that plays the outside parties for manual testing and demos. 
 - **Clock and randomness:** its own clock that can jump ("to T+2", "to month end"); every random choice from a seed. Same seed and same steps give the same signals.
 - **Scenarios:** named scenario definitions shared with the in-memory port fakes used by functional tests (P9), so both are driven by one description. Working home: a small shared library referenced by both.
 - **Reference data:** it may read instruments and reference prices through `webapi` read routes. It owns the prices of simulated instruments (D11). Never ledger data.
+- **Spec:** [simulator.md](features/simulator.md) (`draft` 2026-11-19). Its §11 records where it refines this section: the TestAppHost gets the simulator database only, not the process (P9); the simulator reads no platform data, and S2 is recommended to carry the reference price in the order call instead of reading `webapi`, because D16 gives the operator no `webapi` permission; scenarios and their shared library come with S1; the clock runs at real time plus an offset and can be paused; a reset starts a new world whose id is in every outside id and cursor; the party routes listen on their own port; the platform's machine credential is a key the simulator owns; the VPS container runs under a compose profile.
 
 ### S1. Bank (with B3–B7)
 
@@ -408,7 +412,7 @@ Each question has a status. Decided items were confirmed in discussion on 2026-1
 | D13 | A dividend in a currency other than the account's | **Decided:** convert at the reference rate on the payment date and store the FX detail, until multi-currency cash exists. Multi-currency cash stays out of this plan (future-plans §5); the part this plan cannot avoid is D20. | C2 |
 | D14 | `InternalTransfer` between Custodial accounts of two different Customers | **Decided:** refused on Custodial accounts (same Customer only); it is a third-party payment. External accounts unchanged. | B6 or its own small amendment |
 | D15 | Is a rebalance trade a `Manual` source for P6? | **Decided:** yes until O3, then rebalance writes through orders. | F4 |
-| D16 | Which account signs in to the simulator? (from D10) | **Decided:** a new platform-level role that may sign in only on the simulator client and has no `webapi` permission (ADR 0013 amendment, client role allow-list). Not SystemAdmin, which also has all of Back Office. | S0 |
+| D16 | Which account signs in to the simulator? (from D10) | **Decided:** a new platform-level role that may sign in only on the simulator client and has no `webapi` permission (ADR 0013 amendment, client role allow-list). Not SystemAdmin, which also has all of Back Office. Named `SimulatorOperator` in [simulator.md](features/simulator.md). | S0 |
 | D17 | How are the platform's calls to the simulator protected? (from D10) | **Decided:** the feed, payment and order routes listen only on the internal network and are not routed by Caddy, and the platform calls them with a machine credential. Only the control pages go through Caddy, behind the sign-in of D16. | S0 |
 | D18 | Where is the manual "run for a date" trigger of date-driven platform jobs available? (from D9, D10) | **Decided:** (b) on production and (c) in Development. This concerns jobs whose result depends on a business date or period (the interest run, later the advisory fee accrual), not the price, FX or outbox jobs. The platform keeps the real clock, so a month-end run would otherwise wait for the real month end. The trigger is a SystemAdmin route on `webapi` in every environment, not a simulator action. The command refuses an as-of date after today unless a configuration option allows future dates. The option is off by default and on in the Development settings. The rule reads the option, not the environment name, so functional tests can cover both settings. A host outside Development with the option on fails at startup, before it listens (as `SystemAdminBootstrap` does with bad configuration). Every date-driven job is idempotent per (Account, period) whatever the option: a catch-up run and the scheduled run can meet the same period. Rejected: (a) Development only, because production needs catch-up after a missed run; (c) on production, because it posts periods that have not happened. | I2 |
 | D19 | Is the simulator one tenant's outside world or every tenant's? | **Decided:** every tenant's, because the deployment is a showcase. Every client money account (B1) points at the simulator bank. Revisit before a real launch. | B1, S1 |
@@ -424,7 +428,7 @@ Each step depends only on earlier steps. "Closes" names the matrix cell or known
 | --- | --- | --- | --- | --- | --- |
 | 0 | Custody mode slices 1–5 | — | — | custody-modes and four others | landed 2026-11-19 |
 | 1 | F1 Transaction source, F4 reverse by source | — | Rebalance id leak | [transaction-source](features/transaction-source.md) | accepted 2026-11-19, landed 2026-11-19 |
-| 2 | F2 ADR, S0 skeleton | S0 | — | — | not started |
+| 2 | F2 ADR, S0 skeleton | S0 | — | [ADR 0021](adr/0021-outside-parties-behind-ports.md), [simulator](features/simulator.md) | ADR proposed, spec draft 2026-11-19 |
 | 3 | F3 Adjustment (no review) | — | "No correction other than reverse" | — | not started |
 | 4 | B1 client money accounts, B2 deposit reference | — | — | — | not started |
 | 5 | B3 bank feed, B4 matching and suspense | S1 receipts | Hand `TransferIn` | — | not started |
@@ -457,8 +461,8 @@ Steps 9, 10 and 13 do not depend on each other or on the bank stage beyond steps
 | [instrument-prices.md](features/instrument-prices.md) | Prices of simulated instruments come from the simulator (D11) | S, O |
 | [internal-transfers.md](features/internal-transfers.md) | Same Customer only on Custodial accounts (D14) | B |
 | [accounts.md](features/accounts.md), [customers.md](features/customers.md), [tenants.md](features/tenants.md) | Deposit reference, nominated bank account, tax profile, client money accounts | B, I |
-| [adr/0013](adr/0013-roles-authorization-single-user-table.md) | Operations permissions, maybe a role | F, B |
-| New ADR | Outside parties behind ports (F2); maybe one for the simulator | F, S |
+| [adr/0013](adr/0013-roles-authorization-single-user-table.md) | Operations permissions, maybe a role; the fifth role `SimulatorOperator` (ADR 0021 rule 25) | F, B, S |
+| [adr/0021](adr/0021-outside-parties-behind-ports.md) | Outside parties behind ports (F2) and the simulator host, one ADR (proposed) | F, S |
 | [reports.md](features/reports.md) | Reconciliation reports; source in the Customer Transactions Report | F, B, T |
 | Adviser Portal and Customer Portal page contracts | Operator pages, deposit instructions, withdrawals, orders, contract notes | all |
 | [architecture.md](architecture.md), [deployment.md](deployment.md), [features/identity-auth.md](features/identity-auth.md) | The simulator resource and its VPS container, its `identity` client and sign-in role | S |
