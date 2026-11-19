@@ -177,7 +177,7 @@ Plan and order in [custodial-roadmap.md](../custodial-roadmap.md) (`note`) §13.
 
 | Spec | Status | Who | Ships | Why it stays its own slice |
 | --- | --- | --- | --- | --- |
-| [transaction-source](transaction-source.md) | accepted (2026-11-19) | Same callers as posting and portfolios | Roadmap step 1 (F1, F4). Every Transaction has a source (`Manual`, `Seed`, `Rebalance`, and an optional source id; the rebalance handle on rebalance trades), shown as `source` on the item. Rebalance stops writing `rb:…:{InstrumentId}` into `reference`. On a Custodial account a hand reverse needs a `Manual` or `Rebalance` source. Script `0035`. Adviser Portal: Source line, Reverse hidden by source. No new route, policy or type | Groundwork every later flow uses to mark its writes, and the rule that keeps people from undoing them |
+| [transaction-source](transaction-source.md) | accepted (2026-11-19; landed 2026-11-19) | Same callers as posting and portfolios | Roadmap step 1 (F1, F4). Every Transaction has a source (`Manual`, `Seed`, `Rebalance`, and an optional source id; the rebalance handle on rebalance trades), shown as `source` on the item. Rebalance stops writing `rb:…:{InstrumentId}` into `reference`. On a Custodial account a hand reverse needs a `Manual` or `Rebalance` source. Script `0035`. Adviser Portal: Source line, Reverse hidden by source. No new route, policy or type | Groundwork every later flow uses to mark its writes, and the rule that keeps people from undoing them |
 
 ---
 

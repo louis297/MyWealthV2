@@ -170,7 +170,7 @@ No simulator needed. These make the later flows small.
 - **What:** P6 as a rule: on a Custodial account, a hand reverse of a Transaction whose source is not `Manual` → 400. Rebalance trades: decide whether they count as manual (an Adviser pressed Rebalance) until orders exist.
 - **Changes:** one rule in `ReverseTransaction`, the matrix row for reverse, Adviser Portal hides Reverse on those rows.
 - **Depends on:** F1. Can be part of the F1 spec.
-- **Spec:** F1 and F4 are one spec, [transaction-source.md](features/transaction-source.md) (accepted 2026-11-19). Its §11 records the decisions that refine this section: the reverse rule is Custodial-only; `Seed` is not hand-reversible; the seed back-fill matches the exact seed references, not the `TestSeed-` prefix; existing `rb:` references are cleared; the source id of a rebalance trade is the rebalance handle; the Customer Transactions Report does not show the source yet.
+- **Spec:** F1 and F4 are one spec, [transaction-source.md](features/transaction-source.md) (accepted and landed 2026-11-19). Its §11 records the decisions that refine this section: the reverse rule is Custodial-only; `Seed` is not hand-reversible; the seed back-fill matches the exact seed references, not the `TestSeed-` prefix; existing `rb:` references are cleared; the source id of a rebalance trade is the rebalance handle; the Customer Transactions Report does not show the source yet.
 
 ---
 
@@ -423,7 +423,7 @@ Each step depends only on earlier steps. "Closes" names the matrix cell or known
 | Step | Items | Simulator | Closes | Spec | Status |
 | --- | --- | --- | --- | --- | --- |
 | 0 | Custody mode slices 1–5 | — | — | custody-modes and four others | landed 2026-11-19 |
-| 1 | F1 Transaction source, F4 reverse by source | — | Rebalance id leak | [transaction-source](features/transaction-source.md) | spec accepted 2026-11-19 |
+| 1 | F1 Transaction source, F4 reverse by source | — | Rebalance id leak | [transaction-source](features/transaction-source.md) | accepted 2026-11-19, landed 2026-11-19 |
 | 2 | F2 ADR, S0 skeleton | S0 | — | — | not started |
 | 3 | F3 Adjustment (no review) | — | "No correction other than reverse" | — | not started |
 | 4 | B1 client money accounts, B2 deposit reference | — | — | — | not started |

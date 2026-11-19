@@ -26,7 +26,9 @@ Amendment to the ledger on `webapi`: [posting.md](posting.md), [portfolios.md](p
 
 No new route, no new policy, no new `TransactionType`, no problem code. Script `0035_transaction_source.sql` adds two columns to `Transactions` and back-fills them.
 
-**Status is `accepted` (2026-11-19).** Implementation follows this file. Not landed yet. The eight points of §11 were confirmed as recommended.
+**Status is `accepted` (2026-11-19), landed 2026-11-19.** The eight points of §11 were confirmed as recommended.
+
+One test of §10 did not land: "`POST /portfolios/{id}/rebalance` → every trade of an account has the `handle` of that account in the 202 body". The rebalance job cannot post a trade today, whatever its source. The Worker's `IUser` (`SystemUser`) has no id, so the audit columns leave `Transactions.CreatedBy` null and the insert fails. That is a separate defect of the asynchronous rebalance, not of this slice. `AccountRebalancer` writes the handle it is given for every caller; assign and `POST /accounts/{id}/rebalance` cover that. Add the test with the fix for the job's audit user.
 
 ---
 
