@@ -1,6 +1,6 @@
 ---
 title: Adjustments
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -30,7 +30,7 @@ New ledger write on `webapi`. It is step 3 of [custodial-roadmap.md](../custodia
 
 One new `TransactionType` (`Adjustment`), one new route (`POST /transactions/adjustment`), one new permission (`transactions.adjust`, TenantAdmin only), one new item field (`adjustment`). Script `0037_adjustments.sql` widens the type check and adds `TransactionAdjustmentDetails`. No new source kind and no problem code.
 
-**Status is `review`.** The points in §11 "To confirm" need an answer before this spec can be `accepted`.
+**Status is `accepted` (2026-11-19).** The eight points of §11 were confirmed as recommended. Not landed yet.
 
 ---
 
@@ -301,7 +301,7 @@ Reason labels, used by both portals and the report:
 | `ReconciliationBreak` | Reconciliation |
 | `Other` | Other |
 
-**Adviser Portal** (proposed acceptance rows, numbered after D27)
+**Adviser Portal** (acceptance rows D28–D31 of the page contract)
 
 | ID | Behaviour |
 | --- | --- |
@@ -356,18 +356,18 @@ No new ADR. Roadmap F3, principle P6 and decision D5 gave the direction.
 | Script | `0037_adjustments.sql`, forward only |
 | Review | None in this version; no Transaction status |
 
-### To confirm before `accepted`
+### Confirmed when this spec was accepted (2026-11-19)
 
-Each point has a recommendation, already written into the rules above. The alternative is kept for the record.
+Each point was confirmed as recommended and is written into the rules above as stated here. The alternatives are kept for the record.
 
-1. **Custodial only** (R5). Recommended: refuse on External accounts. They keep every hand type (`Interest`, `StockIn`, `StockOut`, `Split`, …), so they have a correction already, and roadmap target 5 keeps them as they are. Alternative: allow on both modes, so an External account also gets a reason-coded correction.
-2. **TenantAdmin only, SystemAdmin not granted** (R2). Recommended: as roadmap F3 says, and like the four report policies that SystemAdmin does not hold. Alternative: grant SystemAdmin too, with `tenantId` on the body as on `POST /transactions`, for support through Scalar.
-3. **Reverse needs `transactions.adjust`** (R17). Recommended: yes, otherwise an Adviser could undo a TenantAdmin's correction with `transactions.create`. Alternative: any caller with `transactions.create` may reverse it, as every other `Manual` row.
-4. **Source `Manual`, no `Adjustment` source kind** (R4). Recommended: the type already says what the Transaction is, and transaction-source R4 says a person's write is `Manual`. Roadmap F1 listed an `Adjustment` kind; this spec drops it. Alternative: a new kind `Adjustment` (3), which widens the source check in `0037`.
-5. **Reason list** (R7). Recommended: four values. `Rounding` is left out because R9 refuses sub-unit cash (`CloseOut` still covers that), and a firm's compensation payment is real money in, which later comes through the bank feed (roadmap B4). Alternative: a longer list now, or a free-text reason.
-6. **Holding change as two signed deltas** (R10, R13). Recommended: `quantityChange` and `costChange`, which is what the security leg stores and what a reverse undoes. Alternative: the target quantity and cost (like `Split` sends the new total), which is easier to type from a statement but depends on the balance the caller saw.
-7. **Not subject to the trade lock** (R16). Recommended: an adjustment corrects the record, it does not trade, the same as corporate actions later (roadmap C1). Alternative: apply portfolios R18, so a TenantAdmin must unassign first.
-8. **Reason not shown in the Customer Portal, shown in the report** (§9, R23). Recommended: the report is the formal statement and names why; the portal keeps its labels short. Alternative: show the reason in both, or in neither.
+1. **Custodial only** (R5). Decided: refuse on External accounts. They keep every hand type (`Interest`, `StockIn`, `StockOut`, `Split`, …), so they have a correction already, and roadmap target 5 keeps them as they are. Alternative: allow on both modes, so an External account also gets a reason-coded correction.
+2. **TenantAdmin only, SystemAdmin not granted** (R2). Decided: as roadmap F3 says, and like the four report policies that SystemAdmin does not hold. Alternative: grant SystemAdmin too, with `tenantId` on the body as on `POST /transactions`, for support through Scalar.
+3. **Reverse needs `transactions.adjust`** (R17). Decided: yes, otherwise an Adviser could undo a TenantAdmin's correction with `transactions.create`. Alternative: any caller with `transactions.create` may reverse it, as every other `Manual` row.
+4. **Source `Manual`, no `Adjustment` source kind** (R4). Decided: the type already says what the Transaction is, and transaction-source R4 says a person's write is `Manual`. Roadmap F1 listed an `Adjustment` kind; this spec drops it. Alternative: a new kind `Adjustment` (3), which widens the source check in `0037`.
+5. **Reason list** (R7). Decided: four values. `Rounding` is left out because R9 refuses sub-unit cash (`CloseOut` still covers that), and a firm's compensation payment is real money in, which later comes through the bank feed (roadmap B4). Alternative: a longer list now, or a free-text reason.
+6. **Holding change as two signed deltas** (R10, R13). Decided: `quantityChange` and `costChange`, which is what the security leg stores and what a reverse undoes. Alternative: the target quantity and cost (like `Split` sends the new total), which is easier to type from a statement but depends on the balance the caller saw.
+7. **Not subject to the trade lock** (R16). Decided: an adjustment corrects the record, it does not trade, the same as corporate actions later (roadmap C1). Alternative: apply portfolios R18, so a TenantAdmin must unassign first.
+8. **Reason not shown in the Customer Portal, shown in the report** (§9, R23). Decided: the report is the formal statement and names why; the portal keeps its labels short. Alternative: show the reason in both, or in neither.
 
 Still open, not this slice:
 
@@ -392,6 +392,6 @@ The repository should build after each commit. Agents split each behaviour into 
 
 Do not put a review status, an operations role, a reconciliation or a new source kind in these commits.
 
-### Docs amended when this spec is accepted
+### Docs amended when this spec was accepted
 
 [posting.md](posting.md) (amendment note; R16 type set), [holdings.md](holdings.md) (amendment note: a holding change outside the trade types), [custody-modes.md](custody-modes.md) (matrix row `Adjustment`), [portfolios.md](portfolios.md) (R18 does not apply), [reports.md](reports.md) (§9.1 type cell), [api-design.md](../api-design.md) (§3.1 permission row, §7.7 route and item note, change log), [domain-model.md](../domain-model.md) §8.6, [database-design.md](../database-design.md) §9 and §11.4, [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D28–D31), [customer-portal.md](../customer-portal/customer-portal.md) (label), [function-plan.md](../function-plan.md) §9 item, [features/README.md](README.md) row status, the roadmap §13 status.

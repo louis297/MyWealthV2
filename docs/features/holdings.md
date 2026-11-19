@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-28
-last_updated: 2026-11-17
+last_updated: 2026-11-19
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -39,6 +39,8 @@ Buy / Sell / StockIn / StockOut are accepted in [buy-sell.md](buy-sell.md). Spli
 **Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R15: a Transaction with a security leg can be reversed only while it is the latest security activity on each of its holdings. R18 follows posting R24, which now refuses a `bookedAt` in the future.
 
 **Amendment 2026-11-17 (custody modes, accepted, landed):** [custody-modes.md](custody-modes.md). R8: `OpeningHoldings` is refused on a Custodial account (400 with `errors.Type`). A Custodial account starts empty and gets its positions from `Buy`. R6 is unchanged; a Custodial account is always `Brokerage`. R18 follows posting R24 as amended there. The projection, the cost rule and the holdings read are the same for both custody modes.
+
+**Amendment 2026-11-19 (adjustments, accepted):** [adjustments.md](adjustments.md) R10–R13. On a Custodial account a TenantAdmin may change one holding with an `Adjustment`: a security leg that stores the signed `quantityChange` and `costChange` as entered (no price, no average-cost release). After it, quantity `≥ 0` and cost `≥ 0`, and a zero quantity has zero cost, so the projection row can be deleted at zero (R14). A disabled instrument is allowed only when the Account already holds it (R7 otherwise). An adjustment counts as security activity for R15.
 
 ---
 

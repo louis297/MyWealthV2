@@ -215,6 +215,16 @@ The note, used word for word wherever it appears (the same sentence is in the Cu
 | C16 | Customer | Accounts list | Two groups, "Held on platform" first, then "Held elsewhere", from the two filtered requests. A group with no accounts is not shown; both empty → "No accounts.". The note is under the "Held elsewhere" heading. The table columns are unchanged (C13). |
 | C17 | Customer | Account page | An External account shows the note under the "Custody" field. A Custodial account shows no note. |
 
+
+---
+
+## Amendment 2026-11-19 (adjustments) — accepted
+
+Status of this amendment: `accepted` (2026-11-19), together with [adjustments](../features/adjustments.md). No new call; the BFF does not change.
+
+| Id | Given | When | Then |
+| --- | --- | --- | --- |
+| C18 | Customer with an `Adjustment` on a Custodial account | Account page activity | The row is labelled "Adjustment" and shows its memo and amount like any other row. The reason is not shown. Its Reversal stays "Reversal". |
 ---
 
 ## Tests

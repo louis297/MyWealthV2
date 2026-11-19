@@ -130,6 +130,7 @@ The fifth role `SimulatorOperator` ([ADR 0013](adr/0013-roles-authorization-sing
 | `accounts.manage` | ✓ | ✓ | ✓ | | [accounts](features/accounts.md) |
 | `transactions.read` | ✓ | ✓ | ✓ | ✓ | [posting](features/posting.md); Customer: Customer Portal amendment 2026-11-02 |
 | `transactions.create` | ✓ | ✓ | ✓ | | [posting](features/posting.md) |
+| `transactions.adjust` | | ✓ | | | [adjustments](features/adjustments.md) (accepted 2026-11-19) |
 | `portfolios.read` | ✓ | ✓ | ✓ | | [portfolios](features/portfolios.md) |
 | `portfolios.manage` | ✓ | ✓ | ✓ | | [portfolios](features/portfolios.md) |
 | `reports.customer.read` | | ✓ | ✓ | ✓ | [reports](features/reports.md) |
@@ -453,6 +454,7 @@ Field rules: [features/posting.md](features/posting.md) for cash types, [feature
 | POST | `/transactions/transfer` | `transactions.create` | 201 `{ id }` |
 | POST | `/transactions/fx` | `transactions.create` | 201 `{ id }` |
 | POST | `/transactions/fx/quote` | `transactions.create` | 200 quote |
+| POST | `/transactions/adjustment` | `transactions.adjust` | 201 `{ id }` |
 | POST | `/transactions/{id}/reverse` | `transactions.create` | 201 `{ id }` |
 
 - Create and reverse require `Idempotency-Key` ([ADR 0015](adr/0015-idempotency-keys.md)).
@@ -463,10 +465,11 @@ Field rules: [features/posting.md](features/posting.md) for cash types, [feature
 - Amendment 2026-11-17 (custody modes, accepted, landed; field rules in [features/custody-modes.md](features/custody-modes.md)): the Account's custody mode decides what a create body may carry. On a Custodial account `POST /transactions` refuses `Interest`, `Opening`, `OpeningHoldings`, `StockIn`, `StockOut`, `Split`, `Bonus` and `Scrip` (400 `errors.Type`), and the server sets `bookedAt`: a body that sends it to `POST /transactions`, `/transactions/transfer`, `/transactions/fx` or `/transactions/fx/quote` → 400 `errors.BookedAt`. On an External account `bookedAt` stays required. A transfer, conversion or quote between a Custodial and an External account → 400 `errors.ToAccountId`. All are field 400s with no problem code.
 - Amendment 2026-11-18 (External caller numbers, accepted, landed; field rules in [features/external-caller-numbers.md](features/external-caller-numbers.md)): on an External account `POST /transactions` `Buy` / `Sell` require `security[0].price` (executed price), accept an optional `fee`, and require the new `fxRate` when the instrument's quote currency differs from the Account currency; no price, rate or schedule is read. On a Custodial account all three → 400. `POST /transactions/fx` between External Accounts requires both `sellAmount` and `buyAmount` and refuses `expectedRate`; the rate is derived. `POST /transactions/fx/quote` between External Accounts → 400 `errors.FromAccountId`. The item shape does not change: `fee.scheduleId` is `null` for an entered fee, and `fx` is filled for an External `Buy` / `Sell` with a rate. No new route, policy or problem code.
 - Amendment 2026-11-19 (transaction source, accepted; field rules in [features/transaction-source.md](features/transaction-source.md)): the item gains `source: { kind, id }` (`Manual`, `Seed` or `Rebalance`; `id` is the rebalance handle on a rebalance trade, else `null`). No body or query field. Rebalance trades have `reference: null`. On a Custodial account `POST /transactions/{id}/reverse` of a Transaction whose source is not `Manual` or `Rebalance` → 400.
+- Amendment 2026-11-19 (adjustments, accepted; field rules in [features/adjustments.md](features/adjustments.md)): `POST /transactions/adjustment` (`transactions.adjust`, TenantAdmin only) posts an `Adjustment` on one Custodial account: optional signed `amount`, optional `security` `{ instrumentId, quantityChange, costChange }`, required `reason` and `memo`; no `bookedAt`, `tenantId` or currency. External account → 400 `errors.AccountId`. `POST /transactions` refuses `Adjustment`. Reverse of an `Adjustment` without `transactions.adjust` → 403. The item gains `adjustment: { reason }` (`null` on other types). No problem code.
 
 **Type-specific create routes.** When a type's create body differs from the common shape (one top-level `accountId`), that type gets its own `POST /transactions/{action}`. Each type has exactly one create route: a type with its own route is rejected by `POST /transactions` (400). Read (`GET /transactions`, `GET /transactions/{id}`) and reverse (`POST /transactions/{id}/reverse`) stay shared by every type. Every new type gets its own `POST /transactions/{action}` route, whatever its body shape (decided 2026-11-10). Existing types keep `POST /transactions` until each is moved in its own spec amendment ([future-plans.md](future-plans.md) §4).
 
-Type-specific routes: `POST /transactions/transfer` for `InternalTransfer` ([features/internal-transfers.md](features/internal-transfers.md)); `POST /transactions/fx` for `FxConversion` and the read-only `POST /transactions/fx/quote` ([features/fx-conversions.md](features/fx-conversions.md)). The quote is a `POST` because it takes the create body and the same validation; it writes nothing, takes no `Idempotency-Key` and holds no rate. Create confirms the quoted rate with `expectedRate`; a different stored rate → 409 with `expectedRate` in `errors`.
+Type-specific routes: `POST /transactions/transfer` for `InternalTransfer` ([features/internal-transfers.md](features/internal-transfers.md)); `POST /transactions/fx` for `FxConversion` and the read-only `POST /transactions/fx/quote` ([features/fx-conversions.md](features/fx-conversions.md)); `POST /transactions/adjustment` for `Adjustment` ([features/adjustments.md](features/adjustments.md)). The quote is a `POST` because it takes the create body and the same validation; it writes nothing, takes no `Idempotency-Key` and holds no rate. Create confirms the quoted rate with `expectedRate`; a different stored rate → 409 with `expectedRate` in `errors`.
 
 ---
 
@@ -593,3 +596,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-18 | §7 catalog, §7.8: grouping by custody mode accepted. |
 | 2026-11-19 | §7 catalog, §7.8: grouping by custody mode landed. |
 | 2026-11-19 | §1, §3.1: simulator accepted. A third process with its own control and party surfaces; role `SimulatorOperator` has no permission and gets 401 on `webapi`. No `webapi` route or policy added ([features/simulator.md](features/simulator.md)). |
+| 2026-11-19 | §3.1, §7.7: adjustments accepted. New permission `transactions.adjust` (TenantAdmin only), route `POST /transactions/adjustment`, item field `adjustment`, 403 on reverse of an `Adjustment` without the permission. No problem code. |
