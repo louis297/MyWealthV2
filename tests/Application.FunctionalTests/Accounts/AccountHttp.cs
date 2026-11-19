@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using MyWealthV2.Application.FunctionalTests.ClientMoneyAccounts;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Infrastructure.Identity;
@@ -55,7 +56,9 @@ internal static class AccountHttp
 
     /// <summary>
     /// Opens an account through <c>POST /accounts</c> and returns its PublicId. Every functional test that
-    /// needs an account opens it here, so a change to the create body lands in one place.
+    /// needs an account opens it here, so a change to the create body lands in one place. A Custodial account
+    /// first gets an active client money account in its currency for the Customer's tenant
+    /// (client-money-accounts R11).
     /// </summary>
     public static async Task<Guid> OpenAccountAsync(
         string accessToken,
@@ -65,6 +68,11 @@ internal static class AccountHttp
         string currency = "NZD",
         string custodyMode = "External")
     {
+        if (string.Equals(custodyMode, "Custodial", StringComparison.Ordinal))
+        {
+            await ClientMoneyHttp.EnsureActiveForCustomerAsync(customerId, currency);
+        }
+
         var response = await Send(HttpMethod.Post, "/accounts", accessToken, new
         {
             customerId,

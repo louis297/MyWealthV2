@@ -75,8 +75,10 @@ internal static class ClientMoneyHttp
         }
 
         var catalogCurrency = await db.Set<Currency>().AsNoTracking().SingleAsync(row => row.Code == code);
-        db.ClientMoneyAccounts.Add(ClientMoneyAccount.Create(
-            tenantId, catalogCurrency, "Simulator Bank", "Test Client Funds Trust Account", $"T{tenantId}-{code}"));
+        var row = ClientMoneyAccount.Create(
+            tenantId, catalogCurrency, "Simulator Bank", "Test Client Funds Trust Account", $"T{tenantId}-{code}");
+        row.CreatedBy = "test";
+        db.ClientMoneyAccounts.Add(row);
         await db.SaveChangesAsync();
     }
 
