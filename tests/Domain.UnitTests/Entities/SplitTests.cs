@@ -26,6 +26,7 @@ public class SplitTests
             bookedAt: BookedAt,
             memo: "  Two for one  ",
             reference: "  split-1  ",
+            source: TestSources.Manual,
             currentQuantity: 100m,
             currentCost: 2500m);
 
@@ -61,6 +62,7 @@ public class SplitTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentQuantity: 100m,
             currentCost: 800m);
 
@@ -86,6 +88,7 @@ public class SplitTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentQuantity: 100m,
             currentCost: 2500m);
 
@@ -110,6 +113,7 @@ public class SplitTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentQuantity: 100m,
             currentCost: 2500m));
     }
@@ -133,6 +137,7 @@ public class SplitTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentQuantity: currentQuantity,
             currentCost: 2500m));
     }
@@ -152,6 +157,7 @@ public class SplitTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentQuantity: 100m,
             currentCost: 2500m));
     }
@@ -170,11 +176,13 @@ public class SplitTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentQuantity: 100m,
             currentCost: 2500m);
         var originalQuantity = original.SecurityLegs.Single().Quantity;
 
         var reversal = original.Reverse(
+            TestSources.Manual,
             BookedAt.AddDays(1),
             currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 0m },
             currentQuantity: new Dictionary<(int, int), decimal> { [(2, 11)] = 200m });
@@ -210,11 +218,13 @@ public class SplitTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentQuantity: 100m,
             currentCost: 2500m);
         var originalQuantity = original.SecurityLegs.Single().Quantity;
 
         Should.Throw<DomainException>(() => original.Reverse(
+            TestSources.Manual,
             BookedAt.AddDays(1),
             currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 0m },
             currentQuantity: new Dictionary<(int, int), decimal> { [(2, 11)] = 100m }));

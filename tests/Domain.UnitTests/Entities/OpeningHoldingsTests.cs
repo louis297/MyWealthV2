@@ -62,6 +62,7 @@ public class OpeningHoldingsTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentCashSum: 0m,
             existingTransactionCount: 0));
     }
@@ -135,6 +136,7 @@ public class OpeningHoldingsTests
             bookedAt: BookedAt,
             memo: $"  {memo}  ",
             reference: "   ",
+            source: TestSources.Manual,
             securityLegs: [OpeningSecurityLeg.Create(11, 1m, 10m, "USD")]);
 
         transaction.Memo.ShouldBe(memo);
@@ -147,6 +149,7 @@ public class OpeningHoldingsTests
             bookedAt: BookedAt,
             memo: new string('m', 201),
             reference: null,
+            source: TestSources.Manual,
             securityLegs: [OpeningSecurityLeg.Create(11, 1m, 10m, "USD")]));
     }
 
@@ -160,6 +163,7 @@ public class OpeningHoldingsTests
             bookedAt: BookedAt,
             memo: "Open VTI",
             reference: "ref",
+            source: TestSources.Manual,
             securityLegs:
             [
                 OpeningSecurityLeg.Create(11, 100m, 1500.00m, "USD"),
@@ -169,7 +173,7 @@ public class OpeningHoldingsTests
         original.ClearDomainEvents();
         var reverseAt = BookedAt.AddDays(1);
 
-        var reversal = original.Reverse(reverseAt, currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 0m });
+        var reversal = original.Reverse(TestSources.Manual, reverseAt, currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 0m });
 
         original.Type.ShouldBe(TransactionType.OpeningHoldings);
         original.Memo.ShouldBe("Open VTI");
@@ -200,9 +204,9 @@ public class OpeningHoldingsTests
     {
         var original = Post(AccountType.Brokerage, (11, 100m, 1500m, "USD"));
         original.Id = 7;
-        var reversal = original.Reverse(BookedAt.AddDays(1), currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 0m });
+        var reversal = original.Reverse(TestSources.Manual, BookedAt.AddDays(1), currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 0m });
 
-        Should.Throw<DomainException>(() => reversal.Reverse(BookedAt.AddDays(2), currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 0m }));
+        Should.Throw<DomainException>(() => reversal.Reverse(TestSources.Manual, BookedAt.AddDays(2), currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 0m }));
     }
 
     [Test]
@@ -212,6 +216,7 @@ public class OpeningHoldingsTests
         original.Id = 7;
 
         Should.Throw<DomainException>(() => original.Reverse(
+            TestSources.Manual,
             BookedAt.AddDays(1),
             currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 0m },
             currentQuantity: new Dictionary<(int, int), decimal>
@@ -231,5 +236,6 @@ public class OpeningHoldingsTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             securityLegs: legs.Select(t => OpeningSecurityLeg.Create(t.InstrumentId, t.Quantity, t.Cost, t.QuoteCurrency)));
 }

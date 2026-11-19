@@ -26,6 +26,7 @@ public class LegAccountTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentCashSum: 100m,
             existingTransactionCount: 0);
 
@@ -42,6 +43,7 @@ public class LegAccountTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             securityLegs:
             [
                 OpeningSecurityLeg.Create(11, 100m, 1500m, "USD"),
@@ -66,6 +68,7 @@ public class LegAccountTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentCashSum: 1000m);
 
         transaction.CashLegs.Single().AccountId.ShouldBe(AccountId);
@@ -87,6 +90,7 @@ public class LegAccountTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentCashSum: 0m,
             currentQuantity: 2m,
             currentCost: 20m);
@@ -108,7 +112,8 @@ public class LegAccountTests
             quoteCurrency: "USD",
             bookedAt: BookedAt,
             memo: null,
-            reference: null);
+            reference: null,
+            source: TestSources.Manual);
         var stockOut = Transaction.PostStockOut(
             tenantId: 1,
             accountId: AccountId,
@@ -119,6 +124,7 @@ public class LegAccountTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentQuantity: 2m,
             currentCost: 20m);
 
@@ -142,6 +148,7 @@ public class LegAccountTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentQuantity: 2m,
             currentCost: 20m);
 
@@ -163,10 +170,11 @@ public class LegAccountTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentCashSum: 1000m);
         original.Id = 7;
 
-        var reversal = original.Reverse(BookedAt.AddDays(1), currentCashSumByAccount: new Dictionary<int, decimal> { [42] = 980m });
+        var reversal = original.Reverse(TestSources.Manual, BookedAt.AddDays(1), currentCashSumByAccount: new Dictionary<int, decimal> { [42] = 980m });
 
         reversal.CashLegs.Single().AccountId.ShouldBe(AccountId);
         reversal.SecurityLegs.Single().AccountId.ShouldBe(AccountId);

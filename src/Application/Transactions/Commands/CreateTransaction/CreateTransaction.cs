@@ -429,6 +429,7 @@ public class CreateTransactionCommandHandler(
                     bookedAt,
                     request.Memo,
                     request.Reference,
+                    TransactionSource.Manual,
                     legs);
             }
             else if (type is TransactionType.Buy or TransactionType.Sell)
@@ -455,6 +456,7 @@ public class CreateTransactionCommandHandler(
                     bookedAt,
                     request.Memo,
                     request.Reference,
+                    TransactionSource.Manual,
                     currentSum,
                     existingCount);
             }
@@ -585,6 +587,7 @@ public class CreateTransactionCommandHandler(
                 bookedAt,
                 request.Memo,
                 request.Reference,
+                TransactionSource.Manual,
                 currentCashSum,
                 feeSchedule,
                 quoteDecimalPlaces)
@@ -600,6 +603,7 @@ public class CreateTransactionCommandHandler(
                 bookedAt,
                 request.Memo,
                 request.Reference,
+                TransactionSource.Manual,
                 currentCashSum,
                 holding?.Quantity ?? 0m,
                 holding?.CostAmount ?? 0m,
@@ -679,6 +683,7 @@ public class CreateTransactionCommandHandler(
                 bookedAt,
                 request.Memo,
                 request.Reference,
+                TransactionSource.Manual,
                 currentCashSum,
                 feeSchedule: null,
                 quoteDecimalPlaces,
@@ -696,6 +701,7 @@ public class CreateTransactionCommandHandler(
                 bookedAt,
                 request.Memo,
                 request.Reference,
+                TransactionSource.Manual,
                 currentCashSum,
                 holding?.Quantity ?? 0m,
                 holding?.CostAmount ?? 0m,
@@ -767,7 +773,8 @@ public class CreateTransactionCommandHandler(
                 quote,
                 bookedAt,
                 request.Memo,
-                request.Reference);
+                request.Reference,
+                TransactionSource.Manual);
         }
 
         var holding = await db.Holdings.SingleOrDefaultAsync(
@@ -783,6 +790,7 @@ public class CreateTransactionCommandHandler(
             bookedAt,
             request.Memo,
             request.Reference,
+            TransactionSource.Manual,
             holding?.Quantity ?? 0m,
             holding?.CostAmount ?? 0m);
     }
@@ -820,6 +828,7 @@ public class CreateTransactionCommandHandler(
             bookedAt,
             request.Memo,
             request.Reference,
+            TransactionSource.Manual,
             holding?.Quantity ?? 0m,
             holding?.CostAmount ?? 0m);
     }

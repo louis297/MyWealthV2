@@ -82,10 +82,18 @@ internal sealed class ScratchSchemaDatabase : IAsyncDisposable
     /// <c>_customer</c>, <c>_brokerage</c>, <c>_bank</c>, <c>_instrument</c>, <c>_other</c>, <c>_buy</c>,
     /// <c>_fx</c>, <c>_portfolio</c> and <c>_schedule</c>. <paramref name="code"/> makes the tenant and
     /// identity rows unique. Set <paramref name="childTenantIds"/> to false for the schema before <c>0027</c>, and
-    /// <paramref name="custodyMode"/> to false for the schema before <c>0031</c>.
+    /// <paramref name="custodyMode"/> to false for the schema before <c>0031</c>, and
+    /// <paramref name="transactionSource"/> to false for the schema before <c>0035</c>.
     /// </summary>
-    public static string TenantRows(string prefix, string code, bool childTenantIds = true, bool custodyMode = true)
+    public static string TenantRows(
+        string prefix,
+        string code,
+        bool childTenantIds = true,
+        bool custodyMode = true,
+        bool transactionSource = false)
     {
+        var sourceColumn = transactionSource ? "[SourceKind], " : "";
+        var sourceValue = transactionSource ? "0, " : "";
         var custodyColumn = custodyMode ? "[CustodyMode], " : "";
         var custodyValue = custodyMode ? "0, " : "";
         var t = $"@{prefix}_tenant";
@@ -120,16 +128,16 @@ internal sealed class ScratchSchemaDatabase : IAsyncDisposable
             VALUES (NEWID(), {t}, N'BND', N'Bonds', 'USD', SYSDATETIMEOFFSET(), N'test');
             DECLARE @{prefix}_other int = SCOPE_IDENTITY();
 
-            INSERT INTO [Transactions] ([PublicId], [TenantId], [Type], [BookedAt], [Created], [CreatedBy])
-            VALUES (NEWID(), {t}, 7, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            INSERT INTO [Transactions] ([PublicId], [TenantId], [Type], {sourceColumn}[BookedAt], [Created], [CreatedBy])
+            VALUES (NEWID(), {t}, 7, {sourceValue}SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
             DECLARE @{prefix}_buy int = SCOPE_IDENTITY();
             INSERT INTO [TransactionCashLegs] ({tenantColumn}[TransactionId], [AccountId], [Amount], [Currency], [Created], [CreatedBy])
             VALUES ({tenantValue}@{prefix}_buy, @{prefix}_brokerage, -20, 'NZD', SYSDATETIMEOFFSET(), N'test');
             INSERT INTO [TransactionSecurityLegs] ({tenantColumn}[TransactionId], [AccountId], [InstrumentId], [Quantity], [CostAmount], [CostCurrency], [Created], [CreatedBy])
             VALUES ({tenantValue}@{prefix}_buy, @{prefix}_brokerage, @{prefix}_instrument, 1, 10, 'USD', SYSDATETIMEOFFSET(), N'test');
 
-            INSERT INTO [Transactions] ([PublicId], [TenantId], [Type], [BookedAt], [Created], [CreatedBy])
-            VALUES (NEWID(), {t}, 16, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            INSERT INTO [Transactions] ([PublicId], [TenantId], [Type], {sourceColumn}[BookedAt], [Created], [CreatedBy])
+            VALUES (NEWID(), {t}, 16, {sourceValue}SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
             DECLARE @{prefix}_fx int = SCOPE_IDENTITY();
             INSERT INTO [TransactionCashLegs] ({tenantColumn}[TransactionId], [AccountId], [Amount], [Currency], [Created], [CreatedBy])
             VALUES ({tenantValue}@{prefix}_fx, @{prefix}_brokerage, -100, 'NZD', SYSDATETIMEOFFSET(), N'test'),

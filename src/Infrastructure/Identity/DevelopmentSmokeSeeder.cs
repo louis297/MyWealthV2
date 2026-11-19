@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
+using MyWealthV2.Domain.ValueObjects;
 using MyWealthV2.Infrastructure.Data;
 
 namespace MyWealthV2.Infrastructure.Identity;
@@ -97,6 +98,7 @@ public static class DevelopmentSmokeSeeder
             new DateTimeOffset(2026, 1, 15, 9, 0, 0, TimeSpan.FromHours(13)),
             "Smoke opening transfer",
             TransferInReference,
+            TransactionSource.Seed,
             currentCashSum: 0m,
             existingTransactionCount: 0);
         var created = TimeProvider.System.GetUtcNow();

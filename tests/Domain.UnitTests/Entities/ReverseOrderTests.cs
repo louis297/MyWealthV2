@@ -20,6 +20,7 @@ public class ReverseOrderTests
         var stockIn = StockIn();
 
         var exception = Should.Throw<DomainException>(() => stockIn.Reverse(
+            TestSources.Manual,
             BookedAt.AddDays(1),
             currentCashSumByAccount: new Dictionary<int, decimal>(),
             currentQuantity: new Dictionary<(int, int), decimal> { [(2, 11)] = 150m },
@@ -35,6 +36,7 @@ public class ReverseOrderTests
         var stockIn = StockIn();
 
         var reversal = stockIn.Reverse(
+            TestSources.Manual,
             BookedAt.AddDays(1),
             currentCashSumByAccount: new Dictionary<int, decimal>(),
             currentQuantity: new Dictionary<(int, int), decimal> { [(2, 11)] = 100m },
@@ -58,10 +60,12 @@ public class ReverseOrderTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentCashSum: 0m,
             existingTransactionCount: 0);
 
         var reversal = transferIn.Reverse(
+            TestSources.Manual,
             BookedAt.AddDays(1),
             currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 100m },
             hasLaterSecurityActivity: true);
@@ -81,5 +85,6 @@ public class ReverseOrderTests
             quoteCurrency: "USD",
             bookedAt: BookedAt,
             memo: null,
-            reference: null);
+            reference: null,
+            source: TestSources.Manual);
 }

@@ -35,7 +35,7 @@ public class EnteredTradeNumbersTests
         decimal currentCashSum = 100000m) =>
         Transaction.PostBuy(
             TenantId, AccountId, AccountType.Brokerage, accountCurrency, InstrumentId, quantity,
-            Money.Create(price, priceCurrency), fxRate, BookedAt, null, null, currentCashSum,
+            Money.Create(price, priceCurrency), fxRate, BookedAt, null, null, source: TestSources.Manual, currentCashSum,
             schedule, 2, enteredFee, appliedRate);
 
     private static Transaction Sell(
@@ -51,7 +51,7 @@ public class EnteredTradeNumbersTests
         decimal currentCost = 249.5m) =>
         Transaction.PostSell(
             TenantId, AccountId, AccountType.Brokerage, accountCurrency, InstrumentId, quantity,
-            Money.Create(price, priceCurrency), fxRate, BookedAt, null, null, currentCashSum,
+            Money.Create(price, priceCurrency), fxRate, BookedAt, null, null, source: TestSources.Manual, currentCashSum,
             currentQuantity, currentCost, null, 2, enteredFee, appliedRate);
 
     private static TransactionCashLeg Leg(Transaction transaction, CashLegRole role) =>
@@ -176,7 +176,7 @@ public class EnteredTradeNumbersTests
             fxRate: 1.69147m, appliedRate: CallerRate());
         buy.Id = 40;
 
-        var reversal = buy.Reverse(BookedAt.AddDays(1), new Dictionary<int, decimal> { [AccountId] = 0m });
+        var reversal = buy.Reverse(TestSources.Manual, BookedAt.AddDays(1), new Dictionary<int, decimal> { [AccountId] = 0m });
 
         Leg(reversal, CashLegRole.Principal).Amount.ShouldBe(3044.6460m);
         var fee = Leg(reversal, CashLegRole.Fee);

@@ -28,6 +28,7 @@ public class BuySellTests
             bookedAt: BookedAt,
             memo: "  First buy  ",
             reference: "  ref-1  ",
+            source: TestSources.Manual,
             currentCashSum: 2000m);
 
         transaction.TenantId.ShouldBe(1);
@@ -88,6 +89,7 @@ public class BuySellTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentCashSum: 0m,
             currentQuantity: 3m,
             currentCost: 10m);
@@ -114,6 +116,7 @@ public class BuySellTests
             bookedAt: BookedAt,
             memo: null,
             reference: " ",
+            source: TestSources.Manual,
             currentCashSum: 10m,
             currentQuantity: 2m,
             currentCost: 500.0001m);
@@ -140,7 +143,8 @@ public class BuySellTests
             quoteCurrency: "usd",
             bookedAt: BookedAt,
             memo: null,
-            reference: null);
+            reference: null,
+            source: TestSources.Manual);
 
         transaction.Type.ShouldBe(TransactionType.StockIn);
         transaction.CashLegs.ShouldBeEmpty();
@@ -161,7 +165,8 @@ public class BuySellTests
             quoteCurrency: "NZD",
             bookedAt: BookedAt,
             memo: null,
-            reference: null);
+            reference: null,
+            source: TestSources.Manual);
         zero.CashLegs.ShouldBeEmpty();
         zero.SecurityLegs.Single().CostAmount.ShouldBe(0m);
 
@@ -175,7 +180,8 @@ public class BuySellTests
             quoteCurrency: "USD",
             bookedAt: BookedAt,
             memo: null,
-            reference: null));
+            reference: null,
+            source: TestSources.Manual));
     }
 
     [Test]
@@ -191,6 +197,7 @@ public class BuySellTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentQuantity: 3m,
             currentCost: 10m);
 
@@ -212,6 +219,7 @@ public class BuySellTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentQuantity: 2m,
             currentCost: 500.0001m);
         full.CashLegs.ShouldBeEmpty();
@@ -228,6 +236,7 @@ public class BuySellTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentQuantity: 0m,
             currentCost: 0m));
         Should.Throw<DomainException>(() => Transaction.PostStockOut(
@@ -240,6 +249,7 @@ public class BuySellTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentQuantity: 3m,
             currentCost: 10m));
         Should.Throw<DomainException>(() => Transaction.PostSell(
@@ -254,6 +264,7 @@ public class BuySellTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentCashSum: 0m,
             currentQuantity: 3m,
             currentCost: 10m));
@@ -277,6 +288,7 @@ public class BuySellTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentCashSum: 100m));
         Should.Throw<DomainException>(() => Transaction.PostSell(
             tenantId: 1,
@@ -290,6 +302,7 @@ public class BuySellTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentCashSum: 0m,
             currentQuantity: 5m,
             currentCost: 50m));
@@ -303,7 +316,8 @@ public class BuySellTests
             quoteCurrency: "USD",
             bookedAt: BookedAt,
             memo: null,
-            reference: null));
+            reference: null,
+            source: TestSources.Manual));
         Should.Throw<DomainException>(() => Transaction.PostStockOut(
             tenantId: 1,
             accountId: 2,
@@ -314,6 +328,7 @@ public class BuySellTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentQuantity: 5m,
             currentCost: 50m));
     }
@@ -340,6 +355,7 @@ public class BuySellTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentCashSum: 0m,
             currentQuantity: 5m,
             currentCost: 50m));
@@ -355,6 +371,7 @@ public class BuySellTests
         var originalCost = originalLeg.CostAmount;
 
         var reversal = original.Reverse(
+            TestSources.Manual,
             BookedAt.AddDays(1),
             currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 500m },
             currentQuantity: new Dictionary<(int, int), decimal> { [(2, 11)] = 2m });
@@ -405,11 +422,13 @@ public class BuySellTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentCashSum: 0m,
             currentQuantity: 3m,
             currentCost: 10m);
         var sellCash = sell.CashLegs.Single().Amount;
         Should.Throw<DomainException>(() => sell.Reverse(
+            TestSources.Manual,
             BookedAt,
             currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 10m },
             currentQuantity: new Dictionary<(int, int), decimal> { [(2, 11)] = 2m }));
@@ -419,6 +438,7 @@ public class BuySellTests
         var buy = PostBuy(quantity: 2m, price: 10m, priceCurrency: "USD", accountCurrency: "USD", fxRate: 1m);
         var buyQuantity = buy.SecurityLegs.Single().Quantity;
         Should.Throw<DomainException>(() => buy.Reverse(
+            TestSources.Manual,
             BookedAt,
             currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 1000m },
             currentQuantity: new Dictionary<(int, int), decimal> { [(2, 11)] = 1m }));
@@ -445,5 +465,6 @@ public class BuySellTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentCashSum: currentCashSum);
 }

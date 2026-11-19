@@ -235,6 +235,7 @@ internal static class FeeHttp
             DateTimeOffset.Parse(At(tradeDate)),
             memo: null,
             reference: null,
+            source: TransactionSource.Manual,
             currentCashSum: cash);
         buy.CreatedBy = "test";
         buy.CashLegs.ForEach(leg => leg.CreatedBy = "test");

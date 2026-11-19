@@ -7,6 +7,7 @@ using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Exceptions;
+using MyWealthV2.Domain.ValueObjects;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationException;
 
@@ -134,7 +135,7 @@ public class ReverseTransactionCommandHandler(
         try
         {
             reversal = loaded.Transaction.Reverse(
-                time.GetUtcNow(), currentSums, currentQuantities, hasLaterSecurityActivity);
+                TransactionSource.Manual, time.GetUtcNow(), currentSums, currentQuantities, hasLaterSecurityActivity);
         }
         catch (DomainException exception)
         {

@@ -431,6 +431,7 @@ public static class TestSeed
                 new DateTimeOffset(2026, 1, 20, 10, 0, 0, nzdt),
                 "Demo custodial funding",
                 DemoCustodialFundingReference,
+                TransactionSource.Seed,
                 currentCashSum: await CashSumAsync(db, account.Id, cancellationToken),
                 existingTransactionCount: 0);
             Stamp(funding, funding.CashLegs.Single());
@@ -490,6 +491,7 @@ public static class TestSeed
             bookedAt,
             memo: "Demo custodial buy",
             reference: reference,
+            TransactionSource.Seed,
             currentCashSum: await CashSumAsync(db, account.Id, cancellationToken));
         Stamp(transaction, transaction.CashLegs.Single());
         foreach (var leg in transaction.SecurityLegs)
@@ -595,6 +597,7 @@ public static class TestSeed
             bookedAt,
             "Demo opening holdings",
             DemoBrokerageOpeningReference,
+            TransactionSource.Seed,
             [OpeningSecurityLeg.Create(vti.Id, 10m, 2500.00m, vti.QuoteCurrency)]);
         var holding = Holding.Create(tenantId, account.Id, vti.Id, 10m, 2500.00m, vti.QuoteCurrency);
         var created = TimeProvider.System.GetUtcNow();
@@ -640,6 +643,7 @@ public static class TestSeed
             bookedAt,
             "Demo brokerage funding",
             DemoBrokerageFundingReference,
+            TransactionSource.Seed,
             currentCashSum: await CashSumAsync(db, account.Id, cancellationToken),
             existingTransactionCount: 1);
         Stamp(transaction, transaction.CashLegs.Single());
@@ -694,6 +698,7 @@ public static class TestSeed
             bookedAt,
             memo: "Demo brokerage buy",
             reference: DemoBrokerageBuyReference,
+            TransactionSource.Seed,
             currentCashSum: await CashSumAsync(db, account.Id, cancellationToken));
         Stamp(transaction, transaction.CashLegs.Single());
         foreach (var leg in transaction.SecurityLegs)
@@ -735,7 +740,8 @@ public static class TestSeed
             quoteCurrency: vti.QuoteCurrency,
             bookedAt,
             memo: "Demo brokerage stock in",
-            reference: DemoBrokerageStockInReference);
+            reference: DemoBrokerageStockInReference,
+            TransactionSource.Seed);
         Stamp(transaction);
         foreach (var leg in transaction.SecurityLegs)
         {
@@ -788,6 +794,7 @@ public static class TestSeed
             bookedAt,
             memo: "Demo brokerage split",
             reference: DemoBrokerageSplitReference,
+            TransactionSource.Seed,
             currentQuantity: quantity,
             currentCost: cost);
         Stamp(split);
@@ -924,6 +931,7 @@ public static class TestSeed
             bookedAt,
             "Demo opening transfer",
             DemoEverydayBankTransferReference,
+            TransactionSource.Seed,
             currentCashSum: 0m,
             existingTransactionCount: 0);
         var created = TimeProvider.System.GetUtcNow();

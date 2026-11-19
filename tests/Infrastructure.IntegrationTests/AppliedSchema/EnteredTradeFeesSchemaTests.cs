@@ -91,7 +91,7 @@ public class EnteredTradeFeesSchemaTests
             var bookedAt = new DateTimeOffset(2026, 11, 17, 22, 30, 0, TimeSpan.Zero);
             var buy = Transaction.PostBuy(
                 tenant.Id, account.Id, AccountType.Brokerage, "NZD", instrument.Id, 10m,
-                Money.Create(180.00m, "USD"), 1.69147m, bookedAt, null, null, 10000m,
+                Money.Create(180.00m, "USD"), 1.69147m, bookedAt, null, null, source: TransactionSource.Manual, 10000m,
                 enteredFee: 9.95m,
                 appliedRate: AppliedFxRate.Create("USD", "NZD", 1.69147m, new DateOnly(2026, 11, 17), AppliedFxRate.CallerSource));
             db.Transactions.Add(buy);

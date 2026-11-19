@@ -164,6 +164,7 @@ public class FxConversionTests
         original.Id = 7;
 
         var reversal = original.Reverse(
+            TestSources.Manual,
             BookedAt.AddDays(1),
             new Dictionary<int, decimal> { [FromAccountId] = 0m, [ToAccountId] = 591.20m });
 
@@ -189,6 +190,7 @@ public class FxConversionTests
         original.Id = 7;
 
         Should.Throw<DomainException>(() => original.Reverse(
+            TestSources.Manual,
             BookedAt.AddDays(1),
             new Dictionary<int, decimal> { [FromAccountId] = 0m, [ToAccountId] = 591.19m }));
     }
@@ -197,10 +199,11 @@ public class FxConversionTests
     public void Reverse_OfAnotherType_HasNoFxDetail()
     {
         var original = Transaction.PostInternalTransfer(
-            1, FromAccountId, "NZD", CustodyMode.External, ToAccountId, "NZD", CustodyMode.External, Money.Create(10m, "NZD"), BookedAt, null, null, 100m);
+            1, FromAccountId, "NZD", CustodyMode.External, ToAccountId, "NZD", CustodyMode.External, Money.Create(10m, "NZD"), BookedAt, null, null, source: TestSources.Manual, 100m);
         original.Id = 8;
 
         var reversal = original.Reverse(
+            TestSources.Manual,
             BookedAt.AddDays(1),
             new Dictionary<int, decimal> { [FromAccountId] = 90m, [ToAccountId] = 10m });
 
@@ -253,5 +256,6 @@ public class FxConversionTests
             bookedAt: BookedAt,
             memo: "USD for US ETF",
             reference: null,
+            source: TestSources.Manual,
             fromCurrentCashSum: fromCashSum);
 }

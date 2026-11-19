@@ -28,6 +28,9 @@ public class Transaction : BaseAuditableEntity
 
     public byte[] RowVersion { get; private set; } = null!;
 
+    /// <summary>The process that wrote this Transaction (transaction-source R2). Set by the factory or <see cref="Reverse"/>.</summary>
+    public TransactionSource Source => TransactionSource.Manual;
+
     public List<TransactionCashLeg> CashLegs { get; private set; } = [];
 
     public List<TransactionSecurityLeg> SecurityLegs { get; private set; } = [];
@@ -47,6 +50,7 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
+        TransactionSource source,
         decimal currentCashSum,
         int existingTransactionCount)
     {
@@ -108,6 +112,7 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
+        TransactionSource source,
         decimal fromCurrentCashSum)
     {
         if (fromAccountId == toAccountId)
@@ -175,6 +180,7 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
+        TransactionSource source,
         decimal fromCurrentCashSum)
     {
         if (fromAccountId == toAccountId)
@@ -239,6 +245,7 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
+        TransactionSource source,
         decimal fromCurrentCashSum)
     {
         if (fromAccountId == toAccountId)
@@ -359,6 +366,7 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
+        TransactionSource source,
         IEnumerable<OpeningSecurityLeg> securityLegs)
     {
         if (accountType is not AccountType.Brokerage and not AccountType.Other)
@@ -405,6 +413,7 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
+        TransactionSource source,
         decimal currentCashSum,
         TradeFeeSchedule? feeSchedule = null,
         int quoteDecimalPlaces = 2,
@@ -456,6 +465,7 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
+        TransactionSource source,
         decimal currentCashSum,
         decimal currentQuantity,
         decimal currentCost,
@@ -508,7 +518,8 @@ public class Transaction : BaseAuditableEntity
         string quoteCurrency,
         DateTimeOffset bookedAt,
         string? memo,
-        string? reference)
+        string? reference,
+        TransactionSource source)
     {
         EnsureSecurityAccount(accountType);
         if (cost < 0)
@@ -544,6 +555,7 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
+        TransactionSource source,
         decimal currentQuantity,
         decimal currentCost)
     {
@@ -579,6 +591,7 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
+        TransactionSource source,
         decimal currentQuantity,
         decimal currentCost)
     {
@@ -629,6 +642,7 @@ public class Transaction : BaseAuditableEntity
     /// this Transaction's holdings (fixes/ledger-write-guards.md Decision 1).
     /// </summary>
     public Transaction Reverse(
+        TransactionSource source,
         DateTimeOffset bookedAt,
         IReadOnlyDictionary<int, decimal> currentCashSumByAccount,
         IReadOnlyDictionary<(int AccountId, int InstrumentId), decimal>? currentQuantity = null,

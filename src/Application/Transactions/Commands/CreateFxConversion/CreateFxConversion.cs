@@ -310,6 +310,7 @@ public class CreateFxConversionCommandHandler(
                 bookedAt,
                 request.Memo,
                 request.Reference,
+                TransactionSource.Manual,
                 fromSum);
         }
         catch (DomainException exception)
@@ -370,6 +371,7 @@ public class CreateFxConversionCommandHandler(
                 bookedAt,
                 request.Memo,
                 request.Reference,
+                TransactionSource.Manual,
                 fromSum);
         }
         catch (DomainException exception)

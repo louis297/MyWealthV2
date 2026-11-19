@@ -24,6 +24,7 @@ public class TransactionTests
             bookedAt: bookedAt,
             memo: "Salary",
             reference: null,
+            source: TestSources.Manual,
             currentCashSum: 0m,
             existingTransactionCount: 0);
 
@@ -119,6 +120,7 @@ public class TransactionTests
             bookedAt: new DateTimeOffset(2026, 9, 24, 9, 0, 0, TimeSpan.FromHours(12)),
             memo: "  Salary  ",
             reference: "   ",
+            source: TestSources.Manual,
             currentCashSum: 0m,
             existingTransactionCount: 0);
 
@@ -140,7 +142,7 @@ public class TransactionTests
     {
         var original = Post(TransactionType.TransferIn, 100m, currentCashSum: 0m, existingTransactionCount: 0);
         var bookedAt = original.BookedAt;
-        original.Reverse(bookedAt.AddDays(1), currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 100m });
+        original.Reverse(TestSources.Manual, bookedAt.AddDays(1), currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 100m });
 
         original.Type.ShouldBe(TransactionType.TransferIn);
         original.CashLegs.ShouldAllBe(leg => leg.AccountId == 2);
@@ -161,7 +163,7 @@ public class TransactionTests
         original.ClearDomainEvents();
         var bookedAt = new DateTimeOffset(2026, 9, 25, 10, 0, 0, TimeSpan.Zero);
 
-        var reversal = original.Reverse(bookedAt, currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 100m });
+        var reversal = original.Reverse(TestSources.Manual, bookedAt, currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 100m });
 
         original.Type.ShouldBe(TransactionType.TransferIn);
         original.CashLegs.Single().Amount.ShouldBe(100m);
@@ -182,6 +184,7 @@ public class TransactionTests
         reversal.DomainEvents.OfType<TransactionPosted>().ShouldBeEmpty();
 
         Should.Throw<DomainException>(() => original.Reverse(
+            TestSources.Manual,
             bookedAt.AddMinutes(1),
             currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 100m }));
     }
@@ -192,10 +195,12 @@ public class TransactionTests
         var original = Post(TransactionType.TransferIn, 100m, currentCashSum: 0m, existingTransactionCount: 0);
         original.Id = 7;
         var reversal = original.Reverse(
+            TestSources.Manual,
             new DateTimeOffset(2026, 9, 25, 10, 0, 0, TimeSpan.Zero),
             currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 100m });
 
         Should.Throw<DomainException>(() => reversal.Reverse(
+            TestSources.Manual,
             new DateTimeOffset(2026, 9, 25, 11, 0, 0, TimeSpan.Zero),
             currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 0m }));
     }
@@ -206,6 +211,7 @@ public class TransactionTests
         var original = Post(TransactionType.TransferIn, 100m, currentCashSum: 0m, existingTransactionCount: 0);
 
         Should.Throw<DomainException>(() => original.Reverse(
+            TestSources.Manual,
             new DateTimeOffset(2026, 9, 25, 10, 0, 0, TimeSpan.Zero),
             currentCashSumByAccount: new Dictionary<int, decimal> { [2] = 20m }));
     }
@@ -234,6 +240,7 @@ public class TransactionTests
             bookedAt: new DateTimeOffset(2026, 9, 24, 9, 0, 0, TimeSpan.FromHours(12)),
             memo: memo,
             reference: reference,
+            source: TestSources.Manual,
             currentCashSum: 0m,
             existingTransactionCount: 0);
 
@@ -251,6 +258,7 @@ public class TransactionTests
             bookedAt: new DateTimeOffset(2026, 9, 24, 9, 0, 0, TimeSpan.FromHours(12)),
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentCashSum: currentCashSum,
             existingTransactionCount: existingTransactionCount);
 }

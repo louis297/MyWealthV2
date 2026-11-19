@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
+using MyWealthV2.Domain.ValueObjects;
 using MyWealthV2.Infrastructure.Data;
 
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
@@ -141,6 +142,7 @@ public class CashAmountDecimalPlacesTests : TestBase
             DateTimeOffset.Parse(BookedAt),
             memo: null,
             reference: null,
+            source: TransactionSource.Manual,
             currentCashSum: 0m,
             existingTransactionCount: 0);
         transaction.CreatedBy = "test";

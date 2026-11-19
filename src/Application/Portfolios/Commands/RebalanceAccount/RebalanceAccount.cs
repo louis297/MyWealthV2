@@ -115,12 +115,12 @@ public class AccountRebalancer(
                     transaction = trade.Buy
                         ? Domain.Entities.Transaction.PostBuy(
                             account.TenantId, account.Id, account.Type, account.Currency, trade.InstrumentId,
-                            trade.Quantity, price, trade.QuoteToAccount, now, "Rebalance", reference, cash,
-                            fee?.Schedule, fee?.DecimalPlaces ?? 2)
+                            trade.Quantity, price, trade.QuoteToAccount, now, "Rebalance", reference,
+                            TransactionSource.Rebalance(handle), cash, fee?.Schedule, fee?.DecimalPlaces ?? 2)
                         : Domain.Entities.Transaction.PostSell(
                             account.TenantId, account.Id, account.Type, account.Currency, trade.InstrumentId,
-                            trade.Quantity, price, trade.QuoteToAccount, now, "Rebalance", reference, cash,
-                            holding?.Quantity ?? 0m, holding?.CostAmount ?? 0m, fee?.Schedule, fee?.DecimalPlaces ?? 2);
+                            trade.Quantity, price, trade.QuoteToAccount, now, "Rebalance", reference,
+                            TransactionSource.Rebalance(handle), cash, holding?.Quantity ?? 0m, holding?.CostAmount ?? 0m, fee?.Schedule, fee?.DecimalPlaces ?? 2);
                 }
                 catch (DomainException exception)
                 {

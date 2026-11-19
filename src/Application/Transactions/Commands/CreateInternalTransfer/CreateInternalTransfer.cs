@@ -243,6 +243,7 @@ public class CreateInternalTransferCommandHandler(
                 bookedAt,
                 request.Memo,
                 request.Reference,
+                TransactionSource.Manual,
                 fromSum);
         }
         catch (DomainException exception)
