@@ -40,10 +40,17 @@ export type TransactionFx = {
   rateAsOfDate: string;
 };
 
+/** The process that wrote a transaction (transaction-source R10). `id` is the rebalance handle, or null. */
+export type TransactionSource = {
+  kind: string;
+  id: string | null;
+};
+
 export type Transaction = {
   id: string;
   tenantId: string;
   type: string;
+  source?: TransactionSource;
   /** Legs on accounts the caller can see; each carries its own account and customer. */
   cash: TransactionCash[];
   bookedAt: string;
