@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.Transactions;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 
@@ -40,6 +41,7 @@ public sealed class CustomerTransactionsReportGenerator(
                               || row.SecurityLegs.Any(leg => accountIds.Contains(leg.AccountId)))
                 .Include(row => row.CashLegs)
                 .Include(row => row.SecurityLegs)
+                .Include(row => row.AdjustmentDetail)
                 .ToListAsync(cancellationToken);
 
         var instrumentIds = transactions
@@ -76,7 +78,7 @@ public sealed class CustomerTransactionsReportGenerator(
                     transaction.BookedAt,
                     account.Status == AccountStatus.Closed,
                     account.Name,
-                    transaction.Type.ToString(),
+                    TypeCell(transaction),
                     transaction.Memo,
                     accountId,
                     account.CustodyMode.ToString()));
@@ -123,6 +125,12 @@ public sealed class CustomerTransactionsReportGenerator(
             rows,
             selected.Any(row => row.CustodyMode == nameof(CustodyMode.External))));
     }
+
+    /// <summary>Adjustments R23: an adjustment names its reason; its Reversal stays <c>Reversal</c>.</summary>
+    private static string TypeCell(Transaction transaction) =>
+        transaction.Type == TransactionType.Adjustment && transaction.AdjustmentDetail is { } detail
+            ? $"Adjustment ({AdjustmentReasonLabels.For(detail.Reason)})"
+            : transaction.Type.ToString();
 
     /// <summary>The Customer Portal label of a custody mode (custody-mode-grouping R14).</summary>
     private static string CustodyLabel(string custodyMode) => custodyMode switch
