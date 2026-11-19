@@ -30,7 +30,9 @@ New ledger write on `webapi`. It is step 3 of [custodial-roadmap.md](../custodia
 
 One new `TransactionType` (`Adjustment`), one new route (`POST /transactions/adjustment`), one new permission (`transactions.adjust`, TenantAdmin only), one new item field (`adjustment`). Script `0037_adjustments.sql` widens the type check and adds `TransactionAdjustmentDetails`. No new source kind and no problem code.
 
-**Status is `accepted` (2026-11-19).** The eight points of §11 were confirmed as recommended. Not landed yet.
+**Status is `accepted` (2026-11-19), landed 2026-11-19.** The eight points of §11 were confirmed as recommended.
+
+One change from §10 when it landed: there is no functional test of a security part on a Bank or Cash account. A Custodial account must be a Brokerage account (custody-modes R3), and R5 refuses an External account first, so the case cannot be reached through the route. The Domain test covers it.
 
 ---
 

@@ -168,7 +168,7 @@ No simulator needed. These make the later flows small.
 - **Changes:** enum value and schema `CHECK`, reason code list, `POST /transactions/adjustment` (own route, [api-design.md](api-design.md) §7.7), permission, matrix row, Adviser Portal form for TenantAdmin.
 - **Later:** review by a second person (X1). The first version has no review, so it adds no Transaction status.
 - **Depends on:** F1.
-- **Spec:** [adjustments.md](features/adjustments.md) (accepted 2026-11-19). Its §11 records the decisions that refine this section: Custodial only; `transactions.adjust` for TenantAdmin only, not SystemAdmin, and also needed to reverse an adjustment; source `Manual`, so the `Adjustment` source kind of F1 is dropped; four reasons (`EntryError`, `CorporateAction`, `ReconciliationBreak`, `Other`); the holding change as signed quantity and cost changes on one instrument; not subject to the portfolio trade lock; the reason shown in the Customer Transactions Report, not in the Customer Portal.
+- **Spec:** [adjustments.md](features/adjustments.md) (accepted and landed 2026-11-19). Its §11 records the decisions that refine this section: Custodial only; `transactions.adjust` for TenantAdmin only, not SystemAdmin, and also needed to reverse an adjustment; source `Manual`, so the `Adjustment` source kind of F1 is dropped; four reasons (`EntryError`, `CorporateAction`, `ReconciliationBreak`, `Other`); the holding change as signed quantity and cost changes on one instrument; not subject to the portfolio trade lock; the reason shown in the Customer Transactions Report, not in the Customer Portal.
 
 ### F4. Reverse by source on Custodial accounts
 
@@ -431,7 +431,7 @@ Each step depends only on earlier steps. "Closes" names the matrix cell or known
 | 0 | Custody mode slices 1–5 | — | — | custody-modes and four others | landed 2026-11-19 |
 | 1 | F1 Transaction source, F4 reverse by source | — | Rebalance id leak | [transaction-source](features/transaction-source.md) | accepted 2026-11-19, landed 2026-11-19 |
 | 2 | F2 ADR, S0 skeleton | S0 | — | [ADR 0021](adr/0021-outside-parties-behind-ports.md), [simulator](features/simulator.md) | accepted 2026-11-19, landed 2026-11-19 |
-| 3 | F3 Adjustment (no review) | — | "No correction other than reverse" | [adjustments](features/adjustments.md) | accepted 2026-11-19 |
+| 3 | F3 Adjustment (no review) | — | "No correction other than reverse" | [adjustments](features/adjustments.md) | accepted 2026-11-19, landed 2026-11-19 |
 | 4 | B1 client money accounts, B2 deposit reference | — | — | — | not started |
 | 5 | B3 bank feed, B4 matching and suspense | S1 receipts | Hand `TransferIn` | — | not started |
 | 6 | B5 nominated bank account, B6 withdrawals, available cash | S1 payments | Hand `TransferOut` | — | not started |
