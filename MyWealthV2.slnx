@@ -21,6 +21,7 @@
     <Project Path="src/BffAdviserPortal/BffAdviserPortal.csproj" />
     <Project Path="src/BffCustomerPortal/BffCustomerPortal.csproj" />
     <Project Path="src/Worker/Worker.csproj" />
+    <Project Path="src/Simulator/Simulator.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Application.FunctionalTests/Application.FunctionalTests.csproj" />
@@ -28,5 +29,6 @@
     <Project Path="tests/Application.UnitTests/Application.UnitTests.csproj" />
     <Project Path="tests/Domain.UnitTests/Domain.UnitTests.csproj" />
     <Project Path="tests/Infrastructure.IntegrationTests/Infrastructure.IntegrationTests.csproj" />
+    <Project Path="tests/Simulator.Tests/Simulator.Tests.csproj" />
   </Folder>
 </Solution>
