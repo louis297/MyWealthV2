@@ -5,8 +5,8 @@ using MyWealthV2.Application.Fx;
 using MyWealthV2.Application.MarketData;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Schema;
+using MyWealthV2.Infrastructure.Identity;
 using MyWealthV2.Infrastructure.MarketData;
-using MyWealthV2.Worker.Reports;
 
 if (HealthCheckCommand.IsRequested(args))
 {
