@@ -5,6 +5,7 @@ using MyWealthV2.Shared;
 using MyWealthV2.Simulator.Control;
 using MyWealthV2.Simulator.Data;
 using MyWealthV2.Simulator.Hosting;
+using MyWealthV2.Simulator.Party;
 using MyWealthV2.Simulator.Worlds;
 using Scalar.AspNetCore;
 
@@ -36,6 +37,9 @@ builder.Services.AddProblemDetails();
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new UtcInstantJsonConverter()));
 
+// Simulator spec R31: checked before the host listens, from the configuration, in every environment.
+var partyApiKey = PartyEndpoints.ReadPartyApiKey(builder.Configuration);
+
 var app = builder.Build();
 
 // Simulator spec R15: apply database/simulator/ scripts before the host listens.
@@ -56,9 +60,7 @@ app.MapOpenApi().RequireAuthorization(SimulatorAuthentication.OperatorPolicy);
 app.MapScalarApiReference().RequireAuthorization(SimulatorAuthentication.OperatorPolicy);
 
 app.MapControlEndpoints();
-
-// Stub until the party surface lands.
-app.MapGet("/party/status", () => Results.Ok());
+app.MapPartyEndpoints(partyApiKey);
 app.MapDefaultEndpoints();
 
 app.Run();
