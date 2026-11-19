@@ -46,6 +46,13 @@ public class ReverseTransactionCommandHandler(
     public async Task<IdempotentResult> Handle(ReverseTransactionCommand request, CancellationToken cancellationToken)
     {
         var loaded = await LoadAsync(request.Id, cancellationToken);
+
+        // Adjustments R17: after the Transaction is found and visible (404 first), before every other reverse rule.
+        if (loaded.Transaction.Type == TransactionType.Adjustment
+            && (currentUser.Role is not { } role || !RolePermissions.Has(role, Policies.TransactionsAdjust)))
+        {
+            throw new ForbiddenAccessException();
+        }
         var key = Guid.Parse(request.IdempotencyKey!);
         var hash = TransactionRequestHash.Compute(
             request.RequestMethod ?? "POST",
@@ -213,9 +220,11 @@ public class ReverseTransactionCommandHandler(
             query = query.Where(row => row.TenantId == currentUser.TenantId);
         }
 
-        // The FX detail and the fee details are copied to the Reversal (FX conversions R17, trade-fees R19).
+        // The FX, adjustment and fee details are copied to the Reversal (FX conversions R17, adjustments R18,
+        // trade-fees R19).
         var transaction = await query
                               .Include(row => row.FxDetail)
+                              .Include(row => row.AdjustmentDetail)
                               .Include(row => row.FeeDetails)
                               .SingleOrDefaultAsync(cancellationToken)
                           ?? throw new NotFoundException("Transaction", publicId);
