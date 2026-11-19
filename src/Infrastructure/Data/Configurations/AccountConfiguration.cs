@@ -16,6 +16,7 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
             .HasComputedColumnSql(
                 "ISNULL(CAST(CASE WHEN [Status] = 0 THEN 1 ELSE 0 END AS bit), 0)",
                 stored: true);
+        builder.Ignore(account => account.DepositReference);
         builder.Property(account => account.CreatedBy).HasMaxLength(450).IsRequired();
         builder.Property(account => account.RowVersion).IsRowVersion();
         builder.HasIndex(account => account.PublicId).IsUnique();

@@ -1,3 +1,5 @@
+using MyWealthV2.Domain.ValueObjects;
+
 namespace MyWealthV2.Domain.Entities;
 
 public class Account : BaseAuditableEntity
@@ -22,6 +24,9 @@ public class Account : BaseAuditableEntity
 
     public string Currency { get; private set; } = string.Empty;
 
+    /// <summary>Set once on a Custodial account, never on an External one (client-money-accounts R14, R18).</summary>
+    public DepositReference? DepositReference { get; private set; }
+
     public bool IsActive
     {
         get => Status == AccountStatus.Open;
@@ -40,6 +45,7 @@ public class Account : BaseAuditableEntity
         AccountType type,
         CustodyMode custodyMode,
         Currency currency,
+        DepositReference? depositReference = null,
         Guid? publicId = null)
     {
         EnsureCurrency(currency);

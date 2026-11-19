@@ -2,6 +2,7 @@ using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Events;
 using MyWealthV2.Domain.Exceptions;
+using MyWealthV2.Domain.ValueObjects;
 using NUnit.Framework;
 using Shouldly;
 
@@ -64,7 +65,9 @@ public class AccountTests
     [TestCase(CustodyMode.Custodial)]
     public void Create_StoresTheGivenCustodyMode(CustodyMode custodyMode)
     {
-        var account = Account.Create(1, 2, "Everyday spending", AccountType.Brokerage, custodyMode, Nzd());
+        var account = Account.Create(
+            1, 2, "Everyday spending", AccountType.Brokerage, custodyMode, Nzd(),
+            custodyMode == CustodyMode.Custodial ? Reference() : null);
 
         account.CustodyMode.ShouldBe(custodyMode);
     }
@@ -72,7 +75,7 @@ public class AccountTests
     [Test]
     public void CustodyMode_SurvivesRenameCloseAndReopen()
     {
-        var account = Account.Create(1, 2, "Everyday spending", AccountType.Brokerage, CustodyMode.Custodial, Nzd());
+        var account = Account.Create(1, 2, "Everyday spending", AccountType.Brokerage, CustodyMode.Custodial, Nzd(), Reference());
 
         account.Rename("Renamed");
         account.CustodyMode.ShouldBe(CustodyMode.Custodial);
@@ -171,10 +174,38 @@ public class AccountTests
     [Test]
     public void Create_CustodialBrokerage_IsCreated()
     {
-        var account = Account.Create(1, 2, "Managed", AccountType.Brokerage, CustodyMode.Custodial, Nzd());
+        var account = Account.Create(1, 2, "Managed", AccountType.Brokerage, CustodyMode.Custodial, Nzd(), Reference());
 
         account.Type.ShouldBe(AccountType.Brokerage);
         account.CustodyMode.ShouldBe(CustodyMode.Custodial);
+        account.DepositReference.ShouldBe(Reference());
+    }
+
+    [Test]
+    public void Create_CustodialWithoutADepositReference_Throws() =>
+        Should.Throw<DomainException>(() =>
+            Account.Create(1, 2, "Managed", AccountType.Brokerage, CustodyMode.Custodial, Nzd()));
+
+    [Test]
+    public void Create_ExternalWithADepositReference_Throws() =>
+        Should.Throw<DomainException>(() =>
+            Account.Create(1, 2, "Held elsewhere", AccountType.Brokerage, CustodyMode.External, Nzd(), Reference()));
+
+    [Test]
+    public void Create_External_HasNoDepositReference() =>
+        Account.Create(1, 2, "Held elsewhere", AccountType.Bank, CustodyMode.External, Nzd())
+            .DepositReference.ShouldBeNull();
+
+    [Test]
+    public void DepositReference_IsKeptOnRenameCloseAndReopen()
+    {
+        var account = Account.Create(1, 2, "Managed", AccountType.Brokerage, CustodyMode.Custodial, Nzd(), Reference());
+
+        account.Rename("Renamed");
+        account.Close();
+        account.Reopen();
+
+        account.DepositReference!.Value.ShouldBe("K7M3Q9PXB");
     }
 
     [TestCase(AccountType.Bank)]
@@ -184,7 +215,7 @@ public class AccountTests
     [TestCase(AccountType.Credit)]
     public void Create_CustodialWithATypeOtherThanBrokerage_Throws(AccountType type)
     {
-        Should.Throw<DomainException>(() => Account.Create(1, 2, "Managed", type, CustodyMode.Custodial, Nzd()))
+        Should.Throw<DomainException>(() => Account.Create(1, 2, "Managed", type, CustodyMode.Custodial, Nzd(), Reference()))
             .Message.ShouldBe("A Custodial account must be a Brokerage account.");
     }
 
@@ -201,4 +232,7 @@ public class AccountTests
     }
 
     private static Currency Nzd() => Currency.Create("NZD", "New Zealand Dollar", 2);
+
+    private static DepositReference Reference() =>
+        DepositReference.TryParse("K7M3Q9PXB", out var reference) ? reference : throw new InvalidOperationException();
 }
