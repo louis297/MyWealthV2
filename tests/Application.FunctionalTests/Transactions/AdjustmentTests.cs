@@ -225,7 +225,7 @@ public class AdjustmentTests : TestBase
         var enqueuedBefore = scheduler.Enqueued.Count;
 
         var response = await world.AdjustAsync(AdjustmentWorld.Body(
-            world.AccountId, amount: -1m, security: AdjustmentWorld.Holding(world.InstrumentId, 1m, 25m)));
+            world.AccountId, security: AdjustmentWorld.Holding(world.InstrumentId, 1m, 25m)));
 
         await ReadIdAsync(response);
         scheduler.Enqueued.Count.ShouldBe(enqueuedBefore);

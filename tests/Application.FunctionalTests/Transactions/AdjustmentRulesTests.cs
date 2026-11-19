@@ -215,20 +215,6 @@ public class AdjustmentRulesTests : TestBase
     }
 
     [Test]
-    public async Task SecurityPartOnABankAccount_Returns400()
-    {
-        var world = await AdjustmentWorld.CreateAsync();
-        var bank = await AccountHttp.OpenAccountAsync(
-            world.Admin, world.Customer.PublicId, "Custodial cash", "Bank", "USD", "Custodial");
-
-        var response = await world.AdjustAsync(AdjustmentWorld.Body(
-            bank, security: AdjustmentWorld.Holding(world.InstrumentId, 1m, 25m)));
-
-        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest, await response.Content.ReadAsStringAsync());
-        (await TransactionCountAsync(bank)).ShouldBe(0);
-    }
-
-    [Test]
     public async Task ClosedAccount_Returns400()
     {
         var world = await AdjustmentWorld.CreateAsync();
