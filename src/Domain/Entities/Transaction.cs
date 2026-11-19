@@ -44,6 +44,9 @@ public class Transaction : BaseAuditableEntity
     /// <summary>The rate this Transaction used, when it has one (FX conversions R14).</summary>
     public TransactionFxDetail? FxDetail { get; private set; }
 
+    /// <summary>Why the adjustment was entered, on an <c>Adjustment</c> and its Reversal (adjustments §5).</summary>
+    public TransactionAdjustmentDetail? AdjustmentDetail { get; private set; }
+
     /// <summary>One per <see cref="CashLegRole.Fee"/> cash leg (trade-fees R18).</summary>
     public List<TransactionFeeDetail> FeeDetails { get; private set; } = [];
 
@@ -661,6 +664,92 @@ public class Transaction : BaseAuditableEntity
         return transaction;
     }
 
+    /// <summary>Adjustments R11: the <c>errors.Security</c> message when the holding result is refused.</summary>
+    public const string AdjustmentHoldingMessage =
+        "The holding cannot have a negative quantity or cost, or a cost without a quantity.";
+
+    /// <summary>
+    /// Builds an <c>Adjustment</c> on one Account (adjustments §5): an optional signed cash leg, an optional signed
+    /// security leg stored as entered, at least one of them, and the adjustment detail.
+    /// </summary>
+    public static Transaction PostAdjustment(
+        int tenantId,
+        int accountId,
+        AccountType accountType,
+        string accountCurrency,
+        AdjustmentReason reason,
+        string? memo,
+        string? reference,
+        DateTimeOffset bookedAt,
+        TransactionSource source,
+        decimal? amount,
+        decimal currentCashSum,
+        AdjustmentHoldingChange? security)
+    {
+        if (amount is null && security is null)
+        {
+            throw new DomainException("At least one of amount and security is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(memo))
+        {
+            throw new DomainException("Memo is required on an adjustment.");
+        }
+
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            Type = TransactionType.Adjustment,
+            BookedAt = bookedAt.ToUniversalTime(),
+            Memo = NormaliseMemo(memo),
+            Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
+            PublicId = Guid.NewGuid(),
+            AdjustmentDetail = TransactionAdjustmentDetail.Create(tenantId, reason)
+        };
+
+        if (amount is { } cash)
+        {
+            if (cash == 0m)
+            {
+                throw new DomainException("Amount cannot be 0.");
+            }
+
+            if (currentCashSum + cash < 0)
+            {
+                throw new DomainException("Cash balance cannot become negative.");
+            }
+
+            var currency = Money.Create(0m, accountCurrency).Currency;
+            transaction.CashLegs.Add(TransactionCashLeg.Create(tenantId, accountId, cash, currency));
+        }
+
+        if (security is not null)
+        {
+            EnsureSecurityAccount(accountType);
+            if (security.QuantityChange == 0m && security.CostChange == 0m)
+            {
+                throw new DomainException("At least one of quantityChange and costChange must be non-zero.");
+            }
+
+            // R11: never below zero quantity or cost, never cost on a zero quantity (the row is deleted at zero).
+            var quantity = security.CurrentQuantity + security.QuantityChange;
+            var cost = security.CurrentCost + security.CostChange;
+            if (quantity < 0 || cost < 0 || (quantity == 0 && cost != 0))
+            {
+                throw new DomainException(AdjustmentHoldingMessage);
+            }
+
+            var costCurrency = Money.Create(0m, security.QuoteCurrency).Currency;
+            transaction.SecurityLegs.Add(TransactionSecurityLeg.Create(
+                tenantId, accountId, security.InstrumentId, security.QuantityChange, security.CostChange, costCurrency));
+        }
+
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
+    }
+
     /// <summary>
     /// Builds the Reversal: one opposite leg per original leg, each on that leg's Account.
     /// Balances are keyed by leg Account (and Instrument for holdings).
@@ -759,6 +848,7 @@ public class Transaction : BaseAuditableEntity
             CashLegs = cashLegs,
             SecurityLegs = reversalLegs ?? [],
             FxDetail = FxDetail?.Copy(),
+            AdjustmentDetail = AdjustmentDetail?.Copy(),
             FeeDetails = cashLegs.Select(leg => leg.FeeDetail).OfType<TransactionFeeDetail>().ToList()
         };
         ReversedBy = reversal;

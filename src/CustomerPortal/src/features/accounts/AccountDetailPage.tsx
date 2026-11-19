@@ -14,6 +14,7 @@ import { formatInstant } from "@/shared/time/instant";
 const typeLabels: Record<string, string> = {
   InternalTransfer: "Transfer",
   FxConversion: "Currency exchange",
+  Adjustment: "Adjustment",
 };
 
 function typeLabel(type: string) {
@@ -107,7 +108,13 @@ export function AccountDetailPage() {
                 <TableBody>
                   {activityItems.map((row) => (
                     <TableRow key={row.id}>
-                      <TableCell>{typeLabel(row.type)}</TableCell>
+                      <TableCell>
+                        {typeLabel(row.type)}
+                        {/* C18: an adjustment shows its memo, which the TenantAdmin wrote for the customer; not its reason. */}
+                        {row.type === "Adjustment" && row.memo ? (
+                          <p className="text-muted-foreground text-xs">{row.memo}</p>
+                        ) : null}
+                      </TableCell>
                       <TableCell>{formatInstant(row.bookedAt)}</TableCell>
                       <TableCell>
                         {(row.cash ?? [])

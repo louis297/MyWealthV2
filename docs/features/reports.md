@@ -40,6 +40,8 @@ Both support manual trigger and editable recurring schedules in the first phase.
 
 **Amendment 2026-11-18 (grouping by custody mode, accepted, landed):** [custody-mode-grouping.md](custody-mode-grouping.md) R10–R16. Adviser Balances: every cash and holding line has a "Custody" column (enum name) after "Type"; the line order is unchanged; the subtotals become one block per custody mode present (`Custodial`, then `External`) followed by an "All accounts" block with today's per-currency totals. Customer Transactions: a "Custody" column after "Account" with the labels "Held on platform" / "Held elsewhere", and, when any row is on an External account, the note "Held elsewhere: recorded by your adviser from outside statements. The platform has not checked these figures." under the table. Parameters, scope rules and routes do not change.
 
+**Amendment 2026-11-19 (adjustments, accepted):** [adjustments.md](adjustments.md) R22, R23. Customer Transactions: an `Adjustment` row shows the type cell `Adjustment (<reason label>)` (labels: Entry error, Corporate action, Reconciliation, Other) and its memo; its Reversal shows `Reversal`. Adviser Balances is unchanged: it already sums every leg.
+
 ---
 
 ## 1. Summary

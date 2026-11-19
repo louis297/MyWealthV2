@@ -72,6 +72,11 @@ internal static class TransactionLegReader
                 transaction.FxDetail.RateAsOfDate
             }).ToListAsync(cancellationToken);
 
+        var adjustmentRows = await db.Transactions.AsNoTracking()
+            .Where(transaction => transactionIds.Contains(transaction.Id) && transaction.AdjustmentDetail != null)
+            .Select(transaction => new { transaction.Id, transaction.AdjustmentDetail!.Reason })
+            .ToListAsync(cancellationToken);
+
         return new TransactionLegs(
             cashRows.ToLookup(row => row.TransactionId, row => new TransactionCashDto
             {
@@ -106,11 +111,15 @@ internal static class TransactionLegReader
                 QuoteCurrency = row.QuoteCurrency.Trim(),
                 Rate = row.Rate,
                 RateAsOfDate = row.RateAsOfDate.ToString("yyyy-MM-dd")
-            }));
+            }),
+            adjustmentRows.ToDictionary(
+                row => row.Id,
+                row => new TransactionAdjustmentDto { Reason = row.Reason.ToString() }));
     }
 }
 
 internal sealed record TransactionLegs(
     ILookup<int, TransactionCashDto> Cash,
     ILookup<int, TransactionSecurityDto> Security,
-    IReadOnlyDictionary<int, TransactionFxDto> Fx);
+    IReadOnlyDictionary<int, TransactionFxDto> Fx,
+    IReadOnlyDictionary<int, TransactionAdjustmentDto> Adjustment);

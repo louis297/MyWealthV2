@@ -64,6 +64,10 @@ public class TenantCompositeKeysSchemaTests
             INSERT INTO [TransactionFxDetails] ([TenantId], [TransactionId], [BaseCurrency], [QuoteCurrency], [Rate], [RateAsOfDate], [RateSource])
             VALUES (@a_tenant, @{p}_buy, 'NZD', 'USD', 0.5, '2026-11-12', N'Frankfurter');
             """),
+        ("FK_TransactionAdjustmentDetails_Transactions_TenantId_TransactionId", "Transactions", """
+            INSERT INTO [TransactionAdjustmentDetails] ([TransactionId], [TenantId], [Reason])
+            VALUES (@{p}_buy, @a_tenant, 0);
+            """),
         ("FK_TradeFeeBands_TradeFeeSchedules_TenantId_TradeFeeScheduleId", "TradeFeeSchedules", """
             INSERT INTO [TradeFeeBands] ([TenantId], [TradeFeeScheduleId], [FromAmount], [RatePercent])
             VALUES (@a_tenant, @{p}_feeschedule, 1000, 0.3);

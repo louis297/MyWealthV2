@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useAppSelector } from "@/app/hooks";
+import { roles } from "@/features/session/roles";
 import { Link, useParams } from "react-router";
 import {
   ConflictNotice,
@@ -97,6 +99,7 @@ function canPostSecurity(type: string, status: string) {
 
 export function AccountDetailPage() {
   const { id } = useParams();
+  const role = useAppSelector((state) => state.session.currentUser?.role);
   const account = useGetAccountQuery(id ?? "", { skip: !id });
   const holdings = useGetAccountHoldingsQuery(id ?? "", { skip: !id || !account.data });
   const transactions = useGetTransactionsQuery(
@@ -287,6 +290,14 @@ export function AccountDetailPage() {
               Convert
             </Link>
           ) : null}
+          {role === roles.tenantAdmin && data.status === "Open" && isCustodial(data) ? (
+            <Link
+              to={`/accounts/${data.id}/adjust`}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            >
+              Adjust
+            </Link>
+          ) : null}
         </nav>
       ) : null}
       {conflict ? <ConflictNotice /> : null}
@@ -428,7 +439,7 @@ export function AccountDetailPage() {
                         />
                         {item.fx ? <p className="text-muted-foreground text-xs">{rateLine(item.fx)}</p> : null}
                       </TableCell>
-                      <TableCell>{canReverse(item) ? <ReverseTransactionButton id={item.id} /> : null}</TableCell>
+                      <TableCell>{canReverse(item, role) ? <ReverseTransactionButton id={item.id} /> : null}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

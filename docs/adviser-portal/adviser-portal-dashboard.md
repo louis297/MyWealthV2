@@ -207,6 +207,21 @@ Status of this amendment: `accepted` (2026-11-19), together with [transaction-so
 | D26 | `/transactions/:id` shows a "Source" line under the type, from the item's `source.kind`: "Entered by hand" for `Manual`, "Rebalance" for `Rebalance`, "Test seed" for `Seed`. The source id is not shown. No other page shows the source. |
 | D27 | Reverse is offered on `/transactions`, `/transactions/:id` and the recent activity of `/accounts/:id` only when the item is not a `Reversal`, has no `reversedByTransactionId`, and its `source.kind` is `Manual` or `Rebalance`. The portal does not read the custody mode for this rule, so it also hides Reverse on a `Seed` Transaction of an External account (Development data only), which the server would accept. A 400 from reverse shows its sentence as today. |
 
+
+---
+
+## Amendment 2026-11-19 (adjustments) — accepted
+
+Status of this amendment: `accepted` (2026-11-19), together with [adjustments](../features/adjustments.md). It adds the route `/accounts/:id/adjust`, and D31 narrows the Reverse conditions of D27 for an `Adjustment`. The BFF does not change: the write is under `/transactions`.
+
+Reason labels: `EntryError` "Entry error", `CorporateAction` "Corporate action", `ReconciliationBreak` "Reconciliation", `Other` "Other".
+
+| ID | Behaviour |
+| --- | --- |
+| D28 | `/accounts/:id` shows an "Adjust" action only to a TenantAdmin, only on an Open Custodial account. It opens `/accounts/:id/adjust`. An Adviser never sees it. |
+| D29 | `/accounts/:id/adjust`: Reason (select, required), Memo (required, with the hint "The customer sees this memo"), an optional cash change (signed, in the Account currency), and an optional holding change (instrument picker from the Account's holdings plus `GET /instruments?enabledOnly=true`, signed quantity change, signed cost change in the quote currency). No booked-at input. Review lists the changes as entered ("Cash −0.60 USD; AAPL quantity 0, cost +0.60 USD"); the form does no balance arithmetic. Confirm posts `POST /transactions/adjustment` with one `Idempotency-Key` per form open. A 400 is shown at its field, or as the sentence when it has none. |
+| D30 | `/transactions/:id` of an `Adjustment` or its Reversal shows a "Reason" line with the label, under the Source line (D26). `/transactions` shows the type as "Adjustment" like any other type name. |
+| D31 | Reverse on an `Adjustment` (D27 conditions plus this one) is offered only to a TenantAdmin. A 403 from reverse shows "Only a firm administrator can reverse an adjustment." |
 ---
 
 ## Tests

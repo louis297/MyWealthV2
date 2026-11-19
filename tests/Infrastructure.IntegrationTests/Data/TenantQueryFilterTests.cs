@@ -29,6 +29,7 @@ public class TenantQueryFilterTests
         typeof(TransactionCashLeg),
         typeof(TransactionSecurityLeg),
         typeof(TransactionFxDetail),
+        typeof(TransactionAdjustmentDetail),
         typeof(PortfolioLine),
         typeof(TradeFeeSchedule),
         typeof(TradeFeeBand),

@@ -515,3 +515,14 @@ Status of this amendment: `accepted` (2026-11-19), together with [transaction-so
 - R7: the platform's own writes now record who wrote them (transaction-source R2–R6). The factories still do not call the matrix.
 - `CustodyRules` gains `AllowsHandReverse(custodyMode, sourceKind)`, next to `AllowsManualEntry`. The matrix still lives in one Domain class.
 - R9, R17 and every other rule are unchanged. On an assigned Custodial account the source check runs before the trade lock (transaction-source R14).
+
+---
+
+## Amendment 2026-11-19 (adjustments) — accepted
+
+Status of this amendment: `accepted` (2026-11-19), together with [adjustments.md](adjustments.md).
+
+- R5, the matrix gains the row `Adjustment`: External **refused** (400 `errors.AccountId`, `An adjustment can be entered only on a Custodial account.`); Custodial **allowed on its own route `POST /transactions/adjustment`, with `transactions.adjust`**. This is the first type other than `Dividend` that the External column refuses; every existing External cell is unchanged.
+- `CustodyRules.RefusalMessage(External, Adjustment)` returns that message; on Custodial it returns `null`. The matrix still lives in one Domain class.
+- R10 and R12 apply to the new route: the server sets `bookedAt`.
+- R17: the trade lock does not decide an adjustment or its reverse (adjustments R16).

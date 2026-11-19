@@ -238,6 +238,52 @@ public class GenerateCustomerTransactionsTests : TestBase
             "Held elsewhere: recorded by your adviser from outside statements. The platform has not checked these figures.");
     }
 
+    [Test]
+    public async Task Execute_ShowsTheReasonOnAnAdjustmentRow_AndReversalOnItsReversal()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Firm Adjust Rows", "firm-adjust-rows");
+        await TestApp.CreatePersonAsync(
+            UserRole.TenantAdmin, "Tess", "tess@firm-adjust-rows", "Password1!", tenant.Id);
+        var adviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Ann", "ann@firm-adjust-rows", "Password1!", tenant.Id);
+        var customer = await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Ada Adjust", "ada@firm-adjust-rows", "Password1!", tenant.Id, adviser.Id);
+        await GrantAsync(tenant.PublicId);
+        var admin = await FunctionalTestSetup.Oidc.SignInAsync(
+            "tess@firm-adjust-rows", "Password1!", "firm-adjust-rows");
+        var managed = await CustodialHttp.OpenCustodialAsync(admin.AccessToken, customer.PublicId, "Managed");
+        (await CustodialHttp.FundAsync(admin.AccessToken, managed, 40m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        var adjustment = await CustodialHttp.ReadIdAsync(await AdjustmentWorld.PostAsync(
+            admin.AccessToken,
+            AdjustmentWorld.Body(managed, amount: -5m, reason: "EntryError", memo: "Wrong deposit amount")));
+        (await CustodialHttp.ReverseAsync(admin.AccessToken, adjustment)).StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var created = await TenantHttp.Send(
+            HttpMethod.Post,
+            "/reports/request",
+            admin.AccessToken,
+            new
+            {
+                reportId = CustomerTransactionsId,
+                parameters = new { customerId = customer.PublicId, from = "2026-01-01", to = "2099-01-01" }
+            });
+        created.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        using var json = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+        var executionId = json.RootElement.GetProperty("id").GetGuid();
+        await using var scope = FunctionalTestSetup.WebApiServices.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<ReportJob>().Execute(executionId);
+
+        (await ReadExecutionAsync(executionId)).Status.ShouldBe("Succeeded");
+        var path = Path.Combine(ReportStoragePaths.Root, tenant.PublicId.ToString("D"), $"{executionId:D}.pdf");
+        // The type column is narrow, so a cell can wrap; compare without whitespace.
+        var text = string.Concat(ReadPdf(await File.ReadAllBytesAsync(path)).Where(ch => !char.IsWhiteSpace(ch)));
+        text.ShouldContain("Adjustment(Entryerror)");
+        text.ShouldContain("Reversal");
+        text.ShouldContain("Wrongdepositamount");
+        text.IndexOf("Adjustment(", StringComparison.Ordinal)
+            .ShouldBe(text.LastIndexOf("Adjustment(", StringComparison.Ordinal));
+    }
+
     private static async Task<Guid> QueueAdviserBalancesAsync(int tenantId)
     {
         var executionId = Guid.NewGuid();

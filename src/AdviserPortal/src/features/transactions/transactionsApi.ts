@@ -62,6 +62,8 @@ export type Transaction = {
   security: TransactionSecurity[];
   /** The rate the transaction used (FX conversions and their reversals); otherwise null. */
   fx?: TransactionFx | null;
+  /** The reason of an `Adjustment` and of its Reversal; otherwise null (adjustments R21). */
+  adjustment?: { reason: string } | null;
 };
 
 export type TransactionListArgs = {
@@ -135,6 +137,19 @@ export type CreateFxConversionBody = FxQuoteBody & {
 
 export type CreateTransactionBody = CreateSecurityTransactionBody | CreateCashTransactionBody;
 
+/**
+ * Adjustments §8.1: one Custodial account, a reason, a memo, and a signed cash `amount`, a one-instrument holding
+ * change, or both. No `bookedAt`: the server books it.
+ */
+export type CreateAdjustmentBody = {
+  accountId: string;
+  reason: string;
+  memo: string;
+  reference: string | null;
+  amount?: number;
+  security?: { instrumentId: string; quantityChange: number; costChange: number };
+};
+
 export const transactionsApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getTransactions: builder.query<PagedList<Transaction>, TransactionListArgs | void>({
@@ -199,6 +214,15 @@ export const transactionsApi = api.injectEndpoints({
       }),
       invalidatesTags: ["Transaction", "Account"],
     }),
+    createAdjustment: builder.mutation<{ id: string }, { body: CreateAdjustmentBody; idempotencyKey: string }>({
+      query: ({ body, idempotencyKey }) => ({
+        url: "/transactions/adjustment",
+        method: "POST",
+        body,
+        headers: { "Idempotency-Key": idempotencyKey },
+      }),
+      invalidatesTags: ["Transaction", "Account"],
+    }),
     reverseTransaction: builder.mutation<{ id: string }, { id: string; idempotencyKey: string }>({
       query: ({ id, idempotencyKey }) => ({
         url: `/transactions/${id}/reverse`,
@@ -218,5 +242,6 @@ export const {
   useCreateInternalTransferMutation,
   useGetFxQuoteQuery,
   useCreateFxConversionMutation,
+  useCreateAdjustmentMutation,
   useReverseTransactionMutation,
 } = transactionsApi;

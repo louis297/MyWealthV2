@@ -4,7 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
+import { useAppSelector } from "@/app/hooks";
 import {
+  adjustmentReasonLabel,
   canReverse,
   ReverseTransactionButton,
   sourceLabel,
@@ -19,6 +21,7 @@ function isNotFound(error: unknown) {
 export function TransactionDetailPage() {
   const { id } = useParams();
   const { data, error } = useGetTransactionQuery(id ?? "", { skip: !id });
+  const role = useAppSelector((state) => state.session.currentUser?.role);
   const currencies = useGetCurrenciesQuery();
   const places = (code: string) => currencies.data?.find((item) => item.code === code)?.decimalPlaces;
 
@@ -33,7 +36,10 @@ export function TransactionDetailPage() {
             <p className="font-mono text-xs break-all">{data.id}</p>
             <Badge variant="secondary">{data.type}</Badge>
             {data.source ? <p className="text-muted-foreground text-sm">{`Source: ${sourceLabel(data.source.kind)}`}</p> : null}
-            {canReverse(data) ? <ReverseTransactionButton id={data.id} /> : null}
+            {data.adjustment ? (
+              <p className="text-muted-foreground text-sm">{`Reason: ${adjustmentReasonLabel(data.adjustment.reason)}`}</p>
+            ) : null}
+            {canReverse(data, role) ? <ReverseTransactionButton id={data.id} /> : null}
             {data.cash.length > 0 ? (
               <Table aria-label="Cash legs">
                 <TableHeader>

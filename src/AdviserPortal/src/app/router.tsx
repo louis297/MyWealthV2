@@ -19,6 +19,7 @@ import { CreatePortfolioPage } from "@/features/portfolios/CreatePortfolioPage";
 import { PortfolioDetailPage } from "@/features/portfolios/PortfolioDetailPage";
 import { PortfoliosListPage } from "@/features/portfolios/PortfoliosListPage";
 import { ReportsPage } from "@/features/reports/ReportsPage";
+import { CreateAdjustmentPage } from "@/features/transactions/CreateAdjustmentPage";
 import { CreateFxConversionPage } from "@/features/transactions/CreateFxConversionPage";
 import { CreateInternalTransferPage } from "@/features/transactions/CreateInternalTransferPage";
 import { CreateTransactionPage } from "@/features/transactions/CreateTransactionPage";
@@ -92,6 +93,10 @@ export const appRoutes: RouteObject[] = [
               { path: ":id/transactions/new", element: <CreateTransactionPage /> },
               { path: ":id/transfer", element: <CreateInternalTransferPage /> },
               { path: ":id/convert", element: <CreateFxConversionPage /> },
+              {
+                element: <RoleGate allow={[roles.tenantAdmin]} />,
+                children: [{ path: ":id/adjust", element: <CreateAdjustmentPage /> }],
+              },
             ],
           },
           {

@@ -44,6 +44,8 @@ There is **no separate cash-ledger Feature Spec.** Cash legs live here. There is
 
 **Amendment 2026-11-19 (transaction source, accepted):** [transaction-source.md](transaction-source.md). Every Transaction has a source (kind `Manual`, `Seed` or `Rebalance`, and an optional source id), set when it is built and never sent by a caller. The four create and reverse routes write `Manual`; a Reversal has its own source, not the original's. The item gains `source: { kind, id }`. R10: script `0035` back-fills the source on existing rows and clears the `reference` of existing rebalance trades, a one-time data write like `0029`. R11: on a Custodial account a hand reverse of a Transaction whose source is not hand-reversible (`Manual` or `Rebalance`) → 400. External accounts reverse as today.
 
+**Amendment 2026-11-19 (adjustments, accepted):** [adjustments.md](adjustments.md). New type `Adjustment` (17) on its own route `POST /transactions/adjustment`, permission `transactions.adjust` (TenantAdmin only): one Custodial account, an optional signed cash `amount` (R8 decimal places, R9 `SUM ≥ 0`), an optional one-instrument holding change, a required reason and memo, server `bookedAt`, source `Manual`. R16: `POST /transactions` refuses `Adjustment` (400 `errors.Type`). R11: reversing an `Adjustment` also needs `transactions.adjust` (403 otherwise); the Reversal copies the adjustment detail. The item gains `adjustment: { reason }` (`null` on other Transactions).
+
 ---
 
 ## 1. Summary

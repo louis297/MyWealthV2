@@ -390,6 +390,41 @@ describe("Customer Portal", () => {
     expect(row).toHaveTextContent("1 NZD = 0.5912 USD (as of 2026-11-09)");
   });
 
+  it("shows an adjustment as Adjustment with its memo and no reason, and its reversal as Reversal (C18)", async () => {
+    const adjustment = {
+      id: "73333333-3333-3333-3333-333333333333",
+      tenantId: "22222222-2222-2222-2222-222222222222",
+      type: "Adjustment",
+      bookedAt: "2026-11-19T03:00:00Z",
+      memo: "Buy of 18 November was filled at 25.40",
+      reference: null,
+      originalTransactionId: null,
+      reversedByTransactionId: null,
+      rowVersion: "AAAA",
+      cash: [{ accountId: "account-1", customerId: me.id, amount: -0.6, currency: "NZD" }],
+      security: [],
+      adjustment: { reason: "EntryError" },
+    };
+    renderAt("/accounts/account-1", me, [
+      adjustment,
+      {
+        ...adjustment,
+        id: "74444444-4444-4444-4444-444444444444",
+        type: "Reversal",
+        memo: null,
+        originalTransactionId: adjustment.id,
+        cash: [{ accountId: "account-1", customerId: me.id, amount: 0.6, currency: "NZD" }],
+      },
+    ]);
+
+    const row = await screen.findByRole("row", { name: /^Adjustment/ });
+    expect(row).toHaveTextContent("Buy of 18 November was filled at 25.40");
+    expect(row).toHaveTextContent("-0.6 NZD");
+    expect(row).not.toHaveTextContent("Entry error");
+    expect(row).not.toHaveTextContent("EntryError");
+    expect(screen.getByRole("row", { name: /^Reversal/ })).toHaveTextContent("0.6 NZD");
+  });
+
   it("generates a customer report with the caller's id and no schedule controls", async () => {
     const { fetchMock } = renderAt("/reports");
     await openSelect("Report");

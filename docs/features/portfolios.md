@@ -52,6 +52,8 @@ Model portfolios (target-weight investment schemes) on `webapi`. An Adviser or T
 
 **Amendment 2026-11-19 (transaction source, accepted):** [transaction-source.md](transaction-source.md) R5, R9, R12. Every rebalance trade has source `Rebalance` with the rebalance handle as its source id (the `handle` of the 202 body for an asynchronous rebalance). Rebalance no longer writes `rb:{handle}:{B|S}:{InstrumentId}` into `reference`, which put an internal id on the wire; the trade's `reference` is `null`, and script `0035` clears it on existing trades. Rebalance idempotency is unchanged. A rebalance trade stays hand-reversible on a Custodial account; R18 still decides while the account is assigned.
 
+**Amendment 2026-11-19 (adjustments, accepted):** [adjustments.md](adjustments.md) R16. R18 does not apply to an `Adjustment` or its reverse: a TenantAdmin may correct cash or a holding on an assigned Custodial account. The assignment stays Active and no rebalance is enqueued; the next rebalance sees the adjusted holding.
+
 ---
 
 ## 1. Summary

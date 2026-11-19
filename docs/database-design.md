@@ -359,6 +359,7 @@ Beyond PK / unique constraints already listed:
 0034_entered_trade_fees.sql                 -- drop CK_TransactionFeeDetails_BrokerageSchedule (a Brokerage fee may have no schedule)
 0035_transaction_source.sql                 -- Transactions.SourceKind / SourcePublicId, back-filled; rebalance trades lose the rb: reference
 0036_users_role_simulator_operator.sql      -- CK_Users_RoleShape lets Role 4 (SimulatorOperator) have no tenant and no adviser
+0037_adjustments.sql                        -- CK_Transactions_Type 0–17 (Adjustment); TransactionAdjustmentDetails
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -432,6 +433,8 @@ Amendment 2026-11-15 (trade fees, [features/trade-fees.md](features/trade-fees.m
 Amendment 2026-11-18 (External caller numbers, accepted, landed; [features/external-caller-numbers.md](features/external-caller-numbers.md) §6): script `0034_entered_trade_fees.sql` drops `CK_TransactionFeeDetails_BrokerageSchedule`. A `Brokerage` row with `TradeFeeScheduleId` NULL is a fee the caller entered on an External account; every existing row keeps its schedule. No CHECK replaces it, because which fees may lack a schedule depends on the Account. `TransactionFxDetails` does not change; a rate the caller entered has `RateSource = 'Caller'`.
 
 Amendment 2026-11-19 (transaction source, accepted; [features/transaction-source.md](features/transaction-source.md) §6): script `0035_transaction_source.sql` (not written yet) adds `SourceKind int NOT NULL` (CHECK 0–2: `Manual`, `Seed`, `Rebalance`; temporary default 0, dropped at the end) and `SourcePublicId uniqueidentifier NULL` (no FK, no index) to `Transactions`, with a CHECK that `Manual` and `Seed` have no id and `Rebalance` has one. Back-fill: rebalance trades (reference `rb:{32 hex}:{B|S}:{digits}`, `Buy` / `Sell` only, else the script stops) become `Rebalance` with the parsed handle and a null `Reference`; rows with one of the listed seed references become `Seed`; the rest `Manual`. Forward only.
+
+Amendment 2026-11-19 (adjustments, accepted; [features/adjustments.md](features/adjustments.md) §6): script `0037_adjustments.sql` widens `CK_Transactions_Type` to 0–17 for `Adjustment` and adds `TransactionAdjustmentDetails`: `TransactionId int` (PK; at most one row per Transaction), `TenantId int` (FK → `Tenants` RESTRICT; index), `Reason int` (CHECK 0–3: `EntryError`, `CorporateAction`, `ReconciliationBreak`, `Other`); FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)` RESTRICT, as `TransactionFxDetails`. No `PublicId` or `RowVersion`: the row is part of an immutable Transaction. One row on every `Adjustment` and on its Reversal, held by the Domain. No back-fill. Forward only.
 
 ### 11.5 Holdings (accepted, landed)
 
@@ -511,6 +514,7 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-19 | Transaction source accepted. `0035` is a build contract. |
 | 2026-11-19 | Simulator accepted ([features/simulator.md](features/simulator.md) §6). `0036` widens `CK_Users_RoleShape` for Role 4; no data change. Second database `MyWealthSimulatorDb` with its own scripts (§15). |
 | 2026-11-19 | ADR 0008 amendment: `worker` also runs the applicator at start-up (matches the code since `26fb489`). |
+| 2026-11-19 | Adjustments accepted and landed (`0037`): `CK_Transactions_Type` widened to 0–17; new `TransactionAdjustmentDetails` (reason per adjustment and its Reversal). `0037` is a build contract. |
 
 ---
 

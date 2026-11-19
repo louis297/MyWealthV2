@@ -28,7 +28,8 @@ public class CustodyRulesTests
             [TransactionType.Bonus] = true,
             [TransactionType.Scrip] = true,
             [TransactionType.InternalTransfer] = true,
-            [TransactionType.FxConversion] = true
+            [TransactionType.FxConversion] = true,
+            [TransactionType.Adjustment] = false
         };
         var custodial = new Dictionary<TransactionType, bool>
         {
@@ -48,7 +49,8 @@ public class CustodyRulesTests
             [TransactionType.Bonus] = false,
             [TransactionType.Scrip] = false,
             [TransactionType.InternalTransfer] = true,
-            [TransactionType.FxConversion] = true
+            [TransactionType.FxConversion] = true,
+            [TransactionType.Adjustment] = true
         };
 
         external.Count.ShouldBe(Enum.GetValues<TransactionType>().Length);
@@ -81,6 +83,19 @@ public class CustodyRulesTests
     public void RefusalMessage_OnACustodialAccount_IsTheSentenceOfTheRule(TransactionType type, string message)
     {
         CustodyRules.RefusalMessage(CustodyMode.Custodial, type).ShouldBe(message);
+    }
+
+    [Test]
+    public void RefusalMessage_AdjustmentOnAnExternalAccount_IsTheSentenceOfAdjustmentsR5()
+    {
+        CustodyRules.RefusalMessage(CustodyMode.External, TransactionType.Adjustment)
+            .ShouldBe("An adjustment can be entered only on a Custodial account.");
+    }
+
+    [Test]
+    public void RefusalMessage_AdjustmentOnACustodialAccount_IsNull()
+    {
+        CustodyRules.RefusalMessage(CustodyMode.Custodial, TransactionType.Adjustment).ShouldBeNull();
     }
 
     [TestCaseSource(nameof(Matrix))]
