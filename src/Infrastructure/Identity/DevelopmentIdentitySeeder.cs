@@ -47,6 +47,16 @@ public static class DevelopmentIdentitySeeder
             tenantId: null,
             cancellationToken);
 
+        await EnsurePersonAsync(
+            db,
+            userManager,
+            UserRole.SimulatorOperator,
+            name: "Simulator Operator",
+            email: SimulatorOperatorEmail,
+            password: SimulatorOperatorPassword,
+            tenantId: null,
+            cancellationToken);
+
         // Functional tests reseed this method after Respawn and assert exact tenant/person list counts.
         if (IsTestHost())
         {
@@ -133,33 +143,51 @@ public static class DevelopmentIdentitySeeder
             return;
         }
 
-        var publicId = Guid.NewGuid();
-        var identityUser = new ApplicationUser
+        // The identity row and the person row are written together or not at all, so a person that fails a
+        // unique index (a platform-level email already in use) leaves no identity row behind.
+        var strategy = db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            UserName = publicId.ToString(),
-            Email = email,
-            EmailConfirmed = true,
-            TenantId = tenantId
-        };
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
-        var result = await userManager.CreateAsync(identityUser, password);
-        if (!result.Succeeded)
-        {
-            throw new InvalidOperationException(
-                string.Join("; ", result.Errors.Select(error => error.Description)));
-        }
+            var publicId = Guid.NewGuid();
+            var identityUser = new ApplicationUser
+            {
+                UserName = publicId.ToString(),
+                Email = email,
+                EmailConfirmed = true,
+                TenantId = tenantId
+            };
 
-        var person = User.Create(
-            role,
-            name,
-            email,
-            identityUser.Id,
-            tenantId,
-            adviserId,
-            publicId: publicId);
+            var result = await userManager.CreateAsync(identityUser, password);
+            if (!result.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    string.Join("; ", result.Errors.Select(error => error.Description)));
+            }
 
-        db.DomainUsers.Add(person);
-        await db.SaveChangesAsync(cancellationToken);
+            var person = User.Create(
+                role,
+                name,
+                email,
+                identityUser.Id,
+                tenantId,
+                adviserId,
+                publicId: publicId);
+
+            db.DomainUsers.Add(person);
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            catch
+            {
+                db.ChangeTracker.Clear();
+                throw;
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+        });
     }
 
     private static bool IsTestHost()
