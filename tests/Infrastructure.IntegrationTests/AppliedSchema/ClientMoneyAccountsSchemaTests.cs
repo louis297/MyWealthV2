@@ -104,6 +104,7 @@ public class ClientMoneyAccountsSchemaTests
 
         var row = ClientMoneyAccount.Create(tenant.Id, currency, "Simulator Bank", "Round Trip Client Funds Trust Account", "SIM-RT-USD");
         row.Disable();
+        row.CreatedBy = "test";
         await using (var context = OpenDb(db.ConnectionString))
         {
             context.ClientMoneyAccounts.Add(row);

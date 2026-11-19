@@ -36,10 +36,79 @@ public class ClientMoneyAccount : BaseAuditableEntity
         string bankName,
         string accountName,
         string accountNumber,
-        Guid? publicId = null) =>
-        throw new NotImplementedException();
+        Guid? publicId = null)
+    {
+        if (currency is null || string.IsNullOrWhiteSpace(currency.Code))
+        {
+            throw new DomainException("Currency is required.");
+        }
 
-    public void Disable() => throw new NotImplementedException();
+        if (!currency.IsActive)
+        {
+            throw new DomainException("Currency must be enabled.");
+        }
 
-    public void Enable() => throw new NotImplementedException();
+        return new ClientMoneyAccount
+        {
+            TenantId = tenantId,
+            Currency = currency.Code.ToUpperInvariant(),
+            BankName = NormaliseText(bankName, BankNameMaxLength, "Bank name"),
+            AccountName = NormaliseText(accountName, AccountNameMaxLength, "Account name"),
+            AccountNumber = NormaliseAccountNumber(accountNumber),
+            PublicId = publicId ?? Guid.NewGuid(),
+            IsActive = true
+        };
+    }
+
+    /// <summary>True when <paramref name="accountNumber"/>, trimmed, is 1–34 characters of letters, digits,
+    /// spaces and hyphens with no two spaces in a row (R2).</summary>
+    public static bool IsValidAccountNumber(string? accountNumber)
+    {
+        var trimmed = accountNumber?.Trim() ?? string.Empty;
+        return trimmed.Length is >= 1 and <= AccountNumberMaxLength
+            && trimmed.All(ch => char.IsAsciiLetterOrDigit(ch) || ch is ' ' or '-')
+            && !trimmed.Contains("  ", StringComparison.Ordinal);
+    }
+
+    public void Disable()
+    {
+        if (!IsActive)
+        {
+            return;
+        }
+
+        IsActive = false;
+    }
+
+    public void Enable()
+    {
+        if (IsActive)
+        {
+            return;
+        }
+
+        IsActive = true;
+    }
+
+    private static string NormaliseText(string value, int maxLength, string label)
+    {
+        var trimmed = value?.Trim() ?? string.Empty;
+        if (trimmed.Length < 1 || trimmed.Length > maxLength)
+        {
+            throw new DomainException($"{label} must be 1 to {maxLength} characters.");
+        }
+
+        return trimmed;
+    }
+
+    private static string NormaliseAccountNumber(string accountNumber)
+    {
+        if (!IsValidAccountNumber(accountNumber))
+        {
+            throw new DomainException(
+                $"Account number must be 1 to {AccountNumberMaxLength} letters, digits, spaces and hyphens, with no two spaces in a row.");
+        }
+
+        return accountNumber.Trim();
+    }
 }
