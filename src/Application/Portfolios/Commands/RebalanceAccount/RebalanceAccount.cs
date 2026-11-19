@@ -106,7 +106,8 @@ public class AccountRebalancer(
                     row => row.AccountId == account.Id && row.InstrumentId == trade.InstrumentId,
                     cancellationToken);
                 var price = Money.Create(trade.Price, trade.QuoteCurrency);
-                var reference = $"rb:{handle:N}:{(trade.Buy ? "B" : "S")}:{trade.InstrumentId}";
+                // Hashed for idempotency only; never stored as the trade's reference (transaction-source R9).
+                var hashInput = $"rb:{handle:N}:{(trade.Buy ? "B" : "S")}:{trade.InstrumentId}";
                 PlannerFeeSchedule? fee = null;
                 plan.FeeSchedules?.TryGetValue(trade.QuoteCurrency, out fee);
                 Domain.Entities.Transaction transaction;
@@ -115,11 +116,11 @@ public class AccountRebalancer(
                     transaction = trade.Buy
                         ? Domain.Entities.Transaction.PostBuy(
                             account.TenantId, account.Id, account.Type, account.Currency, trade.InstrumentId,
-                            trade.Quantity, price, trade.QuoteToAccount, now, "Rebalance", reference,
+                            trade.Quantity, price, trade.QuoteToAccount, now, "Rebalance", reference: null,
                             TransactionSource.Rebalance(handle), cash, fee?.Schedule, fee?.DecimalPlaces ?? 2)
                         : Domain.Entities.Transaction.PostSell(
                             account.TenantId, account.Id, account.Type, account.Currency, trade.InstrumentId,
-                            trade.Quantity, price, trade.QuoteToAccount, now, "Rebalance", reference,
+                            trade.Quantity, price, trade.QuoteToAccount, now, "Rebalance", reference: null,
                             TransactionSource.Rebalance(handle), cash, holding?.Quantity ?? 0m, holding?.CostAmount ?? 0m, fee?.Schedule, fee?.DecimalPlaces ?? 2);
                 }
                 catch (DomainException exception)
@@ -134,7 +135,7 @@ public class AccountRebalancer(
                     key,
                     "POST",
                     $"/accounts/{account.PublicId}/rebalance",
-                    TransactionRequestHash.Compute("POST", $"/accounts/{account.PublicId}/rebalance", reference),
+                    TransactionRequestHash.Compute("POST", $"/accounts/{account.PublicId}/rebalance", hashInput),
                     200,
                     JsonSerializer.Serialize(new { id = transaction.PublicId }),
                     now));
