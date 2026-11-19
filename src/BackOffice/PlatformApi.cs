@@ -181,6 +181,32 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
             cancellationToken);
     }
 
+    public Task<IReadOnlyList<ClientMoneyAccountItem>> ListClientMoneyAccountsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task<ClientMoneyAccountItem> GetClientMoneyAccountAsync(
+        Guid tenantId,
+        Guid id,
+        CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task<Guid> CreateClientMoneyAccountAsync(
+        Guid tenantId,
+        string currency,
+        string bankName,
+        string accountName,
+        string accountNumber,
+        CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task DisableClientMoneyAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task EnableClientMoneyAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
     public Task<IReadOnlyList<CurrencyItem>> ListCurrenciesAsync(CancellationToken cancellationToken = default) =>
         ReadAsync<IReadOnlyList<CurrencyItem>>(
             HttpMethod.Get,

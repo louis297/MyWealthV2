@@ -63,6 +63,24 @@ public sealed record InstrumentPage(
     int PageSize,
     int TotalCount);
 
+/// <summary>A tenant's client money account (docs/features/client-money-accounts.md §8.1).</summary>
+public sealed record ClientMoneyAccountItem(
+    Guid Id,
+    Guid TenantId,
+    string Currency,
+    string BankName,
+    string AccountName,
+    string AccountNumber,
+    bool IsActive,
+    string RowVersion,
+    DateTimeOffset Created);
+
+public sealed record ClientMoneyAccountPage(
+    IReadOnlyList<ClientMoneyAccountItem> Items,
+    int Page,
+    int PageSize,
+    int TotalCount);
+
 public sealed class PlatformApiException(int status, string body) : Exception(body)
 {
     public int Status { get; } = status;
