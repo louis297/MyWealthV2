@@ -34,6 +34,16 @@ export type CreateAccountBody = {
   currency: string;
 };
 
+// client-money-accounts R22: where to pay in to an Open Custodial account.
+export type DepositInstructions = {
+  accountId: string;
+  currency: string;
+  reference: string;
+  bankName: string;
+  accountName: string;
+  accountNumber: string;
+};
+
 export type AccountHolding = {
   id: string;
   accountId: string;
@@ -70,6 +80,10 @@ export const accountsApi = api.injectEndpoints({
       query: (id) => `/accounts/${id}/holdings`,
       providesTags: (_result, _error, id) => [{ type: "Account", id }],
     }),
+    getDepositInstructions: builder.query<DepositInstructions, string>({
+      query: (id) => `/accounts/${id}/deposit-instructions`,
+      providesTags: (_result, _error, id) => [{ type: "Account", id }],
+    }),
     createAccount: builder.mutation<{ id: string }, CreateAccountBody>({
       query: (body) => ({
         url: "/accounts",
@@ -101,6 +115,7 @@ export const {
   useGetAccountsQuery,
   useGetAccountQuery,
   useGetAccountHoldingsQuery,
+  useGetDepositInstructionsQuery,
   useCreateAccountMutation,
   useCloseAccountMutation,
   useReopenAccountMutation,

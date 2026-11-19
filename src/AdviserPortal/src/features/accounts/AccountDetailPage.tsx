@@ -22,6 +22,7 @@ import {
   useCloseAccountMutation,
   useGetAccountHoldingsQuery,
   useGetAccountQuery,
+  useGetDepositInstructionsQuery,
   useReopenAccountMutation,
 } from "@/features/accounts/accountsApi";
 import { allowsManualEntry, isCustodial } from "@/features/accounts/custodyRules";
@@ -109,6 +110,8 @@ export function AccountDetailPage() {
   // P13: only an Open Custodial account can hold a portfolio (custody-modes R14).
   const eligible = Boolean(account.data && account.data.status === "Open" && isCustodial(account.data));
   const assignment = useGetAccountPortfolioQuery(id ?? "", { skip: !id || !eligible });
+  // D32: deposit instructions are read only for an Open Custodial account (client-money-accounts R21).
+  const depositInstructions = useGetDepositInstructionsQuery(id ?? "", { skip: !id || !eligible });
   const targetPortfolio = useGetPortfolioQuery(assignment.data?.portfolioId ?? "", {
     skip: assignment.data?.status !== "Active",
   });
@@ -312,9 +315,35 @@ export function AccountDetailPage() {
               <StatusBadge status={data.status} />
             </DetailItem>
             <DetailItem label="Cash balance">{data.cashBalance}</DetailItem>
+            {isCustodial(data) && data.depositReference ? (
+              <DetailItem label="Deposit reference">{data.depositReference}</DetailItem>
+            ) : null}
           </DetailGrid>
         </CardContent>
       </Card>
+      {eligible ? (
+        <Section title="Deposit instructions">
+          {depositInstructions.data ? (
+            <Card>
+              <CardContent>
+                <DetailGrid>
+                  <DetailItem label="Bank">{depositInstructions.data.bankName}</DetailItem>
+                  <DetailItem label="Account name">{depositInstructions.data.accountName}</DetailItem>
+                  <DetailItem label="Account number">{depositInstructions.data.accountNumber}</DetailItem>
+                  <DetailItem label="Reference">{depositInstructions.data.reference}</DetailItem>
+                  <DetailItem label="Currency">{depositInstructions.data.currency}</DetailItem>
+                </DetailGrid>
+              </CardContent>
+            </Card>
+          ) : isNotFound(depositInstructions.error) ? (
+            <Muted>{`No client money account in ${data.currency}. Ask the platform operator to add one.`}</Muted>
+          ) : depositInstructions.isError ? (
+            <Muted>Deposit instructions could not be loaded.</Muted>
+          ) : (
+            <Muted>Loading…</Muted>
+          )}
+        </Section>
+      ) : null}
       {eligible && (portfolioChoices.data || portfolioChoices.isError) ? (
         <Section title="Portfolio">
           {locked ? (
