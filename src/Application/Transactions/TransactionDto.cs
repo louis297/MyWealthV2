@@ -34,6 +34,15 @@ public sealed class TransactionDto
 
     /// <summary>The rate the Transaction used, when it has an FX detail; otherwise null (FX conversions R22).</summary>
     public TransactionFxDto? Fx { get; init; }
+
+    /// <summary>Why an adjustment was entered, on an <c>Adjustment</c> and its Reversal; otherwise null (adjustments R21).</summary>
+    public TransactionAdjustmentDto? Adjustment { get; init; }
+}
+
+/// <summary><see cref="Reason"/> is the <c>AdjustmentReason</c> name (adjustments R21).</summary>
+public sealed class TransactionAdjustmentDto
+{
+    public required string Reason { get; init; }
 }
 
 /// <summary>
