@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using MyWealthV2.Application.FunctionalTests.Accounts;
 using MyWealthV2.Application.FunctionalTests.Portfolios;
+using MyWealthV2.Domain.Entities;
 using static MyWealthV2.Application.FunctionalTests.Custody.CustodialHttp;
 
 namespace MyWealthV2.Application.FunctionalTests.Custody;
@@ -9,7 +10,7 @@ namespace MyWealthV2.Application.FunctionalTests.Custody;
 /// <summary>A funded Custodial account with a portfolio, and its rebalance trades (transaction-source R5, R9).</summary>
 internal static class RebalanceTrades
 {
-    public sealed record World(string AccessToken, Guid CustomerId, Guid AccountId, Guid PortfolioId, Guid First, Guid Second);
+    public sealed record World(string AccessToken, User Customer, Guid AccountId, Guid PortfolioId, Guid First, Guid Second);
 
     /// <summary>Opens and funds a Custodial NZD account and assigns a 100 % <c>AIA</c> portfolio, which buys.</summary>
     public static async Task<World> AssignedAsync(
@@ -38,7 +39,7 @@ internal static class RebalanceTrades
         var assign = await PortfolioHttp.Send(
             HttpMethod.Post, $"/accounts/{accountId}/portfolio", tokens.AccessToken, new { portfolioId });
         assign.StatusCode.ShouldBe(HttpStatusCode.OK, await assign.Content.ReadAsStringAsync());
-        return new World(tokens.AccessToken, customer.PublicId, accountId, portfolioId, first, second);
+        return new World(tokens.AccessToken, customer, accountId, portfolioId, first, second);
     }
 
     /// <summary>Changes the portfolio to 50 % each line; the 202 enqueues a rebalance the test scheduler only records.</summary>

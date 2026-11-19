@@ -8,6 +8,9 @@ public sealed class TransactionDto
 
     public required string Type { get; init; }
 
+    /// <summary>The process that wrote the Transaction (transaction-source R10).</summary>
+    public TransactionSourceDto? Source { get; init; }
+
     /// <summary>Cash legs on Accounts the caller can see. Empty when the type has no cash leg.</summary>
     public required IReadOnlyList<TransactionCashDto> Cash { get; init; }
 
@@ -29,6 +32,17 @@ public sealed class TransactionDto
 
     /// <summary>The rate the Transaction used, when it has an FX detail; otherwise null (FX conversions R22).</summary>
     public TransactionFxDto? Fx { get; init; }
+}
+
+/// <summary>
+/// The source on the transaction item: <see cref="Kind"/> is the enum name (<c>Manual</c>, <c>Seed</c>,
+/// <c>Rebalance</c>); <see cref="Id"/> is the source PublicId, or null (transaction-source R10).
+/// </summary>
+public sealed class TransactionSourceDto
+{
+    public required string Kind { get; init; }
+
+    public Guid? Id { get; init; }
 }
 
 public sealed class TransactionCashDto
