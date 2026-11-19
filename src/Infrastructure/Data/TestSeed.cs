@@ -6,6 +6,7 @@ using MyWealthV2.Domain.Common;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.ValueObjects;
+using MyWealthV2.Infrastructure.Accounts;
 using MyWealthV2.Infrastructure.Data.Entities;
 using MyWealthV2.Infrastructure.Identity;
 
@@ -961,7 +962,10 @@ public static class TestSeed
             return;
         }
 
-        var account = Account.Create(tenantId, customerId, name, type, custodyMode, currency);
+        var depositReference = custodyMode == CustodyMode.Custodial
+            ? DepositReference.Generate(CryptoRandomSymbols.Instance)
+            : null;
+        var account = Account.Create(tenantId, customerId, name, type, custodyMode, currency, depositReference);
         if (closed)
         {
             account.Close();

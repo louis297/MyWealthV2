@@ -1,4 +1,5 @@
 using MyWealthV2.Domain.Entities;
+using MyWealthV2.Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -16,7 +17,18 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
             .HasComputedColumnSql(
                 "ISNULL(CAST(CASE WHEN [Status] = 0 THEN 1 ELSE 0 END AS bit), 0)",
                 stored: true);
-        builder.Ignore(account => account.DepositReference);
+        builder.Property(account => account.DepositReference)
+            // EF never passes null to a value converter: NULL stays NULL (an External account).
+            .HasConversion(
+                reference => reference!.Value,
+                value => DepositReferenceFromColumn(value))
+            .HasColumnType("char(9)")
+            .IsFixedLength()
+            .HasMaxLength(DepositReference.Length);
+        builder.HasIndex(account => account.DepositReference)
+            .IsUnique()
+            .HasFilter("[DepositReference] IS NOT NULL")
+            .HasDatabaseName("UX_Accounts_DepositReference");
         builder.Property(account => account.CreatedBy).HasMaxLength(450).IsRequired();
         builder.Property(account => account.RowVersion).IsRowVersion();
         builder.HasIndex(account => account.PublicId).IsUnique();
@@ -35,4 +47,9 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
             .HasForeignKey(account => account.Currency)
             .OnDelete(DeleteBehavior.Restrict);
     }
+
+    private static DepositReference DepositReferenceFromColumn(string value) =>
+        DepositReference.TryParse(value, out var reference)
+            ? reference
+            : throw new InvalidOperationException($"Accounts.DepositReference holds an invalid value '{value}'.");
 }

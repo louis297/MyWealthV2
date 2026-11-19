@@ -6,6 +6,7 @@ using MyWealthV2.Application.Portfolios.Commands.RebalanceAccount;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.ValueObjects;
+using MyWealthV2.Infrastructure.Accounts;
 using MyWealthV2.Infrastructure.Data;
 using NUnit.Framework;
 using Shouldly;
@@ -25,7 +26,8 @@ public class RebalanceJobTenantScopeTests
         var customer = User.Create(UserRole.Customer, "Customer", $"c-{Guid.NewGuid():N}@example", await IdentityAsync(db, tenantA), tenantA.Id, adviserA.Id);
         db.DomainUsers.Add(customer);
         await db.SaveChangesAsync();
-        var account = Account.Create(tenantA.Id, customer.Id, "Brokerage", AccountType.Brokerage, CustodyMode.Custodial, Currency.Create("NZD", "New Zealand Dollar", 2));
+        var account = Account.Create(tenantA.Id, customer.Id, "Brokerage", AccountType.Brokerage, CustodyMode.Custodial, Currency.Create("NZD", "New Zealand Dollar", 2),
+            DepositReference.Generate(CryptoRandomSymbols.Instance));
         account.CreatedBy = "test";
         db.Accounts.Add(account);
         await db.SaveChangesAsync();

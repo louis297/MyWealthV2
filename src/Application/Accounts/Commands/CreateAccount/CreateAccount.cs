@@ -76,7 +76,8 @@ public class CreateAccountCommandValidator : AbstractValidator<CreateAccountComm
 public class CreateAccountCommandHandler(
     IApplicationDbContext db,
     ICurrencyCatalog catalog,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IDepositReferenceSource depositReferences)
     : IRequestHandler<CreateAccountCommand, Guid>
 {
     public async Task<Guid> Handle(CreateAccountCommand request, CancellationToken cancellationToken)
@@ -133,7 +134,8 @@ public class CreateAccountCommandHandler(
         }
 
         var type = Enum.Parse<AccountType>(request.Type);
-        var account = Account.Create(tenant.Id, customer.Id, request.Name, type, custodyMode, currency);
+        var depositReference = custodyMode == CustodyMode.Custodial ? depositReferences.Next() : null;
+        var account = Account.Create(tenant.Id, customer.Id, request.Name, type, custodyMode, currency, depositReference);
         db.Accounts.Add(account);
         await db.SaveChangesAsync(cancellationToken);
         return account.PublicId;

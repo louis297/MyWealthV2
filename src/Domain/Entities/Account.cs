@@ -54,6 +54,17 @@ public class Account : BaseAuditableEntity
             throw new DomainException(CustodialTypeMessage);
         }
 
+        // Client money accounts R14: a Custodial account has a deposit reference, an External account has none.
+        if (custodyMode == CustodyMode.Custodial && depositReference is null)
+        {
+            throw new DomainException("A Custodial account needs a deposit reference.");
+        }
+
+        if (custodyMode == CustodyMode.External && depositReference is not null)
+        {
+            throw new DomainException("An External account has no deposit reference.");
+        }
+
         var account = new Account
         {
             TenantId = tenantId,
@@ -62,6 +73,7 @@ public class Account : BaseAuditableEntity
             Type = type,
             CustodyMode = custodyMode,
             Currency = currency.Code,
+            DepositReference = depositReference,
             PublicId = publicId ?? Guid.NewGuid(),
             Status = AccountStatus.Open
         };
