@@ -32,13 +32,17 @@ function user(overrides: Partial<CurrentUser> = {}): CurrentUser {
   };
 }
 
-function tenant(allowedCustodyModes: Tenant["allowedCustodyModes"] = ["External", "Custodial"]): Tenant {
+function tenant(
+  allowedCustodyModes: Tenant["allowedCustodyModes"] = ["External", "Custodial"],
+  clientMoneyCurrencies: string[] = ["NZD", "USD"],
+): Tenant {
   return {
     id: "22222222-2222-2222-2222-222222222222",
     name: "North Advisory",
     code: "north-advisory",
     reportingCurrency: "NZD",
     allowedCustodyModes,
+    clientMoneyCurrencies,
     isActive: true,
     rowVersion: "AAAA",
     created: "2026-09-14T00:00:00+00:00",
@@ -360,6 +364,75 @@ describe("CreateAccountPage", () => {
       const custody = screen.getByRole("group", { name: "Custody" });
       expect(await within(custody).findByText("The tenant does not allow External accounts.")).toBeInTheDocument();
       expect(screen.getAllByText("The tenant does not allow External accounts.")).toHaveLength(1);
+      expect(screen.queryByText("account detail")).not.toBeInTheDocument();
+    });
+  });
+
+  // client-money-accounts D33: a Custodial account is offered only the currencies with a client money account.
+  describe("client money currencies", () => {
+    async function currencyOptions() {
+      await openSelect("Currency");
+      const options = (await screen.findAllByRole("option")).map((option) => option.textContent?.trim());
+      fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
+      return options.filter((option) => option !== "Select a currency");
+    }
+
+    it("offers only the firm's client money currencies while Custodial is chosen", async () => {
+      renderCreate(user(), undefined, tenant(["External", "Custodial"], ["USD"]));
+
+      fireEvent.click(await screen.findByRole("radio", { name: custodial }));
+
+      expect(await currencyOptions()).toEqual(["USD"]);
+    });
+
+    it("keeps every enabled currency for an External account", async () => {
+      renderCreate(user(), undefined, tenant(["External", "Custodial"], ["USD"]));
+
+      fireEvent.click(await screen.findByRole("radio", { name: external }));
+      await screen.findByLabelText("Currency");
+
+      expect(await currencyOptions()).toEqual(["NZD", "USD"]);
+    });
+
+    it("explains and blocks a Custodial account when the firm has no client money account", async () => {
+      const { fetchMock } = renderCreate(user(), undefined, tenant(["External", "Custodial"], []));
+
+      fireEvent.click(await screen.findByRole("radio", { name: custodial }));
+      fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Managed portfolio" } });
+
+      expect(
+        screen.getByText("Your firm has no client money account, so a Custodial account cannot be opened."),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Create account" })).toBeDisabled();
+      fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+      expect(await postCall(fetchMock)).toBeUndefined();
+
+      fireEvent.click(screen.getByRole("radio", { name: external }));
+      expect(
+        screen.queryByText("Your firm has no client money account, so a Custodial account cannot be opened."),
+      ).not.toBeInTheDocument();
+    });
+
+    it("shows a refused currency at the currency picker", async () => {
+      const message = "The tenant has no active client money account in USD, so a Custodial account cannot be opened in USD.";
+      renderCreate(
+        user(),
+        new Response(JSON.stringify({ errors: { Currency: [message] } }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }),
+        tenant(["External", "Custodial"], ["USD"]),
+      );
+
+      fireEvent.click(await screen.findByRole("radio", { name: custodial }));
+      fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Managed portfolio" } });
+      await chooseOption("Currency", "USD");
+      fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+      const picker = screen.getByLabelText("Currency").closest('[data-field="currency"]') as HTMLElement;
+      expect(picker).not.toBeNull();
+      expect(await within(picker).findByText(message)).toBeInTheDocument();
+      expect(screen.getAllByText(message)).toHaveLength(1);
       expect(screen.queryByText("account detail")).not.toBeInTheDocument();
     });
   });

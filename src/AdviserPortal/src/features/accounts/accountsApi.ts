@@ -11,6 +11,8 @@ export type Account = {
   type: string;
   custodyMode: string;
   currency: string;
+  // client-money-accounts R14: set on a Custodial account, null on an External one.
+  depositReference?: string | null;
   cashBalance: number;
   status: string;
   isActive: boolean;

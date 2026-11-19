@@ -1685,3 +1685,98 @@ describe("AccountDetailPage activity Reverse (adviser-portal-dashboard D27)", ()
     });
   });
 });
+
+// client-money-accounts D32: deposit reference and deposit instructions on a Custodial account.
+describe("AccountDetailPage deposit instructions (client-money-accounts D32)", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal("location", {
+      origin: "http://localhost:3000",
+      pathname: `/accounts/${accountId}`,
+      search: "",
+      href: `http://localhost:3000/accounts/${accountId}`,
+      assign: vi.fn(),
+    });
+  });
+
+  const reference = "K7M3Q9PXB";
+  const instructions = {
+    accountId,
+    currency: "USD",
+    reference,
+    bankName: "Simulator Bank",
+    accountName: "North Advisory Ltd Client Funds Trust Account",
+    accountNumber: "02-0100-0123456-00",
+  };
+
+  function detailValue(label: string) {
+    const term = screen.getByText(label, { selector: "dt" });
+    return term.nextElementSibling?.textContent;
+  }
+
+  function serve(item: unknown, instructionsResponse: () => Response) {
+    return renderDetail((url, method) => {
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.endsWith(`/accounts/${accountId}/deposit-instructions`) && method === "GET") {
+        return instructionsResponse();
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json(item);
+      }
+      return new Response("", { status: 404 });
+    });
+  }
+
+  function instructionCalls(fetchMock: ReturnType<typeof vi.mocked<typeof fetch>>) {
+    return fetchMock.mock.calls.filter(([input]) => {
+      const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
+      return url.includes("/deposit-instructions");
+    });
+  }
+
+  it("shows the reference and the instructions panel on an Open Custodial account", async () => {
+    serve({ ...custodialAccount, currency: "USD", depositReference: reference }, () => json(instructions));
+
+    const panel = (await screen.findByRole("heading", { name: "Deposit instructions" })).closest("section")!;
+    expect(detailValue("Deposit reference")).toBe(reference);
+    expect(await within(panel).findByText("Simulator Bank")).toBeInTheDocument();
+    expect(within(panel).getByText("North Advisory Ltd Client Funds Trust Account")).toBeInTheDocument();
+    expect(within(panel).getByText("02-0100-0123456-00")).toBeInTheDocument();
+    expect(within(panel).getByText(reference)).toBeInTheDocument();
+    expect(within(panel).getByText("USD")).toBeInTheDocument();
+  });
+
+  it("shows the reference but no panel and calls no route on a Closed Custodial account", async () => {
+    const { fetchMock } = serve(
+      { ...custodialAccount, currency: "USD", status: "Closed", isActive: false, depositReference: reference },
+      () => json(instructions),
+    );
+
+    expect(await screen.findByRole("heading", { name: "Everyday spending" })).toBeInTheDocument();
+    expect(detailValue("Deposit reference")).toBe(reference);
+    expect(screen.queryByRole("heading", { name: "Deposit instructions" })).not.toBeInTheDocument();
+    expect(instructionCalls(fetchMock)).toHaveLength(0);
+  });
+
+  it("says to ask the platform operator when the instructions route returns 404", async () => {
+    serve({ ...custodialAccount, currency: "USD", depositReference: reference }, () => new Response("", { status: 404 }));
+
+    const panel = (await screen.findByRole("heading", { name: "Deposit instructions" })).closest("section")!;
+    expect(
+      await within(panel).findByText("No client money account in USD. Ask the platform operator to add one."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows neither the reference nor the panel on an External account", async () => {
+    const { fetchMock } = serve({ ...account, depositReference: null }, () => json(instructions));
+
+    expect(await screen.findByRole("heading", { name: "Everyday spending" })).toBeInTheDocument();
+    await screen.findByText("Cash balance");
+    expect(screen.queryByText("Deposit reference")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Deposit instructions" })).not.toBeInTheDocument();
+    expect(instructionCalls(fetchMock)).toHaveLength(0);
+  });
+});
