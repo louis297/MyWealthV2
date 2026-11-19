@@ -227,16 +227,16 @@ identity-auth created `Tenants` **without** `ReportingCurrency`. Login only need
 
 ### 6.6 Users
 
-One table for all four roles. Credentials live on `AspNetUsers`.
+One table for all five roles. Credentials live on `AspNetUsers`.
 
 | Column | Type | Null | Notes |
 | --- | --- | --- | --- |
 | Id | int identity | no | PK |
 | PublicId | uniqueidentifier | no | Unique. JWT subject uses this |
-| TenantId | int | yes | FK → `Tenants`. Null only for SystemAdmin |
+| TenantId | int | yes | FK → `Tenants`. Null only for SystemAdmin and SimulatorOperator |
 | Name | nvarchar(200) | no | |
-| Email | nvarchar(256) | no | Unique inside a tenant; SystemAdmin unique globally |
-| Role | int | no | 0 SystemAdmin, 1 TenantAdmin, 2 Adviser, 3 Customer |
+| Email | nvarchar(256) | no | Unique inside a tenant; platform-level people (SystemAdmin, SimulatorOperator) unique among themselves (`UQ_Users_SystemAdmin_Email`, `WHERE TenantId IS NULL`) |
+| Role | int | no | 0 SystemAdmin, 1 TenantAdmin, 2 Adviser, 3 Customer, 4 SimulatorOperator (`0036`, accepted, not landed) |
 | Status | int | no | 0 PendingActivation, 1 Active, 2 Disabled. Source of truth |
 | IsActive | bit | no | Derived. `1` iff `Status = Active`. `0011` persisted computed column (landed `bbd0f26`) |
 | AdviserId | int | yes | Required for Customer. FK → `Users.Id` |
@@ -358,6 +358,7 @@ Beyond PK / unique constraints already listed:
 0033_tenants_allowed_custody_modes.sql      -- Tenants.AllowsExternalAccounts / AllowsCustodialAccounts (DEFAULT 1 kept); CHECK at least one
 0034_entered_trade_fees.sql                 -- drop CK_TransactionFeeDetails_BrokerageSchedule (a Brokerage fee may have no schedule)
 0035_transaction_source.sql                 -- not written yet: Transactions.SourceKind / SourcePublicId, back-filled; rebalance trades lose the rb: reference
+0036_users_role_simulator_operator.sql      -- not written yet: CK_Users_RoleShape lets Role 4 (SimulatorOperator) have no tenant and no adviser
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -508,6 +509,8 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-18 | External caller numbers landed: `0034_entered_trade_fees.sql` written and applied. |
 | 2026-11-19 | Transaction source in `review` (`0035`, not written yet): `Transactions.SourceKind` and `SourcePublicId`, back-filled; existing rebalance trades lose their `rb:` reference ([features/transaction-source.md](features/transaction-source.md) §6). |
 | 2026-11-19 | Transaction source accepted. `0035` is a build contract. |
+| 2026-11-19 | Simulator accepted ([features/simulator.md](features/simulator.md) §6). `0036` widens `CK_Users_RoleShape` for Role 4; no data change. Second database `MyWealthSimulatorDb` with its own scripts (§15). |
+| 2026-11-19 | ADR 0008 amendment: `worker` also runs the applicator at start-up (matches the code since `26fb489`). |
 
 ---
 
@@ -593,3 +596,16 @@ Daily Hangfire job at 12:00 UTC fetches EOD prices from EODHD for instruments th
 | 2026-11-08 | Source switched to EODHD. Column value `'EODHD'`. |
 | 2026-11-08 | Instrument price sync runs daily at 12:00 UTC. |
 | 2026-11-02 | `0022_instrument_prices.sql` landed. No seed rows in the script. TestSeed writes the fake prices. |
+
+---
+
+## 15. Simulator database (accepted, not landed)
+
+Owner: [features/simulator.md](features/simulator.md) §6.2, [ADR 0021](adr/0021-outside-parties-behind-ports.md) rule 22.
+
+- Database `MyWealthSimulatorDb` on the same SQL Server as `MyWealthDbV2`. Connection string `ConnectionStrings:MyWealthSimulatorDb`, given only to `simulator`.
+- Scripts in `database/simulator/NNNN_*.sql`, numbered from `0001`, recorded in that database's own `SchemaVersions`. Applied only by `simulator` at its start-up, with the same schema applicator (moved to `src/Schema`). Never applied to `MyWealthDbV2`; platform scripts are never applied to it.
+- No platform host connects to it, and the simulator does not connect to `MyWealthDbV2`. No cross-database query, view or synonym.
+- S0 tables: `World` (one row, `CHECK (Id = 1)`) and `ControlLog`. Each party (S1–S4) adds its tables with its own amendment.
+- Development: Aspire creates the database. VPS: created by hand once, like `MyWealthDbV2` ([deployment.md](deployment.md) §15).
+

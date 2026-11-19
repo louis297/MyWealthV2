@@ -80,6 +80,8 @@ Every .NET host sends traces, metrics and logs over OTLP to a standalone Aspire 
 | `sql` | SQL Server 2022, Express edition | No | — | `MSSQL_PID=Express`, `MSSQL_MEMORY_LIMIT_MB=2048` |
 | `aspire-dashboard` | `mcr.microsoft.com/dotnet/aspire-dashboard`, exact version tag | No | — | Telemetry viewer (§5.1). UI published on `127.0.0.1:18888` of the VPS only |
 
+The simulator container (`simulator`, `sim.<domain>`) is accepted, not landed; its entries are in §15 and join this table when it lands.
+
 `<domain>` is the showcase domain. It is chosen, but this doc does not name it. It lives in `DOMAIN` in `.env` on the VPS and in the smoke URL variables of GitHub environment `production` (§6).
 
 **Ports.** Every .NET host listens on `8080` for traffic and on the health port `8081` for `/health` and `/alive` ([features/production-hosting.md](features/production-hosting.md)). Caddy forwards only to `8080`.
@@ -343,3 +345,24 @@ Suggested build order: 1, 3, 2, 5 (all in host start-up, mostly ServiceDefaults)
 ## 14. Open decisions
 
 None. The domain name was the last one. It is chosen and kept out of this doc (§3). The compose file and the Caddyfile take it from `DOMAIN` in `.env`.
+
+---
+
+## 15. Amendment 2026-11-19: simulator (accepted, not landed)
+
+From [features/simulator.md](features/simulator.md) §9.3 and [ADR 0021](adr/0021-outside-parties-behind-ports.md). When it lands, move each row into its section and drop this one.
+
+| Section | Change |
+| --- | --- |
+| §3 Topology | Container `simulator`, image `mywealth-simulator`, public through Caddy at `sim.<domain>`, control port `8080` only. Party port `8082` on the internal network only; Caddy never forwards to it. Health port `8081` as for every host |
+| §3 Sizing | About 150–250 MB more |
+| §3 Compose profile | The service has compose profile `simulator` and runs only when `.env` has `COMPOSE_PROFILES=simulator`. `docker compose stop simulator` stops it until the next deploy; remove the profile from `.env` to keep it off across deploys. No other service `depends_on` it, and every pull job survives its absence (ADR 0021 rule 15) |
+| §4 Images | A seventh .NET image, same build rules |
+| §5 Keys | `simulator`: `ConnectionStrings__MyWealthSimulatorDb`, `Authentication__Authority`, `Authentication__ClientSecret`, `Authentication__PublicOrigin`, `Simulator__PartyApiKey`, `DataProtection__KeysPath`, `ForwardedHeaders__KnownNetworks__0`. `identity`: `Identity__SimulatorClientSecret`, `Identity__SimulatorOrigin`. `webapi`: `Bootstrap__SimulatorOperator__Email`, `Bootstrap__SimulatorOperator__Password`, first start only. `OTEL_SERVICE_NAME` = `simulator` |
+| §6 Secrets | Fourth OIDC client secret (`identity` and `simulator`); party API key, at least 32 characters (`simulator`; later the `worker` too, from roadmap B3); bootstrap simulator operator email and password (`webapi`, removed after the first sign-in). All in `.env` |
+| §7 State | `data/dataprotection/simulator/`, owned by UID 1654. The simulator's books live in `MyWealthSimulatorDb` on the `sql-data` volume; if lost, the simulator starts a new world |
+| §8 Database | `MyWealthSimulatorDb` is created by hand once, like `MyWealthDbV2`. The simulator applies `database/simulator/` scripts on its own start; no other host does. Start order: `sql` healthy and `identity` healthy → `simulator` |
+| §9 CD | When the profile is on, an unhealthy simulator fails the deploy like any other host |
+| §11 Security | Caddy site `sim.<domain>`: global rate limit, HSTS, forwards to `simulator:8080` only. The simulator is a public host for forwarded headers |
+| §12 Runbook | Step 3: five hostnames. Step 9: also create `MyWealthSimulatorDb`. After step 11: set `COMPOSE_PROFILES=simulator`, sign in to `sim.<domain>` as the bootstrap simulator operator, then remove the `Bootstrap__SimulatorOperator__*` values and run `docker compose up -d webapi` |
+

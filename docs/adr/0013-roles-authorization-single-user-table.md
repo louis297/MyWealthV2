@@ -3,12 +3,13 @@ title: "ADR 0013: Four roles, code-mapped policies, one table per layer"
 status: accepted
 language: en
 date: 2026-09-01
-updated: 2026-11-15
+updated: 2026-11-19
 related:
   - 0005-shared-database-tenantid-isolation.md
   - 0006-email-password-jwt-authentication.md
   - 0012-user-activation-invite-deferred.md
   - 0014-openiddict-authorization-code-pkce.md
+  - 0021-outside-parties-behind-ports.md
 ---
 
 # ADR 0013: Four roles, code-mapped policies, one table per layer
@@ -59,6 +60,18 @@ Amendment 2026-11-15: the per-slice permission tables that were here (Phase 1, i
 - Customer scope is the caller's own rows, checked in the handler.
 
 The `/users` HTTP namespace (`/users/advisers` and so on) is an API convention. It is not this ADR’s authorization model.
+
+### Amendment 2026-11-19: fifth role `SimulatorOperator`
+
+Accepted with [ADR 0021](0021-outside-parties-behind-ports.md) rule 25 and [features/simulator.md](../features/simulator.md) R1–R10. Not landed. Do not rewrite decision 1 in place; this amendment replaces "four values" with five.
+
+- `UserRole.SimulatorOperator = 4`. Platform-level like SystemAdmin: `TenantId` null, `AdviserId` null, `IdentityUserId` required. Its email shares the platform-level unique index with SystemAdmin.
+- It signs in only on client `simulator` (client × role allow-list). No other client allows it, and it is on no other client's row.
+- `RolePermissions` grants it nothing. `webapi` answers 401 to its token on every route, so it is never a resource-API caller and holds no row in the [api-design.md](../api-design.md) §3.1 table.
+- It is created by the `webapi` bootstrap from configuration and by the Development seed, not by a route.
+- Still true: tenants cannot invent roles; no Operations / ReadOnly / Support role inside a tenant. Operations work inside a tenant stays a set of permissions mapped to TenantAdmin first ([custodial-roadmap.md](../custodial-roadmap.md) D5).
+
+`CK_Users_RoleShape` (conceptual, after `0036`): `SystemAdmin` and `SimulatorOperator` → `TenantId` null, `AdviserId` null.
 
 ## Alternatives considered
 

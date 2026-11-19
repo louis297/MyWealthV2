@@ -50,9 +50,13 @@ flowchart LR
   Browser --> Bo[back-office]
   Bo -->|OIDC code + refresh| Id
   Bo -->|Bearer resource API| Web
+  Browser --> Sim[simulator]
+  Sim -->|OIDC code, no API token| Id
+  Sim --> SimSql[(SQL Server MyWealthSimulatorDb)]
   AppHost -.-> Bff
   AppHost -.-> Portal
   AppHost -.-> Bo
+  AppHost -.-> Sim
 ```
 
 Rules that stay true:
@@ -72,7 +76,9 @@ Portals:
 - Customer Portal — second BFF + client on the same authorization server; accepted ([customer-portal/customer-portal.md](customer-portal/customer-portal.md), [features/bff-customer-portal.md](features/bff-customer-portal.md))
 - Back Office — landed ([backoffice/back-office.md](backoffice/back-office.md)). Blazor host `back-office` with MudBlazor (no BFF). Scalar remains. Back Office is the only client that issues SystemAdmin a code; `adviser-portal` refuses SystemAdmin (identity-auth amendment 2026-11-11).
 
-Aspire resource names must not be generic (`Frontend`, `Web`). Hosts: `identity`, `webapi`, `adviser-portal`, `bff-adviser-portal`, `customer-portal`, `bff-customer-portal`, `back-office`, `worker`. Phase 1 does **not** split a separate identity **database**.
+- Simulator — accepted, not landed ([features/simulator.md](features/simulator.md), [ADR 0021](adr/0021-outside-parties-behind-ports.md)). Plays the outside parties. Own database `MyWealthSimulatorDb`; references no platform `Domain`, `Application`, `Infrastructure` or `Web`. Confidential client `simulator`, signed in only by `SimulatorOperator`; keeps no token and never calls `webapi`.
+
+Aspire resource names must not be generic (`Frontend`, `Web`). Hosts: `identity`, `webapi`, `adviser-portal`, `bff-adviser-portal`, `customer-portal`, `bff-customer-portal`, `back-office`, `worker`, `simulator`. Phase 1 does **not** split a separate identity **database**.
 
 One AppHost orchestrates every resource. Separate projects are separate processes. Each ASP.NET project has its own Kestrel and port. Aspire does not merge two projects onto one Kestrel.
 
@@ -93,7 +99,9 @@ One AppHost orchestrates every resource. Separate projects are separate processe
 | BffAdviserPortal | `src/BffAdviserPortal` | Adviser Portal session edge. Confidential client holder. Cookie + OIDC + YARP |
 | BffCustomerPortal | `src/BffCustomerPortal` | Customer Portal session edge (accepted). Confidential client holder. Cookie + OIDC + HttpClient proxy |
 | BackOffice | `src/BackOffice` | SystemAdmin UI. Blazor + MudBlazor. Confidential client `back-office`. Cookie + OIDC. Calls `webapi` with Bearer. No BFF |
-| Worker | `src/Worker` | Background worker. Hangfire Server for async and recurring work (ADR 0017). First consumer: Reports. |
+| Worker | `src/Worker` | Background worker. Hangfire Server for async and recurring work (ADR 0017). First consumer: Reports. Also runs the schema applicator at start-up (ADR 0008 amendment 2026-11-19) |
+| Schema | `src/Schema` | Schema applicator library (accepted, not landed; moved out of `Infrastructure` by [features/simulator.md](features/simulator.md)). Used by `webapi`, `worker` and `simulator`, each for its own database |
+| Simulator | `src/Simulator` | Outside parties for manual tests and demos (accepted, not landed). Control port behind sign-in, party port on the internal network, own database |
 | AdviserPortal | Independent frontend | Vite SPA. No tokens. OIDC client id `adviser-portal` is not held here |
 | CustomerPortal | Independent frontend | Vite SPA (accepted). No tokens. OIDC client id `customer-portal` is not held here |
 | Tests | `tests/*` | Domain unit, application unit, infrastructure integration, functional |
@@ -114,7 +122,7 @@ Hosted in `src/IdentityHost` (ADR 0014). Aspire resource name: `identity`.
 | --- | --- |
 | Protocol | OpenIddict **defaults, do not remap**: `/.well-known/openid-configuration`, `/.well-known/jwks`, `/connect/authorize`, `/connect/token`, `/connect/revocation`, `/connect/logout` (plus default `/connect/userinfo`). Callers follow discovery; do not hard-code |
 | Hosted login | Password page on `identity`: email + password + tenantCode (SystemAdmin omits tenantCode) |
-| Client | Three confidential clients. `adviser-portal` is held by `bff-adviser-portal`. `back-office` is held by `src/BackOffice`. `customer-portal` is held by `bff-customer-portal` (accepted). Authorization code + PKCE + refresh. No password grant. |
+| Client | Three confidential clients. `adviser-portal` is held by `bff-adviser-portal`. `back-office` is held by `src/BackOffice`. `customer-portal` is held by `bff-customer-portal` (accepted). Authorization code + PKCE + refresh. No password grant. A fourth, `simulator`, is accepted, not landed: code + PKCE, scopes `openid profile email` only, no refresh, no `api` (identity-auth amendment 2026-11-19). |
 | Access | Short-lived JWT. **Asymmetric** signing. Public keys on JWKS |
 | Refresh | OpenIddict token store. Revoked on logout (at once), and on password change and disable (when the outbox delivers the event). Rotated when presented. No custom `RefreshTokens` table |
 | Scopes | `openid`, `profile`, `offline_access`, `api`. Role and tenant are JWT claims, not scopes. Permissions are not expanded into the token |
@@ -211,6 +219,7 @@ dotnet run --project src/AppHost
 | Adviser Portal BFF | `bff-adviser-portal` | `src/BffAdviserPortal`. Cookie session, code exchange, `/api` proxy |
 | Customer Portal | `customer-portal` | Vite frontend (accepted). No OIDC client in the browser |
 | Customer Portal BFF | `bff-customer-portal` | `src/BffCustomerPortal` (accepted). Cookie session, code exchange, `/api` proxy |
+| Simulator | `simulator` | `src/Simulator` (accepted, not landed). Control endpoint with Scalar; `party` endpoint; database `MyWealthSimulatorDb` on `dbserver` |
 
 **Database lifecycle (ADR 0008)**
 
@@ -267,7 +276,7 @@ Password change, disable, and logout revoke that subject’s OpenIddict tokens. 
 
 Do not add a port whose surface is still open. Do add a port (or value object) when later use is certain and omitting it would force a Phase-1 redesign (`Money`, `ICurrencyCatalog`, no-op `IEmailSender`).
 
-Outside parties (proposed, [ADR 0021](adr/0021-outside-parties-behind-ports.md)): a bank, broker, custodian or issuer gets one port per party role, added by the flow spec that needs it (the first with roadmap B3). The `worker` pulls each feed on a schedule, stores the inbound records and the feed cursor first, and a flow processes stored records afterwards. `webapi` handlers never call an outside party. The simulator host (`simulator`, [features/simulator.md](features/simulator.md), `draft`) is one adapter behind those ports, with its own database; no host list in this document includes it until that spec is accepted.
+Outside parties ([ADR 0021](adr/0021-outside-parties-behind-ports.md), accepted): a bank, broker, custodian or issuer gets one port per party role, added by the flow spec that needs it (the first with roadmap B3). The `worker` pulls each feed on a schedule, stores the inbound records and the feed cursor first, and a flow processes stored records afterwards. `webapi` handlers never call an outside party. The simulator host (`simulator`, [features/simulator.md](features/simulator.md), accepted, not landed) is one adapter behind those ports, with its own database.
 
 ---
 
@@ -328,7 +337,7 @@ Phase 3 introduces a general-purpose background worker (ADR 0017).
 ## 11. ADR index (architecture view)
 
 
-Locked conclusions follow function-plan §0 and these ADRs. The `docs/adr/` folder holds English ADRs 0001–0018 (as of 2026-11-01). All are accepted unless a later ADR explicitly supersedes one.
+Locked conclusions follow function-plan §0 and these ADRs. The `docs/adr/` folder holds English ADRs 0001–0021 (as of 2026-11-19). All are accepted unless a later ADR explicitly supersedes one.
 
 | ADR | Constraint on this document |
 | --- | --- |
@@ -352,6 +361,8 @@ Locked conclusions follow function-plan §0 and these ADRs. The `docs/adr/` fold
 | 0019 | FX rate source and refresh (accepted). Frankfurter daily rates, hourly Hangfire job (UTC), directed pairs for active catalog currencies. Contract: features/fx-rates.md (accepted). |
 | — | Instrument prices (accepted, no new ADR). EODHD EOD, daily Hangfire job at 12:00 UTC, local `InstrumentPrices` table. Contract: features/instrument-prices.md (accepted). Follows ADR 0019 pattern. |
 | — | Portfolios (accepted). Model portfolios, Full Rebalance, assignment lock. Contract: features/portfolios.md (accepted). No new ADR. |
+| 0020 | Custody mode on the Account (`External` / `Custodial`) |
+| 0021 | Outside parties behind ports: one port per party role, pulled by the `worker`, stored before use, booked at processing time. The simulator is one adapter in its own host with its own database; fifth role `SimulatorOperator` |
 
 ---
 
@@ -381,3 +392,4 @@ Locked conclusions follow function-plan §0 and these ADRs. The `docs/adr/` fold
 | 2026-11-02 | [features/portfolios.md](features/portfolios.md) accepted. Assign and single-account rebalance are synchronous. Weight change and bulk rebalance return 202. Disable unassigns every Active assignment. |
 | 2026-11-19 | §3.3: the `worker` also runs the schema applicator at start-up (ADR 0008 amendment, matches the code since `26fb489`). |
 | 2026-11-19 | ADR 0021 proposed: outside parties behind ports, pulled by the `worker`, stored before use. Simulator host spec [features/simulator.md](features/simulator.md) drafted. Pointer in §6; hosts, solution map and ADR table change when they are accepted. |
+| 2026-11-19 | ADR 0021 and [features/simulator.md](features/simulator.md) accepted. `simulator` and `src/Schema` added to §1, §2, §3.1 and §4; ADR table gains 0020 and 0021. |
