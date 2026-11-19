@@ -11,6 +11,7 @@ using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using Microsoft.AspNetCore.Http.HttpResults;
 using MyWealthV2.Application.Accounts.Queries.GetAccountHoldings;
+using MyWealthV2.Application.Accounts.Queries.GetDepositInstructions;
 using MyWealthV2.Application.Portfolios;
 using MyWealthV2.Application.Portfolios.Commands.AssignPortfolio;
 using MyWealthV2.Application.Portfolios.Commands.RebalanceAccount;
@@ -35,6 +36,7 @@ public class Accounts : IEndpointGroup
         groupBuilder.MapPost(ReopenAccount, "{id}/reopen").RequireAuthorization(Policies.AccountsManage);
         groupBuilder.MapGet(GetHoldings, "{id}/holdings").RequireAuthorization(Policies.AccountsRead);
         groupBuilder.MapGet(GetAccountPortfolio, "{id}/portfolio").RequireAuthorization(ReadPortfolio);
+        groupBuilder.MapGet(GetDepositInstructions, "{id}/deposit-instructions");
         groupBuilder.MapPost(AssignPortfolio, "{id}/portfolio").RequireAuthorization(Policies.TransactionsCreate);
         groupBuilder.MapDelete(UnassignPortfolio, "{id}/portfolio").RequireAuthorization(Policies.TransactionsCreate);
         groupBuilder.MapPost(RebalanceAccount, "{id}/rebalance").RequireAuthorization(Policies.TransactionsCreate);
@@ -69,6 +71,11 @@ public class Accounts : IEndpointGroup
         var item = await sender.Send(new GetAccountCashBalanceQuery(id));
         return TypedResults.Ok(item);
     }
+
+    [EndpointSummary("Get deposit instructions")]
+    [EndpointDescription("Returns where to pay in to an Open Custodial account, and the reference to quote.")]
+    public static Task<Ok<DepositInstructionsDto>> GetDepositInstructions(ISender sender, Guid id) =>
+        throw new NotImplementedException();
 
     [EndpointSummary("Get an account")]
     [EndpointDescription("Returns one account by PublicId.")]
