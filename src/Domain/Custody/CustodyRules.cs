@@ -21,7 +21,9 @@ public static class CustodyRules
     /// on an Account of <paramref name="custodyMode"/>. Application calls it in the reverse handler only;
     /// <see cref="Transaction.Reverse"/> does not, so a later flow can undo its own write (R16).
     /// </summary>
-    public static bool AllowsHandReverse(CustodyMode custodyMode, TransactionSourceKind sourceKind) => true;
+    public static bool AllowsHandReverse(CustodyMode custodyMode, TransactionSourceKind sourceKind) =>
+        custodyMode == CustodyMode.External
+        || sourceKind is TransactionSourceKind.Manual or TransactionSourceKind.Rebalance;
 
     public static bool AllowsManualEntry(CustodyMode custodyMode, TransactionType type) =>
         RefusalMessage(custodyMode, type) is null;
