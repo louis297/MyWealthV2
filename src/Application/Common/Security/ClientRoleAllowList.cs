@@ -8,7 +8,8 @@ public static class ClientRoleAllowList
     {
         ["adviser-portal"] = [UserRole.TenantAdmin, UserRole.Adviser],
         ["back-office"] = [UserRole.SystemAdmin],
-        ["customer-portal"] = [UserRole.Customer]
+        ["customer-portal"] = [UserRole.Customer],
+        ["simulator"] = [UserRole.SimulatorOperator]
     };
 
     public static bool Allows(string? clientId, UserRole role) =>

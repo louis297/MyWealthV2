@@ -47,6 +47,11 @@ public static class Services
     public const string BackOffice = "back-office";
 
     /// <summary>
+    /// Aspire resource name and OIDC client id for the simulator (src/Simulator).
+    /// </summary>
+    public const string Simulator = "simulator";
+
+    /// <summary>
     /// Aspire resource name for the background worker (src/Worker).
     /// </summary>
     public const string Worker = "worker";
