@@ -1,6 +1,6 @@
 ---
 title: Simulator
-status: draft
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -24,11 +24,11 @@ related:
 
 # Simulator
 
-New host `simulator` (`src/Simulator`) that plays the outside parties of [custodial-roadmap.md](../custodial-roadmap.md): bank, broker, custodian, issuer. This spec is roadmap step 2, item **S0**: the skeleton with no party in it yet. Each party is added later with the flow that needs it (S1 bank with B3–B7, and so on), as an amendment to this file. The decision behind it is [ADR 0021](../adr/0021-outside-parties-behind-ports.md) (`proposed`).
+New host `simulator` (`src/Simulator`) that plays the outside parties of [custodial-roadmap.md](../custodial-roadmap.md): bank, broker, custodian, issuer. This spec is roadmap step 2, item **S0**: the skeleton with no party in it yet. Each party is added later with the flow that needs it (S1 bank with B3–B7, and so on), as an amendment to this file. The decision behind it is [ADR 0021](../adr/0021-outside-parties-behind-ports.md) (accepted 2026-11-19).
 
 The skeleton has a control surface for a person (sign-in, Scalar, clock, reset, a party outage switch, a log) and a party surface for the platform (one status route behind a machine credential). On the platform side it adds a fifth role, `SimulatorOperator`, a fourth OIDC client `simulator` on `identity`, and the deploy entries. Scripts: platform `0036_users_role_simulator_operator.sql`; simulator `database/simulator/0001`, `0002`. No new `webapi` route or policy. No platform port: the first one lands with roadmap B3.
 
-**Status is `draft` (2026-11-19).** Not a build contract. The points in §11 need an answer before it moves to `review`.
+**Status is `accepted` (2026-11-19).** Build contract; not landed. The twelve points of §11 were confirmed as recommended. The amendments it makes to other documents (deployment, identity-auth, ADR 0013, architecture, database-design, domain-model, api-design, glossary) were written in the same change and are marked "accepted, not landed".
 
 ---
 
@@ -45,7 +45,7 @@ The rule that distinguishes this slice: the two surfaces never mix. Control rout
 **In**
 
 - Host: project `src/Simulator`, Aspire resource `simulator`, ASP.NET Core minimal API. References `ServiceDefaults`, `Shared` and the new schema library (below). No reference to `Domain`, `Application`, `Infrastructure`, `Web` or any other host
-- Schema library: the schema applicator (`SchemaApplicator`, `ISchemaScriptSource`, `FileSchemaScriptSource`, the version store and the batch executor) moves from `src/Infrastructure/Data/Schema` into a new project `src/Schema`, with the version store and executor taking a connection string instead of `ApplicationDbContext`. `Infrastructure` references it. Behaviour unchanged
+- Schema library: the schema applicator (`SchemaApplicator`, `ISchemaScriptSource`, `FileSchemaScriptSource`, the version store and the batch executor) moves from `src/Infrastructure/Data/Schema` into a new project `src/Schema`, with the version store and executor taking a connection string instead of `ApplicationDbContext`. `Infrastructure` references it. `webapi` and `worker` keep running it for `MyWealthDbV2` ([ADR 0008](../adr/0008-schema-sql-as-source-of-truth.md) amendment 2026-11-19). Behaviour unchanged
 - Simulator database `MyWealthSimulatorDb`, scripts in `database/simulator/` (`0001_schema_versions.sql`, `0002_world.sql`), applied by the simulator at start-up
 - Control surface (port `8080`): OIDC sign-in, Scalar, `GET /control/world`, clock advance / pause / resume, party outage on / off, reset, `GET /control/log`
 - Party surface (port `8082`): machine credential check, `GET /party/status`, outage answer
@@ -165,7 +165,7 @@ The simulator has no shared Domain project. Its own types live in `src/Simulator
 | `ControlLogEntry` | Entity | R28 |
 | `SeededRandom` | Service | R26 |
 
-Update [domain-model.md](../domain-model.md) (role list) when this spec is accepted.
+Recorded in [domain-model.md](../domain-model.md) §4 and §5 (accepted, not landed).
 
 ---
 
@@ -179,7 +179,7 @@ Script: `database/schema/0036_users_role_simulator_operator.sql`. Forward only.
 | --- | --- | --- |
 | `Users` | Drop and re-add `CK_Users_RoleShape`: `([Role] IN (0, 4) AND [TenantId] IS NULL AND [AdviserId] IS NULL) OR ([Role] IN (1, 2) AND [TenantId] IS NOT NULL AND [AdviserId] IS NULL) OR ([Role] = 3 AND [TenantId] IS NOT NULL AND [AdviserId] IS NOT NULL)` | none |
 
-No data change. Update [database-design.md](../database-design.md) (`Users`, script list) when this spec is accepted.
+No data change. Recorded in [database-design.md](../database-design.md) §6.6, §9 and §15 (accepted, not landed).
 
 ### 6.2 Simulator (`MyWealthSimulatorDb`)
 
@@ -294,7 +294,7 @@ Party status:
 
 Validation 400 as ProblemDetails with `errors` (`By`, `To`, `Seed`, `On`). Both or neither of `by` / `to` → 400 `errors.By`. A `to` not after simulator now, or more than 366 days ahead → 400 `errors.To`. No problem codes.
 
-The simulator is a third HTTP surface next to `webapi` and `identity`. [api-design.md](../api-design.md) §1 gains a pointer to this section when this spec is accepted; its conventions do not otherwise apply to the simulator.
+The simulator is a third HTTP surface next to `webapi` and `identity`. [api-design.md](../api-design.md) §1 points to this section; its conventions do not otherwise apply to the simulator.
 
 ---
 
@@ -312,7 +312,7 @@ Scalar on the control port is the only UI in this slice. No portal, Back Office 
 
 ### 9.3 VPS showcase
 
-Amendment to [deployment.md](../deployment.md), applied when this spec is accepted:
+Amendment to [deployment.md](../deployment.md), written there as §15 (accepted, not landed):
 
 | Item | Change |
 | --- | --- |
@@ -345,7 +345,7 @@ No two-tenant isolation tests: the simulator holds no tenant data, and the platf
 
 ## 11. Locked in this spec
 
-New ADR: [adr/0021-outside-parties-behind-ports.md](../adr/0021-outside-parties-behind-ports.md) (`proposed`). It amends [ADR 0013](../adr/0013-roles-authorization-single-user-table.md) decision 1 (five roles).
+New ADR: [adr/0021-outside-parties-behind-ports.md](../adr/0021-outside-parties-behind-ports.md) (accepted 2026-11-19). It amends [ADR 0013](../adr/0013-roles-authorization-single-user-table.md) decision 1 (five roles).
 
 | Item | Lock |
 | --- | --- |
@@ -358,22 +358,22 @@ New ADR: [adr/0021-outside-parties-behind-ports.md](../adr/0021-outside-parties-
 | Machine credential | `X-Api-Key` header, `Simulator:PartyApiKey`, at least 32 characters |
 | Routes, policies on `webapi` | None added |
 
-### To confirm before `review`
+### Confirmed when this spec was accepted (2026-11-19)
 
-Each point has a recommendation, written into the rules above. The alternatives are kept for the record.
+Each point was confirmed as recommended and is written into the rules above as stated here. The alternatives are kept for the record.
 
-1. **How the operator account is made** (R9, R10). Recommended: bootstrap from configuration on `webapi` start, plus the Development seed. There is one operator (the owner) on the showcase. A password change is not possible from the simulator (it has no `api` scope, so it cannot call `PUT /users/me/password`); to change it, delete the operator's `Users` and `AspNetUsers` rows in SQL and let the bootstrap create it again (R9 creates one only when none exists, whatever its status). Nothing references those rows. Alternative: a `/users/simulator-operators` route under `tenants.manage` and a Back Office page. More work, and it gives SystemAdmin power over the simulator, which D16 wanted to avoid.
-2. **No `api` scope and a 401 on `webapi`** (R3, R6). Recommended: both. `webapi` does not check scope or audience today, so the scope alone does not keep the token out. Alternative: make `webapi` require the `api` scope for every caller, which is a wider change to every client's tokens.
-3. **Machine credential** (R30, ADR 0021 rule 17). Recommended: a static key the simulator owns, as a real bank would issue its own credentials. Alternative: OAuth client credentials on `identity`, which adds a grant to ADR 0014 for a test tool and makes the outside party trust the platform's identity server.
-4. **A separate party port** (R11, R12). Recommended: port `8082`, matched on the local port like the health port, so Caddy cannot forward party routes by mistake. Alternative: one port and a Caddy path filter, which one Caddyfile edit can undo.
-5. **Running clock with offset, plus pause** (R21–R23). Recommended: running by default, so outside dates follow the real days on the showcase when nobody touches it; pause gives fixed instants for a scripted demo. Alternative: a frozen clock that moves only on command, which is fully deterministic but makes every demo day need a manual advance.
-6. **World id in every outside id and cursor** (R24, R25). Recommended: yes, so a reset cannot make the platform's unique index (ADR 0021 rule 7) drop a new record as a duplicate of an old one. Alternative: no reset at all on production.
-7. **Scenarios later** (§2 Out). Recommended: the scenario library lands with S1, when the first step kinds exist. Alternative: an empty library now, which the docs rule "do not create empty files for slices not discussed" argues against.
-8. **No platform reads** (§2 Out). The roadmap S0 said the simulator "may read instruments and reference prices through `webapi` read routes"; D16 gives the operator no `webapi` permission, and R3 refuses the role. Recommended for S2: the order call carries the platform's reference price, and the simulator fills at it plus a seeded slippage (D11 for real instruments); simulated instruments are the simulator's own (D11). Then the simulator never reads the platform. Decide in the S2 amendment.
-9. **Compose profile** (§9.3). Recommended: the simulator runs only when `COMPOSE_PROFILES=simulator`, so the owner can keep it off across deploys. Alternative: always on, stopped by hand, which every deploy undoes.
-10. **TestAppHost** (§9.2). Recommended: a database only, no process. The roadmap S0 said "an Aspire resource ... in the test AppHost"; ADR 0021 rule 19 makes the process unnecessary for tests.
-11. **Schema library** (§2). Recommended: move the applicator into `src/Schema` with a connection string, so the simulator does not reference `Infrastructure` (ADR 0021 rule 21). Alternative: the simulator references `Infrastructure`, which brings the platform's `DbContext` and every platform table mapping into the simulator.
-12. **Session without tokens, 8 hours** (R16). Recommended: the host needs no token, so it keeps none. A disabled operator keeps a session until the cookie ends. Alternative: keep refresh tokens and re-check on refresh, which needs `offline_access` for a client that calls nothing.
+1. **How the operator account is made** (R9, R10). Decided: bootstrap from configuration on `webapi` start, plus the Development seed. There is one operator (the owner) on the showcase. A password change is not possible from the simulator (it has no `api` scope, so it cannot call `PUT /users/me/password`); to change it, delete the operator's `Users` and `AspNetUsers` rows in SQL and let the bootstrap create it again (R9 creates one only when none exists, whatever its status). Nothing references those rows. Alternative: a `/users/simulator-operators` route under `tenants.manage` and a Back Office page. More work, and it gives SystemAdmin power over the simulator, which D16 wanted to avoid.
+2. **No `api` scope and a 401 on `webapi`** (R3, R6). Decided: both. `webapi` does not check scope or audience today, so the scope alone does not keep the token out. Alternative: make `webapi` require the `api` scope for every caller, which is a wider change to every client's tokens.
+3. **Machine credential** (R30, ADR 0021 rule 17). Decided: a static key the simulator owns, as a real bank would issue its own credentials. Alternative: OAuth client credentials on `identity`, which adds a grant to ADR 0014 for a test tool and makes the outside party trust the platform's identity server.
+4. **A separate party port** (R11, R12). Decided: port `8082`, matched on the local port like the health port, so Caddy cannot forward party routes by mistake. Alternative: one port and a Caddy path filter, which one Caddyfile edit can undo.
+5. **Running clock with offset, plus pause** (R21–R23). Decided: running by default, so outside dates follow the real days on the showcase when nobody touches it; pause gives fixed instants for a scripted demo. Alternative: a frozen clock that moves only on command, which is fully deterministic but makes every demo day need a manual advance.
+6. **World id in every outside id and cursor** (R24, R25). Decided: yes, so a reset cannot make the platform's unique index (ADR 0021 rule 7) drop a new record as a duplicate of an old one. Alternative: no reset at all on production.
+7. **Scenarios later** (§2 Out). Decided: the scenario library lands with S1, when the first step kinds exist. Alternative: an empty library now, which the docs rule "do not create empty files for slices not discussed" argues against.
+8. **No platform reads** (§2 Out). The roadmap S0 said the simulator "may read instruments and reference prices through `webapi` read routes"; D16 gives the operator no `webapi` permission, and R3 refuses the role. Direction for S2: the order call carries the platform's reference price, and the simulator fills at it plus a seeded slippage (D11 for real instruments); simulated instruments are the simulator's own (D11). Then the simulator never reads the platform. The S2 amendment locks the S2 part.
+9. **Compose profile** (§9.3). Decided: the simulator runs only when `COMPOSE_PROFILES=simulator`, so the owner can keep it off across deploys. Alternative: always on, stopped by hand, which every deploy undoes.
+10. **TestAppHost** (§9.2). Decided: a database only, no process. The roadmap S0 said "an Aspire resource ... in the test AppHost"; ADR 0021 rule 19 makes the process unnecessary for tests.
+11. **Schema library** (§2). Decided: move the applicator into `src/Schema` with a connection string, so the simulator does not reference `Infrastructure` (ADR 0021 rule 21). Alternative: the simulator references `Infrastructure`, which brings the platform's `DbContext` and every platform table mapping into the simulator.
+12. **Session without tokens, 8 hours** (R16). Decided: the host needs no token, so it keeps none. A disabled operator keeps a session until the cookie ends. Alternative: keep refresh tokens and re-check on refresh, which needs `offline_access` for a client that calls nothing.
 
 Still open, not this slice:
 

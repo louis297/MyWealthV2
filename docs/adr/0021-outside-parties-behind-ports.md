@@ -1,6 +1,6 @@
 ---
 title: "ADR 0021: Outside parties behind ports, and the simulator"
-status: proposed
+status: accepted
 language: en
 date: 2026-11-19
 updated: 2026-11-19
@@ -21,7 +21,7 @@ related:
 
 # ADR 0021: Outside parties behind ports, and the simulator
 
-Status: proposed
+Status: accepted (2026-11-19)
 
 Roadmap item F2 of [custodial-roadmap.md](../custodial-roadmap.md) (step 2). It writes principles P1–P4, P9 and P10 and decisions D1, D2, D8–D10, D16, D17 and D19 of that note as one decision. The first port arrives with roadmap B3. The simulator host's first cut is [features/simulator.md](../features/simulator.md) (S0).
 

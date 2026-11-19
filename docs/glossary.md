@@ -29,12 +29,12 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | MyWealthV2 | This wealth-management SaaS. | — |
 | Tenant / Firm / Client | A contracted firm on the platform. One firm = one tenant. | End-client **Customer** |
 | TenantCode | Login identifier for a tenant. Phase 1 uses a code; no subdomain routing. | `TenantId` (internal integer key) |
-| User | A person in the domain. All four roles share one Domain `Users` table. | The ASP.NET Identity login row by itself |
+| User | A person in the domain. All five roles share one Domain `Users` table (`SimulatorOperator` is the fifth, [ADR 0021](adr/0021-outside-parties-behind-ports.md)). | The ASP.NET Identity login row by itself |
 | SystemAdmin | Platform-level operator. Not bound to a tenant. Signs in to Back Office only. | TenantAdmin |
 | TenantAdmin | Highest authority inside one tenant. | SystemAdmin |
 | Adviser | Tenant operator who manages assigned customers (and, from Phase 2, their ledger). | Customer |
 | Customer | Account holder. Login principal. Phase 1 client `adviser-portal` issues no code. Client `customer-portal` is accepted ([customer-portal/customer-portal.md](customer-portal/customer-portal.md)). | A business row with no login principal |
-| SimulatorOperator | Fifth role (proposed, [ADR 0021](adr/0021-outside-parties-behind-ports.md), [features/simulator.md](features/simulator.md) `draft`). Platform-level like SystemAdmin: no tenant, no adviser. Signs in only on client `simulator`. No permission; `webapi` answers 401 to its token. | SystemAdmin; an operations role inside a tenant (roadmap D5) |
+| SimulatorOperator | Fifth role ([ADR 0021](adr/0021-outside-parties-behind-ports.md), accepted: [features/simulator.md](features/simulator.md)). Platform-level like SystemAdmin: no tenant, no adviser. Signs in only on client `simulator`. No permission; `webapi` answers 401 to its token. | SystemAdmin; an operations role inside a tenant (roadmap D5) |
 | Report | Platform catalog entry: PublicId, stable Code, name, function, scope (`Customer` or `Book`), allowed triggers, IsActive. Disable cascades revoke of all TenantReports. | A tenant-owned row; a generated file |
 | Book | An Adviser’s set of assigned Customers. Book-scoped reports run across that set. TenantAdmin selects an Adviser. | The whole tenant; a single Customer |
 | TenantReport | Grant of a Report to a Tenant. Required before the tenant can schedule or run it. | An execution |
@@ -42,7 +42,7 @@ Phase-2 ledger words are kept so names stay stable. They are **not** Phase-1 sch
 | IReportGenerator | Per-report strategy. Registered by ReportId. Binds and validates `parameters`, checks scope, generates the result. | A Hangfire job type per report |
 | asOf | Server-written UTC timestamp on Adviser Balances Report, set when the job is created. Not a client parameter. | A date the caller sends |
 | Worker | Aspire resource `worker` (`src/Worker`). General-purpose Hangfire host for async tasks. | A second resource API |
-| ApplicationUser / Identity user | ASP.NET Identity user in Infrastructure. All four roles share this table set. | Domain `User` |
+| ApplicationUser / Identity user | ASP.NET Identity user in Infrastructure. All five roles share this table set. | Domain `User` |
 | Permission / Policy | Named capability on an endpoint (for example `accounts.close`). Role → permission is mapped in code. | Per-tenant custom role tables; `AspNetRoles` |
 | UserStatus | `PendingActivation` / `Active` / `Disabled`. Source of truth for a person. | Writing `IsActive` by itself |
 | User.IsActive | Derived filter bit. `1` only when `Status = Active`. `PendingActivation` and `Disabled` are `0`. | A second writable switch; replacing `UserStatus` |
@@ -140,7 +140,7 @@ One row per process. Aspire resource names are the words used in docs and servic
 | Customer Portal SPA | `customer-portal` | `CustomerPortal` | `src/CustomerPortal` | [customer-portal/customer-portal.md](customer-portal/customer-portal.md) (accepted) |
 | Customer Portal BFF | `bff-customer-portal` | `BffCustomerPortal` | `src/BffCustomerPortal` | [features/bff-customer-portal.md](features/bff-customer-portal.md) (accepted) |
 | Back Office | `back-office` | `BackOffice` | `src/BackOffice` | [backoffice/back-office.md](backoffice/back-office.md) (accepted) |
-| Simulator | `simulator` | `Simulator` | `src/Simulator` | [features/simulator.md](features/simulator.md) (draft) |
+| Simulator | `simulator` | `Simulator` | `src/Simulator` | [features/simulator.md](features/simulator.md) (accepted) |
 
 Later portals copy the last BFF row: `bff-customer-portal`, `BffCustomerPortal`, `src/BffCustomerPortal`, `features/bff-customer-portal.md`. Do not use `customer-portal-bff` or `CustomerPortalBff`.
 
@@ -190,19 +190,19 @@ Later portals copy the last BFF row: `bff-customer-portal`, `BffCustomerPortal`,
 | Demo catalog | The 18 instruments (USD, NZD, AUD, EUR, GBP, JPY) that the demo seed and `TestSeed` both write for the demo tenant. No prices. | `TestSeed`'s Development-only extras (`NZD-CASH`, fake prices) |
 | Smoke test | Playwright suite `tests/Smoke.Tests` that signs in to each portal and reads one page, to prove the system is on. Reads only. Runs locally and after each deploy. See [smoke-test.md](smoke-test.md). | The functional test suite; an end-to-end suite of business rules |
 | Post-deploy smoke test | The smoke test run from GitHub Actions against the public hostnames after each deploy. A failure fails the deploy and rolls back the image tag. | Running the smoke test on every pull request |
-| Public host | A host that Caddy forwards browser traffic to: `identity`, `bff-adviser-portal`, `bff-customer-portal`, `back-office`. See [features/production-hosting.md](features/production-hosting.md). | `webapi`, `worker` (internal only) |
+| Public host | A host that Caddy forwards browser traffic to: `identity`, `bff-adviser-portal`, `bff-customer-portal`, `back-office`, and the control port of `simulator` ([features/simulator.md](features/simulator.md), accepted). See [features/production-hosting.md](features/production-hosting.md). | `webapi`, `worker` (internal only) |
 | Health port | Second HTTP port of every host (default `8081`). Outside Development, `/health` and `/alive` answer only there. The reverse proxy never forwards to it. See [features/production-hosting.md](features/production-hosting.md). | The traffic port `8080`; a public status page |
 | Bootstrap SystemAdmin | The first SystemAdmin in a production database, created by `webapi` from configuration when no SystemAdmin exists. See [features/identity-auth.md](features/identity-auth.md) amendment 2026-11-12. | The Development seed SystemAdmin `system-admin@localhost`; a SystemAdmin created on every start |
 | Deploy folder | Repository folder `deploy/`: compose file, Caddy files and deploy scripts, copied to the VPS on every deploy. Holds no secrets. See [deployment.md](deployment.md) §5. | `.env`, `certs/` or `data/` on the VPS |
 | Telemetry dashboard | Container `aspire-dashboard` in the production compose project: the standalone Aspire Dashboard that receives OTLP from every .NET host. In memory only; opened through an SSH tunnel. See [deployment.md](deployment.md) §5.1. | The Aspire dashboard that the AppHost starts in Development; the Hangfire dashboard; a public status page |
-| Outside party | A bank, broker, custodian, issuer or data vendor that the platform exchanges data with through a port, one port per party role. The platform pulls; it never takes a push. See [ADR 0021](adr/0021-outside-parties-behind-ports.md) (proposed). | A Tenant; the simulator (one adapter that plays outside parties); EODHD and Frankfurter as vendors of reference data |
-| Inbound record | One record an outside party returned (a statement line, a fill, an event), stored before any flow uses it and unique on (connection, outside id). A flow then processes it and sets its status in the same transaction as the ledger change. [ADR 0021](adr/0021-outside-parties-behind-ports.md) (proposed). | The port response used directly; a Transaction |
-| Feed cursor | Opaque string an outside party returns with a page of records, stored per feed and sent with the next pull. Advanced in the same transaction as the records of that page. A failed pull leaves it unchanged. [ADR 0021](adr/0021-outside-parties-behind-ports.md) (proposed). | A date the platform computes; a page number |
-| Simulator | Aspire resource `simulator` (`src/Simulator`) that plays the outside parties for manual tests and demos. Own database `MyWealthSimulatorDb`, own scripts in `database/simulator/`; never reads platform tables. One party at a time is added with the flow that needs it. [features/simulator.md](features/simulator.md) (draft). | An in-memory port fake in functional tests; a module of `webapi`; a second platform |
-| Simulator world | The simulator's whole state since its last reset: a world id, a seed, the simulator clock, the party outage switch, and later every party's books. A reset starts a new world. Every outside id and cursor contains the world id, so none repeats after a reset. [features/simulator.md](features/simulator.md) (draft). | A tenant; the platform's data |
-| Simulator clock | The simulator's own time: real UTC time plus a stored offset that only grows, or a fixed instant while paused. Sets outside dates only; the platform keeps the real clock (roadmap D9). [features/simulator.md](features/simulator.md) (draft). | The platform clock; a business date on the platform |
-| Control surface | The simulator routes a person uses (clock, reset, outage, log, Scalar), on the control port through Caddy, behind sign-in as `SimulatorOperator`. [features/simulator.md](features/simulator.md) (draft). | The party surface |
-| Party surface | The simulator routes the platform calls (feeds, payments, orders; `GET /party/status` in S0), on the party port `8082`, internal network only, behind the party API key. [features/simulator.md](features/simulator.md) (draft). | The control surface; an inbound endpoint on the platform |
+| Outside party | A bank, broker, custodian, issuer or data vendor that the platform exchanges data with through a port, one port per party role. The platform pulls; it never takes a push. See [ADR 0021](adr/0021-outside-parties-behind-ports.md) (accepted). | A Tenant; the simulator (one adapter that plays outside parties); EODHD and Frankfurter as vendors of reference data |
+| Inbound record | One record an outside party returned (a statement line, a fill, an event), stored before any flow uses it and unique on (connection, outside id). A flow then processes it and sets its status in the same transaction as the ledger change. [ADR 0021](adr/0021-outside-parties-behind-ports.md) (accepted). | The port response used directly; a Transaction |
+| Feed cursor | Opaque string an outside party returns with a page of records, stored per feed and sent with the next pull. Advanced in the same transaction as the records of that page. A failed pull leaves it unchanged. [ADR 0021](adr/0021-outside-parties-behind-ports.md) (accepted). | A date the platform computes; a page number |
+| Simulator | Aspire resource `simulator` (`src/Simulator`) that plays the outside parties for manual tests and demos. Own database `MyWealthSimulatorDb`, own scripts in `database/simulator/`; never reads platform tables. One party at a time is added with the flow that needs it. [features/simulator.md](features/simulator.md) (accepted). | An in-memory port fake in functional tests; a module of `webapi`; a second platform |
+| Simulator world | The simulator's whole state since its last reset: a world id, a seed, the simulator clock, the party outage switch, and later every party's books. A reset starts a new world. Every outside id and cursor contains the world id, so none repeats after a reset. [features/simulator.md](features/simulator.md) (accepted). | A tenant; the platform's data |
+| Simulator clock | The simulator's own time: real UTC time plus a stored offset that only grows, or a fixed instant while paused. Sets outside dates only; the platform keeps the real clock (roadmap D9). [features/simulator.md](features/simulator.md) (accepted). | The platform clock; a business date on the platform |
+| Control surface | The simulator routes a person uses (clock, reset, outage, log, Scalar), on the control port through Caddy, behind sign-in as `SimulatorOperator`. [features/simulator.md](features/simulator.md) (accepted). | The party surface |
+| Party surface | The simulator routes the platform calls (feeds, payments, orders; `GET /party/status` in S0), on the party port `8082`, internal network only, behind the party API key. [features/simulator.md](features/simulator.md) (accepted). | The control surface; an inbound endpoint on the platform |
 
 ---
 
@@ -226,7 +226,7 @@ Account type does **not** replace the cash ledger. Cash balance comes from cash 
 - Product terms follow locked decisions as of 2026-09-11.
 - Login context is **TenantCode** (Phase 1 does not parse a host subdomain).
 - Session protocol is OpenIddict authorization code + PKCE (ADR 0014).
-- Four roles share one Domain `Users` table and one `ApplicationUser` table (ADR 0013).
+- Five roles share one Domain `Users` table and one `ApplicationUser` table (ADR 0013, amended by ADR 0021).
 - Internal key is `int` identity; external key is `PublicId` (ADR 0007).
 - Reversal and instrument catalog wording is reserved for the Phase-2 ledger. Phase 1 does not implement those tables or APIs.
 - Invitation / password-reset wording is reserved. Phase 1 keeps `UserStatus`, `UserTokens`, and `IEmailSender` seams only.
