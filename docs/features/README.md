@@ -171,6 +171,16 @@ Decision in [ADR 0020](../adr/0020-account-custody-mode.md) (accepted 2026-11-17
 
 ---
 
+## Ledger — custodial roadmap (opened 2026-11-19)
+
+Plan and order in [custodial-roadmap.md](../custodial-roadmap.md) (`note`) §13. Each step gets its own spec; this table grows one row per step.
+
+| Spec | Status | Who | Ships | Why it stays its own slice |
+| --- | --- | --- | --- | --- |
+| [transaction-source](transaction-source.md) | review (2026-11-19) | Same callers as posting and portfolios | Roadmap step 1 (F1, F4). Every Transaction has a source (`Manual`, `Seed`, `Rebalance`, and an optional source id; the rebalance handle on rebalance trades), shown as `source` on the item. Rebalance stops writing `rb:…:{InstrumentId}` into `reference`. On a Custodial account a hand reverse needs a `Manual` or `Rebalance` source. Script `0035`. Adviser Portal: Source line, Reverse hidden by source. No new route, policy or type | Groundwork every later flow uses to mark its writes, and the rule that keeps people from undoing them |
+
+---
+
 ## Platform — production hosting (drafted 2026-11-12)
 
 Host start-up outside Development, for the VPS showcase in [deployment.md](../deployment.md). No resource API, no table.

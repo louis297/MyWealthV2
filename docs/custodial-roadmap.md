@@ -21,6 +21,7 @@ related:
   - adr/0017-background-worker.md
   - adr/0018-transactional-outbox.md
   - adr/0013-roles-authorization-single-user-table.md
+  - features/transaction-source.md
 ---
 
 # Custodial accounts roadmap
@@ -86,7 +87,7 @@ The manual entry matrix at the end of the plan. The External column stays as tod
 | `Split` / `Bonus` / `Scrip` | refused | refused | Corporate action events (C1, C3) |
 | `Dividend` | reserved | refused | Corporate action events (C2) |
 | `Adjustment` (new) | — | allowed with its own permission | Hand entry (F3) |
-| Reverse | allowed | allowed only for `Manual` sources (P6) | Hand entry; flows reverse their own writes |
+| Reverse | allowed | allowed only for `Manual` sources (P6; `Rebalance` counts as manual until O3, D15) | Hand entry; flows reverse their own writes |
 
 ```mermaid
 flowchart LR
@@ -169,6 +170,7 @@ No simulator needed. These make the later flows small.
 - **What:** P6 as a rule: on a Custodial account, a hand reverse of a Transaction whose source is not `Manual` → 400. Rebalance trades: decide whether they count as manual (an Adviser pressed Rebalance) until orders exist.
 - **Changes:** one rule in `ReverseTransaction`, the matrix row for reverse, Adviser Portal hides Reverse on those rows.
 - **Depends on:** F1. Can be part of the F1 spec.
+- **Spec:** F1 and F4 are one spec, [transaction-source.md](features/transaction-source.md) (`review`). Its §11 lists the points to confirm, among them whether the reverse rule stays Custodial-only and whether `Seed` rows are hand-reversible.
 
 ---
 
@@ -421,7 +423,7 @@ Each step depends only on earlier steps. "Closes" names the matrix cell or known
 | Step | Items | Simulator | Closes | Spec | Status |
 | --- | --- | --- | --- | --- | --- |
 | 0 | Custody mode slices 1–5 | — | — | custody-modes and four others | landed 2026-11-19 |
-| 1 | F1 Transaction source, F4 reverse by source | — | Rebalance id leak | — | not started |
+| 1 | F1 Transaction source, F4 reverse by source | — | Rebalance id leak | [transaction-source](features/transaction-source.md) | spec in review 2026-11-19 |
 | 2 | F2 ADR, S0 skeleton | S0 | — | — | not started |
 | 3 | F3 Adjustment (no review) | — | "No correction other than reverse" | — | not started |
 | 4 | B1 client money accounts, B2 deposit reference | — | — | — | not started |
