@@ -686,7 +686,68 @@ public class Transaction : BaseAuditableEntity
         decimal currentCashSum,
         AdjustmentHoldingChange? security)
     {
-        throw new NotImplementedException();
+        if (amount is null && security is null)
+        {
+            throw new DomainException("At least one of amount and security is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(memo))
+        {
+            throw new DomainException("Memo is required on an adjustment.");
+        }
+
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            Type = TransactionType.Adjustment,
+            BookedAt = bookedAt.ToUniversalTime(),
+            Memo = NormaliseMemo(memo),
+            Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
+            PublicId = Guid.NewGuid(),
+            AdjustmentDetail = TransactionAdjustmentDetail.Create(tenantId, reason)
+        };
+
+        if (amount is { } cash)
+        {
+            if (cash == 0m)
+            {
+                throw new DomainException("Amount cannot be 0.");
+            }
+
+            if (currentCashSum + cash < 0)
+            {
+                throw new DomainException("Cash balance cannot become negative.");
+            }
+
+            var currency = Money.Create(0m, accountCurrency).Currency;
+            transaction.CashLegs.Add(TransactionCashLeg.Create(tenantId, accountId, cash, currency));
+        }
+
+        if (security is not null)
+        {
+            EnsureSecurityAccount(accountType);
+            if (security.QuantityChange == 0m && security.CostChange == 0m)
+            {
+                throw new DomainException("At least one of quantityChange and costChange must be non-zero.");
+            }
+
+            // R11: never below zero quantity or cost, never cost on a zero quantity (the row is deleted at zero).
+            var quantity = security.CurrentQuantity + security.QuantityChange;
+            var cost = security.CurrentCost + security.CostChange;
+            if (quantity < 0 || cost < 0 || (quantity == 0 && cost != 0))
+            {
+                throw new DomainException(AdjustmentHoldingMessage);
+            }
+
+            var costCurrency = Money.Create(0m, security.QuoteCurrency).Currency;
+            transaction.SecurityLegs.Add(TransactionSecurityLeg.Create(
+                tenantId, accountId, security.InstrumentId, security.QuantityChange, security.CostChange, costCurrency));
+        }
+
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
     }
 
     /// <summary>
@@ -787,6 +848,7 @@ public class Transaction : BaseAuditableEntity
             CashLegs = cashLegs,
             SecurityLegs = reversalLegs ?? [],
             FxDetail = FxDetail?.Copy(),
+            AdjustmentDetail = AdjustmentDetail?.Copy(),
             FeeDetails = cashLegs.Select(leg => leg.FeeDetail).OfType<TransactionFeeDetail>().ToList()
         };
         ReversedBy = reversal;

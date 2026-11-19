@@ -12,4 +12,17 @@ public class TransactionAdjustmentDetail
     public int TransactionId { get; private set; }
 
     public AdjustmentReason Reason { get; private set; }
+
+    internal static TransactionAdjustmentDetail Create(int tenantId, AdjustmentReason reason)
+    {
+        if (!Enum.IsDefined(reason))
+        {
+            throw new DomainException("Adjustment reason is not valid.");
+        }
+
+        return new TransactionAdjustmentDetail { TenantId = tenantId, Reason = reason };
+    }
+
+    /// <summary>A new row with the same reason, for the Reversal (adjustments R18).</summary>
+    internal TransactionAdjustmentDetail Copy() => new() { TenantId = TenantId, Reason = Reason };
 }

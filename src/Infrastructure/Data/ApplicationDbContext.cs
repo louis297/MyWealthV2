@@ -202,8 +202,6 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
         base.OnModelCreating(builder);
         builder.UseOpenIddict();
         builder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
-        // Mapped with script 0037 (adjustments §12 commit 1, green).
-        builder.Ignore<TransactionAdjustmentDetail>();
         ApplyTenantQueryFilters(builder);
     }
 

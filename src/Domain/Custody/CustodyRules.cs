@@ -13,6 +13,9 @@ public static class CustodyRules
     private const string CorporateActionMessage = "Corporate actions cannot be entered by hand on a Custodial account.";
     private const string DividendMessage = "Dividend is reserved and cannot be entered.";
 
+    /// <summary>Adjustments R5: the <c>errors.AccountId</c> message for an adjustment on an External account.</summary>
+    public const string AdjustmentMessage = "An adjustment can be entered only on a Custodial account.";
+
     /// <summary>Transaction source R13: the <c>errors</c> message when a hand reverse is refused by source.</summary>
     public const string HandReverseMessage = "This transaction was written by the platform and cannot be reversed by hand.";
 
@@ -38,7 +41,7 @@ public static class CustodyRules
 
         if (custodyMode == CustodyMode.External)
         {
-            return null;
+            return type == TransactionType.Adjustment ? AdjustmentMessage : null;
         }
 
         return type switch
