@@ -1,6 +1,8 @@
 using MyWealthV2.Schema;
 using MyWealthV2.Shared;
+using MyWealthV2.Simulator.Control;
 using MyWealthV2.Simulator.Hosting;
+using Scalar.AspNetCore;
 
 if (HealthCheckCommand.IsRequested(args))
 {
@@ -13,6 +15,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.AddPublicHostForwardedHeaders();
 builder.AddPublicHostDataProtection("mywealth-simulator");
+builder.AddSimulatorAuthentication();
+builder.Services.AddOpenApi();
 
 // Simulator spec R14: the simulator's own database, and no other.
 var connectionString = builder.Configuration.GetConnectionString(Services.SimulatorDatabase);
@@ -32,9 +36,15 @@ await SchemaApplicator.ForDatabase(
 
 app.UsePublicHostForwardedHeaders(trustAnyProxyInDevelopment: true);
 app.UseSurfacePorts();
+app.UseAuthentication();
+app.UseAuthorization();
 
-// Stubs until the control and party surfaces land.
-app.MapGet("/control/world", () => Results.Ok());
+app.MapSimulatorSession();
+app.MapOpenApi().RequireAuthorization(SimulatorAuthentication.OperatorPolicy);
+app.MapScalarApiReference().RequireAuthorization(SimulatorAuthentication.OperatorPolicy);
+
+// Stubs until the world and the party surface land.
+app.MapGet("/control/world", () => Results.Ok()).RequireAuthorization(SimulatorAuthentication.OperatorPolicy);
 app.MapGet("/party/status", () => Results.Ok());
 app.MapDefaultEndpoints();
 

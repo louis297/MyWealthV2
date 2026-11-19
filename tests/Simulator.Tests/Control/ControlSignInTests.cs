@@ -58,7 +58,8 @@ public class ControlSignInTests
         using var client = _factory.SessionClient();
 
         (await client.GetAsync("/control/world")).StatusCode.ShouldBe(HttpStatusCode.OK);
-        (await client.GetAsync("/scalar")).StatusCode.ShouldBe(HttpStatusCode.OK);
+        // Scalar answers /scalar with a redirect to /scalar/.
+        (await client.GetAsync("/scalar/")).StatusCode.ShouldBe(HttpStatusCode.OK);
         (await client.GetAsync("/openapi/v1.json")).StatusCode.ShouldBe(HttpStatusCode.OK);
         var root = await client.GetAsync("/");
         root.StatusCode.ShouldBe(HttpStatusCode.Redirect);
@@ -75,7 +76,7 @@ public class ControlSignInTests
         (await client.GetAsync("/control/world")).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         var page = await client.GetAsync("/scalar");
         page.StatusCode.ShouldBe(HttpStatusCode.Redirect);
-        page.Headers.Location!.AbsolutePath.ShouldBe("/not-allowed");
+        page.Headers.Location!.ToString().ShouldBe("/not-allowed");
     }
 
     [Test]
