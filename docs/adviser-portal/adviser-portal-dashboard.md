@@ -25,6 +25,7 @@ related:
   - ../features/tenant-custody-modes.md
   - ../features/external-caller-numbers.md
   - ../features/custody-mode-grouping.md
+  - ../features/transaction-source.md
 ---
 
 # Adviser Portal — Dashboard and ledger pages
@@ -194,6 +195,17 @@ Status of this amendment: `accepted` (2026-11-18), together with [custody-mode-g
 | D25 | A custody mode with no entry in `byCustodyMode` shows "None." under its figure. The figures show no note; the "not checked" note is for the Customer only. |
 
 The Reports page does not change. The Adviser Balances and Customer Transactions PDFs gain a Custody column (custody-mode-grouping R10, R14); that is server output.
+
+---
+
+## Amendment 2026-11-19 (transaction source) — review
+
+Status of this amendment: `review`, together with [transaction-source](../features/transaction-source.md). Not in force until that spec is accepted. D27 narrows the Reverse conditions of the `/transactions` and `/transactions/:id` rows, D13 and D18. The BFF does not change.
+
+| ID | Behaviour |
+| --- | --- |
+| D26 | `/transactions/:id` shows a "Source" line under the type, from the item's `source.kind`: "Entered by hand" for `Manual`, "Rebalance" for `Rebalance`, "Test seed" for `Seed`. The source id is not shown. No other page shows the source. |
+| D27 | Reverse is offered on `/transactions`, `/transactions/:id` and the recent activity of `/accounts/:id` only when the item is not a `Reversal`, has no `reversedByTransactionId`, and its `source.kind` is `Manual` or `Rebalance`. The portal does not read the custody mode for this rule, so it also hides Reverse on a `Seed` Transaction of an External account (Development data only), which the server would accept. A 400 from reverse shows its sentence as today. |
 
 ---
 
