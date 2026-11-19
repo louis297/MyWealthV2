@@ -28,7 +28,7 @@ No new route, no new policy, no new `TransactionType`, no problem code. Script `
 
 **Status is `accepted` (2026-11-19), landed 2026-11-19.** The eight points of §11 were confirmed as recommended.
 
-One test of §10 did not land: "`POST /portfolios/{id}/rebalance` → every trade of an account has the `handle` of that account in the 202 body". The rebalance job cannot post a trade today, whatever its source. The Worker's `IUser` (`SystemUser`) has no id, so the audit columns leave `Transactions.CreatedBy` null and the insert fails. That is a separate defect of the asynchronous rebalance, not of this slice. `AccountRebalancer` writes the handle it is given for every caller; assign and `POST /accounts/{id}/rebalance` cover that. Add the test with the fix for the job's audit user.
+The §10 case "`POST /portfolios/{id}/rebalance` → every trade of an account has the `handle` of that account in the 202 body" is proved at the infrastructure layer. The functional host has no Worker, and the job runs there under `SystemUser`, so `RebalanceJobWorkerTests` runs `RebalanceJob` with the Worker's services and asserts that its trades have source `(Rebalance, handle)` and `CreatedBy` `system`. Before 2026-11-19 the Worker's `SystemUser` had no id, so the job could not post a trade (`Transactions.CreatedBy` is NOT NULL). It now writes the system name, as [database-design.md](../database-design.md) allows ("the actor's Identity id or a system name").
 
 ---
 
