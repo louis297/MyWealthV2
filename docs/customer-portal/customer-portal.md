@@ -224,7 +224,7 @@ Status of this amendment: `accepted` (2026-11-19), together with [adjustments](.
 
 | Id | Given | When | Then |
 | --- | --- | --- | --- |
-| C18 | Customer with an `Adjustment` on a Custodial account | Account page activity | The row is labelled "Adjustment" and shows its memo and amount like any other row. The reason is not shown. Its Reversal stays "Reversal". |
+| C18 | Customer with an `Adjustment` on a Custodial account | Account page activity | The row is labelled "Adjustment" and shows its amount like any other row, and its memo on a line under the label (the activity table shows no memo on other rows). The reason is not shown. Its Reversal stays "Reversal", with no memo line. |
 ---
 
 ## Tests
