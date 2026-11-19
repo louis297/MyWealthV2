@@ -1,3 +1,5 @@
+using MyWealthV2.Domain.ValueObjects;
+
 namespace MyWealthV2.Application.Transactions;
 
 public sealed class TransactionDto
@@ -101,4 +103,13 @@ public sealed class TransactionFxDto
     public required decimal Rate { get; init; }
 
     public required string RateAsOfDate { get; init; }
+}
+
+internal static class TransactionSourceMapping
+{
+    public static TransactionSourceDto ToDto(TransactionSource source) => new()
+    {
+        Kind = source.Kind.ToString(),
+        Id = source.PublicId
+    };
 }
