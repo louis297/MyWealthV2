@@ -4,7 +4,7 @@ status: accepted
 phase: 1
 language: en
 created: 2026-10-24
-updated: 2026-11-18
+updated: 2026-11-20
 related:
   - README.md
   - ../function-plan.md
@@ -17,6 +17,7 @@ related:
   - ../features/instruments.md
   - back-office-instruments.md
   - ../features/tenant-custody-modes.md
+  - ../features/client-money-accounts.md
   - ../adr/0014-openiddict-authorization-code-pkce.md
 ---
 
@@ -207,6 +208,20 @@ Status of this amendment: `accepted` (2026-11-18), together with [tenant-custody
 | --- | --- |
 | BO14 | New tenant: both custody mode boxes are checked on open. Create is disabled while neither is checked. The POST carries exactly the checked values. A 400 on `errors.AllowedCustodyModes` is shown on the form |
 | BO15 | Tenant detail: the boxes reflect the item's `allowedCustodyModes`. Save sends `allowedCustodyModes` with name, reporting currency and `rowVersion`, and is disabled while neither is checked. The page shows "Changing this affects only new accounts." |
+
+---
+
+## Amendment 2026-11-20 (client money accounts) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [client-money-accounts.md](../features/client-money-accounts.md). Field rules live there.
+
+- `/tenants/{id}/config` gains a "Client money accounts" section under the report grants. Calls: `GET /tenants/{tenantId}/client-money-accounts`, `POST /tenants/{tenantId}/client-money-accounts`, `POST …/{id}/disable` and `POST …/{id}/enable` with `rowVersion`, and `GET /currencies?enabledOnly=true` for the currency picker. All use `tenants.manage`.
+- No edit action: a client money account has no PUT.
+
+| ID | Behaviour |
+| --- | --- |
+| BO16 | `/tenants/{id}/config` gains a "Client money accounts" section under the report grants: a table from `GET /tenants/{tenantId}/client-money-accounts` with Currency, Bank, Account name, Account number and Active, and Disable / Enable per row (sending its `rowVersion`). An "Add client money account" form: currency picker over enabled currencies (`GET /currencies?enabledOnly=true`), bank name, account name, account number. A 400 is shown at its field. After a write the table reloads. |
+| BO17 | No edit action. Under the table: "Details cannot be changed. To correct them, disable the account and add a new one. Disabling the last account in a currency stops new Custodial accounts in that currency." |
 
 ---
 

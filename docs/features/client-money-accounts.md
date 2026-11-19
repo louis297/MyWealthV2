@@ -1,11 +1,11 @@
 ---
 title: Client money accounts and deposit references
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
 created: 2026-11-19
-last_updated: 2026-11-19
+last_updated: 2026-11-20
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -32,7 +32,7 @@ SystemAdmin records, per Tenant and currency, the **client money account**: the 
 
 New routes under `/tenants/{tenantId}/client-money-accounts` (`tenants.manage`) and `GET /accounts/{id}/deposit-instructions` (`accounts.read`). New item fields `depositReference` (account) and `clientMoneyCurrencies` (tenant). Scripts `0038_client_money_accounts.sql` and `0039_accounts_deposit_reference.sql`. No new policy, problem code, transaction type or source kind.
 
-**Status is `review` (2026-11-19).** §11 lists the points to confirm, each with a recommendation. The amendments to accepted docs listed in §12 are made in the change that accepts this spec, not before.
+**Status is `accepted` (2026-11-20).** The eleven points of §11 were confirmed as recommended, and the redraw after a save that hits the unique index (R17 b) was added before acceptance. The amendments to accepted docs listed in §12 are in force from the same change. Not landed yet.
 
 Nothing in this slice moves money. Deposits are still entered by hand as `TransferIn` until roadmap B3 and B4 read the bank statement and match receipts by the deposit reference. This slice gives those flows the two things they match on.
 
@@ -196,7 +196,7 @@ Invariants:
 - A Tenant has at most one active client money account per currency, and an account number is active on at most one row. Held by Application (R4, R5) and two filtered unique indexes. They are not invariants of one aggregate, so the Domain does not hold them.
 - A Custodial account is opened only where an active client money account exists **at the time of open**. Held in Application (R11), like tenant-custody-modes R7. Not an invariant of existing accounts (R13).
 
-Update [domain-model.md](../domain-model.md) §8.5 (Account) and add the client money account when this spec is accepted.
+Recorded in [domain-model.md](../domain-model.md) §8.5 and §8.8.
 
 ---
 
@@ -245,7 +245,7 @@ Existing data:
 - VPS showcase: every existing Custodial account gets a reference. No Tenant has a client money account after the scripts, so **no new Custodial account can be opened** until SystemAdmin adds one in the Back Office. Existing Custodial accounts keep working (R13). The deployment notes of this slice say so.
 - Functional tests create their own data (§10 fan-out).
 
-Update [database-design.md](../database-design.md) §9, §11.3 and a new §11 table section when this spec is accepted.
+Recorded in [database-design.md](../database-design.md) §9, §11.3 and §11.8.
 
 ---
 
@@ -387,7 +387,7 @@ Cross-tenant or wrong-collection id → **404**, not 403. Keep the resource cata
 
 ## 9. UI
 
-Page contracts: [back-office.md](../backoffice/back-office.md) (BO16, BO17), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D32, D33) and [customer-portal.md](../customer-portal/customer-portal.md) (C19, C20), amended in the change that accepts this spec. No BFF changes.
+Page contracts: [back-office.md](../backoffice/back-office.md) (BO16, BO17), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D32, D33) and [customer-portal.md](../customer-portal/customer-portal.md) (C19, C20), amended and accepted together with this spec. No BFF changes.
 
 **Back Office**
 
@@ -444,7 +444,7 @@ Fan-out in the tests:
 
 ## 11. Locked in this spec
 
-No new ADR. Roadmap B1, B2 and decisions D5 and D19 gave the direction; [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rule 3 names the client money account as the place a bank connection is chosen later.
+No new ADR. Roadmap B1, B2 and decisions D5 and D19 gave the direction; [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rule 3 names the client money account as the place a bank connection is chosen later. [ADR 0020](../adr/0020-account-custody-mode.md) item 1 (a Tenant gets at most one custody setting) is not touched: a client money account is the firm's bank details, not a custody mode setting, and R11 is a check on open in the same way as that one setting.
 
 | Item | Lock |
 | --- | --- |
@@ -457,21 +457,21 @@ No new ADR. Roadmap B1, B2 and decisions D5 and D19 gave the direction; [ADR 002
 | Scripts | `0038_client_money_accounts.sql`, `0039_accounts_deposit_reference.sql` (with the back-fill) |
 | Policies, problem codes, events | None added |
 
-### To confirm before acceptance
+### Confirmed when this spec was accepted (2026-11-20)
 
-Each point has a recommendation, written into the rules above. The alternative is kept for the record.
+Each point was confirmed as recommended and is written into the rules above as stated here. The alternatives are kept for the record.
 
-1. **SystemAdmin sets the client money accounts** (R1). Recommended: the platform operator, in the Back Office, like the allowed custody modes. The account number is where every Customer's money goes, so a change to it is the classic payment redirection fraud; and the bank connection that B3 adds is platform configuration (ADR 0021 rules 3 and 17), which only the operator controls. Alternative: TenantAdmin in the Adviser Portal, as the roadmap's B1 also offered.
-2. **Full account number, not masked** (R3). Recommended: full. The roadmap said "masked account number", but the Customer needs the full number to pay in, and the trust account number is the firm's, not personal data. Masking stays the rule for the Customer's nominated bank account (B5). Alternative: store it masked and keep the full number elsewhere, which leaves deposit instructions without a number to show.
-3. **Immutable details, no PUT** (R7). Recommended: a correction is disable plus a new row, so every instruction a Customer saw maps to one stored row, and B7 can say which account a statement belongs to without history. Alternative: a PUT for `bankName` and `accountName` only, or for all fields with an audit trail.
-4. **One active client money account per currency** (R4). Recommended: yes. Deposit instructions then name exactly one account, and B4 matches a receipt to one Tenant. Alternative: several active per currency, with one marked as the one to show.
-5. **Reference format and uniqueness** (R15, R17). Recommended: nine characters with a check symbol, first a letter, random, unique on the platform. Nine fits the 12-character reference field of NZ banks; the check symbol turns most typos into an unmatched receipt instead of a deposit on someone else's account; a random code reveals nothing about how many accounts exist and makes a typo very unlikely to hit another real reference; a first letter stops a spreadsheet or bank export from reading it as a number. The roadmap said "unique in the Tenant"; platform-wide costs nothing and lets an operator find an account from a reference alone. Alternative: a sequential number per Tenant, or no check symbol.
-6. **Reference only on Custodial accounts** (R14). Recommended: yes; External accounts are funded at banks the platform does not hold. Alternative: give every account one, for later use.
-7. **Open rule only on create; reopen not checked** (R11, R13). Recommended: the same as tenant-custody-modes R9: the rule blocks a new reference and leaves existing ones working. Alternative: treat reopen as an open and refuse it without a client money account.
-8. **Deposit instructions as their own route, 404 when unavailable** (R20, R21). Recommended: a separate read that joins the account with the client money account, like `GET /accounts/{id}/portfolio` returns 404 without an assignment, so the account item does not carry bank details on every list row. Alternative: a `depositInstructions` object on the account item, `null` when unavailable.
-9. **No bank connection yet** (§2 Out). Recommended: B3 adds how a client money account names its connection (ADR 0021 rule 3), with a back-fill that points every existing row at the simulator bank (D19). Today there is no reader, and the shape (a configured connection name, a party account id issued by the bank) belongs to the bank feed spec. Alternative: add a connection column now.
-10. **No client money account in the demo seed** (§9.1). Recommended: the VPS operator adds them in the Back Office, because their account numbers must match the simulator bank's accounts once S1 exists, which this slice cannot know. Until then no new Custodial account opens on the showcase. Alternative: the demo seed adds a USD row with a placeholder number.
-11. **`clientMoneyCurrencies` on the tenant item** (R23). Recommended: so the Adviser Portal offers only the currencies that will be accepted, as D21 does for custody modes, without giving TenantAdmin or Adviser the bank details list. Alternative: no field; the form shows the 400.
+1. **SystemAdmin sets the client money accounts** (R1). Decided: the platform operator, in the Back Office, like the allowed custody modes. The account number is where every Customer's money goes, so a change to it is the classic payment redirection fraud; and the bank connection that B3 adds is platform configuration (ADR 0021 rules 3 and 17), which only the operator controls. Alternative: TenantAdmin in the Adviser Portal, as the roadmap's B1 also offered.
+2. **Full account number, not masked** (R3). Decided: full. The roadmap said "masked account number", but the Customer needs the full number to pay in, and the trust account number is the firm's, not personal data. Masking stays the rule for the Customer's nominated bank account (B5). Alternative: store it masked and keep the full number elsewhere, which leaves deposit instructions without a number to show.
+3. **Immutable details, no PUT** (R7). Decided: a correction is disable plus a new row, so every instruction a Customer saw maps to one stored row, and B7 can say which account a statement belongs to without history. Alternative: a PUT for `bankName` and `accountName` only, or for all fields with an audit trail.
+4. **One active client money account per currency** (R4). Decided: yes. Deposit instructions then name exactly one account, and B4 matches a receipt to one Tenant. Alternative: several active per currency, with one marked as the one to show.
+5. **Reference format and uniqueness** (R15, R17). Decided: nine characters with a check symbol, first a letter, random, unique on the platform. Nine fits the 12-character reference field of NZ banks; the check symbol turns most typos into an unmatched receipt instead of a deposit on someone else's account; a random code reveals nothing about how many accounts exist and makes a typo very unlikely to hit another real reference; a first letter stops a spreadsheet or bank export from reading it as a number. The roadmap said "unique in the Tenant"; platform-wide costs nothing and lets an operator find an account from a reference alone. Alternative: a sequential number per Tenant, or no check symbol.
+6. **Reference only on Custodial accounts** (R14). Decided: yes; External accounts are funded at banks the platform does not hold. Alternative: give every account one, for later use.
+7. **Open rule only on create; reopen not checked** (R11, R13). Decided: the same as tenant-custody-modes R9: the rule blocks a new reference and leaves existing ones working. Alternative: treat reopen as an open and refuse it without a client money account.
+8. **Deposit instructions as their own route, 404 when unavailable** (R20, R21). Decided: a separate read that joins the account with the client money account, like `GET /accounts/{id}/portfolio` returns 404 without an assignment, so the account item does not carry bank details on every list row. Alternative: a `depositInstructions` object on the account item, `null` when unavailable.
+9. **No bank connection yet** (§2 Out). Decided: B3 adds how a client money account names its connection (ADR 0021 rule 3), with a back-fill that points every existing row at the simulator bank (D19). Today there is no reader, and the shape (a configured connection name, a party account id issued by the bank) belongs to the bank feed spec. Alternative: add a connection column now.
+10. **No client money account in the demo seed** (§9.1). Decided: the VPS operator adds them in the Back Office, because their account numbers must match the simulator bank's accounts once S1 exists, which this slice cannot know. Until then no new Custodial account opens on the showcase. Alternative: the demo seed adds a USD row with a placeholder number.
+11. **`clientMoneyCurrencies` on the tenant item** (R23). Decided: so the Adviser Portal offers only the currencies that will be accepted, as D21 does for custody modes, without giving TenantAdmin or Adviser the bank details list. Alternative: no field; the form shows the 400.
 
 Still open, not this slice:
 
@@ -501,6 +501,6 @@ The repository should build after each commit. Agents split each behaviour into 
 
 Do not put a bank feed, a connection, matching, suspense, nominated bank accounts or withdrawals in these commits.
 
-### Docs to amend when this spec is accepted
+### Docs amended when this spec was accepted
 
 [tenants.md](tenants.md) (amendment: `clientMoneyCurrencies` on the item; the client money account routes), [accounts.md](accounts.md) (amendment: R8 open rule, `depositReference` on the item, refused on POST and PUT, the deposit instructions route), [custody-modes.md](custody-modes.md) (a Custodial account opens only in a covered currency), [demo-tenant-seed.md](demo-tenant-seed.md) (no client money accounts), [api-design.md](../api-design.md) (§7.3 and §7.6 rows, change log), [domain-model.md](../domain-model.md) §8.5 and the new aggregate, [database-design.md](../database-design.md) §9, §11.3 and the new table, [back-office.md](../backoffice/back-office.md) (BO16, BO17), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D32, D33), [customer-portal.md](../customer-portal/customer-portal.md) (C19, C20), [function-plan.md](../function-plan.md) §5 item 9, [features/README.md](README.md) row status, the roadmap §5 B1 / B2 and §13 status.

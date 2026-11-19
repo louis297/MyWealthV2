@@ -223,3 +223,13 @@ Status of this amendment: `accepted` (2026-11-18), together with [tenant-custody
 - R4: the demo tenant the command creates allows both custody modes. It is still created through `Tenant.Create`, which allows both; the seed code does not change.
 - R5: an existing `demo` tenant is not changed, and that includes its allowed custody modes. A `demo` tenant that existed before script `0033` allows both from the back-fill.
 - §10: the integration test for a new run also asserts that `demo` allows both; the test with an existing `demo` tenant also asserts that a narrowed setting stays as it was.
+
+---
+
+## Amendment 2026-11-20 (client money accounts) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [client-money-accounts.md](client-money-accounts.md).
+
+- The seed adds no client money account, on a new or an existing `demo` tenant. Until SystemAdmin adds one in the Back Office, no new Custodial account can be opened in the demo tenant (client-money-accounts R11). The account numbers must match the simulator bank's accounts once the simulator bank exists (roadmap S1), which the seed cannot know.
+- §10: no test change.
+

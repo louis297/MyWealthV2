@@ -4,8 +4,9 @@ status: accepted
 phase: 2
 language: en
 created: 2026-10-12
-updated: 2026-11-19
+updated: 2026-11-20
 related:
+  - ../features/client-money-accounts.md
   - README.md
   - frontend-conventions.md
   - frontend-implementation-notes.md
@@ -222,6 +223,17 @@ Reason labels: `EntryError` "Entry error", `CorporateAction` "Corporate action",
 | D29 | `/accounts/:id/adjust`: Reason (select, required), Memo (required, with the hint "The customer sees this memo"), an optional cash change (signed, in the Account currency), and an optional holding change (instrument picker from the Account's holdings plus `GET /instruments?enabledOnly=true`, signed quantity change, signed cost change in the quote currency). No booked-at input. Review lists the changes as entered ("Cash −0.60 USD; AAPL quantity 0, cost +0.60 USD"); the form does no balance arithmetic. Confirm posts `POST /transactions/adjustment` with one `Idempotency-Key` per form open. A 400 is shown at its field, or as the sentence when it has none. |
 | D30 | `/transactions/:id` of an `Adjustment` or its Reversal shows a "Reason" line with the label, under the Source line (D26). `/transactions` shows the type as "Adjustment" like any other type name. |
 | D31 | Reverse on an `Adjustment` (D27 conditions plus this one) is offered only to a TenantAdmin. A 403 from reverse shows "Only a firm administrator can reverse an adjustment." |
+
+---
+
+## Amendment 2026-11-20 (client money accounts and deposit references) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [client-money-accounts](../features/client-money-accounts.md). D32 adds deposit instructions to `/accounts/:id`; D33 narrows the currency picker of D17 and D21 for a Custodial account. The BFF does not change: `GET /accounts/{id}/deposit-instructions` is under `/accounts`, and `clientMoneyCurrencies` comes on the tenant item from `GET /tenants/by-code/{code}`.
+
+| ID | Behaviour |
+| --- | --- |
+| D32 | `/accounts/:id` of a Custodial account shows "Deposit reference" with the item's `depositReference`, Open or Closed. On an Open Custodial account it also shows a "Deposit instructions" panel from `GET /accounts/{id}/deposit-instructions`: Bank, Account name, Account number, Reference, Currency. A 404 shows "No client money account in <currency>. Ask the platform operator to add one." External accounts show neither. |
+| D33 | The New account form (`/customers/:id/accounts/new`, D17 and D21): while Custodial is chosen, the currency picker offers only the enabled currencies in the firm's `clientMoneyCurrencies` from the tenant item. When that list is empty, the form shows "Your firm has no client money account, so a Custodial account cannot be opened." and cannot be submitted with Custodial. A 400 with `errors.Currency` (the setting changed after the page loaded) is shown at the currency picker. External keeps every enabled currency. |
 ---
 
 ## Tests

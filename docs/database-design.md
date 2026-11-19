@@ -3,7 +3,7 @@ title: Database design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-11-19
+updated: 2026-11-20
 related:
   - README.md
   - glossary.md
@@ -360,6 +360,8 @@ Beyond PK / unique constraints already listed:
 0035_transaction_source.sql                 -- Transactions.SourceKind / SourcePublicId, back-filled; rebalance trades lose the rb: reference
 0036_users_role_simulator_operator.sql      -- CK_Users_RoleShape lets Role 4 (SimulatorOperator) have no tenant and no adviser
 0037_adjustments.sql                        -- CK_Transactions_Type 0–17 (Adjustment); TransactionAdjustmentDetails
+0038_client_money_accounts.sql              -- accepted, not written yet: ClientMoneyAccounts; one active per (TenantId, Currency); account number unique among active rows
+0039_accounts_deposit_reference.sql         -- accepted, not written yet: Accounts.DepositReference char(9), back-filled on Custodial rows; CHECK iff Custodial; unique filtered index
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -416,6 +418,8 @@ Script `0012_accounts.sql`. Columns: [features/accounts.md](features/accounts.md
 
 Amendment 2026-11-17 (account custody mode, accepted; [features/account-custody-mode.md](features/account-custody-mode.md) §6): script `0031_accounts_custody_mode.sql` adds `CustodyMode int NOT NULL` to `Accounts` (0 External, 1 Custodial) with CHECK 0–1. The script adds the column with a default of 0 so that existing rows become External, then drops the default: an insert that does not name the column fails. No new index and no FK. Forward only; `0012` is not edited.
 
+Amendment 2026-11-20 (client money accounts, accepted; [features/client-money-accounts.md](features/client-money-accounts.md) §6.2): script `0039_accounts_deposit_reference.sql` adds `DepositReference char(9) NULL`, gives every existing Custodial row a reference in the same script (random, Luhn mod 32 check symbol, redrawn while used), then adds `CK_Accounts_DepositReference` (not null iff `CustodyMode = 1`) and unique `UX_Accounts_DepositReference` WHERE not null. Still no institution or account-number column on `Accounts`.
+
 ### 11.4 Transactions (accepted spec; landed)
 
 Script `0013_transactions.sql`. Columns and rules: [features/posting.md](features/posting.md) §6. Header `Transactions` plus child `TransactionCashLegs` (one cash leg per header this increment). Idempotency table in the same script ([ADR 0015](adr/0015-idempotency-keys.md)). No `Accounts.Balance`. No seed in the script — `TestSeed` only.
@@ -466,6 +470,14 @@ Feature spec: [features/trade-fees.md](features/trade-fees.md) (accepted 2026-11
 
 No seed in the script. Development / TestAppHost `TestSeed` adds one schedule.
 
+### 11.8 Client money accounts (accepted)
+
+Feature spec: [features/client-money-accounts.md](features/client-money-accounts.md) (accepted 2026-11-20). Script `0038_client_money_accounts.sql`:
+
+- `ClientMoneyAccounts` — TenantId (FK `Tenants`), PublicId (unique), Currency (FK `Currencies`), BankName `nvarchar(100)`, AccountName `nvarchar(140)`, AccountNumber `nvarchar(34)`, IsActive, audit, RowVersion. Unique `(TenantId, Currency)` WHERE `IsActive = 1`; unique `(AccountNumber)` WHERE `IsActive = 1`; index `(TenantId)`. No column changes after insert except `IsActive`.
+
+No seed in the script. Development / TestAppHost `TestSeed` adds a USD and an NZD row per firm.
+
 ## 12. Still not a schema decision
 
 These stay open in the function plan and do not change tables:
@@ -515,6 +527,7 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-19 | Simulator accepted ([features/simulator.md](features/simulator.md) §6). `0036` widens `CK_Users_RoleShape` for Role 4; no data change. Second database `MyWealthSimulatorDb` with its own scripts (§15). |
 | 2026-11-19 | ADR 0008 amendment: `worker` also runs the applicator at start-up (matches the code since `26fb489`). |
 | 2026-11-19 | Adjustments accepted and landed (`0037`): `CK_Transactions_Type` widened to 0–17; new `TransactionAdjustmentDetails` (reason per adjustment and its Reversal). `0037` is a build contract. |
+| 2026-11-20 | Client money accounts accepted (`0038`, `0039`, not written yet): `ClientMoneyAccounts` (§11.8) and `Accounts.DepositReference` with its back-fill (§11.3). Both are build contracts. |
 
 ---
 

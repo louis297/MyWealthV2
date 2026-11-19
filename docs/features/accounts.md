@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-21
-last_updated: 2026-11-18
+last_updated: 2026-11-20
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -23,6 +23,7 @@ related:
   - ../adr/0020-account-custody-mode.md
   - custody-modes.md
   - tenant-custody-modes.md
+  - client-money-accounts.md
 ---
 
 # Accounts
@@ -55,6 +56,13 @@ Landed in GitHub `louis297/MyWealthV2` master 2026-09-21, last slice commit `3e8
 
 - R8: `POST /accounts` with a `custodyMode` the account's Tenant does not allow → 400 with `errors.CustodyMode`. The check runs in the handler after the Tenant, the Customer and the currency checks; the validator rules on `type` and `custodyMode` still run first.
 - Close, reopen, rename and every other rule in this file do not read the Tenant's setting. A Tenant that stops allowing a custody mode keeps its existing accounts of that mode, and they may still be reopened.
+
+**Amendment 2026-11-20 (client money accounts and deposit references, accepted):** [client-money-accounts.md](client-money-accounts.md).
+
+- R8: `POST /accounts` with `custodyMode: "Custodial"` in a currency where the account's Tenant has no active client money account → 400 `errors.Currency`. The check runs in the handler directly after the allowed custody modes check. External accounts are not checked. Reopen is not checked.
+- R14 and §8.1: every Custodial account has a server-generated `depositReference` (nine characters, unique on the platform, never changed); an External account has `null`. A POST or PUT body that carries `depositReference` → 400. Script `0039` adds the column and gives existing Custodial accounts one.
+- §8: new read `GET /accounts/{id}/deposit-instructions` (`accounts.read`, same visibility as get): the account's reference and the active client money account in its currency; 404 for an External or Closed account or when the currency has none.
+- §2 Out "Institution name, account number" still holds for the Account itself: the bank details live on the Tenant's client money account, not on `Accounts`.
 
 ---
 

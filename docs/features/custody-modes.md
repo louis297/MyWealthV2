@@ -30,6 +30,7 @@ related:
   - ../future-plans.md
   - external-caller-numbers.md
   - transaction-source.md
+  - client-money-accounts.md
 ---
 
 # Custody modes
@@ -526,3 +527,14 @@ Status of this amendment: `accepted` (2026-11-19), together with [adjustments.md
 - `CustodyRules.RefusalMessage(External, Adjustment)` returns that message; on Custodial it returns `null`. The matrix still lives in one Domain class.
 - R10 and R12 apply to the new route: the server sets `bookedAt`.
 - R17: the trade lock does not decide an adjustment or its reverse (adjustments R16).
+
+---
+
+## Amendment 2026-11-20 (client money accounts and deposit references) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [client-money-accounts.md](client-money-accounts.md).
+
+- R2 / R3: a Custodial account can be opened only in a currency in which its Tenant has an active client money account (client-money-accounts R11); otherwise 400 `errors.Currency`. R4's "Currency (accounts R9) … the same for both modes" no longer holds for open; close, reopen and rename are still the same for both modes.
+- Every Custodial account has a deposit reference (client-money-accounts R14–R19). External accounts have none.
+- The manual entry matrix (R5) does not change: hand `TransferIn` on a Custodial account stays allowed until deposit matching (roadmap B4).
+
