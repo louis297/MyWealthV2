@@ -120,6 +120,18 @@ public class CreateAccountCommandHandler(
             ]);
         }
 
+        // Client money accounts R11, R12: a Custodial account opens only where the firm has a trust bank account.
+        if (custodyMode == CustodyMode.Custodial
+            && !await db.ClientMoneyAccounts.AsNoTracking().AnyAsync(
+                row => row.TenantId == tenant.Id && row.Currency == currency.Code && row.IsActive,
+                cancellationToken))
+        {
+            throw new ValidationException([
+                new ValidationFailure(nameof(CreateAccountCommand.Currency),
+                    $"The tenant has no active client money account in {currency.Code}, so a Custodial account cannot be opened in {currency.Code}.")
+            ]);
+        }
+
         var type = Enum.Parse<AccountType>(request.Type);
         var account = Account.Create(tenant.Id, customer.Id, request.Name, type, custodyMode, currency);
         db.Accounts.Add(account);
