@@ -12,6 +12,9 @@ namespace Microsoft.Extensions.DependencyInjection;
 
 public static class DependencyInjection
 {
+    /// <summary>The <c>role</c> claim value identity issues for <c>UserRole.SimulatorOperator</c>.</summary>
+    private const string SimulatorOperatorRoleClaim = "simulatorOperator";
+
     public static void AddWebServices(this IHostApplicationBuilder builder)
     {
         builder.Services.AddDatabaseDeveloperPageExceptionFilter();
@@ -73,6 +76,18 @@ public static class DependencyInjection
                 options.TokenValidationParameters.ValidateAudience = false;
                 options.Events = new JwtBearerEvents
                 {
+                    // Simulator spec R3: a SimulatorOperator is never a webapi caller. Failing here makes every
+                    // route answer 401 through OnChallenge, the default-authorized ones included, and never 403.
+                    // The role claim is set by identity from the person row, and a role never changes.
+                    OnTokenValidated = context =>
+                    {
+                        if (context.Principal?.HasClaim(AuthClaims.Role, SimulatorOperatorRoleClaim) == true)
+                        {
+                            context.Fail("The SimulatorOperator role is not a webapi caller.");
+                        }
+
+                        return Task.CompletedTask;
+                    },
                     OnChallenge = context =>
                     {
                         context.HandleResponse();
