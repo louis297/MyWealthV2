@@ -313,6 +313,29 @@ describe("TransactionsListPage", () => {
     expect((await row("seed-row")).queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
   });
 
+  it.each([
+    ["tenantAdmin", true],
+    ["adviser", false],
+  ])("shows an adjustment as Adjustment and offers its Reverse to a %s: %s (D30, D31)", async (role, offered) => {
+    renderList(user({ role }), "/transactions", 200, [
+      {
+        ...transaction,
+        type: "Adjustment",
+        memo: "adjustment-row",
+        security: [],
+        adjustment: { reason: "EntryError" },
+      },
+    ]);
+
+    const row = within((await screen.findByText("adjustment-row")).closest("tr") as HTMLElement);
+    expect(row.getByRole("link", { name: "Adjustment" })).toBeInTheDocument();
+    if (offered) {
+      expect(row.getByRole("button", { name: "Reverse" })).toBeInTheDocument();
+    } else {
+      expect(row.queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
+    }
+  });
+
   it("stays on /transactions when the filtered list is not found", async () => {
     const { router } = renderList(user(), `/transactions?accountId=${accountId}`, 404);
 

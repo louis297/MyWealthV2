@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { sessionSlice, setCurrentUser, type CurrentUser } from "@/features/session/sessionSlice";
 import { TransactionDetailPage } from "@/features/transactions/TransactionDetailPage";
 import { api } from "@/shared/api/api";
-import { renderFees, stubBrowser, type Handler } from "@/test/fees";
+import { adviser, feeUser, renderFees, stubBrowser, type Handler } from "@/test/fees";
 
 const originalId = "dddddddd-dddd-dddd-dddd-dddddddddddd";
 const reverseId = "99999999-9999-9999-9999-999999999999";
@@ -483,5 +483,85 @@ describe("TransactionDetailPage cash legs (adviser-portal-fees F13)", () => {
     const legs = within(await screen.findByRole("table", { name: "Cash legs" }));
     expect(legs.getByText("Brokerage 10.00 NZD on 1,250.00 NZD")).toBeInTheDocument();
     expect(legs.queryByRole("link", { name: "View schedule" })).not.toBeInTheDocument();
+  });
+});
+
+describe("TransactionDetailPage adjustment (adviser-portal-dashboard D30, D31)", () => {
+  const path = `/transactions/${originalId}`;
+  const routes = [{ path: "/transactions/:id", element: <TransactionDetailPage /> }];
+  const adjustment = {
+    ...original,
+    type: "Adjustment",
+    memo: "Fill price was wrong",
+    security: [],
+    adjustment: { reason: "EntryError" },
+  };
+
+  function serve(item: object, onReverse?: () => Response): Handler {
+    return (request) => {
+      if (request.method === "POST" && request.url.endsWith(`${path}/reverse`) && onReverse) {
+        return onReverse();
+      }
+      return request.method === "GET" && request.url.endsWith(path) ? json(item) : undefined;
+    };
+  }
+
+  beforeEach(() => {
+    stubBrowser(path);
+  });
+
+  it("shows the Reason line with the label on an adjustment", async () => {
+    renderFees(feeUser(), routes, path, serve(adjustment));
+
+    expect(await screen.findByText("Reason: Entry error")).toBeInTheDocument();
+    expect(screen.getByText("Source: Entered by hand")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["CorporateAction", "Reason: Corporate action"],
+    ["ReconciliationBreak", "Reason: Reconciliation"],
+    ["Other", "Reason: Other"],
+  ])("labels the reason %s", async (reason, line) => {
+    renderFees(feeUser(), routes, path, serve({ ...adjustment, adjustment: { reason } }));
+
+    expect(await screen.findByText(line)).toBeInTheDocument();
+  });
+
+  it("shows the Reason line on the reversal of an adjustment", async () => {
+    renderFees(feeUser(), routes, path, serve({
+      ...adjustment,
+      type: "Reversal",
+      originalTransactionId: reverseId,
+    }));
+
+    expect(await screen.findByText("Reason: Entry error")).toBeInTheDocument();
+  });
+
+  it("shows no Reason line on another transaction", async () => {
+    renderFees(feeUser(), routes, path, serve({ ...original, adjustment: null }));
+
+    expect(await screen.findByText(originalId)).toBeInTheDocument();
+    expect(screen.queryByText(/^Reason:/)).not.toBeInTheDocument();
+  });
+
+  it("offers Reverse on an adjustment to a TenantAdmin", async () => {
+    renderFees(feeUser(), routes, path, serve(adjustment));
+
+    expect(await screen.findByRole("button", { name: "Reverse" })).toBeInTheDocument();
+  });
+
+  it("hides Reverse on an adjustment from an Adviser", async () => {
+    renderFees(adviser(), routes, path, serve(adjustment));
+
+    expect(await screen.findByText("Reason: Entry error")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
+  });
+
+  it("shows the firm administrator sentence on a 403 from reverse", async () => {
+    renderFees(feeUser(), routes, path, serve(adjustment, () => new Response("", { status: 403 })));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reverse" }));
+
+    expect(await screen.findByText("Only a firm administrator can reverse an adjustment.")).toBeInTheDocument();
   });
 });

@@ -62,6 +62,8 @@ export type Transaction = {
   security: TransactionSecurity[];
   /** The rate the transaction used (FX conversions and their reversals); otherwise null. */
   fx?: TransactionFx | null;
+  /** The reason of an `Adjustment` and of its Reversal; otherwise null (adjustments R21). */
+  adjustment?: { reason: string } | null;
 };
 
 export type TransactionListArgs = {

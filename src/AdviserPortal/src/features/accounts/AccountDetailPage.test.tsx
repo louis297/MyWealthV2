@@ -69,6 +69,7 @@ const currencyCatalog = [
 
 function renderDetail(
   fetchImpl: (url: string, method: string, body?: string) => Response,
+  me: CurrentUser = user(),
 ) {
   const store = configureStore({
     reducer: {
@@ -77,7 +78,7 @@ function renderDetail(
     },
     middleware: (getDefault) => getDefault().concat(api.middleware),
   });
-  store.dispatch(setCurrentUser(user()));
+  store.dispatch(setCurrentUser(me));
 
   const fetchMock = vi.mocked(fetch);
   fetchMock.mockImplementation(async (input, init) => {
@@ -575,7 +576,7 @@ describe("AccountDetailPage", () => {
   });
 
   it.each([
-    ["Custodial", ["TransferIn", "TransferOut", "Buy", "Sell", "Transfer", "Convert"]],
+    ["Custodial", ["TransferIn", "TransferOut", "Buy", "Sell", "Transfer", "Convert", "Adjust"]],
     [
       "External",
       ["TransferIn", "TransferOut", "Buy", "Sell", "StockIn", "StockOut", "Split", "Bonus", "Scrip", "Transfer", "Convert"],
@@ -1585,5 +1586,102 @@ describe("AccountDetailPage activity Reverse (adviser-portal-dashboard D27)", ()
 
     expect(await screen.findByText(sentence)).toBeInTheDocument();
     expect(reversed).toEqual([`http://localhost:3000/api/transactions/${manualId}/reverse`]);
+  });
+  describe("Adjust action (D28)", () => {
+    function serveAccount(served: object) {
+      return (url: string, method: string) => {
+        if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+          return json({ items: [] });
+        }
+        if (url.includes("/transactions") && method === "GET") {
+          return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+        }
+        if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+          return json(served);
+        }
+        return new Response("", { status: 404 });
+      };
+    }
+
+    it("offers Adjust to a TenantAdmin on an Open Custodial account", async () => {
+      renderDetail(serveAccount(custodialAccount));
+
+      expect(await screen.findByRole("link", { name: "Adjust" })).toHaveAttribute(
+        "href",
+        `/accounts/${accountId}/adjust`,
+      );
+    });
+
+    it.each([
+      ["an Adviser on an Open Custodial account", custodialAccount, user({ role: "adviser", name: "Sam Reed" })],
+      ["a TenantAdmin on an External account", account, user()],
+    ])("does not offer Adjust to %s", async (_case, served, me) => {
+      renderDetail(serveAccount(served), me);
+
+      await screen.findByRole("navigation", { name: "Transaction actions" });
+      expect(screen.queryByRole("link", { name: "Adjust" })).not.toBeInTheDocument();
+    });
+
+    it("does not offer Adjust on a Closed Custodial account", async () => {
+      renderDetail(serveAccount({ ...custodialAccount, status: "Closed" }));
+
+      expect(await screen.findByRole("button", { name: "Reopen" })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Adjust" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Reverse on an adjustment row (D31)", () => {
+    const adjustmentId = "76666666-6666-6666-6666-666666666666";
+
+    function serveAdjustment(me: CurrentUser) {
+      renderDetail((url, method) => {
+        if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+          return json({ items: [] });
+        }
+        if (url.includes("/transactions") && method === "GET") {
+          return json({
+            items: [
+              {
+                id: adjustmentId,
+                tenantId: account.tenantId,
+                type: "Adjustment",
+                source: { kind: "Manual", id: null },
+                adjustment: { reason: "EntryError" },
+                bookedAt: "2026-11-19T03:00:00Z",
+                memo: "Fill price was wrong",
+                reference: null,
+                originalTransactionId: null,
+                reversedByTransactionId: null,
+                rowVersion: "AAAA",
+                cash: [{ accountId, customerId, amount: -0.6, currency: "NZD" }],
+                security: [],
+              },
+            ],
+            page: 1,
+            pageSize: 20,
+            totalCount: 1,
+          });
+        }
+        if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+          return json(custodialAccount);
+        }
+        return new Response("", { status: 404 });
+      }, me);
+    }
+
+    it("offers Reverse on an adjustment to a TenantAdmin", async () => {
+      serveAdjustment(user());
+
+      const table = await screen.findByRole("table", { name: "Activity" });
+      expect(within(table).getByRole("button", { name: "Reverse" })).toBeInTheDocument();
+    });
+
+    it("hides Reverse on an adjustment from an Adviser", async () => {
+      serveAdjustment(user({ role: "adviser", name: "Sam Reed" }));
+
+      const table = await screen.findByRole("table", { name: "Activity" });
+      expect(within(table).getByRole("link", { name: adjustmentId })).toBeInTheDocument();
+      expect(within(table).queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
+    });
   });
 });

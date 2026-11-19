@@ -258,6 +258,24 @@ describe("app routes", () => {
     expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
   });
 
+  it("lets TenantAdmin open the adjust form (D28)", async () => {
+    renderApp(user(), "/accounts/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/adjust");
+
+    expect(await screen.findByRole("heading", { name: "Adjust" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
+  });
+
+  it("sends an Adviser on the adjust form to /forbidden (D28)", async () => {
+    const router = renderApp(
+      user({ role: "adviser", name: "Sam Reed" }),
+      "/accounts/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/adjust",
+    );
+
+    expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/forbidden");
+    expect(screen.queryByRole("heading", { name: "Adjust" })).not.toBeInTheDocument();
+  });
+
   it("sends SystemAdmin on a new transaction form to /forbidden", async () => {
     renderApp(
       user({
