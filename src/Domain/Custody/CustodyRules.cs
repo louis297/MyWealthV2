@@ -13,6 +13,16 @@ public static class CustodyRules
     private const string CorporateActionMessage = "Corporate actions cannot be entered by hand on a Custodial account.";
     private const string DividendMessage = "Dividend is reserved and cannot be entered.";
 
+    /// <summary>Transaction source R13: the <c>errors</c> message when a hand reverse is refused by source.</summary>
+    public const string HandReverseMessage = "This transaction was written by the platform and cannot be reversed by hand.";
+
+    /// <summary>
+    /// Transaction source R12, R13, R15: whether a person may reverse a Transaction of <paramref name="sourceKind"/>
+    /// on an Account of <paramref name="custodyMode"/>. Application calls it in the reverse handler only;
+    /// <see cref="Transaction.Reverse"/> does not, so a later flow can undo its own write (R16).
+    /// </summary>
+    public static bool AllowsHandReverse(CustodyMode custodyMode, TransactionSourceKind sourceKind) => true;
+
     public static bool AllowsManualEntry(CustodyMode custodyMode, TransactionType type) =>
         RefusalMessage(custodyMode, type) is null;
 
