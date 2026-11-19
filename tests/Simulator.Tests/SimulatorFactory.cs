@@ -32,6 +32,9 @@ public sealed class SimulatorFactory(
 
     public const string OperatorEmail = "operator@sim.test";
 
+    /// <summary>The real clock the host reads. The simulator clock is this plus the world's offset.</summary>
+    public TestClock Clock { get; } = new();
+
     public HttpClient ControlClient() => ClientOn(ControlPort);
 
     /// <summary>A control-port client with a session for <paramref name="email"/> in <paramref name="role"/>.</summary>
@@ -84,6 +87,7 @@ public sealed class SimulatorFactory(
         builder.ConfigureTestServices(services =>
         {
             services.AddTransient<IStartupFilter, TestConnection>();
+            services.AddSingleton<TimeProvider>(Clock);
             services.AddAuthentication()
                 .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(TestAuthenticationHandler.SchemeName, _ => { });
             services.PostConfigure<AuthenticationOptions>(options =>
