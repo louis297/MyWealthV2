@@ -44,6 +44,9 @@ public class Transaction : BaseAuditableEntity
     /// <summary>The rate this Transaction used, when it has one (FX conversions R14).</summary>
     public TransactionFxDetail? FxDetail { get; private set; }
 
+    /// <summary>Why the adjustment was entered, on an <c>Adjustment</c> and its Reversal (adjustments §5).</summary>
+    public TransactionAdjustmentDetail? AdjustmentDetail { get; private set; }
+
     /// <summary>One per <see cref="CashLegRole.Fee"/> cash leg (trade-fees R18).</summary>
     public List<TransactionFeeDetail> FeeDetails { get; private set; } = [];
 
@@ -659,6 +662,31 @@ public class Transaction : BaseAuditableEntity
         };
         transaction.AddDomainEvent(new TransactionPosted(transaction));
         return transaction;
+    }
+
+    /// <summary>Adjustments R11: the <c>errors.Security</c> message when the holding result is refused.</summary>
+    public const string AdjustmentHoldingMessage =
+        "The holding cannot have a negative quantity or cost, or a cost without a quantity.";
+
+    /// <summary>
+    /// Builds an <c>Adjustment</c> on one Account (adjustments §5): an optional signed cash leg, an optional signed
+    /// security leg stored as entered, at least one of them, and the adjustment detail.
+    /// </summary>
+    public static Transaction PostAdjustment(
+        int tenantId,
+        int accountId,
+        AccountType accountType,
+        string accountCurrency,
+        AdjustmentReason reason,
+        string? memo,
+        string? reference,
+        DateTimeOffset bookedAt,
+        TransactionSource source,
+        decimal? amount,
+        decimal currentCashSum,
+        AdjustmentHoldingChange? security)
+    {
+        throw new NotImplementedException();
     }
 
     /// <summary>

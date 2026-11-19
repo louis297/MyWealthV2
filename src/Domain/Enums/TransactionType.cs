@@ -18,5 +18,6 @@ public enum TransactionType
     Bonus = 13,
     Scrip = 14,
     InternalTransfer = 15,
-    FxConversion = 16
+    FxConversion = 16,
+    Adjustment = 17
 }
