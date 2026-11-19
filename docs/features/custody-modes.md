@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-17
-last_updated: 2026-11-18
+last_updated: 2026-11-19
 related:
   - account-custody-mode.md
   - accounts.md
@@ -29,6 +29,7 @@ related:
   - ../glossary.md
   - ../future-plans.md
   - external-caller-numbers.md
+  - transaction-source.md
 ---
 
 # Custody modes
@@ -503,3 +504,14 @@ Status of this amendment: `accepted` (2026-11-18), together with [external-calle
 - I3 holds in both directions: the server decides the numbers on a Custodial account, the caller on an External account.
 - R18 is unchanged. R19: the sentence "`Buy` / `Sell` on an External account are still priced by the server and still carry the trade fee" is replaced by external-caller-numbers §4.2 and §4.4.
 - The manual entry matrix (R5), the same custody mode (R8) and `bookedAt` (R10–R13) do not change.
+
+---
+
+## Amendment 2026-11-19 (transaction source) — review
+
+Status of this amendment: `review`, together with [transaction-source.md](transaction-source.md). Not in force until that spec is accepted.
+
+- R5, the matrix row "`Reversal` (reverse)": External stays **allowed**. Custodial becomes **allowed for a hand-reversible source only** (`Manual` or `Rebalance`); the reverse of a Transaction with any other source → 400 (transaction-source R13). The last column becomes "Each flow undoes its own writes".
+- R7: the platform's own writes now record who wrote them (transaction-source R2–R6). The factories still do not call the matrix.
+- `CustodyRules` gains `AllowsHandReverse(custodyMode, sourceKind)`, next to `AllowsManualEntry`. The matrix still lives in one Domain class.
+- R9, R17 and every other rule are unchanged. On an assigned Custodial account the source check runs before the trade lock (transaction-source R14).

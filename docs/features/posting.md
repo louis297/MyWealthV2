@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-25
-last_updated: 2026-11-17
+last_updated: 2026-11-19
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -21,6 +21,7 @@ related:
   - instruments.md
   - customers.md
   - custody-modes.md
+  - transaction-source.md
 ---
 
 # Posting
@@ -40,6 +41,8 @@ There is **no separate cash-ledger Feature Spec.** Cash legs live here. There is
 **Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R8: the caller's `amount` must fit the Account currency's `DecimalPlaces`; `CloseOut` is exempt. R11: a Transaction with a security leg can be reversed only while it is the latest security activity on each of its holdings. R24: a `bookedAt` in the future is refused.
 
 **Amendment 2026-11-17 (custody modes, accepted, landed):** [custody-modes.md](custody-modes.md). R16 and the §5 type table: on a Custodial account `POST /transactions` refuses `Interest` and cash `Opening` (400 with `errors.Type`); `TransferIn`, `TransferOut` and `CloseOut` stay allowed. R24: on a Custodial account the server sets `bookedAt` from its clock, and a body that sends `bookedAt` → 400 with `errors.BookedAt`; on an External account `bookedAt` stays required and the rest of R24 is unchanged. Reverse (R11) is allowed on both custody modes. Nothing else changes for an External account.
+
+**Amendment 2026-11-19 (transaction source, `review`):** [transaction-source.md](transaction-source.md). Not in force until that spec is accepted. Every Transaction has a source (kind `Manual`, `Seed` or `Rebalance`, and an optional source id), set when it is built and never sent by a caller. The four create and reverse routes write `Manual`; a Reversal has its own source, not the original's. The item gains `source: { kind, id }`. R10: script `0035` back-fills the source on existing rows and clears the `reference` of existing rebalance trades, a one-time data write like `0029`. R11: on a Custodial account a hand reverse of a Transaction whose source is not hand-reversible (`Manual` or `Rebalance`) → 400. External accounts reverse as today.
 
 ---
 

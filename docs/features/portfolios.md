@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-02
-last_updated: 2026-11-17
+last_updated: 2026-11-19
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -26,6 +26,7 @@ related:
   - instrument-prices.md
   - posting.md
   - custody-modes.md
+  - transaction-source.md
 ---
 
 # Portfolios
@@ -48,6 +49,8 @@ Model portfolios (target-weight investment schemes) on `webapi`. An Adviser or T
 - R18 is unchanged. On a Custodial account the manual entry matrix already refuses `StockIn`, `StockOut`, `Split`, `Bonus`, `Scrip` and `OpeningHoldings`, so the lock decides `Buy`, `Sell` and their reverse.
 - R8–R13, R19–R25 and the 2026-11-13 and 2026-11-15 amendments are unchanged. Rebalance already books its trades at the server clock.
 - TestSeed: the `Demo Growth` assignment moves to the new Custodial demo account.
+
+**Amendment 2026-11-19 (transaction source, `review`):** [transaction-source.md](transaction-source.md) R5, R9, R12. Not in force until that spec is accepted. Every rebalance trade has source `Rebalance` with the rebalance handle as its source id (the `handle` of the 202 body for an asynchronous rebalance). Rebalance no longer writes `rb:{handle}:{B|S}:{InstrumentId}` into `reference`, which put an internal id on the wire; the trade's `reference` is `null`, and script `0035` clears it on existing trades. Rebalance idempotency is unchanged. A rebalance trade stays hand-reversible on a Custodial account; R18 still decides while the account is assigned.
 
 ---
 
