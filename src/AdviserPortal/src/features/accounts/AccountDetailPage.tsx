@@ -34,6 +34,7 @@ import {
   useUnassignPortfolioMutation,
 } from "@/features/portfolios/portfoliosApi";
 import { rateLine } from "@/features/transactions/fxFormat";
+import { canReverse, ReverseTransactionButton } from "@/features/transactions/ReverseTransactionButton";
 import { type TransactionCash, useGetTransactionsQuery } from "@/features/transactions/transactionsApi";
 import { formatMoney, sumAmounts } from "@/shared/format/money";
 import { formatInstant } from "@/shared/time/instant";
@@ -405,6 +406,9 @@ export function AccountDetailPage() {
                     <TableHead>Type</TableHead>
                     <TableHead>Booked at</TableHead>
                     <TableHead>Amount</TableHead>
+                    <TableHead>
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -424,6 +428,7 @@ export function AccountDetailPage() {
                         />
                         {item.fx ? <p className="text-muted-foreground text-xs">{rateLine(item.fx)}</p> : null}
                       </TableCell>
+                      <TableCell>{canReverse(item) ? <ReverseTransactionButton id={item.id} /> : null}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
