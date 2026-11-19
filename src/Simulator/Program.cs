@@ -1,7 +1,11 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using MyWealthV2.Schema;
 using MyWealthV2.Shared;
 using MyWealthV2.Simulator.Control;
+using MyWealthV2.Simulator.Data;
 using MyWealthV2.Simulator.Hosting;
+using MyWealthV2.Simulator.Worlds;
 using Scalar.AspNetCore;
 
 if (HealthCheckCommand.IsRequested(args))
@@ -25,6 +29,13 @@ if (string.IsNullOrWhiteSpace(connectionString))
     throw new InvalidOperationException($"Connection string '{Services.SimulatorDatabase}' not found.");
 }
 
+builder.Services.AddDbContext<SimulatorDbContext>(options => options.UseSqlServer(connectionString));
+builder.EnrichSqlServerDbContext<SimulatorDbContext>();
+builder.Services.TryAddSingleton(TimeProvider.System);
+builder.Services.AddProblemDetails();
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new UtcInstantJsonConverter()));
+
 var app = builder.Build();
 
 // Simulator spec R15: apply database/simulator/ scripts before the host listens.
@@ -33,6 +44,7 @@ await SchemaApplicator.ForDatabase(
         Path.Combine(AppContext.BaseDirectory, "simulator-schema"),
         app.Services.GetRequiredService<ILogger<SchemaApplicator>>())
     .ApplyAsync(CancellationToken.None);
+await WorldStartup.EnsureWorldAsync(app.Services, CancellationToken.None);
 
 app.UsePublicHostForwardedHeaders(trustAnyProxyInDevelopment: true);
 app.UseSurfacePorts();
@@ -43,8 +55,9 @@ app.MapSimulatorSession();
 app.MapOpenApi().RequireAuthorization(SimulatorAuthentication.OperatorPolicy);
 app.MapScalarApiReference().RequireAuthorization(SimulatorAuthentication.OperatorPolicy);
 
-// Stubs until the world and the party surface land.
-app.MapGet("/control/world", () => Results.Ok()).RequireAuthorization(SimulatorAuthentication.OperatorPolicy);
+app.MapControlEndpoints();
+
+// Stub until the party surface lands.
 app.MapGet("/party/status", () => Results.Ok());
 app.MapDefaultEndpoints();
 
