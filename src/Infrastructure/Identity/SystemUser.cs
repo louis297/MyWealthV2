@@ -8,6 +8,6 @@ public class SystemUser : IUser
     /// <summary>The system name the background jobs write to the audit columns, as the seeds do.</summary>
     public const string Name = "system";
 
-    public string? Id => null;
+    public string? Id => Name;
     public List<string>? Roles => null;
 }
