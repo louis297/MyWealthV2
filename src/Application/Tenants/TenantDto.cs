@@ -23,14 +23,14 @@ public sealed class TenantDto
 
     public required DateTimeOffset Created { get; init; }
 
-    public static TenantDto From(Tenant tenant) => new()
+    public static TenantDto From(Tenant tenant, IReadOnlyList<string> clientMoneyCurrencies) => new()
     {
         Id = tenant.PublicId,
         Name = tenant.Name,
         Code = tenant.Code,
         ReportingCurrency = tenant.ReportingCurrency,
         AllowedCustodyModes = tenant.AllowedCustodyModes.Select(mode => mode.ToString()).ToList(),
-        ClientMoneyCurrencies = [],
+        ClientMoneyCurrencies = clientMoneyCurrencies,
         IsActive = tenant.IsActive,
         RowVersion = Convert.ToBase64String(tenant.RowVersion ?? []),
         Created = tenant.Created

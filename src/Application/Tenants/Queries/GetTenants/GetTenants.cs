@@ -62,9 +62,12 @@ public class GetTenantsQueryHandler(IApplicationDbContext db)
             .Take(request.PageSize)
             .ToListAsync(cancellationToken);
 
+        var currencies = await TenantClientMoneyCurrencies.ForTenantsAsync(
+            db, items.Select(tenant => tenant.Id).ToList(), cancellationToken);
+
         return new PagedList<TenantDto>
         {
-            Items = items.Select(TenantDto.From).ToList(),
+            Items = items.Select(tenant => TenantDto.From(tenant, currencies[tenant.Id])).ToList(),
             Page = request.Page,
             PageSize = request.PageSize,
             TotalCount = totalCount
