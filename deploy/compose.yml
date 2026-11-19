@@ -4,7 +4,9 @@
 #
 # Only `caddy` publishes ports on a public address; `aspire-dashboard` publishes its UI on 127.0.0.1 only
 # (open it through an SSH tunnel, §5.1). Every .NET host listens on 8080 (traffic) and 8081 (health port,
-# never forwarded by Caddy). Bind-mounted folders under certs/ and data/ must belong to UID 1654.
+# never forwarded by Caddy). The simulator also listens on 8082 (party port, internal network only, never
+# forwarded by Caddy) and runs only with COMPOSE_PROFILES=simulator in .env (docs/deployment.md).
+# Bind-mounted folders under certs/ and data/ must belong to UID 1654.
 
 name: mywealth
 
@@ -27,6 +29,10 @@ x-healthcheck-timing: &healthcheck-timing
 
 x-connection-string: &connection-string >-
   Server=sql,1433;Database=MyWealthDbV2;User Id=sa;Password=${SQL_SA_PASSWORD:?};Encrypt=True;TrustServerCertificate=True
+
+# The simulator's own database (docs/features/simulator.md R14). Only the simulator gets it.
+x-simulator-connection-string: &simulator-connection-string >-
+  Server=sql,1433;Database=MyWealthSimulatorDb;User Id=sa;Password=${SQL_SA_PASSWORD:?};Encrypt=True;TrustServerCertificate=True
 
 services:
   sql:
@@ -59,6 +65,9 @@ services:
       # First start only; remove from .env after the first SystemAdmin sign-in (§12 step 11).
       Bootstrap__SystemAdmin__Email: ${BOOTSTRAP_SYSTEMADMIN_EMAIL:-}
       Bootstrap__SystemAdmin__Password: ${BOOTSTRAP_SYSTEMADMIN_PASSWORD:-}
+      # First start of the simulator only; remove from .env after the first simulator sign-in.
+      Bootstrap__SimulatorOperator__Email: ${BOOTSTRAP_SIMULATOROPERATOR_EMAIL:-}
+      Bootstrap__SimulatorOperator__Password: ${BOOTSTRAP_SIMULATOROPERATOR_PASSWORD:-}
       # MediatR and AutoMapper read it from the environment. Without it they only log a license warning.
       LUCKYPENNY_LICENSE_KEY: ${LUCKYPENNY_LICENSE_KEY:-}
     volumes:
@@ -80,9 +89,11 @@ services:
       Identity__AdviserPortalClientSecret: ${ADVISER_PORTAL_CLIENT_SECRET:?}
       Identity__CustomerPortalClientSecret: ${CUSTOMER_PORTAL_CLIENT_SECRET:?}
       Identity__BackOfficeClientSecret: ${BACK_OFFICE_CLIENT_SECRET:?}
+      Identity__SimulatorClientSecret: ${SIMULATOR_CLIENT_SECRET:?}
       Identity__PortalOrigins__0: https://adviser.${DOMAIN:?}
       Identity__CustomerPortalOrigins__0: https://customer.${DOMAIN:?}
       Identity__BackOfficeOrigin: https://admin.${DOMAIN:?}
+      Identity__SimulatorOrigin: https://sim.${DOMAIN:?}
       Identity__Issuer: https://id.${DOMAIN:?}/
       Identity__SigningCertificatePath: /certs/signing.pfx
       Identity__EncryptionCertificatePath: /certs/encryption.pfx
@@ -184,6 +195,36 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "dotnet", "/app/MyWealthV2.BackOffice.dll", "--healthcheck"]
+      <<: *healthcheck-timing
+
+  simulator:
+    <<: *dotnet-service
+    image: ghcr.io/${GHCR_OWNER:?}/mywealth-simulator:${IMAGE_TAG:?}
+    # Off unless .env has COMPOSE_PROFILES=simulator. No other service depends on it, and every pull job
+    # survives its absence (ADR 0021 rule 15).
+    profiles: [simulator]
+    environment:
+      <<: *dotnet-environment
+      ASPNETCORE_HTTP_PORTS: "8080;8081;8082"
+      OTEL_SERVICE_NAME: simulator
+      ConnectionStrings__MyWealthSimulatorDb: *simulator-connection-string
+      Authentication__Authority: https://id.${DOMAIN:?}
+      Authentication__ClientSecret: ${SIMULATOR_CLIENT_SECRET:?}
+      Authentication__PublicOrigin: https://sim.${DOMAIN:?}
+      # Not `:?`, so .env needs no key while the profile is off; the simulator itself refuses to start
+      # without one of 32+ characters (docs/features/simulator.md R31).
+      Simulator__PartyApiKey: ${SIMULATOR_PARTY_API_KEY:-}
+      DataProtection__KeysPath: /keys
+      ForwardedHeaders__KnownNetworks__0: 172.30.0.0/24
+    volumes:
+      - ./data/dataprotection/simulator:/keys
+    depends_on:
+      sql:
+        condition: service_healthy
+      identity:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "dotnet", "/app/MyWealthV2.Simulator.dll", "--healthcheck"]
       <<: *healthcheck-timing
 
   aspire-dashboard:
