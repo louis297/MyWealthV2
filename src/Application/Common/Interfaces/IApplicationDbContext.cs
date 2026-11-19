@@ -8,6 +8,8 @@ public interface IApplicationDbContext
 
     DbSet<Tenant> Tenants { get; }
 
+    DbSet<ClientMoneyAccount> ClientMoneyAccounts { get; }
+
     DbSet<Instrument> Instruments { get; }
 
     DbSet<Account> Accounts { get; }

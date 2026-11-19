@@ -55,6 +55,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
 
+    public DbSet<ClientMoneyAccount> ClientMoneyAccounts => Set<ClientMoneyAccount>();
+
     public DbSet<Instrument> Instruments => Set<Instrument>();
 
     public DbSet<Account> Accounts => Set<Account>();
