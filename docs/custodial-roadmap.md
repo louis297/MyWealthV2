@@ -25,6 +25,7 @@ related:
   - adr/0021-outside-parties-behind-ports.md
   - features/simulator.md
   - features/adjustments.md
+  - features/client-money-accounts.md
 ---
 
 # Custodial accounts roadmap
@@ -191,12 +192,14 @@ Real-world shape: Customers pay into the firm's client money trust account at a 
 - **Who sets it:** SystemAdmin in Back Office, or TenantAdmin in the Adviser Portal (decide).
 - **Rule:** a Custodial account can be opened only in a currency that has an active client money account. This is a new check on `CreateAccount`, next to tenant-custody-modes.
 - **Depends on:** nothing.
+- **Spec:** B1 and B2 are one spec, [client-money-accounts.md](features/client-money-accounts.md) (`review`, 2026-11-19). Its §11 lists the points to confirm, each with a recommendation: SystemAdmin sets the client money accounts in the Back Office; the account number is stored in full, not masked, because Customers pay to it; the details never change (disable and add a new one); at most one active per currency; reopen is not checked; no bank connection yet (B3 adds it, ADR 0021 rule 3); the demo seed adds none.
 
 ### B2. Deposit reference on a Custodial account
 
 - **What:** a payment reference generated when a Custodial account is opened, unique in the Tenant, short enough for a bank reference field. Customers quote it when they pay in.
 - **Changes:** column and unique index, account item field, Customer Portal shows deposit instructions (trust account, reference). Back-fill existing Custodial accounts.
 - **Depends on:** B1 for the instructions page; the reference itself does not.
+- **Spec:** [client-money-accounts.md](features/client-money-accounts.md) (`review`, 2026-11-19), with B1. Its §11 proposes: nine characters with a Luhn mod 32 check symbol, first a letter, random, unique on the platform rather than in the Tenant; Custodial accounts only; never changed or reused; deposit instructions on their own route `GET /accounts/{id}/deposit-instructions`.
 
 ### B3. Bank feed port and statement lines
 
@@ -432,7 +435,7 @@ Each step depends only on earlier steps. "Closes" names the matrix cell or known
 | 1 | F1 Transaction source, F4 reverse by source | — | Rebalance id leak | [transaction-source](features/transaction-source.md) | accepted 2026-11-19, landed 2026-11-19 |
 | 2 | F2 ADR, S0 skeleton | S0 | — | [ADR 0021](adr/0021-outside-parties-behind-ports.md), [simulator](features/simulator.md) | accepted 2026-11-19, landed 2026-11-19 |
 | 3 | F3 Adjustment (no review) | — | "No correction other than reverse" | [adjustments](features/adjustments.md) | accepted 2026-11-19, landed 2026-11-19 |
-| 4 | B1 client money accounts, B2 deposit reference | — | — | — | not started |
+| 4 | B1 client money accounts, B2 deposit reference | — | — | [client-money-accounts](features/client-money-accounts.md) | review 2026-11-19 |
 | 5 | B3 bank feed, B4 matching and suspense | S1 receipts | Hand `TransferIn` | — | not started |
 | 6 | B5 nominated bank account, B6 withdrawals, available cash | S1 payments | Hand `TransferOut` | — | not started |
 | 7 | B7 bank reconciliation | S1 balances | — | — | not started |
