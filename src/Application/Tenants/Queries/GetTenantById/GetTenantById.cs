@@ -17,6 +17,7 @@ public class GetTenantByIdQueryHandler(IApplicationDbContext db)
                          .SingleOrDefaultAsync(row => row.PublicId == request.Id, cancellationToken)
                      ?? throw new NotFoundException("Tenant", request.Id);
 
-        return TenantDto.From(tenant);
+        var currencies = await TenantClientMoneyCurrencies.ForTenantsAsync(db, [tenant.Id], cancellationToken);
+        return TenantDto.From(tenant, currencies[tenant.Id]);
     }
 }

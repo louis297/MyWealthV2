@@ -6,6 +6,7 @@ import {
   useGetAccountQuery,
   useGetActivityQuery,
   useGetCashBalanceQuery,
+  useGetDepositInstructionsQuery,
   useGetHoldingsQuery,
 } from "@/features/accounts/accountsApi";
 import { custodyLabel, externalNote } from "@/features/accounts/custodyLabel";
@@ -31,6 +32,9 @@ export function AccountDetailPage() {
   const cash = useGetCashBalanceQuery(id, { skip: account.isError });
   const holdings = useGetHoldingsQuery(id, { skip: account.isError });
   const activity = useGetActivityQuery(id, { skip: account.isError });
+  // C19, C20: only an Open Custodial account has deposit instructions; nothing is called for any other.
+  const payable = account.data?.custodyMode === "Custodial" && account.data.status === "Open";
+  const instructions = useGetDepositInstructionsQuery(id, { skip: !payable });
 
   if (isNotFound(account.error)) {
     return <Muted>Not found</Muted>;
@@ -67,6 +71,29 @@ export function AccountDetailPage() {
           </DetailGrid>
         </CardContent>
       </Card>
+      {payable ? (
+        <Section title="How to pay in">
+          {instructions.data ? (
+            <Card>
+              <CardContent className="flex flex-col gap-3">
+                <DetailGrid>
+                  <DetailItem label="Bank">{instructions.data.bankName}</DetailItem>
+                  <DetailItem label="Account name">{instructions.data.accountName}</DetailItem>
+                  <DetailItem label="Account number">{instructions.data.accountNumber}</DetailItem>
+                  <DetailItem label="Reference">{instructions.data.reference}</DetailItem>
+                </DetailGrid>
+                <p className="text-sm">
+                  {`Pay in ${instructions.data.currency} only, and quote the reference exactly so the payment is matched to this account.`}
+                </p>
+              </CardContent>
+            </Card>
+          ) : instructions.isError ? (
+            <Muted>Deposit instructions are not available yet. Contact your adviser.</Muted>
+          ) : (
+            <Muted>Loading…</Muted>
+          )}
+        </Section>
+      ) : null}
       <Section title="Holdings">
         {holdings.data && holdingsItems.length === 0 ? <Muted>No holdings.</Muted> : null}
         {holdingsItems.length > 0 ? (

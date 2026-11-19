@@ -3,7 +3,7 @@ title: API design
 status: accepted
 language: en
 created: 2026-09-11
-updated: 2026-11-19
+updated: 2026-11-20
 related:
   - README.md
   - glossary.md
@@ -294,8 +294,9 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Customers | `/users/customers` | same | `customers.manage` or `customers.manage-own` |
 | Currencies | `/currencies` | GET | Authenticated |
 | Tenants | `/tenants` | list / get / create / update / disable / enable | `tenants.manage` |
+| Client money accounts | `/tenants/{tenantId}/client-money-accounts` | list / get / create / disable / enable. See features/client-money-accounts.md | `tenants.manage` |
 | Instruments | `/instruments` | list / get / create / update / disable / enable | `instruments.read` / `instruments.create` / `instruments.manage` |
-| Accounts | `/accounts` | list / get / create / update / close / reopen; `GET …/cash-balance` | `accounts.read` / `accounts.create` / `accounts.manage` |
+| Accounts | `/accounts` | list / get / create / update / close / reopen; `GET …/cash-balance`; `GET …/deposit-instructions` (features/client-money-accounts.md) | `accounts.read` / `accounts.create` / `accounts.manage` |
 | Transactions | `/transactions` | list / get / create / reverse | `transactions.read` / `transactions.create` |
 | Net worth | `/net-worth`, `/users/customers/{id}/net-worth` | GET. See features/net-worth.md; `breakdowns.byCustodyMode` in features/custody-mode-grouping.md | `accounts.read` |
 | Portfolios | `/portfolios`, `/accounts/{id}/portfolio`, `/accounts/{id}/rebalance` | list / get / create / update / disable; assign / unassign / rebalance. See features/portfolios.md | `portfolios.read` / `portfolios.manage` + `transactions.create` |
@@ -363,6 +364,7 @@ Lookup: `GET /tenants/by-code/{code}` uses `tenants.read` (SystemAdmin, TenantAd
 - After disable, that Code must not complete login; existing refresh fails once the outbox delivers `TenantDisabled`. Its people get 403 from `webapi` at once. Person `Status` is not bulk-updated.
 - Field rules: [features/tenants.md](features/tenants.md).
 - Amendment 2026-11-18 (tenant custody modes, accepted, landed; field rules in [features/tenant-custody-modes.md](features/tenant-custody-modes.md)): POST body adds required `allowedCustodyModes` (array of `External` / `Custodial`, non-empty, no repeats); PUT body may carry it (omitted = unchanged); the item on list, get and by-code carries it. Bad shape → 400 `errors.AllowedCustodyModes`. `POST /accounts` with a custody mode the Tenant does not allow → 400 `errors.CustodyMode`. No new route, policy or problem code.
+- Amendment 2026-11-20 (client money accounts, accepted; field rules in [features/client-money-accounts.md](features/client-money-accounts.md)): sub-resource `/tenants/{tenantId}/client-money-accounts` with list, get, create (201 `{ id }`), `POST …/{id}/disable` and `POST …/{id}/enable` (`rowVersion`), all `tenants.manage`. No PUT. One active row per currency and an account number active on one row only, else 400 `errors.Currency` / `errors.AccountNumber`. The tenant item on list, get and by-code carries `clientMoneyCurrencies`. No new policy or problem code.
 
 ### 7.4 People (TenantAdmin / Adviser / Customer)
 
@@ -441,6 +443,7 @@ Field rules: [features/accounts.md](features/accounts.md).
 - Create on a disabled tenant → §4.1 `target=tenant`. Create or reopen on a Disabled Customer → §4.1 `target=user`.
 - Amendment 2026-11-17 (account custody mode, accepted; field rules in [features/account-custody-mode.md](features/account-custody-mode.md)): the item also includes `custodyMode` (`External` / `Custodial`). `POST /accounts` requires `custodyMode`; only `External` can be selected, and a missing, reserved or unknown value is a field 400 with no problem code. A PUT body that includes `custodyMode` → 400. `GET /accounts` takes an optional `custodyMode` filter.
 - Amendment 2026-11-17 (custody modes, accepted, landed; field rules in [features/custody-modes.md](features/custody-modes.md)): `POST /accounts` accepts `custodyMode: "Custodial"`, with `type` `Brokerage` only; another type → 400 `errors.Type`. `POST /accounts/{id}/portfolio` and `POST /accounts/{id}/rebalance` require a Custodial account, else 400 `account_not_eligible`.
+- Amendment 2026-11-20 (client money accounts and deposit references, accepted; field rules in [features/client-money-accounts.md](features/client-money-accounts.md)): `POST /accounts` with `Custodial` in a currency where the Tenant has no active client money account → 400 `errors.Currency`. The item includes `depositReference` (server-generated on a Custodial account, `null` on an External one); a POST or PUT body that carries it → 400. `GET /accounts/{id}/deposit-instructions` (`accounts.read`) → `{ accountId, currency, reference, bankName, accountName, accountNumber }`, or 404 for an External or Closed account or when the currency has no active client money account.
 
 ### 7.7 Transactions
 
@@ -597,3 +600,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-19 | §7 catalog, §7.8: grouping by custody mode landed. |
 | 2026-11-19 | §1, §3.1: simulator accepted. A third process with its own control and party surfaces; role `SimulatorOperator` has no permission and gets 401 on `webapi`. No `webapi` route or policy added ([features/simulator.md](features/simulator.md)). |
 | 2026-11-19 | §3.1, §7.7: adjustments accepted. New permission `transactions.adjust` (TenantAdmin only), route `POST /transactions/adjustment`, item field `adjustment`, 403 on reverse of an `Adjustment` without the permission. No problem code. |
+| 2026-11-20 | §6, §7.3, §7.6: client money accounts and deposit references accepted. Sub-resource `/tenants/{tenantId}/client-money-accounts` (`tenants.manage`); tenant item `clientMoneyCurrencies`; account item `depositReference`; `GET /accounts/{id}/deposit-instructions`; Custodial open needs an active client money account in its currency. No new policy or problem code ([features/client-money-accounts.md](features/client-money-accounts.md)). |

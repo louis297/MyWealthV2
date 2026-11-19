@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-13
-last_updated: 2026-11-18
+last_updated: 2026-11-20
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -18,6 +18,7 @@ related:
   - currencies.md
   - identity-auth.md
   - tenant-custody-modes.md
+  - client-money-accounts.md
 ---
 
 # Tenants
@@ -382,3 +383,15 @@ Status of this amendment: `accepted` (2026-11-18), together with [tenant-custody
 - §8.3: `POST /tenants` requires `allowedCustodyModes` (array of enum names, exact case, non-empty, no repeats; else 400 `errors.AllowedCustodyModes`). `PUT /tenants/{id}` may carry it; omitted or `null` leaves the setting unchanged.
 - Disable and enable do not touch the setting.
 - Only `POST /accounts` reads the setting (tenant-custody-modes R7). Narrowing it changes no existing account.
+
+---
+
+## Amendment 2026-11-20 (client money accounts) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [client-money-accounts.md](client-money-accounts.md). That spec owns the field rules; this list says what changes here.
+
+- New sub-resource `/tenants/{tenantId}/client-money-accounts` (list, get, create, disable, enable), `tenants.manage` only. A client money account is the firm's trust bank account for one currency; at most one active per currency; no edit. Create on a disabled tenant → 400 `disabled` / `target=tenant`.
+- §8.1: the item on list, get-by-id and by-code carries `clientMoneyCurrencies`: the codes with an active client money account, sorted A–Z, `[]` when none. No bank details on the tenant item.
+- §2 Out "per-tenant currency allow-lists" still holds: `clientMoneyCurrencies` is read from the client money accounts, not a setting, and it limits only the currency of a new Custodial account (client-money-accounts R11).
+- Disabling or enabling the Tenant does not touch its client money accounts.
+

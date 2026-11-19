@@ -27,6 +27,9 @@ public class UpdateAccountCommand : IRequest
     public Guid? TenantId { get; init; }
 
     public Guid? CustomerId { get; init; }
+
+    /// <summary>Refused when present (client-money-accounts R16).</summary>
+    public string? DepositReference { get; init; }
 }
 
 public class UpdateAccountCommandValidator : AbstractValidator<UpdateAccountCommand>
@@ -58,6 +61,9 @@ public class UpdateAccountCommandValidator : AbstractValidator<UpdateAccountComm
         RuleFor(command => command.CustomerId)
             .Must(customerId => customerId is null)
             .WithMessage("CustomerId cannot be changed.");
+        RuleFor(command => command.DepositReference)
+            .Must(reference => reference is null)
+            .WithMessage("DepositReference cannot be changed.");
     }
 }
 

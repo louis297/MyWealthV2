@@ -3,7 +3,7 @@ title: Domain model
 status: accepted
 language: en
 created: 2026-09-11
-updated: 2026-11-19
+updated: 2026-11-20
 related:
   - README.md
   - glossary.md
@@ -303,6 +303,7 @@ Invariants:
 - Disable Customer rejects while any account is active.
 - `CustodyMode` is set on create and immutable, like `Type` and `Currency`.
 - A Custodial account is a `Brokerage` account: `Create` refuses `Custodial` with any other type, and Application lets a caller select it. An External account may have any openable type. An Active `AccountPortfolioAssignment` is on a Custodial account (held by Application; [features/custody-modes.md](features/custody-modes.md)).
+- (client money accounts) A Custodial account has a `DepositReference` and an External account has none: `Create` takes an optional `DepositReference` and refuses a Custodial account without one or an External account with one. The reference never changes. Uniqueness on the platform is held by Application and a unique index. A Custodial account is opened only in a currency with an active client money account at the time of open; Application holds that check, and reopen does not repeat it ([features/client-money-accounts.md](features/client-money-accounts.md)).
 
 Field rules: [features/accounts.md](features/accounts.md). Landed in the repo 2026-09-21. Custody mode: [features/account-custody-mode.md](features/account-custody-mode.md) (landed 2026-11-17). Custodial account rules: [features/custody-modes.md](features/custody-modes.md) (accepted 2026-11-17).
 
@@ -352,6 +353,15 @@ Field rules: [features/posting.md](features/posting.md), [features/holdings.md](
 | `FeeBands` | Value object | Marginal `(from, ratePercent)` steps; first `from` is 0, ascending. Reused by later fee kinds. |
 
 Invariant: no schedule write changes which row applies to a posted `Buy` / `Sell`, or that row's values. Field rules: [features/trade-fees.md](features/trade-fees.md).
+
+### 8.8 Client money account (accepted — client-money-accounts slice)
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `ClientMoneyAccount` | Aggregate | Tenant, currency, bank name, account name, account number (all immutable), `IsActive`. `Create`, `Disable`, `Enable` (idempotent). No event. |
+| `DepositReference` | Value object | Nine characters from `0123456789ABCDEFGHJKMNPQRSTVWXYZ`, first a letter, last a Luhn mod 32 check symbol. `Generate`, `TryParse`, `IsValid`. |
+
+Invariants: at most one active client money account per (Tenant, currency), and an account number is active on at most one row on the platform. Both span rows, so Application holds them, with filtered unique indexes as the backstop; the aggregate does not. Field rules: [features/client-money-accounts.md](features/client-money-accounts.md).
 
 ---
 
@@ -405,6 +415,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-19 | Transaction source in `review`: `TransactionSourceKind`, `TransactionSource` on every Transaction, `CustodyRules.AllowsHandReverse`. Recorded in §8.6 with a `review` mark. [features/transaction-source.md](features/transaction-source.md). |
 | 2026-11-19 | Transaction source accepted. The `review` mark in §8.6 is dropped. |
 | 2026-11-19 | Simulator accepted: fifth role `SimulatorOperator` in §1, §4 and §5. The simulator's own types are not platform Domain types ([features/simulator.md](features/simulator.md) §5). |
+| 2026-11-20 | Client money accounts accepted: `ClientMoneyAccount` and `DepositReference` (§8.8); `Account` holds a deposit reference on Custodial accounts only (§8.5). [features/client-money-accounts.md](features/client-money-accounts.md). |
 
 ---
 

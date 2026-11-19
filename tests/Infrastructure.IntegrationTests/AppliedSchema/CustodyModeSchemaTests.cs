@@ -1,4 +1,6 @@
 using Microsoft.Data.SqlClient;
+using MyWealthV2.Domain.ValueObjects;
+using MyWealthV2.Infrastructure.Accounts;
 using MyWealthV2.Schema;
 using Shouldly;
 
@@ -10,8 +12,8 @@ public class CustodyModeSchemaTests
     private const string CustodyModeScript = "0031_accounts_custody_mode.sql";
 
     private const string InsertAccount = """
-        INSERT INTO [Accounts] ([PublicId], [TenantId], [CustomerId], [Name], [Type], [CustodyMode], [Status], [Currency], [Created], [CreatedBy])
-        VALUES (NEWID(), @a_tenant, @a_customer, N'New', 0, {0}, 0, 'NZD', SYSDATETIMEOFFSET(), N'test');
+        INSERT INTO [Accounts] ([PublicId], [TenantId], [CustomerId], [Name], [Type], [CustodyMode], [Status], [Currency], [DepositReference], [Created], [CreatedBy])
+        VALUES (NEWID(), @a_tenant, @a_customer, N'New', 0, {0}, 0, 'NZD', {1}, SYSDATETIMEOFFSET(), N'test');
         SELECT [CustodyMode] FROM [Accounts] WHERE [Id] = SCOPE_IDENTITY();
         """;
 
@@ -58,7 +60,7 @@ public class CustodyModeSchemaTests
     [TestCase(1)]
     public async Task Insert_KnownCustodyMode_IsAccepted(int custodyMode)
     {
-        var stored = await RunAsync(string.Format(InsertAccount, custodyMode));
+        var stored = await RunAsync(string.Format(InsertAccount, custodyMode, DepositReferenceFor(custodyMode)));
 
         stored.ShouldBe(custodyMode);
     }
@@ -67,7 +69,7 @@ public class CustodyModeSchemaTests
     [TestCase(2)]
     public async Task Insert_UnknownCustodyMode_IsRejected(int custodyMode)
     {
-        var exception = await Should.ThrowAsync<SqlException>(() => RunAsync(string.Format(InsertAccount, custodyMode)));
+        var exception = await Should.ThrowAsync<SqlException>(() => RunAsync(string.Format(InsertAccount, custodyMode, DepositReferenceFor(custodyMode))));
 
         exception.Number.ShouldBe(547);
     }
@@ -120,4 +122,8 @@ public class CustodyModeSchemaTests
             await transaction.RollbackAsync();
         }
     }
+
+    /// <summary>A Custodial row needs a deposit reference from script 0039 on; any other row has none.</summary>
+    private static string DepositReferenceFor(int custodyMode) =>
+        custodyMode == 1 ? $"'{DepositReference.Generate(CryptoRandomSymbols.Instance).Value}'" : "NULL";
 }

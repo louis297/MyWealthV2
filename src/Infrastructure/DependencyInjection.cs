@@ -6,6 +6,7 @@ using MyWealthV2.Application.MarketData;
 using MyWealthV2.Application.Portfolios;
 using MyWealthV2.Application.Portfolios.Commands.RebalanceAccount;
 using MyWealthV2.Application.Reports;
+using MyWealthV2.Infrastructure.Accounts;
 using MyWealthV2.Infrastructure.Currencies;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Interceptors;
@@ -44,6 +45,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<ITenantIdAccessor, TenantIdAccessor>();
         builder.Services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
         builder.Services.AddSingleton<ICurrencyCatalog, CurrencyCatalog>();
+        builder.Services.AddSingleton<IDepositReferenceSource, RandomDepositReferenceSource>();
         builder.Services.AddScoped<FxRateStore>();
         builder.Services.AddScoped<IFxRate>(sp => sp.GetRequiredService<FxRateStore>());
         builder.Services.AddScoped<IFxRateStore>(sp => sp.GetRequiredService<FxRateStore>());

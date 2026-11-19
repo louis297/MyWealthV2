@@ -181,6 +181,60 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
             cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ClientMoneyAccountItem>> ListClientMoneyAccountsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        var page = await ReadAsync<ClientMoneyAccountPage>(
+            HttpMethod.Get,
+            $"{ClientMoneyAccountsPath(tenantId)}?pageSize=100",
+            json: null,
+            cancellationToken);
+        return page.Items;
+    }
+
+    public Task<ClientMoneyAccountItem> GetClientMoneyAccountAsync(
+        Guid tenantId,
+        Guid id,
+        CancellationToken cancellationToken = default) =>
+        ReadAsync<ClientMoneyAccountItem>(
+            HttpMethod.Get,
+            $"{ClientMoneyAccountsPath(tenantId)}/{id}",
+            json: null,
+            cancellationToken);
+
+    public async Task<Guid> CreateClientMoneyAccountAsync(
+        Guid tenantId,
+        string currency,
+        string bankName,
+        string accountName,
+        string accountNumber,
+        CancellationToken cancellationToken = default)
+    {
+        var created = await ReadAsync<Created>(
+            HttpMethod.Post,
+            ClientMoneyAccountsPath(tenantId),
+            JsonSerializer.Serialize(new { currency, bankName, accountName, accountNumber }, Json),
+            cancellationToken);
+        return created.Id;
+    }
+
+    public Task DisableClientMoneyAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
+        SendExpectingSuccessAsync(
+            HttpMethod.Post,
+            $"{ClientMoneyAccountsPath(tenantId)}/{id}/disable",
+            RowVersion(rowVersion),
+            cancellationToken);
+
+    public Task EnableClientMoneyAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
+        SendExpectingSuccessAsync(
+            HttpMethod.Post,
+            $"{ClientMoneyAccountsPath(tenantId)}/{id}/enable",
+            RowVersion(rowVersion),
+            cancellationToken);
+
+    private static string ClientMoneyAccountsPath(Guid tenantId) => $"/tenants/{tenantId}/client-money-accounts";
+
     public Task<IReadOnlyList<CurrencyItem>> ListCurrenciesAsync(CancellationToken cancellationToken = default) =>
         ReadAsync<IReadOnlyList<CurrencyItem>>(
             HttpMethod.Get,

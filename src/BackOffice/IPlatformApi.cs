@@ -40,6 +40,27 @@ public interface IPlatformApi
         IReadOnlyList<string>? allowedTriggers,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<ClientMoneyAccountItem>> ListClientMoneyAccountsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default);
+
+    Task<ClientMoneyAccountItem> GetClientMoneyAccountAsync(
+        Guid tenantId,
+        Guid id,
+        CancellationToken cancellationToken = default);
+
+    Task<Guid> CreateClientMoneyAccountAsync(
+        Guid tenantId,
+        string currency,
+        string bankName,
+        string accountName,
+        string accountNumber,
+        CancellationToken cancellationToken = default);
+
+    Task DisableClientMoneyAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default);
+
+    Task EnableClientMoneyAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<CurrencyItem>> ListCurrenciesAsync(CancellationToken cancellationToken = default);
 
     Task<InstrumentPage> ListInstrumentsAsync(

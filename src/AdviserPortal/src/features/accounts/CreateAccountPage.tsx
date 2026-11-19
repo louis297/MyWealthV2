@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useAppSelector } from "@/app/hooks";
-import { Messages, Page, PageHeading, SelectField, TextField } from "@/components/portal";
+import { Messages, Muted, Page, PageHeading, SelectField, TextField } from "@/components/portal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { SelectItem } from "@/components/ui/select";
@@ -17,25 +17,34 @@ const custodyOptions: { value: CustodyMode; label: string }[] = [
   { value: "Custodial", label: "Custodial — held on the platform" },
 ];
 
-type ProblemMessages = { custody: string[]; other: string[] };
+type ProblemMessages = { custody: string[]; currency: string[]; other: string[] };
 
-// A refused custody mode (tenant-custody-modes R7) is shown at the Custody choice; every other message on top.
+const noMessages: ProblemMessages = { custody: [], currency: [], other: [] };
+
+// D33: shown instead of the currencies while Custodial is chosen and the firm has no client money account.
+const noClientMoneyAccount = "Your firm has no client money account, so a Custodial account cannot be opened.";
+
+// A refused custody mode (tenant-custody-modes R7) is shown at the Custody choice, a refused currency
+// (client-money-accounts D33) at the currency picker; every other message on top.
 function problemMessages(error: unknown): ProblemMessages {
-  const none: ProblemMessages = { custody: [], other: [] };
+  const none = noMessages;
   if (typeof error !== "object" || error === null || !("data" in error)) {
     return none;
   }
   const data = (error as { data?: { errors?: Record<string, string[]>; detail?: string } }).data;
   if (data?.errors) {
     const entries = Object.entries(data.errors);
-    const isCustody = ([key]: [string, string[]]) => key.toLowerCase() === "custodymode";
+    const field = (name: string) => ([key]: [string, string[]]) => key.toLowerCase() === name;
+    const isCustody = field("custodymode");
+    const isCurrency = field("currency");
     return {
       custody: entries.filter(isCustody).flatMap(([, values]) => values),
-      other: entries.filter((entry) => !isCustody(entry)).flatMap(([, values]) => values),
+      currency: entries.filter(isCurrency).flatMap(([, values]) => values),
+      other: entries.filter((entry) => !isCustody(entry) && !isCurrency(entry)).flatMap(([, values]) => values),
     };
   }
   if (data?.detail) {
-    return { custody: [], other: [data.detail] };
+    return { ...none, other: [data.detail] };
   }
   return none;
 }
@@ -47,7 +56,7 @@ export function CreateAccountPage() {
   const [type, setType] = useState<string>(accountTypes[0]);
   const [custodyMode, setCustodyMode] = useState<CustodyMode | "">("");
   const [currency, setCurrency] = useState("");
-  const [messages, setMessages] = useState<ProblemMessages>({ custody: [], other: [] });
+  const [messages, setMessages] = useState<ProblemMessages>(noMessages);
   const [createAccount] = useCreateAccountMutation();
   const { data: currencies } = useGetCurrenciesQuery();
   const firm = useAppSelector((state) => state.session.tenant);
@@ -61,10 +70,16 @@ export function CreateAccountPage() {
       ? custodyMode
       : "";
   const selectedType = selectedCustody === "Custodial" ? "Brokerage" : type;
+  // D33: a Custodial account is offered only the enabled currencies in the firm's clientMoneyCurrencies.
+  const offeredCurrencies = (currencies ?? []).filter(
+    (item) => selectedCustody !== "Custodial" || (firm?.clientMoneyCurrencies ?? []).includes(item.code),
+  );
+  const selectedCurrency = offeredCurrencies.some((item) => item.code === currency) ? currency : "";
+  const custodialBlocked = selectedCustody === "Custodial" && offeredCurrencies.length === 0;
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!customerId || selectedCustody === "") {
+    if (!customerId || selectedCustody === "" || custodialBlocked) {
       return;
     }
 
@@ -74,7 +89,7 @@ export function CreateAccountPage() {
         name: name.trim(),
         type: selectedType,
         custodyMode: selectedCustody,
-        currency,
+        currency: selectedCurrency,
       }).unwrap();
       void navigate(`/accounts/${created.id}`);
     } catch (error: unknown) {
@@ -127,21 +142,25 @@ export function CreateAccountPage() {
                 </SelectItem>
               ))}
             </SelectField>
-            <SelectField
-              id="account-currency"
-              label="Currency"
-              value={currency}
-              onChange={(event) => setCurrency(event.target.value)}
-              required
-            >
-              <SelectItem value="">Select a currency</SelectItem>
-              {(currencies ?? []).map((item) => (
-                <SelectItem key={item.code} value={item.code}>
-                  {item.code}
-                </SelectItem>
-              ))}
-            </SelectField>
-            <Button type="submit" disabled={selectedCustody === ""}>
+            <div className="flex flex-col gap-2" data-field="currency">
+              <SelectField
+                id="account-currency"
+                label="Currency"
+                value={selectedCurrency}
+                onChange={(event) => setCurrency(event.target.value)}
+                required
+              >
+                <SelectItem value="">Select a currency</SelectItem>
+                {offeredCurrencies.map((item) => (
+                  <SelectItem key={item.code} value={item.code}>
+                    {item.code}
+                  </SelectItem>
+                ))}
+              </SelectField>
+              {custodialBlocked ? <Muted>{noClientMoneyAccount}</Muted> : null}
+              <Messages messages={messages.currency} />
+            </div>
+            <Button type="submit" disabled={selectedCustody === "" || custodialBlocked}>
               Create account
             </Button>
           </form>

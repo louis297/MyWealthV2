@@ -9,6 +9,18 @@ export type Account = {
   currency: string;
   cashBalance: number;
   status: string;
+  /** client-money-accounts R14: set on a Custodial account, null on an External one. */
+  depositReference?: string | null;
+};
+
+/** client-money-accounts R22: where to pay in to an Open Custodial account. */
+export type DepositInstructions = {
+  accountId: string;
+  currency: string;
+  reference: string;
+  bankName: string;
+  accountName: string;
+  accountNumber: string;
 };
 
 export type Holding = {
@@ -56,6 +68,10 @@ export const accountsApi = api.injectEndpoints({
     getCashBalance: builder.query<{ cashBalance: number; currency: string }, string>({
       query: (id) => `/accounts/${id}/cash-balance`,
     }),
+    getDepositInstructions: builder.query<DepositInstructions, string>({
+      query: (id) => `/accounts/${id}/deposit-instructions`,
+      providesTags: ["Account"],
+    }),
     getHoldings: builder.query<{ items: Holding[] }, string>({
       query: (id) => `/accounts/${id}/holdings`,
     }),
@@ -70,6 +86,7 @@ export const {
   useGetAccountsQuery,
   useGetAccountQuery,
   useGetCashBalanceQuery,
+  useGetDepositInstructionsQuery,
   useGetHoldingsQuery,
   useGetActivityQuery,
 } = accountsApi;

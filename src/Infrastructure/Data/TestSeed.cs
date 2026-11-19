@@ -6,6 +6,7 @@ using MyWealthV2.Domain.Common;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.ValueObjects;
+using MyWealthV2.Infrastructure.Accounts;
 using MyWealthV2.Infrastructure.Data.Entities;
 using MyWealthV2.Infrastructure.Identity;
 
@@ -160,6 +161,7 @@ public static class TestSeed
 
         await EnsureReportGrantsAsync(db, tenant.Id, cancellationToken);
         await EnsureCatalogAsync(db, tenant.Id, cancellationToken);
+        await EnsureClientMoneyAccountsAsync(db, tenant, cancellationToken);
 
         if (services is not null)
         {
@@ -168,6 +170,41 @@ public static class TestSeed
 
         await EnsureAccountsAsync(db, tenant.Id, firm.CustomerEmail, cancellationToken);
         await EnsureTradeFeeScheduleAsync(db, tenant.Id, cancellationToken);
+    }
+
+    private static readonly string[] ClientMoneyCurrencies = ["USD", "NZD"];
+
+    /// <summary>
+    /// An active client money account in USD and in NZD (client-money-accounts §9.1), so the Custodial demo
+    /// account has deposit instructions and new Custodial accounts open in those currencies. Idempotent on
+    /// (tenant, currency, active).
+    /// </summary>
+    private static async Task EnsureClientMoneyAccountsAsync(
+        ApplicationDbContext db,
+        Tenant tenant,
+        CancellationToken cancellationToken)
+    {
+        foreach (var code in ClientMoneyCurrencies)
+        {
+            var exists = await db.ClientMoneyAccounts.AnyAsync(
+                row => row.TenantId == tenant.Id && row.Currency == code && row.IsActive, cancellationToken);
+            if (exists)
+            {
+                continue;
+            }
+
+            var currency = await db.Set<Currency>().AsNoTracking().SingleAsync(row => row.Code == code, cancellationToken);
+            var row = ClientMoneyAccount.Create(
+                tenant.Id,
+                currency,
+                "Simulator Bank",
+                $"{tenant.Name} Client Funds Trust Account",
+                $"SIM-{tenant.Code.ToUpperInvariant()}-{code}");
+            row.Created = TimeProvider.System.GetUtcNow();
+            row.CreatedBy = CreatedBy;
+            db.ClientMoneyAccounts.Add(row);
+            await db.SaveChangesAsync(cancellationToken);
+        }
     }
 
     /// <summary>
@@ -961,7 +998,10 @@ public static class TestSeed
             return;
         }
 
-        var account = Account.Create(tenantId, customerId, name, type, custodyMode, currency);
+        var depositReference = custodyMode == CustodyMode.Custodial
+            ? DepositReference.Generate(CryptoRandomSymbols.Instance)
+            : null;
+        var account = Account.Create(tenantId, customerId, name, type, custodyMode, currency, depositReference);
         if (closed)
         {
             account.Close();

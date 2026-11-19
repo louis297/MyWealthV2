@@ -115,6 +115,51 @@ public class BackOfficeApiTests
     }
 
     [Test]
+    public async Task ClientMoneyAccountCalls_UseTheTenantRoutes_AndSendTheRowVersion()
+    {
+        var rowId = Guid.Parse("88888888-8888-8888-8888-888888888888");
+        var item = $$"""
+            {"id":"{{rowId}}","tenantId":"{{TenantId}}","currency":"USD","bankName":"Simulator Bank","accountName":"North Trust","accountNumber":"02-0100","isActive":true,"rowVersion":"rv1","created":"2026-11-19T03:00:00+00:00"}
+            """;
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.OK, $$"""{"items":[{{item}}],"page":1,"pageSize":100,"totalCount":1}""");
+        api.Enqueue(HttpStatusCode.OK, item);
+        api.Enqueue(HttpStatusCode.Created, $$"""{"id":"{{rowId}}"}""");
+        api.Enqueue(HttpStatusCode.NoContent, "");
+        api.Enqueue(HttpStatusCode.NoContent, "");
+        var platform = Create(api);
+
+        var listed = (await platform.ListClientMoneyAccountsAsync(TenantId)).ShouldHaveSingleItem();
+        var fetched = await platform.GetClientMoneyAccountAsync(TenantId, rowId);
+        var created = await platform.CreateClientMoneyAccountAsync(TenantId, "USD", "Simulator Bank", "North Trust", "02-0100");
+        await platform.DisableClientMoneyAccountAsync(TenantId, rowId, "rv1");
+        await platform.EnableClientMoneyAccountAsync(TenantId, rowId, "rv2");
+
+        listed.Id.ShouldBe(rowId);
+        listed.Currency.ShouldBe("USD");
+        listed.BankName.ShouldBe("Simulator Bank");
+        listed.AccountName.ShouldBe("North Trust");
+        listed.AccountNumber.ShouldBe("02-0100");
+        listed.IsActive.ShouldBeTrue();
+        listed.RowVersion.ShouldBe("rv1");
+        fetched.Id.ShouldBe(rowId);
+        created.ShouldBe(rowId);
+        AssertRequest(api.Requests[0], "GET", $"/tenants/{TenantId}/client-money-accounts?pageSize=100");
+        AssertRequest(api.Requests[1], "GET", $"/tenants/{TenantId}/client-money-accounts/{rowId}");
+        AssertRequest(api.Requests[2], "POST", $"/tenants/{TenantId}/client-money-accounts");
+        var body = Body(api.Requests[2]);
+        body.GetProperty("currency").GetString().ShouldBe("USD");
+        body.GetProperty("bankName").GetString().ShouldBe("Simulator Bank");
+        body.GetProperty("accountName").GetString().ShouldBe("North Trust");
+        body.GetProperty("accountNumber").GetString().ShouldBe("02-0100");
+        body.EnumerateObject().Count().ShouldBe(4);
+        AssertRequest(api.Requests[3], "POST", $"/tenants/{TenantId}/client-money-accounts/{rowId}/disable");
+        Body(api.Requests[3]).GetProperty("rowVersion").GetString().ShouldBe("rv1");
+        AssertRequest(api.Requests[4], "POST", $"/tenants/{TenantId}/client-money-accounts/{rowId}/enable");
+        Body(api.Requests[4]).GetProperty("rowVersion").GetString().ShouldBe("rv2");
+    }
+
+    [Test]
     public async Task InstrumentCalls_ListUsesTenantAndFilters()
     {
         var instrumentId = Guid.Parse("33333333-3333-3333-3333-333333333333");

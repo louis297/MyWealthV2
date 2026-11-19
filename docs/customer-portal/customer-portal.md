@@ -4,7 +4,7 @@ status: accepted
 phase: 3
 language: en
 created: 2026-11-02
-updated: 2026-11-19
+updated: 2026-11-20
 related:
   - README.md
   - ../adviser-portal/frontend-conventions.md
@@ -18,6 +18,7 @@ related:
   - ../features/posting.md
   - ../features/net-worth.md
   - ../features/reports.md
+  - ../features/client-money-accounts.md
   - ../adr/0003-react-redux-typescript-vite-tailwind-frontend.md
   - ../adr/0014-openiddict-authorization-code-pkce.md
   - ../adr/0016-bff-for-first-party-portals.md
@@ -225,6 +226,21 @@ Status of this amendment: `accepted` (2026-11-19), together with [adjustments](.
 | Id | Given | When | Then |
 | --- | --- | --- | --- |
 | C18 | Customer with an `Adjustment` on a Custodial account | Account page activity | The row is labelled "Adjustment" and shows its amount like any other row, and its memo on a line under the label (the activity table shows no memo on other rows). The reason is not shown. Its Reversal stays "Reversal", with no memo line. |
+
+---
+
+## Amendment 2026-11-20 (deposit instructions) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [client-money-accounts](../features/client-money-accounts.md). No backend grant changes: the Customer reads deposit instructions with `accounts.read`, own accounts only. The BFF does not change: the route is under `/accounts`.
+
+| Call | When | Notes |
+| --- | --- | --- |
+| `GET /accounts/{id}/deposit-instructions` | Account page of an Open Custodial account | 200 `{ accountId, currency, reference, bankName, accountName, accountNumber }`; 404 when unavailable. Not called for External or Closed accounts |
+
+| Id | Given | When | Then |
+| --- | --- | --- | --- |
+| C19 | Customer with an Open Custodial account whose currency has a client money account | Account page | A "How to pay in" section under the cash balance: Bank, Account name, Account number, Reference, and the sentence "Pay in <currency> only, and quote the reference exactly so the payment is matched to this account." |
+| C20 | Customer with a Closed Custodial account, or an Open one whose deposit instructions return 404 | Account page | A Closed account shows no section. An Open one shows "Deposit instructions are not available yet. Contact your adviser." An External account shows no section and calls no route. |
 ---
 
 ## Tests

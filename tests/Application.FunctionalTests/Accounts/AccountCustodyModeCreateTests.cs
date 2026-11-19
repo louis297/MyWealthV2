@@ -1,3 +1,4 @@
+using MyWealthV2.Application.FunctionalTests.ClientMoneyAccounts;
 using System.Net;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -73,6 +74,7 @@ public class AccountCustodyModeCreateTests : TestBase
     public async Task Adviser_CustodialBrokerage_Returns201AndGetReturnsCustodial()
     {
         var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        await ClientMoneyHttp.EnsureActiveForCustomerAsync(customer.PublicId, "NZD");
 
         var response = await AccountHttp.Send(HttpMethod.Post, "/accounts", tokens.AccessToken,
             Body(customer.PublicId, "Custodial", "Brokerage"));
@@ -85,6 +87,7 @@ public class AccountCustodyModeCreateTests : TestBase
     public async Task TenantAdmin_CustodialBrokerage_Returns201()
     {
         var (_, _, customer, tokens) = await AccountHttp.SignInTenantAdmin();
+        await ClientMoneyHttp.EnsureActiveForCustomerAsync(customer.PublicId, "NZD");
 
         var response = await AccountHttp.Send(HttpMethod.Post, "/accounts", tokens.AccessToken,
             Body(customer.PublicId, "Custodial", "Brokerage"));
@@ -160,6 +163,7 @@ public class AccountCustodyModeCreateTests : TestBase
         }));
         (await CountAccountsAsync(customer.Id)).ShouldBe(0);
 
+        await ClientMoneyHttp.EnsureActiveAsync(tenant.Id, "NZD");
         var custodial = await AccountHttp.Send(HttpMethod.Post, "/accounts", tokens.AccessToken, new
         {
             tenantId = tenant.PublicId,

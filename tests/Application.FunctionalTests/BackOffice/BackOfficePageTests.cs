@@ -24,6 +24,8 @@ public class BackOfficePageTests
     private static readonly Guid EmptyTenantId = Guid.Parse("55555555-5555-5555-5555-555555555555");
     private static readonly Guid OutsideTenantId = Guid.Parse("66666666-6666-6666-6666-666666666666");
     private static readonly Guid MissingTenantId = Guid.Parse("77777777-7777-7777-7777-777777777777");
+    private static readonly Guid ClientMoneyUsdId = Guid.Parse("88888888-8888-8888-8888-888888888888");
+    private static readonly Guid ClientMoneyNzdId = Guid.Parse("99999999-9999-9999-9999-999999999999");
 
     private BackOfficeFactory _factory = null!;
     private HttpClient _client = null!;
@@ -187,6 +189,41 @@ public class BackOfficePageTests
         body.ShouldNotContain(">Schedule<");
         body.ShouldNotContain("/reports/request");
         body.ShouldNotContain("/reports/schedules");
+    }
+
+    [Test]
+    public async Task Configuration_ListsClientMoneyAccounts_WithDisableOrEnablePerRow_AndTheAddForm()
+    {
+        var body = await GetAsync($"/tenants/{TenantId}/config");
+
+        body.ShouldContain("Client money accounts");
+        foreach (var header in new[] { "Currency", "Bank", "Account name", "Account number", "Active" })
+        {
+            body.ShouldContain($"<th>{header}</th>");
+        }
+
+        body.ShouldContain("Simulator Bank");
+        body.ShouldContain("North Advisory Ltd Client Funds Trust Account");
+        body.ShouldContain("02-0100-0123456-00");
+        body.ShouldContain("38-9000-7654321-00");
+        ClientMoneyButton(body, ClientMoneyUsdId).ShouldContain(">Disable<");
+        ClientMoneyButton(body, ClientMoneyNzdId).ShouldContain(">Enable<");
+        body.ShouldContain("Add client money account");
+        body.ShouldContain("Bank name");
+        SubmitButton(body, "Add").ShouldNotContain(" disabled");
+        _api.ClientMoneyLists.ShouldContain(TenantId);
+    }
+
+    [Test]
+    public async Task Configuration_OffersNoEditForClientMoneyAccounts_AndSaysHowToCorrectThem()
+    {
+        var body = await GetAsync($"/tenants/{TenantId}/config");
+
+        body.ShouldContain(
+            "Details cannot be changed. To correct them, disable the account and add a new one. "
+            + "Disabling the last account in a currency stops new Custodial accounts in that currency.");
+        body.ShouldNotContain(">Edit<");
+        body.ShouldNotContain(">Save<");
     }
 
     [Test]
@@ -355,6 +392,15 @@ public class BackOfficePageTests
         return match.Value;
     }
 
+    /// <summary>The Disable or Enable button of one client money account row (marked with its id).</summary>
+    private static string ClientMoneyButton(string body, Guid id)
+    {
+        var match = Regex.Match(
+            body, $"<button[^>]*data-client-money-account=\"{id}\"[^>]*>(?:(?!</button>).)*</button>", RegexOptions.Singleline);
+        match.Success.ShouldBeTrue($"no button for client money account {id}");
+        return match.Value;
+    }
+
     private static string SubmitButton(string body, string label)
     {
         var match = Regex.Match(body, $"<button[^>]*type=\"submit\"[^>]*><span class=\"mud-button-label\">{label}<");
@@ -477,6 +523,44 @@ public class BackOfficePageTests
             bool? isActive,
             IReadOnlyList<string>? allowedTriggers,
             CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public List<Guid> ClientMoneyLists { get; } = [];
+
+        public Task<IReadOnlyList<ClientMoneyAccountItem>> ListClientMoneyAccountsAsync(
+            Guid tenantId,
+            CancellationToken cancellationToken = default)
+        {
+            ClientMoneyLists.Add(tenantId);
+            return Task.FromResult<IReadOnlyList<ClientMoneyAccountItem>>([
+                new ClientMoneyAccountItem(
+                    ClientMoneyUsdId, tenantId, "USD", "Simulator Bank", "North Advisory Ltd Client Funds Trust Account",
+                    "02-0100-0123456-00", true, "cma-rv1", DateTimeOffset.UnixEpoch),
+                new ClientMoneyAccountItem(
+                    ClientMoneyNzdId, tenantId, "NZD", "Old Bank", "North Advisory Ltd Old Trust Account",
+                    "38-9000-7654321-00", false, "cma-rv2", DateTimeOffset.UnixEpoch)
+            ]);
+        }
+
+        public Task<ClientMoneyAccountItem> GetClientMoneyAccountAsync(
+            Guid tenantId,
+            Guid id,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<Guid> CreateClientMoneyAccountAsync(
+            Guid tenantId,
+            string currency,
+            string bankName,
+            string accountName,
+            string accountNumber,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(ClientMoneyUsdId);
+
+        public Task DisableClientMoneyAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task EnableClientMoneyAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 
         public Task<IReadOnlyList<CurrencyItem>> ListCurrenciesAsync(CancellationToken cancellationToken = default) =>

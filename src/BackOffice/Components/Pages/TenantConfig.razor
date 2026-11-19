@@ -45,20 +45,100 @@ else
     </MudSimpleTable>
 }
 
+<MudText Typo="Typo.h5" Class="mt-8 mb-2">Client money accounts</MudText>
+
+@if (clientMoneyAccounts.Count == 0)
+{
+    <MudText>No client money accounts.</MudText>
+}
+else
+{
+    <MudSimpleTable Hover="true" Dense="true" Bordered="true" Class="mt-2">
+        <thead>
+            <tr><th>Currency</th><th>Bank</th><th>Account name</th><th>Account number</th><th>Active</th><th></th></tr>
+        </thead>
+        <tbody>
+        @foreach (var row in clientMoneyAccounts)
+        {
+            <tr>
+                <td>@row.Currency</td>
+                <td>@row.BankName</td>
+                <td>@row.AccountName</td>
+                <td>@row.AccountNumber</td>
+                <td>@(row.IsActive ? "Yes" : "No")</td>
+                <td>
+                    @if (row.IsActive)
+                    {
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Error" data-client-money-account="@row.Id" OnClick="() => DisableClientMoneyAccount(row)">Disable</MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Success" data-client-money-account="@row.Id" OnClick="() => EnableClientMoneyAccount(row)">Enable</MudButton>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </MudSimpleTable>
+}
+
+<MudText Typo="Typo.body2" Class="mt-2">Details cannot be changed. To correct them, disable the account and add a new one. Disabling the last account in a currency stops new Custodial accounts in that currency.</MudText>
+
+<MudText Typo="Typo.h6" Class="mt-6 mb-2">Add client money account</MudText>
+<MudPaper Class="pa-4" Outlined="true">
+    <EditForm Model="newAccount" OnValidSubmit="AddClientMoneyAccount" FormName="new-client-money-account">
+        <MudStack Spacing="3" Style="max-width: 28rem;">
+            <MudSelect T="string" @bind-Value="newAccount.Currency" Label="Currency" Variant="Variant.Outlined"
+                       Error="@HasFieldError("Currency")" ErrorText="@FieldError("Currency")">
+                @foreach (var currency in currencies)
+                {
+                    <MudSelectItem T="string" Value="@currency.Code">@currency.Code</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField @bind-Value="newAccount.BankName" Label="Bank name" Variant="Variant.Outlined"
+                          Error="@HasFieldError("BankName")" ErrorText="@FieldError("BankName")" />
+            <MudTextField @bind-Value="newAccount.AccountName" Label="Account name" Variant="Variant.Outlined"
+                          Error="@HasFieldError("AccountName")" ErrorText="@FieldError("AccountName")" />
+            <MudTextField @bind-Value="newAccount.AccountNumber" Label="Account number" Variant="Variant.Outlined"
+                          Error="@HasFieldError("AccountNumber")" ErrorText="@FieldError("AccountNumber")" />
+            <MudStack Row="true" Spacing="2">
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Add</MudButton>
+            </MudStack>
+        </MudStack>
+    </EditForm>
+</MudPaper>
+
 @code {
     [Parameter]
     public Guid TenantId { get; set; }
 
     private IReadOnlyList<ReportGrantItem> reports = [];
+    private IReadOnlyList<ClientMoneyAccountItem> clientMoneyAccounts = [];
+    private IReadOnlyList<CurrencyItem> currencies = [];
+    private IReadOnlyDictionary<string, string> fieldErrors = new Dictionary<string, string>();
+    private readonly ClientMoneyAccountForm newAccount = new();
     private string? error;
 
-    protected override async Task OnInitializedAsync() => await Load();
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+        try
+        {
+            currencies = await Api.ListCurrenciesAsync();
+            newAccount.Currency = currencies.FirstOrDefault()?.Code ?? "";
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
 
     private async Task Load()
     {
         try
         {
             reports = await Api.ListReportGrantsAsync(TenantId);
+            clientMoneyAccounts = await Api.ListClientMoneyAccountsAsync(TenantId);
             error = null;
         }
         catch (PlatformApiException exception)
@@ -91,5 +171,62 @@ else
         {
             error = exception.Message;
         }
+    }
+
+    private bool HasFieldError(string field) => fieldErrors.ContainsKey(field);
+
+    private string? FieldError(string field) => fieldErrors.GetValueOrDefault(field);
+
+    private async Task AddClientMoneyAccount()
+    {
+        try
+        {
+            await Api.CreateClientMoneyAccountAsync(
+                TenantId, newAccount.Currency, newAccount.BankName, newAccount.AccountName, newAccount.AccountNumber);
+            fieldErrors = new Dictionary<string, string>();
+            newAccount.BankName = "";
+            newAccount.AccountName = "";
+            newAccount.AccountNumber = "";
+            await Load();
+        }
+        catch (PlatformApiException exception)
+        {
+            fieldErrors = ValidationErrors.From(exception);
+            error = fieldErrors.Count == 0 ? exception.Message : null;
+        }
+    }
+
+    private async Task DisableClientMoneyAccount(ClientMoneyAccountItem row)
+    {
+        try
+        {
+            await Api.DisableClientMoneyAccountAsync(TenantId, row.Id, row.RowVersion);
+            await Load();
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+
+    private async Task EnableClientMoneyAccount(ClientMoneyAccountItem row)
+    {
+        try
+        {
+            await Api.EnableClientMoneyAccountAsync(TenantId, row.Id, row.RowVersion);
+            await Load();
+        }
+        catch (PlatformApiException exception)
+        {
+            error = ValidationErrors.From(exception).Values.FirstOrDefault() ?? exception.Message;
+        }
+    }
+
+    private sealed class ClientMoneyAccountForm
+    {
+        public string Currency { get; set; } = "";
+        public string BankName { get; set; } = "";
+        public string AccountName { get; set; } = "";
+        public string AccountNumber { get; set; } = "";
     }
 }

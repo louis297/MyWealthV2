@@ -6,6 +6,7 @@ using MyWealthV2.Application.Portfolios;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.ValueObjects;
+using MyWealthV2.Infrastructure.Accounts;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Identity;
 using MyWealthV2.Shared;
@@ -66,7 +67,8 @@ public class RebalanceJobWorkerTests
         var (customer, _) = await TwoTenantFixture.InsertCustomersAsync(db, tenant, otherTenant, adviser, otherAdviser);
         var nzd = Currency.Create("NZD", "New Zealand Dollar", 2);
 
-        var account = Account.Create(tenant.Id, customer.Id, "Model", AccountType.Brokerage, CustodyMode.Custodial, nzd);
+        var account = Account.Create(tenant.Id, customer.Id, "Model", AccountType.Brokerage, CustodyMode.Custodial, nzd,
+            DepositReference.Generate(CryptoRandomSymbols.Instance));
         account.CreatedBy = "test";
         var instrument = Instrument.Create(tenant.Id, "AIA", "AIA fund", nzd);
         instrument.CreatedBy = "test";

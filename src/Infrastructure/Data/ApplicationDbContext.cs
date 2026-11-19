@@ -55,6 +55,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
 
+    public DbSet<ClientMoneyAccount> ClientMoneyAccounts => Set<ClientMoneyAccount>();
+
     public DbSet<Instrument> Instruments => Set<Instrument>();
 
     public DbSet<Account> Accounts => Set<Account>();
@@ -150,6 +152,10 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
         {
             CaptureOutboxMessages();
             return await base.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (IsDepositReferenceTaken(exception))
+        {
+            throw new DepositReferenceTakenException(exception);
         }
         catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
         {
@@ -248,4 +254,9 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     private static bool IsUniqueConstraintViolation(DbUpdateException exception) =>
         exception.InnerException is SqlException sql && sql.Number is 2601 or 2627;
+
+    /// <summary>A unique violation on <c>UX_Accounts_DepositReference</c> and nothing else (client-money-accounts R17 b).</summary>
+    private static bool IsDepositReferenceTaken(DbUpdateException exception) =>
+        IsUniqueConstraintViolation(exception)
+        && exception.InnerException!.Message.Contains("UX_Accounts_DepositReference", StringComparison.Ordinal);
 }

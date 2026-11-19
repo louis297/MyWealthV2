@@ -18,6 +18,9 @@ public sealed class AccountDto
 
     public required string Currency { get; init; }
 
+    /// <summary>The deposit reference of a Custodial account; null on an External one (client-money-accounts R14).</summary>
+    public required string? DepositReference { get; init; }
+
     public required decimal CashBalance { get; init; }
 
     public required string Status { get; init; }
@@ -35,6 +38,7 @@ public sealed class AccountDto
         Type = account.Type.ToString(),
         CustodyMode = account.CustodyMode.ToString(),
         Currency = account.Currency,
+        DepositReference = account.DepositReference?.Value,
         CashBalance = cashBalance,
         Status = account.Status.ToString(),
         IsActive = account.IsActive,
