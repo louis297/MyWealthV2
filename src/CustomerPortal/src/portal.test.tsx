@@ -76,7 +76,12 @@ function renderAt(
   person = me,
   activity: unknown[] = [],
   custodyMode = "External",
-  options: { netWorth?: unknown; accounts?: AccountItem[] } = {},
+  options: {
+    netWorth?: unknown;
+    accounts?: AccountItem[];
+    account?: Record<string, unknown>;
+    depositInstructions?: () => Response;
+  } = {},
 ) {
   const accounts = options.accounts ?? [
     { id: "account-1", name: "Everyday", type: "Bank", custodyMode, currency: "NZD", cashBalance: 100, status: "Open" },
@@ -105,8 +110,19 @@ function renderAt(
     if (url.includes("/transactions?accountId=")) {
       return json({ items: activity, page: 1, pageSize: 20, totalCount: activity.length });
     }
+    if (url.endsWith("/accounts/account-1/deposit-instructions")) {
+      return options.depositInstructions?.() ?? new Response("", { status: 404 });
+    }
     if (url.endsWith("/accounts/account-1")) {
-      return json({ id: "account-1", name: "Everyday", type: "Bank", custodyMode, currency: "NZD", status: "Open" });
+      return json({
+        id: "account-1",
+        name: "Everyday",
+        type: "Bank",
+        custodyMode,
+        currency: "NZD",
+        status: "Open",
+        ...options.account,
+      });
     }
     if (url.includes("/accounts/missing")) {
       return new Response(JSON.stringify({ detail: "missing" }), { status: 404 });
@@ -461,5 +477,83 @@ describe("Customer Portal", () => {
     await waitFor(() => {
       expect(window.location.assign).toHaveBeenCalledWith(expect.stringContaining("/bff/login?returnUrl="));
     });
+  });
+});
+
+// client-money-accounts C19, C20: "How to pay in" on a Custodial account.
+describe("Customer Portal deposit instructions", () => {
+  const reference = "K7M3Q9PXB";
+  const custodialUsd = { type: "Brokerage", currency: "USD", depositReference: reference };
+  const instructions = {
+    accountId: "account-1",
+    currency: "USD",
+    reference,
+    bankName: "Simulator Bank",
+    accountName: "North Advisory Ltd Client Funds Trust Account",
+    accountNumber: "02-0100-0123456-00",
+  };
+  const payInSentence = "Pay in USD only, and quote the reference exactly so the payment is matched to this account.";
+  const notAvailable = "Deposit instructions are not available yet. Contact your adviser.";
+
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal("location", {
+      origin: "http://localhost:3000",
+      pathname: "/accounts/account-1",
+      search: "",
+      href: "http://localhost:3000/accounts/account-1",
+      assign: vi.fn(),
+    });
+  });
+
+  function instructionUrls(fetchMock: ReturnType<typeof vi.mocked<typeof fetch>>) {
+    return urls(fetchMock).filter((url) => url.includes("/deposit-instructions"));
+  }
+
+  it("shows where to pay and which reference to quote on an Open Custodial account", async () => {
+    renderAt("/accounts/account-1", me, [], "Custodial", {
+      account: custodialUsd,
+      depositInstructions: () => json(instructions),
+    });
+
+    const section = (await screen.findByRole("heading", { name: "How to pay in" })).closest("section")!;
+    expect(await within(section).findByText("Simulator Bank")).toBeInTheDocument();
+    expect(within(section).getByText("North Advisory Ltd Client Funds Trust Account")).toBeInTheDocument();
+    expect(within(section).getByText("02-0100-0123456-00")).toBeInTheDocument();
+    expect(within(section).getByText(reference)).toBeInTheDocument();
+    expect(within(section).getByText(payInSentence)).toBeInTheDocument();
+  });
+
+  it("says the instructions are not available yet when the route returns 404", async () => {
+    renderAt("/accounts/account-1", me, [], "Custodial", {
+      account: custodialUsd,
+      depositInstructions: () => new Response("", { status: 404 }),
+    });
+
+    const section = (await screen.findByRole("heading", { name: "How to pay in" })).closest("section")!;
+    expect(await within(section).findByText(notAvailable)).toBeInTheDocument();
+  });
+
+  it("shows no section and calls no route on a Closed Custodial account", async () => {
+    const { fetchMock } = renderAt("/accounts/account-1", me, [], "Custodial", {
+      account: { ...custodialUsd, status: "Closed" },
+      depositInstructions: () => json(instructions),
+    });
+
+    expect(await screen.findByRole("heading", { name: "Holdings" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "How to pay in" })).not.toBeInTheDocument();
+    expect(screen.queryByText(notAvailable)).not.toBeInTheDocument();
+    expect(instructionUrls(fetchMock)).toEqual([]);
+  });
+
+  it("shows no section and calls no route on an External account", async () => {
+    const { fetchMock } = renderAt("/accounts/account-1", me, [], "External", {
+      depositInstructions: () => json(instructions),
+    });
+
+    expect(await screen.findByRole("heading", { name: "Holdings" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "How to pay in" })).not.toBeInTheDocument();
+    expect(instructionUrls(fetchMock)).toEqual([]);
   });
 });
