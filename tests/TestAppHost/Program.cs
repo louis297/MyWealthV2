@@ -30,6 +30,7 @@ public class Program
 
         server.AddDatabase(Services.TestDatabase);
         server.AddDatabase(Services.SchemaTestDatabase);
+        server.AddDatabase(Services.TestSimulatorDatabase);
 
         builder.Build().Run();
     }

@@ -47,6 +47,8 @@ jobs:
             project: src/Worker
           - image: mywealth-back-office
             project: src/BackOffice
+          - image: mywealth-simulator
+            project: src/Simulator
           - image: mywealth-bff-adviser-portal
             project: src/BffAdviserPortal
             portal: src/AdviserPortal

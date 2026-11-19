@@ -163,7 +163,7 @@ public class User : BaseAuditableEntity
     {
         var valid = role switch
         {
-            UserRole.SystemAdmin => tenantId is null && adviserId is null,
+            UserRole.SystemAdmin or UserRole.SimulatorOperator => tenantId is null && adviserId is null,
             UserRole.TenantAdmin or UserRole.Adviser => tenantId is not null && adviserId is null,
             UserRole.Customer => tenantId is not null && adviserId is not null,
             _ => false

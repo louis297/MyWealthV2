@@ -9,6 +9,22 @@ namespace MyWealthV2.Application.UnitTests.Common.Security;
 public class CurrentUserAccessTests
 {
     [Test]
+    public void SimulatorOperator_IsNeverACaller()
+    {
+        var user = User.Create(
+            UserRole.SimulatorOperator,
+            name: "Sim",
+            email: "sim@localhost",
+            identityUserId: "id-sim");
+
+        CurrentUserAccess.Resolve(
+            user,
+            tenant: null,
+            tenantIdClaim: null,
+            tenantCodeClaim: null).ShouldBeNull();
+    }
+
+    [Test]
     public void SystemAdmin_WithEmptyTenantClaims_Resolves()
     {
         var user = User.Create(

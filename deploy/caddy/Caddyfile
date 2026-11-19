@@ -1,7 +1,7 @@
-# Routing, TLS, rate limits and HSTS for the four public hostnames (docs/deployment.md §3, §11).
+# Routing, TLS, rate limits and HSTS for the five public hostnames (docs/deployment.md §3, §11).
 # Caddy is the only public entry. It forwards to port 8080 of each host only; the health port 8081
-# is never forwarded. reverse_proxy keeps the original Host and sets X-Forwarded-Proto/-For,
-# which the hosts trust from 172.30.0.0/24 only.
+# and the simulator's party port 8082 are never forwarded. reverse_proxy keeps the original Host and
+# sets X-Forwarded-Proto/-For, which the hosts trust from 172.30.0.0/24 only.
 #
 # Hosts reach id.{$DOMAIN} through Caddy on the internal network (compose alias), so the global
 # limit skips 172.30.0.0/24; otherwise every host-to-host call from one container shares one key.
@@ -68,4 +68,11 @@ customer.{$DOMAIN} {
 admin.{$DOMAIN} {
 	import public
 	reverse_proxy back-office:8080
+}
+
+# The simulator's control port only (docs/features/simulator.md R11, R12). The container runs only with
+# COMPOSE_PROFILES=simulator; without it this site answers 502.
+sim.{$DOMAIN} {
+	import public
+	reverse_proxy simulator:8080
 }

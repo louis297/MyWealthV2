@@ -7,6 +7,8 @@ public static class OpenIddictClientUris
 
     public const string BackOfficeFallbackOrigin = "https://localhost/back-office";
 
+    public const string SimulatorFallbackOrigin = "https://localhost/simulator";
+
     public static IReadOnlyList<string> ReadPortalOrigins(IConfiguration configuration)
     {
         var origins = new List<string>();
@@ -48,6 +50,12 @@ public static class OpenIddictClientUris
     {
         return NormalizeOrigin(configuration["Identity:BackOfficeOrigin"])
             ?? BackOfficeFallbackOrigin;
+    }
+
+    public static string ReadSimulatorOrigin(IConfiguration configuration)
+    {
+        return NormalizeOrigin(configuration["Identity:SimulatorOrigin"])
+            ?? SimulatorFallbackOrigin;
     }
 
     public static (IReadOnlyList<Uri> Redirects, IReadOnlyList<Uri> PostLogout) FromOrigins(IEnumerable<string> origins)

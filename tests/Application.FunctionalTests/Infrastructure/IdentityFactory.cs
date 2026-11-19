@@ -23,6 +23,10 @@ public class IdentityFactory(
         builder.UseSetting("Identity:AdviserPortalClientSecret", AdviserPortalTestSecret.Value);
         builder.UseSetting("Identity:BackOfficeClientSecret", BackOfficeTestSecret.Value);
         builder.UseSetting("Identity:CustomerPortalClientSecret", CustomerPortalTestSecret.Value);
+        builder.UseSetting("Identity:SimulatorClientSecret", SimulatorTestSecret.Value);
+        builder.UseSetting("Identity:SimulatorOrigin", SimulatorTestSecret.Origin);
+        builder.UseSetting("Identity:SimulatorClientSecret", SimulatorTestSecret.Value);
+        builder.UseSetting("Identity:SimulatorOrigin", SimulatorTestSecret.Origin);
         builder.ConfigureTestServices(services =>
         {
             services.Configure<PasswordHasherOptions>(o => o.IterationCount = 1);

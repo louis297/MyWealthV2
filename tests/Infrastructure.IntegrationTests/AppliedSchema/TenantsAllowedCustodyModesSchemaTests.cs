@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Infrastructure.Data;
-using MyWealthV2.Infrastructure.Data.Schema;
+using MyWealthV2.Schema;
 using NUnit.Framework;
 using Shouldly;
 

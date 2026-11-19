@@ -4,11 +4,15 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 builder.AddAzureContainerAppEnvironment("aca-env");
 
-var databaseServer = builder
+var sqlServer = builder
     .AddAzureSqlServer(Services.DatabaseServer)
     .RunAsContainer(container => 
-        container.WithLifetime(ContainerLifetime.Persistent))
-    .AddDatabase(Services.Database);
+        container.WithLifetime(ContainerLifetime.Persistent));
+
+var databaseServer = sqlServer.AddDatabase(Services.Database);
+
+// Simulator spec R14: the simulator's own database on the same server. No platform host references it.
+var simulatorDatabase = sqlServer.AddDatabase(Services.SimulatorDatabase);
 
 var solutionRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", ".."));
 var reportsPath = Path.Combine(solutionRoot, "artifacts", "reports");
@@ -158,6 +162,43 @@ var backOffice = builder.AddProject<Projects.BackOffice>(Services.BackOffice)
 
 backOffice.WithEnvironment("Authentication__PublicOrigin", backOffice.GetEndpoint("https"));
 identity.WithEnvironment("Identity__BackOfficeOrigin", backOffice.GetEndpoint("https"));
+
+// Simulator spec R6: identity seeds the fourth client from this secret. The simulator resource uses it too.
+var simulatorClientSecret = builder.AddParameter("simulator-client-secret", secret: true);
+
+identity.WithEnvironment("Identity__SimulatorClientSecret", simulatorClientSecret);
+
+// Simulator spec §9.2. The party endpoint is for the platform (from roadmap B3) and is not external.
+// No platform host receives the party key in this slice.
+var simulatorPartyApiKey = builder.AddParameter("simulator-party-api-key", secret: true);
+
+var simulator = builder.AddProject<Projects.Simulator>(Services.Simulator)
+    .WithReference(simulatorDatabase)
+    .WithReference(identity)
+    .WaitFor(simulatorDatabase)
+    .WaitFor(identity)
+    .WithHttpEndpoint(name: "party")
+    .WithExternalHttpEndpoints()
+    .WithEndpoint("party", endpoint => endpoint.IsExternal = false)
+    .WithHttpHealthCheck("/health", endpointName: "http")
+    .WithAspNetCoreEnvironment()
+    .WithEnvironment("Authentication__Authority", identity.GetEndpoint("https"))
+    .WithEnvironment("Authentication__ClientSecret", simulatorClientSecret)
+    .WithEnvironment("Simulator__PartyApiKey", simulatorPartyApiKey)
+    .WithUrlForEndpoint("https", url =>
+    {
+        url.DisplayText = "Simulator";
+        url.Url = "/scalar";
+    })
+    .WithUrlForEndpoint("party", url =>
+    {
+        url.DisplayLocation = UrlDisplayLocation.DetailsOnly;
+    });
+
+// Simulator spec R12: the host tells the party port from the control ports by the port Kestrel listens on.
+simulator.WithEnvironment("Simulator__PartyPort", simulator.GetEndpoint("party").Property(EndpointProperty.TargetPort));
+simulator.WithEnvironment("Authentication__PublicOrigin", simulator.GetEndpoint("https"));
+identity.WithEnvironment("Identity__SimulatorOrigin", simulator.GetEndpoint("https"));
 
 var eodhdApiKey = builder.AddParameter("eodhd-api-key", secret: true);
 

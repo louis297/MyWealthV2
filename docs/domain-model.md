@@ -31,7 +31,7 @@ The session protocol (OpenIddict, authorization code + PKCE, refresh) lives on t
 - `Money` is a domain value object (amount + currency). Never persist a bare `decimal`. Phase 1 has no balance column; the type still lives in Domain so the ledger does not invent a second amount shape.
 - Invariants live on entities / domain services, not only in FluentValidation.
 - Identity stays in Infrastructure. Domain `User.IdentityUserId` points at the login principal. The link is one-way. There is no reverse domain association and no reverse database FK.
-- Four roles share one Domain `Users` table and one `ApplicationUser` table. Role is immutable. A Customer is a login principal from day one. No Customer Portal client in Phase 1 does not mean no identity.
+- Five roles share one Domain `Users` table and one `ApplicationUser` table (the fifth, `SimulatorOperator`, from ADR 0013 amendment 2026-11-19). Role is immutable. A Customer is a login principal from day one. No Customer Portal client in Phase 1 does not mean no identity.
 - The `UserStatus` machine is written once. Phase 1 create may set a password and land in `Active`. `PendingActivation` + `UserTokens` + `IEmailSender` are the invitation seams, not a half-boolean.
 - OpenIddict clients, token stores, and the hosted login page are **not** Domain types.
 - The Phase-2 ledger is thought as sub-ledgers (cash leg / security leg). §8 records the conceptual model and locked tendencies. It does **not** lock undecided storage (journal header, one vs two physical rows for a buy, Opening columns, close-and-liquidate, daily snapshots).
@@ -113,9 +113,10 @@ Authorization (named policies, `RolePermissions`, handler scope checks) is not a
 Role shape (CHECK-level, not a transition accident):
 
 - SystemAdmin: `TenantId` empty, `AdviserId` empty. Email unique **globally**.
+- SimulatorOperator: `TenantId` empty, `AdviserId` empty. Email unique among platform-level people (shared with SystemAdmin). No permission; never a `webapi` caller ([features/simulator.md](features/simulator.md), landed 2026-11-19).
 - TenantAdmin / Adviser: `TenantId` required, `AdviserId` empty.
 - Customer: `TenantId` required, `AdviserId` required; target is same-tenant, Role=Adviser, not Disabled.
-- All four roles have a login principal: `IdentityUserId` required, points at an existing Identity user, one-to-one.
+- All five roles have a login principal: `IdentityUserId` required, points at an existing Identity user, one-to-one.
 
 Uniqueness and immutability:
 
@@ -168,10 +169,10 @@ The domain **does** supply the login gate:
 
 ## 5. Enumerations (Phase 1)
 
-**UserRole:** `SystemAdmin`, `TenantAdmin`, `Adviser`, `Customer`  
+**UserRole:** `SystemAdmin`, `TenantAdmin`, `Adviser`, `Customer`, `SimulatorOperator` (value 4; ADR 0013 amendment 2026-11-19, landed)  
 **UserStatus:** `PendingActivation`, `Active`, `Disabled`
 
-Do not add a fifth role in Phase 1. Ledger permission names are registered when the ledger domain opens. Do not hang empty policies in Phase 1.
+Phase 1 added no fifth role; `SimulatorOperator` comes from [ADR 0021](adr/0021-outside-parties-behind-ports.md). Do not add a role inside a tenant. Ledger permission names are registered when the ledger domain opens. Do not hang empty policies in Phase 1.
 
 ---
 
@@ -401,6 +402,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-18 | External caller numbers landed: `enteredFee` and `appliedRate` on `PostBuy` / `PostSell`, `PostFxConversionWithAmounts`, `AppliedFxRate.CallerSource`. |
 | 2026-11-19 | Transaction source in `review`: `TransactionSourceKind`, `TransactionSource` on every Transaction, `CustodyRules.AllowsHandReverse`. Recorded in §8.6 with a `review` mark. [features/transaction-source.md](features/transaction-source.md). |
 | 2026-11-19 | Transaction source accepted. The `review` mark in §8.6 is dropped. |
+| 2026-11-19 | Simulator accepted: fifth role `SimulatorOperator` in §1, §4 and §5. The simulator's own types are not platform Domain types ([features/simulator.md](features/simulator.md) §5). |
 
 ---
 

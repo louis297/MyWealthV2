@@ -47,6 +47,11 @@ public static class Services
     public const string BackOffice = "back-office";
 
     /// <summary>
+    /// Aspire resource name and OIDC client id for the simulator (src/Simulator).
+    /// </summary>
+    public const string Simulator = "simulator";
+
+    /// <summary>
     /// Aspire resource name for the background worker (src/Worker).
     /// </summary>
     public const string Worker = "worker";
@@ -81,4 +86,16 @@ public static class Services
     /// (persistent) container never reset each other's data.
     /// </summary>
     public const string SchemaTestDatabase = "MyWealthDbV2-schema-test";
+
+    /// <summary>
+    /// Aspire resource name, SQL database name and connection string key of the simulator's own database
+    /// (docs/features/simulator.md R14). Only the simulator connects to it.
+    /// </summary>
+    public const string SimulatorDatabase = "MyWealthSimulatorDb";
+
+    /// <summary>
+    /// Aspire resource name and SQL database name of the simulator database on the TestAppHost server.
+    /// Used only by tests/Simulator.Tests.
+    /// </summary>
+    public const string TestSimulatorDatabase = "MyWealthSimulatorDb-test";
 }

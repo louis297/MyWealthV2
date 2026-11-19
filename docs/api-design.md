@@ -41,6 +41,8 @@ Browser
 
 The portal (`adviser-portal`) does not issue tokens. It redirects to `identity`, stores access / refresh after the callback, and calls `webapi` with Bearer.
 
+A third process, the simulator (`simulator`, [features/simulator.md](features/simulator.md) §8, landed 2026-11-19), has its own HTTP surfaces: a control surface for a person behind sign-in on client `simulator`, and a party surface for the platform behind an API key on an internal port. Neither is a `webapi` resource, and the conventions in this document do not apply to them.
+
 Phase 1 registers one public OIDC client: `adviser-portal`. IdentityHost allows TenantAdmin and Adviser on that client (SystemAdmin removed by identity-auth amendment 2026-11-11; SystemAdmin signs in through `back-office`). A Customer with a correct password does not receive an authorization code for it. Customer Portal is a later second client; it is not registered in Phase 1. Adviser-management resource routes stay 403 for Customer.
 
 ---
@@ -108,6 +110,8 @@ Password change, disable, and logout revoke that subject’s OpenIddict tokens. 
 The only role × permission table. It matches `RolePermissions` in `src/Application/Common/Security/RolePermissions.cs`. A permission lets a role call the endpoint; the handler still checks the scope (tenant, the Adviser's assigned Customers, the Customer's own rows). Permissions are not claims in the JWT ([ADR 0013](adr/0013-roles-authorization-single-user-table.md)).
 
 A spec that adds a permission or changes a grant updates this table in the change that accepts it. Other docs link here and do not copy it.
+
+The fifth role `SimulatorOperator` ([ADR 0013](adr/0013-roles-authorization-single-user-table.md) amendment 2026-11-19) holds no permission and has no column. `webapi` answers 401 to its token on every route ([features/simulator.md](features/simulator.md) R3).
 
 | Permission | SystemAdmin | TenantAdmin | Adviser | Customer | Owner |
 | --- | --- | --- | --- | --- | --- |
@@ -588,3 +592,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-18 | §7 catalog, §7.8: grouping by custody mode in `review`. `breakdowns.byCustodyMode` on both net-worth reads; a Custody column and subtotals per custody mode in the Adviser Balances PDF; a Custody column and a note in the Customer Transactions PDF. No new route, policy, parameter or problem code ([features/custody-mode-grouping.md](features/custody-mode-grouping.md)). |
 | 2026-11-18 | §7 catalog, §7.8: grouping by custody mode accepted. |
 | 2026-11-19 | §7 catalog, §7.8: grouping by custody mode landed. |
+| 2026-11-19 | §1, §3.1: simulator accepted. A third process with its own control and party surfaces; role `SimulatorOperator` has no permission and gets 401 on `webapi`. No `webapi` route or policy added ([features/simulator.md](features/simulator.md)). |

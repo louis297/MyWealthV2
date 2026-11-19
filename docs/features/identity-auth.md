@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-12
-last_updated: 2026-11-15
+last_updated: 2026-11-19
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -568,6 +568,28 @@ Today's code: `AddIdentityCore` in `src/Infrastructure/DependencyInjection.cs` s
 | A45 | Active Adviser | Four wrong passwords, the correct one, then four wrong ones | Not locked. A further correct password issues a code |
 | A46 | The same email as an Active Adviser in tenant A and in tenant B | Five wrong passwords with tenant B's code | Tenant A's person is not locked; correct password with tenant A's code issues a code |
 | A47 | Unknown email in a known tenant | Five `POST /login` attempts | No `AspNetUsers` row is written |
+
+### Amendment 2026-11-19 (simulator client and `SimulatorOperator`)
+
+Accepted with [simulator.md](simulator.md) (R1–R10) and [ADR 0021](../adr/0021-outside-parties-behind-ports.md). Landed 2026-11-19. Do not rewrite R1–R21 or earlier amendments in place.
+
+- **Fifth role.** `SimulatorOperator` (ADR 0013 amendment 2026-11-19): platform-level, no tenant, no adviser, no permission. `LoginEligibility` treats it like SystemAdmin (Active, identity link, no tenant).
+- **Hosted login without tenantCode.** The person is looked up by email among platform-level people (SystemAdmin or SimulatorOperator, `TenantId IS NULL`). Order of checks, uniform failure copy, lockout and the one-hash rule are unchanged.
+- **Client `simulator`.** Confidential, authorization code + PKCE. Scopes `openid`, `profile`, `email` only: no `offline_access`, no refresh grant, no `api`. Redirect `{simulatorOrigin}/signin-oidc`, post-logout `{simulatorOrigin}/`. Secret `Identity:SimulatorClientSecret` (Aspire parameter `simulator-client-secret`), origin `Identity:SimulatorOrigin`. Seeded by `OpenIddictSeeder` like the other three.
+- **Allow-list row.** `simulator` → SimulatorOperator only. SimulatorOperator is on no other row. Wrong role → no code, uniform failure.
+- **Identity cookie scheme.** One more scheme for `simulator` (name example `.AspNetCore.Identity.Simulator`), with the rules of the 2026-10-27 amendment and the security-stamp check of 2026-11-13.
+- **`webapi` refuses the role.** The current-user load treats a SimulatorOperator token as unauthenticated: 401 on every route, the default-authorized ones included. `webapi` still checks neither scope nor audience; this rule is what keeps the token out.
+- **Bootstrap.** `webapi` creates one SimulatorOperator from `Bootstrap:SimulatorOperator:Email` / `Password` (optional `Name`, default `Simulator Operator`) when none exists, with the rules of the 2026-11-12 amendment (A25–A31 apply with these keys). Independent of the bootstrap SystemAdmin. The same email as an existing SystemAdmin fails on the unique index and creates nothing.
+- **Development seed.** `simulator-operator@localhost`, same Development password as the seeded SystemAdmin.
+
+| # | Given | When | Then |
+| --- | --- | --- | --- |
+| A48 | Active SimulatorOperator | Hosted login for `simulator`, no tenantCode | Authorization code issued; token has no `api` scope and no refresh token |
+| A49 | SystemAdmin, TenantAdmin, Adviser, Customer | Hosted login for `simulator` | Uniform failure, no code |
+| A50 | Active SimulatorOperator | Hosted login for `adviser-portal`, `customer-portal`, `back-office` | Uniform failure, no code |
+| A51 | A SimulatorOperator access token | `GET /users/me`, `GET /currencies`, a ledger route on `webapi` | 401 each |
+| A52 | Valid `back-office` identity cookie, no `simulator` cookie | Authorize for `simulator` | Redirect to hosted `/login`; no code from the other cookie |
+| A53 | Both cookies set | Sign out on `simulator` | Only the `simulator` scheme cookie is cleared |
 
 ### Amendment 2026-09-14 (R21 — end session)
 

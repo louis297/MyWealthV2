@@ -3,7 +3,7 @@ title: Deployment
 status: accepted
 language: en
 created: 2026-11-11
-updated: 2026-11-18
+updated: 2026-11-19
 related:
   - README.md
   - smoke-test.md
@@ -75,14 +75,17 @@ Every .NET host sends traces, metrics and logs over OTLP to a standalone Aspire 
 | `bff-adviser-portal` | `mywealth-bff-adviser-portal` | Through Caddy | `adviser.<domain>` | Serves the Adviser Portal SPA build and `/bff/*` |
 | `bff-customer-portal` | `mywealth-bff-customer-portal` | Through Caddy | `customer.<domain>` | Serves the Customer Portal SPA build and `/bff/*` |
 | `back-office` | `mywealth-back-office` | Through Caddy | `admin.<domain>` | SystemAdmin only |
+| `simulator` | `mywealth-simulator` | Through Caddy, control port only | `sim.<domain>` | Plays the outside parties ([features/simulator.md](features/simulator.md)). SimulatorOperator only. Compose profile `simulator`, off unless `.env` turns it on (below) |
 | `webapi` | `mywealth-webapi` | No | — | Called by the BFFs and Back Office. Runs the schema applicator on start |
-| `worker` | `mywealth-worker` | No | — | Hangfire. Outbox, FX rates, instrument prices, reports. Dashboard stays Development-only |
+| `worker` | `mywealth-worker` | No | — | Hangfire. Outbox, FX rates, instrument prices, reports. Dashboard stays Development-only. Also runs the schema applicator on start; finds nothing pending after `webapi` |
 | `sql` | SQL Server 2022, Express edition | No | — | `MSSQL_PID=Express`, `MSSQL_MEMORY_LIMIT_MB=2048` |
 | `aspire-dashboard` | `mcr.microsoft.com/dotnet/aspire-dashboard`, exact version tag | No | — | Telemetry viewer (§5.1). UI published on `127.0.0.1:18888` of the VPS only |
 
 `<domain>` is the showcase domain. It is chosen, but this doc does not name it. It lives in `DOMAIN` in `.env` on the VPS and in the smoke URL variables of GitHub environment `production` (§6).
 
-**Ports.** Every .NET host listens on `8080` for traffic and on the health port `8081` for `/health` and `/alive` ([features/production-hosting.md](features/production-hosting.md)). Caddy forwards only to `8080`.
+**Ports.** Every .NET host listens on `8080` for traffic and on the health port `8081` for `/health` and `/alive` ([features/production-hosting.md](features/production-hosting.md)). Caddy forwards only to `8080`. The simulator also listens on its party port `8082`, which only containers on the internal network reach; Caddy never forwards to it ([features/simulator.md](features/simulator.md) R11, R12).
+
+**Simulator profile.** The `simulator` service has compose profile `simulator` and runs only when `.env` has `COMPOSE_PROFILES=simulator`. `docker compose stop simulator` stops it until the next deploy; remove the profile from `.env` to keep it off across deploys. No other service `depends_on` it, and every pull job survives its absence ([ADR 0021](adr/0021-outside-parties-behind-ports.md) rule 15). Without it, `sim.<domain>` answers 502.
 
 **Network.** One Docker network `internal` with the fixed subnet `172.30.0.0/24`. The public hosts trust forwarded headers only from that subnet.
 
@@ -97,6 +100,7 @@ flowchart LR
             bffa[bff-adviser-portal]
             bffc[bff-customer-portal]
             bo[back-office]
+            sim[simulator]
             webapi
             worker
             sql[(sql)]
@@ -107,16 +111,18 @@ flowchart LR
     gha -- SSH, scp deploy/ --> vps
     gha -- smoke test --> caddy
     caddy --> identity & bffa & bffc & bo
+    caddy -- :8080 only --> sim
+    sim -. OIDC .-> caddy
     bffa & bffc & bo --> webapi
     bffa & bffc & bo -. OIDC .-> caddy
     webapi -. JWKS .-> caddy
-    webapi & identity & worker --> sql
+    webapi & identity & worker & sim --> sql
     identity & webapi & worker & bffa & bffc & bo -. OTLP .-> dash
 ```
 
-**Issuer and authority.** Tokens carry the public issuer `https://id.<domain>/`, set explicitly on `identity`. Every host that validates tokens or runs OIDC (`webapi`, both BFFs, `back-office`) uses that public URL as `Authentication__Authority` / `Identity__Authority`, not the internal container name, so the issuer always matches. Inside the Docker network, `caddy` carries the network alias `id.<domain>`, so these calls stay on the VPS and still go through TLS.
+**Issuer and authority.** Tokens carry the public issuer `https://id.<domain>/`, set explicitly on `identity`. Every host that validates tokens or runs OIDC (`webapi`, both BFFs, `back-office`, `simulator`) uses that public URL as `Authentication__Authority` / `Identity__Authority`, not the internal container name, so the issuer always matches. Inside the Docker network, `caddy` carries the network alias `id.<domain>`, so these calls stay on the VPS and still go through TLS.
 
-**Sizing.** About 1–1.5 GB for the six .NET hosts, 2 GB for SQL Server (capped), up to 512 MB for the dashboard (capped), 0.5 GB for the OS, Docker and Caddy. A 6 GB, 2 vCPU VPS fits with headroom. Add 2 GB of swap.
+**Sizing.** About 1–1.5 GB for the six .NET hosts, about 150–250 MB more for the simulator when its profile is on, 2 GB for SQL Server (capped), up to 512 MB for the dashboard (capped), 0.5 GB for the OS, Docker and Caddy. A 6 GB, 2 vCPU VPS fits with headroom. Add 2 GB of swap.
 
 ---
 
@@ -145,6 +151,9 @@ The table lists the keys the compose file sets. Keys marked † are introduced b
 | `bff-customer-portal` | same keys as `bff-adviser-portal`, with its own secret and origin |
 | `back-office` | same keys as `bff-adviser-portal`, with its own secret and origin |
 | `worker` | `ConnectionStrings__MyWealthDbV2`, `Reports__StorageRoot`, `Eodhd__ApiKey` |
+| `simulator` | `ConnectionStrings__MyWealthSimulatorDb`, `Authentication__Authority`, `Authentication__ClientSecret`, `Authentication__PublicOrigin`, `Simulator__PartyApiKey`, `DataProtection__KeysPath` †, `ForwardedHeaders__KnownNetworks__0` †, and `ASPNETCORE_HTTP_PORTS=8080;8081;8082` |
+
+`identity` also gets `Identity__SimulatorClientSecret` and `Identity__SimulatorOrigin`, and `webapi` gets `Bootstrap__SimulatorOperator__Email` and `Bootstrap__SimulatorOperator__Password` for the first start only ([features/simulator.md](features/simulator.md) R6, R9). `identity` needs the simulator client secret even while the simulator profile is off.
 
 - `Api__BaseAddress` is `http://webapi:8080`. Traffic between containers on the internal network is plain HTTP.
 - Each origin key is the public `https://` origin of that host. `Identity__Issuer` is `https://id.<domain>/`.
@@ -175,7 +184,7 @@ The hosts already collect traces, metrics and logs through ServiceDefaults. They
 
 - **Viewer.** One `aspire-dashboard` container. The image tag is an exact version, the same as the Aspire packages in `Directory.Packages.props`, never `latest`.
 - **Ingest.** The hosts send OTLP over gRPC to `aspire-dashboard:18889` on the internal network. That endpoint has no authentication. Any container on the internal network can write telemetry to it, and every container there is ours. It is not published.
-- **Service names.** `OTEL_SERVICE_NAME` is the container name (`webapi`, `identity`, `worker`, `bff-adviser-portal`, `bff-customer-portal`, `back-office`), so the dashboard shows the same names as §3 and the Aspire dashboard in Development.
+- **Service names.** `OTEL_SERVICE_NAME` is the container name (`webapi`, `identity`, `worker`, `bff-adviser-portal`, `bff-customer-portal`, `back-office`, `simulator`), so the dashboard shows the same names as §3 and the Aspire dashboard in Development.
 - **Health checks.** Requests to `/health` and `/alive` produce no trace ([production-hosting.md](features/production-hosting.md) R17), so the compose health checks do not fill the trace limit.
 - **Access.** The UI port `18888` is published on `127.0.0.1` of the VPS only. The owner opens an SSH tunnel from their own computer, `ssh -N -L 18888:127.0.0.1:18888 <deploy-user>@<vps>`, and browses `http://localhost:18888`. The dashboard keeps its default browser-token login. The token is printed in the container log on each start (`docker compose logs aspire-dashboard`). Caddy never forwards to the dashboard.
 - **Retention.** In memory only, with the dashboard's default per-resource limits (10,000 log entries, 10,000 traces, 50,000 metric points). When a limit is reached, the oldest entries go first. A restart of the container (VPS reboot, Docker restart, a change to its own compose entry or image tag) empties it. A deploy that changes only `IMAGE_TAG` does not recreate it.
@@ -187,14 +196,16 @@ The hosts already collect traces, metrics and logs through ServiceDefaults. They
 
 | Secret | Used by | Lives in |
 | --- | --- | --- |
-| Three OIDC client secrets | `identity` and the matching client host | `.env` on the VPS |
+| Four OIDC client secrets | `identity` and the matching client host (the fourth: `identity` and `simulator`) | `.env` on the VPS |
+| Simulator party API key, at least 32 characters | `simulator` (later the `worker` too, from roadmap B3) | `.env` on the VPS. Needed only with the simulator profile on; the simulator refuses to start without it |
 | SQL `sa` password | `sql`, and the connection string of `webapi`, `identity`, `worker` | `.env` on the VPS |
 | EODHD API key | `worker` | `.env` on the VPS |
 | Lucky Penny license key (MediatR, AutoMapper) | `webapi` | `.env` on the VPS. The token copied from the Lucky Penny account page; the downloadable license file is not used |
 | OpenIddict signing and encryption certificates | `identity` | `certs/` on the VPS: `signing.pfx`, `encryption.pfx` |
 | OpenIddict certificate password (one password for both PFX files) | `identity` | `.env` on the VPS |
 | Bootstrap SystemAdmin email and password | `webapi`, first start only | `.env` on the VPS. Removed after the first sign-in (§12) |
-| Data Protection keys | `identity`, both BFFs, `back-office` | `data/dataprotection/<host>/` on the VPS, written by the hosts |
+| Bootstrap SimulatorOperator email and password | `webapi`, first start of the simulator only | `.env` on the VPS. Removed after the first simulator sign-in (§12) |
+| Data Protection keys | `identity`, both BFFs, `back-office`, `simulator` | `data/dataprotection/<host>/` on the VPS, written by the hosts |
 | VPS SSH private key, host, user, host key | deploy job | GitHub environment `production` secrets `VPS_SSH_KEY`, `VPS_HOST`, `VPS_USER`, `VPS_KNOWN_HOSTS` |
 | GHCR read token | VPS `docker login` | VPS, set once. Classic personal access token with `read:packages` only |
 | Smoke account passwords | post-deploy smoke test | GitHub environment `production` secrets ([smoke-test.md](smoke-test.md) §5) |
@@ -203,7 +214,7 @@ GitHub environment `production` also holds two variables that are not secret: `S
 
 - `.env` is created by hand on the VPS from `deploy/.env.example`, `chmod 600`, owned by the deploy user. GitHub does not hold the runtime secrets. To change one, edit `.env` and run `docker compose up -d`.
 - Values in `.env` use letters, digits and `-` only. `$` triggers compose interpolation, and quotes or `;` break the SQL connection string. The exception is `LUCKYPENNY_LICENSE_KEY`: it is a JWT, pasted as issued. Its `.` and `_` are safe because compose interpolates only `$` and the value never enters the connection string.
-- Passwords that become Identity passwords (`BOOTSTRAP_SYSTEMADMIN_PASSWORD`, and the smoke passwords of [smoke-test.md](smoke-test.md) §3) must pass the Identity password options: 8+ characters with an upper-case letter, a lower-case letter, a digit and a non-alphanumeric character (only `RequiredLength` differs from the ASP.NET Core Identity defaults). A `-` satisfies the last rule and is safe in `.env`. Otherwise `webapi` refuses to start (identity-auth bootstrap amendment), or the create form rejects the password.
+- Passwords that become Identity passwords (`BOOTSTRAP_SYSTEMADMIN_PASSWORD`, `BOOTSTRAP_SIMULATOROPERATOR_PASSWORD`, and the smoke passwords of [smoke-test.md](smoke-test.md) §3) must pass the Identity password options: 8+ characters with an upper-case letter, a lower-case letter, a digit and a non-alphanumeric character (only `RequiredLength` differs from the ASP.NET Core Identity defaults). A `-` satisfies the last rule and is safe in `.env`. Otherwise `webapi` refuses to start (identity-auth bootstrap amendment), or the create form rejects the password.
 - SystemAdmin credentials never leave the owner. CI never signs in as SystemAdmin.
 - Aspire user secrets are for local Development only. They are not a deployment source.
 - The OpenIddict certificates are self-signed and generated on the VPS: RSA 3072, valid 730 days, key usage `digitalSignature` for signing and `keyEncipherment` for encryption. Only the PFX files are kept.
@@ -216,7 +227,7 @@ Everything lives under `/opt/mywealth` on the VPS, owned by the deploy user, exc
 
 | Path or volume | Kind | Content | If lost |
 | --- | --- | --- | --- |
-| `sql-data` | Named volume | `MyWealthDbV2` | Rebuild (§12). Smoke data is recreated |
+| `sql-data` | Named volume | `MyWealthDbV2` and `MyWealthSimulatorDb` | Rebuild (§12). Smoke data is recreated. The simulator starts a new world |
 | `data/reports/` | Bind mount | Generated report files | Reports re-run on schedule or on request |
 | `data/dataprotection/<host>/` | Bind mount, one folder per host | ASP.NET Core Data Protection key ring of that host | Everyone signs in again |
 | `certs/` | Bind mount, read-only | OpenIddict PFX files | Generate new ones; tokens issued earlier stop validating; everyone signs in again |
@@ -224,7 +235,7 @@ Everything lives under `/opt/mywealth` on the VPS, owned by the deploy user, exc
 
 The `aspire-dashboard` container has no volume. Its telemetry is not state (§5.1).
 
-- The `<host>` folders are `identity`, `bff-adviser-portal`, `bff-customer-portal` and `back-office`. Each host mounts only its own folder at `/keys`, so no host can read another host's keys.
+- The `<host>` folders are `identity`, `bff-adviser-portal`, `bff-customer-portal`, `back-office` and `simulator`. Each host mounts only its own folder at `/keys`, so no host can read another host's keys.
 - The .NET hosts run as UID 1654. `data/reports/`, every `data/dataprotection/<host>/` and `certs/` must belong to UID 1654, or the host fails on first read or write.
 - SQL Server runs as UID 10001. Docker sets the ownership of a new named volume, so `sql-data` needs no `chown`.
 
@@ -235,9 +246,9 @@ No backup is taken. A weekly `BACKUP DATABASE` to the VPS disk is a cheap later 
 ## 8. Database
 
 - SQL Server 2022 Express in a container. Express is free for production use. Its limits (about 1.4 GB buffer pool, 10 GB per database) fit this project.
-- The database `MyWealthDbV2` is created by hand once, with `CREATE DATABASE`, before the first start of `webapi` (§12). The schema applicator creates tables, not the database.
-- `webapi` applies pending `database/schema/` scripts on start (ADR 0008). It is the only host that does. Only one `webapi` instance runs. It starts listening only after the scripts are applied.
-- Every .NET container has a compose health check that runs the host with `--healthcheck` ([features/production-hosting.md](features/production-hosting.md)). Start order: `sql` healthy → `webapi` healthy → `identity`, `worker` → the BFFs and `back-office` once `identity` and `webapi` are healthy → `caddy`.
+- The databases `MyWealthDbV2` and `MyWealthSimulatorDb` are created by hand once, with `CREATE DATABASE`, before the first start of `webapi` and of `simulator` (§12). The schema applicator creates tables, not the database.
+- `webapi` applies pending `database/schema/` scripts on start (ADR 0008). The `worker` runs the same applicator on its own start (ADR 0008 amendment 2026-11-19); because it starts only after `webapi` is healthy, it finds nothing pending. `identity` does not apply scripts. The simulator applies `database/simulator/` scripts to `MyWealthSimulatorDb` on its own start; no other host does, and no platform host connects to that database ([features/simulator.md](features/simulator.md) R14, R15). Only one instance of each runs. Each starts listening only after the applicator has finished.
+- Every .NET container has a compose health check that runs the host with `--healthcheck` ([features/production-hosting.md](features/production-hosting.md)). Start order: `sql` healthy → `webapi` healthy → `identity`, `worker` → the BFFs and `back-office` once `identity` and `webapi` are healthy → `caddy`. With its profile on, `simulator` starts once `sql` and `identity` are healthy; `caddy` does not wait for it.
 
 ---
 
@@ -246,14 +257,14 @@ No backup is taken. A weekly `BACKUP DATABASE` to the VPS disk is a cheap later 
 Trigger: push to `master` after the CI workflow passes, or manual dispatch.
 
 1. Build and test (existing CI workflow).
-2. Build the portals, copy each `dist/` into its BFF `wwwroot/`, publish the six images, push them to GHCR with tag `<sha>`.
+2. Build the portals, copy each `dist/` into its BFF `wwwroot/`, publish the seven images (the seventh is `mywealth-simulator`), push them to GHCR with tag `<sha>`.
 3. Deploy job, GitHub environment `production`, `concurrency: production` (no two deploys at once):
    1. Check out the same commit. Write `VPS_SSH_KEY` and `VPS_KNOWN_HOSTS` to the runner's SSH folder.
    2. `scp -r deploy/.` to `/opt/mywealth` on the VPS. This overwrites `compose.yml`, `caddy/`, `deploy.sh`, `rollback.sh` and `.env.example`, and nothing else.
    3. Run `deploy.sh <sha>` over SSH. The script:
       - writes the current `IMAGE_TAG` to `PREVIOUS_IMAGE_TAG` and the new SHA to `IMAGE_TAG` in `.env`;
       - runs `docker compose build caddy`, so a changed Caddy Dockerfile takes effect;
-      - runs `docker compose pull` and `docker compose up -d --remove-orphans --wait`, which returns only when every container with a health check is healthy, and fails otherwise;
+      - runs `docker compose pull` and `docker compose up -d --remove-orphans --wait`, which returns only when every container with a health check is healthy, and fails otherwise (with the simulator profile on, an unhealthy simulator fails the deploy like any other host);
       - reloads the Caddyfile (`caddy reload`), so a changed Caddyfile takes effect even when the Caddy container is not recreated;
       - removes dangling image layers, and `mywealth-*` app images whose tag is neither `IMAGE_TAG` nor `PREVIOUS_IMAGE_TAG`. The Caddy builder and base images stay, so the next `build caddy` is a cache hit, and the previous tag stays, so a rollback starts without a pull.
 4. Post-deploy smoke test (§10): the deploy workflow calls `.github/workflows/smoke.yml` as a reusable workflow.
@@ -282,6 +293,7 @@ Playwright, run from the GitHub runner against the public hostnames. The cases, 
 
 - Caddy is the only container with ports published on a public address. `webapi`, `worker`, `sql` and `aspire-dashboard` are never reachable from outside. Scalar on `webapi` is therefore not public.
 - Health endpoints answer only on the health port `8081`, which Caddy never forwards to. On port `8080` they return 404.
+- `sim.<domain>` has the same `public` snippet as the other sites (global rate limit, HSTS) and forwards to `simulator:8080` only. The simulator's party routes answer only on `8082`, matched on the connection's local port, and need the party API key ([features/simulator.md](features/simulator.md) R12, R30). The simulator is a public host for forwarded headers.
 - Caddy rate-limits `POST /login*` on `id.<domain>` per client IP (about 10 per minute). The wildcard also catches `/login/`, which ASP.NET routing serves to the same page. `/connect/token` is not limited there: every OIDC client is confidential and there is no password grant. A loose global limit per IP applies on every host (about 300 per minute). It skips the internal network `172.30.0.0/24`, because the hosts reach `id.<domain>` through Caddy (§3), but not the gateway `172.30.0.1`, the source address of traffic that Docker's userland proxy forwards (IPv6 clients). The stock Caddy image has no rate limiting, so `deploy/caddy/Dockerfile` builds Caddy with the `caddy-ratelimit` module. Rate limiting is not added inside the hosts in this deploy.
 - Hosted login locks an identity user for five minutes after five wrong passwords in a row, every role included ([identity-auth.md](features/identity-auth.md), amendment 2026-11-13, lockout). There is no unlock UI; clear a lockout in SQL as in [known-issues/hosted-login-lockout.md](known-issues/hosted-login-lockout.md).
 - HSTS on every public hostname, set by Caddy. The hosts do not redirect to HTTPS themselves; Caddy redirects HTTP to HTTPS.
@@ -302,18 +314,19 @@ The operator runbook holds the commands. This list is the order and the outcome 
 
 1. Install the OS updates, create the deploy user with key-only SSH, turn off password login, configure the firewall (§11) and 2 GB of swap.
 2. Install Docker Engine 28 or later from Docker's own package repository, with the compose plugin (§11). Add the deploy user to the `docker` group. Cap container logs (`json-file`, 20 MB × 5).
-3. Point the four hostnames at the VPS. Wait until all four resolve before Caddy starts; failed ACME validations count against the issuer's rate limit.
-4. Create `/opt/mywealth` with `certs/`, `data/reports/` and one `data/dataprotection/<host>/` per host (§7). Give `certs/` and `data/` to UID 1654.
+3. Point the five hostnames at the VPS (`sim.<domain>` included). Wait until all five resolve before Caddy starts; failed ACME validations count against the issuer's rate limit.
+4. Create `/opt/mywealth` with `certs/`, `data/reports/` and one `data/dataprotection/<host>/` per host, `simulator` included (§7). Give `certs/` and `data/` to UID 1654.
 5. Create `.env` from `deploy/.env.example` (§6). Keep a copy in the owner's password manager.
 6. Generate the OpenIddict certificates into `certs/` (§6).
 7. `docker login ghcr.io` with the read token.
 8. Run the deploy workflow once by hand with the smoke test skipped. It copies `deploy/` to the VPS. Its first health wait fails because the database does not exist yet; the images and files are in place.
-9. Start `sql` alone and create the database `MyWealthDbV2` (§8).
+9. Start `sql` alone and create the databases `MyWealthDbV2` and `MyWealthSimulatorDb` (§8).
 10. Set `ACME_CA` in `.env` to the staging issuer. Run `deploy.sh` with the current `master` SHA on the VPS. Once all four hostnames serve a staging certificate, clear `ACME_CA`, remove the `caddy-data` volume and start Caddy again, so it requests production certificates.
 11. Sign in to Back Office as the bootstrap SystemAdmin ([identity-auth.md](features/identity-auth.md) amendment 2026-11-12). Remove the `Bootstrap__SystemAdmin__*` values from `.env` and run `docker compose up -d webapi`.
-12. Create the smoke tenant and the asserted data ([smoke-test.md](smoke-test.md) §3). Store the Adviser and Customer passwords as GitHub secrets `SMOKE_ADVISER_PASSWORD` and `SMOKE_CUSTOMER_PASSWORD`, and the two portal URLs as variables, in environment `production`.
-13. Optional: create the demo tenant with `docker compose run --rm webapi --seed-demo` ([features/demo-tenant-seed.md](features/demo-tenant-seed.md)). It creates tenant `demo`, its 18 instruments and its two report grants, and no people. It exits 0 and logs one summary line. Running it again later adds only what is missing. Prices arrive with the next daily instrument-price run.
-14. Run the deploy workflow by hand with the smoke test on. It must go green end to end.
+12. Optional, the simulator: set `COMPOSE_PROFILES=simulator`, `SIMULATOR_PARTY_API_KEY` and the `BOOTSTRAP_SIMULATOROPERATOR_*` values in `.env`, and run `deploy.sh` again. Sign in to `sim.<domain>` as the bootstrap simulator operator ([features/simulator.md](features/simulator.md) R9). Remove the `BOOTSTRAP_SIMULATOROPERATOR_*` values and run `docker compose up -d webapi`.
+13. Create the smoke tenant and the asserted data ([smoke-test.md](smoke-test.md) §3). Store the Adviser and Customer passwords as GitHub secrets `SMOKE_ADVISER_PASSWORD` and `SMOKE_CUSTOMER_PASSWORD`, and the two portal URLs as variables, in environment `production`.
+14. Optional: create the demo tenant with `docker compose run --rm webapi --seed-demo` ([features/demo-tenant-seed.md](features/demo-tenant-seed.md)). It creates tenant `demo`, its 18 instruments and its two report grants, and no people. It exits 0 and logs one summary line. Running it again later adds only what is missing. Prices arrive with the next daily instrument-price run.
+15. Run the deploy workflow by hand with the smoke test on. It must go green end to end.
 
 The runbook is the restore plan. Run it once on a throwaway VPS before the real deploy.
 
@@ -331,7 +344,7 @@ Found while writing this doc (2026-11-11). Updated 2026-11-12 with the decisions
 | 4 | The BFFs serve the SPA only through `DevelopmentSpaProxy` | Landed: when `Spa:DevServerUrl` is not set, each BFF serves the built SPA from `wwwroot`, with fallback to `index.html` for client routes, `no-cache` on `index.html` and `immutable` on `/assets/` (amendments 2026-11-12 to [bff-adviser-portal.md](features/bff-adviser-portal.md) and [bff-customer-portal.md](features/bff-customer-portal.md), P1–P10) | Done |
 | 5 | `MapDefaultEndpoints` maps `/health` and `/alive` only in Development. Chiseled images cannot run `curl` for a compose health check | Landed: outside Development they are mapped on the health port only, matched on the connection's local port. Each host accepts `--healthcheck`, calls its own `/health` and exits ([production-hosting.md](features/production-hosting.md) R12–R15) | Done |
 | 6 | The SystemAdmin exists only through `DevelopmentIdentitySeeder`. Production has no SystemAdmin | Landed: on start, `webapi` creates one SystemAdmin from `Bootstrap__SystemAdmin__*` when none exists, and fails before it listens when that configuration is incomplete or invalid ([identity-auth.md](features/identity-auth.md) amendment 2026-11-12, A25–A31) | Done |
-| 7 | `TestSeed` runs only in Development. [tenants.md](features/tenants.md) R17 allows seeding only in Development | Decided 2026-11-12: no demo data for the first deploy. Recorded in [future-plans.md](future-plans.md) §6. Landed 2026-11-14: [features/demo-tenant-seed.md](features/demo-tenant-seed.md), the operator command `webapi --seed-demo` creates the demo tenant and its catalog without people (§12 step 13). Shared demo logins stay in future-plans §6 | Done |
+| 7 | `TestSeed` runs only in Development. [tenants.md](features/tenants.md) R17 allows seeding only in Development | Decided 2026-11-12: no demo data for the first deploy. Recorded in [future-plans.md](future-plans.md) §6. Landed 2026-11-14: [features/demo-tenant-seed.md](features/demo-tenant-seed.md), the operator command `webapi --seed-demo` creates the demo tenant and its catalog without people (§12 step 14). Shared demo logins stay in future-plans §6 | Done |
 | 8 | The AppHost is Azure-shaped (`AddAzureContainerAppEnvironment`, `AddAzureSqlServer`) | Landed: the `deploy/` folder (§5): `compose.yml`, `.env.example`, `caddy/Dockerfile`, `caddy/Caddyfile`, `deploy.sh`, `rollback.sh`. The AppHost stays the Development orchestrator | Done |
 | 9 | No Playwright project | Landed: `tests/Smoke.Tests`, its Development seed and `.github/workflows/smoke.yml` ([smoke-test.md](smoke-test.md) §8) | Done |
 | 10 | No image publish or deploy workflow | Landed: `.github/workflows/deploy.yml` (§9), SPA copy into `wwwroot/`, `wwwroot/` of both BFFs in `.gitignore`. Item 4 serves that build | Done |

@@ -1,6 +1,6 @@
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Infrastructure.Data;
-using MyWealthV2.Infrastructure.Data.Schema;
+using MyWealthV2.Schema;
 using MyWealthV2.Infrastructure.Identity;
 using Scalar.AspNetCore;
 
@@ -64,6 +64,7 @@ await using (var scope = app.Services.CreateAsyncScope())
     // Every environment. After the Development seed, so Development always finds its SystemAdmin
     // (identity-auth amendment 2026-11-12). Throws on bad configuration before the host listens.
     await SystemAdminBootstrap.RunAsync(scope.ServiceProvider, app.Configuration, CancellationToken.None);
+    await SimulatorOperatorBootstrap.RunAsync(scope.ServiceProvider, app.Configuration, CancellationToken.None);
 }
 
 // No HTTPS redirection or HSTS here: the reverse proxy owns both (production-hosting R11).

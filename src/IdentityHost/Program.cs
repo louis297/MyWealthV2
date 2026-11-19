@@ -53,7 +53,9 @@ builder.Services
     .AddCookie(ClientCookieSchemes.BackOffice, options =>
         ClientCookieSchemes.Configure(options, ClientCookieSchemes.BackOfficeCookie, development))
     .AddCookie(ClientCookieSchemes.CustomerPortal, options =>
-        ClientCookieSchemes.Configure(options, ClientCookieSchemes.CustomerPortalCookie, development));
+        ClientCookieSchemes.Configure(options, ClientCookieSchemes.CustomerPortalCookie, development))
+    .AddCookie(ClientCookieSchemes.Simulator, options =>
+        ClientCookieSchemes.Configure(options, ClientCookieSchemes.SimulatorCookie, development));
 
 builder.Services.AddOpenIddict()
     .AddServer(options =>

@@ -16,7 +16,7 @@ public static class LoginEligibility
             return false;
         }
 
-        if (user.Role == UserRole.SystemAdmin)
+        if (user.Role is UserRole.SystemAdmin or UserRole.SimulatorOperator)
         {
             return tenant is null && user.TenantId is null;
         }

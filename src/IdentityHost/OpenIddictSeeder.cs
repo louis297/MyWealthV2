@@ -5,7 +5,7 @@ namespace MyWealthV2.IdentityHost;
 
 public static class OpenIddictSeeder
 {
-    private static readonly string[] RequiredPermissions =
+    private static readonly string[] PortalPermissions =
     [
         Permissions.Endpoints.Authorization,
         Permissions.Endpoints.Token,
@@ -18,6 +18,19 @@ public static class OpenIddictSeeder
         Permissions.Scopes.Profile,
         Permissions.Prefixes.Scope + Scopes.OfflineAccess,
         Permissions.Prefixes.Scope + "api"
+    ];
+
+    // Simulator spec R6: code + PKCE, openid profile email only. No refresh grant, no offline_access, no api.
+    private static readonly string[] SimulatorPermissions =
+    [
+        Permissions.Endpoints.Authorization,
+        Permissions.Endpoints.Token,
+        Permissions.Endpoints.Revocation,
+        Permissions.Endpoints.EndSession,
+        Permissions.GrantTypes.AuthorizationCode,
+        Permissions.ResponseTypes.Code,
+        Permissions.Scopes.Email,
+        Permissions.Scopes.Profile
     ];
 
     public static async Task SeedAsync(IServiceProvider services, CancellationToken cancellationToken)
@@ -75,6 +88,24 @@ public static class OpenIddictSeeder
             redirects: customerRedirects,
             postLogout: customerPostLogout,
             cancellationToken);
+
+        var simulatorSecret = configuration["Identity:SimulatorClientSecret"];
+        if (string.IsNullOrWhiteSpace(simulatorSecret))
+        {
+            throw new InvalidOperationException("Identity:SimulatorClientSecret is required.");
+        }
+
+        var simulatorOrigin = OpenIddictClientUris.ReadSimulatorOrigin(configuration);
+        var (simulatorRedirects, simulatorPostLogout) = OpenIddictClientUris.FromOrigins([simulatorOrigin]);
+        await UpsertAsync(
+            manager,
+            clientId: "simulator",
+            secret: simulatorSecret,
+            displayName: "Simulator",
+            redirects: simulatorRedirects,
+            postLogout: simulatorPostLogout,
+            cancellationToken,
+            SimulatorPermissions);
     }
 
     private static async Task UpsertAsync(
@@ -84,7 +115,8 @@ public static class OpenIddictSeeder
         string displayName,
         IReadOnlyList<Uri> redirects,
         IReadOnlyList<Uri> postLogout,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyList<string>? permissions = null)
     {
         var existing = await manager.FindByClientIdAsync(clientId, cancellationToken);
         var descriptor = new OpenIddictApplicationDescriptor();
@@ -100,7 +132,9 @@ public static class OpenIddictSeeder
         descriptor.DisplayName = displayName;
         descriptor.Requirements.Add(Requirements.Features.ProofKeyForCodeExchange);
 
-        foreach (var permission in RequiredPermissions)
+        // The list is the client's whole permission set, so a narrowed list also narrows an existing row.
+        descriptor.Permissions.Clear();
+        foreach (var permission in permissions ?? PortalPermissions)
         {
             descriptor.Permissions.Add(permission);
         }
