@@ -63,7 +63,7 @@ The `/users` HTTP namespace (`/users/advisers` and so on) is an API convention. 
 
 ### Amendment 2026-11-19: fifth role `SimulatorOperator`
 
-Accepted with [ADR 0021](0021-outside-parties-behind-ports.md) rule 25 and [features/simulator.md](../features/simulator.md) R1–R10. Not landed. Do not rewrite decision 1 in place; this amendment replaces "four values" with five.
+Accepted with [ADR 0021](0021-outside-parties-behind-ports.md) rule 25 and [features/simulator.md](../features/simulator.md) R1–R10. Landed 2026-11-19. Do not rewrite decision 1 in place; this amendment replaces "four values" with five.
 
 - `UserRole.SimulatorOperator = 4`. Platform-level like SystemAdmin: `TenantId` null, `AdviserId` null, `IdentityUserId` required. Its email shares the platform-level unique index with SystemAdmin.
 - It signs in only on client `simulator` (client × role allow-list). No other client allows it, and it is on no other client's row.

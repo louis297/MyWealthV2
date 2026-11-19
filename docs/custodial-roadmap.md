@@ -364,7 +364,7 @@ A separate project that plays the outside parties for manual testing and demos. 
 - **Clock and randomness:** its own clock that can jump ("to T+2", "to month end"); every random choice from a seed. Same seed and same steps give the same signals.
 - **Scenarios:** named scenario definitions shared with the in-memory port fakes used by functional tests (P9), so both are driven by one description. Working home: a small shared library referenced by both.
 - **Reference data:** it may read instruments and reference prices through `webapi` read routes. It owns the prices of simulated instruments (D11). Never ledger data.
-- **Spec:** [simulator.md](features/simulator.md) (accepted 2026-11-19). Its §11 records where it refines this section: the TestAppHost gets the simulator database only, not the process (P9); the simulator reads no platform data, and S2 is recommended to carry the reference price in the order call instead of reading `webapi`, because D16 gives the operator no `webapi` permission; scenarios and their shared library come with S1; the clock runs at real time plus an offset and can be paused; a reset starts a new world whose id is in every outside id and cursor; the party routes listen on their own port; the platform's machine credential is a key the simulator owns; the VPS container runs under a compose profile.
+- **Spec:** [simulator.md](features/simulator.md) (accepted and landed 2026-11-19). Its §11 records where it refines this section: the TestAppHost gets the simulator database only, not the process (P9); the simulator reads no platform data, and S2 is recommended to carry the reference price in the order call instead of reading `webapi`, because D16 gives the operator no `webapi` permission; scenarios and their shared library come with S1; the clock runs at real time plus an offset and can be paused; a reset starts a new world whose id is in every outside id and cursor; the party routes listen on their own port; the platform's machine credential is a key the simulator owns; the VPS container runs under a compose profile.
 
 ### S1. Bank (with B3–B7)
 
@@ -428,7 +428,7 @@ Each step depends only on earlier steps. "Closes" names the matrix cell or known
 | --- | --- | --- | --- | --- | --- |
 | 0 | Custody mode slices 1–5 | — | — | custody-modes and four others | landed 2026-11-19 |
 | 1 | F1 Transaction source, F4 reverse by source | — | Rebalance id leak | [transaction-source](features/transaction-source.md) | accepted 2026-11-19, landed 2026-11-19 |
-| 2 | F2 ADR, S0 skeleton | S0 | — | [ADR 0021](adr/0021-outside-parties-behind-ports.md), [simulator](features/simulator.md) | accepted 2026-11-19 |
+| 2 | F2 ADR, S0 skeleton | S0 | — | [ADR 0021](adr/0021-outside-parties-behind-ports.md), [simulator](features/simulator.md) | accepted 2026-11-19, landed 2026-11-19 |
 | 3 | F3 Adjustment (no review) | — | "No correction other than reverse" | — | not started |
 | 4 | B1 client money accounts, B2 deposit reference | — | — | — | not started |
 | 5 | B3 bank feed, B4 matching and suspense | S1 receipts | Hand `TransferIn` | — | not started |

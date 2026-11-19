@@ -76,7 +76,7 @@ Portals:
 - Customer Portal — second BFF + client on the same authorization server; accepted ([customer-portal/customer-portal.md](customer-portal/customer-portal.md), [features/bff-customer-portal.md](features/bff-customer-portal.md))
 - Back Office — landed ([backoffice/back-office.md](backoffice/back-office.md)). Blazor host `back-office` with MudBlazor (no BFF). Scalar remains. Back Office is the only client that issues SystemAdmin a code; `adviser-portal` refuses SystemAdmin (identity-auth amendment 2026-11-11).
 
-- Simulator — accepted, not landed ([features/simulator.md](features/simulator.md), [ADR 0021](adr/0021-outside-parties-behind-ports.md)). Plays the outside parties. Own database `MyWealthSimulatorDb`; references no platform `Domain`, `Application`, `Infrastructure` or `Web`. Confidential client `simulator`, signed in only by `SimulatorOperator`; keeps no token and never calls `webapi`.
+- Simulator — landed 2026-11-19 ([features/simulator.md](features/simulator.md), [ADR 0021](adr/0021-outside-parties-behind-ports.md)). Plays the outside parties. Own database `MyWealthSimulatorDb`; references no platform `Domain`, `Application`, `Infrastructure` or `Web`. Confidential client `simulator`, signed in only by `SimulatorOperator`; keeps no token and never calls `webapi`.
 
 Aspire resource names must not be generic (`Frontend`, `Web`). Hosts: `identity`, `webapi`, `adviser-portal`, `bff-adviser-portal`, `customer-portal`, `bff-customer-portal`, `back-office`, `worker`, `simulator`. Phase 1 does **not** split a separate identity **database**.
 
@@ -100,8 +100,8 @@ One AppHost orchestrates every resource. Separate projects are separate processe
 | BffCustomerPortal | `src/BffCustomerPortal` | Customer Portal session edge (accepted). Confidential client holder. Cookie + OIDC + HttpClient proxy |
 | BackOffice | `src/BackOffice` | SystemAdmin UI. Blazor + MudBlazor. Confidential client `back-office`. Cookie + OIDC. Calls `webapi` with Bearer. No BFF |
 | Worker | `src/Worker` | Background worker. Hangfire Server for async and recurring work (ADR 0017). First consumer: Reports. Also runs the schema applicator at start-up (ADR 0008 amendment 2026-11-19) |
-| Schema | `src/Schema` | Schema applicator library (accepted, not landed; moved out of `Infrastructure` by [features/simulator.md](features/simulator.md)). Used by `webapi`, `worker` and `simulator`, each for its own database |
-| Simulator | `src/Simulator` | Outside parties for manual tests and demos (accepted, not landed). Control port behind sign-in, party port on the internal network, own database |
+| Schema | `src/Schema` | Schema applicator library (moved out of `Infrastructure` by [features/simulator.md](features/simulator.md)). Used by `webapi`, `worker` and `simulator`, each for its own database |
+| Simulator | `src/Simulator` | Outside parties for manual tests and demos. Control port behind sign-in, party port on the internal network, own database |
 | AdviserPortal | Independent frontend | Vite SPA. No tokens. OIDC client id `adviser-portal` is not held here |
 | CustomerPortal | Independent frontend | Vite SPA (accepted). No tokens. OIDC client id `customer-portal` is not held here |
 | Tests | `tests/*` | Domain unit, application unit, infrastructure integration, functional |
@@ -122,7 +122,7 @@ Hosted in `src/IdentityHost` (ADR 0014). Aspire resource name: `identity`.
 | --- | --- |
 | Protocol | OpenIddict **defaults, do not remap**: `/.well-known/openid-configuration`, `/.well-known/jwks`, `/connect/authorize`, `/connect/token`, `/connect/revocation`, `/connect/logout` (plus default `/connect/userinfo`). Callers follow discovery; do not hard-code |
 | Hosted login | Password page on `identity`: email + password + tenantCode (SystemAdmin omits tenantCode) |
-| Client | Three confidential clients. `adviser-portal` is held by `bff-adviser-portal`. `back-office` is held by `src/BackOffice`. `customer-portal` is held by `bff-customer-portal` (accepted). Authorization code + PKCE + refresh. No password grant. A fourth, `simulator`, is accepted, not landed: code + PKCE, scopes `openid profile email` only, no refresh, no `api` (identity-auth amendment 2026-11-19). |
+| Client | Four confidential clients. `adviser-portal` is held by `bff-adviser-portal`. `back-office` is held by `src/BackOffice`. `customer-portal` is held by `bff-customer-portal` (accepted). Authorization code + PKCE + refresh. No password grant. The fourth, `simulator`, is held by `src/Simulator`: code + PKCE, scopes `openid profile email` only, no refresh, no `api` (identity-auth amendment 2026-11-19). |
 | Access | Short-lived JWT. **Asymmetric** signing. Public keys on JWKS |
 | Refresh | OpenIddict token store. Revoked on logout (at once), and on password change and disable (when the outbox delivers the event). Rotated when presented. No custom `RefreshTokens` table |
 | Scopes | `openid`, `profile`, `offline_access`, `api`. Role and tenant are JWT claims, not scopes. Permissions are not expanded into the token |
@@ -219,7 +219,7 @@ dotnet run --project src/AppHost
 | Adviser Portal BFF | `bff-adviser-portal` | `src/BffAdviserPortal`. Cookie session, code exchange, `/api` proxy |
 | Customer Portal | `customer-portal` | Vite frontend (accepted). No OIDC client in the browser |
 | Customer Portal BFF | `bff-customer-portal` | `src/BffCustomerPortal` (accepted). Cookie session, code exchange, `/api` proxy |
-| Simulator | `simulator` | `src/Simulator` (accepted, not landed). Control endpoint with Scalar; `party` endpoint; database `MyWealthSimulatorDb` on `dbserver` |
+| Simulator | `simulator` | `src/Simulator`. Control endpoint with Scalar; `party` endpoint; database `MyWealthSimulatorDb` on `dbserver` |
 
 **Database lifecycle (ADR 0008)**
 
@@ -276,7 +276,7 @@ Password change, disable, and logout revoke that subject’s OpenIddict tokens. 
 
 Do not add a port whose surface is still open. Do add a port (or value object) when later use is certain and omitting it would force a Phase-1 redesign (`Money`, `ICurrencyCatalog`, no-op `IEmailSender`).
 
-Outside parties ([ADR 0021](adr/0021-outside-parties-behind-ports.md), accepted): a bank, broker, custodian or issuer gets one port per party role, added by the flow spec that needs it (the first with roadmap B3). The `worker` pulls each feed on a schedule, stores the inbound records and the feed cursor first, and a flow processes stored records afterwards. `webapi` handlers never call an outside party. The simulator host (`simulator`, [features/simulator.md](features/simulator.md), accepted, not landed) is one adapter behind those ports, with its own database.
+Outside parties ([ADR 0021](adr/0021-outside-parties-behind-ports.md), accepted): a bank, broker, custodian or issuer gets one port per party role, added by the flow spec that needs it (the first with roadmap B3). The `worker` pulls each feed on a schedule, stores the inbound records and the feed cursor first, and a flow processes stored records afterwards. `webapi` handlers never call an outside party. The simulator host (`simulator`, [features/simulator.md](features/simulator.md)) is one adapter behind those ports, with its own database.
 
 ---
 

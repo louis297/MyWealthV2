@@ -113,7 +113,7 @@ Authorization (named policies, `RolePermissions`, handler scope checks) is not a
 Role shape (CHECK-level, not a transition accident):
 
 - SystemAdmin: `TenantId` empty, `AdviserId` empty. Email unique **globally**.
-- SimulatorOperator: `TenantId` empty, `AdviserId` empty. Email unique among platform-level people (shared with SystemAdmin). No permission; never a `webapi` caller ([features/simulator.md](features/simulator.md), accepted, not landed).
+- SimulatorOperator: `TenantId` empty, `AdviserId` empty. Email unique among platform-level people (shared with SystemAdmin). No permission; never a `webapi` caller ([features/simulator.md](features/simulator.md), landed 2026-11-19).
 - TenantAdmin / Adviser: `TenantId` required, `AdviserId` empty.
 - Customer: `TenantId` required, `AdviserId` required; target is same-tenant, Role=Adviser, not Disabled.
 - All five roles have a login principal: `IdentityUserId` required, points at an existing Identity user, one-to-one.
@@ -169,7 +169,7 @@ The domain **does** supply the login gate:
 
 ## 5. Enumerations (Phase 1)
 
-**UserRole:** `SystemAdmin`, `TenantAdmin`, `Adviser`, `Customer`, `SimulatorOperator` (value 4; ADR 0013 amendment 2026-11-19, not landed)  
+**UserRole:** `SystemAdmin`, `TenantAdmin`, `Adviser`, `Customer`, `SimulatorOperator` (value 4; ADR 0013 amendment 2026-11-19, landed)  
 **UserStatus:** `PendingActivation`, `Active`, `Disabled`
 
 Phase 1 added no fifth role; `SimulatorOperator` comes from [ADR 0021](adr/0021-outside-parties-behind-ports.md). Do not add a role inside a tenant. Ledger permission names are registered when the ledger domain opens. Do not hang empty policies in Phase 1.

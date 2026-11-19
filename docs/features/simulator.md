@@ -28,7 +28,9 @@ New host `simulator` (`src/Simulator`) that plays the outside parties of [custod
 
 The skeleton has a control surface for a person (sign-in, Scalar, clock, reset, a party outage switch, a log) and a party surface for the platform (one status route behind a machine credential). On the platform side it adds a fifth role, `SimulatorOperator`, a fourth OIDC client `simulator` on `identity`, and the deploy entries. Scripts: platform `0036_users_role_simulator_operator.sql`; simulator `database/simulator/0001`, `0002`. No new `webapi` route or policy. No platform port: the first one lands with roadmap B3.
 
-**Status is `accepted` (2026-11-19).** Build contract; not landed. The twelve points of §11 were confirmed as recommended. The amendments it makes to other documents (deployment, identity-auth, ADR 0013, architecture, database-design, domain-model, api-design, glossary) were written in the same change and are marked "accepted, not landed".
+**Status is `accepted` (2026-11-19), landed 2026-11-19.** The twelve points of §11 were confirmed as recommended. The amendments it makes to other documents (deployment, identity-auth, ADR 0013, architecture, database-design, domain-model, api-design, glossary) were written in the same change and are now landed.
+
+Where the build had to choose, it is recorded in §11 "Settled while landing". One rule changed: R23 resume, see point 13 there.
 
 ---
 
@@ -102,7 +104,7 @@ The rule that distinguishes this slice: the two surfaces never mix. Control rout
 | ID | Rule |
 | --- | --- |
 | R11 | **Three ports.** Outside Development the simulator listens on `8080` (control), `8081` (health) and `8082` (party). Health follows [production-hosting.md](production-hosting.md) R12–R15. In Development the AppHost names the endpoints `https` / `http` (control) and `party`. |
-| R12 | **Routes by port.** `/control/*`, `/scalar`, `/openapi/*`, `/signin-oidc`, `/signout-callback-oidc`, `/signout` and `/` answer only on the control port. `/party/*` answers only on the party port. A request on the other port → 404. The check reads the connection's local port, as the health port does. |
+| R12 | **Routes by port.** `/control/*`, `/scalar`, `/openapi/*`, `/signin-oidc`, `/signout-callback-oidc`, `/signout` and `/` answer only on the control port. `/party/*` answers only on the party port. A request on the other port → 404. The check reads the connection's local port, as the health port does. The party port is `Simulator:PartyPort` (default `8082`); the control port is every other port the host listens on, except the health port outside Development, so Aspire's `https` and `http` endpoints both serve the control surface. `/health` and `/alive` stay with production-hosting R12–R13. |
 | R13 | **Public host rules.** The control port is a public host: forwarded headers from the configured networks only, Data Protection keys in its own folder with an explicit application name, no in-host HTTPS redirection ([production-hosting.md](production-hosting.md) R6–R11). |
 | R14 | **Own database.** The simulator reads and writes only `MyWealthSimulatorDb` (connection string `ConnectionStrings:MyWealthSimulatorDb`). It has no connection string to `MyWealthDbV2`. |
 | R15 | **Own scripts.** `database/simulator/NNNN_*.sql`, numbered from `0001`, applied by the simulator at start-up with the schema library, recorded in that database's own `SchemaVersions`. The simulator is the only host that applies them. It starts listening only after the scripts are applied. The database itself is created by Aspire in Development and by hand on the VPS (§9.3). |
@@ -121,14 +123,14 @@ The rule that distinguishes this slice: the two surfaces never mix. Control rout
 | ID | Rule |
 | --- | --- |
 | R20 | **One world.** The simulator database holds exactly one world row: `WorldId` (GUID), `Seed` (int), clock state (R21), `PartyOutage` (bool), `StartedAt` (real instant of the last reset). The first start creates it with a new `WorldId`, a random seed, offset zero, running, no outage. |
-| R21 | **Simulator clock.** Simulator now = real UTC now + `ClockOffset` while running; = `PausedAt` while paused. `ClockOffset` is never negative. The simulator clock never goes back: no command moves it to an instant before the current simulator now. |
+| R21 | **Simulator clock.** Simulator now = real UTC now + `ClockOffset` while running; = `PausedAt` while paused. `ClockOffset` is never negative. The simulator clock never goes back: no command moves it to an instant before the current simulator now. `ClockOffset` is whole seconds, rounded up when a command sets it, so simulator now never lands before the instant a command asked for. |
 | R22 | **Advance.** `POST /control/clock/advance` with exactly one of `by` (ISO 8601 duration, `> 0`, at most `P366D`) or `to` (instant, later than simulator now, at most 366 days ahead). Running: adds to `ClockOffset`. Paused: moves `PausedAt`. Returns the world. |
-| R23 | **Pause and resume.** `POST /control/clock/pause` freezes simulator now at its current value. `POST /control/clock/resume` sets `ClockOffset` so simulator now continues from the paused value without a jump. Pausing a paused clock or resuming a running one returns 200 and changes nothing. |
+| R23 | **Pause and resume.** `POST /control/clock/pause` freezes simulator now at its current value. `POST /control/clock/resume` sets `ClockOffset` so simulator now continues from the paused value without a jump. When the paused value is behind real now (the clock was paused longer than its offset), that offset would be negative, so resume sets `ClockOffset` to zero and the clock continues at real now (amended 2026-11-19 while landing, §11 point 13). Pausing a paused clock or resuming a running one returns 200 and changes nothing. |
 | R24 | **Reset.** `POST /control/reset` with optional `seed` (int; omitted → random). New `WorldId`, the seed, offset zero, running, no outage, `StartedAt` = real now. Every party table (none in this slice) is emptied in the same transaction. The control log is kept. |
 | R25 | **Outside ids and cursors across resets.** Every outside id and cursor the simulator ever hands out contains the `WorldId` it was made in, so an id never repeats after a reset (ADR 0021 rule 7). A cursor from an earlier world reads the current world from its start. (No id or cursor exists in this slice; the rule is fixed now so S1 does not have to.) |
 | R26 | **Randomness.** Every random choice the simulator makes is drawn from a generator built from (`Seed`, purpose name, sequence number). No `Random.Shared`, no `Guid.NewGuid()` for an outside value. `WorldId` itself is a new GUID on reset. |
 | R27 | **Outage.** `POST /control/party/outage` with `{ "on": true | false }`. While on, every `/party/*` route returns 503 after the credential check (R30). Control routes are not affected. |
-| R28 | **Control log.** Every control write (advance, pause, resume, outage, reset) appends one row: real instant, simulator instant after the action, the operator's email from the session, the action and its body. A refused write (400) appends nothing. `GET /control/log` lists newest first, `{ items, page, pageSize, totalCount }`, page default 1, pageSize default 20, max 100. |
+| R28 | **Control log.** Every control write (advance, pause, resume, outage, reset) appends one row: real instant, simulator instant after the action, the operator's email from the session, the action and its body. A refused write (400) appends nothing. `GET /control/log` lists newest first, `{ items, page, pageSize, totalCount }`, page default 1, pageSize default 20, max 100. A pageSize above 100 is answered with 100, and a page or pageSize below 1 with 1; neither is a 400. |
 | R29 | **Concurrency.** Control writes on the world row use its `RowVersion`. Two writes at once: one wins, the other returns 409 and changes nothing. |
 
 ### 4.5 Party surface
@@ -149,7 +151,7 @@ Platform:
 | Type | Kind | Change |
 | --- | --- | --- |
 | `UserRole` | Enum (existing) | Add `SimulatorOperator = 4`. |
-| `User` | Aggregate (existing) | New factory for a `SimulatorOperator`, the same shape as the SystemAdmin one (no tenant, no adviser). |
+| `User` | Aggregate (existing) | `User.Create` accepts `SimulatorOperator` with the SystemAdmin shape (no tenant, no adviser). There is no role-specific factory; every role goes through `User.Create` and its role-shape check. |
 | `LoginEligibility` | Static rules (existing) | Platform-level roles: SystemAdmin and SimulatorOperator need no tenant (R4). |
 
 Invariants (platform):
@@ -165,7 +167,7 @@ The simulator has no shared Domain project. Its own types live in `src/Simulator
 | `ControlLogEntry` | Entity | R28 |
 | `SeededRandom` | Service | R26 |
 
-Recorded in [domain-model.md](../domain-model.md) §4 and §5 (accepted, not landed).
+Recorded in [domain-model.md](../domain-model.md) §4 and §5.
 
 ---
 
@@ -179,7 +181,7 @@ Script: `database/schema/0036_users_role_simulator_operator.sql`. Forward only.
 | --- | --- | --- |
 | `Users` | Drop and re-add `CK_Users_RoleShape`: `([Role] IN (0, 4) AND [TenantId] IS NULL AND [AdviserId] IS NULL) OR ([Role] IN (1, 2) AND [TenantId] IS NOT NULL AND [AdviserId] IS NULL) OR ([Role] = 3 AND [TenantId] IS NOT NULL AND [AdviserId] IS NOT NULL)` | none |
 
-No data change. Recorded in [database-design.md](../database-design.md) §6.6, §9 and §15 (accepted, not landed).
+No data change. Recorded in [database-design.md](../database-design.md) §6.6, §9 and §15.
 
 ### 6.2 Simulator (`MyWealthSimulatorDb`)
 
@@ -292,7 +294,7 @@ Party status:
 
 ### 8.2 Errors
 
-Validation 400 as ProblemDetails with `errors` (`By`, `To`, `Seed`, `On`). Both or neither of `by` / `to` → 400 `errors.By`. A `to` not after simulator now, or more than 366 days ahead → 400 `errors.To`. No problem codes.
+Validation 400 as ProblemDetails with `errors` (`By`, `To`, `Seed`, `On`). Both or neither of `by` / `to` → 400 `errors.By`. A `by` that is not an ISO 8601 duration → 400 `errors.By`. A `to` not after simulator now, or more than 366 days ahead → 400 `errors.To`. A body that does not bind (for example `"seed": "abc"`) → 400 from the framework. A concurrent write (R29) → 409 ProblemDetails. No problem codes.
 
 The simulator is a third HTTP surface next to `webapi` and `identity`. [api-design.md](../api-design.md) §1 points to this section; its conventions do not otherwise apply to the simulator.
 
@@ -312,7 +314,7 @@ Scalar on the control port is the only UI in this slice. No portal, Back Office 
 
 ### 9.3 VPS showcase
 
-Amendment to [deployment.md](../deployment.md), written there as §15 (accepted, not landed):
+Amendment to [deployment.md](../deployment.md). Written there as §15 when accepted; folded into §3–§12 when it landed (2026-11-19):
 
 | Item | Change |
 | --- | --- |
@@ -374,6 +376,15 @@ Each point was confirmed as recommended and is written into the rules above as s
 10. **TestAppHost** (§9.2). Decided: a database only, no process. The roadmap S0 said "an Aspire resource ... in the test AppHost"; ADR 0021 rule 19 makes the process unnecessary for tests.
 11. **Schema library** (§2). Decided: move the applicator into `src/Schema` with a connection string, so the simulator does not reference `Infrastructure` (ADR 0021 rule 21). Alternative: the simulator references `Infrastructure`, which brings the platform's `DbContext` and every platform table mapping into the simulator.
 12. **Session without tokens, 8 hours** (R16). Decided: the host needs no token, so it keeps none. A disabled operator keeps a session until the cookie ends. Alternative: keep refresh tokens and re-check on refresh, which needs `offline_access` for a client that calls nothing.
+
+### Settled while landing (2026-11-19)
+
+13. **Resume after a long pause** (R23). R21 keeps `ClockOffset` never negative and the clock never going back; R23 asked resume to continue from the paused value. When the clock is paused longer than its offset, both cannot hold. Decided while landing: the offset stays non-negative (the database checks it), and resume continues at real now in that case. A frozen past instant stays available: leave the clock paused.
+14. **How `webapi` refuses the role** (R3). A JwtBearer `OnTokenValidated` hook fails a token whose `role` claim is `simulatorOperator`, so every route answers 401 through the existing challenge. `identity` sets the claim from the person row and a role never changes (R1), so the claim is the person's role, and there is no extra lookup per request. `CurrentUserAccess.Resolve` also returns no caller for the role.
+15. **Routes by port** (R12). Written against the party port, so Development's two Aspire control endpoints both work; implemented as a middleware gate before authentication, so the OIDC callback paths are covered too.
+16. **The dual write is one transaction** (R9). The bootstrap and the Development seed create the identity row and the person row in one database transaction, so an email already used by a SystemAdmin fails on `UQ_Users_SystemAdmin_Email` and leaves no identity row.
+17. **The party port in Development** (§9.2). The AppHost gives the `party` endpoint no target-port variable and passes its target port to the host as `Simulator__PartyPort`.
+18. **`identity` always needs the simulator client secret.** Like the other three, `Identity:SimulatorClientSecret` is required, so `.env` carries it even while the simulator's compose profile is off. The party key is needed only with the profile on.
 
 Still open, not this slice:
 

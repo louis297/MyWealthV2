@@ -571,7 +571,7 @@ Today's code: `AddIdentityCore` in `src/Infrastructure/DependencyInjection.cs` s
 
 ### Amendment 2026-11-19 (simulator client and `SimulatorOperator`)
 
-Accepted with [simulator.md](simulator.md) (R1–R10) and [ADR 0021](../adr/0021-outside-parties-behind-ports.md). Not landed. Do not rewrite R1–R21 or earlier amendments in place.
+Accepted with [simulator.md](simulator.md) (R1–R10) and [ADR 0021](../adr/0021-outside-parties-behind-ports.md). Landed 2026-11-19. Do not rewrite R1–R21 or earlier amendments in place.
 
 - **Fifth role.** `SimulatorOperator` (ADR 0013 amendment 2026-11-19): platform-level, no tenant, no adviser, no permission. `LoginEligibility` treats it like SystemAdmin (Active, identity link, no tenant).
 - **Hosted login without tenantCode.** The person is looked up by email among platform-level people (SystemAdmin or SimulatorOperator, `TenantId IS NULL`). Order of checks, uniform failure copy, lockout and the one-hash rule are unchanged.
