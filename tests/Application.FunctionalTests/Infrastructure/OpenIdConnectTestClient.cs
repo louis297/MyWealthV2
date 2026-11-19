@@ -10,8 +10,10 @@ public sealed class OpenIdConnectTestClient(
     Func<HttpClient> createClient,
     string clientId = "adviser-portal",
     string clientSecret = AdviserPortalTestSecret.Value,
-    string redirectUri = "https://localhost/signin-oidc")
+    string redirectUri = "https://localhost/signin-oidc",
+    string scope = "openid profile offline_access api")
 {
+    private readonly string Scope = scope;
     private readonly string RedirectUri = redirectUri;
     private readonly string ClientId = clientId;
     private readonly string ClientSecret = clientSecret;
@@ -24,7 +26,7 @@ public sealed class OpenIdConnectTestClient(
             "client_id=" + Uri.EscapeDataString(ClientId),
             "redirect_uri=" + Uri.EscapeDataString(RedirectUri),
             "response_type=code",
-            "scope=" + Uri.EscapeDataString("openid profile offline_access api"),
+            "scope=" + Uri.EscapeDataString(Scope),
             "code_challenge=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
             "code_challenge_method=S256",
             "state=" + Base64Url(RandomNumberGenerator.GetBytes(16))
@@ -51,7 +53,7 @@ public sealed class OpenIdConnectTestClient(
             "client_id=" + Uri.EscapeDataString(ClientId),
             "redirect_uri=" + Uri.EscapeDataString(RedirectUri),
             "response_type=code",
-            "scope=" + Uri.EscapeDataString("openid profile offline_access api"),
+            "scope=" + Uri.EscapeDataString(Scope),
             "code_challenge=" + challenge,
             "code_challenge_method=S256",
             "state=" + state
@@ -167,7 +169,7 @@ public sealed class OpenIdConnectTestClient(
             "client_id=" + Uri.EscapeDataString(ClientId),
             "redirect_uri=" + Uri.EscapeDataString(RedirectUri),
             "response_type=code",
-            "scope=" + Uri.EscapeDataString("openid profile offline_access api"),
+            "scope=" + Uri.EscapeDataString(Scope),
             "code_challenge=" + challenge,
             "code_challenge_method=S256",
             "state=" + Base64Url(RandomNumberGenerator.GetBytes(16))
