@@ -22,6 +22,7 @@
     <ProjectReference Include="..\BffCustomerPortal\BffCustomerPortal.csproj" />
     <ProjectReference Include="..\BackOffice\BackOffice.csproj" />
     <ProjectReference Include="..\Worker\Worker.csproj" />
+    <ProjectReference Include="..\Simulator\Simulator.csproj" />
   </ItemGroup>
 
 </Project>
