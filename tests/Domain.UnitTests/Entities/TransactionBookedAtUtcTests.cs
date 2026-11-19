@@ -14,33 +14,33 @@ public class TransactionBookedAtUtcTests
     private static IEnumerable<TestCaseData> Factories()
     {
         yield return Case("Post", () => Transaction.Post(
-            1, 2, TransactionType.TransferIn, 100m, "NZD", BookedAt, null, null,
+            1, 2, TransactionType.TransferIn, 100m, "NZD", BookedAt, null, null, source: TestSources.Manual,
             currentCashSum: 0m, existingTransactionCount: 0));
         yield return Case("PostInternalTransfer", () => Transaction.PostInternalTransfer(
-            1, 2, "NZD", CustodyMode.External, 3, "NZD", CustodyMode.External, Money.Create(10m, "NZD"), BookedAt, null, null, fromCurrentCashSum: 100m));
+            1, 2, "NZD", CustodyMode.External, 3, "NZD", CustodyMode.External, Money.Create(10m, "NZD"), BookedAt, null, null, source: TestSources.Manual, fromCurrentCashSum: 100m));
         yield return Case("PostFxConversion", () => Transaction.PostFxConversion(
             1, 2, "NZD", CustodyMode.External, 3, "USD", CustodyMode.External,
             AppliedFxRate.Create("NZD", "USD", 0.5912m, new DateOnly(2026, 11, 13), "Frankfurter"),
-            Money.Create(100m, "NZD"), 2, BookedAt, null, null, fromCurrentCashSum: 500m));
+            Money.Create(100m, "NZD"), 2, BookedAt, null, null, source: TestSources.Manual, fromCurrentCashSum: 500m));
         yield return Case("PostOpeningHoldings", () => Transaction.PostOpeningHoldings(
-            1, 2, AccountType.Brokerage, BookedAt, null, null, [OpeningSecurityLeg.Create(11, 1m, 10m, "USD")]));
+            1, 2, AccountType.Brokerage, BookedAt, null, null, source: TestSources.Manual, [OpeningSecurityLeg.Create(11, 1m, 10m, "USD")]));
         yield return Case("PostBuy", () => Transaction.PostBuy(
-            1, 2, AccountType.Brokerage, "NZD", 11, 1m, Money.Create(10m, "USD"), 1.5m, BookedAt, null, null,
+            1, 2, AccountType.Brokerage, "NZD", 11, 1m, Money.Create(10m, "USD"), 1.5m, BookedAt, null, null, source: TestSources.Manual,
             currentCashSum: 100m));
         yield return Case("PostSell", () => Transaction.PostSell(
-            1, 2, AccountType.Brokerage, "NZD", 11, 1m, Money.Create(10m, "USD"), 1.5m, BookedAt, null, null,
+            1, 2, AccountType.Brokerage, "NZD", 11, 1m, Money.Create(10m, "USD"), 1.5m, BookedAt, null, null, source: TestSources.Manual,
             currentCashSum: 0m, currentQuantity: 2m, currentCost: 20m));
         yield return Case("PostStockIn", () => Transaction.PostStockIn(
-            1, 2, AccountType.Brokerage, 11, 1m, 10m, "USD", BookedAt, null, null));
+            1, 2, AccountType.Brokerage, 11, 1m, 10m, "USD", BookedAt, null, null, source: TestSources.Manual));
         yield return Case("PostStockOut", () => Transaction.PostStockOut(
-            1, 2, AccountType.Brokerage, 11, 1m, "USD", BookedAt, null, null, currentQuantity: 2m, currentCost: 20m));
+            1, 2, AccountType.Brokerage, 11, 1m, "USD", BookedAt, null, null, source: TestSources.Manual, currentQuantity: 2m, currentCost: 20m));
         yield return Case("PostSplit", () => Transaction.PostSplit(
-            1, 2, AccountType.Brokerage, TransactionType.Split, 11, 4m, "USD", BookedAt, null, null,
+            1, 2, AccountType.Brokerage, TransactionType.Split, 11, 4m, "USD", BookedAt, null, null, source: TestSources.Manual,
             currentQuantity: 2m, currentCost: 20m));
         yield return Case("Reverse", () => Transaction.Post(
-                1, 2, TransactionType.TransferIn, 100m, "NZD", BookedAt.AddDays(-1), null, null,
+                1, 2, TransactionType.TransferIn, 100m, "NZD", BookedAt.AddDays(-1), null, null, source: TestSources.Manual,
                 currentCashSum: 0m, existingTransactionCount: 0)
-            .Reverse(BookedAt, new Dictionary<int, decimal> { [2] = 100m }));
+            .Reverse(TestSources.Manual, BookedAt, new Dictionary<int, decimal> { [2] = 100m }));
     }
 
     [TestCaseSource(nameof(Factories))]

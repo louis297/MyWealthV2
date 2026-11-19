@@ -26,7 +26,9 @@ Amendment to the ledger on `webapi`: [posting.md](posting.md), [portfolios.md](p
 
 No new route, no new policy, no new `TransactionType`, no problem code. Script `0035_transaction_source.sql` adds two columns to `Transactions` and back-fills them.
 
-**Status is `accepted` (2026-11-19).** Implementation follows this file. Not landed yet. The eight points of §11 were confirmed as recommended.
+**Status is `accepted` (2026-11-19), landed 2026-11-19.** The eight points of §11 were confirmed as recommended.
+
+The §10 case "`POST /portfolios/{id}/rebalance` → every trade of an account has the `handle` of that account in the 202 body" is proved at the infrastructure layer. The functional host has no Worker, and the job runs there under `SystemUser`, so `RebalanceJobWorkerTests` runs `RebalanceJob` with the Worker's services and asserts that its trades have source `(Rebalance, handle)` and `CreatedBy` `system`. Before 2026-11-19 the Worker's `SystemUser` had no id, so the job could not post a trade (`Transactions.CreatedBy` is NOT NULL). It now writes the system name, as [database-design.md](../database-design.md) allows ("the actor's Identity id or a system name").
 
 ---
 

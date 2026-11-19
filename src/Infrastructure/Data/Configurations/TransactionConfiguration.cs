@@ -14,6 +14,10 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         builder.Property(transaction => transaction.Reference).HasMaxLength(100);
         builder.Property(transaction => transaction.CreatedBy).HasMaxLength(450).IsRequired();
         builder.Property(transaction => transaction.RowVersion).IsRowVersion();
+        // Transaction source §6: two columns, no FK; Source is built from them.
+        builder.Ignore(transaction => transaction.Source);
+        builder.Property(transaction => transaction.SourceKind).IsRequired();
+        builder.Property(transaction => transaction.SourcePublicId);
         builder.HasIndex(transaction => transaction.PublicId).IsUnique();
         builder.HasIndex(transaction => new { transaction.TenantId, transaction.BookedAt });
         builder.HasOne<Tenant>()

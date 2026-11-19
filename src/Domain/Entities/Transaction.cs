@@ -28,6 +28,15 @@ public class Transaction : BaseAuditableEntity
 
     public byte[] RowVersion { get; private set; } = null!;
 
+    /// <summary>The process that wrote this Transaction (transaction-source R2). Set by the factory or <see cref="Reverse"/>.</summary>
+    public TransactionSource Source => TransactionSource.FromStored(SourceKind, SourcePublicId);
+
+    /// <summary>Stored in <c>Transactions.SourceKind</c>; read through <see cref="Source"/>.</summary>
+    public TransactionSourceKind SourceKind { get; private set; }
+
+    /// <summary>Stored in <c>Transactions.SourcePublicId</c>; read through <see cref="Source"/>.</summary>
+    public Guid? SourcePublicId { get; private set; }
+
     public List<TransactionCashLeg> CashLegs { get; private set; } = [];
 
     public List<TransactionSecurityLeg> SecurityLegs { get; private set; } = [];
@@ -47,6 +56,7 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
+        TransactionSource source,
         decimal currentCashSum,
         int existingTransactionCount)
     {
@@ -74,6 +84,8 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
             PublicId = Guid.NewGuid(),
             CashLegs = [TransactionCashLeg.Create(tenantId, accountId, amount, currency)]
         };
@@ -108,6 +120,7 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
+        TransactionSource source,
         decimal fromCurrentCashSum)
     {
         if (fromAccountId == toAccountId)
@@ -145,6 +158,8 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
             PublicId = Guid.NewGuid(),
             CashLegs =
             [
@@ -175,6 +190,7 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
+        TransactionSource source,
         decimal fromCurrentCashSum)
     {
         if (fromAccountId == toAccountId)
@@ -211,6 +227,8 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
             PublicId = Guid.NewGuid(),
             CashLegs =
             [
@@ -239,6 +257,7 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
+        TransactionSource source,
         decimal fromCurrentCashSum)
     {
         if (fromAccountId == toAccountId)
@@ -287,6 +306,8 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
             PublicId = Guid.NewGuid(),
             CashLegs =
             [
@@ -359,6 +380,7 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
+        TransactionSource source,
         IEnumerable<OpeningSecurityLeg> securityLegs)
     {
         if (accountType is not AccountType.Brokerage and not AccountType.Other)
@@ -384,6 +406,8 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
             PublicId = Guid.NewGuid(),
             SecurityLegs = openingSecurityLegs.Select(t => TransactionSecurityLeg.Create(
                     tenantId, accountId, t.InstrumentId, t.Quantity, t.Cost, t.QuoteCurrency
@@ -405,6 +429,7 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
+        TransactionSource source,
         decimal currentCashSum,
         TradeFeeSchedule? feeSchedule = null,
         int quoteDecimalPlaces = 2,
@@ -430,6 +455,8 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
             PublicId = Guid.NewGuid(),
             CashLegs = [TransactionCashLeg.Create(tenantId, accountId, cash, currency)],
             SecurityLegs =
@@ -456,6 +483,7 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
+        TransactionSource source,
         decimal currentCashSum,
         decimal currentQuantity,
         decimal currentCost,
@@ -485,6 +513,8 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
             PublicId = Guid.NewGuid(),
             CashLegs = [TransactionCashLeg.Create(tenantId, accountId, cash, currency)],
             SecurityLegs =
@@ -508,7 +538,8 @@ public class Transaction : BaseAuditableEntity
         string quoteCurrency,
         DateTimeOffset bookedAt,
         string? memo,
-        string? reference)
+        string? reference,
+        TransactionSource source)
     {
         EnsureSecurityAccount(accountType);
         if (cost < 0)
@@ -524,6 +555,8 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
             PublicId = Guid.NewGuid(),
             SecurityLegs =
             [
@@ -544,6 +577,7 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
+        TransactionSource source,
         decimal currentQuantity,
         decimal currentCost)
     {
@@ -558,6 +592,8 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
             PublicId = Guid.NewGuid(),
             SecurityLegs =
             [
@@ -579,6 +615,7 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
+        TransactionSource source,
         decimal currentQuantity,
         decimal currentCost)
     {
@@ -612,6 +649,8 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
             PublicId = Guid.NewGuid(),
             SecurityLegs =
             [
@@ -629,6 +668,7 @@ public class Transaction : BaseAuditableEntity
     /// this Transaction's holdings (fixes/ledger-write-guards.md Decision 1).
     /// </summary>
     public Transaction Reverse(
+        TransactionSource source,
         DateTimeOffset bookedAt,
         IReadOnlyDictionary<int, decimal> currentCashSumByAccount,
         IReadOnlyDictionary<(int AccountId, int InstrumentId), decimal>? currentQuantity = null,
@@ -714,6 +754,8 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt.ToUniversalTime(),
             PublicId = Guid.NewGuid(),
             OriginalTransactionId = Id,
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
             CashLegs = cashLegs,
             SecurityLegs = reversalLegs ?? [],
             FxDetail = FxDetail?.Copy(),

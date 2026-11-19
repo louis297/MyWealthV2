@@ -1,5 +1,5 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,6 +15,7 @@ const transaction = {
   id: transactionId,
   tenantId: "22222222-2222-2222-2222-222222222222",
   type: "Buy",
+  source: { kind: "Manual", id: null },
   cash: [{ accountId, customerId, amount: -1250, currency: "NZD" }],
   bookedAt: "2026-10-10T21:00:00Z",
   memo: "Parcel",
@@ -287,6 +288,29 @@ describe("TransactionsListPage", () => {
     expect(await screen.findByRole("button", { name: "Reverse" })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Reverse" })).toHaveLength(1);
     expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it("offers Reverse only on a hand-reversible source (D27)", async () => {
+    renderList(user(), "/transactions", 200, [
+      { ...transaction, id: "a1111111-1111-1111-1111-111111111111", memo: "manual-row" },
+      {
+        ...transaction,
+        id: "a2222222-2222-2222-2222-222222222222",
+        memo: "rebalance-row",
+        source: { kind: "Rebalance", id: "12121212-1212-1212-1212-121212121212" },
+      },
+      {
+        ...transaction,
+        id: "a3333333-3333-3333-3333-333333333333",
+        memo: "seed-row",
+        source: { kind: "Seed", id: null },
+      },
+    ]);
+
+    const row = async (memo: string) => within((await screen.findByText(memo)).closest("tr") as HTMLElement);
+    expect((await row("manual-row")).getByRole("button", { name: "Reverse" })).toBeInTheDocument();
+    expect((await row("rebalance-row")).getByRole("button", { name: "Reverse" })).toBeInTheDocument();
+    expect((await row("seed-row")).queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
   });
 
   it("stays on /transactions when the filtered list is not found", async () => {

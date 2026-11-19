@@ -38,7 +38,7 @@ public class TradeFeeTests
         decimal currentCashSum = 100000m) =>
         Transaction.PostBuy(
             TenantId, AccountId, AccountType.Brokerage, accountCurrency, InstrumentId, quantity,
-            Money.Create(price, priceCurrency), fxRate, BookedAt, null, null, currentCashSum,
+            Money.Create(price, priceCurrency), fxRate, BookedAt, null, null, source: TestSources.Manual, currentCashSum,
             schedule, 2);
 
     private static Transaction Sell(
@@ -53,7 +53,7 @@ public class TradeFeeTests
         decimal currentCost = 2000m) =>
         Transaction.PostSell(
             TenantId, AccountId, AccountType.Brokerage, accountCurrency, InstrumentId, quantity,
-            Money.Create(price, priceCurrency), fxRate, BookedAt, null, null, currentCashSum,
+            Money.Create(price, priceCurrency), fxRate, BookedAt, null, null, source: TestSources.Manual, currentCashSum,
             currentQuantity, currentCost, schedule, 2);
 
     private static TransactionCashLeg Leg(Transaction transaction, CashLegRole role) =>
@@ -199,9 +199,9 @@ public class TradeFeeTests
     [Test]
     public void OtherTypes_HaveOnlyPrincipalLegs()
     {
-        var transferIn = Transaction.Post(TenantId, AccountId, TransactionType.TransferIn, 100m, "NZD", BookedAt, null, null, 0m, 1);
+        var transferIn = Transaction.Post(TenantId, AccountId, TransactionType.TransferIn, 100m, "NZD", BookedAt, null, null, source: TestSources.Manual, 0m, 1);
         var stockIn = Transaction.PostStockIn(
-            TenantId, AccountId, AccountType.Brokerage, InstrumentId, 10m, 100m, "NZD", BookedAt, null, null);
+            TenantId, AccountId, AccountType.Brokerage, InstrumentId, 10m, 100m, "NZD", BookedAt, null, null, source: TestSources.Manual);
 
         transferIn.CashLegs.ShouldAllBe(leg => leg.Role == CashLegRole.Principal && leg.FeeDetail == null);
         stockIn.CashLegs.ShouldAllBe(leg => leg.Role == CashLegRole.Principal);
@@ -215,7 +215,7 @@ public class TradeFeeTests
         var buy = Buy(50m, 25.00m, Schedule());
         buy.Id = 40;
 
-        var reversal = buy.Reverse(BookedAt.AddDays(1), new Dictionary<int, decimal> { [AccountId] = 0m });
+        var reversal = buy.Reverse(TestSources.Manual, BookedAt.AddDays(1), new Dictionary<int, decimal> { [AccountId] = 0m });
 
         Leg(reversal, CashLegRole.Principal).Amount.ShouldBe(1250m);
         Leg(reversal, CashLegRole.Principal).FeeDetail.ShouldBeNull();
@@ -239,8 +239,8 @@ public class TradeFeeTests
         var sell = Sell(50m, 25.00m, Schedule());
         sell.Id = 41;
 
-        Should.Throw<DomainException>(() => sell.Reverse(BookedAt.AddDays(1), new Dictionary<int, decimal> { [AccountId] = 1239m }));
-        var reversal = sell.Reverse(BookedAt.AddDays(1), new Dictionary<int, decimal> { [AccountId] = 1240m });
+        Should.Throw<DomainException>(() => sell.Reverse(TestSources.Manual, BookedAt.AddDays(1), new Dictionary<int, decimal> { [AccountId] = 1239m }));
+        var reversal = sell.Reverse(TestSources.Manual, BookedAt.AddDays(1), new Dictionary<int, decimal> { [AccountId] = 1240m });
 
         Leg(reversal, CashLegRole.Principal).Amount.ShouldBe(-1250m);
         Leg(reversal, CashLegRole.Fee).Amount.ShouldBe(10m);
@@ -253,7 +253,7 @@ public class TradeFeeTests
         var buy = Buy(50m, 25.00m, null);
         buy.Id = 42;
 
-        var reversal = buy.Reverse(BookedAt.AddDays(1), new Dictionary<int, decimal> { [AccountId] = 0m });
+        var reversal = buy.Reverse(TestSources.Manual, BookedAt.AddDays(1), new Dictionary<int, decimal> { [AccountId] = 0m });
 
         reversal.CashLegs.ShouldHaveSingleItem().Role.ShouldBe(CashLegRole.Principal);
         reversal.FeeDetails.ShouldBeEmpty();

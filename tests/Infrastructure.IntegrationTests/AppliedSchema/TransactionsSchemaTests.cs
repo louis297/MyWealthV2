@@ -15,7 +15,7 @@ public class TransactionsSchemaTests
         columns.Select(column => column.Name).ShouldBe([
             "Id", "PublicId", "TenantId", "Type", "BookedAt", "Memo", "Reference",
             "OriginalTransactionId", "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion",
-            "ReversedByTransactionId"
+            "ReversedByTransactionId", "SourceKind", "SourcePublicId"
         ]);
 
         Column(columns, "Id").ShouldSatisfyAllConditions(
@@ -320,8 +320,8 @@ public class TransactionsSchemaTests
             await using var insert = connection.CreateCommand();
             insert.Transaction = transaction.GetDbTransaction();
             insert.CommandText = $"""
-                INSERT INTO [Transactions] ([PublicId], [TenantId], [Type], [BookedAt], [Created], [CreatedBy])
-                SELECT NEWID(), [Id], {type}, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test'
+                INSERT INTO [Transactions] ([PublicId], [TenantId], [Type], [SourceKind], [BookedAt], [Created], [CreatedBy])
+                SELECT NEWID(), [Id], {type}, 0, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test'
                 FROM [Tenants] WHERE [Code] = N'TYPECHK';
                 """;
             await insert.ExecuteNonQueryAsync();

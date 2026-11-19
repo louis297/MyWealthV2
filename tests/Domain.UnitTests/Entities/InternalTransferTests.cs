@@ -98,6 +98,7 @@ public class InternalTransferTests
         original.Id = 7;
 
         var reversal = original.Reverse(
+            TestSources.Manual,
             BookedAt.AddDays(1),
             new Dictionary<int, decimal> { [FromAccountId] = 500m, [ToAccountId] = 500m });
 
@@ -114,6 +115,7 @@ public class InternalTransferTests
         original.Id = 7;
 
         Should.Throw<DomainException>(() => original.Reverse(
+            TestSources.Manual,
             BookedAt.AddDays(1),
             new Dictionary<int, decimal> { [FromAccountId] = 500m, [ToAccountId] = 499m }));
     }
@@ -138,5 +140,6 @@ public class InternalTransferTests
             bookedAt: BookedAt,
             memo: "Move to savings",
             reference: null,
+            source: TestSources.Manual,
             fromCurrentCashSum: fromCashSum);
 }

@@ -28,7 +28,7 @@ public class RemoveExternalPortfolioAssignmentsSchemaTests
     {
         await using var db = await ScratchSchemaDatabase.CreateAsync("RemoveExternalAssignments");
         await db.ApplyBeforeAsync(Script);
-        await db.ExecuteAsync(ScratchSchemaDatabase.TenantRows("a", Guid.NewGuid().ToString("N")[..12]) + """
+        await db.ExecuteAsync(ScratchSchemaDatabase.TenantRows("a", Guid.NewGuid().ToString("N")[..12], transactionSource: false) + """
             INSERT INTO [Accounts] ([PublicId], [TenantId], [CustomerId], [Name], [Type], [CustodyMode], [Status], [Currency], [Created], [CreatedBy])
             VALUES (NEWID(), @a_tenant, @a_customer, N'Custodial', 2, 1, 0, 'NZD', SYSDATETIMEOFFSET(), N'test');
             DECLARE @a_custodial int = SCOPE_IDENTITY();

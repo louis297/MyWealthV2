@@ -102,7 +102,7 @@ public class TenantsAllowedCustodyModesSchemaTests
     {
         await using var db = await ScratchSchemaDatabase.CreateAsync("AllowedCustodyModesBackfill");
         await db.ApplyBeforeAsync(AllowedCustodyModesScript);
-        await db.ExecuteAsync(ScratchSchemaDatabase.TenantRows("a", Code()));
+        await db.ExecuteAsync(ScratchSchemaDatabase.TenantRows("a", Code(), transactionSource: false));
         var before = await db.ReadAsync("SELECT [Id] FROM [Tenants] ORDER BY [Id]");
 
         await db.ApplyAllAsync();

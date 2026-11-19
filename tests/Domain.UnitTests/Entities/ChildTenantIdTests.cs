@@ -26,6 +26,7 @@ public class ChildTenantIdTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentCashSum: 0m,
             existingTransactionCount: 0);
 
@@ -47,6 +48,7 @@ public class ChildTenantIdTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             fromCurrentCashSum: 100m);
 
         transaction.CashLegs.Select(leg => leg.TenantId).ShouldBe([TenantId, TenantId]);
@@ -71,6 +73,7 @@ public class ChildTenantIdTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             securityLegs:
             [
                 OpeningSecurityLeg.Create(11, 100m, 1500m, "USD"),
@@ -104,6 +107,7 @@ public class ChildTenantIdTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentCashSum: 0m,
             currentQuantity: 2m,
             currentCost: 20m);
@@ -125,7 +129,8 @@ public class ChildTenantIdTests
             quoteCurrency: "USD",
             bookedAt: BookedAt,
             memo: null,
-            reference: null);
+            reference: null,
+            source: TestSources.Manual);
         var stockOut = Transaction.PostStockOut(
             tenantId: TenantId,
             accountId: AccountId,
@@ -136,6 +141,7 @@ public class ChildTenantIdTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentQuantity: 2m,
             currentCost: 20m);
 
@@ -159,6 +165,7 @@ public class ChildTenantIdTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentQuantity: 2m,
             currentCost: 20m);
 
@@ -172,6 +179,7 @@ public class ChildTenantIdTests
         original.Id = 9;
 
         var reversal = original.Reverse(
+            TestSources.Manual,
             BookedAt.AddDays(1),
             currentCashSumByAccount: new Dictionary<int, decimal> { [AccountId] = 980m });
 
@@ -186,6 +194,7 @@ public class ChildTenantIdTests
         original.Id = 9;
 
         var reversal = original.Reverse(
+            TestSources.Manual,
             BookedAt.AddDays(1),
             currentCashSumByAccount: new Dictionary<int, decimal>
             {
@@ -228,6 +237,7 @@ public class ChildTenantIdTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             currentCashSum: 1000m);
 
     private static Transaction FxConversion() =>
@@ -245,6 +255,7 @@ public class ChildTenantIdTests
             bookedAt: BookedAt,
             memo: null,
             reference: null,
+            source: TestSources.Manual,
             fromCurrentCashSum: 1000m);
 
     private static Currency Nzd() => Currency.Create("NZD", "New Zealand Dollar", 2);

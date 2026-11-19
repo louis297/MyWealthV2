@@ -1484,3 +1484,106 @@ describe("AccountDetailPage", () => {
     expect(fisher).toHaveTextContent("40");
   });
 });
+
+describe("AccountDetailPage activity Reverse (adviser-portal-dashboard D27)", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal("location", {
+      origin: "http://localhost:3000",
+      pathname: `/accounts/${accountId}`,
+      search: "",
+      href: `http://localhost:3000/accounts/${accountId}`,
+      assign: vi.fn(),
+    });
+  });
+
+  function item(id: string, memo: string, source: { kind: string; id: string | null }, extra: object = {}) {
+    return {
+      id,
+      tenantId: account.tenantId,
+      type: "TransferIn",
+      source,
+      bookedAt: "2026-11-09T20:00:00Z",
+      memo,
+      reference: null,
+      originalTransactionId: null,
+      reversedByTransactionId: null,
+      rowVersion: "AAAA",
+      cash: [{ accountId, customerId, amount: 100, currency: "NZD" }],
+      security: [],
+      ...extra,
+    };
+  }
+
+  const manualId = "71111111-1111-1111-1111-111111111111";
+  const rebalanceId = "72222222-2222-2222-2222-222222222222";
+  const seedId = "73333333-3333-3333-3333-333333333333";
+  const reversedId = "74444444-4444-4444-4444-444444444444";
+  const reversalId = "75555555-5555-5555-5555-555555555555";
+
+  function serve(onReverse: (url: string) => Response = () => new Response("", { status: 404 })) {
+    renderDetail((url, method) => {
+      if (method === "POST" && url.endsWith("/reverse")) {
+        return onReverse(url);
+      }
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({
+          items: [
+            item(manualId, "manual-row", { kind: "Manual", id: null }),
+            item(rebalanceId, "rebalance-row", { kind: "Rebalance", id: "12121212-1212-1212-1212-121212121212" }, {
+              type: "Buy",
+            }),
+            item(seedId, "seed-row", { kind: "Seed", id: null }),
+            item(reversedId, "reversed-row", { kind: "Manual", id: null }, { reversedByTransactionId: reversalId }),
+            item(reversalId, "reversal-row", { kind: "Manual", id: null }, {
+              type: "Reversal",
+              originalTransactionId: reversedId,
+            }),
+          ],
+          page: 1,
+          pageSize: 20,
+          totalCount: 5,
+        });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json(custodialAccount);
+      }
+      return new Response("", { status: 404 });
+    });
+  }
+
+  function row(id: string) {
+    return within(screen.getByRole("link", { name: id }).closest("tr") as HTMLElement);
+  }
+
+  it("offers Reverse on Manual and Rebalance rows only, never on a Seed, reversed or Reversal row", async () => {
+    serve();
+
+    const table = await screen.findByRole("table", { name: "Activity" });
+    expect(within(table).getAllByRole("button", { name: "Reverse" })).toHaveLength(2);
+    expect(row(manualId).getByRole("button", { name: "Reverse" })).toBeInTheDocument();
+    expect(row(rebalanceId).getByRole("button", { name: "Reverse" })).toBeInTheDocument();
+    expect(row(seedId).queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
+    expect(row(reversedId).queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
+    expect(row(reversalId).queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
+  });
+
+  it("reverses from the activity row and shows the sentence of a 400", async () => {
+    const sentence = "This transaction was written by the platform and cannot be reversed by hand.";
+    const reversed: string[] = [];
+    serve((url) => {
+      reversed.push(url);
+      return json({ status: 400, errors: { "": [sentence] } }, 400);
+    });
+
+    await screen.findByRole("table", { name: "Activity" });
+    fireEvent.click(row(manualId).getByRole("button", { name: "Reverse" }));
+
+    expect(await screen.findByText(sentence)).toBeInTheDocument();
+    expect(reversed).toEqual([`http://localhost:3000/api/transactions/${manualId}/reverse`]);
+  });
+});

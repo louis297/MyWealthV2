@@ -85,8 +85,8 @@ public class TransactionFxDetailsSchemaTests
                 INSERT INTO [Tenants] ([PublicId], [Name], [Code], [ReportingCurrency], [Created], [LastModified])
                 VALUES (NEWID(), N'FX detail tenant', N'FXDETAIL', 'NZD', SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET());
 
-                INSERT INTO [Transactions] ([PublicId], [TenantId], [Type], [BookedAt], [Created], [CreatedBy])
-                SELECT NEWID(), [Id], 15, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test'
+                INSERT INTO [Transactions] ([PublicId], [TenantId], [Type], [SourceKind], [BookedAt], [Created], [CreatedBy])
+                SELECT NEWID(), [Id], 15, 0, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test'
                 FROM [Tenants] WHERE [Code] = N'FXDETAIL';
 
                 SELECT CAST(SCOPE_IDENTITY() AS int);

@@ -93,4 +93,25 @@ public class CustodyRulesTests
 
         (CustodyRules.RefusalMessage(custodyMode, type) is null).ShouldBe(allowed);
     }
+
+    [TestCase(CustodyMode.External, TransactionSourceKind.Manual, true)]
+    [TestCase(CustodyMode.External, TransactionSourceKind.Seed, true)]
+    [TestCase(CustodyMode.External, TransactionSourceKind.Rebalance, true)]
+    [TestCase(CustodyMode.Custodial, TransactionSourceKind.Manual, true)]
+    [TestCase(CustodyMode.Custodial, TransactionSourceKind.Seed, false)]
+    [TestCase(CustodyMode.Custodial, TransactionSourceKind.Rebalance, true)]
+    public void AllowsHandReverse_MatchesTransactionSourceR12ToR15(
+        CustodyMode custodyMode,
+        TransactionSourceKind sourceKind,
+        bool allowed)
+    {
+        CustodyRules.AllowsHandReverse(custodyMode, sourceKind).ShouldBe(allowed);
+    }
+
+    [Test]
+    public void AllowsHandReverse_EveryKindOnExternal_IsAllowed()
+    {
+        Enum.GetValues<TransactionSourceKind>()
+            .ShouldAllBe(kind => CustodyRules.AllowsHandReverse(CustodyMode.External, kind));
+    }
 }

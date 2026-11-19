@@ -7,6 +7,7 @@ import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
 import {
   canReverse,
   ReverseTransactionButton,
+  sourceLabel,
 } from "@/features/transactions/ReverseTransactionButton";
 import { useGetTransactionQuery } from "@/features/transactions/transactionsApi";
 import { formatAmount, formatMoney } from "@/shared/format/money";
@@ -31,6 +32,7 @@ export function TransactionDetailPage() {
           <CardContent className="flex flex-col items-start gap-3">
             <p className="font-mono text-xs break-all">{data.id}</p>
             <Badge variant="secondary">{data.type}</Badge>
+            {data.source ? <p className="text-muted-foreground text-sm">{`Source: ${sourceLabel(data.source.kind)}`}</p> : null}
             {canReverse(data) ? <ReverseTransactionButton id={data.id} /> : null}
             {data.cash.length > 0 ? (
               <Table aria-label="Cash legs">

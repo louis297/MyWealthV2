@@ -4,9 +4,11 @@ using MyWealthV2.Application.Accounts;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
+using MyWealthV2.Domain.Custody;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Exceptions;
+using MyWealthV2.Domain.ValueObjects;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationException;
 
@@ -107,6 +109,15 @@ public class ReverseTransactionCommandHandler(
             await db.LockAccountAsync(leg.Account.Id, cancellationToken);
         }
 
+        // Transaction source R13, R14: every leg account has the same custody mode (custody-modes R9), so the
+        // first one decides. Runs before the portfolio trade lock and the already-reversed check.
+        if (!CustodyRules.AllowsHandReverse(loaded.LegAccounts[0].Account.CustodyMode, loaded.Transaction.Source.Kind))
+        {
+            throw new ValidationException([
+                new ValidationFailure(string.Empty, CustodyRules.HandReverseMessage)
+            ]);
+        }
+
         var header = await db.Transactions.AsNoTracking()
             .Where(row => row.Id == loaded.Transaction.Id)
             .Select(row => new { row.Type, row.ReversedByTransactionId })
@@ -134,7 +145,7 @@ public class ReverseTransactionCommandHandler(
         try
         {
             reversal = loaded.Transaction.Reverse(
-                time.GetUtcNow(), currentSums, currentQuantities, hasLaterSecurityActivity);
+                TransactionSource.Manual, time.GetUtcNow(), currentSums, currentQuantities, hasLaterSecurityActivity);
         }
         catch (DomainException exception)
         {

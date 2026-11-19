@@ -156,6 +156,40 @@ public class TestSeedAccountsTests
         aaplHolding.CostAmount.ShouldBe(3600m);
     }
 
+    /// <summary>Transaction source R6: every Transaction the seed builds has kind <c>Seed</c> and no source id.</summary>
+    [Test]
+    public async Task Seed_MarksEveryTransactionItWritesAsSeed()
+    {
+        await using var db = OpenDb();
+        var tenant = await EnsureDemoTenantAsync(db);
+        var adviser = await EnsurePersonAsync(
+            db, tenant, UserRole.Adviser, "Demo Adviser", DevelopmentIdentitySeeder.AdviserEmail);
+        await EnsurePersonAsync(
+            db, tenant, UserRole.Customer, "Demo Customer", "customer@localhost", adviser.Id);
+        await TestSeed.SeedAsync(db, CancellationToken.None);
+        var customer = await db.DomainUsers.SingleAsync(
+            row => row.TenantId == tenant.Id && row.Email == "customer@localhost");
+        var first = await LoadCustomerTransactionsAsync(db, customer.Id);
+
+        await TestSeed.SeedAsync(db, CancellationToken.None);
+        var second = await LoadCustomerTransactionsAsync(db, customer.Id);
+
+        first.Select(row => row.Reference).Order().ShouldBe(new[]
+        {
+            "TestSeed-DemoBrokerage-Buy",
+            "TestSeed-DemoBrokerage-Funding",
+            "TestSeed-DemoBrokerage-OpeningHoldings",
+            "TestSeed-DemoBrokerage-Split",
+            "TestSeed-DemoBrokerage-StockIn",
+            "TestSeed-DemoCustodial-BuyAapl",
+            "TestSeed-DemoCustodial-BuyVti",
+            "TestSeed-DemoCustodial-Funding",
+            "TestSeed-DemoEverydayBank-OpeningTransfer"
+        });
+        first.ShouldAllBe(row => row.Source.Kind == TransactionSourceKind.Seed && row.Source.PublicId == null);
+        second.Select(row => row.PublicId).ShouldBe(first.Select(row => row.PublicId));
+    }
+
     [Test]
     public async Task Seed_AssignsDemoGrowthToTheCustodialAccountAndNotToTheDemoBrokerage()
     {
@@ -181,6 +215,16 @@ public class TestSeedAccountsTests
         (await db.AccountPortfolioAssignments.AnyAsync(
                 row => row.AccountId == brokerage.Id && row.Status == AssignmentStatus.Active))
             .ShouldBeFalse();
+    }
+
+    private static async Task<List<Transaction>> LoadCustomerTransactionsAsync(ApplicationDbContext db, int customerId)
+    {
+        var accountIds = await db.Accounts.Where(row => row.CustomerId == customerId).Select(row => row.Id).ToListAsync();
+        return await db.Transactions.AsNoTracking()
+            .Where(row => row.CashLegs.Any(leg => accountIds.Contains(leg.AccountId))
+                          || row.SecurityLegs.Any(leg => accountIds.Contains(leg.AccountId)))
+            .OrderBy(row => row.Id)
+            .ToListAsync();
     }
 
     private static Task<DateTimeOffset> BookedAtAsync(ApplicationDbContext db, int accountId, string reference) =>

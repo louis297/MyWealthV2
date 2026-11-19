@@ -90,6 +90,22 @@ public class DevelopmentSmokeSeedTests : TestBase
         (await db.Transactions.CountAsync(row => row.TenantId == tenant.Id)).ShouldBe(1);
     }
 
+    /// <summary>Transaction source R6: the smoke seed's TransferIn has kind <c>Seed</c> and keeps its reference.</summary>
+    [Test]
+    public async Task Seed_TheTransferInIsSeed()
+    {
+        await SeedAsync(AdviserPassword, CustomerPassword);
+
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var tenant = await db.Tenants.SingleAsync(row => row.Code == DevelopmentSmokeSeeder.TenantCode);
+        var transaction = await db.Transactions.AsNoTracking().SingleAsync(row => row.TenantId == tenant.Id);
+
+        transaction.Reference.ShouldBe("Smoke-Cash-TransferIn");
+        transaction.Source.Kind.ShouldBe(TransactionSourceKind.Seed);
+        transaction.Source.PublicId.ShouldBeNull();
+    }
+
     [TestCase(null, CustomerPassword)]
     [TestCase(AdviserPassword, null)]
     [TestCase("", "")]

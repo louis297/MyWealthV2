@@ -93,6 +93,7 @@ public class FxConversionWithAmountsTests
         original.Id = 9;
 
         var reversal = original.Reverse(
+            TestSources.Manual,
             BookedAt.AddDays(1),
             new Dictionary<int, decimal> { [FromAccountId] = 0m, [ToAccountId] = 500.00m });
 
@@ -124,5 +125,6 @@ public class FxConversionWithAmountsTests
             bookedAt: BookedAt,
             memo: "Bank conversion",
             reference: null,
+            source: TestSources.Manual,
             fromCurrentCashSum: fromCashSum);
 }

@@ -155,6 +155,7 @@ public class GetTransactionsQueryHandler(IApplicationDbContext db, ICurrentUser 
                     Id = row.transaction.PublicId,
                     TenantId = row.tenant.PublicId,
                     Type = row.transaction.Type.ToString(),
+                    Source = TransactionSourceMapping.ToDto(row.transaction.Source),
                     Cash = legs.Cash[row.transaction.Id].ToList(),
                     BookedAt = row.transaction.BookedAt,
                     Memo = row.transaction.Memo,

@@ -3,8 +3,31 @@ import { Messages } from "@/components/portal";
 import { Button } from "@/components/ui/button";
 import { useReverseTransactionMutation } from "@/features/transactions/transactionsApi";
 
-export function canReverse(item: { type: string; reversedByTransactionId?: string | null }) {
-  return item.type !== "Reversal" && !item.reversedByTransactionId;
+/**
+ * D27: Reverse is offered on a posted item that is not a Reversal, is not reversed, and has a hand-reversible
+ * source (`Manual` or `Rebalance`). The portal does not read the custody mode for it (transaction-source §9).
+ */
+export function canReverse(item: {
+  type: string;
+  reversedByTransactionId?: string | null;
+  source?: { kind: string } | null;
+}) {
+  const handReversible = item.source?.kind === "Manual" || item.source?.kind === "Rebalance";
+  return handReversible && item.type !== "Reversal" && !item.reversedByTransactionId;
+}
+
+/** D26: the "Source" line on `/transactions/:id`. The source id is not shown. */
+export function sourceLabel(kind: string | undefined) {
+  switch (kind) {
+    case "Manual":
+      return "Entered by hand";
+    case "Rebalance":
+      return "Rebalance";
+    case "Seed":
+      return "Test seed";
+    default:
+      return kind;
+  }
 }
 
 function problemMessages(error: unknown): string[] {

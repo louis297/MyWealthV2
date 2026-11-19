@@ -17,7 +17,7 @@ public class UtcBookedAtSchemaTests
 
         await using var db = await ScratchSchemaDatabase.CreateAsync("UtcBookedAt");
         await db.ApplyBeforeAsync(UtcBookedAtScript);
-        await db.ExecuteAsync(ScratchSchemaDatabase.TenantRows("tenanta", "tenanta", custodyMode: false) + """
+        await db.ExecuteAsync(ScratchSchemaDatabase.TenantRows("tenanta", "tenanta", custodyMode: false, transactionSource: false) + """
             UPDATE [Transactions] SET [BookedAt] = '2026-11-14T16:13:00+13:00' WHERE [Type] = 7;
             UPDATE [Transactions] SET [BookedAt] = '2026-11-14T03:13:00+00:00' WHERE [Type] = 16;
             """);

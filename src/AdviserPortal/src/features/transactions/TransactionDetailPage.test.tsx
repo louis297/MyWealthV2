@@ -16,6 +16,7 @@ const original = {
   id: originalId,
   tenantId: "22222222-2222-2222-2222-222222222222",
   type: "Buy",
+  source: { kind: "Manual", id: null },
   cash: [
     {
       accountId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
@@ -344,6 +345,63 @@ describe("TransactionDetailPage", () => {
     expect(screen.getByText(originalId)).toBeInTheDocument();
     expect(screen.queryByText(reverseId)).not.toBeInTheDocument();
     expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+});
+
+describe("TransactionDetailPage source (adviser-portal-dashboard D26, D27)", () => {
+  const path = `/transactions/${originalId}`;
+  const routes = [{ path: "/transactions/:id", element: <TransactionDetailPage /> }];
+  const handle = "12121212-1212-1212-1212-121212121212";
+
+  function serve(source: { kind: string; id: string | null }, onReverse?: () => Response): Handler {
+    return (request) => {
+      if (request.method === "POST" && request.url.endsWith(`${path}/reverse`) && onReverse) {
+        return onReverse();
+      }
+      return request.method === "GET" && request.url.endsWith(path) ? json({ ...original, source }) : undefined;
+    };
+  }
+
+  beforeEach(() => {
+    stubBrowser(path);
+  });
+
+  it.each([
+    ["Manual", null, "Source: Entered by hand"],
+    ["Rebalance", handle, "Source: Rebalance"],
+    ["Seed", null, "Source: Test seed"],
+  ])("shows the Source line for a %s transaction without its id", async (kind, id, line) => {
+    renderFees(user(), routes, path, serve({ kind, id }));
+
+    expect(await screen.findByText(line)).toBeInTheDocument();
+    expect(screen.queryByText(handle)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["Manual", null, true],
+    ["Rebalance", handle, true],
+    ["Seed", null, false],
+  ])("offers Reverse on a %s transaction (source id %s): %s", async (kind, id, offered) => {
+    renderFees(user(), routes, path, serve({ kind, id }));
+
+    expect(await screen.findByText(originalId)).toBeInTheDocument();
+    if (offered) {
+      expect(screen.getByRole("button", { name: "Reverse" })).toBeInTheDocument();
+    } else {
+      expect(screen.queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
+    }
+  });
+
+  it("shows the sentence of a 400 from reverse", async () => {
+    const sentence = "This transaction was written by the platform and cannot be reversed by hand.";
+    renderFees(user(), routes, path, serve({ kind: "Manual", id: null }, () => json({
+      status: 400,
+      errors: { "": [sentence] },
+    }, 400)));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reverse" }));
+
+    expect(await screen.findByText(sentence)).toBeInTheDocument();
   });
 });
 
