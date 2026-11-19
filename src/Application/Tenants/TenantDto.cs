@@ -14,6 +14,9 @@ public sealed class TenantDto
 
     public required IReadOnlyList<string> AllowedCustodyModes { get; init; }
 
+    /// <summary>Currencies with an active client money account, A–Z (client-money-accounts R23).</summary>
+    public required IReadOnlyList<string> ClientMoneyCurrencies { get; init; }
+
     public required bool IsActive { get; init; }
 
     public required string RowVersion { get; init; }
@@ -27,6 +30,7 @@ public sealed class TenantDto
         Code = tenant.Code,
         ReportingCurrency = tenant.ReportingCurrency,
         AllowedCustodyModes = tenant.AllowedCustodyModes.Select(mode => mode.ToString()).ToList(),
+        ClientMoneyCurrencies = [],
         IsActive = tenant.IsActive,
         RowVersion = Convert.ToBase64String(tenant.RowVersion ?? []),
         Created = tenant.Created
