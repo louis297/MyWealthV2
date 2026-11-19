@@ -32,7 +32,14 @@ SystemAdmin records, per Tenant and currency, the **client money account**: the 
 
 New routes under `/tenants/{tenantId}/client-money-accounts` (`tenants.manage`) and `GET /accounts/{id}/deposit-instructions` (`accounts.read`). New item fields `depositReference` (account) and `clientMoneyCurrencies` (tenant). Scripts `0038_client_money_accounts.sql` and `0039_accounts_deposit_reference.sql`. No new policy, problem code, transaction type or source kind.
 
-**Status is `accepted` (2026-11-20).** The eleven points of §11 were confirmed as recommended, and the redraw after a save that hits the unique index (R17 b) was added before acceptance. The amendments to accepted docs listed in §12 are in force from the same change. Not landed yet.
+**Status is `accepted` (2026-11-20), landed 2026-11-20.** The eleven points of §11 were confirmed as recommended, and the redraw after a save that hits the unique index (R17 b) was added before acceptance. The amendments to accepted docs listed in §12 are in force from the same change.
+
+Notes from landing:
+
+- `IRandomSymbols`, the random source `DepositReference.Generate` takes, lives in the Domain next to `DepositReference`. Infrastructure implements it with `RandomNumberGenerator` (`CryptoRandomSymbols`), and `RandomDepositReferenceSource` implements `IDepositReferenceSource` with it.
+- A `POST /accounts` whose save fails on a constraint other than `UX_Accounts_DepositReference` keeps the existing answer for a unique violation (400 with an `errors` entry under the empty key). It is not retried (R17).
+- BO16 "a 400 is shown at its field": the Back Office page tests only render a page; none submits an interactive form. The rule is proven in two parts: `ValidationErrors.From` maps a 400 `errors` body to its fields (unit test), and the page passes that map to each field's error text.
+- D32: a deposit instructions read that fails with a status other than 404 shows "Deposit instructions could not be loaded." The 404 sentence is as specified.
 
 Nothing in this slice moves money. Deposits are still entered by hand as `TransferIn` until roadmap B3 and B4 read the bank statement and match receipts by the deposit reference. This slice gives those flows the two things they match on.
 
