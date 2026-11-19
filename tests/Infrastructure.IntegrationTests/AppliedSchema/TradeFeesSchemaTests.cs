@@ -45,7 +45,7 @@ public class TradeFeesSchemaTests
     {
         await using var db = await ScratchSchemaDatabase.CreateAsync("TradeFeesRoles");
         await db.ApplyBeforeAsync(TradeFeesScript);
-        await db.ExecuteAsync(ScratchSchemaDatabase.TenantRows("a", Guid.NewGuid().ToString("N")[..12], custodyMode: false));
+        await db.ExecuteAsync(ScratchSchemaDatabase.TenantRows("a", Guid.NewGuid().ToString("N")[..12], custodyMode: false, transactionSource: false));
 
         await db.ApplyAllAsync();
 

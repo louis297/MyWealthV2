@@ -90,7 +90,7 @@ internal sealed class ScratchSchemaDatabase : IAsyncDisposable
         string code,
         bool childTenantIds = true,
         bool custodyMode = true,
-        bool transactionSource = false)
+        bool transactionSource = true)
     {
         var sourceColumn = transactionSource ? "[SourceKind], " : "";
         var sourceValue = transactionSource ? "0, " : "";
@@ -181,7 +181,7 @@ internal sealed class ScratchSchemaDatabase : IAsyncDisposable
     }
 
     /// <summary><see cref="TenantRows"/> for the schema after <c>0026</c>, before <c>0027</c>.</summary>
-    public static string TenantRowsBefore0027(string prefix) => TenantRows(prefix, prefix, childTenantIds: false, custodyMode: false);
+    public static string TenantRowsBefore0027(string prefix) => TenantRows(prefix, prefix, childTenantIds: false, custodyMode: false, transactionSource: false);
 
     private async Task ApplyAsync(Func<SchemaScript, bool> include)
     {

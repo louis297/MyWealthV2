@@ -29,7 +29,13 @@ public class Transaction : BaseAuditableEntity
     public byte[] RowVersion { get; private set; } = null!;
 
     /// <summary>The process that wrote this Transaction (transaction-source R2). Set by the factory or <see cref="Reverse"/>.</summary>
-    public TransactionSource Source => TransactionSource.Manual;
+    public TransactionSource Source => TransactionSource.FromStored(SourceKind, SourcePublicId);
+
+    /// <summary>Stored in <c>Transactions.SourceKind</c>; read through <see cref="Source"/>.</summary>
+    public TransactionSourceKind SourceKind { get; private set; }
+
+    /// <summary>Stored in <c>Transactions.SourcePublicId</c>; read through <see cref="Source"/>.</summary>
+    public Guid? SourcePublicId { get; private set; }
 
     public List<TransactionCashLeg> CashLegs { get; private set; } = [];
 
@@ -78,6 +84,8 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
             PublicId = Guid.NewGuid(),
             CashLegs = [TransactionCashLeg.Create(tenantId, accountId, amount, currency)]
         };
@@ -150,6 +158,8 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
             PublicId = Guid.NewGuid(),
             CashLegs =
             [
@@ -217,6 +227,8 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
             PublicId = Guid.NewGuid(),
             CashLegs =
             [
@@ -294,6 +306,8 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
             PublicId = Guid.NewGuid(),
             CashLegs =
             [
@@ -392,6 +406,8 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
             PublicId = Guid.NewGuid(),
             SecurityLegs = openingSecurityLegs.Select(t => TransactionSecurityLeg.Create(
                     tenantId, accountId, t.InstrumentId, t.Quantity, t.Cost, t.QuoteCurrency
@@ -439,6 +455,8 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
             PublicId = Guid.NewGuid(),
             CashLegs = [TransactionCashLeg.Create(tenantId, accountId, cash, currency)],
             SecurityLegs =
@@ -495,6 +513,8 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
             PublicId = Guid.NewGuid(),
             CashLegs = [TransactionCashLeg.Create(tenantId, accountId, cash, currency)],
             SecurityLegs =
@@ -535,6 +555,8 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
             PublicId = Guid.NewGuid(),
             SecurityLegs =
             [
@@ -570,6 +592,8 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
             PublicId = Guid.NewGuid(),
             SecurityLegs =
             [
@@ -625,6 +649,8 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt.ToUniversalTime(),
             Memo = NormaliseMemo(memo),
             Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
             PublicId = Guid.NewGuid(),
             SecurityLegs =
             [
@@ -728,6 +754,8 @@ public class Transaction : BaseAuditableEntity
             BookedAt = bookedAt.ToUniversalTime(),
             PublicId = Guid.NewGuid(),
             OriginalTransactionId = Id,
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
             CashLegs = cashLegs,
             SecurityLegs = reversalLegs ?? [],
             FxDetail = FxDetail?.Copy(),

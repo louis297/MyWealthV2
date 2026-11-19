@@ -56,8 +56,8 @@ internal static class LegAccountsFixture
         var typeValue = (int)type;
 
         await db.Database.ExecuteSqlInterpolatedAsync($"""
-            INSERT INTO [Transactions] ([PublicId], [TenantId], [Type], [BookedAt], [Created], [CreatedBy], [LastModified], [LastModifiedBy])
-            VALUES ({publicId}, {tenantId}, {typeValue}, {bookedAt}, SYSDATETIMEOFFSET(), N'test', SYSDATETIMEOFFSET(), N'test')
+            INSERT INTO [Transactions] ([PublicId], [TenantId], [Type], [SourceKind], [BookedAt], [Created], [CreatedBy], [LastModified], [LastModifiedBy])
+            VALUES ({publicId}, {tenantId}, {typeValue}, 0, {bookedAt}, SYSDATETIMEOFFSET(), N'test', SYSDATETIMEOFFSET(), N'test')
             """);
         var transactionId = await db.Transactions
             .Where(row => row.PublicId == publicId)

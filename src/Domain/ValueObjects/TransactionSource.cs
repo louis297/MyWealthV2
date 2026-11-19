@@ -21,7 +21,26 @@ public sealed class TransactionSource : ValueObject
 
     public static TransactionSource Seed { get; } = new(TransactionSourceKind.Seed, null);
 
-    public static TransactionSource Rebalance(Guid handle) => new(TransactionSourceKind.Rebalance, handle);
+    /// <summary>A rebalance trade's source: the rebalance handle, shared by every trade of one run (R5).</summary>
+    public static TransactionSource Rebalance(Guid handle)
+    {
+        if (handle == Guid.Empty)
+        {
+            throw new DomainException("A rebalance source needs the rebalance handle.");
+        }
+
+        return new TransactionSource(TransactionSourceKind.Rebalance, handle);
+    }
+
+    /// <summary>The source as stored on a Transaction row.</summary>
+    internal static TransactionSource FromStored(TransactionSourceKind kind, Guid? publicId) =>
+        kind switch
+        {
+            TransactionSourceKind.Manual => Manual,
+            TransactionSourceKind.Seed => Seed,
+            TransactionSourceKind.Rebalance => Rebalance(publicId ?? Guid.Empty),
+            _ => new TransactionSource(kind, publicId)
+        };
 
     protected override IEnumerable<object> GetEqualityComponents()
     {

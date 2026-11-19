@@ -37,7 +37,7 @@ public class EnteredTradeFeesSchemaTests
         await using var db = await ScratchSchemaDatabase.CreateAsync("EnteredTradeFees");
         await db.ApplyBeforeAsync(EnteredTradeFeesScript);
         await db.ExecuteAsync(
-            ScratchSchemaDatabase.TenantRows("a", Guid.NewGuid().ToString("N")[..12])
+            ScratchSchemaDatabase.TenantRows("a", Guid.NewGuid().ToString("N")[..12], transactionSource: false)
             + ScratchSchemaDatabase.FeeRows("a")
             + ScheduledDetail);
         const string read = "SELECT [CashLegId], [Kind], [TradeFeeScheduleId], [BasisAmount], [FeeAmount] FROM [TransactionFeeDetails]";
