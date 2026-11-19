@@ -27,6 +27,9 @@ public class CreateAccountCommand : IRequest<Guid>
     public string? Status { get; init; }
 
     public bool? IsActive { get; init; }
+
+    /// <summary>Refused when present: the server draws the reference (client-money-accounts R16).</summary>
+    public string? DepositReference { get; init; }
 }
 
 public class CreateAccountCommandValidator : AbstractValidator<CreateAccountCommand>

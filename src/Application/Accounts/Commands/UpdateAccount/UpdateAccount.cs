@@ -27,6 +27,9 @@ public class UpdateAccountCommand : IRequest
     public Guid? TenantId { get; init; }
 
     public Guid? CustomerId { get; init; }
+
+    /// <summary>Refused when present (client-money-accounts R16).</summary>
+    public string? DepositReference { get; init; }
 }
 
 public class UpdateAccountCommandValidator : AbstractValidator<UpdateAccountCommand>

@@ -5,12 +5,14 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.FunctionalTests.Accounts;
 using MyWealthV2.Application.FunctionalTests.Hosting;
 using MyWealthV2.Application.FunctionalTests.Portfolios;
 using MyWealthV2.Application.FunctionalTests.Reports;
@@ -52,6 +54,11 @@ public class WebApiFactory(
             services.RemoveAll<IRebalanceScheduler>();
             services.AddSingleton<RecordingRebalanceScheduler>();
             services.AddSingleton<IRebalanceScheduler>(sp => sp.GetRequiredService<RecordingRebalanceScheduler>());
+            services.RemoveAll<IDepositReferenceSource>();
+            services.AddSingleton<ScriptedDepositReferenceSource>();
+            services.AddSingleton<IDepositReferenceSource>(sp => sp.GetRequiredService<ScriptedDepositReferenceSource>());
+            services.AddSingleton<CollidingAccountSaveInterceptor>();
+            services.AddScoped<ISaveChangesInterceptor>(sp => sp.GetRequiredService<CollidingAccountSaveInterceptor>());
 
             if (identityBackchannel is not null && !string.IsNullOrWhiteSpace(identityAuthority))
             {
