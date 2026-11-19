@@ -3,7 +3,7 @@ title: Database design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-11-18
+updated: 2026-11-19
 related:
   - README.md
   - glossary.md
@@ -429,6 +429,8 @@ Amendment 2026-11-15 (trade fees, [features/trade-fees.md](features/trade-fees.m
 
 Amendment 2026-11-18 (External caller numbers, accepted, landed; [features/external-caller-numbers.md](features/external-caller-numbers.md) §6): script `0034_entered_trade_fees.sql` drops `CK_TransactionFeeDetails_BrokerageSchedule`. A `Brokerage` row with `TradeFeeScheduleId` NULL is a fee the caller entered on an External account; every existing row keeps its schedule. No CHECK replaces it, because which fees may lack a schedule depends on the Account. `TransactionFxDetails` does not change; a rate the caller entered has `RateSource = 'Caller'`.
 
+Amendment 2026-11-19 (transaction source, `review`; [features/transaction-source.md](features/transaction-source.md) §6): script `0035_transaction_source.sql` (not written yet) adds `SourceKind int NOT NULL` (CHECK 0–2: `Manual`, `Seed`, `Rebalance`; temporary default 0, dropped at the end) and `SourcePublicId uniqueidentifier NULL` (no FK, no index) to `Transactions`, with a CHECK that `Manual` and `Seed` have no id and `Rebalance` has one. Back-fill: rebalance trades (reference `rb:{32 hex}:{B|S}:{digits}`, `Buy` / `Sell` only, else the script stops) become `Rebalance` with the parsed handle and a null `Reference`; rows with one of the listed seed references become `Seed`; the rest `Manual`. Forward only.
+
 ### 11.5 Holdings (accepted, landed)
 
 Scripts `0014_holdings.sql` and `0015_transaction_type_opening_holdings.sql`. Columns: [features/holdings.md](features/holdings.md) §6. `0016_transaction_type_stock_in_out.sql` widens `CK_Transactions_Type` to 0–11 for `StockIn` (10) and `StockOut` (11). `0017_transaction_type_split.sql` widens that check to 0–14 for `Split` (12), `Bonus` (13), and `Scrip` (14). No new column. No seed in the scripts — `TestSeed` only.
@@ -503,6 +505,7 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-18 | External caller numbers in `review` (`0034`, not written yet): drop `CK_TransactionFeeDetails_BrokerageSchedule` so a caller-entered fee needs no schedule ([features/external-caller-numbers.md](features/external-caller-numbers.md) §6). |
 | 2026-11-18 | External caller numbers accepted. `0034` is a build contract. |
 | 2026-11-18 | External caller numbers landed: `0034_entered_trade_fees.sql` written and applied. |
+| 2026-11-19 | Transaction source in `review` (`0035`, not written yet): `Transactions.SourceKind` and `SourcePublicId`, back-filled; existing rebalance trades lose their `rb:` reference ([features/transaction-source.md](features/transaction-source.md) §6). |
 
 ---
 
