@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
+using MyWealthV2.Domain.ValueObjects;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Identity;
 using NUnit.Framework;
@@ -47,6 +48,8 @@ public class TestSeedAccountsTests
         var custodial = first.Single(row => row.Name == "Demo custodial brokerage");
         custodial.Type.ShouldBe(AccountType.Brokerage);
         custodial.CustodyMode.ShouldBe(CustodyMode.Custodial);
+        DepositReference.IsValid(custodial.DepositReference?.Value).ShouldBeTrue();
+        second.Single(row => row.Name == "Demo custodial brokerage").DepositReference.ShouldBe(custodial.DepositReference);
         custodial.Currency.ShouldBe("USD");
         custodial.Status.ShouldBe(AccountStatus.Open);
 
