@@ -126,7 +126,7 @@ These are the working rules the plan assumes. Each is open to change in the spec
 | # | Principle | Why |
 | --- | --- | --- |
 | P1 | **The platform does not know the simulator.** It talks to ports. The simulator is one adapter behind them; a real bank or broker would be another. | No business code changes when a real connection replaces the simulator. |
-| P2 | **The platform pulls.** A recurring `worker` job calls the port and stores what it gets, as the price and FX syncs do today. Outgoing instructions are calls on the same ports. | No inbound endpoint and no machine-to-machine sign-in on `webapi`. Same pattern and same tests as EODHD. |
+| P2 | **The platform pulls.** A recurring `worker` job calls the port and stores what it gets, as the price and FX syncs do today. Outgoing instructions are calls on the same ports. Push is not built in the first version (D1). | No inbound endpoint and no machine-to-machine sign-in on `webapi`. Same pattern and same tests as EODHD. |
 | P3 | **Inbound records are stored before they are used, and are idempotent on the outside party's id** (statement line id, fill id, event id). A unique index rejects a second copy. | A feed can resend. Reconciliation needs the raw record next to what the platform did with it. |
 | P4 | **A flow books at the time the platform processes the signal.** Outside dates (value date, trade date, settlement date, record date) go into detail rows on the Transaction, the same pattern as `TransactionFxDetails` and `TransactionFeeDetails`. | The ledger cannot check a balance as of a past date (no replay yet). Booking at processing time keeps custody-modes R10 true for flows too. |
 | P5 | **Flows call the `Transaction` factories directly** and do not go through the matrix (custody-modes R7). Each flow sets the Transaction's source. | The matrix is about what a person may type. |
@@ -208,12 +208,13 @@ Real-world shape: Customers pay into the firm's client money trust account at a 
 ### B5. Nominated bank account
 
 - **What:** a Customer's bank account that withdrawals may be paid to: masked number, account name, currency, verified flag, who verified it and when. Changes are audited.
-- **Who:** an Adviser adds it, an operator verifies it (the anti-money-laundering control). Whether a Customer may add one is part of D6.
+- **Who:** an Adviser adds it for the Customer, an operator verifies it (the anti-money-laundering control). The Customer only sees it (D6).
 - **Depends on:** nothing.
 
 ### B6. Withdrawals
 
 - **What:** an instruction aggregate (P7): requested → approved → sent → paid, or rejected, cancelled, returned. On request the amount is reserved (P8). Approval is by a different person from the requester. On approval the platform sends a payment to the bank port. When the bank statement shows the payment, the platform posts the withdrawal (`TransferOut`, source `Payment`) and releases the reservation. A returned payment posts nothing, or reverses the posted withdrawal if the return comes after it.
+- **Who:** the Adviser requests it on the Customer's behalf; the Customer sees its status (D6). An operator approves.
 - **Available cash:** cash balance minus reservations. Shown on the account; used by withdrawals now and by buy orders (O1). Later, only settled cash is available to withdraw (O2).
 - **Matrix:** hand `TransferOut` on a Custodial account → refused.
 - **Simulator:** S1 bank, payments side (execute, fail, return a day later).
@@ -298,7 +299,7 @@ The event belongs to the instrument, not to an account. The platform computes ea
 ### O3. Rebalance through orders
 
 - **What:** a rebalance produces a proposed set of orders. The Adviser confirms, then the orders are placed. Today's immediate trades and the portfolio trade lock are re-thought in the same spec ([portfolios.md](features/portfolios.md)).
-- **Open:** whether the Customer must consent before each rebalance (discretionary service or not).
+- **Open:** whether the Customer must consent before each rebalance (discretionary service or not). If so, the Adviser records the consent (D6).
 - **Depends on:** O1.
 
 ### O4. Order aggregation and allocation (later)
@@ -351,12 +352,13 @@ A separate project that plays the outside parties for manual testing and demos. 
 
 ### S0. Skeleton
 
-- **Project:** `src/Simulator` (working name), an Aspire resource added in Development and in the test AppHost only. Not deployed to production (D10).
+- **Project:** `src/Simulator` (working name), an Aspire resource in Development and in the test AppHost, and a container on the VPS showcase (D10). The operator can stop that container at any time; the platform's pull jobs must survive it.
+- **Sign-in:** the simulator is a client of `identity`. Its control pages need a dedicated account (D16). The routes the platform calls stay on the internal network (D17).
 - **Storage:** its own database on the same SQL Server container, its own schema scripts in a separate folder (D8). It never reads platform tables (P10).
 - **Control:** a small control API (Scalar first, a Blazor page set like Back Office later): advance the clock, run a scenario, inject an event, inject a fault, show its own books.
 - **Clock and randomness:** its own clock that can jump ("to T+2", "to month end"); every random choice from a seed. Same seed and same steps give the same signals.
 - **Scenarios:** named scenario definitions shared with the in-memory port fakes used by functional tests (P9), so both are driven by one description. Working home: a small shared library referenced by both.
-- **Reference data:** it may read instruments and prices (through `webapi` read routes, or its own price source; D11). Never ledger data.
+- **Reference data:** it may read instruments and reference prices through `webapi` read routes. It owns the prices of simulated instruments (D11). Never ledger data.
 
 ### S1. Bank (with B3–B7)
 
@@ -383,27 +385,32 @@ Announce a split, consolidation, bonus issue, dividend or reinvestment plan with
 
 ---
 
-## 12. Decisions to make
+## 12. Decisions
 
-Each has a recommendation. Settle it in the first spec that needs it, then record it here.
+Each question has a status. Decided items were confirmed in discussion on 2026-11-19; the first spec that needs one writes it as a rule. Open items keep a recommendation.
 
-| # | Question | Recommendation | First needed by |
+| # | Question | Status and answer | First needed by |
 | --- | --- | --- | --- |
-| D1 | Does the platform pull signals, or do outside parties push to an inbound endpoint? | Pull through ports and `worker` jobs (P2). Push needs a machine client on `identity` and an inbound route on `webapi`. | F2 |
-| D2 | When is a flow's Transaction booked? | At processing time; outside dates in detail rows (P4). Booking at the outside date needs balance checks as of a date, which needs replay. | F2 |
-| D3 | How do instructions sit with posting §1 ("maker-checker is a status on the same row, not a second resource")? | Instructions (withdrawal, order, in-kind transfer) are separate aggregates that talk to an outside party; the Transaction is posted when the outside party confirms. Posting §1 stays the rule for reviewing a ledger entry itself (X1). Amend posting §1 to say this explicitly. | B6 |
-| D4 | New types (`Deposit`, `Withdrawal`) or the existing `TransferIn` / `TransferOut` with a source? | Keep the existing types and add the source. Renames go with the type route moves (future-plans §4), for both modes at once. | B4 |
-| D5 | Who operates suspense, approvals, reconciliation and adjustments? | New permissions mapped to TenantAdmin first. A separate operations role (ADR 0013 amendment) only when one TenantAdmin doing everything gets in the way of the four-eyes rule. | F3 |
-| D6 | May a Customer request a withdrawal or add a nominated bank account in the Customer Portal? | Not at first: the Adviser requests. A Customer write is a first for the Customer Portal, its BFF allow-list and the permission map. | B6 |
-| D7 | Are unmatched receipts in the ledger (a suspense account) or only on the statement line? | Only on the statement line. Accounts belong to Customers today; a firm-owned ledger account is a new concept. B7 adds unmatched lines to the comparison. | B4 |
-| D8 | Simulator storage | Own database, own schema scripts applied by the same schema applicator, in a separate folder. | S0 |
-| D9 | One clock or two? | Two. The platform keeps the real clock. The simulator's clock sets outside dates only. Settlement and other outside events arrive as signals. Clock-driven platform jobs (interest) get a Development-only trigger with an as-of date. | S0, I2 |
-| D10 | Is the simulator deployed? | Not to production. Revisit with the demo tenant (future-plans §6) if visitors should see the flows. | S0 |
-| D11 | Where does the simulator get prices? | Reference data may come from the platform's read routes or its own source. Ledger data never. | S2 |
-| D12 | Does the firm keep an interest margin? | Open. Decide with I2. | I2 |
-| D13 | A dividend in a currency other than the account's | Convert at the reference rate on the payment date and store the FX detail, until multi-currency cash exists. | C2 |
-| D14 | `InternalTransfer` between Custodial accounts of two different Customers | Refuse on Custodial accounts (same Customer only); it is a third-party payment, which needs a written authority in a real platform. External accounts unchanged. | B6 or its own small amendment |
-| D15 | Is a rebalance trade a `Manual` source for P6? | Yes until O3 (an Adviser pressed Rebalance), then rebalance writes through orders. | F4 |
+| D1 | Does the platform pull signals, or do outside parties push to an inbound endpoint? | **Decided:** pull only in the first version, through ports and `worker` jobs (P2). Push is not built. A simulated push may be added later as its own item, once a flow runs on pull. | F2 |
+| D2 | When is a flow's Transaction booked? | **Decided:** at processing time, with outside dates in detail rows (P4). Booking at the outside date needs balance checks as of a date, which needs replay; revisit after X2. | F2 |
+| D3 | How do instructions sit with posting §1 ("maker-checker is a status on the same row, not a second resource")? | **Decided:** instructions (withdrawal, order, in-kind transfer) are separate aggregates that talk to an outside party; the Transaction is posted when the outside party confirms. Posting §1 stays the rule for reviewing a ledger entry itself (X1). The B6 spec amends posting §1 to say this. | B6 |
+| D4 | New types (`Deposit`, `Withdrawal`) or the existing `TransferIn` / `TransferOut` with a source? | **Decided:** keep the existing types and add the source. Renames go with the type route moves (future-plans §4), for both modes at once. | B4 |
+| D5 | Who operates suspense, approvals, reconciliation and adjustments? | **Decided:** new permissions mapped to TenantAdmin first. A separate operations role (ADR 0013 amendment) only when one TenantAdmin doing everything gets in the way of the four-eyes rule. | F3 |
+| D6 | May a Customer act in the Customer Portal (request a withdrawal, add a nominated bank account, give consent)? | **Decided:** no. The Customer Portal stays read-only. Every action for a Customer is entered by the Adviser in the Adviser Portal on the Customer's behalf. The Customer sees its status. | B5, B6 |
+| D7 | Are unmatched receipts in the ledger (a suspense account) or only on the statement line? | **Decided:** only on the statement line. B7 adds unmatched lines to the comparison. | B4 |
+| D8 | Simulator storage | **Decided:** own database, own schema scripts applied by the same schema applicator, in a separate folder. | S0 |
+| D9 | One clock or two? | **Decided:** two. The platform keeps the real clock. The simulator's clock sets outside dates only. Settlement and other outside events arrive as signals. Clock-driven platform jobs (interest) get a manual trigger with an as-of date; where it is available is D18. | S0, I2 |
+| D10 | Is the simulator deployed? | **Decided:** yes, also to production (today the VPS showcase). The simulator is a client of `identity`, and its control pages need a dedicated sign-in. The operator can stop its container at any time, so every pull job must survive an unreachable simulator: the job fails, the cursor stays, the next run continues. Follow-up questions: D16–D18. | S0 |
+| D11 | Where does the simulator get prices? | **Open, proposal:** two kinds of instrument. *Simulated instruments* (made-up symbols under a simulator exchange suffix, for example `.SIM`) are owned by the simulator end to end: a seeded daily random walk from the previous close, corporate actions that move the price (a 2:1 split halves it), and fills. The platform reads their prices from the simulator through an `IMarketData` adapter chosen by the suffix (an amendment to instrument-prices). *Real instruments* (EODHD) fill at the platform's reference close plus a seeded slippage; the simulator does not invent their price path. A free random walk on a real instrument would drift away from the price the platform values holdings and reserves cash with, and a simulated split would not show in EODHD prices. | S2, C1 |
+| D12 | Does the firm keep an interest margin? | **Open.** Decide with I2. | I2 |
+| D13 | A dividend in a currency other than the account's | **Decided:** convert at the reference rate on the payment date and store the FX detail, until multi-currency cash exists. Multi-currency cash stays out of this plan (future-plans §5); the part this plan cannot avoid is D20. | C2 |
+| D14 | `InternalTransfer` between Custodial accounts of two different Customers | **Decided:** refused on Custodial accounts (same Customer only); it is a third-party payment. External accounts unchanged. | B6 or its own small amendment |
+| D15 | Is a rebalance trade a `Manual` source for P6? | **Decided:** yes until O3, then rebalance writes through orders. | F4 |
+| D16 | Which account signs in to the simulator? (from D10) | **Open.** Recommendation: a new platform-level role that may sign in only on the simulator client and has no `webapi` permission (ADR 0013 amendment, client role allow-list). Not SystemAdmin, which also has all of Back Office. | S0 |
+| D17 | How are the platform's calls to the simulator protected? (from D10) | **Open.** Recommendation: the feed, payment and order routes listen only on the internal network and are not routed by Caddy, and the platform calls them with a machine credential. Only the control pages go through Caddy, behind the sign-in of D16. | S0 |
+| D18 | Where is the manual trigger of clock-driven platform jobs available? (from D9, D10) | **Open.** Development only, or also on production for the showcase. If production, it is a SystemAdmin route on `webapi`, not a simulator action. | I2 |
+| D19 | Is the simulator one tenant's outside world or every tenant's? | **Open.** Recommendation: it serves the tenants whose client money accounts (B1) point at it; in production that is the demo and smoke tenants. | B1, S1 |
+| D20 | An order in an instrument whose quote currency differs from the account's currency (from D13) | **Open.** Refuse it (the Customer opens a Custodial account in that currency and converts first), or convert automatically at the fill as buy-sell R12 does today. Decide before O1. | O1 |
 
 ---
 
@@ -445,12 +452,13 @@ Steps 9, 10 and 13 do not depend on each other or on the bank stage beyond steps
 | [portfolios.md](features/portfolios.md) | Trade lock does not apply to corporate actions; rebalance through orders | C, O |
 | [buy-sell.md](features/buy-sell.md), [trade-fees.md](features/trade-fees.md) | Custodial trades come from fills; fee schedule unchanged | O |
 | [split.md](features/split.md), [holdings.md](features/holdings.md) | Corporate actions replace hand entry on Custodial accounts | C |
+| [instrument-prices.md](features/instrument-prices.md) | Prices of simulated instruments come from the simulator (D11) | S, O |
 | [internal-transfers.md](features/internal-transfers.md) | Same Customer only on Custodial accounts (D14) | B |
 | [accounts.md](features/accounts.md), [customers.md](features/customers.md), [tenants.md](features/tenants.md) | Deposit reference, nominated bank account, tax profile, client money accounts | B, I |
 | [adr/0013](adr/0013-roles-authorization-single-user-table.md) | Operations permissions, maybe a role | F, B |
 | New ADR | Outside parties behind ports (F2); maybe one for the simulator | F, S |
 | [reports.md](features/reports.md) | Reconciliation reports; source in the Customer Transactions Report | F, B, T |
 | Adviser Portal and Customer Portal page contracts | Operator pages, deposit instructions, withdrawals, orders, contract notes | all |
-| [architecture.md](architecture.md), [deployment.md](deployment.md) | The simulator resource, Development only | S |
+| [architecture.md](architecture.md), [deployment.md](deployment.md), [features/identity-auth.md](features/identity-auth.md) | The simulator resource and its VPS container, its `identity` client and sign-in role | S |
 | [domain-model.md](domain-model.md), [database-design.md](database-design.md), [api-design.md](api-design.md), [glossary.md](glossary.md) | With each spec | all |
 | [future-plans.md](future-plans.md) §9 | Points here for the order | now |
