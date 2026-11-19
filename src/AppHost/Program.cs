@@ -159,6 +159,11 @@ var backOffice = builder.AddProject<Projects.BackOffice>(Services.BackOffice)
 backOffice.WithEnvironment("Authentication__PublicOrigin", backOffice.GetEndpoint("https"));
 identity.WithEnvironment("Identity__BackOfficeOrigin", backOffice.GetEndpoint("https"));
 
+// Simulator spec R6: identity seeds the fourth client from this secret. The simulator resource uses it too.
+var simulatorClientSecret = builder.AddParameter("simulator-client-secret", secret: true);
+
+identity.WithEnvironment("Identity__SimulatorClientSecret", simulatorClientSecret);
+
 var eodhdApiKey = builder.AddParameter("eodhd-api-key", secret: true);
 
 builder.AddProject<Projects.Worker>(Services.Worker)

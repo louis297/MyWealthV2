@@ -173,7 +173,9 @@ public static class TestApp
         if (string.IsNullOrWhiteSpace(tenantCode))
         {
             person = await db.DomainUsers.SingleOrDefaultAsync(
-                row => row.Role == UserRole.SystemAdmin && row.Email == email);
+                row => (row.Role == UserRole.SystemAdmin || row.Role == UserRole.SimulatorOperator)
+                    && row.TenantId == null
+                    && row.Email == email);
         }
         else
         {

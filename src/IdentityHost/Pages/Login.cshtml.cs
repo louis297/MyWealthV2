@@ -106,8 +106,11 @@ public class LoginModel(
 
         if (string.IsNullOrWhiteSpace(TenantCode))
         {
+            // Platform-level people (SystemAdmin, SimulatorOperator) share one email index (simulator spec R5).
             return await db.Users.SingleOrDefaultAsync(
-                person => person.Role == UserRole.SystemAdmin && person.Email == Email,
+                person => (person.Role == UserRole.SystemAdmin || person.Role == UserRole.SimulatorOperator)
+                    && person.TenantId == null
+                    && person.Email == Email,
                 cancellationToken);
         }
 
