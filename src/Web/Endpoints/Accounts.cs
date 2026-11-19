@@ -36,7 +36,7 @@ public class Accounts : IEndpointGroup
         groupBuilder.MapPost(ReopenAccount, "{id}/reopen").RequireAuthorization(Policies.AccountsManage);
         groupBuilder.MapGet(GetHoldings, "{id}/holdings").RequireAuthorization(Policies.AccountsRead);
         groupBuilder.MapGet(GetAccountPortfolio, "{id}/portfolio").RequireAuthorization(ReadPortfolio);
-        groupBuilder.MapGet(GetDepositInstructions, "{id}/deposit-instructions");
+        groupBuilder.MapGet(GetDepositInstructions, "{id}/deposit-instructions").RequireAuthorization(Policies.AccountsRead);
         groupBuilder.MapPost(AssignPortfolio, "{id}/portfolio").RequireAuthorization(Policies.TransactionsCreate);
         groupBuilder.MapDelete(UnassignPortfolio, "{id}/portfolio").RequireAuthorization(Policies.TransactionsCreate);
         groupBuilder.MapPost(RebalanceAccount, "{id}/rebalance").RequireAuthorization(Policies.TransactionsCreate);
@@ -74,8 +74,11 @@ public class Accounts : IEndpointGroup
 
     [EndpointSummary("Get deposit instructions")]
     [EndpointDescription("Returns where to pay in to an Open Custodial account, and the reference to quote.")]
-    public static Task<Ok<DepositInstructionsDto>> GetDepositInstructions(ISender sender, Guid id) =>
-        throw new NotImplementedException();
+    public static async Task<Ok<DepositInstructionsDto>> GetDepositInstructions(ISender sender, Guid id)
+    {
+        var item = await sender.Send(new GetDepositInstructionsQuery(id));
+        return TypedResults.Ok(item);
+    }
 
     [EndpointSummary("Get an account")]
     [EndpointDescription("Returns one account by PublicId.")]
