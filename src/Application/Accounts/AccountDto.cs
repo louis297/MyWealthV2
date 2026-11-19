@@ -38,7 +38,7 @@ public sealed class AccountDto
         Type = account.Type.ToString(),
         CustodyMode = account.CustodyMode.ToString(),
         Currency = account.Currency,
-        DepositReference = null,
+        DepositReference = account.DepositReference?.Value,
         CashBalance = cashBalance,
         Status = account.Status.ToString(),
         IsActive = account.IsActive,

@@ -61,6 +61,9 @@ public class UpdateAccountCommandValidator : AbstractValidator<UpdateAccountComm
         RuleFor(command => command.CustomerId)
             .Must(customerId => customerId is null)
             .WithMessage("CustomerId cannot be changed.");
+        RuleFor(command => command.DepositReference)
+            .Must(reference => reference is null)
+            .WithMessage("DepositReference cannot be changed.");
     }
 }
 

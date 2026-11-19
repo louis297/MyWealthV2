@@ -4,6 +4,7 @@ using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
+using MyWealthV2.Domain.ValueObjects;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationException;
 
@@ -57,6 +58,9 @@ public class CreateAccountCommandValidator : AbstractValidator<CreateAccountComm
         RuleFor(command => command.Status)
             .Must(status => status is null)
             .WithMessage("Status cannot be set.");
+        RuleFor(command => command.DepositReference)
+            .Must(reference => reference is null)
+            .WithMessage("DepositReference cannot be set. The server draws it.");
         RuleFor(command => command.IsActive)
             .Must(isActive => isActive is null)
             .WithMessage("IsActive cannot be set.");
@@ -137,11 +141,62 @@ public class CreateAccountCommandHandler(
         }
 
         var type = Enum.Parse<AccountType>(request.Type);
-        var depositReference = custodyMode == CustodyMode.Custodial ? depositReferences.Next() : null;
-        var account = Account.Create(tenant.Id, customer.Id, request.Name, type, custodyMode, currency, depositReference);
-        db.Accounts.Add(account);
-        await db.SaveChangesAsync(cancellationToken);
-        return account.PublicId;
+        if (custodyMode == CustodyMode.External)
+        {
+            var external = Account.Create(tenant.Id, customer.Id, request.Name, type, custodyMode, currency);
+            db.Accounts.Add(external);
+            await db.SaveChangesAsync(cancellationToken);
+            return external.PublicId;
+        }
+
+        // Client money accounts R17: the reference is unique on the platform. Draw again when it is already used
+        // (a), and build the account again when the save hits the unique index because another open drew the same
+        // reference at the same time (b). Every draw counts towards MaxReferenceDraws.
+        var draws = 0;
+        while (true)
+        {
+            var depositReference = await DrawUnusedReferenceAsync(() => ++draws, cancellationToken);
+            var account = Account.Create(
+                tenant.Id, customer.Id, request.Name, type, custodyMode, currency, depositReference);
+            db.Accounts.Add(account);
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                return account.PublicId;
+            }
+            catch (DepositReferenceTakenException) when (draws < MaxReferenceDraws)
+            {
+                db.ClearTrackedChanges();
+            }
+        }
+    }
+
+    /// <summary>At most five draws per request (client-money-accounts R17).</summary>
+    private const int MaxReferenceDraws = 5;
+
+    /// <summary>
+    /// Draws until the reference is unused in every tenant (R17 a). <paramref name="countDraw"/> counts each draw
+    /// and returns the running total; the draw that reaches <see cref="MaxReferenceDraws"/> is the last.
+    /// </summary>
+    private async Task<DepositReference> DrawUnusedReferenceAsync(Func<int> countDraw, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            var draw = countDraw();
+            var reference = depositReferences.Next();
+            var used = await db.Accounts.IgnoreQueryFilters().AsNoTracking()
+                .AnyAsync(row => row.DepositReference! == reference, cancellationToken);
+            if (!used)
+            {
+                return reference;
+            }
+
+            if (draw >= MaxReferenceDraws)
+            {
+                throw new InvalidOperationException(
+                    $"{MaxReferenceDraws} deposit references in a row were already used.");
+            }
+        }
     }
 
     private async Task<Tenant> ResolveTenantAsync(Guid? tenantPublicId, CancellationToken cancellationToken)
