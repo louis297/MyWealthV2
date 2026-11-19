@@ -1,4 +1,4 @@
-using MyWealthV2.Infrastructure.Data.Schema;
+using MyWealthV2.Schema;
 using Shouldly;
 
 namespace MyWealthV2.Infrastructure.IntegrationTests.Schema;

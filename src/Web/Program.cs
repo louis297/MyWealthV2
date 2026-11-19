@@ -1,6 +1,6 @@
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Infrastructure.Data;
-using MyWealthV2.Infrastructure.Data.Schema;
+using MyWealthV2.Schema;
 using MyWealthV2.Infrastructure.Identity;
 using Scalar.AspNetCore;
 

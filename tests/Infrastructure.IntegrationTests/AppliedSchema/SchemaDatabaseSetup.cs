@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Infrastructure.Data;
-using MyWealthV2.Infrastructure.Data.Schema;
+using MyWealthV2.Schema;
 using MyWealthV2.Shared;
 using MyWealthV2.Tests.Common;
 using NUnit.Framework;
@@ -50,10 +50,7 @@ public class SchemaDatabaseSetup
 
         await using var db = new ApplicationDbContext(options);
         var schemaDirectory = Path.Combine(AppContext.BaseDirectory, "schema");
-        var applicator = new SchemaApplicator(
-            new FileSchemaScriptSource(schemaDirectory),
-            new EfSchemaVersionStore(db),
-            new EfSqlBatchExecutor(db));
+        var applicator = SchemaApplicator.ForDatabase(ConnectionString, schemaDirectory);
 
         await applicator.ApplyAsync(cancellationToken);
 

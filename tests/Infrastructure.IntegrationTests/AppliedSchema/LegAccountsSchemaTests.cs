@@ -2,7 +2,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Infrastructure.Data;
-using MyWealthV2.Infrastructure.Data.Schema;
+using MyWealthV2.Schema;
 using Shouldly;
 
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
@@ -153,11 +153,10 @@ public class LegAccountsSchemaTests
 
     private static async Task ApplyAsync(string connectionString, Func<SchemaScript, bool> include)
     {
-        await using var db = OpenDb(connectionString);
         var applicator = new SchemaApplicator(
             new FilteredScriptSource(new FileSchemaScriptSource(SchemaDirectory()), include),
-            new EfSchemaVersionStore(db),
-            new EfSqlBatchExecutor(db));
+            new SqlSchemaVersionStore(connectionString),
+            new SqlBatchExecutor(connectionString));
         await applicator.ApplyAsync(CancellationToken.None);
     }
 

@@ -1,4 +1,4 @@
-namespace MyWealthV2.Infrastructure.Data.Schema;
+namespace MyWealthV2.Schema;
 
 public sealed class FileSchemaScriptSource(string directory) : ISchemaScriptSource
 {

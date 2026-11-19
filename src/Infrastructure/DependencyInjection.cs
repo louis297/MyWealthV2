@@ -9,11 +9,11 @@ using MyWealthV2.Application.Reports;
 using MyWealthV2.Infrastructure.Currencies;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Interceptors;
-using MyWealthV2.Infrastructure.Data.Schema;
 using MyWealthV2.Infrastructure.Email;
 using MyWealthV2.Infrastructure.Identity;
 using MyWealthV2.Infrastructure.MarketData;
 using MyWealthV2.Infrastructure.Reports;
+using MyWealthV2.Schema;
 using Microsoft.AspNetCore.Identity;
 
 using Microsoft.EntityFrameworkCore;
@@ -62,8 +62,8 @@ public static class DependencyInjection
 
         var schemaDirectory = Path.Combine(AppContext.BaseDirectory, "schema");
         builder.Services.AddSingleton<ISchemaScriptSource>(_ => new FileSchemaScriptSource(schemaDirectory));
-        builder.Services.AddScoped<ISchemaVersionStore, EfSchemaVersionStore>();
-        builder.Services.AddScoped<ISqlBatchExecutor, EfSqlBatchExecutor>();
+        builder.Services.AddSingleton<ISchemaVersionStore>(_ => new SqlSchemaVersionStore(connectionString));
+        builder.Services.AddSingleton<ISqlBatchExecutor>(_ => new SqlBatchExecutor(connectionString));
         builder.Services.AddScoped<SchemaApplicator>();
 
         builder.Services.AddAuthorization();

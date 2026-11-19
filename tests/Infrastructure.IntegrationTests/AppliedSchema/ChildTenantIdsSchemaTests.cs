@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Infrastructure.Data;
-using MyWealthV2.Infrastructure.Data.Schema;
+using MyWealthV2.Schema;
 using Shouldly;
 
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;

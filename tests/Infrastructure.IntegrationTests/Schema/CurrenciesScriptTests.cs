@@ -1,4 +1,4 @@
-using MyWealthV2.Infrastructure.Data.Schema;
+using MyWealthV2.Schema;
 using NUnit.Framework;
 using Shouldly;
 
