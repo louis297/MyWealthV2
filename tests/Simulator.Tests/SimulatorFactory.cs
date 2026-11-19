@@ -1,7 +1,11 @@
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using MyWealthV2.Simulator.Tests.Hosting;
 
 namespace MyWealthV2.Simulator.Tests;
@@ -26,7 +30,18 @@ public sealed class SimulatorFactory(
 
     public const string PublicOrigin = "https://sim.test";
 
+    public const string OperatorEmail = "operator@sim.test";
+
     public HttpClient ControlClient() => ClientOn(ControlPort);
+
+    /// <summary>A control-port client with a session for <paramref name="email"/> in <paramref name="role"/>.</summary>
+    public HttpClient SessionClient(string email = OperatorEmail, string role = TestAuthenticationHandler.OperatorRole)
+    {
+        var client = ControlClient();
+        client.DefaultRequestHeaders.Add(TestAuthenticationHandler.EmailHeader, email);
+        client.DefaultRequestHeaders.Add(TestAuthenticationHandler.RoleHeader, role);
+        return client;
+    }
 
     public HttpClient PartyClient(string? apiKey = PartyApiKey)
     {
@@ -69,6 +84,24 @@ public sealed class SimulatorFactory(
         builder.ConfigureTestServices(services =>
         {
             services.AddTransient<IStartupFilter, TestConnection>();
+            services.AddAuthentication()
+                .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(TestAuthenticationHandler.SchemeName, _ => { });
+            services.PostConfigure<AuthenticationOptions>(options =>
+                options.DefaultAuthenticateScheme = TestAuthenticationHandler.SchemeName);
+
+            // No identity host here: the challenge builds its redirect from a fixed configuration.
+            services.PostConfigure<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme, options =>
+            {
+                var configuration = new OpenIdConnectConfiguration
+                {
+                    Issuer = Authority + "/",
+                    AuthorizationEndpoint = Authority + "/connect/authorize",
+                    TokenEndpoint = Authority + "/connect/token",
+                    EndSessionEndpoint = Authority + "/connect/logout"
+                };
+                options.Configuration = configuration;
+                options.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(configuration);
+            });
         });
     }
 }
