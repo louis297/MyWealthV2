@@ -507,9 +507,9 @@ Status of this amendment: `accepted` (2026-11-18), together with [external-calle
 
 ---
 
-## Amendment 2026-11-19 (transaction source) — review
+## Amendment 2026-11-19 (transaction source) — accepted
 
-Status of this amendment: `review`, together with [transaction-source.md](transaction-source.md). Not in force until that spec is accepted.
+Status of this amendment: `accepted` (2026-11-19), together with [transaction-source.md](transaction-source.md).
 
 - R5, the matrix row "`Reversal` (reverse)": External stays **allowed**. Custodial becomes **allowed for a hand-reversible source only** (`Manual` or `Rebalance`); the reverse of a Transaction with any other source → 400 (transaction-source R13). The last column becomes "Each flow undoes its own writes".
 - R7: the platform's own writes now record who wrote them (transaction-source R2–R6). The factories still do not call the matrix.

@@ -198,9 +198,9 @@ The Reports page does not change. The Adviser Balances and Customer Transactions
 
 ---
 
-## Amendment 2026-11-19 (transaction source) — review
+## Amendment 2026-11-19 (transaction source) — accepted
 
-Status of this amendment: `review`, together with [transaction-source](../features/transaction-source.md). Not in force until that spec is accepted. D27 narrows the Reverse conditions of the `/transactions` and `/transactions/:id` rows, D13 and D18. The BFF does not change.
+Status of this amendment: `accepted` (2026-11-19), together with [transaction-source](../features/transaction-source.md). D27 narrows the Reverse conditions of the `/transactions` and `/transactions/:id` rows, D13 and D18. The BFF does not change.
 
 | ID | Behaviour |
 | --- | --- |

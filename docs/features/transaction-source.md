@@ -1,6 +1,6 @@
 ---
 title: Transaction source
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -26,7 +26,7 @@ Amendment to the ledger on `webapi`: [posting.md](posting.md), [portfolios.md](p
 
 No new route, no new policy, no new `TransactionType`, no problem code. Script `0035_transaction_source.sql` adds two columns to `Transactions` and back-fills them.
 
-**Status is `review`.** Not a build contract until accepted. §11 lists the points to confirm before acceptance.
+**Status is `accepted` (2026-11-19).** Implementation follows this file. Not landed yet. The eight points of §11 were confirmed as recommended.
 
 ---
 
@@ -308,18 +308,18 @@ No new ADR. The roadmap principles P5 and P6 and decision D15 gave the direction
 | Script | `0035_transaction_source.sql`, forward only |
 | Routes, policies, problem codes, filters | None added |
 
-### To confirm before acceptance
+### Confirmed when this spec was accepted (2026-11-19)
 
-Each point is written into the rules above as the recommendation. Confirm or change it before the spec is accepted.
+Each point was confirmed as recommended and is written into the rules above as stated here. The alternatives are kept for the record.
 
-1. **Scope of the reverse rule** (R13, R15). Recommendation: Custodial accounts only, as the roadmap F4 says, so External accounts do not change (roadmap target 5). Alternative: the rule applies on every account. In production this changes nothing for External accounts (no `Seed` rows there, and no flow writes to them), and the portal could follow the server exactly without the custody mode. The cost is that the rule no longer reads "External accounts are unchanged".
-2. **`Seed` is not hand-reversible** (R12). Recommendation: not hand-reversible, because a seeded row on a Custodial account stands in for a platform write, and it gives F4 a case that can be tested now. Alternative: treat `Seed` like `Manual`. Then F4 has no observable effect until the first flow lands, and the demo Custodial rows stay reversible.
-3. **Clear `reference` on existing rebalance trades** (R17). Recommendation: clear it, which closes the leak for old rows too; `0029` already changed posted rows once. Alternatives: keep old references (the leak stays on old rows), or rewrite the integer as the instrument's PublicId (keeps the B/S and instrument text, which the legs already hold).
-4. **The rebalance handle as the source id** (R5). Recommendation: yes. It groups the trades of one run, and the async 202 body already shows it. It is not a resource: no route returns a rebalance run, and a synchronous call never shows its handle. Alternative: no id for `Rebalance` until a rebalance run record exists.
-5. **Wire shape** (R10). Recommendation: one nested object `source: { kind, id }`, like `fx`. Alternative: two flat fields `source` and `sourceId`, which a later list filter (`?source=`) would match more directly.
-6. **Seed back-fill by exact reference** (§6 step 3). Recommendation: the exact list, because a person may type any reference and a prefix match would mark a hand row as `Seed` (and make it unreversible on a Custodial account). The roadmap said "`TestSeed-` references". The exact list also covers `Smoke-Cash-TransferIn`, which has no `TestSeed-` prefix.
-7. **Where the source is shown** (§2 Out, §9). Recommendation: only the item and the Adviser Portal detail page. Not in the Customer Transactions Report (roadmap F1 said "may"), not in the Customer Portal, no list filter. Each can be added by the spec that first needs it.
-8. **Kind values reserved now** (R2). Recommendation: only the three kinds this slice writes; each later flow adds its kind. Alternative: reserve the whole roadmap list now. That locks names before their specs are discussed.
+1. **Scope of the reverse rule** (R13, R15). Decided: Custodial accounts only, as the roadmap F4 says, so External accounts do not change (roadmap target 5). Alternative: the rule applies on every account. In production this changes nothing for External accounts (no `Seed` rows there, and no flow writes to them), and the portal could follow the server exactly without the custody mode. The cost is that the rule no longer reads "External accounts are unchanged".
+2. **`Seed` is not hand-reversible** (R12). Decided: not hand-reversible, because a seeded row on a Custodial account stands in for a platform write, and it gives F4 a case that can be tested now. Alternative: treat `Seed` like `Manual`. Then F4 has no observable effect until the first flow lands, and the demo Custodial rows stay reversible.
+3. **Clear `reference` on existing rebalance trades** (R17). Decided: clear it, which closes the leak for old rows too; `0029` already changed posted rows once. Alternatives: keep old references (the leak stays on old rows), or rewrite the integer as the instrument's PublicId (keeps the B/S and instrument text, which the legs already hold).
+4. **The rebalance handle as the source id** (R5). Decided: yes. It groups the trades of one run, and the async 202 body already shows it. It is not a resource: no route returns a rebalance run, and a synchronous call never shows its handle. Alternative: no id for `Rebalance` until a rebalance run record exists.
+5. **Wire shape** (R10). Decided: one nested object `source: { kind, id }`, like `fx`. Alternative: two flat fields `source` and `sourceId`, which a later list filter (`?source=`) would match more directly.
+6. **Seed back-fill by exact reference** (§6 step 3). Decided: the exact list, because a person may type any reference and a prefix match would mark a hand row as `Seed` (and make it unreversible on a Custodial account). The roadmap said "`TestSeed-` references". The exact list also covers `Smoke-Cash-TransferIn`, which has no `TestSeed-` prefix.
+7. **Where the source is shown** (§2 Out, §9). Decided: only the item and the Adviser Portal detail page. Not in the Customer Transactions Report (roadmap F1 said "may"), not in the Customer Portal, no list filter. Each can be added by the spec that first needs it.
+8. **Kind values reserved now** (R2). Decided: only the three kinds this slice writes; each later flow adds its kind. Alternative: reserve the whole roadmap list now. That locks names before their specs are discussed.
 
 Still open, not this slice:
 
