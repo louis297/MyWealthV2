@@ -3,7 +3,7 @@ title: Deployment
 status: accepted
 language: en
 created: 2026-11-11
-updated: 2026-11-18
+updated: 2026-11-19
 related:
   - README.md
   - smoke-test.md
@@ -76,7 +76,7 @@ Every .NET host sends traces, metrics and logs over OTLP to a standalone Aspire 
 | `bff-customer-portal` | `mywealth-bff-customer-portal` | Through Caddy | `customer.<domain>` | Serves the Customer Portal SPA build and `/bff/*` |
 | `back-office` | `mywealth-back-office` | Through Caddy | `admin.<domain>` | SystemAdmin only |
 | `webapi` | `mywealth-webapi` | No | — | Called by the BFFs and Back Office. Runs the schema applicator on start |
-| `worker` | `mywealth-worker` | No | — | Hangfire. Outbox, FX rates, instrument prices, reports. Dashboard stays Development-only |
+| `worker` | `mywealth-worker` | No | — | Hangfire. Outbox, FX rates, instrument prices, reports. Dashboard stays Development-only. Also runs the schema applicator on start; finds nothing pending after `webapi` |
 | `sql` | SQL Server 2022, Express edition | No | — | `MSSQL_PID=Express`, `MSSQL_MEMORY_LIMIT_MB=2048` |
 | `aspire-dashboard` | `mcr.microsoft.com/dotnet/aspire-dashboard`, exact version tag | No | — | Telemetry viewer (§5.1). UI published on `127.0.0.1:18888` of the VPS only |
 
@@ -236,7 +236,7 @@ No backup is taken. A weekly `BACKUP DATABASE` to the VPS disk is a cheap later 
 
 - SQL Server 2022 Express in a container. Express is free for production use. Its limits (about 1.4 GB buffer pool, 10 GB per database) fit this project.
 - The database `MyWealthDbV2` is created by hand once, with `CREATE DATABASE`, before the first start of `webapi` (§12). The schema applicator creates tables, not the database.
-- `webapi` applies pending `database/schema/` scripts on start (ADR 0008). It is the only host that does. Only one `webapi` instance runs. It starts listening only after the scripts are applied.
+- `webapi` applies pending `database/schema/` scripts on start (ADR 0008). The `worker` runs the same applicator on its own start (ADR 0008 amendment 2026-11-19); because it starts only after `webapi` is healthy, it finds nothing pending. `identity` does not apply scripts. Only one instance of each runs. Each starts listening only after the applicator has finished.
 - Every .NET container has a compose health check that runs the host with `--healthcheck` ([features/production-hosting.md](features/production-hosting.md)). Start order: `sql` healthy → `webapi` healthy → `identity`, `worker` → the BFFs and `back-office` once `identity` and `webapi` are healthy → `caddy`.
 
 ---

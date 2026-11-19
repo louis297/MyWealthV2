@@ -172,7 +172,7 @@ Aspire does three things for the session stack:
 2. Publishes service-discovery URLs for `identity` (issuer), `webapi`, `bff-adviser-portal`, and `adviser-portal`, so redirect URIs and the OIDC authority match.
 3. In Development, adds the BFF callback origin and the Scalar origin to client redirects. The browser does not call `webapi` for the product path.
 
-The schema applicator runs **once** (default: `webapi` startup, or an explicit apply step). `identity` must not run a second applicator concurrently.
+The schema applicator runs at `webapi` start-up and at `worker` start-up (ADR 0008 amendment 2026-11-19). `identity` does not run it. The applicator takes no lock; see [known-issues/schema-applicator-two-hosts.md](known-issues/schema-applicator-two-hosts.md).
 
 ### 3.4 Phase 1 configuration (locked here; package versions and lifetimes are not)
 
@@ -379,4 +379,5 @@ Locked conclusions follow function-plan §0 and these ADRs. The `docs/adr/` fold
 | 2026-11-08 | Instrument price sync runs daily at 12:00 UTC. |
 | 2026-11-02 | [features/portfolios.md](features/portfolios.md) drafted. Full Rebalance model portfolios. Async job + per-account handle. Assigned accounts reject manual security trades. |
 | 2026-11-02 | [features/portfolios.md](features/portfolios.md) accepted. Assign and single-account rebalance are synchronous. Weight change and bulk rebalance return 202. Disable unassigns every Active assignment. |
+| 2026-11-19 | §3.3: the `worker` also runs the schema applicator at start-up (ADR 0008 amendment, matches the code since `26fb489`). |
 | 2026-11-19 | ADR 0021 proposed: outside parties behind ports, pulled by the `worker`, stored before use. Simulator host spec [features/simulator.md](features/simulator.md) drafted. Pointer in §6; hosts, solution map and ADR table change when they are accepted. |
