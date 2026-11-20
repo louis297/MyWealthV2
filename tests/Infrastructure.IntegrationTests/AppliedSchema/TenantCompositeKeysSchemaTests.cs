@@ -134,6 +134,34 @@ public class TenantCompositeKeysSchemaTests
             INSERT INTO [AccountPortfolioAssignments] ([PublicId], [TenantId], [AccountId], [PortfolioId], [Status], [AssignedAt], [AssignedBy], [Created], [CreatedBy])
             VALUES (NEWID(), @a_tenant, @a_brokerage, @{p}_portfolio, 0, SYSDATETIMEOFFSET(), N'test', SYSDATETIMEOFFSET(), N'test');
             """),
+        ("FK_NominatedBankAccounts_Users_TenantId_CustomerId", "Users", """
+            INSERT INTO [NominatedBankAccounts]
+                ([PublicId], [TenantId], [CustomerId], [Currency], [BankName], [AccountName], [AccountNumber], [AccountNumberKey], [Status],
+                 [AddedByUserId], [AddedAt], [ReviewedByUserId], [ReviewedAt], [ReviewNote], [RemovedByUserId], [RemovedAt], [RemovedNote], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @{p}_customer, 'USD', N'ANZ', N'J Smith', N'0601', N'0601', 0,
+                    @a_adviser, SYSDATETIMEOFFSET(), NULL, NULL, NULL, NULL, NULL, NULL, SYSDATETIMEOFFSET(), N'test');
+            """),
+        ("FK_NominatedBankAccounts_Users_TenantId_AddedByUserId", "Users", """
+            INSERT INTO [NominatedBankAccounts]
+                ([PublicId], [TenantId], [CustomerId], [Currency], [BankName], [AccountName], [AccountNumber], [AccountNumberKey], [Status],
+                 [AddedByUserId], [AddedAt], [ReviewedByUserId], [ReviewedAt], [ReviewNote], [RemovedByUserId], [RemovedAt], [RemovedNote], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_customer, 'USD', N'ANZ', N'J Smith', N'0601', N'0601', 0,
+                    @{p}_adviser, SYSDATETIMEOFFSET(), NULL, NULL, NULL, NULL, NULL, NULL, SYSDATETIMEOFFSET(), N'test');
+            """),
+        ("FK_NominatedBankAccounts_Users_TenantId_ReviewedByUserId", "Users", """
+            INSERT INTO [NominatedBankAccounts]
+                ([PublicId], [TenantId], [CustomerId], [Currency], [BankName], [AccountName], [AccountNumber], [AccountNumberKey], [Status],
+                 [AddedByUserId], [AddedAt], [ReviewedByUserId], [ReviewedAt], [ReviewNote], [RemovedByUserId], [RemovedAt], [RemovedNote], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_customer, 'USD', N'ANZ', N'J Smith', N'0601', N'0601', 1,
+                    @a_adviser, SYSDATETIMEOFFSET(), @{p}_adviser, SYSDATETIMEOFFSET(), N'Checked', NULL, NULL, NULL, SYSDATETIMEOFFSET(), N'test');
+            """),
+        ("FK_NominatedBankAccounts_Users_TenantId_RemovedByUserId", "Users", """
+            INSERT INTO [NominatedBankAccounts]
+                ([PublicId], [TenantId], [CustomerId], [Currency], [BankName], [AccountName], [AccountNumber], [AccountNumberKey], [Status],
+                 [AddedByUserId], [AddedAt], [ReviewedByUserId], [ReviewedAt], [ReviewNote], [RemovedByUserId], [RemovedAt], [RemovedNote], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_customer, 'USD', N'ANZ', N'J Smith', N'0601', N'0601', 3,
+                    @a_adviser, SYSDATETIMEOFFSET(), NULL, NULL, NULL, @{p}_adviser, SYSDATETIMEOFFSET(), N'Gone', SYSDATETIMEOFFSET(), N'test');
+            """),
         ("FK_ReportExecutions_ReportSchedules_TenantId_ScheduleId", "ReportSchedules", """
             INSERT INTO [ReportExecutions] ([PublicId], [ReportId], [ScheduleId], [TenantId], [TriggerKind], [Status], [ParametersJson], [Created], [CreatedBy])
             VALUES (NEWID(), @report, @{p}_schedule, @a_tenant, N'Scheduled', N'Queued', N'{}', SYSDATETIMEOFFSET(), N'test');
@@ -167,7 +195,7 @@ public class TenantCompositeKeysSchemaTests
     ];
 
     private static readonly string[] Parents =
-        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs"];
+        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts"];
 
     private static IEnumerable<TestCaseData> CompositeKeyCases() =>
         CompositeKeys.Select(key => new TestCaseData(key.ForeignKey).SetName($"Insert_ChildPointingAtOtherTenant_IsRejected({key.ForeignKey})"));
