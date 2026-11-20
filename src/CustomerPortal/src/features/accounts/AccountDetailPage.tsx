@@ -3,6 +3,7 @@ import { DetailGrid, DetailItem, Muted, Page, PageHeading, Section, StatusBadge 
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
+  type Activity,
   useGetAccountQuery,
   useGetActivityQuery,
   useGetCashBalanceQuery,
@@ -18,8 +19,13 @@ const typeLabels: Record<string, string> = {
   Adjustment: "Adjustment",
 };
 
-function typeLabel(type: string) {
-  return typeLabels[type] ?? type;
+function typeLabel(row: Activity) {
+  // C21: a deposit from the bank statement is a TransferIn with a bank receipt; its Reversal stays "Reversal".
+  if (row.type === "TransferIn" && row.bankReceipt) {
+    return "Deposit";
+  }
+
+  return typeLabels[row.type] ?? row.type;
 }
 
 function isNotFound(error: unknown) {
@@ -136,7 +142,10 @@ export function AccountDetailPage() {
                   {activityItems.map((row) => (
                     <TableRow key={row.id}>
                       <TableCell>
-                        {typeLabel(row.type)}
+                        {typeLabel(row)}
+                        {row.type === "TransferIn" && row.bankReceipt ? (
+                          <p className="text-muted-foreground text-xs">{`Value date ${row.bankReceipt.valueDate}`}</p>
+                        ) : null}
                         {/* C18: an adjustment shows its memo, which the TenantAdmin wrote for the customer; not its reason. */}
                         {row.type === "Adjustment" && row.memo ? (
                           <p className="text-muted-foreground text-xs">{row.memo}</p>
