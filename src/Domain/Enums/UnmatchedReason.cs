@@ -9,5 +9,9 @@ public enum UnmatchedReason
     CurrencyMismatch = 3,
     AccountClosed = 4,
     CustomerDisabled = 5,
-    AmountPrecision = 6
+    AmountPrecision = 6,
+
+    /// <summary>The line names a withdrawal's payment but its amount differs, or the withdrawal is already paid
+    /// (withdrawals R40, R42).</summary>
+    PaymentMismatch = 7
 }

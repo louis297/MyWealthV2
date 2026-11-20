@@ -174,6 +174,17 @@ public class BankStatementLine : BaseAuditableEntity
         SetMatch(accountId, transactionId, StatementLineMatchMethod.Reference, at);
     }
 
+    /// <summary>Withdrawals R40: the debit line of a withdrawal's payment; its payout is posted.</summary>
+    public void MarkPayout(int accountId, int transactionId, int withdrawalId, DateTimeOffset at) =>
+        throw new NotImplementedException();
+
+    /// <summary>Withdrawals R42: the credit line that returns a payout; the payout is reversed.</summary>
+    public void MarkPaymentReturn(int accountId, int transactionId, int withdrawalId, int relatedLineId, DateTimeOffset at) =>
+        throw new NotImplementedException();
+
+    /// <summary>Withdrawals R40, R42: the line names a payment but does not fit it.</summary>
+    public void MarkPaymentMismatch() => throw new NotImplementedException();
+
     /// <summary>The platform could not place it (R18).</summary>
     public void MarkUnmatched(UnmatchedReason reason)
     {

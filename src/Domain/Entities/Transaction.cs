@@ -50,6 +50,9 @@ public class Transaction : BaseAuditableEntity
     /// <summary>The bank's details, on a deposit and on its Reversal (deposit-matching R32, R33).</summary>
     public TransactionBankReceiptDetail? BankReceiptDetail { get; private set; }
 
+    /// <summary>The bank's details of a payout and of its Reversal (withdrawals R41).</summary>
+    public TransactionPaymentDetail? PaymentDetail { get; private set; }
+
     /// <summary>One per <see cref="CashLegRole.Fee"/> cash leg (trade-fees R18).</summary>
     public List<TransactionFeeDetail> FeeDetails { get; private set; } = [];
 
@@ -143,6 +146,24 @@ public class Transaction : BaseAuditableEntity
         transaction.AddDomainEvent(new TransactionPosted(transaction));
         return transaction;
     }
+
+    /// <summary>The memo every payout carries (withdrawals R41).</summary>
+    public const string PayoutMemo = "Withdrawal";
+
+    /// <summary>
+    /// A withdrawal's payout from the bank statement (withdrawals R41): one <c>TransferOut</c> cash leg of
+    /// <c>−amount</c>, source <c>Payment</c>, memo <see cref="PayoutMemo"/>, no reference, and the payment detail.
+    /// Flows build it without the manual entry matrix (custody-modes R7).
+    /// </summary>
+    public static Transaction PostPayout(
+        int tenantId,
+        int accountId,
+        string accountCurrency,
+        decimal amount,
+        DateTimeOffset bookedAt,
+        TransactionSource source,
+        BankPayment payment) =>
+        throw new NotImplementedException();
 
     /// <summary>Custody modes I2: every leg account of one Transaction has the same custody mode.</summary>
     public const string DifferentCustodyModesMessage = "Both accounts must have the same custody mode.";

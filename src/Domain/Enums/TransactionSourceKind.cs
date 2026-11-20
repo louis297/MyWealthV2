@@ -16,5 +16,8 @@ public enum TransactionSourceKind
     Rebalance = 2,
 
     /// <summary>The bank feed; the source id is the statement line's PublicId (deposit-matching R32).</summary>
-    BankFeed = 3
+    BankFeed = 3,
+
+    /// <summary>A payment the bank made for a withdrawal; the source id is the withdrawal's PublicId (withdrawals R41).</summary>
+    Payment = 4
 }

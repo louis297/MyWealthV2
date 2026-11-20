@@ -43,6 +43,9 @@ public sealed class TransactionSource : ValueObject
         return new TransactionSource(TransactionSourceKind.BankFeed, statementLinePublicId);
     }
 
+    /// <summary>A payout's source: the PublicId of the withdrawal it pays (withdrawals R41).</summary>
+    public static TransactionSource Payment(Guid withdrawalPublicId) => throw new NotImplementedException();
+
     /// <summary>The source as stored on a Transaction row.</summary>
     internal static TransactionSource FromStored(TransactionSourceKind kind, Guid? publicId) =>
         kind switch
