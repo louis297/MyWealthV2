@@ -53,7 +53,8 @@ public class BankStatementSyncJobTests
         payload.RootElement.GetProperty("Queue").GetString().ShouldBe("bank");
         payload.RootElement.GetProperty("Type").GetString()!.ShouldContain("BankStatementSyncJob");
         payload.RootElement.GetProperty("Method").GetString().ShouldBe("Run");
-        payload.RootElement.GetProperty("Arguments").GetString()!.ShouldContain("\"simulator\"");
+        using var arguments = JsonDocument.Parse(payload.RootElement.GetProperty("Arguments").GetString()!);
+        JsonSerializer.Deserialize<string>(arguments.RootElement[0].GetString()!).ShouldBe("simulator");
         storage.GetAllEntriesFromHash("recurring-job:bank-statement-sync:other-bank")["Cron"].ShouldBe("*/5 * * * *");
     }
 
@@ -76,10 +77,13 @@ public class BankStatementSyncJobTests
     [Test]
     public void Run_HasNoAutomaticRetry()
     {
+        // Read from metadata: constructing the attribute asks Hangfire's global log provider for a logger.
         var retry = typeof(BankStatementSyncJob).GetMethod(nameof(BankStatementSyncJob.Run))!
-            .GetCustomAttribute<AutomaticRetryAttribute>().ShouldNotBeNull();
+            .GetCustomAttributesData()
+            .Single(data => data.AttributeType == typeof(AutomaticRetryAttribute));
 
-        retry.Attempts.ShouldBe(0);
+        retry.NamedArguments.Single(argument => argument.MemberName == nameof(AutomaticRetryAttribute.Attempts))
+            .TypedValue.Value.ShouldBe(0);
     }
 
     [Test]

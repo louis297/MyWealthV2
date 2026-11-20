@@ -1,4 +1,5 @@
 using Hangfire;
+using Hangfire.Storage;
 using Microsoft.Extensions.Logging;
 using MyWealthV2.Application.BankFeed;
 
@@ -22,8 +23,25 @@ public sealed class BankStatementSyncJob(
     public static string JobId(string connection) => $"bank-statement-sync:{connection}";
 
     [AutomaticRetry(Attempts = 0, OnAttemptsExceeded = AttemptsExceededAction.Fail)]
-    public Task Run(string connection, CancellationToken cancellationToken) =>
-        throw new NotImplementedException(pull.GetType().Name + process.GetType().Name + runLock.GetType().Name + logger.GetType().Name);
+    public async Task Run(string connection, CancellationToken cancellationToken)
+    {
+        await using var held = await runLock.TryAcquireAsync(JobId(connection), cancellationToken);
+        if (held is null)
+        {
+            logger.LogInformation("Another run of {JobId} is still going; this run does nothing.", JobId(connection));
+            return;
+        }
+
+        var outcome = await pull.RunAsync(connection, cancellationToken);
+
+        // A failed read does not stop the processing of lines already stored (R13).
+        await process.RunAsync(connection, cancellationToken);
+
+        if (outcome.AnyFailed)
+        {
+            throw new BankStatementSyncFailedException(connection, outcome.FailedClientMoneyAccounts);
+        }
+    }
 }
 
 /// <summary>Registers one recurring job per configured connection, on queue <c>bank</c> (deposit-matching R6).</summary>
@@ -31,8 +49,34 @@ public static class BankStatementRecurringJob
 {
     public const string Queue = "bank";
 
-    public static string Cron(int pollMinutes) => throw new NotImplementedException();
+    private const string Prefix = "bank-statement-sync:";
 
-    public static void Register(IRecurringJobManager recurring, JobStorage storage, ConfiguredBankConnections connections) =>
-        throw new NotImplementedException();
+    /// <summary>Every <paramref name="pollMinutes"/> minutes from the hour, UTC; 60 is once an hour.</summary>
+    public static string Cron(int pollMinutes) => pollMinutes == 60 ? "0 * * * *" : $"*/{pollMinutes} * * * *";
+
+    /// <summary>Adds or updates the job of every configured connection and removes the job of a connection that is
+    /// no longer configured.</summary>
+    public static void Register(IRecurringJobManager recurring, JobStorage storage, ConfiguredBankConnections connections)
+    {
+        foreach (var connection in connections.Settings)
+        {
+            var name = connection.Name;
+            recurring.AddOrUpdate<BankStatementSyncJob>(
+                BankStatementSyncJob.JobId(name),
+                Queue,
+                job => job.Run(name, CancellationToken.None),
+                Cron(connection.PollMinutes),
+                new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+        }
+
+        var configured = connections.Settings.Select(entry => BankStatementSyncJob.JobId(entry.Name)).ToHashSet(StringComparer.Ordinal);
+        using var storageConnection = storage.GetConnection();
+        foreach (var job in storageConnection.GetRecurringJobs())
+        {
+            if (job.Id.StartsWith(Prefix, StringComparison.Ordinal) && !configured.Contains(job.Id))
+            {
+                recurring.RemoveIfExists(job.Id);
+            }
+        }
+    }
 }

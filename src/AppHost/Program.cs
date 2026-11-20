@@ -168,8 +168,8 @@ var simulatorClientSecret = builder.AddParameter("simulator-client-secret", secr
 
 identity.WithEnvironment("Identity__SimulatorClientSecret", simulatorClientSecret);
 
-// Simulator spec §9.2. The party endpoint is for the platform (from roadmap B3) and is not external.
-// No platform host receives the party key in this slice.
+// Simulator spec §9.2. The party endpoint is for the platform (roadmap B3) and is not external. Only worker
+// receives the party key: it reads the simulator bank through bank connection "simulator" (deposit-matching §9.1).
 var simulatorPartyApiKey = builder.AddParameter("simulator-party-api-key", secret: true);
 
 var simulator = builder.AddProject<Projects.Simulator>(Services.Simulator)
@@ -202,9 +202,16 @@ identity.WithEnvironment("Identity__SimulatorOrigin", simulator.GetEndpoint("htt
 
 var eodhdApiKey = builder.AddParameter("eodhd-api-key", secret: true);
 
+// Deposit matching R1, §9.1: webapi knows only the connection name and adapter; worker also gets the URL and the
+// key. worker does not wait for the simulator: a missing party is a normal state (ADR 0021 rule 15).
+web.WithEnvironment("BankConnections__simulator__Adapter", "Simulator");
+
 builder.AddProject<Projects.Worker>(Services.Worker)
     .WithReference(databaseServer)
     .WaitFor(databaseServer)
+    .WithEnvironment("BankConnections__simulator__Adapter", "Simulator")
+    .WithEnvironment("BankConnections__simulator__BaseUrl", simulator.GetEndpoint("party"))
+    .WithEnvironment("BankConnections__simulator__ApiKey", simulatorPartyApiKey)
     .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health", endpointName: "http")
     .WithAspNetCoreEnvironment()
