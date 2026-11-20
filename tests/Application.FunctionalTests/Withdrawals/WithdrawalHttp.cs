@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using MyWealthV2.Application.BankFeed;
 using MyWealthV2.Application.FunctionalTests.Accounts;
 using MyWealthV2.Application.FunctionalTests.BankFeed;
 using MyWealthV2.Application.FunctionalTests.Custody;
@@ -126,6 +127,37 @@ internal sealed record WithdrawalWorld(
 
     /// <summary>Requests <paramref name="amount"/> as the Adviser.</summary>
     public Task<Guid> RequestAsync(decimal amount) => WithdrawalHttp.RequestAsync(Adviser, AccountId, NominatedBankAccountId, amount);
+
+    /// <summary>Adds the bank's debit line of a withdrawal's payment to the fake feed, with the withdrawal's id as the
+    /// end-to-end id (withdrawals R48, R53), and returns its outside id.</summary>
+    public string AddPayoutLine(Guid withdrawalId, decimal amount, string? endToEndId = null)
+    {
+        var id = "payout-" + Guid.NewGuid().ToString("N");
+        BankFeedHttp.Feed.Add(ClientMoney.AccountNumber, new BankFeedLine(
+            id, DateOnly.FromDateTime(DateTime.UtcNow), BankLineDirection.Debit, amount, "USD", "J Smith", "06-0123-0456789-00",
+            DepositReference, EndToEndId: endToEndId ?? withdrawalId.ToString()));
+        return id;
+    }
+
+    /// <summary>Adds the bank's credit line that returns <paramref name="payoutLine"/> (withdrawals R54).</summary>
+    public string AddReturnLine(string payoutLine, decimal amount, string? reason = "Account closed")
+    {
+        var id = "return-" + Guid.NewGuid().ToString("N");
+        BankFeedHttp.Feed.Add(ClientMoney.AccountNumber, new BankFeedLine(
+            id, DateOnly.FromDateTime(DateTime.UtcNow), BankLineDirection.Credit, amount, "USD", "J Smith", "06-0123-0456789-00",
+            DepositReference, ReturnOf: payoutLine, ReturnReason: reason));
+        return id;
+    }
+
+    /// <summary>Requests, approves, sends, and runs the job with the bank's debit line: a paid withdrawal.</summary>
+    public async Task<(Guid Withdrawal, string PayoutLine)> PaidAsync(decimal amount)
+    {
+        var id = await ApprovedAsync(amount);
+        await BankFeedHttp.SendAsync();
+        var line = AddPayoutLine(id, amount);
+        await BankFeedHttp.RunAsync();
+        return (id, line);
+    }
 
     /// <summary>Requests as the Adviser and approves as Tess.</summary>
     public async Task<Guid> ApprovedAsync(decimal amount)
