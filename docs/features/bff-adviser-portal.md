@@ -19,6 +19,7 @@ related:
   - ../adviser-portal/frontend-conventions.md
   - production-hosting.md
   - ../deployment.md
+  - withdrawals.md
 ---
 
 # Adviser Portal BFF
@@ -454,3 +455,13 @@ Today's code: `src/BffAdviserPortal/ApiProxy.cs` and `src/BffCustomerPortal/ApiP
 3. Adviser Portal BFF: RF-T1–RF-T7 red, then `ApiProxy` uses `RefreshTokenExchange` (green).
 4. Customer Portal BFF: the same.
 5. Mark this amendment landed in this file, `bff-customer-portal.md` and `back-office.md`.
+
+---
+
+## Amendment 2026-11-20 (nominated bank accounts and withdrawals prefixes) — accepted
+
+Add `/nominated-bank-accounts` and `/withdrawals` to the BFF prefix allow-list (R20) so the Adviser Portal can call the routes of [withdrawals.md](withdrawals.md) through `/api`.
+
+- Prefixes: `/nominated-bank-accounts`, `/withdrawals`
+- Methods: GET, POST
+- Who: TenantAdmin and Adviser. `webapi` checks the permissions; the BFF does not filter by role, so an Adviser gets the 403 from `webapi` on verify and approve.

@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-11-02
-last_updated: 2026-11-14
+last_updated: 2026-11-20
 related:
   - ../function-plan.md
   - ../architecture.md
@@ -20,6 +20,7 @@ related:
   - bff-adviser-portal.md
   - production-hosting.md
   - ../deployment.md
+  - withdrawals.md
 ---
 
 # Customer Portal BFF
@@ -361,3 +362,12 @@ Status of this amendment: `accepted` (2026-11-13). It is a build contract. Lande
 **Why.** R7 refreshes once per proxied request, with no join between concurrent requests. Together with refresh rotation and a zero reuse leeway (R24, identity-auth amendment 2026-10-01), two requests that hit `webapi` 401 at the same time present the same refresh token twice. The second grant is a replay, OpenIddict revokes the chain, and the person is signed out.
 
 **Here.** `src/BffCustomerPortal/ApiProxy.cs` `TryRefreshAsync` uses the shared `RefreshTokenExchange` with client `customer-portal`. RF-T1–RF-T7 run against this host as well. R7, R20, R22 and R24 are otherwise unchanged.
+
+---
+
+## Amendment 2026-11-20 (nominated bank accounts and withdrawals prefixes) — accepted
+
+Add `/nominated-bank-accounts` and `/withdrawals` to the R20 prefix allow-list so the Customer Portal can read the Customer's own nominated bank accounts and withdrawals ([withdrawals.md](withdrawals.md) C22, C24).
+
+- Prefixes: `/nominated-bank-accounts`, `/withdrawals`
+- Methods: GET only is used by the portal. `webapi` refuses every write for a Customer (403), so the BFF forwards the methods it already forwards and does not filter by role.

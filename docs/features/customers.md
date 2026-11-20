@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-14
-last_updated: 2026-11-13
+last_updated: 2026-11-20
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -18,6 +18,7 @@ related:
   - tenants.md
   - tenant-admins.md
   - advisers.md
+  - withdrawals.md
 ---
 
 # Customers
@@ -358,3 +359,12 @@ The repository should build after each commit.
 6. Hosted-login smoke after create; that Customer gets 403 on this collection and 200 on `/users/me`
 
 Do not put portal pages or ledger tables in these commits.
+
+---
+
+## Amendment 2026-11-20 (nominated bank accounts) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md](withdrawals.md).
+
+- A Customer may have **nominated bank accounts** (`/nominated-bank-accounts`): their own bank accounts that withdrawals may be paid to. They belong to the Customer, not to an Account, and do not need a Custodial account. An Adviser or TenantAdmin adds them; a TenantAdmin other than the adder verifies or rejects them. The Customer reads their own and cannot change them (roadmap D6).
+- Disabling a Customer does not change their nominated bank accounts. Adding one for a Disabled Customer, or verifying one, → 400 `disabled` / `target=user`.

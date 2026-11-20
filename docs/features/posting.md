@@ -23,6 +23,7 @@ related:
   - custody-modes.md
   - transaction-source.md
   - deposit-matching.md
+  - withdrawals.md
 ---
 
 # Posting
@@ -442,3 +443,14 @@ Accepted with [deposit-matching.md](deposit-matching.md).
 - R9 holds for the flow: an undo match whose Reversal would make the cash `SUM` negative is refused (deposit-matching R30).
 - R11: a deposit's Reversal is written by the flow (an undo match), not by `POST /transactions/{id}/reverse`, which refuses it on a Custodial account (transaction-source R13). The Reversal copies the bank receipt detail.
 - R16: `TransferIn` on a Custodial account is refused on `POST /transactions` (custody-modes R5 amendment 2026-11-20). External accounts unchanged.
+
+---
+
+## Amendment 2026-11-20 (nominated bank accounts and withdrawals) — accepted
+
+Accepted with [withdrawals.md](withdrawals.md).
+
+- §1 and roadmap D3: "maker-checker is a status on this same row" stays the rule for reviewing a ledger entry itself (roadmap X1). An **instruction** to an outside party (a withdrawal, later an order or an in-kind transfer) is a separate aggregate with its own lifecycle; the Transaction it leads to is still posted in one step, when the outside party confirms.
+- A `TransferOut` may be a **payout**: posted by the withdrawal flow from the bank's debit line, with source `Payment` (the withdrawal's PublicId), server `bookedAt`, memo `Withdrawal`, no `reference`, and a payment detail (`TransactionPaymentDetails`: value date, reference sent, payee name, masked payee account). The item carries `payment` on a payout and its Reversal, `null` otherwise. A payout is reversed only by its flow (a returned payout).
+- R9 on a Custodial account: every write that lowers cash must keep **available cash** (cash `SUM` minus the open withdrawals' reserved cash) `≥ 0`, checked under the Account lock (withdrawals R36, R37). The payout is the one exception: it releases its own reservation. External accounts keep R9 as it is.
+- R16: on a Custodial account `TransferOut` is refused on `POST /transactions` for every caller, and `CloseOut` is allowed only when `0 < SUM <` one minor unit of the currency (custody-modes amendment 2026-11-20, withdrawals R45, R46). External accounts unchanged.

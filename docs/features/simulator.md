@@ -21,6 +21,7 @@ related:
   - ../api-design.md
   - ../glossary.md
   - deposit-matching.md
+  - withdrawals.md
 ---
 
 # Simulator
@@ -427,3 +428,14 @@ Status of this amendment: `accepted` (2026-11-20), together with [deposit-matchi
 - R28: new control log actions `BankAccountOpened` and `BankReceiptAdded`.
 - §9.2: the AppHost now gives the party key to `worker` as the `simulator` bank connection's `ApiKey`, with the party endpoint as its `BaseUrl`. The Development settings list four standing accounts that match `TestSeed`'s client money accounts.
 - §11 point 7 changes: no scenario library with the receipts side. One-off control calls are enough; a named scenario earns its place when it combines steps across parties, from B6 (deposit-matching §11 point 16).
+
+---
+
+## Amendment 2026-11-20 (S1 bank, payments side) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md](withdrawals.md). Rules R48–R57 and the simulator script `0004_bank_payments.sql` live there (§4.7, §6.3); this section records what changes here.
+
+- §2 Out "Every outside party": the bank's payments side is in. Party route `POST /party/bank/accounts/{accountNumber}/payments`, idempotent on the platform's `instructionId`; control routes `POST /control/bank/payment-mode` (`Execute`, `Hold`, `Reject`), `POST /control/bank/payments/{paymentId}/execute`, `POST /control/bank/payments/{paymentId}/return` and `GET /control/bank/payments`. An executed payment is a debit line in the feed, carrying the instruction id as `endToEndId`; a return is a credit line with `returnOf`.
+- R24: a reset also empties the payments and sets the payment mode to `Execute`. R25: payment ids are `{WorldId:N}-P{n}`.
+- R28: new control log actions `BankPaymentModeChanged`, `BankPaymentExecuted` and `BankPaymentReturned`. A payment received on the party port is not a control action.
+- §11 point 7: still no scenario library (withdrawals §11 point 19); it is proposed for B7.

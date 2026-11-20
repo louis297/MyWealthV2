@@ -1,6 +1,6 @@
 ---
 title: Nominated bank accounts and withdrawals
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -45,7 +45,7 @@ The other debit lines that [deposit-matching.md](deposit-matching.md) R14 leaves
 
 New: permissions `nominated-bank-accounts.read`, `nominated-bank-accounts.manage`, `nominated-bank-accounts.verify`, `withdrawals.read`, `withdrawals.request` and `withdrawals.approve`; routes under `/nominated-bank-accounts` and `/withdrawals`; port `IBankPayments`; source kind `Payment`; item fields `reservedCash` and `availableCash` (account), `payment` (transaction), `relatedLineId`, `withdrawalId` and `returnReason` (statement line); the `direction` filter on `GET /statement-lines`. Scripts `0042_nominated_bank_accounts.sql` and `0043_withdrawals.sql`; simulator script `database/simulator/0004_bank_payments.sql`. No new `TransactionType`, problem code or domain event.
 
-**Status is `review` (2026-11-20).** The points of §11 were confirmed in discussion on 2026-11-20, every one as recommended, and are written into the rules. The spec becomes `accepted` when the owner says so; the amendments to accepted docs listed in §12 are made in that change, not before.
+**Status is `accepted` (2026-11-20).** The points of §11 were confirmed in discussion on 2026-11-20, every one as recommended, and are written into the rules. The amendments to accepted docs listed in §12 were made when it was accepted. It is a build contract.
 
 ---
 

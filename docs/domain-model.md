@@ -305,6 +305,8 @@ Invariants:
 - A Custodial account is a `Brokerage` account: `Create` refuses `Custodial` with any other type, and Application lets a caller select it. An External account may have any openable type. An Active `AccountPortfolioAssignment` is on a Custodial account (held by Application; [features/custody-modes.md](features/custody-modes.md)).
 - (client money accounts) A Custodial account has a `DepositReference` and an External account has none: `Create` takes an optional `DepositReference` and refuses a Custodial account without one or an External account with one. The reference never changes. Uniqueness on the platform is held by Application and a unique index. A Custodial account is opened only in a currency with an active client money account at the time of open; Application holds that check, and reopen does not repeat it ([features/client-money-accounts.md](features/client-money-accounts.md)).
 
+- (Withdrawals) A Custodial account has **reserved cash**, the sum of its open withdrawals, and **available cash**, the cash `SUM` minus reserved cash. Every write that lowers cash on a Custodial account keeps available cash `≥ 0`, except a payout, which releases its own reservation. Held by Application under the Account lock (`AccountCash` with the Domain static `AvailableCash`); External accounts have no reserved cash ([features/withdrawals.md](features/withdrawals.md)).
+
 Field rules: [features/accounts.md](features/accounts.md). Landed in the repo 2026-09-21. Custody mode: [features/account-custody-mode.md](features/account-custody-mode.md) (landed 2026-11-17). Custodial account rules: [features/custody-modes.md](features/custody-modes.md) (accepted 2026-11-17).
 
 Close requires cash `SUM = 0` and no `Holdings` rows ([features/holdings.md](features/holdings.md)).
@@ -345,6 +347,8 @@ Invariants:
 - (Adjustments) `PostAdjustment` builds an `Adjustment` on one Account: at most one `Principal` cash leg and at most one security leg, at least one of them, a required memo and an adjustment detail. The security leg stores the signed quantity and cost changes as given (no price, no release). Cash `SUM ≥ 0`; the holding after it has quantity `≥ 0`, cost `≥ 0`, and no cost on a zero quantity. The factory does not read the custody mode; Application holds the Custodial-only rule and the `transactions.adjust` permission, on create and on reverse ([features/adjustments.md](features/adjustments.md)).
 - (Deposit matching) Source kind `BankFeed` (3) has the statement line's PublicId as its id and is not hand-reversible. `PostBankDeposit` builds a deposit: one `Principal` `TransferIn` cash leg, `amount > 0`, source `BankFeed`, a bank receipt detail. A deposit is undone only by its flow, through `Reverse` with source `BankFeed`. `CustodyRules.AllowsManualEntry(Custodial, TransferIn)` is `false`: no person enters a `TransferIn` on a Custodial account ([features/deposit-matching.md](features/deposit-matching.md)).
 
+- (Withdrawals) Source kind `Payment` (4) has the withdrawal's PublicId as its id and is not hand-reversible. `PostPayout` builds a payout: one `Principal` `TransferOut` cash leg, the amount given positive and posted negative, source `Payment`, a payment detail (`TransactionPaymentDetail`: value date, reference sent, payee name, masked payee account; 0..1 per Transaction, copied by `Reverse`). A payout is undone only by its flow (a returned payout), through `Reverse` with source `Payment`. `CustodyRules` refuses a hand `TransferOut` on a Custodial account, allows a hand `CloseOut` there only for a remainder below the currency's minor unit, and allows an `InternalTransfer` between Custodial accounts of the same Customer only ([features/withdrawals.md](features/withdrawals.md)).
+
 Field rules: [features/posting.md](features/posting.md), [features/holdings.md](features/holdings.md), [features/buy-sell.md](features/buy-sell.md), [features/split.md](features/split.md), [features/leg-accounts.md](features/leg-accounts.md), and [features/adjustments.md](features/adjustments.md).
 
 ### 8.7 Trade fee schedule (accepted — trade-fees slice)
@@ -376,6 +380,28 @@ Amendment 2026-11-20 (deposit matching, accepted): `ClientMoneyAccount` gains `B
 | `DepositReferenceScanner` | Domain service | Deposit reference candidates in a free-text reference (tokens and the whole text, Crockford mapping, check symbol). |
 
 Invariants: a `Matched` line has exactly one Account and one deposit; no other status has one. The economic fields never change. Uniqueness on (connection, outside id) spans rows, so Application holds it with a unique index as the backstop. Field rules: [features/deposit-matching.md](features/deposit-matching.md).
+
+
+Amendment 2026-11-20 (withdrawals, accepted): `BankStatementLine` gains `EndToEndId`, `ReturnOfOutsideId`, `RelatedLineId` (the stored line it returns), `ReturnReason` and `WithdrawalId`; `Receive` takes the three new wire fields. New methods `MarkPayout`, `MarkPaymentReturn` and `MarkPaymentMismatch`; unmatched reason `PaymentMismatch` (7); match methods `Payment` (2) and `PaymentReturn` (3). A `Matched` line still has one Account and one Transaction ([features/withdrawals.md](features/withdrawals.md)).
+
+### 8.10 Nominated bank account (accepted — withdrawals slice)
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `NominatedBankAccount` | Aggregate | A Customer's own bank account that withdrawals may be paid to: Customer, currency, bank name, account name, full account number (all immutable); status (`Pending`, `Verified`, `Rejected`, `Removed`); who added it, who reviewed it (with a note) and who removed it (with a note). `Add`, `Verify`, `Reject`, `Remove`. |
+| `NominatedBankAccountStatus` | Enum | `Pending`, `Verified`, `Rejected`, `Removed` |
+
+Invariants: the details never change; a correction is a new row. Verify and reject only from `Pending`, by someone other than the person who added it. Remove from `Pending` or `Verified`. `Rejected` and `Removed` are final. At most one `Pending` or `Verified` row per (Customer, account number key, currency) spans rows, so Application holds it with a filtered unique index as the backstop. Field rules: [features/withdrawals.md](features/withdrawals.md).
+
+### 8.11 Withdrawal and outgoing payment (accepted — withdrawals slice)
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `Withdrawal` | Aggregate | An instruction to pay cash from a Custodial account to a verified nominated bank account of the same Customer (roadmap D3: an instruction is its own aggregate, not a Transaction). Account, nominated bank account, amount, currency, reference, memo, status (`Requested`, `Approved`, `Sent`, `Paid`, `Rejected`, `Cancelled`, `Failed`, `Returned`), requester, decision (`Approved`, `Rejected`, `Cancelled`, by, at, note), payout and return Transactions, failure and return reasons. Open while `Requested`, `Approved` or `Sent`. |
+| `OutgoingPayment` | Aggregate | One payment the platform asks a bank to make from a client money account: connection, instruction PublicId (the withdrawal's), amount, reference, status (`Pending`, `Accepted`, `Rejected`, `Cancelled`, `Paid`, `Returned`), attempts, last attempt and failure, the bank's payment id, reject reason. |
+| `PaymentRejectReason` | Enum | `InvalidAccount`, `AccountClosed`, `InsufficientFunds`, `Refused` |
+
+Invariants: a withdrawal is approved or rejected by someone other than its requester. It is cancelled only while `Requested`, or `Approved` with an outgoing payment that has no send attempt. A withdrawal has at most one payout and at most one return Reversal. An outgoing payment is unique on its instruction PublicId (a unique index). No domain event. Field rules: [features/withdrawals.md](features/withdrawals.md).
 
 ---
 
@@ -431,6 +457,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-19 | Simulator accepted: fifth role `SimulatorOperator` in §1, §4 and §5. The simulator's own types are not platform Domain types ([features/simulator.md](features/simulator.md) §5). |
 | 2026-11-20 | Client money accounts accepted: `ClientMoneyAccount` and `DepositReference` (§8.8); `Account` holds a deposit reference on Custodial accounts only (§8.5). [features/client-money-accounts.md](features/client-money-accounts.md). |
 | 2026-11-20 | Deposit matching accepted: `BankStatementLine`, `BankFeedCursor`, `DepositReferenceScanner` (§8.9); source kind `BankFeed`, `PostBankDeposit` and `TransactionBankReceiptDetail` (§8.6); `ClientMoneyAccount.BankConnection` (§8.8). [features/deposit-matching.md](features/deposit-matching.md). |
+| 2026-11-20 | Withdrawals accepted: `NominatedBankAccount` (§8.10); `Withdrawal`, `OutgoingPayment` (§8.11); reserved and available cash on a Custodial account (§8.5); source kind `Payment`, `PostPayout`, `TransactionPaymentDetail` and the Custodial `TransferOut`, `CloseOut` and `InternalTransfer` rules (§8.6); the payout fields of `BankStatementLine` (§8.9). [features/withdrawals.md](features/withdrawals.md). |
 
 ---
 

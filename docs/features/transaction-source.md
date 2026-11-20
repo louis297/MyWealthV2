@@ -19,6 +19,7 @@ related:
   - ../glossary.md
   - ../known-issues/custodial-account-gaps.md
   - deposit-matching.md
+  - withdrawals.md
 ---
 
 # Transaction source
@@ -356,3 +357,15 @@ Status of this amendment: `accepted` (2026-11-20), together with [deposit-matchi
 - R10: `kind` may be `BankFeed`.
 - R12: `BankFeed` is not hand-reversible. On a Custodial account a hand reverse of a deposit → 400 (R13). The deposit flow undoes its own write by an undo match (deposit-matching R30, R33).
 - §5: `TransactionSource.BankFeed(Guid statementLinePublicId)`; an empty id → `DomainException`.
+
+---
+
+## Amendment 2026-11-20 (nominated bank accounts and withdrawals) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md](withdrawals.md).
+
+- R2: new kind `Payment` (4), written by the withdrawal flow. Script `0043` widens `CK_Transactions_SourceKind` to 0–4 and requires a `SourcePublicId` for kinds 2, 3 and 4.
+- R3: the source id of `Payment` is the PublicId of the withdrawal. A payout and the Reversal of a returned payout share it.
+- R10: `kind` may be `Payment`.
+- R12: `Payment` is not hand-reversible. On a Custodial account a hand reverse of a payout or its Reversal → 400 (R13). The withdrawal flow undoes its own write when the bank returns the payout.
+- §5: `TransactionSource.Payment(Guid withdrawalPublicId)`; an empty id → `DomainException`.
