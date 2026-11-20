@@ -3,6 +3,8 @@
  * still decides: when it refuses a type, the form shows the sentence of the 400.
  */
 const refusedOnCustodial: ReadonlySet<string> = new Set([
+  // D39 (deposit-matching R35): deposits come from the bank statement.
+  "TransferIn",
   "Interest",
   "Opening",
   "OpeningHoldings",

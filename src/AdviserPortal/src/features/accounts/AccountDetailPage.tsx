@@ -333,6 +333,9 @@ export function AccountDetailPage() {
                   <DetailItem label="Reference">{depositInstructions.data.reference}</DetailItem>
                   <DetailItem label="Currency">{depositInstructions.data.currency}</DetailItem>
                 </DetailGrid>
+                <p className="text-muted-foreground mt-3 text-sm">
+                  Deposits are credited from the bank statement when the customer pays in with this reference.
+                </p>
               </CardContent>
             </Card>
           ) : isNotFound(depositInstructions.error) ? (

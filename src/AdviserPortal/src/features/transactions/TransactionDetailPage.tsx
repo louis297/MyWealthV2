@@ -1,10 +1,11 @@
 import { Link, useParams } from "react-router";
-import { Muted, Page, PageHeading, recordLinkClass } from "@/components/portal";
+import { DetailGrid, DetailItem, Muted, Page, PageHeading, recordLinkClass, Section } from "@/components/portal";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
 import { useAppSelector } from "@/app/hooks";
+import { roles } from "@/features/session/roles";
 import {
   adjustmentReasonLabel,
   canReverse,
@@ -36,6 +37,21 @@ export function TransactionDetailPage() {
             <p className="font-mono text-xs break-all">{data.id}</p>
             <Badge variant="secondary">{data.type}</Badge>
             {data.source ? <p className="text-muted-foreground text-sm">{`Source: ${sourceLabel(data.source.kind)}`}</p> : null}
+            {data.source?.kind === "BankFeed" && data.source.id && role === roles.tenantAdmin ? (
+              <Link to={`/statement-lines/${data.source.id}`} className={recordLinkClass}>
+                Statement line
+              </Link>
+            ) : null}
+            {data.bankReceipt ? (
+              <Section title="Bank receipt">
+                <DetailGrid>
+                  <DetailItem label="Value date">{data.bankReceipt.valueDate}</DetailItem>
+                  <DetailItem label="Reference">{data.bankReceipt.reference ?? "—"}</DetailItem>
+                  <DetailItem label="Payer">{data.bankReceipt.payerName ?? "—"}</DetailItem>
+                  <DetailItem label="Payer account">{data.bankReceipt.payerAccount ?? "—"}</DetailItem>
+                </DetailGrid>
+              </Section>
+            ) : null}
             {data.adjustment ? (
               <p className="text-muted-foreground text-sm">{`Reason: ${adjustmentReasonLabel(data.adjustment.reason)}`}</p>
             ) : null}
