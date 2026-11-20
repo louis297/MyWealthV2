@@ -140,7 +140,8 @@ describe("WithdrawPage (withdrawals D45)", () => {
   it("says how to add an account when the Customer has none in the currency", async () => {
     renderFees(me, routes, `/accounts/${accountId}/withdraw`, serve([]));
 
-    expect(await screen.findByText("No verified bank account in USD. Add one on the customer page.")).toBeInTheDocument();
+    expect(await screen.findByText((_, element) =>
+      element?.tagName === "P" && element.textContent === "No verified bank account in USD. Add one on the customer page.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "customer page" })).toHaveAttribute("href", `/customers/${customerId}`);
   });
 
@@ -176,9 +177,9 @@ describe("WithdrawalsListPage (withdrawals D46)", () => {
       return undefined;
     });
 
-    expect(await screen.findByText("Waiting for approval")).toBeInTheDocument();
+    expect(await screen.findByText("ANZ ****8900")).toBeInTheDocument();
+    expect(screen.getAllByText("Waiting for approval").length).toBeGreaterThan(0);
     expect(new URL(requestsTo(requests, "GET", "/withdrawals")[0].url).searchParams.get("status")).toBe("Requested");
-    expect(screen.getByText("ANZ ****8900")).toBeInTheDocument();
     expect(await screen.findByText("Ned North")).toBeInTheDocument();
     expect(await screen.findByText("Managed portfolio")).toBeInTheDocument();
     expect(screen.getByText("Ann Adviser")).toBeInTheDocument();
@@ -260,7 +261,7 @@ describe("WithdrawalDetailPage (withdrawals D47)", () => {
 
     expect(await screen.findByText("Approved, sending")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
-    expect(screen.getByText("Timed out")).toBeInTheDocument();
+    expect(screen.getByText("Bank did not answer in time")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancel withdrawal" })).not.toBeInTheDocument();
   });
 

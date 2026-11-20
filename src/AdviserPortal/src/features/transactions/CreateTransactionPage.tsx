@@ -5,14 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { SelectItem } from "@/components/ui/select";
 import { useGetAccountHoldingsQuery, useGetAccountQuery } from "@/features/accounts/accountsApi";
-import { allowsManualEntry, bookedWhenPosted, isCustodial } from "@/features/accounts/custodyRules";
+import { allowsManualEntry, bookedWhenPosted, isCustodial, offersCloseOut } from "@/features/accounts/custodyRules";
+import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
 import { useGetAccountPortfolioQuery } from "@/features/portfolios/portfoliosApi";
 import { useGetInstrumentsQuery } from "@/features/instruments/instrumentsApi";
 import { useCreateTransactionMutation } from "@/features/transactions/transactionsApi";
 import { toUtcIso } from "@/shared/time/instant";
 
 const securityTypes = ["Buy", "Sell", "StockIn", "StockOut", "Split", "Bonus", "Scrip"] as const;
-const cashTypes = ["TransferIn", "TransferOut"] as const;
+// D44 (withdrawals R46): CloseOut is offered only on a Custodial account with a remainder below the minor unit.
+const cashTypes = ["TransferIn", "TransferOut", "CloseOut"] as const;
 const types = [...securityTypes, ...cashTypes] as const;
 
 function initialType(value: string | null) {
@@ -27,6 +29,7 @@ function isCashType(value: string): value is (typeof cashTypes)[number] {
 }
 
 function cashSignError(type: (typeof cashTypes)[number], amount: number) {
+  // TransferOut and CloseOut are negative.
   const invalid = type === "TransferIn" ? !(amount > 0) : !(amount < 0);
   return invalid ? "Amount sign is not valid for this transaction type." : null;
 }
@@ -97,6 +100,9 @@ export function CreateTransactionPage() {
   const [messages, setMessages] = useState<string[]>([]);
   const account = useGetAccountQuery(accountId ?? "", { skip: !accountId });
   const custodial = isCustodial(account.data);
+  const currencies = useGetCurrenciesQuery();
+  const places = currencies.data?.find((item) => item.code === account.data?.currency)?.decimalPlaces;
+  const closeOut = account.data ? offersCloseOut(account.data, places) : false;
   const assignment = useGetAccountPortfolioQuery(accountId ?? "", { skip: !accountId });
   const holdings = useGetAccountHoldingsQuery(accountId ?? "", { skip: !accountId });
   const instruments = useGetInstrumentsQuery();
@@ -177,7 +183,9 @@ export function CreateTransactionPage() {
   const offeredTypes = [
     ...(offerSecurity ? securityTypes : []),
     ...(offerCash ? cashTypes : []),
-  ].filter((item) => !account.data || allowsManualEntry(account.data.custodyMode, item));
+  ].filter((item) => item === "CloseOut"
+    ? closeOut
+    : !account.data || allowsManualEntry(account.data.custodyMode, item));
   // D39: a type the account does not take (for example TransferIn on a Custodial account, from the address) is not
   // kept; the form starts on the first type the account offers.
   const offeredKey = offeredTypes.join(",");
@@ -188,6 +196,12 @@ export function CreateTransactionPage() {
     // offeredKey stands for offeredTypes, which is rebuilt on every render.
   }, [account.data, offeredKey, type]);
   const cashType = isCashType(type);
+  // D44: a CloseOut writes off the whole remainder, so its amount is the balance, negated.
+  useEffect(() => {
+    if (type === "CloseOut" && account.data) {
+      setAmount(String(-account.data.cashBalance));
+    }
+  }, [type, account.data]);
   const securityBlocked = assignment.isSuccess && assignment.data?.status === "Active" && !cashType;
 
   if (isNotFound(account.error)) {
@@ -228,6 +242,7 @@ export function CreateTransactionPage() {
                       id="transaction-amount"
                       label="Amount"
                       value={amount}
+                      readOnly={type === "CloseOut"}
                       onChange={(event) => setAmount(event.target.value)}
                       required
                     />

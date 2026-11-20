@@ -778,7 +778,6 @@ describe("CreateTransactionPage", () => {
       expect(screen.getAllByRole("option").map((option) => option.textContent?.trim())).toEqual([
         "Buy",
         "Sell",
-        "TransferOut",
       ]);
     });
   });

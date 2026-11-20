@@ -1309,7 +1309,8 @@ describe("AccountDetailPage", () => {
 
     expect(await screen.findByRole("button", { name: "Unassign" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Buy" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "TransferOut" })).toBeInTheDocument();
+    // D44 (withdrawals R45): cash leaves a Custodial account as a withdrawal, also while a portfolio is assigned.
+    expect(screen.getByRole("link", { name: "Withdraw" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Unassign" }));
     expect(await screen.findByRole("link", { name: "Buy" })).toBeInTheDocument();
     expect(deleted.some((url) => url.includes(`/api/accounts/${accountId}/portfolio`))).toBe(true);

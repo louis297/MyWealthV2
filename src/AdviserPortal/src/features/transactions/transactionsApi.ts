@@ -100,7 +100,7 @@ export type CreateSecurityTransactionBody = {
 
 export type CreateCashTransactionBody = {
   accountId: string;
-  type: "TransferIn" | "TransferOut";
+  type: "TransferIn" | "TransferOut" | "CloseOut";
   amount: number;
   bookedAt?: string;
   memo: string | null;

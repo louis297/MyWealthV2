@@ -5,6 +5,8 @@
 const refusedOnCustodial: ReadonlySet<string> = new Set([
   // D39 (deposit-matching R35): deposits come from the bank statement.
   "TransferIn",
+  // D44 (withdrawals R45): money leaves as a withdrawal to a nominated bank account.
+  "TransferOut",
   "Interest",
   "Opening",
   "OpeningHoldings",
@@ -28,3 +30,25 @@ export const bookedWhenPosted = "Booked when posted.";
 
 /** D20: a transfer or conversion needs both Accounts in the same custody mode (custody-modes R8). */
 export const differentCustodyMode = "Different custody mode";
+
+/** One minor unit of a currency: 0.01 for two decimals, 1 for none. */
+export function minorUnit(decimalPlaces: number | undefined) {
+  return 10 ** -(decimalPlaces ?? 2);
+}
+
+/**
+ * D44 (withdrawals R46): on a Custodial account a CloseOut writes off only a remainder smaller than one minor unit.
+ * The portal does not offer CloseOut on an External account.
+ */
+export function offersCloseOut(
+  account: { custodyMode: string; status: string; cashBalance: number },
+  decimalPlaces: number | undefined,
+): boolean {
+  return isCustodial(account)
+    && account.status === "Open"
+    && account.cashBalance > 0
+    && account.cashBalance < minorUnit(decimalPlaces);
+}
+
+/** D44 (withdrawals R47): a Custodial account of another Customer is not a transfer destination. */
+export const anotherCustomer = "Another customer";
