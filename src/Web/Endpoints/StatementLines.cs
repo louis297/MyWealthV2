@@ -81,10 +81,11 @@ public class StatementLines : IEndpointGroup
         string? status = null,
         string? currency = null,
         Guid? clientMoneyAccountId = null,
-        Guid? tenantId = null)
+        Guid? tenantId = null,
+        string? direction = null)
     {
         var result = await sender.Send(
-            new GetStatementLinesQuery(page, pageSize, status, currency, clientMoneyAccountId, tenantId));
+            new GetStatementLinesQuery(page, pageSize, status, currency, clientMoneyAccountId, tenantId, direction));
         return TypedResults.Ok(result);
     }
 

@@ -31,6 +31,14 @@ public sealed class StatementLineDto
 
     public StatementLineLastActionDto? LastAction { get; init; }
 
+    /// <summary>The PublicId of the line this line returns, else null (withdrawals R44).</summary>
+    public Guid? RelatedLineId { get; init; }
+
+    /// <summary>The withdrawal of a payout line and of a returned payout line, else null (withdrawals R44).</summary>
+    public Guid? WithdrawalId { get; init; }
+
+    public string? ReturnReason { get; init; }
+
     public required string RowVersion { get; init; }
 }
 
