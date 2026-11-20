@@ -20,6 +20,9 @@ public class BankStatementLineConfiguration : IEntityTypeConfiguration<BankState
         builder.Property(line => line.PayerAccountMasked).HasMaxLength(BankStatementLine.PayerAccountMaxLength);
         builder.Property(line => line.ReferenceText).HasMaxLength(BankStatementLine.FreeTextMaxLength);
         builder.Property(line => line.LastActionNote).HasMaxLength(BankStatementLine.NoteMaxLength);
+        builder.Property(line => line.EndToEndId).HasMaxLength(BankStatementLine.OutsideIdMaxLength);
+        builder.Property(line => line.ReturnOfOutsideId).HasMaxLength(BankStatementLine.OutsideIdMaxLength);
+        builder.Property(line => line.ReturnReason).HasMaxLength(BankStatementLine.FreeTextMaxLength);
         builder.Property(line => line.CreatedBy).HasMaxLength(450).IsRequired();
         builder.Property(line => line.RowVersion).IsRowVersion();
         builder.HasIndex(line => line.PublicId).IsUnique();

@@ -102,6 +102,7 @@ public sealed class PullBankStatements(
                 || line.Direction is null
                 || line.Amount is null
                 || !BankStatementLine.IsStorable(line.Id, line.Direction.Value, line.Amount.Value)
+                || !BankStatementLine.FitsPaymentIds(line.EndToEndId, line.ReturnOf)
                 || !string.Equals(line.Currency?.Trim(), account.Currency, StringComparison.OrdinalIgnoreCase))
             {
                 return BankFeedFailure.InvalidLine;
@@ -150,7 +151,10 @@ public sealed class PullBankStatements(
                     line.PayerName,
                     AccountNumberMask.Mask(line.PayerAccount),
                     line.Reference,
-                    now);
+                    now,
+                    endToEndId: line.EndToEndId,
+                    returnOfOutsideId: line.ReturnOf,
+                    returnReason: line.ReturnReason);
 
                 // The worker's system user, also when the pull runs outside the worker (deposit-matching R32).
                 stored.CreatedBy = SystemActor.Name;
@@ -165,7 +169,37 @@ public sealed class PullBankStatements(
 
             cursor.Advance(page.Cursor, now);
             await db.SaveChangesAsync(token);
+            await LinkReturnedLinesAsync(connection, token);
         }, cancellationToken);
+    }
+
+    /// <summary>Withdrawals R38: a line that names the line it takes back is linked to that stored line of the same
+    /// connection, also when both arrived in one page.</summary>
+    private async Task LinkReturnedLinesAsync(string connection, CancellationToken cancellationToken)
+    {
+        var added = db.BankStatementLines.Local
+            .Where(line => line.ReturnOfOutsideId is not null && line.RelatedLineId is null)
+            .ToList();
+        if (added.Count == 0)
+        {
+            return;
+        }
+
+        var outsideIds = added.Select(line => line.ReturnOfOutsideId!).Distinct().ToList();
+        var returned = await db.BankStatementLines.IgnoreQueryFilters().AsNoTracking()
+            .Where(row => row.Connection == connection && outsideIds.Contains(row.OutsideId))
+            .Select(row => new { row.OutsideId, row.Id })
+            .ToListAsync(cancellationToken);
+        var byOutsideId = returned.ToDictionary(row => row.OutsideId, row => row.Id, StringComparer.OrdinalIgnoreCase);
+        foreach (var line in added)
+        {
+            if (byOutsideId.TryGetValue(line.ReturnOfOutsideId!, out var relatedId))
+            {
+                line.LinkReturnedLine(relatedId);
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private async Task RecordFailureAsync(

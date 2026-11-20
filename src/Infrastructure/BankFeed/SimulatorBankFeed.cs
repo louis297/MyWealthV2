@@ -104,7 +104,10 @@ public sealed class SimulatorBankFeed(IHttpClientFactory httpClients) : IBankFee
                 item.Currency,
                 item.PayerName,
                 item.PayerAccount,
-                item.Reference))
+                item.Reference,
+                item.EndToEndId,
+                item.ReturnOf,
+                item.ReturnReason))
             .ToList();
         return BankFeedResult.Succeeded(new BankFeedPage(lines, page.Cursor, page.HasMore));
     }
@@ -122,5 +125,8 @@ public sealed class SimulatorBankFeed(IHttpClientFactory httpClients) : IBankFee
         [property: JsonPropertyName("currency")] string? Currency,
         [property: JsonPropertyName("payerName")] string? PayerName,
         [property: JsonPropertyName("payerAccount")] string? PayerAccount,
-        [property: JsonPropertyName("reference")] string? Reference);
+        [property: JsonPropertyName("reference")] string? Reference,
+        [property: JsonPropertyName("endToEndId")] string? EndToEndId = null,
+        [property: JsonPropertyName("returnOf")] string? ReturnOf = null,
+        [property: JsonPropertyName("returnReason")] string? ReturnReason = null);
 }

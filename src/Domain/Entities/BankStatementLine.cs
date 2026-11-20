@@ -110,6 +110,11 @@ public class BankStatementLine : BaseAuditableEntity
             throw new DomainException("Currency must be a three-letter code.");
         }
 
+        if (!FitsPaymentIds(endToEndId, returnOfOutsideId))
+        {
+            throw new DomainException($"An end-to-end id and a returned line id are at most {OutsideIdMaxLength} characters.");
+        }
+
         return new BankStatementLine
         {
             PublicId = publicId ?? Guid.NewGuid(),
@@ -125,15 +130,19 @@ public class BankStatementLine : BaseAuditableEntity
             PayerAccountMasked = FreeText(payerAccountMasked, PayerAccountMaxLength),
             ReferenceText = FreeText(referenceText, FreeTextMaxLength),
             ReceivedAt = receivedAt,
-            Status = BankStatementLineStatus.Received
+            Status = BankStatementLineStatus.Received,
+            EndToEndId = string.IsNullOrEmpty(endToEndId) ? null : endToEndId,
+            ReturnOfOutsideId = string.IsNullOrEmpty(returnOfOutsideId) ? null : returnOfOutsideId,
+            ReturnReason = FreeText(returnReason, FreeTextMaxLength)
         };
     }
 
     /// <summary>Withdrawals R38: an end-to-end id and a returned line id fit in 100 characters each.</summary>
-    public static bool FitsPaymentIds(string? endToEndId, string? returnOfOutsideId) => throw new NotImplementedException();
+    public static bool FitsPaymentIds(string? endToEndId, string? returnOfOutsideId) =>
+        (endToEndId?.Length ?? 0) <= OutsideIdMaxLength && (returnOfOutsideId?.Length ?? 0) <= OutsideIdMaxLength;
 
     /// <summary>Withdrawals R38: the stored line this line takes back.</summary>
-    public void LinkReturnedLine(int relatedLineId) => throw new NotImplementedException();
+    public void LinkReturnedLine(int relatedLineId) => RelatedLineId = relatedLineId;
 
     /// <summary>True when the bank's line has a shape the platform can store (R10).</summary>
     public static bool IsStorable(string? outsideId, BankLineDirection direction, decimal amount) =>
