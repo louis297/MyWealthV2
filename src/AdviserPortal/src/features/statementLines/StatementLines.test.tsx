@@ -411,3 +411,69 @@ describe("MatchStatementLinePage (deposit-matching D36)", () => {
     expect(await screen.findByText("No account has this deposit reference.")).toBeInTheDocument();
   });
 });
+
+describe("Bank receipts payments out (withdrawals D49)", () => {
+  const withdrawalId = "77777777-0000-0000-0000-000000000001";
+  const payoutLine = {
+    ...matched,
+    direction: "Debit",
+    reference: "K7M3Q9PXB",
+    match: { accountId, customerId, transactionId, method: "Payment", at: "2026-11-20T04:07:02Z" },
+    relatedLineId: null,
+    withdrawalId,
+    returnReason: null,
+  };
+
+  it("filters receipts by default and offers payments out and all", async () => {
+    stubBrowser("/statement-lines");
+    const { requests } = renderFees(feeUser(), [{ path: "/statement-lines", element: <StatementLinesListPage /> }],
+      "/statement-lines", (request) => (path(request) === "/statement-lines" ? page([unmatched]) : undefined));
+
+    await screen.findByRole("row", { name: /J SMITH/ });
+    expect(new URL(requestsTo(requests, "GET", "/statement-lines")[0].url).searchParams.get("direction")).toBe("Credit");
+    await chooseOption("Direction", "Payments out");
+    await waitFor(() => expect(requestsTo(requests, "GET", "/statement-lines").some((request) =>
+      new URL(request.url).searchParams.get("direction") === "Debit")).toBe(true));
+    await chooseOption("Direction", "All");
+    await waitFor(() => expect(requestsTo(requests, "GET", "/statement-lines").some((request) =>
+      !new URL(request.url).searchParams.has("direction"))).toBe(true));
+  });
+
+  it("labels a payment mismatch", async () => {
+    stubBrowser("/statement-lines");
+    renderFees(feeUser(), [{ path: "/statement-lines", element: <StatementLinesListPage /> }], "/statement-lines", (request) =>
+      path(request) === "/statement-lines" ? page([{ ...unmatched, direction: "Debit", unmatchedReason: "PaymentMismatch" }]) : undefined);
+
+    expect(await screen.findByText("Amount differs from the payment")).toBeInTheDocument();
+  });
+
+  it("shows a payout line with the method label, a withdrawal link and no action", async () => {
+    stubBrowser(`/statement-lines/${lineId}`);
+    renderFees(feeUser(), [{ path: "/statement-lines/:id", element: <StatementLineDetailPage /> }], `/statement-lines/${lineId}`,
+      serveLine(payoutLine));
+
+    expect(await screen.findByText("Paid by the platform")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Withdrawal" })).toHaveAttribute("href", `/withdrawals/${withdrawalId}`);
+    for (const name of ["Match", "Ignore", "Return to payer", "Reopen", "Undo match"]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+  });
+
+  it("shows a returned payout with its method label and a link to the line it returns", async () => {
+    stubBrowser(`/statement-lines/${lineId}`);
+    const returnedId = "3f2c0000-0000-0000-0000-0000000000e2";
+    renderFees(feeUser(), [{ path: "/statement-lines/:id", element: <StatementLineDetailPage /> }], `/statement-lines/${lineId}`,
+      serveLine({
+        ...payoutLine,
+        direction: "Credit",
+        match: { ...payoutLine.match, method: "PaymentReturn" },
+        relatedLineId: returnedId,
+        returnReason: "Account closed",
+      }));
+
+    expect(await screen.findByText("Payment returned")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Returned line" })).toHaveAttribute("href", `/statement-lines/${returnedId}`);
+    expect(screen.getByText("Account closed")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Undo match" })).not.toBeInTheDocument();
+  });
+});

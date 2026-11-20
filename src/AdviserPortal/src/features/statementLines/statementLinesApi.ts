@@ -28,10 +28,14 @@ export type StatementLine = {
     by: { id: string; name: string };
     at: string;
   } | null;
+  /** withdrawals R44: the line this line returns, the withdrawal of a payout line, and the bank's return reason. */
+  relatedLineId?: string | null;
+  withdrawalId?: string | null;
+  returnReason?: string | null;
   rowVersion: string;
 };
 
-export type StatementLineListArgs = { status: string; page?: number };
+export type StatementLineListArgs = { status: string; direction?: string; page?: number };
 
 export type NoteAction = "ignore" | "request-return" | "unmatch";
 

@@ -620,3 +620,36 @@ describe("TransactionDetailPage bank deposit (deposit-matching D38)", () => {
     expect(screen.queryByRole("heading", { name: "Bank receipt" })).not.toBeInTheDocument();
   });
 });
+
+describe("TransactionDetailPage payout (withdrawals D48)", () => {
+  const path = `/transactions/${originalId}`;
+  const routes = [{ path: "/transactions/:id", element: <TransactionDetailPage /> }];
+  const withdrawalId = "77777777-0000-0000-0000-000000000001";
+  const payout = {
+    ...original,
+    type: "TransferOut",
+    memo: "Withdrawal",
+    security: [],
+    source: { kind: "Payment", id: withdrawalId },
+    bankReceipt: null,
+    payment: { valueDate: "2026-11-20", reference: "K7M3Q9PXB", payeeName: "J Smith", payeeAccount: "****8900" },
+  };
+
+  beforeEach(() => {
+    stubBrowser(path);
+  });
+
+  it("shows the Payment section, the Withdrawal source with its link, and no Reverse", async () => {
+    renderFees(adviser(), routes, path, (request) =>
+      request.method === "GET" && request.url.endsWith(path) ? json(payout) : undefined);
+
+    const section = (await screen.findByRole("heading", { name: "Payment" })).closest("section")!;
+    expect(within(section).getByText("2026-11-20")).toBeInTheDocument();
+    expect(within(section).getByText("K7M3Q9PXB")).toBeInTheDocument();
+    expect(within(section).getByText("J Smith")).toBeInTheDocument();
+    expect(within(section).getByText("****8900")).toBeInTheDocument();
+    expect(screen.getByText("Source: Withdrawal")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Withdrawal" })).toHaveAttribute("href", `/withdrawals/${withdrawalId}`);
+    expect(screen.queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
+  });
+});

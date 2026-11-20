@@ -73,6 +73,15 @@ export type Transaction = {
   adjustment?: { reason: string } | null;
   /** deposit-matching R36: the bank's details on a deposit and on its Reversal; otherwise null. */
   bankReceipt?: TransactionBankReceipt | null;
+  /** withdrawals R41: the bank's details on a payout and on its Reversal; otherwise null. */
+  payment?: TransactionPayment | null;
+};
+
+export type TransactionPayment = {
+  valueDate: string;
+  reference: string | null;
+  payeeName: string | null;
+  payeeAccount: string | null;
 };
 
 export type TransactionListArgs = {
