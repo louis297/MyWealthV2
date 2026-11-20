@@ -10,7 +10,9 @@ namespace MyWealthV2.Application.BankFeed;
 /// <summary>
 /// Processes every <c>Received</c> credit line of one connection, oldest first: posts the deposit of a receipt that
 /// quotes one Custodial account's deposit reference, or leaves it unmatched with a reason (deposit-matching R13,
-/// R15–R20, R32; ADR 0021 rule 8). Each line is one database transaction, guarded by the line's row version.
+/// R15–R20, R32; ADR 0021 rule 8). It also processes the debit lines that carry an end-to-end id, and the credit lines
+/// that return a payout (withdrawals R39–R42). Each line is one database transaction, guarded by the line's row
+/// version.
 /// </summary>
 public sealed class ProcessStatementLines(
     IApplicationDbContext db,
@@ -23,7 +25,7 @@ public sealed class ProcessStatementLines(
         var ids = await db.BankStatementLines.IgnoreQueryFilters().AsNoTracking()
             .Where(row => row.Connection == connection
                           && row.Status == BankStatementLineStatus.Received
-                          && row.Direction == BankLineDirection.Credit)
+                          && (row.Direction == BankLineDirection.Credit || row.EndToEndId != null))
             .OrderBy(row => row.ReceivedAt)
             .ThenBy(row => row.Id)
             .Select(row => row.Id)
@@ -49,6 +51,18 @@ public sealed class ProcessStatementLines(
         var line = await db.BankStatementLines.IgnoreQueryFilters()
             .SingleAsync(row => row.Id == id, cancellationToken);
         if (line.Status != BankStatementLineStatus.Received)
+        {
+            return;
+        }
+
+        var payouts = new BankPayouts(db, time);
+        if (line.Direction == BankLineDirection.Debit)
+        {
+            await payouts.ProcessDebitAsync(line, cancellationToken);
+            return;
+        }
+
+        if (line.ReturnOfOutsideId is not null && await payouts.ProcessReturnAsync(line, cancellationToken))
         {
             return;
         }
