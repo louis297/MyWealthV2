@@ -72,7 +72,7 @@ internal static class BankHttp
         DELETE FROM [BankLines];
         DELETE FROM [BankAccounts];
         DELETE FROM [ControlLog];
-        UPDATE [World] SET [ClockOffsetSeconds] = 0, [PausedAt] = NULL, [PartyOutage] = 0;
+        UPDATE [World] SET [ClockOffsetSeconds] = 0, [PausedAt] = NULL, [PartyOutage] = 0, [NextLineNumber] = 1;
         """;
 }
 

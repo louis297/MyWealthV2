@@ -195,6 +195,21 @@ var simulator = builder.AddProject<Projects.Simulator>(Services.Simulator)
         url.DisplayLocation = UrlDisplayLocation.DetailsOnly;
     });
 
+// Deposit matching R39, §9.1: the simulator bank opens the trust accounts TestSeed gives its client money accounts.
+string[][] standingAccounts =
+[
+    ["SIM-DEMO-USD", "USD", "Demo Advisory Client Funds Trust Account"],
+    ["SIM-DEMO-NZD", "NZD", "Demo Advisory Client Funds Trust Account"],
+    ["SIM-DEMO2-USD", "USD", "Demo Advisory 2 Client Funds Trust Account"],
+    ["SIM-DEMO2-NZD", "NZD", "Demo Advisory 2 Client Funds Trust Account"]
+];
+for (var i = 0; i < standingAccounts.Length; i++)
+{
+    simulator.WithEnvironment($"Simulator__Bank__StandingAccounts__{i}__AccountNumber", standingAccounts[i][0])
+        .WithEnvironment($"Simulator__Bank__StandingAccounts__{i}__Currency", standingAccounts[i][1])
+        .WithEnvironment($"Simulator__Bank__StandingAccounts__{i}__Name", standingAccounts[i][2]);
+}
+
 // Simulator spec R12: the host tells the party port from the control ports by the port Kestrel listens on.
 simulator.WithEnvironment("Simulator__PartyPort", simulator.GetEndpoint("party").Property(EndpointProperty.TargetPort));
 simulator.WithEnvironment("Authentication__PublicOrigin", simulator.GetEndpoint("https"));

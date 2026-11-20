@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using MyWealthV2.Simulator.Bank;
 using MyWealthV2.Simulator.Data;
 using MyWealthV2.Simulator.Hosting;
 
@@ -59,6 +60,7 @@ public static class PartyEndpoints
             });
 
         party.MapGet("/status", GetStatusAsync);
+        party.MapBankPartyEndpoints();
 
         return app;
     }
