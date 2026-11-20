@@ -362,8 +362,8 @@ Beyond PK / unique constraints already listed:
 0037_adjustments.sql                        -- CK_Transactions_Type 0–17 (Adjustment); TransactionAdjustmentDetails
 0038_client_money_accounts.sql              -- ClientMoneyAccounts; one active per (TenantId, Currency); account number unique among active rows
 0039_accounts_deposit_reference.sql         -- Accounts.DepositReference char(9), back-filled on Custodial rows; CHECK iff Custodial; unique filtered index
-0040_client_money_accounts_bank_connection.sql -- accepted, not written yet: ClientMoneyAccounts.BankConnection nvarchar(50), existing rows 'simulator'
-0041_bank_statement_lines.sql               -- accepted, not written yet: BankFeedCursors, BankStatementLines, TransactionBankReceiptDetails; CK_Transactions_SourceKind 0–3
+0040_client_money_accounts_bank_connection.sql -- ClientMoneyAccounts.BankConnection nvarchar(50), existing rows 'simulator'
+0041_bank_statement_lines.sql               -- BankFeedCursors, BankStatementLines, TransactionBankReceiptDetails; CK_Transactions_SourceKind 0–3
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -442,7 +442,7 @@ Amendment 2026-11-19 (transaction source, accepted; [features/transaction-source
 
 Amendment 2026-11-19 (adjustments, accepted; [features/adjustments.md](features/adjustments.md) §6): script `0037_adjustments.sql` widens `CK_Transactions_Type` to 0–17 for `Adjustment` and adds `TransactionAdjustmentDetails`: `TransactionId int` (PK; at most one row per Transaction), `TenantId int` (FK → `Tenants` RESTRICT; index), `Reason int` (CHECK 0–3: `EntryError`, `CorporateAction`, `ReconciliationBreak`, `Other`); FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)` RESTRICT, as `TransactionFxDetails`. No `PublicId` or `RowVersion`: the row is part of an immutable Transaction. One row on every `Adjustment` and on its Reversal, held by the Domain. No back-fill. Forward only.
 
-Amendment 2026-11-20 (bank feed and deposit matching, accepted; [features/deposit-matching.md](features/deposit-matching.md) §6.2): script `0041_bank_statement_lines.sql` (not written yet) widens `CK_Transactions_SourceKind` to 0–3 (`BankFeed`) and requires a `SourcePublicId` for kinds 2 and 3. It adds `TransactionBankReceiptDetails`: `TransactionId int` (PK), `TenantId int` (FK → `Tenants`; index), FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)` RESTRICT, as `TransactionFxDetails`, `ValueDate date`, `Reference nvarchar(140) NULL`, `PayerName nvarchar(140) NULL`, `PayerAccount nvarchar(40) NULL` (masked). One row on every deposit and on its Reversal, held by the Domain. No back-fill. Forward only.
+Amendment 2026-11-20 (bank feed and deposit matching, accepted; [features/deposit-matching.md](features/deposit-matching.md) §6.2): script `0041_bank_statement_lines.sql` widens `CK_Transactions_SourceKind` to 0–3 (`BankFeed`) and requires a `SourcePublicId` for kinds 2 and 3. It adds `TransactionBankReceiptDetails`: `TransactionId int` (PK), `TenantId int` (FK → `Tenants`; index), FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)` RESTRICT, as `TransactionFxDetails`, `ValueDate date`, `Reference nvarchar(140) NULL`, `PayerName nvarchar(140) NULL`, `PayerAccount nvarchar(40) NULL` (masked). One row on every deposit and on its Reversal, held by the Domain. No back-fill. Forward only.
 
 ### 11.5 Holdings (accepted, landed)
 
@@ -482,11 +482,11 @@ Feature spec: [features/client-money-accounts.md](features/client-money-accounts
 
 No seed in the script. Development / TestAppHost `TestSeed` adds a USD and an NZD row per firm.
 
-Amendment 2026-11-20 (bank feed and deposit matching, accepted; [features/deposit-matching.md](features/deposit-matching.md) §6.1): script `0040_client_money_accounts_bank_connection.sql` (not written yet) adds `BankConnection nvarchar(50) NOT NULL`, the name of a bank connection in configuration, `'simulator'` on every existing row through a temporary default that the script drops. It never changes after insert.
+Amendment 2026-11-20 (bank feed and deposit matching, accepted; [features/deposit-matching.md](features/deposit-matching.md) §6.1): script `0040_client_money_accounts_bank_connection.sql` adds `BankConnection nvarchar(50) NOT NULL`, the name of a bank connection in configuration, `'simulator'` on every existing row through a temporary default that the script drops. It never changes after insert.
 
 ### 11.9 Bank statement lines (accepted)
 
-Feature spec: [features/deposit-matching.md](features/deposit-matching.md) (accepted 2026-11-20) §6.2. Script `0041_bank_statement_lines.sql` (not written yet):
+Feature spec: [features/deposit-matching.md](features/deposit-matching.md) (accepted 2026-11-20, landed 2026-11-20) §6.2. Script `0041_bank_statement_lines.sql`:
 
 - `BankFeedCursors` — PK and FK `ClientMoneyAccountId` → `ClientMoneyAccounts` RESTRICT; `Cursor nvarchar(500) NULL` (opaque); `LastSucceededAt`, `LastFailedAt`; `LastFailure int NULL` (CHECK 0–6); RowVersion. One row per client money account, written by the `worker` only.
 - `BankStatementLines` — the bank's inbound records ([ADR 0021](adr/0021-outside-parties-behind-ports.md) rule 7). TenantId, PublicId (unique), ClientMoneyAccountId, `Connection nvarchar(50)`, `OutsideId nvarchar(100)`; unique `(Connection, OutsideId)`. ValueDate, Direction (CHECK 0–1), `Amount decimal(18,4)` (CHECK `> 0`), Currency (FK), PayerName, `PayerAccountMasked nvarchar(40)`, ReferenceText, ReceivedAt. Status (CHECK 0–4), UnmatchedReason (CHECK 0–6), the match columns (account, transaction, method, time; all set iff `Status = 1`, CHECK), the last action columns (action, note, person, time), audit, RowVersion. FKs RESTRICT. Indexes `(TenantId, Status, ReceivedAt DESC)` and `(Connection, Status, ReceivedAt)`. The economic columns never change after insert.
@@ -546,6 +546,7 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-20 | Client money accounts accepted (`0038`, `0039`, not written yet): `ClientMoneyAccounts` (§11.8) and `Accounts.DepositReference` with its back-fill (§11.3). Both are build contracts. |
 | 2026-11-20 | Client money accounts landed: `0038` and `0039` written. The back-fill and the C# `DepositReference.IsValid` agree (integration test). |
 | 2026-11-20 | Bank feed and deposit matching accepted (`0040`, `0041`, not written yet): `ClientMoneyAccounts.BankConnection` (§11.8), `BankFeedCursors` and `BankStatementLines` (§11.9), `TransactionBankReceiptDetails` and source kind 3 (§11.4). Simulator script `0003_bank.sql` (§15). All are build contracts. |
+| 2026-11-20 | Bank feed and deposit matching landed: `0040`, `0041` and simulator `0003` written. `TransactionBankReceiptDetails` has a `TenantId` and the tenant composite key, and the match and last-action keys of `BankStatementLines` are tenant composite keys (§11.4, §11.9). |
 
 ---
 
@@ -642,6 +643,6 @@ Owner: [features/simulator.md](features/simulator.md) §6.2, [ADR 0021](adr/0021
 - Scripts in `database/simulator/NNNN_*.sql`, numbered from `0001`, recorded in that database's own `SchemaVersions`. Applied only by `simulator` at its start-up, with the same schema applicator (moved to `src/Schema`). Never applied to `MyWealthDbV2`; platform scripts are never applied to it.
 - No platform host connects to it, and the simulator does not connect to `MyWealthDbV2`. No cross-database query, view or synonym.
 - S0 tables: `World` (one row, `CHECK (Id = 1)`) and `ControlLog`. Each party (S1–S4) adds its tables with its own amendment.
-- S1 receipts ([features/deposit-matching.md](features/deposit-matching.md) §6.3, accepted 2026-11-20; `0003_bank.sql`, not written yet): `BankAccounts` (account number unique), `BankLines` (outside id unique; available-at instant), `BankFeedPlaces` (one row per place in an account's feed, two for a line delivered twice), and `World.NextLineNumber`. A reset empties the three bank tables.
+- S1 receipts ([features/deposit-matching.md](features/deposit-matching.md) §6.3, accepted and landed 2026-11-20; `0003_bank.sql`): `BankAccounts` (account number unique), `BankLines` (outside id unique; available-at instant), `BankFeedPlaces` (one row per place in an account's feed, two for a line delivered twice), and `World.NextLineNumber`. A reset empties the three bank tables.
 - Development: Aspire creates the database. VPS: created by hand once, like `MyWealthDbV2` ([deployment.md](deployment.md) §15).
 

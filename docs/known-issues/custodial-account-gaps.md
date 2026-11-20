@@ -25,7 +25,7 @@ A Custodial account is meant to be the platform's own record: the server produce
 
 | Gap | Effect on a Custodial account | Closed by |
 | --- | --- | --- |
-| Withdrawals and closing payments are entered by hand (`TransferOut`, `CloseOut`) | Anyone with `transactions.create` can record money leaving that no bank paid out. The amount is the caller's number. Deposits no longer have this gap: from [deposit-matching](../features/deposit-matching.md) (accepted 2026-11-20) a `TransferIn` on a Custodial account comes only from a matched bank statement line | Withdrawals with review (roadmap B6) and an account closure flow (B8), driven by the simulator bank |
+| Withdrawals and closing payments are entered by hand (`TransferOut`, `CloseOut`) | Anyone with `transactions.create` can record money leaving that no bank paid out. The amount is the caller's number. Deposits no longer have this gap: from [deposit-matching](../features/deposit-matching.md) (accepted, landed 2026-11-20) a `TransferIn` on a Custodial account comes only from a matched bank statement line | Withdrawals with review (roadmap B6) and an account closure flow (B8), driven by the simulator bank |
 | No interest | Cash on the platform earns nothing. `Interest` is refused | An interest job |
 | A split cannot be recorded | If a held instrument really splits, the quantity stays as it was while the price falls. The holding's market value, net worth and the next rebalance of that account are wrong until the quantity is corrected | Corporate action events |
 | Existing positions cannot be moved in | A Custodial account starts with cash only. `OpeningHoldings` and `StockIn` are refused, so a Customer's shares at another broker cannot arrive in kind | In-kind transfer |
