@@ -91,6 +91,7 @@ public static class TestSeed
 
     private readonly record struct SeedFirm(
         string TenantCode,
+        string TenantAdminEmail,
         string AdviserEmail,
         string CustomerEmail,
         string CustomerName);
@@ -99,11 +100,13 @@ public static class TestSeed
     [
         new(
             DevelopmentIdentitySeeder.DemoTenantCode,
+            DevelopmentIdentitySeeder.TenantAdminEmail,
             DevelopmentIdentitySeeder.AdviserEmail,
             DemoCustomerEmail,
             DemoCustomerName),
         new(
             DevelopmentIdentitySeeder.SecondTenantCode,
+            DevelopmentIdentitySeeder.SecondTenantAdminEmail,
             DevelopmentIdentitySeeder.SecondAdviserEmail,
             SecondCustomerEmail,
             SecondCustomerName),
@@ -170,6 +173,51 @@ public static class TestSeed
 
         await EnsureAccountsAsync(db, tenant.Id, firm.CustomerEmail, cancellationToken);
         await EnsureTradeFeeScheduleAsync(db, tenant.Id, cancellationToken);
+        await EnsureNominatedBankAccountAsync(db, tenant, firm, cancellationToken);
+    }
+
+    /// <summary>The account number of the seeded nominated bank account (withdrawals §9.1).</summary>
+    public const string SeededPayeeAccountNumber = "SIM-PAYEE-0001";
+
+    /// <summary>
+    /// One Verified USD nominated bank account for the firm's Customer (withdrawals §9.1), added by the firm's Adviser
+    /// and verified by its TenantAdmin, so a withdrawal can be requested in Development without a check first.
+    /// Idempotent on (Customer, account number); skipped while any of the three people is missing.
+    /// </summary>
+    private static async Task EnsureNominatedBankAccountAsync(
+        ApplicationDbContext db,
+        Tenant tenant,
+        SeedFirm firm,
+        CancellationToken cancellationToken)
+    {
+        var people = await db.DomainUsers
+            .Where(row => row.TenantId == tenant.Id
+                          && (row.Email == firm.TenantAdminEmail || row.Email == firm.AdviserEmail || row.Email == firm.CustomerEmail))
+            .ToListAsync(cancellationToken);
+        var admin = people.SingleOrDefault(row => row.Email == firm.TenantAdminEmail);
+        var adviser = people.SingleOrDefault(row => row.Email == firm.AdviserEmail);
+        var customer = people.SingleOrDefault(row => row.Email == firm.CustomerEmail);
+        if (admin is null || adviser is null || customer is null)
+        {
+            return;
+        }
+
+        var exists = await db.NominatedBankAccounts.AnyAsync(
+            row => row.CustomerId == customer.Id && row.AccountNumber == SeededPayeeAccountNumber, cancellationToken);
+        if (exists)
+        {
+            return;
+        }
+
+        var usd = await db.Set<Currency>().AsNoTracking().SingleAsync(row => row.Code == "USD", cancellationToken);
+        var now = TimeProvider.System.GetUtcNow();
+        var row = NominatedBankAccount.Add(
+            tenant.Id, customer.Id, usd, "Simulator Bank", customer.Name, SeededPayeeAccountNumber, adviser.Id, now);
+        row.Verify(admin.Id, "Seeded for Development: no evidence was checked.", now);
+        row.Created = now;
+        row.CreatedBy = CreatedBy;
+        db.NominatedBankAccounts.Add(row);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private static readonly string[] ClientMoneyCurrencies = ["USD", "NZD"];
