@@ -82,7 +82,7 @@ public class BankConnectionsConfigurationTests
     [TestCase("1bank")]
     [TestCase("-bank")]
     [TestCase("bank_one")]
-    [TestCase("banknamebanknamebanknamebanknamebanknamebanknameb1")]
+    [TestCase("banknamebanknamebanknamebanknamebanknamebanknamebk1")]
     public void BadName_StopsTheHost(string name)
     {
         var builder = Builder(new() { [$"BankConnections:{name}:Adapter"] = "Simulator" });

@@ -125,7 +125,7 @@ public static class DependencyInjection
     /// </summary>
     public static void AddBankConnections(this IHostApplicationBuilder builder, BankConnectionHost host)
     {
-        var connections = new ConfiguredBankConnections([]);
+        var connections = new ConfiguredBankConnections(BankConnectionsConfiguration.Read(builder.Configuration, host));
         builder.Services.AddSingleton(connections);
         builder.Services.AddSingleton<IBankConnections>(connections);
     }

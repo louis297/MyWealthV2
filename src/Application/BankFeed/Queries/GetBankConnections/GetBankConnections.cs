@@ -9,9 +9,23 @@ public sealed record GetBankConnectionsQuery : IRequest<PagedList<BankConnection
 
 public sealed record BankConnectionDto(string Name, string Adapter);
 
-public class GetBankConnectionsQueryHandler
+public class GetBankConnectionsQueryHandler(IBankConnections connections)
     : IRequestHandler<GetBankConnectionsQuery, PagedList<BankConnectionDto>>
 {
-    public Task<PagedList<BankConnectionDto>> Handle(GetBankConnectionsQuery request, CancellationToken cancellationToken) =>
-        throw new NotImplementedException();
+    private const int DefaultPageSize = 20;
+
+    public Task<PagedList<BankConnectionDto>> Handle(GetBankConnectionsQuery request, CancellationToken cancellationToken)
+    {
+        var items = connections.All
+            .OrderBy(entry => entry.Name, StringComparer.Ordinal)
+            .Select(entry => new BankConnectionDto(entry.Name, entry.Adapter))
+            .ToList();
+        return Task.FromResult(new PagedList<BankConnectionDto>
+        {
+            Items = items,
+            Page = 1,
+            PageSize = Math.Max(DefaultPageSize, items.Count),
+            TotalCount = items.Count
+        });
+    }
 }

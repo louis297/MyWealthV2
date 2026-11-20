@@ -140,9 +140,9 @@ public class ClientMoneyAccountsSchemaTests
 
     private static string InsertRow(string currency, string number, bool active) => $"""
         INSERT INTO [ClientMoneyAccounts]
-            ([PublicId], [TenantId], [Currency], [BankName], [AccountName], [AccountNumber], [IsActive], [Created], [CreatedBy])
+            ([PublicId], [TenantId], [Currency], [BankName], [AccountName], [AccountNumber], [IsActive], [Created], [CreatedBy], [BankConnection])
         VALUES (NEWID(), @tenant, '{currency}', N'Simulator Bank', N'Client Funds Trust Account', N'{number}', {(active ? 1 : 0)},
-                SYSDATETIMEOFFSET(), N'test');
+                SYSDATETIMEOFFSET(), N'test', N'simulator');
         """;
 
     private static ApplicationDbContext OpenDb(string connectionString)

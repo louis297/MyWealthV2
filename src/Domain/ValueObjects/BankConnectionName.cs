@@ -8,5 +8,8 @@ public static class BankConnectionName
 {
     public const int MaxLength = 50;
 
-    public static bool IsValid(string? name) => throw new NotImplementedException();
+    public static bool IsValid(string? name) =>
+        name is { Length: >= 1 and <= MaxLength }
+        && name[0] is >= 'a' and <= 'z'
+        && name.All(ch => ch is >= 'a' and <= 'z' or >= '0' and <= '9' or '-');
 }

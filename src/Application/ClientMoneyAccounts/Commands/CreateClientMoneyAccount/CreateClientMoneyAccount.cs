@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using FluentValidation.Results;
+using MyWealthV2.Application.BankFeed;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
@@ -41,7 +42,7 @@ public class CreateClientMoneyAccountCommand : IRequest<Guid>
 
 public class CreateClientMoneyAccountCommandValidator : AbstractValidator<CreateClientMoneyAccountCommand>
 {
-    public CreateClientMoneyAccountCommandValidator()
+    public CreateClientMoneyAccountCommandValidator(IBankConnections connections)
     {
         RuleFor(command => command.Currency).NotEmpty();
         RuleFor(command => command.BankName)
@@ -54,6 +55,9 @@ public class CreateClientMoneyAccountCommandValidator : AbstractValidator<Create
             .Must(ClientMoneyAccount.IsValidAccountNumber)
             .WithMessage(
                 $"Account number must be 1 to {ClientMoneyAccount.AccountNumberMaxLength} letters, digits, spaces and hyphens, with no two spaces in a row.");
+        RuleFor(command => command.BankConnection)
+            .Must(connections.IsConfigured)
+            .WithMessage("Unknown bank connection.");
         RuleFor(command => command.TenantId).Null().WithMessage("TenantId cannot be set.");
         RuleFor(command => command.Id).Null().WithMessage("Id cannot be set.");
         RuleFor(command => command.IsActive).Null().WithMessage("IsActive cannot be set.");
@@ -94,7 +98,7 @@ public class CreateClientMoneyAccountCommandHandler(IApplicationDbContext db, IC
             db, tenant.Id, currency.Code, accountNumber, exceptId: null, cancellationToken);
 
         var row = ClientMoneyAccount.Create(
-            tenant.Id, currency, request.BankName!, request.AccountName!, accountNumber, request.BankConnection ?? string.Empty);
+            tenant.Id, currency, request.BankName!, request.AccountName!, accountNumber, request.BankConnection!);
         db.ClientMoneyAccounts.Add(row);
         await db.SaveChangesAsync(cancellationToken);
         return row.PublicId;

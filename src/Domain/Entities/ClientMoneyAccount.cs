@@ -1,3 +1,5 @@
+using MyWealthV2.Domain.ValueObjects;
+
 namespace MyWealthV2.Domain.Entities;
 
 /// <summary>
@@ -53,6 +55,12 @@ public class ClientMoneyAccount : BaseAuditableEntity
             throw new DomainException("Currency must be enabled.");
         }
 
+        if (!BankConnectionName.IsValid(bankConnection))
+        {
+            throw new DomainException(
+                $"Bank connection must be 1 to {BankConnectionName.MaxLength} characters: a lower-case letter, then lower-case letters, digits and hyphens.");
+        }
+
         return new ClientMoneyAccount
         {
             TenantId = tenantId,
@@ -60,6 +68,7 @@ public class ClientMoneyAccount : BaseAuditableEntity
             BankName = NormaliseText(bankName, BankNameMaxLength, "Bank name"),
             AccountName = NormaliseText(accountName, AccountNameMaxLength, "Account name"),
             AccountNumber = NormaliseAccountNumber(accountNumber),
+            BankConnection = bankConnection,
             PublicId = publicId ?? Guid.NewGuid(),
             IsActive = true
         };
