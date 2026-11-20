@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-20
-last_updated: 2026-11-20
+last_updated: 2026-11-21
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -45,7 +45,24 @@ The other debit lines that [deposit-matching.md](deposit-matching.md) R14 leaves
 
 New: permissions `nominated-bank-accounts.read`, `nominated-bank-accounts.manage`, `nominated-bank-accounts.verify`, `withdrawals.read`, `withdrawals.request` and `withdrawals.approve`; routes under `/nominated-bank-accounts` and `/withdrawals`; port `IBankPayments`; source kind `Payment`; item fields `reservedCash` and `availableCash` (account), `payment` (transaction), `relatedLineId`, `withdrawalId` and `returnReason` (statement line); the `direction` filter on `GET /statement-lines`. Scripts `0042_nominated_bank_accounts.sql` and `0043_withdrawals.sql`; simulator script `database/simulator/0004_bank_payments.sql`. No new `TransactionType`, problem code or domain event.
 
-**Status is `accepted` (2026-11-20).** The points of §11 were confirmed in discussion on 2026-11-20, every one as recommended, and are written into the rules. The amendments to accepted docs listed in §12 were made when it was accepted. It is a build contract.
+**Status is `accepted` (2026-11-20), landed 2026-11-21.** The points of §11 were confirmed in discussion on 2026-11-20, every one as recommended, and are written into the rules. The amendments to accepted docs listed in §12 were made when it was accepted.
+
+Notes from landing:
+
+- `AccountNumberMask` is the old `PayerAccountMask`, renamed without a change of behaviour; it masks payer, payee and nominated account numbers alike (§5).
+- The nominated bank account item writes `added`, `review` and `removal` with one shape, `{ by: { id, name }, at, note }`; `added.note` is always `null`. A person on an item is a `PersonRefDto` (`{ id, name }`).
+- `0042` and `0043` add the tenant keys the composite FKs need: `UQ_NominatedBankAccounts_TenantId_Id`, `UQ_Withdrawals_TenantId_Id` and `UQ_BankStatementLines_TenantId_Id`. `0043` and simulator `0004` run the statements that use their new columns inside `EXEC`, so each batch compiles before the columns exist (as `0039`).
+- `AccountCash` (reserved and available cash) sits next to `TransactionCash` in Application. The R36 check is `AvailableCashGuard`, run after each write is saved and still under the Account lock, as the posting R9 check is; its refusal uses the same empty `errors` key as the R9 message. A rebalance plans with available cash; its trades still pass the real cash `SUM` to the factories.
+- Approve and cancel take an optional note: blank is stored as no note. Reject needs one (R27). A withdrawal's `decision` is the last decision: a cancel after an approval replaces it.
+- R43 is extended to undo match: a credit line matched with method `PaymentReturn` (or `Payment`) refuses `unmatch` with `This line returned a payment and cannot be unmatched.` (400 `errors.Status`), since its Reversal belongs to the payment flow.
+- `IBankPayments` is dispatched like `IBankFeed` (`BankPaymentsDispatcher`, `IBankPaymentsAdapter`) and registered on both hosts; only the `worker` has the connection's URL, so a call from `webapi` would be `Unreachable`. `SendBankPayments` is an Application service with `RunAsync(connection)`, as the pull and the processing are. A disabled Tenant's payment with no attempt is not read at all; one with an attempt is sent again (R32).
+- The pull links a line whose `returnOf` names a stored line of the connection (also one earlier in the same page) by a second save in the page's transaction; processing resolves `returnOf` again when the link is missing.
+- Processing a debit line: an `endToEndId` that is not a GUID, names no withdrawal of the line's Tenant, or names one whose payment is `Rejected`, `Cancelled` or from another client money account leaves the line `Received` (R39). A payment already `Paid` or `Returned` makes the line `PaymentMismatch` (R40). A returned payout to a withdrawal not `Paid` is `PaymentMismatch` too.
+- The simulator bank keeps the statuses `Held`, `Executed`, `Returned` and `Rejected` (R55): in `Execute` mode a payment is accepted and executed in one step, so no payment rests in `Accepted`. The party answer is `Accepted` for every payment but a rejected one. A body that breaks R49 is a bare 400. A second call that races the first on one instruction id gets the first answer, or 409. `GET /control/bank/payments` pages by `page` and `pageSize` (default 50, at most 200).
+- `TestSeed` gives the nominated bank account to the Customer of each seeded firm (the demo firm and the second one), as it does with client money accounts; it is skipped while the firm's TenantAdmin, Adviser or Customer is missing.
+- Tests that took cash out of a Custodial account by hand use `CustodialHttp.WithdrawAsync` (§10 fan-out); it adds a TenantAdmin approver and a Verified nominated bank account straight to the database when the tenant has none.
+- Adviser Portal: `CloseOut` is a type of the new transaction form only on a Custodial account with a remainder below the minor unit, with the amount fixed at minus the balance (D44). Withdraw is the last link of the action bar. On `/withdrawals/:id` approve and cancel share one optional note field; reject asks for its note in a dialog. The send attempt's failure uses the BO18 labels. The Withdrawals filter's default option reads "Waiting for approval".
+- Customer Portal: the profile reads `GET /nominated-bank-accounts?status=Pending,Verified`; the account page reads `GET /withdrawals?accountId=` and keeps open withdrawals and those requested in the last 90 days on the client (C24).
 
 ---
 

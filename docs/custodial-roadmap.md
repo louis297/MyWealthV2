@@ -3,7 +3,7 @@ title: Custodial accounts roadmap
 status: note
 language: en
 created: 2026-11-19
-updated: 2026-11-20
+updated: 2026-11-21
 related:
   - future-plans.md
   - adr/0020-account-custody-mode.md
@@ -83,10 +83,10 @@ The manual entry matrix at the end of the plan. The External column stays as tod
 | Type | Custodial hand entry, today | Custodial at the end | Written by |
 | --- | --- | --- | --- |
 | `TransferIn` | refused (from deposit matching, landed 2026-11-20) | refused | Deposit matching (B4) |
-| `TransferOut` | allowed (transitional) | refused | Withdrawal (B6) |
-| `CloseOut` | allowed (transitional) | refused | Account closure (B8) |
+| `TransferOut` | refused (from withdrawals, landed 2026-11-21) | refused | Withdrawal (B6) |
+| `CloseOut` | a remainder below the minor unit only (from withdrawals, landed 2026-11-21) | refused | Account closure (B8) |
 | `Buy` / `Sell` | allowed, filled at once | refused | Order fills (O1); rebalance through orders (O3) |
-| `InternalTransfer` | allowed, both Custodial | allowed, same Customer only (D14) | Hand entry |
+| `InternalTransfer` | allowed, same Customer only (D14, from withdrawals, landed 2026-11-21) | allowed, same Customer only (D14) | Hand entry |
 | `FxConversion` | allowed, both Custodial | allowed (later through an outside FX party, O5) | Hand entry |
 | `Interest` | refused | refused | Interest run (I2) |
 | `Opening` / `OpeningHoldings` | refused | refused | Migration batch (T2) |
@@ -225,7 +225,7 @@ Real-world shape: Customers pay into the firm's client money trust account at a 
 - **What:** a Customer's bank account that withdrawals may be paid to: masked number, account name, currency, verified flag, who verified it and when. Changes are audited.
 - **Who:** an Adviser adds it for the Customer, an operator verifies it (the anti-money-laundering control). The Customer only sees it (D6).
 - **Depends on:** nothing.
-- **Spec:** B5 and B6 are one spec, with S1 payments, [withdrawals.md](features/withdrawals.md) (accepted 2026-11-20). It decides: the full account number is stored and shown on the nominated bank account (masked on withdrawals and payouts); one currency per nominated bank account; details never change (remove and add again); a TenantAdmin other than the person who added it verifies or rejects it, with a note; permissions `nominated-bank-accounts.read`, `.manage` and `.verify`; SystemAdmin none.
+- **Spec:** B5 and B6 are one spec, with S1 payments, [withdrawals.md](features/withdrawals.md) (accepted 2026-11-20, landed 2026-11-21). It decides: the full account number is stored and shown on the nominated bank account (masked on withdrawals and payouts); one currency per nominated bank account; details never change (remove and add again); a TenantAdmin other than the person who added it verifies or rejects it, with a note; permissions `nominated-bank-accounts.read`, `.manage` and `.verify`; SystemAdmin none.
 
 ### B6. Withdrawals
 
@@ -235,7 +235,7 @@ Real-world shape: Customers pay into the firm's client money trust account at a 
 - **Matrix:** hand `TransferOut` on a Custodial account → refused.
 - **Simulator:** S1 bank, payments side (execute, fail, return a day later).
 - **Depends on:** B3, B5, the operator permissions (D5).
-- **Spec:** [withdrawals.md](features/withdrawals.md) (accepted 2026-11-20), with B5. It decides: the amount is reserved on request, and every write that lowers cash on a Custodial account (flows and rebalance included) keeps available cash `≥ 0`, except the payout; only a TenantAdmin approves, never their own request (a very small firm keeps two TenantAdmin logins); cancel only before the first send attempt; one outgoing payment record, sent by the existing bank sync job before its pull; the payout (`TransferOut`, source `Payment`) is posted from the debit line, found by the end-to-end id the bank echoes; a returned payout is reversed by the flow; the bank rejects at once or returns later (no payment status feed); hand `TransferOut` refused, hand `CloseOut` limited to a rounding remainder, and `InternalTransfer` between two Customers' Custodial accounts refused (D14); no balance check and no scenario library in the simulator bank yet.
+- **Spec:** [withdrawals.md](features/withdrawals.md) (accepted 2026-11-20, landed 2026-11-21), with B5. It decides: the amount is reserved on request, and every write that lowers cash on a Custodial account (flows and rebalance included) keeps available cash `≥ 0`, except the payout; only a TenantAdmin approves, never their own request (a very small firm keeps two TenantAdmin logins); cancel only before the first send attempt; one outgoing payment record, sent by the existing bank sync job before its pull; the payout (`TransferOut`, source `Payment`) is posted from the debit line, found by the end-to-end id the bank echoes; a returned payout is reversed by the flow; the bank rejects at once or returns later (no payment status feed); hand `TransferOut` refused, hand `CloseOut` limited to a rounding remainder, and `InternalTransfer` between two Customers' Custodial accounts refused (D14); no balance check and no scenario library in the simulator bank yet.
 - **Spec, the other debit lines:** the parts deposit-matching left for B6 that are not withdrawals (sending a receipt back to its payer, recalls and dishonours of receipts, debit lines the platform did not cause) are step 6b, [bank-returns.md](features/bank-returns.md) (`review`, 2026-11-20; §11 confirmed 2026-11-20). It decides: request return creates the return payment, reopen cancels it until the first attempt, a rejected return goes back to suspense; a recall reverses the deposit while available cash allows, otherwise suspense and an adjustment; unknown debit lines go to suspense and can only be ignored; a receipt return needs no second approval.
 
 ### B7. Bank reconciliation
@@ -381,7 +381,7 @@ A separate project that plays the outside parties for manual testing and demos. 
 
 ### S1. Bank (with B3–B7)
 
-The receipts side (the first two rows, without recalls) is in [deposit-matching.md](features/deposit-matching.md) (accepted 2026-11-20) §4.6: bank accounts, standing accounts from configuration, receipts with a delay or delivered twice, and the statement feed. It adds no scenario library yet (simulator §11 point 7 put it with S1). The payments side is in [withdrawals.md](features/withdrawals.md) (accepted 2026-11-20) §4.7: a payment route idempotent on the platform's instruction id, a payment mode (execute, hold, reject), execute a held payment, return a payment. Returning a receipt and recalling a receipt are in [bank-returns.md](features/bank-returns.md) (`review`, 2026-11-20) §4.5. Neither adds a scenario library; it is proposed for B7. Balances for reconciliation come with B7.
+The receipts side (the first two rows, without recalls) is in [deposit-matching.md](features/deposit-matching.md) (accepted 2026-11-20) §4.6: bank accounts, standing accounts from configuration, receipts with a delay or delivered twice, and the statement feed. It adds no scenario library yet (simulator §11 point 7 put it with S1). The payments side is in [withdrawals.md](features/withdrawals.md) (accepted 2026-11-20, landed 2026-11-21) §4.7: a payment route idempotent on the platform's instruction id, a payment mode (execute, hold, reject), execute a held payment, return a payment. Returning a receipt and recalling a receipt are in [bank-returns.md](features/bank-returns.md) (`review`, 2026-11-20) §4.5. Neither adds a scenario library; it is proposed for B7. Balances for reconciliation come with B7.
 
 | Signal or action | Platform flow |
 | --- | --- |
@@ -447,7 +447,7 @@ Each step depends only on earlier steps. "Closes" names the matrix cell or known
 | 3 | F3 Adjustment (no review) | — | "No correction other than reverse" | [adjustments](features/adjustments.md) | accepted 2026-11-19, landed 2026-11-19 |
 | 4 | B1 client money accounts, B2 deposit reference | — | — | [client-money-accounts](features/client-money-accounts.md) | accepted 2026-11-20, landed 2026-11-20 |
 | 5 | B3 bank feed, B4 matching and suspense | S1 receipts | Hand `TransferIn` | [deposit-matching](features/deposit-matching.md) | accepted 2026-11-20, landed 2026-11-20 |
-| 6 | B5 nominated bank account, B6 withdrawals, available cash | S1 payments | Hand `TransferOut`; hand `CloseOut` beyond a remainder | [withdrawals](features/withdrawals.md) | accepted 2026-11-20 |
+| 6 | B5 nominated bank account, B6 withdrawals, available cash | S1 payments | Hand `TransferOut`; hand `CloseOut` beyond a remainder | [withdrawals](features/withdrawals.md) | accepted 2026-11-20, landed 2026-11-21 |
 | 6b | B4 / B6 remainder: receipt returns, recalls, other debit lines | S1 returns and recalls | — | [bank-returns](features/bank-returns.md) | review 2026-11-20 |
 | 7 | B7 bank reconciliation | S1 balances | — | — | not started |
 | 8 | B8 account closure | — | Hand `CloseOut` | — | not started |

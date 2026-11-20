@@ -3,7 +3,7 @@ title: "Known issue — Custodial accounts still rely on hand entry, and some wr
 status: open
 language: en
 created: 2026-11-17
-updated: 2026-11-20
+updated: 2026-11-21
 related:
   - ../features/custody-modes.md
   - ../features/account-custody-mode.md
@@ -26,7 +26,7 @@ A Custodial account is meant to be the platform's own record: the server produce
 
 | Gap | Effect on a Custodial account | Closed by |
 | --- | --- | --- |
-| Withdrawals and closing payments are entered by hand (`TransferOut`, `CloseOut`) | Anyone with `transactions.create` can record money leaving that no bank paid out. The amount is the caller's number. Deposits no longer have this gap: from [deposit-matching](../features/deposit-matching.md) (accepted, landed 2026-11-20) a `TransferIn` on a Custodial account comes only from a matched bank statement line. From [withdrawals](../features/withdrawals.md) (accepted 2026-11-20) a hand `TransferOut` is refused and a hand `CloseOut` is limited to a remainder below the currency's minor unit; until it lands the gap stays as it is | Withdrawals with review (roadmap B6, accepted) and an account closure flow (B8), driven by the simulator bank |
+| Closing an account is a hand `CloseOut` of the remainder | Since [withdrawals](../features/withdrawals.md) (landed 2026-11-21) cash leaves a Custodial account only as a withdrawal paid by the bank, and deposits come only from the bank statement ([deposit-matching](../features/deposit-matching.md)). A person still writes off the remainder smaller than one minor unit that a trade leaves with a hand `CloseOut`, and closes the account by hand | An account closure flow (roadmap B8) |
 | No interest | Cash on the platform earns nothing. `Interest` is refused | An interest job |
 | A split cannot be recorded | If a held instrument really splits, the quantity stays as it was while the price falls. The holding's market value, net worth and the next rebalance of that account are wrong until the quantity is corrected | Corporate action events |
 | Existing positions cannot be moved in | A Custodial account starts with cash only. `OpeningHoldings` and `StockIn` are refused, so a Customer's shares at another broker cannot arrive in kind | In-kind transfer |
