@@ -1,4 +1,5 @@
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Infrastructure.BankFeed;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Schema;
 using MyWealthV2.Infrastructure.Identity;
@@ -21,6 +22,7 @@ builder.AddServiceDefaults();
 builder.AddKeyVaultIfConfigured();
 builder.AddApplicationServices();
 builder.AddInfrastructureServices();
+builder.AddBankConnections(BankConnectionHost.WebApi);
 builder.AddWebServices();
 
 var app = builder.Build();

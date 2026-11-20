@@ -174,6 +174,9 @@ public static class TestSeed
 
     private static readonly string[] ClientMoneyCurrencies = ["USD", "NZD"];
 
+    /// <summary>The bank connection the seeded client money accounts are read through (deposit-matching §9.1).</summary>
+    public const string SimulatorBankConnection = "simulator";
+
     /// <summary>
     /// An active client money account in USD and in NZD (client-money-accounts §9.1), so the Custodial demo
     /// account has deposit instructions and new Custodial accounts open in those currencies. Idempotent on
@@ -199,7 +202,8 @@ public static class TestSeed
                 currency,
                 "Simulator Bank",
                 $"{tenant.Name} Client Funds Trust Account",
-                $"SIM-{tenant.Code.ToUpperInvariant()}-{code}");
+                $"SIM-{tenant.Code.ToUpperInvariant()}-{code}",
+                SimulatorBankConnection);
             row.Created = TimeProvider.System.GetUtcNow();
             row.CreatedBy = CreatedBy;
             db.ClientMoneyAccounts.Add(row);

@@ -12,7 +12,9 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.BankFeed;
 using MyWealthV2.Application.FunctionalTests.Accounts;
+using MyWealthV2.Application.FunctionalTests.BankFeed;
 using MyWealthV2.Application.FunctionalTests.Hosting;
 using MyWealthV2.Application.FunctionalTests.Portfolios;
 using MyWealthV2.Application.FunctionalTests.Reports;
@@ -57,6 +59,8 @@ public class WebApiFactory(
             services.RemoveAll<IDepositReferenceSource>();
             services.AddSingleton<ScriptedDepositReferenceSource>();
             services.AddSingleton<IDepositReferenceSource>(sp => sp.GetRequiredService<ScriptedDepositReferenceSource>());
+            services.RemoveAll<IBankConnections>();
+            services.AddSingleton<IBankConnections, FakeBankConnections>();
             services.AddSingleton<CollidingAccountSaveInterceptor>();
             services.AddScoped<ISaveChangesInterceptor>(sp => sp.GetRequiredService<CollidingAccountSaveInterceptor>());
 

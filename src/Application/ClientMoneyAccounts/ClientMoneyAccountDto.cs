@@ -17,6 +17,9 @@ public sealed class ClientMoneyAccountDto
 
     public required string AccountNumber { get; init; }
 
+    /// <summary>The bank connection its statement is read through (deposit-matching R2).</summary>
+    public required string BankConnection { get; init; }
+
     public required bool IsActive { get; init; }
 
     public required string RowVersion { get; init; }
@@ -31,6 +34,7 @@ public sealed class ClientMoneyAccountDto
         BankName = row.BankName,
         AccountName = row.AccountName,
         AccountNumber = row.AccountNumber,
+        BankConnection = row.BankConnection,
         IsActive = row.IsActive,
         RowVersion = Convert.ToBase64String(row.RowVersion ?? []),
         Created = row.Created

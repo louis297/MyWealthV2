@@ -3,6 +3,7 @@ using MyWealthV2.Application.Common.Interfaces;
 using Microsoft.Extensions.Logging;
 using MyWealthV2.Application.Fx;
 using MyWealthV2.Application.MarketData;
+using MyWealthV2.Infrastructure.BankFeed;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Schema;
 using MyWealthV2.Infrastructure.Identity;
@@ -18,6 +19,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddInfrastructureServices();
+builder.AddBankConnections(BankConnectionHost.Worker);
 builder.Services.AddScoped<IUser, SystemUser>();
 builder.Services.AddScoped<OutboxProcessor>();
 builder.Services.AddScoped<FxRateSyncJob>();

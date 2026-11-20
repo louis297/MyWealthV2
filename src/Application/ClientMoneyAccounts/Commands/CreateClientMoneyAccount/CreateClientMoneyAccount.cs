@@ -9,7 +9,8 @@ using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationE
 
 namespace MyWealthV2.Application.ClientMoneyAccounts.Commands.CreateClientMoneyAccount;
 
-/// <summary>Client money accounts R2, R4–R6 (docs/features/client-money-accounts.md §4.1).</summary>
+/// <summary>Client money accounts R2, R4–R6 (docs/features/client-money-accounts.md §4.1); the bank connection,
+/// deposit-matching R2.</summary>
 [Authorize(Policy = Policies.TenantsManage)]
 public class CreateClientMoneyAccountCommand : IRequest<Guid>
 {
@@ -24,6 +25,9 @@ public class CreateClientMoneyAccountCommand : IRequest<Guid>
     public string? AccountName { get; init; }
 
     public string? AccountNumber { get; init; }
+
+    /// <summary>A bank connection configured on this host (deposit-matching R2).</summary>
+    public string? BankConnection { get; init; }
 
     /// <summary>Refused when present (R6).</summary>
     public Guid? TenantId { get; init; }
@@ -90,7 +94,7 @@ public class CreateClientMoneyAccountCommandHandler(IApplicationDbContext db, IC
             db, tenant.Id, currency.Code, accountNumber, exceptId: null, cancellationToken);
 
         var row = ClientMoneyAccount.Create(
-            tenant.Id, currency, request.BankName!, request.AccountName!, accountNumber);
+            tenant.Id, currency, request.BankName!, request.AccountName!, accountNumber, request.BankConnection ?? string.Empty);
         db.ClientMoneyAccounts.Add(row);
         await db.SaveChangesAsync(cancellationToken);
         return row.PublicId;

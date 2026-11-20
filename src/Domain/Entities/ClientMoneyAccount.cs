@@ -2,7 +2,8 @@ namespace MyWealthV2.Domain.Entities;
 
 /// <summary>
 /// The trust bank account a Tenant holds Customers' cash in, for one currency
-/// (docs/features/client-money-accounts.md §5). The four details never change; only disable and enable.
+/// (docs/features/client-money-accounts.md §5). The four details and the bank connection it is read through
+/// (docs/features/deposit-matching.md R2) never change; only disable and enable.
 /// </summary>
 public class ClientMoneyAccount : BaseAuditableEntity
 {
@@ -26,6 +27,9 @@ public class ClientMoneyAccount : BaseAuditableEntity
 
     public string AccountNumber { get; private set; } = string.Empty;
 
+    /// <summary>The configured bank connection its statement is read through (deposit-matching R2).</summary>
+    public string BankConnection { get; private set; } = string.Empty;
+
     public bool IsActive { get; private set; }
 
     public byte[] RowVersion { get; private set; } = null!;
@@ -36,6 +40,7 @@ public class ClientMoneyAccount : BaseAuditableEntity
         string bankName,
         string accountName,
         string accountNumber,
+        string bankConnection,
         Guid? publicId = null)
     {
         if (currency is null || string.IsNullOrWhiteSpace(currency.Code))
