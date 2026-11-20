@@ -11,6 +11,17 @@ public static class CustodyRules
     public const string TransferInMessage =
         "Deposits to a Custodial account come from the bank statement. The customer pays in with the account's deposit instructions.";
 
+    /// <summary>Withdrawals R45: money leaves a Custodial account only as a withdrawal.</summary>
+    public const string TransferOutMessage =
+        "Withdrawals from a Custodial account are paid to the customer's nominated bank account. Request a withdrawal.";
+
+    /// <summary>
+    /// Withdrawals R46: the <c>errors.Type</c> message for a hand <c>CloseOut</c> of <paramref name="cashSum"/>, or null
+    /// when it is allowed: always on an External account, and on a Custodial account only for a remainder smaller than
+    /// one minor unit of the currency (<c>0 &lt; SUM &lt; 10^−decimalPlaces</c>).
+    /// </summary>
+    public static string? CloseOutRefusal(CustodyMode custodyMode, decimal cashSum, string currency, int decimalPlaces) => null;
+
     private const string InterestMessage = "Interest cannot be entered by hand on a Custodial account.";
     private const string OpeningMessage = "A Custodial account starts empty. Fund it with TransferIn.";
     private const string StockMessage = "Securities cannot be moved in or out of a Custodial account by hand. Use Buy and Sell.";
