@@ -16,7 +16,9 @@ public interface IBankFeed
 public sealed record BankFeedRequest(string Connection, string AccountNumber, string? Cursor, int Limit);
 
 /// <summary>A line as the bank sent it. Fields the bank left out or sent in a shape the adapter cannot read are
-/// null; the pull refuses such a page (R10).</summary>
+/// null; the pull refuses such a page (R10). On a debit line the payer fields carry the payee. The end-to-end id
+/// echoes the instruction id of a payment the platform sent; <paramref name="ReturnOf"/> names the line this line
+/// takes back (withdrawals R38, R48).</summary>
 public sealed record BankFeedLine(
     string? Id,
     DateOnly? ValueDate,
@@ -25,7 +27,10 @@ public sealed record BankFeedLine(
     string? Currency,
     string? PayerName,
     string? PayerAccount,
-    string? Reference);
+    string? Reference,
+    string? EndToEndId = null,
+    string? ReturnOf = null,
+    string? ReturnReason = null);
 
 /// <summary>One page: its lines, oldest first, the party's new cursor, and whether more lines follow.</summary>
 public sealed record BankFeedPage(IReadOnlyList<BankFeedLine> Lines, string? Cursor, bool HasMore);

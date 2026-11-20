@@ -13,6 +13,51 @@ public class BankStatementLineTests
     private const int Admin = 42;
 
     [Test]
+    public void Receive_KeepsThePaymentFields_AsSent_AndCutsTheReturnReasonTo140()
+    {
+        var line = BankStatementLine.Receive(
+            3, 9, "simulator", "w-L8", new DateOnly(2026, 11, 20), BankLineDirection.Credit, 300m, "USD",
+            "J Smith", null, null, At, endToEndId: " 6b1f ", returnOfOutsideId: "w-L7", returnReason: "  " + new string('r', 150));
+
+        line.EndToEndId.ShouldBe(" 6b1f ");
+        line.ReturnOfOutsideId.ShouldBe("w-L7");
+        line.ReturnReason.ShouldBe(new string('r', 140));
+        line.RelatedLineId.ShouldBeNull();
+        line.WithdrawalId.ShouldBeNull();
+    }
+
+    [TestCase(101, 0)]
+    [TestCase(0, 101)]
+    public void Receive_RefusesAnEndToEndIdOrAReturnedLineIdOver100(int endToEnd, int returnOf)
+    {
+        Should.Throw<DomainException>(() => BankStatementLine.Receive(
+            3, 9, "simulator", "w-L8", new DateOnly(2026, 11, 20), BankLineDirection.Debit, 300m, "USD", null, null, null, At,
+            endToEndId: endToEnd == 0 ? null : new string('e', endToEnd),
+            returnOfOutsideId: returnOf == 0 ? null : new string('r', returnOf)));
+        BankStatementLine.FitsPaymentIds(endToEnd == 0 ? null : new string('e', endToEnd), returnOf == 0 ? null : new string('r', returnOf))
+            .ShouldBeFalse();
+    }
+
+    [Test]
+    public void FitsPaymentIds_AtTheLimit_AndWithNone()
+    {
+        BankStatementLine.FitsPaymentIds(new string('e', 100), new string('r', 100)).ShouldBeTrue();
+        BankStatementLine.FitsPaymentIds(null, null).ShouldBeTrue();
+    }
+
+    [Test]
+    public void LinkReturnedLine_KeepsTheStoredLine()
+    {
+        var line = BankStatementLine.Receive(
+            3, 9, "simulator", "w-L8", new DateOnly(2026, 11, 20), BankLineDirection.Credit, 300m, "USD", null, null, null, At,
+            returnOfOutsideId: "w-L7");
+
+        line.LinkReturnedLine(77);
+
+        line.RelatedLineId.ShouldBe(77);
+    }
+
+    [Test]
     public void Receive_IsReceived_AndKeepsTheBanksLine()
     {
         var line = BankStatementLine.Receive(

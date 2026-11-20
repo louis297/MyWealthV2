@@ -273,6 +273,54 @@ public class PullBankStatementsTests : TestBase
     }
 
     [Test]
+    public async Task PaymentLines_KeepTheirFields_AndAReturnIsLinkedToTheStoredLineItReturns()
+    {
+        var tenant = await TestApp.CreateTenantAsync("Pull Payments", "pull-payments");
+        var cma = await BankFeedHttp.ClientMoneyAccountAsync(tenant.Id);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        BankFeedHttp.Feed.Add(cma.AccountNumber, new BankFeedLine(
+            "p-L1", today, BankLineDirection.Debit, 300m, "USD", "J Smith", "06-0123-0456789-00", "K7M3Q9PXB", EndToEndId: "6b1f"));
+        BankFeedHttp.Feed.Add(cma.AccountNumber, new BankFeedLine(
+            "p-L2", today, BankLineDirection.Credit, 300m, "USD", "J Smith", null, null, ReturnOf: "p-L1", ReturnReason: " Account closed "));
+        await BankFeedHttp.PullAsync();
+        BankFeedHttp.Feed.Add(cma.AccountNumber, new BankFeedLine(
+            "p-L3", today, BankLineDirection.Credit, 300m, "USD", null, null, null, ReturnOf: "p-L1"));
+        BankFeedHttp.Feed.Add(cma.AccountNumber, new BankFeedLine(
+            "p-L4", today, BankLineDirection.Credit, 300m, "USD", null, null, null, ReturnOf: "never-seen"));
+
+        await BankFeedHttp.PullAsync();
+
+        var lines = (await BankFeedHttp.LinesAsync(cma.Id)).ToDictionary(line => line.OutsideId);
+        lines["p-L1"].EndToEndId.ShouldBe("6b1f");
+        lines["p-L1"].PayerAccountMasked.ShouldBe("****8900");
+        lines["p-L2"].ReturnOfOutsideId.ShouldBe("p-L1");
+        lines["p-L2"].ReturnReason.ShouldBe("Account closed");
+        lines["p-L2"].RelatedLineId.ShouldBe(lines["p-L1"].Id);
+        lines["p-L3"].RelatedLineId.ShouldBe(lines["p-L1"].Id);
+        lines["p-L4"].ReturnOfOutsideId.ShouldBe("never-seen");
+        lines["p-L4"].RelatedLineId.ShouldBeNull();
+        lines.Values.ShouldAllBe(line => line.Status == BankStatementLineStatus.Received);
+    }
+
+    [TestCase(101, 0)]
+    [TestCase(0, 101)]
+    public async Task AnEndToEndIdOrAReturnedLineIdOver100_RefusesThePageAsInvalidLine(int endToEnd, int returnOf)
+    {
+        var tenant = await TestApp.CreateTenantAsync("Pull Long", "pull-long");
+        var cma = await BankFeedHttp.ClientMoneyAccountAsync(tenant.Id);
+        BankFeedHttp.Feed.AddReceipt(cma.AccountNumber, 5m, "USD", null);
+        BankFeedHttp.Feed.Add(cma.AccountNumber, new BankFeedLine(
+            "long-1", DateOnly.FromDateTime(DateTime.UtcNow), BankLineDirection.Debit, 5m, "USD", null, null, null,
+            EndToEndId: endToEnd == 0 ? null : new string('e', endToEnd),
+            ReturnOf: returnOf == 0 ? null : new string('r', returnOf)));
+
+        var outcome = await BankFeedHttp.PullAsync();
+
+        outcome.FailedClientMoneyAccounts.ShouldBe([cma.PublicId]);
+        (await BankFeedHttp.LinesAsync(cma.Id)).ShouldBeEmpty();
+    }
+
+    [Test]
     public async Task DebitLine_IsStored_AndStaysReceived()
     {
         var tenant = await TestApp.CreateTenantAsync("Pull Debit", "pull-debit");

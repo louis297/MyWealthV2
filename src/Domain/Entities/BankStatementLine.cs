@@ -63,6 +63,20 @@ public class BankStatementLine : BaseAuditableEntity
 
     public DateTimeOffset? LastActionAt { get; private set; }
 
+    /// <summary>The instruction id of the platform's payment, as the bank echoed it (withdrawals R38).</summary>
+    public string? EndToEndId { get; private set; }
+
+    /// <summary>The outside id of the line this line takes back (withdrawals R38).</summary>
+    public string? ReturnOfOutsideId { get; private set; }
+
+    /// <summary>The stored line of the same connection that this line takes back (withdrawals R38).</summary>
+    public int? RelatedLineId { get; private set; }
+
+    public string? ReturnReason { get; private set; }
+
+    /// <summary>The withdrawal whose payout or returned payout this line is (withdrawals R40, R42).</summary>
+    public int? WithdrawalId { get; private set; }
+
     public byte[] RowVersion { get; private set; } = null!;
 
     /// <summary>A line as the bank sent it, in status <c>Received</c> (R10–R12). Payer name and reference are
@@ -80,7 +94,10 @@ public class BankStatementLine : BaseAuditableEntity
         string? payerAccountMasked,
         string? referenceText,
         DateTimeOffset receivedAt,
-        Guid? publicId = null)
+        Guid? publicId = null,
+        string? endToEndId = null,
+        string? returnOfOutsideId = null,
+        string? returnReason = null)
     {
         if (!IsStorable(outsideId, direction, amount))
         {
@@ -111,6 +128,12 @@ public class BankStatementLine : BaseAuditableEntity
             Status = BankStatementLineStatus.Received
         };
     }
+
+    /// <summary>Withdrawals R38: an end-to-end id and a returned line id fit in 100 characters each.</summary>
+    public static bool FitsPaymentIds(string? endToEndId, string? returnOfOutsideId) => throw new NotImplementedException();
+
+    /// <summary>Withdrawals R38: the stored line this line takes back.</summary>
+    public void LinkReturnedLine(int relatedLineId) => throw new NotImplementedException();
 
     /// <summary>True when the bank's line has a shape the platform can store (R10).</summary>
     public static bool IsStorable(string? outsideId, BankLineDirection direction, decimal amount) =>
