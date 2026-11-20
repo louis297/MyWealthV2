@@ -42,9 +42,12 @@ export type NoteAction = "ignore" | "request-return" | "unmatch";
 export const statementLinesApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getStatementLines: builder.query<PagedList<StatementLine>, StatementLineListArgs>({
-      query: ({ status, page }) => {
+      query: ({ status, direction, page }) => {
         const params = new URLSearchParams();
         params.set("status", status);
+        if (direction) {
+          params.set("direction", direction);
+        }
         params.set("page", String(page ?? 1));
         params.set("pageSize", "20");
         return `/statement-lines?${params.toString()}`;

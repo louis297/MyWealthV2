@@ -42,6 +42,21 @@ export function TransactionDetailPage() {
                 Statement line
               </Link>
             ) : null}
+            {data.source?.kind === "Payment" && data.source.id ? (
+              <Link to={`/withdrawals/${data.source.id}`} className={recordLinkClass}>
+                Withdrawal
+              </Link>
+            ) : null}
+            {data.payment ? (
+              <Section title="Payment">
+                <DetailGrid>
+                  <DetailItem label="Value date">{data.payment.valueDate}</DetailItem>
+                  <DetailItem label="Reference">{data.payment.reference ?? "—"}</DetailItem>
+                  <DetailItem label="Payee">{data.payment.payeeName ?? "—"}</DetailItem>
+                  <DetailItem label="Payee account">{data.payment.payeeAccount ?? "—"}</DetailItem>
+                </DetailGrid>
+              </Section>
+            ) : null}
             {data.bankReceipt ? (
               <Section title="Bank receipt">
                 <DetailGrid>

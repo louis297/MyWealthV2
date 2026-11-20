@@ -10,6 +10,7 @@ import { NoteDialog } from "@/features/statementLines/NoteDialog";
 import { forbiddenSentence } from "@/features/statementLines/StatementLinesListPage";
 import {
   actionLabel,
+  methodLabel,
   problemMessages,
   problemStatus,
   reasonLabel,
@@ -64,7 +65,9 @@ export function StatementLineDetailPage() {
 
   const line = data;
   const places = currencies.data?.find((item) => item.code === line.currency)?.decimalPlaces;
-  const credit = line.direction === "Credit";
+  // D49: a debit line, or a line the platform matched to a payment, offers no action.
+  const byPayment = line.match?.method === "Payment" || line.match?.method === "PaymentReturn";
+  const credit = line.direction === "Credit" && !byPayment;
   const accountName = account.data?.name ?? line.match?.accountId ?? "";
 
   function failed(problem: unknown) {
@@ -142,6 +145,17 @@ export function StatementLineDetailPage() {
             <DetailItem label="Payer">{line.payerName ?? "—"}</DetailItem>
             <DetailItem label="Payer account">{line.payerAccount ?? "—"}</DetailItem>
             <DetailItem label="Reference">{line.reference ?? "—"}</DetailItem>
+            {line.withdrawalId ? (
+              <DetailItem label="Withdrawal">
+                <Link to={`/withdrawals/${line.withdrawalId}`} className={recordLinkClass}>Withdrawal</Link>
+              </DetailItem>
+            ) : null}
+            {line.relatedLineId ? (
+              <DetailItem label="Returns">
+                <Link to={`/statement-lines/${line.relatedLineId}`} className={recordLinkClass}>Returned line</Link>
+              </DetailItem>
+            ) : null}
+            {line.returnReason ? <DetailItem label="Return reason">{line.returnReason}</DetailItem> : null}
           </DetailGrid>
         </CardContent>
       </Card>
@@ -149,7 +163,7 @@ export function StatementLineDetailPage() {
         <Section title="Match">
           <Card>
             <CardContent className="flex flex-col gap-3">
-              <p className="text-sm">{line.match.method === "Manual" ? "Matched by hand" : "Matched by reference"}</p>
+              <p className="text-sm">{methodLabel(line.match.method)}</p>
               <DetailGrid>
                 <DetailItem label="Account">
                   <Link to={`/accounts/${line.match.accountId}`} className={recordLinkClass}>
@@ -159,7 +173,7 @@ export function StatementLineDetailPage() {
                 <DetailItem label="Customer">{customer.data?.name ?? line.match.customerId}</DetailItem>
                 <DetailItem label="Transaction">
                   <Link to={`/transactions/${line.match.transactionId}`} className={recordLinkClass}>
-                    Deposit
+                    {line.match.method === "Payment" ? "Payout" : line.match.method === "PaymentReturn" ? "Reversal" : "Deposit"}
                   </Link>
                 </DetailItem>
                 <DetailItem label="Matched at">{formatInstant(line.match.at)}</DetailItem>
