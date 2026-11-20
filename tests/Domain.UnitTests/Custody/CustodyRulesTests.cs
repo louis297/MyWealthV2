@@ -162,4 +162,10 @@ public class CustodyRulesTests
     [TestCase(0.004)]
     public void CloseOut_OnAnExternalAccount_IsNotLimited(decimal sum) =>
         CustodyRules.CloseOutRefusal(CustodyMode.External, sum, "USD", 2).ShouldBeNull();
+
+    [TestCase(CustodyMode.Custodial, 1, 1, true)]
+    [TestCase(CustodyMode.Custodial, 1, 2, false)]
+    [TestCase(CustodyMode.External, 1, 2, true)]
+    public void InternalTransfer_BetweenCustodialAccounts_StaysWithOneCustomer(CustodyMode mode, int from, int to, bool allowed) =>
+        CustodyRules.AllowsCustodialTransfer(mode, from, to).ShouldBe(allowed);
 }

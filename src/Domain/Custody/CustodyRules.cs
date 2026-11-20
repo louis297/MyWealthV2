@@ -45,6 +45,14 @@ public static class CustodyRules
         return unit;
     }
 
+    /// <summary>Withdrawals R47 (roadmap D14): the <c>errors.ToAccountId</c> message for a transfer between two
+    /// Customers' Custodial accounts.</summary>
+    public const string CustodialTransferMessage = "Cash can be transferred between Custodial accounts of the same customer only.";
+
+    /// <summary>Withdrawals R47: an <c>InternalTransfer</c> between Custodial accounts stays with one Customer; it would
+    /// otherwise be a third-party payment (roadmap X4). External accounts are not limited.</summary>
+    public static bool AllowsCustodialTransfer(CustodyMode custodyMode, int fromCustomerId, int toCustomerId) => true;
+
     private const string InterestMessage = "Interest cannot be entered by hand on a Custodial account.";
     private const string OpeningMessage = "A Custodial account starts empty. Fund it with TransferIn.";
     private const string StockMessage = "Securities cannot be moved in or out of a Custodial account by hand. Use Buy and Sell.";
