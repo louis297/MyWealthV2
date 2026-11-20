@@ -25,6 +25,7 @@ public class BackOfficePageTests
     private static readonly Guid OutsideTenantId = Guid.Parse("66666666-6666-6666-6666-666666666666");
     private static readonly Guid MissingTenantId = Guid.Parse("77777777-7777-7777-7777-777777777777");
     private static readonly Guid ClientMoneyUsdId = Guid.Parse("88888888-8888-8888-8888-888888888888");
+    private static readonly Guid ClientMoneyAudId = Guid.Parse("88888888-8888-8888-8888-8888888888aa");
     private static readonly Guid ClientMoneyNzdId = Guid.Parse("99999999-9999-9999-9999-999999999999");
 
     private BackOfficeFactory _factory = null!;
@@ -212,6 +213,65 @@ public class BackOfficePageTests
         body.ShouldContain("Bank name");
         SubmitButton(body, "Add").ShouldNotContain(" disabled");
         _api.ClientMoneyLists.ShouldContain(TenantId);
+    }
+
+    [Test]
+    public async Task Configuration_ShowsTheConnectionAndTheStatementOfEachClientMoneyAccount()
+    {
+        var body = await GetAsync($"/tenants/{TenantId}/config");
+
+        body.ShouldContain("<th>Connection</th>");
+        body.ShouldContain("<th>Statement</th>");
+        body.ShouldContain("other-bank");
+        body.ShouldContain("Read 2026-11-20 02:01 UTC");
+        body.ShouldContain("Not read yet");
+        body.ShouldContain("Failing since 2026-11-20 03:05 UTC: Bank does not know this account");
+        body.ShouldNotContain("Bank unavailable");
+    }
+
+    [TestCase("Unreachable", "Bank not reachable")]
+    [TestCase("Timeout", "Bank did not answer in time")]
+    [TestCase("Unauthorized", "Bank refused the key")]
+    [TestCase("Unavailable", "Bank unavailable")]
+    [TestCase("UnknownAccount", "Bank does not know this account")]
+    [TestCase("BadResponse", "Bank answer not understood")]
+    [TestCase("InvalidLine", "Statement line rejected")]
+    public void FeedStatus_LabelsEveryFailure(string failure, string label)
+    {
+        var at = new DateTimeOffset(2026, 11, 20, 3, 5, 0, TimeSpan.Zero);
+
+        BackOfficeHost::MyWealthV2.BackOffice.Components.Pages.FeedStatus.Text(new ClientMoneyAccountFeed(null, at, failure))
+            .ShouldBe($"Failing since 2026-11-20 03:05 UTC: {label}");
+        BackOfficeHost::MyWealthV2.BackOffice.Components.Pages.FeedStatus.Text(null).ShouldBe("Not read yet");
+        BackOfficeHost::MyWealthV2.BackOffice.Components.Pages.FeedStatus.Text(new ClientMoneyAccountFeed(at, at.AddMinutes(-1), failure))
+            .ShouldBe("Read 2026-11-20 03:05 UTC");
+    }
+
+    [Test]
+    public async Task AddForm_HasABankConnectionSelect_PreselectedWithTheOnlyConnection()
+    {
+        var body = await GetAsync($"/tenants/{TenantId}/config");
+
+        body.ShouldContain("Bank connection");
+        Regex.IsMatch(body, "<input[^>]*value=\"simulator\"").ShouldBeTrue("the only connection is preselected");
+        SubmitButton(body, "Add").ShouldNotContain(" disabled");
+    }
+
+    [Test]
+    public async Task AddForm_WithNoConnection_SaysSo_AndCannotBeSubmitted()
+    {
+        _api.BankConnections = [];
+        try
+        {
+            var body = await GetAsync($"/tenants/{TenantId}/config");
+
+            body.ShouldContain("No bank connection is configured.");
+            SubmitButton(body, "Add").ShouldContain(" disabled");
+        }
+        finally
+        {
+            _api.BankConnections = [new("simulator", "Simulator")];
+        }
     }
 
     [Test]
@@ -535,10 +595,21 @@ public class BackOfficePageTests
             return Task.FromResult<IReadOnlyList<ClientMoneyAccountItem>>([
                 new ClientMoneyAccountItem(
                     ClientMoneyUsdId, tenantId, "USD", "Simulator Bank", "North Advisory Ltd Client Funds Trust Account",
-                    "02-0100-0123456-00", true, "cma-rv1", DateTimeOffset.UnixEpoch),
+                    "02-0100-0123456-00", true, "cma-rv1", DateTimeOffset.UnixEpoch, "simulator",
+                    new ClientMoneyAccountFeed(
+                        new DateTimeOffset(2026, 11, 20, 2, 1, 7, TimeSpan.Zero),
+                        new DateTimeOffset(2026, 11, 19, 22, 14, 0, TimeSpan.Zero),
+                        "Unavailable")),
                 new ClientMoneyAccountItem(
                     ClientMoneyNzdId, tenantId, "NZD", "Old Bank", "North Advisory Ltd Old Trust Account",
-                    "38-9000-7654321-00", false, "cma-rv2", DateTimeOffset.UnixEpoch)
+                    "38-9000-7654321-00", false, "cma-rv2", DateTimeOffset.UnixEpoch, "other-bank"),
+                new ClientMoneyAccountItem(
+                    ClientMoneyAudId, tenantId, "AUD", "Simulator Bank", "North Advisory Ltd AUD Trust Account",
+                    "06-0100-0000001-00", true, "cma-rv3", DateTimeOffset.UnixEpoch, "simulator",
+                    new ClientMoneyAccountFeed(
+                        new DateTimeOffset(2026, 11, 19, 1, 0, 0, TimeSpan.Zero),
+                        new DateTimeOffset(2026, 11, 20, 3, 5, 0, TimeSpan.Zero),
+                        "UnknownAccount"))
             ]);
         }
 
@@ -554,8 +625,14 @@ public class BackOfficePageTests
             string bankName,
             string accountName,
             string accountNumber,
+            string bankConnection,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(ClientMoneyUsdId);
+
+        public List<BankConnectionItem> BankConnections { get; set; } = [new("simulator", "Simulator")];
+
+        public Task<IReadOnlyList<BankConnectionItem>> ListBankConnectionsAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<BankConnectionItem>>(BankConnections);
 
         public Task DisableClientMoneyAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;

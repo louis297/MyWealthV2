@@ -209,6 +209,7 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         string bankName,
         string accountName,
         string accountNumber,
+        string bankConnection,
         CancellationToken cancellationToken = default)
     {
         var created = await ReadAsync<Created>(
@@ -232,6 +233,9 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
             $"{ClientMoneyAccountsPath(tenantId)}/{id}/enable",
             RowVersion(rowVersion),
             cancellationToken);
+
+    public Task<IReadOnlyList<BankConnectionItem>> ListBankConnectionsAsync(CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
 
     private static string ClientMoneyAccountsPath(Guid tenantId) => $"/tenants/{tenantId}/client-money-accounts";
 

@@ -119,7 +119,7 @@ public class BackOfficeApiTests
     {
         var rowId = Guid.Parse("88888888-8888-8888-8888-888888888888");
         var item = $$"""
-            {"id":"{{rowId}}","tenantId":"{{TenantId}}","currency":"USD","bankName":"Simulator Bank","accountName":"North Trust","accountNumber":"02-0100","isActive":true,"rowVersion":"rv1","created":"2026-11-19T03:00:00+00:00"}
+            {"id":"{{rowId}}","tenantId":"{{TenantId}}","currency":"USD","bankName":"Simulator Bank","accountName":"North Trust","accountNumber":"02-0100","bankConnection":"simulator","isActive":true,"bankFeed":{"lastSucceededAt":"2026-11-20T02:01:07Z","lastFailedAt":null,"lastFailure":null},"rowVersion":"rv1","created":"2026-11-19T03:00:00+00:00"}
             """;
         var api = new ScriptedHandler();
         api.Enqueue(HttpStatusCode.OK, $$"""{"items":[{{item}}],"page":1,"pageSize":100,"totalCount":1}""");
@@ -131,7 +131,7 @@ public class BackOfficeApiTests
 
         var listed = (await platform.ListClientMoneyAccountsAsync(TenantId)).ShouldHaveSingleItem();
         var fetched = await platform.GetClientMoneyAccountAsync(TenantId, rowId);
-        var created = await platform.CreateClientMoneyAccountAsync(TenantId, "USD", "Simulator Bank", "North Trust", "02-0100");
+        var created = await platform.CreateClientMoneyAccountAsync(TenantId, "USD", "Simulator Bank", "North Trust", "02-0100", "simulator");
         await platform.DisableClientMoneyAccountAsync(TenantId, rowId, "rv1");
         await platform.EnableClientMoneyAccountAsync(TenantId, rowId, "rv2");
 
@@ -142,6 +142,9 @@ public class BackOfficeApiTests
         listed.AccountNumber.ShouldBe("02-0100");
         listed.IsActive.ShouldBeTrue();
         listed.RowVersion.ShouldBe("rv1");
+        listed.BankConnection.ShouldBe("simulator");
+        listed.BankFeed.ShouldNotBeNull().LastSucceededAt.ShouldBe(new DateTimeOffset(2026, 11, 20, 2, 1, 7, TimeSpan.Zero));
+        listed.BankFeed.LastFailure.ShouldBeNull();
         fetched.Id.ShouldBe(rowId);
         created.ShouldBe(rowId);
         AssertRequest(api.Requests[0], "GET", $"/tenants/{TenantId}/client-money-accounts?pageSize=100");
@@ -152,11 +155,25 @@ public class BackOfficeApiTests
         body.GetProperty("bankName").GetString().ShouldBe("Simulator Bank");
         body.GetProperty("accountName").GetString().ShouldBe("North Trust");
         body.GetProperty("accountNumber").GetString().ShouldBe("02-0100");
-        body.EnumerateObject().Count().ShouldBe(4);
+        body.GetProperty("bankConnection").GetString().ShouldBe("simulator");
+        body.EnumerateObject().Count().ShouldBe(5);
         AssertRequest(api.Requests[3], "POST", $"/tenants/{TenantId}/client-money-accounts/{rowId}/disable");
         Body(api.Requests[3]).GetProperty("rowVersion").GetString().ShouldBe("rv1");
         AssertRequest(api.Requests[4], "POST", $"/tenants/{TenantId}/client-money-accounts/{rowId}/enable");
         Body(api.Requests[4]).GetProperty("rowVersion").GetString().ShouldBe("rv2");
+    }
+
+    [Test]
+    public async Task BankConnections_ReadsTheList()
+    {
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.OK, """{"items":[{"name":"simulator","adapter":"Simulator"}],"page":1,"pageSize":20,"totalCount":1}""");
+        var platform = Create(api);
+
+        var connections = await platform.ListBankConnectionsAsync();
+
+        connections.ShouldBe([new BankConnectionItem("simulator", "Simulator")]);
+        AssertRequest(api.Requests[0], "GET", "/bank-connections");
     }
 
     [Test]

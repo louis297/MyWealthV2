@@ -182,7 +182,7 @@ else
         try
         {
             await Api.CreateClientMoneyAccountAsync(
-                TenantId, newAccount.Currency, newAccount.BankName, newAccount.AccountName, newAccount.AccountNumber);
+                TenantId, newAccount.Currency, newAccount.BankName, newAccount.AccountName, newAccount.AccountNumber, "");
             fieldErrors = new Dictionary<string, string>();
             newAccount.BankName = "";
             newAccount.AccountName = "";
