@@ -201,8 +201,8 @@ public class WithdrawalsSchemaTests
         var ids = (await db.ReadAsync($"""
             {ScratchSchemaDatabase.TenantRows("a", code)}
             INSERT INTO [ClientMoneyAccounts]
-                ([PublicId], [TenantId], [Currency], [BankName], [AccountName], [AccountNumber], [IsActive], [Created], [CreatedBy], [BankConnection])
-            VALUES (NEWID(), @a_tenant, 'USD', N'Simulator Bank', N'Trust', N'N-{code}', 1, SYSDATETIMEOFFSET(), N'test', N'simulator');
+                ([PublicId], [TenantId], [Currency], [BankName], [AccountName], [AccountNumber], [IsActive], [Created], [CreatedBy], [LastModified], [BankConnection])
+            VALUES (NEWID(), @a_tenant, 'USD', N'Simulator Bank', N'Trust', N'N-{code}', 1, SYSDATETIMEOFFSET(), N'test', SYSDATETIMEOFFSET(), N'simulator');
             DECLARE @cma int = SCOPE_IDENTITY();
             {InsertNominated()}
             SELECT @a_tenant, @a_bank, SCOPE_IDENTITY(), @a_adviser, @a_customer, @cma, @a_buy;

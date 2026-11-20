@@ -264,7 +264,7 @@ public class TenantCompositeKeysSchemaTests
             DECLARE @cma int = SCOPE_IDENTITY();
             INSERT INTO [ClientMoneyAccounts]
                 ([PublicId], [TenantId], [Currency], [BankName], [AccountName], [AccountNumber], [IsActive], [Created], [CreatedBy], [BankConnection])
-            VALUES (NEWID(), @{p}_tenant, 'USD', N'Simulator Bank', N'Trust', CONVERT(nvarchar(34), LEFT(REPLACE(CONVERT(nvarchar(36), NEWID()), N'-', N''), 30)), 1, SYSDATETIMEOFFSET(), N'test', N'simulator');
+            VALUES (NEWID(), @{p}_tenant, 'NZD', N'Simulator Bank', N'Trust', CONVERT(nvarchar(34), LEFT(REPLACE(CONVERT(nvarchar(36), NEWID()), N'-', N''), 30)), 1, SYSDATETIMEOFFSET(), N'test', N'simulator');
             DECLARE @pcma int = SCOPE_IDENTITY();
             INSERT INTO [BankStatementLines]
                 ([PublicId], [TenantId], [ClientMoneyAccountId], [Connection], [OutsideId], [ValueDate], [Direction], [Amount], [Currency],
