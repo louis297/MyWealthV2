@@ -29,7 +29,7 @@ public sealed class ClientMoneyAccountDto
 
     public required DateTimeOffset Created { get; init; }
 
-    public static ClientMoneyAccountDto From(ClientMoneyAccount row, Tenant tenant) => new()
+    public static ClientMoneyAccountDto From(ClientMoneyAccount row, Tenant tenant, BankFeedCursor? cursor = null) => new()
     {
         Id = row.PublicId,
         TenantId = tenant.PublicId,
@@ -39,6 +39,9 @@ public sealed class ClientMoneyAccountDto
         AccountNumber = row.AccountNumber,
         BankConnection = row.BankConnection,
         IsActive = row.IsActive,
+        BankFeed = cursor is null
+            ? null
+            : new ClientMoneyAccountFeedDto(cursor.LastSucceededAt, cursor.LastFailedAt, cursor.LastFailure?.ToString()),
         RowVersion = Convert.ToBase64String(row.RowVersion ?? []),
         Created = row.Created
     };

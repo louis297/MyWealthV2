@@ -49,9 +49,14 @@ public class GetClientMoneyAccountsQueryHandler(IApplicationDbContext db)
             .Take(request.PageSize)
             .ToListAsync(cancellationToken);
 
+        var ids = items.Select(row => row.Id).ToList();
+        var cursors = await db.BankFeedCursors.AsNoTracking()
+            .Where(row => ids.Contains(row.ClientMoneyAccountId))
+            .ToDictionaryAsync(row => row.ClientMoneyAccountId, cancellationToken);
+
         return new PagedList<ClientMoneyAccountDto>
         {
-            Items = items.Select(row => ClientMoneyAccountDto.From(row, tenant)).ToList(),
+            Items = items.Select(row => ClientMoneyAccountDto.From(row, tenant, cursors.GetValueOrDefault(row.Id))).ToList(),
             Page = request.Page,
             PageSize = request.PageSize,
             TotalCount = totalCount

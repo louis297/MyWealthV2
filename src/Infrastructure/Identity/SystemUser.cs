@@ -1,4 +1,5 @@
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.Common.Security;
 
 namespace MyWealthV2.Infrastructure.Identity;
 
@@ -6,7 +7,7 @@ namespace MyWealthV2.Infrastructure.Identity;
 public class SystemUser : IUser
 {
     /// <summary>The system name the background jobs write to the audit columns, as the seeds do.</summary>
-    public const string Name = "system";
+    public const string Name = SystemActor.Name;
 
     public string? Id => Name;
     public List<string>? Roles => null;
