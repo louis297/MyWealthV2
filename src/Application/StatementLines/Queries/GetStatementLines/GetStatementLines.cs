@@ -36,6 +36,10 @@ public class GetStatementLinesQueryValidator : AbstractValidator<GetStatementLin
             .Must(status => GetStatementLinesQuery.StatusNames(status)
                 .All(name => Names.Contains(name, StringComparer.OrdinalIgnoreCase)))
             .WithMessage($"Status must be one or more of {string.Join(", ", Names)}, comma-separated.");
+        RuleFor(query => query.Direction)
+            .Must(direction => direction is null || Enum.TryParse<BankLineDirection>(direction, ignoreCase: true, out var parsed)
+                && Enum.IsDefined(parsed) && !int.TryParse(direction, out _))
+            .WithMessage("Direction must be Credit or Debit.");
     }
 }
 
@@ -54,6 +58,13 @@ public class GetStatementLinesQueryHandler(IApplicationDbContext db, ICurrentUse
         if (statuses.Count > 0)
         {
             query = query.Where(row => statuses.Contains(row.Status));
+        }
+
+        // Withdrawals R44: receipts, payments out, or both.
+        if (request.Direction is not null)
+        {
+            var direction = Enum.Parse<BankLineDirection>(request.Direction, ignoreCase: true);
+            query = query.Where(row => row.Direction == direction);
         }
 
         if (!string.IsNullOrWhiteSpace(request.Currency))
