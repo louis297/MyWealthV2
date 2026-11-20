@@ -40,7 +40,8 @@ public class ReverseTransactionCommandValidator : AbstractValidator<ReverseTrans
 public class ReverseTransactionCommandHandler(
     IApplicationDbContext db,
     ICurrentUser currentUser,
-    TimeProvider time)
+    TimeProvider time,
+    ICurrencyCatalog currencies)
     : IRequestHandler<ReverseTransactionCommand, IdempotentResult>
 {
     public async Task<IdempotentResult> Handle(ReverseTransactionCommand request, CancellationToken cancellationToken)
@@ -207,6 +208,8 @@ public class ReverseTransactionCommandHandler(
                     new ValidationFailure(string.Empty, "Cash balance cannot become negative.")
                 ]);
             }
+
+            await AvailableCashGuard.EnsureAsync(db, currencies, leg.Account, postedSum, cancellationToken);
         }
 
         return new IdempotentResult(201, body);

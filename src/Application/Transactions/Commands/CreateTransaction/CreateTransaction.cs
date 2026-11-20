@@ -511,6 +511,8 @@ public class CreateTransactionCommandHandler(
             ]);
         }
 
+        await AvailableCashGuard.EnsureAsync(db, catalog, loaded.Account, postedSum, cancellationToken);
+
         return new IdempotentResult(201, body);
     }
 
