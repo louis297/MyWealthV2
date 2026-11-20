@@ -148,7 +148,7 @@ public sealed class PullBankStatements(
                     line.Amount!.Value,
                     account.Currency,
                     line.PayerName,
-                    PayerAccountMask.Mask(line.PayerAccount),
+                    AccountNumberMask.Mask(line.PayerAccount),
                     line.Reference,
                     now);
 
