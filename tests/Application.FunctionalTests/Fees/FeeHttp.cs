@@ -203,14 +203,9 @@ internal static class FeeHttp
     public static Task<Guid> OpenCustodialAsync(string accessToken, Guid customerId, string currency) =>
         AccountHttp.OpenAccountAsync(accessToken, customerId, "Custodial " + currency, "Brokerage", currency, "Custodial");
 
-    /// <summary>A <c>TransferIn</c> on a Custodial account, booked by the server.</summary>
+    /// <summary>A deposit on a Custodial account, through the fake bank feed (deposit-matching R35).</summary>
     public static Task<HttpResponseMessage> FundCustodialAsync(string accessToken, Guid accountId, decimal amount) =>
-        TransactionHttp.Send(HttpMethod.Post, "/transactions", accessToken, new
-        {
-            accountId,
-            type = "TransferIn",
-            amount
-        }, Guid.NewGuid());
+        Custody.CustodialHttp.FundAsync(accessToken, accountId, amount);
 
     /// <summary>
     /// Inserts a Buy at 25.00 directly, without a fee, as a row posted before a future bookedAt was refused

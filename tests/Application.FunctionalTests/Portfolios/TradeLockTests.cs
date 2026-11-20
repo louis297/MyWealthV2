@@ -14,18 +14,7 @@ public class TradeLockTests : TestBase
     {
         var (tokens, accountId, instrumentId) = await AssignedAccountAsync("Lock Firm", "lock-firm");
 
-        var cash = await Transactions.TransactionHttp.Send(
-            HttpMethod.Post,
-            "/transactions",
-            tokens.AccessToken,
-            new
-            {
-                accountId,
-                type = "TransferIn",
-                amount = 50m,
-                currency = "NZD"
-            },
-            Guid.NewGuid());
+        var cash = await Custody.CustodialHttp.FundAsync(tokens.AccessToken, accountId, 50m);
         cash.StatusCode.ShouldBe(HttpStatusCode.Created);
 
         var buy = await Transactions.TransactionHttp.Send(
@@ -105,13 +94,7 @@ public class TradeLockTests : TestBase
 
         var accountId = await Accounts.AccountHttp.OpenAccountAsync(
             tokens.AccessToken, customer.PublicId, name: "Model", type: "Brokerage", custodyMode: "Custodial");
-        var funded = await Transactions.TransactionHttp.Send(HttpMethod.Post, "/transactions", tokens.AccessToken, new
-        {
-            accountId,
-            type = "TransferIn",
-            amount = 10000m,
-            currency = "NZD"
-        }, Guid.NewGuid());
+        var funded = await Custody.CustodialHttp.FundAsync(tokens.AccessToken, accountId, 10000m);
         funded.StatusCode.ShouldBe(HttpStatusCode.Created);
         return (tokens, accountId, instrumentId);
     }

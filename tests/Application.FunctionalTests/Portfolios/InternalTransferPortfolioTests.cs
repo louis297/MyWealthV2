@@ -20,12 +20,7 @@ public class InternalTransferPortfolioTests : TestBase
         // Custody modes R8, R14: both accounts are Custodial, so the portfolio can be assigned and they can trade.
         var brokerage = await CustodialHttp.OpenCustodialAsync(tokens.AccessToken, customer.PublicId, "Model", "NZD");
         var bank = await CustodialHttp.OpenCustodialAsync(tokens.AccessToken, customer.PublicId, "Cash brokerage", "NZD");
-        (await TransactionHttp.Send(HttpMethod.Post, "/transactions", tokens.AccessToken, new
-            {
-                accountId = bank,
-                type = "TransferIn",
-                amount = 1000m
-            }, Guid.NewGuid()))
+        (await Custody.CustodialHttp.FundAsync(tokens.AccessToken, bank, 1000m))
             .StatusCode.ShouldBe(HttpStatusCode.Created);
         await AssignPortfolioAsync(tokens.AccessToken, brokerage, instrumentId);
         var scheduler = FunctionalTestSetup.WebApiServices.GetRequiredService<RecordingRebalanceScheduler>();

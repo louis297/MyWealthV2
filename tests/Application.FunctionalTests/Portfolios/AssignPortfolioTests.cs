@@ -98,18 +98,7 @@ public class AssignPortfolioTests : TestBase
         var (tokens, portfolioId, customerId, instrumentId) = await FundedContextAsync(tenantName, tenantCode, withPrice);
         var accountId = await Accounts.AccountHttp.OpenAccountAsync(
             tokens.AccessToken, customerId, "Model", "Brokerage", custodyMode: "Custodial");
-        var funded = await Transactions.TransactionHttp.Send(
-            HttpMethod.Post,
-            "/transactions",
-            tokens.AccessToken,
-            new
-            {
-                accountId,
-                type = "TransferIn",
-                amount = 10000m,
-                currency = "NZD"
-            },
-            Guid.NewGuid());
+        var funded = await Custody.CustodialHttp.FundAsync(tokens.AccessToken, accountId, 10000m);
         funded.StatusCode.ShouldBe(HttpStatusCode.Created);
         return (tokens, accountId, portfolioId);
     }

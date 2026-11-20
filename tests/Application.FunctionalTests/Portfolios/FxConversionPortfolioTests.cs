@@ -20,12 +20,7 @@ public class FxConversionPortfolioTests : TestBase
         // Custody modes R8, R14: both accounts are Custodial, so the portfolio can be assigned and they can trade.
         var brokerage = await CustodialHttp.OpenCustodialAsync(tokens.AccessToken, customer.PublicId, "Model", "NZD");
         var usdBank = await CustodialHttp.OpenCustodialAsync(tokens.AccessToken, customer.PublicId, "USD brokerage", "USD");
-        (await TransactionHttp.Send(HttpMethod.Post, "/transactions", tokens.AccessToken, new
-            {
-                accountId = usdBank,
-                type = "TransferIn",
-                amount = 1000m
-            }, Guid.NewGuid()))
+        (await Custody.CustodialHttp.FundAsync(tokens.AccessToken, usdBank, 1000m))
             .StatusCode.ShouldBe(HttpStatusCode.Created);
         // A Custodial conversion is booked at the server clock (custody modes R10), so the rate is today's.
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
