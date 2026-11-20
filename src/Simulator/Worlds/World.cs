@@ -34,6 +34,15 @@ public sealed class World
     /// <summary>The number of the next bank line of this world (deposit-matching R42).</summary>
     public long NextLineNumber { get; private set; } = 1;
 
+    /// <summary>The number of the next bank payment of this world (withdrawals R50).</summary>
+    public long NextPaymentNumber { get; private set; } = 1;
+
+    /// <summary>How the bank answers new payments (withdrawals R52): <see cref="Bank.BankPaymentMode"/>.</summary>
+    public int BankPaymentMode { get; private set; }
+
+    /// <summary>The reason of the <c>Reject</c> mode (withdrawals R52, R34).</summary>
+    public string? BankPaymentRejectReason { get; private set; }
+
     public byte[] RowVersion { get; private set; } = [];
 
     public bool Paused => PausedAt is not null;
@@ -120,6 +129,24 @@ public sealed class World
         PartyOutage = false;
         StartedAt = realNow.ToUniversalTime();
         NextLineNumber = 1;
+        NextPaymentNumber = 1;
+        BankPaymentMode = (int)Bank.BankPaymentMode.Execute;
+        BankPaymentRejectReason = null;
+    }
+
+    /// <summary>Withdrawals R50: the id of the next payment, <c>{WorldId:N}-P{n}</c>.</summary>
+    public string TakePaymentId() => $"{WorldId:N}-P{NextPaymentNumber++}";
+
+    /// <summary>Withdrawals R52: <c>Reject</c> needs one of the reasons of R34; the other modes take none.</summary>
+    public void SetPaymentMode(Bank.BankPaymentMode mode, string? reason)
+    {
+        if (mode == Bank.BankPaymentMode.Reject && !Bank.BankRules.IsRejectReason(reason))
+        {
+            throw new WorldRuleException("Reason", $"reason must be one of {string.Join(", ", Bank.BankRules.RejectReasons)} with Reject.");
+        }
+
+        BankPaymentMode = (int)mode;
+        BankPaymentRejectReason = mode == Bank.BankPaymentMode.Reject ? reason : null;
     }
 
     /// <summary>Deposit matching R42: the outside id of the next bank line, <c>{WorldId:N}-L{n}</c>.</summary>

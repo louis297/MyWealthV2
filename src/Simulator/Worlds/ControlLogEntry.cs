@@ -47,4 +47,7 @@ public static class ControlActions
     public const string WorldReset = "WorldReset";
     public const string BankAccountOpened = "BankAccountOpened";
     public const string BankReceiptAdded = "BankReceiptAdded";
+    public const string BankPaymentModeChanged = "BankPaymentModeChanged";
+    public const string BankPaymentExecuted = "BankPaymentExecuted";
+    public const string BankPaymentReturned = "BankPaymentReturned";
 }
