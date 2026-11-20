@@ -215,7 +215,7 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         var created = await ReadAsync<Created>(
             HttpMethod.Post,
             ClientMoneyAccountsPath(tenantId),
-            JsonSerializer.Serialize(new { currency, bankName, accountName, accountNumber }, Json),
+            JsonSerializer.Serialize(new { currency, bankName, accountName, accountNumber, bankConnection }, Json),
             cancellationToken);
         return created.Id;
     }
@@ -234,8 +234,11 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
             RowVersion(rowVersion),
             cancellationToken);
 
-    public Task<IReadOnlyList<BankConnectionItem>> ListBankConnectionsAsync(CancellationToken cancellationToken = default) =>
-        throw new NotImplementedException();
+    public async Task<IReadOnlyList<BankConnectionItem>> ListBankConnectionsAsync(CancellationToken cancellationToken = default)
+    {
+        var page = await ReadAsync<BankConnectionPage>(HttpMethod.Get, "/bank-connections", json: null, cancellationToken);
+        return page.Items;
+    }
 
     private static string ClientMoneyAccountsPath(Guid tenantId) => $"/tenants/{tenantId}/client-money-accounts";
 
