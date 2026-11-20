@@ -32,6 +32,9 @@ public sealed class TransactionSource : ValueObject
         return new TransactionSource(TransactionSourceKind.Rebalance, handle);
     }
 
+    /// <summary>A deposit's source: the PublicId of the statement line it came from (deposit-matching R32).</summary>
+    public static TransactionSource BankFeed(Guid statementLinePublicId) => throw new NotImplementedException();
+
     /// <summary>The source as stored on a Transaction row.</summary>
     internal static TransactionSource FromStored(TransactionSourceKind kind, Guid? publicId) =>
         kind switch

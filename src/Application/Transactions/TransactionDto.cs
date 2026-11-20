@@ -37,6 +37,21 @@ public sealed class TransactionDto
 
     /// <summary>Why an adjustment was entered, on an <c>Adjustment</c> and its Reversal; otherwise null (adjustments R21).</summary>
     public TransactionAdjustmentDto? Adjustment { get; init; }
+
+    /// <summary>The bank's details, on a deposit and on its Reversal; otherwise null (deposit-matching R36).</summary>
+    public TransactionBankReceiptDto? BankReceipt { get; init; }
+}
+
+/// <summary>A deposit's bank receipt detail (deposit-matching R36). <see cref="PayerAccount"/> is masked.</summary>
+public sealed class TransactionBankReceiptDto
+{
+    public required string ValueDate { get; init; }
+
+    public string? Reference { get; init; }
+
+    public string? PayerName { get; init; }
+
+    public string? PayerAccount { get; init; }
 }
 
 /// <summary><see cref="Reason"/> is the <c>AdjustmentReason</c> name (adjustments R21).</summary>

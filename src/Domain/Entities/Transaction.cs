@@ -47,6 +47,9 @@ public class Transaction : BaseAuditableEntity
     /// <summary>Why the adjustment was entered, on an <c>Adjustment</c> and its Reversal (adjustments §5).</summary>
     public TransactionAdjustmentDetail? AdjustmentDetail { get; private set; }
 
+    /// <summary>The bank's details, on a deposit and on its Reversal (deposit-matching R32, R33).</summary>
+    public TransactionBankReceiptDetail? BankReceiptDetail { get; private set; }
+
     /// <summary>One per <see cref="CashLegRole.Fee"/> cash leg (trade-fees R18).</summary>
     public List<TransactionFeeDetail> FeeDetails { get; private set; } = [];
 
@@ -95,6 +98,23 @@ public class Transaction : BaseAuditableEntity
         transaction.AddDomainEvent(new TransactionPosted(transaction));
         return transaction;
     }
+
+    /// <summary>The memo every deposit carries (deposit-matching R32).</summary>
+    public const string BankDepositMemo = "Bank deposit";
+
+    /// <summary>
+    /// A deposit from the bank statement (deposit-matching R32): one <c>TransferIn</c> cash leg, source
+    /// <c>BankFeed</c>, memo <see cref="BankDepositMemo"/>, no reference, and the bank receipt detail. Flows build it
+    /// without the manual entry matrix (custody-modes R7).
+    /// </summary>
+    public static Transaction PostBankDeposit(
+        int tenantId,
+        int accountId,
+        string accountCurrency,
+        decimal amount,
+        DateTimeOffset bookedAt,
+        TransactionSource source,
+        BankReceipt receipt) => throw new NotImplementedException();
 
     /// <summary>Custody modes I2: every leg account of one Transaction has the same custody mode.</summary>
     public const string DifferentCustodyModesMessage = "Both accounts must have the same custody mode.";

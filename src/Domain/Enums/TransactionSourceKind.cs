@@ -13,5 +13,8 @@ public enum TransactionSourceKind
     Seed = 1,
 
     /// <summary>A portfolio rebalance; the source id is the rebalance handle (R5).</summary>
-    Rebalance = 2
+    Rebalance = 2,
+
+    /// <summary>The bank feed; the source id is the statement line's PublicId (deposit-matching R32).</summary>
+    BankFeed = 3
 }

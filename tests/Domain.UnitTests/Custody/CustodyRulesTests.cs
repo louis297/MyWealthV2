@@ -115,6 +115,7 @@ public class CustodyRulesTests
     [TestCase(CustodyMode.Custodial, TransactionSourceKind.Manual, true)]
     [TestCase(CustodyMode.Custodial, TransactionSourceKind.Seed, false)]
     [TestCase(CustodyMode.Custodial, TransactionSourceKind.Rebalance, true)]
+    [TestCase(CustodyMode.Custodial, TransactionSourceKind.BankFeed, false)]
     public void AllowsHandReverse_MatchesTransactionSourceR12ToR15(
         CustodyMode custodyMode,
         TransactionSourceKind sourceKind,
