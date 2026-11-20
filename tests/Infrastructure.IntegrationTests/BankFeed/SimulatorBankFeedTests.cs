@@ -48,7 +48,7 @@ public class SimulatorBankFeedTests
         ]);
         var sent = handler.Requests.ShouldHaveSingleItem();
         sent.Method.ShouldBe(HttpMethod.Get);
-        sent.RequestUri!.ToString().ShouldBe(
+        sent.RequestUri!.AbsoluteUri.ShouldBe(
             "http://simulator:8082/party/bank/accounts/SIM-DEMO%20USD/statement-lines?after=3f2c%3A10&limit=100");
         sent.Headers.GetValues("X-Api-Key").ShouldBe([Key]);
     }
