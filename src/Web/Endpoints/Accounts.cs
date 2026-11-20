@@ -57,10 +57,11 @@ public class Accounts : IEndpointGroup
         Guid? tenantId = null,
         Guid? customerId = null,
         string? type = null,
-        string? custodyMode = null)
+        string? custodyMode = null,
+        string? depositReference = null)
     {
         var result = await sender.Send(
-            new GetAccountsQuery(page, pageSize, enabledOnly, search, tenantId, customerId, type, custodyMode));
+            new GetAccountsQuery(page, pageSize, enabledOnly, search, tenantId, customerId, type, custodyMode, depositReference));
         return TypedResults.Ok(result);
     }
 
