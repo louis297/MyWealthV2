@@ -62,6 +62,8 @@ services:
       ConnectionStrings__MyWealthDbV2: *connection-string
       Identity__Authority: https://id.${DOMAIN:?}
       Reports__StorageRoot: /reports
+      # Bank connection `simulator` (docs/features/deposit-matching.md R1): webapi knows only its name and adapter.
+      BankConnections__simulator__Adapter: Simulator
       # First start only; remove from .env after the first SystemAdmin sign-in (§12 step 11).
       Bootstrap__SystemAdmin__Email: ${BOOTSTRAP_SYSTEMADMIN_EMAIL:-}
       Bootstrap__SystemAdmin__Password: ${BOOTSTRAP_SYSTEMADMIN_PASSWORD:-}
@@ -119,6 +121,12 @@ services:
       ConnectionStrings__MyWealthDbV2: *connection-string
       Reports__StorageRoot: /reports
       Eodhd__ApiKey: ${EODHD_API_KEY:?}
+      # Bank connection `simulator` (deposit-matching R1, R6). Worker does not depend on the simulator: with its
+      # profile off, each run of the bank statement job fails with Unreachable and keeps its cursor.
+      BankConnections__simulator__Adapter: Simulator
+      BankConnections__simulator__BaseUrl: http://simulator:8082
+      BankConnections__simulator__ApiKey: ${SIMULATOR_PARTY_API_KEY:?}
+      BankConnections__simulator__PollMinutes: ${BANK_SIMULATOR_POLL_MINUTES:-1}
     volumes:
       - ./data/reports:/reports
     depends_on:
@@ -214,6 +222,14 @@ services:
       # Not `:?`, so .env needs no key while the profile is off; the simulator itself refuses to start
       # without one of 32+ characters (docs/features/simulator.md R31).
       Simulator__PartyApiKey: ${SIMULATOR_PARTY_API_KEY:-}
+      # Standing trust accounts (deposit-matching R39): the numbers of the demo tenant's client money accounts,
+      # as the SystemAdmin adds them in the Back Office. Opened on first start and after every reset.
+      Simulator__Bank__StandingAccounts__0__AccountNumber: ${SIM_BANK_USD_ACCOUNT_NUMBER:-SIM-DEMO-USD}
+      Simulator__Bank__StandingAccounts__0__Currency: USD
+      Simulator__Bank__StandingAccounts__0__Name: ${SIM_BANK_ACCOUNT_NAME:-Demo Advisory Client Funds Trust Account}
+      Simulator__Bank__StandingAccounts__1__AccountNumber: ${SIM_BANK_NZD_ACCOUNT_NUMBER:-SIM-DEMO-NZD}
+      Simulator__Bank__StandingAccounts__1__Currency: NZD
+      Simulator__Bank__StandingAccounts__1__Name: ${SIM_BANK_ACCOUNT_NAME:-Demo Advisory Client Funds Trust Account}
       DataProtection__KeysPath: /keys
       ForwardedHeaders__KnownNetworks__0: 172.30.0.0/24
     volumes:
