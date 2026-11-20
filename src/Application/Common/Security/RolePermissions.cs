@@ -22,6 +22,7 @@ public static class RolePermissions
             Policies.AccountsRead, Policies.AccountsCreate, Policies.AccountsManage,
             Policies.TransactionsRead, Policies.TransactionsCreate, Policies.TransactionsAdjust,
             Policies.StatementLinesManage,
+            Policies.NominatedBankAccountsRead, Policies.NominatedBankAccountsManage, Policies.NominatedBankAccountsVerify,
             Policies.PortfoliosRead, Policies.PortfoliosManage,
             Policies.FeesRead, Policies.FeesManage,
             Policies.ReportsCustomerRead, Policies.ReportsCustomerCreate,
@@ -33,6 +34,7 @@ public static class RolePermissions
             Policies.InstrumentsRead, Policies.InstrumentsCreate,
             Policies.AccountsRead, Policies.AccountsCreate, Policies.AccountsManage,
             Policies.TransactionsRead, Policies.TransactionsCreate,
+            Policies.NominatedBankAccountsRead, Policies.NominatedBankAccountsManage,
             Policies.PortfoliosRead, Policies.PortfoliosManage,
             Policies.FeesRead,
             Policies.ReportsCustomerRead, Policies.ReportsCustomerCreate,
@@ -43,6 +45,7 @@ public static class RolePermissions
             Policies.UsersMe,
             Policies.AccountsRead,
             Policies.TransactionsRead,
+            Policies.NominatedBankAccountsRead,
             Policies.ReportsCustomerRead,
             Policies.ReportsCustomerCreate
         ]
