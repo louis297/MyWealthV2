@@ -25,11 +25,24 @@ public class BankFeedCursor
     public byte[] RowVersion { get; private set; } = null!;
 
     /// <summary>A cursor before the first read: no cursor, nothing tried yet.</summary>
-    public static BankFeedCursor Start(int clientMoneyAccountId) => throw new NotImplementedException();
+    public static BankFeedCursor Start(int clientMoneyAccountId) => new() { ClientMoneyAccountId = clientMoneyAccountId };
 
     /// <summary>A page was stored: the party's new cursor and the time (R8).</summary>
-    public void Advance(string? cursor, DateTimeOffset at) => throw new NotImplementedException();
+    public void Advance(string? cursor, DateTimeOffset at)
+    {
+        if (cursor is { Length: > CursorMaxLength })
+        {
+            throw new DomainException($"A bank feed cursor is at most {CursorMaxLength} characters.");
+        }
+
+        Cursor = cursor;
+        LastSucceededAt = at;
+    }
 
     /// <summary>A read failed: the cursor stays (R7).</summary>
-    public void Fail(BankFeedFailure failure, DateTimeOffset at) => throw new NotImplementedException();
+    public void Fail(BankFeedFailure failure, DateTimeOffset at)
+    {
+        LastFailure = failure;
+        LastFailedAt = at;
+    }
 }

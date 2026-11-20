@@ -68,6 +68,40 @@ public class TenantCompositeKeysSchemaTests
             INSERT INTO [TransactionAdjustmentDetails] ([TransactionId], [TenantId], [Reason])
             VALUES (@{p}_buy, @a_tenant, 0);
             """),
+        ("FK_BankStatementLines_Accounts_TenantId_MatchedAccountId", "Accounts", """
+            INSERT INTO [ClientMoneyAccounts]
+                ([PublicId], [TenantId], [Currency], [BankName], [AccountName], [AccountNumber], [IsActive], [Created], [CreatedBy], [BankConnection])
+            VALUES (NEWID(), @a_tenant, 'USD', N'Simulator Bank', N'Trust', CONVERT(nvarchar(34), LEFT(REPLACE(CONVERT(nvarchar(36), NEWID()), N'-', N''), 30)), 1, SYSDATETIMEOFFSET(), N'test', N'simulator');
+            INSERT INTO [BankStatementLines]
+                ([PublicId], [TenantId], [ClientMoneyAccountId], [Connection], [OutsideId], [ValueDate], [Direction], [Amount], [Currency],
+                 [ReceivedAt], [Status], [MatchedAccountId], [MatchedTransactionId], [MatchMethod], [MatchedAt], [LastActionByUserId], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, SCOPE_IDENTITY(), N'simulator', CONVERT(nvarchar(100), NEWID()), '2026-11-20', 0, 5, 'USD',
+                    SYSDATETIMEOFFSET(), 1, @{p}_bank, @a_buy, 0, SYSDATETIMEOFFSET(), NULL, SYSDATETIMEOFFSET(), N'test');
+            """),
+        ("FK_BankStatementLines_Transactions_TenantId_MatchedTransactionId", "Transactions", """
+            INSERT INTO [ClientMoneyAccounts]
+                ([PublicId], [TenantId], [Currency], [BankName], [AccountName], [AccountNumber], [IsActive], [Created], [CreatedBy], [BankConnection])
+            VALUES (NEWID(), @a_tenant, 'USD', N'Simulator Bank', N'Trust', CONVERT(nvarchar(34), LEFT(REPLACE(CONVERT(nvarchar(36), NEWID()), N'-', N''), 30)), 1, SYSDATETIMEOFFSET(), N'test', N'simulator');
+            INSERT INTO [BankStatementLines]
+                ([PublicId], [TenantId], [ClientMoneyAccountId], [Connection], [OutsideId], [ValueDate], [Direction], [Amount], [Currency],
+                 [ReceivedAt], [Status], [MatchedAccountId], [MatchedTransactionId], [MatchMethod], [MatchedAt], [LastActionByUserId], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, SCOPE_IDENTITY(), N'simulator', CONVERT(nvarchar(100), NEWID()), '2026-11-20', 0, 5, 'USD',
+                    SYSDATETIMEOFFSET(), 1, @a_bank, @{p}_buy, 0, SYSDATETIMEOFFSET(), NULL, SYSDATETIMEOFFSET(), N'test');
+            """),
+        ("FK_BankStatementLines_Users_TenantId_LastActionByUserId", "Users", """
+            INSERT INTO [ClientMoneyAccounts]
+                ([PublicId], [TenantId], [Currency], [BankName], [AccountName], [AccountNumber], [IsActive], [Created], [CreatedBy], [BankConnection])
+            VALUES (NEWID(), @a_tenant, 'USD', N'Simulator Bank', N'Trust', CONVERT(nvarchar(34), LEFT(REPLACE(CONVERT(nvarchar(36), NEWID()), N'-', N''), 30)), 1, SYSDATETIMEOFFSET(), N'test', N'simulator');
+            INSERT INTO [BankStatementLines]
+                ([PublicId], [TenantId], [ClientMoneyAccountId], [Connection], [OutsideId], [ValueDate], [Direction], [Amount], [Currency],
+                 [ReceivedAt], [Status], [MatchedAccountId], [MatchedTransactionId], [MatchMethod], [MatchedAt], [LastActionByUserId], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, SCOPE_IDENTITY(), N'simulator', CONVERT(nvarchar(100), NEWID()), '2026-11-20', 0, 5, 'USD',
+                    SYSDATETIMEOFFSET(), 0, NULL, NULL, NULL, NULL, @{p}_adviser, SYSDATETIMEOFFSET(), N'test');
+            """),
+        ("FK_TransactionBankReceiptDetails_Transactions_TenantId_TransactionId", "Transactions", """
+            INSERT INTO [TransactionBankReceiptDetails] ([TransactionId], [TenantId], [ValueDate])
+            VALUES (@{p}_buy, @a_tenant, '2026-11-20');
+            """),
         ("FK_TradeFeeBands_TradeFeeSchedules_TenantId_TradeFeeScheduleId", "TradeFeeSchedules", """
             INSERT INTO [TradeFeeBands] ([TenantId], [TradeFeeScheduleId], [FromAmount], [RatePercent])
             VALUES (@a_tenant, @{p}_feeschedule, 1000, 0.3);

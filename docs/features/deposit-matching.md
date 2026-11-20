@@ -291,7 +291,7 @@ Forward only. Do not add EF migrations.
 | --- | --- | --- |
 | `BankFeedCursors` | Add | PK `ClientMoneyAccountId`, FK → `ClientMoneyAccounts` RESTRICT |
 | `BankStatementLines` | Add | PK `Id`. Unique `PublicId`. Unique `UX_BankStatementLines_Connection_OutsideId` on `(Connection, OutsideId)`. FK `TenantId` → `Tenants`, `ClientMoneyAccountId` → `ClientMoneyAccounts`, `MatchedAccountId` → `Accounts`, `MatchedTransactionId` → `Transactions`, `LastActionByUserId` → `Users`, all RESTRICT. Index `(TenantId, Status, ReceivedAt DESC)`; index `(Connection, Status, ReceivedAt)` for processing |
-| `TransactionBankReceiptDetails` | Add | PK and FK `TransactionId` → `Transactions` CASCADE (as `TransactionFxDetails`) |
+| `TransactionBankReceiptDetails` | Add | PK `TransactionId`; `TenantId` FK → `Tenants`; FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)` RESTRICT, as `TransactionFxDetails` and `TransactionAdjustmentDetails` |
 | `Transactions` | Drop and re-add `CK_Transactions_SourceKind` (`SourceKind BETWEEN 0 AND 3`) and `CK_Transactions_SourcePublicId` (`(SourceKind IN (0, 1) AND SourcePublicId IS NULL) OR (SourceKind IN (2, 3) AND SourcePublicId IS NOT NULL)`) | none |
 
 `BankFeedCursors`:
@@ -335,7 +335,9 @@ Forward only. Do not add EF migrations.
 | Created, CreatedBy, LastModified, LastModifiedBy | audit | | |
 | RowVersion | rowversion | no | |
 
-`TransactionBankReceiptDetails`: `TransactionId int` PK, `ValueDate date NOT NULL`, `Reference nvarchar(140) NULL`, `PayerName nvarchar(140) NULL`, `PayerAccount nvarchar(40) NULL`.
+`TransactionBankReceiptDetails`: `TransactionId int` PK, `TenantId int NOT NULL`, `ValueDate date NOT NULL`, `Reference nvarchar(140) NULL`, `PayerName nvarchar(140) NULL`, `PayerAccount nvarchar(40) NULL`.
+
+The match and last-action foreign keys of `BankStatementLines` (`MatchedAccountId`, `MatchedTransactionId`, `LastActionByUserId`) are tenant composite keys `(TenantId, …)` → `(TenantId, Id)`, as every other tenant-scoped reference since script `0028`. Amended 2026-11-20 when `0041` was written: the first wording said CASCADE without `TenantId`, which `TransactionFxDetails` no longer is.
 
 No back-fill: no Transaction has source `BankFeed` before this slice. Hand `TransferIn` rows keep source `Manual` and get no receipt detail.
 

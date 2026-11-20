@@ -80,31 +80,178 @@ public class BankStatementLine : BaseAuditableEntity
         string? payerAccountMasked,
         string? referenceText,
         DateTimeOffset receivedAt,
-        Guid? publicId = null) => throw new NotImplementedException();
+        Guid? publicId = null)
+    {
+        if (!IsStorable(outsideId, direction, amount))
+        {
+            throw new DomainException(
+                $"A statement line needs an id of 1 to {OutsideIdMaxLength} characters, a direction, and an amount above zero with at most {AmountMaxDecimalPlaces} decimal places.");
+        }
+
+        if (string.IsNullOrWhiteSpace(currency) || currency.Trim().Length != 3)
+        {
+            throw new DomainException("Currency must be a three-letter code.");
+        }
+
+        return new BankStatementLine
+        {
+            PublicId = publicId ?? Guid.NewGuid(),
+            TenantId = tenantId,
+            ClientMoneyAccountId = clientMoneyAccountId,
+            Connection = connection,
+            OutsideId = outsideId,
+            ValueDate = valueDate,
+            Direction = direction,
+            Amount = amount,
+            Currency = currency.Trim().ToUpperInvariant(),
+            PayerName = FreeText(payerName, FreeTextMaxLength),
+            PayerAccountMasked = FreeText(payerAccountMasked, PayerAccountMaxLength),
+            ReferenceText = FreeText(referenceText, FreeTextMaxLength),
+            ReceivedAt = receivedAt,
+            Status = BankStatementLineStatus.Received
+        };
+    }
 
     /// <summary>True when the bank's line has a shape the platform can store (R10).</summary>
     public static bool IsStorable(string? outsideId, BankLineDirection direction, decimal amount) =>
-        throw new NotImplementedException();
+        !string.IsNullOrWhiteSpace(outsideId)
+        && outsideId.Length <= OutsideIdMaxLength
+        && Enum.IsDefined(direction)
+        && amount > 0
+        && decimal.Round(amount, AmountMaxDecimalPlaces) == amount;
 
     /// <summary>The platform matched it by its deposit reference (R17).</summary>
-    public void MarkMatched(int accountId, int transactionId, DateTimeOffset at) => throw new NotImplementedException();
+    public void MarkMatched(int accountId, int transactionId, DateTimeOffset at)
+    {
+        EnsureCredit("matched");
+        EnsureStatus("matched", BankStatementLineStatus.Received);
+        SetMatch(accountId, transactionId, StatementLineMatchMethod.Reference, at);
+    }
 
     /// <summary>The platform could not place it (R18).</summary>
-    public void MarkUnmatched(UnmatchedReason reason) => throw new NotImplementedException();
+    public void MarkUnmatched(UnmatchedReason reason)
+    {
+        EnsureCredit("unmatched");
+        EnsureStatus("unmatched", BankStatementLineStatus.Received);
+        if (!Enum.IsDefined(reason))
+        {
+            throw new DomainException("Unmatched reason is not valid.");
+        }
 
-    /// <summary>A TenantAdmin matched it to an account (R26).</summary>
-    public void MatchByHand(int accountId, int transactionId, string? note, int byUserId, DateTimeOffset at) =>
-        throw new NotImplementedException();
+        Status = BankStatementLineStatus.Unmatched;
+        UnmatchedReason = reason;
+    }
+
+    /// <summary>A TenantAdmin matched it to an account (R26); the note is optional.</summary>
+    public void MatchByHand(int accountId, int transactionId, string? note, int byUserId, DateTimeOffset at)
+    {
+        EnsureCredit("matched");
+        EnsureStatus("matched", BankStatementLineStatus.Unmatched);
+        var trimmed = OptionalNote(note);
+        SetMatch(accountId, transactionId, StatementLineMatchMethod.Manual, at);
+        Record(StatementLineAction.Matched, trimmed, byUserId, at);
+    }
 
     /// <summary>Not a Customer's money (R27).</summary>
-    public void Ignore(string note, int byUserId, DateTimeOffset at) => throw new NotImplementedException();
+    public void Ignore(string note, int byUserId, DateTimeOffset at)
+    {
+        EnsureCredit("ignored");
+        EnsureStatus("ignored", BankStatementLineStatus.Unmatched);
+        var trimmed = RequiredNote(note);
+        Status = BankStatementLineStatus.Ignored;
+        Record(StatementLineAction.Ignored, trimmed, byUserId, at);
+    }
 
-    /// <summary>Must go back to the payer (R28).</summary>
-    public void RequestReturn(string note, int byUserId, DateTimeOffset at) => throw new NotImplementedException();
+    /// <summary>Must go back to the payer (R28). No payment is sent in this slice.</summary>
+    public void RequestReturn(string note, int byUserId, DateTimeOffset at)
+    {
+        EnsureCredit("returned");
+        EnsureStatus("returned", BankStatementLineStatus.Unmatched);
+        var trimmed = RequiredNote(note);
+        Status = BankStatementLineStatus.ReturnRequested;
+        Record(StatementLineAction.ReturnRequested, trimmed, byUserId, at);
+    }
 
     /// <summary>Back into suspense (R29).</summary>
-    public void Reopen(int byUserId, DateTimeOffset at) => throw new NotImplementedException();
+    public void Reopen(int byUserId, DateTimeOffset at)
+    {
+        EnsureCredit("reopened");
+        EnsureStatus("reopened", BankStatementLineStatus.Ignored, BankStatementLineStatus.ReturnRequested);
+        Status = BankStatementLineStatus.Unmatched;
+        Record(StatementLineAction.Reopened, null, byUserId, at);
+    }
 
-    /// <summary>The match was wrong; its deposit was reversed (R30).</summary>
-    public void Unmatch(string note, int byUserId, DateTimeOffset at) => throw new NotImplementedException();
+    /// <summary>The match was wrong and its deposit was reversed (R30). The reason from processing stays.</summary>
+    public void Unmatch(string note, int byUserId, DateTimeOffset at)
+    {
+        EnsureCredit("unmatched");
+        EnsureStatus("unmatched", BankStatementLineStatus.Matched);
+        var trimmed = RequiredNote(note);
+        Status = BankStatementLineStatus.Unmatched;
+        MatchedAccountId = null;
+        MatchedTransactionId = null;
+        MatchMethod = null;
+        MatchedAt = null;
+        Record(StatementLineAction.Unmatched, trimmed, byUserId, at);
+    }
+
+    private void SetMatch(int accountId, int transactionId, StatementLineMatchMethod method, DateTimeOffset at)
+    {
+        Status = BankStatementLineStatus.Matched;
+        MatchedAccountId = accountId;
+        MatchedTransactionId = transactionId;
+        MatchMethod = method;
+        MatchedAt = at;
+    }
+
+    private void Record(StatementLineAction action, string? note, int byUserId, DateTimeOffset at)
+    {
+        LastAction = action;
+        LastActionNote = note;
+        LastActionByUserId = byUserId;
+        LastActionAt = at;
+    }
+
+    private void EnsureCredit(string action)
+    {
+        if (Direction != BankLineDirection.Credit)
+        {
+            throw new StatementLineStatusException($"This line is a payment out and cannot be {action}.");
+        }
+    }
+
+    private void EnsureStatus(string action, params BankStatementLineStatus[] from)
+    {
+        if (!from.Contains(Status))
+        {
+            throw new StatementLineStatusException($"This receipt is {Status} and cannot be {action}.");
+        }
+    }
+
+    private static string RequiredNote(string? note) =>
+        OptionalNote(note) ?? throw new DomainException($"Note must be 1 to {NoteMaxLength} characters.");
+
+    private static string? OptionalNote(string? note)
+    {
+        var trimmed = note?.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return null;
+        }
+
+        return trimmed.Length <= NoteMaxLength
+            ? trimmed
+            : throw new DomainException($"Note must be 1 to {NoteMaxLength} characters.");
+    }
+
+    private static string? FreeText(string? value, int maxLength)
+    {
+        var trimmed = value?.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return null;
+        }
+
+        return trimmed.Length <= maxLength ? trimmed : trimmed[..maxLength].TrimEnd();
+    }
 }
