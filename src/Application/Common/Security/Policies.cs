@@ -18,6 +18,7 @@ public static class Policies
     public const string TransactionsRead = "transactions.read";
     public const string TransactionsCreate = "transactions.create";
     public const string TransactionsAdjust = "transactions.adjust";
+    public const string StatementLinesManage = "statement-lines.manage";
     public const string PortfoliosRead = "portfolios.read";
     public const string PortfoliosManage = "portfolios.manage";
     public const string FeesRead = "fees.read";

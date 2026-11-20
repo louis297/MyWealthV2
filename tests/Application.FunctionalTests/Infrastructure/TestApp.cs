@@ -1,3 +1,4 @@
+using MyWealthV2.Application.FunctionalTests.BankFeed;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using MyWealthV2.Application.Common.Security;
@@ -76,6 +77,7 @@ public static class TestApp
             await FunctionalTestSetup.DbResetter.ResetAsync();
         }
 
+        FunctionalTestSetup.WebApiServices.GetRequiredService<InMemoryBankFeed>().Reset();
         _userId = null;
         _roles = null;
     }

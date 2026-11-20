@@ -168,8 +168,8 @@ var simulatorClientSecret = builder.AddParameter("simulator-client-secret", secr
 
 identity.WithEnvironment("Identity__SimulatorClientSecret", simulatorClientSecret);
 
-// Simulator spec §9.2. The party endpoint is for the platform (from roadmap B3) and is not external.
-// No platform host receives the party key in this slice.
+// Simulator spec §9.2. The party endpoint is for the platform (roadmap B3) and is not external. Only worker
+// receives the party key: it reads the simulator bank through bank connection "simulator" (deposit-matching §9.1).
 var simulatorPartyApiKey = builder.AddParameter("simulator-party-api-key", secret: true);
 
 var simulator = builder.AddProject<Projects.Simulator>(Services.Simulator)
@@ -195,6 +195,21 @@ var simulator = builder.AddProject<Projects.Simulator>(Services.Simulator)
         url.DisplayLocation = UrlDisplayLocation.DetailsOnly;
     });
 
+// Deposit matching R39, §9.1: the simulator bank opens the trust accounts TestSeed gives its client money accounts.
+string[][] standingAccounts =
+[
+    ["SIM-DEMO-USD", "USD", "Demo Advisory Client Funds Trust Account"],
+    ["SIM-DEMO-NZD", "NZD", "Demo Advisory Client Funds Trust Account"],
+    ["SIM-DEMO2-USD", "USD", "Demo Advisory 2 Client Funds Trust Account"],
+    ["SIM-DEMO2-NZD", "NZD", "Demo Advisory 2 Client Funds Trust Account"]
+];
+for (var i = 0; i < standingAccounts.Length; i++)
+{
+    simulator.WithEnvironment($"Simulator__Bank__StandingAccounts__{i}__AccountNumber", standingAccounts[i][0])
+        .WithEnvironment($"Simulator__Bank__StandingAccounts__{i}__Currency", standingAccounts[i][1])
+        .WithEnvironment($"Simulator__Bank__StandingAccounts__{i}__Name", standingAccounts[i][2]);
+}
+
 // Simulator spec R12: the host tells the party port from the control ports by the port Kestrel listens on.
 simulator.WithEnvironment("Simulator__PartyPort", simulator.GetEndpoint("party").Property(EndpointProperty.TargetPort));
 simulator.WithEnvironment("Authentication__PublicOrigin", simulator.GetEndpoint("https"));
@@ -202,9 +217,16 @@ identity.WithEnvironment("Identity__SimulatorOrigin", simulator.GetEndpoint("htt
 
 var eodhdApiKey = builder.AddParameter("eodhd-api-key", secret: true);
 
+// Deposit matching R1, §9.1: webapi knows only the connection name and adapter; worker also gets the URL and the
+// key. worker does not wait for the simulator: a missing party is a normal state (ADR 0021 rule 15).
+web.WithEnvironment("BankConnections__simulator__Adapter", "Simulator");
+
 builder.AddProject<Projects.Worker>(Services.Worker)
     .WithReference(databaseServer)
     .WaitFor(databaseServer)
+    .WithEnvironment("BankConnections__simulator__Adapter", "Simulator")
+    .WithEnvironment("BankConnections__simulator__BaseUrl", simulator.GetEndpoint("party"))
+    .WithEnvironment("BankConnections__simulator__ApiKey", simulatorPartyApiKey)
     .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health", endpointName: "http")
     .WithAspNetCoreEnvironment()

@@ -55,7 +55,7 @@ else
 {
     <MudSimpleTable Hover="true" Dense="true" Bordered="true" Class="mt-2">
         <thead>
-            <tr><th>Currency</th><th>Bank</th><th>Account name</th><th>Account number</th><th>Active</th><th></th></tr>
+            <tr><th>Currency</th><th>Bank</th><th>Account name</th><th>Account number</th><th>Connection</th><th>Statement</th><th>Active</th><th></th></tr>
         </thead>
         <tbody>
         @foreach (var row in clientMoneyAccounts)
@@ -65,6 +65,8 @@ else
                 <td>@row.BankName</td>
                 <td>@row.AccountName</td>
                 <td>@row.AccountNumber</td>
+                <td>@row.BankConnection</td>
+                <td>@FeedStatus.Text(row.BankFeed)</td>
                 <td>@(row.IsActive ? "Yes" : "No")</td>
                 <td>
                     @if (row.IsActive)
@@ -101,8 +103,23 @@ else
                           Error="@HasFieldError("AccountName")" ErrorText="@FieldError("AccountName")" />
             <MudTextField @bind-Value="newAccount.AccountNumber" Label="Account number" Variant="Variant.Outlined"
                           Error="@HasFieldError("AccountNumber")" ErrorText="@FieldError("AccountNumber")" />
+            @if (bankConnections.Count == 0)
+            {
+                <MudText Color="Color.Warning">No bank connection is configured.</MudText>
+            }
+            else
+            {
+                <MudSelect T="string" @bind-Value="newAccount.BankConnection" Label="Bank connection" Variant="Variant.Outlined"
+                           Error="@HasFieldError("BankConnection")" ErrorText="@FieldError("BankConnection")">
+                    @foreach (var connection in bankConnections)
+                    {
+                        <MudSelectItem T="string" Value="@connection.Name">@connection.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            }
             <MudStack Row="true" Spacing="2">
-                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Add</MudButton>
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                           Disabled="@(bankConnections.Count == 0)">Add</MudButton>
             </MudStack>
         </MudStack>
     </EditForm>
@@ -115,6 +132,7 @@ else
     private IReadOnlyList<ReportGrantItem> reports = [];
     private IReadOnlyList<ClientMoneyAccountItem> clientMoneyAccounts = [];
     private IReadOnlyList<CurrencyItem> currencies = [];
+    private IReadOnlyList<BankConnectionItem> bankConnections = [];
     private IReadOnlyDictionary<string, string> fieldErrors = new Dictionary<string, string>();
     private readonly ClientMoneyAccountForm newAccount = new();
     private string? error;
@@ -126,6 +144,8 @@ else
         {
             currencies = await Api.ListCurrenciesAsync();
             newAccount.Currency = currencies.FirstOrDefault()?.Code ?? "";
+            bankConnections = await Api.ListBankConnectionsAsync();
+            newAccount.BankConnection = bankConnections.Count == 1 ? bankConnections[0].Name : "";
         }
         catch (PlatformApiException exception)
         {
@@ -182,7 +202,7 @@ else
         try
         {
             await Api.CreateClientMoneyAccountAsync(
-                TenantId, newAccount.Currency, newAccount.BankName, newAccount.AccountName, newAccount.AccountNumber);
+                TenantId, newAccount.Currency, newAccount.BankName, newAccount.AccountName, newAccount.AccountNumber, newAccount.BankConnection);
             fieldErrors = new Dictionary<string, string>();
             newAccount.BankName = "";
             newAccount.AccountName = "";
@@ -228,5 +248,6 @@ else
         public string BankName { get; set; } = "";
         public string AccountName { get; set; } = "";
         public string AccountNumber { get; set; } = "";
+        public string BankConnection { get; set; } = "";
     }
 }

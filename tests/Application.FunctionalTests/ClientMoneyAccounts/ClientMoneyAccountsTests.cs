@@ -85,7 +85,8 @@ public class ClientMoneyAccountsTests : TestBase
             currency = "usd",
             bankName = "  Simulator Bank ",
             accountName = " North Advisory Ltd Client Funds Trust Account ",
-            accountNumber = " 02-0100-0123456-00 "
+            accountNumber = " 02-0100-0123456-00 ",
+            bankConnection = "simulator"
         });
 
         var content = await response.Content.ReadAsStringAsync();
@@ -104,6 +105,7 @@ public class ClientMoneyAccountsTests : TestBase
         item.GetProperty("bankName").GetString().ShouldBe("Simulator Bank");
         item.GetProperty("accountName").GetString().ShouldBe("North Advisory Ltd Client Funds Trust Account");
         item.GetProperty("accountNumber").GetString().ShouldBe("02-0100-0123456-00");
+        item.GetProperty("bankConnection").GetString().ShouldBe("simulator");
         item.GetProperty("isActive").GetBoolean().ShouldBeTrue();
         item.GetProperty("rowVersion").GetString().ShouldNotBeNullOrEmpty();
         item.GetProperty("created").GetDateTimeOffset().ShouldBeGreaterThan(DateTimeOffset.UtcNow.AddMinutes(-5));
@@ -167,12 +169,35 @@ public class ClientMoneyAccountsTests : TestBase
             ["bankName"] = "Simulator Bank",
             ["accountName"] = "Client Funds Trust Account",
             ["accountNumber"] = ClientMoneyHttp.UniqueNumber(),
+            ["bankConnection"] = ClientMoneyHttp.Connection,
             [field] = value
         };
 
         var response = await TenantHttp.Send(HttpMethod.Post, ClientMoneyHttp.Path(tenant.PublicId), system.AccessToken, body);
 
         (await CustodialHttp.ErrorsAsync(response)).ShouldContainKey(field);
+        (await ClientMoneyHttp.CountAsync(tenant.Id)).ShouldBe(0);
+    }
+
+    [TestCase(null)]
+    [TestCase("")]
+    [TestCase("other-bank")]
+    [TestCase("Simulator")]
+    public async Task Create_WithoutAConfiguredBankConnection_Returns400AtBankConnection(string? bankConnection)
+    {
+        var tenant = await TestApp.CreateTenantAsync("Money Connection", "money-connection");
+        var system = await TenantHttp.SignInSystemAdmin();
+
+        var response = await TenantHttp.Send(
+            HttpMethod.Post,
+            ClientMoneyHttp.Path(tenant.PublicId),
+            system.AccessToken,
+            ClientMoneyHttp.Body(bankConnection: bankConnection));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        var errors = await CustodialHttp.ErrorsAsync(response);
+        errors.ShouldContainKey("BankConnection");
+        errors["BankConnection"].ShouldContain("Unknown bank connection.");
         (await ClientMoneyHttp.CountAsync(tenant.Id)).ShouldBe(0);
     }
 
@@ -189,6 +214,7 @@ public class ClientMoneyAccountsTests : TestBase
             ["bankName"] = "Simulator Bank",
             ["accountName"] = "Client Funds Trust Account",
             ["accountNumber"] = ClientMoneyHttp.UniqueNumber(),
+            ["bankConnection"] = ClientMoneyHttp.Connection,
             [field] = value
         };
 

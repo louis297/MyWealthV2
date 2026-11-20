@@ -3,11 +3,12 @@ title: "ADR 0021: Outside parties behind ports, and the simulator"
 status: accepted
 language: en
 date: 2026-11-19
-updated: 2026-11-19
+updated: 2026-11-20
 related:
   - ../custodial-roadmap.md
   - ../architecture.md
   - ../features/simulator.md
+  - ../features/deposit-matching.md
   - ../features/transaction-source.md
   - ../features/instrument-prices.md
   - ../features/fx-rates.md
@@ -65,7 +66,7 @@ The platform talks to every outside party through a port. A `worker` job pulls i
 
 ### Failure
 
-15. **A missing party is a normal state (D10).** Each adapter call has a timeout. When the party cannot be reached or answers with an error, the job run fails: it stores nothing for that feed, the cursor stays, and the next scheduled run continues from it. Pull jobs do not use automatic Hangfire retries; the schedule is the retry. Each feed is its own recurring job, so one party's failure never stops another feed, another job or `webapi`.
+15. **A missing party is a normal state (D10).** Each adapter call has a timeout. When the party cannot be reached or answers with an error, the job run fails: it stores nothing for that feed, the cursor stays, and the next scheduled run continues from it. Pull jobs do not use automatic Hangfire retries; the schedule is the retry. Each connection to a party is its own recurring job, so one party's failure never stops another party's feeds, another job or `webapi`. When one connection serves several feeds (for example a bank's trust accounts), the job reads each feed on its own: a feed's failure is recorded on that feed and the job goes on with the next (amended 2026-11-20, [features/deposit-matching.md](../features/deposit-matching.md) R6, R7).
 16. **The failure is visible.** A failed run is logged with the feed and the reason, and the feed's last success time is stored next to its cursor. A later operator page may show both; this ADR fixes only that they are stored.
 
 ### Credentials and network
@@ -117,5 +118,9 @@ The platform talks to every outside party through a port. A `worker` job pulls i
 ## Links
 
 - Plan: [custodial-roadmap.md](../custodial-roadmap.md) §3, §4 F2, §11, §12
-- Feature specs: [features/simulator.md](../features/simulator.md) (S0); the first port lands with roadmap B3
+- Feature specs: [features/simulator.md](../features/simulator.md) (S0); [features/deposit-matching.md](../features/deposit-matching.md) (B3, B4: the first port, `IBankFeed`, and the feed cursor table)
 - Related ADRs: [0008](0008-schema-sql-as-source-of-truth.md), [0013](0013-roles-authorization-single-user-table.md) (amended by rule 25), [0014](0014-openiddict-authorization-code-pkce.md), [0017](0017-background-worker.md), [0018](0018-transactional-outbox.md), [0019](0019-fx-rate-source-and-refresh.md)
+
+## Amendments
+
+- 2026-11-20 ([features/deposit-matching.md](../features/deposit-matching.md), accepted): rule 15 says "each connection is its own recurring job" instead of "each feed is its own recurring job". A bank connection serves one feed per client money account; one job per connection reads them one after another, each on its own, so the rule's purpose (one failure never stops another feed) holds without one Hangfire job per account. The polling interval is a setting of the connection.

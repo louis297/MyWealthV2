@@ -24,6 +24,9 @@ export type AccountListArgs = {
   pageSize?: number;
   customerId?: string;
   type?: string;
+  custodyMode?: CustodyMode;
+  /** deposit-matching R37: at most one Account, matched exactly. */
+  depositReference?: string;
 };
 
 export type CreateAccountBody = {
@@ -67,6 +70,12 @@ export const accountsApi = api.injectEndpoints({
         }
         if (args?.type) {
           params.set("type", args.type);
+        }
+        if (args?.custodyMode) {
+          params.set("custodyMode", args.custodyMode);
+        }
+        if (args?.depositReference) {
+          params.set("depositReference", args.depositReference);
         }
         return `/accounts?${params.toString()}`;
       },

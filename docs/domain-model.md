@@ -321,6 +321,7 @@ Close requires cash `SUM = 0` and no `Holdings` rows ([features/holdings.md](fea
 | `TransactionFeeDetail` | Entity (child of a `Fee` cash leg) | How the fee was computed: kind, schedule, basis amount, fee, currency. Exactly one per `Fee` leg, at most one per `(Transaction, kind)`, immutable, copied to the Reversal's matching leg. |
 | `CashLegRole` / `FeeKind` | Enums | `Principal` / `Fee`. `Brokerage` is the only fee kind so far. |
 | `TransactionAdjustmentDetail` | Entity (child of `Transaction`) | Why an adjustment was entered: `AdjustmentReason` (`EntryError`, `CorporateAction`, `ReconciliationBreak`, `Other`). Exactly one on an `Adjustment` and on its Reversal, none elsewhere, immutable, copied by `Reverse` ([features/adjustments.md](features/adjustments.md)). |
+| `TransactionBankReceiptDetail` | Entity (child of `Transaction`) | The bank's data on a deposit: value date, reference text, payer name, masked payer account. Exactly one on a deposit (a `TransferIn` with source `BankFeed`) and on its Reversal, none elsewhere, immutable, copied by `Reverse` ([features/deposit-matching.md](features/deposit-matching.md)). |
 | `TransactionType` | Enum | Cash set plus `OpeningHoldings`, `Buy`, `Sell`, `StockIn` (10), `StockOut` (11), `Split` (12), `Bonus` (13), `Scrip` (14), `InternalTransfer` (15), `FxConversion` (16), `Adjustment` (17), and `Reversal`. |
 | `TransactionPosted` / `TransactionReversed` | Event | Side effects only. Must not write the books. |
 
@@ -342,6 +343,7 @@ Invariants:
 - (External caller numbers) `PostBuy` / `PostSell` take an optional entered fee (quote currency, `≥ 0`) in place of a schedule, never both; its fee detail has no schedule. They take an optional `AppliedFxRate`, stored as the trade's FX detail; its base is the price currency, its quote the Account currency and its rate the one the cash legs used. `PostFxConversionWithAmounts` builds an `FxConversion` from both amounts: legs equal to them, rate `Round(buy ÷ sell, 8, AwayFromZero)`, FX detail source `Caller`. The factories do not read the custody mode to choose where a number comes from; Application does (External: the caller, Custodial: the server) ([features/external-caller-numbers.md](features/external-caller-numbers.md)).
 - (Transaction source) Every Transaction has a `TransactionSource`: a kind (`Manual`, `Seed`, `Rebalance`) and an optional PublicId. `Manual` and `Seed` have no id; `Rebalance` has the rebalance handle. Every factory and `Reverse` take it as a required parameter; it never changes. A Reversal has the source passed to `Reverse`, not the original's. `CustodyRules.AllowsHandReverse(custodyMode, sourceKind)`: on a Custodial account a person reverses only a `Manual` or `Rebalance` Transaction; Application calls it, `Reverse` does not ([features/transaction-source.md](features/transaction-source.md)).
 - (Adjustments) `PostAdjustment` builds an `Adjustment` on one Account: at most one `Principal` cash leg and at most one security leg, at least one of them, a required memo and an adjustment detail. The security leg stores the signed quantity and cost changes as given (no price, no release). Cash `SUM ≥ 0`; the holding after it has quantity `≥ 0`, cost `≥ 0`, and no cost on a zero quantity. The factory does not read the custody mode; Application holds the Custodial-only rule and the `transactions.adjust` permission, on create and on reverse ([features/adjustments.md](features/adjustments.md)).
+- (Deposit matching) Source kind `BankFeed` (3) has the statement line's PublicId as its id and is not hand-reversible. `PostBankDeposit` builds a deposit: one `Principal` `TransferIn` cash leg, `amount > 0`, source `BankFeed`, a bank receipt detail. A deposit is undone only by its flow, through `Reverse` with source `BankFeed`. `CustodyRules.AllowsManualEntry(Custodial, TransferIn)` is `false`: no person enters a `TransferIn` on a Custodial account ([features/deposit-matching.md](features/deposit-matching.md)).
 
 Field rules: [features/posting.md](features/posting.md), [features/holdings.md](features/holdings.md), [features/buy-sell.md](features/buy-sell.md), [features/split.md](features/split.md), [features/leg-accounts.md](features/leg-accounts.md), and [features/adjustments.md](features/adjustments.md).
 
@@ -362,6 +364,18 @@ Invariant: no schedule write changes which row applies to a posted `Buy` / `Sell
 | `DepositReference` | Value object | Nine characters from `0123456789ABCDEFGHJKMNPQRSTVWXYZ`, first a letter, last a Luhn mod 32 check symbol. `Generate`, `TryParse`, `IsValid`. |
 
 Invariants: at most one active client money account per (Tenant, currency), and an account number is active on at most one row on the platform. Both span rows, so Application holds them, with filtered unique indexes as the backstop; the aggregate does not. Field rules: [features/client-money-accounts.md](features/client-money-accounts.md).
+
+Amendment 2026-11-20 (deposit matching, accepted): `ClientMoneyAccount` gains `BankConnection`, the name of a configured bank connection, required and immutable like the other details ([features/deposit-matching.md](features/deposit-matching.md)).
+
+### 8.9 Bank statement line (accepted — deposit-matching slice)
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `BankStatementLine` | Aggregate | One line of a client money account's statement, stored once per (connection, outside id). Tenant, client money account, value date, direction, amount, currency, payer, masked payer account, reference text (all immutable); status (`Received`, `Matched`, `Unmatched`, `Ignored`, `ReturnRequested`), unmatched reason, the current match, the last action. Methods for the platform (`MarkMatched`, `MarkUnmatched`) and the TenantAdmin (`MatchByHand`, `Ignore`, `RequestReturn`, `Reopen`, `Unmatch`). Debit lines refuse every method. No event. |
+| `BankFeedCursor` | Entity | Per client money account: the opaque cursor and the feed status (last success, last failure and its kind). |
+| `DepositReferenceScanner` | Domain service | Deposit reference candidates in a free-text reference (tokens and the whole text, Crockford mapping, check symbol). |
+
+Invariants: a `Matched` line has exactly one Account and one deposit; no other status has one. The economic fields never change. Uniqueness on (connection, outside id) spans rows, so Application holds it with a unique index as the backstop. Field rules: [features/deposit-matching.md](features/deposit-matching.md).
 
 ---
 
@@ -416,6 +430,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-19 | Transaction source accepted. The `review` mark in §8.6 is dropped. |
 | 2026-11-19 | Simulator accepted: fifth role `SimulatorOperator` in §1, §4 and §5. The simulator's own types are not platform Domain types ([features/simulator.md](features/simulator.md) §5). |
 | 2026-11-20 | Client money accounts accepted: `ClientMoneyAccount` and `DepositReference` (§8.8); `Account` holds a deposit reference on Custodial accounts only (§8.5). [features/client-money-accounts.md](features/client-money-accounts.md). |
+| 2026-11-20 | Deposit matching accepted: `BankStatementLine`, `BankFeedCursor`, `DepositReferenceScanner` (§8.9); source kind `BankFeed`, `PostBankDeposit` and `TransactionBankReceiptDetail` (§8.6); `ClientMoneyAccount.BankConnection` (§8.8). [features/deposit-matching.md](features/deposit-matching.md). |
 
 ---
 

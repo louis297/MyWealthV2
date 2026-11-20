@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Xml;
 using Microsoft.EntityFrameworkCore;
+using MyWealthV2.Simulator.Bank;
 using MyWealthV2.Simulator.Data;
 using MyWealthV2.Simulator.Worlds;
 
@@ -14,7 +15,7 @@ public static class ControlEndpoints
     public const int DefaultPageSize = 20;
     public const int MaxPageSize = 100;
 
-    private static readonly JsonSerializerOptions DetailJson = new(JsonSerializerDefaults.Web)
+    internal static readonly JsonSerializerOptions DetailJson = new(JsonSerializerDefaults.Web)
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
@@ -34,6 +35,7 @@ public static class ControlEndpoints
         control.MapPost("/party/outage", OutageAsync);
         control.MapPost("/reset", ResetAsync);
         control.MapGet("/log", GetLogAsync);
+        control.MapBankControlEndpoints();
 
         return app;
     }
@@ -96,17 +98,34 @@ public static class ControlEndpoints
         return WriteAsync(http, db, time, ControlActions.PartyOutageChanged, body, (world, _) => world.SetOutage(on));
     }
 
-    private static Task<IResult> ResetAsync(
+    private static async Task<IResult> ResetAsync(
         ResetRequest body,
         HttpContext http,
         SimulatorDbContext db,
-        TimeProvider time)
+        TimeProvider time,
+        BankStandingAccounts standing)
     {
         var seed = body.Seed ?? SeededRandom.NewSeed();
 
-        // R24: every party table is emptied here, in the same transaction. There is none in this slice.
-        return WriteAsync(http, db, time, ControlActions.WorldReset, body, (world, now) =>
-            world.Reset(Guid.NewGuid(), seed, now));
+        // R24: every party table is emptied in the same transaction; deposit-matching R47 opens the standing
+        // accounts of the new world again.
+        return await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            db.ChangeTracker.Clear();
+            await using var transaction = await db.Database.BeginTransactionAsync(http.RequestAborted);
+            await db.BankFeedPlaces.ExecuteDeleteAsync(http.RequestAborted);
+            await db.BankLines.ExecuteDeleteAsync(http.RequestAborted);
+            await db.BankAccounts.ExecuteDeleteAsync(http.RequestAborted);
+            await standing.OpenMissingAsync(db, time.GetUtcNow(), http.RequestAborted);
+            var result = await WriteAsync(http, db, time, ControlActions.WorldReset, body, (world, now) =>
+                world.Reset(Guid.NewGuid(), seed, now));
+            if (result is IStatusCodeHttpResult { StatusCode: StatusCodes.Status200OK })
+            {
+                await transaction.CommitAsync(http.RequestAborted);
+            }
+
+            return result;
+        });
     }
 
     private static async Task<IResult> GetLogAsync(
@@ -178,10 +197,10 @@ public static class ControlEndpoints
         return Results.Ok(WorldItem.From(world, realNow));
     }
 
-    private static IResult Refused(string field, string message) =>
+    internal static IResult Refused(string field, string message) =>
         Results.ValidationProblem(new Dictionary<string, string[]> { [field] = [message] });
 
-    private static string Actor(ClaimsPrincipal user) =>
+    internal static string Actor(ClaimsPrincipal user) =>
         user.FindFirst("email")?.Value ?? user.Identity?.Name ?? "unknown";
 }
 

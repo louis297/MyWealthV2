@@ -45,4 +45,6 @@ public static class ControlActions
     public const string ClockResumed = "ClockResumed";
     public const string PartyOutageChanged = "PartyOutageChanged";
     public const string WorldReset = "WorldReset";
+    public const string BankAccountOpened = "BankAccountOpened";
+    public const string BankReceiptAdded = "BankReceiptAdded";
 }

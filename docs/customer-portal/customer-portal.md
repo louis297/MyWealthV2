@@ -22,6 +22,7 @@ related:
   - ../adr/0003-react-redux-typescript-vite-tailwind-frontend.md
   - ../adr/0014-openiddict-authorization-code-pkce.md
   - ../adr/0016-bff-for-first-party-portals.md
+  - ../features/deposit-matching.md
 ---
 
 # Customer Portal
@@ -241,6 +242,16 @@ Status of this amendment: `accepted` (2026-11-20), together with [client-money-a
 | --- | --- | --- | --- |
 | C19 | Customer with an Open Custodial account whose currency has a client money account | Account page | A "How to pay in" section under the cash balance: Bank, Account name, Account number, Reference, and the sentence "Pay in <currency> only, and quote the reference exactly so the payment is matched to this account." |
 | C20 | Customer with a Closed Custodial account, or an Open one whose deposit instructions return 404 | Account page | A Closed account shows no section. An Open one shows "Deposit instructions are not available yet. Contact your adviser." An External account shows no section and calls no route. |
+
+---
+
+## Amendment 2026-11-20 (deposits) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [deposit-matching](../features/deposit-matching.md). No new call and no grant change: the deposit is a `TransferIn` on the existing transaction reads, with `bankReceipt` on the item. The BFF does not change.
+
+| Id | Given | When | Then |
+| --- | --- | --- | --- |
+| C21 | Customer with a deposit (a `TransferIn` with `bankReceipt`) on a Custodial account | Account page activity | The row is labelled "Deposit" instead of the `TransferIn` label and shows "Value date <date>" on a line under it. Payer details are not shown. Its Reversal stays "Reversal". A `TransferIn` without `bankReceipt` keeps today's label. |
 ---
 
 ## Tests

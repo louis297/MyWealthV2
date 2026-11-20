@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { Messages, Muted, Page, PageHeading, SelectField, TextField } from "@/components/portal";
 import { Button } from "@/components/ui/button";
@@ -178,6 +178,15 @@ export function CreateTransactionPage() {
     ...(offerSecurity ? securityTypes : []),
     ...(offerCash ? cashTypes : []),
   ].filter((item) => !account.data || allowsManualEntry(account.data.custodyMode, item));
+  // D39: a type the account does not take (for example TransferIn on a Custodial account, from the address) is not
+  // kept; the form starts on the first type the account offers.
+  const offeredKey = offeredTypes.join(",");
+  useEffect(() => {
+    if (account.data && offeredTypes.length > 0 && !(offeredTypes as readonly string[]).includes(type)) {
+      setType(offeredTypes[0]);
+    }
+    // offeredKey stands for offeredTypes, which is rebuilt on every render.
+  }, [account.data, offeredKey, type]);
   const cashType = isCashType(type);
   const securityBlocked = assignment.isSuccess && assignment.data?.status === "Active" && !cashType;
 

@@ -17,13 +17,14 @@ public class CustodialBookedAtTests : TestBase
     private const decimal NzdUsd = 0.59120000m;
 
     [Test]
-    public async Task Custodial_TransferInWithoutBookedAt_Returns201_BookedAtTheServerClock()
+    public async Task Custodial_TransferOutWithoutBookedAt_Returns201_BookedAtTheServerClock()
     {
         var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
         var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
+        (await FundAsync(tokens.AccessToken, accountId, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
 
         var before = DateTimeOffset.UtcNow;
-        var id = await ReadIdAsync(await FundAsync(tokens.AccessToken, accountId, 100m));
+        var id = await ReadIdAsync(await PostAsync(tokens.AccessToken, Cash(accountId, "TransferOut", -40m)));
         var after = DateTimeOffset.UtcNow;
 
         using var item = await GetTransactionAsync(tokens.AccessToken, id);
@@ -41,19 +42,20 @@ public class CustodialBookedAtTests : TestBase
     }
 
     [TestCaseSource(nameof(SentInstants))]
-    public async Task Custodial_TransferInWithBookedAt_Returns400OnBookedAtAndWritesNothing(int offsetSeconds, string? message)
+    public async Task Custodial_TransferOutWithBookedAt_Returns400OnBookedAtAndWritesNothing(int offsetSeconds, string? message)
     {
         var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
         var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
+        (await FundAsync(tokens.AccessToken, accountId, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
         var key = Guid.NewGuid();
 
         var response = await PostAsync(
             tokens.AccessToken,
-            Cash(accountId, "TransferIn", 100m).WithBookedAt(Instant(DateTimeOffset.UtcNow.AddSeconds(offsetSeconds))),
+            Cash(accountId, "TransferOut", -10m).WithBookedAt(Instant(DateTimeOffset.UtcNow.AddSeconds(offsetSeconds))),
             idempotencyKey: key);
 
         await ShouldRefuseBookedAtAsync(response, message);
-        (await TransactionCountAsync(accountId)).ShouldBe(0);
+        (await TransactionCountAsync(accountId)).ShouldBe(1);
         (await IdempotencyRecordExistsAsync(key)).ShouldBeFalse();
     }
 
@@ -62,7 +64,8 @@ public class CustodialBookedAtTests : TestBase
     {
         var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
         var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
-        var body = Cash(accountId, "TransferIn", 100m);
+        (await FundAsync(tokens.AccessToken, accountId, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        var body = Cash(accountId, "TransferOut", -10m);
         body["bookedAt"] = null;
 
         (await PostAsync(tokens.AccessToken, body)).StatusCode.ShouldBe(HttpStatusCode.Created);
@@ -148,13 +151,14 @@ public class CustodialBookedAtTests : TestBase
     {
         var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
         var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
+        (await FundAsync(tokens.AccessToken, accountId, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
         var key = Guid.NewGuid();
 
-        var first = await ReadIdAsync(await PostAsync(tokens.AccessToken, Cash(accountId, "TransferIn", 100m), idempotencyKey: key));
-        var second = await ReadIdAsync(await PostAsync(tokens.AccessToken, Cash(accountId, "TransferIn", 100m), idempotencyKey: key));
+        var first = await ReadIdAsync(await PostAsync(tokens.AccessToken, Cash(accountId, "TransferOut", -10m), idempotencyKey: key));
+        var second = await ReadIdAsync(await PostAsync(tokens.AccessToken, Cash(accountId, "TransferOut", -10m), idempotencyKey: key));
 
         second.ShouldBe(first);
-        (await TransactionCountAsync(accountId)).ShouldBe(1);
+        (await TransactionCountAsync(accountId)).ShouldBe(2);
     }
 
     [TestCase("/transactions")]

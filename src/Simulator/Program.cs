@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using MyWealthV2.Schema;
 using MyWealthV2.Shared;
+using MyWealthV2.Simulator.Bank;
 using MyWealthV2.Simulator.Control;
 using MyWealthV2.Simulator.Data;
 using MyWealthV2.Simulator.Hosting;
@@ -40,6 +41,9 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 // Simulator spec R31: checked before the host listens, from the configuration, in every environment.
 var partyApiKey = PartyEndpoints.ReadPartyApiKey(builder.Configuration);
 
+// Deposit matching R39: a bad standing account stops the host before it listens.
+builder.Services.AddSingleton(BankStandingAccounts.Read(builder.Configuration));
+
 var app = builder.Build();
 
 // Simulator spec R15: apply database/simulator/ scripts before the host listens.
@@ -49,6 +53,7 @@ await SchemaApplicator.ForDatabase(
         app.Services.GetRequiredService<ILogger<SchemaApplicator>>())
     .ApplyAsync(CancellationToken.None);
 await WorldStartup.EnsureWorldAsync(app.Services, CancellationToken.None);
+await BankStandingAccounts.EnsureAsync(app.Services, CancellationToken.None);
 
 app.UsePublicHostForwardedHeaders(trustAnyProxyInDevelopment: true);
 app.UseSurfacePorts();

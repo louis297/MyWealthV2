@@ -32,6 +32,9 @@ import { RequireSession } from "@/features/session/RequireSession";
 import { RoleGate } from "@/features/session/RoleGate";
 import { roles } from "@/features/session/roles";
 import { SessionProbePage } from "@/features/session/SessionProbePage";
+import { MatchStatementLinePage } from "@/features/statementLines/MatchStatementLinePage";
+import { StatementLineDetailPage } from "@/features/statementLines/StatementLineDetailPage";
+import { StatementLinesListPage } from "@/features/statementLines/StatementLinesListPage";
 import { ShellLayout } from "@/layouts/ShellLayout";
 
 export const appRoutes: RouteObject[] = [
@@ -105,6 +108,16 @@ export const appRoutes: RouteObject[] = [
             children: [
               { index: true, element: <TransactionsListPage /> },
               { path: ":id", element: <TransactionDetailPage /> },
+            ],
+          },
+          {
+            // D34: an Adviser who opens the route gets the firm administrator sentence from the 403.
+            path: "/statement-lines",
+            element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
+            children: [
+              { index: true, element: <StatementLinesListPage /> },
+              { path: ":id", element: <StatementLineDetailPage /> },
+              { path: ":id/match", element: <MatchStatementLinePage /> },
             ],
           },
           {

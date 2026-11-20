@@ -576,7 +576,8 @@ describe("AccountDetailPage", () => {
   });
 
   it.each([
-    ["Custodial", ["TransferIn", "TransferOut", "Buy", "Sell", "Transfer", "Convert", "Adjust"]],
+    // D39: deposits to a Custodial account come from the bank statement.
+    ["Custodial", ["TransferOut", "Buy", "Sell", "Transfer", "Convert", "Adjust"]],
     [
       "External",
       ["TransferIn", "TransferOut", "Buy", "Sell", "StockIn", "StockOut", "Split", "Bonus", "Scrip", "Transfer", "Convert"],
@@ -1307,7 +1308,7 @@ describe("AccountDetailPage", () => {
 
     expect(await screen.findByRole("button", { name: "Unassign" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Buy" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "TransferIn" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "TransferOut" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Unassign" }));
     expect(await screen.findByRole("link", { name: "Buy" })).toBeInTheDocument();
     expect(deleted.some((url) => url.includes(`/api/accounts/${accountId}/portfolio`))).toBe(true);
@@ -1747,6 +1748,9 @@ describe("AccountDetailPage deposit instructions (client-money-accounts D32)", (
     expect(within(panel).getByText("02-0100-0123456-00")).toBeInTheDocument();
     expect(within(panel).getByText(reference)).toBeInTheDocument();
     expect(within(panel).getByText("USD")).toBeInTheDocument();
+    expect(
+      within(panel).getByText("Deposits are credited from the bank statement when the customer pays in with this reference."),
+    ).toBeInTheDocument();
   });
 
   it("shows the reference but no panel and calls no route on a Closed Custodial account", async () => {

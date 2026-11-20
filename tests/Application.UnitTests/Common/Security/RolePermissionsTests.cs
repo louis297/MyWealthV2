@@ -124,4 +124,14 @@ public class RolePermissionsTests
     {
         RolePermissions.Has(role, policy).ShouldBe(expected);
     }
+
+    [TestCase(UserRole.TenantAdmin, true)]
+    [TestCase(UserRole.SystemAdmin, false)]
+    [TestCase(UserRole.Adviser, false)]
+    [TestCase(UserRole.Customer, false)]
+    [TestCase(UserRole.SimulatorOperator, false)]
+    public void StatementLinesManage_IsTenantAdminOnly(UserRole role, bool expected)
+    {
+        RolePermissions.Has(role, Policies.StatementLinesManage).ShouldBe(expected);
+    }
 }

@@ -10,6 +10,10 @@ public interface IApplicationDbContext
 
     DbSet<ClientMoneyAccount> ClientMoneyAccounts { get; }
 
+    DbSet<BankFeedCursor> BankFeedCursors { get; }
+
+    DbSet<BankStatementLine> BankStatementLines { get; }
+
     DbSet<Instrument> Instruments { get; }
 
     DbSet<Account> Accounts { get; }

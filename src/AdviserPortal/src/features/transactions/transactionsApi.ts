@@ -46,6 +46,13 @@ export type TransactionSource = {
   id: string | null;
 };
 
+export type TransactionBankReceipt = {
+  valueDate: string;
+  reference: string | null;
+  payerName: string | null;
+  payerAccount: string | null;
+};
+
 export type Transaction = {
   id: string;
   tenantId: string;
@@ -64,6 +71,8 @@ export type Transaction = {
   fx?: TransactionFx | null;
   /** The reason of an `Adjustment` and of its Reversal; otherwise null (adjustments R21). */
   adjustment?: { reason: string } | null;
+  /** deposit-matching R36: the bank's details on a deposit and on its Reversal; otherwise null. */
+  bankReceipt?: TransactionBankReceipt | null;
 };
 
 export type TransactionListArgs = {

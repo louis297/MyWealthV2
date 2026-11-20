@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using FluentValidation.Results;
+using MyWealthV2.Application.BankFeed;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
@@ -9,7 +10,8 @@ using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationE
 
 namespace MyWealthV2.Application.ClientMoneyAccounts.Commands.CreateClientMoneyAccount;
 
-/// <summary>Client money accounts R2, R4–R6 (docs/features/client-money-accounts.md §4.1).</summary>
+/// <summary>Client money accounts R2, R4–R6 (docs/features/client-money-accounts.md §4.1); the bank connection,
+/// deposit-matching R2.</summary>
 [Authorize(Policy = Policies.TenantsManage)]
 public class CreateClientMoneyAccountCommand : IRequest<Guid>
 {
@@ -25,6 +27,9 @@ public class CreateClientMoneyAccountCommand : IRequest<Guid>
 
     public string? AccountNumber { get; init; }
 
+    /// <summary>A bank connection configured on this host (deposit-matching R2).</summary>
+    public string? BankConnection { get; init; }
+
     /// <summary>Refused when present (R6).</summary>
     public Guid? TenantId { get; init; }
 
@@ -37,7 +42,7 @@ public class CreateClientMoneyAccountCommand : IRequest<Guid>
 
 public class CreateClientMoneyAccountCommandValidator : AbstractValidator<CreateClientMoneyAccountCommand>
 {
-    public CreateClientMoneyAccountCommandValidator()
+    public CreateClientMoneyAccountCommandValidator(IBankConnections connections)
     {
         RuleFor(command => command.Currency).NotEmpty();
         RuleFor(command => command.BankName)
@@ -50,6 +55,9 @@ public class CreateClientMoneyAccountCommandValidator : AbstractValidator<Create
             .Must(ClientMoneyAccount.IsValidAccountNumber)
             .WithMessage(
                 $"Account number must be 1 to {ClientMoneyAccount.AccountNumberMaxLength} letters, digits, spaces and hyphens, with no two spaces in a row.");
+        RuleFor(command => command.BankConnection)
+            .Must(connections.IsConfigured)
+            .WithMessage("Unknown bank connection.");
         RuleFor(command => command.TenantId).Null().WithMessage("TenantId cannot be set.");
         RuleFor(command => command.Id).Null().WithMessage("Id cannot be set.");
         RuleFor(command => command.IsActive).Null().WithMessage("IsActive cannot be set.");
@@ -90,7 +98,7 @@ public class CreateClientMoneyAccountCommandHandler(IApplicationDbContext db, IC
             db, tenant.Id, currency.Code, accountNumber, exceptId: null, cancellationToken);
 
         var row = ClientMoneyAccount.Create(
-            tenant.Id, currency, request.BankName!, request.AccountName!, accountNumber);
+            tenant.Id, currency, request.BankName!, request.AccountName!, accountNumber, request.BankConnection!);
         db.ClientMoneyAccounts.Add(row);
         await db.SaveChangesAsync(cancellationToken);
         return row.PublicId;

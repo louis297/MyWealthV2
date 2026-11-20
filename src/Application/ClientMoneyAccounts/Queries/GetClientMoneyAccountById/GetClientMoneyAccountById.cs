@@ -16,6 +16,8 @@ public class GetClientMoneyAccountByIdQueryHandler(IApplicationDbContext db)
         var row = await db.ClientMoneyAccounts.AsNoTracking()
                       .SingleOrDefaultAsync(r => r.TenantId == tenant.Id && r.PublicId == request.Id, cancellationToken)
                   ?? throw new NotFoundException("Client money account", request.Id);
-        return ClientMoneyAccountDto.From(row, tenant);
+        var cursor = await db.BankFeedCursors.AsNoTracking()
+            .SingleOrDefaultAsync(r => r.ClientMoneyAccountId == row.Id, cancellationToken);
+        return ClientMoneyAccountDto.From(row, tenant, cursor);
     }
 }

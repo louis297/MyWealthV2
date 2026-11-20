@@ -77,6 +77,17 @@ internal static class TransactionLegReader
             .Select(transaction => new { transaction.Id, transaction.AdjustmentDetail!.Reason })
             .ToListAsync(cancellationToken);
 
+        var receiptRows = await db.Transactions.AsNoTracking()
+            .Where(transaction => transactionIds.Contains(transaction.Id) && transaction.BankReceiptDetail != null)
+            .Select(transaction => new
+            {
+                transaction.Id,
+                transaction.BankReceiptDetail!.ValueDate,
+                transaction.BankReceiptDetail.Reference,
+                transaction.BankReceiptDetail.PayerName,
+                transaction.BankReceiptDetail.PayerAccount
+            }).ToListAsync(cancellationToken);
+
         return new TransactionLegs(
             cashRows.ToLookup(row => row.TransactionId, row => new TransactionCashDto
             {
@@ -114,7 +125,16 @@ internal static class TransactionLegReader
             }),
             adjustmentRows.ToDictionary(
                 row => row.Id,
-                row => new TransactionAdjustmentDto { Reason = row.Reason.ToString() }));
+                row => new TransactionAdjustmentDto { Reason = row.Reason.ToString() }),
+            receiptRows.ToDictionary(
+                row => row.Id,
+                row => new TransactionBankReceiptDto
+                {
+                    ValueDate = row.ValueDate.ToString("yyyy-MM-dd"),
+                    Reference = row.Reference,
+                    PayerName = row.PayerName,
+                    PayerAccount = row.PayerAccount
+                }));
     }
 }
 
@@ -122,4 +142,5 @@ internal sealed record TransactionLegs(
     ILookup<int, TransactionCashDto> Cash,
     ILookup<int, TransactionSecurityDto> Security,
     IReadOnlyDictionary<int, TransactionFxDto> Fx,
-    IReadOnlyDictionary<int, TransactionAdjustmentDto> Adjustment);
+    IReadOnlyDictionary<int, TransactionAdjustmentDto> Adjustment,
+    IReadOnlyDictionary<int, TransactionBankReceiptDto> BankReceipt);

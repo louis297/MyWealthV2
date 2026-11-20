@@ -19,13 +19,7 @@ public class RebalanceEnqueueTests : TestBase
         await SetPriceAsync(first);
         await SetPriceAsync(second);
         var accountId = await CreateAccountAsync(tokens.AccessToken, customer.PublicId);
-        (await Transactions.TransactionHttp.Send(HttpMethod.Post, "/transactions", tokens.AccessToken, new
-        {
-            accountId,
-            type = "TransferIn",
-            amount = 10000m,
-            currency = "NZD"
-        }, Guid.NewGuid())).StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await Custody.CustodialHttp.FundAsync(tokens.AccessToken, accountId, 10000m)).StatusCode.ShouldBe(HttpStatusCode.Created);
 
         var created = await PortfolioHttp.Send(HttpMethod.Post, "/portfolios", tokens.AccessToken, new
         {

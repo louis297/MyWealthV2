@@ -52,6 +52,8 @@ export function sourceLabel(kind: string | undefined) {
       return "Rebalance";
     case "Seed":
       return "Test seed";
+    case "BankFeed":
+      return "Bank feed";
     default:
       return kind;
   }

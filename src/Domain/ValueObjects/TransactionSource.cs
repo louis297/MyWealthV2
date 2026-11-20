@@ -32,6 +32,17 @@ public sealed class TransactionSource : ValueObject
         return new TransactionSource(TransactionSourceKind.Rebalance, handle);
     }
 
+    /// <summary>A deposit's source: the PublicId of the statement line it came from (deposit-matching R32).</summary>
+    public static TransactionSource BankFeed(Guid statementLinePublicId)
+    {
+        if (statementLinePublicId == Guid.Empty)
+        {
+            throw new DomainException("A bank feed source needs the statement line's PublicId.");
+        }
+
+        return new TransactionSource(TransactionSourceKind.BankFeed, statementLinePublicId);
+    }
+
     /// <summary>The source as stored on a Transaction row.</summary>
     internal static TransactionSource FromStored(TransactionSourceKind kind, Guid? publicId) =>
         kind switch
@@ -39,6 +50,7 @@ public sealed class TransactionSource : ValueObject
             TransactionSourceKind.Manual => Manual,
             TransactionSourceKind.Seed => Seed,
             TransactionSourceKind.Rebalance => Rebalance(publicId ?? Guid.Empty),
+            TransactionSourceKind.BankFeed => BankFeed(publicId ?? Guid.Empty),
             _ => new TransactionSource(kind, publicId)
         };
 

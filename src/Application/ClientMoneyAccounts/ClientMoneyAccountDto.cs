@@ -17,13 +17,19 @@ public sealed class ClientMoneyAccountDto
 
     public required string AccountNumber { get; init; }
 
+    /// <summary>The bank connection its statement is read through (deposit-matching R2).</summary>
+    public required string BankConnection { get; init; }
+
     public required bool IsActive { get; init; }
+
+    /// <summary>How the last read of its statement went; <c>null</c> until the first read was tried (deposit-matching R4).</summary>
+    public ClientMoneyAccountFeedDto? BankFeed { get; init; }
 
     public required string RowVersion { get; init; }
 
     public required DateTimeOffset Created { get; init; }
 
-    public static ClientMoneyAccountDto From(ClientMoneyAccount row, Tenant tenant) => new()
+    public static ClientMoneyAccountDto From(ClientMoneyAccount row, Tenant tenant, BankFeedCursor? cursor = null) => new()
     {
         Id = row.PublicId,
         TenantId = tenant.PublicId,
@@ -31,10 +37,20 @@ public sealed class ClientMoneyAccountDto
         BankName = row.BankName,
         AccountName = row.AccountName,
         AccountNumber = row.AccountNumber,
+        BankConnection = row.BankConnection,
         IsActive = row.IsActive,
+        BankFeed = cursor is null
+            ? null
+            : new ClientMoneyAccountFeedDto(cursor.LastSucceededAt, cursor.LastFailedAt, cursor.LastFailure?.ToString()),
         RowVersion = Convert.ToBase64String(row.RowVersion ?? []),
         Created = row.Created
     };
 }
 
 public sealed record CreatedClientMoneyAccountDto(Guid Id);
+
+/// <summary>Feed status of a client money account (deposit-matching R4). Never carries a message from the party.</summary>
+public sealed record ClientMoneyAccountFeedDto(
+    DateTimeOffset? LastSucceededAt,
+    DateTimeOffset? LastFailedAt,
+    string? LastFailure);

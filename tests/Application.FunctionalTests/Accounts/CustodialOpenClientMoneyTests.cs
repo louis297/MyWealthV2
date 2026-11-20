@@ -89,10 +89,12 @@ public class CustodialOpenClientMoneyTests : TestBase
         var account = await CreatedIdAsync(await AccountHttp.Send(HttpMethod.Post, "/accounts", tokens.AccessToken,
             Body(customer.PublicId, "Custodial", "Brokerage", "USD")));
 
+        // Funded through the bank feed while the client money account is still read (deposit-matching R5).
+        (await FundAsync(tokens.AccessToken, account, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+
         (await ClientMoneyHttp.SetActiveAsync(system.AccessToken, tenant.PublicId, row, active: false))
             .StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
-        (await FundAsync(tokens.AccessToken, account, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
         var closeOut = await PostAsync(tokens.AccessToken, Cash(account, "CloseOut", -100m));
         closeOut.StatusCode.ShouldBe(HttpStatusCode.Created, await closeOut.Content.ReadAsStringAsync());
         (await CloseAsync(tokens.AccessToken, account)).StatusCode.ShouldBe(HttpStatusCode.NoContent);

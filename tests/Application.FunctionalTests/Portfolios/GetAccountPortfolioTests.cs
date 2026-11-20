@@ -63,18 +63,7 @@ public class GetAccountPortfolioTests : TestBase
     {
         var accountId = await Accounts.AccountHttp.OpenAccountAsync(accessToken, customerId, name, type: "Brokerage", custodyMode: "Custodial");
 
-        var funded = await Transactions.TransactionHttp.Send(
-            HttpMethod.Post,
-            "/transactions",
-            accessToken,
-            new
-            {
-                accountId,
-                type = "TransferIn",
-                amount = 10000m,
-                currency = "NZD"
-            },
-            Guid.NewGuid());
+        var funded = await Custody.CustodialHttp.FundAsync(accessToken, accountId, 10000m);
         funded.StatusCode.ShouldBe(HttpStatusCode.Created);
 
         var assign = await PortfolioHttp.Send(

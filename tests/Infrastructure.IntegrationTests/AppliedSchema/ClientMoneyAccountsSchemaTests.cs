@@ -102,7 +102,7 @@ public class ClientMoneyAccountsSchemaTests
             await context.SaveChangesAsync();
         }
 
-        var row = ClientMoneyAccount.Create(tenant.Id, currency, "Simulator Bank", "Round Trip Client Funds Trust Account", "SIM-RT-USD");
+        var row = ClientMoneyAccount.Create(tenant.Id, currency, "Simulator Bank", "Round Trip Client Funds Trust Account", "SIM-RT-USD", "simulator");
         row.Disable();
         row.CreatedBy = "test";
         await using (var context = OpenDb(db.ConnectionString))
@@ -119,6 +119,7 @@ public class ClientMoneyAccountsSchemaTests
             reloaded.BankName.ShouldBe("Simulator Bank");
             reloaded.AccountName.ShouldBe("Round Trip Client Funds Trust Account");
             reloaded.AccountNumber.ShouldBe("SIM-RT-USD");
+            reloaded.BankConnection.ShouldBe("simulator");
             reloaded.IsActive.ShouldBeFalse();
             reloaded.RowVersion.ShouldNotBeEmpty();
         }
@@ -139,9 +140,9 @@ public class ClientMoneyAccountsSchemaTests
 
     private static string InsertRow(string currency, string number, bool active) => $"""
         INSERT INTO [ClientMoneyAccounts]
-            ([PublicId], [TenantId], [Currency], [BankName], [AccountName], [AccountNumber], [IsActive], [Created], [CreatedBy])
+            ([PublicId], [TenantId], [Currency], [BankName], [AccountName], [AccountNumber], [IsActive], [Created], [CreatedBy], [BankConnection])
         VALUES (NEWID(), @tenant, '{currency}', N'Simulator Bank', N'Client Funds Trust Account', N'{number}', {(active ? 1 : 0)},
-                SYSDATETIMEOFFSET(), N'test');
+                SYSDATETIMEOFFSET(), N'test', N'simulator');
         """;
 
     private static ApplicationDbContext OpenDb(string connectionString)

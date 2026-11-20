@@ -19,6 +19,7 @@ related:
   - ../features/tenant-custody-modes.md
   - ../features/client-money-accounts.md
   - ../adr/0014-openiddict-authorization-code-pkce.md
+  - ../features/deposit-matching.md
 ---
 
 # Back Office
@@ -222,6 +223,19 @@ Status of this amendment: `accepted` (2026-11-20), together with [client-money-a
 | --- | --- |
 | BO16 | `/tenants/{id}/config` gains a "Client money accounts" section under the report grants: a table from `GET /tenants/{tenantId}/client-money-accounts` with Currency, Bank, Account name, Account number and Active, and Disable / Enable per row (sending its `rowVersion`). An "Add client money account" form: currency picker over enabled currencies (`GET /currencies?enabledOnly=true`), bank name, account name, account number. A 400 is shown at its field. After a write the table reloads. |
 | BO17 | No edit action. Under the table: "Details cannot be changed. To correct them, disable the account and add a new one. Disabling the last account in a currency stops new Custodial accounts in that currency." |
+
+---
+
+## Amendment 2026-11-20 (bank connection and feed status) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [deposit-matching.md](../features/deposit-matching.md). Field rules live there.
+
+- The client money accounts section (BO16) shows each row's bank connection and the state of its statement feed, and the add form names the connection. New call: `GET /bank-connections` (`tenants.manage`). The create call sends `bankConnection`.
+
+| ID | Behaviour |
+| --- | --- |
+| BO18 | The client money accounts table (BO16) gains a "Connection" column (`bankConnection`) and a "Statement" column from `bankFeed`: `null` → "Not read yet"; `lastFailedAt` later than `lastSucceededAt` (or no success) → "Failing since <lastFailedAt>: <failure label>"; otherwise "Read <lastSucceededAt>". Failure labels: Unreachable "Bank not reachable", Timeout "Bank did not answer in time", Unauthorized "Bank refused the key", Unavailable "Bank unavailable", UnknownAccount "Bank does not know this account", BadResponse "Bank answer not understood", InvalidLine "Statement line rejected". |
+| BO19 | The add form gains a required "Bank connection" select from `GET /bank-connections`. With one connection it is preselected. With none the form shows "No bank connection is configured." and cannot be submitted. A 400 `errors.BankConnection` is shown at the select. |
 
 ---
 

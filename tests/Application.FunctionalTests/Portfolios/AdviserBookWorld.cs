@@ -163,13 +163,7 @@ internal sealed class AdviserBookWorld
     {
         var accountId = await Accounts.AccountHttp.OpenAccountAsync(
             accessToken, customerId, name: "Model", type: "Brokerage", custodyMode: "Custodial");
-        (await Transactions.TransactionHttp.Send(HttpMethod.Post, "/transactions", accessToken, new
-        {
-            accountId,
-            type = "TransferIn",
-            amount = 10000m,
-            currency = "NZD"
-        }, Guid.NewGuid())).StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await Custody.CustodialHttp.FundAsync(accessToken, accountId, 10000m)).StatusCode.ShouldBe(HttpStatusCode.Created);
         return accountId;
     }
 }

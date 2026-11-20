@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-17
-last_updated: 2026-11-19
+last_updated: 2026-11-20
 related:
   - account-custody-mode.md
   - accounts.md
@@ -31,6 +31,7 @@ related:
   - external-caller-numbers.md
   - transaction-source.md
   - client-money-accounts.md
+  - deposit-matching.md
 ---
 
 # Custody modes
@@ -538,3 +539,14 @@ Status of this amendment: `accepted` (2026-11-20), together with [client-money-a
 - Every Custodial account has a deposit reference (client-money-accounts R14–R19). External accounts have none.
 - The manual entry matrix (R5) does not change: hand `TransferIn` on a Custodial account stays allowed until deposit matching (roadmap B4).
 
+---
+
+## Amendment 2026-11-20 (bank feed and deposit matching) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [deposit-matching.md](deposit-matching.md).
+
+- R5, the matrix row "`TransferIn` / `TransferOut`" is split. `TransferIn`: External **allowed**; Custodial **refused**, replaced by deposits matched to a bank statement (deposit-matching R32, R35). `TransferOut`: unchanged, allowed (**transitional**) until withdrawals (roadmap B6). `CloseOut` unchanged.
+- §4.2.1 gains the refusal message for `TransferIn`: `Deposits to a Custodial account come from the bank statement. The customer pays in with the account's deposit instructions.` It applies to every caller, SystemAdmin included.
+- R7: the deposit flow builds its `TransferIn` with `Transaction.PostBankDeposit`, outside the matrix.
+- A `TransferIn` entered by hand before this amendment keeps source `Manual` and can still be reversed by hand.
+- `CustodyRules.AllowsManualEntry(Custodial, TransferIn)` returns `false`; the matrix still lives in one Domain class.

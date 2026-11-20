@@ -22,6 +22,7 @@ related:
   - ../database-design.md
   - ../api-design.md
   - ../glossary.md
+  - deposit-matching.md
 ---
 
 # Client money accounts and deposit references
@@ -511,3 +512,15 @@ Do not put a bank feed, a connection, matching, suspense, nominated bank account
 ### Docs amended when this spec was accepted
 
 [tenants.md](tenants.md) (amendment: `clientMoneyCurrencies` on the item; the client money account routes), [accounts.md](accounts.md) (amendment: R8 open rule, `depositReference` on the item, refused on POST and PUT, the deposit instructions route), [custody-modes.md](custody-modes.md) (a Custodial account opens only in a covered currency), [demo-tenant-seed.md](demo-tenant-seed.md) (no client money accounts), [api-design.md](../api-design.md) (§7.3 and §7.6 rows, change log), [domain-model.md](../domain-model.md) §8.5 and the new aggregate, [database-design.md](../database-design.md) §9, §11.3 and the new table, [back-office.md](../backoffice/back-office.md) (BO16, BO17), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D32, D33), [customer-portal.md](../customer-portal/customer-portal.md) (C19, C20), [function-plan.md](../function-plan.md) §5 item 9, [features/README.md](README.md) row status, the roadmap §5 B1 / B2 and §13 status.
+
+---
+
+## Amendment 2026-11-20 (bank feed and deposit matching) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [deposit-matching.md](deposit-matching.md).
+
+- R2 and R6: create requires `bankConnection`, the name of a bank connection in configuration; unknown → 400 `errors.BankConnection`. R7: it never changes, like the other details. Script `0040` sets `simulator` on every existing row (roadmap D19).
+- §8.1: the item gains `bankConnection` and `bankFeed` (`{ lastSucceededAt, lastFailedAt, lastFailure }`, `null` until the first read).
+- R10 no longer holds in full: an active client money account is read by the bank statement job of its connection (deposit-matching R5); an inactive one is not, and keeps its cursor.
+- New read `GET /bank-connections` (`tenants.manage`).
+- §11 "Still open" answered: the bank connection (point 1, deposit-matching R1, R2); an inactive row is not read (R5); how a reference is found and normalised (R15); search by deposit reference (`GET /accounts?depositReference=`, R37); the simulator bank keeps the trust accounts across a reset through standing accounts (R39). Interest on the trust account stays open (B7, I2).

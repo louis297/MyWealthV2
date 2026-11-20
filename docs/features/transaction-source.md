@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-19
-last_updated: 2026-11-19
+last_updated: 2026-11-20
 related:
   - ../custodial-roadmap.md
   - posting.md
@@ -18,6 +18,7 @@ related:
   - ../api-design.md
   - ../glossary.md
   - ../known-issues/custodial-account-gaps.md
+  - deposit-matching.md
 ---
 
 # Transaction source
@@ -343,3 +344,15 @@ The repository should build after each commit. Agents split each behaviour into 
 6. Repo docs: mark this file landed; update roadmap §13 step 1.
 
 Do not put an adjustment, a new flow's source kind, or a list filter in these commits.
+
+---
+
+## Amendment 2026-11-20 (bank feed and deposit matching) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [deposit-matching.md](deposit-matching.md).
+
+- R2: new kind `BankFeed` (3), written by the deposit flow. Script `0041` widens `CK_Transactions_SourceKind` to 0–3 and requires a `SourcePublicId` for kinds 2 and 3.
+- R3: the source id of `BankFeed` is the PublicId of the bank statement line the deposit came from. A deposit and the Reversal of its undo share it; a line matched again after an undo gives a second deposit with the same id.
+- R10: `kind` may be `BankFeed`.
+- R12: `BankFeed` is not hand-reversible. On a Custodial account a hand reverse of a deposit → 400 (R13). The deposit flow undoes its own write by an undo match (deposit-matching R30, R33).
+- §5: `TransactionSource.BankFeed(Guid statementLinePublicId)`; an empty id → `DomainException`.

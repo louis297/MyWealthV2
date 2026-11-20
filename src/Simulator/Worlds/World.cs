@@ -31,6 +31,9 @@ public sealed class World
     /// <summary>Real instant of the last reset (or of the first start).</summary>
     public DateTimeOffset StartedAt { get; private set; }
 
+    /// <summary>The number of the next bank line of this world (deposit-matching R42).</summary>
+    public long NextLineNumber { get; private set; } = 1;
+
     public byte[] RowVersion { get; private set; } = [];
 
     public bool Paused => PausedAt is not null;
@@ -116,7 +119,11 @@ public sealed class World
         PausedAt = null;
         PartyOutage = false;
         StartedAt = realNow.ToUniversalTime();
+        NextLineNumber = 1;
     }
+
+    /// <summary>Deposit matching R42: the outside id of the next bank line, <c>{WorldId:N}-L{n}</c>.</summary>
+    public string TakeLineOutsideId() => $"{WorldId:N}-L{NextLineNumber++}";
 
     private void MoveTo(DateTimeOffset target, DateTimeOffset realNow)
     {

@@ -53,6 +53,11 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
             .HasForeignKey<TransactionAdjustmentDetail>(detail => detail.TransactionId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_TransactionAdjustmentDetails_Transactions_TenantId_TransactionId");
+        builder.HasOne(transaction => transaction.BankReceiptDetail)
+            .WithOne()
+            .HasForeignKey<TransactionBankReceiptDetail>(detail => detail.TransactionId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_TransactionBankReceiptDetails_Transactions_TenantId_TransactionId");
         builder.HasMany(transaction => transaction.FeeDetails)
             .WithOne()
             .HasForeignKey(detail => detail.TransactionId)

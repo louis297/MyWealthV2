@@ -778,7 +778,6 @@ describe("CreateTransactionPage", () => {
       expect(screen.getAllByRole("option").map((option) => option.textContent?.trim())).toEqual([
         "Buy",
         "Sell",
-        "TransferIn",
         "TransferOut",
       ]);
     });
@@ -807,13 +806,13 @@ describe("CreateTransactionPage", () => {
     });
   });
 
-  it("posts a Custodial TransferIn with no bookedAt (D19)", async () => {
+  it("posts a Custodial TransferOut with no bookedAt (D19)", async () => {
     const { fetchMock } = renderForm(
-      user(), 201, "Price is not available.", { custodyMode: "Custodial" }, "errors", "?type=TransferIn",
+      user(), 201, "Price is not available.", { custodyMode: "Custodial" }, "errors", "?type=TransferOut",
     );
 
     expect(await screen.findByText("Booked when posted.")).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "100" } });
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "-100" } });
     fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
     expect(await screen.findByText("account detail")).toBeInTheDocument();
@@ -822,10 +821,17 @@ describe("CreateTransactionPage", () => {
       .find((input): input is Request => input instanceof Request && input.method === "POST");
     expect(JSON.parse(await post!.clone().text())).toEqual({
       accountId,
-      type: "TransferIn",
-      amount: 100,
+      type: "TransferOut",
+      amount: -100,
       memo: null,
     });
+  });
+
+  it("does not take a TransferIn on a Custodial account from the address (D39)", async () => {
+    renderForm(user(), 201, "Price is not available.", { custodyMode: "Custodial" }, "errors", "?type=TransferIn");
+
+    expect(await screen.findByText("Booked when posted.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Amount")).not.toBeInTheDocument();
   });
 
   it("offers only cash transfers on an open Bank account", async () => {

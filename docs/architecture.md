@@ -3,7 +3,7 @@ title: Architecture
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-11-19
+updated: 2026-11-20
 related:
   - README.md
   - glossary.md
@@ -272,6 +272,7 @@ Password change, disable, and logout revoke that subject’s OpenIddict tokens. 
 | `IIdentityService` (or equivalent) | Phase 1 | Create / verify / change-password for Identity users. OpenIddict protocol stays out of Domain |
 | Token-revocation port | Phase 1 | `webapi` writes the shared OpenIddict store today. Replace the adapter if the identity database splits later |
 | `IMarketData` | Phase 3 instrument-prices | `TryGetPrice(instrumentId, asOf?) → Money?`. Missing → empty, not 0. Implemented against local `InstrumentPrices` table (EODHD daily job at 12:00 UTC). See [features/instrument-prices.md](features/instrument-prices.md). |
+| `IBankFeed` | Custodial roadmap B3 (deposit-matching) | The first outside party port ([ADR 0021](adr/0021-outside-parties-behind-ports.md)). `GetStatementLinesAsync(connection, accountNumber, cursor, limit)` → a page of statement lines and a new cursor, or a failure kind. Infrastructure picks the adapter by the bank connection's configured `Adapter` (`Simulator` → `SimulatorBankFeed`, HTTP with `X-Api-Key`). Called only by the `worker`. See [features/deposit-matching.md](features/deposit-matching.md). |
 | `IFxRate` | Phase 3 fx-rates | `GetRate(from, to, asOf?)`. Same currency = 1. Missing pair → `FxRateNotFoundException`. Implemented against local `FxRates` table (Frankfurter hourly job). See [features/fx-rates.md](features/fx-rates.md). |
 
 Do not add a port whose surface is still open. Do add a port (or value object) when later use is certain and omitting it would force a Phase-1 redesign (`Money`, `ICurrencyCatalog`, no-op `IEmailSender`).
@@ -330,7 +331,7 @@ Phase 3 introduces a general-purpose background worker (ADR 0017).
 - Manual work is enqueued from `webapi` after the normal policy and handler scope checks.
 - Recurring work is driven by Hangfire recurring jobs whose scope is owned by a schedule record. Generation re-validates that scope.
 - Queues (`reports`, `email`, default) provide light isolation. One worker project is enough until a concrete resource or failure-domain need appears.
-- First consumer: [features/reports.md](features/reports.md). The same worker delivers domain events from `OutboxMessages` (ADR 0018 and [features/outbox.md](features/outbox.md), both accepted), runs the hourly FX rate sync ([features/fx-rates.md](features/fx-rates.md), ADR 0019, both accepted), and runs the daily instrument price sync at 12:00 UTC ([features/instrument-prices.md](features/instrument-prices.md), accepted). Email and other async tasks land here later unless a later ADR splits them.
+- First consumer: [features/reports.md](features/reports.md). The same worker delivers domain events from `OutboxMessages` (ADR 0018 and [features/outbox.md](features/outbox.md), both accepted), runs the hourly FX rate sync ([features/fx-rates.md](features/fx-rates.md), ADR 0019, both accepted), and runs the daily instrument price sync at 12:00 UTC ([features/instrument-prices.md](features/instrument-prices.md), accepted). From the custodial roadmap it also reads the bank statements: one recurring job `bank-statement-sync:{connection}` per configured bank connection, on queue `bank`, every `PollMinutes` of that connection, with no automatic retries ([features/deposit-matching.md](features/deposit-matching.md), accepted). Email and other async tasks land here later unless a later ADR splits them.
 
 ---
 
@@ -393,3 +394,4 @@ Locked conclusions follow function-plan §0 and these ADRs. The `docs/adr/` fold
 | 2026-11-19 | §3.3: the `worker` also runs the schema applicator at start-up (ADR 0008 amendment, matches the code since `26fb489`). |
 | 2026-11-19 | ADR 0021 proposed: outside parties behind ports, pulled by the `worker`, stored before use. Simulator host spec [features/simulator.md](features/simulator.md) drafted. Pointer in §6; hosts, solution map and ADR table change when they are accepted. |
 | 2026-11-19 | ADR 0021 and [features/simulator.md](features/simulator.md) accepted. `simulator` and `src/Schema` added to §1, §2, §3.1 and §4; ADR table gains 0020 and 0021. |
+| 2026-11-20 | [features/deposit-matching.md](features/deposit-matching.md) accepted. §6 gains `IBankFeed`, the first outside party port; §10 gains the bank statement sync job and queue `bank`. |

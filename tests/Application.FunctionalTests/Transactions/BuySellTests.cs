@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Application.FunctionalTests.Accounts;
+using MyWealthV2.Application.FunctionalTests.Custody;
 using MyWealthV2.Application.FunctionalTests.Instruments;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Entities;
@@ -511,6 +512,12 @@ public class BuySellTests : TestBase
         decimal amount,
         bool custodial = false)
     {
+        // A Custodial account is funded through the bank feed (deposit-matching R35).
+        if (custodial && type == "TransferIn")
+        {
+            return CustodialHttp.FundAsync(accessToken, accountId, amount);
+        }
+
         var body = new Dictionary<string, object?>
         {
             ["accountId"] = accountId,

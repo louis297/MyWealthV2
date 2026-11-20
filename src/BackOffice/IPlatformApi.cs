@@ -55,7 +55,11 @@ public interface IPlatformApi
         string bankName,
         string accountName,
         string accountNumber,
+        string bankConnection,
         CancellationToken cancellationToken = default);
+
+    /// <summary>The configured bank connections (deposit-matching R3).</summary>
+    Task<IReadOnlyList<BankConnectionItem>> ListBankConnectionsAsync(CancellationToken cancellationToken = default);
 
     Task DisableClientMoneyAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default);
 

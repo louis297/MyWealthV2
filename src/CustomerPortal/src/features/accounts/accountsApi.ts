@@ -52,6 +52,15 @@ export type Activity = {
   cash: ActivityCash[];
   /** The rate used by an FX conversion (or its reversal); otherwise null. */
   fx?: ActivityFx | null;
+  /** deposit-matching R36: the bank's details on a deposit and its Reversal; otherwise null. */
+  bankReceipt?: ActivityBankReceipt | null;
+};
+
+export type ActivityBankReceipt = {
+  valueDate: string;
+  reference: string | null;
+  payerName: string | null;
+  payerAccount: string | null;
 };
 
 export const accountsApi = api.injectEndpoints({

@@ -126,7 +126,7 @@ public class TransactionSourceTests : TestBase
         var items = await ListAsync(customerTokens.AccessToken, world.AccountId);
 
         items.Select(item => Source(item).GetProperty("kind").GetString())
-            .ShouldBe(["Manual", "Rebalance"], ignoreOrder: true);
+            .ShouldBe(["BankFeed", "Rebalance"], ignoreOrder: true);
         var trade = items.Single(item => item.GetProperty("type").GetString() == "Buy");
         using var single = await CustodialHttp.GetTransactionAsync(
             customerTokens.AccessToken, trade.GetProperty("id").GetGuid());

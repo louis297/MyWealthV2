@@ -73,7 +73,17 @@ public sealed record ClientMoneyAccountItem(
     string AccountNumber,
     bool IsActive,
     string RowVersion,
-    DateTimeOffset Created);
+    DateTimeOffset Created,
+    string BankConnection = "",
+    ClientMoneyAccountFeed? BankFeed = null);
+
+/// <summary>How the last read of a client money account's statement went (docs/features/deposit-matching.md R4).</summary>
+public sealed record ClientMoneyAccountFeed(DateTimeOffset? LastSucceededAt, DateTimeOffset? LastFailedAt, string? LastFailure);
+
+/// <summary>A configured bank connection (deposit-matching R3).</summary>
+public sealed record BankConnectionItem(string Name, string Adapter);
+
+public sealed record BankConnectionPage(IReadOnlyList<BankConnectionItem> Items, int Page, int PageSize, int TotalCount);
 
 public sealed record ClientMoneyAccountPage(
     IReadOnlyList<ClientMoneyAccountItem> Items,

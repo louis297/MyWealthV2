@@ -1,3 +1,4 @@
+using MyWealthV2.Domain.ValueObjects;
 using MyWealthV2.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -14,6 +15,7 @@ public class ClientMoneyAccountConfiguration : IEntityTypeConfiguration<ClientMo
         builder.Property(row => row.BankName).HasMaxLength(ClientMoneyAccount.BankNameMaxLength).IsRequired();
         builder.Property(row => row.AccountName).HasMaxLength(ClientMoneyAccount.AccountNameMaxLength).IsRequired();
         builder.Property(row => row.AccountNumber).HasMaxLength(ClientMoneyAccount.AccountNumberMaxLength).IsRequired();
+        builder.Property(row => row.BankConnection).HasMaxLength(BankConnectionName.MaxLength).IsRequired();
         builder.Property(row => row.IsActive).IsRequired();
         builder.Property(row => row.CreatedBy).HasMaxLength(450).IsRequired();
         builder.Property(row => row.RowVersion).IsRowVersion();

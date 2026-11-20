@@ -203,6 +203,29 @@ public class BffApiTests
     }
 
     [Test]
+    public async Task Session_ProxiesStatementLines_ReadsAndActions()
+    {
+        // bff-adviser-portal amendment 2026-11-20 (deposit-matching): /statement-lines is on the prefix allow-list.
+        var id = Guid.NewGuid();
+        _api.Scripts["/statement-lines"] = (HttpStatusCode.OK, """{"items":[],"page":1,"pageSize":20,"totalCount":0}""");
+        _api.Scripts[$"/statement-lines/{id}/ignore"] = (HttpStatusCode.NoContent, "");
+
+        using var list = new HttpRequestMessage(HttpMethod.Get, "/api/statement-lines?status=Unmatched");
+        list.Headers.TryAddWithoutValidation("Cookie", _sessionCookie);
+        var listed = await _bff.SendAsync(list);
+        using var ignore = new HttpRequestMessage(HttpMethod.Post, $"/api/statement-lines/{id}/ignore");
+        ignore.Headers.TryAddWithoutValidation("Cookie", _sessionCookie);
+        ignore.Headers.TryAddWithoutValidation(RequestHeader, "1");
+        ignore.Content = new StringContent("""{"note":"Bank interest","rowVersion":"AAAA"}""", System.Text.Encoding.UTF8, "application/json");
+        var ignored = await _bff.SendAsync(ignore);
+
+        listed.StatusCode.ShouldBe(HttpStatusCode.OK);
+        ignored.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        _api.Calls.ShouldContain(call => call.Path == "/statement-lines");
+        _api.Calls.ShouldContain(call => call.Path == $"/statement-lines/{id}/ignore");
+    }
+
+    [Test]
     public async Task Session_ProxiesTheFeePreviewPost()
     {
         _api.Scripts["/fees/trade-schedules/preview"] = (HttpStatusCode.OK, """{"currency":"NZD","items":[]}""");

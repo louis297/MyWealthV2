@@ -62,3 +62,8 @@ export function canAccessFees(role: string | null | undefined) {
 export function canManageFees(role: string | null | undefined) {
   return role === roles.tenantAdmin;
 }
+
+/** statement-lines.manage: the Bank receipts pages (deposit-matching D34). */
+export function canManageStatementLines(role: string | null | undefined) {
+  return role === roles.tenantAdmin;
+}

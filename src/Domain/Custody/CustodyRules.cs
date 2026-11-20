@@ -7,6 +7,10 @@ namespace MyWealthV2.Domain.Custody;
 /// </summary>
 public static class CustodyRules
 {
+    /// <summary>Deposit matching R35: a Custodial account's cash comes in only through the bank statement.</summary>
+    public const string TransferInMessage =
+        "Deposits to a Custodial account come from the bank statement. The customer pays in with the account's deposit instructions.";
+
     private const string InterestMessage = "Interest cannot be entered by hand on a Custodial account.";
     private const string OpeningMessage = "A Custodial account starts empty. Fund it with TransferIn.";
     private const string StockMessage = "Securities cannot be moved in or out of a Custodial account by hand. Use Buy and Sell.";
@@ -46,6 +50,7 @@ public static class CustodyRules
 
         return type switch
         {
+            TransactionType.TransferIn => TransferInMessage,
             TransactionType.Interest => InterestMessage,
             TransactionType.Opening or TransactionType.OpeningHoldings => OpeningMessage,
             TransactionType.StockIn or TransactionType.StockOut => StockMessage,

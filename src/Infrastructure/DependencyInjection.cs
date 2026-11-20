@@ -6,7 +6,9 @@ using MyWealthV2.Application.MarketData;
 using MyWealthV2.Application.Portfolios;
 using MyWealthV2.Application.Portfolios.Commands.RebalanceAccount;
 using MyWealthV2.Application.Reports;
+using MyWealthV2.Application.BankFeed;
 using MyWealthV2.Infrastructure.Accounts;
+using MyWealthV2.Infrastructure.BankFeed;
 using MyWealthV2.Infrastructure.Currencies;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Interceptors;
@@ -115,5 +117,31 @@ public static class DependencyInjection
                 options.UseEntityFrameworkCore()
                     .UseDbContext<ApplicationDbContext>();
             });
+    }
+
+    /// <summary>
+    /// Reads <c>BankConnections</c> for <paramref name="host"/> and registers <see cref="IBankConnections"/>
+    /// (deposit-matching R1). Throws on a bad entry, so call it before <c>Build()</c>.
+    /// </summary>
+    public static void AddBankConnections(this IHostApplicationBuilder builder, BankConnectionHost host)
+    {
+        var connections = new ConfiguredBankConnections(BankConnectionsConfiguration.Read(builder.Configuration, host));
+        builder.Services.AddSingleton(connections);
+        builder.Services.AddSingleton<IBankConnections>(connections);
+        builder.Services.AddHttpClient(SimulatorBankFeed.HttpClientName);
+        builder.Services.AddSingleton<IBankFeedAdapter, SimulatorBankFeed>();
+        builder.Services.AddScoped<IBankFeed, BankFeedDispatcher>();
+        builder.Services.AddScoped<PullBankStatements>();
+        builder.Services.AddScoped<ProcessStatementLines>();
+        if (host == BankConnectionHost.Worker)
+        {
+            builder.Services.AddSingleton(sp =>
+            {
+                var connectionString = sp.GetRequiredService<IConfiguration>().GetConnectionString(Services.Database);
+                Guard.Against.Null(connectionString, message: $"Connection string '{Services.Database}' not found.");
+                return new SqlRunLock(connectionString);
+            });
+            builder.Services.AddScoped<BankStatementSyncJob>();
+        }
     }
 }

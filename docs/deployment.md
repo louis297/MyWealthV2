@@ -3,7 +3,7 @@ title: Deployment
 status: accepted
 language: en
 created: 2026-11-11
-updated: 2026-11-19
+updated: 2026-11-20
 related:
   - README.md
   - smoke-test.md
@@ -155,6 +155,8 @@ The table lists the keys the compose file sets. Keys marked † are introduced b
 
 `identity` also gets `Identity__SimulatorClientSecret` and `Identity__SimulatorOrigin`, and `webapi` gets `Bootstrap__SimulatorOperator__Email` and `Bootstrap__SimulatorOperator__Password` for the first start only ([features/simulator.md](features/simulator.md) R6, R9). `identity` needs the simulator client secret even while the simulator profile is off.
 
+Bank connection `simulator` ([features/deposit-matching.md](features/deposit-matching.md) R1, landed 2026-11-20): `compose.yml` gives `webapi` and `worker` `BankConnections__simulator__Adapter=Simulator`; `worker` also gets `BankConnections__simulator__BaseUrl=http://simulator:8082`, `BankConnections__simulator__ApiKey` from `SIMULATOR_PARTY_API_KEY` (now required in `.env`, also while the simulator profile is off, because `worker` refuses to start without it) and `BankConnections__simulator__PollMinutes` from `BANK_SIMULATOR_POLL_MINUTES` (empty: 1). `simulator` gets two standing accounts (`Simulator__Bank__StandingAccounts__0` USD and `__1` NZD): the account numbers come from `SIM_BANK_USD_ACCOUNT_NUMBER` and `SIM_BANK_NZD_ACCOUNT_NUMBER` (empty: `SIM-DEMO-USD`, `SIM-DEMO-NZD`) and the name from `SIM_BANK_ACCOUNT_NAME`. Use the account numbers the SystemAdmin gives the demo tenant's client money accounts in the Back Office. `worker` does not depend on `simulator`: with the simulator profile off, each run of the bank statement job fails with `Unreachable`, stores nothing and keeps its cursor (ADR 0021 rule 15).
+
 - `Api__BaseAddress` is `http://webapi:8080`. Traffic between containers on the internal network is plain HTTP.
 - Each origin key is the public `https://` origin of that host. `Identity__Issuer` is `https://id.<domain>/`.
 - `ForwardedHeaders__KnownNetworks__0` is `172.30.0.0/24` (§3).
@@ -197,7 +199,7 @@ The hosts already collect traces, metrics and logs through ServiceDefaults. They
 | Secret | Used by | Lives in |
 | --- | --- | --- |
 | Four OIDC client secrets | `identity` and the matching client host (the fourth: `identity` and `simulator`) | `.env` on the VPS |
-| Simulator party API key, at least 32 characters | `simulator` (later the `worker` too, from roadmap B3) | `.env` on the VPS. Needed only with the simulator profile on; the simulator refuses to start without it |
+| Simulator party API key, at least 32 characters | `simulator`, and `worker` as the `simulator` bank connection's key ([features/deposit-matching.md](features/deposit-matching.md)) | `.env` on the VPS. Needed only with the simulator profile on; the simulator refuses to start without it |
 | SQL `sa` password | `sql`, and the connection string of `webapi`, `identity`, `worker` | `.env` on the VPS |
 | EODHD API key | `worker` | `.env` on the VPS |
 | Lucky Penny license key (MediatR, AutoMapper) | `webapi` | `.env` on the VPS. The token copied from the Lucky Penny account page; the downloadable license file is not used |
@@ -324,7 +326,7 @@ The operator runbook holds the commands. This list is the order and the outcome 
 9. Start `sql` alone and create the databases `MyWealthDbV2` and `MyWealthSimulatorDb` (§8).
 10. Set `ACME_CA` in `.env` to the staging issuer. Run `deploy.sh` with the current `master` SHA on the VPS. Once all four hostnames serve a staging certificate, clear `ACME_CA`, remove the `caddy-data` volume and start Caddy again, so it requests production certificates.
 11. Sign in to Back Office as the bootstrap SystemAdmin ([identity-auth.md](features/identity-auth.md) amendment 2026-11-12). Remove the `Bootstrap__SystemAdmin__*` values from `.env` and run `docker compose up -d webapi`.
-12. Optional, the simulator: set `COMPOSE_PROFILES=simulator`, `SIMULATOR_PARTY_API_KEY` and the `BOOTSTRAP_SIMULATOROPERATOR_*` values in `.env`, and run `deploy.sh` again. Sign in to `sim.<domain>` as the bootstrap simulator operator ([features/simulator.md](features/simulator.md) R9). Remove the `BOOTSTRAP_SIMULATOROPERATOR_*` values and run `docker compose up -d webapi`.
+12. Optional, the simulator: set `COMPOSE_PROFILES=simulator` and the `BOOTSTRAP_SIMULATOROPERATOR_*` values in `.env` (`SIMULATOR_PARTY_API_KEY` is already set: `worker` needs it from the first deploy, §5), and run `deploy.sh` again. Sign in to `sim.<domain>` as the bootstrap simulator operator ([features/simulator.md](features/simulator.md) R9). Remove the `BOOTSTRAP_SIMULATOROPERATOR_*` values and run `docker compose up -d webapi`.
 13. Create the smoke tenant and the asserted data ([smoke-test.md](smoke-test.md) §3). Store the Adviser and Customer passwords as GitHub secrets `SMOKE_ADVISER_PASSWORD` and `SMOKE_CUSTOMER_PASSWORD`, and the two portal URLs as variables, in environment `production`.
 14. Optional: create the demo tenant with `docker compose run --rm webapi --seed-demo` ([features/demo-tenant-seed.md](features/demo-tenant-seed.md)). It creates tenant `demo`, its 18 instruments and its two report grants, and no people. It exits 0 and logs one summary line. Running it again later adds only what is missing. Prices arrive with the next daily instrument-price run. It adds no client money account: before a Custodial account can be opened in the demo tenant, add one per currency on its configuration page in Back Office ([features/client-money-accounts.md](features/client-money-accounts.md) §9.1).
 15. Run the deploy workflow by hand with the smoke test on. It must go green end to end.

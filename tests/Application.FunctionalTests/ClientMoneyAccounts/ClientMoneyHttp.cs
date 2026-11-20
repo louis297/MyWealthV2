@@ -11,15 +11,20 @@ namespace MyWealthV2.Application.FunctionalTests.ClientMoneyAccounts;
 /// <summary>Client money account routes (docs/features/client-money-accounts.md §8).</summary>
 internal static class ClientMoneyHttp
 {
+    /// <summary>The bank connection the functional host's fake <c>IBankConnections</c> knows.</summary>
+    public const string Connection = "simulator";
+
     public static string Path(Guid tenantId) => $"/tenants/{tenantId}/client-money-accounts";
 
     public static object Body(
         string currency = "USD",
         string? accountNumber = null,
         string bankName = "Simulator Bank",
-        string accountName = "North Advisory Ltd Client Funds Trust Account") => new
+        string accountName = "North Advisory Ltd Client Funds Trust Account",
+        string? bankConnection = Connection) => new
         {
             currency,
+            bankConnection,
             bankName,
             accountName,
             accountNumber = accountNumber ?? UniqueNumber()
@@ -76,7 +81,8 @@ internal static class ClientMoneyHttp
 
         var catalogCurrency = await db.Set<Currency>().AsNoTracking().SingleAsync(row => row.Code == code);
         var row = ClientMoneyAccount.Create(
-            tenantId, catalogCurrency, "Simulator Bank", "Test Client Funds Trust Account", $"T{tenantId}-{code}");
+            tenantId, catalogCurrency, "Simulator Bank", "Test Client Funds Trust Account", $"T{tenantId}-{code}",
+            Connection);
         row.CreatedBy = "test";
         db.ClientMoneyAccounts.Add(row);
         await db.SaveChangesAsync();
