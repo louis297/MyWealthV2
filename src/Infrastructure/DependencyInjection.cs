@@ -131,6 +131,7 @@ public static class DependencyInjection
         builder.Services.AddHttpClient(SimulatorBankFeed.HttpClientName);
         builder.Services.AddSingleton<IBankFeedAdapter, SimulatorBankFeed>();
         builder.Services.AddScoped<IBankFeed, BankFeedDispatcher>();
+        builder.Services.AddScoped<IBankPayments, BankPaymentsDispatcher>();
         builder.Services.AddScoped<PullBankStatements>();
         builder.Services.AddScoped<SendBankPayments>();
         builder.Services.AddScoped<ProcessStatementLines>();
