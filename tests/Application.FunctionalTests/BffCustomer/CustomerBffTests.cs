@@ -170,6 +170,33 @@ public class CustomerBffTests : TestBase
         location.ShouldContain("client_id=customer-portal");
     }
 
+    [Test]
+    public async Task Customer_ReadsTheirNominatedBankAccountsAndWithdrawals()
+    {
+        // bff-customer-portal amendment 2026-11-20 (withdrawals): the two prefixes are on the allow-list.
+        var tenant = await TestApp.CreateTenantAsync("Firm Customer Payees", "firm-customer-payees");
+        var adviser = await TestApp.CreatePersonAsync(
+            UserRole.Adviser, "Ann", "ann@firm-customer-payees", "Password1!", tenant.Id);
+        await TestApp.CreatePersonAsync(
+            UserRole.Customer, "Cee", "cee@firm-customer-payees", "Password1!", tenant.Id, adviser.Id);
+
+        var login = await _bff.GetAsync("/bff/login?returnUrl=/dashboard");
+        var result = await SubmitAsync(login.Headers.Location!, "cee@firm-customer-payees", "Password1!", "firm-customer-payees");
+        using var callback = new HttpRequestMessage(HttpMethod.Get, result.Callback!.PathAndQuery);
+        callback.Headers.TryAddWithoutValidation("Cookie", CookieHeader(login));
+        var session = CookieHeader(await _bff.SendAsync(callback));
+
+        foreach (var path in new[] { "/api/nominated-bank-accounts", "/api/withdrawals" })
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, path);
+            request.Headers.TryAddWithoutValidation("Cookie", session);
+            var response = await _bff.SendAsync(request);
+            response.StatusCode.ShouldBe(HttpStatusCode.OK, path);
+            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            json.RootElement.GetProperty("items").GetArrayLength().ShouldBe(0);
+        }
+    }
+
     private async Task RegisterOriginAsync()
     {
         using var scope = FunctionalTestSetup.Identity.Services.CreateScope();

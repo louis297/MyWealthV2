@@ -226,6 +226,43 @@ public class BffApiTests
     }
 
     [Test]
+    public async Task Session_ProxiesNominatedBankAccountsAndWithdrawals_ReadsAndActions()
+    {
+        // bff-adviser-portal amendment 2026-11-20 (withdrawals): /nominated-bank-accounts and /withdrawals are on the
+        // prefix allow-list.
+        var id = Guid.NewGuid();
+        _api.Scripts["/nominated-bank-accounts"] = (HttpStatusCode.OK, """{"items":[],"page":1,"pageSize":20,"totalCount":0}""");
+        _api.Scripts[$"/nominated-bank-accounts/{id}/verify"] = (HttpStatusCode.NoContent, "");
+        _api.Scripts["/withdrawals"] = (HttpStatusCode.OK, """{"items":[],"page":1,"pageSize":20,"totalCount":0}""");
+        _api.Scripts[$"/withdrawals/{id}/approve"] = (HttpStatusCode.NoContent, "");
+
+        foreach (var (method, path) in new[]
+                 {
+                     (HttpMethod.Get, "/api/nominated-bank-accounts?status=Pending"),
+                     (HttpMethod.Post, $"/api/nominated-bank-accounts/{id}/verify"),
+                     (HttpMethod.Get, "/api/withdrawals?status=Requested"),
+                     (HttpMethod.Post, $"/api/withdrawals/{id}/approve")
+                 })
+        {
+            using var request = new HttpRequestMessage(method, path);
+            request.Headers.TryAddWithoutValidation("Cookie", _sessionCookie);
+            if (method == HttpMethod.Post)
+            {
+                request.Headers.TryAddWithoutValidation(RequestHeader, "1");
+                request.Content = new StringContent("""{"note":"Checked","rowVersion":"AAAA"}""", System.Text.Encoding.UTF8, "application/json");
+            }
+
+            var response = await _bff.SendAsync(request);
+            response.StatusCode.ShouldNotBe(HttpStatusCode.NotFound, path);
+        }
+
+        _api.Calls.ShouldContain(call => call.Path == "/nominated-bank-accounts");
+        _api.Calls.ShouldContain(call => call.Path == $"/nominated-bank-accounts/{id}/verify");
+        _api.Calls.ShouldContain(call => call.Path == "/withdrawals");
+        _api.Calls.ShouldContain(call => call.Path == $"/withdrawals/{id}/approve");
+    }
+
+    [Test]
     public async Task Session_ProxiesTheFeePreviewPost()
     {
         _api.Scripts["/fees/trade-schedules/preview"] = (HttpStatusCode.OK, """{"currency":"NZD","items":[]}""");
