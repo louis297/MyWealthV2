@@ -55,6 +55,17 @@ internal static class WithdrawalReader
         var transactions = await db.Transactions.AsNoTracking()
             .Where(row => transactionIds.Contains(row.Id))
             .ToDictionaryAsync(row => row.Id, row => row.PublicId, cancellationToken);
+        var withdrawalIds = rows.Select(row => row.Id).ToList();
+        var payments = await db.OutgoingPayments.AsNoTracking()
+            .Where(row => withdrawalIds.Contains(row.WithdrawalId))
+            .ToDictionaryAsync(row => row.WithdrawalId, row => new WithdrawalPaymentDto
+            {
+                Status = row.Status.ToString(),
+                Attempts = row.Attempts,
+                LastAttemptAt = row.LastAttemptAt,
+                LastFailure = row.LastFailure.HasValue ? row.LastFailure.Value.ToString() : null,
+                SentAt = row.AcceptedAt
+            }, cancellationToken);
 
         // R25: a Customer reads neither the memo nor the decision's note.
         var customerView = currentUser.Role == UserRole.Customer;
@@ -89,6 +100,7 @@ internal static class WithdrawalReader
                         Note = customerView ? null : row.DecisionNote
                     }
                     : null,
+                Payment = payments.GetValueOrDefault(row.Id),
                 PayoutTransactionId = row.PayoutTransactionId is int payout ? transactions[payout] : null,
                 ReturnTransactionId = row.ReturnTransactionId is int returned ? transactions[returned] : null,
                 FailureReason = row.FailureReason?.ToString(),
