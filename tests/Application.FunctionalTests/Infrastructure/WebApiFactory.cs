@@ -61,6 +61,9 @@ public class WebApiFactory(
             services.AddSingleton<IDepositReferenceSource>(sp => sp.GetRequiredService<ScriptedDepositReferenceSource>());
             services.RemoveAll<IBankConnections>();
             services.AddSingleton<IBankConnections, FakeBankConnections>();
+            services.RemoveAll<IBankFeed>();
+            services.AddSingleton<InMemoryBankFeed>();
+            services.AddSingleton<IBankFeed>(sp => sp.GetRequiredService<InMemoryBankFeed>());
             services.AddSingleton<CollidingAccountSaveInterceptor>();
             services.AddScoped<ISaveChangesInterceptor>(sp => sp.GetRequiredService<CollidingAccountSaveInterceptor>());
 

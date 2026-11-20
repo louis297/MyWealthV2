@@ -22,6 +22,9 @@ public sealed class ClientMoneyAccountDto
 
     public required bool IsActive { get; init; }
 
+    /// <summary>How the last read of its statement went; <c>null</c> until the first read was tried (deposit-matching R4).</summary>
+    public ClientMoneyAccountFeedDto? BankFeed { get; init; }
+
     public required string RowVersion { get; init; }
 
     public required DateTimeOffset Created { get; init; }
@@ -42,3 +45,9 @@ public sealed class ClientMoneyAccountDto
 }
 
 public sealed record CreatedClientMoneyAccountDto(Guid Id);
+
+/// <summary>Feed status of a client money account (deposit-matching R4). Never carries a message from the party.</summary>
+public sealed record ClientMoneyAccountFeedDto(
+    DateTimeOffset? LastSucceededAt,
+    DateTimeOffset? LastFailedAt,
+    string? LastFailure);

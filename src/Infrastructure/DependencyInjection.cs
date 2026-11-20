@@ -128,5 +128,7 @@ public static class DependencyInjection
         var connections = new ConfiguredBankConnections(BankConnectionsConfiguration.Read(builder.Configuration, host));
         builder.Services.AddSingleton(connections);
         builder.Services.AddSingleton<IBankConnections>(connections);
+        builder.Services.AddScoped<IBankFeed, BankFeedDispatcher>();
+        builder.Services.AddScoped<PullBankStatements>();
     }
 }
