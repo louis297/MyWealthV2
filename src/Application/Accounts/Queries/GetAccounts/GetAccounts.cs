@@ -3,6 +3,7 @@ using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Transactions;
 using MyWealthV2.Domain.Enums;
+using MyWealthV2.Domain.ValueObjects;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 
 namespace MyWealthV2.Application.Accounts.Queries.GetAccounts;
@@ -101,6 +102,19 @@ public class GetAccountsQueryHandler(IApplicationDbContext db, ICurrentUser curr
         {
             var custodyMode = Enum.Parse<CustodyMode>(request.CustodyMode);
             query = query.Where(row => row.account.CustodyMode == custodyMode);
+        }
+
+        // Deposit matching R37: exact, after trim and upper-casing; a value that is not a valid reference finds nothing.
+        if (request.DepositReference is not null)
+        {
+            if (!DepositReference.TryParse(request.DepositReference.Trim().ToUpperInvariant(), out var reference))
+            {
+                query = query.Where(_ => false);
+            }
+            else
+            {
+                query = query.Where(row => row.account.DepositReference! == reference);
+            }
         }
 
         var search = request.Search?.Trim();
