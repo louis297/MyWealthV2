@@ -1,6 +1,13 @@
 using System.Text.Json.Serialization;
+using FluentValidation.Results;
+using MyWealthV2.Application.Accounts;
+using MyWealthV2.Application.BankFeed;
+using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
+using MyWealthV2.Domain.Enums;
+using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
+using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationException;
 
 namespace MyWealthV2.Application.StatementLines.Commands;
 
@@ -64,26 +71,114 @@ public sealed class ReopenStatementLineCommand : IRequest
     public Guid? TenantId { get; init; }
 }
 
-public class MatchStatementLineCommandHandler : IRequestHandler<MatchStatementLineCommand>
+public class MatchStatementLineCommandValidator : AbstractValidator<MatchStatementLineCommand>
 {
-    public Task Handle(MatchStatementLineCommand request, CancellationToken cancellationToken) =>
-        throw new NotImplementedException();
+    public MatchStatementLineCommandValidator()
+    {
+        RuleFor(command => command.AccountId).NotEmpty();
+        RuleFor(command => command.RowVersion).NotEmpty();
+        RuleFor(command => command.Note).Must(StatementLineActions.IsOptionalNote).WithMessage(StatementLineActions.NoteMessage);
+        RuleFor(command => command.TenantId).Null().WithMessage("TenantId cannot be set.");
+    }
 }
 
-public class IgnoreStatementLineCommandHandler : IRequestHandler<IgnoreStatementLineCommand>
+public class IgnoreStatementLineCommandValidator : AbstractValidator<IgnoreStatementLineCommand>
+{
+    public IgnoreStatementLineCommandValidator()
+    {
+        RuleFor(command => command.RowVersion).NotEmpty();
+        RuleFor(command => command.Note).Must(StatementLineActions.IsRequiredNote).WithMessage(StatementLineActions.NoteMessage);
+        RuleFor(command => command.TenantId).Null().WithMessage("TenantId cannot be set.");
+    }
+}
+
+public class RequestStatementLineReturnCommandValidator : AbstractValidator<RequestStatementLineReturnCommand>
+{
+    public RequestStatementLineReturnCommandValidator()
+    {
+        RuleFor(command => command.RowVersion).NotEmpty();
+        RuleFor(command => command.Note).Must(StatementLineActions.IsRequiredNote).WithMessage(StatementLineActions.NoteMessage);
+        RuleFor(command => command.TenantId).Null().WithMessage("TenantId cannot be set.");
+    }
+}
+
+public class ReopenStatementLineCommandValidator : AbstractValidator<ReopenStatementLineCommand>
+{
+    public ReopenStatementLineCommandValidator()
+    {
+        RuleFor(command => command.RowVersion).NotEmpty();
+        RuleFor(command => command.Note).Null().WithMessage("Note cannot be set on reopen.");
+        RuleFor(command => command.TenantId).Null().WithMessage("TenantId cannot be set.");
+    }
+}
+
+public class MatchStatementLineCommandHandler(
+    IApplicationDbContext db,
+    ICurrentUser currentUser,
+    ICurrencyCatalog catalog,
+    TimeProvider time) : IRequestHandler<MatchStatementLineCommand>
+{
+    public async Task Handle(MatchStatementLineCommand request, CancellationToken cancellationToken)
+    {
+        var line = await StatementLineReader.FindAsync(db, currentUser, request.Id, cancellationToken);
+        StatementLineActions.CheckRowVersion(line, request.RowVersion);
+        StatementLineActions.Guard(line.EnsureCanMatchByHand);
+        var actor = StatementLineActions.ActorId(currentUser);
+
+        var account = await AccountScope.ManagedAccounts(db, currentUser).AsNoTracking()
+                          .SingleOrDefaultAsync(row => row.PublicId == request.AccountId, cancellationToken)
+                      ?? throw new NotFoundException("Account", request.AccountId!.Value);
+        if (account.CustodyMode != CustodyMode.Custodial)
+        {
+            throw AccountIdError("A receipt can be matched only to a Custodial account.");
+        }
+
+        if (!string.Equals(account.Currency.Trim(), line.Currency, StringComparison.OrdinalIgnoreCase))
+        {
+            throw AccountIdError($"The account's currency is {account.Currency.Trim()}; this receipt is {line.Currency}.");
+        }
+
+        await db.ExecuteInTransactionAsync(async token =>
+        {
+            await db.LockAccountAsync(account.Id, token);
+            var locked = await db.Accounts.AsNoTracking().SingleAsync(row => row.Id == account.Id, token);
+            await StatementLinePosting.EnsureCanPostAsync(db, locked, token);
+            if (!BankDeposits.AmountFits(catalog, line))
+            {
+                throw AccountIdError($"This receipt has more decimal places than {line.Currency} allows.");
+            }
+
+            var now = time.GetUtcNow();
+            var deposit = await BankDeposits.PostAsync(db, line, locked, now, createdBy: null, token);
+            line.MatchByHand(locked.Id, deposit.Id, request.Note, actor, now);
+            await StatementLineActions.SaveAsync(db, token);
+        }, cancellationToken);
+    }
+
+    private static ValidationException AccountIdError(string message) =>
+        new([new ValidationFailure(nameof(MatchStatementLineCommand.AccountId), message)]);
+}
+
+public class IgnoreStatementLineCommandHandler(IApplicationDbContext db, ICurrentUser currentUser, TimeProvider time)
+    : IRequestHandler<IgnoreStatementLineCommand>
 {
     public Task Handle(IgnoreStatementLineCommand request, CancellationToken cancellationToken) =>
-        throw new NotImplementedException();
+        StatementLineActions.ChangeAsync(db, currentUser, time, request.Id, request.RowVersion,
+            (line, actor, now) => line.Ignore(request.Note!, actor, now), cancellationToken);
 }
 
-public class RequestStatementLineReturnCommandHandler : IRequestHandler<RequestStatementLineReturnCommand>
+public class RequestStatementLineReturnCommandHandler(IApplicationDbContext db, ICurrentUser currentUser, TimeProvider time)
+    : IRequestHandler<RequestStatementLineReturnCommand>
 {
     public Task Handle(RequestStatementLineReturnCommand request, CancellationToken cancellationToken) =>
-        throw new NotImplementedException();
+        StatementLineActions.ChangeAsync(db, currentUser, time, request.Id, request.RowVersion,
+            (line, actor, now) => line.RequestReturn(request.Note!, actor, now), cancellationToken);
 }
 
-public class ReopenStatementLineCommandHandler : IRequestHandler<ReopenStatementLineCommand>
+public class ReopenStatementLineCommandHandler(IApplicationDbContext db, ICurrentUser currentUser, TimeProvider time)
+    : IRequestHandler<ReopenStatementLineCommand>
 {
     public Task Handle(ReopenStatementLineCommand request, CancellationToken cancellationToken) =>
-        throw new NotImplementedException();
+        StatementLineActions.ChangeAsync(db, currentUser, time, request.Id, request.RowVersion,
+            (line, actor, now) => line.Reopen(actor, now), cancellationToken);
 }

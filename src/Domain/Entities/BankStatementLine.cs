@@ -120,6 +120,20 @@ public class BankStatementLine : BaseAuditableEntity
         && amount > 0
         && decimal.Round(amount, AmountMaxDecimalPlaces) == amount;
 
+    /// <summary>Throws <see cref="StatementLineStatusException"/> unless a TenantAdmin may match it by hand now (R23).</summary>
+    public void EnsureCanMatchByHand()
+    {
+        EnsureCredit("matched");
+        EnsureStatus("matched", BankStatementLineStatus.Unmatched);
+    }
+
+    /// <summary>Throws <see cref="StatementLineStatusException"/> unless its match may be undone now (R23).</summary>
+    public void EnsureCanUnmatch()
+    {
+        EnsureCredit("unmatched");
+        EnsureStatus("unmatched", BankStatementLineStatus.Matched);
+    }
+
     /// <summary>The platform matched it by its deposit reference (R17).</summary>
     public void MarkMatched(int accountId, int transactionId, DateTimeOffset at)
     {
