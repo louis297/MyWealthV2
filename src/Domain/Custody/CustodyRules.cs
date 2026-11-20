@@ -51,7 +51,8 @@ public static class CustodyRules
 
     /// <summary>Withdrawals R47: an <c>InternalTransfer</c> between Custodial accounts stays with one Customer; it would
     /// otherwise be a third-party payment (roadmap X4). External accounts are not limited.</summary>
-    public static bool AllowsCustodialTransfer(CustodyMode custodyMode, int fromCustomerId, int toCustomerId) => true;
+    public static bool AllowsCustodialTransfer(CustodyMode custodyMode, int fromCustomerId, int toCustomerId) =>
+        custodyMode == CustodyMode.External || fromCustomerId == toCustomerId;
 
     private const string InterestMessage = "Interest cannot be entered by hand on a Custodial account.";
     private const string OpeningMessage = "A Custodial account starts empty. Fund it with TransferIn.";

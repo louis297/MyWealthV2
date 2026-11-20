@@ -4,6 +4,7 @@ using MyWealthV2.Application.Accounts;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
+using MyWealthV2.Domain.Custody;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Exceptions;
@@ -219,6 +220,14 @@ public class CreateInternalTransferCommandHandler(
                 new ValidationFailure(
                     nameof(CreateInternalTransferCommand.ToAccountId),
                     Domain.Entities.Transaction.DifferentCustodyModesMessage)
+            ]);
+        }
+
+        // Withdrawals R47 (roadmap D14): cash moves between Custodial accounts of one Customer only.
+        if (!CustodyRules.AllowsCustodialTransfer(from.Account.CustodyMode, from.Customer.Id, to.Customer.Id))
+        {
+            throw new ValidationException([
+                new ValidationFailure(nameof(CreateInternalTransferCommand.ToAccountId), CustodyRules.CustodialTransferMessage)
             ]);
         }
 
