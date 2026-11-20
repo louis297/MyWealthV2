@@ -25,9 +25,31 @@ public class TransactionBankReceiptDetail
 
     public string? PayerAccount { get; private set; }
 
-    internal static TransactionBankReceiptDetail Create(int tenantId, BankReceipt receipt) =>
-        throw new NotImplementedException();
+    internal static TransactionBankReceiptDetail Create(int tenantId, BankReceipt receipt)
+    {
+        ArgumentNullException.ThrowIfNull(receipt);
+        return new TransactionBankReceiptDetail
+        {
+            TenantId = tenantId,
+            ValueDate = receipt.ValueDate,
+            Reference = Text(receipt.Reference, FreeTextMaxLength, "Reference"),
+            PayerName = Text(receipt.PayerName, FreeTextMaxLength, "Payer name"),
+            PayerAccount = Text(receipt.PayerAccount, PayerAccountMaxLength, "Payer account")
+        };
+    }
 
     /// <summary>A new row with the same details, for the Reversal (R33).</summary>
-    internal TransactionBankReceiptDetail Copy() => throw new NotImplementedException();
+    internal TransactionBankReceiptDetail Copy() => new()
+    {
+        TenantId = TenantId,
+        ValueDate = ValueDate,
+        Reference = Reference,
+        PayerName = PayerName,
+        PayerAccount = PayerAccount
+    };
+
+    private static string? Text(string? value, int maxLength, string label) =>
+        value is { Length: > 0 } && value.Length > maxLength
+            ? throw new DomainException($"{label} must be at most {maxLength} characters.")
+            : value;
 }

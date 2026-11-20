@@ -66,7 +66,8 @@ public class GetTransactionByIdQueryHandler(IApplicationDbContext db, ICurrentUs
             RowVersion = Convert.ToBase64String(row.transaction.RowVersion ?? []),
             Security = legs.Security[row.transaction.Id].ToList(),
             Fx = legs.Fx.GetValueOrDefault(row.transaction.Id),
-            Adjustment = legs.Adjustment.GetValueOrDefault(row.transaction.Id)
+            Adjustment = legs.Adjustment.GetValueOrDefault(row.transaction.Id),
+            BankReceipt = legs.BankReceipt.GetValueOrDefault(row.transaction.Id)
         };
     }
 }
