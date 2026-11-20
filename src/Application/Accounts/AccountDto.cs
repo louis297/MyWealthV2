@@ -46,8 +46,8 @@ public sealed class AccountDto
         Currency = account.Currency,
         DepositReference = account.DepositReference?.Value,
         CashBalance = cashBalance,
-        ReservedCash = 0m,
-        AvailableCash = 0m,
+        ReservedCash = reservedCash,
+        AvailableCash = Domain.Custody.AvailableCash.Of(cashBalance, reservedCash),
         Status = account.Status.ToString(),
         IsActive = account.IsActive,
         RowVersion = Convert.ToBase64String(account.RowVersion ?? [])

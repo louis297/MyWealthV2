@@ -34,6 +34,7 @@ public class GetAccountByIdQueryHandler(IApplicationDbContext db, ICurrentUser c
                   ?? throw new NotFoundException("Account", request.Id);
 
         var cashBalance = await TransactionCash.SumAsync(db, row.account.Id, cancellationToken);
-        return AccountDto.From(row.account, row.tenant, row.customer, cashBalance, 0m);
+        var reserved = await AccountCash.ReservedAsync(db, row.account.Id, cancellationToken);
+        return AccountDto.From(row.account, row.tenant, row.customer, cashBalance, reserved);
     }
 }

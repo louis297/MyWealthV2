@@ -6,8 +6,8 @@ namespace MyWealthV2.Domain.Custody;
 /// </summary>
 public static class AvailableCash
 {
-    public static decimal Of(decimal cashSum, decimal reserved) => throw new NotImplementedException();
+    public static decimal Of(decimal cashSum, decimal reserved) => cashSum - reserved;
 
     /// <summary>True when a cash <c>SUM</c> of <paramref name="cashSumAfter"/> leaves available cash at or above zero.</summary>
-    public static bool Allows(decimal cashSumAfter, decimal reserved) => throw new NotImplementedException();
+    public static bool Allows(decimal cashSumAfter, decimal reserved) => Of(cashSumAfter, reserved) >= 0m;
 }
