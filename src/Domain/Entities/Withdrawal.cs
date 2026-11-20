@@ -59,13 +59,20 @@ public class Withdrawal : BaseAuditableEntity
     public byte[] RowVersion { get; private set; } = null!;
 
     /// <summary>R24: only an open withdrawal reserves cash.</summary>
-    public bool IsOpen => throw new NotImplementedException();
+    public bool IsOpen => IsOpenStatus(Status);
 
-    public static bool IsOpenStatus(WithdrawalStatus status) => throw new NotImplementedException();
+    public static bool IsOpenStatus(WithdrawalStatus status) =>
+        status is WithdrawalStatus.Requested or WithdrawalStatus.Approved or WithdrawalStatus.Sent;
 
     /// <summary>R23: 1–18 letters, digits, spaces, hyphens and full stops, trimmed.</summary>
-    public static bool IsValidReference(string? reference) => throw new NotImplementedException();
+    public static bool IsValidReference(string? reference)
+    {
+        var trimmed = reference?.Trim() ?? string.Empty;
+        return trimmed.Length is >= 1 and <= ReferenceMaxLength
+               && trimmed.All(ch => char.IsAsciiLetterOrDigit(ch) || ch is ' ' or '-' or '.');
+    }
 
+    /// <summary>R18–R23: a new withdrawal, <c>Requested</c>, reserving <paramref name="amount"/>.</summary>
     public static Withdrawal Request(
         int tenantId,
         int accountId,
@@ -76,20 +83,139 @@ public class Withdrawal : BaseAuditableEntity
         string? memo,
         int requestedByUserId,
         DateTimeOffset requestedAt,
-        Guid? publicId = null) =>
-        throw new NotImplementedException();
+        Guid? publicId = null)
+    {
+        if (amount <= 0)
+        {
+            throw new DomainException("Amount must be greater than 0.");
+        }
 
-    public void Approve(int byUserId, string? note, DateTimeOffset at) => throw new NotImplementedException();
+        if (string.IsNullOrWhiteSpace(currency) || currency.Trim().Length != 3)
+        {
+            throw new DomainException("Currency is required.");
+        }
 
-    public void Reject(int byUserId, string note, DateTimeOffset at) => throw new NotImplementedException();
+        if (!IsValidReference(reference))
+        {
+            throw new DomainException(
+                $"Reference must be 1 to {ReferenceMaxLength} letters, digits, spaces, hyphens and full stops.");
+        }
 
-    public void Cancel(int byUserId, string? note, DateTimeOffset at) => throw new NotImplementedException();
+        return new Withdrawal
+        {
+            TenantId = tenantId,
+            AccountId = accountId,
+            NominatedBankAccountId = nominatedBankAccountId,
+            Amount = amount,
+            Currency = currency.Trim().ToUpperInvariant(),
+            Reference = reference.Trim(),
+            Memo = OptionalText(memo, MemoMaxLength, "Memo"),
+            Status = WithdrawalStatus.Requested,
+            RequestedByUserId = requestedByUserId,
+            RequestedAt = requestedAt,
+            PublicId = publicId ?? Guid.NewGuid()
+        };
+    }
 
-    public void MarkSent() => throw new NotImplementedException();
+    /// <summary>R28, R29: a TenantAdmin other than the requester approves it.</summary>
+    public void Approve(int byUserId, string? note, DateTimeOffset at)
+    {
+        EnsureStatus("approved", WithdrawalStatus.Requested);
+        EnsureNotRequester(byUserId);
+        Decide(WithdrawalDecision.Approved, byUserId, OptionalText(note, NoteMaxLength, "Note"), at);
+        Status = WithdrawalStatus.Approved;
+    }
 
-    public void MarkFailed(PaymentRejectReason reason) => throw new NotImplementedException();
+    /// <summary>R27, R28: a TenantAdmin other than the requester refuses it, with a note. The reservation ends.</summary>
+    public void Reject(int byUserId, string note, DateTimeOffset at)
+    {
+        EnsureStatus("rejected", WithdrawalStatus.Requested);
+        EnsureNotRequester(byUserId);
+        var trimmed = OptionalText(note, NoteMaxLength, "Note") ?? throw new DomainException("Note is required.");
+        Decide(WithdrawalDecision.Rejected, byUserId, trimmed, at);
+        Status = WithdrawalStatus.Rejected;
+    }
 
-    public void MarkPaid(int payoutTransactionId) => throw new NotImplementedException();
+    /// <summary>R30: withdrawn before the bank was asked. Application checks that the payment has no attempt.</summary>
+    public void Cancel(int byUserId, string? note, DateTimeOffset at)
+    {
+        EnsureStatus("cancelled", WithdrawalStatus.Requested, WithdrawalStatus.Approved);
+        Decide(WithdrawalDecision.Cancelled, byUserId, OptionalText(note, NoteMaxLength, "Note"), at);
+        Status = WithdrawalStatus.Cancelled;
+    }
 
-    public void MarkReturned(int returnTransactionId, string? reason) => throw new NotImplementedException();
+    /// <summary>R33: the bank accepted the payment.</summary>
+    public void MarkSent()
+    {
+        EnsureStatus("sent", WithdrawalStatus.Approved);
+        Status = WithdrawalStatus.Sent;
+    }
+
+    /// <summary>R33: the bank refused the payment. The reservation ends.</summary>
+    public void MarkFailed(PaymentRejectReason reason)
+    {
+        EnsureStatus("failed", WithdrawalStatus.Approved);
+        Status = WithdrawalStatus.Failed;
+        FailureReason = reason;
+    }
+
+    /// <summary>R40: the statement showed the payment and the payout is posted. The reservation ends.</summary>
+    public void MarkPaid(int payoutTransactionId)
+    {
+        EnsureStatus("paid", WithdrawalStatus.Approved, WithdrawalStatus.Sent);
+        Status = WithdrawalStatus.Paid;
+        PayoutTransactionId = payoutTransactionId;
+    }
+
+    /// <summary>R42: the payee's bank sent the money back and the payout is reversed.</summary>
+    public void MarkReturned(int returnTransactionId, string? reason)
+    {
+        EnsureStatus("returned", WithdrawalStatus.Paid);
+        Status = WithdrawalStatus.Returned;
+        ReturnTransactionId = returnTransactionId;
+        var trimmed = reason?.Trim();
+        ReturnReason = string.IsNullOrEmpty(trimmed)
+            ? null
+            : trimmed.Length > ReturnReasonMaxLength ? trimmed[..ReturnReasonMaxLength] : trimmed;
+    }
+
+    private void Decide(WithdrawalDecision action, int byUserId, string? note, DateTimeOffset at)
+    {
+        DecisionAction = action;
+        DecisionByUserId = byUserId;
+        DecisionAt = at;
+        DecisionNote = note;
+    }
+
+    private void EnsureNotRequester(int byUserId)
+    {
+        if (byUserId == RequestedByUserId)
+        {
+            throw new WithdrawalStatusException(FourEyesMessage);
+        }
+    }
+
+    private void EnsureStatus(string action, params WithdrawalStatus[] from)
+    {
+        if (!from.Contains(Status))
+        {
+            throw new WithdrawalStatusException($"This withdrawal is {Status} and cannot be {action}.");
+        }
+    }
+
+    private static string? OptionalText(string? value, int maxLength, string label)
+    {
+        var trimmed = value?.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return null;
+        }
+
+        if (trimmed.Length > maxLength)
+        {
+            throw new DomainException($"{label} must be at most {maxLength} characters.");
+        }
+
+        return trimmed;
+    }
 }
