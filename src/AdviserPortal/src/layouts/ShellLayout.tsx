@@ -44,6 +44,7 @@ import {
   canAccessPortfolios,
   canAccessProfile,
   canAccessReports,
+  canManageStatementLines,
 } from "@/features/session/roles";
 import { ModeToggle } from '@/components/mode-toggle';
 
@@ -97,6 +98,12 @@ export function ShellLayout({ children }: { children?: ReactNode }) {
       label: "Transactions",
       icon: ArrowLeftRightIcon,
       visible: canAccessTransactions(role),
+    },
+    {
+      to: "/statement-lines",
+      label: "Bank receipts",
+      icon: LandmarkIcon,
+      visible: canManageStatementLines(role),
     },
     {
       to: "/customers",

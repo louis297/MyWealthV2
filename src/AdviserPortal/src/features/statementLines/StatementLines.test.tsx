@@ -205,7 +205,7 @@ describe("StatementLineDetailPage (deposit-matching D35, D37)", () => {
     renderFees(feeUser(), routes, detailPath, serveLine(matched));
 
     expect(await screen.findByText("Matched by reference")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Managed portfolio" })).toHaveAttribute("href", `/accounts/${accountId}`);
+    expect(await screen.findByRole("link", { name: "Managed portfolio" })).toHaveAttribute("href", `/accounts/${accountId}`);
     expect(await screen.findByText("Ned North")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Deposit" })).toHaveAttribute("href", `/transactions/${transactionId}`);
     expect(screen.getByText("K7M3Q9PXB")).toBeInTheDocument();
