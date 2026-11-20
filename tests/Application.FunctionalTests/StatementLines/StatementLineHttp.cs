@@ -43,5 +43,27 @@ internal static class StatementLineHttp
     {
         yield return (HttpMethod.Get, Path, null);
         yield return (HttpMethod.Get, $"{Path}/{id}", null);
+        yield return (HttpMethod.Post, $"{Path}/{id}/match", new { accountId = Guid.NewGuid(), rowVersion = StaleRowVersion });
+        yield return (HttpMethod.Post, $"{Path}/{id}/ignore", new { note = "Note", rowVersion = StaleRowVersion });
+        yield return (HttpMethod.Post, $"{Path}/{id}/request-return", new { note = "Note", rowVersion = StaleRowVersion });
+        yield return (HttpMethod.Post, $"{Path}/{id}/reopen", new { rowVersion = StaleRowVersion });
+    }
+
+    public const string StaleRowVersion = "AAAAAAAAAAE=";
+
+    /// <summary>Posts an action with the line's current <c>rowVersion</c> merged into <paramref name="body"/>.</summary>
+    public static async Task<HttpResponseMessage> ActAsync(
+        string accessToken,
+        Guid id,
+        string action,
+        Dictionary<string, object?>? body = null)
+    {
+        var sent = new Dictionary<string, object?>(body ?? []);
+        if (!sent.ContainsKey("rowVersion"))
+        {
+            sent["rowVersion"] = await RowVersionAsync(accessToken, id);
+        }
+
+        return await Send(HttpMethod.Post, $"{Path}/{id}/{action}", accessToken, sent);
     }
 }

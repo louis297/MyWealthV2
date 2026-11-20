@@ -1,6 +1,7 @@
 using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.StatementLines;
+using MyWealthV2.Application.StatementLines.Commands;
 using MyWealthV2.Application.StatementLines.Queries.GetStatementLineById;
 using MyWealthV2.Application.StatementLines.Queries.GetStatementLines;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -16,6 +17,49 @@ public class StatementLines : IEndpointGroup
     {
         groupBuilder.MapGet(GetStatementLines).RequireAuthorization(Policies.StatementLinesManage);
         groupBuilder.MapGet(GetStatementLine, "{id}").RequireAuthorization(Policies.StatementLinesManage);
+        groupBuilder.MapPost(MatchStatementLine, "{id}/match").RequireAuthorization(Policies.StatementLinesManage);
+        groupBuilder.MapPost(IgnoreStatementLine, "{id}/ignore").RequireAuthorization(Policies.StatementLinesManage);
+        groupBuilder.MapPost(RequestStatementLineReturn, "{id}/request-return").RequireAuthorization(Policies.StatementLinesManage);
+        groupBuilder.MapPost(ReopenStatementLine, "{id}/reopen").RequireAuthorization(Policies.StatementLinesManage);
+    }
+
+    [EndpointSummary("Match a statement line")]
+    [EndpointDescription("Matches an unmatched receipt to a Custodial account by hand and posts the deposit (R26).")]
+    public static async Task<NoContent> MatchStatementLine(ISender sender, Guid id, MatchStatementLineCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Ignore a statement line")]
+    [EndpointDescription("Marks an unmatched receipt as not Customer money, with a note (R27).")]
+    public static async Task<NoContent> IgnoreStatementLine(ISender sender, Guid id, IgnoreStatementLineCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Request the return of a statement line")]
+    [EndpointDescription("Marks an unmatched receipt to be returned to the payer, with a note (R28).")]
+    public static async Task<NoContent> RequestStatementLineReturn(
+        ISender sender,
+        Guid id,
+        RequestStatementLineReturnCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Reopen a statement line")]
+    [EndpointDescription("Puts an ignored or to-be-returned receipt back into suspense (R29).")]
+    public static async Task<NoContent> ReopenStatementLine(ISender sender, Guid id, ReopenStatementLineCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
     }
 
     [EndpointSummary("List statement lines")]

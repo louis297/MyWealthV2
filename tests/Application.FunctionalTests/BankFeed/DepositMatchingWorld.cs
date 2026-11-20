@@ -46,5 +46,15 @@ internal sealed record DepositMatchingWorld(
         return await BankFeedHttp.LineAsync(sent.Id!);
     }
 
+    /// <summary>The TenantAdmin person who signed in (<c>tess@{code}.example</c>).</summary>
+    public async Task<User> TenantAdminUserAsync()
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var email = $"tess@{Tenant.Code}.example";
+        return await db.DomainUsers.IgnoreQueryFilters().AsNoTracking()
+            .SingleAsync(row => row.TenantId == Tenant.Id && row.Email == email);
+    }
+
     public async Task<decimal> CashBalanceAsync() => await CustodialHttp.CashBalanceAsync(TenantAdmin.AccessToken, AccountId);
 }
