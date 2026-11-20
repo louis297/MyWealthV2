@@ -133,5 +133,15 @@ public static class DependencyInjection
         builder.Services.AddScoped<IBankFeed, BankFeedDispatcher>();
         builder.Services.AddScoped<PullBankStatements>();
         builder.Services.AddScoped<ProcessStatementLines>();
+        if (host == BankConnectionHost.Worker)
+        {
+            builder.Services.AddSingleton(sp =>
+            {
+                var connectionString = sp.GetRequiredService<IConfiguration>().GetConnectionString(Services.Database);
+                Guard.Against.Null(connectionString, message: $"Connection string '{Services.Database}' not found.");
+                return new SqlRunLock(connectionString);
+            });
+            builder.Services.AddScoped<BankStatementSyncJob>();
+        }
     }
 }

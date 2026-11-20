@@ -32,7 +32,7 @@ builder.Services.AddScoped(sp => new InstrumentPriceSyncJob(
     sp.GetRequiredService<ILogger<InstrumentPriceSyncJob>>()));
 builder.Services.AddHangfireServer(options =>
 {
-    options.Queues = ["reports", "rebalance", "outbox", "fx", "prices"];
+    options.Queues = ["reports", "rebalance", "outbox", "fx", "prices", BankStatementRecurringJob.Queue];
 });
 
 var app = builder.Build();
@@ -49,6 +49,10 @@ await using (var scope = app.Services.CreateAsyncScope())
 OutboxRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 FxRateRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 InstrumentPriceRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
+BankStatementRecurringJob.Register(
+    app.Services.GetRequiredService<IRecurringJobManager>(),
+    app.Services.GetRequiredService<JobStorage>(),
+    app.Services.GetRequiredService<ConfiguredBankConnections>());
 
 if (app.Environment.IsDevelopment())
 {
