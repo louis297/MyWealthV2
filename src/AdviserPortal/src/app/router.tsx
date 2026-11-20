@@ -34,6 +34,9 @@ import { roles } from "@/features/session/roles";
 import { SessionProbePage } from "@/features/session/SessionProbePage";
 import { AddBankAccountPage } from "@/features/nominatedBankAccounts/AddBankAccountPage";
 import { BankAccountChecksPage } from "@/features/nominatedBankAccounts/BankAccountChecksPage";
+import { WithdrawalDetailPage } from "@/features/withdrawals/WithdrawalDetailPage";
+import { WithdrawalsListPage } from "@/features/withdrawals/WithdrawalsListPage";
+import { WithdrawPage } from "@/features/withdrawals/WithdrawPage";
 import { MatchStatementLinePage } from "@/features/statementLines/MatchStatementLinePage";
 import { StatementLineDetailPage } from "@/features/statementLines/StatementLineDetailPage";
 import { StatementLinesListPage } from "@/features/statementLines/StatementLinesListPage";
@@ -98,6 +101,7 @@ export const appRoutes: RouteObject[] = [
               { path: ":id/transactions/new", element: <CreateTransactionPage /> },
               { path: ":id/transfer", element: <CreateInternalTransferPage /> },
               { path: ":id/convert", element: <CreateFxConversionPage /> },
+              { path: ":id/withdraw", element: <WithdrawPage /> },
               {
                 element: <RoleGate allow={[roles.tenantAdmin]} />,
                 children: [{ path: ":id/adjust", element: <CreateAdjustmentPage /> }],
@@ -120,6 +124,14 @@ export const appRoutes: RouteObject[] = [
               { index: true, element: <StatementLinesListPage /> },
               { path: ":id", element: <StatementLineDetailPage /> },
               { path: ":id/match", element: <MatchStatementLinePage /> },
+            ],
+          },
+          {
+            path: "/withdrawals",
+            element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
+            children: [
+              { index: true, element: <WithdrawalsListPage /> },
+              { path: ":id", element: <WithdrawalDetailPage /> },
             ],
           },
           {

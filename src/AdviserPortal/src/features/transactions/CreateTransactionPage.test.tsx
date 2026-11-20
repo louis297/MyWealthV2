@@ -806,13 +806,23 @@ describe("CreateTransactionPage", () => {
     });
   });
 
-  it("posts a Custodial TransferOut with no bookedAt (D19)", async () => {
+  it("does not offer a TransferOut on a Custodial account (withdrawals D44)", async () => {
+    renderForm(user(), 201, "Price is not available.", { custodyMode: "Custodial" }, "errors", "?type=TransferOut");
+
+    expect(await screen.findByText("Booked when posted.")).toBeInTheDocument();
+    await openSelect("Type");
+    expect(await screen.findByRole("option", { name: "Buy" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "TransferOut" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "CloseOut" })).not.toBeInTheDocument();
+  });
+
+  it("closes out a Custodial remainder below the minor unit with no bookedAt (withdrawals D44)", async () => {
     const { fetchMock } = renderForm(
-      user(), 201, "Price is not available.", { custodyMode: "Custodial" }, "errors", "?type=TransferOut",
+      user(), 201, "Price is not available.", { custodyMode: "Custodial", cashBalance: 0.004 }, "errors", "?type=CloseOut",
     );
 
     expect(await screen.findByText("Booked when posted.")).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "-100" } });
+    expect(await screen.findByLabelText("Amount")).toHaveValue("-0.004");
     fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
 
     expect(await screen.findByText("account detail")).toBeInTheDocument();
@@ -821,8 +831,8 @@ describe("CreateTransactionPage", () => {
       .find((input): input is Request => input instanceof Request && input.method === "POST");
     expect(JSON.parse(await post!.clone().text())).toEqual({
       accountId,
-      type: "TransferOut",
-      amount: -100,
+      type: "CloseOut",
+      amount: -0.004,
       memo: null,
     });
   });

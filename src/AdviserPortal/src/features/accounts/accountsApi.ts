@@ -14,6 +14,10 @@ export type Account = {
   // client-money-accounts R14: set on a Custodial account, null on an External one.
   depositReference?: string | null;
   cashBalance: number;
+  /** withdrawals R35: the sum of the open withdrawals; 0 on an External account. */
+  reservedCash?: number;
+  /** withdrawals R35: cash balance minus reserved cash. */
+  availableCash?: number;
   status: string;
   isActive: boolean;
   rowVersion: string;

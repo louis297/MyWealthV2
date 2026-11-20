@@ -90,7 +90,7 @@ function requestUrl(input: RequestInfo | URL) {
   return String(input);
 }
 
-function renderForm(accounts = nedAccounts) {
+function renderForm(accounts = nedAccounts, noraItems = noraAccounts) {
   const store = configureStore({
     reducer: {
       session: sessionSlice.reducer,
@@ -123,7 +123,7 @@ function renderForm(accounts = nedAccounts) {
     }
     if (url.includes("/accounts?")) {
       const customerId = new URL(url).searchParams.get("customerId");
-      const items = customerId === nedId ? accounts : customerId === noraId ? noraAccounts : [];
+      const items = customerId === nedId ? accounts : customerId === noraId ? noraItems : [];
       return json({ items, page: 1, pageSize: 100, totalCount: items.length });
     }
     return new Response("", { status: 404 });
@@ -276,6 +276,18 @@ describe("CreateInternalTransferPage", () => {
     account(savingsId, nedId, "Ned savings"),
     account(audId, nedId, "Ned managed two", { type: "Brokerage", custodyMode: "Custodial" }),
   ];
+
+  it("greys out another Customer's Custodial account from a Custodial one (withdrawals D44, R47)", async () => {
+    renderForm(custodialAccounts, [account(noraBankId, noraId, "Nora managed", { type: "Brokerage", custodyMode: "Custodial" })]);
+    await screen.findByText("Destination customer: Ned North");
+
+    fireEvent.change(screen.getByLabelText("Search customers"), { target: { value: "Nora" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Nora North" }, { timeout: 2000 }));
+    const list = await screen.findByRole("radiogroup", { name: "Destination account" });
+    const nora = await within(list).findByRole("radio", { name: /Nora managed/ });
+    expect(nora).toBeDisabled();
+    expect(nora.closest("label")).toHaveTextContent("Another customer");
+  });
 
   it("greys out an Account with a different custody mode (D20)", async () => {
     renderForm(custodialAccounts);
