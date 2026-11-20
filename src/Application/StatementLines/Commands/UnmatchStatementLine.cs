@@ -1,5 +1,11 @@
 using System.Text.Json.Serialization;
+using FluentValidation.Results;
+using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
+using MyWealthV2.Application.Transactions;
+using MyWealthV2.Domain.Exceptions;
+using MyWealthV2.Domain.ValueObjects;
+using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationException;
 
 namespace MyWealthV2.Application.StatementLines.Commands;
 
@@ -20,8 +26,58 @@ public sealed class UnmatchStatementLineCommand : IRequest
     public Guid? TenantId { get; init; }
 }
 
-public class UnmatchStatementLineCommandHandler : IRequestHandler<UnmatchStatementLineCommand>
+public class UnmatchStatementLineCommandValidator : AbstractValidator<UnmatchStatementLineCommand>
 {
-    public Task Handle(UnmatchStatementLineCommand request, CancellationToken cancellationToken) =>
-        throw new NotImplementedException();
+    public UnmatchStatementLineCommandValidator()
+    {
+        RuleFor(command => command.RowVersion).NotEmpty();
+        RuleFor(command => command.Note).Must(StatementLineActions.IsRequiredNote).WithMessage(StatementLineActions.NoteMessage);
+        RuleFor(command => command.TenantId).Null().WithMessage("TenantId cannot be set.");
+    }
+}
+
+public class UnmatchStatementLineCommandHandler(IApplicationDbContext db, ICurrentUser currentUser, TimeProvider time)
+    : IRequestHandler<UnmatchStatementLineCommand>
+{
+    public async Task Handle(UnmatchStatementLineCommand request, CancellationToken cancellationToken)
+    {
+        var line = await StatementLineReader.FindAsync(db, currentUser, request.Id, cancellationToken);
+        StatementLineActions.CheckRowVersion(line, request.RowVersion);
+        StatementLineActions.Guard(line.EnsureCanUnmatch);
+        var actor = StatementLineActions.ActorId(currentUser);
+        var accountId = line.MatchedAccountId!.Value;
+        var depositId = line.MatchedTransactionId!.Value;
+
+        await db.ExecuteInTransactionAsync(async token =>
+        {
+            await db.LockAccountAsync(accountId, token);
+            var account = await db.Accounts.AsNoTracking().SingleAsync(row => row.Id == accountId, token);
+            await StatementLinePosting.EnsureCanPostAsync(db, account, token);
+
+            var deposit = await db.Transactions
+                .Include(row => row.CashLegs)
+                .Include(row => row.BankReceiptDetail)
+                .SingleAsync(row => row.Id == depositId, token);
+            var cash = await TransactionCash.SumAsync(db, accountId, token);
+            var now = time.GetUtcNow();
+            Domain.Entities.Transaction reversal;
+            try
+            {
+                // Posting R9 holds for flows too: the Reversal may not take the balance below zero (R30).
+                reversal = deposit.Reverse(
+                    TransactionSource.BankFeed(line.PublicId), now, new Dictionary<int, decimal> { [accountId] = cash });
+            }
+            catch (DomainException)
+            {
+                throw new ValidationException([
+                    new ValidationFailure(string.Empty, UnmatchStatementLineCommand.CashGoneMessage)
+                ]);
+            }
+
+            db.Transactions.Add(reversal);
+            await db.SaveChangesAsync(token);
+            line.Unmatch(request.Note!, actor, now);
+            await StatementLineActions.SaveAsync(db, token);
+        }, cancellationToken);
+    }
 }
