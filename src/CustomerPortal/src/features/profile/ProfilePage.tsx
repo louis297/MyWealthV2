@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from "@/app/hooks";
 import { Muted, Page, PageHeading, TextField } from "@/components/portal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BankAccountsSection } from "@/features/profile/BankAccountsSection";
 import { useUpdateMeMutation, useUpdateMePasswordMutation } from "@/features/profile/profileApi";
 import { startLogin } from "@/features/session/session";
 import { clearSession } from "@/features/session/sessionSlice";
@@ -78,6 +79,7 @@ export function ProfilePage() {
           </form>
         </CardContent>
       </Card>
+      <BankAccountsSection />
     </Page>
   );
 }
