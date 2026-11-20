@@ -14,6 +14,8 @@ public interface IApplicationDbContext
 
     DbSet<BankStatementLine> BankStatementLines { get; }
 
+    DbSet<NominatedBankAccount> NominatedBankAccounts { get; }
+
     DbSet<Instrument> Instruments { get; }
 
     DbSet<Account> Accounts { get; }
