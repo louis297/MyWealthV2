@@ -157,7 +157,8 @@ public class GetAccountsQueryHandler(IApplicationDbContext db, ICurrentUser curr
                 row.account,
                 row.tenant,
                 row.customer,
-                cashBalances.GetValueOrDefault(row.account.Id))).ToList(),
+                cashBalances.GetValueOrDefault(row.account.Id),
+                0m)).ToList(),
             Page = request.Page,
             PageSize = request.PageSize,
             TotalCount = totalCount

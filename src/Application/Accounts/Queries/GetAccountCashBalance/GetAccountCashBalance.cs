@@ -34,6 +34,6 @@ public class GetAccountCashBalanceQueryHandler(IApplicationDbContext db, ICurren
         var row = await query.SingleOrDefaultAsync(cancellationToken)
                   ?? throw new NotFoundException("Account", request.Id);
         var cashBalance = await TransactionCash.SumAsync(db, row.Id, cancellationToken);
-        return new AccountCashBalanceDto(row.PublicId, row.Currency, cashBalance);
+        return new AccountCashBalanceDto(row.PublicId, row.Currency, cashBalance, 0m, 0m);
     }
 }

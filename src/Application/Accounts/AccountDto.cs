@@ -23,13 +23,19 @@ public sealed class AccountDto
 
     public required decimal CashBalance { get; init; }
 
+    /// <summary>The sum of the Account's open withdrawals; 0 on an External account (withdrawals R35).</summary>
+    public required decimal ReservedCash { get; init; }
+
+    /// <summary>Cash balance minus reserved cash (withdrawals R35).</summary>
+    public required decimal AvailableCash { get; init; }
+
     public required string Status { get; init; }
 
     public required bool IsActive { get; init; }
 
     public required string RowVersion { get; init; }
 
-    public static AccountDto From(Account account, Tenant tenant, User customer, decimal cashBalance) => new()
+    public static AccountDto From(Account account, Tenant tenant, User customer, decimal cashBalance, decimal reservedCash) => new()
     {
         Id = account.PublicId,
         TenantId = tenant.PublicId,
@@ -40,6 +46,8 @@ public sealed class AccountDto
         Currency = account.Currency,
         DepositReference = account.DepositReference?.Value,
         CashBalance = cashBalance,
+        ReservedCash = 0m,
+        AvailableCash = 0m,
         Status = account.Status.ToString(),
         IsActive = account.IsActive,
         RowVersion = Convert.ToBase64String(account.RowVersion ?? [])
