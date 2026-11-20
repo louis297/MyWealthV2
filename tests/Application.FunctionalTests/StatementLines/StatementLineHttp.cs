@@ -47,6 +47,7 @@ internal static class StatementLineHttp
         yield return (HttpMethod.Post, $"{Path}/{id}/ignore", new { note = "Note", rowVersion = StaleRowVersion });
         yield return (HttpMethod.Post, $"{Path}/{id}/request-return", new { note = "Note", rowVersion = StaleRowVersion });
         yield return (HttpMethod.Post, $"{Path}/{id}/reopen", new { rowVersion = StaleRowVersion });
+        yield return (HttpMethod.Post, $"{Path}/{id}/unmatch", new { note = "Note", rowVersion = StaleRowVersion });
     }
 
     public const string StaleRowVersion = "AAAAAAAAAAE=";

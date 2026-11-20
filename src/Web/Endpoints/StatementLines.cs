@@ -21,6 +21,16 @@ public class StatementLines : IEndpointGroup
         groupBuilder.MapPost(IgnoreStatementLine, "{id}/ignore").RequireAuthorization(Policies.StatementLinesManage);
         groupBuilder.MapPost(RequestStatementLineReturn, "{id}/request-return").RequireAuthorization(Policies.StatementLinesManage);
         groupBuilder.MapPost(ReopenStatementLine, "{id}/reopen").RequireAuthorization(Policies.StatementLinesManage);
+        groupBuilder.MapPost(UnmatchStatementLine, "{id}/unmatch").RequireAuthorization(Policies.StatementLinesManage);
+    }
+
+    [EndpointSummary("Undo the match of a statement line")]
+    [EndpointDescription("Reverses the deposit of a matched receipt and puts it back into suspense, with a note (R30).")]
+    public static async Task<NoContent> UnmatchStatementLine(ISender sender, Guid id, UnmatchStatementLineCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
     }
 
     [EndpointSummary("Match a statement line")]
