@@ -162,8 +162,35 @@ public class Transaction : BaseAuditableEntity
         decimal amount,
         DateTimeOffset bookedAt,
         TransactionSource source,
-        BankPayment payment) =>
-        throw new NotImplementedException();
+        BankPayment payment)
+    {
+        if (amount <= 0)
+        {
+            throw new DomainException("A payout must be greater than zero.");
+        }
+
+        if (source.Kind != TransactionSourceKind.Payment)
+        {
+            throw new DomainException("A payout comes from a payment.");
+        }
+
+        var currency = Money.Create(0m, accountCurrency).Currency;
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            Type = TransactionType.TransferOut,
+            BookedAt = bookedAt.ToUniversalTime(),
+            Memo = PayoutMemo,
+            Reference = null,
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
+            PublicId = Guid.NewGuid(),
+            CashLegs = [TransactionCashLeg.Create(tenantId, accountId, -amount, currency)],
+            PaymentDetail = TransactionPaymentDetail.Create(tenantId, payment)
+        };
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
+    }
 
     /// <summary>Custody modes I2: every leg account of one Transaction has the same custody mode.</summary>
     public const string DifferentCustodyModesMessage = "Both accounts must have the same custody mode.";
@@ -919,6 +946,7 @@ public class Transaction : BaseAuditableEntity
             FxDetail = FxDetail?.Copy(),
             AdjustmentDetail = AdjustmentDetail?.Copy(),
             BankReceiptDetail = BankReceiptDetail?.Copy(),
+            PaymentDetail = PaymentDetail?.Copy(),
             FeeDetails = cashLegs.Select(leg => leg.FeeDetail).OfType<TransactionFeeDetail>().ToList()
         };
         ReversedBy = reversal;

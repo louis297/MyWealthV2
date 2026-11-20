@@ -267,6 +267,44 @@ public class WithdrawalsSchemaTests
         }
     }
 
+    [Test]
+    public async Task EfRoundTrip_KeepsThePayoutAndItsPaymentDetail_AndTheReversalCopiesIt()
+    {
+        await using var db = await ScratchSchemaDatabase.CreateAsync("PaymentDetailsEf");
+        await db.ApplyAllAsync();
+        var ids = (await db.ReadAsync($"""
+            {ScratchSchemaDatabase.TenantRows("a", Guid.NewGuid().ToString("N")[..12])}
+            SELECT @a_tenant, @a_bank;
+            """)).Single().Select(Convert.ToInt32).ToArray();
+        var withdrawalId = Guid.NewGuid();
+        var payout = Transaction.PostPayout(
+            ids[0], ids[1], "USD", 300m, DateTimeOffset.UtcNow, Domain.ValueObjects.TransactionSource.Payment(withdrawalId),
+            new Domain.ValueObjects.BankPayment(new DateOnly(2026, 11, 20), "K7M3Q9PXB", "J Smith", "****8900"));
+        payout.CreatedBy = "test";
+        payout.CashLegs.ForEach(leg => leg.CreatedBy = "test");
+        await using (var context = OpenDb(db.ConnectionString))
+        {
+            context.Transactions.Add(payout);
+            await context.SaveChangesAsync();
+            var reversal = payout.Reverse(
+                Domain.ValueObjects.TransactionSource.Payment(withdrawalId), DateTimeOffset.UtcNow, new Dictionary<int, decimal> { [ids[1]] = 0m });
+            reversal.CreatedBy = "test";
+            reversal.CashLegs.ForEach(leg => leg.CreatedBy = "test");
+            context.Transactions.Add(reversal);
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = OpenDb(db.ConnectionString))
+        {
+            var rows = await context.Transactions.AsNoTracking().Include(row => row.PaymentDetail)
+                .Where(row => row.SourcePublicId == withdrawalId).ToListAsync();
+            rows.Count.ShouldBe(2);
+            rows.ShouldAllBe(row => row.SourceKind == TransactionSourceKind.Payment);
+            rows.Select(row => (row.PaymentDetail!.ValueDate, row.PaymentDetail.Reference, row.PaymentDetail.PayeeName, row.PaymentDetail.PayeeAccount))
+                .Distinct().ShouldHaveSingleItem().ShouldBe((new DateOnly(2026, 11, 20), "K7M3Q9PXB", "J Smith", "****8900"));
+        }
+    }
+
     /// <summary>A tenant (<c>@a_*</c> from <see cref="ScratchSchemaDatabase.TenantRows"/>) with a USD client money
     /// account <c>@cma</c> and a Verified nominated bank account <c>@nba</c> of <c>@a_customer</c>.</summary>
     private static string World()

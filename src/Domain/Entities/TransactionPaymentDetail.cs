@@ -25,7 +25,31 @@ public class TransactionPaymentDetail
 
     public string? PayeeAccount { get; private set; }
 
-    internal static TransactionPaymentDetail Create(int tenantId, BankPayment payment) => throw new NotImplementedException();
+    internal static TransactionPaymentDetail Create(int tenantId, BankPayment payment)
+    {
+        ArgumentNullException.ThrowIfNull(payment);
+        return new TransactionPaymentDetail
+        {
+            TenantId = tenantId,
+            ValueDate = payment.ValueDate,
+            Reference = Text(payment.Reference, ReferenceMaxLength, "Reference"),
+            PayeeName = Text(payment.PayeeName, PayeeNameMaxLength, "Payee name"),
+            PayeeAccount = Text(payment.PayeeAccount, PayeeAccountMaxLength, "Payee account")
+        };
+    }
 
-    internal TransactionPaymentDetail Copy() => throw new NotImplementedException();
+    /// <summary>A new row with the same details, for the Reversal of a returned payout (R42).</summary>
+    internal TransactionPaymentDetail Copy() => new()
+    {
+        TenantId = TenantId,
+        ValueDate = ValueDate,
+        Reference = Reference,
+        PayeeName = PayeeName,
+        PayeeAccount = PayeeAccount
+    };
+
+    private static string? Text(string? value, int maxLength, string label) =>
+        value is { Length: > 0 } && value.Length > maxLength
+            ? throw new DomainException($"{label} must be at most {maxLength} characters.")
+            : value;
 }

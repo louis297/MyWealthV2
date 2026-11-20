@@ -44,7 +44,15 @@ public sealed class TransactionSource : ValueObject
     }
 
     /// <summary>A payout's source: the PublicId of the withdrawal it pays (withdrawals R41).</summary>
-    public static TransactionSource Payment(Guid withdrawalPublicId) => throw new NotImplementedException();
+    public static TransactionSource Payment(Guid withdrawalPublicId)
+    {
+        if (withdrawalPublicId == Guid.Empty)
+        {
+            throw new DomainException("A payment source needs the withdrawal's PublicId.");
+        }
+
+        return new TransactionSource(TransactionSourceKind.Payment, withdrawalPublicId);
+    }
 
     /// <summary>The source as stored on a Transaction row.</summary>
     internal static TransactionSource FromStored(TransactionSourceKind kind, Guid? publicId) =>
@@ -54,6 +62,7 @@ public sealed class TransactionSource : ValueObject
             TransactionSourceKind.Seed => Seed,
             TransactionSourceKind.Rebalance => Rebalance(publicId ?? Guid.Empty),
             TransactionSourceKind.BankFeed => BankFeed(publicId ?? Guid.Empty),
+            TransactionSourceKind.Payment => Payment(publicId ?? Guid.Empty),
             _ => new TransactionSource(kind, publicId)
         };
 

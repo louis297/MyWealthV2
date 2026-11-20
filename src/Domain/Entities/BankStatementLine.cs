@@ -164,6 +164,11 @@ public class BankStatementLine : BaseAuditableEntity
     {
         EnsureCredit("unmatched");
         EnsureStatus("unmatched", BankStatementLineStatus.Matched);
+        if (MatchMethod is StatementLineMatchMethod.Payment or StatementLineMatchMethod.PaymentReturn)
+        {
+            // Withdrawals R43: a returned payout is the flow's own write; it is not undone by hand.
+            throw new StatementLineStatusException("This line returned a payment and cannot be unmatched.");
+        }
     }
 
     /// <summary>The platform matched it by its deposit reference (R17).</summary>
@@ -175,15 +180,35 @@ public class BankStatementLine : BaseAuditableEntity
     }
 
     /// <summary>Withdrawals R40: the debit line of a withdrawal's payment; its payout is posted.</summary>
-    public void MarkPayout(int accountId, int transactionId, int withdrawalId, DateTimeOffset at) =>
-        throw new NotImplementedException();
+    public void MarkPayout(int accountId, int transactionId, int withdrawalId, DateTimeOffset at)
+    {
+        if (Direction != BankLineDirection.Debit)
+        {
+            throw new StatementLineStatusException("A payout is a debit line.");
+        }
+
+        EnsureStatus("matched", BankStatementLineStatus.Received);
+        SetMatch(accountId, transactionId, StatementLineMatchMethod.Payment, at);
+        WithdrawalId = withdrawalId;
+    }
 
     /// <summary>Withdrawals R42: the credit line that returns a payout; the payout is reversed.</summary>
-    public void MarkPaymentReturn(int accountId, int transactionId, int withdrawalId, int relatedLineId, DateTimeOffset at) =>
-        throw new NotImplementedException();
+    public void MarkPaymentReturn(int accountId, int transactionId, int withdrawalId, int relatedLineId, DateTimeOffset at)
+    {
+        EnsureCredit("matched");
+        EnsureStatus("matched", BankStatementLineStatus.Received);
+        SetMatch(accountId, transactionId, StatementLineMatchMethod.PaymentReturn, at);
+        WithdrawalId = withdrawalId;
+        RelatedLineId = relatedLineId;
+    }
 
     /// <summary>Withdrawals R40, R42: the line names a payment but does not fit it.</summary>
-    public void MarkPaymentMismatch() => throw new NotImplementedException();
+    public void MarkPaymentMismatch()
+    {
+        EnsureStatus("unmatched", BankStatementLineStatus.Received);
+        Status = BankStatementLineStatus.Unmatched;
+        UnmatchedReason = Enums.UnmatchedReason.PaymentMismatch;
+    }
 
     /// <summary>The platform could not place it (R18).</summary>
     public void MarkUnmatched(UnmatchedReason reason)
