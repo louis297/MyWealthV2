@@ -441,6 +441,50 @@ describe("Customer Portal", () => {
     expect(screen.getByRole("row", { name: /^Reversal/ })).toHaveTextContent("0.6 NZD");
   });
 
+  it("labels a bank deposit as Deposit with its value date and no payer details, and keeps Reversal and TransferIn (C21)", async () => {
+    const deposit = {
+      id: "75555555-5555-5555-5555-555555555555",
+      tenantId: "22222222-2222-2222-2222-222222222222",
+      type: "TransferIn",
+      bookedAt: "2026-11-20T02:01:08Z",
+      memo: "Bank deposit",
+      reference: null,
+      originalTransactionId: null,
+      reversedByTransactionId: null,
+      rowVersion: "AAAA",
+      source: { kind: "BankFeed", id: "3f2c0000-0000-0000-0000-0000000000e1" },
+      cash: [{ accountId: "account-1", customerId: me.id, amount: 500, currency: "NZD" }],
+      security: [],
+      bankReceipt: { valueDate: "2026-11-19", reference: "K7M3Q9PXB", payerName: "J SMITH", payerAccount: "****4200" },
+    };
+    renderAt("/accounts/account-1", me, [
+      deposit,
+      {
+        ...deposit,
+        id: "76666666-6666-6666-6666-666666666666",
+        type: "Reversal",
+        originalTransactionId: deposit.id,
+        cash: [{ accountId: "account-1", customerId: me.id, amount: -500, currency: "NZD" }],
+      },
+      {
+        ...deposit,
+        id: "77777777-7777-7777-7777-777777777777",
+        memo: null,
+        source: { kind: "Manual", id: null },
+        bankReceipt: null,
+        cash: [{ accountId: "account-1", customerId: me.id, amount: 20, currency: "NZD" }],
+      },
+    ]);
+
+    const row = await screen.findByRole("row", { name: /^Deposit/ });
+    expect(row).toHaveTextContent("Value date 2026-11-19");
+    expect(row).toHaveTextContent("500 NZD");
+    expect(row).not.toHaveTextContent("J SMITH");
+    expect(row).not.toHaveTextContent("****4200");
+    expect(screen.getByRole("row", { name: /^Reversal/ })).not.toHaveTextContent("Deposit");
+    expect(screen.getByRole("row", { name: /^TransferIn/ })).toHaveTextContent("20 NZD");
+  });
+
   it("generates a customer report with the caller's id and no schedule controls", async () => {
     const { fetchMock } = renderAt("/reports");
     await openSelect("Report");
