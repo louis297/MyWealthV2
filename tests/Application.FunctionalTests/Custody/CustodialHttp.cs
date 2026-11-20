@@ -3,8 +3,11 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Application.FunctionalTests.Accounts;
+using MyWealthV2.Application.FunctionalTests.BankFeed;
 using MyWealthV2.Application.FunctionalTests.Instruments;
 using MyWealthV2.Application.FunctionalTests.Transactions;
+using MyWealthV2.Domain.Enums;
+using MyWealthV2.Domain.ValueObjects;
 using MyWealthV2.Infrastructure.Data;
 
 namespace MyWealthV2.Application.FunctionalTests.Custody;
@@ -68,15 +71,70 @@ internal static class CustodialHttp
         ["security"] = new[] { new { instrumentId, quantity } }
     };
 
-    /// <summary>A <c>TransferIn</c>. Pass <paramref name="external"/> for an External account, which needs a bookedAt.</summary>
-    public static Task<HttpResponseMessage> FundAsync(
+    /// <summary>
+    /// Funds an account. An External account gets a hand <c>TransferIn</c>, which needs a bookedAt. A Custodial
+    /// account cannot (deposit-matching R35): the helper adds a receipt with the account's deposit reference to the
+    /// functional host's fake bank feed, runs the pull and the processing, and answers 201 with the deposit's id
+    /// as the create route would, or 400 with the line's unmatched reason.
+    /// </summary>
+    public static async Task<HttpResponseMessage> FundAsync(
         string accessToken,
         Guid accountId,
         decimal amount,
-        bool external = false) =>
-        PostAsync(accessToken, external
-            ? Cash(accountId, "TransferIn", amount).WithBookedAt()
-            : Cash(accountId, "TransferIn", amount));
+        bool external = false)
+    {
+        if (external)
+        {
+            return await PostAsync(accessToken, Cash(accountId, "TransferIn", amount).WithBookedAt());
+        }
+
+        int tenantId;
+        string currency;
+        string reference;
+        using (var scope = FunctionalTestSetup.ScopeFactory.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var account = await db.Accounts.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.PublicId == accountId);
+            tenantId = account.TenantId;
+            currency = account.Currency.Trim();
+            reference = account.DepositReference?.Value
+                        ?? throw new InvalidOperationException("FundAsync needs a Custodial account or external: true.");
+        }
+
+        var clientMoney = await BankFeedHttp.ClientMoneyAccountAsync(tenantId, currency);
+        var sent = BankFeedHttp.Feed.AddReceipt(clientMoney.AccountNumber, amount, currency, reference);
+        await BankFeedHttp.RunAsync();
+        var line = await BankFeedHttp.LineAsync(sent.Id!);
+        if (line.Status != BankStatementLineStatus.Matched)
+        {
+            return Json(HttpStatusCode.BadRequest, new { errors = new { Line = new[] { $"Unmatched: {line.UnmatchedReason}" } } });
+        }
+
+        var deposit = (await BankFeedHttp.TransactionsOfLineAsync(line.PublicId)).Single();
+        return Json(HttpStatusCode.Created, new { id = deposit.PublicId });
+    }
+
+    /// <summary>A <c>TransferIn</c> with source <c>Manual</c>, written straight to the database, as a person could
+    /// enter it on a Custodial account before deposit matching (R35).</summary>
+    public static async Task<Guid> InsertManualTransferInAsync(Guid accountId, decimal amount)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var account = await db.Accounts.IgnoreQueryFilters().SingleAsync(row => row.PublicId == accountId);
+        var transaction = Domain.Entities.Transaction.Post(
+            account.TenantId, account.Id, TransactionType.TransferIn, amount, account.Currency, DateTimeOffset.UtcNow,
+            memo: null, reference: null, TransactionSource.Manual, currentCashSum: 0m, existingTransactionCount: 0);
+        transaction.CreatedBy = "test";
+        transaction.CashLegs.ForEach(leg => leg.CreatedBy = "test");
+        db.Transactions.Add(transaction);
+        await db.SaveChangesAsync();
+        return transaction.PublicId;
+    }
+
+    private static HttpResponseMessage Json(HttpStatusCode status, object body) => new(status)
+    {
+        Content = new StringContent(JsonSerializer.Serialize(body), System.Text.Encoding.UTF8, "application/json")
+    };
 
     public static async Task<Guid> CreateInstrumentAsync(
         string accessToken,

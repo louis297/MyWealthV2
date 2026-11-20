@@ -26,7 +26,7 @@ public class ReverseBySourceTests : TestBase
     {
         var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
         var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId, "Model", "NZD");
-        var transferIn = await ReadIdAsync(await FundAsync(tokens.AccessToken, accountId, 100m));
+        var transferIn = await InsertManualTransferInAsync(accountId, 100m);
 
         var response = await ReverseAsync(tokens.AccessToken, transferIn);
 

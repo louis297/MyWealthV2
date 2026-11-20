@@ -11,7 +11,7 @@ namespace MyWealthV2.Application.FunctionalTests.Custody;
 public class CustodialManualEntryTests : TestBase
 {
     [Test]
-    public async Task TransferInAndTransferOut_Return201()
+    public async Task FundedByTheBankFeed_TransferOutReturns201()
     {
         var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
         var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
@@ -115,12 +115,12 @@ public class CustodialManualEntryTests : TestBase
     }
 
     [Test]
-    public async Task Reverse_OfATransferInAndOfABuy_Returns201()
+    public async Task Reverse_OfAManualTransferInAndOfABuy_Returns201()
     {
         var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
         var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
         var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, price: 25.00m);
-        var fundingId = await ReadIdAsync(await FundAsync(tokens.AccessToken, accountId, 1000m));
+        var fundingId = await InsertManualTransferInAsync(accountId, 1000m);
         var buyId = await ReadIdAsync(await PostAsync(tokens.AccessToken, Trade(accountId, "Buy", instrumentId, 4m)));
 
         (await ReverseAsync(tokens.AccessToken, buyId)).StatusCode.ShouldBe(HttpStatusCode.Created);

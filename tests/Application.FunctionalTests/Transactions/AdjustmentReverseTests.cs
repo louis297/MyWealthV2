@@ -77,7 +77,7 @@ public class AdjustmentReverseTests : TestBase
         var world = await AdjustmentWorld.CreateAsync();
         await world.FundAsync(100m);
         await ReadIdAsync(await world.AdjustAsync(AdjustmentWorld.Body(world.AccountId, amount: 5m)));
-        var transferIn = await ReadIdAsync(await FundAsync(world.AdviserToken, world.AccountId, 20m));
+        var transferIn = await InsertManualTransferInAsync(world.AccountId, 20m);
 
         var response = await ReverseAsync(world.AdviserToken, transferIn);
 

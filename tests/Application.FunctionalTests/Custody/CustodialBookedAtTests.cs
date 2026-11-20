@@ -17,13 +17,14 @@ public class CustodialBookedAtTests : TestBase
     private const decimal NzdUsd = 0.59120000m;
 
     [Test]
-    public async Task Custodial_TransferInWithoutBookedAt_Returns201_BookedAtTheServerClock()
+    public async Task Custodial_TransferOutWithoutBookedAt_Returns201_BookedAtTheServerClock()
     {
         var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
         var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
+        (await FundAsync(tokens.AccessToken, accountId, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
 
         var before = DateTimeOffset.UtcNow;
-        var id = await ReadIdAsync(await FundAsync(tokens.AccessToken, accountId, 100m));
+        var id = await ReadIdAsync(await PostAsync(tokens.AccessToken, Cash(accountId, "TransferOut", -40m)));
         var after = DateTimeOffset.UtcNow;
 
         using var item = await GetTransactionAsync(tokens.AccessToken, id);

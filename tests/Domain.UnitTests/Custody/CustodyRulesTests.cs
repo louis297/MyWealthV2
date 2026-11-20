@@ -33,7 +33,7 @@ public class CustodyRulesTests
         };
         var custodial = new Dictionary<TransactionType, bool>
         {
-            [TransactionType.TransferIn] = true,
+            [TransactionType.TransferIn] = false,
             [TransactionType.TransferOut] = true,
             [TransactionType.Interest] = false,
             [TransactionType.CloseOut] = true,
@@ -72,6 +72,8 @@ public class CustodyRulesTests
         CustodyRules.AllowsManualEntry(custodyMode, type).ShouldBe(allowed);
     }
 
+    [TestCase(TransactionType.TransferIn,
+        "Deposits to a Custodial account come from the bank statement. The customer pays in with the account's deposit instructions.")]
     [TestCase(TransactionType.Interest, "Interest cannot be entered by hand on a Custodial account.")]
     [TestCase(TransactionType.Opening, "A Custodial account starts empty. Fund it with TransferIn.")]
     [TestCase(TransactionType.OpeningHoldings, "A Custodial account starts empty. Fund it with TransferIn.")]
