@@ -16,6 +16,10 @@ public interface IApplicationDbContext
 
     DbSet<NominatedBankAccount> NominatedBankAccounts { get; }
 
+    DbSet<Withdrawal> Withdrawals { get; }
+
+    DbSet<OutgoingPayment> OutgoingPayments { get; }
+
     DbSet<Instrument> Instruments { get; }
 
     DbSet<Account> Accounts { get; }
