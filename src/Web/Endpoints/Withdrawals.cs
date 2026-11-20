@@ -18,6 +18,9 @@ public class Withdrawals : IEndpointGroup
         groupBuilder.MapGet(GetWithdrawals).RequireAuthorization(Policies.WithdrawalsRead);
         groupBuilder.MapGet(GetWithdrawal, "{id}").RequireAuthorization(Policies.WithdrawalsRead);
         groupBuilder.MapPost(RequestWithdrawal).RequireAuthorization(Policies.WithdrawalsRequest);
+        groupBuilder.MapPost(ApproveWithdrawal, "{id}/approve").RequireAuthorization(Policies.WithdrawalsApprove);
+        groupBuilder.MapPost(RejectWithdrawal, "{id}/reject").RequireAuthorization(Policies.WithdrawalsApprove);
+        groupBuilder.MapPost(CancelWithdrawal, "{id}/cancel").RequireAuthorization(Policies.WithdrawalsRequest);
     }
 
     [EndpointSummary("List withdrawals")]
@@ -56,5 +59,32 @@ public class Withdrawals : IEndpointGroup
         }
 
         return Results.Content(result.Body, "application/json", statusCode: result.StatusCode);
+    }
+
+    [EndpointSummary("Approve a withdrawal")]
+    [EndpointDescription("A TenantAdmin other than the requester approves it; an outgoing payment waits to be sent (R27–R29, R31).")]
+    public static async Task<NoContent> ApproveWithdrawal(ISender sender, Guid id, ApproveWithdrawalCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Reject a withdrawal")]
+    [EndpointDescription("A TenantAdmin other than the requester refuses it, with a note; the reservation ends (R27, R28).")]
+    public static async Task<NoContent> RejectWithdrawal(ISender sender, Guid id, RejectWithdrawalCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Cancel a withdrawal")]
+    [EndpointDescription("Withdraws a requested withdrawal, or an approved one the bank was not asked to pay yet (R27, R30).")]
+    public static async Task<NoContent> CancelWithdrawal(ISender sender, Guid id, CancelWithdrawalCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
     }
 }
