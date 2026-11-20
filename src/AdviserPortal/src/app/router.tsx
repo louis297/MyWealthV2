@@ -32,6 +32,8 @@ import { RequireSession } from "@/features/session/RequireSession";
 import { RoleGate } from "@/features/session/RoleGate";
 import { roles } from "@/features/session/roles";
 import { SessionProbePage } from "@/features/session/SessionProbePage";
+import { AddBankAccountPage } from "@/features/nominatedBankAccounts/AddBankAccountPage";
+import { BankAccountChecksPage } from "@/features/nominatedBankAccounts/BankAccountChecksPage";
 import { MatchStatementLinePage } from "@/features/statementLines/MatchStatementLinePage";
 import { StatementLineDetailPage } from "@/features/statementLines/StatementLineDetailPage";
 import { StatementLinesListPage } from "@/features/statementLines/StatementLinesListPage";
@@ -121,12 +123,19 @@ export const appRoutes: RouteObject[] = [
             ],
           },
           {
+            // D42: an Adviser who opens the route gets the firm administrator sentence from the 403.
+            path: "/nominated-bank-accounts",
+            element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
+            children: [{ index: true, element: <BankAccountChecksPage /> }],
+          },
+          {
             path: "/customers",
             element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
             children: [
               { index: true, element: <CustomersListPage /> },
               { path: "new", element: <CreateCustomerPage /> },
               { path: ":id/accounts/new", element: <CreateAccountPage /> },
+              { path: ":id/bank-accounts/new", element: <AddBankAccountPage /> },
               { path: ":id", element: <CustomerDetailPage /> },
               { path: ":id/edit", element: <EditCustomerPage /> },
             ],
