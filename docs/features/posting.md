@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-25
-last_updated: 2026-11-19
+last_updated: 2026-11-20
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -22,6 +22,7 @@ related:
   - customers.md
   - custody-modes.md
   - transaction-source.md
+  - deposit-matching.md
 ---
 
 # Posting
@@ -430,3 +431,14 @@ Only after `accepted`. Tree must build after each commit. Split each line red th
 ## Amendment 2026-11-14 (UTC instants)
 
 Accepted with [utc-instants](../fixes/utc-instants.md). R24 no longer stores the request offset: `bookedAt` must carry `Z` or an offset, is converted to UTC, and is returned with `Z`. The item example shows the UTC form.
+
+---
+
+## Amendment 2026-11-20 (bank feed and deposit matching) — accepted
+
+Accepted with [deposit-matching.md](deposit-matching.md).
+
+- A `TransferIn` may be a **deposit**: posted by the deposit flow from a matched bank statement line, with source `BankFeed`, server `bookedAt`, memo `Bank deposit`, no `reference`, and a bank receipt detail (`TransactionBankReceiptDetails`: value date, reference text, payer name, masked payer account). The item carries `bankReceipt` on a deposit and its Reversal, `null` otherwise.
+- R9 holds for the flow: an undo match whose Reversal would make the cash `SUM` negative is refused (deposit-matching R30).
+- R11: a deposit's Reversal is written by the flow (an undo match), not by `POST /transactions/{id}/reverse`, which refuses it on a Custodial account (transaction-source R13). The Reversal copies the bank receipt detail.
+- R16: `TransferIn` on a Custodial account is refused on `POST /transactions` (custody-modes R5 amendment 2026-11-20). External accounts unchanged.

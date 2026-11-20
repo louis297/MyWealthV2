@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-01
-last_updated: 2026-11-15
+last_updated: 2026-11-20
 related:
   - ../function-plan.md
   - ../architecture.md
@@ -348,6 +348,18 @@ Add `/fees` to the BFF prefix allow-list so the Adviser Portal can call the fee 
 - The Customer Portal BFF does not add `/fees`: Customer has no fee permission.
 
 ---
+
+---
+
+## Amendment 2026-11-20 (statement lines prefix) — accepted
+
+Add `/statement-lines` to the BFF prefix allow-list (R20) so the Adviser Portal can call the suspense routes of [deposit-matching.md](deposit-matching.md) through `/api`.
+
+- Prefix: `/statement-lines`
+- Methods: GET, POST
+- Who: TenantAdmin. `webapi` checks `statement-lines.manage`; the BFF does not filter by role, so an Adviser gets the 403 from `webapi`.
+- `GET /bank-connections` is not added: only SystemAdmin reads it, in the Back Office.
+- The Customer Portal BFF does not change.
 
 ---
 

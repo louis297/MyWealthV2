@@ -3,7 +3,7 @@ title: Deployment
 status: accepted
 language: en
 created: 2026-11-11
-updated: 2026-11-19
+updated: 2026-11-20
 related:
   - README.md
   - smoke-test.md
@@ -155,6 +155,8 @@ The table lists the keys the compose file sets. Keys marked † are introduced b
 
 `identity` also gets `Identity__SimulatorClientSecret` and `Identity__SimulatorOrigin`, and `webapi` gets `Bootstrap__SimulatorOperator__Email` and `Bootstrap__SimulatorOperator__Password` for the first start only ([features/simulator.md](features/simulator.md) R6, R9). `identity` needs the simulator client secret even while the simulator profile is off.
 
+Bank connection `simulator` ([features/deposit-matching.md](features/deposit-matching.md) R1, accepted 2026-11-20; keys used once that slice lands): `webapi` and `worker` get `BankConnections__simulator__Adapter=Simulator`; `worker` also gets `BankConnections__simulator__BaseUrl=http://simulator:8082`, `BankConnections__simulator__ApiKey` (the simulator party API key) and optionally `BankConnections__simulator__PollMinutes` (default 1). `simulator` gets `Simulator__Bank__StandingAccounts__N__AccountNumber`, `__Currency` and `__Name` for each trust account the SystemAdmin adds for the demo tenant in the Back Office, with the same account numbers. `worker` does not depend on `simulator`: with the simulator profile off, each run of the bank statement job fails with `Unreachable`, stores nothing and keeps its cursor (ADR 0021 rule 15).
+
 - `Api__BaseAddress` is `http://webapi:8080`. Traffic between containers on the internal network is plain HTTP.
 - Each origin key is the public `https://` origin of that host. `Identity__Issuer` is `https://id.<domain>/`.
 - `ForwardedHeaders__KnownNetworks__0` is `172.30.0.0/24` (§3).
@@ -197,7 +199,7 @@ The hosts already collect traces, metrics and logs through ServiceDefaults. They
 | Secret | Used by | Lives in |
 | --- | --- | --- |
 | Four OIDC client secrets | `identity` and the matching client host (the fourth: `identity` and `simulator`) | `.env` on the VPS |
-| Simulator party API key, at least 32 characters | `simulator` (later the `worker` too, from roadmap B3) | `.env` on the VPS. Needed only with the simulator profile on; the simulator refuses to start without it |
+| Simulator party API key, at least 32 characters | `simulator`, and `worker` as the `simulator` bank connection's key ([features/deposit-matching.md](features/deposit-matching.md)) | `.env` on the VPS. Needed only with the simulator profile on; the simulator refuses to start without it |
 | SQL `sa` password | `sql`, and the connection string of `webapi`, `identity`, `worker` | `.env` on the VPS |
 | EODHD API key | `worker` | `.env` on the VPS |
 | Lucky Penny license key (MediatR, AutoMapper) | `webapi` | `.env` on the VPS. The token copied from the Lucky Penny account page; the downloadable license file is not used |

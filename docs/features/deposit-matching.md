@@ -1,6 +1,6 @@
 ---
 title: Bank feed and deposit matching
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -37,7 +37,7 @@ The `worker` reads the bank statement of every active client money account throu
 
 New: source kind `BankFeed`, permission `statement-lines.manage` (TenantAdmin only), routes under `/statement-lines`, `GET /bank-connections`, the `depositReference` filter on `GET /accounts`, item fields `bankConnection` and `bankFeed` (client money account) and `bankReceipt` (transaction). Scripts `0040_client_money_accounts_bank_connection.sql` and `0041_bank_statement_lines.sql`; simulator script `database/simulator/0003_bank.sql`. No new `TransactionType`, problem code or domain event.
 
-**Status is `review` (2026-11-20).** §11 lists the points to confirm, each with a recommendation written into the rules. The amendments to accepted docs listed in §12 are made in the change that accepts this spec, not before.
+**Status is `accepted` (2026-11-20).** The nineteen points of §11 were confirmed as recommended; point 5 was changed before acceptance to make the polling interval a setting of each connection (`PollMinutes`) and to record the scale limit of reading each account on its own. The amendments to accepted docs listed in §12 are in force from the same change.
 
 ---
 
@@ -271,7 +271,7 @@ Invariants:
 
 Domain events: none.
 
-Update [domain-model.md](../domain-model.md) §8.6 and §8.8 and add the statement line in the change that accepts this spec.
+Recorded in [domain-model.md](../domain-model.md) §8.6, §8.8 and §8.9.
 
 ---
 
@@ -349,7 +349,7 @@ No back-fill: no Transaction has source `BankFeed` before this slice. Hand `Tran
 
 A reset deletes from all three in the reset transaction (simulator R24). The world counter for `n` in R42 is a column `NextLineNumber bigint` added to `World` by the same script, reset to 1.
 
-Update [database-design.md](../database-design.md) §9, §11.4, §11.8 and the simulator section in the change that accepts this spec.
+Recorded in [database-design.md](../database-design.md) §9, §11.4, §11.8, §11.9 and §15.
 
 ---
 
@@ -579,7 +579,7 @@ Page contracts: [back-office.md](../backoffice/back-office.md) (BO18, BO19), [ad
 - `DevelopmentSmokeSeeder`, demo seed: no change.
 - AppHost: `webapi` gets `BankConnections__simulator__Adapter=Simulator`; `worker` gets the same plus `BaseUrl` = the simulator's `party` endpoint and `ApiKey` = parameter `simulator-party-api-key`. `worker` does not wait for `simulator` (ADR 0021 rule 15). The simulator gets the four standing accounts of R39 in its Development settings. This changes simulator §9.2 "No platform host receives the party key in this slice".
 - TestAppHost: no connection configured for the hosts; functional tests replace `IBankFeed` and `IBankConnections` (§10).
-- VPS ([deployment.md](../deployment.md), amended at acceptance): `.env` keys `BankConnections__simulator__Adapter` for `webapi` and `worker`, `BankConnections__simulator__BaseUrl=http://simulator:8082`, `BankConnections__simulator__ApiKey` (the party key) and optional `BankConnections__simulator__PollMinutes` for `worker`; `Simulator__Bank__StandingAccounts__N__*` for `simulator`, matching the client money accounts SystemAdmin adds for the demo tenant. With the simulator's compose profile off, the job fails every minute with `Unreachable` and stores nothing, which is the intended state (ADR 0021 rule 15, roadmap D10).
+- VPS ([deployment.md](../deployment.md) §5, amended 2026-11-20): `.env` keys `BankConnections__simulator__Adapter` for `webapi` and `worker`, `BankConnections__simulator__BaseUrl=http://simulator:8082`, `BankConnections__simulator__ApiKey` (the party key) and optional `BankConnections__simulator__PollMinutes` for `worker`; `Simulator__Bank__StandingAccounts__N__*` for `simulator`, matching the client money accounts SystemAdmin adds for the demo tenant. With the simulator's compose profile off, the job fails every minute with `Unreachable` and stores nothing, which is the intended state (ADR 0021 rule 15, roadmap D10).
 
 ---
 
@@ -609,7 +609,7 @@ Fan-out in the tests:
 
 ## 11. Locked in this spec
 
-No new ADR. It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 1–20 and refines rule 15 (point 5). Roadmap D4 (keep `TransferIn`, add a source), D5 (new permissions to TenantAdmin first) and D7 (unmatched receipts only on the statement line) are written as rules here.
+No new ADR. It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 1–20 and amends the wording of rule 15 (point 5). Roadmap D4 (keep `TransferIn`, add a source), D5 (new permissions to TenantAdmin first) and D7 (unmatched receipts only on the statement line) are written as rules here.
 
 | Item | Lock |
 | --- | --- |
@@ -624,30 +624,30 @@ No new ADR. It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) r
 | Scripts | `0040_client_money_accounts_bank_connection.sql`, `0041_bank_statement_lines.sql`; simulator `0003_bank.sql` |
 | Problem codes, events | None added |
 
-### To confirm before acceptance
+### Confirmed when this spec was accepted (2026-11-20)
 
-Each point has a recommendation, written into the rules above. The alternative is kept for the record.
+Each point was confirmed as recommended and is written into the rules above as stated here. The alternatives are kept for the record.
 
-1. **A bank connection is a configured name on the client money account** (R1–R3). Recommended: the account names a connection; the URL and key live in `worker` configuration; `webapi` knows only the names, to refuse a typo, and lists them for the Back Office. This is what ADR 0021 rule 3 and client-money-accounts §11 point 9 asked for. Alternative: one platform-wide bank connection with no column, which a second bank (or a second simulator) would force a script to change.
-2. **The feed is addressed by the trust account number** (R7, R44). Recommended: the platform already stores the full number (client-money-accounts R3), and the simulator keys its accounts by it. Alternative: a separate party account id issued by the bank, a column a real bank adapter can add when it needs it.
-3. **One cursor row per client money account** (R9). Recommended: `BankFeedCursors`, keyed by the client money account, with the feed status of ADR 0021 rule 16. Alternative: one generic cursor table for every later feed (broker, custodian), keyed by a string, with no foreign key.
-4. **Only active client money accounts are read** (R5). Recommended: disabling is how the operator says "this account is no longer used", and a replacement row reads the same bank account again without duplicates (R8, R9). Alternative: read every row, active or not, which reads a replaced account twice for ever.
-5. **One recurring job per connection, accounts read independently, polling interval per connection** (R1, R6, R7). ADR 0021 rule 15 says "each feed is its own recurring job, so one party's failure never stops another feed". Recommended: a connection is one party, so it is one job; within it each account's failure is recorded on that account and the run continues, which keeps the rule's purpose. The number of Hangfire jobs is the number of connections (one today), about 1 440 runs a day each at the default; Hangfire expires succeeded runs after a day. The interval is `PollMinutes` per connection: 1 for the simulator, so a demo receipt appears quickly without a manual trigger; a real bank's connection takes what its terms allow (often 5–15 minutes). The ADR's rule 15 wording is amended to say this when this spec is accepted. Alternative: one Hangfire job per client money account, registered and removed as rows are added and disabled.
+1. **A bank connection is a configured name on the client money account** (R1–R3). Decided: the account names a connection; the URL and key live in `worker` configuration; `webapi` knows only the names, to refuse a typo, and lists them for the Back Office. This is what ADR 0021 rule 3 and client-money-accounts §11 point 9 asked for. Alternative: one platform-wide bank connection with no column, which a second bank (or a second simulator) would force a script to change.
+2. **The feed is addressed by the trust account number** (R7, R44). Decided: the platform already stores the full number (client-money-accounts R3), and the simulator keys its accounts by it. Alternative: a separate party account id issued by the bank, a column a real bank adapter can add when it needs it.
+3. **One cursor row per client money account** (R9). Decided: `BankFeedCursors`, keyed by the client money account, with the feed status of ADR 0021 rule 16. Alternative: one generic cursor table for every later feed (broker, custodian), keyed by a string, with no foreign key.
+4. **Only active client money accounts are read** (R5). Decided: disabling is how the operator says "this account is no longer used", and a replacement row reads the same bank account again without duplicates (R8, R9). Alternative: read every row, active or not, which reads a replaced account twice for ever.
+5. **One recurring job per connection, accounts read independently, polling interval per connection** (R1, R6, R7). ADR 0021 rule 15 says "each feed is its own recurring job, so one party's failure never stops another feed". Decided: a connection is one party, so it is one job; within it each account's failure is recorded on that account and the run continues, which keeps the rule's purpose. The number of Hangfire jobs is the number of connections (one today), about 1 440 runs a day each at the default; Hangfire expires succeeded runs after a day. The interval is `PollMinutes` per connection: 1 for the simulator, so a demo receipt appears quickly without a manual trigger; a real bank's connection takes what its terms allow (often 5–15 minutes). ADR 0021 rule 15 is amended to say this (2026-11-20). Alternative: one Hangfire job per client money account, registered and removed as rows are added and disabled.
    Scale limit, recorded on purpose: a run reads its accounts one after another, one call each at least. Client money accounts are the firms' trust accounts, one per Tenant and currency, so they stay few (two on the showcase per Tenant); at several hundred per connection a run approaches its interval and later runs are skipped (R6). A bank that delivers one statement file per connection for all its accounts (for example CAMT.052 intraday and CAMT.053 end of day over host-to-host) fits a cursor per connection, not per account (points 2 and 3). That change belongs to the spec of that bank's adapter and is not designed now.
-6. **The payer's account number is masked on store** (R11). Recommended: the platform needs it only to show who paid; a return (B6) goes back against the bank's line id, as banks return a payment. Alternative: store the full number for a later return payment, which puts a third party's bank details in the platform.
-7. **How a reference is found in the text** (R15). Recommended: tokens and the whole text without separators, with the Crockford mapping of `O`, `I`, `L`, and only values that pass the check symbol. This answers the open point of client-money-accounts §11. Alternative: the whole reference field only, exactly as typed, which sends "Dep K7M3Q9PXB" to suspense.
-8. **A reference of another Tenant's account is "not found"** (R16). Recommended: money in Tenant A's trust account can never credit Tenant B, and Tenant A's operator must not learn that Tenant B has that reference. Alternative: a distinct reason for the platform operator, which needs a SystemAdmin view this slice does not have.
-9. **`statement-lines.manage` for TenantAdmin only** (R21, roadmap D5). Recommended: the receipts carry third parties' names and money not yet anybody's; the TenantAdmin already holds `transactions.adjust`. Alternative: an Adviser may read suspense to recognise a Customer's payment.
-10. **No `Idempotency-Key` on the line actions** (R24). Recommended: each action is a status change guarded by `rowVersion`, like close and reopen, so a repeat cannot post twice. Alternative: require the key on match and undo because they write a Transaction.
-11. **Undo by the flow, refused when the cash is gone; recalls wait for B6** (R30, roadmap B4 "Open"). Recommended: a wrong match is undone by a Reversal with source `BankFeed` while the balance allows it; otherwise the TenantAdmin corrects with adjustments, so no balance goes negative (posting R9 holds for flows too). A recalled or dishonoured receipt is a debit line on the statement, so it is handled with the other debit lines in B6, by the same rule. Alternative: let a recall make the balance negative.
-12. **Request return is a status only** (R28). Recommended: it records the decision now, and B6 sends the payment for every `ReturnRequested` line. Alternative: no return action until B6, leaving such lines Unmatched with a note nobody can record.
-13. **A disabled Tenant's receipts are still matched** (R19). Recommended: the books must follow the bank whatever the Tenant's state. Alternative: leave them Unmatched with a reason `TenantDisabled`.
-14. **Debit lines are stored and wait** (R14). Recommended: the statement is stored whole, so B6 and B7 see it from the start. Alternative: drop debit lines until B6, which loses them past the cursor.
-15. **Hand `TransferIn` on a Custodial account is refused for every caller** (R35). Recommended: this is the cell step 5 closes; SystemAdmin has no reason to bypass it, and the test seed builds Transactions directly. Existing hand deposits stay reversible. Alternative: keep it allowed for SystemAdmin as a break-glass write; an adjustment already is that write.
-16. **No scenario library yet** (§2 Out). Simulator §11 point 7 put the library with S1. Recommended: the receipts side needs only one-off injections (R40, R41); a named scenario earns its place when it combines parties or steps, from B6 (pay in, withdraw, return). The functional test fakes are fed by the tests, as ADR 0021 rule 19 allows. Alternative: add the library now with three step kinds (open account, receipt, advance clock).
-17. **Standing accounts from configuration** (R39). Recommended: a reset would otherwise remove the trust accounts the platform reads, and every demo would start with four control calls. This answers the open point of client-money-accounts §11 on resets. Alternative: open them by hand after each reset.
-18. **A bank receipt detail on the Transaction** (R32, R36). Recommended: ADR 0021 rule 10 puts outside dates on a detail row, and the Customer can then see the value date without a statement line route. Alternative: read the value date through the source id from the line.
-19. **`FundAsync` goes through the fake feed** (§10 fan-out). Recommended: the 26 callers keep their signature and every Custodial test exercises the real path. Alternative: a helper that inserts a `TransferIn` directly, which tests a path production no longer has.
+6. **The payer's account number is masked on store** (R11). Decided: the platform needs it only to show who paid; a return (B6) goes back against the bank's line id, as banks return a payment. Alternative: store the full number for a later return payment, which puts a third party's bank details in the platform.
+7. **How a reference is found in the text** (R15). Decided: tokens and the whole text without separators, with the Crockford mapping of `O`, `I`, `L`, and only values that pass the check symbol. This answers the open point of client-money-accounts §11. Alternative: the whole reference field only, exactly as typed, which sends "Dep K7M3Q9PXB" to suspense.
+8. **A reference of another Tenant's account is "not found"** (R16). Decided: money in Tenant A's trust account can never credit Tenant B, and Tenant A's operator must not learn that Tenant B has that reference. Alternative: a distinct reason for the platform operator, which needs a SystemAdmin view this slice does not have.
+9. **`statement-lines.manage` for TenantAdmin only** (R21, roadmap D5). Decided: the receipts carry third parties' names and money not yet anybody's; the TenantAdmin already holds `transactions.adjust`. Alternative: an Adviser may read suspense to recognise a Customer's payment.
+10. **No `Idempotency-Key` on the line actions** (R24). Decided: each action is a status change guarded by `rowVersion`, like close and reopen, so a repeat cannot post twice. Alternative: require the key on match and undo because they write a Transaction.
+11. **Undo by the flow, refused when the cash is gone; recalls wait for B6** (R30, roadmap B4 "Open"). Decided: a wrong match is undone by a Reversal with source `BankFeed` while the balance allows it; otherwise the TenantAdmin corrects with adjustments, so no balance goes negative (posting R9 holds for flows too). A recalled or dishonoured receipt is a debit line on the statement, so it is handled with the other debit lines in B6, by the same rule. Alternative: let a recall make the balance negative.
+12. **Request return is a status only** (R28). Decided: it records the decision now, and B6 sends the payment for every `ReturnRequested` line. Alternative: no return action until B6, leaving such lines Unmatched with a note nobody can record.
+13. **A disabled Tenant's receipts are still matched** (R19). Decided: the books must follow the bank whatever the Tenant's state. Alternative: leave them Unmatched with a reason `TenantDisabled`.
+14. **Debit lines are stored and wait** (R14). Decided: the statement is stored whole, so B6 and B7 see it from the start. Alternative: drop debit lines until B6, which loses them past the cursor.
+15. **Hand `TransferIn` on a Custodial account is refused for every caller** (R35). Decided: this is the cell step 5 closes; SystemAdmin has no reason to bypass it, and the test seed builds Transactions directly. Existing hand deposits stay reversible. Alternative: keep it allowed for SystemAdmin as a break-glass write; an adjustment already is that write.
+16. **No scenario library yet** (§2 Out). Simulator §11 point 7 put the library with S1. Decided: the receipts side needs only one-off injections (R40, R41); a named scenario earns its place when it combines parties or steps, from B6 (pay in, withdraw, return). The functional test fakes are fed by the tests, as ADR 0021 rule 19 allows. Alternative: add the library now with three step kinds (open account, receipt, advance clock).
+17. **Standing accounts from configuration** (R39). Decided: a reset would otherwise remove the trust accounts the platform reads, and every demo would start with four control calls. This answers the open point of client-money-accounts §11 on resets. Alternative: open them by hand after each reset.
+18. **A bank receipt detail on the Transaction** (R32, R36). Decided: ADR 0021 rule 10 puts outside dates on a detail row, and the Customer can then see the value date without a statement line route. Alternative: read the value date through the source id from the line.
+19. **`FundAsync` goes through the fake feed** (§10 fan-out). Decided: the 26 callers keep their signature and every Custodial test exercises the real path. Alternative: a helper that inserts a `TransferIn` directly, which tests a path production no longer has.
 
 Still open, not this slice:
 
@@ -683,6 +683,6 @@ The repository should build after each commit. Agents split each behaviour into 
 
 Do not put debit-line processing, payments, returns, nominated bank accounts, withdrawals or reconciliation in these commits.
 
-### Docs to amend when this spec is accepted
+### Docs amended when this spec was accepted
 
 [custody-modes.md](custody-modes.md) (R5 matrix: `TransferIn` / Custodial refused, the refusal message), [transaction-source.md](transaction-source.md) (kind `BankFeed` = 3, not hand-reversible, check widened), [posting.md](posting.md) (a `TransferIn` may carry a bank receipt detail; the flow's Reversal), [client-money-accounts.md](client-money-accounts.md) (`bankConnection`, `bankFeed`, the open points of §11 answered), [accounts.md](accounts.md) (`depositReference` filter), [simulator.md](simulator.md) (S1 receipts amendment: R38–R48, script `0003`, the AppHost party key, §11 point 7), [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rule 15 wording (point 5), [bff-adviser-portal.md](bff-adviser-portal.md) (prefix `/statement-lines`), [api-design.md](../api-design.md) (§3.1 permission row, §7.3, §7.6, §7.7 rows, a `/statement-lines` and `/bank-connections` catalog entry, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [architecture.md](../architecture.md) (the first party port and the `bank` queue), [deployment.md](../deployment.md) (§5 keys), [back-office.md](../backoffice/back-office.md) (BO18, BO19), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D34–D39, D18), [customer-portal.md](../customer-portal/customer-portal.md) (C21), [known-issues/custodial-account-gaps.md](../known-issues/custodial-account-gaps.md) (the deposit half of the first row), [function-plan.md](../function-plan.md) §5, [features/README.md](README.md) row status, the roadmap §5 B3 / B4, §11 S1 and §13 status.

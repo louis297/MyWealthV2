@@ -207,7 +207,7 @@ Real-world shape: Customers pay into the firm's client money trust account at a 
 - **What:** a port that returns statement lines for one client money account after a cursor; a `worker` job that pulls them and stores each line once (P3); a statement line table (outside id, account, value date, amount, direction, payer details, reference text, status: unmatched, matched, returned, ignored).
 - **Simulator:** S1 bank, receipts side.
 - **Depends on:** F2, B1.
-- **Spec:** B3 and B4 are one spec, with S1 receipts, [deposit-matching.md](features/deposit-matching.md) (`review`, 2026-11-20). Its §11 lists the points to confirm, each with a recommendation: a client money account names a bank connection kept in configuration (URL and key on `worker` only); the feed is addressed by the trust account number; one cursor row per client money account; only active client money accounts are read; one recurring job per connection, polling interval `PollMinutes` per connection (default one minute), each account read on its own (a refinement of ADR 0021 rule 15); the payer's account number is masked on store; debit lines are stored and wait for B6.
+- **Spec:** B3 and B4 are one spec, with S1 receipts, [deposit-matching.md](features/deposit-matching.md) (accepted 2026-11-20). Its §11 records the decisions that refine this section: a client money account names a bank connection kept in configuration (URL and key on `worker` only); the feed is addressed by the trust account number; one cursor row per client money account; only active client money accounts are read; one recurring job per connection, polling interval `PollMinutes` per connection (default one minute), each account read on its own (ADR 0021 rule 15 amended to "one job per connection"); the payer's account number is masked on store; debit lines are stored and wait for B6.
 
 ### B4. Deposit matching and suspense
 
@@ -216,7 +216,7 @@ Real-world shape: Customers pay into the firm's client money trust account at a 
 - **Pages:** a Suspense page for the operator; the Customer sees the deposit with its value date.
 - **Open:** a dishonoured or recalled receipt after it was credited (the flow reverses the deposit; if the cash is already spent, the account goes negative or the reverse is refused and an adjustment follows — decide).
 - **Depends on:** F1, F4, B2, B3.
-- **Spec:** [deposit-matching.md](features/deposit-matching.md) (`review`, 2026-11-20), with B3. Its §11 proposes: reference candidates from the text with the Crockford mapping and the check symbol; a reference of another Tenant's account counts as not found; permission `statement-lines.manage` for TenantAdmin only; match, ignore, request return, reopen and undo match on the line, guarded by `rowVersion`; undo match is a Reversal by the flow, refused when the cash is gone (then an adjustment), so no balance goes negative; a recall or dishonour is a debit line and comes with B6; request return records the decision and B6 sends the payment; hand `TransferIn` on a Custodial account refused for every caller.
+- **Spec:** [deposit-matching.md](features/deposit-matching.md) (accepted 2026-11-20), with B3. Its §11 records: reference candidates from the text with the Crockford mapping and the check symbol; a reference of another Tenant's account counts as not found; permission `statement-lines.manage` for TenantAdmin only; match, ignore, request return, reopen and undo match on the line, guarded by `rowVersion`; undo match is a Reversal by the flow, refused when the cash is gone (then an adjustment), so no balance goes negative; a recall or dishonour is a debit line and comes with B6; request return records the decision and B6 sends the payment; hand `TransferIn` on a Custodial account refused for every caller.
 
 ### B5. Nominated bank account
 
@@ -376,7 +376,7 @@ A separate project that plays the outside parties for manual testing and demos. 
 
 ### S1. Bank (with B3–B7)
 
-The receipts side (the first two rows, without recalls) is in [deposit-matching.md](features/deposit-matching.md) (`review`, 2026-11-20) §4.6: bank accounts, standing accounts from configuration, receipts with a delay or delivered twice, and the statement feed. It proposes no scenario library yet (simulator §11 point 7 put it with S1). The rest comes with B6 and B7.
+The receipts side (the first two rows, without recalls) is in [deposit-matching.md](features/deposit-matching.md) (accepted 2026-11-20) §4.6: bank accounts, standing accounts from configuration, receipts with a delay or delivered twice, and the statement feed. It adds no scenario library yet (simulator §11 point 7 put it with S1). The rest comes with B6 and B7.
 
 | Signal or action | Platform flow |
 | --- | --- |
@@ -441,7 +441,7 @@ Each step depends only on earlier steps. "Closes" names the matrix cell or known
 | 2 | F2 ADR, S0 skeleton | S0 | — | [ADR 0021](adr/0021-outside-parties-behind-ports.md), [simulator](features/simulator.md) | accepted 2026-11-19, landed 2026-11-19 |
 | 3 | F3 Adjustment (no review) | — | "No correction other than reverse" | [adjustments](features/adjustments.md) | accepted 2026-11-19, landed 2026-11-19 |
 | 4 | B1 client money accounts, B2 deposit reference | — | — | [client-money-accounts](features/client-money-accounts.md) | accepted 2026-11-20, landed 2026-11-20 |
-| 5 | B3 bank feed, B4 matching and suspense | S1 receipts | Hand `TransferIn` | [deposit-matching](features/deposit-matching.md) | review 2026-11-20 |
+| 5 | B3 bank feed, B4 matching and suspense | S1 receipts | Hand `TransferIn` | [deposit-matching](features/deposit-matching.md) | accepted 2026-11-20 |
 | 6 | B5 nominated bank account, B6 withdrawals, available cash | S1 payments | Hand `TransferOut` | — | not started |
 | 7 | B7 bank reconciliation | S1 balances | — | — | not started |
 | 8 | B8 account closure | — | Hand `CloseOut` | — | not started |

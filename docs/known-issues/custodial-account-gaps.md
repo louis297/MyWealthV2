@@ -3,13 +3,14 @@ title: "Known issue — Custodial accounts still rely on hand entry, and some wr
 status: open
 language: en
 created: 2026-11-17
-updated: 2026-11-19
+updated: 2026-11-20
 related:
   - ../features/custody-modes.md
   - ../features/account-custody-mode.md
   - ../adr/0020-account-custody-mode.md
   - ../future-plans.md
   - ../features/adjustments.md
+  - ../features/deposit-matching.md
 ---
 
 # Known issue: Custodial accounts still rely on hand entry, and some writes are missing
@@ -24,7 +25,7 @@ A Custodial account is meant to be the platform's own record: the server produce
 
 | Gap | Effect on a Custodial account | Closed by |
 | --- | --- | --- |
-| Deposits and withdrawals are entered by hand (`TransferIn`, `TransferOut`, `CloseOut`) | Anyone with `transactions.create` can record a deposit that no bank received. The amount is the caller's number, the one exception to "the server produces the numbers" | Deposits matched to a bank statement, withdrawals with review, driven by a bank simulator first |
+| Withdrawals and closing payments are entered by hand (`TransferOut`, `CloseOut`) | Anyone with `transactions.create` can record money leaving that no bank paid out. The amount is the caller's number. Deposits no longer have this gap: from [deposit-matching](../features/deposit-matching.md) (accepted 2026-11-20) a `TransferIn` on a Custodial account comes only from a matched bank statement line | Withdrawals with review (roadmap B6) and an account closure flow (B8), driven by the simulator bank |
 | No interest | Cash on the platform earns nothing. `Interest` is refused | An interest job |
 | A split cannot be recorded | If a held instrument really splits, the quantity stays as it was while the price falls. The holding's market value, net worth and the next rebalance of that account are wrong until the quantity is corrected | Corporate action events |
 | Existing positions cannot be moved in | A Custodial account starts with cash only. `OpeningHoldings` and `StockIn` are refused, so a Customer's shares at another broker cannot arrive in kind | In-kind transfer |

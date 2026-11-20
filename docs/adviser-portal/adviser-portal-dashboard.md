@@ -27,6 +27,7 @@ related:
   - ../features/external-caller-numbers.md
   - ../features/custody-mode-grouping.md
   - ../features/transaction-source.md
+  - ../features/deposit-matching.md
 ---
 
 # Adviser Portal — Dashboard and ledger pages
@@ -234,6 +235,21 @@ Status of this amendment: `accepted` (2026-11-20), together with [client-money-a
 | --- | --- |
 | D32 | `/accounts/:id` of a Custodial account shows "Deposit reference" with the item's `depositReference`, Open or Closed. On an Open Custodial account it also shows a "Deposit instructions" panel from `GET /accounts/{id}/deposit-instructions`: Bank, Account name, Account number, Reference, Currency. A 404 shows "No client money account in <currency>. Ask the platform operator to add one." External accounts show neither. |
 | D33 | The New account form (`/customers/:id/accounts/new`, D17 and D21): while Custodial is chosen, the currency picker offers only the enabled currencies in the firm's `clientMoneyCurrencies` from the tenant item. When that list is empty, the form shows "Your firm has no client money account, so a Custodial account cannot be opened." and cannot be submitted with Custodial. A 400 with `errors.Currency` (the setting changed after the page loaded) is shown at the currency picker. External keeps every enabled currency. |
+
+---
+
+## Amendment 2026-11-20 (bank receipts and deposits) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [deposit-matching](../features/deposit-matching.md). D34–D37 add the Bank receipts pages for a TenantAdmin; D38 adds the bank receipt to the transaction page; D39 changes D18 and D32. The BFF gains the prefix `/statement-lines` ([bff-adviser-portal.md](../features/bff-adviser-portal.md) amendment 2026-11-20). Calls: `GET /statement-lines`, `GET /statement-lines/{id}`, `POST /statement-lines/{id}/match|ignore|request-return|reopen|unmatch`, `GET /accounts?depositReference=`.
+
+| ID | Behaviour |
+| --- | --- |
+| D34 | A TenantAdmin sees a nav item "Bank receipts" (`/statement-lines`). An Adviser does not; a 403 on the route shows "Only a firm administrator can see bank receipts." The page lists `GET /statement-lines` with a status filter (default Unmatched; options Unmatched, Matched, Ignored, To be returned, and All, which sends those four statuses): Value date, Received, Amount, Currency, Payer, Reference, Status, Reason. Reason labels: NoReference "No valid reference", UnknownReference "Reference not found", SeveralReferences "More than one reference", CurrencyMismatch "Account in another currency", AccountClosed "Account closed", CustomerDisabled "Customer disabled", AmountPrecision "Amount has too many decimals". `Received` lines (debit lines waiting for B6, and credit lines not yet processed) are not shown. |
+| D35 | `/statement-lines/:id` shows every field of the item, the reason, the last action (action, note, person, time) and, on a Matched line, the account (link to `/accounts/:id`), the Customer and the deposit (link to `/transactions/:id`) with "Matched by reference" or "Matched by hand". Actions follow R23: Unmatched → Match, Ignore, Return to payer; Ignored or To be returned → Reopen; Matched → Undo match. |
+| D36 | Match opens a form with two ways to pick the account: "Deposit reference" (calls `GET /accounts?depositReference=`) or a Customer picker followed by the Customer's Open Custodial accounts in the line's currency (`GET /accounts?customerId=&custodyMode=Custodial`). An optional note. Review: "Credit 500.00 USD to <account name> of <customer name>." A 400 is shown at its field; a 409 reloads the line with "This receipt changed. Check it and try again." |
+| D37 | Ignore, Return to payer and Undo match ask for a required note in a dialog. Undo match warns "This posts a reversal of the deposit on <account name>." Reopen asks for confirmation only. The R30 400 message is shown as returned. |
+| D38 | `/transactions/:id` of a deposit or its Reversal shows a "Bank receipt" section: Value date, Reference, Payer, Payer account. The Source line (D26) shows "Bank feed" for `BankFeed`; a TenantAdmin also sees a link "Statement line" to `/statement-lines/:source.id`. Reverse is not offered (D27 already hides it for every source other than `Manual` and `Rebalance`). |
+| D39 | D18 changes: on a Custodial account the action buttons and the type selector no longer offer TransferIn. The deposit instructions panel (D32) gains the line "Deposits are credited from the bank statement when the customer pays in with this reference." External accounts unchanged. |
 ---
 
 ## Tests

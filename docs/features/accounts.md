@@ -24,6 +24,7 @@ related:
   - custody-modes.md
   - tenant-custody-modes.md
   - client-money-accounts.md
+  - deposit-matching.md
 ---
 
 # Accounts
@@ -63,6 +64,10 @@ Landed in GitHub `louis297/MyWealthV2` master 2026-09-21, last slice commit `3e8
 - R14 and §8.1: every Custodial account has a server-generated `depositReference` (nine characters, unique on the platform, never changed); an External account has `null`. A POST or PUT body that carries `depositReference` → 400. Script `0039` adds the column and gives existing Custodial accounts one.
 - §8: new read `GET /accounts/{id}/deposit-instructions` (`accounts.read`, same visibility as get): the account's reference and the active client money account in its currency; 404 for an External or Closed account or when the currency has none.
 - §2 Out "Institution name, account number" still holds for the Account itself: the bank details live on the Tenant's client money account, not on `Accounts`.
+
+**Amendment 2026-11-20 (bank feed and deposit matching, accepted):** [deposit-matching.md](deposit-matching.md).
+
+- R17 (list): `GET /accounts` takes an optional `depositReference`, matched exactly after trim and upper-casing, with the visibility of the list. It returns at most one Account; an invalid value returns an empty list, not a 400. Used by the TenantAdmin's manual match of a bank receipt.
 
 ---
 

@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-19
-last_updated: 2026-11-19
+last_updated: 2026-11-20
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -20,6 +20,7 @@ related:
   - ../domain-model.md
   - ../api-design.md
   - ../glossary.md
+  - deposit-matching.md
 ---
 
 # Simulator
@@ -414,3 +415,15 @@ The repository should build after each commit. Agents split each behaviour into 
 11. Repo docs: deployment, identity-auth, ADR 0013, architecture, database-design, domain-model, api-design amendments; mark this file landed; roadmap §13 step 2.
 
 Do not put a party, a platform port, a feed table or a scenario in these commits.
+
+---
+
+## Amendment 2026-11-20 (S1 bank, receipts side) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [deposit-matching.md](deposit-matching.md). Rules R38–R48 and the simulator script `0003_bank.sql` live there (§4.6, §6.3); this section records what changes here.
+
+- §2 Out "Every outside party": the bank's receipts side is in. Bank accounts (opened by `POST /control/bank/accounts` or from configuration `Simulator:Bank:StandingAccounts`, again after every reset), receipts (`POST /control/bank/receipts`, with an optional delay into the feed and an optional second delivery), its own books (`GET /control/bank/accounts`, `GET /control/bank/accounts/{accountNumber}/statement-lines`), and the party route `GET /party/bank/accounts/{accountNumber}/statement-lines?after=&limit=`. Payments, returns, recalls and balances for reconciliation come with roadmap B6 and B7.
+- R24: a reset also empties the bank tables and then opens the standing accounts. R25: bank outside ids are `{WorldId:N}-L{n}` and feed cursors carry the world id.
+- R28: new control log actions `BankAccountOpened` and `BankReceiptAdded`.
+- §9.2: the AppHost now gives the party key to `worker` as the `simulator` bank connection's `ApiKey`, with the party endpoint as its `BaseUrl`. The Development settings list four standing accounts that match `TestSeed`'s client money accounts.
+- §11 point 7 changes: no scenario library with the receipts side. One-off control calls are enough; a named scenario earns its place when it combines steps across parties, from B6 (deposit-matching §11 point 16).
