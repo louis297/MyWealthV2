@@ -565,3 +565,58 @@ describe("TransactionDetailPage adjustment (adviser-portal-dashboard D30, D31)",
     expect(await screen.findByText("Only a firm administrator can reverse an adjustment.")).toBeInTheDocument();
   });
 });
+
+describe("TransactionDetailPage bank deposit (deposit-matching D38)", () => {
+  const path = `/transactions/${originalId}`;
+  const routes = [{ path: "/transactions/:id", element: <TransactionDetailPage /> }];
+  const lineId = "3f2c0000-0000-0000-0000-0000000000e1";
+  const deposit = {
+    ...original,
+    type: "TransferIn",
+    memo: "Bank deposit",
+    security: [],
+    source: { kind: "BankFeed", id: lineId },
+    bankReceipt: { valueDate: "2026-11-19", reference: "K7M3Q9PXB", payerName: "J SMITH", payerAccount: "****4200" },
+  };
+
+  function serve(item: object): Handler {
+    return (request) => (request.method === "GET" && request.url.endsWith(path) ? json(item) : undefined);
+  }
+
+  beforeEach(() => {
+    stubBrowser(path);
+  });
+
+  it("shows the Bank receipt section, the Bank feed source and the statement line link to a TenantAdmin", async () => {
+    renderFees(feeUser(), routes, path, serve(deposit));
+
+    const section = (await screen.findByRole("heading", { name: "Bank receipt" })).closest("section")!;
+    expect(within(section).getByText("2026-11-19")).toBeInTheDocument();
+    expect(within(section).getByText("K7M3Q9PXB")).toBeInTheDocument();
+    expect(within(section).getByText("J SMITH")).toBeInTheDocument();
+    expect(within(section).getByText("****4200")).toBeInTheDocument();
+    expect(screen.getByText("Source: Bank feed")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Statement line" })).toHaveAttribute("href", `/statement-lines/${lineId}`);
+    expect(screen.queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
+  });
+
+  it("shows the section on the Reversal of a deposit too", async () => {
+    renderFees(feeUser(), routes, path, serve({ ...deposit, type: "Reversal", originalTransactionId: reverseId }));
+
+    expect(await screen.findByRole("heading", { name: "Bank receipt" })).toBeInTheDocument();
+  });
+
+  it("gives an Adviser no statement line link", async () => {
+    renderFees(adviser(), routes, path, serve(deposit));
+
+    expect(await screen.findByText("Source: Bank feed")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Statement line" })).not.toBeInTheDocument();
+  });
+
+  it("shows no Bank receipt section on another transaction", async () => {
+    renderFees(feeUser(), routes, path, serve({ ...original, bankReceipt: null }));
+
+    expect(await screen.findByText(originalId)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Bank receipt" })).not.toBeInTheDocument();
+  });
+});
