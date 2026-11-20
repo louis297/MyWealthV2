@@ -130,8 +130,8 @@ public class CustodialPortfolioTests : TestBase
         (await ReverseAsync(tokens.AccessToken, rebalanceBuy)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
 
         (await FundAsync(tokens.AccessToken, accountId, 50m)).StatusCode.ShouldBe(HttpStatusCode.Created);
-        var transferOut = await PostAsync(tokens.AccessToken, Cash(accountId, "TransferOut", -50m));
-        transferOut.StatusCode.ShouldBe(HttpStatusCode.Created, await transferOut.Content.ReadAsStringAsync());
+        var withdrawal = await WithdrawAsync(accountId, 50m);
+        withdrawal.StatusCode.ShouldBe(HttpStatusCode.Created, await withdrawal.Content.ReadAsStringAsync());
     }
 
     private static async Task<Guid> CreatePortfolioAsync(string accessToken, Guid? instrumentId = null)

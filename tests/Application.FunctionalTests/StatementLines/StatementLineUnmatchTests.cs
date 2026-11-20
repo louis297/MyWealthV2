@@ -78,8 +78,7 @@ public class StatementLineUnmatchTests : TestBase
     {
         var world = await DepositMatchingWorld.CreateAsync();
         var line = await world.ReceiveAsync(80m, world.DepositReference);
-        (await CustodialHttp.PostAsync(world.TenantAdmin.AccessToken, CustodialHttp.Cash(world.AccountId, "TransferOut", -30m)))
-            .StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await CustodialHttp.WithdrawAsync(world.AccountId, 30m)).StatusCode.ShouldBe(HttpStatusCode.Created);
 
         var response = await StatementLineHttp.ActAsync(world.TenantAdmin.AccessToken, line.PublicId, "unmatch", new() { ["note"] = "Wrong" });
 
@@ -94,8 +93,7 @@ public class StatementLineUnmatchTests : TestBase
     {
         var world = await DepositMatchingWorld.CreateAsync();
         var line = await world.ReceiveAsync(80m, world.DepositReference);
-        (await CustodialHttp.PostAsync(world.TenantAdmin.AccessToken, CustodialHttp.Cash(world.AccountId, "CloseOut", -80m)))
-            .StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await CustodialHttp.WithdrawAsync(world.AccountId, 80m)).StatusCode.ShouldBe(HttpStatusCode.Created);
         (await CustodialHttp.CloseAsync(world.TenantAdmin.AccessToken, world.AccountId)).StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
         var response = await StatementLineHttp.ActAsync(world.TenantAdmin.AccessToken, line.PublicId, "unmatch", new() { ["note"] = "Wrong" });

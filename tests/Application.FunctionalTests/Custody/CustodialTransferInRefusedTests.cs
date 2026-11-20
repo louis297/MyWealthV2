@@ -66,15 +66,4 @@ public class CustodialTransferInRefusedTests : TestBase
         response.StatusCode.ShouldBe(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
         (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(0m);
     }
-
-    [Test]
-    public async Task TransferOutAndCloseOut_StayAllowed()
-    {
-        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
-        var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
-        (await FundAsync(tokens.AccessToken, accountId, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
-
-        (await PostAsync(tokens.AccessToken, Cash(accountId, "TransferOut", -40m))).StatusCode.ShouldBe(HttpStatusCode.Created);
-        (await PostAsync(tokens.AccessToken, Cash(accountId, "CloseOut", -60m))).StatusCode.ShouldBe(HttpStatusCode.Created);
-    }
 }

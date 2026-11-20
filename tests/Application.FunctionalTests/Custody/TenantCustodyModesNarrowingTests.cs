@@ -42,8 +42,8 @@ public class TenantCustodyModesNarrowingTests : TestBase
             HttpMethod.Post, $"/accounts/{assigned}/rebalance", tokens.AccessToken);
         rebalance.StatusCode.ShouldBe(HttpStatusCode.OK, await rebalance.Content.ReadAsStringAsync());
 
-        var closeOut = await PostAsync(tokens.AccessToken, Cash(spare, "CloseOut", -40m));
-        closeOut.StatusCode.ShouldBe(HttpStatusCode.Created, await closeOut.Content.ReadAsStringAsync());
+        var withdrawal = await WithdrawAsync(spare, 40m);
+        withdrawal.StatusCode.ShouldBe(HttpStatusCode.Created, await withdrawal.Content.ReadAsStringAsync());
         (await CloseAsync(tokens.AccessToken, spare)).StatusCode.ShouldBe(HttpStatusCode.NoContent);
         (await ReopenAsync(tokens.AccessToken, spare)).StatusCode.ShouldBe(HttpStatusCode.NoContent);
 

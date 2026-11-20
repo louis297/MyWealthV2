@@ -20,7 +20,30 @@ public static class CustodyRules
     /// when it is allowed: always on an External account, and on a Custodial account only for a remainder smaller than
     /// one minor unit of the currency (<c>0 &lt; SUM &lt; 10^−decimalPlaces</c>).
     /// </summary>
-    public static string? CloseOutRefusal(CustodyMode custodyMode, decimal cashSum, string currency, int decimalPlaces) => null;
+    public static string? CloseOutRefusal(CustodyMode custodyMode, decimal cashSum, string currency, int decimalPlaces)
+    {
+        if (custodyMode == CustodyMode.External)
+        {
+            return null;
+        }
+
+        var minorUnit = MinorUnit(decimalPlaces);
+        return cashSum > 0 && cashSum < minorUnit
+            ? null
+            : $"Only a remainder smaller than {minorUnit.ToString(System.Globalization.CultureInfo.InvariantCulture)} {currency} can be closed out on a Custodial account. Withdraw the balance first.";
+    }
+
+    /// <summary>One minor unit of a currency with <paramref name="decimalPlaces"/>: 0.01 for two, 1 for none.</summary>
+    private static decimal MinorUnit(int decimalPlaces)
+    {
+        var unit = 1m;
+        for (var place = 0; place < decimalPlaces; place++)
+        {
+            unit /= 10m;
+        }
+
+        return unit;
+    }
 
     private const string InterestMessage = "Interest cannot be entered by hand on a Custodial account.";
     private const string OpeningMessage = "A Custodial account starts empty. Fund it with TransferIn.";
@@ -62,6 +85,7 @@ public static class CustodyRules
         return type switch
         {
             TransactionType.TransferIn => TransferInMessage,
+            TransactionType.TransferOut => TransferOutMessage,
             TransactionType.Interest => InterestMessage,
             TransactionType.Opening or TransactionType.OpeningHoldings => OpeningMessage,
             TransactionType.StockIn or TransactionType.StockOut => StockMessage,
