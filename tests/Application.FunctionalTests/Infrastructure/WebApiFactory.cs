@@ -64,6 +64,9 @@ public class WebApiFactory(
             services.RemoveAll<IBankFeed>();
             services.AddSingleton<InMemoryBankFeed>();
             services.AddSingleton<IBankFeed>(sp => sp.GetRequiredService<InMemoryBankFeed>());
+            services.RemoveAll<IBankPayments>();
+            services.AddSingleton<InMemoryBankPayments>();
+            services.AddSingleton<IBankPayments>(sp => sp.GetRequiredService<InMemoryBankPayments>());
             services.AddSingleton<CollidingAccountSaveInterceptor>();
             services.AddScoped<ISaveChangesInterceptor>(sp => sp.GetRequiredService<CollidingAccountSaveInterceptor>());
 

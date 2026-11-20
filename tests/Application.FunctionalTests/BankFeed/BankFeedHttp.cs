@@ -15,6 +15,15 @@ internal static class BankFeedHttp
 
     public static InMemoryBankFeed Feed => FunctionalTestSetup.WebApiServices.GetRequiredService<InMemoryBankFeed>();
 
+    public static InMemoryBankPayments Payments => FunctionalTestSetup.WebApiServices.GetRequiredService<InMemoryBankPayments>();
+
+    /// <summary>The send step (withdrawals R32).</summary>
+    public static async Task SendAsync()
+    {
+        await using var scope = FunctionalTestSetup.WebApiServices.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<SendBankPayments>().RunAsync(Connection);
+    }
+
     public static async Task<BankPullOutcome> PullAsync()
     {
         await using var scope = FunctionalTestSetup.WebApiServices.CreateAsyncScope();
@@ -27,9 +36,10 @@ internal static class BankFeedHttp
         await scope.ServiceProvider.GetRequiredService<ProcessStatementLines>().RunAsync(Connection);
     }
 
-    /// <summary>Pulls, then processes, as one run of the job does (R13).</summary>
+    /// <summary>Sends, pulls, then processes, as one run of the job does (deposit-matching R13, withdrawals R32).</summary>
     public static async Task<BankPullOutcome> RunAsync()
     {
+        await SendAsync();
         var outcome = await PullAsync();
         await ProcessAsync();
         return outcome;
