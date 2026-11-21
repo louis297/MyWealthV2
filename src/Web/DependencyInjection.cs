@@ -44,6 +44,7 @@ public static class DependencyInjection
                      Policies.TransactionsRead,
                      Policies.TransactionsCreate,
                      Policies.StatementLinesManage,
+                     Policies.BankReconciliationsManage,
                      Policies.NominatedBankAccountsRead,
                      Policies.NominatedBankAccountsManage,
                      Policies.NominatedBankAccountsVerify,

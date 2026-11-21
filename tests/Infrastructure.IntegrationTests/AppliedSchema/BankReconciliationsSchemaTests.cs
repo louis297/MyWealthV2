@@ -311,6 +311,45 @@ public class BankReconciliationsSchemaTests
         }
     }
 
+    [Test]
+    public async Task ASnapshotRead_DoesNotSeeALineAndItsDepositWrittenByAConcurrentTransaction_UntilBothAreCommitted()
+    {
+        // Bank-reconciliation R6: the run reads at SNAPSHOT, so a line's status and its Transaction are seen together.
+        await using var db = await ScratchSchemaDatabase.CreateAsync("BankReconciliationsSnapshot");
+        await db.ApplyAllAsync();
+        await db.ExecuteAsync(World());
+
+        await using var writer = new SqlConnection(db.ConnectionString);
+        await writer.OpenAsync();
+        await using var write = writer.BeginTransaction();
+        await using (var command = writer.CreateCommand())
+        {
+            command.Transaction = write;
+            command.CommandText = """
+                DECLARE @tenant int = (SELECT [TenantId] FROM [ClientMoneyAccounts]);
+                DECLARE @cma int = (SELECT [Id] FROM [ClientMoneyAccounts]);
+                DECLARE @account int = (SELECT TOP 1 [Id] FROM [Accounts] WHERE [Currency] = 'USD');
+                INSERT INTO [BankStatementLines]
+                    ([PublicId], [TenantId], [ClientMoneyAccountId], [Connection], [OutsideId], [ValueDate], [Direction], [Amount], [Currency],
+                     [ReceivedAt], [Status], [Created], [CreatedBy])
+                VALUES (NEWID(), @tenant, @cma, N'simulator', N'snap-L1', '2026-11-21', 0, 500, 'USD', SYSDATETIMEOFFSET(), 0,
+                        SYSDATETIMEOFFSET(), N'test');
+                INSERT INTO [Transactions] ([PublicId], [TenantId], [Type], [SourceKind], [BookedAt], [Created], [CreatedBy])
+                VALUES (NEWID(), @tenant, 0, 0, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+                INSERT INTO [TransactionCashLegs] ([TenantId], [TransactionId], [AccountId], [Amount], [Currency], [Created], [CreatedBy])
+                VALUES (@tenant, SCOPE_IDENTITY(), @account, 500, 'USD', SYSDATETIMEOFFSET(), N'test');
+                """;
+            await command.ExecuteNonQueryAsync();
+        }
+
+        var before = await ReadLinesAndLegsAsync(db.ConnectionString);
+        await write.CommitAsync();
+        var after = await ReadLinesAndLegsAsync(db.ConnectionString);
+
+        before.ShouldBe((0, 0m));
+        after.ShouldBe((1, 500m));
+    }
+
     /// <summary>A tenant (<c>@a_*</c> from <see cref="ScratchSchemaDatabase.TenantRows"/>) with a USD client money
     /// account <c>@cma</c>.</summary>
     private static string World()
@@ -363,6 +402,23 @@ public class BankReconciliationsSchemaTests
             INSERT INTO [BankReconciliationItems] ([TenantId], [ReconciliationId], [Position], [Kind], [Class], [Amount], [Count])
             VALUES (@a_tenant, @run, 1, {kind}, 0, 500, 1);
             """;
+
+    /// <summary>Counts the lines and sums the cash legs in one SNAPSHOT transaction, as a reconciliation reads; a
+    /// read that waits for the writer's locks fails after a short timeout.</summary>
+    private static async Task<(int Lines, decimal Legs)> ReadLinesAndLegsAsync(string connectionString)
+    {
+        await using var context = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSqlServer(connectionString, sql => sql.CommandTimeout(3)).Options);
+        var result = (Lines: 0, Legs: 0m);
+        await context.ExecuteInTransactionAsync(System.Data.IsolationLevel.Snapshot, async token =>
+        {
+            result.Lines = await context.BankStatementLines.IgnoreQueryFilters().CountAsync(token);
+            result.Legs = await context.TransactionCashLegs.IgnoreQueryFilters()
+                .Where(leg => leg.Currency == "USD" && leg.Amount == 500m)
+                .SumAsync(leg => (decimal?)leg.Amount, token) ?? 0m;
+        }, CancellationToken.None);
+        return result;
+    }
 
     private static ApplicationDbContext OpenDb(string connectionString) =>
         new(new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlServer(connectionString).Options);

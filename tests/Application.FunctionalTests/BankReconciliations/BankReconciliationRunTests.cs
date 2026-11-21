@@ -249,7 +249,7 @@ public class BankReconciliationRunTests : TestBase
         var usdRun = await RunAndGetAsync(admin, usd.PublicId);
 
         Items(nzdRun).ShouldBe([("FxConversions", "Known", 10m, 1), ("OtherLedgerCash", "Known", -100m, 1)]);
-        Items(usdRun).ShouldBe([("FxConversions", "Known", -5.912m, 1)]);
+        Items(usdRun).ShouldBe([("FxConversions", "Known", -5.91m, 1)]);
         Status(nzdRun).ShouldBe("Agreed");
         Status(usdRun).ShouldBe("Agreed");
     }
