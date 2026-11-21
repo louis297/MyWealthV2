@@ -132,8 +132,8 @@ internal static class AccountClosureHttp
         return await db.Withdrawals.IgnoreQueryFilters().AsNoTracking().Where(row => row.AccountId == account.Id).ToListAsync();
     }
 
-    /// <summary>A portfolio created through the API, assigned Active straight in the database (no rebalance).</summary>
-    public static async Task InsertActiveAssignmentAsync(string accessToken, Guid accountId)
+    /// <summary>A USD portfolio of one instrument, created through the API.</summary>
+    public static async Task<Guid> CreatePortfolioAsync(string accessToken)
     {
         var instrument = await CustodialHttp.CreateInstrumentAsync(accessToken, "CLS" + Guid.NewGuid().ToString("N")[..4], "USD", 10m);
         var created = await Send(HttpMethod.Post, "/portfolios", accessToken, new
@@ -144,7 +144,13 @@ internal static class AccountClosureHttp
             minimumTrade = 1m,
             lines = new[] { new { instrumentId = instrument, targetWeight = 100m } }
         });
-        var portfolioId = await CustodialHttp.ReadIdAsync(created);
+        return await CustodialHttp.ReadIdAsync(created);
+    }
+
+    /// <summary>A portfolio created through the API, assigned Active straight in the database (no rebalance).</summary>
+    public static async Task InsertActiveAssignmentAsync(string accessToken, Guid accountId)
+    {
+        var portfolioId = await CreatePortfolioAsync(accessToken);
         using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var account = await db.Accounts.IgnoreQueryFilters().SingleAsync(row => row.PublicId == accountId);
