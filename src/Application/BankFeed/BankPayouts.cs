@@ -82,20 +82,15 @@ internal sealed class BankPayouts(IApplicationDbContext db, TimeProvider time)
     }
 
     /// <summary>R42: true when the credit line returns a payout line and has been handled; false when it names no
-    /// payout line, so it goes through deposit matching as any receipt.</summary>
+    /// payout line of its Tenant and client money account (bank-returns R8).</summary>
     public async Task<bool> ProcessReturnAsync(BankStatementLine line, CancellationToken cancellationToken)
     {
-        var relatedId = line.RelatedLineId ?? await db.BankStatementLines.IgnoreQueryFilters().AsNoTracking()
-            .Where(row => row.Connection == line.Connection && row.OutsideId == line.ReturnOfOutsideId)
-            .Select(row => (int?)row.Id)
-            .SingleOrDefaultAsync(cancellationToken);
-        if (relatedId is null)
+        var returned = await BankRecalls.ReturnedLineAsync(db, line, cancellationToken);
+        if (returned is null)
         {
             return false;
         }
 
-        var returned = await db.BankStatementLines.IgnoreQueryFilters().AsNoTracking()
-            .SingleAsync(row => row.Id == relatedId, cancellationToken);
         if (returned.MatchMethod != StatementLineMatchMethod.Payment || returned.WithdrawalId is not int withdrawalId)
         {
             return false;

@@ -57,19 +57,33 @@ public sealed class ProcessStatementLines(
         var payouts = new BankPayouts(db, time);
         if (line.Direction == BankLineDirection.Debit)
         {
-            if (!await payouts.ProcessDebitAsync(line, cancellationToken)
-                && !await new BankReturns(db, time).ProcessReturnPaidAsync(line, cancellationToken))
+            if (await payouts.ProcessDebitAsync(line, cancellationToken)
+                || await new BankReturns(db, time).ProcessReturnPaidAsync(line, cancellationToken))
             {
-                // R4: a debit the platform did not cause is the firm's to explain, not a Customer's.
-                line.MarkUnknown(UnmatchedReason.UnknownPayment);
-                await db.SaveChangesAsync(cancellationToken);
+                return;
             }
 
+            if (line.EndToEndId is null && line.ReturnOfOutsideId is not null)
+            {
+                await new BankRecalls(db, time).ProcessRecallAsync(line, cancellationToken);
+                return;
+            }
+
+            // R4: a debit the platform did not cause is the firm's to explain, not a Customer's.
+            line.MarkUnknown(UnmatchedReason.UnknownPayment);
+            await db.SaveChangesAsync(cancellationToken);
             return;
         }
 
-        if (line.ReturnOfOutsideId is not null && await payouts.ProcessReturnAsync(line, cancellationToken))
+        if (line.ReturnOfOutsideId is not null)
         {
+            // R8: a credit that takes back a line other than a payout is a receipt again, for a person to place.
+            if (!await payouts.ProcessReturnAsync(line, cancellationToken))
+            {
+                line.MarkUnknown(UnmatchedReason.UnknownReturn);
+                await db.SaveChangesAsync(cancellationToken);
+            }
+
             return;
         }
 
