@@ -57,7 +57,8 @@ public sealed class ProcessStatementLines(
         var payouts = new BankPayouts(db, time);
         if (line.Direction == BankLineDirection.Debit)
         {
-            if (!await payouts.ProcessDebitAsync(line, cancellationToken))
+            if (!await payouts.ProcessDebitAsync(line, cancellationToken)
+                && !await new BankReturns(db, time).ProcessReturnPaidAsync(line, cancellationToken))
             {
                 // R4: a debit the platform did not cause is the firm's to explain, not a Customer's.
                 line.MarkUnknown(UnmatchedReason.UnknownPayment);

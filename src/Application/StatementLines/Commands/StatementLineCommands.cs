@@ -5,6 +5,7 @@ using MyWealthV2.Application.BankFeed;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
+using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationException;
@@ -170,15 +171,37 @@ public class IgnoreStatementLineCommandHandler(IApplicationDbContext db, ICurren
 public class RequestStatementLineReturnCommandHandler(IApplicationDbContext db, ICurrentUser currentUser, TimeProvider time)
     : IRequestHandler<RequestStatementLineReturnCommand>
 {
-    public Task Handle(RequestStatementLineReturnCommand request, CancellationToken cancellationToken) =>
-        StatementLineActions.ChangeAsync(db, currentUser, time, request.Id, request.RowVersion,
-            (line, actor, now) => line.RequestReturn(request.Note!, actor, now), cancellationToken);
+    /// <summary>Bank-returns R5: the decision and the return payment are saved together.</summary>
+    public async Task Handle(RequestStatementLineReturnCommand request, CancellationToken cancellationToken)
+    {
+        var line = await StatementLineReader.FindAsync(db, currentUser, request.Id, cancellationToken);
+        StatementLineActions.CheckRowVersion(line, request.RowVersion);
+        var actor = StatementLineActions.ActorId(currentUser);
+        StatementLineActions.Guard(() => line.RequestReturn(request.Note!, actor, time.GetUtcNow()));
+        var clientMoney = await db.ClientMoneyAccounts.IgnoreQueryFilters()
+            .SingleAsync(row => row.Id == line.ClientMoneyAccountId, cancellationToken);
+        var payment = OutgoingPayment.ForReceiptReturn(line, clientMoney);
+        db.OutgoingPayments.Add(payment);
+        await StatementLineActions.SaveAsync(db, cancellationToken);
+    }
 }
 
 public class ReopenStatementLineCommandHandler(IApplicationDbContext db, ICurrentUser currentUser, TimeProvider time)
     : IRequestHandler<ReopenStatementLineCommand>
 {
-    public Task Handle(ReopenStatementLineCommand request, CancellationToken cancellationToken) =>
-        StatementLineActions.ChangeAsync(db, currentUser, time, request.Id, request.RowVersion,
-            (line, actor, now) => line.Reopen(actor, now), cancellationToken);
+    /// <summary>Bank-returns R5: a line to be returned is reopened only while its return payment has no attempt;
+    /// the payment is cancelled in the same save, and its row version guards the race with the send step.</summary>
+    public async Task Handle(ReopenStatementLineCommand request, CancellationToken cancellationToken)
+    {
+        var line = await StatementLineReader.FindAsync(db, currentUser, request.Id, cancellationToken);
+        StatementLineActions.CheckRowVersion(line, request.RowVersion);
+        var actor = StatementLineActions.ActorId(currentUser);
+        var payment = line.Status == BankStatementLineStatus.ReturnRequested
+            ? await StatementLineReturns.OpenPaymentAsync(db, line.Id, cancellationToken)
+            : null;
+        var attempted = payment is not null && (payment.Attempts > 0 || payment.Status != OutgoingPaymentStatus.Pending);
+        StatementLineActions.Guard(() => line.Reopen(actor, time.GetUtcNow(), attempted));
+        payment?.Cancel();
+        await StatementLineActions.SaveAsync(db, cancellationToken);
+    }
 }

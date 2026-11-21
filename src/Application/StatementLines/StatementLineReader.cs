@@ -1,6 +1,7 @@
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Domain.Entities;
+using MyWealthV2.Domain.Enums;
 
 namespace MyWealthV2.Application.StatementLines;
 
@@ -53,6 +54,13 @@ internal static class StatementLineReader
         var withdrawals = await db.Withdrawals.AsNoTracking()
             .Where(row => withdrawalIds.Contains(row.Id))
             .ToDictionaryAsync(row => row.Id, row => row.PublicId, cancellationToken);
+        var lineIds = lines.Select(line => line.Id).ToList();
+        var returnPayments = (await db.OutgoingPayments.AsNoTracking()
+                .Where(row => row.Kind == OutgoingPaymentKind.ReceiptReturn && lineIds.Contains(row.ReturnOfLineId!.Value))
+                .Select(row => new { LineId = row.ReturnOfLineId!.Value, row.Id, row.Status, row.Attempts, row.LastFailure })
+                .ToListAsync(cancellationToken))
+            .GroupBy(row => row.LineId)
+            .ToDictionary(group => group.Key, group => group.MaxBy(row => row.Id)!);
         var users = await db.Users.AsNoTracking()
             .Where(row => userIds.Contains(row.Id))
             .ToDictionaryAsync(row => row.Id, row => new StatementLinePersonDto(row.PublicId, row.Name), cancellationToken);
@@ -71,13 +79,14 @@ internal static class StatementLineReader
             ReceivedAt = line.ReceivedAt,
             Status = line.Status.ToString(),
             UnmatchedReason = line.UnmatchedReason?.ToString(),
-            Match = line.MatchedAccountId is int accountId && line.MatchedTransactionId is int transactionId
+            // Bank-returns R10, R11: a match with no Transaction has null account, customer and transaction.
+            Match = line.MatchMethod is { } method
                 ? new StatementLineMatchDto
                 {
-                    AccountId = accounts[accountId].PublicId,
-                    CustomerId = accounts[accountId].CustomerPublicId,
-                    TransactionId = transactions[transactionId],
-                    Method = line.MatchMethod!.Value.ToString(),
+                    AccountId = line.MatchedAccountId is int accountId ? accounts[accountId].PublicId : null,
+                    CustomerId = line.MatchedAccountId is int customerOf ? accounts[customerOf].CustomerPublicId : null,
+                    TransactionId = line.MatchedTransactionId is int transactionId ? transactions[transactionId] : null,
+                    Method = method.ToString(),
                     At = line.MatchedAt!.Value
                 }
                 : null,
@@ -93,6 +102,14 @@ internal static class StatementLineReader
             RelatedLineId = line.RelatedLineId is int relatedId ? related[relatedId] : null,
             WithdrawalId = line.WithdrawalId is int withdrawalId ? withdrawals[withdrawalId] : null,
             ReturnReason = line.ReturnReason,
+            ReturnPayment = returnPayments.TryGetValue(line.Id, out var payment)
+                ? new StatementLineReturnPaymentDto
+                {
+                    Status = payment.Status.ToString(),
+                    Attempts = payment.Attempts,
+                    LastFailure = payment.LastFailure?.ToString()
+                }
+                : null,
             RowVersion = Convert.ToBase64String(line.RowVersion ?? [])
         }).ToList();
     }
