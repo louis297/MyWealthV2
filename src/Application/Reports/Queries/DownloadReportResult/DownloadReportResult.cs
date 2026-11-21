@@ -8,7 +8,7 @@ using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationE
 
 namespace MyWealthV2.Application.Reports.Queries.DownloadReportResult;
 
-[Authorize(Policy = Policies.ReportsCustomerRead + "," + Policies.ReportsBookRead)]
+[Authorize(Policy = Policies.ReportsCustomerRead + "," + Policies.ReportsBookRead + "," + Policies.ReportsTenantRead)]
 public record DownloadReportResultQuery(Guid Id) : IRequest<ReportPdf>;
 
 public sealed record ReportPdf(byte[] Content);
@@ -29,9 +29,7 @@ public class DownloadReportResultHandler(
                         ?? throw new NotFoundException("ReportExecution", request.Id);
         var report = await db.Reports.AsNoTracking()
                          .SingleAsync(row => row.Id == execution.ReportId, cancellationToken);
-        var readPolicy = report.Scope == "Book"
-            ? Policies.ReportsBookRead
-            : Policies.ReportsCustomerRead;
+        var readPolicy = ReportScopes.ReadPolicy(report.Scope);
         if (!RolePermissions.Has(role, readPolicy))
         {
             throw new ForbiddenAccessException();

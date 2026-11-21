@@ -23,6 +23,7 @@ related:
   - deposit-matching.md
   - withdrawals.md
   - bank-returns.md
+  - bank-reconciliation.md
 ---
 
 # Simulator
@@ -450,3 +451,14 @@ Status of this amendment: `accepted` (2026-11-21), together with [bank-returns.m
 - §2 Out "Every outside party": the bank also returns a receipt and recalls one. The payment route takes `returnOf` (the outside id of a credit line on that account) in place of `payee`; an executed return is a debit line with `endToEndId` and `returnOf`, payer fields = the original payer. A return of no credit line, of a return line, or of a line already returned or recalled is rejected with reason `UnknownLine`. Control route `POST /control/bank/lines/{outsideId}/recall` `{ reason, availableAfter? }` adds a debit line with `returnOf` and `returnReason`.
 - R24: a reset is unchanged (it already empties lines and payments).
 - R28: new control log action `BankReceiptRecalled`.
+
+---
+
+## Amendment 2026-11-21 (S1 bank, balances) — accepted
+
+Status of this amendment: `accepted` (2026-11-21), together with [bank-reconciliation.md](bank-reconciliation.md). Rules R26–R30 and the simulator script `0006_bank_balances.sql` live there (§4.7, §6.2); this section records what changes here.
+
+- §2 Out "Every outside party": the bank's statement feed carries `balance` on every page. Control route `POST /control/bank/charges` `{ accountNumber, amount, reference?, valueDate?, availableAfter?, omitFromFeed? }` adds a debit line that is a fee the bank takes (no payee, no `endToEndId`, no `returnOf`). Receipts and charges take `omitFromFeed`: the line is in the bank's books and in `balance` but the feed never returns it. `GET /control/bank/accounts` gains `statementBalance`.
+- R24: a reset is unchanged; the platform's next reconciliation shows the old world's lines as a statement difference (bank-reconciliation R30).
+- R28: new control log action `BankChargeAdded`.
+- §11 point 7: still no scenario library (bank-reconciliation §11 point 12).

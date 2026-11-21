@@ -320,6 +320,57 @@ public class TenantCompositeKeysSchemaTests
                     SYSDATETIMEOFFSET(), 0, NULL, @w, SYSDATETIMEOFFSET(), N'test');
             DECLARE @line int = SCOPE_IDENTITY();
             """),
+        ("FK_BankReconciliations_Users_TenantId_RanByUserId", "Users", """
+            INSERT INTO [ClientMoneyAccounts]
+                ([PublicId], [TenantId], [Currency], [BankName], [AccountName], [AccountNumber], [IsActive], [Created], [CreatedBy], [BankConnection])
+            VALUES (NEWID(), @a_tenant, 'USD', N'Simulator Bank', N'Trust', CONVERT(nvarchar(34), LEFT(REPLACE(CONVERT(nvarchar(36), NEWID()), N'-', N''), 30)), 1, SYSDATETIMEOFFSET(), N'test', N'simulator');
+            DECLARE @cma int = SCOPE_IDENTITY();
+            INSERT INTO [BankReconciliations]
+                ([PublicId], [TenantId], [ClientMoneyAccountId], [Currency], [Trigger], [RanAt], [RanByUserId], [Status], [CustodialCash],
+                 [BreakCount], [BreakTotal], [TimingCount], [TimingTotal], [KnownCount], [KnownTotal], [ReservedCash],
+                 [PaymentsInFlightCount], [PaymentsInFlightAmount], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @cma, 'USD', 1, SYSDATETIMEOFFSET(), @{p}_adviser, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, SYSDATETIMEOFFSET(), N'test');
+            DECLARE @rec int = SCOPE_IDENTITY();
+            """),
+        ("FK_BankReconciliationItems_BankReconciliations_TenantId_ReconciliationId", "BankReconciliations", """
+            INSERT INTO [ClientMoneyAccounts]
+                ([PublicId], [TenantId], [Currency], [BankName], [AccountName], [AccountNumber], [IsActive], [Created], [CreatedBy], [BankConnection])
+            VALUES (NEWID(), @{p}_tenant, 'NZD', N'Simulator Bank', N'Trust', CONVERT(nvarchar(34), LEFT(REPLACE(CONVERT(nvarchar(36), NEWID()), N'-', N''), 30)), 1, SYSDATETIMEOFFSET(), N'test', N'simulator');
+            DECLARE @pcma int = SCOPE_IDENTITY();
+            INSERT INTO [BankReconciliations]
+                ([PublicId], [TenantId], [ClientMoneyAccountId], [Currency], [Trigger], [RanAt], [RanByUserId], [Status], [CustodialCash],
+                 [BreakCount], [BreakTotal], [TimingCount], [TimingTotal], [KnownCount], [KnownTotal], [ReservedCash],
+                 [PaymentsInFlightCount], [PaymentsInFlightAmount], [Created], [CreatedBy])
+            VALUES (NEWID(), @{p}_tenant, @pcma, 'USD', 0, SYSDATETIMEOFFSET(), NULL, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, SYSDATETIMEOFFSET(), N'test');
+            DECLARE @rec int = SCOPE_IDENTITY();
+            INSERT INTO [BankReconciliationItems] ([TenantId], [ReconciliationId], [Position], [Kind], [Class], [Amount], [Count])
+            VALUES (@a_tenant, @rec, 1, 0, 0, 5, 1);
+            """),
+        ("FK_BankReconciliationItems_BankStatementLines_TenantId_StatementLineId", "BankStatementLines", """
+            INSERT INTO [ClientMoneyAccounts]
+                ([PublicId], [TenantId], [Currency], [BankName], [AccountName], [AccountNumber], [IsActive], [Created], [CreatedBy], [BankConnection])
+            VALUES (NEWID(), @a_tenant, 'USD', N'Simulator Bank', N'Trust', CONVERT(nvarchar(34), LEFT(REPLACE(CONVERT(nvarchar(36), NEWID()), N'-', N''), 30)), 1, SYSDATETIMEOFFSET(), N'test', N'simulator');
+            DECLARE @cma int = SCOPE_IDENTITY();
+            INSERT INTO [BankReconciliations]
+                ([PublicId], [TenantId], [ClientMoneyAccountId], [Currency], [Trigger], [RanAt], [RanByUserId], [Status], [CustodialCash],
+                 [BreakCount], [BreakTotal], [TimingCount], [TimingTotal], [KnownCount], [KnownTotal], [ReservedCash],
+                 [PaymentsInFlightCount], [PaymentsInFlightAmount], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @cma, 'USD', 0, SYSDATETIMEOFFSET(), NULL, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, SYSDATETIMEOFFSET(), N'test');
+            DECLARE @rec int = SCOPE_IDENTITY();
+            INSERT INTO [ClientMoneyAccounts]
+                ([PublicId], [TenantId], [Currency], [BankName], [AccountName], [AccountNumber], [IsActive], [Created], [CreatedBy], [BankConnection])
+            VALUES (NEWID(), @{p}_tenant, 'NZD', N'Simulator Bank', N'Trust', CONVERT(nvarchar(34), LEFT(REPLACE(CONVERT(nvarchar(36), NEWID()), N'-', N''), 30)), 1, SYSDATETIMEOFFSET(), N'test', N'simulator');
+            DECLARE @pcma int = SCOPE_IDENTITY();
+            INSERT INTO [BankStatementLines]
+                ([PublicId], [TenantId], [ClientMoneyAccountId], [Connection], [OutsideId], [ValueDate], [Direction], [Amount], [Currency],
+                 [ReceivedAt], [Status], [Created], [CreatedBy])
+            VALUES (NEWID(), @{p}_tenant, @pcma, N'simulator', CONVERT(nvarchar(100), NEWID()), '2026-11-21', 0, 5, 'USD',
+                    SYSDATETIMEOFFSET(), 2, SYSDATETIMEOFFSET(), N'test');
+            DECLARE @line int = SCOPE_IDENTITY();
+            INSERT INTO [BankReconciliationItems]
+                ([TenantId], [ReconciliationId], [Position], [Kind], [Class], [Amount], [Count], [StatementLineId], [Direction], [ValueDate], [LineStatus])
+            VALUES (@a_tenant, @rec, 1, 2, 0, 5, 1, @line, 0, '2026-11-21', 2);
+            """),
         ("FK_ReportExecutions_ReportSchedules_TenantId_ScheduleId", "ReportSchedules", """
             INSERT INTO [ReportExecutions] ([PublicId], [ReportId], [ScheduleId], [TenantId], [TriggerKind], [Status], [ParametersJson], [Created], [CreatedBy])
             VALUES (NEWID(), @report, @{p}_schedule, @a_tenant, N'Scheduled', N'Queued', N'{}', SYSDATETIMEOFFSET(), N'test');
@@ -353,7 +404,7 @@ public class TenantCompositeKeysSchemaTests
     ];
 
     private static readonly string[] Parents =
-        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines"];
+        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines", "BankReconciliations"];
 
     private static IEnumerable<TestCaseData> CompositeKeyCases() =>
         CompositeKeys.Select(key => new TestCaseData(key.ForeignKey).SetName($"Insert_ChildPointingAtOtherTenant_IsRejected({key.ForeignKey})"));

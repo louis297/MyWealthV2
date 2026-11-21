@@ -29,6 +29,7 @@ related:
   - ../glossary.md
   - withdrawals.md
   - bank-returns.md
+  - bank-reconciliation.md
 ---
 
 # Bank feed and deposit matching
@@ -732,3 +733,16 @@ Status of this amendment: `accepted` (2026-11-21), together with [bank-returns.m
 - R29: reopen from `ReturnRequested` is allowed only while the return payment has no send attempt, and cancels it; after an attempt → 400 `errors.Status`, `The bank has been asked to return this receipt, so it can no longer be reopened.`
 - New statuses `ReturnSent` (5) and `Returned` (6), match method `Recall` (4). A `Matched` line may have no Account and no Transaction (the debit of a receipt return, the recall of a receipt never credited); its `relatedLineId` is then set.
 - The item (§8.1): `returnPayment: { status, attempts, lastFailure }` on a credit line with a return payment, else `null`; `match.accountId`, `match.customerId` and `match.transactionId` are `null` on a match with no Transaction. The `status` filter takes the new names.
+
+---
+
+## Amendment 2026-11-21 (bank reconciliation) — accepted
+
+Status of this amendment: `accepted` (2026-11-21), together with [bank-reconciliation.md](bank-reconciliation.md). Rules R2–R5, R26 and R31 live there; this section records what changes here.
+
+- R7, R8: each page of the feed carries the bank's statement balance (`balance`: the trust account's balance after the last line up to the page's cursor). The pull writes it and the commit time to the client money account's feed cursor in the same database transaction as the page's lines and cursor. The first stored balance also sets the cursor's opening balance (that balance minus the signed sum of the lines stored for the account so far), which never changes. A page without a balance stores its lines and cursor and clears the stored balance; the opening balance stays.
+- R9: `BankFeedCursors` gains `Balance`, `BalanceAt` and `OpeningBalance` (script `0045_bank_reconciliations.sql`).
+- R44, R45: the feed answer is `{ items, cursor, hasMore, balance }`; `balance` is a JSON number, the balance at the returned cursor, every line counted once (a line delivered twice too), lines the feed leaves out included. Before the first place it is `0`.
+- R46: the control account list gains `statementBalance`, the balance the feed would answer at the account's last place.
+- R49: `SimulatorBankFeed` reads `balance` as a number or `null`; a string, or more than 4 decimal places → `BadResponse`.
+- §2 Out "Bank reconciliation": now in [bank-reconciliation.md](bank-reconciliation.md).

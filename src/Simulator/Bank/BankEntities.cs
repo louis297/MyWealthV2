@@ -57,6 +57,9 @@ public sealed class BankLine
 
     public bool DeliverTwice { get; private set; }
 
+    /// <summary>Bank-reconciliation R28: in the bank's books and in the feed order, but never returned by the feed.</summary>
+    public bool OmitFromFeed { get; private set; }
+
     /// <summary>Withdrawals R53: the instruction id of the payment that caused a debit line, echoed as sent.</summary>
     public string? EndToEndId { get; private set; }
 
@@ -155,7 +158,8 @@ public sealed class BankLine
         string? reference,
         DateTimeOffset postedAt,
         DateTimeOffset availableAt,
-        bool deliverTwice) => new()
+        bool deliverTwice,
+        bool omitFromFeed = false) => new()
     {
         OutsideId = outsideId,
         BankAccountId = bankAccountId,
@@ -167,7 +171,31 @@ public sealed class BankLine
         Reference = reference,
         PostedAt = postedAt,
         AvailableAt = availableAt,
-        DeliverTwice = deliverTwice
+        DeliverTwice = deliverTwice,
+        OmitFromFeed = omitFromFeed
+    };
+
+    /// <summary>Bank-reconciliation R27: a fee the bank takes from the account, a debit line with no payee and no
+    /// payment ids.</summary>
+    public static BankLine Charge(
+        string outsideId,
+        int bankAccountId,
+        decimal amount,
+        DateOnly valueDate,
+        string? reference,
+        DateTimeOffset postedAt,
+        DateTimeOffset availableAt,
+        bool omitFromFeed) => new()
+    {
+        OutsideId = outsideId,
+        BankAccountId = bankAccountId,
+        Direction = DebitDirection,
+        Amount = amount,
+        ValueDate = valueDate,
+        Reference = reference,
+        PostedAt = postedAt,
+        AvailableAt = availableAt,
+        OmitFromFeed = omitFromFeed
     };
 }
 

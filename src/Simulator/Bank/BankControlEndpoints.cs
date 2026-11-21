@@ -17,6 +17,7 @@ public static class BankControlEndpoints
         bank.MapPost("/accounts", OpenAccountAsync);
         bank.MapGet("/accounts/{accountNumber}/statement-lines", GetLinesAsync);
         bank.MapPost("/receipts", AddReceiptAsync);
+        bank.MapPost("/charges", AddChargeAsync);
         bank.MapPost("/payment-mode", SetPaymentModeAsync);
         bank.MapGet("/payments", GetPaymentsAsync);
         bank.MapPost("/payments/{paymentId}/execute", ExecutePaymentAsync);
@@ -29,7 +30,9 @@ public static class BankControlEndpoints
     {
         var accounts = await db.BankAccounts.AsNoTracking().OrderBy(account => account.AccountNumber).ToListAsync(cancellationToken);
         var balances = await BalancesAsync(db, cancellationToken);
-        var items = accounts.Select(account => BankAccountItem.From(account, balances.GetValueOrDefault(account.Id))).ToList();
+        var statementBalances = await BankStatementBalance.AtLastPlaceAsync(db, cancellationToken);
+        var items = accounts.Select(account => BankAccountItem.From(
+            account, balances.GetValueOrDefault(account.Id), statementBalances.GetValueOrDefault(account.Id))).ToList();
         return Results.Ok(new BankAccountList(items));
     }
 
@@ -67,7 +70,7 @@ public static class BankControlEndpoints
         db.BankAccounts.Add(account);
         Log(db, http, world, realNow, ControlActions.BankAccountOpened, body);
         await db.SaveChangesAsync(http.RequestAborted);
-        return Results.Created($"/control/bank/accounts/{Uri.EscapeDataString(account.AccountNumber)}", BankAccountItem.From(account, 0m));
+        return Results.Created($"/control/bank/accounts/{Uri.EscapeDataString(account.AccountNumber)}", BankAccountItem.From(account, 0m, 0m));
     }
 
     private static async Task<IResult> AddReceiptAsync(
@@ -111,6 +114,11 @@ public static class BankControlEndpoints
             return ControlEndpoints.Refused("AvailableAfter", "availableAfter must be an ISO 8601 duration from PT0S to P30D.");
         }
 
+        if (body.OmitFromFeed == true && body.DeliverTwice == true)
+        {
+            return ControlEndpoints.Refused("OmitFromFeed", "omitFromFeed cannot be set with deliverTwice.");
+        }
+
         var world = await db.Worlds.SingleAsync(http.RequestAborted);
         var realNow = time.GetUtcNow();
         var simulatorNow = world.Now(realNow);
@@ -131,9 +139,81 @@ public static class BankControlEndpoints
             BankRules.Text(body.Reference),
             simulatorNow,
             simulatorNow + availableAfter.Value,
-            body.DeliverTwice ?? false);
+            body.DeliverTwice ?? false,
+            body.OmitFromFeed ?? false);
         db.BankLines.Add(line);
         Log(db, http, world, realNow, ControlActions.BankReceiptAdded, body);
+        try
+        {
+            await db.SaveChangesAsync(http.RequestAborted);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "The world was changed by another write. Read it again and retry.");
+        }
+
+        return Results.Created($"/control/bank/accounts/{Uri.EscapeDataString(account.AccountNumber)}/statement-lines",
+            new AddedReceipt(line.OutsideId));
+    }
+
+    /// <summary>
+    /// Bank-reconciliation R27, R28: a fee the bank takes from an open account, as a debit line with no payee and no
+    /// payment ids. The fields follow a receipt's rules (deposit-matching R41); a 400 writes nothing.
+    /// </summary>
+    private static async Task<IResult> AddChargeAsync(
+        AddChargeRequest body,
+        HttpContext http,
+        SimulatorDbContext db,
+        TimeProvider time)
+    {
+        var number = body.AccountNumber?.Trim() ?? "";
+        var account = number.Length == 0
+            ? null
+            : await db.BankAccounts.AsNoTracking().SingleOrDefaultAsync(row => row.AccountNumber == number, http.RequestAborted);
+        if (account is null)
+        {
+            return ControlEndpoints.Refused("AccountNumber", "accountNumber must be an open account.");
+        }
+
+        if (!BankRules.IsAmount(body.Amount))
+        {
+            return ControlEndpoints.Refused("Amount", "amount must be greater than zero, with at most 4 decimal places.");
+        }
+
+        if (body.Reference?.Length > BankRules.FreeTextMaxLength)
+        {
+            return ControlEndpoints.Refused("Reference", "reference must be at most 140 characters.");
+        }
+
+        var availableAfter = BankRules.AvailableAfter(body.AvailableAfter);
+        if (availableAfter is null)
+        {
+            return ControlEndpoints.Refused("AvailableAfter", "availableAfter must be an ISO 8601 duration from PT0S to P30D.");
+        }
+
+        var world = await db.Worlds.SingleAsync(http.RequestAborted);
+        var realNow = time.GetUtcNow();
+        var simulatorNow = world.Now(realNow);
+        var today = DateOnly.FromDateTime(simulatorNow.UtcDateTime);
+        var valueDate = body.ValueDate ?? today;
+        if (valueDate > today)
+        {
+            return ControlEndpoints.Refused("ValueDate", "valueDate cannot be after the simulator date.");
+        }
+
+        var line = BankLine.Charge(
+            world.TakeLineOutsideId(),
+            account.Id,
+            body.Amount!.Value,
+            valueDate,
+            BankRules.Text(body.Reference),
+            simulatorNow,
+            simulatorNow + availableAfter.Value,
+            body.OmitFromFeed ?? false);
+        db.BankLines.Add(line);
+        Log(db, http, world, realNow, ControlActions.BankChargeAdded, body);
         try
         {
             await db.SaveChangesAsync(http.RequestAborted);
@@ -399,6 +479,7 @@ public static class BankControlEndpoints
             line.PostedAt,
             line.AvailableAt,
             line.DeliverTwice,
+            line.OmitFromFeed,
             places[line.Id].Order().ToList())).ToList();
         return Results.Ok(new BankLineList(items));
     }
@@ -428,14 +509,32 @@ public sealed record AddReceiptRequest(
     string? PayerAccount,
     DateOnly? ValueDate,
     string? AvailableAfter,
-    bool? DeliverTwice);
+    bool? DeliverTwice,
+    bool? OmitFromFeed = null);
+
+/// <summary>Bank-reconciliation R27: a bank charge.</summary>
+public sealed record AddChargeRequest(
+    string? AccountNumber,
+    decimal? Amount,
+    string? Reference,
+    DateOnly? ValueDate,
+    string? AvailableAfter,
+    bool? OmitFromFeed);
 
 public sealed record AddedReceipt(string Id);
 
-public sealed record BankAccountItem(string AccountNumber, string Currency, string Name, DateTimeOffset OpenedAt, decimal Balance)
+/// <summary><c>Balance</c> is every line, placed or not (deposit-matching R46); <c>StatementBalance</c> the balance the
+/// feed would answer at the account's last place (bank-reconciliation R29).</summary>
+public sealed record BankAccountItem(
+    string AccountNumber,
+    string Currency,
+    string Name,
+    DateTimeOffset OpenedAt,
+    decimal Balance,
+    decimal StatementBalance)
 {
-    public static BankAccountItem From(BankAccount account, decimal balance) =>
-        new(account.AccountNumber, account.Currency.Trim(), account.Name, account.OpenedAt, balance);
+    public static BankAccountItem From(BankAccount account, decimal balance, decimal statementBalance) =>
+        new(account.AccountNumber, account.Currency.Trim(), account.Name, account.OpenedAt, balance, statementBalance);
 }
 
 public sealed record BankAccountList(IReadOnlyList<BankAccountItem> Items);
@@ -452,6 +551,7 @@ public sealed record BankLineItem(
     DateTimeOffset PostedAt,
     DateTimeOffset AvailableAt,
     bool DeliverTwice,
+    bool OmitFromFeed,
     IReadOnlyList<long> Places);
 
 public sealed record BankLineList(IReadOnlyList<BankLineItem> Items);

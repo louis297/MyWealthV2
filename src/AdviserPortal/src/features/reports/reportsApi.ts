@@ -1,7 +1,7 @@
 import { api } from "@/shared/api/api";
 import type { PagedList } from "@/shared/types/page";
 
-export type ReportScope = "Customer" | "Book";
+export type ReportScope = "Customer" | "Book" | "Tenant";
 
 export type ReportParameters = Record<string, unknown>;
 

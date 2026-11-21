@@ -6,7 +6,7 @@ using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundExcep
 
 namespace MyWealthV2.Application.Reports.Commands.DisableReportSchedule;
 
-[Authorize(Policy = Policies.ReportsCustomerCreate + "," + Policies.ReportsBookCreate)]
+[Authorize(Policy = Policies.ReportsCustomerCreate + "," + Policies.ReportsBookCreate + "," + Policies.ReportsTenantCreate)]
 public record DisableReportScheduleCommand(Guid Id) : IRequest;
 
 public class DisableReportScheduleCommandHandler(
@@ -29,7 +29,11 @@ public class DisableReportScheduleCommandHandler(
             .SingleAsync(cancellationToken);
 
         var report = await ReportScheduleRules.EnsureAvailableAsync(db, currentUser, reportId, cancellationToken);
-        if (report.Code == AdviserBalancesBinder.Code)
+        if (report.Code == BankReconciliationBinder.Code)
+        {
+            // Bank-reconciliation R22: the Tenant scope's policy, checked above, is the whole scope check.
+        }
+        else if (report.Code == AdviserBalancesBinder.Code)
         {
             await AdviserReportScope.EnsureSnapshotAsync(
                 db, currentUser, schedule.ParametersJson, "ReportSchedule", cancellationToken);

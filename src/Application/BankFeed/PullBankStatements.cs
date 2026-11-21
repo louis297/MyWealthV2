@@ -132,6 +132,7 @@ public sealed class PullBankStatements(
 
             // The database compares outside ids without regard to case, so the page does too.
             var seen = new HashSet<string>(known, StringComparer.OrdinalIgnoreCase);
+            var addedTotal = 0m;
             foreach (var line in page.Lines)
             {
                 if (!seen.Add(line.Id!))
@@ -159,6 +160,7 @@ public sealed class PullBankStatements(
                 // The worker's system user, also when the pull runs outside the worker (deposit-matching R32).
                 stored.CreatedBy = SystemActor.Name;
                 db.BankStatementLines.Add(stored);
+                addedTotal += stored.Direction == BankLineDirection.Credit ? stored.Amount : -stored.Amount;
             }
 
             if (cursor is null)
@@ -167,7 +169,18 @@ public sealed class PullBankStatements(
                 db.BankFeedCursors.Add(cursor);
             }
 
-            cursor.Advance(page.Cursor, now);
+            // Bank-reconciliation R3, R4: the balance commits with the lines it covers. The first balance sets the
+            // opening balance against every line stored for the account so far, the page's included.
+            var linesTotal = 0m;
+            if (page.Balance is not null && cursor.OpeningBalance is null)
+            {
+                var stored = await db.BankStatementLines.IgnoreQueryFilters()
+                    .Where(row => row.ClientMoneyAccountId == account.Id)
+                    .SumAsync(row => (decimal?)(row.Direction == BankLineDirection.Credit ? row.Amount : -row.Amount), token) ?? 0m;
+                linesTotal = stored + addedTotal;
+            }
+
+            cursor.StorePage(page.Cursor, page.Balance, linesTotal, now);
             await db.SaveChangesAsync(token);
             await LinkReturnedLinesAsync(connection, token);
         }, cancellationToken);

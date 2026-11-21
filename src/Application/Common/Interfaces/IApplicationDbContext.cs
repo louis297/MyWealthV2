@@ -14,6 +14,10 @@ public interface IApplicationDbContext
 
     DbSet<BankStatementLine> BankStatementLines { get; }
 
+    DbSet<BankReconciliation> BankReconciliations { get; }
+
+    DbSet<BankReconciliationItem> BankReconciliationItems { get; }
+
     DbSet<NominatedBankAccount> NominatedBankAccounts { get; }
 
     DbSet<Withdrawal> Withdrawals { get; }
@@ -57,6 +61,13 @@ public interface IApplicationDbContext
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 
     Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken cancellationToken);
+
+    /// <summary>Runs <paramref name="action"/> in one transaction at <paramref name="isolationLevel"/>, for example
+    /// SNAPSHOT for a consistent read that blocks no writer (bank-reconciliation R6).</summary>
+    Task ExecuteInTransactionAsync(
+        System.Data.IsolationLevel isolationLevel,
+        Func<CancellationToken, Task> action,
+        CancellationToken cancellationToken);
 
     Task LockAccountAsync(int accountId, CancellationToken cancellationToken);
 

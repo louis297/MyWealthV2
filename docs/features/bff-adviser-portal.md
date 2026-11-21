@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-01
-last_updated: 2026-11-20
+last_updated: 2026-11-21
 related:
   - ../function-plan.md
   - ../architecture.md
@@ -465,3 +465,15 @@ Add `/nominated-bank-accounts` and `/withdrawals` to the BFF prefix allow-list (
 - Prefixes: `/nominated-bank-accounts`, `/withdrawals`
 - Methods: GET, POST
 - Who: TenantAdmin and Adviser. `webapi` checks the permissions; the BFF does not filter by role, so an Adviser gets the 403 from `webapi` on verify and approve.
+
+---
+
+## Amendment 2026-11-21 (bank reconciliations prefix) — accepted
+
+Add `/bank-reconciliations` to the BFF prefix allow-list (R20) so the Adviser Portal can call the routes of [bank-reconciliation.md](bank-reconciliation.md) through `/api`.
+
+- Prefix: `/bank-reconciliations`
+- Methods: GET, POST
+- Who: TenantAdmin. `webapi` checks `bank-reconciliations.manage`; the BFF does not filter by role, so an Adviser gets the 403 from `webapi`.
+- The Tenant-scoped report uses the existing `/reports` prefix.
+- The Customer Portal BFF does not change.

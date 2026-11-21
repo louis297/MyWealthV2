@@ -22,6 +22,7 @@ export function ReportParametersUnavailable() {
 export function ReportCatalog({
   scope,
   title,
+  label,
   note,
   emptyMessage,
   selectedId,
@@ -31,6 +32,8 @@ export function ReportCatalog({
 }: {
   scope: ReportScope;
   title?: "h1" | "h2";
+  /** The label of the report picker; "Report" unless a page shows more than one catalog. */
+  label?: string;
   note?: string;
   emptyMessage: string;
   selectedId: string;
@@ -65,7 +68,7 @@ export function ReportCatalog({
         <>
           <SelectField
             id={`report-${scope}`}
-            label="Report"
+            label={label ?? "Report"}
             value={selectedId}
             onChange={(event) => onSelectedId(event.target.value)}
           >

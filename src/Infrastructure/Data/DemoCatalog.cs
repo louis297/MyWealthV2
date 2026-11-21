@@ -14,8 +14,10 @@ public static class DemoCatalog
 
     public const string AdviserBalancesReportCode = "adviser-balances";
 
+    public const string BankReconciliationReportCode = "bank-reconciliation";
+
     public static IReadOnlyList<string> ReportCodes { get; } =
-        [CustomerTransactionsReportCode, AdviserBalancesReportCode];
+        [CustomerTransactionsReportCode, AdviserBalancesReportCode, BankReconciliationReportCode];
 
     public static IReadOnlyList<DemoInstrument> Instruments { get; } =
     [

@@ -83,7 +83,8 @@ public sealed class SimulatorBankFeed(IHttpClientFactory httpClients) : IBankFee
             return BankFeedResult.Failed(BankFeedFailure.BadResponse);
         }
 
-        if (page?.Items is null)
+        // Bank-reconciliation R31: a balance is a JSON number with at most 4 decimal places, or absent.
+        if (page?.Items is null || page.Balance is decimal balance && decimal.Round(balance, 4) != balance)
         {
             return BankFeedResult.Failed(BankFeedFailure.BadResponse);
         }
@@ -109,13 +110,14 @@ public sealed class SimulatorBankFeed(IHttpClientFactory httpClients) : IBankFee
                 item.ReturnOf,
                 item.ReturnReason))
             .ToList();
-        return BankFeedResult.Succeeded(new BankFeedPage(lines, page.Cursor, page.HasMore));
+        return BankFeedResult.Succeeded(new BankFeedPage(lines, page.Cursor, page.HasMore, page.Balance));
     }
 
     private sealed record WirePage(
         [property: JsonPropertyName("items")] List<WireLine>? Items,
         [property: JsonPropertyName("cursor")] string? Cursor,
-        [property: JsonPropertyName("hasMore")] bool HasMore);
+        [property: JsonPropertyName("hasMore")] bool HasMore,
+        [property: JsonPropertyName("balance")] decimal? Balance = null);
 
     private sealed record WireLine(
         [property: JsonPropertyName("id")] string? Id,

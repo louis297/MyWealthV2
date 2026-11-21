@@ -51,4 +51,5 @@ public static class ControlActions
     public const string BankPaymentExecuted = "BankPaymentExecuted";
     public const string BankPaymentReturned = "BankPaymentReturned";
     public const string BankReceiptRecalled = "BankReceiptRecalled";
+    public const string BankChargeAdded = "BankChargeAdded";
 }

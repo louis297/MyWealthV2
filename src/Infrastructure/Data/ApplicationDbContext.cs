@@ -61,6 +61,10 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<BankStatementLine> BankStatementLines => Set<BankStatementLine>();
 
+    public DbSet<BankReconciliation> BankReconciliations => Set<BankReconciliation>();
+
+    public DbSet<BankReconciliationItem> BankReconciliationItems => Set<BankReconciliationItem>();
+
     public DbSet<NominatedBankAccount> NominatedBankAccounts => Set<NominatedBankAccount>();
 
     public DbSet<Withdrawal> Withdrawals => Set<Withdrawal>();
@@ -109,14 +113,20 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<InstrumentPrice> InstrumentPrices => Set<InstrumentPrice>();
 
+    public Task ExecuteInTransactionAsync(
+        Func<CancellationToken, Task> action,
+        CancellationToken cancellationToken) =>
+        ExecuteInTransactionAsync(System.Data.IsolationLevel.ReadCommitted, action, cancellationToken);
+
     public async Task ExecuteInTransactionAsync(
+        System.Data.IsolationLevel isolationLevel,
         Func<CancellationToken, Task> action,
         CancellationToken cancellationToken)
     {
         var strategy = Database.CreateExecutionStrategy();
         await strategy.ExecuteAsync(async () =>
         {
-            await using var transaction = await Database.BeginTransactionAsync(cancellationToken);
+            await using var transaction = await Database.BeginTransactionAsync(isolationLevel, cancellationToken);
             try
             {
                 await action(cancellationToken);

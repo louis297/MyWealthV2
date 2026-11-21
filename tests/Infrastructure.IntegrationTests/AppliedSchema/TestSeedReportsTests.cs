@@ -20,7 +20,7 @@ public class TestSeedReportsTests
         await TestSeed.SeedAsync(db, CancellationToken.None);
         var second = await LoadGrantsAsync(db, DevelopmentIdentitySeeder.DemoTenantCode);
 
-        first.Select(row => row.Code).ShouldBe(["adviser-balances", "customer-transactions"]);
+        first.Select(row => row.Code).ShouldBe(["adviser-balances", "bank-reconciliation", "customer-transactions"]);
         second.Select(row => row.Id).ShouldBe(first.Select(row => row.Id));
         (await LoadGrantsAsync(db, "reports-other")).ShouldBeEmpty();
     }

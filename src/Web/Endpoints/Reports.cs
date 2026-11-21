@@ -27,7 +27,8 @@ public class Reports : IEndpointGroup
         .RequireAuthenticatedUser()
         .AddRequirements(new AnyPermissionRequirement(
             Policies.ReportsCustomerCreate,
-            Policies.ReportsBookCreate))
+            Policies.ReportsBookCreate,
+            Policies.ReportsTenantCreate))
         .Build();
 
     private static readonly AuthorizationPolicy ReadReports = new AuthorizationPolicyBuilder()
@@ -35,7 +36,8 @@ public class Reports : IEndpointGroup
         .RequireAuthenticatedUser()
         .AddRequirements(new AnyPermissionRequirement(
             Policies.ReportsCustomerRead,
-            Policies.ReportsBookRead))
+            Policies.ReportsBookRead,
+            Policies.ReportsTenantRead))
         .Build();
 
     public static void Map(RouteGroupBuilder groupBuilder)

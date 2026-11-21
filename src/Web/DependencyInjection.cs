@@ -44,6 +44,7 @@ public static class DependencyInjection
                      Policies.TransactionsRead,
                      Policies.TransactionsCreate,
                      Policies.StatementLinesManage,
+                     Policies.BankReconciliationsManage,
                      Policies.NominatedBankAccountsRead,
                      Policies.NominatedBankAccountsManage,
                      Policies.NominatedBankAccountsVerify,
@@ -58,7 +59,9 @@ public static class DependencyInjection
                      Policies.ReportsCustomerRead,
                      Policies.ReportsCustomerCreate,
                      Policies.ReportsBookRead,
-                     Policies.ReportsBookCreate
+                     Policies.ReportsBookCreate,
+                     Policies.ReportsTenantRead,
+                     Policies.ReportsTenantCreate
                  })
         {
             var name = policy;

@@ -386,6 +386,8 @@ Amendment 2026-11-20 (withdrawals, accepted): `BankStatementLine` gains `EndToEn
 
 Amendment 2026-11-21 (bank returns, accepted): statuses `ReturnSent` and `Returned`; unmatched reasons `UnknownPayment` (8), `UnknownReturn` (9), `RecallNotCovered` (10), `ReturnRejected` (11); match method `Recall` (4). New methods `MarkReturnSent`, `ReturnRejected`, `MarkReturned`, `MarkRecall`, `MarkReturnPaid` and `MarkUnknown`. A debit line accepts `Ignore` (from `Unmatched`) and `Reopen` (from `Ignored`) and refuses the other hand methods; `Reopen` from `ReturnRequested` is refused once the return payment was attempted. A `Matched` line has either one Account and one Transaction, or neither and a related line (the debit of a receipt return, the recall of a receipt never credited). A `Returned` line has no match and never changes again ([features/bank-returns.md](features/bank-returns.md)).
 
+Amendment 2026-11-21 (bank reconciliation, accepted): `BankFeedCursor` gains the statement balance the bank sent with the last stored page, its time, and the opening balance, set once by the first page with a balance (`StorePage`). A page without a balance clears the balance and keeps the opening ([features/bank-reconciliation.md](features/bank-reconciliation.md)).
+
 ### 8.10 Nominated bank account (accepted — withdrawals slice)
 
 | Type | Kind | Notes |
@@ -406,6 +408,17 @@ Invariants: the details never change; a correction is a new row. Verify and reje
 Invariants: a withdrawal is approved or rejected by someone other than its requester. It is cancelled only while `Requested`, or `Approved` with an outgoing payment that has no send attempt. A withdrawal has at most one payout and at most one return Reversal. An outgoing payment is unique on its instruction PublicId (a unique index). No domain event. Field rules: [features/withdrawals.md](features/withdrawals.md).
 
 Amendment 2026-11-21 (bank returns, accepted): `OutgoingPaymentKind` (`Withdrawal`, `ReceiptReturn`); `OutgoingPayment` gains `Kind` and `ReturnOfLineId`, and `WithdrawalId` becomes optional: exactly one of the two, by kind. `ForReceiptReturn(line, clientMoneyAccount)` creates a return with its own PublicId as instruction id, the line's amount and currency, no reference and no payee. A line has at most one open (`Pending` or `Accepted`) return payment, held by a filtered unique index. `PaymentRejectReason` gains `UnknownLine` ([features/bank-returns.md](features/bank-returns.md)).
+
+### 8.12 Bank reconciliation (accepted — bank-reconciliation slice)
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `BankReconciliation` | Aggregate | One run for one client money account at one instant: the bank side (statement balance with its time, opening balance, total of the stored lines), the platform side (cash of every Custodial account of the Tenant in the currency), the difference, the items, totals per class, status (`Agreed`, `Breaks`, `NoBankBalance`), trigger (`Scheduled`, `Manual`), who ran it, and information (reserved cash, payments in flight, feed status). Built by `Compute(inputs, …)`; no other method. |
+| `BankReconciliationItem` | Entity (child) | Kind, class, signed amount (its effect on bank minus platform), count, and the statement line as it was at the run, or the other client money account. |
+| `ReconciliationItemKind` | Enum | `Unexplained`, `StatementDifference`, `Suspense`, `NotProcessed`, `ReturnInProgress`, `OpeningBalance`, `Ignored`, `Trades`, `FxConversions`, `Adjustments`, `OtherLedgerCash`, `OtherClientMoneyAccount` |
+| `ReconciliationItemClass` | Enum | `Break`, `Timing`, `Known`; one fixed class per kind |
+
+Invariants: the items of an `Agreed` or `Breaks` run add up to bank balance minus Custodial cash; a run is `Agreed` exactly when it has no Break item; a run and its items never change; a run counts only its own Tenant's accounts and lines. No domain event. Field rules: [features/bank-reconciliation.md](features/bank-reconciliation.md).
 
 ---
 
@@ -462,6 +475,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-20 | Client money accounts accepted: `ClientMoneyAccount` and `DepositReference` (§8.8); `Account` holds a deposit reference on Custodial accounts only (§8.5). [features/client-money-accounts.md](features/client-money-accounts.md). |
 | 2026-11-20 | Deposit matching accepted: `BankStatementLine`, `BankFeedCursor`, `DepositReferenceScanner` (§8.9); source kind `BankFeed`, `PostBankDeposit` and `TransactionBankReceiptDetail` (§8.6); `ClientMoneyAccount.BankConnection` (§8.8). [features/deposit-matching.md](features/deposit-matching.md). |
 | 2026-11-20 | Withdrawals accepted: `NominatedBankAccount` (§8.10); `Withdrawal`, `OutgoingPayment` (§8.11); reserved and available cash on a Custodial account (§8.5); source kind `Payment`, `PostPayout`, `TransactionPaymentDetail` and the Custodial `TransferOut`, `CloseOut` and `InternalTransfer` rules (§8.6); the payout fields of `BankStatementLine` (§8.9). [features/withdrawals.md](features/withdrawals.md). |
+| 2026-11-21 | Bank reconciliation accepted: `BankReconciliation`, `BankReconciliationItem` and their enums (§8.12); `BankFeedCursor` statement balance and opening balance (§8.9); report scope `Tenant` (§11). [features/bank-reconciliation.md](features/bank-reconciliation.md) |
 
 ---
 
@@ -471,7 +485,7 @@ Field rules: [features/reports.md](features/reports.md). Not landed.
 
 | Type | Kind | Notes |
 | --- | --- | --- |
-| `Report` | Entity (platform catalog) | No TenantId. PublicId + stable Code. Name, Function, Scope (`Customer` \| `Book`, nvarchar), AllowedTriggers (nvarchar), IsActive. |
+| `Report` | Entity (platform catalog) | No TenantId. PublicId + stable Code. Name, Function, Scope (`Customer` \| `Book` \| `Tenant`, nvarchar; `Tenant` from [features/bank-reconciliation.md](features/bank-reconciliation.md)), AllowedTriggers (nvarchar), IsActive. |
 | `TenantReport` | Entity | Grant. TenantId + ReportId. Presence of the row configures the report for that tenant. |
 | `ReportSchedule` | Entity | Recurring definition. ReportId + TenantId + ParametersJson. IsActive. Cron. |
 | `ReportExecution` | Entity | One run. ReportId, optional ScheduleId, TriggerKind, Status, ParametersJson, AsOf (nullable), TriggeredByUserId, ResultStorageKey, ErrorMessage. |
@@ -482,7 +496,7 @@ Invariants:
 - A platform-inactive report is not offered for tenant grant. The tenant grant list omits it. Granting it is rejected.
 - Disabling a catalog report (`IsActive` false) revokes every `TenantReport` row for that report (Hangfire recurring jobs removed; schedule and execution rows stay; schedule `IsActive` is unchanged). Re-enabling the catalog does not recreate any grants.
 - Removing `"scheduled"` from `AllowedTriggers` disables every `ReportSchedule` for that report (IsActive false + Hangfire RemoveIfExists). Rows stay. Grants are not revoked. Adding `"scheduled"` does not re-enable those schedules.
-- Scope selects the policy pair (`reports.customer.*` or `reports.book.*`).
+- Scope selects the policy pair (`reports.customer.*`, `reports.book.*` or `reports.tenant.*`).
 - AllowedTriggers gates manual / scheduled / event.
 - A schedule and an execution each reference exactly one Report.
 - ParametersJson is a bound snapshot (max 8 KB, known fields only).
@@ -500,3 +514,4 @@ Generator registry maps Report Code / PublicId to `IReportGenerator`. Hangfire e
 | --- | --- |
 | 2026-10-26 | Catalog IsActive write + cascade revoke. Disable removes all TenantReports for the report (Hangfire cleaned; schedule/execution rows stay). Re-enable restores no grants. |
 | 2026-10-26 | Tenant grant list omits platform-inactive reports. Granting an inactive catalog report is rejected. `GET /reports/catalog` lists every catalog row for SystemAdmin. |
+| 2026-11-21 | Third report scope `Tenant` (policies `reports.tenant.*`, TenantAdmin only) and report `bank-reconciliation` ([features/bank-reconciliation.md](features/bank-reconciliation.md)). |

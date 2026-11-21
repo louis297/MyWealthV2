@@ -55,7 +55,21 @@ internal static class BankHttp
         return new FeedPage(
             root.GetProperty("items").EnumerateArray().Select(item => item.Clone()).ToList(),
             root.GetProperty("cursor").GetString()!,
-            root.GetProperty("hasMore").GetBoolean());
+            root.GetProperty("hasMore").GetBoolean(),
+            root.TryGetProperty("balance", out var balance) && balance.ValueKind == JsonValueKind.Number ? balance.GetDecimal() : null);
+    }
+
+    /// <summary>Bank-reconciliation R27: a fee the bank takes from the account.</summary>
+    public static Task<HttpResponseMessage> AddChargeAsync(HttpClient control, object body) =>
+        control.PostJsonAsync("/control/bank/charges", JsonSerializer.Serialize(body));
+
+    public static async Task<string> AddChargeOkAsync(HttpClient control, object body)
+    {
+        var response = await AddChargeAsync(control, body);
+        var content = await response.Content.ReadAsStringAsync();
+        response.StatusCode.ShouldBe(HttpStatusCode.Created, content);
+        using var json = JsonDocument.Parse(content);
+        return json.RootElement.GetProperty("id").GetString()!;
     }
 
     public static async Task<JsonElement> AccountsAsync(HttpClient control)
@@ -106,7 +120,7 @@ internal static class BankHttp
         """;
 }
 
-internal sealed record FeedPage(IReadOnlyList<JsonElement> Items, string Cursor, bool HasMore)
+internal sealed record FeedPage(IReadOnlyList<JsonElement> Items, string Cursor, bool HasMore, decimal? Balance = null)
 {
     public IReadOnlyList<string> Ids => Items.Select(item => item.GetProperty("id").GetString()!).ToList();
 }

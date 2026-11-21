@@ -22,6 +22,15 @@ public class BankFeedCursor
 
     public BankFeedFailure? LastFailure { get; private set; }
 
+    /// <summary>The bank's balance after the last stored line, as the last stored page sent it (bank-reconciliation R3).</summary>
+    public decimal? Balance { get; private set; }
+
+    /// <summary>When the page that carried <see cref="Balance"/> was stored.</summary>
+    public DateTimeOffset? BalanceAt { get; private set; }
+
+    /// <summary>The money in the trust account before the first line the platform holds; set once (R4).</summary>
+    public decimal? OpeningBalance { get; private set; }
+
     public byte[] RowVersion { get; private set; } = null!;
 
     /// <summary>A cursor before the first read: no cursor, nothing tried yet.</summary>
@@ -37,6 +46,22 @@ public class BankFeedCursor
 
         Cursor = cursor;
         LastSucceededAt = at;
+    }
+
+    /// <summary>
+    /// A page was stored with the bank's balance after its last line (bank-reconciliation R3–R5).
+    /// <paramref name="signedLinesTotal"/> is the signed sum of every statement line stored for the client money
+    /// account so far, the page's included; the first balance that is not null sets the opening balance from it.
+    /// </summary>
+    public void StorePage(string? cursor, decimal? balance, decimal signedLinesTotal, DateTimeOffset at)
+    {
+        Advance(cursor, at);
+        Balance = balance;
+        BalanceAt = balance is null ? null : at;
+        if (balance is not null && OpeningBalance is null)
+        {
+            OpeningBalance = balance.Value - signedLinesTotal;
+        }
     }
 
     /// <summary>A read failed: the cursor stays (R7).</summary>

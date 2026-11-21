@@ -107,6 +107,14 @@ public class RolePermissionsTests
     [TestCase(UserRole.Customer, Policies.ReportsCustomerCreate, true)]
     [TestCase(UserRole.Customer, Policies.ReportsBookRead, false)]
     [TestCase(UserRole.Customer, Policies.ReportsBookCreate, false)]
+    [TestCase(UserRole.TenantAdmin, Policies.ReportsTenantRead, true)]
+    [TestCase(UserRole.TenantAdmin, Policies.ReportsTenantCreate, true)]
+    [TestCase(UserRole.SystemAdmin, Policies.ReportsTenantRead, false)]
+    [TestCase(UserRole.SystemAdmin, Policies.ReportsTenantCreate, false)]
+    [TestCase(UserRole.Adviser, Policies.ReportsTenantRead, false)]
+    [TestCase(UserRole.Adviser, Policies.ReportsTenantCreate, false)]
+    [TestCase(UserRole.Customer, Policies.ReportsTenantRead, false)]
+    [TestCase(UserRole.Customer, Policies.ReportsTenantCreate, false)]
     public void Has_MatchesReportsMap(UserRole role, string policy, bool expected)
     {
         RolePermissions.Has(role, policy).ShouldBe(expected);
@@ -133,6 +141,16 @@ public class RolePermissionsTests
     public void StatementLinesManage_IsTenantAdminOnly(UserRole role, bool expected)
     {
         RolePermissions.Has(role, Policies.StatementLinesManage).ShouldBe(expected);
+    }
+
+    [TestCase(UserRole.TenantAdmin, true)]
+    [TestCase(UserRole.SystemAdmin, false)]
+    [TestCase(UserRole.Adviser, false)]
+    [TestCase(UserRole.Customer, false)]
+    [TestCase(UserRole.SimulatorOperator, false)]
+    public void BankReconciliationsManage_IsTenantAdminOnly(UserRole role, bool expected)
+    {
+        RolePermissions.Has(role, Policies.BankReconciliationsManage).ShouldBe(expected);
     }
 
     [TestCase(Policies.NominatedBankAccountsRead, true, true, true)]

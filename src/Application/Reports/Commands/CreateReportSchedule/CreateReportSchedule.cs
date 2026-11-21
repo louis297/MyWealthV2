@@ -6,7 +6,7 @@ using MyWealthV2.Domain.Entities;
 
 namespace MyWealthV2.Application.Reports.Commands.CreateReportSchedule;
 
-[Authorize(Policy = Policies.ReportsCustomerCreate + "," + Policies.ReportsBookCreate)]
+[Authorize(Policy = Policies.ReportsCustomerCreate + "," + Policies.ReportsBookCreate + "," + Policies.ReportsTenantCreate)]
 public class CreateReportScheduleCommand : IRequest<Guid>
 {
     public Guid ReportId { get; set; }
@@ -32,7 +32,13 @@ public class CreateReportScheduleCommandHandler(
             db, currentUser, request.ReportId, cancellationToken);
 
         string snapshotJson;
-        if (report.Code == AdviserBalancesBinder.Code)
+        if (report.Code == BankReconciliationBinder.Code)
+        {
+            var binding = BankReconciliationBinder.Bind(request.Parameters);
+            await BankReconciliationBinder.EnsureScopeAsync(db, tenantId, binding, cancellationToken);
+            snapshotJson = binding.SnapshotJson;
+        }
+        else if (report.Code == AdviserBalancesBinder.Code)
         {
             var role = currentUser.Role ?? throw new UnauthorizedAccessException();
             var binding = AdviserBalancesBinder.Bind(request.Parameters, role, currentUser.PublicId);

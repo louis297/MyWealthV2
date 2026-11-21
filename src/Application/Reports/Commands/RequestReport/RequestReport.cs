@@ -11,7 +11,7 @@ using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationE
 
 namespace MyWealthV2.Application.Reports.Commands.RequestReport;
 
-[Authorize(Policy = Policies.ReportsCustomerCreate + "," + Policies.ReportsBookCreate)]
+[Authorize(Policy = Policies.ReportsCustomerCreate + "," + Policies.ReportsBookCreate + "," + Policies.ReportsTenantCreate)]
 public class RequestReportCommand : IRequest<Guid>
 {
     public Guid ReportId { get; set; }
@@ -63,9 +63,7 @@ public class RequestReportCommandHandler(
             throw new NotFoundException("Report", report.PublicId);
         }
 
-        var createPolicy = report.Scope == "Book"
-            ? Policies.ReportsBookCreate
-            : Policies.ReportsCustomerCreate;
+        var createPolicy = ReportScopes.CreatePolicy(report.Scope);
         if (!RolePermissions.Has(role, createPolicy))
         {
             throw new ForbiddenAccessException();
@@ -77,6 +75,12 @@ public class RequestReportCommandHandler(
         {
             var binding = CustomerTransactionsBinder.Bind(request.Parameters);
             await EnsureCustomerInScopeAsync(binding.CustomerId, tenantId, role, cancellationToken);
+            snapshotJson = binding.SnapshotJson;
+        }
+        else if (report.Code == BankReconciliationBinder.Code)
+        {
+            var binding = BankReconciliationBinder.Bind(request.Parameters);
+            await BankReconciliationBinder.EnsureScopeAsync(db, tenantId, binding, cancellationToken);
             snapshotJson = binding.SnapshotJson;
         }
         else if (report.Code == AdviserBalancesBinder.Code)

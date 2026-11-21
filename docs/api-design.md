@@ -138,12 +138,15 @@ The fifth role `SimulatorOperator` ([ADR 0013](adr/0013-roles-authorization-sing
 | `withdrawals.read` | | ✓ | ✓ | ✓ | [withdrawals](features/withdrawals.md) (accepted 2026-11-20) |
 | `withdrawals.request` | | ✓ | ✓ | | [withdrawals](features/withdrawals.md) (accepted 2026-11-20) |
 | `withdrawals.approve` | | ✓ | | | [withdrawals](features/withdrawals.md) (accepted 2026-11-20) |
+| `bank-reconciliations.manage` | | ✓ | | | [bank-reconciliation](features/bank-reconciliation.md) (accepted 2026-11-21) |
 | `portfolios.read` | ✓ | ✓ | ✓ | | [portfolios](features/portfolios.md) |
 | `portfolios.manage` | ✓ | ✓ | ✓ | | [portfolios](features/portfolios.md) |
 | `reports.customer.read` | | ✓ | ✓ | ✓ | [reports](features/reports.md) |
 | `reports.customer.create` | | ✓ | ✓ | ✓ | [reports](features/reports.md); Customer: Customer Portal amendment 2026-11-02 |
 | `reports.book.read` | | ✓ | ✓ | | [reports](features/reports.md) |
 | `reports.book.create` | | ✓ | ✓ | | [reports](features/reports.md) |
+| `reports.tenant.read` | | ✓ | | | [reports](features/reports.md); scope `Tenant`: [bank-reconciliation](features/bank-reconciliation.md) (accepted 2026-11-21) |
+| `reports.tenant.create` | | ✓ | | | [reports](features/reports.md); scope `Tenant`: [bank-reconciliation](features/bank-reconciliation.md) (accepted 2026-11-21) |
 | `fees.read` | ✓ | ✓ | ✓ | | [trade-fees](features/trade-fees.md) (landed) |
 | `fees.manage` | ✓ | ✓ | | | [trade-fees](features/trade-fees.md) (landed) |
 
@@ -306,13 +309,14 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Statement lines | `/statement-lines` | list / get; match / ignore / request-return / reopen / unmatch. See features/deposit-matching.md and features/bank-returns.md (returns, recalls, debit lines) | `statement-lines.manage` |
 | Nominated bank accounts | `/nominated-bank-accounts` | list / get / create; verify / reject / remove. No PUT. See features/withdrawals.md | `nominated-bank-accounts.read` / `.manage` / `.verify` |
 | Withdrawals | `/withdrawals` | list / get / create (`Idempotency-Key`); approve / reject / cancel. See features/withdrawals.md | `withdrawals.read` / `.request` / `.approve` |
+| Bank reconciliations | `/bank-reconciliations` | overview / list / get / create (run now). No PUT or DELETE: a run never changes. See features/bank-reconciliation.md | `bank-reconciliations.manage` |
 | Instruments | `/instruments` | list / get / create / update / disable / enable | `instruments.read` / `instruments.create` / `instruments.manage` |
 | Accounts | `/accounts` | list / get / create / update / close / reopen; `GET …/cash-balance`; `GET …/deposit-instructions` (features/client-money-accounts.md) | `accounts.read` / `accounts.create` / `accounts.manage` |
 | Transactions | `/transactions` | list / get / create / reverse | `transactions.read` / `transactions.create` |
 | Net worth | `/net-worth`, `/users/customers/{id}/net-worth` | GET. See features/net-worth.md; `breakdowns.byCustodyMode` in features/custody-mode-grouping.md | `accounts.read` |
 | Portfolios | `/portfolios`, `/accounts/{id}/portfolio`, `/accounts/{id}/rebalance` | list / get / create / update / disable; assign / unassign / rebalance. See features/portfolios.md | `portfolios.read` / `portfolios.manage` + `transactions.create` |
 | Fees | `/fees/trade-schedules` (namespace `/fees`) | list / get / create / update / delete. See features/trade-fees.md | `fees.read` / `fees.manage` |
-| Reports | `/reports` | list / request / schedules / executions / download | `reports.customer.read` / `reports.customer.create` / `reports.book.read` / `reports.book.create` |
+| Reports | `/reports` | list / request / schedules / executions / download | `reports.customer.read` / `reports.customer.create` / `reports.book.read` / `reports.book.create` / `reports.tenant.read` / `reports.tenant.create` |
 
 Path `{id}` is always PublicId.
 
@@ -499,13 +503,15 @@ Field rules: [features/reports.md](features/reports.md). Accepted.
 
 Grouping by custody mode (accepted, [features/custody-mode-grouping.md](features/custody-mode-grouping.md)) changes the content of the two PDFs only: a Custody column in both, subtotals per custody mode in Adviser Balances, a note on External rows in Customer Transactions. The routes do not change.
 
+Bank reconciliation (accepted, [features/bank-reconciliation.md](features/bank-reconciliation.md) R22–R25) adds a third scope, `Tenant`, with policies `reports.tenant.read` and `reports.tenant.create` for TenantAdmin only, and the report `bank-reconciliation`. "By scope" in the table below includes it; Adviser and Customer get 403 on a Tenant-scoped report. The routes do not change.
+
 | Method | Route | Policy | Success |
 | --- | --- | --- | --- |
 | GET | `/reports/catalog` | `tenants.manage` | 200 every catalog row, including inactive, ordered by code. No `granted` |
 | GET | `/tenants/{tenantId}/reports` | `tenants.manage` | 200 active catalog rows for that tenant, each item includes `granted`. Inactive catalog rows are omitted |
 | POST | `/tenants/{tenantId}/reports` | `tenants.manage` | 201 `{ id }` the first time, 204 when the grant already exists. Inactive catalog report → 404 and no row |
 | DELETE | `/tenants/{tenantId}/reports/{reportId}` | `tenants.manage` | 204 when removed or already absent |
-| GET | `/reports` | `reports.customer.read` or `reports.book.read` | 200 list (granted + active only) |
+| GET | `/reports` | `reports.customer.read`, `reports.book.read` or `reports.tenant.read` | 200 list (granted + active only) |
 | PUT | `/reports/{id}` | `tenants.manage` | 204. Body may include `isActive` and/or `allowedTriggers`. Neither field → 400. Unknown trigger → 400. `isActive` false cascades revoke of every TenantReports row (schedule `IsActive` unchanged). Removing `"scheduled"` from `allowedTriggers` disables every schedule for that report (rows stay; no grant revoke) |
 | POST | `/reports/schedules` | by report scope (`*.create`) | 201 `{ id }` |
 | GET | `/reports/schedules` | by scope | 200 list |
@@ -621,3 +627,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-20 | §3.1, §6, §7.3, §7.6, §7.7: bank feed and deposit matching accepted. Permission `statement-lines.manage` (TenantAdmin only); resources `/statement-lines` and `/bank-connections`; client money account `bankConnection` and `bankFeed`; `GET /accounts?depositReference=`; transaction item `bankReceipt` and source kind `BankFeed`; hand `TransferIn` refused on a Custodial account. No problem code ([features/deposit-matching.md](features/deposit-matching.md)). |
 | 2026-11-20 | §3.1, §6, §7.6, §7.7: nominated bank accounts and withdrawals accepted. Six permissions (`nominated-bank-accounts.read` / `.manage` / `.verify`, `withdrawals.read` / `.request` / `.approve`); resources `/nominated-bank-accounts` and `/withdrawals`; account item `reservedCash` and `availableCash`; transaction item `payment` and source kind `Payment`; hand `TransferOut` refused and `CloseOut` limited on a Custodial account; Custodial transfers between Customers refused; statement line `direction` filter and payout fields. No problem code ([features/withdrawals.md](features/withdrawals.md)). |
 | 2026-11-21 | §6, §7.7: receipt returns, recalls and other debit lines accepted. No route, permission or problem code; statement line statuses `ReturnSent`, `Returned`, four unmatched reasons, method `Recall`, item `returnPayment`, nullable match ids; ignore and reopen on debit lines; request return sends the payment ([features/bank-returns.md](features/bank-returns.md)). |
+| 2026-11-21 | §3.1, §6, §7.8: bank reconciliation accepted. Permissions `bank-reconciliations.manage`, `reports.tenant.read` and `reports.tenant.create` (TenantAdmin only); resource `/bank-reconciliations` (overview, list, get, run now); report scope `Tenant` and report `bank-reconciliation`. No problem code ([features/bank-reconciliation.md](features/bank-reconciliation.md)). |

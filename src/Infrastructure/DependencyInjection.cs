@@ -1,3 +1,5 @@
+using MyWealthV2.Infrastructure.BankReconciliations;
+using MyWealthV2.Application.BankReconciliations;
 using Hangfire;
 using Hangfire.SqlServer;
 using MyWealthV2.Application.Common.Interfaces;
@@ -104,8 +106,11 @@ public static class DependencyInjection
         builder.Services.AddSingleton<IReportFileStore, ReportFileStore>();
         builder.Services.AddScoped<IReportGenerator, CustomerTransactionsReportGenerator>();
         builder.Services.AddScoped<IReportGenerator, AdviserBalancesReportGenerator>();
+        builder.Services.AddScoped<IReportGenerator, BankReconciliationReportGenerator>();
         builder.Services.AddScoped<IReportGeneratorRegistry, ReportGeneratorRegistry>();
         builder.Services.AddScoped<ReportJob>();
+        builder.Services.AddScoped<IReconcileClientMoneyAccount, ReconcileClientMoneyAccount>();
+        builder.Services.AddScoped<BankReconciliationJob>();
         builder.Services.AddSingleton<IReportScheduler, HangfireReportScheduler>();
         builder.Services.AddScoped<AccountRebalancer>();
         builder.Services.AddScoped<RebalanceJob>();

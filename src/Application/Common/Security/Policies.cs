@@ -19,6 +19,7 @@ public static class Policies
     public const string TransactionsCreate = "transactions.create";
     public const string TransactionsAdjust = "transactions.adjust";
     public const string StatementLinesManage = "statement-lines.manage";
+    public const string BankReconciliationsManage = "bank-reconciliations.manage";
     public const string NominatedBankAccountsRead = "nominated-bank-accounts.read";
     public const string NominatedBankAccountsManage = "nominated-bank-accounts.manage";
     public const string NominatedBankAccountsVerify = "nominated-bank-accounts.verify";
@@ -33,4 +34,6 @@ public static class Policies
     public const string ReportsCustomerCreate = "reports.customer.create";
     public const string ReportsBookRead = "reports.book.read";
     public const string ReportsBookCreate = "reports.book.create";
+    public const string ReportsTenantRead = "reports.tenant.read";
+    public const string ReportsTenantCreate = "reports.tenant.create";
 }

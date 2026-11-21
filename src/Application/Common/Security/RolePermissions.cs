@@ -21,13 +21,14 @@ public static class RolePermissions
             Policies.InstrumentsRead, Policies.InstrumentsCreate, Policies.InstrumentsManage,
             Policies.AccountsRead, Policies.AccountsCreate, Policies.AccountsManage,
             Policies.TransactionsRead, Policies.TransactionsCreate, Policies.TransactionsAdjust,
-            Policies.StatementLinesManage,
+            Policies.StatementLinesManage, Policies.BankReconciliationsManage,
             Policies.NominatedBankAccountsRead, Policies.NominatedBankAccountsManage, Policies.NominatedBankAccountsVerify,
             Policies.WithdrawalsRead, Policies.WithdrawalsRequest, Policies.WithdrawalsApprove,
             Policies.PortfoliosRead, Policies.PortfoliosManage,
             Policies.FeesRead, Policies.FeesManage,
             Policies.ReportsCustomerRead, Policies.ReportsCustomerCreate,
-            Policies.ReportsBookRead, Policies.ReportsBookCreate
+            Policies.ReportsBookRead, Policies.ReportsBookCreate,
+            Policies.ReportsTenantRead, Policies.ReportsTenantCreate
         ],
         [UserRole.Adviser] =
         [

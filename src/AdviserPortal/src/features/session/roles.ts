@@ -68,6 +68,11 @@ export function canManageStatementLines(role: string | null | undefined) {
   return role === roles.tenantAdmin;
 }
 
+/** bank-reconciliation D51, D52: the Bank reconciliation pages and the firm reports are for a TenantAdmin. */
+export function canManageBankReconciliations(role: string | null | undefined) {
+  return role === roles.tenantAdmin;
+}
+
 /** nominated-bank-accounts.verify: the Bank account checks page (withdrawals D42). */
 export function canCheckBankAccounts(role: string | null | undefined) {
   return role === roles.tenantAdmin;
