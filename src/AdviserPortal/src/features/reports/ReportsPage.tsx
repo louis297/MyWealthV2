@@ -6,7 +6,8 @@ import { ReportCatalog, ReportParametersUnavailable } from "@/features/reports/R
 import { ReportHistory } from "@/features/reports/ReportHistory";
 import { ReportSchedules } from "@/features/reports/ReportSchedules";
 import { useGetReportsQuery } from "@/features/reports/reportsApi";
-import { roles } from "@/features/session/roles";
+import { FirmReportsSection } from "@/features/reports/FirmReportsSection";
+import { canManageBankReconciliations, roles } from "@/features/session/roles";
 
 export function ReportsPage() {
   const role = useAppSelector((state) => state.session.currentUser?.role);
@@ -55,6 +56,7 @@ export function ReportsPage() {
           <ReportHistory scope="Book" focusId={focusId} />
         </TabsContent>
       </Tabs>
+      {canManageBankReconciliations(role) && role ? <FirmReportsSection role={role} /> : null}
     </section>
   );
 }

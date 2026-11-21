@@ -38,6 +38,9 @@ import { WithdrawalDetailPage } from "@/features/withdrawals/WithdrawalDetailPag
 import { WithdrawalsListPage } from "@/features/withdrawals/WithdrawalsListPage";
 import { WithdrawPage } from "@/features/withdrawals/WithdrawPage";
 import { MatchStatementLinePage } from "@/features/statementLines/MatchStatementLinePage";
+import { BankReconciliationDetailPage } from "@/features/bankReconciliations/BankReconciliationDetailPage";
+import { BankReconciliationHistoryPage } from "@/features/bankReconciliations/BankReconciliationHistoryPage";
+import { BankReconciliationOverviewPage } from "@/features/bankReconciliations/BankReconciliationOverviewPage";
 import { StatementLineDetailPage } from "@/features/statementLines/StatementLineDetailPage";
 import { StatementLinesListPage } from "@/features/statementLines/StatementLinesListPage";
 import { ShellLayout } from "@/layouts/ShellLayout";
@@ -124,6 +127,16 @@ export const appRoutes: RouteObject[] = [
               { index: true, element: <StatementLinesListPage /> },
               { path: ":id", element: <StatementLineDetailPage /> },
               { path: ":id/match", element: <MatchStatementLinePage /> },
+            ],
+          },
+          {
+            // D51: an Adviser who opens the route gets the firm administrator sentence from the 403.
+            path: "/bank-reconciliations",
+            element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
+            children: [
+              { index: true, element: <BankReconciliationOverviewPage /> },
+              { path: "history", element: <BankReconciliationHistoryPage /> },
+              { path: ":id", element: <BankReconciliationDetailPage /> },
             ],
           },
           {

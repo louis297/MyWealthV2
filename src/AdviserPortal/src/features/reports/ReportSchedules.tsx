@@ -14,6 +14,7 @@ import {
   type ReportSchedule,
   type ReportScope,
 } from "@/features/reports/reportsApi";
+import { ClientMoneyAccountField } from "@/features/reports/BankReconciliationGenerate";
 import { roles } from "@/features/session/roles";
 
 function isStatus(error: unknown, status: number) {
@@ -43,6 +44,7 @@ export function ReportSchedules({
   const [to, setTo] = useState("");
   const [includeClosedAccounts, setIncludeClosedAccounts] = useState(false);
   const [adviserId, setAdviserId] = useState("");
+  const [clientMoneyAccountId, setClientMoneyAccountId] = useState("");
   const [preset, setPreset] = useState<CronPreset>("daily");
   const [time, setTime] = useState("09:00");
   const [isActive, setIsActive] = useState(true);
@@ -71,12 +73,13 @@ export function ReportSchedules({
   const formReport = editing ? reports.find((item) => item.id === editing.reportId) ?? chosen : chosen;
   const canSchedule = allowsScheduled((selected ?? formReport) ?? undefined);
   const customerReport = formReport?.code === "customer-transactions";
+  const bankReport = formReport?.code === "bank-reconciliation";
   const needsAdviser = formReport?.code === "adviser-balances" && role === roles.tenantAdmin;
   const { data: advisers } = useGetAdvisersQuery(
     { page: 1, pageSize: 100, enabledOnly: true },
     { skip: !needsAdviser },
   );
-  const blocked = needsAdviser && adviserId === "" && editingId === null;
+  const blocked = (needsAdviser && adviserId === "" && editingId === null) || (bankReport && clientMoneyAccountId === "");
 
   function reportName(id: string) {
     return reports.find((item) => item.id === id)?.name ?? id;
@@ -88,6 +91,9 @@ export function ReportSchedules({
     setTo(typeof item.parameters.to === "string" ? item.parameters.to : "");
     setIncludeClosedAccounts(item.parameters.includeClosedAccounts === true);
     setAdviserId(typeof item.parameters.adviserId === "string" ? item.parameters.adviserId : "");
+    setClientMoneyAccountId(
+      typeof item.parameters.clientMoneyAccountId === "string" ? item.parameters.clientMoneyAccountId : "",
+    );
     setIsActive(item.isActive);
     const parsed = fromCron(item.cron);
     if (parsed) {
@@ -115,7 +121,10 @@ export function ReportSchedules({
       return;
     }
 
-    const parameters: ReportParameters = customerReport
+    // D52: the bank reconciliation report asks for the client money account and sends no reconciliationId.
+    const parameters: ReportParameters = bankReport
+      ? { clientMoneyAccountId }
+      : customerReport
       ? { customerId, from, to, includeClosedAccounts }
       : needsAdviser
         ? { adviserId, includeClosedAccounts }
@@ -242,12 +251,20 @@ export function ReportSchedules({
               ))}
             </SelectField>
           ) : null}
-          <CheckField
-            checked={includeClosedAccounts}
-            onChange={(event) => setIncludeClosedAccounts(event.target.checked)}
-          >
-            Include closed accounts
-          </CheckField>
+          {bankReport ? (
+            <ClientMoneyAccountField
+              id={`schedule-client-money-account-${formReport.id}`}
+              value={clientMoneyAccountId}
+              onChange={setClientMoneyAccountId}
+            />
+          ) : (
+            <CheckField
+              checked={includeClosedAccounts}
+              onChange={(event) => setIncludeClosedAccounts(event.target.checked)}
+            >
+              Include closed accounts
+            </CheckField>
+          )}
           <SelectField
             id={`schedule-frequency-${formReport.id}`}
             label="Frequency"
