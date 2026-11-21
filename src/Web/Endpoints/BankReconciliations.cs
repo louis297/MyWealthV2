@@ -1,6 +1,7 @@
 using MyWealthV2.Application.BankReconciliations;
 using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
+using MyWealthV2.Web.Infrastructure;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace MyWealthV2.Web.Endpoints;
@@ -12,10 +13,16 @@ public class BankReconciliations : IEndpointGroup
 
     public static void Map(RouteGroupBuilder groupBuilder)
     {
-        groupBuilder.MapGet(GetBankReconciliationOverview, "overview").RequireAuthorization(Policies.BankReconciliationsManage);
-        groupBuilder.MapGet(GetBankReconciliations).RequireAuthorization(Policies.BankReconciliationsManage);
-        groupBuilder.MapPost(RunBankReconciliation).RequireAuthorization(Policies.BankReconciliationsManage);
-        groupBuilder.MapGet(GetBankReconciliation, "{id}").RequireAuthorization(Policies.BankReconciliationsManage);
+        // R1: a query or body field the route does not define is a 400.
+        groupBuilder.MapGet(GetBankReconciliationOverview, "overview").RequireAuthorization(Policies.BankReconciliationsManage)
+            .AddEndpointFilter(new KnownQueryKeysFilter("tenantId"));
+        groupBuilder.MapGet(GetBankReconciliations).RequireAuthorization(Policies.BankReconciliationsManage)
+            .AddEndpointFilter(new KnownQueryKeysFilter(
+                "page", "pageSize", "clientMoneyAccountId", "status", "from", "to", "tenantId"));
+        groupBuilder.MapPost(RunBankReconciliation).RequireAuthorization(Policies.BankReconciliationsManage)
+            .AddEndpointFilter(new KnownQueryKeysFilter());
+        groupBuilder.MapGet(GetBankReconciliation, "{id}").RequireAuthorization(Policies.BankReconciliationsManage)
+            .AddEndpointFilter(new KnownQueryKeysFilter());
     }
 
     [EndpointSummary("Run a bank reconciliation now")]

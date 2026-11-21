@@ -1,5 +1,6 @@
 using System.Data;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.ValueObjects;
@@ -52,6 +53,9 @@ public sealed class ReconcileClientMoneyAccount(IApplicationDbContext db, TimePr
         }, cancellationToken);
 
         var run = BankReconciliation.Compute(inputs!, trigger, ranByUserId, at);
+
+        // The daily job runs as the worker's system user, also when the service is called outside the worker.
+        run.CreatedBy = SystemActor.Name;
         db.BankReconciliations.Add(run);
         await db.SaveChangesAsync(cancellationToken);
         return run.PublicId;
