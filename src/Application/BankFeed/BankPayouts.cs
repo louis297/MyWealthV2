@@ -1,3 +1,4 @@
+using MyWealthV2.Application.AccountClosures;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Transactions;
@@ -110,6 +111,14 @@ internal sealed class BankPayouts(IApplicationDbContext db, TimeProvider time)
         {
             // A Closed account holds nothing; the money is a receipt for a TenantAdmin to place (deposit-matching R26).
             line.MarkUnmatched(UnmatchedReason.AccountClosed);
+            await db.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+
+        if (await AccountClosing.IsClosingAsync(db, account.Id, cancellationToken))
+        {
+            // Account closure R14: the closing account's payout is fixed; the money waits in suspense.
+            line.MarkUnmatched(UnmatchedReason.AccountClosing);
             await db.SaveChangesAsync(cancellationToken);
             return true;
         }

@@ -1,3 +1,4 @@
+using MyWealthV2.Application.AccountClosures;
 using Microsoft.Extensions.Logging;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
@@ -136,6 +137,12 @@ public sealed class ProcessStatementLines(
         if (account.Status == AccountStatus.Closed)
         {
             return (null, UnmatchedReason.AccountClosed);
+        }
+
+        // Account closure R14: nothing is posted to a closing account; the receipt waits in suspense.
+        if (await AccountClosing.IsClosingAsync(db, account.Id, cancellationToken))
+        {
+            return (null, UnmatchedReason.AccountClosing);
         }
 
         if (BankDeposits.IsDisabled(await BankDeposits.CustomerAsync(db, account, cancellationToken)))
