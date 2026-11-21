@@ -164,7 +164,9 @@ describe("StatementLinesListPage (deposit-matching D34)", () => {
     ["Matched", "Matched"],
     ["Ignored", "Ignored"],
     ["To be returned", "ReturnRequested"],
-    ["All", "Unmatched,Matched,Ignored,ReturnRequested"],
+    ["Return sent", "ReturnSent"],
+    ["Returned", "Returned"],
+    ["All", "Unmatched,Matched,Ignored,ReturnRequested,ReturnSent,Returned"],
   ])("filters by %s", async (option, status) => {
     const { requests } = renderFees(feeUser(), routes, "/statement-lines", (request) =>
       path(request) === "/statement-lines" ? page([]) : undefined,
@@ -475,5 +477,160 @@ describe("Bank receipts payments out (withdrawals D49)", () => {
     expect(screen.getByRole("link", { name: "Returned line" })).toHaveAttribute("href", `/statement-lines/${returnedId}`);
     expect(screen.getByText("Account closed")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Undo match" })).not.toBeInTheDocument();
+  });
+});
+
+describe("Receipt returns, recalls and debit lines (bank-returns D50)", () => {
+  const detailPath = `/statement-lines/${lineId}`;
+  const detailRoutes = [{ path: "/statement-lines/:id", element: <StatementLineDetailPage /> }];
+  const receiptId = "3f2c0000-0000-0000-0000-0000000000e3";
+  const debit = { ...unmatched, direction: "Debit", unmatchedReason: "UnknownPayment", returnPayment: null };
+
+  it.each([
+    ["ReturnSent", "Return sent"],
+    ["Returned", "Returned"],
+  ])("labels the status %s", async (status, label) => {
+    stubBrowser("/statement-lines");
+    renderFees(feeUser(), [{ path: "/statement-lines", element: <StatementLinesListPage /> }], "/statement-lines", (request) =>
+      path(request) === "/statement-lines" ? page([{ ...unmatched, status, unmatchedReason: null }]) : undefined);
+
+    expect(await screen.findByRole("row", { name: /J SMITH/ })).toHaveTextContent(label);
+  });
+
+  it.each([
+    ["UnknownPayment", "Payment out not recognised"],
+    ["UnknownReturn", "Return not recognised"],
+    ["RecallNotCovered", "Recalled, but the cash is gone"],
+    ["ReturnRejected", "Bank refused the return"],
+  ])("labels the reason %s", async (reason, label) => {
+    stubBrowser("/statement-lines");
+    renderFees(feeUser(), [{ path: "/statement-lines", element: <StatementLinesListPage /> }], "/statement-lines", (request) =>
+      path(request) === "/statement-lines" ? page([{ ...unmatched, unmatchedReason: reason }]) : undefined);
+
+    expect(await screen.findByRole("row", { name: /J SMITH/ })).toHaveTextContent(label);
+  });
+
+  it("offers only Ignore on an unmatched debit line, and ignores it with a note", async () => {
+    stubBrowser(detailPath);
+    const { requests } = renderFees(feeUser(), detailRoutes, detailPath, serveLine(debit, (request) =>
+      request.method === "POST" ? new Response(null, { status: 204 }) : undefined));
+
+    const ignore = await screen.findByRole("button", { name: "Ignore" });
+    for (const name of ["Return to payer", "Reopen", "Undo match"]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+    expect(screen.queryByRole("link", { name: "Match" })).not.toBeInTheDocument();
+    fireEvent.click(ignore);
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("Note"), { target: { value: "Monthly bank fee" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Confirm" }));
+
+    await waitFor(() => expect(requestsTo(requests, "POST", `/statement-lines/${lineId}/ignore`)).toHaveLength(1));
+    expect(await body(requestsTo(requests, "POST", `/statement-lines/${lineId}/ignore`)[0])).toEqual({
+      note: "Monthly bank fee",
+      rowVersion: "AAAA",
+    });
+    expect(screen.getByText("Payment out not recognised")).toBeInTheDocument();
+  });
+
+  it("offers Reopen on an ignored debit line", async () => {
+    stubBrowser(detailPath);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { requests } = renderFees(feeUser(), detailRoutes, detailPath, serveLine({ ...debit, status: "Ignored" }, (request) =>
+      request.method === "POST" ? new Response(null, { status: 204 }) : undefined));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reopen" }));
+
+    await waitFor(() => expect(requestsTo(requests, "POST", `/statement-lines/${lineId}/reopen`)).toHaveLength(1));
+  });
+
+  it("shows a return waiting to be sent under the status, and offers Reopen while it has no attempt", async () => {
+    stubBrowser(detailPath);
+    renderFees(feeUser(), detailRoutes, detailPath, serveLine({
+      ...unmatched,
+      status: "ReturnRequested",
+      returnPayment: { status: "Pending", attempts: 0, lastFailure: null },
+    }));
+
+    expect(await screen.findByText("Waiting to send")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reopen" })).toBeInTheDocument();
+  });
+
+  it("shows a failed send with its label, and offers no Reopen once the bank was asked", async () => {
+    stubBrowser(detailPath);
+    renderFees(feeUser(), detailRoutes, detailPath, serveLine({
+      ...unmatched,
+      status: "ReturnRequested",
+      returnPayment: { status: "Pending", attempts: 2, lastFailure: "Unavailable" },
+    }));
+
+    expect(await screen.findByText("Sending failed: Bank unavailable")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reopen" })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["ReturnSent", "Return sent"],
+    ["Returned", "Returned"],
+  ])("offers no action on a %s line", async (status, label) => {
+    stubBrowser(detailPath);
+    renderFees(feeUser(), detailRoutes, detailPath, serveLine({
+      ...unmatched,
+      status,
+      unmatchedReason: null,
+      returnPayment: { status: "Accepted", attempts: 1, lastFailure: null },
+    }));
+
+    expect(await screen.findByText(label)).toBeInTheDocument();
+    for (const name of ["Ignore", "Return to payer", "Reopen", "Undo match"]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+  });
+
+  it("shows a recall with the Reversal and offers no action", async () => {
+    stubBrowser(detailPath);
+    renderFees(feeUser(), detailRoutes, detailPath, serveLine({
+      ...matched,
+      direction: "Debit",
+      match: { accountId, customerId, transactionId, method: "Recall", at: "2026-11-21T02:01:08Z" },
+      relatedLineId: receiptId,
+      returnReason: "Payer's bank recalled the payment",
+      returnPayment: null,
+    }));
+
+    expect(await screen.findByText("Recalled by the payer's bank")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Reversal" })).toHaveAttribute("href", `/transactions/${transactionId}`);
+    expect(screen.getByRole("link", { name: "Returned line" })).toHaveAttribute("href", `/statement-lines/${receiptId}`);
+    for (const name of ["Ignore", "Reopen", "Undo match"]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+  });
+
+  it("shows a match with no transaction without account or transaction links", async () => {
+    stubBrowser(detailPath);
+    renderFees(feeUser(), detailRoutes, detailPath, serveLine({
+      ...matched,
+      direction: "Debit",
+      match: { accountId: null, customerId: null, transactionId: null, method: "Payment", at: "2026-11-21T02:01:08Z" },
+      relatedLineId: receiptId,
+      returnPayment: null,
+    }));
+
+    expect(await screen.findByText("Paid by the platform")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Returned line" })).toHaveAttribute("href", `/statement-lines/${receiptId}`);
+    expect(screen.queryByText("Account")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Payout" })).not.toBeInTheDocument();
+  });
+
+  it("tells the administrator to adjust the account on a recall the cash no longer covers", async () => {
+    stubBrowser(detailPath);
+    const receipt = { ...matched, id: receiptId };
+    renderFees(feeUser(), detailRoutes, detailPath, serveLine(
+      { ...debit, unmatchedReason: "RecallNotCovered", relatedLineId: receiptId },
+      (request) => (request.method === "GET" && path(request) === `/statement-lines/${receiptId}` ? json(receipt) : undefined),
+    ));
+
+    expect(await screen.findByText("Correct the account with an adjustment, then ignore this line.")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Managed portfolio" })).toHaveAttribute("href", `/accounts/${accountId}`);
+    expect(screen.getByRole("button", { name: "Ignore" })).toBeInTheDocument();
   });
 });
