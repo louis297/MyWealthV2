@@ -61,6 +61,10 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<BankStatementLine> BankStatementLines => Set<BankStatementLine>();
 
+    public DbSet<BankReconciliation> BankReconciliations => Set<BankReconciliation>();
+
+    public DbSet<BankReconciliationItem> BankReconciliationItems => Set<BankReconciliationItem>();
+
     public DbSet<NominatedBankAccount> NominatedBankAccounts => Set<NominatedBankAccount>();
 
     public DbSet<Withdrawal> Withdrawals => Set<Withdrawal>();

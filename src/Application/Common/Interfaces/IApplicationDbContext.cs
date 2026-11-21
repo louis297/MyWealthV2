@@ -14,6 +14,10 @@ public interface IApplicationDbContext
 
     DbSet<BankStatementLine> BankStatementLines { get; }
 
+    DbSet<BankReconciliation> BankReconciliations { get; }
+
+    DbSet<BankReconciliationItem> BankReconciliationItems { get; }
+
     DbSet<NominatedBankAccount> NominatedBankAccounts { get; }
 
     DbSet<Withdrawal> Withdrawals { get; }
