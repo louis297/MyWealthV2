@@ -53,7 +53,7 @@ sequenceDiagram
   Rec->>DB: read at SNAPSHOT: balance, lines by status, Custodial cash by source
   Rec->>DB: store the run and its items
   Op->>DB: read the latest run, follow a break to its line
-  Op->>DB: fix the cause (match, ignore, adjustment); run again
+  Op->>DB: fix the cause (match, ignore, adjustment), then run again
 ```
 
 | | After step 6b | After this slice |
