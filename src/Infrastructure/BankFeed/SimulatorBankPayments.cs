@@ -35,7 +35,7 @@ public sealed class SimulatorBankPayments(IHttpClientFactory httpClients) : IBan
             request.Amount,
             request.Currency,
             request.Reference,
-            new WirePayee(request.Payee.AccountNumber, request.Payee.Name)), options: Json);
+            request.Payee is { } payee ? new WirePayee(payee.AccountNumber, payee.Name) : null), options: Json);
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(connection.TimeoutSeconds));
@@ -97,7 +97,7 @@ public sealed class SimulatorBankPayments(IHttpClientFactory httpClients) : IBan
         [property: JsonPropertyName("amount")] decimal Amount,
         [property: JsonPropertyName("currency")] string Currency,
         [property: JsonPropertyName("reference")] string? Reference,
-        [property: JsonPropertyName("payee")] WirePayee Payee);
+        [property: JsonPropertyName("payee")] WirePayee? Payee);
 
     private sealed record WirePayee(
         [property: JsonPropertyName("accountNumber")] string AccountNumber,

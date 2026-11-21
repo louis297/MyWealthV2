@@ -16,7 +16,9 @@ public interface IBankPayments
 /// <summary>The account the money goes to: the full number and the holder's name.</summary>
 public sealed record BankPaymentPayee(string AccountNumber, string Name);
 
-/// <summary>One payment from <paramref name="TrustAccountNumber"/>, built from stored data only (R58).</summary>
+/// <summary>One payment from <paramref name="TrustAccountNumber"/>, built from stored data only (R58). It pays
+/// <paramref name="Payee"/>, or sends back the receipt line <paramref name="ReturnOfOutsideId"/> to its payer
+/// (bank-returns R6); exactly one of the two.</summary>
 public sealed record BankPaymentRequest(
     string Connection,
     string TrustAccountNumber,
@@ -24,7 +26,8 @@ public sealed record BankPaymentRequest(
     decimal Amount,
     string Currency,
     string? Reference,
-    BankPaymentPayee Payee);
+    BankPaymentPayee? Payee,
+    string? ReturnOfOutsideId = null);
 
 /// <summary>The bank's answer to one call (R33): accepted with its payment id, rejected with a reason, or a failure
 /// of the call itself.</summary>
