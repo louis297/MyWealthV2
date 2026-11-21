@@ -7,7 +7,7 @@ namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 public class ReportsSchemaTests
 {
     [Test]
-    public async Task Apply_SeedsTwoReportsAndNoTenantGrants()
+    public async Task Apply_SeedsThreeReportsAndNoTenantGrants()
     {
         var rows = await QueryReports();
 
@@ -18,6 +18,14 @@ public class ReportsSchemaTests
                 "Adviser Balances Report",
                 "Point-in-time cash and holding lines for an adviser's customers.",
                 "Book",
+                """["manual","scheduled"]""",
+                true),
+            (
+                Guid.Parse("3e7b9d14-6c2a-4f58-b0e1-9a4d2c7f8e33"),
+                "bank-reconciliation",
+                "Bank reconciliation",
+                "A stored bank reconciliation of one client money account: the bank balance, the Custodial cash and the items between them.",
+                "Tenant",
                 """["manual","scheduled"]""",
                 true),
             (
@@ -177,6 +185,7 @@ public class ReportsSchemaTests
         var scope = await CheckDefinition("Reports", "CK_Reports_Scope");
         scope.ShouldContain("Customer");
         scope.ShouldContain("Book");
+        scope.ShouldContain("Tenant");
 
         var trigger = await CheckDefinition("ReportExecutions", "CK_ReportExecutions_TriggerKind");
         trigger.ShouldContain("Manual");

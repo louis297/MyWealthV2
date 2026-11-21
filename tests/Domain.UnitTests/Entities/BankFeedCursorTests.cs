@@ -52,6 +52,79 @@ public class BankFeedCursorTests
     }
 
     [Test]
+    public void StorePage_StoresTheBalanceAndItsTime_AndTheCursor()
+    {
+        var cursor = BankFeedCursor.Start(7);
+
+        cursor.StorePage("w:3", 512.4m, 500m, At);
+
+        cursor.Cursor.ShouldBe("w:3");
+        cursor.LastSucceededAt.ShouldBe(At);
+        cursor.Balance.ShouldBe(512.4m);
+        cursor.BalanceAt.ShouldBe(At);
+    }
+
+    [Test]
+    public void StorePage_TheFirstBalance_SetsTheOpeningBalanceFromTheLinesTotal()
+    {
+        var cursor = BankFeedCursor.Start(7);
+
+        cursor.StorePage("w:3", 1512.4m, 500m, At);
+
+        cursor.OpeningBalance.ShouldBe(1012.4m);
+    }
+
+    [Test]
+    public void StorePage_ALaterBalance_KeepsTheOpeningBalance()
+    {
+        var cursor = BankFeedCursor.Start(7);
+        cursor.StorePage("w:3", 1512.4m, 500m, At);
+
+        cursor.StorePage("w:5", 300m, 700m, At.AddMinutes(1));
+
+        cursor.Balance.ShouldBe(300m);
+        cursor.BalanceAt.ShouldBe(At.AddMinutes(1));
+        cursor.OpeningBalance.ShouldBe(1012.4m);
+    }
+
+    [Test]
+    public void StorePage_WithoutABalance_ClearsTheBalanceAndItsTime_AndKeepsTheOpening()
+    {
+        var cursor = BankFeedCursor.Start(7);
+        cursor.StorePage("w:3", 512.4m, 500m, At);
+
+        cursor.StorePage("w:4", null, 600m, At.AddMinutes(1));
+
+        cursor.Cursor.ShouldBe("w:4");
+        cursor.LastSucceededAt.ShouldBe(At.AddMinutes(1));
+        cursor.Balance.ShouldBeNull();
+        cursor.BalanceAt.ShouldBeNull();
+        cursor.OpeningBalance.ShouldBe(12.4m);
+    }
+
+    [Test]
+    public void StorePage_WithoutABalanceBeforeAnyBalance_SetsNoOpening_AndTheNextBalanceDoes()
+    {
+        var cursor = BankFeedCursor.Start(7);
+        cursor.StorePage("w:3", null, 500m, At);
+
+        cursor.OpeningBalance.ShouldBeNull();
+
+        cursor.StorePage("w:4", 650m, 600m, At.AddMinutes(1));
+
+        cursor.OpeningBalance.ShouldBe(50m);
+    }
+
+    [Test]
+    public void StorePage_RefusesACursorOver500()
+    {
+        var cursor = BankFeedCursor.Start(7);
+
+        Should.Throw<DomainException>(() => cursor.StorePage(new string('c', 501), 1m, 1m, At));
+        cursor.Balance.ShouldBeNull();
+    }
+
+    [Test]
     public void Advance_RefusesACursorOver500()
     {
         var cursor = BankFeedCursor.Start(7);
