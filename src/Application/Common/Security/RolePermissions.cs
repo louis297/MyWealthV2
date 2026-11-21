@@ -27,7 +27,8 @@ public static class RolePermissions
             Policies.PortfoliosRead, Policies.PortfoliosManage,
             Policies.FeesRead, Policies.FeesManage,
             Policies.ReportsCustomerRead, Policies.ReportsCustomerCreate,
-            Policies.ReportsBookRead, Policies.ReportsBookCreate
+            Policies.ReportsBookRead, Policies.ReportsBookCreate,
+            Policies.ReportsTenantRead, Policies.ReportsTenantCreate
         ],
         [UserRole.Adviser] =
         [

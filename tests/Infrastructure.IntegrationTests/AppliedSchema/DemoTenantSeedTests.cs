@@ -181,9 +181,9 @@ public class DemoTenantSeedTests
             .ToList();
         summaries.Count.ShouldBe(2);
         summaries[0].ShouldBe(
-            "Demo seed: tenant demo created; instruments 18 created, 0 existing; reports 2 granted, 0 existing");
+            "Demo seed: tenant demo created; instruments 18 created, 0 existing; reports 3 granted, 0 existing");
         summaries[1].ShouldBe(
-            "Demo seed: tenant demo existing; instruments 0 created, 18 existing; reports 0 granted, 2 existing");
+            "Demo seed: tenant demo existing; instruments 0 created, 18 existing; reports 0 granted, 3 existing");
     }
 
     private static readonly (string Symbol, string Name, string Quote)[] ExpectedCatalog =

@@ -8,7 +8,7 @@ using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationE
 
 namespace MyWealthV2.Application.Reports.Commands.UpdateReportSchedule;
 
-[Authorize(Policy = Policies.ReportsCustomerCreate + "," + Policies.ReportsBookCreate)]
+[Authorize(Policy = Policies.ReportsCustomerCreate + "," + Policies.ReportsBookCreate + "," + Policies.ReportsTenantCreate)]
 public class UpdateReportScheduleCommand : IRequest
 {
     public Guid Id { get; set; }
@@ -61,7 +61,13 @@ public class UpdateReportScheduleCommandHandler(
         }
 
         string snapshotJson;
-        if (report.Code == AdviserBalancesBinder.Code)
+        if (report.Code == BankReconciliationBinder.Code)
+        {
+            var binding = BankReconciliationBinder.Bind(request.Parameters);
+            await BankReconciliationBinder.EnsureScopeAsync(db, tenantId, binding, cancellationToken);
+            snapshotJson = binding.SnapshotJson;
+        }
+        else if (report.Code == AdviserBalancesBinder.Code)
         {
             var role = currentUser.Role ?? throw new UnauthorizedAccessException();
             await AdviserReportScope.EnsureSnapshotAsync(

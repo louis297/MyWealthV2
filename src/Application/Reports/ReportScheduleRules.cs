@@ -96,15 +96,13 @@ public static class ReportScheduleRules
             throw new NotFoundException("Report", report.PublicId);
         }
 
-        var createPolicy = report.Scope == "Book"
-            ? Policies.ReportsBookCreate
-            : Policies.ReportsCustomerCreate;
+        var createPolicy = ReportScopes.CreatePolicy(report.Scope);
         if (!RolePermissions.Has(role, createPolicy))
         {
             throw new ForbiddenAccessException();
         }
 
-        if (report.Code is not (CustomerTransactionsBinder.Code or AdviserBalancesBinder.Code))
+        if (report.Code is not (CustomerTransactionsBinder.Code or AdviserBalancesBinder.Code or BankReconciliationBinder.Code))
         {
             throw new NotFoundException("Report", report.PublicId);
         }

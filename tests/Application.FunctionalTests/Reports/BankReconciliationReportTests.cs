@@ -61,7 +61,8 @@ public class BankReconciliationReportTests : TestBase
         text.ShouldContain("Status: Breaks");
         text.ShouldContain("Breaks");
         text.ShouldContain("In suspense");
-        text.ShouldContain("UnknownReference");
+        text.ShouldContain("Credit");
+        text.ShouldContain("Unmatched");
         text.ShouldContain("Difference");
         text.ShouldContain("Reserved cash");
         text.ShouldContain("Payments in flight");

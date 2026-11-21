@@ -9,7 +9,7 @@ using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationE
 
 namespace MyWealthV2.Application.Reports.Queries.GetReportSchedules;
 
-[Authorize(Policy = Policies.ReportsCustomerRead + "," + Policies.ReportsBookRead)]
+[Authorize(Policy = Policies.ReportsCustomerRead + "," + Policies.ReportsBookRead + "," + Policies.ReportsTenantRead)]
 public record GetReportSchedulesQuery(string? Scope) : IRequest<IReadOnlyList<ReportScheduleDto>>;
 
 public class GetReportSchedulesQueryHandler(IApplicationDbContext db, ICurrentUser currentUser)
@@ -129,15 +129,15 @@ public class GetReportSchedulesQueryHandler(IApplicationDbContext db, ICurrentUs
     {
         if (string.IsNullOrWhiteSpace(scope))
         {
-            return new[] { "Customer", "Book" }
+            return ReportScopes.All
                 .Where(item => RolePermissions.Has(role, ReadPolicy(item)))
                 .ToList();
         }
 
-        if (scope is not ("Customer" or "Book"))
+        if (!ReportScopes.IsKnown(scope))
         {
             throw new ValidationException([
-                new ValidationFailure(nameof(GetReportSchedulesQuery.Scope), "Scope must be Customer or Book.")
+                new ValidationFailure(nameof(GetReportSchedulesQuery.Scope), ReportScopes.InvalidMessage)
             ]);
         }
 
@@ -150,5 +150,5 @@ public class GetReportSchedulesQueryHandler(IApplicationDbContext db, ICurrentUs
     }
 
     private static string ReadPolicy(string scope) =>
-        scope == "Book" ? Policies.ReportsBookRead : Policies.ReportsCustomerRead;
+        ReportScopes.ReadPolicy(scope);
 }

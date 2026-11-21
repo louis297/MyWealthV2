@@ -90,7 +90,7 @@ public sealed class ReportJob(
             .SingleOrDefaultAsync(row => row.Id == schedule.ReportId);
         if (report is null
             || !report.IsActive
-            || report.Code is not (CustomerTransactionsBinder.Code or AdviserBalancesBinder.Code)
+            || report.Code is not (CustomerTransactionsBinder.Code or AdviserBalancesBinder.Code or BankReconciliationBinder.Code)
             || !TenantReportGrantDto.ParseTriggers(report.AllowedTriggers)
                 .Contains("scheduled", StringComparer.Ordinal))
         {
@@ -116,6 +116,16 @@ public sealed class ReportJob(
                     && row.TenantId == schedule.TenantId
                     && row.Role == UserRole.Customer);
                 if (!customerExists)
+                {
+                    return;
+                }
+            }
+            else if (report.Code == BankReconciliationBinder.Code)
+            {
+                var clientMoneyAccountId = BankReconciliationBinder.Bind(parameters).ClientMoneyAccountId;
+                var accountExists = await db.ClientMoneyAccounts.AsNoTracking().AnyAsync(row =>
+                    row.PublicId == clientMoneyAccountId && row.TenantId == schedule.TenantId);
+                if (!accountExists)
                 {
                     return;
                 }
