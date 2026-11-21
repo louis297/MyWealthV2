@@ -1,3 +1,4 @@
+using MyWealthV2.Application.AccountClosures;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Transactions;
@@ -35,6 +36,8 @@ public class GetAccountByIdQueryHandler(IApplicationDbContext db, ICurrentUser c
 
         var cashBalance = await TransactionCash.SumAsync(db, row.account.Id, cancellationToken);
         var reserved = await AccountCash.ReservedAsync(db, row.account.Id, cancellationToken);
-        return AccountDto.From(row.account, row.tenant, row.customer, cashBalance, reserved);
+        var closures = await AccountClosureReader.LatestAsync(db, [row.account.Id], cancellationToken);
+        return AccountDto.From(
+            row.account, row.tenant, row.customer, cashBalance, reserved, closures.GetValueOrDefault(row.account.Id));
     }
 }

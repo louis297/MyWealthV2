@@ -51,6 +51,8 @@ public static class DependencyInjection
                      Policies.WithdrawalsRead,
                      Policies.WithdrawalsRequest,
                      Policies.WithdrawalsApprove,
+                     Policies.AccountClosuresRead,
+                     Policies.AccountClosuresRequest,
                      Policies.TransactionsAdjust,
                      Policies.PortfoliosRead,
                      Policies.PortfoliosManage,
