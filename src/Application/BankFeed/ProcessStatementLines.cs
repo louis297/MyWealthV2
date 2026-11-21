@@ -55,7 +55,7 @@ public sealed class ProcessStatementLines(
             return;
         }
 
-        var payouts = new BankPayouts(db, time);
+        var payouts = new BankPayouts(db, time, catalog, logger);
         if (line.Direction == BankLineDirection.Debit)
         {
             if (await payouts.ProcessDebitAsync(line, cancellationToken)
