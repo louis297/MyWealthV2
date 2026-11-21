@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-20
-last_updated: 2026-11-21
+last_updated: 2026-11-22
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -19,6 +19,7 @@ related:
   - ../database-design.md
   - ../api-design.md
   - ../glossary.md
+  - account-closure.md
 ---
 
 # Receipt returns, recalls and other debit lines
@@ -313,3 +314,11 @@ The repository should build after each commit. Agents split each behaviour into 
 ### Docs amended when this spec was accepted
 
 [deposit-matching.md](deposit-matching.md) (R13, R14, R18, R23, R28, R29 and the item: every debit line processed, returns sent, recalls applied, actions on debit lines), [withdrawals.md](withdrawals.md) (R31 kinds, R34 `UnknownLine`), [simulator.md](simulator.md) (R12–R15, script `0005`), [api-design.md](../api-design.md) (§7.7 row, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D50), [features/README.md](README.md) row status, the roadmap §5 B4 / B6, §11 S1 and §13 status, [glossary.md](../glossary.md) (statement line statuses, suspense, receipt return, recall) and [function-plan.md](../function-plan.md) §5.
+
+---
+
+## Amendment 2026-11-22 (account closure) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [account-closure.md](account-closure.md).
+
+- R3: no rule changes. On a closing account (an account closure `InProgress`) available cash is the remainder below the minor unit, so a recall of one of its receipts is not covered and waits in suspense as `RecallNotCovered` (account-closure R15), as on any account whose cash is reserved for a withdrawal.

@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-19
-last_updated: 2026-11-20
+last_updated: 2026-11-22
 related:
   - ../custodial-roadmap.md
   - transaction-source.md
@@ -23,6 +23,7 @@ related:
   - ../glossary.md
   - ../known-issues/custodial-account-gaps.md
   - withdrawals.md
+  - account-closure.md
 ---
 
 # Adjustments
@@ -406,3 +407,12 @@ Do not put a review status, an operations role, a reconciliation or a new source
 Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md](withdrawals.md).
 
 - R9: after an adjustment with a negative `amount`, the Account's **available cash** (cash `SUM` minus the reserved cash of open withdrawals) must be `≥ 0`, checked under the Account lock. When the `SUM` stays `≥ 0` but falls below reserved cash → 400 with `Available cash cannot become negative: 300.00 USD is reserved for withdrawals.` (withdrawals R37). The reverse of an adjustment that lowers cash follows the same rule.
+
+---
+
+## Amendment 2026-11-22 (account closure) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [account-closure.md](account-closure.md).
+
+- R15: an adjustment on a closing account (an account closure `InProgress`), and the reverse of one, → 400 with `This account is being closed and accepts no new activity.` under the empty `errors` key, directly after the Closed-account check (account-closure R12).
+- §2 Out, the B8 write-off: decided in [account-closure.md](account-closure.md) §11 point 6. The remainder write-off is a `CloseOut` with source `AccountClosure`, not an `Adjustment`; R7 gains no `Rounding` reason and R9 is unchanged.

@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-20
-last_updated: 2026-11-21
+last_updated: 2026-11-22
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -30,6 +30,7 @@ related:
   - withdrawals.md
   - bank-returns.md
   - bank-reconciliation.md
+  - account-closure.md
 ---
 
 # Bank feed and deposit matching
@@ -746,3 +747,13 @@ Status of this amendment: `accepted` (2026-11-21), together with [bank-reconcili
 - R46: the control account list gains `statementBalance`, the balance the feed would answer at the account's last place.
 - R49: `SimulatorBankFeed` reads `balance` as a number or `null`; a string, or more than 4 decimal places → `BadResponse`.
 - §2 Out "Bank reconciliation": now in [bank-reconciliation.md](bank-reconciliation.md).
+
+---
+
+## Amendment 2026-11-22 (account closure) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [account-closure.md](account-closure.md).
+
+- R18: new unmatched reason `AccountClosing` (12), checked directly after `AccountClosed`: the reference names an Account with an account closure `InProgress`. Nothing is posted; the TenantAdmin returns the line or matches it by hand once the closure has ended (account-closure R14).
+- R26, R30: a match by hand to a closing account, and an undo match of a deposit on one → 400 with `This account is being closed and accepts no new activity.` under the empty `errors` key (account-closure R12).
+- §6: script `0046_account_closures.sql` widens the `UnmatchedReason` CHECK of `BankStatementLines` to 0–12. The item's `unmatchedReason` may be `AccountClosing`.

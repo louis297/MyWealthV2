@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-19
-last_updated: 2026-11-20
+last_updated: 2026-11-22
 related:
   - ../custodial-roadmap.md
   - posting.md
@@ -20,6 +20,7 @@ related:
   - ../known-issues/custodial-account-gaps.md
   - deposit-matching.md
   - withdrawals.md
+  - account-closure.md
 ---
 
 # Transaction source
@@ -369,3 +370,14 @@ Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md
 - R10: `kind` may be `Payment`.
 - R12: `Payment` is not hand-reversible. On a Custodial account a hand reverse of a payout or its Reversal → 400 (R13). The withdrawal flow undoes its own write when the bank returns the payout.
 - §5: `TransactionSource.Payment(Guid withdrawalPublicId)`; an empty id → `DomainException`.
+
+---
+
+## Amendment 2026-11-22 (account closure) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [account-closure.md](account-closure.md).
+
+- R2, R4: new source kind `AccountClosure = 5`, with the account closure's PublicId as source id (required). It marks the remainder write-off (a `CloseOut`, account-closure R18). `TransactionSource.AccountClosure(Guid closurePublicId)`; an empty id → `DomainException`.
+- R12, R13: `AccountClosure` is not hand-reversible. `POST /transactions/{id}/reverse` of a write-off → 400 with the R13 message.
+- §6: script `0046_account_closures.sql` widens `CK_Transactions_SourceKind` to 0–5 and requires a `SourcePublicId` for kinds 2–5.
+- R18 (item): `source.kind` may be `AccountClosure`, with `id` the closure's PublicId.

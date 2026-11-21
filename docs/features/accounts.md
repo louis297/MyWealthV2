@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-21
-last_updated: 2026-11-20
+last_updated: 2026-11-22
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -26,6 +26,7 @@ related:
   - client-money-accounts.md
   - deposit-matching.md
   - withdrawals.md
+  - account-closure.md
 ---
 
 # Accounts
@@ -466,3 +467,14 @@ Do not put cash, holdings, Opening, or portal pages in these commits.
 Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md](withdrawals.md).
 
 - The item on list and get, and `GET /accounts/{id}/cash-balance`, gain `reservedCash` (the sum of the Account's open withdrawals: `Requested`, `Approved`, `Sent`) and `availableCash` (cash balance minus reserved cash). On an External account `reservedCash` is always 0 and `availableCash` equals the cash balance. Neither is a body field.
+
+---
+
+## Amendment 2026-11-22 (account closure) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [account-closure.md](account-closure.md). Rules R2–R9, R17–R22 and R27 live there; this section records what changes here.
+
+- R16 and close: an Open Custodial account is closed only through an account closure, which pays out the balance as a withdrawal, writes off a remainder below the minor unit and closes the Account (account-closure R7–R9, R17). `POST /accounts/{id}/close` on an Open Custodial account → 400 with the message `A Custodial account is closed with an account closure.` under the empty `errors` key, for every caller, SystemAdmin included (account-closure R22). An already Closed Custodial account → 204 (R12). External accounts unchanged.
+- §8: new sub-resource `/accounts/{accountId}/closures` (`account-closures.read`, `account-closures.request`): `POST` (request, `Idempotency-Key`), `GET` (the Account's closures) and `GET …/{id}`. Field rules in account-closure §4.2 and §4.6.
+- R17 and §8.1: the item on list and get gains `closure`, the Account's latest closure as `{ id, status, payoutAmount, withdrawalId, requestedAt, completedAt }`, or `null`; always `null` on an External account.
+- While a closure is `InProgress` the Account is **closing**: it is Open but accepts no hand write (account-closure R11–R13). Reopen, rename and the Disable-Customer guard are unchanged; a Closed account keeps its closures, and a later closure is a new row.

@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-02
-last_updated: 2026-11-20
+last_updated: 2026-11-22
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -28,6 +28,7 @@ related:
   - custody-modes.md
   - transaction-source.md
   - withdrawals.md
+  - account-closure.md
 ---
 
 # Portfolios
@@ -450,3 +451,12 @@ Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md
 
 - R8: the cash `V` a rebalance invests is the Account's **available cash** (cash balance minus the reserved cash of open withdrawals), so cash reserved for a withdrawal is never invested.
 - R11: the check for enough cash to fund the net buys uses available cash. Its trades therefore never meet the withdrawals R37 refusal.
+
+---
+
+## Amendment 2026-11-22 (account closure) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [account-closure.md](account-closure.md).
+
+- R4 / assign (as amended by custody-modes R14): a closing account (an account closure `InProgress`) cannot be assigned → 400 `account_not_eligible` with `Only an open Custodial account that is not being closed can be assigned a portfolio.` (account-closure R13).
+- An account closure is refused while the Account has an Active assignment (account-closure R5): unassign first, then sell the holdings (R18 still locks manual trades while assigned).
