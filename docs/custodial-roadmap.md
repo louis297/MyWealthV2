@@ -3,7 +3,7 @@ title: Custodial accounts roadmap
 status: note
 language: en
 created: 2026-11-19
-updated: 2026-11-21
+updated: 2026-11-22
 related:
   - future-plans.md
   - adr/0020-account-custody-mode.md
@@ -30,6 +30,7 @@ related:
   - features/withdrawals.md
   - features/bank-returns.md
   - features/bank-reconciliation.md
+  - features/account-closure.md
 ---
 
 # Custodial accounts roadmap
@@ -252,6 +253,7 @@ Real-world shape: Customers pay into the firm's client money trust account at a 
 - **What:** closing a Custodial account becomes a flow: no open instructions, no holdings, withdraw the balance to the nominated account, write off a remainder smaller than the currency's minor unit (the reason `CloseOut` still exists, custody-modes §4.2) as a rounding adjustment, then close.
 - **Matrix:** hand `CloseOut` on a Custodial account → refused.
 - **Depends on:** B6, F3.
+- **Spec:** [account-closure.md](features/account-closure.md) (`review`, 2026-11-22). Its §11 proposes: an account closure is its own record (`/account-closures`), requested by an Adviser or TenantAdmin; it refuses while the account holds anything, has an Active portfolio assignment, an open withdrawal or another closure, and does not sell, unassign or cancel; the payout is the cash balance rounded down to the minor unit, paid as an ordinary withdrawal created with the closure, whose approval is the only approval; with nothing to pay out the closure completes at once; while the payout is on its way the account is closing and accepts no hand write, and its receipts and returned payouts wait in suspense (`AccountClosing`); the payout, the remainder write-off and the close are one database transaction; the closure ends with its withdrawal (no cancel route of its own); the remainder is a `CloseOut` written by the flow with a new source `AccountClosure`, not an `Adjustment` (this refines "as a rounding adjustment" above); `POST /accounts/{id}/close` and hand `CloseOut` are refused on Custodial accounts; permissions `account-closures.read` and `.request`, SystemAdmin none.
 
 ---
 
@@ -452,7 +454,7 @@ Each step depends only on earlier steps. "Closes" names the matrix cell or known
 | 6 | B5 nominated bank account, B6 withdrawals, available cash | S1 payments | Hand `TransferOut`; hand `CloseOut` beyond a remainder | [withdrawals](features/withdrawals.md) | accepted 2026-11-20, landed 2026-11-21 |
 | 6b | B4 / B6 remainder: receipt returns, recalls, other debit lines | S1 returns and recalls | — | [bank-returns](features/bank-returns.md) | accepted 2026-11-21, landed 2026-11-21 |
 | 7 | B7 bank reconciliation | S1 balances | — | [bank-reconciliation](features/bank-reconciliation.md) | accepted 2026-11-21, landed 2026-11-21 |
-| 8 | B8 account closure | — | Hand `CloseOut` | — | not started |
+| 8 | B8 account closure | — | Hand `CloseOut` | [account-closure](features/account-closure.md) | review 2026-11-22 |
 | 9 | I1 tax profile, I2 interest run | S1 trust interest | "No interest" | — | not started |
 | 10 | C1 corporate actions (split, consolidation, bonus) | S4 | "A split cannot be recorded" | — | not started |
 | 11 | O1 orders, O2 settlement | S2 | Immediate `Buy` / `Sell` | — | not started |
