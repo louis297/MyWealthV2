@@ -226,6 +226,28 @@ public class BffApiTests
     }
 
     [Test]
+    public async Task Session_ProxiesBankReconciliations_ReadsAndRunNow()
+    {
+        // bff-adviser-portal amendment 2026-11-21 (bank reconciliation): /bank-reconciliations is on the prefix allow-list.
+        _api.Scripts["/bank-reconciliations/overview"] = (HttpStatusCode.OK, """{"items":[],"page":1,"pageSize":1,"totalCount":0}""");
+        _api.Scripts["/bank-reconciliations"] = (HttpStatusCode.Created, """{"id":"3e7b9d14-6c2a-4f58-b0e1-9a4d2c7f8e33"}""");
+
+        using var overview = new HttpRequestMessage(HttpMethod.Get, "/api/bank-reconciliations/overview");
+        overview.Headers.TryAddWithoutValidation("Cookie", _sessionCookie);
+        var read = await _bff.SendAsync(overview);
+        using var run = new HttpRequestMessage(HttpMethod.Post, "/api/bank-reconciliations");
+        run.Headers.TryAddWithoutValidation("Cookie", _sessionCookie);
+        run.Headers.TryAddWithoutValidation(RequestHeader, "1");
+        run.Content = new StringContent("""{"clientMoneyAccountId":"8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11"}""", System.Text.Encoding.UTF8, "application/json");
+        var ran = await _bff.SendAsync(run);
+
+        read.StatusCode.ShouldBe(HttpStatusCode.OK);
+        ran.StatusCode.ShouldBe(HttpStatusCode.Created);
+        _api.Calls.ShouldContain(call => call.Path == "/bank-reconciliations/overview");
+        _api.Calls.ShouldContain(call => call.Path == "/bank-reconciliations");
+    }
+
+    [Test]
     public async Task Session_ProxiesNominatedBankAccountsAndWithdrawals_ReadsAndActions()
     {
         // bff-adviser-portal amendment 2026-11-20 (withdrawals): /nominated-bank-accounts and /withdrawals are on the
