@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useGetAccountQuery } from "@/features/accounts/accountsApi";
 import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
 import { useGetCustomerQuery } from "@/features/customers/customersApi";
+import { paymentFailureLabel } from "@/features/withdrawals/withdrawalLabels";
 import { NoteDialog } from "@/features/statementLines/NoteDialog";
 import { forbiddenSentence } from "@/features/statementLines/StatementLinesListPage";
 import {
@@ -34,13 +35,23 @@ const dialogs: Record<NoteAction, string> = {
   unmatch: "Undo this match",
 };
 
-/** D35: one bank receipt with its match, its last action and the actions its status allows (R23). */
+export const adjustSentence = "Correct the account with an adjustment, then ignore this line.";
+
+/** D50: a match the platform made for a payment, a returned payment or a recall is undone only by its flow. */
+const platformMethods = ["Payment", "PaymentReturn", "Recall"];
+
+/** D35, D50: one bank statement line with its match, its last action and the actions its status allows (R23,
+ * bank-returns R9). */
 export function StatementLineDetailPage() {
   const { id = "" } = useParams();
   const { data, error, refetch } = useGetStatementLineQuery(id, { skip: !id });
   const currencies = useGetCurrenciesQuery();
-  const account = useGetAccountQuery(data?.match?.accountId ?? "", { skip: !data?.match });
-  const customer = useGetCustomerQuery(data?.match?.customerId ?? "", { skip: !data?.match });
+  // D50: a recall the cash no longer covers links to the account of the recalled receipt's deposit.
+  const notCovered = data?.unmatchedReason === "RecallNotCovered" && !!data.relatedLineId;
+  const recalled = useGetStatementLineQuery(data?.relatedLineId ?? "", { skip: !notCovered });
+  const accountId = data?.match?.accountId ?? (notCovered ? recalled.data?.match?.accountId : null) ?? null;
+  const account = useGetAccountQuery(accountId ?? "", { skip: !accountId });
+  const customer = useGetCustomerQuery(data?.match?.customerId ?? "", { skip: !data?.match?.customerId });
   const [noteAction, { isLoading: noting }] = useNoteStatementLineMutation();
   const [reopen, { isLoading: reopening }] = useReopenStatementLineMutation();
   const [dialog, setDialog] = useState<NoteAction | null>(null);
@@ -65,10 +76,12 @@ export function StatementLineDetailPage() {
 
   const line = data;
   const places = currencies.data?.find((item) => item.code === line.currency)?.decimalPlaces;
-  // D49: a debit line, or a line the platform matched to a payment, offers no action.
-  const byPayment = line.match?.method === "Payment" || line.match?.method === "PaymentReturn";
-  const credit = line.direction === "Credit" && !byPayment;
-  const accountName = account.data?.name ?? line.match?.accountId ?? "";
+  // D49, D50: a line the platform matched offers no action; a debit line offers only ignore and reopen.
+  const byPlatform = platformMethods.includes(line.match?.method ?? "");
+  const credit = line.direction === "Credit";
+  // D50: a receipt to be returned is reopened only while the bank was not asked yet.
+  const returnAttempted = (line.returnPayment?.attempts ?? 0) > 0;
+  const accountName = account.data?.name ?? accountId ?? "";
 
   function failed(problem: unknown) {
     if (problemStatus(problem) === 409) {
@@ -103,7 +116,17 @@ export function StatementLineDetailPage() {
     }
   }
 
-  const actions = !credit ? null : line.status === "Unmatched" ? (
+  const debitActions = line.status === "Unmatched" ? (
+    <Button size="sm" variant="outline" onClick={() => setDialog("ignore")}>
+      Ignore
+    </Button>
+  ) : line.status === "Ignored" ? (
+    <Button size="sm" variant="outline" onClick={() => void onReopen()} disabled={reopening}>
+      Reopen
+    </Button>
+  ) : null;
+
+  const actions = byPlatform ? null : !credit ? debitActions : line.status === "Unmatched" ? (
     <div className="flex flex-wrap gap-2">
       <Link to={`/statement-lines/${line.id}/match`} className={cn(buttonVariants({ size: "sm" }))}>
         Match
@@ -115,7 +138,7 @@ export function StatementLineDetailPage() {
         Return to payer
       </Button>
     </div>
-  ) : line.status === "Ignored" || line.status === "ReturnRequested" ? (
+  ) : line.status === "Ignored" || (line.status === "ReturnRequested" && !returnAttempted) ? (
     <Button size="sm" variant="outline" onClick={() => void onReopen()} disabled={reopening}>
       Reopen
     </Button>
@@ -134,6 +157,13 @@ export function StatementLineDetailPage() {
           <DetailGrid>
             <DetailItem label="Status">
               <StatusBadge status={statusLabel(line.status)} />
+              {line.status === "ReturnRequested" && line.returnPayment ? (
+                <p className="text-muted-foreground mt-1 text-sm">
+                  {line.returnPayment.lastFailure
+                    ? `Sending failed: ${paymentFailureLabel(line.returnPayment.lastFailure)}`
+                    : "Waiting to send"}
+                </p>
+              ) : null}
             </DetailItem>
             {line.status === "Unmatched" || line.unmatchedReason ? (
               <DetailItem label="Reason">{reasonLabel(line.unmatchedReason)}</DetailItem>
@@ -159,23 +189,41 @@ export function StatementLineDetailPage() {
           </DetailGrid>
         </CardContent>
       </Card>
+      {line.status === "Unmatched" && line.unmatchedReason === "RecallNotCovered" ? (
+        <p className="text-sm">
+          {adjustSentence}{" "}
+          {accountId ? (
+            <Link to={`/accounts/${accountId}`} className={recordLinkClass}>
+              {accountName}
+            </Link>
+          ) : null}
+        </p>
+      ) : null}
       {line.match ? (
         <Section title="Match">
           <Card>
             <CardContent className="flex flex-col gap-3">
               <p className="text-sm">{methodLabel(line.match.method)}</p>
               <DetailGrid>
-                <DetailItem label="Account">
-                  <Link to={`/accounts/${line.match.accountId}`} className={recordLinkClass}>
-                    {accountName}
-                  </Link>
-                </DetailItem>
-                <DetailItem label="Customer">{customer.data?.name ?? line.match.customerId}</DetailItem>
-                <DetailItem label="Transaction">
-                  <Link to={`/transactions/${line.match.transactionId}`} className={recordLinkClass}>
-                    {line.match.method === "Payment" ? "Payout" : line.match.method === "PaymentReturn" ? "Reversal" : "Deposit"}
-                  </Link>
-                </DetailItem>
+                {/* D50: a match with no Transaction (a receipt return paid, a receipt never credited recalled) has no
+                    account and no transaction. */}
+                {line.match.accountId ? (
+                  <DetailItem label="Account">
+                    <Link to={`/accounts/${line.match.accountId}`} className={recordLinkClass}>
+                      {accountName}
+                    </Link>
+                  </DetailItem>
+                ) : null}
+                {line.match.customerId ? (
+                  <DetailItem label="Customer">{customer.data?.name ?? line.match.customerId}</DetailItem>
+                ) : null}
+                {line.match.transactionId ? (
+                  <DetailItem label="Transaction">
+                    <Link to={`/transactions/${line.match.transactionId}`} className={recordLinkClass}>
+                      {transactionLabel(line.match.method)}
+                    </Link>
+                  </DetailItem>
+                ) : null}
                 <DetailItem label="Matched at">{formatInstant(line.match.at)}</DetailItem>
               </DetailGrid>
             </CardContent>
@@ -208,4 +256,16 @@ export function StatementLineDetailPage() {
       ) : null}
     </Page>
   );
+}
+
+function transactionLabel(method: string) {
+  switch (method) {
+    case "Payment":
+      return "Payout";
+    case "PaymentReturn":
+    case "Recall":
+      return "Reversal";
+    default:
+      return "Deposit";
+  }
 }

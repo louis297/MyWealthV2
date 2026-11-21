@@ -10,13 +10,15 @@ import { Pager } from "@/shared/components/Pager";
 import { formatAmount } from "@/shared/format/money";
 import { formatInstant } from "@/shared/time/instant";
 
-/** D34: the filter values; All sends the four statuses a person acts on. Received lines are not shown. */
+/** D34, D50: the filter values; All sends every status but Received, which is not shown. */
 const filters: Record<string, { label: string; status: string }> = {
   Unmatched: { label: "Unmatched", status: "Unmatched" },
   Matched: { label: "Matched", status: "Matched" },
   Ignored: { label: "Ignored", status: "Ignored" },
   ReturnRequested: { label: "To be returned", status: "ReturnRequested" },
-  All: { label: "All", status: "Unmatched,Matched,Ignored,ReturnRequested" },
+  ReturnSent: { label: "Return sent", status: "ReturnSent" },
+  Returned: { label: "Returned", status: "Returned" },
+  All: { label: "All", status: "Unmatched,Matched,Ignored,ReturnRequested,ReturnSent,Returned" },
 };
 
 /** D49: receipts by default; payments out; or both. */
