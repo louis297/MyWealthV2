@@ -19,13 +19,25 @@ const filters: Record<string, { label: string; status: string }> = {
   All: { label: "All", status: "Unmatched,Matched,Ignored,ReturnRequested" },
 };
 
+/** D49: receipts by default; payments out; or both. */
+const directions: Record<string, { label: string; direction?: string }> = {
+  Credit: { label: "Receipts", direction: "Credit" },
+  Debit: { label: "Payments out", direction: "Debit" },
+  All: { label: "All" },
+};
+
 export const forbiddenSentence = "Only a firm administrator can see bank receipts.";
 
 export function StatementLinesListPage() {
   const [params, setParams] = useSearchParams();
   const filter = filters[params.get("status") ?? ""] ? params.get("status")! : "Unmatched";
+  const direction = directions[params.get("direction") ?? ""] ? params.get("direction")! : "Credit";
   const page = Number(params.get("page") ?? "1") || 1;
-  const { data, error } = useGetStatementLinesQuery({ status: filters[filter].status, page });
+  const { data, error } = useGetStatementLinesQuery({
+    status: filters[filter].status,
+    direction: directions[direction].direction,
+    page,
+  });
   const currencies = useGetCurrenciesQuery();
   const places = (code: string) => currencies.data?.find((item) => item.code === code)?.decimalPlaces;
 
@@ -58,6 +70,19 @@ export function StatementLinesListPage() {
               onChange={(event) => update("status", event.target.value || null)}
             >
               {Object.entries(filters).map(([value, item]) => (
+                <SelectItem key={value} value={value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectField>
+            <SelectField
+              id="statement-lines-direction"
+              label="Direction"
+              className="w-48"
+              value={direction}
+              onChange={(event) => update("direction", event.target.value || null)}
+            >
+              {Object.entries(directions).map(([value, item]) => (
                 <SelectItem key={value} value={value}>
                   {item.label}
                 </SelectItem>

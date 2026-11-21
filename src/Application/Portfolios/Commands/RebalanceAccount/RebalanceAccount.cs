@@ -184,7 +184,10 @@ public class AccountRebalancer(
         }
 
         decimal? accountToBase = await RateAsync(account.Currency, portfolio.BaseCurrency, cancellationToken);
-        var cash = await TransactionCash.SumAsync(db, account.Id, cancellationToken);
+
+        // Withdrawals R37, portfolios R8 and R11: a rebalance plans with the available cash, so it never invests
+        // cash reserved for a withdrawal.
+        var cash = await AccountCash.AvailableAsync(db, account.Id, cancellationToken);
         var feeSchedules = await FeeSchedulesAsync(
             account.TenantId,
             holdings.Select(row => row.QuoteCurrency).Concat(targets.Select(row => row.QuoteCurrency)),

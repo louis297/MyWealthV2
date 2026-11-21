@@ -151,13 +151,16 @@ public class GetAccountsQueryHandler(IApplicationDbContext db, ICurrentUser curr
                 select new { AccountId = grouped.Key, Sum = grouped.Sum(leg => leg.Amount) }
             ).ToDictionaryAsync(row => row.AccountId, row => row.Sum, cancellationToken);
 
+        var reserved = await AccountCash.ReservedAsync(db, accountIds, cancellationToken);
+
         return new PagedList<AccountDto>
         {
             Items = items.Select(row => AccountDto.From(
                 row.account,
                 row.tenant,
                 row.customer,
-                cashBalances.GetValueOrDefault(row.account.Id))).ToList(),
+                cashBalances.GetValueOrDefault(row.account.Id),
+                reserved.GetValueOrDefault(row.account.Id))).ToList(),
             Page = request.Page,
             PageSize = request.PageSize,
             TotalCount = totalCount

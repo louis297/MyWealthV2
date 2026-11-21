@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-19
-last_updated: 2026-11-19
+last_updated: 2026-11-20
 related:
   - ../custodial-roadmap.md
   - transaction-source.md
@@ -22,6 +22,7 @@ related:
   - ../api-design.md
   - ../glossary.md
   - ../known-issues/custodial-account-gaps.md
+  - withdrawals.md
 ---
 
 # Adjustments
@@ -397,3 +398,11 @@ Do not put a review status, an operations role, a reconciliation or a new source
 ### Docs amended when this spec was accepted
 
 [posting.md](posting.md) (amendment note; R16 type set), [holdings.md](holdings.md) (amendment note: a holding change outside the trade types), [custody-modes.md](custody-modes.md) (matrix row `Adjustment`), [portfolios.md](portfolios.md) (R18 does not apply), [reports.md](reports.md) (§9.1 type cell), [api-design.md](../api-design.md) (§3.1 permission row, §7.7 route and item note, change log), [domain-model.md](../domain-model.md) §8.6, [database-design.md](../database-design.md) §9 and §11.4, [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D28–D31), [customer-portal.md](../customer-portal/customer-portal.md) (label), [function-plan.md](../function-plan.md) §9 item, [features/README.md](README.md) row status, the roadmap §13 status.
+
+---
+
+## Amendment 2026-11-20 (available cash) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md](withdrawals.md).
+
+- R9: after an adjustment with a negative `amount`, the Account's **available cash** (cash `SUM` minus the reserved cash of open withdrawals) must be `≥ 0`, checked under the Account lock. When the `SUM` stays `≥ 0` but falls below reserved cash → 400 with `Available cash cannot become negative: 300.00 USD is reserved for withdrawals.` (withdrawals R37). The reverse of an adjustment that lowers cash follows the same rule.

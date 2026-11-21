@@ -27,6 +27,7 @@ related:
   - ../database-design.md
   - ../api-design.md
   - ../glossary.md
+  - withdrawals.md
 ---
 
 # Bank feed and deposit matching
@@ -702,3 +703,16 @@ Do not put debit-line processing, payments, returns, nominated bank accounts, wi
 ### Docs amended when this spec was accepted
 
 [custody-modes.md](custody-modes.md) (R5 matrix: `TransferIn` / Custodial refused, the refusal message), [transaction-source.md](transaction-source.md) (kind `BankFeed` = 3, not hand-reversible, check widened), [posting.md](posting.md) (a `TransferIn` may carry a bank receipt detail; the flow's Reversal), [client-money-accounts.md](client-money-accounts.md) (`bankConnection`, `bankFeed`, the open points of §11 answered), [accounts.md](accounts.md) (`depositReference` filter), [simulator.md](simulator.md) (S1 receipts amendment: R38–R48, script `0003`, the AppHost party key, §11 point 7), [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rule 15 wording (point 5), [bff-adviser-portal.md](bff-adviser-portal.md) (prefix `/statement-lines`), [api-design.md](../api-design.md) (§3.1 permission row, §7.3, §7.6, §7.7 rows, a `/statement-lines` and `/bank-connections` catalog entry, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [architecture.md](../architecture.md) (the first party port and the `bank` queue), [deployment.md](../deployment.md) (§5 keys), [back-office.md](../backoffice/back-office.md) (BO18, BO19), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D34–D39, D18), [customer-portal.md](../customer-portal/customer-portal.md) (C21), [known-issues/custodial-account-gaps.md](../known-issues/custodial-account-gaps.md) (the deposit half of the first row), [function-plan.md](../function-plan.md) §5, [features/README.md](README.md) row status, the roadmap §5 B3 / B4, §11 S1 and §13 status.
+
+---
+
+## Amendment 2026-11-20 (nominated bank accounts and withdrawals) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md](withdrawals.md). The other debit lines (receipt returns, recalls, debit lines the platform did not cause) stay as this spec leaves them until [bank-returns.md](bank-returns.md).
+
+- R10: a line may carry three more optional fields from the bank, `endToEndId`, `returnOf` and `returnReason`. `EndToEndId` and `ReturnOfOutsideId` are stored as sent (at most 100 characters each, else the page is refused as `InvalidLine`), `ReturnReason` cut to 140, and `returnOf` resolved to the stored line of the same connection (`RelatedLineId`) when it exists (withdrawals R38).
+- R13: the processing step also handles, in the same order and the same way, every `Received` debit line whose `endToEndId` names a withdrawal of the line's Tenant (a payout, withdrawals R40), and every `Received` credit line whose `returnOf` names a payout line (a returned payout, withdrawals R42). Other credit lines go through R15–R20 as before.
+- R14: a debit line without a withdrawal's `endToEndId` still stays `Received`.
+- R30: on a Custodial account an undo match is refused when it would leave **available cash** below 0, not only the cash `SUM` (withdrawals R36, R37).
+- The line item gains `relatedLineId`, `withdrawalId` and `returnReason`; unmatched reason `PaymentMismatch` (7); match methods `Payment` (2) and `PaymentReturn` (3). `GET /statement-lines` takes an optional `direction` (`Credit`, `Debit`; unknown → 400 `errors.Direction`).
+- §4.6 (simulator bank): the payments side is in withdrawals §4.7.

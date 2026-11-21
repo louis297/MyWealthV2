@@ -4,6 +4,7 @@ using MyWealthV2.Application.Accounts;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
+using MyWealthV2.Domain.Custody;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Exceptions;
@@ -222,6 +223,14 @@ public class CreateInternalTransferCommandHandler(
             ]);
         }
 
+        // Withdrawals R47 (roadmap D14): cash moves between Custodial accounts of one Customer only.
+        if (!CustodyRules.AllowsCustodialTransfer(from.Account.CustodyMode, from.Customer.Id, to.Customer.Id))
+        {
+            throw new ValidationException([
+                new ValidationFailure(nameof(CreateInternalTransferCommand.ToAccountId), CustodyRules.CustodialTransferMessage)
+            ]);
+        }
+
         // Custody modes R10, R11.
         var bookedAt = BookedAtByCustody.Resolve(from.Account.CustodyMode, request.BookedAt, time);
 
@@ -266,12 +275,15 @@ public class CreateInternalTransferCommandHandler(
             DateTimeOffset.UtcNow));
         await db.SaveChangesAsync(cancellationToken);
 
-        if (await TransactionCash.SumAsync(db, from.Account.Id, cancellationToken) < 0)
+        var fromSumAfter = await TransactionCash.SumAsync(db, from.Account.Id, cancellationToken);
+        if (fromSumAfter < 0)
         {
             throw new ValidationException([
                 new ValidationFailure(string.Empty, "Cash balance cannot become negative.")
             ]);
         }
+
+        await AvailableCashGuard.EnsureAsync(db, currencies, from.Account, fromSumAfter, cancellationToken);
 
         return new IdempotentResult(201, body);
     }

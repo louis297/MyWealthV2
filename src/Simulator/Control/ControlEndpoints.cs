@@ -113,6 +113,9 @@ public static class ControlEndpoints
         {
             db.ChangeTracker.Clear();
             await using var transaction = await db.Database.BeginTransactionAsync(http.RequestAborted);
+            await db.BankPayments.ExecuteDeleteAsync(http.RequestAborted);
+            await db.BankLines.ExecuteUpdateAsync(
+                setters => setters.SetProperty(line => line.ReturnOfLineId, (long?)null), http.RequestAborted);
             await db.BankFeedPlaces.ExecuteDeleteAsync(http.RequestAborted);
             await db.BankLines.ExecuteDeleteAsync(http.RequestAborted);
             await db.BankAccounts.ExecuteDeleteAsync(http.RequestAborted);
@@ -158,7 +161,7 @@ public static class ControlEndpoints
     /// One control write: apply it to the world, append the log row and save both in one transaction.
     /// A refused write (400) appends nothing; a concurrent write on the world row (R29) returns 409.
     /// </summary>
-    private static async Task<IResult> WriteAsync(
+    internal static async Task<IResult> WriteAsync(
         HttpContext http,
         SimulatorDbContext db,
         TimeProvider time,

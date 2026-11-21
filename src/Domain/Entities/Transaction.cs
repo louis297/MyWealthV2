@@ -50,6 +50,9 @@ public class Transaction : BaseAuditableEntity
     /// <summary>The bank's details, on a deposit and on its Reversal (deposit-matching R32, R33).</summary>
     public TransactionBankReceiptDetail? BankReceiptDetail { get; private set; }
 
+    /// <summary>The bank's details of a payout and of its Reversal (withdrawals R41).</summary>
+    public TransactionPaymentDetail? PaymentDetail { get; private set; }
+
     /// <summary>One per <see cref="CashLegRole.Fee"/> cash leg (trade-fees R18).</summary>
     public List<TransactionFeeDetail> FeeDetails { get; private set; } = [];
 
@@ -139,6 +142,51 @@ public class Transaction : BaseAuditableEntity
             PublicId = Guid.NewGuid(),
             CashLegs = [TransactionCashLeg.Create(tenantId, accountId, amount, currency)],
             BankReceiptDetail = TransactionBankReceiptDetail.Create(tenantId, receipt)
+        };
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
+    }
+
+    /// <summary>The memo every payout carries (withdrawals R41).</summary>
+    public const string PayoutMemo = "Withdrawal";
+
+    /// <summary>
+    /// A withdrawal's payout from the bank statement (withdrawals R41): one <c>TransferOut</c> cash leg of
+    /// <c>−amount</c>, source <c>Payment</c>, memo <see cref="PayoutMemo"/>, no reference, and the payment detail.
+    /// Flows build it without the manual entry matrix (custody-modes R7).
+    /// </summary>
+    public static Transaction PostPayout(
+        int tenantId,
+        int accountId,
+        string accountCurrency,
+        decimal amount,
+        DateTimeOffset bookedAt,
+        TransactionSource source,
+        BankPayment payment)
+    {
+        if (amount <= 0)
+        {
+            throw new DomainException("A payout must be greater than zero.");
+        }
+
+        if (source.Kind != TransactionSourceKind.Payment)
+        {
+            throw new DomainException("A payout comes from a payment.");
+        }
+
+        var currency = Money.Create(0m, accountCurrency).Currency;
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            Type = TransactionType.TransferOut,
+            BookedAt = bookedAt.ToUniversalTime(),
+            Memo = PayoutMemo,
+            Reference = null,
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
+            PublicId = Guid.NewGuid(),
+            CashLegs = [TransactionCashLeg.Create(tenantId, accountId, -amount, currency)],
+            PaymentDetail = TransactionPaymentDetail.Create(tenantId, payment)
         };
         transaction.AddDomainEvent(new TransactionPosted(transaction));
         return transaction;
@@ -898,6 +946,7 @@ public class Transaction : BaseAuditableEntity
             FxDetail = FxDetail?.Copy(),
             AdjustmentDetail = AdjustmentDetail?.Copy(),
             BankReceiptDetail = BankReceiptDetail?.Copy(),
+            PaymentDetail = PaymentDetail?.Copy(),
             FeeDetails = cashLegs.Select(leg => leg.FeeDetail).OfType<TransactionFeeDetail>().ToList()
         };
         ReversedBy = reversal;

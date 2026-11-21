@@ -92,11 +92,14 @@ public class CustodialOpenClientMoneyTests : TestBase
         // Funded through the bank feed while the client money account is still read (deposit-matching R5).
         (await FundAsync(tokens.AccessToken, account, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
 
+        // A Custodial account is emptied by a withdrawal, which pays out of the active client money account
+        // (withdrawals R29, R45, R46).
+        var withdrawal = await WithdrawAsync(account, 100m);
+        withdrawal.StatusCode.ShouldBe(HttpStatusCode.Created, await withdrawal.Content.ReadAsStringAsync());
+
         (await ClientMoneyHttp.SetActiveAsync(system.AccessToken, tenant.PublicId, row, active: false))
             .StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
-        var closeOut = await PostAsync(tokens.AccessToken, Cash(account, "CloseOut", -100m));
-        closeOut.StatusCode.ShouldBe(HttpStatusCode.Created, await closeOut.Content.ReadAsStringAsync());
         (await CloseAsync(tokens.AccessToken, account)).StatusCode.ShouldBe(HttpStatusCode.NoContent);
         (await ReopenAsync(tokens.AccessToken, account)).StatusCode.ShouldBe(HttpStatusCode.NoContent);
 

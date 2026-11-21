@@ -34,7 +34,7 @@ public class CustodyRulesTests
         var custodial = new Dictionary<TransactionType, bool>
         {
             [TransactionType.TransferIn] = false,
-            [TransactionType.TransferOut] = true,
+            [TransactionType.TransferOut] = false,
             [TransactionType.Interest] = false,
             [TransactionType.CloseOut] = true,
             [TransactionType.Opening] = false,
@@ -132,4 +132,40 @@ public class CustodyRulesTests
         Enum.GetValues<TransactionSourceKind>()
             .ShouldAllBe(kind => CustodyRules.AllowsHandReverse(CustodyMode.External, kind));
     }
+
+    [Test]
+    public void TransferOut_OnACustodialAccount_IsRefused_WithTheWithdrawalsMessage() =>
+        CustodyRules.RefusalMessage(CustodyMode.Custodial, TransactionType.TransferOut).ShouldBe(
+            "Withdrawals from a Custodial account are paid to the customer's nominated bank account. Request a withdrawal.");
+
+    [TestCase(0.004, "USD", 2, true)]
+    [TestCase(0.0099, "USD", 2, true)]
+    [TestCase(0.01, "USD", 2, false)]
+    [TestCase(5.00, "USD", 2, false)]
+    [TestCase(0, "USD", 2, false)]
+    [TestCase(-0.004, "USD", 2, false)]
+    [TestCase(0.4, "JPY", 0, true)]
+    [TestCase(1, "JPY", 0, false)]
+    public void CloseOut_OnACustodialAccount_IsAllowedOnlyBelowTheMinorUnit(decimal sum, string currency, int places, bool allowed) =>
+        (CustodyRules.CloseOutRefusal(CustodyMode.Custodial, sum, currency, places) is null).ShouldBe(allowed);
+
+    [Test]
+    public void CloseOut_Refusal_NamesTheMinorUnitAndTheCurrency()
+    {
+        CustodyRules.CloseOutRefusal(CustodyMode.Custodial, 5m, "USD", 2).ShouldBe(
+            "Only a remainder smaller than 0.01 USD can be closed out on a Custodial account. Withdraw the balance first.");
+        CustodyRules.CloseOutRefusal(CustodyMode.Custodial, 5m, "JPY", 0).ShouldBe(
+            "Only a remainder smaller than 1 JPY can be closed out on a Custodial account. Withdraw the balance first.");
+    }
+
+    [TestCase(5)]
+    [TestCase(0.004)]
+    public void CloseOut_OnAnExternalAccount_IsNotLimited(decimal sum) =>
+        CustodyRules.CloseOutRefusal(CustodyMode.External, sum, "USD", 2).ShouldBeNull();
+
+    [TestCase(CustodyMode.Custodial, 1, 1, true)]
+    [TestCase(CustodyMode.Custodial, 1, 2, false)]
+    [TestCase(CustodyMode.External, 1, 2, true)]
+    public void InternalTransfer_BetweenCustodialAccounts_StaysWithOneCustomer(CustodyMode mode, int from, int to, bool allowed) =>
+        CustodyRules.AllowsCustodialTransfer(mode, from, to).ShouldBe(allowed);
 }

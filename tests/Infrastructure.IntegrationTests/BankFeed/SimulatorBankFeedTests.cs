@@ -54,6 +54,36 @@ public class SimulatorBankFeedTests
     }
 
     [Test]
+    public async Task PaymentLines_CarryTheEndToEndIdTheReturnedLineAndTheReason()
+    {
+        var handler = new StubHandler(HttpStatusCode.OK, """
+            {
+              "items": [
+                { "id": "3f2c-L12", "valueDate": "2026-11-20", "direction": "Debit", "amount": 300.00, "currency": "USD",
+                  "payerName": "J Smith", "payerAccount": "06-0123-0456789-00", "reference": "K7M3Q9PXB",
+                  "endToEndId": "6b1f0c2e", "returnOf": null, "returnReason": null },
+                { "id": "3f2c-L13", "valueDate": "2026-11-21", "direction": "Credit", "amount": 300.00, "currency": "USD",
+                  "payerName": "J Smith", "payerAccount": "06-0123-0456789-00", "reference": "K7M3Q9PXB",
+                  "endToEndId": null, "returnOf": "3f2c-L12", "returnReason": "Account closed" }
+              ],
+              "cursor": "3f2c:13",
+              "hasMore": false
+            }
+            """);
+
+        var result = await Feed(handler).GetStatementLinesAsync(
+            Connection, new BankFeedRequest("simulator", "SIM-DEMO-USD", null, 100), CancellationToken.None);
+
+        var lines = result.Page!.Lines;
+        lines[0].EndToEndId.ShouldBe("6b1f0c2e");
+        lines[0].ReturnOf.ShouldBeNull();
+        lines[0].Direction.ShouldBe(BankLineDirection.Debit);
+        lines[1].EndToEndId.ShouldBeNull();
+        lines[1].ReturnOf.ShouldBe("3f2c-L12");
+        lines[1].ReturnReason.ShouldBe("Account closed");
+    }
+
+    [Test]
     public async Task FirstRead_SendsNoCursor()
     {
         var handler = new StubHandler(HttpStatusCode.OK, """{ "items": [], "cursor": "w:0", "hasMore": false }""");

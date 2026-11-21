@@ -576,8 +576,9 @@ describe("AccountDetailPage", () => {
   });
 
   it.each([
-    // D39: deposits to a Custodial account come from the bank statement.
-    ["Custodial", ["TransferOut", "Buy", "Sell", "Transfer", "Convert", "Adjust"]],
+    // D39: deposits to a Custodial account come from the bank statement. D44 (withdrawals R45): money leaves it as a
+    // withdrawal, not a hand TransferOut.
+    ["Custodial", ["Buy", "Sell", "Transfer", "Convert", "Adjust", "Withdraw"]],
     [
       "External",
       ["TransferIn", "TransferOut", "Buy", "Sell", "StockIn", "StockOut", "Split", "Bonus", "Scrip", "Transfer", "Convert"],
@@ -1308,7 +1309,8 @@ describe("AccountDetailPage", () => {
 
     expect(await screen.findByRole("button", { name: "Unassign" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Buy" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "TransferOut" })).toBeInTheDocument();
+    // D44 (withdrawals R45): cash leaves a Custodial account as a withdrawal, also while a portfolio is assigned.
+    expect(screen.getByRole("link", { name: "Withdraw" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Unassign" }));
     expect(await screen.findByRole("link", { name: "Buy" })).toBeInTheDocument();
     expect(deleted.some((url) => url.includes(`/api/accounts/${accountId}/portfolio`))).toBe(true);
@@ -1782,5 +1784,74 @@ describe("AccountDetailPage deposit instructions (client-money-accounts D32)", (
     expect(screen.queryByText("Deposit reference")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Deposit instructions" })).not.toBeInTheDocument();
     expect(instructionCalls(fetchMock)).toHaveLength(0);
+  });
+});
+
+// withdrawals D44: cash, reserved cash, available cash, Withdraw and the open withdrawals on a Custodial account.
+describe("AccountDetailPage withdrawals (withdrawals D44)", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  function serve(override: Record<string, unknown>, withdrawals: unknown[] = []) {
+    return (url: string, method: string) => {
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.includes("/withdrawals") && method === "GET") {
+        return json({ items: withdrawals, page: 1, pageSize: 20, totalCount: withdrawals.length });
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json({ ...custodialAccount, currency: "USD", ...override });
+      }
+      return new Response("", { status: 404 });
+    };
+  }
+
+  it("shows Cash, Reserved for withdrawals and Available, links Withdraw and lists the open withdrawals", async () => {
+    renderDetail(serve({ cashBalance: 1000, reservedCash: 300, availableCash: 700 }, [{
+      id: "77777777-0000-0000-0000-000000000001",
+      accountId,
+      customerId,
+      nominatedBankAccount: { id: "b", bankName: "ANZ", accountName: "J Smith", accountNumber: "****8900" },
+      amount: 300,
+      currency: "USD",
+      reference: "REF",
+      memo: null,
+      status: "Requested",
+      requestedBy: { id: "e", name: "Ann Adviser" },
+      requestedAt: "2026-11-20T04:00:00Z",
+      decision: null,
+      payment: null,
+      payoutTransactionId: null,
+      returnTransactionId: null,
+      failureReason: null,
+      returnReason: null,
+      rowVersion: "AAAA",
+    }]));
+
+    expect(await screen.findByText("Reserved for withdrawals")).toBeInTheDocument();
+    expect(screen.getByText("Available")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Withdraw" })).toHaveAttribute("href", `/accounts/${accountId}/withdraw`);
+    expect(await screen.findByText("Waiting for approval")).toBeInTheDocument();
+    expect(screen.getByText("ANZ ****8900")).toBeInTheDocument();
+  });
+
+  it("hides Reserved for withdrawals when nothing is reserved", async () => {
+    renderDetail(serve({ cashBalance: 1000, reservedCash: 0, availableCash: 1000 }));
+
+    expect(await screen.findByText("Available")).toBeInTheDocument();
+    expect(screen.queryByText("Reserved for withdrawals")).not.toBeInTheDocument();
+  });
+
+  it("offers CloseOut only for a remainder below the minor unit", async () => {
+    renderDetail(serve({ cashBalance: 0.004, reservedCash: 0, availableCash: 0.004 }));
+
+    const nav = await screen.findByRole("navigation", { name: "Transaction actions" });
+    expect(within(nav).getByRole("link", { name: "CloseOut" })).toHaveAttribute(
+      "href", `/accounts/${accountId}/transactions/new?type=CloseOut`);
   });
 });

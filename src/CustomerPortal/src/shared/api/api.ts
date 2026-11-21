@@ -42,7 +42,7 @@ const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
 export const api = createApi({
   reducerPath: "api",
   baseQuery,
-  tagTypes: ["Me", "NetWorth", "Account", "Transaction", "Report"],
+  tagTypes: ["Me", "NetWorth", "Account", "Transaction", "Report", "NominatedBankAccount", "Withdrawal"],
   endpoints: (builder) => ({
     getMe: builder.query<CurrentUser, void>({
       query: () => "/users/me",

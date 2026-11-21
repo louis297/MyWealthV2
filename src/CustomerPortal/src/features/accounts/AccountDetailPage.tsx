@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
   type Activity,
   useGetAccountQuery,
+  useGetAccountWithdrawalsQuery,
   useGetActivityQuery,
   useGetCashBalanceQuery,
   useGetDepositInstructionsQuery,
@@ -25,8 +26,32 @@ function typeLabel(row: Activity) {
     return "Deposit";
   }
 
+  // C25: a payout of a withdrawal is a TransferOut with a payment; its Reversal stays "Reversal".
+  if (row.type === "TransferOut" && row.payment) {
+    return "Withdrawal";
+  }
+
   return typeLabels[row.type] ?? row.type;
 }
+
+/** C24: the status words a Customer reads. */
+function withdrawalStatusLabel(status: string) {
+  switch (status) {
+    case "Requested":
+      return "Waiting for approval";
+    case "Sent":
+      return "Sent to bank";
+    case "Failed":
+      return "Bank refused";
+    case "Returned":
+      return "Returned by bank";
+    default:
+      return status;
+  }
+}
+
+const openStatuses = new Set(["Requested", "Approved", "Sent"]);
+const ninetyDays = 90 * 24 * 60 * 60 * 1000;
 
 function isNotFound(error: unknown) {
   return typeof error === "object" && error !== null && "status" in error && error.status === 404;
@@ -41,6 +66,8 @@ export function AccountDetailPage() {
   // C19, C20: only an Open Custodial account has deposit instructions; nothing is called for any other.
   const payable = account.data?.custodyMode === "Custodial" && account.data.status === "Open";
   const instructions = useGetDepositInstructionsQuery(id, { skip: !payable });
+  const custodial = account.data?.custodyMode === "Custodial";
+  const withdrawals = useGetAccountWithdrawalsQuery(id, { skip: !custodial });
 
   if (isNotFound(account.error)) {
     return <Muted>Not found</Muted>;
@@ -51,6 +78,9 @@ export function AccountDetailPage() {
   }
 
   const holdingsItems = holdings.data?.items ?? [];
+  // C24: open withdrawals, and those requested in the last 90 days.
+  const shownWithdrawals = (withdrawals.data?.items ?? []).filter((item) =>
+    openStatuses.has(item.status) || Date.now() - new Date(item.requestedAt).getTime() <= ninetyDays);
   const activityItems = activity.data?.items ?? [];
 
   return (
@@ -72,6 +102,16 @@ export function AccountDetailPage() {
             {cash.data ? (
               <DetailItem label="Cash balance">
                 {cash.data.cashBalance} {cash.data.currency}
+              </DetailItem>
+            ) : null}
+            {custodial && cash.data ? (
+              <DetailItem label="Available to withdraw">
+                {cash.data.availableCash ?? cash.data.cashBalance} {cash.data.currency}
+              </DetailItem>
+            ) : null}
+            {custodial && cash.data && (cash.data.reservedCash ?? 0) !== 0 ? (
+              <DetailItem label="Withdrawals in progress">
+                {cash.data.reservedCash} {cash.data.currency}
               </DetailItem>
             ) : null}
           </DetailGrid>
@@ -125,6 +165,34 @@ export function AccountDetailPage() {
           </Card>
         ) : null}
       </Section>
+      {custodial && shownWithdrawals.length > 0 ? (
+        <Section title="Withdrawals">
+          <Card className="gap-0 py-0">
+            <CardContent className="px-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Requested</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>To</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {shownWithdrawals.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>{formatInstant(item.requestedAt)}</TableCell>
+                      <TableCell>{`${item.amount} ${item.currency}`}</TableCell>
+                      <TableCell>{item.nominatedBankAccount.accountNumber}</TableCell>
+                      <TableCell>{withdrawalStatusLabel(item.status)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </Section>
+      ) : null}
       <Section title="Activity">
         {activity.data && activityItems.length === 0 ? <Muted>No activity.</Muted> : null}
         {activityItems.length > 0 ? (
@@ -145,6 +213,9 @@ export function AccountDetailPage() {
                         {typeLabel(row)}
                         {row.type === "TransferIn" && row.bankReceipt ? (
                           <p className="text-muted-foreground text-xs">{`Value date ${row.bankReceipt.valueDate}`}</p>
+                        ) : null}
+                        {row.type === "TransferOut" && row.payment ? (
+                          <p className="text-muted-foreground text-xs">{`Value date ${row.payment.valueDate}`}</p>
                         ) : null}
                         {/* C18: an adjustment shows its memo, which the TenantAdmin wrote for the customer; not its reason. */}
                         {row.type === "Adjustment" && row.memo ? (

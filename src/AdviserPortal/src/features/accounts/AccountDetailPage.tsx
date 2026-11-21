@@ -25,7 +25,8 @@ import {
   useGetDepositInstructionsQuery,
   useReopenAccountMutation,
 } from "@/features/accounts/accountsApi";
-import { allowsManualEntry, isCustodial } from "@/features/accounts/custodyRules";
+import { allowsManualEntry, isCustodial, offersCloseOut } from "@/features/accounts/custodyRules";
+import { AccountWithdrawalsSection } from "@/features/withdrawals/AccountWithdrawalsSection";
 import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
 import { useGetInstrumentsQuery } from "@/features/instruments/instrumentsApi";
 import {
@@ -245,10 +246,14 @@ export function AccountDetailPage() {
         };
       }),
   ];
+  const places = currencies.data?.find((currency) => currency.code === data.currency)?.decimalPlaces;
   const actions = [
     ...(canPostCash(data.status) ? cashActions : []),
+    // D44 (withdrawals R46): a Custodial account closes out only the remainder a trade leaves.
+    ...(offersCloseOut(data, places) ? (["CloseOut"] as const) : []),
     ...(canPostSecurity(data.type, data.status) && !locked ? securityActions : []),
-  ].filter((action) => allowsManualEntry(data.custodyMode, action));
+  ].filter((action) => action === "CloseOut" || allowsManualEntry(data.custodyMode, action));
+  const withdrawable = data.status === "Open" && isCustodial(data);
 
   return (
     <Page>
@@ -266,7 +271,7 @@ export function AccountDetailPage() {
           )
         }
       />
-      {actions.length > 0 ? (
+      {actions.length > 0 || withdrawable ? (
         <nav aria-label="Transaction actions" className="flex flex-wrap gap-2">
           {actions.map((action) => (
             <Link
@@ -301,6 +306,14 @@ export function AccountDetailPage() {
               Adjust
             </Link>
           ) : null}
+          {withdrawable ? (
+            <Link
+              to={`/accounts/${data.id}/withdraw`}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            >
+              Withdraw
+            </Link>
+          ) : null}
         </nav>
       ) : null}
       {conflict ? <ConflictNotice /> : null}
@@ -315,6 +328,12 @@ export function AccountDetailPage() {
               <StatusBadge status={data.status} />
             </DetailItem>
             <DetailItem label="Cash balance">{data.cashBalance}</DetailItem>
+            {isCustodial(data) && (data.reservedCash ?? 0) !== 0 ? (
+              <DetailItem label="Reserved for withdrawals">{formatMoney(data.reservedCash ?? 0, data.currency, places)}</DetailItem>
+            ) : null}
+            {isCustodial(data) ? (
+              <DetailItem label="Available">{formatMoney(data.availableCash ?? data.cashBalance, data.currency, places)}</DetailItem>
+            ) : null}
             {isCustodial(data) && data.depositReference ? (
               <DetailItem label="Deposit reference">{data.depositReference}</DetailItem>
             ) : null}
@@ -438,6 +457,7 @@ export function AccountDetailPage() {
           </Card>
         )}
       </Section>
+      {isCustodial(data) ? <AccountWithdrawalsSection accountId={data.id} /> : null}
       <Section title="Activity">
         {(transactions.data?.items.length ?? 0) === 0 ? <Muted>No activity.</Muted> : (
           <Card className="gap-0 py-0">

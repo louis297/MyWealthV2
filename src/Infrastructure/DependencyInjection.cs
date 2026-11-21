@@ -130,8 +130,12 @@ public static class DependencyInjection
         builder.Services.AddSingleton<IBankConnections>(connections);
         builder.Services.AddHttpClient(SimulatorBankFeed.HttpClientName);
         builder.Services.AddSingleton<IBankFeedAdapter, SimulatorBankFeed>();
+        builder.Services.AddHttpClient(SimulatorBankPayments.HttpClientName);
+        builder.Services.AddSingleton<IBankPaymentsAdapter, SimulatorBankPayments>();
         builder.Services.AddScoped<IBankFeed, BankFeedDispatcher>();
+        builder.Services.AddScoped<IBankPayments, BankPaymentsDispatcher>();
         builder.Services.AddScoped<PullBankStatements>();
+        builder.Services.AddScoped<SendBankPayments>();
         builder.Services.AddScoped<ProcessStatementLines>();
         if (host == BankConnectionHost.Worker)
         {

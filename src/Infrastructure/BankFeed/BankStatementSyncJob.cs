@@ -10,11 +10,13 @@ public sealed class BankStatementSyncFailedException(string connection, IReadOnl
     : Exception($"Bank statement read failed for connection {connection}: client money accounts {string.Join(", ", clientMoneyAccounts)}.");
 
 /// <summary>
-/// One run of <c>bank-statement-sync:{connection}</c> (deposit-matching R6, R7, R13): pull the statements, then
-/// process the stored lines. One run of a connection at a time; no automatic retries, the schedule is the retry
+/// One run of <c>bank-statement-sync:{connection}</c> (deposit-matching R6, R7, R13; withdrawals R32): send the
+/// pending outgoing payments, pull the statements, then process the stored lines, so a payment and its debit line can
+/// meet in one run. One run of a connection at a time; no automatic retries, the schedule is the retry
 /// (ADR 0021 rule 15).
 /// </summary>
 public sealed class BankStatementSyncJob(
+    SendBankPayments send,
     PullBankStatements pull,
     ProcessStatementLines process,
     SqlRunLock runLock,
@@ -32,6 +34,8 @@ public sealed class BankStatementSyncJob(
             return;
         }
 
+        // A payment's failure is recorded on it and never stops the pull (withdrawals R33).
+        await send.RunAsync(connection, cancellationToken);
         var outcome = await pull.RunAsync(connection, cancellationToken);
 
         // A failed read does not stop the processing of lines already stored (R13).

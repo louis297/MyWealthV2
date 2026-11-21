@@ -32,6 +32,11 @@ import { RequireSession } from "@/features/session/RequireSession";
 import { RoleGate } from "@/features/session/RoleGate";
 import { roles } from "@/features/session/roles";
 import { SessionProbePage } from "@/features/session/SessionProbePage";
+import { AddBankAccountPage } from "@/features/nominatedBankAccounts/AddBankAccountPage";
+import { BankAccountChecksPage } from "@/features/nominatedBankAccounts/BankAccountChecksPage";
+import { WithdrawalDetailPage } from "@/features/withdrawals/WithdrawalDetailPage";
+import { WithdrawalsListPage } from "@/features/withdrawals/WithdrawalsListPage";
+import { WithdrawPage } from "@/features/withdrawals/WithdrawPage";
 import { MatchStatementLinePage } from "@/features/statementLines/MatchStatementLinePage";
 import { StatementLineDetailPage } from "@/features/statementLines/StatementLineDetailPage";
 import { StatementLinesListPage } from "@/features/statementLines/StatementLinesListPage";
@@ -96,6 +101,7 @@ export const appRoutes: RouteObject[] = [
               { path: ":id/transactions/new", element: <CreateTransactionPage /> },
               { path: ":id/transfer", element: <CreateInternalTransferPage /> },
               { path: ":id/convert", element: <CreateFxConversionPage /> },
+              { path: ":id/withdraw", element: <WithdrawPage /> },
               {
                 element: <RoleGate allow={[roles.tenantAdmin]} />,
                 children: [{ path: ":id/adjust", element: <CreateAdjustmentPage /> }],
@@ -121,12 +127,27 @@ export const appRoutes: RouteObject[] = [
             ],
           },
           {
+            path: "/withdrawals",
+            element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
+            children: [
+              { index: true, element: <WithdrawalsListPage /> },
+              { path: ":id", element: <WithdrawalDetailPage /> },
+            ],
+          },
+          {
+            // D42: an Adviser who opens the route gets the firm administrator sentence from the 403.
+            path: "/nominated-bank-accounts",
+            element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
+            children: [{ index: true, element: <BankAccountChecksPage /> }],
+          },
+          {
             path: "/customers",
             element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
             children: [
               { index: true, element: <CustomersListPage /> },
               { path: "new", element: <CreateCustomerPage /> },
               { path: ":id/accounts/new", element: <CreateAccountPage /> },
+              { path: ":id/bank-accounts/new", element: <AddBankAccountPage /> },
               { path: ":id", element: <CustomerDetailPage /> },
               { path: ":id/edit", element: <EditCustomerPage /> },
             ],

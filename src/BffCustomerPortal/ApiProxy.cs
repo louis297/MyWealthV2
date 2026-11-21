@@ -18,7 +18,9 @@ public static class ApiProxy
         "/accounts",
         "/transactions",
         "/net-worth",
-        "/reports"
+        "/reports",
+        "/nominated-bank-accounts",
+        "/withdrawals"
     ];
 
     public static WebApplication MapBffApi(this WebApplication app)

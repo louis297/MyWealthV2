@@ -23,6 +23,7 @@ related:
   - ../adr/0014-openiddict-authorization-code-pkce.md
   - ../adr/0016-bff-for-first-party-portals.md
   - ../features/deposit-matching.md
+  - ../features/withdrawals.md
 ---
 
 # Customer Portal
@@ -267,3 +268,16 @@ Portal tests assert routes, role visibility (Customer only), and API-client shap
 - Firm name in the shell (`tenants.read` for Customer).
 - Instrument detail pages.
 - Multi-report parameter forms beyond Customer Transactions.
+
+---
+
+## Amendment 2026-11-20 (bank accounts, available cash and withdrawals) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [withdrawals](../features/withdrawals.md). New calls: `GET /nominated-bank-accounts` and `GET /withdrawals?accountId=`, both read-only for a Customer (roadmap D6). The BFF gains the two prefixes ([bff-customer-portal.md](../features/bff-customer-portal.md) amendment 2026-11-20). The account item carries `reservedCash` and `availableCash`; a payout carries `payment`.
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| C22 | Customer with nominated bank accounts | Profile page | A "Bank accounts" section lists Pending and Verified rows: Bank, Account name, Account number, Currency, and "Verified" or "Being checked". No add or remove control. "To change your bank accounts, contact your adviser." |
+| C23 | Customer with a Custodial account | Account page | Under the cash balance: "Available to withdraw" with `availableCash`, and when `reservedCash` is not 0, "Withdrawals in progress" with it. |
+| C24 | Customer with withdrawals on a Custodial account | Account page | A "Withdrawals" section lists open withdrawals and those of the last 90 days: Requested, Amount, To (****8900), Status ("Waiting for approval", "Approved", "Sent to bank", "Paid", "Rejected", "Cancelled", "Bank refused", "Returned by bank"). No action. No memo or note. |
+| C25 | Customer with a payout on a Custodial account | Account page activity | The row is labelled "Withdrawal" instead of the `TransferOut` label and shows "Value date <date>" under it. Its Reversal stays "Reversal". A `TransferOut` without `payment` keeps today's label. |

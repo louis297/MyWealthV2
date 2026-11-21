@@ -134,4 +134,28 @@ public class RolePermissionsTests
     {
         RolePermissions.Has(role, Policies.StatementLinesManage).ShouldBe(expected);
     }
+
+    [TestCase(Policies.NominatedBankAccountsRead, true, true, true)]
+    [TestCase(Policies.NominatedBankAccountsManage, true, true, false)]
+    [TestCase(Policies.NominatedBankAccountsVerify, true, false, false)]
+    public void NominatedBankAccounts_MatchTheWithdrawalsGrants(string policy, bool tenantAdmin, bool adviser, bool customer)
+    {
+        RolePermissions.Has(UserRole.TenantAdmin, policy).ShouldBe(tenantAdmin);
+        RolePermissions.Has(UserRole.Adviser, policy).ShouldBe(adviser);
+        RolePermissions.Has(UserRole.Customer, policy).ShouldBe(customer);
+        RolePermissions.Has(UserRole.SystemAdmin, policy).ShouldBeFalse();
+        RolePermissions.Has(UserRole.SimulatorOperator, policy).ShouldBeFalse();
+    }
+
+    [TestCase(Policies.WithdrawalsRead, true, true, true)]
+    [TestCase(Policies.WithdrawalsRequest, true, true, false)]
+    [TestCase(Policies.WithdrawalsApprove, true, false, false)]
+    public void Withdrawals_MatchTheWithdrawalsGrants(string policy, bool tenantAdmin, bool adviser, bool customer)
+    {
+        RolePermissions.Has(UserRole.TenantAdmin, policy).ShouldBe(tenantAdmin);
+        RolePermissions.Has(UserRole.Adviser, policy).ShouldBe(adviser);
+        RolePermissions.Has(UserRole.Customer, policy).ShouldBe(customer);
+        RolePermissions.Has(UserRole.SystemAdmin, policy).ShouldBeFalse();
+        RolePermissions.Has(UserRole.SimulatorOperator, policy).ShouldBeFalse();
+    }
 }

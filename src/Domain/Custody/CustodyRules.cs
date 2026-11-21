@@ -11,6 +11,49 @@ public static class CustodyRules
     public const string TransferInMessage =
         "Deposits to a Custodial account come from the bank statement. The customer pays in with the account's deposit instructions.";
 
+    /// <summary>Withdrawals R45: money leaves a Custodial account only as a withdrawal.</summary>
+    public const string TransferOutMessage =
+        "Withdrawals from a Custodial account are paid to the customer's nominated bank account. Request a withdrawal.";
+
+    /// <summary>
+    /// Withdrawals R46: the <c>errors.Type</c> message for a hand <c>CloseOut</c> of <paramref name="cashSum"/>, or null
+    /// when it is allowed: always on an External account, and on a Custodial account only for a remainder smaller than
+    /// one minor unit of the currency (<c>0 &lt; SUM &lt; 10^−decimalPlaces</c>).
+    /// </summary>
+    public static string? CloseOutRefusal(CustodyMode custodyMode, decimal cashSum, string currency, int decimalPlaces)
+    {
+        if (custodyMode == CustodyMode.External)
+        {
+            return null;
+        }
+
+        var minorUnit = MinorUnit(decimalPlaces);
+        return cashSum > 0 && cashSum < minorUnit
+            ? null
+            : $"Only a remainder smaller than {minorUnit.ToString(System.Globalization.CultureInfo.InvariantCulture)} {currency} can be closed out on a Custodial account. Withdraw the balance first.";
+    }
+
+    /// <summary>One minor unit of a currency with <paramref name="decimalPlaces"/>: 0.01 for two, 1 for none.</summary>
+    private static decimal MinorUnit(int decimalPlaces)
+    {
+        var unit = 1m;
+        for (var place = 0; place < decimalPlaces; place++)
+        {
+            unit /= 10m;
+        }
+
+        return unit;
+    }
+
+    /// <summary>Withdrawals R47 (roadmap D14): the <c>errors.ToAccountId</c> message for a transfer between two
+    /// Customers' Custodial accounts.</summary>
+    public const string CustodialTransferMessage = "Cash can be transferred between Custodial accounts of the same customer only.";
+
+    /// <summary>Withdrawals R47: an <c>InternalTransfer</c> between Custodial accounts stays with one Customer; it would
+    /// otherwise be a third-party payment (roadmap X4). External accounts are not limited.</summary>
+    public static bool AllowsCustodialTransfer(CustodyMode custodyMode, int fromCustomerId, int toCustomerId) =>
+        custodyMode == CustodyMode.External || fromCustomerId == toCustomerId;
+
     private const string InterestMessage = "Interest cannot be entered by hand on a Custodial account.";
     private const string OpeningMessage = "A Custodial account starts empty. Fund it with TransferIn.";
     private const string StockMessage = "Securities cannot be moved in or out of a Custodial account by hand. Use Buy and Sell.";
@@ -51,6 +94,7 @@ public static class CustodyRules
         return type switch
         {
             TransactionType.TransferIn => TransferInMessage,
+            TransactionType.TransferOut => TransferOutMessage,
             TransactionType.Interest => InterestMessage,
             TransactionType.Opening or TransactionType.OpeningHoldings => OpeningMessage,
             TransactionType.StockIn or TransactionType.StockOut => StockMessage,

@@ -40,6 +40,21 @@ public sealed class TransactionDto
 
     /// <summary>The bank's details, on a deposit and on its Reversal; otherwise null (deposit-matching R36).</summary>
     public TransactionBankReceiptDto? BankReceipt { get; init; }
+
+    /// <summary>The bank's details, on a payout and on its Reversal; otherwise null (withdrawals R41).</summary>
+    public TransactionPaymentDto? Payment { get; init; }
+}
+
+/// <summary>A payout's payment detail (withdrawals R41). <see cref="PayeeAccount"/> is masked.</summary>
+public sealed class TransactionPaymentDto
+{
+    public required string ValueDate { get; init; }
+
+    public string? Reference { get; init; }
+
+    public string? PayeeName { get; init; }
+
+    public string? PayeeAccount { get; init; }
 }
 
 /// <summary>A deposit's bank receipt detail (deposit-matching R36). <see cref="PayerAccount"/> is masked.</summary>

@@ -19,6 +19,12 @@ public static class Policies
     public const string TransactionsCreate = "transactions.create";
     public const string TransactionsAdjust = "transactions.adjust";
     public const string StatementLinesManage = "statement-lines.manage";
+    public const string NominatedBankAccountsRead = "nominated-bank-accounts.read";
+    public const string NominatedBankAccountsManage = "nominated-bank-accounts.manage";
+    public const string NominatedBankAccountsVerify = "nominated-bank-accounts.verify";
+    public const string WithdrawalsRead = "withdrawals.read";
+    public const string WithdrawalsRequest = "withdrawals.request";
+    public const string WithdrawalsApprove = "withdrawals.approve";
     public const string PortfoliosRead = "portfolios.read";
     public const string PortfoliosManage = "portfolios.manage";
     public const string FeesRead = "fees.read";

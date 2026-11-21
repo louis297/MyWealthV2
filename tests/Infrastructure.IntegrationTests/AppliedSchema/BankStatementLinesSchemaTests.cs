@@ -88,7 +88,7 @@ public class BankStatementLinesSchemaTests
     [TestCase("[Amount]", "0")]
     [TestCase("[Status]", "5")]
     [TestCase("[Direction]", "2")]
-    [TestCase("[UnmatchedReason]", "7")]
+    [TestCase("[UnmatchedReason]", "8")]
     public async Task ValueOutsideItsCheck_IsRejected(string column, string value)
     {
         var exception = await Should.ThrowAsync<SqlException>(() => RunAsync($"""
@@ -101,7 +101,7 @@ public class BankStatementLinesSchemaTests
     }
 
     [Test]
-    public async Task Transaction_SourceKind3_NeedsASourcePublicId_AndKind4IsRejected()
+    public async Task Transaction_SourceKind3_NeedsASourcePublicId_AndKind5IsRejected()
     {
         (await RunAsync($"""
             {World()}
@@ -116,12 +116,13 @@ public class BankStatementLinesSchemaTests
         withoutId.Number.ShouldBe(547);
         withoutId.Message.ShouldContain("CK_Transactions_SourcePublicId");
 
-        var kind4 = await Should.ThrowAsync<SqlException>(() => RunAsync($"""
+        // Withdrawals widened the check to Payment (4); 5 is still outside it.
+        var kind5 = await Should.ThrowAsync<SqlException>(() => RunAsync($"""
             {World()}
-            {InsertTransaction(4, "NEWID()")}
+            {InsertTransaction(5, "NEWID()")}
             """));
-        kind4.Number.ShouldBe(547);
-        kind4.Message.ShouldContain("CK_Transactions_SourceKind");
+        kind5.Number.ShouldBe(547);
+        kind5.Message.ShouldContain("CK_Transactions_SourceKind");
     }
 
     [Test]

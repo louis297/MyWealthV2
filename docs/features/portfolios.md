@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-02
-last_updated: 2026-11-19
+last_updated: 2026-11-20
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -27,6 +27,7 @@ related:
   - posting.md
   - custody-modes.md
   - transaction-source.md
+  - withdrawals.md
 ---
 
 # Portfolios
@@ -440,3 +441,12 @@ Portal: [../adviser-portal/adviser-portal-portfolios.md](../adviser-portal/advis
 5. Disable refused on a Shared portfolio (PB4, PB-T9–PB-T11).
 6. Adviser Portal branches on `code` on the portfolio detail page (P12).
 7. Mark this amendment landed here, in the portal spec and in `api-design.md` §4.2.
+
+---
+
+## Amendment 2026-11-20 (available cash) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md](withdrawals.md).
+
+- R8: the cash `V` a rebalance invests is the Account's **available cash** (cash balance minus the reserved cash of open withdrawals), so cash reserved for a withdrawal is never invested.
+- R11: the check for enough cash to fund the net buys uses available cash. Its trades therefore never meet the withdrawals R37 refusal.

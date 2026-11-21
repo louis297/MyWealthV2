@@ -67,3 +67,13 @@ export function canManageFees(role: string | null | undefined) {
 export function canManageStatementLines(role: string | null | undefined) {
   return role === roles.tenantAdmin;
 }
+
+/** nominated-bank-accounts.verify: the Bank account checks page (withdrawals D42). */
+export function canCheckBankAccounts(role: string | null | undefined) {
+  return role === roles.tenantAdmin;
+}
+
+/** withdrawals.read for staff: the Withdrawals pages (withdrawals D46). */
+export function canAccessWithdrawals(role: string | null | undefined) {
+  return role === roles.tenantAdmin || role === roles.adviser;
+}

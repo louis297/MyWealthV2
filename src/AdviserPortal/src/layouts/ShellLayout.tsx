@@ -12,6 +12,8 @@ import {
   UserRoundIcon,
   UsersIcon,
   WalletIcon,
+  ShieldCheckIcon,
+  BanknoteArrowUpIcon,
 } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router";
 import { useAppSelector } from "@/app/hooks";
@@ -44,6 +46,8 @@ import {
   canAccessPortfolios,
   canAccessProfile,
   canAccessReports,
+  canAccessWithdrawals,
+  canCheckBankAccounts,
   canManageStatementLines,
 } from "@/features/session/roles";
 import { ModeToggle } from '@/components/mode-toggle';
@@ -104,6 +108,18 @@ export function ShellLayout({ children }: { children?: ReactNode }) {
       label: "Bank receipts",
       icon: LandmarkIcon,
       visible: canManageStatementLines(role),
+    },
+    {
+      to: "/withdrawals",
+      label: "Withdrawals",
+      icon: BanknoteArrowUpIcon,
+      visible: canAccessWithdrawals(role),
+    },
+    {
+      to: "/nominated-bank-accounts",
+      label: "Bank account checks",
+      icon: ShieldCheckIcon,
+      visible: canCheckBankAccounts(role),
     },
     {
       to: "/customers",

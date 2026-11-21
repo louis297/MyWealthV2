@@ -110,6 +110,27 @@ public class BankStatementSyncJobTests
     }
 
     [Test]
+    public async Task Run_SendsPendingPayments_BeforeItPulls()
+    {
+        var world = await InsertWorldAsync(withApprovedWithdrawal: true);
+        var feed = new ScriptedFeed();
+        var payments = new ScriptedPayments(feed);
+        using var host = await WorkerHostAsync(feed, payments);
+
+        using (var scope = host.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<BankStatementSyncJob>().Run("simulator", CancellationToken.None);
+        }
+
+        payments.Requests.ShouldHaveSingleItem().InstructionId.ShouldBe(world.WithdrawalPublicId!.Value);
+        payments.FeedCallsAtFirstSend.ShouldBe(0);
+        feed.Calls.ShouldBeGreaterThan(0);
+        await using var db = OpenDb();
+        (await db.Withdrawals.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.PublicId == world.WithdrawalPublicId))
+            .Status.ShouldBe(WithdrawalStatus.Sent);
+    }
+
+    [Test]
     public async Task Run_WithAFailedAccount_ProcessesWhatIsStored_ThenFails()
     {
         var world = await InsertWorldAsync();
@@ -169,7 +190,7 @@ public class BankStatementSyncJobTests
         return builder.Build();
     }
 
-    private static async Task<IHost> WorkerHostAsync(ScriptedFeed feed)
+    private static async Task<IHost> WorkerHostAsync(ScriptedFeed feed, IBankPayments? payments = null)
     {
         var builder = Host.CreateApplicationBuilder();
         builder.Configuration[$"ConnectionStrings:{Services.Database}"] = SchemaDatabaseSetup.ConnectionString;
@@ -180,15 +201,18 @@ public class BankStatementSyncJobTests
         builder.Services.AddSingleton<IBankConnections>(new ConfiguredBankConnections([Settings("simulator", 1)]));
         builder.Services.RemoveAll<IBankFeed>();
         builder.Services.AddSingleton<IBankFeed>(feed);
+        builder.Services.RemoveAll<IBankPayments>();
+        builder.Services.AddSingleton(payments ?? new ScriptedPayments(feed));
         var host = builder.Build();
         await host.Services.GetRequiredService<ICurrencyCatalog>().ReloadAsync(CancellationToken.None);
         return host;
     }
 
-    private sealed record World(string ClientMoneyAccountNumber, string DepositReference);
+    private sealed record World(string ClientMoneyAccountNumber, string DepositReference, Guid? WithdrawalPublicId = null);
 
-    /// <summary>A tenant with a USD client money account and an Open Custodial USD account.</summary>
-    private static async Task<World> InsertWorldAsync()
+    /// <summary>A tenant with a USD client money account and an Open Custodial USD account, and optionally an
+    /// approved withdrawal from it with its Pending outgoing payment.</summary>
+    private static async Task<World> InsertWorldAsync(bool withApprovedWithdrawal = false)
     {
         await using var db = OpenDb();
         var (tenant, otherTenant) = await TwoTenantFixture.InsertAsync(db);
@@ -204,7 +228,27 @@ public class BankStatementSyncJobTests
         db.Accounts.Add(account);
         db.ClientMoneyAccounts.Add(clientMoney);
         await db.SaveChangesAsync();
-        return new World(number, reference.Value);
+        if (!withApprovedWithdrawal)
+        {
+            return new World(number, reference.Value);
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var nominated = NominatedBankAccount.Add(tenant.Id, customer.Id, usd, "ANZ", "J Smith", "06-0123-0456789-00", adviser.Id, now);
+        nominated.Verify(customer.Id, "Checked", now);
+        nominated.CreatedBy = "test";
+        db.NominatedBankAccounts.Add(nominated);
+        await db.SaveChangesAsync();
+        var withdrawal = Withdrawal.Request(tenant.Id, account.Id, nominated.Id, 10m, "USD", reference.Value, null, adviser.Id, now);
+        withdrawal.Approve(customer.Id, null, now);
+        withdrawal.CreatedBy = "test";
+        db.Withdrawals.Add(withdrawal);
+        await db.SaveChangesAsync();
+        var payment = OutgoingPayment.ForWithdrawal(withdrawal, clientMoney);
+        payment.CreatedBy = "test";
+        db.OutgoingPayments.Add(payment);
+        await db.SaveChangesAsync();
+        return new World(number, reference.Value, withdrawal.PublicId);
     }
 
     private static ApplicationDbContext OpenDb() =>
@@ -244,6 +288,21 @@ public class BankStatementSyncJobTests
             var page = lines.Skip(after).ToList();
             return Task.FromResult(BankFeedResult.Succeeded(
                 new BankFeedPage(page, (after + page.Count).ToString(), HasMore: false)));
+        }
+    }
+
+    /// <summary>A bank that accepts every payment and notes how often the feed was read before its first call.</summary>
+    private sealed class ScriptedPayments(ScriptedFeed feed) : IBankPayments
+    {
+        public List<BankPaymentRequest> Requests { get; } = [];
+
+        public int? FeedCallsAtFirstSend { get; private set; }
+
+        public Task<BankPaymentResult> SendAsync(BankPaymentRequest request, CancellationToken cancellationToken)
+        {
+            FeedCallsAtFirstSend ??= feed.Calls;
+            Requests.Add(request);
+            return Task.FromResult(BankPaymentResult.Accepted("job-P" + Requests.Count));
         }
     }
 }

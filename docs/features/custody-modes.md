@@ -32,6 +32,7 @@ related:
   - transaction-source.md
   - client-money-accounts.md
   - deposit-matching.md
+  - withdrawals.md
 ---
 
 # Custody modes
@@ -550,3 +551,16 @@ Status of this amendment: `accepted` (2026-11-20), together with [deposit-matchi
 - R7: the deposit flow builds its `TransferIn` with `Transaction.PostBankDeposit`, outside the matrix.
 - A `TransferIn` entered by hand before this amendment keeps source `Manual` and can still be reversed by hand.
 - `CustodyRules.AllowsManualEntry(Custodial, TransferIn)` returns `false`; the matrix still lives in one Domain class.
+
+---
+
+## Amendment 2026-11-20 (nominated bank accounts and withdrawals) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md](withdrawals.md).
+
+- R5, matrix row `TransferOut`: External **allowed**; Custodial **refused**, replaced by withdrawals paid to a verified nominated bank account (withdrawals R45). A `TransferOut` entered by hand before this amendment keeps source `Manual` and can still be reversed by hand.
+- R5, matrix row `CloseOut`: on a Custodial account allowed only for a remainder smaller than one minor unit of the currency (`0 < SUM < 10^−DecimalPlaces`), the part a `Buy` / `Sell` leaves (§4.2); otherwise refused (withdrawals R46). The account closure flow (roadmap B8) replaces it later.
+- R5, matrix row `InternalTransfer`: between Custodial accounts allowed only when both belong to the same Customer (roadmap D14, withdrawals R47). External accounts unchanged.
+- §4.2.1 gains the messages: `TransferOut` — `Withdrawals from a Custodial account are paid to the customer's nominated bank account. Request a withdrawal.`; `CloseOut` — `Only a remainder smaller than 0.01 USD can be closed out on a Custodial account. Withdraw the balance first.` (the minor unit and currency from the Account); `InternalTransfer` to another Customer — `Cash can be transferred between Custodial accounts of the same customer only.` (under `errors.ToAccountId`). Each applies to every caller, SystemAdmin included.
+- R7: the withdrawal flow builds its payout with `Transaction.PostPayout`, outside the matrix.
+- `CustodyRules` holds the three rules (`AllowsManualEntry(Custodial, TransferOut)` is `false`, the `CloseOut` remainder check, `AllowsCustodialTransfer`); the matrix still lives in one Domain class.

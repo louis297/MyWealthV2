@@ -20,6 +20,8 @@ export function reasonLabel(reason: string | null | undefined) {
       return "Customer disabled";
     case "AmountPrecision":
       return "Amount has too many decimals";
+    case "PaymentMismatch":
+      return "Amount differs from the payment";
     default:
       return reason ?? "";
   }
@@ -61,4 +63,18 @@ export function problemMessages(error: unknown): { fields: Record<string, string
     messages.push(data.detail);
   }
   return { fields, messages };
+}
+
+/** D35, D49: how a matched line was matched. */
+export function methodLabel(method: string) {
+  switch (method) {
+    case "Manual":
+      return "Matched by hand";
+    case "Payment":
+      return "Paid by the platform";
+    case "PaymentReturn":
+      return "Payment returned";
+    default:
+      return "Matched by reference";
+  }
 }

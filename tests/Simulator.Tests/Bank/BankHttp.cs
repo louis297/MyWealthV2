@@ -67,12 +67,42 @@ internal static class BankHttp
         return json.RootElement.Clone();
     }
 
+    public static Task<HttpResponseMessage> PayAsync(HttpClient party, string accountNumber, object body) =>
+        party.PostJsonAsync($"/party/bank/accounts/{Uri.EscapeDataString(accountNumber)}/payments", JsonSerializer.Serialize(body));
+
+    /// <summary>A payment body by withdrawals R49, with <paramref name="instructionId"/> fresh when not given.</summary>
+    public static Dictionary<string, object?> Payment(string? instructionId = null, decimal amount = 300.00m) => new()
+    {
+        ["instructionId"] = instructionId ?? Guid.NewGuid().ToString(),
+        ["amount"] = amount,
+        ["currency"] = "USD",
+        ["reference"] = "K7M3Q9PXB",
+        ["payee"] = new Dictionary<string, object?> { ["accountNumber"] = "06-0123-0456789-00", ["name"] = "J Smith" }
+    };
+
+    public static Task<HttpResponseMessage> SetModeAsync(HttpClient control, string mode, string? reason = null) =>
+        control.PostJsonAsync("/control/bank/payment-mode", JsonSerializer.Serialize(new { mode, reason }));
+
+    public static async Task<JsonElement> PaymentsAsync(HttpClient control)
+    {
+        var response = await control.GetAsync("/control/bank/payments");
+        var content = await response.Content.ReadAsStringAsync();
+        response.StatusCode.ShouldBe(HttpStatusCode.OK, content);
+        using var json = JsonDocument.Parse(content);
+        return json.RootElement.Clone();
+    }
+
+    // The payments tables exist from script 0004; until then the reset leaves them alone.
     public const string ResetBank = """
+        IF OBJECT_ID(N'dbo.BankPayments', N'U') IS NOT NULL EXEC(N'DELETE FROM [BankPayments]');
+        IF COL_LENGTH(N'dbo.BankLines', N'ReturnOfLineId') IS NOT NULL EXEC(N'UPDATE [BankLines] SET [ReturnOfLineId] = NULL');
         DELETE FROM [BankFeedPlaces];
         DELETE FROM [BankLines];
         DELETE FROM [BankAccounts];
         DELETE FROM [ControlLog];
         UPDATE [World] SET [ClockOffsetSeconds] = 0, [PausedAt] = NULL, [PartyOutage] = 0, [NextLineNumber] = 1;
+        IF COL_LENGTH(N'dbo.World', N'BankPaymentMode') IS NOT NULL
+            EXEC(N'UPDATE [World] SET [BankPaymentMode] = 0, [BankPaymentRejectReason] = NULL, [NextPaymentNumber] = 1');
         """;
 }
 

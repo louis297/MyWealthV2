@@ -81,6 +81,9 @@ function renderAt(
     accounts?: AccountItem[];
     account?: Record<string, unknown>;
     depositInstructions?: () => Response;
+    cash?: Record<string, unknown>;
+    withdrawals?: unknown[];
+    nominated?: unknown[];
   } = {},
 ) {
   const accounts = options.accounts ?? [
@@ -102,7 +105,15 @@ function renderAt(
       return json(options.netWorth ?? netWorth);
     }
     if (url.includes("/accounts/") && url.endsWith("/cash-balance")) {
-      return json({ accountId: "account-1", currency: "NZD", cashBalance: 100 });
+      return json({ accountId: "account-1", currency: "NZD", cashBalance: 100, ...options.cash });
+    }
+    if (url.includes("/nominated-bank-accounts")) {
+      const items = options.nominated ?? [];
+      return json({ items, page: 1, pageSize: 100, totalCount: items.length });
+    }
+    if (url.includes("/withdrawals")) {
+      const items = options.withdrawals ?? [];
+      return json({ items, page: 1, pageSize: 100, totalCount: items.length });
     }
     if (url.includes("/accounts/") && url.endsWith("/holdings")) {
       return json({ items: [] });
@@ -599,5 +610,148 @@ describe("Customer Portal deposit instructions", () => {
     expect(await screen.findByRole("heading", { name: "Holdings" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "How to pay in" })).not.toBeInTheDocument();
     expect(instructionUrls(fetchMock)).toEqual([]);
+  });
+});
+
+describe("Customer Portal bank accounts and withdrawals (withdrawals C22–C25)", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal("location", {
+      origin: "http://localhost:3000",
+      pathname: "/accounts/account-1",
+      search: "",
+      href: "http://localhost:3000/accounts/account-1",
+      assign: vi.fn(),
+    });
+  });
+
+  const custodialUsd = { type: "Brokerage", currency: "USD", depositReference: "K7M3Q9PXB" };
+
+  function payee(status: string, accountNumber: string) {
+    return {
+      id: `payee-${accountNumber}`,
+      customerId: me.id,
+      currency: "USD",
+      bankName: "ANZ",
+      accountName: "J Smith",
+      accountNumber,
+      status,
+      added: { by: { id: "a", name: "Ann Adviser" }, at: "2026-11-20T03:00:00Z" },
+      review: null,
+      removal: null,
+      rowVersion: "AAAA",
+    };
+  }
+
+  function withdrawal(status: string, requestedAt: string, id: string) {
+    return {
+      id,
+      accountId: "account-1",
+      customerId: me.id,
+      nominatedBankAccount: { id: "payee", bankName: "ANZ", accountName: "J Smith", accountNumber: "****8900" },
+      amount: 300,
+      currency: "USD",
+      reference: "K7M3Q9PXB",
+      memo: null,
+      status,
+      requestedBy: { id: "a", name: "Ann Adviser" },
+      requestedAt,
+      decision: null,
+      payment: null,
+      payoutTransactionId: null,
+      returnTransactionId: null,
+      failureReason: null,
+      returnReason: null,
+      rowVersion: "AAAA",
+    };
+  }
+
+  it("lists Pending and Verified bank accounts on the profile, with no add or remove control (C22)", async () => {
+    renderAt("/profile", me, [], "External", {
+      nominated: [payee("Verified", "06-0123-0456789-00"), payee("Pending", "111"), payee("Removed", "222")],
+    });
+
+    const section = (await screen.findByRole("heading", { name: "Bank accounts" })).closest("section")!;
+    expect(await within(section).findByText("06-0123-0456789-00")).toBeInTheDocument();
+    expect(within(section).getByText("Verified")).toBeInTheDocument();
+    expect(within(section).getByText("Being checked")).toBeInTheDocument();
+    expect(within(section).queryByText("222")).not.toBeInTheDocument();
+    expect(within(section).getByText("To change your bank accounts, contact your adviser.")).toBeInTheDocument();
+    expect(within(section).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("shows Available to withdraw, and Withdrawals in progress when cash is reserved (C23)", async () => {
+    renderAt("/accounts/account-1", me, [], "Custodial", {
+      account: custodialUsd,
+      cash: { currency: "USD", cashBalance: 1000, reservedCash: 300, availableCash: 700 },
+    });
+
+    expect(await screen.findByText("Available to withdraw")).toBeInTheDocument();
+    expect(screen.getByText("700 USD")).toBeInTheDocument();
+    expect(screen.getByText("Withdrawals in progress")).toBeInTheDocument();
+    expect(screen.getByText("300 USD")).toBeInTheDocument();
+  });
+
+  it("hides Withdrawals in progress when nothing is reserved (C23)", async () => {
+    renderAt("/accounts/account-1", me, [], "Custodial", {
+      account: custodialUsd,
+      cash: { currency: "USD", cashBalance: 1000, reservedCash: 0, availableCash: 1000 },
+    });
+
+    expect(await screen.findByText("Available to withdraw")).toBeInTheDocument();
+    expect(screen.queryByText("Withdrawals in progress")).not.toBeInTheDocument();
+  });
+
+  it("lists open withdrawals and those of the last 90 days, with no action (C24)", async () => {
+    const recent = new Date(Date.now() - 5 * 86400000).toISOString();
+    const old = new Date(Date.now() - 120 * 86400000).toISOString();
+    renderAt("/accounts/account-1", me, [], "Custodial", {
+      account: custodialUsd,
+      withdrawals: [
+        withdrawal("Requested", old, "w-open"),
+        withdrawal("Paid", recent, "w-recent"),
+        withdrawal("Rejected", old, "w-old"),
+      ],
+    });
+
+    const section = (await screen.findByRole("heading", { name: "Withdrawals" })).closest("section")!;
+    expect(await within(section).findByText("Waiting for approval")).toBeInTheDocument();
+    expect(within(section).getByText("Paid")).toBeInTheDocument();
+    expect(within(section).queryByText("Rejected")).not.toBeInTheDocument();
+    expect(within(section).getAllByText("****8900")).toHaveLength(2);
+    expect(within(section).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("labels a payout as Withdrawal with its value date and keeps Reversal and TransferOut (C25)", async () => {
+    const payout = {
+      id: "75555555-5555-5555-5555-555555555555",
+      tenantId: "22222222-2222-2222-2222-222222222222",
+      type: "TransferOut",
+      bookedAt: "2026-11-20T04:07:02Z",
+      memo: "Withdrawal",
+      reference: null,
+      originalTransactionId: null,
+      reversedByTransactionId: null,
+      rowVersion: "AAAA",
+      source: { kind: "Payment", id: "w" },
+      cash: [{ accountId: "account-1", customerId: me.id, amount: -300, currency: "USD" }],
+      security: [],
+      bankReceipt: null,
+      payment: { valueDate: "2026-11-20", reference: "K7M3Q9PXB", payeeName: "J Smith", payeeAccount: "****8900" },
+    };
+    renderAt("/accounts/account-1", me, [
+      payout,
+      { ...payout, id: "76666666-6666-6666-6666-666666666666", type: "Reversal", originalTransactionId: payout.id,
+        cash: [{ accountId: "account-1", customerId: me.id, amount: 300, currency: "USD" }] },
+      { ...payout, id: "77777777-7777-7777-7777-777777777777", source: { kind: "Manual", id: null }, payment: null, memo: null,
+        cash: [{ accountId: "account-1", customerId: me.id, amount: -20, currency: "USD" }] },
+    ], "Custodial", { account: custodialUsd });
+
+    const row = await screen.findByRole("row", { name: /^Withdrawal/ });
+    expect(row).toHaveTextContent("Value date 2026-11-20");
+    expect(row).toHaveTextContent("-300 USD");
+    expect(screen.getByRole("row", { name: /^Reversal/ })).not.toHaveTextContent("Withdrawal");
+    expect(screen.getByRole("row", { name: /^TransferOut/ })).toHaveTextContent("-20 USD");
   });
 });

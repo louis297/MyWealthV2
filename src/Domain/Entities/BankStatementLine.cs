@@ -63,6 +63,20 @@ public class BankStatementLine : BaseAuditableEntity
 
     public DateTimeOffset? LastActionAt { get; private set; }
 
+    /// <summary>The instruction id of the platform's payment, as the bank echoed it (withdrawals R38).</summary>
+    public string? EndToEndId { get; private set; }
+
+    /// <summary>The outside id of the line this line takes back (withdrawals R38).</summary>
+    public string? ReturnOfOutsideId { get; private set; }
+
+    /// <summary>The stored line of the same connection that this line takes back (withdrawals R38).</summary>
+    public int? RelatedLineId { get; private set; }
+
+    public string? ReturnReason { get; private set; }
+
+    /// <summary>The withdrawal whose payout or returned payout this line is (withdrawals R40, R42).</summary>
+    public int? WithdrawalId { get; private set; }
+
     public byte[] RowVersion { get; private set; } = null!;
 
     /// <summary>A line as the bank sent it, in status <c>Received</c> (R10–R12). Payer name and reference are
@@ -80,7 +94,10 @@ public class BankStatementLine : BaseAuditableEntity
         string? payerAccountMasked,
         string? referenceText,
         DateTimeOffset receivedAt,
-        Guid? publicId = null)
+        Guid? publicId = null,
+        string? endToEndId = null,
+        string? returnOfOutsideId = null,
+        string? returnReason = null)
     {
         if (!IsStorable(outsideId, direction, amount))
         {
@@ -91,6 +108,11 @@ public class BankStatementLine : BaseAuditableEntity
         if (string.IsNullOrWhiteSpace(currency) || currency.Trim().Length != 3)
         {
             throw new DomainException("Currency must be a three-letter code.");
+        }
+
+        if (!FitsPaymentIds(endToEndId, returnOfOutsideId))
+        {
+            throw new DomainException($"An end-to-end id and a returned line id are at most {OutsideIdMaxLength} characters.");
         }
 
         return new BankStatementLine
@@ -108,9 +130,19 @@ public class BankStatementLine : BaseAuditableEntity
             PayerAccountMasked = FreeText(payerAccountMasked, PayerAccountMaxLength),
             ReferenceText = FreeText(referenceText, FreeTextMaxLength),
             ReceivedAt = receivedAt,
-            Status = BankStatementLineStatus.Received
+            Status = BankStatementLineStatus.Received,
+            EndToEndId = string.IsNullOrEmpty(endToEndId) ? null : endToEndId,
+            ReturnOfOutsideId = string.IsNullOrEmpty(returnOfOutsideId) ? null : returnOfOutsideId,
+            ReturnReason = FreeText(returnReason, FreeTextMaxLength)
         };
     }
+
+    /// <summary>Withdrawals R38: an end-to-end id and a returned line id fit in 100 characters each.</summary>
+    public static bool FitsPaymentIds(string? endToEndId, string? returnOfOutsideId) =>
+        (endToEndId?.Length ?? 0) <= OutsideIdMaxLength && (returnOfOutsideId?.Length ?? 0) <= OutsideIdMaxLength;
+
+    /// <summary>Withdrawals R38: the stored line this line takes back.</summary>
+    public void LinkReturnedLine(int relatedLineId) => RelatedLineId = relatedLineId;
 
     /// <summary>True when the bank's line has a shape the platform can store (R10).</summary>
     public static bool IsStorable(string? outsideId, BankLineDirection direction, decimal amount) =>
@@ -132,6 +164,11 @@ public class BankStatementLine : BaseAuditableEntity
     {
         EnsureCredit("unmatched");
         EnsureStatus("unmatched", BankStatementLineStatus.Matched);
+        if (MatchMethod is StatementLineMatchMethod.Payment or StatementLineMatchMethod.PaymentReturn)
+        {
+            // Withdrawals R43: a returned payout is the flow's own write; it is not undone by hand.
+            throw new StatementLineStatusException("This line returned a payment and cannot be unmatched.");
+        }
     }
 
     /// <summary>The platform matched it by its deposit reference (R17).</summary>
@@ -140,6 +177,37 @@ public class BankStatementLine : BaseAuditableEntity
         EnsureCredit("matched");
         EnsureStatus("matched", BankStatementLineStatus.Received);
         SetMatch(accountId, transactionId, StatementLineMatchMethod.Reference, at);
+    }
+
+    /// <summary>Withdrawals R40: the debit line of a withdrawal's payment; its payout is posted.</summary>
+    public void MarkPayout(int accountId, int transactionId, int withdrawalId, DateTimeOffset at)
+    {
+        if (Direction != BankLineDirection.Debit)
+        {
+            throw new StatementLineStatusException("A payout is a debit line.");
+        }
+
+        EnsureStatus("matched", BankStatementLineStatus.Received);
+        SetMatch(accountId, transactionId, StatementLineMatchMethod.Payment, at);
+        WithdrawalId = withdrawalId;
+    }
+
+    /// <summary>Withdrawals R42: the credit line that returns a payout; the payout is reversed.</summary>
+    public void MarkPaymentReturn(int accountId, int transactionId, int withdrawalId, int relatedLineId, DateTimeOffset at)
+    {
+        EnsureCredit("matched");
+        EnsureStatus("matched", BankStatementLineStatus.Received);
+        SetMatch(accountId, transactionId, StatementLineMatchMethod.PaymentReturn, at);
+        WithdrawalId = withdrawalId;
+        RelatedLineId = relatedLineId;
+    }
+
+    /// <summary>Withdrawals R40, R42: the line names a payment but does not fit it.</summary>
+    public void MarkPaymentMismatch()
+    {
+        EnsureStatus("unmatched", BankStatementLineStatus.Received);
+        Status = BankStatementLineStatus.Unmatched;
+        UnmatchedReason = Enums.UnmatchedReason.PaymentMismatch;
     }
 
     /// <summary>The platform could not place it (R18).</summary>

@@ -36,7 +36,11 @@ public class UnmatchStatementLineCommandValidator : AbstractValidator<UnmatchSta
     }
 }
 
-public class UnmatchStatementLineCommandHandler(IApplicationDbContext db, ICurrentUser currentUser, TimeProvider time)
+public class UnmatchStatementLineCommandHandler(
+    IApplicationDbContext db,
+    ICurrentUser currentUser,
+    TimeProvider time,
+    ICurrencyCatalog currencies)
     : IRequestHandler<UnmatchStatementLineCommand>
 {
     public async Task Handle(UnmatchStatementLineCommand request, CancellationToken cancellationToken)
@@ -76,6 +80,9 @@ public class UnmatchStatementLineCommandHandler(IApplicationDbContext db, ICurre
 
             db.Transactions.Add(reversal);
             await db.SaveChangesAsync(token);
+
+            // Withdrawals R36: the undo may not take the cash below what open withdrawals reserve.
+            await AvailableCashGuard.EnsureAsync(db, currencies, account, await TransactionCash.SumAsync(db, accountId, token), token);
             line.Unmatch(request.Note!, actor, now);
             await StatementLineActions.SaveAsync(db, token);
         }, cancellationToken);

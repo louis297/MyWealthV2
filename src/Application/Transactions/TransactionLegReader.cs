@@ -88,6 +88,17 @@ internal static class TransactionLegReader
                 transaction.BankReceiptDetail.PayerAccount
             }).ToListAsync(cancellationToken);
 
+        var paymentRows = await db.Transactions.AsNoTracking()
+            .Where(transaction => transactionIds.Contains(transaction.Id) && transaction.PaymentDetail != null)
+            .Select(transaction => new
+            {
+                transaction.Id,
+                transaction.PaymentDetail!.ValueDate,
+                transaction.PaymentDetail.Reference,
+                transaction.PaymentDetail.PayeeName,
+                transaction.PaymentDetail.PayeeAccount
+            }).ToListAsync(cancellationToken);
+
         return new TransactionLegs(
             cashRows.ToLookup(row => row.TransactionId, row => new TransactionCashDto
             {
@@ -134,6 +145,15 @@ internal static class TransactionLegReader
                     Reference = row.Reference,
                     PayerName = row.PayerName,
                     PayerAccount = row.PayerAccount
+                }),
+            paymentRows.ToDictionary(
+                row => row.Id,
+                row => new TransactionPaymentDto
+                {
+                    ValueDate = row.ValueDate.ToString("yyyy-MM-dd"),
+                    Reference = row.Reference,
+                    PayeeName = row.PayeeName,
+                    PayeeAccount = row.PayeeAccount
                 }));
     }
 }
@@ -143,4 +163,5 @@ internal sealed record TransactionLegs(
     ILookup<int, TransactionSecurityDto> Security,
     IReadOnlyDictionary<int, TransactionFxDto> Fx,
     IReadOnlyDictionary<int, TransactionAdjustmentDto> Adjustment,
-    IReadOnlyDictionary<int, TransactionBankReceiptDto> BankReceipt);
+    IReadOnlyDictionary<int, TransactionBankReceiptDto> BankReceipt,
+    IReadOnlyDictionary<int, TransactionPaymentDto> Payment);

@@ -11,14 +11,13 @@ namespace MyWealthV2.Application.FunctionalTests.Custody;
 public class CustodialManualEntryTests : TestBase
 {
     [Test]
-    public async Task FundedByTheBankFeed_TransferOutReturns201()
+    public async Task FundedByTheBankFeed_AWithdrawalTakesCashOut()
     {
         var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
         var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
 
         (await FundAsync(tokens.AccessToken, accountId, 1000m)).StatusCode.ShouldBe(HttpStatusCode.Created);
-        (await PostAsync(tokens.AccessToken, Cash(accountId, "TransferOut", -250m))).StatusCode
-            .ShouldBe(HttpStatusCode.Created);
+        (await WithdrawAsync(accountId, 250m)).StatusCode.ShouldBe(HttpStatusCode.Created);
 
         (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(750m);
     }
@@ -58,14 +57,13 @@ public class CustodialManualEntryTests : TestBase
     }
 
     [Test]
-    public async Task CloseOut_OfTheFullBalance_Returns201_ThenTheAccountCloses()
+    public async Task AWithdrawalOfTheFullBalance_ThenTheAccountCloses()
     {
         var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
         var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
         (await FundAsync(tokens.AccessToken, accountId, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
 
-        (await PostAsync(tokens.AccessToken, Cash(accountId, "CloseOut", -100m))).StatusCode
-            .ShouldBe(HttpStatusCode.Created);
+        (await WithdrawAsync(accountId, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
 
         (await CloseAsync(tokens.AccessToken, accountId)).StatusCode.ShouldBe(HttpStatusCode.NoContent);
     }

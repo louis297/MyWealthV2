@@ -78,6 +78,7 @@ public static class TestApp
         }
 
         FunctionalTestSetup.WebApiServices.GetRequiredService<InMemoryBankFeed>().Reset();
+        FunctionalTestSetup.WebApiServices.GetRequiredService<InMemoryBankPayments>().Reset();
         _userId = null;
         _roles = null;
     }

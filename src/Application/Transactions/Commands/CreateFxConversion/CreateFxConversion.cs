@@ -235,12 +235,15 @@ public class CreateFxConversionCommandHandler(
             DateTimeOffset.UtcNow));
         await db.SaveChangesAsync(cancellationToken);
 
-        if (await TransactionCash.SumAsync(db, pair.From.Id, cancellationToken) < 0)
+        var fromSumAfter = await TransactionCash.SumAsync(db, pair.From.Id, cancellationToken);
+        if (fromSumAfter < 0)
         {
             throw new ValidationException([
                 new ValidationFailure(string.Empty, "Cash balance cannot become negative.")
             ]);
         }
+
+        await AvailableCashGuard.EnsureAsync(db, currencies, pair.From, fromSumAfter, cancellationToken);
 
         return new IdempotentResult(201, body);
     }

@@ -288,12 +288,15 @@ public class CreateAdjustmentCommandHandler(
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        if (await TransactionCash.SumAsync(db, account.Id, cancellationToken) < 0)
+        var sumAfter = await TransactionCash.SumAsync(db, account.Id, cancellationToken);
+        if (sumAfter < 0)
         {
             throw new ValidationException([
                 new ValidationFailure(string.Empty, "Cash balance cannot become negative.")
             ]);
         }
+
+        await AvailableCashGuard.EnsureAsync(db, catalog, account, sumAfter, cancellationToken);
 
         return new IdempotentResult(201, body);
     }

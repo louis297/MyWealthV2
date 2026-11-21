@@ -17,7 +17,7 @@ public class SimulatorHostTests
 
         var applied = await Sql.ReadAsync(connectionString,
             "IF OBJECT_ID(N'dbo.SchemaVersions', N'U') IS NOT NULL SELECT [ScriptName], [AppliedAt] FROM [SchemaVersions] ORDER BY [ScriptName]");
-        applied.Select(row => (string)row[0]).ShouldBe(["0001_schema_versions.sql", "0002_world.sql", "0003_bank.sql"]);
+        applied.Select(row => (string)row[0]).ShouldBe(["0001_schema_versions.sql", "0002_world.sql", "0003_bank.sql", "0004_bank_payments.sql"]);
         (await Sql.ReadAsync(connectionString,
                 "SELECT [name] FROM sys.tables WHERE [name] IN (N'World', N'ControlLog') ORDER BY [name]"))
             .Select(row => (string)row[0]).ShouldBe(["ControlLog", "World"]);

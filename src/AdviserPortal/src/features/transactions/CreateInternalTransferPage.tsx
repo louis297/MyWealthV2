@@ -8,7 +8,7 @@ import { type Account, useGetAccountQuery, useGetAccountsQuery } from "@/feature
 import { useGetCustomerQuery, useGetCustomersQuery } from "@/features/customers/customersApi";
 import { useCreateInternalTransferMutation } from "@/features/transactions/transactionsApi";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
-import { bookedWhenPosted, differentCustodyMode, isCustodial } from "@/features/accounts/custodyRules";
+import { anotherCustomer, bookedWhenPosted, differentCustodyMode, isCustodial } from "@/features/accounts/custodyRules";
 import { toUtcIso } from "@/shared/time/instant";
 import { cn } from "cn";
 
@@ -27,6 +27,9 @@ function ineligibleReason(candidate: Account, source: Account): string | null {
   }
   if (candidate.custodyMode !== source.custodyMode) {
     return differentCustodyMode;
+  }
+  if (isCustodial(source) && candidate.customerId !== source.customerId) {
+    return anotherCustomer;
   }
   return null;
 }

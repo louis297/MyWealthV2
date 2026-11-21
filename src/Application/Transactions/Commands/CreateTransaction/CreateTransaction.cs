@@ -382,6 +382,21 @@ public class CreateTransactionCommandHandler(
         }
 
         var currentSum = await TransactionCash.SumAsync(db, loaded.Account.Id, cancellationToken);
+
+        // Withdrawals R46: on a Custodial account a CloseOut writes off only the remainder a trade leaves.
+        if (type == TransactionType.CloseOut)
+        {
+            var closeOutCurrency = Money.Create(0m, currency).Currency;
+            var closeOutRefusal = CustodyRules.CloseOutRefusal(
+                loaded.Account.CustodyMode, currentSum, closeOutCurrency, catalog.TryGet(closeOutCurrency)?.DecimalPlaces ?? 2);
+            if (closeOutRefusal is not null)
+            {
+                throw new ValidationException([
+                    new ValidationFailure(nameof(CreateTransactionCommand.Type), closeOutRefusal)
+                ]);
+            }
+        }
+
         var existingCount = await TransactionCash.CountAsync(db, loaded.Account.Id, cancellationToken);
         await PortfolioTradeLock.RejectIfAssignedAsync(db, loaded.Account.Id, type, cancellationToken);
         Domain.Entities.Transaction transaction;
@@ -510,6 +525,8 @@ public class CreateTransactionCommandHandler(
                 new ValidationFailure(string.Empty, "Cash balance cannot become negative.")
             ]);
         }
+
+        await AvailableCashGuard.EnsureAsync(db, catalog, loaded.Account, postedSum, cancellationToken);
 
         return new IdempotentResult(201, body);
     }

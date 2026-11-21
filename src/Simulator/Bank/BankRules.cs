@@ -49,4 +49,15 @@ public static class BankRules
     }
 
     public static string? Text(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <summary>Withdrawals R49: the platform's instruction id, opaque, 1–100 characters (R57).</summary>
+    public const int InstructionIdMaxLength = 100;
+
+    /// <summary>Withdrawals R49: the reference a payment carries to the payee's statement.</summary>
+    public const int PaymentReferenceMaxLength = 18;
+
+    /// <summary>Withdrawals R34: the reasons a bank gives for refusing a payment.</summary>
+    public static readonly string[] RejectReasons = ["InvalidAccount", "AccountClosed", "InsufficientFunds", "Refused"];
+
+    public static bool IsRejectReason(string? value) => value is not null && RejectReasons.Contains(value, StringComparer.Ordinal);
 }

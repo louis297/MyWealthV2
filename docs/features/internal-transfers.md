@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-10
-last_updated: 2026-11-17
+last_updated: 2026-11-20
 related:
   - leg-accounts.md
   - posting.md
@@ -20,6 +20,7 @@ related:
   - ../api-design.md
   - ../glossary.md
   - custody-modes.md
+  - withdrawals.md
 ---
 
 # Internal transfers
@@ -294,3 +295,12 @@ Only after `accepted`. The tree must build after each commit. Split each behavio
 8. Portfolio interaction (R16) + tests.
 9. Adviser Portal Transfer form and picker + frontend tests. Customer Portal label.
 10. Repo docs: this file `accepted`; amend domain-model, database-design, api-design change log, adviser-portal-dashboard, customer-portal, features README status.
+
+---
+
+## Amendment 2026-11-20 (same Customer on Custodial transfers) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md](withdrawals.md).
+
+- New rule (roadmap D14, withdrawals R47): `POST /transactions/transfer` between two Custodial accounts of two different Customers → 400 `errors.ToAccountId` with the message `Cash can be transferred between Custodial accounts of the same customer only.` A transfer to another Customer's Custodial account would let cash leave through that Customer's own nominated bank account, around the review of a third-party payment (roadmap X4). External accounts unchanged. Existing transfers stay and can still be reversed.
+- R10 on a Custodial from Account: the from Account's **available cash** (cash `SUM` minus reserved cash) must stay `≥ 0` (withdrawals R36, R37).

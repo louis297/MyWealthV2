@@ -20,6 +20,8 @@ public sealed class SimulatorDbContext(DbContextOptions<SimulatorDbContext> opti
 
     public DbSet<BankFeedPlace> BankFeedPlaces => Set<BankFeedPlace>();
 
+    public DbSet<BankPayment> BankPayments => Set<BankPayment>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<World>(world =>
@@ -57,6 +59,22 @@ public sealed class SimulatorDbContext(DbContextOptions<SimulatorDbContext> opti
             line.Property(row => row.PayerName).HasMaxLength(BankRules.FreeTextMaxLength);
             line.Property(row => row.PayerAccount).HasMaxLength(BankRules.AccountNumberMaxLength);
             line.Property(row => row.Reference).HasMaxLength(BankRules.FreeTextMaxLength);
+            line.Property(row => row.EndToEndId).HasMaxLength(BankRules.InstructionIdMaxLength);
+            line.Property(row => row.ReturnReason).HasMaxLength(BankRules.FreeTextMaxLength);
+        });
+
+        modelBuilder.Entity<BankPayment>(payment =>
+        {
+            payment.ToTable("BankPayments");
+            payment.HasKey(row => row.Id);
+            payment.Property(row => row.PaymentId).HasMaxLength(100);
+            payment.Property(row => row.InstructionId).HasMaxLength(BankRules.InstructionIdMaxLength);
+            payment.Property(row => row.RequestHash).HasMaxLength(32);
+            payment.Property(row => row.Amount).HasColumnType("decimal(18,4)");
+            payment.Property(row => row.Reference).HasMaxLength(BankRules.PaymentReferenceMaxLength);
+            payment.Property(row => row.PayeeAccountNumber).HasMaxLength(BankRules.AccountNumberMaxLength);
+            payment.Property(row => row.PayeeName).HasMaxLength(BankRules.NameMaxLength);
+            payment.Property(row => row.RejectReason).HasMaxLength(30);
         });
 
         modelBuilder.Entity<BankFeedPlace>(place =>

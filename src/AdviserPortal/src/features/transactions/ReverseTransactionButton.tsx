@@ -54,6 +54,8 @@ export function sourceLabel(kind: string | undefined) {
       return "Test seed";
     case "BankFeed":
       return "Bank feed";
+    case "Payment":
+      return "Withdrawal";
     default:
       return kind;
   }

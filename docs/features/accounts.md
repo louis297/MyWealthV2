@@ -25,6 +25,7 @@ related:
   - tenant-custody-modes.md
   - client-money-accounts.md
   - deposit-matching.md
+  - withdrawals.md
 ---
 
 # Accounts
@@ -457,3 +458,11 @@ The repository should build after each commit. Agents split each line into red t
 7. `TestSeed` demo Customer (if missing) + four accounts + idempotent integration test
 
 Do not put cash, holdings, Opening, or portal pages in these commits.
+
+---
+
+## Amendment 2026-11-20 (reserved and available cash) — accepted
+
+Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md](withdrawals.md).
+
+- The item on list and get, and `GET /accounts/{id}/cash-balance`, gain `reservedCash` (the sum of the Account's open withdrawals: `Requested`, `Approved`, `Sent`) and `availableCash` (cash balance minus reserved cash). On an External account `reservedCash` is always 0 and `availableCash` equals the cash balance. Neither is a body field.

@@ -172,7 +172,8 @@ public class GetTransactionsQueryHandler(IApplicationDbContext db, ICurrentUser 
                     Security = legs.Security[row.transaction.Id].ToList(),
                     Fx = legs.Fx.GetValueOrDefault(row.transaction.Id),
                     Adjustment = legs.Adjustment.GetValueOrDefault(row.transaction.Id),
-                    BankReceipt = legs.BankReceipt.GetValueOrDefault(row.transaction.Id)
+                    BankReceipt = legs.BankReceipt.GetValueOrDefault(row.transaction.Id),
+                    Payment = legs.Payment.GetValueOrDefault(row.transaction.Id)
                 };
             }).ToList(),
             Page = request.Page,

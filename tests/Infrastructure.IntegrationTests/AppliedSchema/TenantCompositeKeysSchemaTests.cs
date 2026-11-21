@@ -134,6 +134,173 @@ public class TenantCompositeKeysSchemaTests
             INSERT INTO [AccountPortfolioAssignments] ([PublicId], [TenantId], [AccountId], [PortfolioId], [Status], [AssignedAt], [AssignedBy], [Created], [CreatedBy])
             VALUES (NEWID(), @a_tenant, @a_brokerage, @{p}_portfolio, 0, SYSDATETIMEOFFSET(), N'test', SYSDATETIMEOFFSET(), N'test');
             """),
+        ("FK_NominatedBankAccounts_Users_TenantId_CustomerId", "Users", """
+            INSERT INTO [NominatedBankAccounts]
+                ([PublicId], [TenantId], [CustomerId], [Currency], [BankName], [AccountName], [AccountNumber], [AccountNumberKey], [Status],
+                 [AddedByUserId], [AddedAt], [ReviewedByUserId], [ReviewedAt], [ReviewNote], [RemovedByUserId], [RemovedAt], [RemovedNote], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @{p}_customer, 'USD', N'ANZ', N'J Smith', N'0601', N'0601', 0,
+                    @a_adviser, SYSDATETIMEOFFSET(), NULL, NULL, NULL, NULL, NULL, NULL, SYSDATETIMEOFFSET(), N'test');
+            """),
+        ("FK_NominatedBankAccounts_Users_TenantId_AddedByUserId", "Users", """
+            INSERT INTO [NominatedBankAccounts]
+                ([PublicId], [TenantId], [CustomerId], [Currency], [BankName], [AccountName], [AccountNumber], [AccountNumberKey], [Status],
+                 [AddedByUserId], [AddedAt], [ReviewedByUserId], [ReviewedAt], [ReviewNote], [RemovedByUserId], [RemovedAt], [RemovedNote], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_customer, 'USD', N'ANZ', N'J Smith', N'0601', N'0601', 0,
+                    @{p}_adviser, SYSDATETIMEOFFSET(), NULL, NULL, NULL, NULL, NULL, NULL, SYSDATETIMEOFFSET(), N'test');
+            """),
+        ("FK_NominatedBankAccounts_Users_TenantId_ReviewedByUserId", "Users", """
+            INSERT INTO [NominatedBankAccounts]
+                ([PublicId], [TenantId], [CustomerId], [Currency], [BankName], [AccountName], [AccountNumber], [AccountNumberKey], [Status],
+                 [AddedByUserId], [AddedAt], [ReviewedByUserId], [ReviewedAt], [ReviewNote], [RemovedByUserId], [RemovedAt], [RemovedNote], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_customer, 'USD', N'ANZ', N'J Smith', N'0601', N'0601', 1,
+                    @a_adviser, SYSDATETIMEOFFSET(), @{p}_adviser, SYSDATETIMEOFFSET(), N'Checked', NULL, NULL, NULL, SYSDATETIMEOFFSET(), N'test');
+            """),
+        ("FK_NominatedBankAccounts_Users_TenantId_RemovedByUserId", "Users", """
+            INSERT INTO [NominatedBankAccounts]
+                ([PublicId], [TenantId], [CustomerId], [Currency], [BankName], [AccountName], [AccountNumber], [AccountNumberKey], [Status],
+                 [AddedByUserId], [AddedAt], [ReviewedByUserId], [ReviewedAt], [ReviewNote], [RemovedByUserId], [RemovedAt], [RemovedNote], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_customer, 'USD', N'ANZ', N'J Smith', N'0601', N'0601', 3,
+                    @a_adviser, SYSDATETIMEOFFSET(), NULL, NULL, NULL, @{p}_adviser, SYSDATETIMEOFFSET(), N'Gone', SYSDATETIMEOFFSET(), N'test');
+            """),
+        ("FK_Withdrawals_Accounts_TenantId_AccountId", "Accounts", """
+            INSERT INTO [NominatedBankAccounts]
+                ([PublicId], [TenantId], [CustomerId], [Currency], [BankName], [AccountName], [AccountNumber], [AccountNumberKey], [Status],
+                 [AddedByUserId], [AddedAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_customer, 'USD', N'ANZ', N'J Smith', N'0601', N'0601', 0, @a_adviser, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            DECLARE @nba int = SCOPE_IDENTITY();
+            INSERT INTO [Withdrawals]
+                ([PublicId], [TenantId], [AccountId], [NominatedBankAccountId], [Amount], [Currency], [Reference], [Status],
+                 [RequestedByUserId], [RequestedAt], [DecisionAction], [DecisionByUserId], [DecisionAt], [PayoutTransactionId], [ReturnTransactionId], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @{p}_bank, @nba, 300, 'USD', N'REF', 0, @a_adviser, SYSDATETIMEOFFSET(), NULL, NULL, NULL, NULL, NULL, SYSDATETIMEOFFSET(), N'test');
+            DECLARE @w int = SCOPE_IDENTITY();
+            """),
+        ("FK_Withdrawals_NominatedBankAccounts_TenantId_NominatedBankAccountId", "NominatedBankAccounts", """
+            INSERT INTO [NominatedBankAccounts]
+                ([PublicId], [TenantId], [CustomerId], [Currency], [BankName], [AccountName], [AccountNumber], [AccountNumberKey], [Status],
+                 [AddedByUserId], [AddedAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @{p}_tenant, @{p}_customer, 'USD', N'ANZ', N'J Smith', N'0601', N'0601', 0, @{p}_adviser, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            DECLARE @nba int = SCOPE_IDENTITY();
+            INSERT INTO [Withdrawals]
+                ([PublicId], [TenantId], [AccountId], [NominatedBankAccountId], [Amount], [Currency], [Reference], [Status],
+                 [RequestedByUserId], [RequestedAt], [DecisionAction], [DecisionByUserId], [DecisionAt], [PayoutTransactionId], [ReturnTransactionId], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_bank, @nba, 300, 'USD', N'REF', 0, @a_adviser, SYSDATETIMEOFFSET(), NULL, NULL, NULL, NULL, NULL, SYSDATETIMEOFFSET(), N'test');
+            DECLARE @w int = SCOPE_IDENTITY();
+            """),
+        ("FK_Withdrawals_Users_TenantId_RequestedByUserId", "Users", """
+            INSERT INTO [NominatedBankAccounts]
+                ([PublicId], [TenantId], [CustomerId], [Currency], [BankName], [AccountName], [AccountNumber], [AccountNumberKey], [Status],
+                 [AddedByUserId], [AddedAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_customer, 'USD', N'ANZ', N'J Smith', N'0601', N'0601', 0, @a_adviser, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            DECLARE @nba int = SCOPE_IDENTITY();
+            INSERT INTO [Withdrawals]
+                ([PublicId], [TenantId], [AccountId], [NominatedBankAccountId], [Amount], [Currency], [Reference], [Status],
+                 [RequestedByUserId], [RequestedAt], [DecisionAction], [DecisionByUserId], [DecisionAt], [PayoutTransactionId], [ReturnTransactionId], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_bank, @nba, 300, 'USD', N'REF', 0, @{p}_adviser, SYSDATETIMEOFFSET(), NULL, NULL, NULL, NULL, NULL, SYSDATETIMEOFFSET(), N'test');
+            DECLARE @w int = SCOPE_IDENTITY();
+            """),
+        ("FK_Withdrawals_Users_TenantId_DecisionByUserId", "Users", """
+            INSERT INTO [NominatedBankAccounts]
+                ([PublicId], [TenantId], [CustomerId], [Currency], [BankName], [AccountName], [AccountNumber], [AccountNumberKey], [Status],
+                 [AddedByUserId], [AddedAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_customer, 'USD', N'ANZ', N'J Smith', N'0601', N'0601', 0, @a_adviser, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            DECLARE @nba int = SCOPE_IDENTITY();
+            INSERT INTO [Withdrawals]
+                ([PublicId], [TenantId], [AccountId], [NominatedBankAccountId], [Amount], [Currency], [Reference], [Status],
+                 [RequestedByUserId], [RequestedAt], [DecisionAction], [DecisionByUserId], [DecisionAt], [PayoutTransactionId], [ReturnTransactionId], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_bank, @nba, 300, 'USD', N'REF', 1, @a_adviser, SYSDATETIMEOFFSET(), 0, @{p}_adviser, SYSDATETIMEOFFSET(), NULL, NULL, SYSDATETIMEOFFSET(), N'test');
+            DECLARE @w int = SCOPE_IDENTITY();
+            """),
+        ("FK_Withdrawals_Transactions_TenantId_PayoutTransactionId", "Transactions", """
+            INSERT INTO [NominatedBankAccounts]
+                ([PublicId], [TenantId], [CustomerId], [Currency], [BankName], [AccountName], [AccountNumber], [AccountNumberKey], [Status],
+                 [AddedByUserId], [AddedAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_customer, 'USD', N'ANZ', N'J Smith', N'0601', N'0601', 0, @a_adviser, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            DECLARE @nba int = SCOPE_IDENTITY();
+            INSERT INTO [Withdrawals]
+                ([PublicId], [TenantId], [AccountId], [NominatedBankAccountId], [Amount], [Currency], [Reference], [Status],
+                 [RequestedByUserId], [RequestedAt], [DecisionAction], [DecisionByUserId], [DecisionAt], [PayoutTransactionId], [ReturnTransactionId], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_bank, @nba, 300, 'USD', N'REF', 3, @a_adviser, SYSDATETIMEOFFSET(), 0, @a_adviser, SYSDATETIMEOFFSET(), @{p}_buy, NULL, SYSDATETIMEOFFSET(), N'test');
+            DECLARE @w int = SCOPE_IDENTITY();
+            """),
+        ("FK_Withdrawals_Transactions_TenantId_ReturnTransactionId", "Transactions", """
+            INSERT INTO [NominatedBankAccounts]
+                ([PublicId], [TenantId], [CustomerId], [Currency], [BankName], [AccountName], [AccountNumber], [AccountNumberKey], [Status],
+                 [AddedByUserId], [AddedAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_customer, 'USD', N'ANZ', N'J Smith', N'0601', N'0601', 0, @a_adviser, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            DECLARE @nba int = SCOPE_IDENTITY();
+            INSERT INTO [Withdrawals]
+                ([PublicId], [TenantId], [AccountId], [NominatedBankAccountId], [Amount], [Currency], [Reference], [Status],
+                 [RequestedByUserId], [RequestedAt], [DecisionAction], [DecisionByUserId], [DecisionAt], [PayoutTransactionId], [ReturnTransactionId], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_bank, @nba, 300, 'USD', N'REF', 7, @a_adviser, SYSDATETIMEOFFSET(), 0, @a_adviser, SYSDATETIMEOFFSET(), @a_buy, @{p}_fx, SYSDATETIMEOFFSET(), N'test');
+            DECLARE @w int = SCOPE_IDENTITY();
+            """),
+        ("FK_OutgoingPayments_Withdrawals_TenantId_WithdrawalId", "Withdrawals", """
+            INSERT INTO [ClientMoneyAccounts]
+                ([PublicId], [TenantId], [Currency], [BankName], [AccountName], [AccountNumber], [IsActive], [Created], [CreatedBy], [BankConnection])
+            VALUES (NEWID(), @a_tenant, 'USD', N'Simulator Bank', N'Trust', CONVERT(nvarchar(34), LEFT(REPLACE(CONVERT(nvarchar(36), NEWID()), N'-', N''), 30)), 1, SYSDATETIMEOFFSET(), N'test', N'simulator');
+            DECLARE @cma int = SCOPE_IDENTITY();
+            INSERT INTO [NominatedBankAccounts]
+                ([PublicId], [TenantId], [CustomerId], [Currency], [BankName], [AccountName], [AccountNumber], [AccountNumberKey], [Status],
+                 [AddedByUserId], [AddedAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @{p}_tenant, @{p}_customer, 'USD', N'ANZ', N'J Smith', N'0601', N'0601', 0, @{p}_adviser, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            DECLARE @nba int = SCOPE_IDENTITY();
+            INSERT INTO [Withdrawals]
+                ([PublicId], [TenantId], [AccountId], [NominatedBankAccountId], [Amount], [Currency], [Reference], [Status],
+                 [RequestedByUserId], [RequestedAt], [DecisionAction], [DecisionByUserId], [DecisionAt], [PayoutTransactionId], [ReturnTransactionId], [Created], [CreatedBy])
+            VALUES (NEWID(), @{p}_tenant, @{p}_bank, @nba, 300, 'USD', N'REF', 0, @{p}_adviser, SYSDATETIMEOFFSET(), NULL, NULL, NULL, NULL, NULL, SYSDATETIMEOFFSET(), N'test');
+            DECLARE @w int = SCOPE_IDENTITY();
+            INSERT INTO [OutgoingPayments]
+                ([PublicId], [TenantId], [ClientMoneyAccountId], [Connection], [InstructionPublicId], [WithdrawalId], [Amount], [Currency], [Status], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @cma, N'simulator', NEWID(), @w, 300, 'USD', 0, SYSDATETIMEOFFSET(), N'test');
+            """),
+        ("FK_TransactionPaymentDetails_Transactions_TenantId_TransactionId", "Transactions", """
+            INSERT INTO [TransactionPaymentDetails] ([TransactionId], [TenantId], [ValueDate])
+            VALUES (@{p}_buy, @a_tenant, '2026-11-20');
+            """),
+        ("FK_BankStatementLines_BankStatementLines_TenantId_RelatedLineId", "BankStatementLines", """
+            INSERT INTO [ClientMoneyAccounts]
+                ([PublicId], [TenantId], [Currency], [BankName], [AccountName], [AccountNumber], [IsActive], [Created], [CreatedBy], [BankConnection])
+            VALUES (NEWID(), @a_tenant, 'USD', N'Simulator Bank', N'Trust', CONVERT(nvarchar(34), LEFT(REPLACE(CONVERT(nvarchar(36), NEWID()), N'-', N''), 30)), 1, SYSDATETIMEOFFSET(), N'test', N'simulator');
+            DECLARE @cma int = SCOPE_IDENTITY();
+            INSERT INTO [ClientMoneyAccounts]
+                ([PublicId], [TenantId], [Currency], [BankName], [AccountName], [AccountNumber], [IsActive], [Created], [CreatedBy], [BankConnection])
+            VALUES (NEWID(), @{p}_tenant, 'NZD', N'Simulator Bank', N'Trust', CONVERT(nvarchar(34), LEFT(REPLACE(CONVERT(nvarchar(36), NEWID()), N'-', N''), 30)), 1, SYSDATETIMEOFFSET(), N'test', N'simulator');
+            DECLARE @pcma int = SCOPE_IDENTITY();
+            INSERT INTO [BankStatementLines]
+                ([PublicId], [TenantId], [ClientMoneyAccountId], [Connection], [OutsideId], [ValueDate], [Direction], [Amount], [Currency],
+                 [ReceivedAt], [Status], [RelatedLineId], [WithdrawalId], [Created], [CreatedBy])
+            VALUES (NEWID(), @{p}_tenant, @pcma, N'simulator', CONVERT(nvarchar(100), NEWID()), '2026-11-20', 1, 5, 'USD',
+                    SYSDATETIMEOFFSET(), 0, NULL, NULL, SYSDATETIMEOFFSET(), N'test');
+            DECLARE @returned int = SCOPE_IDENTITY();
+            INSERT INTO [BankStatementLines]
+                ([PublicId], [TenantId], [ClientMoneyAccountId], [Connection], [OutsideId], [ValueDate], [Direction], [Amount], [Currency],
+                 [ReceivedAt], [Status], [RelatedLineId], [WithdrawalId], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @cma, N'simulator', CONVERT(nvarchar(100), NEWID()), '2026-11-20', 1, 5, 'USD',
+                    SYSDATETIMEOFFSET(), 0, @returned, NULL, SYSDATETIMEOFFSET(), N'test');
+            DECLARE @line int = SCOPE_IDENTITY();
+            """),
+        ("FK_BankStatementLines_Withdrawals_TenantId_WithdrawalId", "Withdrawals", """
+            INSERT INTO [ClientMoneyAccounts]
+                ([PublicId], [TenantId], [Currency], [BankName], [AccountName], [AccountNumber], [IsActive], [Created], [CreatedBy], [BankConnection])
+            VALUES (NEWID(), @a_tenant, 'USD', N'Simulator Bank', N'Trust', CONVERT(nvarchar(34), LEFT(REPLACE(CONVERT(nvarchar(36), NEWID()), N'-', N''), 30)), 1, SYSDATETIMEOFFSET(), N'test', N'simulator');
+            DECLARE @cma int = SCOPE_IDENTITY();
+            INSERT INTO [NominatedBankAccounts]
+                ([PublicId], [TenantId], [CustomerId], [Currency], [BankName], [AccountName], [AccountNumber], [AccountNumberKey], [Status],
+                 [AddedByUserId], [AddedAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @{p}_tenant, @{p}_customer, 'USD', N'ANZ', N'J Smith', N'0601', N'0601', 0, @{p}_adviser, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            DECLARE @nba int = SCOPE_IDENTITY();
+            INSERT INTO [Withdrawals]
+                ([PublicId], [TenantId], [AccountId], [NominatedBankAccountId], [Amount], [Currency], [Reference], [Status],
+                 [RequestedByUserId], [RequestedAt], [DecisionAction], [DecisionByUserId], [DecisionAt], [PayoutTransactionId], [ReturnTransactionId], [Created], [CreatedBy])
+            VALUES (NEWID(), @{p}_tenant, @{p}_bank, @nba, 300, 'USD', N'REF', 0, @{p}_adviser, SYSDATETIMEOFFSET(), NULL, NULL, NULL, NULL, NULL, SYSDATETIMEOFFSET(), N'test');
+            DECLARE @w int = SCOPE_IDENTITY();
+            INSERT INTO [BankStatementLines]
+                ([PublicId], [TenantId], [ClientMoneyAccountId], [Connection], [OutsideId], [ValueDate], [Direction], [Amount], [Currency],
+                 [ReceivedAt], [Status], [RelatedLineId], [WithdrawalId], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @cma, N'simulator', CONVERT(nvarchar(100), NEWID()), '2026-11-20', 1, 5, 'USD',
+                    SYSDATETIMEOFFSET(), 0, NULL, @w, SYSDATETIMEOFFSET(), N'test');
+            DECLARE @line int = SCOPE_IDENTITY();
+            """),
         ("FK_ReportExecutions_ReportSchedules_TenantId_ScheduleId", "ReportSchedules", """
             INSERT INTO [ReportExecutions] ([PublicId], [ReportId], [ScheduleId], [TenantId], [TriggerKind], [Status], [ParametersJson], [Created], [CreatedBy])
             VALUES (NEWID(), @report, @{p}_schedule, @a_tenant, N'Scheduled', N'Queued', N'{}', SYSDATETIMEOFFSET(), N'test');
@@ -167,7 +334,7 @@ public class TenantCompositeKeysSchemaTests
     ];
 
     private static readonly string[] Parents =
-        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs"];
+        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines"];
 
     private static IEnumerable<TestCaseData> CompositeKeyCases() =>
         CompositeKeys.Select(key => new TestCaseData(key.ForeignKey).SetName($"Insert_ChildPointingAtOtherTenant_IsRejected({key.ForeignKey})"));

@@ -32,6 +32,8 @@ internal static class StatementLineReader
         var accountIds = lines.Where(line => line.MatchedAccountId is not null).Select(line => line.MatchedAccountId!.Value).Distinct().ToList();
         var transactionIds = lines.Where(line => line.MatchedTransactionId is not null).Select(line => line.MatchedTransactionId!.Value).Distinct().ToList();
         var userIds = lines.Where(line => line.LastActionByUserId is not null).Select(line => line.LastActionByUserId!.Value).Distinct().ToList();
+        var relatedIds = lines.Where(line => line.RelatedLineId is not null).Select(line => line.RelatedLineId!.Value).Distinct().ToList();
+        var withdrawalIds = lines.Where(line => line.WithdrawalId is not null).Select(line => line.WithdrawalId!.Value).Distinct().ToList();
 
         var clientMoney = await db.ClientMoneyAccounts.AsNoTracking()
             .Where(row => clientMoneyIds.Contains(row.Id))
@@ -44,6 +46,12 @@ internal static class StatementLineReader
             .ToDictionaryAsync(row => row.Id, cancellationToken);
         var transactions = await db.Transactions.AsNoTracking()
             .Where(row => transactionIds.Contains(row.Id))
+            .ToDictionaryAsync(row => row.Id, row => row.PublicId, cancellationToken);
+        var related = await db.BankStatementLines.AsNoTracking()
+            .Where(row => relatedIds.Contains(row.Id))
+            .ToDictionaryAsync(row => row.Id, row => row.PublicId, cancellationToken);
+        var withdrawals = await db.Withdrawals.AsNoTracking()
+            .Where(row => withdrawalIds.Contains(row.Id))
             .ToDictionaryAsync(row => row.Id, row => row.PublicId, cancellationToken);
         var users = await db.Users.AsNoTracking()
             .Where(row => userIds.Contains(row.Id))
@@ -82,6 +90,9 @@ internal static class StatementLineReader
                     At = line.LastActionAt!.Value
                 }
                 : null,
+            RelatedLineId = line.RelatedLineId is int relatedId ? related[relatedId] : null,
+            WithdrawalId = line.WithdrawalId is int withdrawalId ? withdrawals[withdrawalId] : null,
+            ReturnReason = line.ReturnReason,
             RowVersion = Convert.ToBase64String(line.RowVersion ?? [])
         }).ToList();
     }

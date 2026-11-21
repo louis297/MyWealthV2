@@ -54,6 +54,18 @@ export type Activity = {
   fx?: ActivityFx | null;
   /** deposit-matching R36: the bank's details on a deposit and its Reversal; otherwise null. */
   bankReceipt?: ActivityBankReceipt | null;
+  /** withdrawals R41: the bank's details on a payout and its Reversal; otherwise null. */
+  payment?: { valueDate: string; reference: string | null; payeeName: string | null; payeeAccount: string | null } | null;
+};
+
+/** withdrawals R25: a withdrawal as the Customer reads it; the payee number is masked, no memo, no note. */
+export type CustomerWithdrawal = {
+  id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  requestedAt: string;
+  nominatedBankAccount: { bankName: string; accountNumber: string };
 };
 
 export type ActivityBankReceipt = {
@@ -74,8 +86,16 @@ export const accountsApi = api.injectEndpoints({
       query: (id) => `/accounts/${id}`,
       providesTags: ["Account"],
     }),
-    getCashBalance: builder.query<{ cashBalance: number; currency: string }, string>({
+    getCashBalance: builder.query<
+      { cashBalance: number; currency: string; reservedCash?: number; availableCash?: number },
+      string
+    >({
       query: (id) => `/accounts/${id}/cash-balance`,
+    }),
+    /** C24: the Customer's withdrawals from one account. */
+    getAccountWithdrawals: builder.query<PagedList<CustomerWithdrawal>, string>({
+      query: (accountId) => `/withdrawals?accountId=${encodeURIComponent(accountId)}&page=1&pageSize=100`,
+      providesTags: ["Withdrawal"],
     }),
     getDepositInstructions: builder.query<DepositInstructions, string>({
       query: (id) => `/accounts/${id}/deposit-instructions`,
@@ -92,6 +112,7 @@ export const accountsApi = api.injectEndpoints({
 });
 
 export const {
+  useGetAccountWithdrawalsQuery,
   useGetAccountsQuery,
   useGetAccountQuery,
   useGetCashBalanceQuery,
