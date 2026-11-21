@@ -6,6 +6,7 @@ using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Transactions;
+using MyWealthV2.Application.Withdrawals;
 using MyWealthV2.Domain.Custody;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
@@ -191,9 +192,9 @@ public class RequestAccountClosureCommandHandler(
 
         if (payout > 0m)
         {
-            throw Error(
-                nameof(RequestAccountClosureCommand.NominatedBankAccountId),
-                $"The account has {payout.ToString($"F{places}", CultureInfo.InvariantCulture)} {currency} to pay out. Choose a verified bank account.");
+            return await StartWithPayoutAsync(
+                request, account, tenantId, requester, now, cash, payout, places, closurePublicId,
+                (key, method, path, hash), cancellationToken);
         }
 
         // R9: nothing leaves the trust account; the remainder is written off and the Account closed at once.
@@ -211,6 +212,47 @@ public class RequestAccountClosureCommandHandler(
             tenantId, account.Id, currency, requester, now, request.Memo!, cash,
             writeOff is null ? null : remainder, writeOff?.Id, closurePublicId));
         return await SaveAsync(tenantId, key, method, path, hash, closurePublicId, now, cancellationToken);
+    }
+
+    /// <summary>R8: the payout is an ordinary withdrawal to a verified bank account of the Customer, created with the
+    /// closure and requested by the same person at the same time; the Account is closing from now on.</summary>
+    private async Task<IdempotentResult> StartWithPayoutAsync(
+        RequestAccountClosureCommand request,
+        Account account,
+        int tenantId,
+        int requester,
+        DateTimeOffset now,
+        decimal cash,
+        decimal payout,
+        int places,
+        Guid closurePublicId,
+        (Guid Key, string Method, string Path, string Hash) idempotency,
+        CancellationToken cancellationToken)
+    {
+        var currency = account.Currency.Trim();
+        if (request.NominatedBankAccountId is not Guid nominatedId)
+        {
+            throw Error(
+                NominatedPayee.ErrorKey,
+                $"The account has {payout.ToString($"F{places}", CultureInfo.InvariantCulture)} {currency} to pay out. Choose a verified bank account.");
+        }
+
+        var nominated = await NominatedPayee.FindAsync(db, tenantId, account.CustomerId, nominatedId, cancellationToken);
+        NominatedPayee.EnsurePayable(nominated, currency);
+
+        // Withdrawals R23: the reference is the deposit reference, so the Customer recognises the payment.
+        var withdrawal = Withdrawal.Request(
+            tenantId, account.Id, nominated.Id, payout, currency, account.DepositReference!.Value, request.Memo,
+            requester, now);
+        db.Withdrawals.Add(withdrawal);
+        await db.SaveChangesAsync(cancellationToken);
+
+        db.AccountClosures.Add(AccountClosure.StartWithPayout(
+            tenantId, account.Id, currency, requester, now, request.Memo!, cash, payout, nominated.Id, withdrawal.Id,
+            closurePublicId));
+        return await SaveAsync(
+            tenantId, idempotency.Key, idempotency.Method, idempotency.Path, idempotency.Hash, closurePublicId, now,
+            cancellationToken);
     }
 
     private async Task<IdempotentResult> SaveAsync(

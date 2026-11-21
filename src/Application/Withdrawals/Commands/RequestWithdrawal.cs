@@ -131,11 +131,8 @@ public class RequestWithdrawalCommandHandler(
         var customer = await db.Users.AsNoTracking().SingleAsync(row => row.Id == account.CustomerId, cancellationToken);
 
         // R20: another Customer's, another tenant's or a missing nominated bank account is 404 for the whole command.
-        var nominated = await db.NominatedBankAccounts.AsNoTracking()
-                            .SingleOrDefaultAsync(row => row.PublicId == request.NominatedBankAccountId
-                                                         && row.TenantId == tenantId
-                                                         && row.CustomerId == account.CustomerId, cancellationToken)
-                        ?? throw new NotFoundException("Nominated bank account", request.NominatedBankAccountId!.Value);
+        var nominated = await NominatedPayee.FindAsync(
+            db, tenantId, account.CustomerId, request.NominatedBankAccountId!.Value, cancellationToken);
 
         if (account.CustodyMode != CustodyMode.Custodial)
         {
@@ -157,17 +154,7 @@ public class RequestWithdrawalCommandHandler(
         }
 
         var currency = account.Currency.Trim();
-        if (nominated.Status != NominatedBankAccountStatus.Verified)
-        {
-            throw Error(nameof(RequestWithdrawalCommand.NominatedBankAccountId), "The bank account is not verified.");
-        }
-
-        if (!string.Equals(nominated.Currency.Trim(), currency, StringComparison.OrdinalIgnoreCase))
-        {
-            throw Error(
-                nameof(RequestWithdrawalCommand.NominatedBankAccountId),
-                $"The bank account is in {nominated.Currency.Trim()}; this account is {currency}.");
-        }
+        NominatedPayee.EnsurePayable(nominated, currency);
 
         // R21: precision, then the available cash under the lock.
         var amount = request.Amount!.Value;
