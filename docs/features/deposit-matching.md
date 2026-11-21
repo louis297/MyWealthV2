@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-20
-last_updated: 2026-11-20
+last_updated: 2026-11-21
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -28,6 +28,7 @@ related:
   - ../api-design.md
   - ../glossary.md
   - withdrawals.md
+  - bank-returns.md
 ---
 
 # Bank feed and deposit matching
@@ -716,3 +717,18 @@ Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md
 - R30: on a Custodial account an undo match is refused when it would leave **available cash** below 0, not only the cash `SUM` (withdrawals R36, R37).
 - The line item gains `relatedLineId`, `withdrawalId` and `returnReason`; unmatched reason `PaymentMismatch` (7); match methods `Payment` (2) and `PaymentReturn` (3). `GET /statement-lines` takes an optional `direction` (`Credit`, `Debit`; unknown → 400 `errors.Direction`).
 - §4.6 (simulator bank): the payments side is in withdrawals §4.7.
+
+---
+
+## Amendment 2026-11-21 (receipt returns, recalls and other debit lines) — accepted
+
+Status of this amendment: `accepted` (2026-11-21), together with [bank-returns.md](bank-returns.md). Rules R2–R11 live there; this section records what changes here.
+
+- R13: the processing step processes every `Received` line of the connection, debit and credit, in the same order and the same way (bank-returns R2). A line named by `returnOf` or `endToEndId` is looked up in the line's Tenant and client money account only.
+- R14: debit lines no longer wait. A payout is withdrawals R40; the debit of a receipt return is bank-returns R7; a recall or dishonour of a receipt (a debit whose `returnOf` names a receipt) is bank-returns R3; any other debit line becomes `Unmatched` with reason `UnknownPayment`.
+- R18: unmatched reasons gain `UnknownPayment` (8), `UnknownReturn` (9), `RecallNotCovered` (10) and `ReturnRejected` (11). A credit line with a `returnOf` that names no payout to return is `UnknownReturn`, not deposit matching (bank-returns R8).
+- R23: on a debit line, ignore (from `Unmatched`) and reopen (from `Ignored`) are allowed; match, request return and undo match stay refused with `errors.Status`. `ReturnSent` and `Returned` lines, and every `Matched` debit line, accept no action (bank-returns R9). A line matched with method `Recall` refuses undo match.
+- R28: request return also creates an outgoing payment of kind `ReceiptReturn` in the same database transaction; the bank sends the money back and the line becomes `ReturnSent`, then `Returned` (bank-returns R5–R7). A rejected return puts the line back to `Unmatched` with reason `ReturnRejected`.
+- R29: reopen from `ReturnRequested` is allowed only while the return payment has no send attempt, and cancels it; after an attempt → 400 `errors.Status`, `The bank has been asked to return this receipt, so it can no longer be reopened.`
+- New statuses `ReturnSent` (5) and `Returned` (6), match method `Recall` (4). A `Matched` line may have no Account and no Transaction (the debit of a receipt return, the recall of a receipt never credited); its `relatedLineId` is then set.
+- The item (§8.1): `returnPayment: { status, attempts, lastFailure }` on a credit line with a return payment, else `null`; `match.accountId`, `match.customerId` and `match.transactionId` are `null` on a match with no Transaction. The `status` filter takes the new names.

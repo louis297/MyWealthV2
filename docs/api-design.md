@@ -3,7 +3,7 @@ title: API design
 status: accepted
 language: en
 created: 2026-09-11
-updated: 2026-11-20
+updated: 2026-11-21
 related:
   - README.md
   - glossary.md
@@ -303,7 +303,7 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Tenants | `/tenants` | list / get / create / update / disable / enable | `tenants.manage` |
 | Client money accounts | `/tenants/{tenantId}/client-money-accounts` | list / get / create / disable / enable. See features/client-money-accounts.md; `bankConnection`, `bankFeed` in features/deposit-matching.md | `tenants.manage` |
 | Bank connections | `/bank-connections` | list (names and adapters from configuration). See features/deposit-matching.md | `tenants.manage` |
-| Statement lines | `/statement-lines` | list / get; match / ignore / request-return / reopen / unmatch. See features/deposit-matching.md | `statement-lines.manage` |
+| Statement lines | `/statement-lines` | list / get; match / ignore / request-return / reopen / unmatch. See features/deposit-matching.md and features/bank-returns.md (returns, recalls, debit lines) | `statement-lines.manage` |
 | Nominated bank accounts | `/nominated-bank-accounts` | list / get / create; verify / reject / remove. No PUT. See features/withdrawals.md | `nominated-bank-accounts.read` / `.manage` / `.verify` |
 | Withdrawals | `/withdrawals` | list / get / create (`Idempotency-Key`); approve / reject / cancel. See features/withdrawals.md | `withdrawals.read` / `.request` / `.approve` |
 | Instruments | `/instruments` | list / get / create / update / disable / enable | `instruments.read` / `instruments.create` / `instruments.manage` |
@@ -458,6 +458,7 @@ Field rules: [features/accounts.md](features/accounts.md).
 - Amendment 2026-11-20 (client money accounts and deposit references, accepted; field rules in [features/client-money-accounts.md](features/client-money-accounts.md)): `POST /accounts` with `Custodial` in a currency where the Tenant has no active client money account → 400 `errors.Currency`. The item includes `depositReference` (server-generated on a Custodial account, `null` on an External one); a POST or PUT body that carries it → 400. `GET /accounts/{id}/deposit-instructions` (`accounts.read`) → `{ accountId, currency, reference, bankName, accountName, accountNumber }`, or 404 for an External or Closed account or when the currency has no active client money account.
 - Amendment 2026-11-20 (deposit matching, accepted; field rules in [features/deposit-matching.md](features/deposit-matching.md)): `GET /accounts` takes an optional `depositReference` (exact after trim and upper-casing; an invalid value returns an empty list).
 - Amendment 2026-11-20 (withdrawals, accepted; field rules in [features/withdrawals.md](features/withdrawals.md)): the item and `GET /accounts/{id}/cash-balance` include `reservedCash` (the sum of open withdrawals; 0 on an External account) and `availableCash` (cash balance minus reserved cash).
+- Amendment 2026-11-21 (receipt returns, recalls and other debit lines, accepted; field rules in [features/bank-returns.md](features/bank-returns.md)): no new route or permission. `POST /statement-lines/{id}/request-return` also creates the return payment the bank sends; `reopen` of a `ReturnRequested` line is refused (400 `errors.Status`) once the bank was asked. `ignore` (from `Unmatched`) and `reopen` (from `Ignored`) apply to debit lines too. The statement line item gains statuses `ReturnSent` and `Returned`, reasons `UnknownPayment`, `UnknownReturn`, `RecallNotCovered`, `ReturnRejected`, method `Recall`, and `returnPayment: { status, attempts, lastFailure }` (`null` without a return payment); `match.accountId`, `match.customerId` and `match.transactionId` are `null` on a match with no Transaction. A recalled deposit is reversed by the flow (source `BankFeed`).
 
 ### 7.7 Transactions
 
@@ -619,3 +620,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-20 | §6, §7.3, §7.6: client money accounts and deposit references accepted. Sub-resource `/tenants/{tenantId}/client-money-accounts` (`tenants.manage`); tenant item `clientMoneyCurrencies`; account item `depositReference`; `GET /accounts/{id}/deposit-instructions`; Custodial open needs an active client money account in its currency. No new policy or problem code ([features/client-money-accounts.md](features/client-money-accounts.md)). |
 | 2026-11-20 | §3.1, §6, §7.3, §7.6, §7.7: bank feed and deposit matching accepted. Permission `statement-lines.manage` (TenantAdmin only); resources `/statement-lines` and `/bank-connections`; client money account `bankConnection` and `bankFeed`; `GET /accounts?depositReference=`; transaction item `bankReceipt` and source kind `BankFeed`; hand `TransferIn` refused on a Custodial account. No problem code ([features/deposit-matching.md](features/deposit-matching.md)). |
 | 2026-11-20 | §3.1, §6, §7.6, §7.7: nominated bank accounts and withdrawals accepted. Six permissions (`nominated-bank-accounts.read` / `.manage` / `.verify`, `withdrawals.read` / `.request` / `.approve`); resources `/nominated-bank-accounts` and `/withdrawals`; account item `reservedCash` and `availableCash`; transaction item `payment` and source kind `Payment`; hand `TransferOut` refused and `CloseOut` limited on a Custodial account; Custodial transfers between Customers refused; statement line `direction` filter and payout fields. No problem code ([features/withdrawals.md](features/withdrawals.md)). |
+| 2026-11-21 | §6, §7.7: receipt returns, recalls and other debit lines accepted. No route, permission or problem code; statement line statuses `ReturnSent`, `Returned`, four unmatched reasons, method `Recall`, item `returnPayment`, nullable match ids; ignore and reopen on debit lines; request return sends the payment ([features/bank-returns.md](features/bank-returns.md)). |

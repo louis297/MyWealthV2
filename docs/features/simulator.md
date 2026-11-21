@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-19
-last_updated: 2026-11-20
+last_updated: 2026-11-21
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -22,6 +22,7 @@ related:
   - ../glossary.md
   - deposit-matching.md
   - withdrawals.md
+  - bank-returns.md
 ---
 
 # Simulator
@@ -439,3 +440,13 @@ Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md
 - R24: a reset also empties the payments and sets the payment mode to `Execute`. R25: payment ids are `{WorldId:N}-P{n}`.
 - R28: new control log actions `BankPaymentModeChanged`, `BankPaymentExecuted` and `BankPaymentReturned`. A payment received on the party port is not a control action.
 - §11 point 7: still no scenario library (withdrawals §11 point 19); it is proposed for B7.
+
+---
+
+## Amendment 2026-11-21 (S1 bank, returns and recalls) — accepted
+
+Status of this amendment: `accepted` (2026-11-21), together with [bank-returns.md](bank-returns.md). Rules R12–R16 and the simulator script `0005_bank_returns.sql` live there (§4.5, §6.2); this section records what changes here.
+
+- §2 Out "Every outside party": the bank also returns a receipt and recalls one. The payment route takes `returnOf` (the outside id of a credit line on that account) in place of `payee`; an executed return is a debit line with `endToEndId` and `returnOf`, payer fields = the original payer. A return of no credit line, of a return line, or of a line already returned or recalled is rejected with reason `UnknownLine`. Control route `POST /control/bank/lines/{outsideId}/recall` `{ reason, availableAfter? }` adds a debit line with `returnOf` and `returnReason`.
+- R24: a reset is unchanged (it already empties lines and payments).
+- R28: new control log action `BankReceiptRecalled`.

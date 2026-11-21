@@ -3,7 +3,7 @@ title: Domain model
 status: accepted
 language: en
 created: 2026-09-11
-updated: 2026-11-20
+updated: 2026-11-21
 related:
   - README.md
   - glossary.md
@@ -384,6 +384,8 @@ Invariants: a `Matched` line has exactly one Account and one deposit; no other s
 
 Amendment 2026-11-20 (withdrawals, accepted): `BankStatementLine` gains `EndToEndId`, `ReturnOfOutsideId`, `RelatedLineId` (the stored line it returns), `ReturnReason` and `WithdrawalId`; `Receive` takes the three new wire fields. New methods `MarkPayout`, `MarkPaymentReturn` and `MarkPaymentMismatch`; unmatched reason `PaymentMismatch` (7); match methods `Payment` (2) and `PaymentReturn` (3). A `Matched` line still has one Account and one Transaction ([features/withdrawals.md](features/withdrawals.md)).
 
+Amendment 2026-11-21 (bank returns, accepted): statuses `ReturnSent` and `Returned`; unmatched reasons `UnknownPayment` (8), `UnknownReturn` (9), `RecallNotCovered` (10), `ReturnRejected` (11); match method `Recall` (4). New methods `MarkReturnSent`, `ReturnRejected`, `MarkReturned`, `MarkRecall`, `MarkReturnPaid` and `MarkUnknown`. A debit line accepts `Ignore` (from `Unmatched`) and `Reopen` (from `Ignored`) and refuses the other hand methods; `Reopen` from `ReturnRequested` is refused once the return payment was attempted. A `Matched` line has either one Account and one Transaction, or neither and a related line (the debit of a receipt return, the recall of a receipt never credited). A `Returned` line has no match and never changes again ([features/bank-returns.md](features/bank-returns.md)).
+
 ### 8.10 Nominated bank account (accepted — withdrawals slice)
 
 | Type | Kind | Notes |
@@ -402,6 +404,8 @@ Invariants: the details never change; a correction is a new row. Verify and reje
 | `PaymentRejectReason` | Enum | `InvalidAccount`, `AccountClosed`, `InsufficientFunds`, `Refused` |
 
 Invariants: a withdrawal is approved or rejected by someone other than its requester. It is cancelled only while `Requested`, or `Approved` with an outgoing payment that has no send attempt. A withdrawal has at most one payout and at most one return Reversal. An outgoing payment is unique on its instruction PublicId (a unique index). No domain event. Field rules: [features/withdrawals.md](features/withdrawals.md).
+
+Amendment 2026-11-21 (bank returns, accepted): `OutgoingPaymentKind` (`Withdrawal`, `ReceiptReturn`); `OutgoingPayment` gains `Kind` and `ReturnOfLineId`, and `WithdrawalId` becomes optional: exactly one of the two, by kind. `ForReceiptReturn(line, clientMoneyAccount)` creates a return with its own PublicId as instruction id, the line's amount and currency, no reference and no payee. A line has at most one open (`Pending` or `Accepted`) return payment, held by a filtered unique index. `PaymentRejectReason` gains `UnknownLine` ([features/bank-returns.md](features/bank-returns.md)).
 
 ---
 

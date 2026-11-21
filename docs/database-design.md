@@ -500,6 +500,8 @@ Unmatched receipts are not in any ledger table (roadmap D7). No seed.
 
 Amendment 2026-11-20 (withdrawals, accepted, landed; [features/withdrawals.md](features/withdrawals.md) §6.2): script `0043_withdrawals.sql` adds to `BankStatementLines` `EndToEndId nvarchar(100) NULL`, `ReturnOfOutsideId nvarchar(100) NULL`, `ReturnReason nvarchar(140) NULL`, `RelatedLineId int NULL` (FK `(TenantId, RelatedLineId)` → `BankStatementLines` RESTRICT) and `WithdrawalId int NULL` (FK `(TenantId, WithdrawalId)` → `Withdrawals` RESTRICT); widens the `UnmatchedReason` CHECK to 0–7 and the `MatchMethod` CHECK to 0–3; filtered indexes on `(Connection, EndToEndId)` and `(Connection, ReturnOfOutsideId)`. The Matched CHECK is unchanged. Existing lines keep null in the new columns.
 
+Amendment 2026-11-21 (bank returns, accepted; [features/bank-returns.md](features/bank-returns.md) §6.1): script `0044_bank_returns.sql` widens the `Status` CHECK of `BankStatementLines` to 0–6, `UnmatchedReason` to 0–11 and `MatchMethod` to 0–4, and replaces the Matched CHECK: `Status = 1` needs `MatchMethod` and `MatchedAt`, and either both `MatchedAccountId` and `MatchedTransactionId`, or both null with `RelatedLineId` set; any other status has no match columns. No back-fill.
+
 ### 11.10 Nominated bank accounts (accepted)
 
 Feature spec: [features/withdrawals.md](features/withdrawals.md) (accepted 2026-11-20, landed 2026-11-21) §6.1. Script `0042_nominated_bank_accounts.sql`:
@@ -515,6 +517,8 @@ Feature spec: [features/withdrawals.md](features/withdrawals.md) (accepted 2026-
 - `TransactionPaymentDetails` — §11.4. The `BankStatementLines` columns — §11.9.
 
 Reserved cash is computed from `Withdrawals`, not stored. No seed in the script.
+
+Amendment 2026-11-21 (bank returns, accepted; [features/bank-returns.md](features/bank-returns.md) §6.1): script `0044_bank_returns.sql` adds to `OutgoingPayments` `Kind int NOT NULL` (CHECK 0–1; existing rows get 0 through a temporary default, then the default is dropped) and `ReturnOfLineId int NULL` (FK `(TenantId, ReturnOfLineId)` → `BankStatementLines` RESTRICT); `WithdrawalId` becomes NULL; CHECK exactly one of `WithdrawalId` and `ReturnOfLineId` by kind; the `RejectReason` CHECK widens to 0–4; unique filtered `UX_OutgoingPayments_ReturnOfLineId_Open` on `ReturnOfLineId WHERE Kind = 1 AND Status IN (0, 1)`.
 
 ## 12. Still not a schema decision
 
@@ -571,6 +575,7 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-20 | Bank feed and deposit matching landed: `0040`, `0041` and simulator `0003` written. `TransactionBankReceiptDetails` has a `TenantId` and the tenant composite key, and the match and last-action keys of `BankStatementLines` are tenant composite keys (§11.4, §11.9). |
 | 2026-11-20 | Withdrawals accepted (`0042`, `0043`, not written yet): `NominatedBankAccounts` (§11.10), `Withdrawals` and `OutgoingPayments` (§11.11), `TransactionPaymentDetails` and source kind 4 (§11.4), the payout columns of `BankStatementLines` (§11.9). Simulator script `0004_bank_payments.sql` (§15). All are build contracts. |
 | 2026-11-21 | Withdrawals landed: `0042`, `0043` and simulator `0004` written. `NominatedBankAccounts`, `Withdrawals` and `BankStatementLines` gained a unique `(TenantId, Id)` key for the composite FKs; the statements on new columns run inside `EXEC` (§11.4, §11.9–§11.11, §15). |
+| 2026-11-21 | Bank returns accepted (`0044`, not written yet): `OutgoingPayments` kind and returned line (§11.11), the widened checks and the new Matched CHECK of `BankStatementLines` (§11.9). Simulator script `0005_bank_returns.sql` (§15). All are build contracts. |
 
 ---
 
@@ -669,5 +674,6 @@ Owner: [features/simulator.md](features/simulator.md) §6.2, [ADR 0021](adr/0021
 - S0 tables: `World` (one row, `CHECK (Id = 1)`) and `ControlLog`. Each party (S1–S4) adds its tables with its own amendment.
 - S1 receipts ([features/deposit-matching.md](features/deposit-matching.md) §6.3, accepted and landed 2026-11-20; `0003_bank.sql`): `BankAccounts` (account number unique), `BankLines` (outside id unique; available-at instant), `BankFeedPlaces` (one row per place in an account's feed, two for a line delivered twice), and `World.NextLineNumber`. A reset empties the three bank tables.
 - S1 payments ([features/withdrawals.md](features/withdrawals.md) §6.3, accepted 2026-11-20, landed 2026-11-21; `0004_bank_payments.sql`): `BankPayments` (payment id unique; `(BankAccountId, InstructionId)` unique, with the request hash), `BankLines` gains `EndToEndId`, `ReturnOfLineId` and `ReturnReason`, and `World` gains `NextPaymentNumber`, `BankPaymentMode` and `BankPaymentRejectReason`. A reset empties `BankPayments` and sets the mode to `Execute`.
+- S1 returns and recalls ([features/bank-returns.md](features/bank-returns.md) §6.2, accepted 2026-11-21; `0005_bank_returns.sql`): `BankPayments.PayeeAccountNumber` and `PayeeName` become NULL and `BankPayments` gains `ReturnOfLineId` (FK `BankLines`), with a CHECK of exactly one of a payee and `ReturnOfLineId`. A recall is a `BankLines` row with `ReturnOfLineId`. A reset is unchanged.
 - Development: Aspire creates the database. VPS: created by hand once, like `MyWealthDbV2` ([deployment.md](deployment.md) §15).
 
