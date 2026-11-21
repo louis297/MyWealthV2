@@ -75,6 +75,7 @@ public sealed class SimulatorDbContext(DbContextOptions<SimulatorDbContext> opti
             payment.Property(row => row.PayeeAccountNumber).HasMaxLength(BankRules.AccountNumberMaxLength);
             payment.Property(row => row.PayeeName).HasMaxLength(BankRules.NameMaxLength);
             payment.Property(row => row.RejectReason).HasMaxLength(30);
+            payment.Property(row => row.ReturnOf).HasMaxLength(BankRules.InstructionIdMaxLength);
         });
 
         modelBuilder.Entity<BankFeedPlace>(place =>

@@ -8,11 +8,11 @@ using MyWealthV2.Domain.ValueObjects;
 namespace MyWealthV2.Application.BankFeed;
 
 /// <summary>
-/// Processes every <c>Received</c> credit line of one connection, oldest first: posts the deposit of a receipt that
-/// quotes one Custodial account's deposit reference, or leaves it unmatched with a reason (deposit-matching R13,
-/// R15–R20, R32; ADR 0021 rule 8). It also processes the debit lines that carry an end-to-end id, and the credit lines
-/// that return a payout (withdrawals R39–R42). Each line is one database transaction, guarded by the line's row
-/// version.
+/// Processes every <c>Received</c> line of one connection, oldest first (bank-returns R2; ADR 0021 rule 8). A credit
+/// line posts the deposit of a receipt that quotes one Custodial account's deposit reference, or is left unmatched
+/// with a reason (deposit-matching R13, R15–R20, R32); a credit line that returns a payout reverses it (withdrawals
+/// R42). A debit line is a payout (withdrawals R40), or a debit the platform did not cause, which goes to suspense
+/// (bank-returns R4). Each line is one database transaction, guarded by the line's row version.
 /// </summary>
 public sealed class ProcessStatementLines(
     IApplicationDbContext db,
@@ -24,8 +24,7 @@ public sealed class ProcessStatementLines(
     {
         var ids = await db.BankStatementLines.IgnoreQueryFilters().AsNoTracking()
             .Where(row => row.Connection == connection
-                          && row.Status == BankStatementLineStatus.Received
-                          && (row.Direction == BankLineDirection.Credit || row.EndToEndId != null))
+                          && row.Status == BankStatementLineStatus.Received)
             .OrderBy(row => row.ReceivedAt)
             .ThenBy(row => row.Id)
             .Select(row => row.Id)
@@ -58,12 +57,33 @@ public sealed class ProcessStatementLines(
         var payouts = new BankPayouts(db, time);
         if (line.Direction == BankLineDirection.Debit)
         {
-            await payouts.ProcessDebitAsync(line, cancellationToken);
+            if (await payouts.ProcessDebitAsync(line, cancellationToken)
+                || await new BankReturns(db, time).ProcessReturnPaidAsync(line, cancellationToken))
+            {
+                return;
+            }
+
+            if (line.EndToEndId is null && line.ReturnOfOutsideId is not null)
+            {
+                await new BankRecalls(db, time).ProcessRecallAsync(line, cancellationToken);
+                return;
+            }
+
+            // R4: a debit the platform did not cause is the firm's to explain, not a Customer's.
+            line.MarkUnknown(UnmatchedReason.UnknownPayment);
+            await db.SaveChangesAsync(cancellationToken);
             return;
         }
 
-        if (line.ReturnOfOutsideId is not null && await payouts.ProcessReturnAsync(line, cancellationToken))
+        if (line.ReturnOfOutsideId is not null)
         {
+            // R8: a credit that takes back a line other than a payout is a receipt again, for a person to place.
+            if (!await payouts.ProcessReturnAsync(line, cancellationToken))
+            {
+                line.MarkUnknown(UnmatchedReason.UnknownReturn);
+                await db.SaveChangesAsync(cancellationToken);
+            }
+
             return;
         }
 

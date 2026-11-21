@@ -39,16 +39,21 @@ public sealed class StatementLineDto
 
     public string? ReturnReason { get; init; }
 
+    /// <summary>The newest return payment of a receipt marked for return, else null (bank-returns R11).</summary>
+    public StatementLineReturnPaymentDto? ReturnPayment { get; init; }
+
     public required string RowVersion { get; init; }
 }
 
+/// <summary>A match. The account, customer and transaction are null on a match with no Transaction: the debit of a
+/// receipt return, or the recall of a receipt never credited (bank-returns R10, R11).</summary>
 public sealed class StatementLineMatchDto
 {
-    public required Guid AccountId { get; init; }
+    public Guid? AccountId { get; init; }
 
-    public required Guid CustomerId { get; init; }
+    public Guid? CustomerId { get; init; }
 
-    public required Guid TransactionId { get; init; }
+    public Guid? TransactionId { get; init; }
 
     public required string Method { get; init; }
 
@@ -67,3 +72,13 @@ public sealed class StatementLineLastActionDto
 }
 
 public sealed record StatementLinePersonDto(Guid Id, string Name);
+
+/// <summary>The return payment of a receipt (bank-returns R11).</summary>
+public sealed class StatementLineReturnPaymentDto
+{
+    public required string Status { get; init; }
+
+    public required int Attempts { get; init; }
+
+    public string? LastFailure { get; init; }
+}

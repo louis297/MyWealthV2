@@ -2,8 +2,8 @@ namespace MyWealthV2.Domain.Entities;
 
 /// <summary>
 /// One payment the platform asks a bank to make from a client money account (docs/features/withdrawals.md R31). The
-/// instruction's PublicId is the idempotency key the bank sees on every attempt (ADR 0021 rule 13). In this slice
-/// every outgoing payment pays a withdrawal.
+/// instruction's PublicId is the idempotency key the bank sees on every attempt (ADR 0021 rule 13). It pays a
+/// withdrawal, or sends a receipt back to its payer (docs/features/bank-returns.md R5).
 /// </summary>
 public class OutgoingPayment : BaseAuditableEntity
 {
@@ -23,7 +23,13 @@ public class OutgoingPayment : BaseAuditableEntity
 
     public Guid InstructionPublicId { get; private set; }
 
-    public int WithdrawalId { get; private set; }
+    public OutgoingPaymentKind Kind { get; private set; }
+
+    /// <summary>The withdrawal it pays; set only on a <see cref="OutgoingPaymentKind.Withdrawal"/>.</summary>
+    public int? WithdrawalId { get; private set; }
+
+    /// <summary>The statement line it sends back; set only on a <see cref="OutgoingPaymentKind.ReceiptReturn"/>.</summary>
+    public int? ReturnOfLineId { get; private set; }
 
     public decimal Amount { get; private set; }
 
@@ -66,6 +72,7 @@ public class OutgoingPayment : BaseAuditableEntity
             TenantId = withdrawal.TenantId,
             ClientMoneyAccountId = clientMoney.Id,
             Connection = clientMoney.BankConnection,
+            Kind = OutgoingPaymentKind.Withdrawal,
             InstructionPublicId = withdrawal.PublicId,
             WithdrawalId = withdrawal.Id,
             Amount = withdrawal.Amount,
@@ -73,6 +80,42 @@ public class OutgoingPayment : BaseAuditableEntity
             Reference = withdrawal.Reference,
             Status = OutgoingPaymentStatus.Pending,
             PublicId = Guid.NewGuid()
+        };
+    }
+
+    /// <summary>Bank-returns R5: the return of a receipt to its payer, <c>Pending</c>, from the line's client money
+    /// account, with its own PublicId as the instruction id, no payee and no reference.</summary>
+    public static OutgoingPayment ForReceiptReturn(BankStatementLine line, ClientMoneyAccount clientMoney)
+    {
+        if (line.Id == 0)
+        {
+            throw new DomainException("The statement line must be saved first.");
+        }
+
+        if (line.Direction != BankLineDirection.Credit)
+        {
+            throw new DomainException("Only a receipt can be sent back to its payer.");
+        }
+
+        if (clientMoney.Id != line.ClientMoneyAccountId || clientMoney.TenantId != line.TenantId)
+        {
+            throw new DomainException("The client money account must be the line's.");
+        }
+
+        var publicId = Guid.NewGuid();
+        return new OutgoingPayment
+        {
+            TenantId = line.TenantId,
+            ClientMoneyAccountId = clientMoney.Id,
+            Connection = clientMoney.BankConnection,
+            Kind = OutgoingPaymentKind.ReceiptReturn,
+            InstructionPublicId = publicId,
+            ReturnOfLineId = line.Id,
+            Amount = line.Amount,
+            Currency = line.Currency,
+            Reference = null,
+            Status = OutgoingPaymentStatus.Pending,
+            PublicId = publicId
         };
     }
 

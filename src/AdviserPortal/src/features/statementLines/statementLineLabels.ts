@@ -1,6 +1,13 @@
-/** D34: the status labels of the Bank receipts pages. */
+/** D34, D50: the status labels of the Bank receipts pages. */
 export function statusLabel(status: string) {
-  return status === "ReturnRequested" ? "To be returned" : status;
+  switch (status) {
+    case "ReturnRequested":
+      return "To be returned";
+    case "ReturnSent":
+      return "Return sent";
+    default:
+      return status;
+  }
 }
 
 /** D34: the reason labels of an unmatched receipt. */
@@ -22,6 +29,14 @@ export function reasonLabel(reason: string | null | undefined) {
       return "Amount has too many decimals";
     case "PaymentMismatch":
       return "Amount differs from the payment";
+    case "UnknownPayment":
+      return "Payment out not recognised";
+    case "UnknownReturn":
+      return "Return not recognised";
+    case "RecallNotCovered":
+      return "Recalled, but the cash is gone";
+    case "ReturnRejected":
+      return "Bank refused the return";
     default:
       return reason ?? "";
   }
@@ -65,7 +80,7 @@ export function problemMessages(error: unknown): { fields: Record<string, string
   return { fields, messages };
 }
 
-/** D35, D49: how a matched line was matched. */
+/** D35, D49, D50: how a matched line was matched. */
 export function methodLabel(method: string) {
   switch (method) {
     case "Manual":
@@ -74,6 +89,8 @@ export function methodLabel(method: string) {
       return "Paid by the platform";
     case "PaymentReturn":
       return "Payment returned";
+    case "Recall":
+      return "Recalled by the payer's bank";
     default:
       return "Matched by reference";
   }

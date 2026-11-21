@@ -295,17 +295,19 @@ public class BankStatementLineTests
     }
 
     [Test]
-    public void EveryMethod_OnADebitLine_Throws()
+    public void EveryReceiptMethod_OnADebitLine_Throws()
     {
+        // Bank-returns R9: ignore and reopen apply to a debit line too (BankReturnLineTests).
         var actions = new Action<BankStatementLine>[]
         {
             line => line.MarkMatched(11, 12, At),
             line => line.MarkUnmatched(UnmatchedReason.NoReference),
             line => line.MatchByHand(11, 12, null, Admin, At),
-            line => line.Ignore("Note", Admin, At),
             line => line.RequestReturn("Note", Admin, At),
-            line => line.Reopen(Admin, At),
-            line => line.Unmatch("Note", Admin, At)
+            line => line.Unmatch("Note", Admin, At),
+            line => line.MarkReturnSent(),
+            line => line.MarkReturnRejected(),
+            line => line.MarkReturned()
         };
 
         foreach (var act in actions)
@@ -377,6 +379,17 @@ public class BankStatementLineTests
                 line.MarkUnmatched(UnmatchedReason.NoReference);
                 line.RequestReturn("Note", Admin, At);
                 break;
+            case BankStatementLineStatus.ReturnSent:
+                line.MarkUnmatched(UnmatchedReason.NoReference);
+                line.RequestReturn("Note", Admin, At);
+                line.MarkReturnSent();
+                break;
+            case BankStatementLineStatus.Returned:
+                line.MarkUnmatched(UnmatchedReason.NoReference);
+                line.MarkReturned();
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(status), status, null);
         }
 
         return line;

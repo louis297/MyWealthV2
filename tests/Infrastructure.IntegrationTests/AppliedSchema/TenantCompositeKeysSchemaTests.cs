@@ -250,8 +250,27 @@ public class TenantCompositeKeysSchemaTests
             VALUES (NEWID(), @{p}_tenant, @{p}_bank, @nba, 300, 'USD', N'REF', 0, @{p}_adviser, SYSDATETIMEOFFSET(), NULL, NULL, NULL, NULL, NULL, SYSDATETIMEOFFSET(), N'test');
             DECLARE @w int = SCOPE_IDENTITY();
             INSERT INTO [OutgoingPayments]
-                ([PublicId], [TenantId], [ClientMoneyAccountId], [Connection], [InstructionPublicId], [WithdrawalId], [Amount], [Currency], [Status], [Created], [CreatedBy])
-            VALUES (NEWID(), @a_tenant, @cma, N'simulator', NEWID(), @w, 300, 'USD', 0, SYSDATETIMEOFFSET(), N'test');
+                ([PublicId], [TenantId], [ClientMoneyAccountId], [Connection], [Kind], [InstructionPublicId], [WithdrawalId], [Amount], [Currency], [Status], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @cma, N'simulator', 0, NEWID(), @w, 300, 'USD', 0, SYSDATETIMEOFFSET(), N'test');
+            """),
+        ("FK_OutgoingPayments_BankStatementLines_TenantId_ReturnOfLineId", "BankStatementLines", """
+            INSERT INTO [ClientMoneyAccounts]
+                ([PublicId], [TenantId], [Currency], [BankName], [AccountName], [AccountNumber], [IsActive], [Created], [CreatedBy], [BankConnection])
+            VALUES (NEWID(), @a_tenant, 'USD', N'Simulator Bank', N'Trust', CONVERT(nvarchar(34), LEFT(REPLACE(CONVERT(nvarchar(36), NEWID()), N'-', N''), 30)), 1, SYSDATETIMEOFFSET(), N'test', N'simulator');
+            DECLARE @cma int = SCOPE_IDENTITY();
+            INSERT INTO [ClientMoneyAccounts]
+                ([PublicId], [TenantId], [Currency], [BankName], [AccountName], [AccountNumber], [IsActive], [Created], [CreatedBy], [BankConnection])
+            VALUES (NEWID(), @{p}_tenant, 'NZD', N'Simulator Bank', N'Trust', CONVERT(nvarchar(34), LEFT(REPLACE(CONVERT(nvarchar(36), NEWID()), N'-', N''), 30)), 1, SYSDATETIMEOFFSET(), N'test', N'simulator');
+            DECLARE @pcma int = SCOPE_IDENTITY();
+            INSERT INTO [BankStatementLines]
+                ([PublicId], [TenantId], [ClientMoneyAccountId], [Connection], [OutsideId], [ValueDate], [Direction], [Amount], [Currency],
+                 [ReceivedAt], [Status], [Created], [CreatedBy])
+            VALUES (NEWID(), @{p}_tenant, @pcma, N'simulator', CONVERT(nvarchar(100), NEWID()), '2026-11-21', 0, 5, 'USD',
+                    SYSDATETIMEOFFSET(), 0, SYSDATETIMEOFFSET(), N'test');
+            DECLARE @returned int = SCOPE_IDENTITY();
+            INSERT INTO [OutgoingPayments]
+                ([PublicId], [TenantId], [ClientMoneyAccountId], [Connection], [Kind], [InstructionPublicId], [ReturnOfLineId], [Amount], [Currency], [Status], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @cma, N'simulator', 1, NEWID(), @returned, 5, 'USD', 0, SYSDATETIMEOFFSET(), N'test');
             """),
         ("FK_TransactionPaymentDetails_Transactions_TenantId_TransactionId", "Transactions", """
             INSERT INTO [TransactionPaymentDetails] ([TransactionId], [TenantId], [ValueDate])

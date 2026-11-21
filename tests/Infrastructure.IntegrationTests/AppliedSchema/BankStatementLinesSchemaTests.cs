@@ -86,9 +86,9 @@ public class BankStatementLinesSchemaTests
     }
 
     [TestCase("[Amount]", "0")]
-    [TestCase("[Status]", "5")]
+    [TestCase("[Status]", "7")]
     [TestCase("[Direction]", "2")]
-    [TestCase("[UnmatchedReason]", "8")]
+    [TestCase("[UnmatchedReason]", "12")]
     public async Task ValueOutsideItsCheck_IsRejected(string column, string value)
     {
         var exception = await Should.ThrowAsync<SqlException>(() => RunAsync($"""

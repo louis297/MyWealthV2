@@ -35,7 +35,8 @@ public sealed class SimulatorBankPayments(IHttpClientFactory httpClients) : IBan
             request.Amount,
             request.Currency,
             request.Reference,
-            new WirePayee(request.Payee.AccountNumber, request.Payee.Name)), options: Json);
+            request.Payee is { } payee ? new WirePayee(payee.AccountNumber, payee.Name) : null,
+            request.ReturnOfOutsideId), options: Json);
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(connection.TimeoutSeconds));
@@ -96,8 +97,10 @@ public sealed class SimulatorBankPayments(IHttpClientFactory httpClients) : IBan
         [property: JsonPropertyName("instructionId")] string InstructionId,
         [property: JsonPropertyName("amount")] decimal Amount,
         [property: JsonPropertyName("currency")] string Currency,
-        [property: JsonPropertyName("reference")] string? Reference,
-        [property: JsonPropertyName("payee")] WirePayee Payee);
+        [property: JsonPropertyName("reference"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Reference,
+        [property: JsonPropertyName("payee"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] WirePayee? Payee,
+        // Bank-returns R12, R16: a receipt return names the line it sends back in place of a payee.
+        [property: JsonPropertyName("returnOf"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ReturnOf);
 
     private sealed record WirePayee(
         [property: JsonPropertyName("accountNumber")] string AccountNumber,

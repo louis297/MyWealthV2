@@ -48,6 +48,38 @@ public class SimulatorBankPaymentsTests
         root.GetProperty("payee").GetProperty("name").GetString().ShouldBe("J Smith");
     }
 
+    [Test]
+    public async Task AReceiptReturn_SendsTheReturnedLine_AndNoPayee()
+    {
+        var handler = new StubHandler(HttpStatusCode.OK, """{ "paymentId": "3f2c-P6", "status": "Accepted" }""");
+        var request = new BankPaymentRequest(
+            "simulator", "SIM-DEMO USD", Instruction, 250.50m, "USD", null, null, ReturnOfOutsideId: "3f2c-L7");
+
+        var result = await Payments(handler).SendAsync(Connection, request, CancellationToken.None);
+
+        result.PaymentId.ShouldBe("3f2c-P6");
+        using var body = JsonDocument.Parse(handler.Bodies.Single());
+        var root = body.RootElement;
+        root.GetProperty("instructionId").GetString().ShouldBe(Instruction.ToString());
+        root.GetProperty("amount").GetDecimal().ShouldBe(250.50m);
+        root.TryGetProperty("returnOf", out var returnOf).ShouldBeTrue();
+        returnOf.GetString().ShouldBe("3f2c-L7");
+        root.TryGetProperty("payee", out _).ShouldBeFalse();
+        root.TryGetProperty("reference", out _).ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task APayment_SendsNoReturnedLine()
+    {
+        var handler = new StubHandler(HttpStatusCode.OK, """{ "paymentId": "3f2c-P4", "status": "Accepted" }""");
+
+        await Payments(handler).SendAsync(Connection, Request, CancellationToken.None);
+
+        using var body = JsonDocument.Parse(handler.Bodies.Single());
+        body.RootElement.TryGetProperty("returnOf", out _).ShouldBeFalse();
+    }
+
+    [TestCase("UnknownLine", PaymentRejectReason.UnknownLine)]
     [TestCase("InvalidAccount", PaymentRejectReason.InvalidAccount)]
     [TestCase("AccountClosed", PaymentRejectReason.AccountClosed)]
     [TestCase("InsufficientFunds", PaymentRejectReason.InsufficientFunds)]

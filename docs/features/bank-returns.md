@@ -1,11 +1,11 @@
 ---
 title: Receipt returns, recalls and other debit lines
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
 created: 2026-11-20
-last_updated: 2026-11-20
+last_updated: 2026-11-21
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -27,7 +27,18 @@ Step 6b of [custodial-roadmap.md](../custodial-roadmap.md) §13. It finishes the
 
 New: outgoing payment kind `ReceiptReturn`; statement line statuses `ReturnSent` and `Returned`, four unmatched reasons, match method `Recall`; ignore and reopen on a debit line; `returnPayment` on the statement line item; the simulator's return payment and recall. Scripts `0044_bank_returns.sql`; simulator script `database/simulator/0005_bank_returns.sql`. No new route, permission, `TransactionType`, source kind, problem code or domain event.
 
-**Status is `review` (2026-11-20).** It depends on [withdrawals.md](withdrawals.md) and lands after it. The points of §11 were confirmed in discussion on 2026-11-20, every one as recommended, and are written into the rules. The spec becomes `accepted` when the owner says so; the amendments to accepted docs listed in §12 are made in that change, not before.
+**Status is `accepted` (2026-11-21), landed 2026-11-21.** It depends on [withdrawals.md](withdrawals.md), which landed 2026-11-21. The points of §11 were confirmed in discussion on 2026-11-20, every one as recommended, and are written into the rules; point 8 was decided on acceptance (2026-11-21). The amendments to accepted docs listed in §12 were made when it was accepted.
+
+Notes from landing:
+
+- §5 names: the rejected return is `MarkReturnRejected()`, and `MarkReturned()` takes no time, since a `Returned` line stores none. `Reopen(by, at, returnAttempted)` treats an `Accepted` return payment as attempted.
+- `0044` drops and adds again the `WithdrawalId` FK and index of `OutgoingPayments` around the `ALTER COLUMN`, and names the kind CHECK `CK_OutgoingPayments_Kind` and the one-target CHECK `CK_OutgoingPayments_Target`.
+- R2 order in code: payout (withdrawals R40), return paid (R7), any other `endToEndId` (`UnknownPayment`), a `returnOf` (R3), any other debit (`UnknownPayment`). R7 needs the payment of the line's Tenant and client money account; a debit naming a return payment that was never attempted, or one already `Paid`, is `UnknownPayment`.
+- R3: a recall whose receipt is still `Received` stays `Received` until that receipt is processed (it is older, so the same run takes it first). The Reversal's `CreatedBy` is the worker's system name. Not covered means: the Account is Closed, or the cash `SUM` after the Reversal is below 0, or below reserved cash.
+- R2 (tenant scope): the pull now links a `returnOf` only to a stored line of the same Tenant and client money account. Before, a line naming another Tenant's line on the shared connection broke the composite FK and failed the page.
+- R16: `SimulatorBankPayments` leaves `payee`, `reference` and `returnOf` out of the body when they are null.
+- Simulator (§6.2 changed): `BankPayments` keeps `ReturnOf` (the outside id as sent, `nvarchar(100)`) next to `ReturnOfLineId`, because a return of a line the account does not have is rejected as `UnknownLine` and still recorded for R51; the CHECK is exactly one of a payee and `ReturnOf`. "Returned before" includes a held return. A recall's payer fields are the receipt's payer; the recall route answers 200 `{ id }`, an unknown line 404. `GET /control/bank/payments` shows `returnOfLineId` (the outside id) and null payee fields on a return. The hash of a payment with a payee is unchanged, so earlier answers replay.
+- Adviser Portal: the RecallNotCovered link reads the recalled receipt's match for the account; a match with no Transaction shows the method, the time and the related line only.
 
 ---
 
@@ -92,7 +103,7 @@ Amendment to [deposit-matching.md](deposit-matching.md) R13, R14 and [withdrawal
 
 | ID | Rule |
 | --- | --- |
-| R2 | **What is processed.** `ProcessStatementLines` now processes every `Received` line of the connection, debit and credit, in deposit-matching R13 order and one line per database transaction. Withdrawals R39 already took payout lines and returned payout lines. The rest is classified in this order: a debit with an `endToEndId` that names a receipt of the line's Tenant (R7); a debit with any other `endToEndId` (`UnknownPayment`); a debit with a `returnOf` (R3); any other debit (R4); a credit with a `returnOf` (R8); any other credit (deposit matching, unchanged). Debit lines stored before this slice are processed by its first run. |
+| R2 | **What is processed.** `ProcessStatementLines` now processes every `Received` line of the connection, debit and credit, in deposit-matching R13 order and one line per database transaction. Withdrawals R39 already took payout lines and returned payout lines. The rest is classified in this order: a debit with an `endToEndId` that names a receipt return of the line's Tenant (R7); a debit with any other `endToEndId` (`UnknownPayment`, also one that names a withdrawal R40 cannot pay: not a GUID, a payment `Rejected` or `Cancelled`, or one from another client money account); a debit with a `returnOf` (R3); any other debit (R4); a credit with a `returnOf` (R8); any other credit (deposit matching, unchanged). Debit lines stored before this slice are processed by its first run. Every line a line names (`returnOf`, `endToEndId`) is looked up in the line's Tenant and client money account only; a line of another Tenant counts as no line. |
 | R3 | **Recall of a receipt.** A debit line whose `returnOf` is a stored credit line of the same connection that is itself a receipt (no `returnOf`), with the same amount and no `endToEndId`, is a recall or dishonour by the payer's bank. When that credit line is `Matched`: the platform posts the Reversal of its deposit with source `BankFeed` and that line's PublicId (as deposit-matching R33), if the Account is Open and available cash stays `≥ 0` ([withdrawals.md](withdrawals.md) R36); the credit line becomes `Returned` and loses its match (as an undo match); the debit line becomes `Matched` with method `Recall` (Account and Reversal). A Disabled Customer does not stop it. When the cash is not available or the Account is Closed: nothing is posted, the debit line becomes `Unmatched` with reason `RecallNotCovered`, and the TenantAdmin corrects the account with an adjustment ([adjustments.md](adjustments.md)) and then ignores the line. When that credit line is `Unmatched`, `Ignored` or `ReturnRequested`: the credit line becomes `Returned` and the debit line `Matched` with method `Recall`, with no Account and no Transaction; a return payment of that line with no attempt becomes `Cancelled`, and one already attempted is left to its answer, which then changes only the payment (R6). A different amount, or a credit line already `Returned` or `ReturnSent` → `UnknownReturn`. |
 | R4 | **Other debit lines.** A debit the platform did not cause becomes `Unmatched` with reason `UnknownPayment`. Nothing is written to the ledger. A bank fee on the trust account is the firm's, not a Customer's; the TenantAdmin ignores it (R9). |
 
@@ -100,9 +111,9 @@ Amendment to [deposit-matching.md](deposit-matching.md) R13, R14 and [withdrawal
 
 | ID | Rule |
 | --- | --- |
-| R5 | **Request return creates the payment.** Deposit-matching R28 changes: request return also creates, in the same database transaction, an outgoing payment ([withdrawals.md](withdrawals.md) R31) of kind `ReceiptReturn`: `Pending`, instruction id = the line's PublicId, amount and currency of the line, the line as the line returned, no payee and no reference, from the line's client money account. The bank pays it back to the original payer; the platform never holds the payer's full account number (deposit-matching R11). Reopen (deposit-matching R29) from `ReturnRequested` is allowed only while that payment has no attempt, and sets it `Cancelled`; after an attempt → 400 `errors.Status`, `The bank has been asked to return this receipt, so it can no longer be reopened.` |
+| R5 | **Request return creates the payment.** Deposit-matching R28 changes: request return also creates, in the same database transaction, an outgoing payment ([withdrawals.md](withdrawals.md) R31) of kind `ReceiptReturn`: `Pending`, instruction id = the payment's own new PublicId (§11 point 8), amount and currency of the line, the line as the line returned, no payee and no reference, from the line's client money account. The bank pays it back to the original payer; the platform never holds the payer's full account number (deposit-matching R11). A line has at most one open return payment (`Pending` or `Accepted`); a `Rejected` or `Cancelled` one stays as a record, and a new request return creates a new payment with a new instruction id. Reopen (deposit-matching R29) from `ReturnRequested` is allowed only while the open payment has no attempt, and sets it `Cancelled`; after an attempt → 400 `errors.Status`, `The bank has been asked to return this receipt, so it can no longer be reopened.` |
 | R6 | **Sending the return.** The send step (withdrawals R32) sends `ReceiptReturn` payments too, with the same rules for order, attempts, disabled Tenants and inactive client money accounts. The port call names the line's outside id as `returnOf` and carries no payee. Accepted → payment `Accepted`, line `ReturnSent`. Rejected → payment `Rejected`, line `Unmatched` with reason `ReturnRejected`; the TenantAdmin decides again (match, ignore or request return). A failure of the call → the payment stays `Pending`, the line stays `ReturnRequested`. When the line is already `Returned` (a recall came first, R3), an answer changes only the payment. Rejection reasons gain `UnknownLine` (withdrawals R34). |
-| R7 | **Return paid.** A debit line whose `endToEndId` is the PublicId of a credit line of the same Tenant that is `ReturnSent`, or `ReturnRequested` with an attempted payment (the accepted answer was lost), with the same amount: the credit line becomes `Returned`, the payment `Paid`, and the debit line `Matched` with method `Payment`, with no Account and no Transaction, and `relatedLineId` = the returned line. Nothing is written to the ledger. A different amount → `PaymentMismatch`. |
+| R7 | **Return paid.** A debit line whose `endToEndId` is the instruction id of a `ReceiptReturn` payment of the same Tenant and client money account, `Pending` with an attempt (the accepted answer was lost) or `Accepted`, whose line is `ReturnSent` or `ReturnRequested`, with the same amount: the credit line becomes `Returned`, the payment `Paid`, and the debit line `Matched` with method `Payment`, with no Account and no Transaction, and `relatedLineId` = the returned line. Nothing is written to the ledger. A different amount → `PaymentMismatch`. |
 | R8 | **Credit lines with a `returnOf`.** A credit line whose `returnOf` names the debit line of a receipt return (the payer's bank sent the money back again), or names no line withdrawals R42 can act on, becomes `Unmatched` with reason `UnknownReturn`. The TenantAdmin matches, ignores or returns it like any receipt. |
 
 ### 4.4 Actions, statuses and the item
@@ -111,7 +122,7 @@ Amendment to [deposit-matching.md](deposit-matching.md) R13, R14 and [withdrawal
 | --- | --- |
 | R9 | **Actions on debit lines.** Deposit-matching R23 changes: on a debit line, ignore (from `Unmatched`, note required) and reopen (from `Ignored`) are allowed; match, request return and undo match stay refused with `errors.Status`. `ReturnSent` and `Returned` lines, and every `Matched` debit line, accept no action. A matched payout, return or recall is undone only by its flow. |
 | R10 | **New statuses, reasons and methods.** Statuses `ReturnSent = 5`, `Returned = 6`. Unmatched reasons `UnknownPayment = 8`, `UnknownReturn = 9`, `RecallNotCovered = 10`, `ReturnRejected = 11`. Match method `Recall = 4`. A `Matched` line has either an Account and a Transaction (methods `Reference`, `Manual`, `Payment` of a payout, `PaymentReturn`, `Recall` with a Reversal), or no Account, no Transaction and a related line (method `Payment` of a receipt return, `Recall` of a receipt never credited). A `Returned` line has no match. |
-| R11 | **Item.** `relatedLineId` is now also set on a recall line and on the debit line of a receipt return. The statement line item gains `returnPayment: { status, attempts, lastFailure }` on a credit line with a `ReceiptReturn` payment, else `null`. `match.accountId`, `match.customerId` and `match.transactionId` are `null` where R10 has no Transaction. |
+| R11 | **Item.** `relatedLineId` is now also set on a recall line and on the debit line of a receipt return. The statement line item gains `returnPayment: { status, attempts, lastFailure }` on a credit line with a `ReceiptReturn` payment (the newest one), else `null`. `match.accountId`, `match.customerId` and `match.transactionId` are `null` where R10 has no Transaction. |
 
 ### 4.5 The simulator bank
 
@@ -132,7 +143,7 @@ Amendment to [simulator.md](simulator.md), [deposit-matching.md](deposit-matchin
 | Type | Kind | Change |
 | --- | --- | --- |
 | `OutgoingPaymentKind` | Enum (new) | `Withdrawal = 0`, `ReceiptReturn = 1` |
-| `OutgoingPayment` | Aggregate (existing, [withdrawals.md](withdrawals.md)) | `Kind`; `WithdrawalId` becomes optional; `ReturnOfLineId`. `ForReceiptReturn(line, clientMoneyAccount)`. Exactly one of `WithdrawalId` and `ReturnOfLineId`, by kind |
+| `OutgoingPayment` | Aggregate (existing, [withdrawals.md](withdrawals.md)) | `Kind`; `WithdrawalId` becomes optional; `ReturnOfLineId`. `ForReceiptReturn(line, clientMoneyAccount)` with a new PublicId as instruction id. Exactly one of `WithdrawalId` and `ReturnOfLineId`, by kind |
 | `PaymentRejectReason` | Enum (existing) | Add `UnknownLine = 4` |
 | `BankStatementLine` | Aggregate (existing) | Statuses, reasons and method of R10. `MarkReturnSent()`, `MarkReturned(at)`, `ReturnRejected()`, `MarkRecall(...)` (with or without Account and Transaction), `MarkReturnPaid(relatedLineId, at)`, `MarkUnknown(reason)`. `Ignore` from `Unmatched` and `Reopen` from `Ignored` on a debit line. `Reopen` from `ReturnRequested` takes whether the return payment had an attempt (R5) |
 
@@ -151,7 +162,7 @@ debit line:
 
 Invariants:
 
-- A receipt is sent back at most once: one outgoing payment per line PublicId (withdrawals R31).
+- A receipt has at most one open return payment (`Pending` or `Accepted`); each return payment has its own instruction id (withdrawals R31).
 - A `Returned` line has no match and never changes again.
 - A recall reverses a deposit only while the account's available cash allows it.
 
@@ -169,7 +180,7 @@ Forward only. Do not add EF migrations.
 
 | Table | Change | Index / FK |
 | --- | --- | --- |
-| `OutgoingPayments` | Add `Kind int NOT NULL` (temporary default 0 for existing rows, then dropped; CHECK 0–1) and `ReturnOfLineId int NULL`. `WithdrawalId` becomes NULL. CHECK `(Kind = 0 AND WithdrawalId IS NOT NULL AND ReturnOfLineId IS NULL) OR (Kind = 1 AND WithdrawalId IS NULL AND ReturnOfLineId IS NOT NULL)`. Widen `RejectReason` CHECK to 0–4 | FK `(TenantId, ReturnOfLineId)` → `BankStatementLines` RESTRICT |
+| `OutgoingPayments` | Add `Kind int NOT NULL` (temporary default 0 for existing rows, then dropped; CHECK 0–1) and `ReturnOfLineId int NULL`. `WithdrawalId` becomes NULL. CHECK `(Kind = 0 AND WithdrawalId IS NOT NULL AND ReturnOfLineId IS NULL) OR (Kind = 1 AND WithdrawalId IS NULL AND ReturnOfLineId IS NOT NULL)`. Widen `RejectReason` CHECK to 0–4 | FK `(TenantId, ReturnOfLineId)` → `BankStatementLines (TenantId, Id)` RESTRICT; unique filtered index `UX_OutgoingPayments_ReturnOfLineId_Open` on `ReturnOfLineId` `WHERE Kind = 1 AND Status IN (0, 1)` |
 | `BankStatementLines` | Widen `Status` CHECK to 0–6, `UnmatchedReason` to 0–11, `MatchMethod` to 0–4. Replace the Matched CHECK: `Status = 1` needs `MatchMethod` and `MatchedAt`, and either both `MatchedAccountId` and `MatchedTransactionId`, or both null with `RelatedLineId` set; any other status has no match columns | none |
 
 No back-fill: existing outgoing payments are withdrawals (`Kind = 0`); existing lines keep their statuses.
@@ -178,7 +189,7 @@ No back-fill: existing outgoing payments are withdrawals (`Kind = 0`); existing 
 
 | Table | Content |
 | --- | --- |
-| `BankPayments` | `PayeeAccountNumber` and `PayeeName` become NULL; add `ReturnOfLineId bigint NULL` FK `BankLines`; CHECK exactly one of a payee and `ReturnOfLineId` |
+| `BankPayments` | `PayeeAccountNumber` and `PayeeName` become NULL; add `ReturnOf nvarchar(100) NULL` (the outside id as sent) and `ReturnOfLineId bigint NULL` FK `BankLines` (that line, when the account has it); CHECK exactly one of a payee and `ReturnOf` (`CK_BankPayments_Target`) |
 
 Update [database-design.md](../database-design.md) §11.9, §11.11 and §15 when this spec is accepted.
 
@@ -245,8 +256,8 @@ Customer Portal: none.
 | Project | Assert |
 | --- | --- |
 | Domain.UnitTests | `OutgoingPayment.ForReceiptReturn`: kind, line, no withdrawal, no payee. `BankStatementLine`: every transition of §5; ignore and reopen on a debit line; match, request return, undo match on a debit line → throws; no action on `ReturnSent` or `Returned` |
-| Application.FunctionalTests | With fakes for `IBankPayments` and `IBankFeed`. Request return → outgoing payment `ReceiptReturn`, Pending, instruction id = line id; reopen before the attempt → 204, payment Cancelled; after → 400. Send step calls the port with `returnOf` and no payee; Accepted → line ReturnSent; Rejected → Unmatched `ReturnRejected`; failure → stays ReturnRequested. The debit with the line id → line Returned, debit Matched (Payment), no Transaction, `relatedLineId` set; with the accepted answer lost → the same; different amount → `PaymentMismatch`. Recall of a matched receipt → deposit reversed (source `BankFeed`), credit line Returned without a match, debit Matched (Recall); with the cash spent, or reserved by a withdrawal, or the account Closed → `RecallNotCovered`, nothing posted; of an Unmatched or Ignored receipt → credit Returned, no Transaction; of a ReturnRequested receipt with no attempt → payment Cancelled; with an attempt → the later answer changes only the payment; of a line already Returned → `UnknownReturn`. A debit with an unknown `endToEndId`, and one with neither field → `UnknownPayment`; ignore → 204; reopen → 204; match, request return, undo match on it → 400. A credit returning a receipt return → `UnknownReturn`. A debit line stored before this slice → processed by the first run. Processing twice → one Reversal. Two-tenant: a `returnOf` or `endToEndId` naming tenant B's line on tenant A's account → `UnknownReturn` / `UnknownPayment` |
-| Infrastructure.IntegrationTests | `0044`: existing outgoing payments get `Kind = 0`; the kind CHECK; the new Matched CHECK (account and transaction together, or a related line); `Status = 7` violates. `SimulatorBankPayments`: the `returnOf` body; `UnknownLine` maps |
+| Application.FunctionalTests | With fakes for `IBankPayments` and `IBankFeed`. Request return → outgoing payment `ReceiptReturn`, Pending, its own instruction id, the line as the line returned; a new request return after a rejection → a second payment with a new instruction id; reopen before the attempt → 204, payment Cancelled; after → 400. Send step calls the port with `returnOf` and no payee; Accepted → line ReturnSent; Rejected → Unmatched `ReturnRejected`; failure → stays ReturnRequested. The debit with the payment's instruction id → line Returned, debit Matched (Payment), no Transaction, `relatedLineId` set; with the accepted answer lost → the same; different amount → `PaymentMismatch`. Recall of a matched receipt → deposit reversed (source `BankFeed`), credit line Returned without a match, debit Matched (Recall); with the cash spent, or reserved by a withdrawal, or the account Closed → `RecallNotCovered`, nothing posted; of an Unmatched or Ignored receipt → credit Returned, no Transaction; of a ReturnRequested receipt with no attempt → payment Cancelled; with an attempt → the later answer changes only the payment; of a line already Returned → `UnknownReturn`. A debit with an unknown `endToEndId`, and one with neither field → `UnknownPayment`; ignore → 204; reopen → 204; match, request return, undo match on it → 400. A credit returning a receipt return → `UnknownReturn`. A debit line stored before this slice → processed by the first run. Processing twice → one Reversal. Two-tenant: a `returnOf` or `endToEndId` naming tenant B's line on tenant A's account → `UnknownReturn` / `UnknownPayment` |
+| Infrastructure.IntegrationTests | `0044`: existing outgoing payments get `Kind = 0`; the kind CHECK; the new Matched CHECK (account and transaction together, or a related line); `Status = 7` violates; a second open return payment of one line violates the filtered index. `SimulatorBankPayments`: the `returnOf` body; `UnknownLine` maps |
 | Simulator.Tests | `0005` applies. Payment with `returnOf` of a receipt → executed debit line with `endToEndId` and `returnOf`, payer fields = the original payer; both or neither of `payee` and `returnOf` → 400; an unknown line, a return line, or a line already returned or recalled → Rejected `UnknownLine`. Recall → debit line with `returnOf`, reason, after `availableAfter`; twice → 400; of a return line → 400. Control log row for a recall; a 400 writes none |
 | Adviser Portal | D50 labels, filter, debit actions, the return payment status, the reopen rule, the RecallNotCovered sentence |
 
@@ -258,7 +269,7 @@ No new ADR. It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) r
 
 | Item | Lock |
 | --- | --- |
-| Receipt return | An outgoing payment of kind `ReceiptReturn`, created by request return, cancelled by reopen until the first attempt, naming the returned line, no payee |
+| Receipt return | An outgoing payment of kind `ReceiptReturn` with its own instruction id, created by request return, cancelled by reopen until the first attempt, naming the returned line, no payee; at most one open per line |
 | Recall | A debit line naming a receipt; the deposit reversed by the flow while available cash allows; otherwise suspense and an adjustment |
 | Other debit lines | Suspense with `UnknownPayment`; ignore and reopen only |
 | Statement lines | Statuses `ReturnSent`, `Returned`; reasons `UnknownPayment`, `UnknownReturn`, `RecallNotCovered`, `ReturnRejected`; method `Recall` |
@@ -276,6 +287,8 @@ Each point was confirmed in discussion on 2026-11-20 as recommended, and is writ
 5. **Unknown debit lines wait in suspense, and only ignore applies to them** (R4, R9). Decided: a bank fee or an error on the trust account is the firm's, not a Customer's; B7 shows ignored lines as known differences. Alternative: a TenantAdmin may match a debit line to a Custodial account by hand, which would be a hand withdrawal.
 6. **One TenantAdmin returns a receipt, with no second approval** (R5). Decided: the money can only go back the way it came, to an account the platform never sees or types, so the risk a second person guards against for withdrawals is not there. Alternative: a second TenantAdmin approves each return, as for withdrawals.
 7. **A credit line that returns a receipt return goes to suspense** (R8). Decided: the payer's bank refused the money back; it is a receipt again, for a person to place. Alternative: put the original line back to `Unmatched`.
+
+8. **Each return payment has its own instruction id** (R5, R7; decided on acceptance, 2026-11-21). Decided: the bank answers a known instruction id with its first answer (withdrawals R51), so a return requested again after a rejection or a reopen needs a new id; the payment links to the line by `ReturnOfLineId`, with at most one open payment per line. Alternative: the line's PublicId as the instruction id, with no second return after a rejection.
 
 Still open, not this slice:
 
@@ -297,6 +310,6 @@ The repository should build after each commit. Agents split each behaviour into 
 6. Adviser Portal (D50) + frontend tests.
 7. Repo docs: mark this file landed; roadmap §13 step 6b; the known issue.
 
-### Docs amended when this spec is accepted
+### Docs amended when this spec was accepted
 
-[deposit-matching.md](deposit-matching.md) (R13, R14, R18, R23, R28, R29 and the item: every debit line processed, returns sent, recalls applied, actions on debit lines), [withdrawals.md](withdrawals.md) (R31 kinds, R34 `UnknownLine`), [simulator.md](simulator.md) (R12–R15, script `0005`), [api-design.md](../api-design.md) (§7.7 row, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D50), [features/README.md](README.md) row status, the roadmap §5 B4 / B6, §11 S1 and §13 status.
+[deposit-matching.md](deposit-matching.md) (R13, R14, R18, R23, R28, R29 and the item: every debit line processed, returns sent, recalls applied, actions on debit lines), [withdrawals.md](withdrawals.md) (R31 kinds, R34 `UnknownLine`), [simulator.md](simulator.md) (R12–R15, script `0005`), [api-design.md](../api-design.md) (§7.7 row, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D50), [features/README.md](README.md) row status, the roadmap §5 B4 / B6, §11 S1 and §13 status, [glossary.md](../glossary.md) (statement line statuses, suspense, receipt return, recall) and [function-plan.md](../function-plan.md) §5.

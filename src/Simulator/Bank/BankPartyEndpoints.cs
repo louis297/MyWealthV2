@@ -83,7 +83,8 @@ public static class BankPartyEndpoints
     /// <summary>
     /// Withdrawals R49–R51, R53: one payment from a trust account. Unknown account → 404; a body outside the field
     /// rules → 400; the same instruction id and body again → the first answer; the same id with another body → 409.
-    /// The payment mode decides the answer (R52); an executed payment is a debit line in the feed at once.
+    /// The payment mode decides the answer (R52); an executed payment is a debit line in the feed at once. A payment
+    /// names a payee, or a credit line of the account to send back to its payer (bank-returns R12, R13).
     /// </summary>
     private static async Task<IResult> PayAsync(
         string accountNumber,
@@ -115,21 +116,38 @@ public static class BankPartyEndpoints
 
         var world = await db.Worlds.SingleAsync(cancellationToken);
         var simulatorNow = world.Now(time.GetUtcNow());
-        var payment = BankPayment.Receive(
-            world.TakePaymentId(),
-            account.Id,
-            instructionId,
-            hash,
-            body.Amount!.Value,
-            BankRules.Text(body.Reference),
-            body.Payee!.AccountNumber!.Trim(),
-            body.Payee.Name!.Trim(),
-            (BankPaymentMode)world.BankPaymentMode,
-            world.BankPaymentRejectReason,
-            simulatorNow);
-        var line = payment.Status == BankPaymentStatus.Executed
-            ? BankLine.Payment(world.TakeLineOutsideId(), payment, DateOnly.FromDateTime(simulatorNow.UtcDateTime), simulatorNow)
+        var receipt = body.ReturnOf is { } returnOf
+            ? await BankReturns.ReturnableAsync(db, account.Id, returnOf, cancellationToken)
             : null;
+        var payment = body.ReturnOf is not null
+            ? BankPayment.ReceiveReturn(
+                world.TakePaymentId(),
+                account.Id,
+                instructionId,
+                hash,
+                body.Amount!.Value,
+                body.ReturnOf,
+                receipt?.Id,
+                (BankPaymentMode)world.BankPaymentMode,
+                world.BankPaymentRejectReason,
+                simulatorNow)
+            : BankPayment.Receive(
+                world.TakePaymentId(),
+                account.Id,
+                instructionId,
+                hash,
+                body.Amount!.Value,
+                BankRules.Text(body.Reference),
+                body.Payee!.AccountNumber!.Trim(),
+                body.Payee.Name!.Trim(),
+                (BankPaymentMode)world.BankPaymentMode,
+                world.BankPaymentRejectReason,
+                simulatorNow);
+        var line = payment.Status != BankPaymentStatus.Executed
+            ? null
+            : receipt is not null
+                ? BankLine.ReceiptReturn(world.TakeLineOutsideId(), payment, receipt, DateOnly.FromDateTime(simulatorNow.UtcDateTime), simulatorNow)
+                : BankLine.Payment(world.TakeLineOutsideId(), payment, DateOnly.FromDateTime(simulatorNow.UtcDateTime), simulatorNow);
         try
         {
             await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
@@ -168,26 +186,36 @@ public static class BankPartyEndpoints
             ? Results.Ok(PaymentAnswer.From(known))
             : Results.StatusCode(StatusCodes.Status409Conflict);
 
-    /// <summary>R49: the field rules of a payment.</summary>
+    /// <summary>R49: the field rules of a payment; bank-returns R12: exactly one of a payee and <c>returnOf</c>.</summary>
     private static bool Valid(PaymentRequest body, BankAccount account) =>
         body.InstructionId?.Length is >= 1 and <= BankRules.InstructionIdMaxLength
         && BankRules.IsAmount(body.Amount)
         && string.Equals(body.Currency, account.Currency.Trim(), StringComparison.Ordinal)
         && (body.Reference?.Length ?? 0) <= BankRules.PaymentReferenceMaxLength
-        && body.Payee is not null
-        && BankRules.IsAccountNumber(body.Payee.AccountNumber)
-        && BankRules.IsName(body.Payee.Name);
+        && (body.Payee is null) != (body.ReturnOf is null)
+        && (body.Payee is null || (BankRules.IsAccountNumber(body.Payee.AccountNumber) && BankRules.IsName(body.Payee.Name)))
+        && (body.ReturnOf is null || body.ReturnOf.Length is >= 1 and <= BankRules.InstructionIdMaxLength);
 
     private static byte[] Hash(PaymentRequest body) =>
-        SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new object?[]
-        {
-            body.InstructionId,
-            body.Amount!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            body.Currency,
-            body.Reference,
-            body.Payee!.AccountNumber,
-            body.Payee.Name
-        })));
+        SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body.Payee is not null
+            ? new object?[]
+            {
+                body.InstructionId,
+                body.Amount!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                body.Currency,
+                body.Reference,
+                body.Payee.AccountNumber,
+                body.Payee.Name
+            }
+            : new object?[]
+            {
+                body.InstructionId,
+                body.Amount!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                body.Currency,
+                body.Reference,
+                "returnOf",
+                body.ReturnOf
+            })));
 
     /// <summary>
     /// R43: a line takes the next place of its account when simulator now reaches its <c>availableAt</c>, two places
@@ -246,7 +274,8 @@ public sealed record PaymentRequest(
     decimal? Amount,
     string? Currency,
     string? Reference,
-    PaymentPayee? Payee);
+    PaymentPayee? Payee,
+    string? ReturnOf = null);
 
 public sealed record PaymentPayee(string? AccountNumber, string? Name);
 

@@ -15,10 +15,11 @@ export type StatementLine = {
   receivedAt: string;
   status: string;
   unmatchedReason: string | null;
+  /** bank-returns R11: the ids are null on a match with no Transaction. */
   match: {
-    accountId: string;
-    customerId: string;
-    transactionId: string;
+    accountId: string | null;
+    customerId: string | null;
+    transactionId: string | null;
     method: string;
     at: string;
   } | null;
@@ -32,6 +33,8 @@ export type StatementLine = {
   relatedLineId?: string | null;
   withdrawalId?: string | null;
   returnReason?: string | null;
+  /** bank-returns R11: the newest return payment of a receipt marked for return. */
+  returnPayment?: { status: string; attempts: number; lastFailure: string | null } | null;
   rowVersion: string;
 };
 

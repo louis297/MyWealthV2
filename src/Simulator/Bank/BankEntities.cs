@@ -24,8 +24,8 @@ public sealed class BankAccount
     };
 }
 
-/// <summary>One line on a bank account (deposit-matching R41): a receipt, a payment out (withdrawals R53) or the return
-/// of a payment (R54).</summary>
+/// <summary>One line on a bank account (deposit-matching R41): a receipt, a payment out (withdrawals R53), the return
+/// of a payment (R54), a receipt sent back to its payer (bank-returns R13) or a recall of a receipt (R14).</summary>
 public sealed class BankLine
 {
     public const int CreditDirection = 0;
@@ -79,6 +79,46 @@ public sealed class BankLine
         PostedAt = postedAt,
         AvailableAt = postedAt,
         EndToEndId = payment.InstructionId
+    };
+
+    /// <summary>Bank-returns R13: an executed return of a receipt. It names the receipt, and the original payer is in
+    /// the payer fields.</summary>
+    public static BankLine ReceiptReturn(string outsideId, BankPayment payment, BankLine receipt, DateOnly valueDate, DateTimeOffset postedAt) => new()
+    {
+        OutsideId = outsideId,
+        BankAccountId = payment.BankAccountId,
+        Direction = DebitDirection,
+        Amount = payment.Amount,
+        ValueDate = valueDate,
+        PayerName = receipt.PayerName,
+        PayerAccount = receipt.PayerAccount,
+        Reference = payment.Reference,
+        PostedAt = postedAt,
+        AvailableAt = postedAt,
+        EndToEndId = payment.InstructionId,
+        ReturnOfLineId = receipt.Id
+    };
+
+    /// <summary>Bank-returns R14: the payer's bank takes a receipt back, as a debit line that names it.</summary>
+    public static BankLine Recall(
+        string outsideId,
+        BankLine receipt,
+        string reason,
+        DateOnly valueDate,
+        DateTimeOffset postedAt,
+        DateTimeOffset availableAt) => new()
+    {
+        OutsideId = outsideId,
+        BankAccountId = receipt.BankAccountId,
+        Direction = DebitDirection,
+        Amount = receipt.Amount,
+        ValueDate = valueDate,
+        PayerName = receipt.PayerName,
+        PayerAccount = receipt.PayerAccount,
+        PostedAt = postedAt,
+        AvailableAt = availableAt,
+        ReturnOfLineId = receipt.Id,
+        ReturnReason = reason
     };
 
     /// <summary>Withdrawals R54: the payee's bank sends a payment back; the payee is in the payer fields.</summary>
@@ -180,9 +220,15 @@ public sealed class BankPayment
 
     public string? Reference { get; private set; }
 
-    public string PayeeAccountNumber { get; private set; } = "";
+    public string? PayeeAccountNumber { get; private set; }
 
-    public string PayeeName { get; private set; } = "";
+    public string? PayeeName { get; private set; }
+
+    /// <summary>Bank-returns R12: the outside id of the line a return sends back, as the platform sent it.</summary>
+    public string? ReturnOf { get; private set; }
+
+    /// <summary>Bank-returns R12: that line, when the account has it.</summary>
+    public long? ReturnOfLineId { get; private set; }
 
     public BankPaymentStatus Status { get; private set; }
 
@@ -229,6 +275,49 @@ public sealed class BankPayment
         RejectReason = mode == BankPaymentMode.Reject ? rejectReason : null,
         ReceivedAt = simulatorNow
     };
+
+    /// <summary>Bank-returns R12: a return of a receipt. A line the bank cannot return is rejected as
+    /// <c>UnknownLine</c> whatever the mode; otherwise the mode decides, as for any payment.</summary>
+    public static BankPayment ReceiveReturn(
+        string paymentId,
+        int bankAccountId,
+        string instructionId,
+        byte[] requestHash,
+        decimal amount,
+        string returnOf,
+        long? returnableLineId,
+        BankPaymentMode mode,
+        string? rejectReason,
+        DateTimeOffset simulatorNow)
+    {
+        var payment = new BankPayment
+        {
+            PaymentId = paymentId,
+            BankAccountId = bankAccountId,
+            InstructionId = instructionId,
+            RequestHash = requestHash,
+            Amount = amount,
+            ReturnOf = returnOf,
+            ReturnOfLineId = returnableLineId,
+            Mode = mode,
+            ReceivedAt = simulatorNow
+        };
+        if (returnableLineId is null)
+        {
+            payment.Status = BankPaymentStatus.Rejected;
+            payment.RejectReason = BankRules.UnknownLine;
+            return payment;
+        }
+
+        payment.Status = mode switch
+        {
+            BankPaymentMode.Reject => BankPaymentStatus.Rejected,
+            BankPaymentMode.Hold => BankPaymentStatus.Held,
+            _ => BankPaymentStatus.Executed
+        };
+        payment.RejectReason = mode == BankPaymentMode.Reject ? rejectReason : null;
+        return payment;
+    }
 
     /// <summary>R53: executed at once, or later from <c>Held</c>; the debit line is its record on the statement.</summary>
     public void Executed(long debitLineId)

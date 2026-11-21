@@ -4,7 +4,7 @@ status: accepted
 phase: 2
 language: en
 created: 2026-10-12
-updated: 2026-11-20
+updated: 2026-11-21
 related:
   - ../features/client-money-accounts.md
   - README.md
@@ -29,6 +29,7 @@ related:
   - ../features/transaction-source.md
   - ../features/deposit-matching.md
   - ../features/withdrawals.md
+  - ../features/bank-returns.md
 ---
 
 # Adviser Portal — Dashboard and ledger pages
@@ -287,3 +288,13 @@ Status of this amendment: `accepted` (2026-11-20), together with [withdrawals](.
 | D47 | `/withdrawals/:id` shows every field, the decision, the payment (attempts, last failure label as BO18), the failure or return reason, and links to the payout and the return Reversal (`/transactions/:id`). Actions: a TenantAdmin who did not request it sees Approve (optional note) and Reject (required note) on a Requested one; the requester sees "Waiting for another administrator to approve." in their place; an Adviser sees neither. Cancel (optional note) is offered on Requested, and on Approved while `payment.attempts` is 0. A 400 shows its sentence; a 409 reloads with "This withdrawal changed. Check it and try again." |
 | D48 | `/transactions/:id` of a payout or its Reversal shows a "Payment" section: Value date, Reference, Payee, Payee account. The Source line (D26) shows "Withdrawal" for `Payment`, with a link to `/withdrawals/:source.id`. Reverse is not offered (D27). |
 | D49 | The Bank receipts pages (D34, D35) gain a Direction filter (Receipts, the default; Payments out; All). New reason label: PaymentMismatch "Amount differs from the payment". New method labels: Payment "Paid by the platform", PaymentReturn "Payment returned". A line with a withdrawal links to `/withdrawals/:id`; a line with a related line links to it. A debit line offers no action. |
+
+---
+
+## Amendment 2026-11-21 (receipt returns, recalls and other debit lines) — accepted
+
+Status of this amendment: `accepted` (2026-11-21), together with [bank-returns](../features/bank-returns.md). D50 changes the Bank receipts pages (D34, D35, D49). The BFF does not change. Calls: the existing statement line reads and actions (`POST /statement-lines/{id}/ignore`, `/reopen` on a debit line too).
+
+| ID | Behaviour |
+| --- | --- |
+| D50 | The Bank receipts pages (D34, D35, D49) gain status labels ReturnSent "Return sent" and Returned "Returned"; the status filter gains both, and "All" includes them. Reason labels: UnknownPayment "Payment out not recognised", UnknownReturn "Return not recognised", RecallNotCovered "Recalled, but the cash is gone", ReturnRejected "Bank refused the return". Method label: Recall "Recalled by the payer's bank". A debit line offers Ignore (Unmatched) and Reopen (Ignored); a line matched by the platform (Payment, PaymentReturn, Recall) offers no action. On a To be returned line the return payment's status shows under the status ("Waiting to send" with no failure, "Sending failed: <failure label>" with one, labels as BO18), and Reopen is offered only while `returnPayment.attempts` is 0. On a RecallNotCovered line the page says "Correct the account with an adjustment, then ignore this line." with a link to the account of the recalled receipt's deposit when there is one. A match with no Transaction shows no account or transaction link; the related line link (D49) stays. |

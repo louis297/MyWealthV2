@@ -174,7 +174,8 @@ public sealed class PullBankStatements(
     }
 
     /// <summary>Withdrawals R38: a line that names the line it takes back is linked to that stored line of the same
-    /// connection, also when both arrived in one page.</summary>
+    /// connection, also when both arrived in one page. Only a line of the same Tenant and client money account is
+    /// linked; another Tenant's line counts as no line (bank-returns R2).</summary>
     private async Task LinkReturnedLinesAsync(string connection, CancellationToken cancellationToken)
     {
         var added = db.BankStatementLines.Local
@@ -188,14 +189,16 @@ public sealed class PullBankStatements(
         var outsideIds = added.Select(line => line.ReturnOfOutsideId!).Distinct().ToList();
         var returned = await db.BankStatementLines.IgnoreQueryFilters().AsNoTracking()
             .Where(row => row.Connection == connection && outsideIds.Contains(row.OutsideId))
-            .Select(row => new { row.OutsideId, row.Id })
+            .Select(row => new { row.OutsideId, row.Id, row.TenantId, row.ClientMoneyAccountId })
             .ToListAsync(cancellationToken);
-        var byOutsideId = returned.ToDictionary(row => row.OutsideId, row => row.Id, StringComparer.OrdinalIgnoreCase);
+        var byOutsideId = returned.ToDictionary(row => row.OutsideId, StringComparer.OrdinalIgnoreCase);
         foreach (var line in added)
         {
-            if (byOutsideId.TryGetValue(line.ReturnOfOutsideId!, out var relatedId))
+            if (byOutsideId.TryGetValue(line.ReturnOfOutsideId!, out var related)
+                && related.TenantId == line.TenantId
+                && related.ClientMoneyAccountId == line.ClientMoneyAccountId)
             {
-                line.LinkReturnedLine(relatedId);
+                line.LinkReturnedLine(related.Id);
             }
         }
 

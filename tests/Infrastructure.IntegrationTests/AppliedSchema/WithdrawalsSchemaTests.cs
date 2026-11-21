@@ -103,7 +103,7 @@ public class WithdrawalsSchemaTests
 
     [TestCase("[Status]", "6")]
     [TestCase("[LastFailure]", "6")]
-    [TestCase("[RejectReason]", "4")]
+    [TestCase("[RejectReason]", "5")]
     [TestCase("[Attempts]", "-1")]
     [TestCase("[Amount]", "0")]
     public async Task PaymentValueOutsideItsCheck_IsRejected(string column, string value)
@@ -163,8 +163,8 @@ public class WithdrawalsSchemaTests
             """)).ShouldBe(2);
     }
 
-    [TestCase("[UnmatchedReason]", "8")]
-    [TestCase("[MatchMethod]", "4")]
+    [TestCase("[UnmatchedReason]", "12")]
+    [TestCase("[MatchMethod]", "5")]
     public async Task StatementLineValueOutsideItsWidenedCheck_IsRejected(string column, string value)
     {
         var exception = await Should.ThrowAsync<SqlException>(() => RunAsync($"""
@@ -346,9 +346,9 @@ public class WithdrawalsSchemaTests
 
     private static string InsertPayment(string withdrawal, string instruction) => $"""
         INSERT INTO [OutgoingPayments]
-            ([PublicId], [TenantId], [ClientMoneyAccountId], [Connection], [InstructionPublicId], [WithdrawalId], [Amount], [Currency],
+            ([PublicId], [TenantId], [ClientMoneyAccountId], [Connection], [Kind], [InstructionPublicId], [WithdrawalId], [Amount], [Currency],
              [Reference], [Status], [Created], [CreatedBy])
-        VALUES (NEWID(), @a_tenant, @cma, N'simulator', {instruction}, {withdrawal}, 300, 'USD', N'K7M3Q9PXB', 0, SYSDATETIMEOFFSET(), N'test');
+        VALUES (NEWID(), @a_tenant, @cma, N'simulator', 0, {instruction}, {withdrawal}, 300, 'USD', N'K7M3Q9PXB', 0, SYSDATETIMEOFFSET(), N'test');
         """;
 
     private static string InsertLine(string outsideId, string returnOf) => $"""

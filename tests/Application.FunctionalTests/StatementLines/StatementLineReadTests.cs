@@ -114,13 +114,14 @@ public class StatementLineReadTests : TestBase
         var token = world.TenantAdmin.AccessToken;
 
         (await StatementLineHttp.ListIdsAsync(token, "?status=Matched")).ShouldBe([matched.PublicId]);
-        (await StatementLineHttp.ListIdsAsync(token, "?status=Unmatched"))
+        (await StatementLineHttp.ListIdsAsync(token, "?status=Unmatched&direction=Credit"))
             .ShouldBe([nzd.PublicId, unmatched.PublicId]);
-        (await StatementLineHttp.ListIdsAsync(token, "?status=Matched,%20Unmatched"))
+        (await StatementLineHttp.ListIdsAsync(token, "?status=Matched,%20Unmatched&direction=Credit"))
             .ShouldBe([nzd.PublicId, unmatched.PublicId, matched.PublicId]);
-        (await StatementLineHttp.ListIdsAsync(token, "?status=Received")).ShouldBe([debit.PublicId]);
+        (await StatementLineHttp.ListIdsAsync(token, "?status=Unmatched&direction=Debit")).ShouldBe([debit.PublicId]);
+        (await StatementLineHttp.ListIdsAsync(token, "?status=Received")).ShouldBeEmpty();
         (await StatementLineHttp.ListIdsAsync(token, "?currency=nzd")).ShouldBe([nzd.PublicId]);
-        (await StatementLineHttp.ListIdsAsync(token, $"?clientMoneyAccountId={world.ClientMoney.PublicId}&status=Unmatched"))
+        (await StatementLineHttp.ListIdsAsync(token, $"?clientMoneyAccountId={world.ClientMoney.PublicId}&status=Unmatched&direction=Credit"))
             .ShouldBe([unmatched.PublicId]);
         (await StatementLineHttp.ListIdsAsync(token, "?status=Ignored,ReturnRequested")).ShouldBeEmpty();
     }
