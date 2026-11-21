@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using MyWealthV2.Application.Fx;
 using MyWealthV2.Application.MarketData;
 using MyWealthV2.Infrastructure.BankFeed;
+using MyWealthV2.Infrastructure.BankReconciliations;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Schema;
 using MyWealthV2.Infrastructure.Identity;
@@ -48,6 +49,7 @@ await using (var scope = app.Services.CreateAsyncScope())
 
 OutboxRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 FxRateRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
+BankReconciliationRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 InstrumentPriceRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 BankStatementRecurringJob.Register(
     app.Services.GetRequiredService<IRecurringJobManager>(),
