@@ -192,6 +192,19 @@ public class Transaction : BaseAuditableEntity
         return transaction;
     }
 
+    /// <summary>The memo every remainder write-off carries (account-closure R18).</summary>
+    public const string RemainderWriteOffMemo = "Account closure remainder";
+
+    /// <summary>Account closure R18: the remainder write-off.</summary>
+    public static Transaction PostRemainderWriteOff(
+        int tenantId,
+        int accountId,
+        string accountCurrency,
+        int decimalPlaces,
+        decimal cashSum,
+        DateTimeOffset bookedAt,
+        TransactionSource source) => throw new NotImplementedException();
+
     /// <summary>Custody modes I2: every leg account of one Transaction has the same custody mode.</summary>
     public const string DifferentCustodyModesMessage = "Both accounts must have the same custody mode.";
 

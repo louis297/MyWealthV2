@@ -25,5 +25,8 @@ public enum UnmatchedReason
     RecallNotCovered = 10,
 
     /// <summary>The bank refused to send a receipt back (bank-returns R6).</summary>
-    ReturnRejected = 11
+    ReturnRejected = 11,
+
+    /// <summary>The reference names an Account with an account closure in progress (account-closure R14).</summary>
+    AccountClosing = 12
 }

@@ -71,6 +71,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<OutgoingPayment> OutgoingPayments => Set<OutgoingPayment>();
 
+    public DbSet<AccountClosure> AccountClosures => Set<AccountClosure>();
+
     public DbSet<Instrument> Instruments => Set<Instrument>();
 
     public DbSet<Account> Accounts => Set<Account>();

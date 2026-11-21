@@ -19,5 +19,9 @@ public enum TransactionSourceKind
     BankFeed = 3,
 
     /// <summary>A payment the bank made for a withdrawal; the source id is the withdrawal's PublicId (withdrawals R41).</summary>
-    Payment = 4
+    Payment = 4,
+
+    /// <summary>The remainder write-off of an account closure; the source id is the closure's PublicId
+    /// (account-closure R18, R24).</summary>
+    AccountClosure = 5
 }
