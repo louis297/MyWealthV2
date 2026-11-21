@@ -2,8 +2,8 @@ namespace MyWealthV2.Domain.Entities;
 
 /// <summary>
 /// One payment the platform asks a bank to make from a client money account (docs/features/withdrawals.md R31). The
-/// instruction's PublicId is the idempotency key the bank sees on every attempt (ADR 0021 rule 13). In this slice
-/// every outgoing payment pays a withdrawal.
+/// instruction's PublicId is the idempotency key the bank sees on every attempt (ADR 0021 rule 13). It pays a
+/// withdrawal, or sends a receipt back to its payer (docs/features/bank-returns.md R5).
 /// </summary>
 public class OutgoingPayment : BaseAuditableEntity
 {
@@ -23,7 +23,13 @@ public class OutgoingPayment : BaseAuditableEntity
 
     public Guid InstructionPublicId { get; private set; }
 
-    public int WithdrawalId { get; private set; }
+    public OutgoingPaymentKind Kind { get; private set; }
+
+    /// <summary>The withdrawal it pays; set only on a <see cref="OutgoingPaymentKind.Withdrawal"/>.</summary>
+    public int? WithdrawalId { get; private set; }
+
+    /// <summary>The statement line it sends back; set only on a <see cref="OutgoingPaymentKind.ReceiptReturn"/>.</summary>
+    public int? ReturnOfLineId { get; private set; }
 
     public decimal Amount { get; private set; }
 
@@ -75,6 +81,11 @@ public class OutgoingPayment : BaseAuditableEntity
             PublicId = Guid.NewGuid()
         };
     }
+
+    /// <summary>Bank-returns R5: the return of a receipt to its payer, <c>Pending</c>, from the line's client money
+    /// account, with its own PublicId as the instruction id, no payee and no reference.</summary>
+    public static OutgoingPayment ForReceiptReturn(BankStatementLine line, ClientMoneyAccount clientMoney) =>
+        throw new NotImplementedException();
 
     /// <summary>R32: an attempt is recorded and committed before the call.</summary>
     public void RecordAttempt(DateTimeOffset at)

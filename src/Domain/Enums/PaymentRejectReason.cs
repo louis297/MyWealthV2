@@ -7,5 +7,8 @@ public enum PaymentRejectReason
     InvalidAccount = 0,
     AccountClosed = 1,
     InsufficientFunds = 2,
-    Refused = 3
+    Refused = 3,
+
+    /// <summary>The bank knows no line to return (bank-returns R12).</summary>
+    UnknownLine = 4
 }

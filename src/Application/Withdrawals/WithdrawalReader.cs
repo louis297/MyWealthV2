@@ -57,8 +57,8 @@ internal static class WithdrawalReader
             .ToDictionaryAsync(row => row.Id, row => row.PublicId, cancellationToken);
         var withdrawalIds = rows.Select(row => row.Id).ToList();
         var payments = await db.OutgoingPayments.AsNoTracking()
-            .Where(row => withdrawalIds.Contains(row.WithdrawalId))
-            .ToDictionaryAsync(row => row.WithdrawalId, row => new WithdrawalPaymentDto
+            .Where(row => row.WithdrawalId != null && withdrawalIds.Contains(row.WithdrawalId.Value))
+            .ToDictionaryAsync(row => row.WithdrawalId!.Value, row => new WithdrawalPaymentDto
             {
                 Status = row.Status.ToString(),
                 Attempts = row.Attempts,

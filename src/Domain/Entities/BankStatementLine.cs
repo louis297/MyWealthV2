@@ -224,6 +224,25 @@ public class BankStatementLine : BaseAuditableEntity
         UnmatchedReason = reason;
     }
 
+    /// <summary>Bank-returns R2, R4, R8: the platform could not place a line of either direction.</summary>
+    public void MarkUnknown(UnmatchedReason reason) => throw new NotImplementedException();
+
+    /// <summary>Bank-returns R6: the bank accepted the return payment.</summary>
+    public void MarkReturnSent() => throw new NotImplementedException();
+
+    /// <summary>Bank-returns R6: the bank refused the return; the line is back in suspense.</summary>
+    public void MarkReturnRejected() => throw new NotImplementedException();
+
+    /// <summary>Bank-returns R3, R7: the money went back to the payer. The match, if any, is dropped.</summary>
+    public void MarkReturned() => throw new NotImplementedException();
+
+    /// <summary>Bank-returns R3: the debit line of a recall, with the Reversal of the deposit when there was one.</summary>
+    public void MarkRecall(int relatedLineId, int? accountId, int? transactionId, DateTimeOffset at) =>
+        throw new NotImplementedException();
+
+    /// <summary>Bank-returns R7: the debit line of a receipt return the bank paid.</summary>
+    public void MarkReturnPaid(int relatedLineId, DateTimeOffset at) => throw new NotImplementedException();
+
     /// <summary>A TenantAdmin matched it to an account (R26); the note is optional.</summary>
     public void MatchByHand(int accountId, int transactionId, string? note, int byUserId, DateTimeOffset at)
     {
@@ -255,7 +274,7 @@ public class BankStatementLine : BaseAuditableEntity
     }
 
     /// <summary>Back into suspense (R29).</summary>
-    public void Reopen(int byUserId, DateTimeOffset at)
+    public void Reopen(int byUserId, DateTimeOffset at, bool returnAttempted = false)
     {
         EnsureCredit("reopened");
         EnsureStatus("reopened", BankStatementLineStatus.Ignored, BankStatementLineStatus.ReturnRequested);

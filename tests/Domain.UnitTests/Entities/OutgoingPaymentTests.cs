@@ -155,6 +155,88 @@ public class OutgoingPaymentTests
         Should.Throw<DomainException>(() => cancelled.RecordAttempt(At));
     }
 
+    [Test]
+    public void ForWithdrawal_IsOfKindWithdrawal_WithNoReturnedLine()
+    {
+        var payment = Pending();
+
+        payment.Kind.ShouldBe(OutgoingPaymentKind.Withdrawal);
+        payment.ReturnOfLineId.ShouldBeNull();
+    }
+
+    [Test]
+    public void ForReceiptReturn_IsPending_NamesTheLine_WithItsOwnInstructionId_NoWithdrawalPayeeOrReference()
+    {
+        var line = ReturnRequestedLine();
+
+        var payment = OutgoingPayment.ForReceiptReturn(line, ClientMoney());
+        var second = OutgoingPayment.ForReceiptReturn(line, ClientMoney());
+
+        payment.Kind.ShouldBe(OutgoingPaymentKind.ReceiptReturn);
+        payment.ReturnOfLineId.ShouldBe(50);
+        payment.WithdrawalId.ShouldBeNull();
+        payment.TenantId.ShouldBe(7);
+        payment.ClientMoneyAccountId.ShouldBe(40);
+        payment.Connection.ShouldBe("simulator");
+        payment.Amount.ShouldBe(250.50m);
+        payment.Currency.ShouldBe("USD");
+        payment.Reference.ShouldBeNull();
+        payment.Status.ShouldBe(OutgoingPaymentStatus.Pending);
+        payment.Attempts.ShouldBe(0);
+        payment.InstructionPublicId.ShouldBe(payment.PublicId);
+        payment.InstructionPublicId.ShouldNotBe(line.PublicId);
+        second.InstructionPublicId.ShouldNotBe(payment.InstructionPublicId);
+    }
+
+    [Test]
+    public void ForReceiptReturn_NeedsASavedCreditLine_OfTheClientMoneyAccount()
+    {
+        var unsaved = ReturnRequestedLine();
+        unsaved.Id = 0;
+        Should.Throw<DomainException>(() => OutgoingPayment.ForReceiptReturn(unsaved, ClientMoney()));
+
+        var otherAccount = ClientMoney();
+        otherAccount.Id = 41;
+        Should.Throw<DomainException>(() => OutgoingPayment.ForReceiptReturn(ReturnRequestedLine(), otherAccount));
+
+        var debit = BankStatementLine.Receive(
+            7, 40, "simulator", "w-L9", new DateOnly(2026, 11, 21), BankLineDirection.Debit, 250.50m, "USD",
+            null, null, null, At);
+        debit.Id = 51;
+        Should.Throw<DomainException>(() => OutgoingPayment.ForReceiptReturn(debit, ClientMoney()));
+    }
+
+    [Test]
+    public void AReceiptReturn_IsSentAcceptedRejectedAndCancelled_AsAWithdrawalsPayment()
+    {
+        var accepted = OutgoingPayment.ForReceiptReturn(ReturnRequestedLine(), ClientMoney());
+        accepted.RecordAttempt(At);
+        accepted.Accept("w-P1", At);
+        accepted.Status.ShouldBe(OutgoingPaymentStatus.Accepted);
+        accepted.MarkPaid();
+        accepted.Status.ShouldBe(OutgoingPaymentStatus.Paid);
+
+        var rejected = OutgoingPayment.ForReceiptReturn(ReturnRequestedLine(), ClientMoney());
+        rejected.RecordAttempt(At);
+        rejected.Reject(PaymentRejectReason.UnknownLine);
+        rejected.RejectReason.ShouldBe(PaymentRejectReason.UnknownLine);
+
+        var cancelled = OutgoingPayment.ForReceiptReturn(ReturnRequestedLine(), ClientMoney());
+        cancelled.Cancel();
+        cancelled.Status.ShouldBe(OutgoingPaymentStatus.Cancelled);
+    }
+
+    private static BankStatementLine ReturnRequestedLine()
+    {
+        var line = BankStatementLine.Receive(
+            7, 40, "simulator", "w-L8", new DateOnly(2026, 11, 21), BankLineDirection.Credit, 250.50m, "USD",
+            "J SMITH", "****4200", "Gift", At);
+        line.Id = 50;
+        line.MarkUnmatched(UnmatchedReason.NoReference);
+        line.RequestReturn("Not a customer", 22, At);
+        return line;
+    }
+
     private static OutgoingPayment Pending() => OutgoingPayment.ForWithdrawal(Withdrawal(), ClientMoney());
 
     private static Withdrawal Withdrawal()
