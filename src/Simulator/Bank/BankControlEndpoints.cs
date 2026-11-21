@@ -6,7 +6,8 @@ using MyWealthV2.Simulator.Worlds;
 
 namespace MyWealthV2.Simulator.Bank;
 
-/// <summary>Deposit matching R40, R41, R46 and withdrawals R52–R55: the simulator bank on the control surface.</summary>
+/// <summary>Deposit matching R40, R41, R46, withdrawals R52–R55 and bank-returns R14, R15: the simulator bank on the
+/// control surface.</summary>
 public static class BankControlEndpoints
 {
     public static RouteGroupBuilder MapBankControlEndpoints(this RouteGroupBuilder control)
@@ -20,6 +21,7 @@ public static class BankControlEndpoints
         bank.MapGet("/payments", GetPaymentsAsync);
         bank.MapPost("/payments/{paymentId}/execute", ExecutePaymentAsync);
         bank.MapPost("/payments/{paymentId}/return", ReturnPaymentAsync);
+        bank.MapPost("/lines/{outsideId}/recall", RecallAsync);
         return control;
     }
 
@@ -186,9 +188,71 @@ public static class BankControlEndpoints
         var world = await db.Worlds.SingleAsync(http.RequestAborted);
         var realNow = time.GetUtcNow();
         var simulatorNow = world.Now(realNow);
-        var line = BankLine.Payment(world.TakeLineOutsideId(), payment, DateOnly.FromDateTime(simulatorNow.UtcDateTime), simulatorNow);
+        var valueDate = DateOnly.FromDateTime(simulatorNow.UtcDateTime);
+        // Bank-returns R13: a held return pays the receipt's original payer.
+        var receipt = payment.ReturnOfLineId is long receiptId
+            ? await db.BankLines.AsNoTracking().SingleAsync(row => row.Id == receiptId, http.RequestAborted)
+            : null;
+        var line = receipt is not null
+            ? BankLine.ReceiptReturn(world.TakeLineOutsideId(), payment, receipt, valueDate, simulatorNow)
+            : BankLine.Payment(world.TakeLineOutsideId(), payment, valueDate, simulatorNow);
         return await SaveWithLineAsync(db, http, world, realNow, line, ControlActions.BankPaymentExecuted, new { paymentId },
             payment, () => payment.Executed(line.Id));
+    }
+
+    /// <summary>Bank-returns R14: the payer's bank takes back a receipt, as a debit line that names it, available
+    /// after <c>availableAfter</c>.</summary>
+    private static async Task<IResult> RecallAsync(
+        string outsideId,
+        RecallRequest body,
+        HttpContext http,
+        SimulatorDbContext db,
+        TimeProvider time)
+    {
+        var receipt = await db.BankLines.AsNoTracking().SingleOrDefaultAsync(row => row.OutsideId == outsideId, http.RequestAborted);
+        if (receipt is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (!await BankReturns.IsReturnableAsync(db, receipt, http.RequestAborted))
+        {
+            return ControlEndpoints.Refused(
+                "Status", "Only a receipt that was not returned or recalled before can be recalled.");
+        }
+
+        var reason = body.Reason?.Trim();
+        if (reason is not { Length: >= 1 and <= BankRules.FreeTextMaxLength })
+        {
+            return ControlEndpoints.Refused("Reason", "reason must be 1 to 140 characters.");
+        }
+
+        var availableAfter = BankRules.AvailableAfter(body.AvailableAfter);
+        if (availableAfter is null)
+        {
+            return ControlEndpoints.Refused("AvailableAfter", "availableAfter must be an ISO 8601 duration from PT0S to P30D.");
+        }
+
+        var world = await db.Worlds.SingleAsync(http.RequestAborted);
+        var realNow = time.GetUtcNow();
+        var simulatorNow = world.Now(realNow);
+        var line = BankLine.Recall(
+            world.TakeLineOutsideId(), receipt, reason, DateOnly.FromDateTime(simulatorNow.UtcDateTime),
+            simulatorNow, simulatorNow + availableAfter.Value);
+        db.BankLines.Add(line);
+        Log(db, http, world, realNow, ControlActions.BankReceiptRecalled, new { outsideId, reason, body.AvailableAfter });
+        try
+        {
+            await db.SaveChangesAsync(http.RequestAborted);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "The world was changed by another write. Read it again and retry.");
+        }
+
+        return Results.Ok(new AddedReceipt(line.OutsideId));
     }
 
     /// <summary>Withdrawals R54: the payee's bank sends an executed payment back, as a credit line that names its debit
@@ -396,6 +460,8 @@ public sealed record PaymentModeRequest(string? Mode, string? Reason);
 
 public sealed record ReturnPaymentRequest(string? Reason, string? AvailableAfter);
 
+public sealed record RecallRequest(string? Reason, string? AvailableAfter);
+
 /// <summary>Withdrawals R55: a payment in the simulator bank's books.</summary>
 public sealed record PaymentItem(
     string PaymentId,
@@ -404,14 +470,15 @@ public sealed record PaymentItem(
     string InstructionId,
     decimal Amount,
     string? Reference,
-    string PayeeAccountNumber,
-    string PayeeName,
+    string? PayeeAccountNumber,
+    string? PayeeName,
     string Status,
     string Mode,
     string? RejectReason,
     DateTimeOffset ReceivedAt,
     string? DebitLineId,
-    string? ReturnLineId)
+    string? ReturnLineId,
+    string? ReturnOfLineId = null)
 {
     public static PaymentItem From(BankPayment payment, string? debitLineId, string? returnLineId) => new(
         payment.PaymentId,
@@ -427,7 +494,8 @@ public sealed record PaymentItem(
         payment.RejectReason,
         payment.ReceivedAt,
         debitLineId,
-        returnLineId);
+        returnLineId,
+        payment.ReturnOf);
 }
 
 public sealed record PaymentPage(IReadOnlyList<PaymentItem> Items, int Page, int PageSize, int TotalCount);

@@ -57,7 +57,10 @@ public static class BankRules
     public const int PaymentReferenceMaxLength = 18;
 
     /// <summary>Withdrawals R34: the reasons a bank gives for refusing a payment.</summary>
-    public static readonly string[] RejectReasons = ["InvalidAccount", "AccountClosed", "InsufficientFunds", "Refused"];
+    /// <summary>Bank-returns R12: the reason for a return of a line the bank cannot send back.</summary>
+    public const string UnknownLine = "UnknownLine";
+
+    public static readonly string[] RejectReasons = ["InvalidAccount", "AccountClosed", "InsufficientFunds", "Refused", UnknownLine];
 
     public static bool IsRejectReason(string? value) => value is not null && RejectReasons.Contains(value, StringComparer.Ordinal);
 }
