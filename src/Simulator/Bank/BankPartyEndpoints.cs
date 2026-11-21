@@ -58,10 +58,18 @@ public static class BankPartyEndpoints
                         .Select(returned => returned.OutsideId)
                         .FirstOrDefault()
                 })
-            .Take(take + 1)
             .ToListAsync(cancellationToken);
 
-        var page = rows.Take(take).ToList();
+        // Bank-reconciliation R28: a line left out of the feed keeps its place and is passed over. The page ends on its
+        // last item, or at the last place when no item follows, so the cursor passes trailing left-out lines.
+        var page = rows.Where(row => !row.line.OmitFromFeed).Take(take).ToList();
+        var last = page.Count > 0 ? page[^1].Place : afterPlace;
+        var hasMore = rows.Any(row => row.Place > last && !row.line.OmitFromFeed);
+        if (!hasMore && rows.Count > 0)
+        {
+            last = Math.Max(last, rows[^1].Place);
+        }
+
         var items = page.Select(row => new BankFeedItem(
             row.line.OutsideId,
             row.line.ValueDate,
@@ -76,8 +84,9 @@ public static class BankPartyEndpoints
             row.line.ReturnReason)).ToList();
 
         // The place of the last item; with no item, the request's place in this world (0: before the first place).
-        var cursor = BankFeedCursor.Format(world.WorldId, page.Count > 0 ? page[^1].Place : afterPlace);
-        return Results.Ok(new BankFeedResponse(items, cursor, rows.Count > take));
+        var cursor = BankFeedCursor.Format(world.WorldId, last);
+        var balance = await BankStatementBalance.AtAsync(db, account.Id, last, cancellationToken);
+        return Results.Ok(new BankFeedResponse(items, cursor, hasMore, balance));
     }
 
     /// <summary>
@@ -302,4 +311,4 @@ public sealed record BankFeedItem(
     string? ReturnOf,
     string? ReturnReason);
 
-public sealed record BankFeedResponse(IReadOnlyList<BankFeedItem> Items, string Cursor, bool HasMore);
+public sealed record BankFeedResponse(IReadOnlyList<BankFeedItem> Items, string Cursor, bool HasMore, decimal Balance);
