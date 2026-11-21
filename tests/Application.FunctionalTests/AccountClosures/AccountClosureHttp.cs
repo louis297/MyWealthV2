@@ -162,4 +162,38 @@ internal static class AccountClosureHttp
         db.AccountPortfolioAssignments.Add(assignment);
         await db.SaveChangesAsync();
     }
+
+    /// <summary>The withdrawal of a closure with a payout.</summary>
+    public static async Task<Guid> WithdrawalIdAsync(string accessToken, Guid accountId, Guid closureId) =>
+        (await GetAsync(accessToken, accountId, closureId)).GetProperty("withdrawalId").GetGuid();
+
+    /// <summary>A TenantAdmin of the world (not the requester) approves the closure's withdrawal and the fake bank
+    /// accepts it; returns the withdrawal's id.</summary>
+    public static async Task<Guid> ApproveAndSendAsync(Withdrawals.WithdrawalWorld world, Guid closureId, string? approver = null)
+    {
+        var withdrawal = await WithdrawalIdAsync(world.TenantAdmin, world.AccountId, closureId);
+        var response = await Withdrawals.WithdrawalHttp.ActAsync(approver ?? world.TenantAdmin, withdrawal, "approve", readToken: world.TenantAdmin);
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent, await response.Content.ReadAsStringAsync());
+        await BankFeed.BankFeedHttp.SendAsync();
+        return withdrawal;
+    }
+
+    /// <summary>Approves and sends the closure's withdrawal, then runs the job with the bank's debit line.</summary>
+    public static async Task<(Guid Withdrawal, string PayoutLine)> PayOutAsync(Withdrawals.WithdrawalWorld world, Guid closureId, decimal amount)
+    {
+        var withdrawal = await ApproveAndSendAsync(world, closureId);
+        var line = world.AddPayoutLine(withdrawal, amount);
+        await BankFeed.BankFeedHttp.RunAsync();
+        return (withdrawal, line);
+    }
+
+    /// <summary>Transactions with a cash leg on the Account and a source of <paramref name="kind"/>.</summary>
+    public static async Task<int> TransactionsOfKindAsync(Guid accountId, TransactionSourceKind kind)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var account = await db.Accounts.IgnoreQueryFilters().SingleAsync(row => row.PublicId == accountId);
+        return await db.Transactions.IgnoreQueryFilters()
+            .CountAsync(row => row.SourceKind == kind && row.CashLegs.Any(leg => leg.AccountId == account.Id));
+    }
 }
