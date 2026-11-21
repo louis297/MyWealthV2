@@ -32,7 +32,9 @@ public sealed record BankFeedLine(
     string? ReturnOf = null,
     string? ReturnReason = null);
 
-/// <summary>One page: its lines, oldest first, the party's new cursor, and whether more lines follow.</summary>
+/// <summary>One page: its lines, oldest first, the party's new cursor, whether more lines follow, and the bank's
+/// balance of the account after the last line up to the cursor, or null when the party sends none
+/// (bank-reconciliation R2).</summary>
 public sealed record BankFeedPage(IReadOnlyList<BankFeedLine> Lines, string? Cursor, bool HasMore, decimal? Balance = null);
 
 /// <summary>A page, or the reason the call failed.</summary>
