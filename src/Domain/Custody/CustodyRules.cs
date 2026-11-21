@@ -33,17 +33,7 @@ public static class CustodyRules
             : $"Only a remainder smaller than {minorUnit.ToString(System.Globalization.CultureInfo.InvariantCulture)} {currency} can be closed out on a Custodial account. Withdraw the balance first.";
     }
 
-    /// <summary>One minor unit of a currency with <paramref name="decimalPlaces"/>: 0.01 for two, 1 for none.</summary>
-    private static decimal MinorUnit(int decimalPlaces)
-    {
-        var unit = 1m;
-        for (var place = 0; place < decimalPlaces; place++)
-        {
-            unit /= 10m;
-        }
-
-        return unit;
-    }
+    private static decimal MinorUnit(int decimalPlaces) => ClosureAmounts.MinorUnit(decimalPlaces);
 
     /// <summary>Withdrawals R47 (roadmap D14): the <c>errors.ToAccountId</c> message for a transfer between two
     /// Customers' Custodial accounts.</summary>

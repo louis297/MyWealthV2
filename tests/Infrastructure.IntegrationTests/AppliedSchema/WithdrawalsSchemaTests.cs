@@ -120,7 +120,7 @@ public class WithdrawalsSchemaTests
     }
 
     [Test]
-    public async Task Transaction_SourceKind4_NeedsASourcePublicId_AndKind5IsRejected()
+    public async Task Transaction_SourceKind4_NeedsASourcePublicId_AndKind6IsRejected()
     {
         (await RunAsync($"""
             {World()}
@@ -135,12 +135,12 @@ public class WithdrawalsSchemaTests
         withoutId.Number.ShouldBe(547);
         withoutId.Message.ShouldContain("CK_Transactions_SourcePublicId");
 
-        var kind5 = await Should.ThrowAsync<SqlException>(() => RunAsync($"""
+        var kind6 = await Should.ThrowAsync<SqlException>(() => RunAsync($"""
             {World()}
-            {InsertTransaction(5, "NEWID()")}
+            {InsertTransaction(6, "NEWID()")}
             """));
-        kind5.Number.ShouldBe(547);
-        kind5.Message.ShouldContain("CK_Transactions_SourceKind");
+        kind6.Number.ShouldBe(547);
+        kind6.Message.ShouldContain("CK_Transactions_SourceKind");
     }
 
     [Test]
@@ -163,7 +163,7 @@ public class WithdrawalsSchemaTests
             """)).ShouldBe(2);
     }
 
-    [TestCase("[UnmatchedReason]", "12")]
+    [TestCase("[UnmatchedReason]", "13")]
     [TestCase("[MatchMethod]", "5")]
     public async Task StatementLineValueOutsideItsWidenedCheck_IsRejected(string column, string value)
     {

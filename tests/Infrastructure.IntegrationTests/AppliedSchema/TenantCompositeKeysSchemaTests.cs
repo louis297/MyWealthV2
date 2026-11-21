@@ -371,6 +371,71 @@ public class TenantCompositeKeysSchemaTests
                 ([TenantId], [ReconciliationId], [Position], [Kind], [Class], [Amount], [Count], [StatementLineId], [Direction], [ValueDate], [LineStatus])
             VALUES (@a_tenant, @rec, 1, 2, 0, 5, 1, @line, 0, '2026-11-21', 2);
             """),
+        ("FK_AccountClosures_Accounts_TenantId_AccountId", "Accounts", """
+            INSERT INTO [AccountClosures]
+                ([PublicId], [TenantId], [AccountId], [Status], [Memo], [RequestedByUserId], [RequestedAt], [Currency], [CashBalanceAtRequest],
+                 [PayoutAmount], [NominatedBankAccountId], [WithdrawalId], [WriteOffAmount], [WriteOffTransactionId], [CompletedAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @{p}_bank, 1, N'Moving', @a_adviser, SYSDATETIMEOFFSET(), 'USD', 0,
+                    0, NULL, NULL, NULL, NULL, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            """),
+        ("FK_AccountClosures_Users_TenantId_RequestedByUserId", "Users", """
+            INSERT INTO [AccountClosures]
+                ([PublicId], [TenantId], [AccountId], [Status], [Memo], [RequestedByUserId], [RequestedAt], [Currency], [CashBalanceAtRequest],
+                 [PayoutAmount], [NominatedBankAccountId], [WithdrawalId], [WriteOffAmount], [WriteOffTransactionId], [CompletedAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_bank, 1, N'Moving', @{p}_adviser, SYSDATETIMEOFFSET(), 'USD', 0,
+                    0, NULL, NULL, NULL, NULL, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            """),
+        ("FK_AccountClosures_NominatedBankAccounts_TenantId_NominatedBankAccountId", "NominatedBankAccounts", """
+            INSERT INTO [NominatedBankAccounts]
+                ([PublicId], [TenantId], [CustomerId], [Currency], [BankName], [AccountName], [AccountNumber], [AccountNumberKey], [Status],
+                 [AddedByUserId], [AddedAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_customer, 'USD', N'ANZ', N'J Smith', N'0601', N'0601', 0, @a_adviser, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            DECLARE @anba int = SCOPE_IDENTITY();
+            INSERT INTO [Withdrawals]
+                ([PublicId], [TenantId], [AccountId], [NominatedBankAccountId], [Amount], [Currency], [Reference], [Status],
+                 [RequestedByUserId], [RequestedAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_bank, @anba, 300, 'USD', N'REF', 0, @a_adviser, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            DECLARE @w int = SCOPE_IDENTITY();
+            INSERT INTO [NominatedBankAccounts]
+                ([PublicId], [TenantId], [CustomerId], [Currency], [BankName], [AccountName], [AccountNumber], [AccountNumberKey], [Status],
+                 [AddedByUserId], [AddedAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @{p}_tenant, @{p}_customer, 'USD', N'ANZ', N'J Smith', N'0602', N'0602', 0, @{p}_adviser, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            DECLARE @pnba int = SCOPE_IDENTITY();
+            INSERT INTO [AccountClosures]
+                ([PublicId], [TenantId], [AccountId], [Status], [Memo], [RequestedByUserId], [RequestedAt], [Currency], [CashBalanceAtRequest],
+                 [PayoutAmount], [NominatedBankAccountId], [WithdrawalId], [WriteOffAmount], [WriteOffTransactionId], [CompletedAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_bank, 0, N'Moving', @a_adviser, SYSDATETIMEOFFSET(), 'USD', 300,
+                    300, @pnba, @w, NULL, NULL, NULL, SYSDATETIMEOFFSET(), N'test');
+            """),
+        ("FK_AccountClosures_Withdrawals_TenantId_WithdrawalId", "Withdrawals", """
+            INSERT INTO [NominatedBankAccounts]
+                ([PublicId], [TenantId], [CustomerId], [Currency], [BankName], [AccountName], [AccountNumber], [AccountNumberKey], [Status],
+                 [AddedByUserId], [AddedAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_customer, 'USD', N'ANZ', N'J Smith', N'0601', N'0601', 0, @a_adviser, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            DECLARE @anba int = SCOPE_IDENTITY();
+            INSERT INTO [NominatedBankAccounts]
+                ([PublicId], [TenantId], [CustomerId], [Currency], [BankName], [AccountName], [AccountNumber], [AccountNumberKey], [Status],
+                 [AddedByUserId], [AddedAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @{p}_tenant, @{p}_customer, 'USD', N'ANZ', N'J Smith', N'0602', N'0602', 0, @{p}_adviser, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            DECLARE @pnba int = SCOPE_IDENTITY();
+            INSERT INTO [Withdrawals]
+                ([PublicId], [TenantId], [AccountId], [NominatedBankAccountId], [Amount], [Currency], [Reference], [Status],
+                 [RequestedByUserId], [RequestedAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @{p}_tenant, @{p}_bank, @pnba, 300, 'USD', N'REF', 0, @{p}_adviser, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            DECLARE @pw int = SCOPE_IDENTITY();
+            INSERT INTO [AccountClosures]
+                ([PublicId], [TenantId], [AccountId], [Status], [Memo], [RequestedByUserId], [RequestedAt], [Currency], [CashBalanceAtRequest],
+                 [PayoutAmount], [NominatedBankAccountId], [WithdrawalId], [WriteOffAmount], [WriteOffTransactionId], [CompletedAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_bank, 0, N'Moving', @a_adviser, SYSDATETIMEOFFSET(), 'USD', 300,
+                    300, @anba, @pw, NULL, NULL, NULL, SYSDATETIMEOFFSET(), N'test');
+            """),
+        ("FK_AccountClosures_Transactions_TenantId_WriteOffTransactionId", "Transactions", """
+            INSERT INTO [AccountClosures]
+                ([PublicId], [TenantId], [AccountId], [Status], [Memo], [RequestedByUserId], [RequestedAt], [Currency], [CashBalanceAtRequest],
+                 [PayoutAmount], [NominatedBankAccountId], [WithdrawalId], [WriteOffAmount], [WriteOffTransactionId], [CompletedAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_bank, 1, N'Moving', @a_adviser, SYSDATETIMEOFFSET(), 'USD', 0.004,
+                    0, NULL, NULL, 0.004, @{p}_buy, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            """),
         ("FK_ReportExecutions_ReportSchedules_TenantId_ScheduleId", "ReportSchedules", """
             INSERT INTO [ReportExecutions] ([PublicId], [ReportId], [ScheduleId], [TenantId], [TriggerKind], [Status], [ParametersJson], [Created], [CreatedBy])
             VALUES (NEWID(), @report, @{p}_schedule, @a_tenant, N'Scheduled', N'Queued', N'{}', SYSDATETIMEOFFSET(), N'test');

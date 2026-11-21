@@ -183,7 +183,7 @@ public class BankReturnsSchemaTests
     }
 
     [TestCase("[Status]", "7", "CK_BankStatementLines_Status")]
-    [TestCase("[UnmatchedReason]", "12", "CK_BankStatementLines_UnmatchedReason")]
+    [TestCase("[UnmatchedReason]", "13", "CK_BankStatementLines_UnmatchedReason")]
     [TestCase("[MatchMethod]", "5", "CK_BankStatementLines_MatchMethod")]
     public async Task StatementLineValueOutsideItsWidenedCheck_IsRejected(string column, string value, string check)
     {

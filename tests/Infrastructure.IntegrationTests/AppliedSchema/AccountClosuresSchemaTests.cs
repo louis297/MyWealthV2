@@ -263,7 +263,7 @@ public class AccountClosuresSchemaTests
     }
 
     /// <summary>A tenant (<c>@a_*</c> from <see cref="ScratchSchemaDatabase.TenantRows"/>) with a USD client money
-    /// account <c>@cma</c> and a verified nominated bank account <c>@nba</c> of <c>@a_customer</c>. The closures are
+    /// account <c>@cma</c> and a nominated bank account <c>@nba</c> of <c>@a_customer</c>. The closures are
     /// of the USD account <c>@a_bank</c>.</summary>
     private static string World()
     {
@@ -277,7 +277,7 @@ public class AccountClosuresSchemaTests
             INSERT INTO [NominatedBankAccounts]
                 ([PublicId], [TenantId], [CustomerId], [Currency], [BankName], [AccountName], [AccountNumber], [AccountNumberKey], [Status],
                  [AddedByUserId], [AddedAt], [Created], [CreatedBy])
-            VALUES (NEWID(), @a_tenant, @a_customer, 'USD', N'ANZ', N'J Smith', N'0601', N'0601', 1, @a_adviser, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            VALUES (NEWID(), @a_tenant, @a_customer, 'USD', N'ANZ', N'J Smith', N'0601', N'0601', 0, @a_adviser, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
             DECLARE @nba int = SCOPE_IDENTITY();
             """;
     }
