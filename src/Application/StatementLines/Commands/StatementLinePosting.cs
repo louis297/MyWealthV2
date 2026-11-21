@@ -1,3 +1,4 @@
+using MyWealthV2.Application.AccountClosures;
 using FluentValidation.Results;
 using MyWealthV2.Application.BankFeed;
 using MyWealthV2.Application.Common.Exceptions;
@@ -19,6 +20,9 @@ internal static class StatementLinePosting
                 new ValidationFailure(string.Empty, "Cannot post a transaction while the account is closed. Reopen the account first.")
             ]);
         }
+
+        // Account closure R12: no match to, and no undo of a deposit on, a closing account.
+        await AccountClosing.EnsureNotClosingAsync(db, account.Id, cancellationToken);
 
         var customer = await BankDeposits.CustomerAsync(db, account, cancellationToken);
         if (BankDeposits.IsDisabled(customer))

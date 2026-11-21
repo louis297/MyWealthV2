@@ -1,3 +1,4 @@
+using MyWealthV2.Application.AccountClosures;
 using MyWealthV2.Application.Accounts;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
@@ -35,6 +36,14 @@ public class AssignPortfolioCommandHandler(
             throw new RebalanceException(
                 "account_not_eligible",
                 "Only an open Custodial account can be assigned a portfolio.");
+        }
+
+        // Account closure R13: a closing account is not assigned a portfolio.
+        if (await AccountClosing.IsClosingAsync(db, account.Id, cancellationToken))
+        {
+            throw new RebalanceException(
+                "account_not_eligible",
+                "Only an open Custodial account that is not being closed can be assigned a portfolio.");
         }
 
         var portfolio = await db.Portfolios.SingleOrDefaultAsync(

@@ -1,3 +1,4 @@
+using MyWealthV2.Application.AccountClosures;
 using System.Text.Json;
 using FluentValidation.Results;
 using MyWealthV2.Application.Accounts;
@@ -116,6 +117,10 @@ public class ReverseTransactionCommandHandler(
         {
             await db.LockAccountAsync(leg.Account.Id, cancellationToken);
         }
+
+        // Account closure R12: no reverse with a leg on a closing account, checked under the locks.
+        await AccountClosing.EnsureNotClosingAsync(
+            db, loaded.LegAccounts.Select(leg => leg.Account.Id).ToList(), cancellationToken);
 
         // Transaction source R13, R14: every leg account has the same custody mode (custody-modes R9), so the
         // first one decides. Runs before the portfolio trade lock and the already-reversed check.

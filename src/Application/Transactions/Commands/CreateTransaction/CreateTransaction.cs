@@ -1,3 +1,4 @@
+using MyWealthV2.Application.AccountClosures;
 using MyWealthV2.Application.Fees.TradeSchedules;
 using System.Text.Json;
 using FluentValidation.Results;
@@ -334,6 +335,9 @@ public class CreateTransactionCommandHandler(
                 new ValidationFailure(string.Empty, "Cannot post a transaction while the account is closed. Reopen the account first.")
             ]);
         }
+
+        // Account closure R12: a closing account accepts no hand write.
+        await AccountClosing.EnsureNotClosingAsync(db, loaded.Account.Id, cancellationToken);
 
         if (loaded.Customer.Status == UserStatus.Disabled)
         {

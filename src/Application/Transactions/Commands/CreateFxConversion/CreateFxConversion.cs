@@ -1,3 +1,4 @@
+using MyWealthV2.Application.AccountClosures;
 using System.Text.Json;
 using FluentValidation.Results;
 using MyWealthV2.Application.Accounts;
@@ -215,6 +216,9 @@ public class CreateFxConversionCommandHandler(
                 new ValidationFailure(string.Empty, "Cannot post a transaction while the account is closed. Reopen the account first.")
             ]);
         }
+
+        // Account closure R12: neither side may be closing.
+        await AccountClosing.EnsureNotClosingAsync(db, [pair.From.Id, pair.To.Id], cancellationToken);
 
         // Custody modes R10, R11. Both accounts share one custody mode (R8, checked in LoadPairAsync).
         var bookedAt = BookedAtByCustody.Resolve(pair.From.CustodyMode, request.BookedAt, time);

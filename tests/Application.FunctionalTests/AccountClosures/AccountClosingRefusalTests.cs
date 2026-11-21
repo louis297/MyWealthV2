@@ -33,8 +33,17 @@ public class AccountClosingRefusalTests : TestBase
         var writes = new List<(string Name, string Token, string Path, Dictionary<string, object?> Body)>();
         foreach (var (role, token) in new[] { ("TenantAdmin", world.TenantAdmin), ("Adviser", world.Adviser), ("SystemAdmin", system.AccessToken) })
         {
-            writes.Add(($"{role} buy", token, "/transactions", Trade(world.AccountId, "Buy", instrument, 1m)));
-            writes.Add(($"{role} close out", token, "/transactions", Cash(world.AccountId, "CloseOut", -closing.Cash)));
+            var buy = Trade(world.AccountId, "Buy", instrument, 1m);
+            var closeOut = Cash(world.AccountId, "CloseOut", -closing.Cash);
+            if (role == "SystemAdmin")
+            {
+                // A SystemAdmin names the tenant of the account (posting R2).
+                buy["tenantId"] = world.Tenant.PublicId;
+                closeOut["tenantId"] = world.Tenant.PublicId;
+            }
+
+            writes.Add(($"{role} buy", token, "/transactions", buy));
+            writes.Add(($"{role} close out", token, "/transactions", closeOut));
         }
 
         foreach (var (role, token) in new[] { ("TenantAdmin", world.TenantAdmin), ("Adviser", world.Adviser) })
@@ -53,7 +62,7 @@ public class AccountClosingRefusalTests : TestBase
             var key = Guid.NewGuid();
             var response = await PostAsync(token, body, path, key);
 
-            (await ErrorsAsync(response)).ShouldBe(Closing(), name);
+            ShouldBeClosing(await ErrorsAsync(response), name);
             (await IdempotencyRecordExistsAsync(key)).ShouldBeFalse(name);
         }
 
@@ -70,8 +79,7 @@ public class AccountClosingRefusalTests : TestBase
         foreach (var (from, to) in new[] { (closing.World.AccountId, closing.Nzd), (closing.Nzd, closing.World.AccountId) })
         {
             var quote = new Dictionary<string, object?> { ["fromAccountId"] = from, ["toAccountId"] = to, ["sellAmount"] = 10m };
-            (await ErrorsAsync(await TransactionHttp.Send(HttpMethod.Post, QuotePath, closing.World.Adviser, quote)))
-                .ShouldBe(Closing());
+            ShouldBeClosing(await ErrorsAsync(await TransactionHttp.Send(HttpMethod.Post, QuotePath, closing.World.Adviser, quote)));
         }
     }
 
@@ -83,7 +91,7 @@ public class AccountClosingRefusalTests : TestBase
 
         foreach (var token in new[] { closing.World.TenantAdmin, closing.World.Adviser, system.AccessToken })
         {
-            (await ErrorsAsync(await ReverseAsync(token, closing.HandTransferIn))).ShouldBe(Closing());
+            ShouldBeClosing(await ErrorsAsync(await ReverseAsync(token, closing.HandTransferIn)));
         }
 
         (await AccountClosureHttp.TransactionAsync(closing.HandTransferIn)).ReversedByTransactionId.ShouldBeNull();
@@ -100,7 +108,7 @@ public class AccountClosingRefusalTests : TestBase
             var key = Guid.NewGuid();
             var response = await WithdrawalHttp.PostAsync(token, WithdrawalHttp.Body(world.AccountId, world.NominatedBankAccountId, 0.01m), key);
 
-            (await ErrorsAsync(response)).ShouldBe(Closing());
+            ShouldBeClosing(await ErrorsAsync(response));
             (await IdempotencyRecordExistsAsync(key)).ShouldBeFalse();
         }
 
@@ -122,8 +130,8 @@ public class AccountClosingRefusalTests : TestBase
         var unmatch = await StatementLineHttp.ActAsync(world.TenantAdmin, deposit, "unmatch",
             new Dictionary<string, object?> { ["note"] = "Wrong account" });
 
-        (await ErrorsAsync(match)).ShouldBe(Closing());
-        (await ErrorsAsync(unmatch)).ShouldBe(Closing());
+        ShouldBeClosing(await ErrorsAsync(match));
+        ShouldBeClosing(await ErrorsAsync(unmatch));
         (await BankFeedHttp.LineAsync(receipt.Id!)).MatchedAccountId.ShouldBeNull();
     }
 
@@ -157,7 +165,11 @@ public class AccountClosingRefusalTests : TestBase
             .StatusCode.ShouldBe(HttpStatusCode.Created);
     }
 
-    private static Dictionary<string, string[]> Closing() => new() { [string.Empty] = [ClosingMessage] };
+    private static void ShouldBeClosing(Dictionary<string, string[]> errors, string? because = null)
+    {
+        errors.Keys.ToArray().ShouldBe([string.Empty], customMessage: because);
+        errors[string.Empty].ShouldBe([ClosingMessage], customMessage: because);
+    }
 
     private static Dictionary<string, object?> Transfer(Guid from, Guid to) => new()
     {

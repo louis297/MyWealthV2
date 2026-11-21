@@ -1,3 +1,4 @@
+using MyWealthV2.Application.AccountClosures;
 using System.Globalization;
 using System.Text.Json;
 using FluentValidation.Results;
@@ -143,6 +144,9 @@ public class RequestWithdrawalCommandHandler(
         {
             throw Error(string.Empty, "Cannot post a transaction while the account is closed. Reopen the account first.");
         }
+
+        // Account closure R12: a closing account takes no other withdrawal.
+        await AccountClosing.EnsureNotClosingAsync(db, account.Id, cancellationToken);
 
         if (customer.Status == UserStatus.Disabled)
         {

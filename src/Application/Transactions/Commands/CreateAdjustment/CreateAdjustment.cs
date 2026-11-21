@@ -1,3 +1,4 @@
+using MyWealthV2.Application.AccountClosures;
 using System.Text.Json;
 using FluentValidation.Results;
 using MyWealthV2.Application.Accounts;
@@ -205,6 +206,9 @@ public class CreateAdjustmentCommandHandler(
                 new ValidationFailure(string.Empty, "Cannot post a transaction while the account is closed. Reopen the account first.")
             ]);
         }
+
+        // Account closure R12: a closing account accepts no adjustment.
+        await AccountClosing.EnsureNotClosingAsync(db, account.Id, cancellationToken);
 
         if (customer.Status == UserStatus.Disabled)
         {
