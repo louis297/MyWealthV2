@@ -30,6 +30,7 @@ related:
   - ../features/deposit-matching.md
   - ../features/withdrawals.md
   - ../features/bank-returns.md
+  - ../features/bank-reconciliation.md
 ---
 
 # Adviser Portal — Dashboard and ledger pages
@@ -298,3 +299,13 @@ Status of this amendment: `accepted` (2026-11-21), together with [bank-returns](
 | ID | Behaviour |
 | --- | --- |
 | D50 | The Bank receipts pages (D34, D35, D49) gain status labels ReturnSent "Return sent" and Returned "Returned"; the status filter gains both, and "All" includes them. Reason labels: UnknownPayment "Payment out not recognised", UnknownReturn "Return not recognised", RecallNotCovered "Recalled, but the cash is gone", ReturnRejected "Bank refused the return". Method label: Recall "Recalled by the payer's bank". A debit line offers Ignore (Unmatched) and Reopen (Ignored); a line matched by the platform (Payment, PaymentReturn, Recall) offers no action. On a To be returned line the return payment's status shows under the status ("Waiting to send" with no failure, "Sending failed: <failure label>" with one, labels as BO18), and Reopen is offered only while `returnPayment.attempts` is 0. On a RecallNotCovered line the page says "Correct the account with an adjustment, then ignore this line." with a link to the account of the recalled receipt's deposit when there is one. A match with no Transaction shows no account or transaction link; the related line link (D49) stays. |
+
+---
+
+## Amendment 2026-11-21 (bank reconciliation) — accepted
+
+Status of this amendment: `accepted` (2026-11-21), together with [bank-reconciliation](../features/bank-reconciliation.md). D51 adds the Bank reconciliation pages for a TenantAdmin. The BFF gains the prefix `/bank-reconciliations` ([bff-adviser-portal.md](../features/bff-adviser-portal.md) amendment 2026-11-21). Calls: `GET /bank-reconciliations/overview`, `GET /bank-reconciliations`, `GET /bank-reconciliations/{id}`, `POST /bank-reconciliations`, and the existing statement line reads. The PDF is on the Reports tab ([adviser-portal-reports.md](adviser-portal-reports.md) D52).
+
+| ID | Behaviour |
+| --- | --- |
+| D51 | A TenantAdmin sees a nav item "Bank reconciliation" (`/bank-reconciliations`); an Adviser does not, and a 403 shows "Only a firm administrator can see bank reconciliations." The page lists the overview: Currency, Bank account (bank name and account number; "Inactive" on an inactive one), Last run, Status (Agreed "Agreed", Breaks "<n> breaks", NoBankBalance "No bank balance yet", no run "Not run yet"), Bank balance, Custodial cash, Difference, Statement read (`balanceAt`; with "Bank feed failing since <time>" when `bankFeed.lastFailedAt` is after `lastSucceededAt`), and "Run now", which posts and opens the new run. A row opens its latest run. `/bank-reconciliations/:id` shows the header (account, ran at, by "Daily run" or the person, status), the two sides and the difference, then the items under "Breaks", "Timing" and "Known differences" with their totals. Kind labels: Unexplained "Not explained", StatementDifference "Bank balance differs from the statement lines", Suspense "In suspense", NotProcessed "Not processed yet", ReturnInProgress "Being returned to the payer", OpeningBalance "Balance before the first statement line", Ignored "Ignored", Trades "Trades not settled through the trust account", FxConversions "FX conversions not settled through the trust account", Adjustments "Adjustments", OtherLedgerCash "Other cash entered on the platform", OtherClientMoneyAccount "Cash from another client money account". A line item shows direction, value date, the status and reason labels of D34, D49 and D50, the note, and links to `/statement-lines/:id` (also a `Received` line, which the Bank receipts list does not show). Under the items: reserved cash and payments in flight, with the sentence "Payments sent to the bank appear on both sides when the statement shows them." An Unexplained item adds "This should not happen. Report it to the platform team." A "History" link lists `GET /bank-reconciliations?clientMoneyAccountId=` with the status filter. |

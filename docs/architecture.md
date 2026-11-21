@@ -3,7 +3,7 @@ title: Architecture
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-11-20
+updated: 2026-11-21
 related:
   - README.md
   - glossary.md
@@ -332,7 +332,7 @@ Phase 3 introduces a general-purpose background worker (ADR 0017).
 - Manual work is enqueued from `webapi` after the normal policy and handler scope checks.
 - Recurring work is driven by Hangfire recurring jobs whose scope is owned by a schedule record. Generation re-validates that scope.
 - Queues (`reports`, `email`, default) provide light isolation. One worker project is enough until a concrete resource or failure-domain need appears.
-- First consumer: [features/reports.md](features/reports.md). The same worker delivers domain events from `OutboxMessages` (ADR 0018 and [features/outbox.md](features/outbox.md), both accepted), runs the hourly FX rate sync ([features/fx-rates.md](features/fx-rates.md), ADR 0019, both accepted), and runs the daily instrument price sync at 12:00 UTC ([features/instrument-prices.md](features/instrument-prices.md), accepted). From the custodial roadmap it also reads the bank statements: one recurring job `bank-statement-sync:{connection}` per configured bank connection, on queue `bank`, every `PollMinutes` of that connection, with no automatic retries ([features/deposit-matching.md](features/deposit-matching.md), accepted). Email and other async tasks land here later unless a later ADR splits them.
+- First consumer: [features/reports.md](features/reports.md). The same worker delivers domain events from `OutboxMessages` (ADR 0018 and [features/outbox.md](features/outbox.md), both accepted), runs the hourly FX rate sync ([features/fx-rates.md](features/fx-rates.md), ADR 0019, both accepted), and runs the daily instrument price sync at 12:00 UTC ([features/instrument-prices.md](features/instrument-prices.md), accepted). From the custodial roadmap it also reads the bank statements: one recurring job `bank-statement-sync:{connection}` per configured bank connection, on queue `bank`, every `PollMinutes` of that connection, with no automatic retries ([features/deposit-matching.md](features/deposit-matching.md), accepted), and reconciles every active client money account once a day: job `bank-reconciliation`, queue `bank`, 17:00 UTC, reading local tables only ([features/bank-reconciliation.md](features/bank-reconciliation.md), accepted). Email and other async tasks land here later unless a later ADR splits them.
 
 ---
 

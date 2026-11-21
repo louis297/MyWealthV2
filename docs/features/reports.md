@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-10-12
-last_updated: 2026-11-19
+last_updated: 2026-11-21
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -18,6 +18,7 @@ related:
   - accounts.md
   - holdings.md
   - custody-mode-grouping.md
+  - bank-reconciliation.md
 ---
 
 # Reports
@@ -41,6 +42,8 @@ Both support manual trigger and editable recurring schedules in the first phase.
 **Amendment 2026-11-18 (grouping by custody mode, accepted, landed):** [custody-mode-grouping.md](custody-mode-grouping.md) R10–R16. Adviser Balances: every cash and holding line has a "Custody" column (enum name) after "Type"; the line order is unchanged; the subtotals become one block per custody mode present (`Custodial`, then `External`) followed by an "All accounts" block with today's per-currency totals. Customer Transactions: a "Custody" column after "Account" with the labels "Held on platform" / "Held elsewhere", and, when any row is on an External account, the note "Held elsewhere: recorded by your adviser from outside statements. The platform has not checked these figures." under the table. Parameters, scope rules and routes do not change.
 
 **Amendment 2026-11-19 (adjustments, accepted):** [adjustments.md](adjustments.md) R22, R23. Customer Transactions: an `Adjustment` row shows the type cell `Adjustment (<reason label>)` (labels: Entry error, Corporate action, Reconciliation, Other) and its memo; its Reversal shows `Reversal`. Adviser Balances is unchanged: it already sums every leg.
+
+**Amendment 2026-11-21 (bank reconciliation, accepted):** [bank-reconciliation.md](bank-reconciliation.md) R22–R25. A third scope, `Tenant`: a report that runs across the whole Tenant, with policies `reports.tenant.read` and `reports.tenant.create`, which only TenantAdmin holds (R4, R6: Adviser and Customer → 403 on a Tenant-scoped request, schedule or execution; SystemAdmin still has no `reports.*` policy). The `scope` filter of `GET /reports`, `GET /reports/schedules` and `GET /reports/executions` takes `Tenant`; a Tenant-scoped execution is visible to every TenantAdmin of the Tenant. `CK_Reports_Scope` accepts `Tenant` (script `0045`). A third catalog row (§6.1): `bank-reconciliation` (PublicId `3e7b9d14-6c2a-4f58-b0e1-9a4d2c7f8e33`, scope `Tenant`, `manual` and `scheduled`), parameters `{ clientMoneyAccountId, reconciliationId? }`, which renders a stored bank reconciliation. `webapi --seed-demo` and `TestSeed` grant it to the demo tenant with the other two.
 
 ---
 

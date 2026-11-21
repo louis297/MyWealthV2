@@ -1,6 +1,6 @@
 ---
 title: Bank reconciliation
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -34,7 +34,7 @@ The bank sends its **statement balance** with every page of the bank feed: the b
 
 New: permission `bank-reconciliations.manage` (TenantAdmin only); routes under `/bank-reconciliations`; report scope `Tenant` with policies `reports.tenant.read` and `reports.tenant.create` (TenantAdmin only); report `bank-reconciliation`; recurring job `bank-reconciliation`; field `balance` on the bank feed page; the simulator's bank charge and a line left out of the feed. Scripts `0045_bank_reconciliations.sql`; simulator script `database/simulator/0006_bank_balances.sql`. No new `TransactionType`, source kind, problem code or domain event.
 
-**Status is `review` (2026-11-21).** Not a build contract. The points of §11 need confirmation before it is accepted; the amendments to accepted docs listed in §12 are made when it is accepted.
+**Status is `accepted` (2026-11-21).** It depends on [bank-returns.md](bank-returns.md), which landed 2026-11-21. The thirteen points of §11 were confirmed on 2026-11-21, every one as recommended, and are written into the rules. The amendments to accepted docs listed in §12 were made when it was accepted. It is a build contract.
 
 ---
 
@@ -240,7 +240,7 @@ Invariants:
 
 Domain events: none.
 
-Update [domain-model.md](../domain-model.md) §8.9 (cursor balance) and add §8.12 (bank reconciliation) when this spec is accepted.
+Recorded in [domain-model.md](../domain-model.md) §8.9 (cursor balance), §8.12 (bank reconciliation) and §11 (report scope).
 
 ---
 
@@ -311,7 +311,7 @@ No back-fill. Existing cursors get their balance and opening balance from the fi
 
 A reset is unchanged: it deletes the lines with the other bank tables.
 
-Update [database-design.md](../database-design.md) §9, §11.9, §14 and §15, and add §11.12, when this spec is accepted.
+Recorded in [database-design.md](../database-design.md) §9, §11.9, §11.12, §14 and §15.
 
 ---
 
@@ -499,23 +499,23 @@ No new ADR. It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) r
 | Scripts | `0045_bank_reconciliations.sql`; simulator `0006_bank_balances.sql` |
 | Permissions, routes | `bank-reconciliations.manage`; four `/bank-reconciliations` routes; no new problem code or event |
 
-### To confirm in review
+### Confirmed in review (2026-11-21)
 
-Each point has a recommendation, written into the rules above. The alternative is kept for the record.
+Each point was confirmed on 2026-11-21 as recommended, and is written into the rules above as stated here. The alternatives are kept for the record.
 
-1. **Reconcile at the feed cursor, against a balance the bank sends with each page** (R2–R4). Recommended: the balance commits in the same transaction as the lines it covers, so the bank figure and the platform's copy of the statement always describe the same set of lines, and a run can be taken at any instant. The roadmap's "per day" is the daily job (R16). Alternative: a balance port that returns the bank's closing balance per value date, reconciled against the ledger as of the end of that day. Rejected for now: the simulator's dates follow its own clock (roadmap D9), so a value date and the platform's `bookedAt` do not share a calendar; and the platform does not store a line's status as of a past instant (deposit-matching R31 keeps only the last action), so the suspense of a past day cannot be rebuilt.
-2. **A break is computed, not stored as an object with its own status** (R15). Recommended: a break disappears from the next run when its cause is fixed by a flow or an adjustment (roadmap B7 "never by editing"); there is no accept, resolve or comment action, which would be a way to hide a difference. The history of runs is the record. Alternative: a break table with an open / resolved status and a note.
-3. **The platform side is every Custodial account of the Tenant in the currency** (R8, R10). Recommended: a firm has one active client money account per currency (client-money-accounts R4), and every Custodial cash movement in that currency is the firm's obligation to its Customers, whichever process wrote it. Cash that never passed through the trust account is split by cause instead of being left out, so the run explains the whole difference. Alternative: count only the Transactions of bank flows (`BankFeed`, `Payment`); simpler, but it would agree while trades had moved Customer cash the bank never paid out.
-4. **Suspense lines are breaks; lines not processed and returns in progress are timing; ignored lines and ledger-only cash are known** (R9–R12). Recommended: an unmatched receipt is Customer money the firm has not placed, and an unknown debit is money gone from the trust account, so each needs a decision; a TenantAdmin's ignore note is the explanation of an ignored line. Alternative: suspense as timing until it is some days old.
+1. **Reconcile at the feed cursor, against a balance the bank sends with each page** (R2–R4). Decided: the balance commits in the same transaction as the lines it covers, so the bank figure and the platform's copy of the statement always describe the same set of lines, and a run can be taken at any instant. The roadmap's "per day" is the daily job (R16). Alternative: a balance port that returns the bank's closing balance per value date, reconciled against the ledger as of the end of that day. Rejected for now: the simulator's dates follow its own clock (roadmap D9), so a value date and the platform's `bookedAt` do not share a calendar; and the platform does not store a line's status as of a past instant (deposit-matching R31 keeps only the last action), so the suspense of a past day cannot be rebuilt.
+2. **A break is computed, not stored as an object with its own status** (R15). Decided: a break disappears from the next run when its cause is fixed by a flow or an adjustment (roadmap B7 "never by editing"); there is no accept, resolve or comment action, which would be a way to hide a difference. The history of runs is the record. Alternative: a break table with an open / resolved status and a note.
+3. **The platform side is every Custodial account of the Tenant in the currency** (R8, R10). Decided: a firm has one active client money account per currency (client-money-accounts R4), and every Custodial cash movement in that currency is the firm's obligation to its Customers, whichever process wrote it. Cash that never passed through the trust account is split by cause instead of being left out, so the run explains the whole difference. Alternative: count only the Transactions of bank flows (`BankFeed`, `Payment`); simpler, but it would agree while trades had moved Customer cash the bank never paid out.
+4. **Suspense lines are breaks; lines not processed and returns in progress are timing; ignored lines and ledger-only cash are known** (R9–R12). Decided: an unmatched receipt is Customer money the firm has not placed, and an unknown debit is money gone from the trust account, so each needs a decision; a TenantAdmin's ignore note is the explanation of an ignored line. Alternative: suspense as timing until it is some days old.
 5. **A payment sent but not yet on the statement is not a reconciling item** (R14). This refines roadmap B7 ("minus payments sent but not yet on the statement"), written before withdrawals R40 decided that the payout is posted from the bank's debit line: until that line arrives, neither the bank balance nor the Custodial cash has moved. The run shows such payments as information next to reserved cash.
-6. **Trades and FX conversions are known differences until orders and settlement exist** (R10). Recommended: a Custodial `Buy` today is filled at once (custody-modes R10–R13) and moves no money out of the trust account; listing it as a break would make every firm that trades permanently `Breaks`. Roadmap O1, O2 and O5 turn these into bank-driven flows, and the items then shrink to zero. Alternative: a break.
-7. **Read at SNAPSHOT isolation, enabled by `0045`** (R6). Recommended: the processing step writes a line's status and its Transaction in one transaction (ADR 0021 rule 8), and a manual match, a trade or a payout can commit while the run reads several tables; SNAPSHOT gives the run one consistent view without blocking any writer. Alternative: `SERIALIZABLE` (blocks postings on the Tenant while it reads) or the connection's application lock (does not stop `webapi` writes).
+6. **Trades and FX conversions are known differences until orders and settlement exist** (R10). Decided: a Custodial `Buy` today is filled at once (custody-modes R10–R13) and moves no money out of the trust account; listing it as a break would make every firm that trades permanently `Breaks`. Roadmap O1, O2 and O5 turn these into bank-driven flows, and the items then shrink to zero. Alternative: a break.
+7. **Read at SNAPSHOT isolation, enabled by `0045`** (R6). Decided: the processing step writes a line's status and its Transaction in one transaction (ADR 0021 rule 8), and a manual match, a trade or a payout can commit while the run reads several tables; SNAPSHOT gives the run one consistent view without blocking any writer. Alternative: `SERIALIZABLE` (blocks postings on the Tenant while it reads) or the connection's application lock (does not stop `webapi` writes).
 8. **Permission `bank-reconciliations.manage`, TenantAdmin only** (R1). As `statement-lines.manage` (roadmap D5). SystemAdmin none. Alternative: a read permission for Advisers.
-9. **The PDF is a report of a new scope `Tenant`** (R22–R25). Recommended: roadmap B7 asks for a report in the existing framework, granted per Tenant, and neither `Customer` nor `Book` fits a firm-wide report only a TenantAdmin may see. The scope is general, so later firm-wide reports (custodian reconciliation T3, interest runs I2) reuse it. The report renders a stored run, so the PDF and the page always show the same figures. Alternative: no report in this slice (the stored runs and the page are the record), or a `Book` report whose generator refuses an Adviser.
+9. **The PDF is a report of a new scope `Tenant`** (R22–R25). Decided: roadmap B7 asks for a report in the existing framework, granted per Tenant, and neither `Customer` nor `Book` fits a firm-wide report only a TenantAdmin may see. The scope is general, so later firm-wide reports (custodian reconciliation T3, interest runs I2) reuse it. The report renders a stored run, so the PDF and the page always show the same figures. Alternative: no report in this slice (the stored runs and the page are the record), or a `Book` report whose generator refuses an Adviser.
 10. **Daily at 17:00 UTC, fixed in code** (R16), like the FX and price jobs. 17:00 UTC is 06:00 in New Zealand in summer and 05:00 in winter: after the day's bank activity and before the next business day. Alternative: a cron per Tenant.
-11. **The simulator reports the balance at each place, counting a line left out of the feed** (R26, R28), and gains a bank charge (R27). Recommended: these are the smallest additions that let a demo show each item: a charge for an unknown debit and an ignore, `omitFromFeed` for a statement difference. Interest on the trust account is an ordinary receipt.
-12. **No scenario library in this slice.** [bank-returns.md](bank-returns.md) proposed it for B7 (roadmap §11 S1). Recommended: the reconciliation tests are fed by the existing fakes, and the simulator bank is complete without named scenarios; a scenario library is its own small item when a demo needs a scripted day. Alternative: one named scenario ("a reconciliation day") shared by the simulator and the fakes (ADR 0021 rule 20).
-13. **A simulator reset shows as a statement difference** (R30). Recommended: the bank's books really changed, and hiding it would teach the reconciliation to trust the feed over the balance. A showcase recovers by replacing the client money account. Alternative: let a SystemAdmin set a new opening balance on a cursor, which is an edit of the bank side.
+11. **The simulator reports the balance at each place, counting a line left out of the feed** (R26, R28), and gains a bank charge (R27). Decided: these are the smallest additions that let a demo show each item: a charge for an unknown debit and an ignore, `omitFromFeed` for a statement difference. Interest on the trust account is an ordinary receipt.
+12. **No scenario library in this slice.** [bank-returns.md](bank-returns.md) proposed it for B7 (roadmap §11 S1). Decided: the reconciliation tests are fed by the existing fakes, and the simulator bank is complete without named scenarios; a scenario library is its own small item when a demo needs a scripted day. Alternative: one named scenario ("a reconciliation day") shared by the simulator and the fakes (ADR 0021 rule 20).
+13. **A simulator reset shows as a statement difference** (R30). Decided: the bank's books really changed, and hiding it would teach the reconciliation to trust the feed over the balance. A showcase recovers by replacing the client money account. Alternative: let a SystemAdmin set a new opening balance on a cursor, which is an edit of the bank side.
 
 Still open, not this slice:
 
@@ -540,6 +540,6 @@ The repository should build after each commit. Agents split each behaviour into 
 8. BFF prefix, Adviser Portal D51 and D52 + frontend tests.
 9. Repo docs: mark this file landed; roadmap §13 step 7.
 
-### Docs to amend when this spec is accepted
+### Docs amended when this spec was accepted
 
-[deposit-matching.md](deposit-matching.md) (R7, R8: the balance stored with the page; R44, R45: `balance` on the page; R49: the adapter reads it), [simulator.md](simulator.md) (R26–R29, script `0006`), [reports.md](reports.md) (scope `Tenant`, its policies in R4–R6 and §8, the third catalog row in §6.1), [api-design.md](../api-design.md) (§3.1 three permissions, §6 resource row, §7.8 scope `Tenant`, change log), [domain-model.md](../domain-model.md) (§8.9, new §8.12, §11 report scope), [database-design.md](../database-design.md) (§9, §11.9, new §11.12, §14, §15), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D51), [adviser-portal-reports.md](../adviser-portal/adviser-portal-reports.md) (D52), [bff-adviser-portal.md](bff-adviser-portal.md) (prefix), [glossary.md](../glossary.md) (status of the terms added in review; Report and Book gain the third scope), [features/README.md](README.md) row status, [function-plan.md](../function-plan.md) §5, and the roadmap §5 B7, §11 S1 and §13 status.
+[deposit-matching.md](deposit-matching.md) (R7, R8: the balance stored with the page; R44, R45: `balance` on the page; R49: the adapter reads it), [simulator.md](simulator.md) (R26–R29, script `0006`), [reports.md](reports.md) (scope `Tenant`, its policies in R4–R6 and §8, the third catalog row in §6.1), [api-design.md](../api-design.md) (§3.1 three permissions, §6 resource row, §7.8 scope `Tenant`, change log), [domain-model.md](../domain-model.md) (§8.9, new §8.12, §11 report scope), [database-design.md](../database-design.md) (§9, §11.9, new §11.12, §14, §15), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D51), [adviser-portal-reports.md](../adviser-portal/adviser-portal-reports.md) (D52), [bff-adviser-portal.md](bff-adviser-portal.md) (prefix), [glossary.md](../glossary.md) (status of the terms added in review; Report and Book gain the third scope), [features/README.md](README.md) row status, [function-plan.md](../function-plan.md) §5, [architecture.md](../architecture.md) (the `worker` job), and the roadmap §5 B7, §11 S1 and §13 status.
