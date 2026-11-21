@@ -121,7 +121,7 @@ public class StatementLineReadTests : TestBase
         (await StatementLineHttp.ListIdsAsync(token, "?status=Unmatched&direction=Debit")).ShouldBe([debit.PublicId]);
         (await StatementLineHttp.ListIdsAsync(token, "?status=Received")).ShouldBeEmpty();
         (await StatementLineHttp.ListIdsAsync(token, "?currency=nzd")).ShouldBe([nzd.PublicId]);
-        (await StatementLineHttp.ListIdsAsync(token, $"?clientMoneyAccountId={world.ClientMoney.PublicId}&status=Unmatched"))
+        (await StatementLineHttp.ListIdsAsync(token, $"?clientMoneyAccountId={world.ClientMoney.PublicId}&status=Unmatched&direction=Credit"))
             .ShouldBe([unmatched.PublicId]);
         (await StatementLineHttp.ListIdsAsync(token, "?status=Ignored,ReturnRequested")).ShouldBeEmpty();
     }

@@ -13,13 +13,14 @@ namespace MyWealthV2.Application.BankFeed;
 /// </summary>
 internal sealed class BankPayouts(IApplicationDbContext db, TimeProvider time)
 {
-    /// <summary>R40: a debit line whose end-to-end id names a withdrawal of the line's Tenant. Lines that name none
-    /// stay <c>Received</c> (deposit-matching R14).</summary>
-    public async Task ProcessDebitAsync(BankStatementLine line, CancellationToken cancellationToken)
+    /// <summary>R40: true when the debit line's end-to-end id names a withdrawal of the line's Tenant that its
+    /// payment can be paid for, and the line was handled; false when it names none, so the caller goes on
+    /// (bank-returns R2).</summary>
+    public async Task<bool> ProcessDebitAsync(BankStatementLine line, CancellationToken cancellationToken)
     {
         if (!Guid.TryParse(line.EndToEndId, out var instruction))
         {
-            return;
+            return false;
         }
 
         var withdrawal = await db.Withdrawals.IgnoreQueryFilters()
@@ -30,26 +31,26 @@ internal sealed class BankPayouts(IApplicationDbContext db, TimeProvider time)
                 .SingleOrDefaultAsync(row => row.WithdrawalId == withdrawal.Id, cancellationToken);
         if (withdrawal is null || payment is null)
         {
-            return;
+            return false;
         }
 
         // A withdrawal is not paid twice: a second line with its id does not fit it.
         if (payment.Status is OutgoingPaymentStatus.Paid or OutgoingPaymentStatus.Returned)
         {
             await MismatchAsync(line, cancellationToken);
-            return;
+            return true;
         }
 
         if (payment.Status is not (OutgoingPaymentStatus.Pending or OutgoingPaymentStatus.Accepted)
             || payment.ClientMoneyAccountId != line.ClientMoneyAccountId)
         {
-            return;
+            return false;
         }
 
         if (line.Amount != withdrawal.Amount)
         {
             await MismatchAsync(line, cancellationToken);
-            return;
+            return true;
         }
 
         await db.LockAccountAsync(withdrawal.AccountId, cancellationToken);
@@ -77,6 +78,7 @@ internal sealed class BankPayouts(IApplicationDbContext db, TimeProvider time)
         payment.MarkPaid();
         line.MarkPayout(account.Id, payout.Id, withdrawal.Id, now);
         await db.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     /// <summary>R42: true when the credit line returns a payout line and has been handled; false when it names no
