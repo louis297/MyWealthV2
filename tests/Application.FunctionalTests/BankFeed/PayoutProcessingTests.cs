@@ -123,7 +123,7 @@ public class PayoutProcessingTests : TestBase
     }
 
     [Test]
-    public async Task ADebitLineWithoutAWithdrawalOfTheTenant_StaysReceived()
+    public async Task ADebitLineWithoutAWithdrawalOfTheTenant_IsAnUnknownPayment()
     {
         var world = await WithdrawalWorld.CreateAsync();
         var south = await WithdrawalWorld.CreateAsync("South Advisory", "south-advisory");
@@ -137,7 +137,9 @@ public class PayoutProcessingTests : TestBase
 
         foreach (var outsideId in new[] { none, unknown, notAGuid, otherTenants })
         {
-            (await BankFeedHttp.LineAsync(outsideId)).Status.ShouldBe(BankStatementLineStatus.Received, outsideId);
+            var line = await BankFeedHttp.LineAsync(outsideId);
+            line.Status.ShouldBe(BankStatementLineStatus.Unmatched, outsideId);
+            line.UnmatchedReason.ShouldBe(UnmatchedReason.UnknownPayment, outsideId);
         }
 
         (await PayoutsAsync(southId)).ShouldBeEmpty();

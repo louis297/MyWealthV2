@@ -244,15 +244,18 @@ public class DepositMatchingTests : TestBase
     }
 
     [Test]
-    public async Task DebitLine_IsNotProcessed()
+    public async Task DebitLine_IsNotMatchedAsADeposit_ItIsAnUnknownPayment()
     {
+        // Bank-returns R2, R4: a debit quoting a deposit reference is not a deposit.
         var world = await DepositMatchingWorld.CreateAsync();
         var sent = BankFeedHttp.Feed.AddReceipt(
             world.ClientMoney.AccountNumber, 10m, "USD", world.DepositReference, direction: BankLineDirection.Debit);
 
         await BankFeedHttp.RunAsync();
 
-        (await BankFeedHttp.LineAsync(sent.Id!)).Status.ShouldBe(BankStatementLineStatus.Received);
+        var line = await BankFeedHttp.LineAsync(sent.Id!);
+        line.Status.ShouldBe(BankStatementLineStatus.Unmatched);
+        line.UnmatchedReason.ShouldBe(UnmatchedReason.UnknownPayment);
         (await world.CashBalanceAsync()).ShouldBe(0m);
     }
 

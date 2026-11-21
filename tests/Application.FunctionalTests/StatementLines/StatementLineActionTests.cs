@@ -249,10 +249,10 @@ public class StatementLineActionTests : TestBase
     }
 
     [TestCase("match")]
-    [TestCase("ignore")]
     [TestCase("request-return")]
     [TestCase("reopen")]
-    public async Task Action_OnADebitLine_Returns400AtStatus(string action)
+    [TestCase("unmatch")]
+    public async Task ReceiptAction_OnADebitLine_Returns400AtStatus(string action)
     {
         var world = await DepositMatchingWorld.CreateAsync();
         var sent = BankFeedHttp.Feed.AddReceipt(
@@ -263,7 +263,7 @@ public class StatementLineActionTests : TestBase
         var response = await StatementLineHttp.ActAsync(world.TenantAdmin.AccessToken, line.PublicId, action, Body(action, world));
 
         (await CustodialHttp.ErrorsAsync(response)).ShouldContainKey("Status");
-        (await BankFeedHttp.LineAsync(sent.Id!)).Status.ShouldBe(BankStatementLineStatus.Received);
+        (await BankFeedHttp.LineAsync(sent.Id!)).Status.ShouldBe(BankStatementLineStatus.Unmatched);
     }
 
     [TestCase("match")]
