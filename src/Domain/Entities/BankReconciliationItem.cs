@@ -1,3 +1,5 @@
+using MyWealthV2.Domain.ValueObjects;
+
 namespace MyWealthV2.Domain.Entities;
 
 /// <summary>
@@ -44,5 +46,35 @@ public class BankReconciliationItem
     public int? OtherClientMoneyAccountId { get; private set; }
 
     /// <summary>The one class of each kind (R9–R11).</summary>
-    public static ReconciliationItemClass ClassOf(ReconciliationItemKind kind) => throw new NotImplementedException();
+    public static ReconciliationItemClass ClassOf(ReconciliationItemKind kind) => kind switch
+    {
+        ReconciliationItemKind.Unexplained or ReconciliationItemKind.StatementDifference or ReconciliationItemKind.Suspense
+            => ReconciliationItemClass.Break,
+        ReconciliationItemKind.NotProcessed or ReconciliationItemKind.ReturnInProgress => ReconciliationItemClass.Timing,
+        _ => ReconciliationItemClass.Known
+    };
+
+    internal static BankReconciliationItem Create(
+        int tenantId,
+        ReconciliationItemKind kind,
+        decimal amount,
+        int count,
+        ReconciliationLine? line = null,
+        int? otherClientMoneyAccountId = null) => new()
+    {
+        TenantId = tenantId,
+        Kind = kind,
+        Class = ClassOf(kind),
+        Amount = amount,
+        Count = count,
+        StatementLineId = line?.Id,
+        Direction = line?.Direction,
+        ValueDate = line?.ValueDate,
+        LineStatus = line?.Status,
+        UnmatchedReason = line?.Status == BankStatementLineStatus.Unmatched ? line.UnmatchedReason : null,
+        Note = line?.Note,
+        OtherClientMoneyAccountId = otherClientMoneyAccountId
+    };
+
+    internal void PlaceAt(int position) => Position = position;
 }

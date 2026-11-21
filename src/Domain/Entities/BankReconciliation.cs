@@ -80,6 +80,137 @@ public class BankReconciliation : BaseAuditableEntity
         int? ranByUserId,
         DateTimeOffset at)
     {
-        throw new NotImplementedException();
+        if ((trigger == ReconciliationTrigger.Scheduled) != (ranByUserId is null))
+        {
+            throw new DomainException("A scheduled reconciliation names no person; a manual one names who ran it.");
+        }
+
+        var run = new BankReconciliation
+        {
+            PublicId = Guid.NewGuid(),
+            TenantId = inputs.TenantId,
+            ClientMoneyAccountId = inputs.ClientMoneyAccountId,
+            Currency = inputs.Currency,
+            Trigger = trigger,
+            RanAt = at,
+            RanByUserId = ranByUserId,
+            CustodialCash = inputs.CustodialCash,
+            ReservedCash = inputs.ReservedCash,
+            PaymentsInFlightCount = inputs.PaymentsInFlightCount,
+            PaymentsInFlightAmount = inputs.PaymentsInFlightAmount,
+            FeedLastSucceededAt = inputs.FeedLastSucceededAt,
+            FeedLastFailedAt = inputs.FeedLastFailedAt,
+            FeedLastFailure = inputs.FeedLastFailure
+        };
+
+        // R12: without a statement balance there is no bank side to compare.
+        if (inputs.StatementBalance is not decimal bank)
+        {
+            run.Status = BankReconciliationStatus.NoBankBalance;
+            return run;
+        }
+
+        var opening = inputs.OpeningBalance
+                      ?? throw new DomainException("A statement balance comes with an opening balance (R4).");
+        var difference = bank - inputs.CustodialCash;
+        run.BankBalance = bank;
+        run.BalanceAt = inputs.BalanceAt ?? throw new DomainException("A statement balance comes with its time (R3).");
+        run.OpeningBalance = opening;
+        run.StatementLinesTotal = inputs.StatementLinesTotal;
+        run.Difference = difference;
+
+        var items = new List<BankReconciliationItem>();
+        items.AddRange(LineItems(inputs));
+        items.AddRange(LedgerItems(inputs));
+        AddUnlessZero(items, inputs.TenantId, ReconciliationItemKind.OpeningBalance, opening);
+        AddUnlessZero(items, inputs.TenantId, ReconciliationItemKind.StatementDifference,
+            bank - opening - inputs.StatementLinesTotal);
+        AddUnlessZero(items, inputs.TenantId, ReconciliationItemKind.Unexplained,
+            difference - items.Sum(item => item.Amount));
+
+        // R13: by class, then kind, then line items by value date and line, ledger items by account.
+        var ordered = items
+            .OrderBy(item => item.Class)
+            .ThenBy(item => item.Kind)
+            .ThenBy(item => item.ValueDate)
+            .ThenBy(item => item.StatementLineId)
+            .ThenBy(item => item.OtherClientMoneyAccountId)
+            .ToList();
+        for (var index = 0; index < ordered.Count; index++)
+        {
+            ordered[index].PlaceAt(index + 1);
+        }
+
+        run._items.AddRange(ordered);
+        run.BreakCount = Count(ordered, ReconciliationItemClass.Break);
+        run.BreakTotal = Total(ordered, ReconciliationItemClass.Break);
+        run.TimingCount = Count(ordered, ReconciliationItemClass.Timing);
+        run.TimingTotal = Total(ordered, ReconciliationItemClass.Timing);
+        run.KnownCount = Count(ordered, ReconciliationItemClass.Known);
+        run.KnownTotal = Total(ordered, ReconciliationItemClass.Known);
+        run.Status = run.BreakCount > 0 ? BankReconciliationStatus.Breaks : BankReconciliationStatus.Agreed;
+        return run;
     }
+
+    /// <summary>R9: one item per line in suspense, not processed, being returned or ignored.</summary>
+    private static IEnumerable<BankReconciliationItem> LineItems(ReconciliationInputs inputs)
+    {
+        foreach (var line in inputs.Lines)
+        {
+            ReconciliationItemKind? kind = line.Status switch
+            {
+                BankStatementLineStatus.Unmatched => ReconciliationItemKind.Suspense,
+                BankStatementLineStatus.Received => ReconciliationItemKind.NotProcessed,
+                BankStatementLineStatus.ReturnRequested or BankStatementLineStatus.ReturnSent => ReconciliationItemKind.ReturnInProgress,
+                BankStatementLineStatus.Ignored => ReconciliationItemKind.Ignored,
+                _ => null
+            };
+            if (kind is not null)
+            {
+                var amount = line.Direction == BankLineDirection.Credit ? line.Amount : -line.Amount;
+                yield return BankReconciliationItem.Create(inputs.TenantId, kind.Value, amount, 1, line);
+            }
+        }
+    }
+
+    /// <summary>
+    /// R10: ledger cash through this account makes no item; through another account, one item per account; any
+    /// other by the type of its Transaction (a Reversal's original). A group that sums to zero is left out.
+    /// </summary>
+    private static IEnumerable<BankReconciliationItem> LedgerItems(ReconciliationInputs inputs) =>
+        inputs.Ledger
+            .Where(cash => cash.ThroughClientMoneyAccountId != inputs.ClientMoneyAccountId)
+            .GroupBy(cash => cash.ThroughClientMoneyAccountId is int other
+                ? (ReconciliationItemKind.OtherClientMoneyAccount, (int?)other)
+                : (LedgerKind(cash.Type == TransactionType.Reversal ? cash.OriginalType ?? cash.Type : cash.Type), null))
+            .Where(group => group.Sum(cash => cash.Sum) != 0m)
+            .Select(group => BankReconciliationItem.Create(
+                inputs.TenantId,
+                group.Key.Item1,
+                -group.Sum(cash => cash.Sum),
+                group.Sum(cash => cash.Count),
+                otherClientMoneyAccountId: group.Key.Item2));
+
+    private static ReconciliationItemKind LedgerKind(TransactionType type) => type switch
+    {
+        TransactionType.Buy or TransactionType.Sell => ReconciliationItemKind.Trades,
+        TransactionType.FxConversion => ReconciliationItemKind.FxConversions,
+        TransactionType.Adjustment => ReconciliationItemKind.Adjustments,
+        _ => ReconciliationItemKind.OtherLedgerCash
+    };
+
+    /// <summary>R11: a check whose amount is zero is left out.</summary>
+    private static void AddUnlessZero(List<BankReconciliationItem> items, int tenantId, ReconciliationItemKind kind, decimal amount)
+    {
+        if (amount != 0m)
+        {
+            items.Add(BankReconciliationItem.Create(tenantId, kind, amount, 1));
+        }
+    }
+
+    private static int Count(List<BankReconciliationItem> items, ReconciliationItemClass itemClass) =>
+        items.Count(item => item.Class == itemClass);
+
+    private static decimal Total(List<BankReconciliationItem> items, ReconciliationItemClass itemClass) =>
+        items.Where(item => item.Class == itemClass).Sum(item => item.Amount);
 }
