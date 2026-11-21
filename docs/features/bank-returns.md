@@ -27,7 +27,18 @@ Step 6b of [custodial-roadmap.md](../custodial-roadmap.md) §13. It finishes the
 
 New: outgoing payment kind `ReceiptReturn`; statement line statuses `ReturnSent` and `Returned`, four unmatched reasons, match method `Recall`; ignore and reopen on a debit line; `returnPayment` on the statement line item; the simulator's return payment and recall. Scripts `0044_bank_returns.sql`; simulator script `database/simulator/0005_bank_returns.sql`. No new route, permission, `TransactionType`, source kind, problem code or domain event.
 
-**Status is `accepted` (2026-11-21).** It depends on [withdrawals.md](withdrawals.md), which landed 2026-11-21. The points of §11 were confirmed in discussion on 2026-11-20, every one as recommended, and are written into the rules; point 8 was decided on acceptance (2026-11-21). The amendments to accepted docs listed in §12 were made when it was accepted. It is a build contract.
+**Status is `accepted` (2026-11-21), landed 2026-11-21.** It depends on [withdrawals.md](withdrawals.md), which landed 2026-11-21. The points of §11 were confirmed in discussion on 2026-11-20, every one as recommended, and are written into the rules; point 8 was decided on acceptance (2026-11-21). The amendments to accepted docs listed in §12 were made when it was accepted.
+
+Notes from landing:
+
+- §5 names: the rejected return is `MarkReturnRejected()`, and `MarkReturned()` takes no time, since a `Returned` line stores none. `Reopen(by, at, returnAttempted)` treats an `Accepted` return payment as attempted.
+- `0044` drops and adds again the `WithdrawalId` FK and index of `OutgoingPayments` around the `ALTER COLUMN`, and names the kind CHECK `CK_OutgoingPayments_Kind` and the one-target CHECK `CK_OutgoingPayments_Target`.
+- R2 order in code: payout (withdrawals R40), return paid (R7), any other `endToEndId` (`UnknownPayment`), a `returnOf` (R3), any other debit (`UnknownPayment`). R7 needs the payment of the line's Tenant and client money account; a debit naming a return payment that was never attempted, or one already `Paid`, is `UnknownPayment`.
+- R3: a recall whose receipt is still `Received` stays `Received` until that receipt is processed (it is older, so the same run takes it first). The Reversal's `CreatedBy` is the worker's system name. Not covered means: the Account is Closed, or the cash `SUM` after the Reversal is below 0, or below reserved cash.
+- R2 (tenant scope): the pull now links a `returnOf` only to a stored line of the same Tenant and client money account. Before, a line naming another Tenant's line on the shared connection broke the composite FK and failed the page.
+- R16: `SimulatorBankPayments` leaves `payee`, `reference` and `returnOf` out of the body when they are null.
+- Simulator (§6.2 changed): `BankPayments` keeps `ReturnOf` (the outside id as sent, `nvarchar(100)`) next to `ReturnOfLineId`, because a return of a line the account does not have is rejected as `UnknownLine` and still recorded for R51; the CHECK is exactly one of a payee and `ReturnOf`. "Returned before" includes a held return. A recall's payer fields are the receipt's payer; the recall route answers 200 `{ id }`, an unknown line 404. `GET /control/bank/payments` shows `returnOfLineId` (the outside id) and null payee fields on a return. The hash of a payment with a payee is unchanged, so earlier answers replay.
+- Adviser Portal: the RecallNotCovered link reads the recalled receipt's match for the account; a match with no Transaction shows the method, the time and the related line only.
 
 ---
 
@@ -178,7 +189,7 @@ No back-fill: existing outgoing payments are withdrawals (`Kind = 0`); existing 
 
 | Table | Content |
 | --- | --- |
-| `BankPayments` | `PayeeAccountNumber` and `PayeeName` become NULL; add `ReturnOfLineId bigint NULL` FK `BankLines`; CHECK exactly one of a payee and `ReturnOfLineId` |
+| `BankPayments` | `PayeeAccountNumber` and `PayeeName` become NULL; add `ReturnOf nvarchar(100) NULL` (the outside id as sent) and `ReturnOfLineId bigint NULL` FK `BankLines` (that line, when the account has it); CHECK exactly one of a payee and `ReturnOf` (`CK_BankPayments_Target`) |
 
 Update [database-design.md](../database-design.md) §11.9, §11.11 and §15 when this spec is accepted.
 
