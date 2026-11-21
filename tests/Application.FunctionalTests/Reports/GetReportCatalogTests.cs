@@ -62,7 +62,7 @@ public class GetReportCatalogTests : TestBase
             using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
             var items = json.RootElement.EnumerateArray().ToList();
             items.Select(item => item.GetProperty("code").GetString())
-                .ShouldBe(["adviser-balances", "customer-transactions"]);
+                .ShouldBe(["adviser-balances", "bank-reconciliation", "customer-transactions"]);
 
             var adviser = items[0];
             adviser.GetProperty("id").GetGuid().ShouldBe(AdviserBalancesId);
@@ -75,7 +75,11 @@ public class GetReportCatalogTests : TestBase
                 .ShouldBe(["manual", "scheduled"]);
             adviser.TryGetProperty("granted", out _).ShouldBeFalse();
 
-            var customer = items[1];
+            var bank = items[1];
+            bank.GetProperty("scope").GetString().ShouldBe("Tenant");
+            bank.GetProperty("name").GetString().ShouldBe("Bank reconciliation");
+
+            var customer = items[2];
             customer.GetProperty("id").GetGuid().ShouldBe(CustomerTransactionsId);
             customer.GetProperty("isActive").GetBoolean().ShouldBeFalse();
             customer.GetProperty("scope").GetString().ShouldBe("Customer");

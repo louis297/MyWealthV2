@@ -34,4 +34,6 @@ public static class Policies
     public const string ReportsCustomerCreate = "reports.customer.create";
     public const string ReportsBookRead = "reports.book.read";
     public const string ReportsBookCreate = "reports.book.create";
+    public const string ReportsTenantRead = "reports.tenant.read";
+    public const string ReportsTenantCreate = "reports.tenant.create";
 }

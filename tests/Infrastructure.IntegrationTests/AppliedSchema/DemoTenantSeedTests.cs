@@ -62,7 +62,7 @@ public class DemoTenantSeedTests
                 .OrderBy(row => row.Symbol, StringComparer.Ordinal));
         instruments.ShouldAllBe(row => row.CreatedBy == "system");
 
-        (await GrantedCodesAsync(db, tenant.Id)).ShouldBe(["adviser-balances", "customer-transactions"]);
+        (await GrantedCodesAsync(db, tenant.Id)).ShouldBe(["adviser-balances", "bank-reconciliation", "customer-transactions"]);
     }
 
     [Test]
@@ -108,7 +108,7 @@ public class DemoTenantSeedTests
         vti.CreatedBy.ShouldBe("someone");
         (await db.Instruments.CountAsync(row => row.TenantId == tenant.Id)).ShouldBe(ExpectedCatalog.Length);
 
-        (await GrantedCodesAsync(db, tenant.Id)).ShouldBe(["adviser-balances", "customer-transactions"]);
+        (await GrantedCodesAsync(db, tenant.Id)).ShouldBe(["adviser-balances", "bank-reconciliation", "customer-transactions"]);
         _logs.Entries.ShouldContain(entry => entry.Level == LogLevel.Warning && entry.Message.Contains("disabled"));
     }
 
@@ -124,7 +124,7 @@ public class DemoTenantSeedTests
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var tenant = (await db.Tenants.AsNoTracking().Where(row => row.Code == "demo").ToListAsync())
             .ShouldHaveSingleItem();
-        (await GrantedCodesAsync(db, tenant.Id)).ShouldBe(["customer-transactions"]);
+        (await GrantedCodesAsync(db, tenant.Id)).ShouldBe(["bank-reconciliation", "customer-transactions"]);
         _logs.Entries.ShouldContain(entry =>
             entry.Level == LogLevel.Warning && entry.Message.Contains("adviser-balances"));
     }
