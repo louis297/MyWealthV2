@@ -55,7 +55,13 @@ public class BankFeedCursor
     /// </summary>
     public void StorePage(string? cursor, decimal? balance, decimal signedLinesTotal, DateTimeOffset at)
     {
-        throw new NotImplementedException();
+        Advance(cursor, at);
+        Balance = balance;
+        BalanceAt = balance is null ? null : at;
+        if (balance is not null && OpeningBalance is null)
+        {
+            OpeningBalance = balance.Value - signedLinesTotal;
+        }
     }
 
     /// <summary>A read failed: the cursor stays (R7).</summary>
