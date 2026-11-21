@@ -112,6 +112,43 @@ public class SimulatorBankFeedTests
         line.Amount.ShouldBe(1m);
     }
 
+    [TestCase("12512.40", 12512.40)]
+    [TestCase("-15.0001", -15.0001)]
+    [TestCase("0", 0)]
+    public async Task Balance_IsReadAsANumber(string balance, decimal expected)
+    {
+        // Bank-reconciliation R31: the bank's balance after the page's last line.
+        var handler = new StubHandler(HttpStatusCode.OK,
+            $$"""{ "items": [], "cursor": "w:4", "hasMore": false, "balance": {{balance}} }""");
+
+        var result = await Feed(handler).GetStatementLinesAsync(
+            Connection, new BankFeedRequest("simulator", "SIM-DEMO-USD", null, 100), CancellationToken.None);
+
+        result.Page!.Balance.ShouldBe(expected);
+    }
+
+    [TestCase("""{ "items": [], "cursor": "w:4", "hasMore": false, "balance": null }""")]
+    [TestCase("""{ "items": [], "cursor": "w:4", "hasMore": false }""")]
+    public async Task NoBalance_IsNull(string body)
+    {
+        var result = await Feed(new StubHandler(HttpStatusCode.OK, body)).GetStatementLinesAsync(
+            Connection, new BankFeedRequest("simulator", "SIM-DEMO-USD", null, 100), CancellationToken.None);
+
+        result.Page.ShouldNotBeNull();
+        result.Page.Balance.ShouldBeNull();
+    }
+
+    [TestCase("""{ "items": [], "cursor": "w:4", "hasMore": false, "balance": "12512.40" }""")]
+    [TestCase("""{ "items": [], "cursor": "w:4", "hasMore": false, "balance": 12512.40001 }""")]
+    public async Task ABalanceItCannotRead_IsABadResponse(string body)
+    {
+        var result = await Feed(new StubHandler(HttpStatusCode.OK, body)).GetStatementLinesAsync(
+            Connection, new BankFeedRequest("simulator", "SIM-DEMO-USD", null, 100), CancellationToken.None);
+
+        result.Page.ShouldBeNull();
+        result.Failure.ShouldBe(BankFeedFailure.BadResponse);
+    }
+
     [TestCase(HttpStatusCode.Unauthorized, BankFeedFailure.Unauthorized)]
     [TestCase(HttpStatusCode.ServiceUnavailable, BankFeedFailure.Unavailable)]
     [TestCase(HttpStatusCode.NotFound, BankFeedFailure.UnknownAccount)]

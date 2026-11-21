@@ -355,4 +355,140 @@ public class PullBankStatementsTests : TestBase
         var content = await listed.Content.ReadAsStringAsync();
         content.ShouldContain("\"lastFailure\":\"Unavailable\"");
     }
+
+    [Test]
+    public async Task APage_StoresTheBalanceAndItsTime_AndTheFirstBalanceSetsTheOpeningBalance()
+    {
+        // Bank-reconciliation R2–R4.
+        var tenant = await TestApp.CreateTenantAsync("Pull Balance", "pull-balance");
+        var cma = await BankFeedHttp.ClientMoneyAccountAsync(tenant.Id);
+        BankFeedHttp.Feed.SetOpeningBalance(cma.AccountNumber, 1000m);
+        BankFeedHttp.Feed.AddReceipt(cma.AccountNumber, 500m, "USD", null);
+        BankFeedHttp.Feed.AddReceipt(cma.AccountNumber, 20m, "USD", null, direction: BankLineDirection.Debit);
+        var before = DateTimeOffset.UtcNow.AddSeconds(-1);
+
+        await BankFeedHttp.PullAsync();
+
+        var cursor = (await BankFeedHttp.CursorAsync(cma.Id))!;
+        cursor.Balance.ShouldBe(1480m);
+        cursor.BalanceAt.ShouldNotBeNull().ShouldBeGreaterThan(before);
+        cursor.BalanceAt.ShouldBe(cursor.LastSucceededAt);
+        cursor.OpeningBalance.ShouldBe(1000m);
+
+        BankFeedHttp.Feed.AddReceipt(cma.AccountNumber, 30m, "USD", null);
+        await BankFeedHttp.PullAsync();
+
+        cursor = (await BankFeedHttp.CursorAsync(cma.Id))!;
+        cursor.Balance.ShouldBe(1510m);
+        cursor.OpeningBalance.ShouldBe(1000m);
+    }
+
+    [Test]
+    public async Task LinesStoredBeforeAnyBalance_AreCoveredByTheOpeningBalanceOfTheFirstBalancedPage()
+    {
+        // Bank-reconciliation R4, R5.
+        var tenant = await TestApp.CreateTenantAsync("Pull Opening", "pull-opening");
+        var cma = await BankFeedHttp.ClientMoneyAccountAsync(tenant.Id);
+        BankFeedHttp.Feed.SetOpeningBalance(cma.AccountNumber, 100m);
+        BankFeedHttp.Feed.SendNoBalance(cma.AccountNumber, true);
+        BankFeedHttp.Feed.AddReceipt(cma.AccountNumber, 10m, "USD", null);
+        await BankFeedHttp.PullAsync();
+
+        var cursor = (await BankFeedHttp.CursorAsync(cma.Id))!;
+        cursor.Cursor.ShouldBe("1");
+        cursor.Balance.ShouldBeNull();
+        cursor.BalanceAt.ShouldBeNull();
+        cursor.OpeningBalance.ShouldBeNull();
+
+        BankFeedHttp.Feed.SendNoBalance(cma.AccountNumber, false);
+        BankFeedHttp.Feed.AddReceipt(cma.AccountNumber, 20m, "USD", null);
+        await BankFeedHttp.PullAsync();
+
+        cursor = (await BankFeedHttp.CursorAsync(cma.Id))!;
+        cursor.Balance.ShouldBe(130m);
+        cursor.OpeningBalance.ShouldBe(100m);
+    }
+
+    [Test]
+    public async Task APageWithoutABalance_ClearsTheBalance_AndKeepsTheOpeningBalance()
+    {
+        // Bank-reconciliation R5.
+        var tenant = await TestApp.CreateTenantAsync("Pull No Balance", "pull-no-balance");
+        var cma = await BankFeedHttp.ClientMoneyAccountAsync(tenant.Id);
+        BankFeedHttp.Feed.SetOpeningBalance(cma.AccountNumber, 5m);
+        BankFeedHttp.Feed.AddReceipt(cma.AccountNumber, 10m, "USD", null);
+        await BankFeedHttp.PullAsync();
+        BankFeedHttp.Feed.SendNoBalance(cma.AccountNumber, true);
+        BankFeedHttp.Feed.AddReceipt(cma.AccountNumber, 20m, "USD", null);
+
+        await BankFeedHttp.PullAsync();
+
+        var cursor = (await BankFeedHttp.CursorAsync(cma.Id))!;
+        cursor.Cursor.ShouldBe("2");
+        cursor.Balance.ShouldBeNull();
+        cursor.BalanceAt.ShouldBeNull();
+        cursor.OpeningBalance.ShouldBe(5m);
+        (await BankFeedHttp.LinesAsync(cma.Id)).Count.ShouldBe(2);
+    }
+
+    [Test]
+    public async Task ARefusedPage_StoresNoBalance()
+    {
+        // Bank-reconciliation R3: the balance is the bank's balance for exactly the stored lines.
+        var tenant = await TestApp.CreateTenantAsync("Pull Refused", "pull-refused");
+        var cma = await BankFeedHttp.ClientMoneyAccountAsync(tenant.Id);
+        BankFeedHttp.Feed.AddReceipt(cma.AccountNumber, 10m, "USD", null);
+        await BankFeedHttp.PullAsync();
+        BankFeedHttp.Feed.AddReceipt(cma.AccountNumber, 20m, "NZD", null);
+
+        await BankFeedHttp.PullAsync();
+
+        var cursor = (await BankFeedHttp.CursorAsync(cma.Id))!;
+        cursor.LastFailure.ShouldBe(BankFeedFailure.InvalidLine);
+        cursor.Balance.ShouldBe(10m);
+        cursor.OpeningBalance.ShouldBe(0m);
+    }
+
+    [Test]
+    public async Task ALineLeftOutOfTheFeed_CountsInTheBalance_AndNotInTheOpeningBalanceOfLaterPages()
+    {
+        // Bank-reconciliation R2, R28: the platform never computes the balance from its lines.
+        var tenant = await TestApp.CreateTenantAsync("Pull Omitted", "pull-omitted");
+        var cma = await BankFeedHttp.ClientMoneyAccountAsync(tenant.Id);
+        BankFeedHttp.Feed.AddReceipt(cma.AccountNumber, 10m, "USD", null);
+        await BankFeedHttp.PullAsync();
+        BankFeedHttp.Feed.Omit(cma.AccountNumber, new BankFeedLine("omit-" + Guid.NewGuid().ToString("N"),
+            new DateOnly(2026, 11, 20), BankLineDirection.Debit, 5m, "USD", null, null, null));
+        BankFeedHttp.Feed.AddReceipt(cma.AccountNumber, 20m, "USD", null);
+
+        await BankFeedHttp.PullAsync();
+
+        var cursor = (await BankFeedHttp.CursorAsync(cma.Id))!;
+        cursor.Balance.ShouldBe(25m);
+        cursor.OpeningBalance.ShouldBe(0m);
+        (await BankFeedHttp.LinesAsync(cma.Id)).Select(line => line.Amount).ShouldBe([10m, 20m]);
+    }
+
+    [Test]
+    public async Task AReplacementClientMoneyAccount_SetsItsOwnOpeningBalance_FromItsOwnLines()
+    {
+        // Bank-reconciliation R4, R30: a line its predecessor stored is not one of its lines.
+        var tenant = await TestApp.CreateTenantAsync("Pull Replace Balance", "pull-replace-balance");
+        var old = await BankFeedHttp.ClientMoneyAccountAsync(tenant.Id);
+        BankFeedHttp.Feed.AddReceipt(old.AccountNumber, 10m, "USD", null);
+        await BankFeedHttp.PullAsync();
+        var system = await TenantHttp.SignInSystemAdmin();
+        (await ClientMoneyHttp.SetActiveAsync(system.AccessToken, tenant.PublicId, old.PublicId, active: false))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        await ClientMoneyHttp.CreateAsync(system.AccessToken, tenant.PublicId, ClientMoneyHttp.Body("USD", accountNumber: old.AccountNumber));
+        BankFeedHttp.Feed.AddReceipt(old.AccountNumber, 20m, "USD", null);
+
+        await BankFeedHttp.PullAsync();
+
+        var replacement = await BankFeedHttp.ClientMoneyAccountAsync(tenant.Id);
+        var cursor = (await BankFeedHttp.CursorAsync(replacement.Id))!;
+        cursor.Balance.ShouldBe(30m);
+        cursor.OpeningBalance.ShouldBe(10m);
+        (await BankFeedHttp.CursorAsync(old.Id))!.OpeningBalance.ShouldBe(0m);
+    }
 }

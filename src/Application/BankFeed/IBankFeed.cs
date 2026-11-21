@@ -33,7 +33,7 @@ public sealed record BankFeedLine(
     string? ReturnReason = null);
 
 /// <summary>One page: its lines, oldest first, the party's new cursor, and whether more lines follow.</summary>
-public sealed record BankFeedPage(IReadOnlyList<BankFeedLine> Lines, string? Cursor, bool HasMore);
+public sealed record BankFeedPage(IReadOnlyList<BankFeedLine> Lines, string? Cursor, bool HasMore, decimal? Balance = null);
 
 /// <summary>A page, or the reason the call failed.</summary>
 public sealed class BankFeedResult
