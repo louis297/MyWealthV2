@@ -34,7 +34,19 @@ The bank sends its **statement balance** with every page of the bank feed: the b
 
 New: permission `bank-reconciliations.manage` (TenantAdmin only); routes under `/bank-reconciliations`; report scope `Tenant` with policies `reports.tenant.read` and `reports.tenant.create` (TenantAdmin only); report `bank-reconciliation`; recurring job `bank-reconciliation`; field `balance` on the bank feed page; the simulator's bank charge and a line left out of the feed. Scripts `0045_bank_reconciliations.sql`; simulator script `database/simulator/0006_bank_balances.sql`. No new `TransactionType`, source kind, problem code or domain event.
 
-**Status is `accepted` (2026-11-21).** It depends on [bank-returns.md](bank-returns.md), which landed 2026-11-21. The thirteen points of §11 were confirmed on 2026-11-21, every one as recommended, and are written into the rules. The amendments to accepted docs listed in §12 were made when it was accepted. It is a build contract.
+**Status is `accepted` (2026-11-21), landed 2026-11-21.** It depends on [bank-returns.md](bank-returns.md), which landed 2026-11-21. The thirteen points of §11 were confirmed on 2026-11-21, every one as recommended, and are written into the rules. The amendments to accepted docs listed in §12 were made when it was accepted.
+
+Notes from landing:
+
+- R6: `IApplicationDbContext.ExecuteInTransactionAsync` gains an overload that takes the isolation level; the reconciliation read uses `Snapshot`, every other caller keeps `ReadCommitted`. The service reads with the tenant filter off and names the client money account's Tenant in every query, so it runs the same on `webapi` and `worker`. A run's `CreatedBy` is the worker's system name, also for "Run now"; `RanByUserId` names the person.
+- R10: the legs are summed per Transaction in SQL and grouped by (type, original type of a Reversal, client money account of the source) in memory. A `BankFeed` source belongs to the client money account of its statement line; a `Payment` source to the client money account of the withdrawal's outgoing payment of kind `Withdrawal`. Cash legs count by the leg's currency on the Tenant's Custodial accounts.
+- R13: within a class and kind, `OtherClientMoneyAccount` items are ordered by the other account's internal `Id`.
+- R1: a query key a `/bank-reconciliations` route does not define is refused with 400 and the key in `errors`, by an endpoint filter (`KnownQueryKeysFilter`); `tenantId` stays a named field with its own message. A body field the command does not define is refused by the JSON reader (400, no `errors`).
+- `0045`: the composite FKs are named `FK_<child>_<parent>_TenantId_<column>`; the item CHECKs are `CK_BankReconciliationItems_Line`, `_UnmatchedReason` (a reason only on an `Unmatched` line), `_OtherClientMoneyAccount`, `_Position` (from 1) and `_Count` (at least 1); the run CHECKs are `CK_BankReconciliations_RanBy` and `_BankFigures`. Items have a unique index `UX_BankReconciliationItems_ReconciliationId_Position`.
+- R16: the daily job's tests are in `Infrastructure.IntegrationTests` (`BankReconciliationJobTests`), on a worker host, because the functional host is `webapi`. The job gives each account its own DI scope.
+- R22: the scope→policy choice lives in one place, `ReportScopes`; a schedule of a Tenant-scoped report needs no scope check beyond the TenantAdmin policy. R25: the PDF prints `No bank balance yet.` for a `NoBankBalance` run, and the item labels of D51.
+- R26–R28 (simulator): a feed page passes over lines left out of the feed; when no delivered line follows, its cursor moves to the last place, so a page of only left-out lines does not stall. `BankStatementBalance` computes the balance at a place.
+- D51, D52: the history is `/bank-reconciliations/history?clientMoneyAccountId=`. The Firm reports section shows only catalog rows of scope `Tenant`, with its own schedules and history, and the report picker is labelled "Firm report".
 
 ---
 
