@@ -72,6 +72,7 @@ public class OutgoingPayment : BaseAuditableEntity
             TenantId = withdrawal.TenantId,
             ClientMoneyAccountId = clientMoney.Id,
             Connection = clientMoney.BankConnection,
+            Kind = OutgoingPaymentKind.Withdrawal,
             InstructionPublicId = withdrawal.PublicId,
             WithdrawalId = withdrawal.Id,
             Amount = withdrawal.Amount,
@@ -84,8 +85,39 @@ public class OutgoingPayment : BaseAuditableEntity
 
     /// <summary>Bank-returns R5: the return of a receipt to its payer, <c>Pending</c>, from the line's client money
     /// account, with its own PublicId as the instruction id, no payee and no reference.</summary>
-    public static OutgoingPayment ForReceiptReturn(BankStatementLine line, ClientMoneyAccount clientMoney) =>
-        throw new NotImplementedException();
+    public static OutgoingPayment ForReceiptReturn(BankStatementLine line, ClientMoneyAccount clientMoney)
+    {
+        if (line.Id == 0)
+        {
+            throw new DomainException("The statement line must be saved first.");
+        }
+
+        if (line.Direction != BankLineDirection.Credit)
+        {
+            throw new DomainException("Only a receipt can be sent back to its payer.");
+        }
+
+        if (clientMoney.Id != line.ClientMoneyAccountId || clientMoney.TenantId != line.TenantId)
+        {
+            throw new DomainException("The client money account must be the line's.");
+        }
+
+        var publicId = Guid.NewGuid();
+        return new OutgoingPayment
+        {
+            TenantId = line.TenantId,
+            ClientMoneyAccountId = clientMoney.Id,
+            Connection = clientMoney.BankConnection,
+            Kind = OutgoingPaymentKind.ReceiptReturn,
+            InstructionPublicId = publicId,
+            ReturnOfLineId = line.Id,
+            Amount = line.Amount,
+            Currency = line.Currency,
+            Reference = null,
+            Status = OutgoingPaymentStatus.Pending,
+            PublicId = publicId
+        };
+    }
 
     /// <summary>R32: an attempt is recorded and committed before the call.</summary>
     public void RecordAttempt(DateTimeOffset at)

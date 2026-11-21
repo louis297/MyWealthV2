@@ -3,7 +3,8 @@ namespace MyWealthV2.Domain.Entities;
 /// <summary>
 /// One line of a client money account's bank statement, stored once per (connection, outside id) before it is
 /// used (docs/features/deposit-matching.md §5; ADR 0021 rule 7). Amount, date, payer and reference never change
-/// after it is stored. Only a credit line moves through matching and suspense; a debit line waits (R14).
+/// after it is stored. A credit line moves through matching, suspense and return; a debit line is a payout, the
+/// debit of a receipt return, a recall, or a line in suspense that can only be ignored (bank-returns R2–R10).
 /// </summary>
 public class BankStatementLine : BaseAuditableEntity
 {
@@ -225,23 +226,72 @@ public class BankStatementLine : BaseAuditableEntity
     }
 
     /// <summary>Bank-returns R2, R4, R8: the platform could not place a line of either direction.</summary>
-    public void MarkUnknown(UnmatchedReason reason) => throw new NotImplementedException();
+    public void MarkUnknown(UnmatchedReason reason)
+    {
+        EnsureStatus("unmatched", BankStatementLineStatus.Received);
+        if (!Enum.IsDefined(reason))
+        {
+            throw new DomainException("Unmatched reason is not valid.");
+        }
+
+        Status = BankStatementLineStatus.Unmatched;
+        UnmatchedReason = reason;
+    }
 
     /// <summary>Bank-returns R6: the bank accepted the return payment.</summary>
-    public void MarkReturnSent() => throw new NotImplementedException();
+    public void MarkReturnSent()
+    {
+        EnsureCredit("sent back");
+        EnsureStatus("sent back", BankStatementLineStatus.ReturnRequested);
+        Status = BankStatementLineStatus.ReturnSent;
+    }
 
     /// <summary>Bank-returns R6: the bank refused the return; the line is back in suspense.</summary>
-    public void MarkReturnRejected() => throw new NotImplementedException();
+    public void MarkReturnRejected()
+    {
+        EnsureCredit("sent back");
+        EnsureStatus("sent back", BankStatementLineStatus.ReturnRequested);
+        Status = BankStatementLineStatus.Unmatched;
+        UnmatchedReason = Enums.UnmatchedReason.ReturnRejected;
+    }
 
     /// <summary>Bank-returns R3, R7: the money went back to the payer. The match, if any, is dropped.</summary>
-    public void MarkReturned() => throw new NotImplementedException();
+    public void MarkReturned()
+    {
+        EnsureCredit("returned");
+        EnsureStatus(
+            "returned",
+            BankStatementLineStatus.Matched,
+            BankStatementLineStatus.Unmatched,
+            BankStatementLineStatus.Ignored,
+            BankStatementLineStatus.ReturnRequested,
+            BankStatementLineStatus.ReturnSent);
+        Status = BankStatementLineStatus.Returned;
+        ClearMatch();
+    }
 
     /// <summary>Bank-returns R3: the debit line of a recall, with the Reversal of the deposit when there was one.</summary>
-    public void MarkRecall(int relatedLineId, int? accountId, int? transactionId, DateTimeOffset at) =>
-        throw new NotImplementedException();
+    public void MarkRecall(int relatedLineId, int? accountId, int? transactionId, DateTimeOffset at)
+    {
+        EnsureDebit("matched");
+        EnsureStatus("matched", BankStatementLineStatus.Received);
+        if (accountId.HasValue != transactionId.HasValue)
+        {
+            throw new DomainException("A recall has both an account and a Reversal, or neither.");
+        }
+
+        SetMatch(accountId, transactionId, StatementLineMatchMethod.Recall, at);
+        RelatedLineId = relatedLineId;
+    }
 
     /// <summary>Bank-returns R7: the debit line of a receipt return the bank paid.</summary>
-    public void MarkReturnPaid(int relatedLineId, DateTimeOffset at) => throw new NotImplementedException();
+    public void MarkReturnPaid(int relatedLineId, DateTimeOffset at)
+    {
+        EnsureDebit("matched");
+        EnsureStatus("matched", BankStatementLineStatus.Received);
+        SetMatch(null, null, StatementLineMatchMethod.Payment, at);
+        RelatedLineId = relatedLineId;
+    }
 
     /// <summary>A TenantAdmin matched it to an account (R26); the note is optional.</summary>
     public void MatchByHand(int accountId, int transactionId, string? note, int byUserId, DateTimeOffset at)
@@ -253,17 +303,16 @@ public class BankStatementLine : BaseAuditableEntity
         Record(StatementLineAction.Matched, trimmed, byUserId, at);
     }
 
-    /// <summary>Not a Customer's money (R27).</summary>
+    /// <summary>Not a Customer's money (R27); on a debit line, a debit that is not a Customer's (bank-returns R9).</summary>
     public void Ignore(string note, int byUserId, DateTimeOffset at)
     {
-        EnsureCredit("ignored");
         EnsureStatus("ignored", BankStatementLineStatus.Unmatched);
         var trimmed = RequiredNote(note);
         Status = BankStatementLineStatus.Ignored;
         Record(StatementLineAction.Ignored, trimmed, byUserId, at);
     }
 
-    /// <summary>Must go back to the payer (R28). No payment is sent in this slice.</summary>
+    /// <summary>Must go back to the payer (R28); the caller creates the return payment (bank-returns R5).</summary>
     public void RequestReturn(string note, int byUserId, DateTimeOffset at)
     {
         EnsureCredit("returned");
@@ -273,11 +322,17 @@ public class BankStatementLine : BaseAuditableEntity
         Record(StatementLineAction.ReturnRequested, trimmed, byUserId, at);
     }
 
-    /// <summary>Back into suspense (R29).</summary>
+    /// <summary>Back into suspense (R29), also an ignored debit line (bank-returns R9). A line to be returned is
+    /// reopened only while its return payment has no send attempt (bank-returns R5).</summary>
     public void Reopen(int byUserId, DateTimeOffset at, bool returnAttempted = false)
     {
-        EnsureCredit("reopened");
         EnsureStatus("reopened", BankStatementLineStatus.Ignored, BankStatementLineStatus.ReturnRequested);
+        if (Status == BankStatementLineStatus.ReturnRequested && returnAttempted)
+        {
+            throw new StatementLineStatusException(
+                "The bank has been asked to return this receipt, so it can no longer be reopened.");
+        }
+
         Status = BankStatementLineStatus.Unmatched;
         Record(StatementLineAction.Reopened, null, byUserId, at);
     }
@@ -289,14 +344,19 @@ public class BankStatementLine : BaseAuditableEntity
         EnsureStatus("unmatched", BankStatementLineStatus.Matched);
         var trimmed = RequiredNote(note);
         Status = BankStatementLineStatus.Unmatched;
+        ClearMatch();
+        Record(StatementLineAction.Unmatched, trimmed, byUserId, at);
+    }
+
+    private void ClearMatch()
+    {
         MatchedAccountId = null;
         MatchedTransactionId = null;
         MatchMethod = null;
         MatchedAt = null;
-        Record(StatementLineAction.Unmatched, trimmed, byUserId, at);
     }
 
-    private void SetMatch(int accountId, int transactionId, StatementLineMatchMethod method, DateTimeOffset at)
+    private void SetMatch(int? accountId, int? transactionId, StatementLineMatchMethod method, DateTimeOffset at)
     {
         Status = BankStatementLineStatus.Matched;
         MatchedAccountId = accountId;
@@ -318,6 +378,14 @@ public class BankStatementLine : BaseAuditableEntity
         if (Direction != BankLineDirection.Credit)
         {
             throw new StatementLineStatusException($"This line is a payment out and cannot be {action}.");
+        }
+    }
+
+    private void EnsureDebit(string action)
+    {
+        if (Direction != BankLineDirection.Debit)
+        {
+            throw new StatementLineStatusException($"This line is a receipt and cannot be {action} as a payment out.");
         }
     }
 
