@@ -73,6 +73,25 @@ internal static class TransactionLegReader
                     : original == null ? null : original.SourcePublicId
             }).ToListAsync(cancellationToken);
 
+        // Orders R38: the execution of a fill; the order is the source of the fill or of the Transaction a Reversal
+        // undoes, and whether it settled is on the fill.
+        var executionRows = await (
+            from detail in db.TransactionExecutionDetails.AsNoTracking()
+            join transaction in db.Transactions.AsNoTracking() on detail.TransactionId equals transaction.Id
+            join original in db.Transactions.AsNoTracking() on transaction.OriginalTransactionId equals original.Id into originals
+            from original in originals.DefaultIfEmpty()
+            join fill in db.OrderFills.AsNoTracking() on detail.FillPublicId equals fill.PublicId into fills
+            from fill in fills.DefaultIfEmpty()
+            where transactionIds.Contains(detail.TransactionId)
+            select new
+            {
+                detail,
+                OrderId = transaction.SourceKind == Domain.Enums.TransactionSourceKind.OrderFill
+                    ? transaction.SourcePublicId
+                    : original == null ? null : original.SourcePublicId,
+                SettledAt = fill == null ? null : fill.SettledAt
+            }).ToListAsync(cancellationToken);
+
         var securityRows = await (
             from leg in db.TransactionSecurityLegs.AsNoTracking()
             join account in db.Accounts.AsNoTracking() on leg.AccountId equals account.Id
@@ -218,6 +237,18 @@ internal static class TransactionLegReader
                     PaymentDate = row.detail.PaymentDate?.ToString("yyyy-MM-dd"),
                     QuantityBefore = row.detail.QuantityBefore,
                     QuantityAfter = row.detail.QuantityAfter
+                }),
+            executionRows.ToDictionary(
+                row => row.detail.TransactionId,
+                row => new TransactionExecutionDto
+                {
+                    OrderId = row.OrderId ?? Guid.Empty,
+                    FillId = row.detail.FillPublicId,
+                    Price = row.detail.Price,
+                    TradeDate = row.detail.TradeDate.ToString("yyyy-MM-dd"),
+                    SettlementDate = row.detail.SettlementDate.ToString("yyyy-MM-dd"),
+                    BrokerReference = row.detail.BrokerReference,
+                    SettledAt = row.SettledAt
                 }));
     }
 }
@@ -230,4 +261,5 @@ internal sealed record TransactionLegs(
     IReadOnlyDictionary<int, TransactionBankReceiptDto> BankReceipt,
     IReadOnlyDictionary<int, TransactionPaymentDto> Payment,
     IReadOnlyDictionary<int, TransactionInterestDto> Interest,
-    IReadOnlyDictionary<int, TransactionCorporateActionDto> CorporateAction);
+    IReadOnlyDictionary<int, TransactionCorporateActionDto> CorporateAction,
+    IReadOnlyDictionary<int, TransactionExecutionDto> Execution);
