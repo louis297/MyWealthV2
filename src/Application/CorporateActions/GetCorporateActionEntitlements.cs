@@ -49,10 +49,72 @@ public class GetCorporateActionEntitlementsQueryValidator : AbstractValidator<Ge
     }
 }
 
-public class GetCorporateActionEntitlementsQueryHandler
+public class GetCorporateActionEntitlementsQueryHandler(IApplicationDbContext db, ICurrentUser currentUser)
     : IRequestHandler<GetCorporateActionEntitlementsQuery, PagedList<CorporateActionEntitlementDto>>
 {
-    public Task<PagedList<CorporateActionEntitlementDto>> Handle(
+    public async Task<PagedList<CorporateActionEntitlementDto>> Handle(
         GetCorporateActionEntitlementsQuery request,
-        CancellationToken cancellationToken) => throw new NotImplementedException();
+        CancellationToken cancellationToken)
+    {
+        var actionId = await CorporateActionReader.Scope(db, currentUser).AsNoTracking()
+                           .Where(action => action.PublicId == request.Id)
+                           .Select(action => (int?)action.Id)
+                           .SingleOrDefaultAsync(cancellationToken)
+                       ?? throw new Common.Exceptions.NotFoundException("CorporateAction", request.Id);
+
+        // R36: a TenantAdmin sees every entitlement, an Adviser those of assigned Customers' accounts.
+        var accounts = AccountScope.ManagedAccounts(db, currentUser);
+        var query = db.CorporateActionEntitlements.AsNoTracking()
+            .Where(entitlement => entitlement.CorporateActionId == actionId
+                                  && accounts.Any(account => account.Id == entitlement.AccountId));
+        var statuses = GetCorporateActionsQuery.Names(request.Status)
+            .Select(name => Enum.Parse<EntitlementStatus>(name, ignoreCase: true))
+            .Distinct()
+            .ToList();
+        if (statuses.Count > 0)
+        {
+            query = query.Where(entitlement => statuses.Contains(entitlement.Status));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var rows = await (
+                from entitlement in query
+                join account in db.Accounts.AsNoTracking() on entitlement.AccountId equals account.Id
+                join customer in db.Users.AsNoTracking() on account.CustomerId equals customer.Id
+                join transaction in db.Transactions.AsNoTracking() on entitlement.TransactionId equals transaction.Id into postings
+                from transaction in postings.DefaultIfEmpty()
+                orderby entitlement.AccountId
+                select new
+                {
+                    entitlement,
+                    AccountId = account.PublicId,
+                    AccountName = account.Name,
+                    CustomerId = customer.PublicId,
+                    CustomerName = customer.Name,
+                    TransactionId = transaction == null ? (Guid?)null : transaction.PublicId
+                })
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedList<CorporateActionEntitlementDto>
+        {
+            Items = rows.Select(row => new CorporateActionEntitlementDto
+            {
+                AccountId = row.AccountId,
+                AccountName = row.AccountName,
+                CustomerId = row.CustomerId,
+                CustomerName = row.CustomerName,
+                Status = row.entitlement.Status.ToString(),
+                Reason = row.entitlement.Reason?.ToString(),
+                QuantityBefore = row.entitlement.QuantityBefore,
+                QuantityAfter = row.entitlement.QuantityAfter,
+                TransactionId = row.TransactionId,
+                PostedAt = row.entitlement.PostedAt
+            }).ToList(),
+            Page = request.Page,
+            PageSize = request.PageSize,
+            TotalCount = totalCount
+        };
+    }
 }
