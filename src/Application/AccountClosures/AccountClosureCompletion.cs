@@ -10,7 +10,7 @@ using MyWealthV2.Domain.ValueObjects;
 namespace MyWealthV2.Application.AccountClosures;
 
 /// <summary>
-/// Account closure R17–R19: after the payout of a closure's withdrawal is posted, in the same database transaction
+/// Account closure R17–R20: after the payout of a closure's withdrawal is posted, in the same database transaction
 /// and with the Account still locked, the remainder is written off, the Account closed and the closure completed;
 /// or, if the Account cannot be closed, the closure ends <c>NotClosable</c>. The caller saves.
 /// </summary>
@@ -63,5 +63,20 @@ internal static class AccountClosureCompletion
 
         account.Close();
         closure.Complete(writeOff is null ? null : cash, writeOff?.Id, now);
+    }
+
+    /// <summary>R20: the closure of <paramref name="withdrawalId"/>, if it is in progress, ends with its withdrawal.
+    /// The caller saves both in one database transaction.</summary>
+    public static async Task EndWithWithdrawalAsync(
+        IApplicationDbContext db,
+        int withdrawalId,
+        AccountClosureCancelReason reason,
+        DateTimeOffset at,
+        CancellationToken cancellationToken)
+    {
+        var closure = await db.AccountClosures.IgnoreQueryFilters()
+            .SingleOrDefaultAsync(row => row.WithdrawalId == withdrawalId && row.Status == AccountClosureStatus.InProgress,
+                cancellationToken);
+        closure?.Cancel(reason, at);
     }
 }
