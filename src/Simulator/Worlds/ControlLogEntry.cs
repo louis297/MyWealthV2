@@ -61,4 +61,7 @@ public static class ControlActions
     public const string CorporateActionCancelled = "CorporateActionCancelled";
     public const string BrokerOrderModeChanged = "BrokerOrderModeChanged";
     public const string BrokerSlippageSet = "BrokerSlippageSet";
+    public const string BrokerSettlementDaysSet = "BrokerSettlementDaysSet";
+    public const string BrokerOrderFilled = "BrokerOrderFilled";
+    public const string BrokerOrderCancelled = "BrokerOrderCancelled";
 }

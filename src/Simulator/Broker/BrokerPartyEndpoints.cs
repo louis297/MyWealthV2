@@ -9,13 +9,14 @@ using MyWealthV2.Simulator.Market;
 
 namespace MyWealthV2.Simulator.Broker;
 
-/// <summary>Orders R53, R54: the simulator broker on the party surface. The key (simulator R30) and the outage (R27)
+/// <summary>Orders R53, R54, R59: the simulator broker on the party surface. The key (simulator R30) and the outage (R27)
 /// are checked by the party group.</summary>
 public static class BrokerPartyEndpoints
 {
     public static RouteGroupBuilder MapBrokerPartyEndpoints(this RouteGroupBuilder party)
     {
         party.MapPost("/broker/orders", PlaceAsync);
+        party.MapPost("/broker/orders/{clientOrderId}/cancel", CancelAsync);
         return party;
     }
 
@@ -85,6 +86,40 @@ public static class BrokerPartyEndpoints
         });
     }
 
+    /// <summary>
+    /// R59: the platform asks to cancel an order by its client order id. A working order is cancelled at once, with a
+    /// <c>Cancelled</c> report of reason <c>Requested</c>; an order that has ended is too late; an id the broker does
+    /// not hold → 404. Not a control action, so nothing is logged.
+    /// </summary>
+    private static async Task<IResult> CancelAsync(
+        string clientOrderId,
+        SimulatorDbContext db,
+        TimeProvider time,
+        CancellationToken cancellationToken)
+    {
+        await BrokerBook.UpToDateAsync(db, time, cancellationToken);
+        return await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            db.ChangeTracker.Clear();
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+            await BrokerBook.LockAsync(db, cancellationToken);
+            var order = await db.BrokerOrders.SingleOrDefaultAsync(row => row.ClientOrderId == clientOrderId, cancellationToken);
+            if (order is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (order.Status != BrokerOrderStatus.Working)
+            {
+                return Results.Ok(new BrokerCancelAnswer("TooLate"));
+            }
+
+            await BrokerBook.CancelAsync(db, order, BrokerRules.RequestedReason, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return Results.Ok(new BrokerCancelAnswer("Accepted"));
+        });
+    }
+
     /// <summary>R54: the same order, whatever the scale its numbers were written with.</summary>
     private static byte[] Hash(BrokerOrderRequest body) =>
         SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new object?[]
@@ -113,6 +148,9 @@ public sealed record BrokerOrderRequest(
     string? TimeInForce,
     decimal? PriceLimit,
     decimal? ReferencePrice);
+
+/// <summary>R59: <c>Accepted</c> or <c>TooLate</c>.</summary>
+public sealed record BrokerCancelAnswer(string Status);
 
 /// <summary>R54: <c>Accepted</c> with the broker's order id, or <c>Rejected</c> with the reason.</summary>
 public sealed record BrokerOrderAnswer(

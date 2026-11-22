@@ -80,6 +80,9 @@ public sealed class BrokerSettings
 
     /// <summary>R56: applies to later fills.</summary>
     public void SetSlippage(decimal slippagePercent) => SlippagePercent = slippagePercent;
+
+    /// <summary>R61: applies to later fills.</summary>
+    public void SetSettlementDays(int settlementDays) => SettlementDays = settlementDays;
 }
 
 /// <summary>An order in the simulator broker's books (orders R52–R54). The broker does not know which Tenant,
@@ -219,6 +222,22 @@ public sealed class BrokerOrder
 
         return fill;
     }
+
+    /// <summary>R58, R59, R62: a working order is cancelled; what was filled stays filled.</summary>
+    public void Cancel() => End(BrokerOrderStatus.Cancelled);
+
+    /// <summary>R60: a working order of an earlier simulator day expires.</summary>
+    public void Expire() => End(BrokerOrderStatus.Expired);
+
+    private void End(BrokerOrderStatus status)
+    {
+        if (Status != BrokerOrderStatus.Working)
+        {
+            throw new InvalidOperationException($"Only a working order can end as {status}; this one is {Status}.");
+        }
+
+        Status = status;
+    }
 }
 
 /// <summary>One fill of an order (orders R57).</summary>
@@ -256,6 +275,9 @@ public sealed class BrokerFill
     public string ContractNote { get; private set; } = "";
 
     public bool Settled { get; private set; }
+
+    /// <summary>R61: the simulator day reached the settlement date.</summary>
+    public void Settle() => Settled = true;
 }
 
 /// <summary>One report of the broker's feed (orders R63). Its <see cref="Id"/> is its place in the feed.</summary>
@@ -284,4 +306,15 @@ public sealed class BrokerReport
     /// <summary>R57: the report of a fill.</summary>
     public static BrokerReport OfFill(BrokerOrder order, BrokerFill fill) =>
         new() { Kind = BrokerReportKind.Fill, Order = order, Fill = fill };
+
+    /// <summary>R58, R59, R62: the report of a cancellation, with who or what cancelled.</summary>
+    public static BrokerReport OfCancel(BrokerOrder order, string reason) =>
+        new() { Kind = BrokerReportKind.Cancelled, Order = order, Reason = reason };
+
+    /// <summary>R60: the report of an expiry.</summary>
+    public static BrokerReport OfExpiry(BrokerOrder order) => new() { Kind = BrokerReportKind.Expired, Order = order };
+
+    /// <summary>R61: the report of a settlement, on the fill's settlement date.</summary>
+    public static BrokerReport OfSettlement(BrokerOrder order, BrokerFill fill) =>
+        new() { Kind = BrokerReportKind.Settled, Order = order, Fill = fill, SettledDate = fill.SettlementDate };
 }

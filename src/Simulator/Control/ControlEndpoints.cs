@@ -126,6 +126,19 @@ public static class ControlEndpoints
             await db.BankAccounts.ExecuteDeleteAsync(http.RequestAborted);
             await standing.OpenMissingAsync(db, time.GetUtcNow(), http.RequestAborted);
 
+            // Orders R65: the broker's orders, fills and reports are emptied and its settings set back.
+            await db.BrokerReports.ExecuteDeleteAsync(http.RequestAborted);
+            await db.BrokerFills.ExecuteDeleteAsync(http.RequestAborted);
+            await db.BrokerOrders.ExecuteDeleteAsync(http.RequestAborted);
+            await db.BrokerSettings.ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(settings => settings.Mode, BrokerOrderMode.Fill)
+                    .SetProperty(settings => settings.FillPercent, BrokerRules.DefaultFillPercent)
+                    .SetProperty(settings => settings.RejectReason, (BrokerRejectReason?)null)
+                    .SetProperty(settings => settings.SlippagePercent, BrokerRules.DefaultSlippagePercent)
+                    .SetProperty(settings => settings.SettlementDays, BrokerRules.DefaultSettlementDays),
+                http.RequestAborted);
+
             // Simulated instruments R23, corporate-actions R47: the market and its corporate actions are emptied and its
             // standing instruments added again, priced on the first day of the new world (its clock starts at real now).
             await db.MarketCorporateActionVersions.ExecuteDeleteAsync(http.RequestAborted);

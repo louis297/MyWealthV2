@@ -14,6 +14,17 @@ public static class BrokerRules
     public const decimal DefaultSlippagePercent = 0.10m;
     public const decimal MaxSlippagePercent = 5m;
     public const int DefaultSettlementDays = 2;
+    public const int MaxSettlementDays = 5;
+    public const int ReasonMaxLength = 140;
+
+    /// <summary>R59: the reason of a cancel the platform asked for.</summary>
+    public const string RequestedReason = "Requested";
+
+    /// <summary>R58: the default reason of a cancel by the operator.</summary>
+    public const string BrokerReason = "Broker";
+
+    /// <summary>R62: the reason of a cancel by a corporate action.</summary>
+    public const string CorporateActionReason = "CorporateAction";
 
     /// <summary>The purpose name of the fill price draw (R56, simulator R26).</summary>
     public const string FillPurpose = "broker-fill";
@@ -38,6 +49,13 @@ public static class BrokerRules
         && body.TimeInForce == "Day";
 
     public static bool IsFillPercent(int? percent) => percent is >= 1 and <= 100;
+
+    /// <summary>R61: a whole number 0 to 5.</summary>
+    public static bool IsSettlementDays(int? days) => days is >= 0 and <= MaxSettlementDays;
+
+    /// <summary>R58: a typed fill price, greater than 0 with at most 4 decimal places.</summary>
+    public static bool IsPrice(decimal? price) =>
+        price is > 0 and <= MaxStoredNumber && decimal.Round(price.Value, PriceDecimalPlaces) == price.Value;
 
     /// <summary>R56: 0 to 5 with at most 2 decimal places.</summary>
     public static bool IsSlippage(decimal? percent) =>
