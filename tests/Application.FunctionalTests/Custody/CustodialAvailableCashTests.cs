@@ -17,18 +17,6 @@ public class CustodialAvailableCashTests : TestBase
     private const string Refusal = "Available cash cannot become negative: 300.00 USD is reserved for withdrawals and orders.";
 
     [Test]
-    public async Task Buy_AboveTheAvailableCash_Returns400_AndWithinIt_Returns201()
-    {
-        var world = await ReservedWorldAsync();
-        var instrument = await CreateInstrumentAsync(world.TenantAdmin, price: 25.00m);
-
-        (await ErrorsAsync(await PostAsync(world.TenantAdmin, Trade(world.AccountId, "Buy", instrument, 32m))))[""].ShouldBe([Refusal]);
-        (await PostAsync(world.TenantAdmin, Trade(world.AccountId, "Buy", instrument, 28m))).StatusCode.ShouldBe(HttpStatusCode.Created);
-
-        (await world.CashAsync()).ShouldBe((300m, 300m, 0m));
-    }
-
-    [Test]
     public async Task InternalTransfer_FromIt_AboveTheAvailableCash_Returns400()
     {
         var world = await ReservedWorldAsync();

@@ -265,45 +265,6 @@ public class ExternalTradeTests : TestBase
         (await CustodialHttp.TransactionCountAsync(world.AccountId)).ShouldBe(2);
     }
 
-    [TestCase("Buy")]
-    [TestCase("Sell")]
-    public async Task CustodialTrade_WithPriceFeeOrFxRate_Returns400OnItsFieldAndWritesNothing(string type)
-    {
-        var (_, _, customer, admin) = await AccountHttp.SignInTenantAdmin();
-        var (accountId, instrumentId) = await FeeHttp.TradingAccountAsync(admin.AccessToken, customer.PublicId);
-        (await FeeHttp.TradeAsync(accountId, "Buy", instrumentId, 10m)).StatusCode
-            .ShouldBe(HttpStatusCode.Created);
-        var before = await CustodialHttp.TransactionCountAsync(accountId);
-
-        var price = CustodialHttp.Trade(accountId, type, instrumentId, 1m);
-        price["security"] = new[] { new { instrumentId, quantity = 1m, price = 25m } };
-        var fee = CustodialHttp.Trade(accountId, type, instrumentId, 1m);
-        fee["fee"] = 1m;
-        var fxRate = CustodialHttp.Trade(accountId, type, instrumentId, 1m);
-        fxRate["fxRate"] = 1m;
-
-        (await CustodialHttp.ErrorsAsync(await CustodialHttp.PostAsync(admin.AccessToken, price)))["Security[0].Price"]
-            .ShouldBe(["Price cannot be set on a buy or sell."]);
-        (await CustodialHttp.ErrorsAsync(await CustodialHttp.PostAsync(admin.AccessToken, fee)))["Fee"]
-            .ShouldBe(["Fee cannot be set. Brokerage is added by the server from the trade fee schedule."]);
-        (await CustodialHttp.ErrorsAsync(await CustodialHttp.PostAsync(admin.AccessToken, fxRate)))["FxRate"]
-            .ShouldBe(["FxRate cannot be set on a Custodial account. The server reads the rate."]);
-        (await CustodialHttp.TransactionCountAsync(accountId)).ShouldBe(before);
-    }
-
-    [Test]
-    public async Task CustodialBuy_StillUsesTheStoredPriceAndTheSchedulesFee()
-    {
-        var (tenant, _, customer, admin) = await AccountHttp.SignInTenantAdmin();
-        var (accountId, instrumentId) = await FeeHttp.TradingAccountAsync(admin.AccessToken, customer.PublicId);
-        await FeeHttp.AddScheduleAsync(tenant.Id, "USD", FeeHttp.Today);
-
-        var id = await CustodialHttp.ReadIdAsync(
-            await FeeHttp.TradeAsync(accountId, "Buy", instrumentId, 50m));
-
-        (await TradeFeeTradeTests.CashAmountsAsync(admin.AccessToken, id)).ShouldBe([-1250m, -10m], ignoreOrder: true);
-    }
-
     [Test]
     public async Task FeeOrFxRateOnACashType_Returns400()
     {

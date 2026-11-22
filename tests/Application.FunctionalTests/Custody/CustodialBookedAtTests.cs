@@ -17,79 +17,6 @@ public class CustodialBookedAtTests : TestBase
     private const decimal NzdUsd = 0.59120000m;
 
     [Test]
-    public async Task Custodial_BuyWithoutBookedAt_Returns201_BookedAtTheServerClock()
-    {
-        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
-        var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
-        (await FundAsync(tokens.AccessToken, accountId, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
-        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, price: 5.00m);
-
-        var before = DateTimeOffset.UtcNow;
-        var id = await ReadIdAsync(await PostAsync(tokens.AccessToken, Trade(accountId, "Buy", instrumentId, 1m)));
-        var after = DateTimeOffset.UtcNow;
-
-        using var item = await GetTransactionAsync(tokens.AccessToken, id);
-        var bookedAt = item.RootElement.GetProperty("bookedAt").GetDateTimeOffset();
-        bookedAt.ShouldBeGreaterThanOrEqualTo(before.AddSeconds(-1));
-        bookedAt.ShouldBeLessThanOrEqualTo(after.AddSeconds(1));
-        item.RootElement.GetProperty("bookedAt").GetString()!.ShouldEndWith("Z");
-    }
-
-    private static IEnumerable<TestCaseData> SentInstants()
-    {
-        yield return new TestCaseData(0, CustodialMessage).SetName("Custodial_BookedAtNow_Returns400AndWritesNothing");
-        yield return new TestCaseData(-86400, CustodialMessage).SetName("Custodial_BookedAtInThePast_Returns400AndWritesNothing");
-        yield return new TestCaseData(3600, null).SetName("Custodial_BookedAtInTheFuture_Returns400AndWritesNothing");
-    }
-
-    [TestCaseSource(nameof(SentInstants))]
-    public async Task Custodial_BuyWithBookedAt_Returns400OnBookedAtAndWritesNothing(int offsetSeconds, string? message)
-    {
-        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
-        var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
-        (await FundAsync(tokens.AccessToken, accountId, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
-        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, price: 5.00m);
-        var key = Guid.NewGuid();
-
-        var response = await PostAsync(
-            tokens.AccessToken,
-            Trade(accountId, "Buy", instrumentId, 1m).WithBookedAt(Instant(DateTimeOffset.UtcNow.AddSeconds(offsetSeconds))),
-            idempotencyKey: key);
-
-        await ShouldRefuseBookedAtAsync(response, message);
-        (await TransactionCountAsync(accountId)).ShouldBe(1);
-        (await IdempotencyRecordExistsAsync(key)).ShouldBeFalse();
-    }
-
-    [Test]
-    public async Task Custodial_BookedAtNull_IsTheSameAsLeavingItOut()
-    {
-        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
-        var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
-        (await FundAsync(tokens.AccessToken, accountId, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
-        var body = Trade(accountId, "Buy", await CreateInstrumentAsync(tokens.AccessToken, price: 5.00m), 1m);
-        body["bookedAt"] = null;
-
-        (await PostAsync(tokens.AccessToken, body)).StatusCode.ShouldBe(HttpStatusCode.Created);
-    }
-
-    [Test]
-    public async Task Custodial_Buy_IsBookedAndPricedAtTheServerClock()
-    {
-        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
-        var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
-        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, price: 25.00m);
-        (await FundAsync(tokens.AccessToken, accountId, 1000m)).StatusCode.ShouldBe(HttpStatusCode.Created);
-
-        var before = DateTimeOffset.UtcNow;
-        var buyId = await ReadIdAsync(await PostAsync(tokens.AccessToken, Trade(accountId, "Buy", instrumentId, 2m)));
-
-        using var item = await GetTransactionAsync(tokens.AccessToken, buyId);
-        item.RootElement.GetProperty("bookedAt").GetDateTimeOffset().ShouldBeGreaterThanOrEqualTo(before.AddSeconds(-1));
-        (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(950m);
-    }
-
-    [Test]
     public async Task Custodial_TransferWithBookedAt_Returns400AndWritesNothing()
     {
         var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
@@ -146,22 +73,6 @@ public class CustodialBookedAtTests : TestBase
         quote["bookedAt"] = Instant(DateTimeOffset.UtcNow.AddDays(-1));
         await ShouldRefuseBookedAtAsync(
             await TransactionHttp.Send(HttpMethod.Post, QuotePath, tokens.AccessToken, quote), CustodialMessage);
-    }
-
-    [Test]
-    public async Task Custodial_ReplayWithTheSameIdempotencyKey_ReturnsTheSameIdAndWritesOneTransaction()
-    {
-        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
-        var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
-        (await FundAsync(tokens.AccessToken, accountId, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
-        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, price: 5.00m);
-        var key = Guid.NewGuid();
-
-        var first = await ReadIdAsync(await PostAsync(tokens.AccessToken, Trade(accountId, "Buy", instrumentId, 1m), idempotencyKey: key));
-        var second = await ReadIdAsync(await PostAsync(tokens.AccessToken, Trade(accountId, "Buy", instrumentId, 1m), idempotencyKey: key));
-
-        second.ShouldBe(first);
-        (await TransactionCountAsync(accountId)).ShouldBe(2);
     }
 
     [TestCase("/transactions")]

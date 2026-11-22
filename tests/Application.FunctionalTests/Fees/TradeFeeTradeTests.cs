@@ -89,24 +89,6 @@ public class TradeFeeTradeTests : TestBase
     }
 
     [Test]
-    public async Task FeeFieldOnTheCreateBody_Returns400()
-    {
-        var (_, _, customer, admin) = await AccountHttp.SignInTenantAdmin();
-        var (accountId, instrumentId) = await FeeHttp.TradingAccountAsync(admin.AccessToken, customer.PublicId);
-
-        var response = await TransactionHttp.Send(HttpMethod.Post, "/transactions", admin.AccessToken, new
-        {
-            accountId,
-            type = "Buy",
-            fee = 5m,
-            security = new[] { new { instrumentId, quantity = 1m } }
-        }, Guid.NewGuid());
-
-        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        (await FeeHttp.ErrorsAsync(response)).ShouldContainKey("Fee");
-    }
-
-    [Test]
     public async Task Buy_CashCoversThePrincipalButNotTheFee_Returns400AndWritesNothing()
     {
         var (tenant, _, customer, admin) = await AccountHttp.SignInTenantAdmin();

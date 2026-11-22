@@ -38,7 +38,10 @@ public static class CustodyRules
 
     private const string InterestMessage = "Interest cannot be entered by hand on a Custodial account.";
     private const string OpeningMessage = "A Custodial account starts empty. Fund it with TransferIn.";
-    private const string StockMessage = "Securities cannot be moved in or out of a Custodial account by hand. Use Buy and Sell.";
+    private const string StockMessage = "Securities cannot be moved in or out of a Custodial account by hand. Place an order.";
+
+    /// <summary>Orders R48: the <c>errors.Type</c> message for a hand <c>Buy</c> or <c>Sell</c> on a Custodial account.</summary>
+    public const string TradeMessage = "Trades on a Custodial account go through the broker. Place an order.";
     private const string CorporateActionMessage = "Corporate actions cannot be entered by hand on a Custodial account.";
     private const string DividendMessage = "Dividend is reserved and cannot be entered.";
 
@@ -80,6 +83,7 @@ public static class CustodyRules
             TransactionType.CloseOut => CloseOutMessage,
             TransactionType.Interest => InterestMessage,
             TransactionType.Opening or TransactionType.OpeningHoldings => OpeningMessage,
+            TransactionType.Buy or TransactionType.Sell => TradeMessage,
             TransactionType.StockIn or TransactionType.StockOut => StockMessage,
             TransactionType.Split or TransactionType.Bonus or TransactionType.Scrip => CorporateActionMessage,
             _ => null
