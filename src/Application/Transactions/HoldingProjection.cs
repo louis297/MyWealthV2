@@ -10,7 +10,8 @@ internal static class HoldingProjection
         int tenantId,
         int accountId,
         IEnumerable<int> instrumentIds,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? createdBy = null)
     {
         foreach (var instrumentId in instrumentIds.Distinct())
         {
@@ -38,7 +39,10 @@ internal static class HoldingProjection
 
             if (holding is null)
             {
-                db.Holdings.Add(Holding.Create(tenantId, accountId, instrumentId, quantity, cost, currency));
+                // A flow with no person names itself; a person's request is named by the audit interceptor.
+                var created = Holding.Create(tenantId, accountId, instrumentId, quantity, cost, currency);
+                created.CreatedBy = createdBy;
+                db.Holdings.Add(created);
                 continue;
             }
 

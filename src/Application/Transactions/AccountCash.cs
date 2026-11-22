@@ -29,6 +29,23 @@ internal static class AccountCash
         return withdrawals + orders;
     }
 
+    /// <summary>Orders R36: the reserved cash of the Account without what <paramref name="orderId"/> reserves, for a
+    /// fill of that order, whose own reservation is worked out again.</summary>
+    public static async Task<decimal> ReservedExceptOrderAsync(
+        IApplicationDbContext db,
+        int accountId,
+        int orderId,
+        CancellationToken cancellationToken)
+    {
+        var withdrawals = await db.Withdrawals
+            .Where(row => row.AccountId == accountId && Open.Contains(row.Status))
+            .SumAsync(row => (decimal?)row.Amount, cancellationToken) ?? 0m;
+        var orders = await db.Orders
+            .Where(row => row.AccountId == accountId && row.Id != orderId)
+            .SumAsync(row => (decimal?)row.ReservedCash, cancellationToken) ?? 0m;
+        return withdrawals + orders;
+    }
+
     public static async Task<decimal> AvailableAsync(IApplicationDbContext db, int accountId, CancellationToken cancellationToken) =>
         AvailableCash.Of(await SumAsync(db, accountId, cancellationToken), await ReservedAsync(db, accountId, cancellationToken));
 

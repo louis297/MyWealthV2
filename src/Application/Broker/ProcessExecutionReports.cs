@@ -20,6 +20,7 @@ public sealed class ProcessExecutionReports(
     IApplicationDbContext db,
     IBrokerConnections connections,
     ICurrencyCatalog currencies,
+    PostOrderFills poster,
     TimeProvider time,
     ILogger<ProcessExecutionReports> logger)
 {
@@ -136,9 +137,13 @@ public sealed class ProcessExecutionReports(
                     return ReportResult.Skipped(ExecutionReportSkipReason.Overfill);
                 }
 
-                order.AddFill(
+                var fill = order.AddFill(
                     report.Id, report.Quantity.Value, report.Price!.Value, report.TradeDate!.Value, report.SettlementDate!.Value,
                     report.ContractNote, now, fees);
+
+                // R26, R31: in the same database transaction the platform tries to post it. A fill that cannot be
+                // posted waits; its report is still processed (R36).
+                await poster.PostAsync(order, fill, fees, cancellationToken);
                 return ReportResult.Processed;
 
             case ExecutionReportKind.Cancelled:

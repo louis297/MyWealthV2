@@ -406,8 +406,16 @@ public class Order : BaseAuditableEntity
 
     /// <summary>R36, R39: what the order would reserve once its <c>Pending</c> <paramref name="fill"/> is posted with
     /// <paramref name="gross"/> and <paramref name="fee"/>; 0 for a sell.</summary>
-    public decimal ReservedCashAfterPosting(OrderFill fill, decimal gross, decimal fee, OrderFeeTerms fees) =>
-        throw new NotImplementedException();
+    public decimal ReservedCashAfterPosting(OrderFill fill, decimal gross, decimal fee, OrderFeeTerms fees)
+    {
+        EnsureTerms(fees);
+        if (fill.Status != OrderFillStatus.Pending || !_fills.Contains(fill))
+        {
+            throw new DomainException("Only a pending fill of the order can be posted.");
+        }
+
+        return ReservedCashFor(OpenQuantity + PendingQuantity - fill.Quantity, PostedGross + gross, FeeCharged + fee, fees);
+    }
 
     /// <summary>R31: a fill of the order was posted with <paramref name="gross"/> and <paramref name="fee"/>.</summary>
     public void RecordPostedFill(decimal gross, decimal fee, OrderFeeTerms fees)
@@ -431,22 +439,21 @@ public class Order : BaseAuditableEntity
     private void Reserve(OrderFeeTerms fees)
     {
         var quantity = OpenQuantity + PendingQuantity;
-        if (Side == OrderSide.Sell)
-        {
-            ReservedQuantity = quantity;
-            ReservedCash = 0m;
-            return;
-        }
+        ReservedQuantity = Side == OrderSide.Sell ? quantity : 0m;
+        ReservedCash = ReservedCashFor(quantity, PostedGross, FeeCharged, fees);
+    }
 
-        ReservedQuantity = 0m;
-        if (quantity == 0m)
+    /// <summary>R39: the most <paramref name="quantity"/> can still cost at the price limit, plus the fee that amount
+    /// adds to the fee already charged. Nothing for a sell, and nothing when the quantity is 0.</summary>
+    private decimal ReservedCashFor(decimal quantity, decimal postedGross, decimal feeCharged, OrderFeeTerms fees)
+    {
+        if (Side == OrderSide.Sell || quantity == 0m)
         {
-            ReservedCash = 0m;
-            return;
+            return 0m;
         }
 
         var gross = OrderRules.MaximumGross(quantity, PriceLimit);
-        ReservedCash = gross + Math.Max(0m, fees.FeeFor(PostedGross + gross) - FeeCharged);
+        return gross + Math.Max(0m, fees.FeeFor(postedGross + gross) - feeCharged);
     }
 
     /// <summary>An order that ended with no fill to post reserves nothing.</summary>
