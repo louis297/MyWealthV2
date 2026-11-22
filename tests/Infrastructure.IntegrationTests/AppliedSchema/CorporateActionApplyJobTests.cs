@@ -56,8 +56,8 @@ public class CorporateActionApplyJobTests
         await db.ApplyAllAsync();
         var actionId = Convert.ToInt32((await db.ReadAsync($"""
             {ScratchSchemaDatabase.TenantRows("a", Guid.NewGuid().ToString("N")[..12])}
-            INSERT INTO [CorporateActions] ([PublicId], [TenantId], [InstrumentId], [Kind], [RatioNew], [RatioHeld], [ExDate], [Origin], [Status], [Created], [CreatedBy])
-            VALUES (NEWID(), @a_tenant, @a_instrument, 0, 2, 1, '2026-11-01', 0, 0, SYSDATETIMEOFFSET(), N'test');
+            INSERT INTO [CorporateActions] ([PublicId], [TenantId], [InstrumentId], [Kind], [RatioNew], [RatioHeld], [ExDate], [Origin], [Status], [Created], [CreatedBy], [LastModified])
+            VALUES (NEWID(), @a_tenant, @a_instrument, 0, 2, 1, '2026-11-01', 0, 0, SYSDATETIMEOFFSET(), N'test', SYSDATETIMEOFFSET());
             DECLARE @action int = SCOPE_IDENTITY();
             INSERT INTO [InstrumentPrices] ([InstrumentId], [AsOfDate], [Price], [Source], [FetchedAt])
             VALUES (@a_instrument, '2026-11-01', 12.5, N'EODHD', SYSDATETIMEOFFSET());
