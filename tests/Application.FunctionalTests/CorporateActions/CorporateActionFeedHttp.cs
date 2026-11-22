@@ -37,6 +37,33 @@ internal static class CorporateActionFeedHttp
         return await scope.ServiceProvider.GetRequiredService<PullCorporateActions>().RunAsync(Connection);
     }
 
+    public static async Task<AnnouncementProcessingOutcome> ProcessAsync()
+    {
+        await using var scope = FunctionalTestSetup.WebApiServices.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<ProcessCorporateActionAnnouncements>().RunAsync(Connection);
+    }
+
+    /// <summary>Adds <paramref name="items"/> to the feed, pulls and processes them.</summary>
+    public static async Task DeliverAsync(params CorporateActionFeedItem[] items)
+    {
+        foreach (var item in items)
+        {
+            Feed.Add(Connection, item);
+        }
+
+        (await PullAsync()).Failure.ShouldBeNull();
+        await ProcessAsync();
+    }
+
+    /// <summary>The corporate actions of <paramref name="tenantId"/>, oldest first.</summary>
+    public static async Task<List<CorporateAction>> ActionsOfAsync(int tenantId)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await db.CorporateActions.IgnoreQueryFilters().AsNoTracking()
+            .Where(row => row.TenantId == tenantId).OrderBy(row => row.Id).ToListAsync();
+    }
+
     public static async Task<List<CorporateActionAnnouncement>> AnnouncementsAsync()
     {
         using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
