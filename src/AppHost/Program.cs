@@ -212,6 +212,21 @@ for (var i = 0; i < standingAccounts.Length; i++)
         .WithEnvironment($"Simulator__Bank__StandingAccounts__{i}__Name", standingAccounts[i][2]);
 }
 
+// Simulated instruments R20, §9.1: the simulator market's standing instruments, the symbols TestSeed adds to the
+// catalog of each firm.
+string[][] standingInstruments =
+[
+    ["ACME.SIM", "Acme Simulated Holdings", "USD", "100.00"],
+    ["KIWI.SIM", "Kiwi Simulated Fund", "NZD", "5.00"]
+];
+for (var i = 0; i < standingInstruments.Length; i++)
+{
+    simulator.WithEnvironment($"Simulator__Market__StandingInstruments__{i}__Symbol", standingInstruments[i][0])
+        .WithEnvironment($"Simulator__Market__StandingInstruments__{i}__Name", standingInstruments[i][1])
+        .WithEnvironment($"Simulator__Market__StandingInstruments__{i}__Currency", standingInstruments[i][2])
+        .WithEnvironment($"Simulator__Market__StandingInstruments__{i}__Price", standingInstruments[i][3]);
+}
+
 // Simulator spec R12: the host tells the party port from the control ports by the port Kestrel listens on.
 simulator.WithEnvironment("Simulator__PartyPort", simulator.GetEndpoint("party").Property(EndpointProperty.TargetPort));
 simulator.WithEnvironment("Authentication__PublicOrigin", simulator.GetEndpoint("https"));
@@ -223,12 +238,21 @@ var eodhdApiKey = builder.AddParameter("eodhd-api-key", secret: true);
 // key. worker does not wait for the simulator: a missing party is a normal state (ADR 0021 rule 15).
 web.WithEnvironment("BankConnections__simulator__Adapter", "Simulator");
 
+// Simulated instruments R1, §9.1: the same pattern for the market data connection; its suffix decides which
+// instruments the simulator prices.
+web.WithEnvironment("MarketDataConnections__simulator__Adapter", "Simulator")
+    .WithEnvironment("MarketDataConnections__simulator__SymbolSuffix", ".SIM");
+
 builder.AddProject<Projects.Worker>(Services.Worker)
     .WithReference(databaseServer)
     .WaitFor(databaseServer)
     .WithEnvironment("BankConnections__simulator__Adapter", "Simulator")
     .WithEnvironment("BankConnections__simulator__BaseUrl", simulator.GetEndpoint("party"))
     .WithEnvironment("BankConnections__simulator__ApiKey", simulatorPartyApiKey)
+    .WithEnvironment("MarketDataConnections__simulator__Adapter", "Simulator")
+    .WithEnvironment("MarketDataConnections__simulator__SymbolSuffix", ".SIM")
+    .WithEnvironment("MarketDataConnections__simulator__BaseUrl", simulator.GetEndpoint("party"))
+    .WithEnvironment("MarketDataConnections__simulator__ApiKey", simulatorPartyApiKey)
     .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health", endpointName: "http")
     .WithAspNetCoreEnvironment()
