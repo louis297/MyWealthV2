@@ -18,6 +18,9 @@ public class Account : BaseAuditableEntity
 
     public AccountType Type { get; private set; }
 
+    /// <summary>Interest-run R19: the last UTC day this account was accrued through; null before the first time.</summary>
+    public DateOnly? InterestAccruedThrough { get; private set; }
+
     public CustodyMode CustodyMode { get; private set; }
 
     public AccountStatus Status { get; private set; }
