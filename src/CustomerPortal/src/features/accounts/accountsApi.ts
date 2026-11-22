@@ -37,9 +37,24 @@ export type DepositInstructions = {
 
 export type Holding = {
   id: string;
+  instrumentId?: string;
   symbol: string;
   name: string;
   quantity: number;
+  /** orders R41: the quantity live sell orders reserve. */
+  reservedQuantity?: number;
+};
+
+/** orders R15: an order as the Customer reads it; no memo, no cancel note and no send attempts. */
+export type CustomerOrder = {
+  id: string;
+  instrument: { id: string; symbol: string; name: string };
+  side: string;
+  quantity: number;
+  filledQuantity: number;
+  status: string;
+  placedAt: string;
+  closedAt: string | null;
 };
 
 export type ActivityCash = {
@@ -76,6 +91,17 @@ export type Activity = {
   payment?: { valueDate: string; reference: string | null; payeeName: string | null; payeeAccount: string | null } | null;
   /** interest-run R34: the period an interest posting pays; otherwise null. */
   interest?: { periodFrom: string; periodTo: string; days: number; accruedAmount: number; grossAmount: number } | null;
+  /** The security legs on the caller's own accounts. */
+  security?: { accountId: string; instrumentId: string; quantity: number }[];
+  /** orders R38: the broker's execution behind an order fill; otherwise null. */
+  execution?: {
+    orderId: string;
+    price: number;
+    tradeDate: string;
+    settlementDate: string;
+    brokerReference: string | null;
+    settledAt: string | null;
+  } | null;
   /** corporate-actions R37: the event behind an entitlement posting; otherwise null. */
   corporateAction?: {
     id: string;
@@ -119,10 +145,24 @@ export const accountsApi = api.injectEndpoints({
       providesTags: ["Account"],
     }),
     getCashBalance: builder.query<
-      { cashBalance: number; currency: string; reservedCash?: number; availableCash?: number },
+      {
+        cashBalance: number;
+        currency: string;
+        reservedCash?: number;
+        availableCash?: number;
+        /** orders R44: the net cash of sales that have not settled. */
+        unsettledCash?: number;
+        /** orders R44: available cash minus unsettled cash. */
+        withdrawableCash?: number;
+      },
       string
     >({
       query: (id) => `/accounts/${id}/cash-balance`,
+    }),
+    /** C32: the Customer's orders on one account, newest first. */
+    getAccountOrders: builder.query<PagedList<CustomerOrder>, string>({
+      query: (accountId) => `/orders?accountId=${encodeURIComponent(accountId)}&page=1&pageSize=100`,
+      providesTags: ["Order"],
     }),
     /** C24: the Customer's withdrawals from one account. */
     getAccountWithdrawals: builder.query<PagedList<CustomerWithdrawal>, string>({
@@ -144,6 +184,7 @@ export const accountsApi = api.injectEndpoints({
 });
 
 export const {
+  useGetAccountOrdersQuery,
   useGetAccountWithdrawalsQuery,
   useGetAccountsQuery,
   useGetAccountQuery,

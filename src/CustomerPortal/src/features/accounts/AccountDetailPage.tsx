@@ -4,6 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   type Activity,
+  type CustomerOrder,
+  useGetAccountOrdersQuery,
   useGetAccountQuery,
   useGetAccountWithdrawalsQuery,
   useGetActivityQuery,
@@ -70,6 +72,34 @@ function withdrawalStatusLabel(status: string) {
 const openStatuses = new Set(["Requested", "Approved", "Sent"]);
 const ninetyDays = 90 * 24 * 60 * 60 * 1000;
 
+const openOrderStatuses = new Set(["Placed", "Working", "PartlyFilled"]);
+const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+
+/** C32: the status of an order in the Customer's words. */
+function orderStatusLabel(order: CustomerOrder) {
+  switch (order.status) {
+    case "Placed":
+    case "Working":
+      return "With the broker";
+    case "PartlyFilled":
+      return `Partly filled (${order.filledQuantity} of ${order.quantity})`;
+    case "Filled":
+      return "Done";
+    case "Rejected":
+      return "Not accepted";
+    default:
+      return order.status;
+  }
+}
+
+const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "25 Nov" from a `yyyy-MM-dd` date. */
+function shortDay(date: string) {
+  const [, month, day] = date.slice(0, 10).split("-").map(Number);
+  return month >= 1 && month <= 12 && day ? `${day} ${months[month - 1]}` : date;
+}
+
 /** C26: an amount with the currency's minor unit, as "300.00 USD". */
 function formatPayout(amount: number, currency: string) {
   let digits = 2;
@@ -128,6 +158,7 @@ export function AccountDetailPage() {
   const instructions = useGetDepositInstructionsQuery(id, { skip: !payable });
   const custodial = account.data?.custodyMode === "Custodial";
   const withdrawals = useGetAccountWithdrawalsQuery(id, { skip: !custodial });
+  const orders = useGetAccountOrdersQuery(id, { skip: !custodial });
 
   if (isNotFound(account.error)) {
     return <Muted>Not found</Muted>;
@@ -142,6 +173,23 @@ export function AccountDetailPage() {
   const shownWithdrawals = (withdrawals.data?.items ?? []).filter((item) =>
     openStatuses.has(item.status) || Date.now() - new Date(item.requestedAt).getTime() <= ninetyDays);
   const activityItems = activity.data?.items ?? [];
+  // C32: open orders, and those that ended in the last 30 days.
+  const orderItems = orders.data?.items ?? [];
+  const shownOrders = orderItems.filter((item) =>
+    openOrderStatuses.has(item.status)
+    || (item.closedAt !== null && Date.now() - new Date(item.closedAt).getTime() <= thirtyDays));
+
+  /** C34: "Bought 4 ACME.SIM at 100.12" for a fill; null for any other row. */
+  function fillLabel(row: Activity) {
+    if (!row.execution || (row.type !== "Buy" && row.type !== "Sell")) {
+      return null;
+    }
+    const leg = (row.security ?? []).find((item) => item.accountId === id) ?? row.security?.[0];
+    const symbol = orderItems.find((item) => item.id === row.execution?.orderId)?.instrument.symbol
+      ?? holdingsItems.find((item) => item.instrumentId === leg?.instrumentId)?.symbol;
+    const what = [leg ? String(Math.abs(leg.quantity)) : null, symbol].filter(Boolean).join(" ");
+    return `${row.type === "Buy" ? "Bought" : "Sold"}${what ? ` ${what}` : ""} at ${row.execution.price}`;
+  }
   // C26: a closing account, and a Closed one whose latest closure is Completed.
   const closure = account.data.closure;
   const closureWithdrawal = (withdrawals.data?.items ?? []).find((item) => item.id === closure?.withdrawalId);
@@ -172,13 +220,24 @@ export function AccountDetailPage() {
               ) : null}
             </DetailItem>
             {cash.data ? (
-              <DetailItem label="Cash balance">
+              <DetailItem label={custodial ? "Cash" : "Cash balance"}>
                 {cash.data.cashBalance} {cash.data.currency}
+              </DetailItem>
+            ) : null}
+            {custodial && cash.data && (cash.data.reservedCash ?? 0) !== 0 ? (
+              // C33: withdrawals in progress and open buy orders.
+              <DetailItem label="Reserved">
+                {cash.data.reservedCash} {cash.data.currency}
+              </DetailItem>
+            ) : null}
+            {custodial && cash.data && (cash.data.unsettledCash ?? 0) !== 0 ? (
+              <DetailItem label="From sales, not settled yet">
+                {cash.data.unsettledCash} {cash.data.currency}
               </DetailItem>
             ) : null}
             {custodial && cash.data ? (
               <DetailItem label="Available to withdraw">
-                {cash.data.availableCash ?? cash.data.cashBalance} {cash.data.currency}
+                {cash.data.withdrawableCash ?? cash.data.availableCash ?? cash.data.cashBalance} {cash.data.currency}
               </DetailItem>
             ) : null}
             {custodial && (account.data.accruedInterest ?? 0) > 0 ? (
@@ -186,11 +245,6 @@ export function AccountDetailPage() {
               <DetailItem label="Interest">
                 {`Interest earned so far this period: ${formatDown(account.data.accruedInterest ?? 0, account.data.currency)}`}
                 <span className="mt-1 block text-xs text-muted-foreground">Paid after the end of the month.</span>
-              </DetailItem>
-            ) : null}
-            {custodial && cash.data && (cash.data.reservedCash ?? 0) !== 0 ? (
-              <DetailItem label="Withdrawals in progress">
-                {cash.data.reservedCash} {cash.data.currency}
               </DetailItem>
             ) : null}
           </DetailGrid>
@@ -235,7 +289,12 @@ export function AccountDetailPage() {
                   {holdingsItems.map((holding) => (
                     <TableRow key={holding.id}>
                       <TableCell>{holding.symbol}</TableCell>
-                      <TableCell>{holding.quantity}</TableCell>
+                      <TableCell>
+                        {holding.quantity}
+                        {(holding.reservedQuantity ?? 0) > 0 ? (
+                          <p className="text-muted-foreground text-xs">{`${holding.reservedQuantity} reserved for a sell order`}</p>
+                        ) : null}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -244,6 +303,32 @@ export function AccountDetailPage() {
           </Card>
         ) : null}
       </Section>
+      {custodial && shownOrders.length > 0 ? (
+        <Section title="Orders">
+          <Card className="gap-0 py-0">
+            <CardContent className="px-0">
+              <Table aria-label="Orders">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Placed</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {shownOrders.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>{`${item.side} ${item.quantity} ${item.instrument.symbol}`}</TableCell>
+                      <TableCell>{orderStatusLabel(item)}</TableCell>
+                      <TableCell>{formatInstant(item.placedAt).slice(0, 10)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </Section>
+      ) : null}
       {custodial && shownWithdrawals.length > 0 ? (
         <Section title="Withdrawals">
           <Card className="gap-0 py-0">
@@ -289,7 +374,19 @@ export function AccountDetailPage() {
                   {activityItems.map((row) => (
                     <TableRow key={row.id}>
                       <TableCell>
-                        {typeLabel(row)}
+                        {fillLabel(row) ?? typeLabel(row)}
+                        {fillLabel(row) && row.execution ? (
+                          // C34: the trade date, the settlement and the contract note of a fill.
+                          <>
+                            <p className="text-muted-foreground text-xs">{`Trade date ${row.execution.tradeDate}`}</p>
+                            <p className="text-muted-foreground text-xs">
+                              {row.execution.settledAt ? "Settled" : `Settles ${shortDay(row.execution.settlementDate)}`}
+                            </p>
+                            {row.execution.brokerReference ? (
+                              <p className="text-muted-foreground text-xs">{`Contract note ${row.execution.brokerReference}`}</p>
+                            ) : null}
+                          </>
+                        ) : null}
                         {row.type === "TransferIn" && row.bankReceipt ? (
                           <p className="text-muted-foreground text-xs">{`Value date ${row.bankReceipt.valueDate}`}</p>
                         ) : null}
