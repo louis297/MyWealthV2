@@ -3,7 +3,7 @@ title: Database design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-11-22
+updated: 2026-11-23
 related:
   - README.md
   - glossary.md
@@ -221,6 +221,8 @@ Client seed: SQL insert or startup seed. Both are allowed.
 
 Amendment 2026-11-18 (tenant custody modes, accepted, landed; [features/tenant-custody-modes.md](features/tenant-custody-modes.md) §6): script `0033_tenants_allowed_custody_modes.sql` adds `AllowsExternalAccounts bit NOT NULL` and `AllowsCustodialAccounts bit NOT NULL`, each with a named DEFAULT 1 that stays after the script, and `CK_Tenants_AllowedCustodyModes` (at least one is 1). Existing rows allow both. No index and no FK; no rule ties `Accounts.CustodyMode` to these columns, because narrowing the setting leaves existing accounts alone.
 
+Amendment 2026-11-23 (orders and settlement, accepted; [features/orders.md](features/orders.md) §6.1): script `0051_orders.sql` adds `BrokerConnection nvarchar(50) NULL`, the name of the Tenant's broker connection in configuration, and sets `'simulator'` on every existing row. No FK: the name is checked against configuration when it is set.
+
 `Code` is treated as immutable after create by the Tenants slice (no update API). The column itself is ordinary.
 
 identity-auth created `Tenants` **without** `ReportingCurrency`. Login only needs `Code` and the active flag. The currencies slice adds the catalog (`0008`) and then `Tenants.ReportingCurrency` (`0009`). `0011` renames `IsEnabled` → `IsActive` on `Currencies`, `Tenants`, and `Instruments`. Do not back-fill `0002` / `0005` / `0008` / `0010`.
@@ -373,6 +375,7 @@ Beyond PK / unique constraints already listed:
 0048_interest.sql                           -- InterestRateSchedules, InterestRateBands, InterestAccruals, InterestRuns, TransactionTaxDetails, TransactionInterestDetails; Accounts.InterestAccruedThrough; cash leg Role 0–2; CK_Transactions_SourceKind 0–6; BankStatementLines.Kind; reconciliation item kinds 0–14
 0049_market_data_feeds.sql                  -- MarketDataFeeds (platform data, PK (Connection, Kind))
 0050_corporate_actions.sql                  -- CorporateActionAnnouncements (platform data), CorporateActions, CorporateActionEntitlements, TransactionCorporateActionDetails; CK_Transactions_SourceKind 0–7; MarketDataFeeds Kind 0–1, LastFailure 0–5
+0051_orders.sql                             -- Orders, OrderFills, ExecutionReports (platform data), BrokerFeeds (platform data), TransactionExecutionDetails; Tenants.BrokerConnection (back-filled 'simulator'); CK_Transactions_SourceKind 0–8
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -464,6 +467,8 @@ Amendment 2026-11-22 (account closure, accepted; [features/account-closure.md](f
 Amendment 2026-11-22 (interest run, accepted; [features/interest-run.md](features/interest-run.md) §6.2): script `0048_interest.sql` widens `CK_TransactionCashLegs_Role` to 0–2 (`Tax`), `CK_Transactions_SourceKind` to 0–6 (`InterestRun`) and requires a `SourcePublicId` for kinds 2–6. It adds `TransactionTaxDetails`: one row per `Tax` cash leg (PK `CashLegId`, FK `(TenantId, CashLegId)` → `TransactionCashLegs`), `TenantId`, `TransactionId` (FK `(TenantId, TransactionId)` → `Transactions`), `Kind int` (CHECK 0–1: `Rwt`, `Nrwt`), `RatePercent decimal(5,2)` (CHECK `> 0` and `≤ 100`), `BasisAmount` and `TaxAmount decimal(18,4)` (CHECK `> 0`), `Currency char(3)` (FK); UQ `(TransactionId, Kind)`. And `TransactionInterestDetails`: `TransactionId` (PK), `TenantId`, FK `(TenantId, TransactionId)` → `Transactions`, `PeriodFrom` and `PeriodTo date` (CHECK from `≤` to), `Days int` (CHECK `≥ 1`), `AccruedAmount decimal(18,8)` and `GrossAmount decimal(18,4)` (CHECK `> 0`). No `PublicId` or `RowVersion`: both are part of an immutable Transaction. All FKs RESTRICT. No back-fill.
 
 Amendment 2026-11-22 (corporate actions, accepted; [features/corporate-actions.md](features/corporate-actions.md) §6.1): script `0050_corporate_actions.sql` widens `CK_Transactions_SourceKind` to 0–7 (`CorporateAction`) and requires a `SourcePublicId` for kinds 2–7, and adds `TransactionCorporateActionDetails`: `TransactionId` (PK; at most one row per Transaction), `TenantId`, `Kind int` (CHECK 0–2), `RatioNew int`, `RatioHeld int` (CHECK `≥ 1`), `ExDate date`, `RecordDate date NULL`, `PaymentDate date NULL`, `QuantityBefore decimal(18,8)`, `QuantityAfter decimal(18,8)` (CHECK both `> 0`); FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)` RESTRICT. No `PublicId` or `RowVersion`: the row is part of an immutable Transaction. One row on every entitlement posting and on its Reversal, held by the Domain. No back-fill.
+
+Amendment 2026-11-23 (orders and settlement, accepted; [features/orders.md](features/orders.md) §6.1): script `0051_orders.sql` widens `CK_Transactions_SourceKind` to 0–8 (`OrderFill`) and requires a `SourcePublicId` for kinds 2–8, and adds `TransactionExecutionDetails`: `TransactionId` (PK; at most one row per Transaction), `TenantId`, `FillPublicId uniqueidentifier`, `Price decimal(18,8)` (CHECK `> 0`), `TradeDate date`, `SettlementDate date` (CHECK `≥ TradeDate`), `BrokerReference nvarchar(50) NULL`; FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)` RESTRICT. No `PublicId` or `RowVersion`: the row is part of an immutable Transaction. One row on every Transaction with source `OrderFill` and on its Reversal, held by the Domain. No back-fill: no `Buy` or `Sell` posted before `0051` gets a row.
 
 ### 11.5 Holdings (accepted, landed)
 
@@ -587,6 +592,18 @@ Feature spec: [features/corporate-actions.md](features/corporate-actions.md) (ac
 
 No back-fill: no corporate action exists before `0050`.
 
+### 11.16 Orders and execution reports (accepted)
+
+Feature spec: [features/orders.md](features/orders.md) (accepted 2026-11-23) §6.1. Script `0051_orders.sql`:
+
+- `Orders` — `Id`, `PublicId` (unique; the client order id and the source id of its Transactions), `TenantId`, `AccountId`, `InstrumentId` (tenant composite FKs, immutable), `Side int` (CHECK 0–1), `Type int`, `TimeInForce int` (CHECK `= 0` each), `Quantity decimal(18,8)` (CHECK `> 0`), `Currency char(3)`, `ReferencePrice`, `PriceLimit decimal(18,8)` (CHECK `> 0`), `ReferencePriceDate date`, `TradeFeeScheduleId NULL` (tenant composite FK), `Connection nvarchar(50)`, `Status int` (CHECK 0–6), `FilledQuantity decimal(18,8)` (CHECK `≥ 0` and `≤ Quantity`), `PostedGross`, `FeeCharged decimal(18,4)`, `ReservedCash decimal(18,4)`, `ReservedQuantity decimal(18,8)` (CHECK `≥ 0` each), `Memo nvarchar(200) NULL`, `PlacedByUserId`, `PlacedAt`, `Attempts`, `LastAttemptAt NULL`, `AcceptedAt NULL`, `LastFailure int NULL` (CHECK 0–4), `BrokerOrderId nvarchar(100) NULL`, `RejectReason int NULL` (CHECK 0–3, set iff `Status = 5`), `CancelRequestedAt`, `CancelRequestedByUserId`, `CancelNote nvarchar(200)`, `CancelAnsweredAt` (all NULL; the person is `NULL` for the platform's request), `ClosedAt` (set iff `Status IN (3, 4, 5, 6)`), `CloseReason nvarchar(140) NULL`, audit, `RowVersion`. UQ `(TenantId, Id)`; index `(TenantId, PlacedAt DESC)`; index `(AccountId, Status)`; filtered index `(Connection, Id) WHERE Status IN (0, 1, 2)`.
+- `OrderFills` — `Id bigint`, `PublicId` (unique), `TenantId`, `OrderId` (tenant composite FK), `ExecutionReportId` (FK, unique: one fill per report), `Quantity`, `Price decimal(18,8)` (CHECK `> 0` each), `TradeDate`, `SettlementDate date`, `BrokerReference nvarchar(50) NULL`, `Status int` (CHECK 0–1), `HoldReason int NULL` (CHECK 0–3, `NULL` when `Status = 1`), `TransactionId NULL` (tenant composite FK) and `NetCash decimal(18,4) NULL` (set iff `Status = 1`), `PostedAt NULL`, `SettledAt`, `SettledDate` (both or neither), `RowVersion`. Index `(OrderId)`; filtered index `WHERE Status = 0`; filtered index `(TenantId, OrderId) WHERE Status = 1 AND SettledAt IS NULL`.
+- `ExecutionReports` — platform data, no `TenantId`. `Id bigint`, `PublicId` (unique), `Connection nvarchar(50)`, `OutsideId nvarchar(100)`, `Kind int NULL` (CHECK 0–3), `ClientOrderId`, `BrokerOrderId nvarchar(100) NULL`, `Quantity`, `Price decimal(18,8) NULL`, `TradeDate`, `SettlementDate`, `SettledDate date NULL`, `ContractNote nvarchar(50) NULL`, `FillOutsideId nvarchar(100) NULL`, `Reason nvarchar(140) NULL`, `ReceivedAt`, `Status int` (CHECK 0–2), `SkipReason int NULL` (CHECK 0–4, set iff `Status = 2`), `ProcessedAt NULL`, `RowVersion`. UQ `(Connection, OutsideId)`; index `(Connection, Status, ReceivedAt)`.
+- `BrokerFeeds` — platform data. `Connection nvarchar(50)` (PK), `Cursor nvarchar(500) NULL`, `LastSucceededAt NULL`, `LastFailedAt NULL`, `LastFailure int NULL` (CHECK 0–5), `RowVersion`. One row per broker connection.
+- `TransactionExecutionDetails` and the source kind (§11.4); `Tenants.BrokerConnection` (§6.5).
+
+Reserved cash, reserved quantity, unsettled cash and withdrawable cash of an Account are sums over `Orders`, `OrderFills` and `Withdrawals`; no column on `Accounts` or `Holdings` stores them. No back-fill: no order exists before `0051`.
+
 ## 12. Still not a schema decision
 
 These stay open in the function plan and do not change tables:
@@ -654,6 +671,7 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-22 | Simulated instruments landed: `0049` and simulator `0008` written. `0049` names `PK_MarketDataFeeds`, `CK_MarketDataFeeds_Kind` and `CK_MarketDataFeeds_LastFailure`; `0008` names `UX_MarketInstruments_Symbol`, `CK_MarketInstruments_DailyMovePercent`, `CK_MarketInstruments_Price`, `CK_MarketPrices_Price` and `FK_MarketPrices_MarketInstruments_InstrumentId`. |
 | 2026-11-22 | Corporate actions accepted (`0050`, not written yet): `CorporateActionAnnouncements`, `CorporateActions`, `CorporateActionEntitlements` (§11.15), `TransactionCorporateActionDetails` and `CK_Transactions_SourceKind` 0–7 (§11.4), `MarketDataFeeds` Kind 0–1 and LastFailure 0–5; simulator `0009_market_corporate_actions.sql` (§15). §9 lists `0050`. |
 | 2026-11-22 | Corporate actions landed: `0050` and simulator `0009` written. `0050` names `UX_CorporateActionAnnouncements_Connection_OutsideId`, `UX_CorporateActions_InstrumentId_Connection_PartyActionId`, `UX_CorporateActions_InstrumentId_Kind_ExDate`, `UQ_CorporateActionEntitlements_CorporateActionId_AccountId` and the set-iff CHECKs (`CK_CorporateActionAnnouncements_Skipped`, `CK_CorporateActions_Feed`, `_EffectiveAt`, `_AppliedAt`, `_CancelledAt`, `CK_CorporateActionEntitlements_NotApplied`, `_Posted`, `_PostedAt`); `0009` names `UX_MarketCorporateActions_Number` and `UX_MarketCorporateActionVersions_ActionId_Version`. |
+| 2026-11-23 | Orders and settlement accepted (`0051`, not written yet): `Orders`, `OrderFills`, `ExecutionReports`, `BrokerFeeds` (§11.16), `TransactionExecutionDetails` and `CK_Transactions_SourceKind` 0–8 (§11.4), `Tenants.BrokerConnection` (§6.5); simulator `0010_broker.sql` (§15). §9 lists `0051`. |
 
 ---
 
@@ -772,5 +790,6 @@ Owner: [features/simulator.md](features/simulator.md) §6.2, [ADR 0021](adr/0021
 - S1 trust interest ([features/interest-run.md](features/interest-run.md) §6.3, accepted 2026-11-22; `0007_bank_line_kind.sql`): `BankLines.Kind int NOT NULL DEFAULT 0` (`0` transfer, `1` interest), CHECK 0–1. Existing lines are transfers. A reset is unchanged.
 - S4 market, data vendor half ([features/simulated-instruments.md](features/simulated-instruments.md) §6.2, accepted 2026-11-22; `0008_market.sql`): `MarketInstruments` (symbol unique, ending in `.SIM`; currency; `DailyMovePercent decimal(5,2)` CHECK 0–20; the current `Price decimal(18,4)` CHECK `> 0` and its `PriceDate`; RowVersion) and `MarketPrices` (PK `(InstrumentId, PriceDate)`, FK `MarketInstruments`, `Price` CHECK `> 0`, `IsSet bit` for a price the operator typed). A reset empties both and adds the standing instruments again.
 - S4 market, issuer half ([features/corporate-actions.md](features/corporate-actions.md) §6.2, accepted 2026-11-22; `0009_market_corporate_actions.sql`): `MarketCorporateActions` (`Number` unique, the `n` of the party action id; FK `MarketInstruments`; `Kind` CHECK 0–2; ratio; dates; `Status` CHECK 0–2; current `Version`; `RowVersion`) and `MarketCorporateActionVersions` (`Id bigint` identity, the place in the feed; FK the action; `Version`, `Status`, ratio and dates; UQ `(ActionId, Version)`). A reset empties both.
+- S2 broker ([features/orders.md](features/orders.md) §6.2, accepted 2026-11-23; `0010_broker.sql`): `BrokerSettings` (one row: order mode, fill percent, reject reason, slippage percent, settlement days), `BrokerOrders` (`Number` unique, the `n` of the broker order id; `ClientOrderId` unique; body hash; symbol, currency, side, quantity, price limit, reference price; `Status` CHECK 0–4; filled quantity; accepted day), `BrokerFills` (`Number` unique, the `n` of the contract note; FK the order; quantity, price, trade date, settlement date, settled flag) and `BrokerReports` (`Id bigint` identity, the place in the feed; kind; FK the order and the fill). A reset empties the three and restores the settings.
 - Development: Aspire creates the database. VPS: created by hand once, like `MyWealthDbV2` ([deployment.md](deployment.md) §15).
 

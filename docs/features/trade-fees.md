@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-15
-last_updated: 2026-11-22
+last_updated: 2026-11-23
 related:
   - ../future-plans.md
   - ../glossary.md
@@ -464,3 +464,16 @@ Status of this amendment: `accepted` (2026-11-22), together with [interest-run.m
 - Cash leg role: `CashLegRole` gains `Tax = 2` (the next role named in §11): an amount withheld from the Transaction's income and owed to a tax authority, always negative, with exactly one tax detail (`TransactionTaxDetails`). In this slice it appears only on an `Interest` posted by an interest run and on its Reversal (interest-run R25).
 - R20: other types never have a `Fee` leg, and every type other than an interest posting never has a `Tax` leg. The Domain refuses both.
 - `FeeBands` is reused unchanged, and not renamed, for the bands of an interest rate schedule (interest-run R9, §5).
+
+---
+
+## Amendment 2026-11-23 (orders and settlement) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R11 and R33 live there; this section records what changes here.
+
+- R7, R14: for the fill of an order, the schedule is the one that applied to the instrument's quote currency on the UTC date the order was **placed**, stored on the order, not the one for the UTC date of the fill's `bookedAt` (orders R11). A rebalance trade keeps R7 and R14 as written. A hand `Buy` / `Sell` on a Custodial account no longer exists (orders R48).
+- R8, R14: the fee is charged on the order, across its fills. The fee of a fill is the schedule's fee on the order's posted gross including that fill, minus the fee already charged on the order's earlier fills (orders R33). An order filled in parts pays the fee of one fill of the same gross; a minimum is charged once, a cap holds for the order.
+- R18: the fee detail of a fill names the order's schedule and has the fill's own gross as basis amount. Its fee is the increment above, so it can be lower than the schedule's fee on that basis amount, and `0` on a later fill gets no `Fee` leg.
+- R9, R11, R12: unchanged. An order's schedule applies on the day it is placed, so it is in effect and can no longer change; no schedule write changes the fee of a later fill.
+- R19: no flow reverses a fill, and a fill is not hand-reversible (orders R37).
+- R24–R29: rebalance is unchanged until roadmap O3.

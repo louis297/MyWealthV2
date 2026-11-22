@@ -4,7 +4,7 @@ status: accepted
 phase: 1
 language: en
 created: 2026-10-24
-updated: 2026-11-22
+updated: 2026-11-23
 related:
   - README.md
   - ../function-plan.md
@@ -91,6 +91,7 @@ Redirect URI and post-logout follow the same pattern as the Adviser Portal BFF (
 | `/instruments/new` | SystemAdmin | Create instrument for the chosen tenant |
 | `/instruments/{id}` | SystemAdmin | Detail + rename / disable / enable |
 | `/market-data` | SystemAdmin | Market data connections and the state of each price feed. `GET /market-data-connections`. See the amendment of 2026-11-22 (simulated instruments); the corporate action feed and the newest announcements in the amendment of 2026-11-22 (corporate actions) |
+| `/broker` | SystemAdmin | Broker connections, the state of each execution report feed and the newest execution reports. `GET /broker-connections`, `GET /execution-reports`. See the amendment of 2026-11-23 (orders and settlement) |
 | `/tenant-admins` | SystemAdmin | List (filter by tenant, search); links to create / detail |
 | `/tenant-admins/new` | SystemAdmin | Create (tenant, name, email, password) |
 | `/tenant-admins/{id}` | SystemAdmin | Detail + rename / disable / enable |
@@ -271,6 +272,18 @@ Status of this amendment: `accepted` (2026-11-22), together with [corporate-acti
 | --- | --- |
 | BO24 | The Market data page (BO23) gains a "Corporate actions" column from `corporateActions`, with the same three states as the Prices column; InvalidItem is labelled "The party sent a record that cannot be read". |
 | BO25 | Under the connections, the newest twenty announcements from `GET /corporate-action-announcements`: Received, Connection, Symbol, Kind ("Unknown" for `null`), Ratio, Ex-date, Party status, Version, Status and Reason (UnsupportedKind "Kind not supported", Invalid "Not valid", NoInstrument "No firm lists this instrument", AlreadyEffective "Already applied", Superseded "An older version"). A status filter (default All). A row skipped as `AlreadyEffective` is shown in red: it needs a person. |
+
+---
+
+## Amendment 2026-11-23 (orders and settlement) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [orders.md](../features/orders.md). Field rules live there. The Tenant forms set the firm's broker connection, and a new Broker page shows each connection's execution report feed and the newest reports. New calls: `GET /broker-connections` and `GET /execution-reports` (`tenants.manage`). The tenant item carries `brokerConnection`.
+
+| ID | Behaviour |
+| --- | --- |
+| BO26 | The Tenant create and edit forms gain "Broker connection": a select of `GET /broker-connections` names, with "None" only on create. The Tenant page shows it. An unknown name's 400 is shown at the field. |
+| BO27 | A "Broker" page lists `GET /broker-connections`: Name, Adapter and "Reports" with the three states of the Prices column of BO23 (never read, last success, failing since with the failure label; InvalidItem "The party sent a record that cannot be read"). |
+| BO28 | Under the connections, the newest twenty reports from `GET /execution-reports`: Received, Connection, Kind ("Unknown" for `null`), Client order id, Quantity, Price, Status and Reason (UnsupportedKind "Kind not supported", UnknownOrder "No such order", UnknownFill "No such fill", Overfill "More than the order", Repeated "Already known"). A status filter (default All). A row skipped as `UnknownOrder`, `UnknownFill` or `Overfill` is shown in red: it needs a person. |
 
 ---
 

@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-22
-last_updated: 2026-11-22
+last_updated: 2026-11-23
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -437,3 +437,13 @@ Status of this amendment: `accepted` (2026-11-22), together with [corporate-acti
 - §5: `MarketDataFeedKind` gains `CorporateActions = 1`, a feed with a cursor; `MarketDataFailure` gains `InvalidItem = 5`. `MarketDataFeed` keeps the cursor of the `CorporateActions` feed.
 - R5: the connection item gains `corporateActions` (corporate-actions R38).
 - R17, R18: when the market is brought up to date and steps to a day on or after the `exDate` of an `Announced` corporate action of the instrument, the price of the day before is rebased by the action's ratio before that day's move (corporate-actions R42).
+
+---
+
+## Amendment 2026-11-23 (orders and settlement) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R52, R56 and R62 live there; this section records what changes here.
+
+- R17, R18: the simulator broker fills an order for a simulated instrument at the market's price of the current simulator day, with a seeded slippage. The market is brought up to date before any broker route answers (orders R52, R56).
+- R13: an order's reference price for a served instrument is the latest price the platform stored from the connection; the fill is then priced by the simulator, so the two can differ by the price's move since the last read.
+- No rule of this file changes.

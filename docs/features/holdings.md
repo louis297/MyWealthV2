@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-28
-last_updated: 2026-11-19
+last_updated: 2026-11-23
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -288,3 +288,13 @@ Status of this amendment: `accepted` (2026-11-22), together with [corporate-acti
 
 - The type table: an **entitlement posting** (`Split` or `Bonus` with source `CorporateAction`) is a security-only change on a Custodial holding, written by the platform. Quantity becomes `quantityAfter = RoundDown(quantityBefore × factor, 8)`; total cost is unchanged. The projection is updated in the same Account-locked transaction (R14).
 - An entitlement posting counts as security activity for R15 (corporate-actions R31).
+
+---
+
+## Amendment 2026-11-23 (orders and settlement) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R13, R31, R40 and R41 live there; this section records what changes here.
+
+- The item of `GET /accounts/{id}/holdings` gains `reservedQuantity` (the open quantity of the Account's live sell orders in that Instrument plus their fills not posted yet) and `availableQuantity` (quantity minus reserved quantity). Neither is stored on `Holdings`; on an External account reserved quantity is always 0 (orders R40, R41).
+- On a Custodial account a sell order and an `Adjustment` that lowers a holding must leave available quantity `≥ 0` (orders R13, R40). A fill, a rebalance and an entitlement posting are not refused by this rule.
+- The type table: on a Custodial account a `Buy` or `Sell` is written by the platform from an order's fill (source `OrderFill`) or by a rebalance; the hand entry is refused. The projection is updated in the same Account-locked transaction (R14), and a fill counts as security activity for R15 (orders R31, R37).

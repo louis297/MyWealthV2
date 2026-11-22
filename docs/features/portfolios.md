@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-02
-last_updated: 2026-11-22
+last_updated: 2026-11-23
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -468,3 +468,14 @@ Status of this amendment: `accepted` (2026-11-22), together with [account-closur
 Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions.md](corporate-actions.md). Rule R30 lives there; this section records what changes here.
 
 - R18: the trade lock does not apply to an entitlement posting (`Split` or `Bonus` with source `CorporateAction`). The assignment stays Active and no rebalance is enqueued, because the holding's value and weight do not change.
+
+---
+
+## Amendment 2026-11-23 (orders and settlement) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R8 and R49 live there; this section records what changes here.
+
+- R18: an order is a hand trade. `POST /orders` on an account with an Active assignment → 400 with the R18 message (orders R8). A fill is booked whatever the account's assignment; the two rules below keep an order and an assignment apart.
+- R4 (custody-modes R14): assigning a portfolio to an account with a live order → 400 `account_not_eligible` with the message `Cancel the account's open orders before assigning a portfolio.` (orders R49).
+- R8, R9: rebalance is unchanged until roadmap O3. It still posts `Buy` / `Sell` at once at the stored price, with the fee of the schedule for that day and source `Rebalance`, and its trades stay hand-reversible. They have no execution detail and no settlement, and count as settled.
+- R8 `V`, R11: a rebalance plans with available cash, which includes cash from sales that have not settled (orders R46).

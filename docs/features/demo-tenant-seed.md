@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-11-14
-last_updated: 2026-11-18
+last_updated: 2026-11-23
 related:
   - ../deployment.md
   - ../future-plans.md
@@ -233,3 +233,11 @@ Status of this amendment: `accepted` (2026-11-20), together with [client-money-a
 - The seed adds no client money account, on a new or an existing `demo` tenant. Until SystemAdmin adds one in the Back Office, no new Custodial account can be opened in the demo tenant (client-money-accounts R11). The account numbers must match the simulator bank's accounts once the simulator bank exists (roadmap S1), which the seed cannot know.
 - §10: no test change.
 
+---
+
+## Amendment 2026-11-23 (orders and settlement) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). §9.1 lives there; this section records what changes here.
+
+- `webapi --seed-demo` sets `brokerConnection` to `simulator` on the demo tenant it creates, when a broker connection of that name is configured on `webapi`; otherwise the tenant gets none. An existing tenant is never changed, as before.
+- §10: one test for each case.

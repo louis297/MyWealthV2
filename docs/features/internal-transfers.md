@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-10
-last_updated: 2026-11-22
+last_updated: 2026-11-23
 related:
   - leg-accounts.md
   - posting.md
@@ -313,3 +313,12 @@ Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md
 Status of this amendment: `accepted` (2026-11-22), together with [account-closure.md](account-closure.md).
 
 - `POST /transactions/transfer` with a closing account (an account closure `InProgress`) on either side, and the reverse of a transfer with a leg on one, → 400 with `This account is being closed and accepts no new activity.` under the empty `errors` key, directly after the Closed-account check (account-closure R12).
+
+---
+
+## Amendment 2026-11-23 (orders and settlement) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rule R45 lives there; this section records what changes here.
+
+- On `POST /transactions/transfer` from a Custodial account, the cash that leaves must come from the account's withdrawable cash: after the transfer, available cash must not be below unsettled cash. Otherwise 400 under the key the transfer uses for withdrawals R37, with the message `Cash from sales that have not settled cannot leave the account: 500.00 USD settles later.` (orders R45). Without it, unsettled cash could move to another account of the Customer and be withdrawn there.
+- External accounts, the to side and the reverse of a transfer are unchanged.
