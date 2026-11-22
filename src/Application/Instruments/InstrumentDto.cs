@@ -29,6 +29,7 @@ public sealed class InstrumentDto
         Name = instrument.Name,
         QuoteCurrency = instrument.QuoteCurrency,
         IsActive = instrument.IsActive,
-        RowVersion = Convert.ToBase64String(instrument.RowVersion ?? [])
+        RowVersion = Convert.ToBase64String(instrument.RowVersion ?? []),
+        MarketDataConnection = marketDataConnection
     };
 }

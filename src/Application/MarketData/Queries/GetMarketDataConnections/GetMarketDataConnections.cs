@@ -1,6 +1,7 @@
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
+using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.MarketData;
 
 namespace MyWealthV2.Application.MarketData.Queries.GetMarketDataConnections;
@@ -21,17 +22,34 @@ public class GetMarketDataConnectionsQueryHandler(IApplicationDbContext db, Mark
 {
     private const int DefaultPageSize = 20;
 
-    public Task<PagedList<MarketDataConnectionDto>> Handle(
+    public async Task<PagedList<MarketDataConnectionDto>> Handle(
         GetMarketDataConnectionsQuery request,
         CancellationToken cancellationToken)
     {
-        _ = (db, connections);
-        return Task.FromResult(new PagedList<MarketDataConnectionDto>
+        var names = connections.All.Select(connection => connection.Name).ToList();
+        var feeds = await db.MarketDataFeeds.AsNoTracking()
+            .Where(feed => feed.Kind == MarketDataFeedKind.Prices && names.Contains(feed.Connection))
+            .ToListAsync(cancellationToken);
+        var items = connections.All
+            .OrderBy(connection => connection.Name, StringComparer.Ordinal)
+            .Select(connection =>
+            {
+                var feed = feeds.SingleOrDefault(row => row.Connection == connection.Name);
+                return new MarketDataConnectionDto(
+                    connection.Name,
+                    connection.Adapter,
+                    connection.SymbolSuffix,
+                    feed is null
+                        ? null
+                        : new MarketDataFeedDto(feed.LastSucceededAt, feed.LastFailedAt, feed.LastFailure?.ToString()));
+            })
+            .ToList();
+        return new PagedList<MarketDataConnectionDto>
         {
-            Items = [],
+            Items = items,
             Page = 1,
-            PageSize = DefaultPageSize,
-            TotalCount = 0
-        });
+            PageSize = Math.Max(DefaultPageSize, items.Count),
+            TotalCount = items.Count
+        };
     }
 }
