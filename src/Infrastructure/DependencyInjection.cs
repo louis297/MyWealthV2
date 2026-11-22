@@ -130,6 +130,17 @@ public static class DependencyInjection
     }
 
     /// <summary>
+    /// Reads <c>MarketDataConnections</c> for <paramref name="host"/> and registers the configured connections
+    /// (simulated-instruments R1–R3). Throws on a bad entry, so call it before <c>Build()</c>.
+    /// </summary>
+    public static void AddMarketDataConnections(this IHostApplicationBuilder builder, MarketDataHost host)
+    {
+        var connections = new ConfiguredMarketDataConnections(MarketDataConnectionsConfiguration.Read(builder.Configuration, host));
+        builder.Services.AddSingleton(connections);
+        builder.Services.AddSingleton(connections.Connections);
+    }
+
+    /// <summary>
     /// Reads <c>BankConnections</c> for <paramref name="host"/> and registers <see cref="IBankConnections"/>
     /// (deposit-matching R1). Throws on a bad entry, so call it before <c>Build()</c>.
     /// </summary>
