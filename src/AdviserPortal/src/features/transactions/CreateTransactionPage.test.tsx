@@ -387,18 +387,6 @@ describe("CreateTransactionPage", () => {
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
-  it.each(["Buy", "Sell"])("tells the user the server adds brokerage on a Custodial %s (F21)", async (type) => {
-    renderForm(user(), 201, "Price is not available.", { custodyMode: "Custodial" });
-
-    await chooseOption("Type", type);
-    await chooseOption("Instrument", "DEMO Demo Fund");
-
-    expect(await screen.findByText("Brokerage is added by the server from the trade fee schedule.")).toBeInTheDocument();
-    expect(screen.queryByLabelText(/fee/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/Price per unit/)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/FX rate/)).not.toBeInTheDocument();
-  });
-
   it("shows no brokerage note on a StockIn", async () => {
     renderForm();
 
@@ -769,67 +757,18 @@ describe("CreateTransactionPage", () => {
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
-  it("offers only the manual entry matrix types on a Custodial account (D18)", async () => {
-    renderForm(user(), 201, "Price is not available.", { custodyMode: "Custodial" });
+  it.each(["", "?type=Buy", "?type=TransferOut", "?type=CloseOut", "?type=TransferIn"])(
+    "offers no type on a Custodial account and points to Place order (orders D69) %s",
+    async (query) => {
+      renderForm(user(), 201, "Price is not available.", { custodyMode: "Custodial" }, "errors", query);
 
-    await screen.findByText("Booked when posted.");
-    await openSelect("Type");
-    await waitFor(() => {
-      expect(screen.getAllByRole("option").map((option) => option.textContent?.trim())).toEqual([
-        "Buy",
-        "Sell",
-      ]);
-    });
-  });
-
-  it("posts a Custodial Buy with no Booked at input and no bookedAt (D19)", async () => {
-    const { fetchMock } = renderForm(user(), 201, "Price is not available.", { custodyMode: "Custodial" });
-
-    expect(await screen.findByText("Booked when posted.")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Booked at")).not.toBeInTheDocument();
-    await chooseOption("Type", "Buy");
-    await chooseOption("Instrument", "DEMO Demo Fund");
-    fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "50" } });
-    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
-
-    expect(await screen.findByText("account detail")).toBeInTheDocument();
-    const post = fetchMock.mock.calls
-      .map(([input]) => input)
-      .find((input): input is Request => input instanceof Request && input.method === "POST");
-    expect(JSON.parse(await post!.clone().text())).toEqual({
-      accountId,
-      type: "Buy",
-      memo: null,
-      reference: null,
-      security: [{ instrumentId, quantity: 50 }],
-    });
-  });
-
-  it("does not offer a TransferOut on a Custodial account (withdrawals D44)", async () => {
-    renderForm(user(), 201, "Price is not available.", { custodyMode: "Custodial" }, "errors", "?type=TransferOut");
-
-    expect(await screen.findByText("Booked when posted.")).toBeInTheDocument();
-    await openSelect("Type");
-    expect(await screen.findByRole("option", { name: "Buy" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "TransferOut" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "CloseOut" })).not.toBeInTheDocument();
-  });
-
-  it("does not offer CloseOut on a Custodial account, even for a remainder (account-closure D53)", async () => {
-    renderForm(user(), 201, "Price is not available.", { custodyMode: "Custodial", cashBalance: 0.004 }, "errors", "?type=CloseOut");
-
-    expect(await screen.findByText("Booked when posted.")).toBeInTheDocument();
-    await openSelect("Type");
-    expect(await screen.findByRole("option", { name: "Buy" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "CloseOut" })).not.toBeInTheDocument();
-  });
-
-  it("does not take a TransferIn on a Custodial account from the address (D39)", async () => {
-    renderForm(user(), 201, "Price is not available.", { custodyMode: "Custodial" }, "errors", "?type=TransferIn");
-
-    expect(await screen.findByText("Booked when posted.")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Amount")).not.toBeInTheDocument();
-  });
+      expect(await screen.findByText("Trades on a Custodial account go through the broker.")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Place an order" })).toHaveAttribute("href", `/accounts/${accountId}/order`);
+      expect(screen.queryByLabelText("Type")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Amount")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Post transaction" })).not.toBeInTheDocument();
+    },
+  );
 
   it("offers only cash transfers on an open Bank account", async () => {
     renderForm(user(), 201, "Price is not available.", { type: "Bank" }, "errors", "?type=TransferIn");

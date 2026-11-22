@@ -109,7 +109,7 @@ describe("WithdrawPage (withdrawals D45)", () => {
   it("asks for the Customer's Verified accounts in the currency, reviews and posts with one key", async () => {
     const { requests } = renderFees(me, routes, `/accounts/${accountId}/withdraw`, serve([payee]));
 
-    expect(await screen.findByText("Available 700.00 USD")).toBeInTheDocument();
+    expect(await screen.findByText("Available to withdraw 700.00 USD")).toBeInTheDocument();
     const lookup = new URL(requestsTo(requests, "GET", "/nominated-bank-accounts")[0].url);
     expect(lookup.searchParams.get("customerId")).toBe(customerId);
     expect(lookup.searchParams.get("status")).toBe("Verified");

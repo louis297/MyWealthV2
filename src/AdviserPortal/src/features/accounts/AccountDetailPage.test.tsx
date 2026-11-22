@@ -577,8 +577,8 @@ describe("AccountDetailPage", () => {
 
   it.each([
     // D39: deposits to a Custodial account come from the bank statement. D44 (withdrawals R45): money leaves it as a
-    // withdrawal, not a hand TransferOut.
-    ["Custodial", ["Buy", "Sell", "Transfer", "Convert", "Adjust", "Withdraw"]],
+    // withdrawal, not a hand TransferOut. D69 (orders R48): a trade on it is an order.
+    ["Custodial", ["Place order", "Transfer", "Convert", "Adjust", "Withdraw"]],
     [
       "External",
       ["TransferIn", "TransferOut", "Buy", "Sell", "StockIn", "StockOut", "Split", "Bonus", "Scrip", "Transfer", "Convert"],
@@ -1308,11 +1308,14 @@ describe("AccountDetailPage", () => {
     });
 
     expect(await screen.findByRole("button", { name: "Unassign" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Buy" })).not.toBeInTheDocument();
+    // D69: an assigned account follows its portfolio, so no order can be placed.
+    expect(screen.queryByRole("link", { name: "Place order" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Place order" })).toBeDisabled();
+    expect(screen.getByText("This account follows a portfolio.")).toBeInTheDocument();
     // D44 (withdrawals R45): cash leaves a Custodial account as a withdrawal, also while a portfolio is assigned.
     expect(screen.getByRole("link", { name: "Withdraw" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Unassign" }));
-    expect(await screen.findByRole("link", { name: "Buy" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Place order" })).toHaveAttribute("href", `/accounts/${accountId}/order`);
     expect(deleted.some((url) => url.includes(`/api/accounts/${accountId}/portfolio`))).toBe(true);
     expect(screen.queryByRole("button", { name: "Unassign" })).not.toBeInTheDocument();
   });
@@ -1811,7 +1814,7 @@ describe("AccountDetailPage withdrawals (withdrawals D44)", () => {
     };
   }
 
-  it("shows Cash, Reserved for withdrawals and Available, links Withdraw and lists the open withdrawals", async () => {
+  it("shows Cash, Reserved and Available, links Withdraw and lists the open withdrawals", async () => {
     renderDetail(serve({ cashBalance: 1000, reservedCash: 300, availableCash: 700 }, [{
       id: "77777777-0000-0000-0000-000000000001",
       accountId,
@@ -1833,17 +1836,19 @@ describe("AccountDetailPage withdrawals (withdrawals D44)", () => {
       rowVersion: "AAAA",
     }]));
 
-    expect(await screen.findByText("Reserved for withdrawals")).toBeInTheDocument();
+    expect(await screen.findByText("Reserved")).toBeInTheDocument();
     expect(screen.getByText("Available")).toBeInTheDocument();
+    expect(screen.getByText("Available to withdraw")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Withdraw" })).toHaveAttribute("href", `/accounts/${accountId}/withdraw`);
     expect(await screen.findByText("Waiting for approval")).toBeInTheDocument();
     expect(screen.getByText("ANZ ****8900")).toBeInTheDocument();
   });
 
-  it("hides Reserved for withdrawals when nothing is reserved", async () => {
+  it("hides Reserved when nothing is reserved", async () => {
     renderDetail(serve({ cashBalance: 1000, reservedCash: 0, availableCash: 1000 }));
 
     expect(await screen.findByText("Available")).toBeInTheDocument();
-    expect(screen.queryByText("Reserved for withdrawals")).not.toBeInTheDocument();
+    expect(screen.queryByText("Reserved")).not.toBeInTheDocument();
+    expect(screen.queryByText("Not settled")).not.toBeInTheDocument();
   });
 });
