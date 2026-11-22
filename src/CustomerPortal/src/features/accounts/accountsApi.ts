@@ -11,6 +11,15 @@ export type Account = {
   status: string;
   /** client-money-accounts R14: set on a Custodial account, null on an External one. */
   depositReference?: string | null;
+  /** account-closure R27: the Account's latest account closure, or null. */
+  closure?: {
+    id: string;
+    status: string;
+    payoutAmount: number;
+    withdrawalId: string | null;
+    requestedAt: string;
+    completedAt: string | null;
+  } | null;
 };
 
 /** client-money-accounts R22: where to pay in to an Open Custodial account. */
@@ -54,6 +63,8 @@ export type Activity = {
   fx?: ActivityFx | null;
   /** deposit-matching R36: the bank's details on a deposit and its Reversal; otherwise null. */
   bankReceipt?: ActivityBankReceipt | null;
+  /** transaction-source R10: the process that wrote the transaction. */
+  source?: { kind: string; id: string | null } | null;
   /** withdrawals R41: the bank's details on a payout and its Reversal; otherwise null. */
   payment?: { valueDate: string; reference: string | null; payeeName: string | null; payeeAccount: string | null } | null;
 };

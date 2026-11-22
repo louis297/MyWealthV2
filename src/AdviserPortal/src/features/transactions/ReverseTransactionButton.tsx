@@ -43,6 +43,11 @@ export function adjustmentReasonLabel(reason: string) {
 /** D31: the sentence for a 403 from reverse, which only an adjustment returns. */
 export const adjustmentReverseForbidden = "Only a firm administrator can reverse an adjustment.";
 
+/** D57: the type of a transaction; the remainder write-off of an account closure reads as rounding. */
+export function transactionTypeLabel(item: { type: string; source?: { kind: string } | null }) {
+  return item.type === "CloseOut" && item.source?.kind === "AccountClosure" ? "Close out (rounding)" : item.type;
+}
+
 /** D26: the "Source" line on `/transactions/:id`. The source id is not shown. */
 export function sourceLabel(kind: string | undefined) {
   switch (kind) {
@@ -56,6 +61,8 @@ export function sourceLabel(kind: string | undefined) {
       return "Bank feed";
     case "Payment":
       return "Withdrawal";
+    case "AccountClosure":
+      return "Account closure";
     default:
       return kind;
   }

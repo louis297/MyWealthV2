@@ -3,7 +3,7 @@ title: Database design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-11-21
+updated: 2026-11-22
 related:
   - README.md
   - glossary.md
@@ -368,6 +368,7 @@ Beyond PK / unique constraints already listed:
 0043_withdrawals.sql                        -- Withdrawals, OutgoingPayments, TransactionPaymentDetails; BankStatementLines payout columns; CK_Transactions_SourceKind 0–4
 0044_bank_returns.sql                       -- OutgoingPayments.Kind and ReturnOfLineId; BankStatementLines statuses 0–6, reasons 0–11, methods 0–4, new Matched CHECK
 0045_bank_reconciliations.sql               -- ALLOW_SNAPSHOT_ISOLATION; BankFeedCursors balance columns; BankReconciliations, BankReconciliationItems; CK_Reports_Scope adds Tenant; report bank-reconciliation
+0046_account_closures.sql                   -- AccountClosures; BankStatementLines reasons 0–12; CK_Transactions_SourceKind 0–5
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -426,6 +427,8 @@ Amendment 2026-11-17 (account custody mode, accepted; [features/account-custody-
 
 Amendment 2026-11-20 (client money accounts, accepted, landed; [features/client-money-accounts.md](features/client-money-accounts.md) §6.2): script `0039_accounts_deposit_reference.sql` adds `DepositReference char(9) NULL`, gives every existing Custodial row a reference in the same script (random, Luhn mod 32 check symbol, redrawn while used), then adds `CK_Accounts_DepositReference` (not null iff `CustodyMode = 1`) and unique `UX_Accounts_DepositReference` WHERE not null. Still no institution or account-number column on `Accounts`.
 
+Amendment 2026-11-22 (account closure, accepted; [features/account-closure.md](features/account-closure.md) §6): no column on `Accounts`. The closures of an Account are rows of `AccountClosures` (§11.13); the account item's `closure` is the latest of them.
+
 ### 11.4 Transactions (accepted spec; landed)
 
 Script `0013_transactions.sql`. Columns and rules: [features/posting.md](features/posting.md) §6. Header `Transactions` plus child `TransactionCashLegs` (one cash leg per header this increment). Idempotency table in the same script ([ADR 0015](adr/0015-idempotency-keys.md)). No `Accounts.Balance`. No seed in the script — `TestSeed` only.
@@ -449,6 +452,8 @@ Amendment 2026-11-19 (adjustments, accepted; [features/adjustments.md](features/
 Amendment 2026-11-20 (bank feed and deposit matching, accepted; [features/deposit-matching.md](features/deposit-matching.md) §6.2): script `0041_bank_statement_lines.sql` widens `CK_Transactions_SourceKind` to 0–3 (`BankFeed`) and requires a `SourcePublicId` for kinds 2 and 3. It adds `TransactionBankReceiptDetails`: `TransactionId int` (PK), `TenantId int` (FK → `Tenants`; index), FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)` RESTRICT, as `TransactionFxDetails`, `ValueDate date`, `Reference nvarchar(140) NULL`, `PayerName nvarchar(140) NULL`, `PayerAccount nvarchar(40) NULL` (masked). One row on every deposit and on its Reversal, held by the Domain. No back-fill. Forward only.
 
 Amendment 2026-11-20 (withdrawals, accepted, landed; [features/withdrawals.md](features/withdrawals.md) §6.2): script `0043_withdrawals.sql` widens `CK_Transactions_SourceKind` to 0–4 (`Payment`) and requires a `SourcePublicId` for kinds 2, 3 and 4. It adds `TransactionPaymentDetails`: `TransactionId int` (PK), `TenantId int NOT NULL`, FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)` RESTRICT, as `TransactionBankReceiptDetails`; `ValueDate date NOT NULL`, `Reference nvarchar(18) NULL`, `PayeeName nvarchar(140) NULL`, `PayeeAccount nvarchar(40) NULL` (masked). 0..1 per Transaction, on a payout and its Reversal only. No back-fill.
+
+Amendment 2026-11-22 (account closure, accepted; [features/account-closure.md](features/account-closure.md) §6): script `0046_account_closures.sql` widens `CK_Transactions_SourceKind` to 0–5 (`AccountClosure`) and requires a `SourcePublicId` for kinds 2–5. No back-fill.
 
 ### 11.5 Holdings (accepted, landed)
 
@@ -506,6 +511,8 @@ Amendment 2026-11-21 (bank returns, accepted; [features/bank-returns.md](feature
 
 Amendment 2026-11-21 (bank reconciliation, accepted; [features/bank-reconciliation.md](features/bank-reconciliation.md) §6.1): script `0045_bank_reconciliations.sql` adds to `BankFeedCursors` `Balance decimal(18,4) NULL`, `BalanceAt datetimeoffset NULL` (both null or both set, `CK_BankFeedCursors_Balance`) and `OpeningBalance decimal(18,4) NULL` (set whenever `Balance` is, `CK_BankFeedCursors_Opening`). No back-fill: the first page after the script sets them.
 
+Amendment 2026-11-22 (account closure, accepted; [features/account-closure.md](features/account-closure.md) §6): script `0046_account_closures.sql` widens the `UnmatchedReason` CHECK of `BankStatementLines` to 0–12 (`AccountClosing`). No back-fill.
+
 ### 11.10 Nominated bank accounts (accepted)
 
 Feature spec: [features/withdrawals.md](features/withdrawals.md) (accepted 2026-11-20, landed 2026-11-21) §6.1. Script `0042_nominated_bank_accounts.sql`:
@@ -533,6 +540,14 @@ Feature spec: [features/bank-reconciliation.md](features/bank-reconciliation.md)
 - `BankReconciliationItems` — `(TenantId, ReconciliationId)` FK → `BankReconciliations`, `Position` (unique with the run), `Kind int` (CHECK 0–11), `Class int` (CHECK 0–2), signed `Amount decimal(18,4)`, `Count`; the line snapshot (`StatementLineId` FK `(TenantId, StatementLineId)` → `BankStatementLines`, set iff a line kind; `Direction`, `LineStatus`, `UnmatchedReason`, `ValueDate`, `Note`); `OtherClientMoneyAccountId` (FK, set iff `Kind = 11`).
 
 No back-fill. A run and its items are never updated or deleted; no purge.
+
+### 11.13 Account closures (accepted)
+
+Feature spec: [features/account-closure.md](features/account-closure.md) (accepted 2026-11-22) §6. Script `0046_account_closures.sql`:
+
+- `AccountClosures` — TenantId, PublicId (unique), `(TenantId, AccountId)` FK → `Accounts`, `Status int` (CHECK 0–2), `CancelReason int NULL` (CHECK 0–3, set iff `Status = 2`), `Memo nvarchar(200)`, `RequestedByUserId` (FK `(TenantId, RequestedByUserId)` → `Users`), `RequestedAt`, `Currency char(3)`, `CashBalanceAtRequest` and `PayoutAmount` (`decimal(18,4)`, CHECK `≥ 0`), `NominatedBankAccountId` and `WithdrawalId` (FKs to `NominatedBankAccounts` and `Withdrawals`, both set iff `PayoutAmount > 0`), `WriteOffAmount decimal(18,4) NULL` (CHECK `> 0`) with `WriteOffTransactionId` (FK → `Transactions`, set together), `CompletedAt` (set iff `Status = 1`), `EndedAt` (set iff `Status = 2`), audit, `RowVersion`. All FKs RESTRICT. Unique filtered `UX_AccountClosures_InProgress` on `(TenantId, AccountId) WHERE Status = 0`; unique filtered `UX_AccountClosures_Withdrawal` on `WithdrawalId WHERE WithdrawalId IS NOT NULL`; index `(TenantId, Status, RequestedAt DESC)`.
+
+No back-fill: Accounts closed before the script have no closure.
 
 ## 12. Still not a schema decision
 
@@ -593,6 +608,8 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-21 | Bank returns landed: `0044` and simulator `0005` written. `0044` drops and adds again the `WithdrawalId` FK and index around the `ALTER COLUMN`; simulator `BankPayments` also keeps `ReturnOf`, the outside id as sent (§11.11, §15). |
 | 2026-11-21 | Bank reconciliation accepted (`0045`, not written yet): `BankReconciliations` and `BankReconciliationItems` (§11.12), the balance columns of `BankFeedCursors` (§11.9), snapshot isolation, report scope `Tenant` and the third catalog row (§14). Simulator script `0006_bank_balances.sql` (§15). §9 lists `0044` and `0045`. All are build contracts. |
 | 2026-11-21 | Bank reconciliation landed: `0045` and simulator `0006` written. `0045` names the composite FKs `FK_<child>_<parent>_TenantId_<column>`, adds `UX_BankReconciliationItems_ReconciliationId_Position` and the item CHECKs `CK_BankReconciliationItems_Line`, `_UnmatchedReason`, `_OtherClientMoneyAccount`, `_Position`, `_Count` (§11.12). |
+| 2026-11-22 | Account closure accepted (`0046`, not written yet): `AccountClosures` (§11.13), `UnmatchedReason` 0–12 (§11.9), `CK_Transactions_SourceKind` 0–5 (§11.4). §9 lists `0046`. All are build contracts. |
+| 2026-11-22 | Account closure landed: `0046` written. It names the CHECKs `CK_AccountClosures_Status`, `_CancelReason`, `_CashBalanceAtRequest`, `_PayoutAmount`, `_WriteOffAmount`, `_Cancel`, `_Completed`, `_Ended`, `_Payout`, `_WriteOff`, the composite FKs `FK_AccountClosures_<parent>_TenantId_<column>` and the index `IX_AccountClosures_TenantId_Status_RequestedAt` (§11.13). |
 
 ---
 

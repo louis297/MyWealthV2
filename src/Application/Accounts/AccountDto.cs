@@ -1,3 +1,4 @@
+using MyWealthV2.Application.AccountClosures;
 using MyWealthV2.Domain.Entities;
 
 namespace MyWealthV2.Application.Accounts;
@@ -35,7 +36,16 @@ public sealed class AccountDto
 
     public required string RowVersion { get; init; }
 
-    public static AccountDto From(Account account, Tenant tenant, User customer, decimal cashBalance, decimal reservedCash) => new()
+    /// <summary>The Account's latest account closure, or null when it has none (account-closure R27).</summary>
+    public AccountClosureSummaryDto? Closure { get; init; }
+
+    public static AccountDto From(
+        Account account,
+        Tenant tenant,
+        User customer,
+        decimal cashBalance,
+        decimal reservedCash,
+        AccountClosureSummaryDto? closure = null) => new()
     {
         Id = account.PublicId,
         TenantId = tenant.PublicId,
@@ -50,6 +60,7 @@ public sealed class AccountDto
         AvailableCash = Domain.Custody.AvailableCash.Of(cashBalance, reservedCash),
         Status = account.Status.ToString(),
         IsActive = account.IsActive,
-        RowVersion = Convert.ToBase64String(account.RowVersion ?? [])
+        RowVersion = Convert.ToBase64String(account.RowVersion ?? []),
+        Closure = closure
     };
 }

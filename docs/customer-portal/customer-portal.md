@@ -4,7 +4,7 @@ status: accepted
 phase: 3
 language: en
 created: 2026-11-02
-updated: 2026-11-20
+updated: 2026-11-22
 related:
   - README.md
   - ../adviser-portal/frontend-conventions.md
@@ -24,6 +24,7 @@ related:
   - ../adr/0016-bff-for-first-party-portals.md
   - ../features/deposit-matching.md
   - ../features/withdrawals.md
+  - ../features/account-closure.md
 ---
 
 # Customer Portal
@@ -281,3 +282,14 @@ Status of this amendment: `accepted` (2026-11-20), together with [withdrawals](.
 | C23 | Customer with a Custodial account | Account page | Under the cash balance: "Available to withdraw" with `availableCash`, and when `reservedCash` is not 0, "Withdrawals in progress" with it. |
 | C24 | Customer with withdrawals on a Custodial account | Account page | A "Withdrawals" section lists open withdrawals and those of the last 90 days: Requested, Amount, To (****8900), Status ("Waiting for approval", "Approved", "Sent to bank", "Paid", "Rejected", "Cancelled", "Bank refused", "Returned by bank"). No action. No memo or note. |
 | C25 | Customer with a payout on a Custodial account | Account page activity | The row is labelled "Withdrawal" instead of the `TransferOut` label and shows "Value date <date>" under it. Its Reversal stays "Reversal". A `TransferOut` without `payment` keeps today's label. |
+
+---
+
+## Amendment 2026-11-22 (account closure) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [account-closure](../features/account-closure.md). The Customer Portal reads the account item's `closure` and the withdrawals it already reads; it calls no closure route and the BFF does not change. The Customer requests no closure (roadmap D6).
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| C26 | Customer with a closing Custodial account | Account page | A note above the balance: "This account is being closed. 300.00 USD is being paid to your bank account ****8900." (amount from `closure.payoutAmount`, the number from the withdrawal). A Closed account whose latest closure is `Completed` shows "Closed on <date>." |
+| C27 | Customer with a write-off on a Custodial account | Account page activity | The row is labelled "Rounding write-off" instead of the `CloseOut` label. A `CloseOut` with another source keeps today's label. |

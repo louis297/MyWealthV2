@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-17
-last_updated: 2026-11-20
+last_updated: 2026-11-22
 related:
   - account-custody-mode.md
   - accounts.md
@@ -33,6 +33,7 @@ related:
   - client-money-accounts.md
   - deposit-matching.md
   - withdrawals.md
+  - account-closure.md
 ---
 
 # Custody modes
@@ -564,3 +565,16 @@ Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md
 - §4.2.1 gains the messages: `TransferOut` — `Withdrawals from a Custodial account are paid to the customer's nominated bank account. Request a withdrawal.`; `CloseOut` — `Only a remainder smaller than 0.01 USD can be closed out on a Custodial account. Withdraw the balance first.` (the minor unit and currency from the Account); `InternalTransfer` to another Customer — `Cash can be transferred between Custodial accounts of the same customer only.` (under `errors.ToAccountId`). Each applies to every caller, SystemAdmin included.
 - R7: the withdrawal flow builds its payout with `Transaction.PostPayout`, outside the matrix.
 - `CustodyRules` holds the three rules (`AllowsManualEntry(Custodial, TransferOut)` is `false`, the `CloseOut` remainder check, `AllowsCustodialTransfer`); the matrix still lives in one Domain class.
+
+---
+
+## Amendment 2026-11-22 (account closure) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [account-closure.md](account-closure.md).
+
+- R5, matrix row `CloseOut`: External **allowed**; Custodial **refused** for every amount, replaced by the account closure flow (account-closure R23). A `CloseOut` entered by hand before this amendment keeps source `Manual` and can still be reversed by hand on an Open account.
+- §4.2.1: the `CloseOut` message becomes `The remainder of a Custodial account is written off by its account closure. Request an account closure.`, for every caller, SystemAdmin included.
+- §4.2, the `CloseOut` paragraph: the part below the minor unit that a `Buy` / `Sell` leaves is written off by the account closure as a `CloseOut` with source `AccountClosure` (account-closure R18). No person enters one on a Custodial account.
+- R7: the closure flow builds the write-off with `Transaction.PostRemainderWriteOff`, outside the matrix.
+- R14: a **closing** account (an account closure `InProgress`) cannot be assigned a portfolio → 400 `account_not_eligible` with the message `Only an open Custodial account that is not being closed can be assigned a portfolio.` (account-closure R13). An account closure needs no Active assignment (account-closure R5).
+- `CustodyRules.CloseOutRefusal(Custodial, …)` returns the message for every amount; the matrix still lives in one Domain class.

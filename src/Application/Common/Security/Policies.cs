@@ -26,6 +26,8 @@ public static class Policies
     public const string WithdrawalsRead = "withdrawals.read";
     public const string WithdrawalsRequest = "withdrawals.request";
     public const string WithdrawalsApprove = "withdrawals.approve";
+    public const string AccountClosuresRead = "account-closures.read";
+    public const string AccountClosuresRequest = "account-closures.request";
     public const string PortfoliosRead = "portfolios.read";
     public const string PortfoliosManage = "portfolios.manage";
     public const string FeesRead = "fees.read";

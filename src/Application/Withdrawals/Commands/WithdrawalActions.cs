@@ -1,3 +1,4 @@
+using MyWealthV2.Application.AccountClosures;
 using System.Text.Json.Serialization;
 using FluentValidation.Results;
 using MyWealthV2.Application.Common.Exceptions;
@@ -147,7 +148,11 @@ public class RejectWithdrawalCommandHandler(IApplicationDbContext db, ICurrentUs
     {
         var withdrawal = await WithdrawalChange.FindAsync(db, currentUser, request.Id, request.RowVersion, cancellationToken);
         var actor = WithdrawalChange.ActorId(currentUser);
-        WithdrawalChange.Guard(() => withdrawal.Reject(actor, request.Note!, time.GetUtcNow()));
+        var now = time.GetUtcNow();
+        WithdrawalChange.Guard(() => withdrawal.Reject(actor, request.Note!, now));
+        // Account closure R20: rejecting a closure's withdrawal ends the closure in the same transaction.
+        await AccountClosureCompletion.EndWithWithdrawalAsync(
+            db, withdrawal.Id, AccountClosureCancelReason.WithdrawalRejected, now, cancellationToken);
         await WithdrawalChange.SaveAsync(db, cancellationToken);
     }
 }
@@ -160,7 +165,8 @@ public class CancelWithdrawalCommandHandler(IApplicationDbContext db, ICurrentUs
         var withdrawal = await WithdrawalChange.FindAsync(db, currentUser, request.Id, request.RowVersion, cancellationToken);
         var actor = WithdrawalChange.ActorId(currentUser);
         var approved = withdrawal.Status == WithdrawalStatus.Approved;
-        WithdrawalChange.Guard(() => withdrawal.Cancel(actor, request.Note, time.GetUtcNow()));
+        var now = time.GetUtcNow();
+        WithdrawalChange.Guard(() => withdrawal.Cancel(actor, request.Note, now));
         if (approved)
         {
             // R30: only before the first send attempt; the payment's row version guards the race with the send step.
@@ -168,6 +174,9 @@ public class CancelWithdrawalCommandHandler(IApplicationDbContext db, ICurrentUs
             WithdrawalChange.Guard(payment.Cancel);
         }
 
+        // Account closure R20: cancelling a closure's withdrawal ends the closure in the same transaction.
+        await AccountClosureCompletion.EndWithWithdrawalAsync(
+            db, withdrawal.Id, AccountClosureCancelReason.WithdrawalCancelled, now, cancellationToken);
         await WithdrawalChange.SaveAsync(db, cancellationToken);
     }
 }

@@ -122,49 +122,12 @@ internal static class CustodialHttp
     /// </summary>
     public static async Task<HttpResponseMessage> WithdrawAsync(Guid accountId, decimal amount)
     {
-        Guid nominatedId;
-        Domain.Entities.User adviser;
-        Domain.Entities.User approver;
-        int tenantId;
-        string currency;
-        using (var scope = FunctionalTestSetup.ScopeFactory.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            var account = await db.Accounts.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.PublicId == accountId);
-            tenantId = account.TenantId;
-            currency = account.Currency.Trim();
-            var customer = await db.DomainUsers.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.Id == account.CustomerId);
-            adviser = await db.DomainUsers.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.Id == customer.AdviserId);
-            approver = await db.DomainUsers.IgnoreQueryFilters().AsNoTracking()
-                           .Where(row => row.TenantId == tenantId && row.Role == UserRole.TenantAdmin && row.Status == UserStatus.Active)
-                           .OrderBy(row => row.Id)
-                           .FirstOrDefaultAsync()
-                       ?? await TestApp.CreatePersonAsync(
-                           UserRole.TenantAdmin, "Wes Approver", $"wes-{Guid.NewGuid():N}@withdrawals.example", "Password1!", tenantId);
-            var nominated = await db.NominatedBankAccounts.IgnoreQueryFilters().AsNoTracking()
-                .Where(row => row.CustomerId == customer.Id && row.Currency == currency && row.Status == NominatedBankAccountStatus.Verified)
-                .Select(row => (Guid?)row.PublicId)
-                .FirstOrDefaultAsync();
-            if (nominated is null)
-            {
-                var row = Domain.Entities.NominatedBankAccount.Add(
-                    tenantId, customer.Id, await db.Set<Domain.Entities.Currency>().SingleAsync(item => item.Code == currency),
-                    "ANZ", customer.Name, "06-0123-0456789-00", adviser.Id, DateTimeOffset.UtcNow);
-                row.Verify(approver.Id, "Seeded for a test withdrawal", DateTimeOffset.UtcNow);
-                row.CreatedBy = "test";
-                db.NominatedBankAccounts.Add(row);
-                await db.SaveChangesAsync();
-                nominated = row.PublicId;
-            }
-
-            nominatedId = nominated.Value;
-        }
-
-        var adviserToken = (await TestApp.IssueAccessTokenAsync(adviser)).AccessToken;
+        var payee = await PayeeAsync(accountId);
+        var adviserToken = (await TestApp.IssueAccessTokenAsync(payee.Adviser)).AccessToken;
         var request = await TransactionHttp.Send(HttpMethod.Post, "/withdrawals", adviserToken, new Dictionary<string, object?>
         {
             ["accountId"] = accountId,
-            ["nominatedBankAccountId"] = nominatedId,
+            ["nominatedBankAccountId"] = payee.NominatedBankAccountId,
             ["amount"] = amount
         }, Guid.NewGuid());
         if (request.StatusCode != HttpStatusCode.Created)
@@ -173,21 +136,7 @@ internal static class CustodialHttp
         }
 
         var withdrawalId = await ReadIdAsync(request);
-        var approverToken = (await TestApp.IssueAccessTokenAsync(approver)).AccessToken;
-        var item = await AccountHttp.Send(HttpMethod.Get, $"/withdrawals/{withdrawalId}", approverToken);
-        using (var json = JsonDocument.Parse(await item.Content.ReadAsStringAsync()))
-        {
-            var approve = await AccountHttp.Send(HttpMethod.Post, $"/withdrawals/{withdrawalId}/approve", approverToken,
-                new { rowVersion = json.RootElement.GetProperty("rowVersion").GetString() });
-            approve.StatusCode.ShouldBe(HttpStatusCode.NoContent, await approve.Content.ReadAsStringAsync());
-        }
-
-        await BankFeedHttp.SendAsync();
-        var clientMoney = await BankFeedHttp.ClientMoneyAccountAsync(tenantId, currency);
-        BankFeedHttp.Feed.Add(clientMoney.AccountNumber, new Application.BankFeed.BankFeedLine(
-            "payout-" + Guid.NewGuid().ToString("N"), DateOnly.FromDateTime(DateTime.UtcNow), BankLineDirection.Debit, amount,
-            currency, null, null, null, EndToEndId: withdrawalId.ToString()));
-        await BankFeedHttp.RunAsync();
+        await ApproveAndPayAsync(payee, withdrawalId, amount);
 
         using var scopeAfter = FunctionalTestSetup.ScopeFactory.CreateScope();
         var dbAfter = scopeAfter.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -199,6 +148,70 @@ internal static class CustodialHttp
             ? Json(HttpStatusCode.BadRequest, new { errors = new { Line = new[] { "The payout was not posted." } } })
             : Json(HttpStatusCode.Created, new { id = payout.Value });
     }
+
+    /// <summary>The Customer's Adviser, a TenantAdmin of the tenant to approve (one is added when there is none), and
+    /// a Verified nominated bank account in the Account's currency (added straight to the database when there is
+    /// none).</summary>
+    private static async Task<Payee> PayeeAsync(Guid accountId)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var account = await db.Accounts.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.PublicId == accountId);
+        var tenantId = account.TenantId;
+        var currency = account.Currency.Trim();
+        var customer = await db.DomainUsers.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.Id == account.CustomerId);
+        var adviser = await db.DomainUsers.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.Id == customer.AdviserId);
+        var approver = await db.DomainUsers.IgnoreQueryFilters().AsNoTracking()
+                           .Where(row => row.TenantId == tenantId && row.Role == UserRole.TenantAdmin && row.Status == UserStatus.Active)
+                           .OrderBy(row => row.Id)
+                           .FirstOrDefaultAsync()
+                       ?? await TestApp.CreatePersonAsync(
+                           UserRole.TenantAdmin, "Wes Approver", $"wes-{Guid.NewGuid():N}@withdrawals.example", "Password1!", tenantId);
+        var nominated = await db.NominatedBankAccounts.IgnoreQueryFilters().AsNoTracking()
+            .Where(row => row.CustomerId == customer.Id && row.Currency == currency && row.Status == NominatedBankAccountStatus.Verified)
+            .Select(row => (Guid?)row.PublicId)
+            .FirstOrDefaultAsync();
+        if (nominated is null)
+        {
+            var row = Domain.Entities.NominatedBankAccount.Add(
+                tenantId, customer.Id, await db.Set<Domain.Entities.Currency>().SingleAsync(item => item.Code == currency),
+                "ANZ", customer.Name, "06-0123-0456789-00", adviser.Id, DateTimeOffset.UtcNow);
+            row.Verify(approver.Id, "Seeded for a test withdrawal", DateTimeOffset.UtcNow);
+            row.CreatedBy = "test";
+            db.NominatedBankAccounts.Add(row);
+            await db.SaveChangesAsync();
+            nominated = row.PublicId;
+        }
+
+        return new Payee(tenantId, currency, adviser, approver, nominated.Value);
+    }
+
+    /// <summary>The approver approves the withdrawal, the fake bank accepts it and its debit line is processed.</summary>
+    private static async Task ApproveAndPayAsync(Payee payee, Guid withdrawalId, decimal amount)
+    {
+        var approverToken = (await TestApp.IssueAccessTokenAsync(payee.Approver)).AccessToken;
+        var item = await AccountHttp.Send(HttpMethod.Get, $"/withdrawals/{withdrawalId}", approverToken);
+        using (var json = JsonDocument.Parse(await item.Content.ReadAsStringAsync()))
+        {
+            var approve = await AccountHttp.Send(HttpMethod.Post, $"/withdrawals/{withdrawalId}/approve", approverToken,
+                new { rowVersion = json.RootElement.GetProperty("rowVersion").GetString() });
+            approve.StatusCode.ShouldBe(HttpStatusCode.NoContent, await approve.Content.ReadAsStringAsync());
+        }
+
+        await BankFeedHttp.SendAsync();
+        var clientMoney = await BankFeedHttp.ClientMoneyAccountAsync(payee.TenantId, payee.Currency);
+        BankFeedHttp.Feed.Add(clientMoney.AccountNumber, new Application.BankFeed.BankFeedLine(
+            "payout-" + Guid.NewGuid().ToString("N"), DateOnly.FromDateTime(DateTime.UtcNow), BankLineDirection.Debit, amount,
+            payee.Currency, null, null, null, EndToEndId: withdrawalId.ToString()));
+        await BankFeedHttp.RunAsync();
+    }
+
+    private sealed record Payee(
+        int TenantId,
+        string Currency,
+        Domain.Entities.User Adviser,
+        Domain.Entities.User Approver,
+        Guid NominatedBankAccountId);
 
     /// <summary>A <c>TransferIn</c> with source <c>Manual</c>, written straight to the database, as a person could
     /// enter it on a Custodial account before deposit matching (R35).</summary>
@@ -275,12 +288,65 @@ internal static class CustodialHttp
         TransactionHttp.Send(
             HttpMethod.Post, $"/transactions/{transactionId}/reverse", accessToken, idempotencyKey: Guid.NewGuid());
 
+    /// <summary>
+    /// Closes an account as the platform does. An External account takes <c>POST /accounts/{id}/close</c>. A
+    /// Custodial account is closed by an account closure (account-closure §10 fan-out): the Customer's Adviser
+    /// requests it, with a Verified nominated bank account when there is cash to pay out; a TenantAdmin approves the
+    /// payout's withdrawal and the fake bank's debit line is processed, as <see cref="WithdrawAsync"/> does. Answers
+    /// 204 when the account is Closed, or the refusal.
+    /// </summary>
     public static async Task<HttpResponseMessage> CloseAsync(string accessToken, Guid accountId)
     {
-        var get = await AccountHttp.Send(HttpMethod.Get, $"/accounts/{accountId}", accessToken);
-        using var json = JsonDocument.Parse(await get.Content.ReadAsStringAsync());
-        var rowVersion = json.RootElement.GetProperty("rowVersion").GetString();
-        return await AccountHttp.Send(HttpMethod.Post, $"/accounts/{accountId}/close", accessToken, new { rowVersion });
+        bool custodial;
+        using (var scope = FunctionalTestSetup.ScopeFactory.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            custodial = (await db.Accounts.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.PublicId == accountId))
+                .CustodyMode == CustodyMode.Custodial;
+        }
+
+        if (!custodial)
+        {
+            var get = await AccountHttp.Send(HttpMethod.Get, $"/accounts/{accountId}", accessToken);
+            using var json = JsonDocument.Parse(await get.Content.ReadAsStringAsync());
+            var rowVersion = json.RootElement.GetProperty("rowVersion").GetString();
+            return await AccountHttp.Send(HttpMethod.Post, $"/accounts/{accountId}/close", accessToken, new { rowVersion });
+        }
+
+        var payee = await PayeeAsync(accountId);
+        var adviserToken = (await TestApp.IssueAccessTokenAsync(payee.Adviser)).AccessToken;
+        var request = await TransactionHttp.Send(HttpMethod.Post, $"/accounts/{accountId}/closures", adviserToken,
+            new Dictionary<string, object?>
+            {
+                ["nominatedBankAccountId"] = payee.NominatedBankAccountId,
+                ["memo"] = "Closed for a test"
+            }, Guid.NewGuid());
+        if (request.StatusCode != HttpStatusCode.Created)
+        {
+            return request;
+        }
+
+        var closureId = await ReadIdAsync(request);
+        var closure = await ClosureAsync(adviserToken, accountId, closureId);
+        if (closure.GetProperty("status").GetString() == "InProgress")
+        {
+            var withdrawalId = closure.GetProperty("withdrawalId").GetGuid();
+            await ApproveAndPayAsync(payee, withdrawalId, closure.GetProperty("payoutAmount").GetDecimal());
+            closure = await ClosureAsync(adviserToken, accountId, closureId);
+        }
+
+        return closure.GetProperty("status").GetString() == "Completed"
+            ? new HttpResponseMessage(HttpStatusCode.NoContent)
+            : Json(HttpStatusCode.BadRequest, new { errors = new { Closure = new[] { $"The closure is {closure.GetProperty("status").GetString()}." } } });
+    }
+
+    private static async Task<JsonElement> ClosureAsync(string accessToken, Guid accountId, Guid closureId)
+    {
+        var response = await AccountHttp.Send(HttpMethod.Get, $"/accounts/{accountId}/closures/{closureId}", accessToken);
+        var content = await response.Content.ReadAsStringAsync();
+        response.StatusCode.ShouldBe(HttpStatusCode.OK, content);
+        using var json = JsonDocument.Parse(content);
+        return json.RootElement.Clone();
     }
 
     public static async Task<Dictionary<string, string[]>> ErrorsAsync(HttpResponseMessage response)

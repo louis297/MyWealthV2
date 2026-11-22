@@ -1,3 +1,4 @@
+using MyWealthV2.Application.AccountClosures;
 using Microsoft.Extensions.Logging;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Domain.Entities;
@@ -90,6 +91,9 @@ public sealed class SendBankPayments(
             {
                 payment.Reject(reason);
                 withdrawal.MarkFailed(reason);
+                // Account closure R20: the bank refusing a closure's payment ends the closure.
+                await AccountClosureCompletion.EndWithWithdrawalAsync(
+                    db, withdrawal.Id, AccountClosureCancelReason.PaymentFailed, time.GetUtcNow(), token);
             }
             else
             {

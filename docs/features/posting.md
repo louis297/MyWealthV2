@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-25
-last_updated: 2026-11-20
+last_updated: 2026-11-22
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -24,6 +24,7 @@ related:
   - transaction-source.md
   - deposit-matching.md
   - withdrawals.md
+  - account-closure.md
 ---
 
 # Posting
@@ -454,3 +455,14 @@ Accepted with [withdrawals.md](withdrawals.md).
 - A `TransferOut` may be a **payout**: posted by the withdrawal flow from the bank's debit line, with source `Payment` (the withdrawal's PublicId), server `bookedAt`, memo `Withdrawal`, no `reference`, and a payment detail (`TransactionPaymentDetails`: value date, reference sent, payee name, masked payee account). The item carries `payment` on a payout and its Reversal, `null` otherwise. A payout is reversed only by its flow (a returned payout).
 - R9 on a Custodial account: every write that lowers cash must keep **available cash** (cash `SUM` minus the open withdrawals' reserved cash) `≥ 0`, checked under the Account lock (withdrawals R36, R37). The payout is the one exception: it releases its own reservation. External accounts keep R9 as it is.
 - R16: on a Custodial account `TransferOut` is refused on `POST /transactions` for every caller, and `CloseOut` is allowed only when `0 < SUM <` one minor unit of the currency (custody-modes amendment 2026-11-20, withdrawals R45, R46). External accounts unchanged.
+
+---
+
+## Amendment 2026-11-22 (account closure) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [account-closure.md](account-closure.md).
+
+- R16, R17: on a Custodial account `POST /transactions` refuses `CloseOut` for every amount and every caller → 400 `errors.Type` with `The remainder of a Custodial account is written off by its account closure. Request an account closure.` (account-closure R23). This replaces the remainder rule of the withdrawals amendment. External accounts unchanged.
+- R17: the only `CloseOut` on a Custodial account from now on is the **remainder write-off** an account closure posts (source `AccountClosure`, `Transaction.PostRemainderWriteOff`, account-closure R18). R17 (amount equal to minus the `SUM`) holds for it, and it is exempt from R8 like every `CloseOut`.
+- R12: `CloseAccount` refuses an Open Custodial account (account-closure R22); inside the closure flow the cash `SUM = 0` and no-holdings rules still hold before `Account.Close()`.
+- R6: on a **closing** account (an account closure `InProgress`), `POST /transactions` and `POST /transactions/{id}/reverse` of a Transaction with a leg on it → 400 with `This account is being closed and accepts no new activity.` under the empty `errors` key, directly after the Closed-account check (account-closure R12). No idempotency record is written.

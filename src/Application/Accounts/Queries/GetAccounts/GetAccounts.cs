@@ -1,3 +1,4 @@
+using MyWealthV2.Application.AccountClosures;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
@@ -152,6 +153,7 @@ public class GetAccountsQueryHandler(IApplicationDbContext db, ICurrentUser curr
             ).ToDictionaryAsync(row => row.AccountId, row => row.Sum, cancellationToken);
 
         var reserved = await AccountCash.ReservedAsync(db, accountIds, cancellationToken);
+        var closures = await AccountClosureReader.LatestAsync(db, accountIds, cancellationToken);
 
         return new PagedList<AccountDto>
         {
@@ -160,7 +162,8 @@ public class GetAccountsQueryHandler(IApplicationDbContext db, ICurrentUser curr
                 row.tenant,
                 row.customer,
                 cashBalances.GetValueOrDefault(row.account.Id),
-                reserved.GetValueOrDefault(row.account.Id))).ToList(),
+                reserved.GetValueOrDefault(row.account.Id),
+                closures.GetValueOrDefault(row.account.Id))).ToList(),
             Page = request.Page,
             PageSize = request.PageSize,
             TotalCount = totalCount

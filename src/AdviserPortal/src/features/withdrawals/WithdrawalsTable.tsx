@@ -56,7 +56,11 @@ export function WithdrawalsTable({ items, places, compact = false }: {
                 )}
                 <TableCell>{formatAmount(item.amount, places(item.currency))}</TableCell>
                 <TableCell>{item.currency}</TableCell>
-                <TableCell>{payeeLabel(item.nominatedBankAccount)}</TableCell>
+                <TableCell>
+                  {payeeLabel(item.nominatedBankAccount)}
+                  {/* D56: the payout of an account closure. */}
+                  {item.accountClosureId ? <p className="text-muted-foreground text-xs">Account closure</p> : null}
+                </TableCell>
                 <TableCell>
                   <StatusBadge status={withdrawalStatusLabel(item.status)} />
                 </TableCell>

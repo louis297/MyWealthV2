@@ -7,6 +7,8 @@ const refusedOnCustodial: ReadonlySet<string> = new Set([
   "TransferIn",
   // D44 (withdrawals R45): money leaves as a withdrawal to a nominated bank account.
   "TransferOut",
+  // D53 (account-closure R23): the account closure writes off a remainder.
+  "CloseOut",
   "Interest",
   "Opening",
   "OpeningHoldings",
@@ -37,17 +39,15 @@ export function minorUnit(decimalPlaces: number | undefined) {
 }
 
 /**
- * D44 (withdrawals R46): on a Custodial account a CloseOut writes off only a remainder smaller than one minor unit.
- * The portal does not offer CloseOut on an External account.
+ * Account closure R7: the payout (the cash balance rounded down to the minor unit) and the remainder below it.
+ * Ledger amounts have at most 4 decimals, so the split is done in units of 0.0001 to avoid binary float drift.
  */
-export function offersCloseOut(
-  account: { custodyMode: string; status: string; cashBalance: number },
-  decimalPlaces: number | undefined,
-): boolean {
-  return isCustodial(account)
-    && account.status === "Open"
-    && account.cashBalance > 0
-    && account.cashBalance < minorUnit(decimalPlaces);
+export function closureAmounts(cashBalance: number, decimalPlaces: number | undefined) {
+  const places = Math.min(decimalPlaces ?? 2, 4);
+  const units = Math.round(cashBalance * 10000);
+  const step = 10 ** (4 - places);
+  const payoutUnits = Math.floor(units / step) * step;
+  return { payout: payoutUnits / 10000, remainder: (units - payoutUnits) / 10000 };
 }
 
 /** D44 (withdrawals R47): a Custodial account of another Customer is not a transfer destination. */

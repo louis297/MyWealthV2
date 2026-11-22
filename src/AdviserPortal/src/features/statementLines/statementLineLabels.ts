@@ -37,6 +37,8 @@ export function reasonLabel(reason: string | null | undefined) {
       return "Recalled, but the cash is gone";
     case "ReturnRejected":
       return "Bank refused the return";
+    case "AccountClosing":
+      return "Account being closed";
     default:
       return reason ?? "";
   }

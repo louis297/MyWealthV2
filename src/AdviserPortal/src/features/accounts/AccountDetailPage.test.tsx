@@ -1846,12 +1846,4 @@ describe("AccountDetailPage withdrawals (withdrawals D44)", () => {
     expect(await screen.findByText("Available")).toBeInTheDocument();
     expect(screen.queryByText("Reserved for withdrawals")).not.toBeInTheDocument();
   });
-
-  it("offers CloseOut only for a remainder below the minor unit", async () => {
-    renderDetail(serve({ cashBalance: 0.004, reservedCash: 0, availableCash: 0.004 }));
-
-    const nav = await screen.findByRole("navigation", { name: "Transaction actions" });
-    expect(within(nav).getByRole("link", { name: "CloseOut" })).toHaveAttribute(
-      "href", `/accounts/${accountId}/transactions/new?type=CloseOut`);
-  });
 });

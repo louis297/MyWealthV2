@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-10
-last_updated: 2026-11-18
+last_updated: 2026-11-22
 related:
   - internal-transfers.md
   - leg-accounts.md
@@ -25,6 +25,7 @@ related:
   - ../glossary.md
   - custody-modes.md
   - external-caller-numbers.md
+  - account-closure.md
 ---
 
 # FX conversions
@@ -357,3 +358,11 @@ Only after `accepted`. The tree must build after each commit. Split each behavio
 ## Amendment 2026-11-14 (UTC instants)
 
 Accepted with [utc-instants](../fixes/utc-instants.md). R9 and R10 use the UTC date of `bookedAt`. A quote or create `bookedAt` with no offset → 400. The item example shows the UTC form.
+
+---
+
+## Amendment 2026-11-22 (account closure) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [account-closure.md](account-closure.md).
+
+- `POST /transactions/fx` and `POST /transactions/fx/quote` with a closing account (an account closure `InProgress`) on either side, and the reverse of a conversion with a leg on one, → 400 with `This account is being closed and accepts no new activity.` under the empty `errors` key, directly after the Closed-account check (account-closure R12).

@@ -26,6 +26,8 @@ export type Withdrawal = {
   returnTransactionId: string | null;
   failureReason: string | null;
   returnReason: string | null;
+  /** account-closure R28: the closure that created the withdrawal, else null. */
+  accountClosureId?: string | null;
   rowVersion: string;
 };
 

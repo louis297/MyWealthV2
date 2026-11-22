@@ -3,6 +3,7 @@ using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Transactions;
+using MyWealthV2.Domain.Enums;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationException;
 
@@ -37,6 +38,15 @@ public class CloseAccountCommandHandler(IApplicationDbContext db, ICurrentUser c
         if (!string.Equals(expected, request.RowVersion, StringComparison.Ordinal))
         {
             throw new ConcurrencyException();
+        }
+
+        // Account closure R22: an Open Custodial account is closed only by an account closure, for every caller.
+        // A Closed one is still 204 (accounts R12).
+        if (account.CustodyMode == CustodyMode.Custodial && account.Status == AccountStatus.Open)
+        {
+            throw new ValidationException([
+                new ValidationFailure(string.Empty, "A Custodial account is closed with an account closure.")
+            ]);
         }
 
         await db.ExecuteInTransactionAsync(async token =>

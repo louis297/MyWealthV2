@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-10
-last_updated: 2026-11-20
+last_updated: 2026-11-22
 related:
   - leg-accounts.md
   - posting.md
@@ -21,6 +21,7 @@ related:
   - ../glossary.md
   - custody-modes.md
   - withdrawals.md
+  - account-closure.md
 ---
 
 # Internal transfers
@@ -304,3 +305,11 @@ Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md
 
 - New rule (roadmap D14, withdrawals R47): `POST /transactions/transfer` between two Custodial accounts of two different Customers → 400 `errors.ToAccountId` with the message `Cash can be transferred between Custodial accounts of the same customer only.` A transfer to another Customer's Custodial account would let cash leave through that Customer's own nominated bank account, around the review of a third-party payment (roadmap X4). External accounts unchanged. Existing transfers stay and can still be reversed.
 - R10 on a Custodial from Account: the from Account's **available cash** (cash `SUM` minus reserved cash) must stay `≥ 0` (withdrawals R36, R37).
+
+---
+
+## Amendment 2026-11-22 (account closure) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [account-closure.md](account-closure.md).
+
+- `POST /transactions/transfer` with a closing account (an account closure `InProgress`) on either side, and the reverse of a transfer with a leg on one, → 400 with `This account is being closed and accepts no new activity.` under the empty `errors` key, directly after the Closed-account check (account-closure R12).

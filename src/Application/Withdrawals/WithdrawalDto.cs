@@ -40,6 +40,9 @@ public sealed class WithdrawalDto
 
     public string? ReturnReason { get; init; }
 
+    /// <summary>The PublicId of the account closure that created the withdrawal, else null (account-closure R28).</summary>
+    public Guid? AccountClosureId { get; init; }
+
     public required string RowVersion { get; init; }
 }
 

@@ -1,3 +1,4 @@
+using MyWealthV2.Application.AccountClosures;
 using System.Text.Json;
 using FluentValidation.Results;
 using MyWealthV2.Application.Accounts;
@@ -190,6 +191,9 @@ public class CreateInternalTransferCommandHandler(
                 ]);
             }
         }
+
+        // Account closure R12: neither side may be closing.
+        await AccountClosing.EnsureNotClosingAsync(db, [from.Account.Id, to.Account.Id], cancellationToken);
 
         foreach (var side in new[] { from, to })
         {

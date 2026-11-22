@@ -3,7 +3,7 @@ title: Domain model
 status: accepted
 language: en
 created: 2026-09-11
-updated: 2026-11-21
+updated: 2026-11-22
 related:
   - README.md
   - glossary.md
@@ -311,6 +311,8 @@ Field rules: [features/accounts.md](features/accounts.md). Landed in the repo 20
 
 Close requires cash `SUM = 0` and no `Holdings` rows ([features/holdings.md](features/holdings.md)).
 
+- (Account closure) A Custodial account is closed only by an `AccountClosure` (§8.13); the plain close is refused for it in Application. While a closure is `InProgress` the Account is **closing**: it stays Open but accepts no hand write and no portfolio assignment, and deposit matching sends its receipts to suspense ([features/account-closure.md](features/account-closure.md)).
+
 ### 8.6 Transaction (accepted — posting slice; landed)
 
 | Type | Kind | Notes |
@@ -348,6 +350,7 @@ Invariants:
 - (Deposit matching) Source kind `BankFeed` (3) has the statement line's PublicId as its id and is not hand-reversible. `PostBankDeposit` builds a deposit: one `Principal` `TransferIn` cash leg, `amount > 0`, source `BankFeed`, a bank receipt detail. A deposit is undone only by its flow, through `Reverse` with source `BankFeed`. `CustodyRules.AllowsManualEntry(Custodial, TransferIn)` is `false`: no person enters a `TransferIn` on a Custodial account ([features/deposit-matching.md](features/deposit-matching.md)).
 
 - (Withdrawals) Source kind `Payment` (4) has the withdrawal's PublicId as its id and is not hand-reversible. `PostPayout` builds a payout: one `Principal` `TransferOut` cash leg, the amount given positive and posted negative, source `Payment`, a payment detail (`TransactionPaymentDetail`: value date, reference sent, payee name, masked payee account; 0..1 per Transaction, copied by `Reverse`). A payout is undone only by its flow (a returned payout), through `Reverse` with source `Payment`. `CustodyRules` refuses a hand `TransferOut` on a Custodial account, allows a hand `CloseOut` there only for a remainder below the currency's minor unit, and allows an `InternalTransfer` between Custodial accounts of the same Customer only ([features/withdrawals.md](features/withdrawals.md)).
+- (Account closure) Source kind `AccountClosure` (5) has the closure's PublicId as its id and is not hand-reversible. `PostRemainderWriteOff` builds the remainder write-off: one `Principal` `CloseOut` cash leg of minus the cash `SUM`, where `0 < SUM <` one minor unit, source `AccountClosure`. On a Custodial account no person enters a `CloseOut` (`CustodyRules`).
 
 Field rules: [features/posting.md](features/posting.md), [features/holdings.md](features/holdings.md), [features/buy-sell.md](features/buy-sell.md), [features/split.md](features/split.md), [features/leg-accounts.md](features/leg-accounts.md), and [features/adjustments.md](features/adjustments.md).
 
@@ -388,6 +391,8 @@ Amendment 2026-11-21 (bank returns, accepted): statuses `ReturnSent` and `Return
 
 Amendment 2026-11-21 (bank reconciliation, accepted): `BankFeedCursor` gains the statement balance the bank sent with the last stored page, its time, and the opening balance, set once by the first page with a balance (`StorePage`). A page without a balance clears the balance and keeps the opening ([features/bank-reconciliation.md](features/bank-reconciliation.md)).
 
+Amendment 2026-11-22 (account closure, accepted): unmatched reason `AccountClosing` (12), after `AccountClosed`: the reference names an Account with a closure `InProgress`; a returned payout of such an Account gets it too ([features/account-closure.md](features/account-closure.md)).
+
 ### 8.10 Nominated bank account (accepted — withdrawals slice)
 
 | Type | Kind | Notes |
@@ -419,6 +424,17 @@ Amendment 2026-11-21 (bank returns, accepted): `OutgoingPaymentKind` (`Withdrawa
 | `ReconciliationItemClass` | Enum | `Break`, `Timing`, `Known`; one fixed class per kind |
 
 Invariants: the items of an `Agreed` or `Breaks` run add up to bank balance minus Custodial cash; a run is `Agreed` exactly when it has no Break item; a run and its items never change; a run counts only its own Tenant's accounts and lines. No domain event. Field rules: [features/bank-reconciliation.md](features/bank-reconciliation.md).
+
+### 8.13 Account closure (accepted — account-closure slice)
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `AccountClosure` | Aggregate | The flow that closes one Custodial account: requester and time, memo, cash balance at request, payout (the balance rounded down to the minor unit), nominated bank account and withdrawal (with a payout), write-off amount and Transaction, status, cancel reason, completed or ended time. `StartWithPayout` → `InProgress`; `CompleteAtOnce` → `Completed`; `Complete`; `Cancel(reason)`. |
+| `AccountClosureStatus` | Enum | `InProgress`, `Completed`, `Cancelled` |
+| `AccountClosureCancelReason` | Enum | `WithdrawalRejected`, `WithdrawalCancelled`, `PaymentFailed`, `NotClosable` |
+| `ClosureAmounts` | Static | `Split(cashSum, decimalPlaces)` → payout and remainder |
+
+Invariants: an Account has at most one closure `InProgress` (filtered unique index, Account lock); a closure with a payout has exactly one withdrawal of that amount, created with it, and one without a payout is never `InProgress`; a closure is `Completed` only together with `Account.Close()` in one database transaction; it follows its withdrawal (rejected, cancelled, failed → `Cancelled`). No domain event of its own. Field rules: [features/account-closure.md](features/account-closure.md).
 
 ---
 
@@ -476,6 +492,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-20 | Deposit matching accepted: `BankStatementLine`, `BankFeedCursor`, `DepositReferenceScanner` (§8.9); source kind `BankFeed`, `PostBankDeposit` and `TransactionBankReceiptDetail` (§8.6); `ClientMoneyAccount.BankConnection` (§8.8). [features/deposit-matching.md](features/deposit-matching.md). |
 | 2026-11-20 | Withdrawals accepted: `NominatedBankAccount` (§8.10); `Withdrawal`, `OutgoingPayment` (§8.11); reserved and available cash on a Custodial account (§8.5); source kind `Payment`, `PostPayout`, `TransactionPaymentDetail` and the Custodial `TransferOut`, `CloseOut` and `InternalTransfer` rules (§8.6); the payout fields of `BankStatementLine` (§8.9). [features/withdrawals.md](features/withdrawals.md). |
 | 2026-11-21 | Bank reconciliation accepted: `BankReconciliation`, `BankReconciliationItem` and their enums (§8.12); `BankFeedCursor` statement balance and opening balance (§8.9); report scope `Tenant` (§11). [features/bank-reconciliation.md](features/bank-reconciliation.md) |
+| 2026-11-22 | Account closure accepted: `AccountClosure`, its enums and `ClosureAmounts` (§8.13); the closing account (§8.5); source kind `AccountClosure` and `PostRemainderWriteOff`, hand `CloseOut` refused on Custodial (§8.6); unmatched reason `AccountClosing` (§8.9). [features/account-closure.md](features/account-closure.md) |
 
 ---
 

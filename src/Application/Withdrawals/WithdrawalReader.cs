@@ -67,6 +67,10 @@ internal static class WithdrawalReader
                 SentAt = row.AcceptedAt
             }, cancellationToken);
 
+        var closures = await db.AccountClosures.AsNoTracking()
+            .Where(row => row.WithdrawalId != null && withdrawalIds.Contains(row.WithdrawalId.Value))
+            .ToDictionaryAsync(row => row.WithdrawalId!.Value, row => row.PublicId, cancellationToken);
+
         // R25: a Customer reads neither the memo nor the decision's note.
         var customerView = currentUser.Role == UserRole.Customer;
         return rows.Select(row =>
@@ -105,6 +109,7 @@ internal static class WithdrawalReader
                 ReturnTransactionId = row.ReturnTransactionId is int returned ? transactions[returned] : null,
                 FailureReason = row.FailureReason?.ToString(),
                 ReturnReason = row.ReturnReason,
+                AccountClosureId = closures.TryGetValue(row.Id, out var closure) ? closure : null,
                 RowVersion = Convert.ToBase64String(row.RowVersion ?? [])
             };
         }).ToList();

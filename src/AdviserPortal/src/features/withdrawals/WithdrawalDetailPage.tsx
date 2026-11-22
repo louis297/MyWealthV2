@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router";
 import { DetailGrid, DetailItem, Messages, Muted, Page, PageHeading, recordLinkClass, Section, StatusBadge } from "@/components/portal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppSelector } from "@/app/hooks";
 import { useGetAccountQuery } from "@/features/accounts/accountsApi";
@@ -26,6 +27,9 @@ import { formatInstant } from "@/shared/time/instant";
 
 export const changedWithdrawalSentence = "This withdrawal changed. Check it and try again.";
 
+/** D56: what rejecting or cancelling the payout of an account closure also does (account-closure R20). */
+export const stopsClosureSentence = "This also stops the account closure. The account stays open.";
+
 /** D47: one withdrawal, its decision and payment, and the actions the caller may take. */
 export function WithdrawalDetailPage() {
   const { id = "" } = useParams();
@@ -36,6 +40,7 @@ export function WithdrawalDetailPage() {
   const [act, { isLoading }] = useActOnWithdrawalMutation();
   const [note, setNote] = useState("");
   const [rejecting, setRejecting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [messages, setMessages] = useState<string[]>([]);
 
   if (problemStatus(error) === 404) {
@@ -51,6 +56,7 @@ export function WithdrawalDetailPage() {
   const tenantAdmin = me?.role === roles.tenantAdmin;
   const requested = item.status === "Requested";
   const cancellable = requested || (item.status === "Approved" && (item.payment?.attempts ?? 0) === 0);
+  const closurePayout = Boolean(item.accountClosureId);
 
   async function run(action: WithdrawalAction, actionNote: string | null) {
     try {
@@ -74,6 +80,7 @@ export function WithdrawalDetailPage() {
     <Page className="max-w-2xl">
       <PageHeading title="Withdrawal" />
       <Messages messages={messages} />
+      {closurePayout ? <p className="text-sm">This withdrawal pays out an account closure.</p> : null}
       <Card>
         <CardContent>
           <DetailGrid>
@@ -148,7 +155,8 @@ export function WithdrawalDetailPage() {
               </>
             ) : null}
             {cancellable ? (
-              <Button size="sm" variant="outline" disabled={isLoading} onClick={() => void run("cancel", optionalNote)}>
+              <Button size="sm" variant="outline" disabled={isLoading}
+                onClick={() => (closurePayout ? setCancelling(true) : void run("cancel", optionalNote))}>
                 Cancel withdrawal
               </Button>
             ) : null}
@@ -159,10 +167,28 @@ export function WithdrawalDetailPage() {
         <NoteDialog
           open
           title="Reject this withdrawal"
+          warning={closurePayout ? stopsClosureSentence : undefined}
           busy={isLoading}
           onConfirm={(reason) => { setRejecting(false); void run("reject", reason); }}
           onClose={() => setRejecting(false)}
         />
+      ) : null}
+      {cancelling ? (
+        <Dialog open onOpenChange={(next) => { if (!next) { setCancelling(false); } }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Cancel this withdrawal</DialogTitle>
+              <DialogDescription>{stopsClosureSentence}</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setCancelling(false)}>Keep it</Button>
+              <Button type="button" disabled={isLoading}
+                onClick={() => { setCancelling(false); void run("cancel", optionalNote); }}>
+                Cancel withdrawal
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       ) : null}
     </Page>
   );

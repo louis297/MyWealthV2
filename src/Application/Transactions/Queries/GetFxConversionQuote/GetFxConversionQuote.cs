@@ -1,3 +1,4 @@
+using MyWealthV2.Application.AccountClosures;
 using System.Text.Json;
 using FluentValidation.Results;
 using MyWealthV2.Application.Common.Interfaces;
@@ -141,6 +142,9 @@ public class GetFxConversionQuoteQueryHandler(
                 new ValidationFailure(string.Empty, "Cannot convert while the account is closed. Reopen the account first.")
             ]);
         }
+
+        // Account closure R12: no quote with a closing account on either side.
+        await AccountClosing.EnsureNotClosingAsync(db, [pair.From.Id, pair.To.Id], cancellationToken);
 
         // Custody modes R12: a Custodial quote takes no bookedAt; an External quote still defaults to now.
         var bookedAt = BookedAtByCustody.Resolve(

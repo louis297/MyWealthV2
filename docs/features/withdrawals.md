@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-20
-last_updated: 2026-11-21
+last_updated: 2026-11-22
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -33,6 +33,7 @@ related:
   - ../database-design.md
   - ../api-design.md
   - ../glossary.md
+  - account-closure.md
 ---
 
 # Nominated bank accounts and withdrawals
@@ -785,3 +786,17 @@ Status of this amendment: `accepted` (2026-11-21), together with [bank-returns.m
 - R34: rejection reasons gain `UnknownLine` (the bank knows no line to return).
 - R39: every other debit line is processed by [bank-returns.md](bank-returns.md) R2; a debit line whose `endToEndId` names a withdrawal R40 cannot pay (not a GUID, no such withdrawal in the Tenant, a payment `Rejected` or `Cancelled`, or one from another client money account) becomes `Unmatched` with reason `UnknownPayment` instead of waiting as `Received`.
 - R58: `BankPaymentRequest` carries either a payee or the outside id of the line returned (`returnOf`).
+
+---
+
+## Amendment 2026-11-22 (account closure) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [account-closure.md](account-closure.md).
+
+- R46 is replaced: a hand `CloseOut` on a Custodial account is refused for every amount (account-closure R23). The remainder is written off by the account closure.
+- R18–R24: an account closure with a payout creates a withdrawal inside its own request (account-closure R8): requested by the closure's requester at the same time, amount the payout (the cash balance rounded down to the minor unit), to the nominated bank account the closure names (checked as R20), reference the deposit reference (R23), memo the closure's memo. It has no `Idempotency-Key` of its own; the closure's key covers it. From then on it is an ordinary withdrawal: R28 approval, R30 cancel, R32 send, R40 payout.
+- R19: `POST /withdrawals` for a **closing** account (an account closure `InProgress`) → 400 with `This account is being closed and accepts no new activity.` under the empty `errors` key (account-closure R12). An account closure needs no open withdrawal on the Account (account-closure R5).
+- R27, R30, R33: rejecting or cancelling a closure's withdrawal, and a bank rejection of its payment, end the closure in the same database transaction (`Cancelled` with `WithdrawalRejected`, `WithdrawalCancelled` or `PaymentFailed`); the Account stays Open with its cash (account-closure R20).
+- R40: after the payout of a closure's withdrawal is posted, the same database transaction writes off the remainder, closes the Account and completes the closure (account-closure R17, R18). If the Account cannot be closed, the payout is still posted and the closure ends `NotClosable` (account-closure R19).
+- R42: a returned payout of an earlier withdrawal of a closing account → nothing posted, line `Unmatched` with reason `AccountClosing` (account-closure R14). A return to a Closed account is unchanged (`AccountClosed`), also after a completed closure (account-closure R21).
+- R25 (item): gains `accountClosureId`, the PublicId of the closure that created the withdrawal, else `null`.

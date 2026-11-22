@@ -1,3 +1,4 @@
+using MyWealthV2.Domain.Custody;
 using MyWealthV2.Domain.ValueObjects;
 
 namespace MyWealthV2.Domain.Entities;
@@ -187,6 +188,52 @@ public class Transaction : BaseAuditableEntity
             PublicId = Guid.NewGuid(),
             CashLegs = [TransactionCashLeg.Create(tenantId, accountId, -amount, currency)],
             PaymentDetail = TransactionPaymentDetail.Create(tenantId, payment)
+        };
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
+    }
+
+    /// <summary>The memo every remainder write-off carries (account-closure R18).</summary>
+    public const string RemainderWriteOffMemo = "Account closure remainder";
+
+    /// <summary>
+    /// Account closure R18: the remainder write-off. One <c>CloseOut</c> <c>Principal</c> cash leg of
+    /// <c>−cashSum</c>, which brings the cash <c>SUM</c> to exactly 0; source <c>AccountClosure</c>, memo
+    /// <see cref="RemainderWriteOffMemo"/>, no reference. Only a remainder (<c>0 &lt; cashSum &lt; u</c>) is written off.
+    /// The flow builds it without the manual entry matrix (custody-modes R7); it is exempt from the minor-unit rule
+    /// (posting R8).
+    /// </summary>
+    public static Transaction PostRemainderWriteOff(
+        int tenantId,
+        int accountId,
+        string accountCurrency,
+        int decimalPlaces,
+        decimal cashSum,
+        DateTimeOffset bookedAt,
+        TransactionSource source)
+    {
+        if (cashSum <= 0m || !ClosureAmounts.IsRemainder(cashSum, decimalPlaces))
+        {
+            throw new DomainException("Only a remainder smaller than the currency's minor unit is written off.");
+        }
+
+        if (source.Kind != TransactionSourceKind.AccountClosure)
+        {
+            throw new DomainException("A remainder write-off comes from an account closure.");
+        }
+
+        var currency = Money.Create(0m, accountCurrency).Currency;
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            Type = TransactionType.CloseOut,
+            BookedAt = bookedAt.ToUniversalTime(),
+            Memo = RemainderWriteOffMemo,
+            Reference = null,
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
+            PublicId = Guid.NewGuid(),
+            CashLegs = [TransactionCashLeg.Create(tenantId, accountId, -cashSum, currency)]
         };
         transaction.AddDomainEvent(new TransactionPosted(transaction));
         return transaction;

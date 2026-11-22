@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using MyWealthV2.Application.AccountClosures;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Transactions;
@@ -11,7 +13,7 @@ namespace MyWealthV2.Application.BankFeed;
 /// Withdrawals R39–R42: the debit line of a withdrawal's payment posts its payout, and the credit line that returns
 /// it reverses the payout. The caller runs each inside its own database transaction, one line at a time.
 /// </summary>
-internal sealed class BankPayouts(IApplicationDbContext db, TimeProvider time)
+internal sealed class BankPayouts(IApplicationDbContext db, TimeProvider time, ICurrencyCatalog catalog, ILogger logger)
 {
     /// <summary>R40: true when the debit line's end-to-end id names a withdrawal of the line's Tenant that its
     /// payment can be paid for, and the line was handled; false when it names none, so the caller goes on
@@ -77,6 +79,9 @@ internal sealed class BankPayouts(IApplicationDbContext db, TimeProvider time)
         withdrawal.MarkPaid(payout.Id);
         payment.MarkPaid();
         line.MarkPayout(account.Id, payout.Id, withdrawal.Id, now);
+
+        // Account closure R17–R19: the payout of a closure's withdrawal completes the closure in this transaction.
+        await AccountClosureCompletion.AfterPayoutAsync(db, catalog, logger, withdrawal, now, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return true;
     }
@@ -110,6 +115,14 @@ internal sealed class BankPayouts(IApplicationDbContext db, TimeProvider time)
         {
             // A Closed account holds nothing; the money is a receipt for a TenantAdmin to place (deposit-matching R26).
             line.MarkUnmatched(UnmatchedReason.AccountClosed);
+            await db.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+
+        if (await AccountClosing.IsClosingAsync(db, account.Id, cancellationToken))
+        {
+            // Account closure R14: the closing account's payout is fixed; the money waits in suspense.
+            line.MarkUnmatched(UnmatchedReason.AccountClosing);
             await db.SaveChangesAsync(cancellationToken);
             return true;
         }

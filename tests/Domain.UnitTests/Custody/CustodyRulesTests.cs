@@ -36,7 +36,7 @@ public class CustodyRulesTests
             [TransactionType.TransferIn] = false,
             [TransactionType.TransferOut] = false,
             [TransactionType.Interest] = false,
-            [TransactionType.CloseOut] = true,
+            [TransactionType.CloseOut] = false,
             [TransactionType.Opening] = false,
             [TransactionType.Reversal] = true,
             [TransactionType.Dividend] = false,
@@ -118,6 +118,7 @@ public class CustodyRulesTests
     [TestCase(CustodyMode.Custodial, TransactionSourceKind.Seed, false)]
     [TestCase(CustodyMode.Custodial, TransactionSourceKind.Rebalance, true)]
     [TestCase(CustodyMode.Custodial, TransactionSourceKind.BankFeed, false)]
+    [TestCase(CustodyMode.Custodial, TransactionSourceKind.AccountClosure, false)]
     public void AllowsHandReverse_MatchesTransactionSourceR12ToR15(
         CustodyMode custodyMode,
         TransactionSourceKind sourceKind,
@@ -138,25 +139,22 @@ public class CustodyRulesTests
         CustodyRules.RefusalMessage(CustodyMode.Custodial, TransactionType.TransferOut).ShouldBe(
             "Withdrawals from a Custodial account are paid to the customer's nominated bank account. Request a withdrawal.");
 
-    [TestCase(0.004, "USD", 2, true)]
-    [TestCase(0.0099, "USD", 2, true)]
-    [TestCase(0.01, "USD", 2, false)]
-    [TestCase(5.00, "USD", 2, false)]
-    [TestCase(0, "USD", 2, false)]
-    [TestCase(-0.004, "USD", 2, false)]
-    [TestCase(0.4, "JPY", 0, true)]
-    [TestCase(1, "JPY", 0, false)]
-    public void CloseOut_OnACustodialAccount_IsAllowedOnlyBelowTheMinorUnit(decimal sum, string currency, int places, bool allowed) =>
-        (CustodyRules.CloseOutRefusal(CustodyMode.Custodial, sum, currency, places) is null).ShouldBe(allowed);
+    private const string CloseOutMessage =
+        "The remainder of a Custodial account is written off by its account closure. Request an account closure.";
+
+    [TestCase(0.004, "USD", 2)]
+    [TestCase(0.0099, "USD", 2)]
+    [TestCase(0.01, "USD", 2)]
+    [TestCase(5.00, "USD", 2)]
+    [TestCase(0, "USD", 2)]
+    [TestCase(0.4, "JPY", 0)]
+    public void CloseOut_OnACustodialAccount_IsRefusedForEveryAmount_WithTheAccountClosureMessage(
+        decimal sum, string currency, int places) =>
+        CustodyRules.CloseOutRefusal(CustodyMode.Custodial, sum, currency, places).ShouldBe(CloseOutMessage);
 
     [Test]
-    public void CloseOut_Refusal_NamesTheMinorUnitAndTheCurrency()
-    {
-        CustodyRules.CloseOutRefusal(CustodyMode.Custodial, 5m, "USD", 2).ShouldBe(
-            "Only a remainder smaller than 0.01 USD can be closed out on a Custodial account. Withdraw the balance first.");
-        CustodyRules.CloseOutRefusal(CustodyMode.Custodial, 5m, "JPY", 0).ShouldBe(
-            "Only a remainder smaller than 1 JPY can be closed out on a Custodial account. Withdraw the balance first.");
-    }
+    public void CloseOut_OnACustodialAccount_IsARefusedCellOfTheMatrix() =>
+        CustodyRules.RefusalMessage(CustodyMode.Custodial, TransactionType.CloseOut).ShouldBe(CloseOutMessage);
 
     [TestCase(5)]
     [TestCase(0.004)]

@@ -24,6 +24,8 @@ public interface IApplicationDbContext
 
     DbSet<OutgoingPayment> OutgoingPayments { get; }
 
+    DbSet<AccountClosure> AccountClosures { get; }
+
     DbSet<Instrument> Instruments { get; }
 
     DbSet<Account> Accounts { get; }

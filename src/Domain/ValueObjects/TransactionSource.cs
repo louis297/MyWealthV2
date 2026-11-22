@@ -54,6 +54,17 @@ public sealed class TransactionSource : ValueObject
         return new TransactionSource(TransactionSourceKind.Payment, withdrawalPublicId);
     }
 
+    /// <summary>A remainder write-off's source: the PublicId of the account closure (account-closure R24).</summary>
+    public static TransactionSource AccountClosure(Guid closurePublicId)
+    {
+        if (closurePublicId == Guid.Empty)
+        {
+            throw new DomainException("An account closure source needs the closure's PublicId.");
+        }
+
+        return new TransactionSource(TransactionSourceKind.AccountClosure, closurePublicId);
+    }
+
     /// <summary>The source as stored on a Transaction row.</summary>
     internal static TransactionSource FromStored(TransactionSourceKind kind, Guid? publicId) =>
         kind switch
@@ -63,6 +74,7 @@ public sealed class TransactionSource : ValueObject
             TransactionSourceKind.Rebalance => Rebalance(publicId ?? Guid.Empty),
             TransactionSourceKind.BankFeed => BankFeed(publicId ?? Guid.Empty),
             TransactionSourceKind.Payment => Payment(publicId ?? Guid.Empty),
+            TransactionSourceKind.AccountClosure => AccountClosure(publicId ?? Guid.Empty),
             _ => new TransactionSource(kind, publicId)
         };
 
