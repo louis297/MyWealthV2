@@ -38,9 +38,16 @@ public sealed class InstrumentPriceStore(ApplicationDbContext db, TimeProvider t
         return Money.Create(row.Value, quote);
     }
 
+    public Task UpsertAsync(
+        IReadOnlyList<InstrumentPriceQuote> quotes,
+        DateTimeOffset fetchedAt,
+        CancellationToken cancellationToken = default) =>
+        UpsertAsync(quotes, fetchedAt, SourceName, cancellationToken);
+
     public async Task UpsertAsync(
         IReadOnlyList<InstrumentPriceQuote> quotes,
         DateTimeOffset fetchedAt,
+        string source,
         CancellationToken cancellationToken = default)
     {
         if (quotes.Count == 0)

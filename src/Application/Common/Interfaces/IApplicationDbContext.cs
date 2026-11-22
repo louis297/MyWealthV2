@@ -12,6 +12,8 @@ public interface IApplicationDbContext
 
     DbSet<BankFeedCursor> BankFeedCursors { get; }
 
+    DbSet<MarketDataFeed> MarketDataFeeds { get; }
+
     DbSet<BankStatementLine> BankStatementLines { get; }
 
     DbSet<BankReconciliation> BankReconciliations { get; }

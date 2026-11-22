@@ -1,4 +1,5 @@
 using MyWealthV2.Application.FunctionalTests.BankFeed;
+using MyWealthV2.Application.FunctionalTests.MarketData;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using MyWealthV2.Application.Common.Security;
@@ -79,6 +80,7 @@ public static class TestApp
 
         FunctionalTestSetup.WebApiServices.GetRequiredService<InMemoryBankFeed>().Reset();
         FunctionalTestSetup.WebApiServices.GetRequiredService<InMemoryBankPayments>().Reset();
+        FunctionalTestSetup.WebApiServices.GetRequiredService<InMemoryMarketPrices>().Reset();
         _userId = null;
         _roles = null;
     }

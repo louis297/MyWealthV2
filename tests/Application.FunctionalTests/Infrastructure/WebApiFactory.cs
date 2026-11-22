@@ -16,6 +16,9 @@ using MyWealthV2.Application.BankFeed;
 using MyWealthV2.Application.FunctionalTests.Accounts;
 using MyWealthV2.Application.FunctionalTests.BankFeed;
 using MyWealthV2.Application.FunctionalTests.Hosting;
+using MyWealthV2.Application.FunctionalTests.MarketData;
+using MyWealthV2.Application.MarketData;
+using MyWealthV2.Domain.MarketData;
 using MyWealthV2.Application.FunctionalTests.Portfolios;
 using MyWealthV2.Application.FunctionalTests.Reports;
 
@@ -67,6 +70,12 @@ public class WebApiFactory(
             services.RemoveAll<IBankPayments>();
             services.AddSingleton<InMemoryBankPayments>();
             services.AddSingleton<IBankPayments>(sp => sp.GetRequiredService<InMemoryBankPayments>());
+            services.RemoveAll<MarketDataConnections>();
+            services.AddSingleton(MarketDataHttp.Connections);
+            services.RemoveAll<IMarketPrices>();
+            services.AddSingleton<InMemoryMarketPrices>();
+            services.AddSingleton<IMarketPrices>(sp => sp.GetRequiredService<InMemoryMarketPrices>());
+            services.TryAddScoped<SyncMarketPrices>();
             services.AddSingleton<CollidingAccountSaveInterceptor>();
             services.AddScoped<ISaveChangesInterceptor>(sp => sp.GetRequiredService<CollidingAccountSaveInterceptor>());
 

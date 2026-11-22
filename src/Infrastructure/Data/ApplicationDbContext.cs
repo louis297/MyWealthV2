@@ -59,6 +59,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<BankFeedCursor> BankFeedCursors => Set<BankFeedCursor>();
 
+    public DbSet<MarketDataFeed> MarketDataFeeds => Set<MarketDataFeed>();
+
     public DbSet<BankStatementLine> BankStatementLines => Set<BankStatementLine>();
 
     public DbSet<BankReconciliation> BankReconciliations => Set<BankReconciliation>();
