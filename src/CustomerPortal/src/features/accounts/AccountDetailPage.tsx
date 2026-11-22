@@ -31,6 +31,11 @@ function typeLabel(row: Activity) {
     return "Withdrawal";
   }
 
+  // C27: the remainder an account closure writes off; a CloseOut with another source keeps its label.
+  if (row.type === "CloseOut" && row.source?.kind === "AccountClosure") {
+    return "Rounding write-off";
+  }
+
   return typeLabels[row.type] ?? row.type;
 }
 
@@ -52,6 +57,17 @@ function withdrawalStatusLabel(status: string) {
 
 const openStatuses = new Set(["Requested", "Approved", "Sent"]);
 const ninetyDays = 90 * 24 * 60 * 60 * 1000;
+
+/** C26: an amount with the currency's minor unit, as "300.00 USD". */
+function formatPayout(amount: number, currency: string) {
+  let digits = 2;
+  try {
+    digits = new Intl.NumberFormat("en-US", { style: "currency", currency }).resolvedOptions().minimumFractionDigits ?? 2;
+  } catch {
+    // An unknown code keeps two decimals.
+  }
+  return `${new Intl.NumberFormat("en-US", { minimumFractionDigits: digits, maximumFractionDigits: 4 }).format(amount)} ${currency}`;
+}
 
 function isNotFound(error: unknown) {
   return typeof error === "object" && error !== null && "status" in error && error.status === 404;
@@ -82,10 +98,22 @@ export function AccountDetailPage() {
   const shownWithdrawals = (withdrawals.data?.items ?? []).filter((item) =>
     openStatuses.has(item.status) || Date.now() - new Date(item.requestedAt).getTime() <= ninetyDays);
   const activityItems = activity.data?.items ?? [];
+  // C26: a closing account, and a Closed one whose latest closure is Completed.
+  const closure = account.data.closure;
+  const closureWithdrawal = (withdrawals.data?.items ?? []).find((item) => item.id === closure?.withdrawalId);
+  const closingNote = closure?.status === "InProgress"
+    ? `This account is being closed. ${formatPayout(closure.payoutAmount, account.data.currency)} is being paid to your bank account${
+      closureWithdrawal ? ` ${closureWithdrawal.nominatedBankAccount.accountNumber}` : ""}.`
+    : null;
+  const closedOn = account.data.status === "Closed" && closure?.status === "Completed" && closure.completedAt
+    ? `Closed on ${formatInstant(closure.completedAt).slice(0, 10)}.`
+    : null;
 
   return (
     <Page>
       <PageHeading title={account.data.name} />
+      {closingNote ? <p className="text-sm">{closingNote}</p> : null}
+      {closedOn ? <p className="text-sm text-muted-foreground">{closedOn}</p> : null}
       <Card>
         <CardContent>
           <DetailGrid>
