@@ -56,4 +56,7 @@ public static class ControlActions
     public const string MarketInstrumentAdded = "MarketInstrumentAdded";
     public const string MarketPriceSet = "MarketPriceSet";
     public const string MarketDailyMoveSet = "MarketDailyMoveSet";
+    public const string CorporateActionAnnounced = "CorporateActionAnnounced";
+    public const string CorporateActionAmended = "CorporateActionAmended";
+    public const string CorporateActionCancelled = "CorporateActionCancelled";
 }

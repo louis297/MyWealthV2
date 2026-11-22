@@ -63,11 +63,62 @@ internal static class MarketHttp
             .ToList();
     }
 
-    // The market tables exist from script 0008; until then the reset leaves them alone.
+    // The market tables exist from script 0008 and its corporate actions from 0009; until then the reset leaves them alone.
     public const string ResetMarket = """
+        IF OBJECT_ID(N'dbo.MarketCorporateActionVersions', N'U') IS NOT NULL EXEC(N'DELETE FROM [MarketCorporateActionVersions]');
+        IF OBJECT_ID(N'dbo.MarketCorporateActions', N'U') IS NOT NULL EXEC(N'DELETE FROM [MarketCorporateActions]');
         IF OBJECT_ID(N'dbo.MarketPrices', N'U') IS NOT NULL EXEC(N'DELETE FROM [MarketPrices]');
         IF OBJECT_ID(N'dbo.MarketInstruments', N'U') IS NOT NULL EXEC(N'DELETE FROM [MarketInstruments]');
         DELETE FROM [ControlLog];
         UPDATE [World] SET [ClockOffsetSeconds] = 0, [PausedAt] = NULL, [PartyOutage] = 0;
         """;
+
+    public static Task<HttpResponseMessage> AnnounceAsync(
+        HttpClient control,
+        string symbol = "ACME.SIM",
+        string kind = "Split",
+        int ratioNew = 2,
+        int ratioHeld = 1,
+        DateOnly? exDate = null,
+        DateOnly? recordDate = null) =>
+        control.PostJsonAsync("/control/market/corporate-actions", JsonSerializer.Serialize(new
+        {
+            symbol,
+            kind,
+            ratioNew,
+            ratioHeld,
+            exDate = (exDate ?? new DateOnly(2026, 11, 21)).ToString("yyyy-MM-dd"),
+            recordDate = recordDate?.ToString("yyyy-MM-dd")
+        }));
+
+    /// <summary>Announces and answers the party action id.</summary>
+    public static async Task<string> AnnounceOkAsync(
+        HttpClient control,
+        string symbol = "ACME.SIM",
+        string kind = "Split",
+        int ratioNew = 2,
+        int ratioHeld = 1,
+        DateOnly? exDate = null)
+    {
+        var response = await AnnounceAsync(control, symbol, kind, ratioNew, ratioHeld, exDate);
+        var content = await response.Content.ReadAsStringAsync();
+        response.StatusCode.ShouldBe(HttpStatusCode.Created, content);
+        using var json = JsonDocument.Parse(content);
+        return json.RootElement.GetProperty("id").GetString()!;
+    }
+
+    public static async Task<JsonElement> CorporateActionAsync(HttpClient control, string id)
+    {
+        var response = await control.GetAsync($"/control/market/corporate-actions/{id}");
+        var content = await response.Content.ReadAsStringAsync();
+        response.StatusCode.ShouldBe(HttpStatusCode.OK, content);
+        using var json = JsonDocument.Parse(content);
+        return json.RootElement.Clone();
+    }
+
+    public static async Task<Guid> WorldIdAsync()
+    {
+        var rows = await Sql.ReadAsync(SimulatorTestSetup.ConnectionString, "SELECT [WorldId] FROM [World]");
+        return (Guid)rows.Single()[0];
+    }
 }
