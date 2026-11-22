@@ -89,6 +89,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<CorporateActionEntitlement> CorporateActionEntitlements => Set<CorporateActionEntitlement>();
 
+    public DbSet<CorporateActionAnnouncement> CorporateActionAnnouncements => Set<CorporateActionAnnouncement>();
+
     public DbSet<Instrument> Instruments => Set<Instrument>();
 
     public DbSet<Account> Accounts => Set<Account>();

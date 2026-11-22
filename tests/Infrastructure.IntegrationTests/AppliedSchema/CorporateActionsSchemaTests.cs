@@ -377,6 +377,46 @@ public class CorporateActionsSchemaTests
         }
     }
 
+    [Test]
+    public async Task EfRoundTrip_KeepsAnAnnouncementAndTheFeedCursor()
+    {
+        await using var db = await ScratchSchemaDatabase.CreateAsync("CorporateActionAnnouncementEf");
+        await db.ApplyAllAsync();
+        var at = new DateTimeOffset(2026, 11, 22, 3, 15, 2, TimeSpan.Zero);
+        var announcement = CorporateActionAnnouncement.Receive(
+            "simulator", "w-CA1-V1", "w-CA1", 1, PartyActionStatus.Effective, "ACME.SIM", "USD", null, 2, 1,
+            new DateOnly(2026, 11, 24), new DateOnly(2026, 11, 25), null, at);
+        var feed = MarketDataFeed.Start("simulator", MarketDataFeedKind.CorporateActions);
+        feed.Advance("w:1", at);
+        await using (var context = OpenDb(db.ConnectionString))
+        {
+            context.Set<CorporateActionAnnouncement>().Add(announcement);
+            context.Set<MarketDataFeed>().Add(feed);
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = OpenDb(db.ConnectionString))
+        {
+            var stored = await context.Set<CorporateActionAnnouncement>().SingleAsync(row => row.Id == announcement.Id);
+            stored.Skip(AnnouncementSkipReason.UnsupportedKind, at.AddSeconds(1));
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = OpenDb(db.ConnectionString))
+        {
+            var stored = await context.Set<CorporateActionAnnouncement>().AsNoTracking().SingleAsync(row => row.Id == announcement.Id);
+            (stored.PublicId, stored.Connection, stored.OutsideId, stored.PartyActionId, stored.Version, stored.PartyStatus, stored.Kind)
+                .ShouldBe((announcement.PublicId, "simulator", "w-CA1-V1", "w-CA1", 1, PartyActionStatus.Effective, (CorporateActionKind?)null));
+            (stored.Symbol, stored.Currency, stored.RatioNew, stored.RatioHeld, stored.RecordDate)
+                .ShouldBe(("ACME.SIM", "USD", 2, 1, (DateOnly?)new DateOnly(2026, 11, 25)));
+            (stored.Status, stored.SkipReason, stored.ReceivedAt).ShouldBe(
+                (AnnouncementStatus.Skipped, (AnnouncementSkipReason?)AnnouncementSkipReason.UnsupportedKind, at));
+            var storedFeed = await context.Set<MarketDataFeed>().AsNoTracking()
+                .SingleAsync(row => row.Connection == "simulator" && row.Kind == MarketDataFeedKind.CorporateActions);
+            storedFeed.Cursor.ShouldBe("w:1");
+        }
+    }
+
     /// <summary>A tenant (<c>@a_*</c> from <see cref="ScratchSchemaDatabase.TenantRows"/>).</summary>
     private static string World() => $"""
         {ScratchSchemaDatabase.TenantRows("a", Guid.NewGuid().ToString("N")[..12])}

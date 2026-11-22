@@ -2,7 +2,8 @@ namespace MyWealthV2.Domain.Entities;
 
 /// <summary>
 /// The state of one feed of one market data connection (docs/features/simulated-instruments.md §5, §6.1; ADR 0021
-/// rule 16): when it was last read and how that went. Platform data: no tenant. The <c>Prices</c> feed has no cursor.
+/// rule 16): when it was last read and how that went. Platform data: no tenant. The <c>Prices</c> feed has no cursor;
+/// the <c>CorporateActions</c> feed keeps the party's cursor (corporate-actions R9).
 /// </summary>
 public class MarketDataFeed
 {
@@ -36,6 +37,10 @@ public class MarketDataFeed
     {
         LastSucceededAt = at;
     }
+
+    /// <summary>Corporate-actions R9: a page was stored; the cursor moves to the party's new cursor. A missing cursor
+    /// keeps the one stored.</summary>
+    public void Advance(string? cursor, DateTimeOffset at) => throw new NotImplementedException();
 
     /// <summary>A read failed (R8). The last success stays.</summary>
     public void Failed(MarketDataFailure failure, DateTimeOffset at)

@@ -42,6 +42,8 @@ public interface IApplicationDbContext
 
     DbSet<CorporateActionEntitlement> CorporateActionEntitlements { get; }
 
+    DbSet<CorporateActionAnnouncement> CorporateActionAnnouncements { get; }
+
     DbSet<Instrument> Instruments { get; }
 
     DbSet<Account> Accounts { get; }

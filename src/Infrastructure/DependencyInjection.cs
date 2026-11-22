@@ -146,6 +146,8 @@ public static class DependencyInjection
         builder.Services.AddScoped<IMarketPrices, MarketPricesDispatcher>();
         builder.Services.AddScoped<SyncMarketPrices>();
         builder.Services.AddScoped<ApplyCorporateActions>();
+        builder.Services.AddScoped<ICorporateActionFeed, CorporateActionFeedDispatcher>();
+        builder.Services.AddScoped<PullCorporateActions>();
         if (host == MarketDataHost.Worker)
         {
             builder.Services.TryAddSingleton(sp =>
