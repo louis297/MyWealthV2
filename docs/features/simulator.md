@@ -488,3 +488,15 @@ Status of this amendment: `accepted` (2026-11-22), together with [simulated-inst
 - R33: the market never reads the platform's catalog and does not know which Tenant lists or holds an instrument.
 - §9.2: the AppHost gives the party key to `worker` as the `simulator` market data connection's `ApiKey`, with the party endpoint as its `BaseUrl`, and gives the simulator the standing instruments `ACME.SIM` (USD, 100.00) and `KIWI.SIM` (NZD, 5.00) that `TestSeed` adds to the catalog.
 - §11 point 7: still no scenario library (simulated-instruments §11 point 13).
+
+---
+
+## Amendment 2026-11-22 (corporate actions) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions.md](corporate-actions.md). Rules R39–R47 and the simulator script `0009_market_corporate_actions.sql` live there (§4.8, §6.2); this section records what changes here.
+
+- The **simulator market** is also the issuer of its own instruments: it announces, amends and cancels splits, consolidations and bonus issues, and makes one `Effective` when the clock reaches its ex-date, rebasing the price. Every announce, amend, cancel and effective appends one version to the feed. Party action id `{WorldId:N}-CA{n}`, version outside id `{WorldId:N}-CA{n}-V{v}`.
+- Control routes: `GET /control/market/corporate-actions`, `GET /control/market/corporate-actions/{id}`, `POST /control/market/corporate-actions`, `POST /control/market/corporate-actions/{id}/amend`, `POST /control/market/corporate-actions/{id}/cancel`. Party route: `GET /party/market/corporate-actions?after={cursor}&limit={n}` (cursor, limit, key and outage as deposit-matching R44).
+- R24: a reset also empties the corporate actions and their versions.
+- R28: new control log actions `CorporateActionAnnounced`, `CorporateActionAmended` and `CorporateActionCancelled`.
+- R33: the simulator never learns who holds an instrument or what the platform posted.

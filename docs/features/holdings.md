@@ -279,3 +279,12 @@ Only after this file is `accepted`. Tree must build after each commit.
 ## Amendment 2026-11-14 (UTC instants)
 
 Accepted with [utc-instants](../fixes/utc-instants.md). R18 follows posting R24.
+
+---
+
+## Amendment 2026-11-22 (corporate actions) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions.md](corporate-actions.md). Rules R25–R29 live there; this section records what changes here.
+
+- The type table: an **entitlement posting** (`Split` or `Bonus` with source `CorporateAction`) is a security-only change on a Custodial holding, written by the platform. Quantity becomes `quantityAfter = RoundDown(quantityBefore × factor, 8)`; total cost is unchanged. The projection is updated in the same Account-locked transaction (R14).
+- An entitlement posting counts as security activity for R15 (corporate-actions R31).

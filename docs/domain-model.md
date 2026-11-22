@@ -290,7 +290,7 @@ Amendment 2026-11-22 (simulated instruments, accepted; [features/simulated-instr
 | `MarketDataConnection` | Value (from configuration) | `Name`, `Adapter`, `SymbolSuffix`. `Serves(symbol)`: the symbol ends with the suffix, compared without regard to case |
 | `MarketDataConnections` | Service | The configured connections. `For(symbol)` → the connection that serves it, or none. Refuses two connections with the same suffix |
 | `MarketDataFeed` | Entity | Platform data, no `TenantId`. One per connection and feed kind: `LastSucceededAt`, `LastFailedAt`, `LastFailure`, `Cursor` (unused by `Prices`). `Succeeded(at)`, `Failed(failure, at)` |
-| `MarketDataFeedKind` | Enum | `Prices = 0` |
+| `MarketDataFeedKind` | Enum | `Prices = 0`, `CorporateActions = 1` (a feed with a cursor; [features/corporate-actions.md](features/corporate-actions.md)) |
 | `MarketDataFailure` | Enum | `Unreachable = 0`, `Timeout = 1`, `Unauthorized = 2`, `Unavailable = 3`, `BadResponse = 4` |
 
 Invariants: an instrument is served by at most one connection; a price row written from a connection has the platform's UTC date; a served instrument is never sent to EODHD.
@@ -367,6 +367,7 @@ Invariants:
 - (Withdrawals) Source kind `Payment` (4) has the withdrawal's PublicId as its id and is not hand-reversible. `PostPayout` builds a payout: one `Principal` `TransferOut` cash leg, the amount given positive and posted negative, source `Payment`, a payment detail (`TransactionPaymentDetail`: value date, reference sent, payee name, masked payee account; 0..1 per Transaction, copied by `Reverse`). A payout is undone only by its flow (a returned payout), through `Reverse` with source `Payment`. `CustodyRules` refuses a hand `TransferOut` on a Custodial account, allows a hand `CloseOut` there only for a remainder below the currency's minor unit, and allows an `InternalTransfer` between Custodial accounts of the same Customer only ([features/withdrawals.md](features/withdrawals.md)).
 - (Account closure) Source kind `AccountClosure` (5) has the closure's PublicId as its id and is not hand-reversible. `PostRemainderWriteOff` builds the remainder write-off: one `Principal` `CloseOut` cash leg of minus the cash `SUM`, where `0 < SUM <` one minor unit, source `AccountClosure`. On a Custodial account no person enters a `CloseOut` (`CustodyRules`).
 - (Interest run) Source kind `InterestRun` (6) has the run's PublicId as its id and is not hand-reversible. `PostInterest` builds an interest posting: one `Principal` `Interest` cash leg of `+gross` (the accrued amount rounded to the minor unit, above 0), a `Tax` cash leg of `−tax` with its tax detail when the withholding tax is above 0, and an interest detail; source `InterestRun`. A cash leg has a tax detail if and only if its role is `Tax`; every factory other than `PostInterest` and `Reverse` refuses a `Tax` leg. `Reverse` copies the `Tax` leg, its tax detail and the interest detail. On a Custodial account no person enters an `Interest` (`CustodyRules`, unchanged) ([features/interest-run.md](features/interest-run.md)).
+- (Corporate actions) Source kind `CorporateAction` (7) has the corporate action's PublicId as its id and is not hand-reversible. `PostCorporateAction` builds an entitlement posting: type `Split` (split or consolidation) or `Bonus`, one security leg of `quantityAfter − quantityBefore` with cost `0` in the quote currency, no cash leg, source `CorporateAction`, and a corporate action detail (`TransactionCorporateActionDetail`: kind, ratio, ex-date, record date, payment date, quantity before and after; 0..1 per Transaction, copied by `Reverse`). It refuses another source kind and a `quantityAfter` that is 0 or equal to `quantityBefore`. It is built outside the manual entry matrix; on a Custodial account a hand `Split`, `Bonus` or `Scrip` stays refused.
 
 Field rules: [features/posting.md](features/posting.md), [features/holdings.md](features/holdings.md), [features/buy-sell.md](features/buy-sell.md), [features/split.md](features/split.md), [features/leg-accounts.md](features/leg-accounts.md), and [features/adjustments.md](features/adjustments.md).
 
@@ -471,6 +472,20 @@ Amendment 2026-11-22 (interest run, accepted): before the payout is worked out, 
 
 Invariants: an `(Account, day)` has at most one accrual row, never after the account's `InterestAccruedThrough` (unique index, Account lock); an accrual row is posted at most once, by exactly one Transaction; the gross of an interest detail is the rounded sum of the rows stamped with its Transaction and equals the `Principal` leg; a tax detail's tax amount is the opposite of its leg's amount and its basis is the gross; an interest rate schedule row in effect never changes; a Customer's withholding is one of the four rows of `WithholdingRates`. No domain event of its own; an interest posting raises `TransactionPosted`. Field rules: [features/interest-run.md](features/interest-run.md).
 
+### 8.15 Corporate actions (accepted — corporate-actions slice)
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `CorporateAction` | Aggregate | One Instrument of one Tenant: kind, ratio, ex-date, record date, payment date, origin (`Manual` or `Feed` with connection, party action id and feed version), status, memo, who made it effective or cancelled it and when. `Enter`, `Announce` (feed), `Change` (Manual only), `Amend(version)` (Feed only, a later version), `Cancel`, `MakeEffective(at, by?)`, `MarkApplied(at)`. Status moves only forward |
+| `CorporateActionKind` | Enum | `Split`, `Consolidation`, `Bonus` |
+| `CorporateActionOrigin` | Enum | `Manual`, `Feed` |
+| `CorporateActionStatus` | Enum | `Announced`, `Effective`, `Applied`, `Cancelled` |
+| `CorporateActionRatio` | Value object | `New`, `Held` (1–10 000). `IsValidFor(kind)`: a split needs `New > Held`, a consolidation `New < Held`. `Apply(kind, quantity)` → `RoundDown(quantity × factor, 8)`, multiply first. `Text` → `2 for 1` |
+| `CorporateActionEntitlement` | Entity | One per corporate action and Custodial account that held the instrument when the action took effect: `Pending`, then `Posted` (quantities and the Transaction) or `NotApplied` (`NoHolding`, `TooSmall`), once |
+| `CorporateActionAnnouncement` | Aggregate (platform data) | One version of one event at a party, unique per (connection, outside id): party action id, version, party status, symbol, currency, kind (none when unknown), ratio, dates. `Received`, then `Processed` or `Skipped` with a reason |
+
+Invariants: a `Feed` action is unique per (Instrument, connection, party action id); a live `Manual` action per (Instrument, kind, ex-date); an account has at most one entitlement per action; an entitlement is `Posted` iff it has a Transaction with source `CorporateAction`; an entitlement posting never changes a holding's total cost. Field rules: [features/corporate-actions.md](features/corporate-actions.md).
+
 ---
 
 ## 9. Value objects (Domain assembly; may exist in Phase 1)
@@ -530,6 +545,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-22 | Account closure accepted: `AccountClosure`, its enums and `ClosureAmounts` (§8.13); the closing account (§8.5); source kind `AccountClosure` and `PostRemainderWriteOff`, hand `CloseOut` refused on Custodial (§8.6); unmatched reason `AccountClosing` (§8.9). [features/account-closure.md](features/account-closure.md) |
 | 2026-11-22 | Interest run accepted: `CustomerTaxProfile`, `WithholdingRates`, `InterestRateSchedule`, `InterestAccrual`, `InterestRun` and their enums (§8.14); `Account.InterestAccruedThrough` (§8.5); cash leg role `Tax`, `TransactionTaxDetail`, `TransactionInterestDetail`, source kind `InterestRun` and `PostInterest` (§8.6); statement line kind (§8.9); three reconciliation item kinds (§8.12). [features/interest-run.md](features/interest-run.md) |
 | 2026-11-22 | Simulated instruments accepted: `MarketDataConnection`, `MarketDataConnections`, `MarketDataFeed`, `MarketDataFeedKind`, `MarketDataFailure` (§8.4). `Instrument` unchanged. [features/simulated-instruments.md](features/simulated-instruments.md) |
+| 2026-11-22 | Corporate actions accepted: `CorporateAction`, `CorporateActionRatio`, `CorporateActionEntitlement`, `CorporateActionAnnouncement` and their enums (§8.15); source kind `CorporateAction`, `TransactionCorporateActionDetail` and `PostCorporateAction` (§8.6); `MarketDataFeedKind.CorporateActions` (§8.4). [features/corporate-actions.md](features/corporate-actions.md) |
 
 ---
 

@@ -460,3 +460,11 @@ Status of this amendment: `accepted` (2026-11-22), together with [account-closur
 
 - R4 / assign (as amended by custody-modes R14): a closing account (an account closure `InProgress`) cannot be assigned → 400 `account_not_eligible` with `Only an open Custodial account that is not being closed can be assigned a portfolio.` (account-closure R13).
 - An account closure is refused while the Account has an Active assignment (account-closure R5): unassign first, then sell the holdings (R18 still locks manual trades while assigned).
+
+---
+
+## Amendment 2026-11-22 (corporate actions) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions.md](corporate-actions.md). Rule R30 lives there; this section records what changes here.
+
+- R18: the trade lock does not apply to an entitlement posting (`Split` or `Bonus` with source `CorporateAction`). The assignment stays Active and no rebalance is enqueued, because the holding's value and weight do not change.

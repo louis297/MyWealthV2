@@ -223,7 +223,7 @@ After slice 2, some writes on a Custodial account are still entered by hand or a
 
 - Deposits and withdrawals matched to a bank statement, replacing hand-entered `TransferIn` / `TransferOut`.
 - An interest job and income events (§1 step 2), replacing hand-entered `Interest`. The interest job is [features/interest-run.md](features/interest-run.md) (accepted 2026-11-22).
-- Corporate action events, replacing hand-entered `Split` / `Bonus` / `Scrip`.
+- Corporate action events, replacing hand-entered `Split` / `Bonus` / `Scrip`. Splits, consolidations and bonus issues are [features/corporate-actions.md](features/corporate-actions.md) (accepted 2026-11-22); `Scrip` and dividends come later.
 - In-kind transfer and migration batches, replacing `Opening`, `OpeningHoldings`, `StockIn` and `StockOut`.
 - Orders, replacing the immediate `Buy` / `Sell`.
 - A controlled manual adjustment as the only hand-entered write.

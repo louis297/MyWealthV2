@@ -372,6 +372,7 @@ Beyond PK / unique constraints already listed:
 0047_customer_tax_profiles.sql              -- CustomerTaxProfiles
 0048_interest.sql                           -- InterestRateSchedules, InterestRateBands, InterestAccruals, InterestRuns, TransactionTaxDetails, TransactionInterestDetails; Accounts.InterestAccruedThrough; cash leg Role 0–2; CK_Transactions_SourceKind 0–6; BankStatementLines.Kind; reconciliation item kinds 0–14
 0049_market_data_feeds.sql                  -- MarketDataFeeds (platform data, PK (Connection, Kind))
+0050_corporate_actions.sql                  -- CorporateActionAnnouncements (platform data), CorporateActions, CorporateActionEntitlements, TransactionCorporateActionDetails; CK_Transactions_SourceKind 0–7; MarketDataFeeds Kind 0–1, LastFailure 0–5
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -461,6 +462,8 @@ Amendment 2026-11-20 (withdrawals, accepted, landed; [features/withdrawals.md](f
 Amendment 2026-11-22 (account closure, accepted; [features/account-closure.md](features/account-closure.md) §6): script `0046_account_closures.sql` widens `CK_Transactions_SourceKind` to 0–5 (`AccountClosure`) and requires a `SourcePublicId` for kinds 2–5. No back-fill.
 
 Amendment 2026-11-22 (interest run, accepted; [features/interest-run.md](features/interest-run.md) §6.2): script `0048_interest.sql` widens `CK_TransactionCashLegs_Role` to 0–2 (`Tax`), `CK_Transactions_SourceKind` to 0–6 (`InterestRun`) and requires a `SourcePublicId` for kinds 2–6. It adds `TransactionTaxDetails`: one row per `Tax` cash leg (PK `CashLegId`, FK `(TenantId, CashLegId)` → `TransactionCashLegs`), `TenantId`, `TransactionId` (FK `(TenantId, TransactionId)` → `Transactions`), `Kind int` (CHECK 0–1: `Rwt`, `Nrwt`), `RatePercent decimal(5,2)` (CHECK `> 0` and `≤ 100`), `BasisAmount` and `TaxAmount decimal(18,4)` (CHECK `> 0`), `Currency char(3)` (FK); UQ `(TransactionId, Kind)`. And `TransactionInterestDetails`: `TransactionId` (PK), `TenantId`, FK `(TenantId, TransactionId)` → `Transactions`, `PeriodFrom` and `PeriodTo date` (CHECK from `≤` to), `Days int` (CHECK `≥ 1`), `AccruedAmount decimal(18,8)` and `GrossAmount decimal(18,4)` (CHECK `> 0`). No `PublicId` or `RowVersion`: both are part of an immutable Transaction. All FKs RESTRICT. No back-fill.
+
+Amendment 2026-11-22 (corporate actions, accepted; [features/corporate-actions.md](features/corporate-actions.md) §6.1): script `0050_corporate_actions.sql` widens `CK_Transactions_SourceKind` to 0–7 (`CorporateAction`) and requires a `SourcePublicId` for kinds 2–7, and adds `TransactionCorporateActionDetails`: `TransactionId` (PK; at most one row per Transaction), `TenantId`, `Kind int` (CHECK 0–2), `RatioNew int`, `RatioHeld int` (CHECK `≥ 1`), `ExDate date`, `RecordDate date NULL`, `PaymentDate date NULL`, `QuantityBefore decimal(18,8)`, `QuantityAfter decimal(18,8)` (CHECK both `> 0`); FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)` RESTRICT. No `PublicId` or `RowVersion`: the row is part of an immutable Transaction. One row on every entitlement posting and on its Reversal, held by the Domain. No back-fill.
 
 ### 11.5 Holdings (accepted, landed)
 
@@ -573,6 +576,17 @@ Feature spec: [features/interest-run.md](features/interest-run.md) (accepted 202
 
 No back-fill: no account was accrued before `0048`.
 
+### 11.15 Corporate actions (accepted)
+
+Feature spec: [features/corporate-actions.md](features/corporate-actions.md) (accepted 2026-11-22) §6.1. Script `0050_corporate_actions.sql`:
+
+- `CorporateActionAnnouncements` — platform data, no `TenantId`. `Id`, `PublicId` (unique), `Connection nvarchar(50)`, `OutsideId nvarchar(100)`, `PartyActionId nvarchar(100)`, `Version int` (CHECK `≥ 1`), `PartyStatus int` (CHECK 0–2), `Symbol nvarchar(32)`, `Currency char(3)` (no FK: the party's text), `Kind int NULL` (CHECK 0–2), `RatioNew`, `RatioHeld int` (CHECK `≥ 1`), `ExDate date`, `RecordDate`, `PaymentDate date NULL`, `ReceivedAt`, `Status int` (CHECK 0–2), `SkipReason int NULL` (CHECK 0–4, set iff `Status = 2`), `ProcessedAt NULL`, `RowVersion`. UQ `(Connection, OutsideId)`; index `(Connection, Status, ReceivedAt)`.
+- `CorporateActions` — `Id`, `PublicId` (unique, the source id of its Transactions), `TenantId`, `InstrumentId` (tenant composite FK, immutable), `Kind int` (CHECK 0–2), `RatioNew`, `RatioHeld int` (CHECK 1–10000), `ExDate date`, `RecordDate`, `PaymentDate date NULL`, `Origin int` (CHECK 0–1), `Connection`, `PartyActionId`, `FeedVersion` (set iff `Origin = 1`), `Status int` (CHECK 0–3), `Memo nvarchar(200) NULL`, `EffectiveAt` (set iff `Status IN (1, 2)`), `EffectiveByUserId NULL`, `AppliedAt` (set iff `Status = 2`), `CancelledAt` (set iff `Status = 3`), `CancelledByUserId NULL`, `CancelNote nvarchar(200) NULL`, audit, `RowVersion`. Filtered UQ `(InstrumentId, Connection, PartyActionId) WHERE Origin = 1`; filtered UQ `(InstrumentId, Kind, ExDate) WHERE Origin = 0 AND Status <> 3`; index `(TenantId, ExDate DESC)`; index `(Status, EffectiveAt)`.
+- `CorporateActionEntitlements` — `Id bigint`, `TenantId`, `CorporateActionId`, `AccountId` (tenant composite FKs), `Status int` (CHECK 0–2), `Reason int NULL` (CHECK 0–1, set iff `Status = 2`), `QuantityBefore`, `QuantityAfter decimal(18,8) NULL` and `TransactionId NULL` (set iff `Status = 1`), `PostedAt NULL`, `RowVersion`. UQ `(CorporateActionId, AccountId)`; filtered index `WHERE Status = 0`.
+- `TransactionCorporateActionDetails` and the source kind (§11.4); `MarketDataFeeds` Kind 0–1 and LastFailure 0–5 (§14.3).
+
+No back-fill: no corporate action exists before `0050`.
+
 ## 12. Still not a schema decision
 
 These stay open in the function plan and do not change tables:
@@ -638,6 +652,7 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-22 | Interest run landed: `0047`, `0048` and simulator `0007` written. `0048` names the CHECKs `CK_InterestRateBands_FromAmount`, `_RatePercent`, `CK_InterestAccruals_Balance`, `_Amount`, `_EffectiveRatePercent`, `CK_InterestRuns_Trigger`, `_RanBy`, `_Account`, `_Counts`, `CK_TransactionTaxDetails_Kind`, `_RatePercent`, `_BasisAmount`, `_TaxAmount`, `CK_TransactionInterestDetails_Period`, `_Days`, `_AccruedAmount`, `_GrossAmount` and `CK_BankStatementLines_Kind`, and the unique keys `UQ_InterestAccruals_AccountId_AccrualDate` and `UQ_TransactionTaxDetails_TransactionId_Kind` (§11.14). `0047` adds `IX_CustomerTaxProfiles_TenantId`. |
 | 2026-11-22 | Simulated instruments accepted (`0049`, not written yet): `MarketDataFeeds` and the `Simulator` source on `InstrumentPrices` (§14.3); simulator `0008_market.sql` (§15). §9 lists `0049`. |
 | 2026-11-22 | Simulated instruments landed: `0049` and simulator `0008` written. `0049` names `PK_MarketDataFeeds`, `CK_MarketDataFeeds_Kind` and `CK_MarketDataFeeds_LastFailure`; `0008` names `UX_MarketInstruments_Symbol`, `CK_MarketInstruments_DailyMovePercent`, `CK_MarketInstruments_Price`, `CK_MarketPrices_Price` and `FK_MarketPrices_MarketInstruments_InstrumentId`. |
+| 2026-11-22 | Corporate actions accepted (`0050`, not written yet): `CorporateActionAnnouncements`, `CorporateActions`, `CorporateActionEntitlements` (§11.15), `TransactionCorporateActionDetails` and `CK_Transactions_SourceKind` 0–7 (§11.4), `MarketDataFeeds` Kind 0–1 and LastFailure 0–5; simulator `0009_market_corporate_actions.sql` (§15). §9 lists `0050`. |
 
 ---
 
@@ -713,10 +728,10 @@ Amendment 2026-11-22 (simulated instruments, accepted; [features/simulated-instr
 | Column | Notes |
 | --- | --- |
 | `Connection` | `nvarchar(50)`. The configured connection name |
-| `Kind` | `int`. `MarketDataFeedKind`, CHECK `= 0` (`Prices`) |
-| `Cursor` | `nvarchar(500) NULL`. Not used by `Prices` |
+| `Kind` | `int`. `MarketDataFeedKind`, CHECK 0–1 (`Prices`, `CorporateActions`; `0050`) |
+| `Cursor` | `nvarchar(500) NULL`. Not used by `Prices`; the party's cursor of the `CorporateActions` feed |
 | `LastSucceededAt`, `LastFailedAt` | `datetimeoffset NULL` |
-| `LastFailure` | `int NULL`. `MarketDataFailure`, CHECK 0–4 |
+| `LastFailure` | `int NULL`. `MarketDataFailure`, CHECK 0–5 (`InvalidItem` = 5; `0050`) |
 | `RowVersion` | `rowversion` |
 
 PK `(Connection, Kind)`. No FK: a connection lives in configuration.
@@ -755,5 +770,6 @@ Owner: [features/simulator.md](features/simulator.md) §6.2, [ADR 0021](adr/0021
 - S1 balances ([features/bank-reconciliation.md](features/bank-reconciliation.md) §6.2, accepted and landed 2026-11-21; `0006_bank_balances.sql`): `BankLines.OmitFromFeed bit NOT NULL DEFAULT 0`. The feed's `balance` and the account list's `statementBalance` are computed from the lines and their places, not stored. A reset is unchanged.
 - S1 trust interest ([features/interest-run.md](features/interest-run.md) §6.3, accepted 2026-11-22; `0007_bank_line_kind.sql`): `BankLines.Kind int NOT NULL DEFAULT 0` (`0` transfer, `1` interest), CHECK 0–1. Existing lines are transfers. A reset is unchanged.
 - S4 market, data vendor half ([features/simulated-instruments.md](features/simulated-instruments.md) §6.2, accepted 2026-11-22; `0008_market.sql`): `MarketInstruments` (symbol unique, ending in `.SIM`; currency; `DailyMovePercent decimal(5,2)` CHECK 0–20; the current `Price decimal(18,4)` CHECK `> 0` and its `PriceDate`; RowVersion) and `MarketPrices` (PK `(InstrumentId, PriceDate)`, FK `MarketInstruments`, `Price` CHECK `> 0`, `IsSet bit` for a price the operator typed). A reset empties both and adds the standing instruments again.
+- S4 market, issuer half ([features/corporate-actions.md](features/corporate-actions.md) §6.2, accepted 2026-11-22; `0009_market_corporate_actions.sql`): `MarketCorporateActions` (`Number` unique, the `n` of the party action id; FK `MarketInstruments`; `Kind` CHECK 0–2; ratio; dates; `Status` CHECK 0–2; current `Version`; `RowVersion`) and `MarketCorporateActionVersions` (`Id bigint` identity, the place in the feed; FK the action; `Version`, `Status`, ratio and dates; UQ `(ActionId, Version)`). A reset empties both.
 - Development: Aspire creates the database. VPS: created by hand once, like `MyWealthDbV2` ([deployment.md](deployment.md) §15).
 

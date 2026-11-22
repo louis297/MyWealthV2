@@ -477,3 +477,13 @@ Status of this amendment: `accepted` (2026-11-22), together with [interest-run.m
 - R16 and the §5 type table: on a Custodial account `Interest` is still refused on `POST /transactions` for every caller; it is written only by the **interest run** (`Transaction.PostInterest`, source `InterestRun`), with a `Principal` cash leg of the gross and, when the withholding tax is above 0, a `Tax` cash leg of minus the tax (interest-run R23–R25). External accounts unchanged: a hand `Interest` there has one `Principal` leg and no `Tax` leg.
 - R20: an interest posting's `Principal` leg is always `> 0` and its `Tax` leg always `< 0`; the net is never negative (interest-run R28). The hand `Interest` of an External account keeps "either sign".
 - The interest posting's `bookedAt` is the platform time of the posting; the days it pays are in its interest detail (interest-run R23, R26). Its Reversal copies the `Tax` leg with its tax detail and the interest detail; no flow reverses one in this slice, and a hand reverse → 400 (interest-run R27).
+
+---
+
+## Amendment 2026-11-22 (corporate actions) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions.md](corporate-actions.md). Rules R24–R33 live there; this section records what changes here.
+
+- The §5 type table: on a Custodial account `Split` and `Bonus` are still refused on `POST /transactions` for every caller; they are written only by the platform from a corporate action (`Transaction.PostCorporateAction`, source `CorporateAction`), one security leg of the quantity difference with cost `0`, no cash leg (corporate-actions R26). External accounts unchanged.
+- R20: an entitlement posting has no cash leg. Its `bookedAt` is the platform time of the posting; the party's dates are in its corporate action detail (corporate-actions R26, R27).
+- R22: each entitlement is posted in its own database transaction with the Account row locked (corporate-actions R25).

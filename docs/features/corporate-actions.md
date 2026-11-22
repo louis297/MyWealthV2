@@ -1,6 +1,6 @@
 ---
 title: Corporate actions
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -42,7 +42,7 @@ A **corporate action** is an event of one Instrument: a split, a consolidation o
 
 New: permissions `corporate-actions.read` and `corporate-actions.manage`; routes under `/corporate-actions`, `GET /corporate-action-announcements`; port `ICorporateActionFeed` with adapter `SimulatorCorporateActionFeed`; source kind `CorporateAction`; a corporate action detail on the Transaction; `worker` job `corporate-action-apply`; the feed kind `CorporateActions` on a market data connection. Script `0050_corporate_actions.sql`; simulator script `database/simulator/0009_market_corporate_actions.sql`. No new `TransactionType`, problem code or domain event.
 
-**Status is `review` (2026-11-22).** Not a build contract. It depends on [simulated-instruments.md](simulated-instruments.md) (`review`). The points of §11 need confirmation before it is accepted; the amendments to accepted docs listed in §12 are made when it is accepted.
+**Status is `accepted` (2026-11-22).** The eighteen points of §11 were confirmed on 2026-11-22, every one as recommended, and are written into the rules. It builds on [simulated-instruments.md](simulated-instruments.md) (accepted and landed 2026-11-22). The amendments to accepted docs listed in §12 were made when it was accepted. It is a build contract.
 
 ---
 
@@ -647,9 +647,9 @@ No new ADR. ADR 0021 applies as written: rule 1 (port `ICorporateActionFeed`), 5
 | Jobs | The announcement steps in `market-data-sync:{connection}`; `corporate-action-apply` every minute |
 | Problem codes, events, `TransactionType` | None added |
 
-### Points to confirm
+### Points confirmed
 
-Each point states a recommendation, written into the rules above, and the alternative.
+Each point states the decision, written into the rules above, and the alternative. All eighteen were confirmed on 2026-11-22 as recommended.
 
 1. **Two specs for step 10; this one carries C1 and the issuer of S4.** Recommended: the flow and its simulator party in one spec, as in every earlier step, on top of [simulated-instruments.md](simulated-instruments.md). Alternative: one spec for the whole step.
 2. **A corporate action is a Tenant's row on a Tenant's instrument; an announcement is platform data fanned out by symbol and quote currency** (R2, R12). Recommended: instruments are tenant rows, the ledger and every read are tenant-scoped, and prices already fan out the same way (instrument-prices R15). Alternative: one platform-level corporate action with entitlements in many Tenants.
@@ -709,6 +709,6 @@ The repository should build after each commit. Agents split each behaviour into 
 
 Do not put dividends, a reversing flow, External accounts or a real vendor adapter in these commits.
 
-### Docs amended when this spec is accepted
+### Docs amended when this spec was accepted
 
 [split.md](split.md) (R8 and §13: on a Custodial account `Split` and `Bonus` are written by corporate actions from a ratio; hand entry stays for External accounts), [holdings.md](holdings.md) (the type table: an entitlement posting), [posting.md](posting.md) (the type table and R20: `Split` / `Bonus` on a Custodial account are written by the platform), [custody-modes.md](custody-modes.md) (R5 matrix: "written by" corporate actions; the known issue of §11 point 3 closes when this lands), [transaction-source.md](transaction-source.md) (kind `CorporateAction` = 7, not hand-reversible, check widened), [portfolios.md](portfolios.md) (R18: the trade lock does not apply to an entitlement posting), [adjustments.md](adjustments.md) (a note: reason `CorporateAction` corrects one account after a corporate action), [instruments.md](instruments.md) (a disabled instrument may still get a corporate action), [simulated-instruments.md](simulated-instruments.md) (R8: the steps before the price read and the skipped read; R17 and R18: the rebased price; the feed kind and failure), [simulator.md](simulator.md) (R39–R47, script `0009`, the routes and log actions), [bff-adviser-portal.md](bff-adviser-portal.md) (prefix `/corporate-actions`), [api-design.md](../api-design.md) (§3.1 two permission rows, §6 resource rows, a new §7.11 Corporate actions, §7.7 note, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [architecture.md](../architecture.md) (port `ICorporateActionFeed`, the job `corporate-action-apply`), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D64–D68), [customer-portal.md](../customer-portal/customer-portal.md) (C31), [back-office.md](../backoffice/back-office.md) (BO24, BO25), [known-issues/custodial-account-gaps.md](../known-issues/custodial-account-gaps.md) (the "A split cannot be recorded" row notes this spec; it is removed when the slice lands), [glossary.md](../glossary.md) (the review terms become accepted; Transaction source gains its new value), [function-plan.md](../function-plan.md) §5 (the roadmap step; §5.2: a split on a Custodial account comes from a corporate action), [features/README.md](README.md) row status, [future-plans.md](../future-plans.md) §9, and the roadmap §2 matrix, §7 C1, §11 S4, §13 status and §14.

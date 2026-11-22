@@ -426,3 +426,14 @@ Do not put corporate actions, orders or a calendar in these commits.
 ### Docs amended when this spec was accepted
 
 [instrument-prices.md](instrument-prices.md) (R1, R3, R5, R14, R15: served instruments are priced by their connection under the platform's date; the EODHD job leaves them out), [instruments.md](instruments.md) (`marketDataConnection` on the item), [simulator.md](simulator.md) (the market party, script `0008`, the new control and party routes and log actions), [deposit-matching.md](deposit-matching.md) (a note that market data connections follow the shape of bank connections), [back-office.md](../backoffice/back-office.md) (BO22, BO23), [back-office-instruments.md](../backoffice/back-office-instruments.md) (the connection line), [api-design.md](../api-design.md) (§6 resource row, §7.5 note, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [architecture.md](../architecture.md) (port `IMarketPrices`, the job and queue `market`), [deployment.md](../deployment.md) (the connection keys and the standing instruments), [glossary.md](../glossary.md) (the review terms become accepted), [function-plan.md](../function-plan.md) §5 (the roadmap step), [features/README.md](README.md) row status, and the roadmap §11 S4, §12 D11, §13 status and §14.
+
+---
+
+## Amendment 2026-11-22 (corporate actions) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions.md](corporate-actions.md). Rules R8, R38 and R42 live there; this section records what changes here.
+
+- R7, R8: `market-data-sync:{connection}` gains three steps before its price read: pull the corporate action announcements, process them, and apply the corporate actions of the connection's instruments. When the announcement pull fails, the price read of that run is skipped and the run is reported as failed (corporate-actions R8).
+- §5: `MarketDataFeedKind` gains `CorporateActions = 1`, a feed with a cursor; `MarketDataFailure` gains `InvalidItem = 5`. `MarketDataFeed` keeps the cursor of the `CorporateActions` feed.
+- R5: the connection item gains `corporateActions` (corporate-actions R38).
+- R17, R18: when the market is brought up to date and steps to a day on or after the `exDate` of an `Announced` corporate action of the instrument, the price of the day before is rebased by the action's ratio before that day's move (corporate-actions R42).

@@ -413,3 +413,12 @@ Status of this amendment: `accepted` (2026-11-22), together with [simulated-inst
 - The instrument item of `GET /instruments` and `GET /instruments/{id}` gains `marketDataConnection`: the name of the configured market data connection whose symbol suffix the symbol ends with (compared without regard to case), or `null`. Every caller who can read the instrument sees it. No filter on it, and no column: it is worked out from the symbol and the configuration on each read.
 - R14 (rename): renaming the symbol can change `marketDataConnection`, and with it where the instrument's price comes from, from the next price run. A symbol like `ACME.SIM` is an ordinary catalog symbol under R6; no create rule changes.
 - `TestSeed` (§9.1) adds `ACME.SIM` (USD) and `KIWI.SIM` (NZD) to each firm it seeds. The demo catalog of `webapi --seed-demo` does not change.
+
+---
+
+## Amendment 2026-11-22 (corporate actions) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions.md](corporate-actions.md). Rules R15 and R16 live there; this section records what changes here.
+
+- A disabled Instrument may still get a corporate action, by hand or from the feed, because it may still be held (corporate-actions R12, R15).
+- An Instrument served by a market data connection takes no hand-entered corporate action; its corporate actions come from the connection's feed (corporate-actions R16).

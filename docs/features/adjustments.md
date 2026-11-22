@@ -416,3 +416,11 @@ Status of this amendment: `accepted` (2026-11-22), together with [account-closur
 
 - R15: an adjustment on a closing account (an account closure `InProgress`), and the reverse of one, → 400 with `This account is being closed and accepts no new activity.` under the empty `errors` key, directly after the Closed-account check (account-closure R12).
 - §2 Out, the B8 write-off: decided in [account-closure.md](account-closure.md) §11 point 6. The remainder write-off is a `CloseOut` with source `AccountClosure`, not an `Adjustment`; R7 gains no `Rounding` reason and R9 is unchanged.
+
+---
+
+## Amendment 2026-11-22 (corporate actions) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions.md](corporate-actions.md).
+
+- R7: the reason `CorporateAction` stays. It now corrects one account after a corporate action was applied (for example a trade booked at the new price before the posting), not the whole event; a wrong ratio is corrected for every account by the inverse corporate action (corporate-actions R32).

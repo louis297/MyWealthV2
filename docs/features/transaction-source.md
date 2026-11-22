@@ -393,3 +393,14 @@ Status of this amendment: `accepted` (2026-11-22), together with [interest-run.m
 - R12, R13: `InterestRun` is not hand-reversible. `POST /transactions/{id}/reverse` of an interest posting → 400 by R13.
 - §6: script `0048_interest.sql` widens `CK_Transactions_SourceKind` to 0–6 and requires a `SourcePublicId` for kinds 2–6.
 - R18 (item): `source.kind` may be `InterestRun`, with `id` the run's PublicId.
+
+---
+
+## Amendment 2026-11-22 (corporate actions) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions.md](corporate-actions.md). Rules R26, R27 and R32 live there; this section records what changes here.
+
+- R2, R4: new source kind `CorporateAction = 7`, with the corporate action's PublicId as source id (required). `TransactionSource.CorporateAction(Guid corporateActionPublicId)` refuses an empty id.
+- R12, R13: `CorporateAction` is not hand-reversible. `POST /transactions/{id}/reverse` of an entitlement posting → 400 by R13.
+- §6: script `0050_corporate_actions.sql` widens `CK_Transactions_SourceKind` to 0–7 and requires a `SourcePublicId` for kinds 2–7.
+- R18 (item): `source.kind` may be `CorporateAction`, with `id` the corporate action's PublicId.

@@ -490,3 +490,15 @@ Add `/interest` to the BFF prefix allow-list (R20) so the Adviser Portal can cal
 - Who: TenantAdmin and Adviser. `webapi` checks `interest-rates.read`, `interest-rates.manage` and `interest-runs.read`; the BFF does not filter by role, so an Adviser gets the 403 from `webapi` on writes and on runs.
 - The tax profile and the accrual rows use the existing `/users` and `/accounts` prefixes.
 - The Customer Portal BFF does not change: it already proxies `/users`, `/accounts` and `/transactions`.
+
+---
+
+## Amendment 2026-11-22 (corporate actions prefix) — accepted
+
+Add `/corporate-actions` to the BFF prefix allow-list (R20) so the Adviser Portal can call the routes of [corporate-actions.md](corporate-actions.md) through `/api`.
+
+- Prefix: `/corporate-actions`
+- Methods: GET, POST, PUT
+- Who: TenantAdmin and Adviser. `webapi` checks `corporate-actions.read` and `corporate-actions.manage`; the BFF does not filter by role, so an Adviser gets the 403 from `webapi` on writes.
+- `GET /corporate-action-announcements` is a Back Office route and is not proxied.
+- The Customer Portal BFF does not change: the Customer sees an entitlement through `/transactions`.
