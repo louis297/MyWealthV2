@@ -387,6 +387,69 @@ public class BankReconciliationTests
     public void EachKind_HasOneClass(ReconciliationItemKind kind, ReconciliationItemClass itemClass) =>
         BankReconciliationItem.ClassOf(kind).ShouldBe(itemClass);
 
+    [Test]
+    public void AnIgnoredInterestLine_IsBankInterest_AndAnIgnoredTransferStaysIgnored()
+    {
+        var run = Compute(Inputs(bank: 620m, opening: 0m, linesTotal: 620m, custodial: 620m) with
+        {
+            Lines =
+            [
+                Line(1, BankStatementLineStatus.Ignored, 520m, note: "Bank interest") with { Kind = StatementLineKind.Interest },
+                Line(2, BankStatementLineStatus.Ignored, 100m, note: "Test payment")
+            ],
+            InterestCredited = 0m
+        });
+
+        run.Items.Select(item => (item.Kind, item.Class, item.Amount, item.StatementLineId)).ShouldBe([
+            (ReconciliationItemKind.Unexplained, ReconciliationItemClass.Break, -620m, (int?)null),
+            (ReconciliationItemKind.Ignored, ReconciliationItemClass.Known, 100m, (int?)2),
+            (ReconciliationItemKind.BankInterest, ReconciliationItemClass.Known, 520m, (int?)1)
+        ]);
+    }
+
+    [Test]
+    public void InterestPostings_AreInterestCreditedAndTaxWithheld_WithTheirSignsAndCounts_AndTheItemsAddUp()
+    {
+        // The bank paid 520.00; the platform credited 410.55 gross on 25 postings and withheld 93.40 on 24 of them.
+        var run = Compute(Inputs(bank: 5520m, opening: 0m, linesTotal: 5520m, custodial: 5317.15m) with
+        {
+            Lines = [Line(1, BankStatementLineStatus.Ignored, 520m, note: "Bank interest") with { Kind = StatementLineKind.Interest }],
+            InterestCredited = 410.55m,
+            InterestCreditedCount = 25,
+            TaxWithheld = -93.40m,
+            TaxWithheldCount = 24
+        });
+
+        run.Status.ShouldBe(BankReconciliationStatus.Agreed);
+        run.Items.Select(item => (item.Kind, item.Amount, item.Count)).ShouldBe([
+            (ReconciliationItemKind.BankInterest, 520m, 1),
+            (ReconciliationItemKind.InterestCredited, -410.55m, 25),
+            (ReconciliationItemKind.TaxWithheld, 93.40m, 24)
+        ]);
+        run.Items.Sum(item => item.Amount).ShouldBe(run.Difference!.Value);
+    }
+
+    [Test]
+    public void InterestItemsOfZero_AreLeftOut()
+    {
+        var run = Compute(Inputs(bank: 100m, opening: 0m, linesTotal: 100m, custodial: 100m) with
+        {
+            InterestCredited = 0m,
+            InterestCreditedCount = 0,
+            TaxWithheld = 0m,
+            TaxWithheldCount = 0
+        });
+
+        run.Items.ShouldBeEmpty();
+        run.Status.ShouldBe(BankReconciliationStatus.Agreed);
+    }
+
+    [TestCase(ReconciliationItemKind.BankInterest)]
+    [TestCase(ReconciliationItemKind.InterestCredited)]
+    [TestCase(ReconciliationItemKind.TaxWithheld)]
+    public void TheInterestKinds_AreKnown(ReconciliationItemKind kind) =>
+        BankReconciliationItem.ClassOf(kind).ShouldBe(ReconciliationItemClass.Known);
+
     private static BankReconciliation Compute(ReconciliationInputs inputs) =>
         BankReconciliation.Compute(inputs, ReconciliationTrigger.Scheduled, null, At);
 
