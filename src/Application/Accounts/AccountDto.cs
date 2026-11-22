@@ -51,7 +51,8 @@ public sealed class AccountDto
         User customer,
         decimal cashBalance,
         decimal reservedCash,
-        AccountClosureSummaryDto? closure = null) => new()
+        AccountClosureSummaryDto? closure = null,
+        decimal accruedInterest = 0m) => new()
     {
         Id = account.PublicId,
         TenantId = tenant.PublicId,
@@ -67,6 +68,8 @@ public sealed class AccountDto
         Status = account.Status.ToString(),
         IsActive = account.IsActive,
         RowVersion = Convert.ToBase64String(account.RowVersion ?? []),
-        Closure = closure
+        Closure = closure,
+        AccruedInterest = accruedInterest,
+        InterestAccruedThrough = account.InterestAccruedThrough
     };
 }

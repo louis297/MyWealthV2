@@ -107,6 +107,10 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<TransactionFeeDetail> TransactionFeeDetails => Set<TransactionFeeDetail>();
 
+    public DbSet<TransactionTaxDetail> TransactionTaxDetails => Set<TransactionTaxDetail>();
+
+    public DbSet<TransactionInterestDetail> TransactionInterestDetails => Set<TransactionInterestDetail>();
+
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     public DbSet<Report> Reports => Set<Report>();

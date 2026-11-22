@@ -60,6 +60,10 @@ public interface IApplicationDbContext
 
     DbSet<TransactionFeeDetail> TransactionFeeDetails { get; }
 
+    DbSet<TransactionTaxDetail> TransactionTaxDetails { get; }
+
+    DbSet<TransactionInterestDetail> TransactionInterestDetails { get; }
+
     DbSet<IdempotencyRecord> IdempotencyRecords { get; }
 
     DbSet<Report> Reports { get; }

@@ -8,6 +8,7 @@ using MyWealthV2.Application.Accounts.Queries.GetAccountById;
 using MyWealthV2.Application.Accounts.Queries.GetAccountCashBalance;
 using MyWealthV2.Application.Accounts.Queries.GetAccounts;
 using MyWealthV2.Application.Common.Models;
+using MyWealthV2.Application.Interest.Accruals;
 using MyWealthV2.Application.Common.Security;
 using Microsoft.AspNetCore.Http.HttpResults;
 using MyWealthV2.Application.Accounts.Queries.GetAccountHoldings;
@@ -37,6 +38,7 @@ public class Accounts : IEndpointGroup
         groupBuilder.MapGet(GetHoldings, "{id}/holdings").RequireAuthorization(Policies.AccountsRead);
         groupBuilder.MapGet(GetAccountPortfolio, "{id}/portfolio").RequireAuthorization(ReadPortfolio);
         groupBuilder.MapGet(GetDepositInstructions, "{id}/deposit-instructions").RequireAuthorization(Policies.AccountsRead);
+        groupBuilder.MapGet(GetInterestAccruals, "{id:guid}/interest-accruals").RequireAuthorization(Policies.AccountsRead);
         groupBuilder.MapPost(AssignPortfolio, "{id}/portfolio").RequireAuthorization(Policies.TransactionsCreate);
         groupBuilder.MapDelete(UnassignPortfolio, "{id}/portfolio").RequireAuthorization(Policies.TransactionsCreate);
         groupBuilder.MapPost(RebalanceAccount, "{id}/rebalance").RequireAuthorization(Policies.TransactionsCreate);
@@ -80,6 +82,19 @@ public class Accounts : IEndpointGroup
         var item = await sender.Send(new GetDepositInstructionsQuery(id));
         return TypedResults.Ok(item);
     }
+
+    [EndpointSummary("List an account's daily interest accruals")]
+    [EndpointDescription("The account's daily accrual rows, newest day first, with filters from, to, transactionId and posted.")]
+    public static async Task<Ok<PagedList<InterestAccrualDto>>> GetInterestAccruals(
+        ISender sender,
+        Guid id,
+        int page = 1,
+        int pageSize = 20,
+        DateOnly? from = null,
+        DateOnly? to = null,
+        Guid? transactionId = null,
+        bool? posted = null) =>
+        TypedResults.Ok(await sender.Send(new GetInterestAccrualsQuery(id, page, pageSize, from, to, transactionId, posted)));
 
     [EndpointSummary("Get an account")]
     [EndpointDescription("Returns one account by PublicId.")]

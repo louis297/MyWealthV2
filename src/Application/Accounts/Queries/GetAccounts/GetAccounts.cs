@@ -154,6 +154,7 @@ public class GetAccountsQueryHandler(IApplicationDbContext db, ICurrentUser curr
 
         var reserved = await AccountCash.ReservedAsync(db, accountIds, cancellationToken);
         var closures = await AccountClosureReader.LatestAsync(db, accountIds, cancellationToken);
+        var accrued = await Interest.Accruals.AccruedInterest.UnpostedAsync(db, accountIds, cancellationToken);
 
         return new PagedList<AccountDto>
         {
@@ -163,7 +164,8 @@ public class GetAccountsQueryHandler(IApplicationDbContext db, ICurrentUser curr
                 row.customer,
                 cashBalances.GetValueOrDefault(row.account.Id),
                 reserved.GetValueOrDefault(row.account.Id),
-                closures.GetValueOrDefault(row.account.Id))).ToList(),
+                closures.GetValueOrDefault(row.account.Id),
+                accrued.GetValueOrDefault(row.account.Id))).ToList(),
             Page = request.Page,
             PageSize = request.PageSize,
             TotalCount = totalCount
