@@ -34,7 +34,21 @@ The simulator gets its second outside party, the **simulator market**. It holds 
 
 New: configuration `MarketDataConnections:{name}`; port `IMarketPrices` with adapter `SimulatorMarketPrices`; `worker` job `market-data-sync:{connection}` on the new queue `market`; table `MarketDataFeeds`; route `GET /market-data-connections`; instrument item field `marketDataConnection`. Script `0049_market_data_feeds.sql`; simulator script `database/simulator/0008_market.sql`. No new permission, `TransactionType`, problem code or domain event.
 
-**Status is `accepted` (2026-11-22).** The thirteen points of §11 were confirmed on 2026-11-22, every one as recommended, and are written into the rules. The amendments to accepted docs listed in §12 were made when it was accepted. It is a build contract. [corporate-actions.md](corporate-actions.md) (step 10b) stays in review and is not part of this contract.
+**Status is `accepted` (2026-11-22), landed 2026-11-22.** The thirteen points of §11 were confirmed on 2026-11-22, every one as recommended, and are written into the rules. The amendments to accepted docs listed in §12 were made when it was accepted. [corporate-actions.md](corporate-actions.md) (step 10b) stays in review and was not part of this contract.
+
+Notes from landing:
+
+- R1–R3: the start-up check is `MarketDataConnectionsConfiguration.Read` (Infrastructure), called by `AddMarketDataConnections(MarketDataHost)` on `webapi` and `worker` before the host is built, the pattern of bank connections. The name rule is `BankConnectionName.IsValid`. `ConfiguredMarketDataConnections` holds the settings; the Domain `MarketDataConnections` (`src/Domain/MarketData`) is registered beside it and refuses a repeated suffix with a `DomainException`.
+- R4: `MarketDataConnection.Serves` also needs the symbol to be longer than the suffix, so `.SIM` itself is served by no connection.
+- R8–R11: `SyncMarketPrices.RunAsync` returns a `MarketPricesOutcome` (failure, rows stored). A failed call writes only the feed state. "More than 8 decimal places" means a price that changes when rounded to 8 places. `IInstrumentPriceStore.UpsertAsync` gained a `source` overload; a row the run did not quote keeps its own `Source`.
+- R7, R25: the adapter dispatch is `MarketPricesDispatcher` over `IMarketPricesAdapter` (`SimulatorMarketPrices`); a connection with no adapter on the host is `Unreachable`. A 404 is `BadResponse`. `MarketDataSyncJob` reuses `SqlRunLock` and throws `MarketDataSyncFailedException` on a failed read. The cron is the bank job's.
+- R12: `InstrumentPriceSyncJob` takes `MarketDataConnections`; its tests stay next to its fakes in `Infrastructure.IntegrationTests` (§10 was adjusted for this when the spec was accepted).
+- R16, R22: the first price of an instrument added by the control route is marked `set` (the operator typed it); a standing instrument's first price is not. The price list route is paged like the control log (`page`, `pageSize` at most 100).
+- R18: each instrument is brought up to date in its own transaction under `UPDLOCK, HOLDLOCK`, inside the execution strategy (`MarketPricePath.BringUpToDateAsync`).
+- R23: the reset adds the standing instruments on the real UTC date, which is the first simulator day of the new world.
+- §9.1: `TestSeed` writes the two simulated instruments' seed rows with `Source` `Simulator`. The two seed catalog tests now ask for page size 100, since the catalog has 21 rows.
+- BO22: the Back Office test that the New instrument page has no price field now looks for a `Price` label, since the BO22 note says "priced". BO23: `FeedStatus.Text` gained an overload that `MarketDataStatus` shares, so both columns word times the same way.
+- The 401 and 403 tests of `GET /market-data-connections` and the simulator's port tests passed already in their red commits, as the route shell carried the policy and the port rule exists since S0.
 
 ---
 
