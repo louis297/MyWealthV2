@@ -1,3 +1,4 @@
+using MyWealthV2.Infrastructure.CorporateActions;
 using MyWealthV2.Application.CorporateActions;
 using MyWealthV2.Infrastructure.BankReconciliations;
 using MyWealthV2.Application.BankReconciliations;
@@ -154,6 +155,7 @@ public static class DependencyInjection
                 return new SqlRunLock(connectionString);
             });
             builder.Services.AddScoped<MarketDataSyncJob>();
+            builder.Services.AddScoped<CorporateActionApplyJob>();
         }
     }
 
