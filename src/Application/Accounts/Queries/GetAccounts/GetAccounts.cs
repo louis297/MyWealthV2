@@ -153,6 +153,7 @@ public class GetAccountsQueryHandler(IApplicationDbContext db, ICurrentUser curr
             ).ToDictionaryAsync(row => row.AccountId, row => row.Sum, cancellationToken);
 
         var reserved = await AccountCash.ReservedAsync(db, accountIds, cancellationToken);
+        var unsettled = await AccountCash.UnsettledAsync(db, accountIds, cancellationToken);
         var closures = await AccountClosureReader.LatestAsync(db, accountIds, cancellationToken);
         var accrued = await Interest.Accruals.AccruedInterest.UnpostedAsync(db, accountIds, cancellationToken);
 
@@ -165,7 +166,8 @@ public class GetAccountsQueryHandler(IApplicationDbContext db, ICurrentUser curr
                 cashBalances.GetValueOrDefault(row.account.Id),
                 reserved.GetValueOrDefault(row.account.Id),
                 closures.GetValueOrDefault(row.account.Id),
-                accrued.GetValueOrDefault(row.account.Id))).ToList(),
+                accrued.GetValueOrDefault(row.account.Id),
+                unsettled.GetValueOrDefault(row.account.Id))).ToList(),
             Page = request.Page,
             PageSize = request.PageSize,
             TotalCount = totalCount

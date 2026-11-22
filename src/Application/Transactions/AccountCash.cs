@@ -49,6 +49,33 @@ internal static class AccountCash
     public static async Task<decimal> AvailableAsync(IApplicationDbContext db, int accountId, CancellationToken cancellationToken) =>
         AvailableCash.Of(await SumAsync(db, accountId, cancellationToken), await ReservedAsync(db, accountId, cancellationToken));
 
+    /// <summary>
+    /// Orders R44: the unsettled cash of an Account: the sum, over its posted sell fills that are not settled, of the
+    /// fill's net cash on the Account when that is above 0. The cash of an unsettled buy is not netted against it.
+    /// </summary>
+    public static async Task<decimal> UnsettledAsync(IApplicationDbContext db, int accountId, CancellationToken cancellationToken) =>
+        (await UnsettledAsync(db, [accountId], cancellationToken)).GetValueOrDefault(accountId);
+
+    /// <summary>Unsettled cash of each Account in <paramref name="accountIds"/>; an Account without any is missing.</summary>
+    public static async Task<Dictionary<int, decimal>> UnsettledAsync(
+        IApplicationDbContext db,
+        IReadOnlyCollection<int> accountIds,
+        CancellationToken cancellationToken) =>
+        accountIds.Count == 0
+            ? []
+            : await (
+                    from fill in db.OrderFills.AsNoTracking()
+                    join order in db.Orders.AsNoTracking() on fill.OrderId equals order.Id
+                    where accountIds.Contains(order.AccountId)
+                          && order.Side == OrderSide.Sell
+                          && fill.Status == OrderFillStatus.Posted
+                          && fill.SettledAt == null
+                          && fill.NetCash > 0
+                    group fill by order.AccountId
+                    into grouped
+                    select new { AccountId = grouped.Key, Sum = grouped.Sum(fill => fill.NetCash!.Value) })
+                .ToDictionaryAsync(row => row.AccountId, row => row.Sum, cancellationToken);
+
     /// <summary>Reserved cash of each Account in <paramref name="accountIds"/>; an Account without one is missing.</summary>
     public static async Task<Dictionary<int, decimal>> ReservedAsync(
         IApplicationDbContext db,

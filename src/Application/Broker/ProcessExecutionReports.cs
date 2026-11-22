@@ -159,8 +159,24 @@ public sealed class ProcessExecutionReports(
                 return ReportResult.Processed;
 
             default:
-                // Settlement (R43) is not processed yet: the report waits as Received.
-                return ReportResult.Waiting;
+                // R43: the fill is named by the outside id of its Fill report. Settlement writes nothing to the ledger.
+                var fillReportId = await db.ExecutionReports.AsNoTracking()
+                    .Where(row => row.Connection == report.Connection && row.OutsideId == report.FillOutsideId)
+                    .Select(row => (long?)row.Id)
+                    .SingleOrDefaultAsync(cancellationToken);
+                var settling = order.Fills.SingleOrDefault(row => row.ExecutionReportId == fillReportId);
+                if (settling is null)
+                {
+                    return ReportResult.Skipped(ExecutionReportSkipReason.UnknownFill);
+                }
+
+                if (settling.IsSettled)
+                {
+                    return ReportResult.Skipped(ExecutionReportSkipReason.Repeated);
+                }
+
+                settling.Settle(report.SettledDate!.Value, now);
+                return ReportResult.Processed;
         }
     }
 

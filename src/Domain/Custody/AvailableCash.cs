@@ -13,5 +13,6 @@ public static class AvailableCash
 
     /// <summary>Orders R44: withdrawable cash is available cash minus the proceeds of sales that have not settled,
     /// and never below 0.</summary>
-    public static decimal Withdrawable(decimal cashSum, decimal reserved, decimal unsettled) => throw new NotImplementedException();
+    public static decimal Withdrawable(decimal cashSum, decimal reserved, decimal unsettled) =>
+        Math.Max(0m, Of(cashSum, reserved) - unsettled);
 }

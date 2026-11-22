@@ -60,7 +60,8 @@ public sealed class AccountDto
         decimal cashBalance,
         decimal reservedCash,
         AccountClosureSummaryDto? closure = null,
-        decimal accruedInterest = 0m) => new()
+        decimal accruedInterest = 0m,
+        decimal unsettledCash = 0m) => new()
     {
         Id = account.PublicId,
         TenantId = tenant.PublicId,
@@ -73,8 +74,10 @@ public sealed class AccountDto
         CashBalance = cashBalance,
         ReservedCash = reservedCash,
         AvailableCash = Domain.Custody.AvailableCash.Of(cashBalance, reservedCash),
-        UnsettledCash = 0m,
-        WithdrawableCash = 0m,
+        UnsettledCash = unsettledCash,
+        WithdrawableCash = account.CustodyMode == Domain.Enums.CustodyMode.Custodial
+            ? Domain.Custody.AvailableCash.Withdrawable(cashBalance, reservedCash, unsettledCash)
+            : cashBalance,
         Status = account.Status.ToString(),
         IsActive = account.IsActive,
         RowVersion = Convert.ToBase64String(account.RowVersion ?? []),

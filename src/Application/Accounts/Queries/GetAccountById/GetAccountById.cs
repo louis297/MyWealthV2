@@ -38,8 +38,9 @@ public class GetAccountByIdQueryHandler(IApplicationDbContext db, ICurrentUser c
         var reserved = await AccountCash.ReservedAsync(db, row.account.Id, cancellationToken);
         var closures = await AccountClosureReader.LatestAsync(db, [row.account.Id], cancellationToken);
         var accrued = await Interest.Accruals.AccruedInterest.UnpostedAsync(db, [row.account.Id], cancellationToken);
+        var unsettled = await AccountCash.UnsettledAsync(db, row.account.Id, cancellationToken);
         return AccountDto.From(
             row.account, row.tenant, row.customer, cashBalance, reserved, closures.GetValueOrDefault(row.account.Id),
-            accrued.GetValueOrDefault(row.account.Id));
+            accrued.GetValueOrDefault(row.account.Id), unsettled);
     }
 }
