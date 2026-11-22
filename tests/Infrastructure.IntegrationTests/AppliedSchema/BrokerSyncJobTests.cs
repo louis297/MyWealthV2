@@ -21,9 +21,22 @@ using Shouldly;
 
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
-/// <summary>Orders R19: the recurring job <c>broker-sync:{connection}</c>.</summary>
+/// <summary>Orders R19: the recurring job <c>broker-sync:{connection}</c>. The runs write instruments, holdings and
+/// trades, so they use a database of their own and leave the shared one as the schema scripts made it.</summary>
 public class BrokerSyncJobTests
 {
+    private static ScratchSchemaDatabase _database = null!;
+
+    [OneTimeSetUp]
+    public async Task CreateDatabase()
+    {
+        _database = await ScratchSchemaDatabase.CreateAsync("BrokerJob");
+        await _database.ApplyAllAsync();
+    }
+
+    [OneTimeTearDown]
+    public async Task DropDatabase() => await _database.DisposeAsync();
+
     [TestCase(1, "*/1 * * * *")]
     [TestCase(5, "*/5 * * * *")]
     [TestCase(60, "0 * * * *")]
@@ -103,7 +116,8 @@ public class BrokerSyncJobTests
         var fill = order.Fills.ShouldHaveSingleItem();
         fill.Status.ShouldBe(OrderFillStatus.Posted);
         var trade = await db.Transactions.IgnoreQueryFilters().AsNoTracking()
-            .SingleAsync(row => row.SourceKind == TransactionSourceKind.OrderFill && row.SourcePublicId == fill.PublicId);
+            .SingleAsync(row => row.Id == fill.TransactionId);
+        (trade.SourceKind, trade.SourcePublicId).ShouldBe((TransactionSourceKind.OrderFill, (Guid?)world.OrderPublicId));
         (trade.Type, trade.CreatedBy).ShouldBe((TransactionType.Buy, SystemUser.Name));
         var holding = await db.Holdings.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.AccountId == order.AccountId);
         (holding.Quantity, holding.CostAmount, holding.CreatedBy).ShouldBe((10m, 1015.00m, SystemUser.Name));
@@ -204,7 +218,7 @@ public class BrokerSyncJobTests
     private static async Task<IHost> WorkerHostAsync(ScriptedBroker broker, string connection)
     {
         var builder = Host.CreateApplicationBuilder();
-        builder.Configuration[$"ConnectionStrings:{Services.Database}"] = SchemaDatabaseSetup.ConnectionString;
+        builder.Configuration[$"ConnectionStrings:{Services.Database}"] = _database.ConnectionString;
         builder.AddInfrastructureServices();
         builder.AddBrokerConnections(BrokerConnectionHost.Worker);
         builder.Services.AddScoped<IUser, SystemUser>();
@@ -266,7 +280,7 @@ public class BrokerSyncJobTests
     }
 
     private static ApplicationDbContext OpenDb() =>
-        new(new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlServer(SchemaDatabaseSetup.ConnectionString).Options);
+        new(new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlServer(_database.ConnectionString).Options);
 
     /// <summary>A broker that accepts every order and keeps one feed; it notes the order of its calls.</summary>
     private sealed class ScriptedBroker : IBrokerOrders, IBrokerFeed
