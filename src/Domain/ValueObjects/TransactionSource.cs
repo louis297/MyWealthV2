@@ -76,6 +76,9 @@ public sealed class TransactionSource : ValueObject
         return new TransactionSource(TransactionSourceKind.InterestRun, runPublicId);
     }
 
+    /// <summary>An entitlement posting's source: the PublicId of the corporate action (corporate-actions R26).</summary>
+    public static TransactionSource CorporateAction(Guid corporateActionPublicId) => throw new NotImplementedException();
+
     /// <summary>The source as stored on a Transaction row.</summary>
     internal static TransactionSource FromStored(TransactionSourceKind kind, Guid? publicId) =>
         kind switch

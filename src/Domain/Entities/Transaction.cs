@@ -63,6 +63,9 @@ public class Transaction : BaseAuditableEntity
     /// <summary>The period an interest posting pays, on the posting and its Reversal (interest-run R26).</summary>
     public TransactionInterestDetail? InterestDetail { get; private set; }
 
+    /// <summary>The event behind an entitlement posting, on the posting and its Reversal (corporate-actions R27).</summary>
+    public TransactionCorporateActionDetail? CorporateActionDetail { get; private set; }
+
     /// <summary>The memo every interest posting carries (interest-run R23).</summary>
     public const string InterestMemo = "Interest";
 
@@ -122,6 +125,27 @@ public class Transaction : BaseAuditableEntity
         transaction.AddDomainEvent(new TransactionPosted(transaction));
         return transaction;
     }
+
+    /// <summary>
+    /// Corporate-actions R26, R27: an entitlement posting. Type <c>Split</c> for a split or a consolidation, <c>Bonus</c>
+    /// for a bonus; one security leg on the Account of <c>quantityAfter − quantityBefore</c> with cost 0 in the quote
+    /// currency; no cash leg; source <c>CorporateAction</c>; memo <c>Split 2 for 1</c>; a corporate action detail.
+    /// Built without the manual entry matrix (custody-modes R7). The holding's total cost does not change (R29).
+    /// </summary>
+    public static Transaction PostCorporateAction(
+        int tenantId,
+        int accountId,
+        int instrumentId,
+        string quoteCurrency,
+        CorporateActionKind kind,
+        CorporateActions.CorporateActionRatio ratio,
+        DateOnly exDate,
+        DateOnly? recordDate,
+        DateOnly? paymentDate,
+        decimal quantityBefore,
+        decimal quantityAfter,
+        DateTimeOffset bookedAt,
+        TransactionSource source) => throw new NotImplementedException();
 
     public static Transaction Post(
         int tenantId,

@@ -334,6 +334,49 @@ public class CorporateActionsSchemaTests
         }
     }
 
+    [Test]
+    public async Task EfRoundTrip_KeepsAnEntitlementPostingAndItsDetail()
+    {
+        await using var db = await ScratchSchemaDatabase.CreateAsync("CorporateActionPostingEf");
+        await db.ApplyAllAsync();
+        var row = (await db.ReadAsync($"""
+            {ScratchSchemaDatabase.TenantRows("a", Guid.NewGuid().ToString("N")[..12])}
+            SELECT @a_tenant, @a_instrument, @a_brokerage;
+            """)).Single();
+        var (tenantId, instrumentId, accountId) = (Convert.ToInt32(row[0]), Convert.ToInt32(row[1]), Convert.ToInt32(row[2]));
+        var actionId = Guid.NewGuid();
+        var posting = Transaction.PostCorporateAction(
+            tenantId, accountId, instrumentId, "USD", CorporateActionKind.Consolidation, new CorporateActionRatio(1, 10),
+            new DateOnly(2026, 11, 24), null, new DateOnly(2026, 12, 1), 105m, 10.5m,
+            new DateTimeOffset(2026, 11, 22, 3, 41, 2, TimeSpan.Zero), MyWealthV2.Domain.ValueObjects.TransactionSource.CorporateAction(actionId));
+        posting.CreatedBy = "worker";
+        foreach (var leg in posting.SecurityLegs)
+        {
+            leg.CreatedBy = "worker";
+        }
+
+        await using (var context = OpenDb(db.ConnectionString))
+        {
+            context.Set<Transaction>().Add(posting);
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = OpenDb(db.ConnectionString))
+        {
+            var stored = await context.Set<Transaction>().AsNoTracking()
+                .Include(transaction => transaction.SecurityLegs)
+                .Include(transaction => transaction.CorporateActionDetail)
+                .SingleAsync(transaction => transaction.Id == posting.Id);
+            (stored.Type, stored.SourceKind, stored.SourcePublicId, stored.Memo)
+                .ShouldBe((TransactionType.Split, TransactionSourceKind.CorporateAction, (Guid?)actionId, "Consolidation 1 for 10"));
+            stored.SecurityLegs.Single().Quantity.ShouldBe(-94.5m);
+            var detail = stored.CorporateActionDetail.ShouldNotBeNull();
+            (detail.Kind, detail.RatioNew, detail.RatioHeld, detail.ExDate, detail.RecordDate, detail.PaymentDate, detail.QuantityBefore, detail.QuantityAfter)
+                .ShouldBe((CorporateActionKind.Consolidation, 1, 10, new DateOnly(2026, 11, 24), (DateOnly?)null,
+                    (DateOnly?)new DateOnly(2026, 12, 1), 105m, 10.5m));
+        }
+    }
+
     /// <summary>A tenant (<c>@a_*</c> from <see cref="ScratchSchemaDatabase.TenantRows"/>).</summary>
     private static string World() => $"""
         {ScratchSchemaDatabase.TenantRows("a", Guid.NewGuid().ToString("N")[..12])}
