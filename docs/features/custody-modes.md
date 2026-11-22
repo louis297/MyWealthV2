@@ -34,6 +34,7 @@ related:
   - deposit-matching.md
   - withdrawals.md
   - account-closure.md
+  - interest-run.md
 ---
 
 # Custody modes
@@ -578,3 +579,12 @@ Status of this amendment: `accepted` (2026-11-22), together with [account-closur
 - R7: the closure flow builds the write-off with `Transaction.PostRemainderWriteOff`, outside the matrix.
 - R14: a **closing** account (an account closure `InProgress`) cannot be assigned a portfolio → 400 `account_not_eligible` with the message `Only an open Custodial account that is not being closed can be assigned a portfolio.` (account-closure R13). An account closure needs no Active assignment (account-closure R5).
 - `CustodyRules.CloseOutRefusal(Custodial, …)` returns the message for every amount; the matrix still lives in one Domain class.
+
+---
+
+## Amendment 2026-11-22 (interest run) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rules R23 and R29 live there; this section records what changes here.
+
+- R5 matrix: the cell `Interest` / Custodial stays **refused**; its "written by" is now the interest run (interest-run R29). The refusal message and `errors.Type` are unchanged.
+- R7: the interest run builds the posting with `Transaction.PostInterest`, outside the matrix, with the platform time as `bookedAt`.

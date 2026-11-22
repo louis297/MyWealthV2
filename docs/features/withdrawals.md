@@ -34,6 +34,7 @@ related:
   - ../api-design.md
   - ../glossary.md
   - account-closure.md
+  - interest-run.md
 ---
 
 # Nominated bank accounts and withdrawals
@@ -800,3 +801,11 @@ Status of this amendment: `accepted` (2026-11-22), together with [account-closur
 - R40: after the payout of a closure's withdrawal is posted, the same database transaction writes off the remainder, closes the Account and completes the closure (account-closure R17, R18). If the Account cannot be closed, the payout is still posted and the closure ends `NotClosable` (account-closure R19).
 - R42: a returned payout of an earlier withdrawal of a closing account → nothing posted, line `Unmatched` with reason `AccountClosing` (account-closure R14). A return to a Closed account is unchanged (`AccountClosed`), also after a completed closure (account-closure R21).
 - R25 (item): gains `accountClosureId`, the PublicId of the closure that created the withdrawal, else `null`.
+
+---
+
+## Amendment 2026-11-22 (interest run) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rule R28 lives there; this section records what changes here.
+
+- R36: no rule changes. The net of an interest posting is never negative, so it only raises available cash; the portfolio trade lock does not apply to it and no rebalance is enqueued.

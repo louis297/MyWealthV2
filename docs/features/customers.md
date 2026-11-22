@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-14
-last_updated: 2026-11-20
+last_updated: 2026-11-22
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -19,6 +19,7 @@ related:
   - tenant-admins.md
   - advisers.md
   - withdrawals.md
+  - interest-run.md
 ---
 
 # Customers
@@ -368,3 +369,14 @@ Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md
 
 - A Customer may have **nominated bank accounts** (`/nominated-bank-accounts`): their own bank accounts that withdrawals may be paid to. They belong to the Customer, not to an Account, and do not need a Custodial account. An Adviser or TenantAdmin adds them; a TenantAdmin other than the adder verifies or rejects them. The Customer reads their own and cannot change them (roadmap D6).
 - Disabling a Customer does not change their nominated bank accounts. Adding one for a Disabled Customer, or verifying one, → 400 `disabled` / `target=user`.
+
+---
+
+## Amendment 2026-11-22 (interest run) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rules R1–R8 live there; this section records what changes here.
+
+- Every Customer has one **tax profile** (interest-run R2): `taxResidency` (`NewZealand` or `Overseas`), `irdNumberHeld` and `rwtRatePercent` (10.5, 17.5, 30, 33, 39, or `null`). A Customer whose profile was never saved reads as `NewZealand`, `false`, `null` ("not provided"). The IRD number itself is never stored. Tax residency is the first attribute that tells a New Zealand Customer from an overseas one; it decides the withholding tax on interest and nothing else.
+- New sub-resource `GET` / `PUT /users/customers/{customerId}/tax-profile`, with the policies and scope of every `/users/customers` route (TenantAdmin: the tenant; Adviser: assigned Customers; else 404; a Customer → 403). `PUT` takes all three attributes and `rowVersion` (`null` for the first write) and answers 204; stale → 409 `stale_row_version` (interest-run R3, R6).
+- New `GET /users/me/tax-profile` (`users.me`): the caller's own profile when the caller is a Customer, without `updatedBy`; any other role → 404 (interest-run R5, R8).
+- Creating, updating, disabling and enabling a Customer are unchanged. A Disabled Customer's profile may be changed. No domain event.

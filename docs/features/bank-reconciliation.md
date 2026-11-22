@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-21
-last_updated: 2026-11-21
+last_updated: 2026-11-22
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -24,6 +24,7 @@ related:
   - ../database-design.md
   - ../api-design.md
   - ../glossary.md
+  - interest-run.md
 ---
 
 # Bank reconciliation
@@ -99,7 +100,7 @@ The rule that distinguishes this slice: every run's items add up exactly to the 
 - A balance as of a past date, or a closing balance by value date (§11 point 1)
 - A position reconciliation against a custodian (roadmap T3)
 - Settling trades or FX conversions through the trust account (roadmap O1, O2, O5). Until then they are known differences (R10)
-- Interest the bank pays on the trust account as its own item. A TenantAdmin ignores such a receipt (deposit-matching R27); it is then an `Ignored` known difference (roadmap B7 "Open", I2)
+- Interest the bank pays on the trust account as its own item. A TenantAdmin ignores such a receipt (deposit-matching R27); it is then an `Ignored` known difference (roadmap B7 "Open", I2). Amended 2026-11-22: it is the item `BankInterest` of [interest-run.md](interest-run.md) R41
 - A client money surplus or shortfall figure (what the firm must top up), and the firm's own money as a separate figure
 - Any action on an item: accept, resolve, assign, comment (§11 point 2)
 - Notifications of a break (email, outbox event)
@@ -532,7 +533,7 @@ Each point was confirmed on 2026-11-21 as recommended, and is written into the r
 Still open, not this slice:
 
 - A client money surplus or shortfall figure, and what the firm must top up
-- The bank's interest on the trust account as its own item (roadmap I2, D12)
+- The bank's interest on the trust account as its own item (roadmap I2, D12). Answered 2026-11-22 by [interest-run.md](interest-run.md) R39–R42
 - A position reconciliation against the custodian (roadmap T3)
 - A real bank adapter, and whether it can send a statement balance per page
 
@@ -555,3 +556,14 @@ The repository should build after each commit. Agents split each behaviour into 
 ### Docs amended when this spec was accepted
 
 [deposit-matching.md](deposit-matching.md) (R7, R8: the balance stored with the page; R44, R45: `balance` on the page; R49: the adapter reads it), [simulator.md](simulator.md) (R26–R29, script `0006`), [reports.md](reports.md) (scope `Tenant`, its policies in R4–R6 and §8, the third catalog row in §6.1), [api-design.md](../api-design.md) (§3.1 three permissions, §6 resource row, §7.8 scope `Tenant`, change log), [domain-model.md](../domain-model.md) (§8.9, new §8.12, §11 report scope), [database-design.md](../database-design.md) (§9, §11.9, new §11.12, §14, §15), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D51), [adviser-portal-reports.md](../adviser-portal/adviser-portal-reports.md) (D52), [bff-adviser-portal.md](bff-adviser-portal.md) (prefix), [glossary.md](../glossary.md) (status of the terms added in review; Report and Book gain the third scope), [features/README.md](README.md) row status, [function-plan.md](../function-plan.md) §5, [architecture.md](../architecture.md) (the `worker` job), and the roadmap §5 B7, §11 S1 and §13 status.
+
+---
+
+## Amendment 2026-11-22 (interest run) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rules R41 and R42 live there; this section records what changes here.
+
+- R9: an `Ignored` **credit** line of kind `Interest` is an item of the new kind `BankInterest` (Known) with the line's amount, in place of the `Ignored` item.
+- R10: the cash legs of Transactions with source `InterestRun` on the Tenant's Custodial accounts in the currency become two items: `InterestCredited` (Known) = minus the sum of their `Principal` legs, `count` = the Transactions; `TaxWithheld` (Known) = minus the sum of their `Tax` legs, `count` = the Transactions with a `Tax` leg. These legs no longer count in `OtherLedgerCash`. An item whose amount is `0` is left out; the items still add up to the difference.
+- §5: `ReconciliationItemKind` gains `BankInterest = 12`, `InterestCredited = 13`, `TaxWithheld = 14`; `ReconciliationInputs` gains the two ledger sums with their counts and each line's kind. `0048` widens `CK_BankReconciliationItems_Kind` to 0–14 and `CK_BankReconciliationItems_Line` to the kinds `2, 3, 4, 6, 12`.
+- §2 Out and "Still open": the bank's interest on the trust account as its own item is no longer out; it is `BankInterest`. The platform still computes no margin (interest-run R42).

@@ -312,18 +312,21 @@ Field rules: [features/accounts.md](features/accounts.md). Landed in the repo 20
 Close requires cash `SUM = 0` and no `Holdings` rows ([features/holdings.md](features/holdings.md)).
 
 - (Account closure) A Custodial account is closed only by an `AccountClosure` (§8.13); the plain close is refused for it in Application. While a closure is `InProgress` the Account is **closing**: it stays Open but accepts no hand write and no portfolio assignment, and deposit matching sends its receipts to suspense ([features/account-closure.md](features/account-closure.md)).
+- (Interest run) An Account has `InterestAccruedThrough` (`DateOnly?`): the last UTC day its daily accrual was worked out for. `MarkInterestAccrued(through)` only moves it forward and is refused on an External account. Only Open Custodial accounts that are not closing are accrued (§8.14, [features/interest-run.md](features/interest-run.md)).
 
 ### 8.6 Transaction (accepted — posting slice; landed)
 
 | Type | Kind | Notes |
 | --- | --- | --- |
 | `Transaction` | Aggregate | Business-event header in a tenant. Has no Account and no Customer; it belongs to its leg accounts. Not a capture row that later copies into a journal. |
-| `TransactionCashLeg` | Entity | Cash accounting line on one Account (`AccountId`). Has a role: `Principal` (one on a cash header, and on `Buy` / `Sell`; at most one per `(Transaction, Account)`) or `Fee` (a trade fee on `Buy` / `Sell` and their Reversals, with one fee detail; [features/trade-fees.md](features/trade-fees.md)). Absent on `OpeningHoldings`, `StockIn`, `StockOut`, `Split`, `Bonus`, and `Scrip`. |
+| `TransactionCashLeg` | Entity | Cash accounting line on one Account (`AccountId`). Has a role: `Principal` (one on a cash header, and on `Buy` / `Sell`; at most one per `(Transaction, Account)`), `Fee` (a trade fee on `Buy` / `Sell` and their Reversals, with one fee detail; [features/trade-fees.md](features/trade-fees.md)) or `Tax` (withholding tax on an interest posting and its Reversal, always negative, with one tax detail; [features/interest-run.md](features/interest-run.md)). Absent on `OpeningHoldings`, `StockIn`, `StockOut`, `Split`, `Bonus`, and `Scrip`. |
 | `TransactionSecurityLeg` | Entity | Security accounting line on one Account (`AccountId`). Exactly one on `Buy`, `Sell`, `StockIn`, `StockOut`, `Split`, `Bonus`, and `Scrip`. Quantity is signed. |
 | `TransactionFxDetail` | Entity (child of `Transaction`) | The rate a Transaction used: base and quote currency, rate (quote per 1 base), as-of date, source. 0..1 per Transaction, immutable. Exactly one on `FxConversion`; a Reversal of a Transaction with one gets a copy ([features/fx-conversions.md](features/fx-conversions.md)). |
 | `AppliedFxRate` | Value object | Base ≠ quote currency, rate `> 0`, as-of date, source. Input to `Transaction.PostFxConversion`. |
 | `TransactionFeeDetail` | Entity (child of a `Fee` cash leg) | How the fee was computed: kind, schedule, basis amount, fee, currency. Exactly one per `Fee` leg, at most one per `(Transaction, kind)`, immutable, copied to the Reversal's matching leg. |
-| `CashLegRole` / `FeeKind` | Enums | `Principal` / `Fee`. `Brokerage` is the only fee kind so far. |
+| `TransactionTaxDetail` | Entity (child of a `Tax` cash leg) | How the withholding tax was computed: tax kind, rate percent, basis amount (the gross), tax amount, currency. Exactly one per `Tax` leg, at most one per `(Transaction, kind)`, immutable, copied to the Reversal's matching leg ([features/interest-run.md](features/interest-run.md)). |
+| `TransactionInterestDetail` | Entity (child of `Transaction`) | The period an interest posting pays: first and last day, number of days, accrued amount (8 decimals), gross. Exactly one on an interest posting and on its Reversal, none elsewhere, immutable, copied by `Reverse`. |
+| `CashLegRole` / `FeeKind` / `TaxKind` | Enums | `Principal` / `Fee` / `Tax`. `Brokerage` is the only fee kind so far. `Rwt`, `Nrwt` are the tax kinds. |
 | `TransactionAdjustmentDetail` | Entity (child of `Transaction`) | Why an adjustment was entered: `AdjustmentReason` (`EntryError`, `CorporateAction`, `ReconciliationBreak`, `Other`). Exactly one on an `Adjustment` and on its Reversal, none elsewhere, immutable, copied by `Reverse` ([features/adjustments.md](features/adjustments.md)). |
 | `TransactionBankReceiptDetail` | Entity (child of `Transaction`) | The bank's data on a deposit: value date, reference text, payer name, masked payer account. Exactly one on a deposit (a `TransferIn` with source `BankFeed`) and on its Reversal, none elsewhere, immutable, copied by `Reverse` ([features/deposit-matching.md](features/deposit-matching.md)). |
 | `TransactionType` | Enum | Cash set plus `OpeningHoldings`, `Buy`, `Sell`, `StockIn` (10), `StockOut` (11), `Split` (12), `Bonus` (13), `Scrip` (14), `InternalTransfer` (15), `FxConversion` (16), `Adjustment` (17), and `Reversal`. |
@@ -351,6 +354,7 @@ Invariants:
 
 - (Withdrawals) Source kind `Payment` (4) has the withdrawal's PublicId as its id and is not hand-reversible. `PostPayout` builds a payout: one `Principal` `TransferOut` cash leg, the amount given positive and posted negative, source `Payment`, a payment detail (`TransactionPaymentDetail`: value date, reference sent, payee name, masked payee account; 0..1 per Transaction, copied by `Reverse`). A payout is undone only by its flow (a returned payout), through `Reverse` with source `Payment`. `CustodyRules` refuses a hand `TransferOut` on a Custodial account, allows a hand `CloseOut` there only for a remainder below the currency's minor unit, and allows an `InternalTransfer` between Custodial accounts of the same Customer only ([features/withdrawals.md](features/withdrawals.md)).
 - (Account closure) Source kind `AccountClosure` (5) has the closure's PublicId as its id and is not hand-reversible. `PostRemainderWriteOff` builds the remainder write-off: one `Principal` `CloseOut` cash leg of minus the cash `SUM`, where `0 < SUM <` one minor unit, source `AccountClosure`. On a Custodial account no person enters a `CloseOut` (`CustodyRules`).
+- (Interest run) Source kind `InterestRun` (6) has the run's PublicId as its id and is not hand-reversible. `PostInterest` builds an interest posting: one `Principal` `Interest` cash leg of `+gross` (the accrued amount rounded to the minor unit, above 0), a `Tax` cash leg of `−tax` with its tax detail when the withholding tax is above 0, and an interest detail; source `InterestRun`. A cash leg has a tax detail if and only if its role is `Tax`; every factory other than `PostInterest` and `Reverse` refuses a `Tax` leg. `Reverse` copies the `Tax` leg, its tax detail and the interest detail. On a Custodial account no person enters an `Interest` (`CustodyRules`, unchanged) ([features/interest-run.md](features/interest-run.md)).
 
 Field rules: [features/posting.md](features/posting.md), [features/holdings.md](features/holdings.md), [features/buy-sell.md](features/buy-sell.md), [features/split.md](features/split.md), [features/leg-accounts.md](features/leg-accounts.md), and [features/adjustments.md](features/adjustments.md).
 
@@ -393,6 +397,8 @@ Amendment 2026-11-21 (bank reconciliation, accepted): `BankFeedCursor` gains the
 
 Amendment 2026-11-22 (account closure, accepted): unmatched reason `AccountClosing` (12), after `AccountClosed`: the reference names an Account with a closure `InProgress`; a returned payout of such an Account gets it too ([features/account-closure.md](features/account-closure.md)).
 
+Amendment 2026-11-22 (interest run, accepted): `BankStatementLine` gains `Kind` (`StatementLineKind`: `Transfer` = 0, `Interest` = 1; immutable, from the port). `SetAsideAsBankInterest(at)`: a `Received` credit line of kind `Interest` → `Ignored` with the note `Bank interest` and no person; `Reopen` works on it as on any ignored line ([features/interest-run.md](features/interest-run.md)).
+
 ### 8.10 Nominated bank account (accepted — withdrawals slice)
 
 | Type | Kind | Notes |
@@ -420,7 +426,7 @@ Amendment 2026-11-21 (bank returns, accepted): `OutgoingPaymentKind` (`Withdrawa
 | --- | --- | --- |
 | `BankReconciliation` | Aggregate | One run for one client money account at one instant: the bank side (statement balance with its time, opening balance, total of the stored lines), the platform side (cash of every Custodial account of the Tenant in the currency), the difference, the items, totals per class, status (`Agreed`, `Breaks`, `NoBankBalance`), trigger (`Scheduled`, `Manual`), who ran it, and information (reserved cash, payments in flight, feed status). Built by `Compute(inputs, …)`; no other method. |
 | `BankReconciliationItem` | Entity (child) | Kind, class, signed amount (its effect on bank minus platform), count, and the statement line as it was at the run, or the other client money account. |
-| `ReconciliationItemKind` | Enum | `Unexplained`, `StatementDifference`, `Suspense`, `NotProcessed`, `ReturnInProgress`, `OpeningBalance`, `Ignored`, `Trades`, `FxConversions`, `Adjustments`, `OtherLedgerCash`, `OtherClientMoneyAccount` |
+| `ReconciliationItemKind` | Enum | `Unexplained`, `StatementDifference`, `Suspense`, `NotProcessed`, `ReturnInProgress`, `OpeningBalance`, `Ignored`, `Trades`, `FxConversions`, `Adjustments`, `OtherLedgerCash`, `OtherClientMoneyAccount`, and (interest run) `BankInterest` (12), `InterestCredited` (13), `TaxWithheld` (14), class Known |
 | `ReconciliationItemClass` | Enum | `Break`, `Timing`, `Known`; one fixed class per kind |
 
 Invariants: the items of an `Agreed` or `Breaks` run add up to bank balance minus Custodial cash; a run is `Agreed` exactly when it has no Break item; a run and its items never change; a run counts only its own Tenant's accounts and lines. No domain event. Field rules: [features/bank-reconciliation.md](features/bank-reconciliation.md).
@@ -435,6 +441,23 @@ Invariants: the items of an `Agreed` or `Breaks` run add up to bank balance minu
 | `ClosureAmounts` | Static | `Split(cashSum, decimalPlaces)` → payout and remainder |
 
 Invariants: an Account has at most one closure `InProgress` (filtered unique index, Account lock); a closure with a payout has exactly one withdrawal of that amount, created with it, and one without a payout is never `InProgress`; a closure is `Completed` only together with `Account.Close()` in one database transaction; it follows its withdrawal (rejected, cancelled, failed → `Cancelled`). No domain event of its own. Field rules: [features/account-closure.md](features/account-closure.md).
+
+Amendment 2026-11-22 (interest run, accepted): before the payout is worked out, the request posts the interest accrued through yesterday (§8.14); a closing account is not accrued ([features/interest-run.md](features/interest-run.md)).
+
+### 8.14 Tax profile and interest (accepted — interest-run slice)
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `CustomerTaxProfile` | Entity, one per Customer | Tax residency, IRD number held, chosen RWT rate (or none), who changed it and when. `Set(residency, irdNumberHeld, rwtRatePercent, by, at)` refuses a rate outside the five, a rate without a held IRD number, and a rate with `Overseas`. `NotProvided` is the profile of a Customer with no row. `Withholding` returns the kind, rate and basis. No history; no event. |
+| `TaxResidency` | Enum | `NewZealand`, `Overseas` |
+| `WithholdingRates` | Static | The five RWT rates (10.5, 17.5, 30, 33, 39), `Default` 33, `NonDeclaration` 45, `NonResident` 15; `For(profile)` → `Withholding(kind, ratePercent, basis)` |
+| `WithholdingBasis` | Enum | `Elected`, `Default`, `NonDeclaration`, `NonResident`. Shown, not stored |
+| `InterestRateSchedule` | Aggregate | Tenant, currency (immutable), `EffectiveFrom`, `FeeBands` of annual rates (marginal). `AccrualFor(dayBalance)` → `Round(bands.Apply(balance) / 365, 8, AwayFromZero)` and the effective rate. Update and delete take the cut-off date and refuse a row in effect |
+| `InterestAccrual` | Entity | One per Account and UTC day: day balance, schedule used, effective annual rate, amount (8 decimals), the Transaction that paid it. Written once; `MarkPosted(transaction)` once |
+| `InterestRun` | Aggregate | One execution for one Tenant and as-of date: trigger (`Scheduled`, `Manual`, `AccountClosure`), the person (none for `Scheduled`), the account (only for `AccountClosure`), start and end, counts of accounts processed, failed and Transactions posted. `Complete(counts, at)` once. `PostingDate` is the last day of the latest month that ended on or before the as-of date |
+| `InterestRunTrigger` | Enum | `Scheduled`, `Manual`, `AccountClosure` |
+
+Invariants: an `(Account, day)` has at most one accrual row, never after the account's `InterestAccruedThrough` (unique index, Account lock); an accrual row is posted at most once, by exactly one Transaction; the gross of an interest detail is the rounded sum of the rows stamped with its Transaction and equals the `Principal` leg; a tax detail's tax amount is the opposite of its leg's amount and its basis is the gross; an interest rate schedule row in effect never changes; a Customer's withholding is one of the four rows of `WithholdingRates`. No domain event of its own; an interest posting raises `TransactionPosted`. Field rules: [features/interest-run.md](features/interest-run.md).
 
 ---
 
@@ -493,6 +516,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-20 | Withdrawals accepted: `NominatedBankAccount` (§8.10); `Withdrawal`, `OutgoingPayment` (§8.11); reserved and available cash on a Custodial account (§8.5); source kind `Payment`, `PostPayout`, `TransactionPaymentDetail` and the Custodial `TransferOut`, `CloseOut` and `InternalTransfer` rules (§8.6); the payout fields of `BankStatementLine` (§8.9). [features/withdrawals.md](features/withdrawals.md). |
 | 2026-11-21 | Bank reconciliation accepted: `BankReconciliation`, `BankReconciliationItem` and their enums (§8.12); `BankFeedCursor` statement balance and opening balance (§8.9); report scope `Tenant` (§11). [features/bank-reconciliation.md](features/bank-reconciliation.md) |
 | 2026-11-22 | Account closure accepted: `AccountClosure`, its enums and `ClosureAmounts` (§8.13); the closing account (§8.5); source kind `AccountClosure` and `PostRemainderWriteOff`, hand `CloseOut` refused on Custodial (§8.6); unmatched reason `AccountClosing` (§8.9). [features/account-closure.md](features/account-closure.md) |
+| 2026-11-22 | Interest run accepted: `CustomerTaxProfile`, `WithholdingRates`, `InterestRateSchedule`, `InterestAccrual`, `InterestRun` and their enums (§8.14); `Account.InterestAccruedThrough` (§8.5); cash leg role `Tax`, `TransactionTaxDetail`, `TransactionInterestDetail`, source kind `InterestRun` and `PostInterest` (§8.6); statement line kind (§8.9); three reconciliation item kinds (§8.12). [features/interest-run.md](features/interest-run.md) |
 
 ---
 

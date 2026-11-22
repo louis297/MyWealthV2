@@ -3,7 +3,7 @@ title: Future plans
 status: note
 language: en
 created: 2026-11-10
-updated: 2026-11-19
+updated: 2026-11-22
 related:
   - README.md
   - function-plan.md
@@ -59,7 +59,7 @@ Order. Each step depends only on earlier steps:
 | Step | Topic | Why here | Depends on |
 | --- | --- | --- | --- |
 | 1 | Transaction fee leg ([features/trade-fees.md](features/trade-fees.md), `accepted`) | Changes the posting leg shape. Income events add similar deduction legs, so the shape is settled first. Closes the fee work deferred in buy-sell, fx-conversions, internal-transfers and leg-accounts. | posting, buy-sell |
-| 2 | Income events | Dividend and interest, with imputation credit, RWT and foreign withholding tax. Every tax report needs them. Foreign-currency dividends need an answer from §5 or automatic FX. | Step 1 |
+| 2 | Income events | Dividend and interest, with imputation credit, RWT and foreign withholding tax. Every tax report needs them. Foreign-currency dividends need an answer from §5 or automatic FX. The `Tax` cash leg with its tax detail and the Customer tax profile exist since [features/interest-run.md](features/interest-run.md) (accepted 2026-11-22), which posts interest on Custodial accounts; dividends reuse them. Withholding on a hand-entered `Interest` of an External account stays here | Step 1 |
 | 3 | Historical valuation | Prices and FX rates as of a date, and holding snapshots. Every period report needs them. Closes the open daily snapshots in [function-plan.md](function-plan.md) §5.4. | instrument-prices, fx-rates |
 | 4 | Advisory fee | Tiered or blended rates, daily accrual, pro rata for part periods, billing in advance or in arrears, and what happens when cash is short. | Step 3 |
 | 5 | Performance report | Time-weighted return (TWR) and money-weighted return (MWR), gross and net of fees. | Steps 3, 4 |
@@ -222,7 +222,7 @@ Slices. All five have a spec. Slices 3 to 5 do not depend on each other:
 After slice 2, some writes on a Custodial account are still entered by hand or are missing. Each later item replaces one of them. The plan for these items, their order, the decisions they need and the simulator is [custodial-roadmap.md](custodial-roadmap.md) (`note`, 2026-11-19):
 
 - Deposits and withdrawals matched to a bank statement, replacing hand-entered `TransferIn` / `TransferOut`.
-- An interest job and income events (§1 step 2), replacing hand-entered `Interest`.
+- An interest job and income events (§1 step 2), replacing hand-entered `Interest`. The interest job is [features/interest-run.md](features/interest-run.md) (accepted 2026-11-22).
 - Corporate action events, replacing hand-entered `Split` / `Bonus` / `Scrip`.
 - In-kind transfer and migration batches, replacing `Opening`, `OpeningHoldings`, `StockIn` and `StockOut`.
 - Orders, replacing the immediate `Buy` / `Sell`.

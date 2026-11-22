@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-15
-last_updated: 2026-11-18
+last_updated: 2026-11-22
 related:
   - ../future-plans.md
   - ../glossary.md
@@ -23,6 +23,7 @@ related:
   - currencies.md
   - custody-modes.md
   - external-caller-numbers.md
+  - interest-run.md
 ---
 
 # Trade fees
@@ -453,3 +454,13 @@ Tests:
 | Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403; Adviser and TenantAdmin → 200; `tenantId` in the body → 400; R5 shape errors → 400 with the same field names as create; `amounts` empty, more than 5, `≤ 0` or with 5 decimals → 400; no row is written. |
 
 Suggested commit: `FeeCalculation` and the preview query with tests (R30–R33), after commit 1 of §12. [api-design.md](../api-design.md) §7.9 lists the route.
+
+---
+
+## Amendment 2026-11-22 (interest run) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rules R23–R27 live there; this section records what changes here.
+
+- Cash leg role: `CashLegRole` gains `Tax = 2` (the next role named in §11): an amount withheld from the Transaction's income and owed to a tax authority, always negative, with exactly one tax detail (`TransactionTaxDetails`). In this slice it appears only on an `Interest` posted by an interest run and on its Reversal (interest-run R25).
+- R20: other types never have a `Fee` leg, and every type other than an interest posting never has a `Tax` leg. The Domain refuses both.
+- `FeeBands` is reused unchanged, and not renamed, for the bands of an interest rate schedule (interest-run R9, §5).

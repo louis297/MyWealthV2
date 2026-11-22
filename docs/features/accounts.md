@@ -27,6 +27,7 @@ related:
   - deposit-matching.md
   - withdrawals.md
   - account-closure.md
+  - interest-run.md
 ---
 
 # Accounts
@@ -478,3 +479,14 @@ Status of this amendment: `accepted` (2026-11-22), together with [account-closur
 - §8: new sub-resource `/accounts/{accountId}/closures` (`account-closures.read`, `account-closures.request`): `POST` (request, `Idempotency-Key`), `GET` (the Account's closures) and `GET …/{id}`. Field rules in account-closure §4.2 and §4.6.
 - R17 and §8.1: the item on list and get gains `closure`, the Account's latest closure as `{ id, status, payoutAmount, withdrawalId, requestedAt, completedAt }`, or `null`; always `null` on an External account.
 - While a closure is `InProgress` the Account is **closing**: it is Open but accepts no hand write (account-closure R11–R13). Reopen, rename and the Disable-Customer guard are unchanged; a Closed account keeps its closures, and a later closure is a new row.
+
+---
+
+## Amendment 2026-11-22 (interest run) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rules R16–R20, R35 and R36 live there; this section records what changes here.
+
+- Every Custodial account has `interestAccruedThrough`: the last UTC day its daily accrual was worked out for, `null` before the first time. It only moves forward and is set by the interest run under the Account lock (interest-run R19).
+- R17 and §8.1: the item on list and get gains `accruedInterest` (the sum of the account's daily accrual rows not yet posted, 8 decimals) and `interestAccruedThrough` (a date or `null`). On an External account `0` and `null`. Neither is a body field.
+- §8: new route `GET /accounts/{accountId}/interest-accruals` (`accounts.read`, the Account's scope): the daily accrual rows, newest day first, with filters `from`, `to`, `transactionId` and `posted` (interest-run R36). An External account → an empty list.
+- Closing, reopening and renaming are unchanged. A Closed or closing account is not accrued; a reopened account earns nothing for the days it had no cash (interest-run R20).

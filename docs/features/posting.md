@@ -25,6 +25,7 @@ related:
   - deposit-matching.md
   - withdrawals.md
   - account-closure.md
+  - interest-run.md
 ---
 
 # Posting
@@ -466,3 +467,13 @@ Status of this amendment: `accepted` (2026-11-22), together with [account-closur
 - R17: the only `CloseOut` on a Custodial account from now on is the **remainder write-off** an account closure posts (source `AccountClosure`, `Transaction.PostRemainderWriteOff`, account-closure R18). R17 (amount equal to minus the `SUM`) holds for it, and it is exempt from R8 like every `CloseOut`.
 - R12: `CloseAccount` refuses an Open Custodial account (account-closure R22); inside the closure flow the cash `SUM = 0` and no-holdings rules still hold before `Account.Close()`.
 - R6: on a **closing** account (an account closure `InProgress`), `POST /transactions` and `POST /transactions/{id}/reverse` of a Transaction with a leg on it → 400 with `This account is being closed and accepts no new activity.` under the empty `errors` key, directly after the Closed-account check (account-closure R12). No idempotency record is written.
+
+---
+
+## Amendment 2026-11-22 (interest run) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rules R16–R29 live there; this section records what changes here.
+
+- R16 and the §5 type table: on a Custodial account `Interest` is still refused on `POST /transactions` for every caller; it is written only by the **interest run** (`Transaction.PostInterest`, source `InterestRun`), with a `Principal` cash leg of the gross and, when the withholding tax is above 0, a `Tax` cash leg of minus the tax (interest-run R23–R25). External accounts unchanged: a hand `Interest` there has one `Principal` leg and no `Tax` leg.
+- R20: an interest posting's `Principal` leg is always `> 0` and its `Tax` leg always `< 0`; the net is never negative (interest-run R28). The hand `Interest` of an External account keeps "either sign".
+- The interest posting's `bookedAt` is the platform time of the posting; the days it pays are in its interest detail (interest-run R23, R26). Its Reversal copies the `Tax` leg with its tax detail and the interest detail; no flow reverses one in this slice, and a hand reverse → 400 (interest-run R27).

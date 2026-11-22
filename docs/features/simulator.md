@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-19
-last_updated: 2026-11-21
+last_updated: 2026-11-22
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -24,6 +24,7 @@ related:
   - withdrawals.md
   - bank-returns.md
   - bank-reconciliation.md
+  - interest-run.md
 ---
 
 # Simulator
@@ -462,3 +463,14 @@ Status of this amendment: `accepted` (2026-11-21), together with [bank-reconcili
 - R24: a reset is unchanged; the platform's next reconciliation shows the old world's lines as a statement difference (bank-reconciliation R30).
 - R28: new control log action `BankChargeAdded`.
 - §11 point 7: still no scenario library (bank-reconciliation §11 point 12).
+
+---
+
+## Amendment 2026-11-22 (interest run) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rules R43 and R44 live there; this section records what changes here.
+
+- §4 bank: new control route `POST /control/bank/interest` → 201 `{ id }`: a **credit** line of kind `Interest` with payer name `Bank interest`, no payer account, no `endToEndId` and no `returnOf`, for the amount the operator types (`> 0`, at most 4 decimal places), with optional `reference` (default `Interest`), `valueDate`, `availableAfter` and `omitFromFeed` as for a bank charge. Log action `BankInterestPaid`. The simulator does not compute interest from a rate.
+- The feed item gains `"kind"`: `"Interest"` on such a line, absent on every other. `GET /control/bank/accounts/{accountNumber}/statement-lines` shows `kind` on each line. The line counts in `balance` and `statementBalance` like any credit. A reset is unchanged.
+- §6: simulator script `0007_bank_line_kind.sql` adds `BankLines.Kind int NOT NULL DEFAULT 0` (CHECK 0–1). Existing lines are transfers.
+- §11 point 7: still no scenario library (interest-run §11 point 16).
