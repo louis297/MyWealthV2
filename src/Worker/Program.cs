@@ -8,6 +8,7 @@ using MyWealthV2.Infrastructure.BankReconciliations;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Schema;
 using MyWealthV2.Infrastructure.Identity;
+using MyWealthV2.Infrastructure.Interest;
 using MyWealthV2.Infrastructure.MarketData;
 
 if (HealthCheckCommand.IsRequested(args))
@@ -33,7 +34,7 @@ builder.Services.AddScoped(sp => new InstrumentPriceSyncJob(
     sp.GetRequiredService<ILogger<InstrumentPriceSyncJob>>()));
 builder.Services.AddHangfireServer(options =>
 {
-    options.Queues = ["reports", "rebalance", "outbox", "fx", "prices", BankStatementRecurringJob.Queue];
+    options.Queues = ["reports", "rebalance", "outbox", "fx", "prices", BankStatementRecurringJob.Queue, InterestRunJob.Queue];
 });
 
 var app = builder.Build();
@@ -50,6 +51,7 @@ await using (var scope = app.Services.CreateAsyncScope())
 OutboxRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 FxRateRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 BankReconciliationRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
+InterestRunRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 InstrumentPriceRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 BankStatementRecurringJob.Register(
     app.Services.GetRequiredService<IRecurringJobManager>(),
