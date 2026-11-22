@@ -11,6 +11,7 @@ import {
   canReverse,
   ReverseTransactionButton,
   sourceLabel,
+  transactionTypeLabel,
 } from "@/features/transactions/ReverseTransactionButton";
 import { useGetTransactionQuery } from "@/features/transactions/transactionsApi";
 import { formatAmount, formatMoney } from "@/shared/format/money";
@@ -35,7 +36,7 @@ export function TransactionDetailPage() {
         <Card>
           <CardContent className="flex flex-col items-start gap-3">
             <p className="font-mono text-xs break-all">{data.id}</p>
-            <Badge variant="secondary">{data.type}</Badge>
+            <Badge variant="secondary">{transactionTypeLabel(data)}</Badge>
             {data.source ? <p className="text-muted-foreground text-sm">{`Source: ${sourceLabel(data.source.kind)}`}</p> : null}
             {data.source?.kind === "BankFeed" && data.source.id && role === roles.tenantAdmin ? (
               <Link to={`/statement-lines/${data.source.id}`} className={recordLinkClass}>
@@ -45,6 +46,12 @@ export function TransactionDetailPage() {
             {data.source?.kind === "Payment" && data.source.id ? (
               <Link to={`/withdrawals/${data.source.id}`} className={recordLinkClass}>
                 Withdrawal
+              </Link>
+            ) : null}
+            {data.source?.kind === "AccountClosure" && data.cash[0] ? (
+              // D57: the write-off of an account closure links to the account it closed.
+              <Link to={`/accounts/${data.cash[0].accountId}`} className={recordLinkClass}>
+                Account closure
               </Link>
             ) : null}
             {data.payment ? (

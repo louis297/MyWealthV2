@@ -36,6 +36,7 @@ import { AddBankAccountPage } from "@/features/nominatedBankAccounts/AddBankAcco
 import { BankAccountChecksPage } from "@/features/nominatedBankAccounts/BankAccountChecksPage";
 import { WithdrawalDetailPage } from "@/features/withdrawals/WithdrawalDetailPage";
 import { WithdrawalsListPage } from "@/features/withdrawals/WithdrawalsListPage";
+import { CloseAccountPage } from "@/features/accountClosures/CloseAccountPage";
 import { WithdrawPage } from "@/features/withdrawals/WithdrawPage";
 import { MatchStatementLinePage } from "@/features/statementLines/MatchStatementLinePage";
 import { BankReconciliationDetailPage } from "@/features/bankReconciliations/BankReconciliationDetailPage";
@@ -105,6 +106,7 @@ export const appRoutes: RouteObject[] = [
               { path: ":id/transfer", element: <CreateInternalTransferPage /> },
               { path: ":id/convert", element: <CreateFxConversionPage /> },
               { path: ":id/withdraw", element: <WithdrawPage /> },
+              { path: ":id/close", element: <CloseAccountPage /> },
               {
                 element: <RoleGate allow={[roles.tenantAdmin]} />,
                 children: [{ path: ":id/adjust", element: <CreateAdjustmentPage /> }],

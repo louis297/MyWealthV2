@@ -10,6 +10,7 @@ import {
   Muted,
   Page,
   PageHeading,
+  recordLinkClass,
   Section,
   SelectField,
   StatusBadge,
@@ -25,8 +26,10 @@ import {
   useGetDepositInstructionsQuery,
   useReopenAccountMutation,
 } from "@/features/accounts/accountsApi";
-import { allowsManualEntry, isCustodial, offersCloseOut } from "@/features/accounts/custodyRules";
+import { allowsManualEntry, isCustodial } from "@/features/accounts/custodyRules";
 import { AccountWithdrawalsSection } from "@/features/withdrawals/AccountWithdrawalsSection";
+import { withdrawalStatusLabel } from "@/features/withdrawals/withdrawalLabels";
+import { useGetWithdrawalQuery } from "@/features/withdrawals/withdrawalsApi";
 import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
 import { useGetInstrumentsQuery } from "@/features/instruments/instrumentsApi";
 import {
@@ -108,6 +111,11 @@ export function AccountDetailPage() {
     { accountId: id },
     { skip: !id || !account.data },
   );
+  // D55 (account-closure R11): an Account with a closure in progress is closing.
+  const closing = account.data?.closure?.status === "InProgress";
+  const closureWithdrawal = useGetWithdrawalQuery(account.data?.closure?.withdrawalId ?? "", {
+    skip: !closing || !account.data?.closure?.withdrawalId,
+  });
   // P13: only an Open Custodial account can hold a portfolio (custody-modes R14).
   const eligible = Boolean(account.data && account.data.status === "Open" && isCustodial(account.data));
   const assignment = useGetAccountPortfolioQuery(id ?? "", { skip: !id || !eligible });
@@ -247,20 +255,28 @@ export function AccountDetailPage() {
       }),
   ];
   const places = currencies.data?.find((currency) => currency.code === data.currency)?.decimalPlaces;
-  const actions = [
+  // D55: a closing account accepts no new activity, so every action is hidden.
+  const open = data.status === "Open" && !closing;
+  const actions = closing ? [] : [
     ...(canPostCash(data.status) ? cashActions : []),
-    // D44 (withdrawals R46): a Custodial account closes out only the remainder a trade leaves.
-    ...(offersCloseOut(data, places) ? (["CloseOut"] as const) : []),
     ...(canPostSecurity(data.type, data.status) && !locked ? securityActions : []),
-  ].filter((action) => action === "CloseOut" || allowsManualEntry(data.custodyMode, action));
-  const withdrawable = data.status === "Open" && isCustodial(data);
+  ].filter((action) => allowsManualEntry(data.custodyMode, action));
+  const withdrawable = open && isCustodial(data);
+  const closedByClosure = data.status === "Closed" && data.closure?.status === "Completed" && data.closure.completedAt
+    ? formatInstant(data.closure.completedAt).slice(0, 10)
+    : null;
 
   return (
     <Page>
       <PageHeading
         title={data.name}
         actions={
-          data.status === "Open" ? (
+          closing ? null : data.status === "Open" && isCustodial(data) ? (
+            // D53: a Custodial account is closed with an account closure.
+            <Link to={`/accounts/${data.id}/close`} className={cn(buttonVariants({ variant: "destructive" }))}>
+              Close
+            </Link>
+          ) : data.status === "Open" ? (
             <Button type="button" variant="destructive" onClick={() => void onLifecycle("close")}>
               Close
             </Button>
@@ -271,6 +287,23 @@ export function AccountDetailPage() {
           )
         }
       />
+      {closing && data.closure ? (
+        <Card>
+          <CardContent className="flex flex-col gap-2">
+            <p>
+              {`Being closed. ${formatMoney(data.closure.payoutAmount, data.currency, places)} is being paid out (${
+                closureWithdrawal.data ? withdrawalStatusLabel(closureWithdrawal.data.status) : "…"
+              }). The account accepts no new activity.`}
+            </p>
+            {data.closure.withdrawalId ? (
+              <Link to={`/withdrawals/${data.closure.withdrawalId}`} className={recordLinkClass}>
+                View the withdrawal
+              </Link>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+      {closedByClosure ? <p className="text-muted-foreground text-sm">{`Closed by account closure on ${closedByClosure}`}</p> : null}
       {actions.length > 0 || withdrawable ? (
         <nav aria-label="Transaction actions" className="flex flex-wrap gap-2">
           {actions.map((action) => (
@@ -282,7 +315,7 @@ export function AccountDetailPage() {
               {action}
             </Link>
           ))}
-          {canPostCash(data.status) ? (
+          {canPostCash(data.status) && !closing ? (
             <Link
               to={`/accounts/${data.id}/transfer`}
               className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
@@ -290,7 +323,7 @@ export function AccountDetailPage() {
               Transfer
             </Link>
           ) : null}
-          {canPostCash(data.status) ? (
+          {canPostCash(data.status) && !closing ? (
             <Link
               to={`/accounts/${data.id}/convert`}
               className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
@@ -298,7 +331,7 @@ export function AccountDetailPage() {
               Convert
             </Link>
           ) : null}
-          {role === roles.tenantAdmin && data.status === "Open" && isCustodial(data) ? (
+          {role === roles.tenantAdmin && open && isCustodial(data) ? (
             <Link
               to={`/accounts/${data.id}/adjust`}
               className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
@@ -366,7 +399,7 @@ export function AccountDetailPage() {
           )}
         </Section>
       ) : null}
-      {eligible && (portfolioChoices.data || portfolioChoices.isError) ? (
+      {eligible && !closing && (portfolioChoices.data || portfolioChoices.isError) ? (
         <Section title="Portfolio">
           {locked ? (
             <div className="flex flex-wrap items-end gap-3">
@@ -491,7 +524,7 @@ export function AccountDetailPage() {
                         />
                         {item.fx ? <p className="text-muted-foreground text-xs">{rateLine(item.fx)}</p> : null}
                       </TableCell>
-                      <TableCell>{canReverse(item, role) ? <ReverseTransactionButton id={item.id} /> : null}</TableCell>
+                      <TableCell>{canReverse(item, role) && !closing ? <ReverseTransactionButton id={item.id} /> : null}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

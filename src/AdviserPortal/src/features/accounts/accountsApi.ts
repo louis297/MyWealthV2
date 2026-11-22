@@ -3,6 +3,16 @@ import type { PagedList } from "@/shared/types/page";
 
 export type CustodyMode = "External" | "Custodial";
 
+/** account-closure R27: the Account's latest account closure on the account item. */
+export type AccountClosureSummary = {
+  id: string;
+  status: string;
+  payoutAmount: number;
+  withdrawalId: string | null;
+  requestedAt: string;
+  completedAt: string | null;
+};
+
 export type Account = {
   id: string;
   tenantId: string;
@@ -21,6 +31,8 @@ export type Account = {
   status: string;
   isActive: boolean;
   rowVersion: string;
+  /** account-closure R27: null when the Account has no closure. */
+  closure?: AccountClosureSummary | null;
 };
 
 export type AccountListArgs = {
