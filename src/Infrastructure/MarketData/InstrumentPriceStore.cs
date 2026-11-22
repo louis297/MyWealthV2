@@ -38,9 +38,16 @@ public sealed class InstrumentPriceStore(ApplicationDbContext db, TimeProvider t
         return Money.Create(row.Value, quote);
     }
 
+    public Task UpsertAsync(
+        IReadOnlyList<InstrumentPriceQuote> quotes,
+        DateTimeOffset fetchedAt,
+        CancellationToken cancellationToken = default) =>
+        UpsertAsync(quotes, fetchedAt, SourceName, cancellationToken);
+
     public async Task UpsertAsync(
         IReadOnlyList<InstrumentPriceQuote> quotes,
         DateTimeOffset fetchedAt,
+        string source,
         CancellationToken cancellationToken = default)
     {
         if (quotes.Count == 0)
@@ -61,10 +68,17 @@ public sealed class InstrumentPriceStore(ApplicationDbContext db, TimeProvider t
                 rows, quote.InstrumentId, quote.Price, quote.AsOfDate, fetchedAt).ToList();
         }
 
+        var quoted = quotes.Select(quote => (quote.InstrumentId, quote.AsOfDate)).ToHashSet();
         foreach (var row in rows)
         {
             var entity = existing.SingleOrDefault(candidate =>
                 candidate.InstrumentId == row.InstrumentId && candidate.AsOfDate == row.AsOfDate);
+            if (!quoted.Contains((row.InstrumentId, row.AsOfDate)))
+            {
+                // A row this run did not quote keeps its own source.
+                continue;
+            }
+
             if (entity is null)
             {
                 entity = new InstrumentPrice
@@ -77,7 +91,7 @@ public sealed class InstrumentPriceStore(ApplicationDbContext db, TimeProvider t
             }
 
             entity.Price = row.Price;
-            entity.Source = SourceName;
+            entity.Source = source;
             entity.FetchedAt = row.FetchedAt;
         }
 

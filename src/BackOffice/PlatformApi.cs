@@ -260,6 +260,12 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         return page.Items;
     }
 
+    public async Task<IReadOnlyList<MarketDataConnectionItem>> ListMarketDataConnectionsAsync(CancellationToken cancellationToken = default)
+    {
+        var page = await ReadAsync<MarketDataConnectionPage>(HttpMethod.Get, "/market-data-connections", json: null, cancellationToken);
+        return page.Items;
+    }
+
     private static string ClientMoneyAccountsPath(Guid tenantId) => $"/tenants/{tenantId}/client-money-accounts";
 
     public Task<IReadOnlyList<CurrencyItem>> ListCurrenciesAsync(CancellationToken cancellationToken = default) =>

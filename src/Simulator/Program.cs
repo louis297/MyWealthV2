@@ -6,6 +6,7 @@ using MyWealthV2.Simulator.Bank;
 using MyWealthV2.Simulator.Control;
 using MyWealthV2.Simulator.Data;
 using MyWealthV2.Simulator.Hosting;
+using MyWealthV2.Simulator.Market;
 using MyWealthV2.Simulator.Party;
 using MyWealthV2.Simulator.Worlds;
 using Scalar.AspNetCore;
@@ -44,6 +45,9 @@ var partyApiKey = PartyEndpoints.ReadPartyApiKey(builder.Configuration);
 // Deposit matching R39: a bad standing account stops the host before it listens.
 builder.Services.AddSingleton(BankStandingAccounts.Read(builder.Configuration));
 
+// Simulated instruments R20: a bad standing instrument stops the host before it listens.
+builder.Services.AddSingleton(MarketStandingInstruments.Read(builder.Configuration));
+
 var app = builder.Build();
 
 // Simulator spec R15: apply database/simulator/ scripts before the host listens.
@@ -54,6 +58,7 @@ await SchemaApplicator.ForDatabase(
     .ApplyAsync(CancellationToken.None);
 await WorldStartup.EnsureWorldAsync(app.Services, CancellationToken.None);
 await BankStandingAccounts.EnsureAsync(app.Services, CancellationToken.None);
+await MarketStandingInstruments.EnsureAsync(app.Services, CancellationToken.None);
 
 app.UsePublicHostForwardedHeaders(trustAnyProxyInDevelopment: true);
 app.UseSurfacePorts();

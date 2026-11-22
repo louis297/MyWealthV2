@@ -5,19 +5,20 @@ namespace MyWealthV2.BackOffice.Components.Pages;
 /// <summary>Deposit matching BO18: the "Statement" column of a client money account.</summary>
 public static class FeedStatus
 {
-    public static string Text(ClientMoneyAccountFeed? feed)
+    public const string NotReadYet = "Not read yet";
+
+    public static string Text(ClientMoneyAccountFeed? feed) =>
+        feed is null ? NotReadYet : Text(feed.LastSucceededAt, feed.LastFailedAt, Label(feed.LastFailure));
+
+    /// <summary>The wording of BO18, shared with the market data feed (simulated-instruments BO23).</summary>
+    public static string Text(DateTimeOffset? lastSucceededAt, DateTimeOffset? lastFailedAt, string failureLabel)
     {
-        if (feed is null)
+        if (lastFailedAt is { } failedAt && (lastSucceededAt is not { } succeeded || failedAt > succeeded))
         {
-            return "Not read yet";
+            return $"Failing since {Instant(failedAt)}: {failureLabel}";
         }
 
-        if (feed.LastFailedAt is { } failedAt && (feed.LastSucceededAt is not { } succeeded || failedAt > succeeded))
-        {
-            return $"Failing since {Instant(failedAt)}: {Label(feed.LastFailure)}";
-        }
-
-        return feed.LastSucceededAt is { } at ? $"Read {Instant(at)}" : "Not read yet";
+        return lastSucceededAt is { } at ? $"Read {Instant(at)}" : NotReadYet;
     }
 
     public static string Label(string? failure) => failure switch

@@ -33,7 +33,7 @@ public class TestSeedSmokeTests : TestBase
             DevelopmentIdentitySeeder.TenantAdminPassword,
             DevelopmentIdentitySeeder.DemoTenantCode);
 
-        var response = await InstrumentHttp.Send(HttpMethod.Get, "/instruments", tokens.AccessToken);
+        var response = await InstrumentHttp.Send(HttpMethod.Get, "/instruments?pageSize=100", tokens.AccessToken);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
@@ -41,8 +41,8 @@ public class TestSeedSmokeTests : TestBase
             .Select(item => item.GetProperty("symbol").GetString())
             .ToList();
         symbols.ShouldBe([
-            "6758", "7203", "9984", "AAPL", "AIA", "AIR", "BHP", "CBA", "FPH", "HSBA",
-            "MEL", "MSFT", "NZD-CASH", "OR", "SAP", "SHEL", "ULVR", "VTI", "WOW"
+            "6758", "7203", "9984", "AAPL", "ACME.SIM", "AIA", "AIR", "BHP", "CBA", "FPH", "HSBA",
+            "KIWI.SIM", "MEL", "MSFT", "NZD-CASH", "OR", "SAP", "SHEL", "ULVR", "VTI", "WOW"
         ]);
     }
 }

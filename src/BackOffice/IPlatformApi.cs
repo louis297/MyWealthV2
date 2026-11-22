@@ -61,6 +61,9 @@ public interface IPlatformApi
     /// <summary>The configured bank connections (deposit-matching R3).</summary>
     Task<IReadOnlyList<BankConnectionItem>> ListBankConnectionsAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>The configured market data connections with their price feed state (simulated-instruments R5).</summary>
+    Task<IReadOnlyList<MarketDataConnectionItem>> ListMarketDataConnectionsAsync(CancellationToken cancellationToken = default);
+
     Task DisableClientMoneyAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default);
 
     Task EnableClientMoneyAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default);

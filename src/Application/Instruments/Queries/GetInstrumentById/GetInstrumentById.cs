@@ -1,6 +1,7 @@
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Domain.Enums;
+using MyWealthV2.Domain.MarketData;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 
 namespace MyWealthV2.Application.Instruments.Queries.GetInstrumentById;
@@ -8,7 +9,7 @@ namespace MyWealthV2.Application.Instruments.Queries.GetInstrumentById;
 [Authorize(Policy = Policies.InstrumentsRead)]
 public record GetInstrumentByIdQuery(Guid Id) : IRequest<InstrumentDto>;
 
-public class GetInstrumentByIdQueryHandler(IApplicationDbContext db, ICurrentUser currentUser)
+public class GetInstrumentByIdQueryHandler(IApplicationDbContext db, ICurrentUser currentUser, MarketDataConnections connections)
     : IRequestHandler<GetInstrumentByIdQuery, InstrumentDto>
 {
     public async Task<InstrumentDto> Handle(GetInstrumentByIdQuery request, CancellationToken cancellationToken)
@@ -27,6 +28,6 @@ public class GetInstrumentByIdQueryHandler(IApplicationDbContext db, ICurrentUse
         var row = await query.SingleOrDefaultAsync(cancellationToken)
                   ?? throw new NotFoundException("Instrument", request.Id);
 
-        return InstrumentDto.From(row.instrument, row.tenant);
+        return InstrumentDto.From(row.instrument, row.tenant, connections.For(row.instrument.Symbol)?.Name);
     }
 }

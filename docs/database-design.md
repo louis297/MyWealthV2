@@ -371,6 +371,7 @@ Beyond PK / unique constraints already listed:
 0046_account_closures.sql                   -- AccountClosures; BankStatementLines reasons 0–12; CK_Transactions_SourceKind 0–5
 0047_customer_tax_profiles.sql              -- CustomerTaxProfiles
 0048_interest.sql                           -- InterestRateSchedules, InterestRateBands, InterestAccruals, InterestRuns, TransactionTaxDetails, TransactionInterestDetails; Accounts.InterestAccruedThrough; cash leg Role 0–2; CK_Transactions_SourceKind 0–6; BankStatementLines.Kind; reconciliation item kinds 0–14
+0049_market_data_feeds.sql                  -- MarketDataFeeds (platform data, PK (Connection, Kind))
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -635,6 +636,8 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-22 | Account closure landed: `0046` written. It names the CHECKs `CK_AccountClosures_Status`, `_CancelReason`, `_CashBalanceAtRequest`, `_PayoutAmount`, `_WriteOffAmount`, `_Cancel`, `_Completed`, `_Ended`, `_Payout`, `_WriteOff`, the composite FKs `FK_AccountClosures_<parent>_TenantId_<column>` and the index `IX_AccountClosures_TenantId_Status_RequestedAt` (§11.13). |
 | 2026-11-22 | Interest run accepted (`0047`, `0048`, not written yet): `CustomerTaxProfiles` and the interest tables (§11.14), `Accounts.InterestAccruedThrough` (§11.3), `TransactionTaxDetails`, `TransactionInterestDetails`, role 0–2 and source kind 0–6 (§11.4), `BankStatementLines.Kind` (§11.9), item kinds 0–14 (§11.12). Simulator script `0007_bank_line_kind.sql` (§15). §9 lists `0047` and `0048`. All are build contracts. |
 | 2026-11-22 | Interest run landed: `0047`, `0048` and simulator `0007` written. `0048` names the CHECKs `CK_InterestRateBands_FromAmount`, `_RatePercent`, `CK_InterestAccruals_Balance`, `_Amount`, `_EffectiveRatePercent`, `CK_InterestRuns_Trigger`, `_RanBy`, `_Account`, `_Counts`, `CK_TransactionTaxDetails_Kind`, `_RatePercent`, `_BasisAmount`, `_TaxAmount`, `CK_TransactionInterestDetails_Period`, `_Days`, `_AccruedAmount`, `_GrossAmount` and `CK_BankStatementLines_Kind`, and the unique keys `UQ_InterestAccruals_AccountId_AccrualDate` and `UQ_TransactionTaxDetails_TransactionId_Kind` (§11.14). `0047` adds `IX_CustomerTaxProfiles_TenantId`. |
+| 2026-11-22 | Simulated instruments accepted (`0049`, not written yet): `MarketDataFeeds` and the `Simulator` source on `InstrumentPrices` (§14.3); simulator `0008_market.sql` (§15). §9 lists `0049`. |
+| 2026-11-22 | Simulated instruments landed: `0049` and simulator `0008` written. `0049` names `PK_MarketDataFeeds`, `CK_MarketDataFeeds_Kind` and `CK_MarketDataFeeds_LastFailure`; `0008` names `UX_MarketInstruments_Symbol`, `CK_MarketInstruments_DailyMovePercent`, `CK_MarketInstruments_Price`, `CK_MarketPrices_Price` and `FK_MarketPrices_MarketInstruments_InstrumentId`. |
 
 ---
 
@@ -698,12 +701,25 @@ Script `0022_instrument_prices.sql`. Table `InstrumentPrices` in the application
 | `InstrumentId` | `int` FK → `Instruments.Id` (RESTRICT) |
 | `Price` | `decimal(18,8)`. In the instrument’s QuoteCurrency |
 | `AsOfDate` | `date`. Date the source published |
-| `Source` | `nvarchar(50)`. `'EODHD'` |
+| `Source` | `nvarchar(50)`. `'EODHD'`, or the adapter name of a market data connection (`'Simulator'`) |
 | `FetchedAt` | `datetimeoffset`. When the job wrote the row |
 
 PK `(InstrumentId, AsOfDate)`. Index on `FetchedAt`. No PublicId. No RowVersion. No audit columns beyond `FetchedAt`. No seed in the script — the daily job populates it. Development / TestAppHost uses `TestSeed` with round, obviously-fake prices (several instruments per seed currency).
 
 Daily Hangfire job at 12:00 UTC fetches EOD prices from EODHD for instruments that are active in at least one tenant when today's UTC date is not already stored for every active instrument. Same symbol + quote currency across tenants is fetched once and written to every matching `InstrumentId`. On the same `AsOfDate`, update `Price` and `FetchedAt`. Fetch failure logs and leaves previous rows. `IMarketData` reads the table: latest row with `AsOfDate` ≤ requested date (or today if omitted); no row → empty (not 0).
+
+Amendment 2026-11-22 (simulated instruments, accepted; [features/simulated-instruments.md](features/simulated-instruments.md) §6.1): an instrument whose symbol ends with a market data connection's suffix gets its rows from that connection's `worker` job, not from EODHD: `Source` = the adapter name (`Simulator`), `AsOfDate` = the platform's UTC date at the run (never the party's date). The table does not change. Script `0049_market_data_feeds.sql` adds `MarketDataFeeds`, platform data with no `TenantId`:
+
+| Column | Notes |
+| --- | --- |
+| `Connection` | `nvarchar(50)`. The configured connection name |
+| `Kind` | `int`. `MarketDataFeedKind`, CHECK `= 0` (`Prices`) |
+| `Cursor` | `nvarchar(500) NULL`. Not used by `Prices` |
+| `LastSucceededAt`, `LastFailedAt` | `datetimeoffset NULL` |
+| `LastFailure` | `int NULL`. `MarketDataFailure`, CHECK 0–4 |
+| `RowVersion` | `rowversion` |
+
+PK `(Connection, Kind)`. No FK: a connection lives in configuration.
 
 ### Change log
 
@@ -721,6 +737,7 @@ Daily Hangfire job at 12:00 UTC fetches EOD prices from EODHD for instruments th
 | 2026-11-08 | Instrument price sync runs daily at 12:00 UTC. |
 | 2026-11-02 | `0022_instrument_prices.sql` landed. No seed rows in the script. TestSeed writes the fake prices. |
 | 2026-11-21 | `CK_Reports_Scope` accepts `Tenant`; `0045` inserts the third catalog row `bank-reconciliation` ([features/bank-reconciliation.md](features/bank-reconciliation.md)). |
+| 2026-11-22 | Simulated instruments accepted (`0049`, not written yet): `MarketDataFeeds`; `InstrumentPrices.Source` also holds `Simulator` ([features/simulated-instruments.md](features/simulated-instruments.md)). |
 
 ---
 
@@ -737,5 +754,6 @@ Owner: [features/simulator.md](features/simulator.md) §6.2, [ADR 0021](adr/0021
 - S1 returns and recalls ([features/bank-returns.md](features/bank-returns.md) §6.2, accepted and landed 2026-11-21; `0005_bank_returns.sql`): `BankPayments.PayeeAccountNumber` and `PayeeName` become NULL and `BankPayments` gains `ReturnOf` (the outside id as sent) and `ReturnOfLineId` (FK `BankLines`, the line when the account has it), with a CHECK of exactly one of a payee and `ReturnOf`. A recall is a `BankLines` row with `ReturnOfLineId`. A reset is unchanged.
 - S1 balances ([features/bank-reconciliation.md](features/bank-reconciliation.md) §6.2, accepted and landed 2026-11-21; `0006_bank_balances.sql`): `BankLines.OmitFromFeed bit NOT NULL DEFAULT 0`. The feed's `balance` and the account list's `statementBalance` are computed from the lines and their places, not stored. A reset is unchanged.
 - S1 trust interest ([features/interest-run.md](features/interest-run.md) §6.3, accepted 2026-11-22; `0007_bank_line_kind.sql`): `BankLines.Kind int NOT NULL DEFAULT 0` (`0` transfer, `1` interest), CHECK 0–1. Existing lines are transfers. A reset is unchanged.
+- S4 market, data vendor half ([features/simulated-instruments.md](features/simulated-instruments.md) §6.2, accepted 2026-11-22; `0008_market.sql`): `MarketInstruments` (symbol unique, ending in `.SIM`; currency; `DailyMovePercent decimal(5,2)` CHECK 0–20; the current `Price decimal(18,4)` CHECK `> 0` and its `PriceDate`; RowVersion) and `MarketPrices` (PK `(InstrumentId, PriceDate)`, FK `MarketInstruments`, `Price` CHECK `> 0`, `IsSet bit` for a price the operator typed). A reset empties both and adds the standing instruments again.
 - Development: Aspire creates the database. VPS: created by hand once, like `MyWealthDbV2` ([deployment.md](deployment.md) §15).
 

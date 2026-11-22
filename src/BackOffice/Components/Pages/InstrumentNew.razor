@@ -26,7 +26,8 @@ else
                         <MudSelectItem T="string" Value="@tenant.Id.ToString()">@tenant.Name</MudSelectItem>
                     }
                 </MudSelect>
-                <MudTextField @bind-Value="form.Symbol" Label="Symbol" Variant="Variant.Outlined" />
+                <MudTextField @bind-Value="form.Symbol" Label="Symbol" Variant="Variant.Outlined"
+                              HelperText="A symbol that ends with a market data suffix (for example .SIM) is priced by that connection." />
                 <MudTextField @bind-Value="form.Name" Label="Name" Variant="Variant.Outlined" />
                 <MudSelect T="string" @bind-Value="form.QuoteCurrency" Label="Quote currency" Variant="Variant.Outlined">
                     @foreach (var currency in currencies)

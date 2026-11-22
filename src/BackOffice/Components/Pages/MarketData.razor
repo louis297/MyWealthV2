@@ -1,0 +1,55 @@
+@page "/market-data"
+@inject IPlatformApi Api
+
+<PageTitle>Market data</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">Market data</MudText>
+<MudText Typo="Typo.body1" Class="mb-4">Configured market data connections. An instrument whose symbol ends with a connection's suffix is priced by that connection.</MudText>
+
+@if (error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="my-4">@error</MudAlert>
+}
+else if (connections is not null)
+{
+    @if (connections.Count == 0)
+    {
+        <MudText Class="mt-4">No market data connection is configured. Every instrument is priced by EODHD.</MudText>
+    }
+    else
+    {
+        <MudSimpleTable Hover="true" Dense="true" Bordered="true" Class="mt-4">
+            <thead>
+                <tr><th>Name</th><th>Adapter</th><th>Suffix</th><th>Prices</th></tr>
+            </thead>
+            <tbody>
+            @foreach (var connection in connections)
+            {
+                <tr>
+                    <td>@connection.Name</td>
+                    <td>@connection.Adapter</td>
+                    <td>@connection.SymbolSuffix</td>
+                    <td>@MarketDataStatus.Text(connection.Prices)</td>
+                </tr>
+            }
+            </tbody>
+        </MudSimpleTable>
+    }
+}
+
+@code {
+    private IReadOnlyList<MarketDataConnectionItem>? connections;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            connections = await Api.ListMarketDataConnectionsAsync();
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+}

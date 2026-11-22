@@ -260,3 +260,14 @@ Still open, not this slice:
 ## Amendment 2026-11-14 (UTC instants)
 
 Accepted with [utc-instants](../fixes/utc-instants.md). R6 reads the UTC date of `asOf`, not the date in its own offset.
+
+## Amendment 2026-11-22 (instruments served by a market data connection) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [simulated-instruments.md](simulated-instruments.md). Rules R4, R7–R13 live there; this section records what changes here.
+
+- **R1.** EODHD is the source of every instrument that no market data connection serves. An instrument whose symbol ends with the symbol suffix of a configured market data connection (for example `.SIM`) is **served** by that connection and gets its prices from it, through the port `IMarketPrices` and the `worker` job `market-data-sync:{connection}` (queue `market`, every `PollMinutes` of the connection). EODHD stays as it is: one job, one key, the symbol table in `EodhdSymbols`.
+- **R3.** Unchanged for both sources: only active instruments are updated, and the rows of an inactive one stay.
+- **R5.** A row written from a connection has `AsOfDate` = the platform's UTC date at the run, never the date the party sent, so a simulator clock that runs ahead cannot date a price in the platform's future (ADR 0021 rule 11). Each run of the day replaces today's row; the first run of a new UTC day adds one. `Source` is the adapter name (`Simulator`).
+- **R14.** `InstrumentPriceSyncJob` leaves out every served instrument: from the instruments it fetches and from its test whether every active instrument has today's date. No EODHD call is spent on a served symbol.
+- **R15.** A connection's run also writes one price to every active instrument, in any Tenant, with the item's symbol and with `QuoteCurrency` equal to the item's currency.
+- R6, R8, R9 and R12 are unchanged: `IMarketData` reads the table as before, a failed read keeps the old rows, the read path never calls a party, and there is still no price read route on `webapi`.

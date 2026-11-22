@@ -474,3 +474,17 @@ Status of this amendment: `accepted` (2026-11-22), together with [interest-run.m
 - The feed item gains `"kind"`: `"Interest"` on such a line, absent on every other. `GET /control/bank/accounts/{accountNumber}/statement-lines` shows `kind` on each line. The line counts in `balance` and `statementBalance` like any credit. A reset is unchanged.
 - §6: simulator script `0007_bank_line_kind.sql` adds `BankLines.Kind int NOT NULL DEFAULT 0` (CHECK 0–1). Existing lines are transfers.
 - §11 point 7: still no scenario library (interest-run §11 point 16).
+
+---
+
+## Amendment 2026-11-22 (S4 market, data vendor half) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [simulated-instruments.md](simulated-instruments.md). Rules R14–R24 and the simulator script `0008_market.sql` live there (§4.3, §6.2); this section records what changes here.
+
+- §2 Out "Every outside party": the **simulator market** is in, as the data vendor of its own instruments. Simulated instruments (symbol ending in `.SIM`, name, currency, `dailyMovePercent`) with one price per simulator day, stepped from the day before by a seeded random move of at most `dailyMovePercent` (purpose `market-price:{symbol}`, sequence the day number from 2000-01-01, R26) or set by the operator. Before any market route answers, the price of every day up to the current simulator day is worked out and stored. Standing instruments come from configuration `Simulator:Market:StandingInstruments`, added when the world is created and again after every reset; a bad entry stops the host before it listens.
+- Control routes: `GET /control/market/instruments`, `POST /control/market/instruments`, `POST /control/market/instruments/{symbol}/price`, `POST /control/market/instruments/{symbol}/daily-move`, `GET /control/market/instruments/{symbol}/prices`. Party route: `GET /party/market/prices` (key R30 and outage R27 as for every party route).
+- R24: a reset also empties the market tables and then adds the standing instruments at their configured price.
+- R28: new control log actions `MarketInstrumentAdded`, `MarketPriceSet` and `MarketDailyMoveSet`.
+- R33: the market never reads the platform's catalog and does not know which Tenant lists or holds an instrument.
+- §9.2: the AppHost gives the party key to `worker` as the `simulator` market data connection's `ApiKey`, with the party endpoint as its `BaseUrl`, and gives the simulator the standing instruments `ACME.SIM` (USD, 100.00) and `KIWI.SIM` (NZD, 5.00) that `TestSeed` adds to the catalog.
+- §11 point 7: still no scenario library (simulated-instruments §11 point 13).

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MyWealthV2.Application.MarketData;
 using MyWealthV2.Domain.Entities;
+using MyWealthV2.Domain.MarketData;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Entities;
 using MyWealthV2.Infrastructure.MarketData;
@@ -160,6 +161,71 @@ public class InstrumentPriceSyncJobTests
         }
     }
 
+    /// <summary>Simulated instruments R12: no EODHD call is spent on a symbol a market data connection serves.</summary>
+    [Test]
+    public async Task Sync_NeverAsksTheSourceForAServedSymbol()
+    {
+        await using var db = Open();
+        var (tenant, otherTenant) = await TwoTenantFixture.InsertAsync(db);
+        var real = await AddInstrumentAsync(db, tenant, "VTI", "USD", active: true);
+        var served = await AddInstrumentAsync(db, tenant, "ACME.SIM", "USD", active: true);
+        var source = new RecordingSource(new DateOnly(2026, 11, 1), price: 250m, currency: "USD");
+        var job = Job(
+            db,
+            new FixedCatalog(
+                new ActiveInstrument(real.Id, "VTI", "USD"),
+                new ActiveInstrument(served.Id, "acme.sim", "USD")),
+            source,
+            new FixedTime(new DateTimeOffset(2026, 11, 2, 12, 0, 0, TimeSpan.Zero)),
+            Simulator);
+
+        try
+        {
+            await job.Sync();
+
+            source.Calls.ShouldBe([("VTI", "USD")]);
+            (await db.InstrumentPrices.AsNoTracking().AnyAsync(row => row.InstrumentId == served.Id)).ShouldBeFalse();
+        }
+        finally
+        {
+            await CleanupAsync(db, tenant.Id, otherTenant.Id);
+        }
+    }
+
+    /// <summary>Simulated instruments R12: a served instrument without today's row does not make the job call.</summary>
+    [Test]
+    public async Task Sync_SkipsTheSourceWhenEveryUnservedInstrumentHasTodaysDate()
+    {
+        await using var db = Open();
+        var (tenant, otherTenant) = await TwoTenantFixture.InsertAsync(db);
+        var real = await AddInstrumentAsync(db, tenant, "VTI", "USD", active: true);
+        var served = await AddInstrumentAsync(db, tenant, "ACME.SIM", "USD", active: true);
+        var now = new DateTimeOffset(2026, 11, 2, 15, 0, 0, TimeSpan.Zero);
+        db.InstrumentPrices.Add(Stored(real.Id, 250m, new DateOnly(2026, 11, 2), now));
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        var source = new RecordingSource(new DateOnly(2026, 11, 2), price: 251m, currency: "USD");
+        var job = Job(
+            db,
+            new FixedCatalog(
+                new ActiveInstrument(real.Id, "VTI", "USD"),
+                new ActiveInstrument(served.Id, "ACME.SIM", "USD")),
+            source,
+            new FixedTime(now),
+            Simulator);
+
+        try
+        {
+            await job.Sync();
+
+            source.Calls.ShouldBeEmpty();
+        }
+        finally
+        {
+            await CleanupAsync(db, tenant.Id, otherTenant.Id);
+        }
+    }
+
     [Test]
     public async Task ListActive_IncludesEveryTenantAndSkipsInactive()
     {
@@ -189,8 +255,12 @@ public class InstrumentPriceSyncJobTests
         ApplicationDbContext db,
         IActiveInstrumentCatalog catalog,
         IInstrumentPriceSource source,
-        TimeProvider time) =>
-        new(catalog, source, new InstrumentPriceStore(db, time), time, TimeSpan.Zero, new SilentLogger());
+        TimeProvider time,
+        MarketDataConnections? connections = null) =>
+        new(catalog, source, new InstrumentPriceStore(db, time), connections ?? MarketDataConnections.None, time, TimeSpan.Zero, new SilentLogger());
+
+    private static readonly MarketDataConnections Simulator =
+        new([new MarketDataConnection("simulator", "Simulator", ".SIM")]);
 
     private static async Task<Instrument> AddInstrumentAsync(
         ApplicationDbContext db,

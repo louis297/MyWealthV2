@@ -3,6 +3,7 @@ using MyWealthV2.Application.Common.Interfaces;
 using Microsoft.Extensions.Logging;
 using MyWealthV2.Application.Fx;
 using MyWealthV2.Application.MarketData;
+using MyWealthV2.Domain.MarketData;
 using MyWealthV2.Infrastructure.BankFeed;
 using MyWealthV2.Infrastructure.BankReconciliations;
 using MyWealthV2.Infrastructure.Data;
@@ -22,6 +23,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.AddInfrastructureServices();
 builder.AddBankConnections(BankConnectionHost.Worker);
+builder.AddMarketDataConnections(MarketDataHost.Worker);
 builder.Services.AddScoped<IUser, SystemUser>();
 builder.Services.AddScoped<OutboxProcessor>();
 builder.Services.AddScoped<FxRateSyncJob>();
@@ -29,12 +31,13 @@ builder.Services.AddScoped(sp => new InstrumentPriceSyncJob(
     sp.GetRequiredService<IActiveInstrumentCatalog>(),
     sp.GetRequiredService<IInstrumentPriceSource>(),
     sp.GetRequiredService<IInstrumentPriceStore>(),
+    sp.GetRequiredService<MarketDataConnections>(),
     sp.GetRequiredService<TimeProvider>(),
     TimeSpan.FromSeconds(8),
     sp.GetRequiredService<ILogger<InstrumentPriceSyncJob>>()));
 builder.Services.AddHangfireServer(options =>
 {
-    options.Queues = ["reports", "rebalance", "outbox", "fx", "prices", BankStatementRecurringJob.Queue, InterestRunJob.Queue];
+    options.Queues = ["reports", "rebalance", "outbox", "fx", "prices", BankStatementRecurringJob.Queue, InterestRunJob.Queue, MarketDataRecurringJob.Queue];
 });
 
 var app = builder.Build();
@@ -57,6 +60,10 @@ BankStatementRecurringJob.Register(
     app.Services.GetRequiredService<IRecurringJobManager>(),
     app.Services.GetRequiredService<JobStorage>(),
     app.Services.GetRequiredService<ConfiguredBankConnections>());
+MarketDataRecurringJob.Register(
+    app.Services.GetRequiredService<IRecurringJobManager>(),
+    app.Services.GetRequiredService<JobStorage>(),
+    app.Services.GetRequiredService<ConfiguredMarketDataConnections>());
 
 if (app.Environment.IsDevelopment())
 {

@@ -24,6 +24,8 @@ public class BackOfficePageTests
     private static readonly Guid EmptyTenantId = Guid.Parse("55555555-5555-5555-5555-555555555555");
     private static readonly Guid OutsideTenantId = Guid.Parse("66666666-6666-6666-6666-666666666666");
     private static readonly Guid MissingTenantId = Guid.Parse("77777777-7777-7777-7777-777777777777");
+    private static readonly Guid MarketTenantId = Guid.Parse("88888888-8888-8888-8888-888888888888");
+    private static readonly Guid MarketInstrumentId = Guid.Parse("99999999-9999-9999-9999-999999999999");
     private static readonly Guid ClientMoneyUsdId = Guid.Parse("88888888-8888-8888-8888-888888888888");
     private static readonly Guid ClientMoneyAudId = Guid.Parse("88888888-8888-8888-8888-8888888888aa");
     private static readonly Guid ClientMoneyNzdId = Guid.Parse("99999999-9999-9999-9999-999999999999");
@@ -301,6 +303,89 @@ public class BackOfficePageTests
         _api.InstrumentListCalls.ShouldBe(callsBefore);
     }
 
+    /// <summary>Simulated instruments BO22: the connection that prices an instrument, under its symbol.</summary>
+    [Test]
+    public async Task Instruments_ShowWhichMarketDataConnectionPricesAnInstrument()
+    {
+        var list = await GetAsync($"/instruments?tenantId={MarketTenantId}");
+        list.ShouldContain("Prices from simulator");
+        list.IndexOf("Prices from", StringComparison.Ordinal)
+            .ShouldBeGreaterThan(list.IndexOf("ACME.SIM", StringComparison.Ordinal));
+        list.IndexOf("Prices from", StringComparison.Ordinal)
+            .ShouldBeLessThan(list.IndexOf("VTI", StringComparison.Ordinal));
+
+        (await GetAsync($"/instruments/{MarketInstrumentId}")).ShouldContain("Prices from simulator");
+        (await GetAsync($"/instruments/{InstrumentId}")).ShouldNotContain("Prices from");
+    }
+
+    [Test]
+    public async Task NewInstrument_NotesThatAMarketDataSuffixDecidesThePriceSource()
+    {
+        var body = await GetAsync($"/instruments/new?tenantId={TenantId}");
+
+        body.ShouldContain("A symbol that ends with a market data suffix (for example .SIM) is priced by that connection.");
+    }
+
+    /// <summary>Simulated instruments BO23: the market data connections and the state of their price feed.</summary>
+    [Test]
+    public async Task MarketData_ListsTheConnections_WithTheStateOfTheirPrices()
+    {
+        var at = new DateTimeOffset(2026, 11, 22, 3, 15, 0, TimeSpan.Zero);
+        _api.MarketDataConnections =
+        [
+            new("alpha", "Simulator", ".ALP", null),
+            new("beta", "Simulator", ".BET", new MarketDataFeed(at, null, null)),
+            new("gamma", "Simulator", ".GAM", new MarketDataFeed(at, at.AddMinutes(5), "Unavailable"))
+        ];
+
+        try
+        {
+            var body = await GetAsync("/market-data");
+
+            body.ShouldContain("Market data");
+            body.ShouldContain(".ALP");
+            body.ShouldContain(">Simulator<");
+            body.ShouldContain("Not read yet");
+            body.ShouldContain("Read 2026-11-22 03:15 UTC");
+            body.ShouldContain("Failing since 2026-11-22 03:20 UTC: Market data source unavailable");
+            body.ShouldNotContain("No market data connection is configured.");
+        }
+        finally
+        {
+            _api.MarketDataConnections = [];
+        }
+    }
+
+    [Test]
+    public async Task MarketData_WithNoConnection_SaysEveryInstrumentIsPricedByEodhd()
+    {
+        var body = await GetAsync("/market-data");
+
+        body.ShouldContain("No market data connection is configured. Every instrument is priced by EODHD.");
+    }
+
+    [Test]
+    public async Task Navigation_LinksToMarketData()
+    {
+        (await GetAsync("/")).ShouldContain("href=\"/market-data\"");
+    }
+
+    [TestCase("Unreachable", "Market data source not reachable")]
+    [TestCase("Timeout", "Market data source did not answer in time")]
+    [TestCase("Unauthorized", "Market data source refused the key")]
+    [TestCase("Unavailable", "Market data source unavailable")]
+    [TestCase("BadResponse", "Market data answer not understood")]
+    public void MarketDataStatus_LabelsEveryFailure(string failure, string label)
+    {
+        var at = new DateTimeOffset(2026, 11, 22, 3, 15, 0, TimeSpan.Zero);
+
+        BackOfficeHost::MyWealthV2.BackOffice.Components.Pages.MarketDataStatus.Text(new MarketDataFeed(null, at, failure))
+            .ShouldBe($"Failing since 2026-11-22 03:15 UTC: {label}");
+        BackOfficeHost::MyWealthV2.BackOffice.Components.Pages.MarketDataStatus.Text(null).ShouldBe("Not read yet");
+        BackOfficeHost::MyWealthV2.BackOffice.Components.Pages.MarketDataStatus.Text(new MarketDataFeed(at, at.AddMinutes(-1), failure))
+            .ShouldBe("Read 2026-11-22 03:15 UTC");
+    }
+
     [Test]
     public async Task Instruments_WithTenant_ShowsTheCatalogInServerOrder()
     {
@@ -386,7 +471,8 @@ public class BackOfficePageTests
         body.ShouldContain("NZD");
         body.ShouldContain(">Create<");
         body.ShouldNotContain(">Delete<");
-        body.ShouldNotContain("Price");
+        // BO-I6: no price field. The BO22 note under the symbol says "priced" (simulated-instruments).
+        body.ShouldNotContain(">Price<");
     }
 
     [Test]
@@ -656,6 +742,11 @@ public class BackOfficePageTests
 
         public List<BankConnectionItem> BankConnections { get; set; } = [new("simulator", "Simulator")];
 
+        public List<MarketDataConnectionItem> MarketDataConnections { get; set; } = [];
+
+        public Task<IReadOnlyList<MarketDataConnectionItem>> ListMarketDataConnectionsAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<MarketDataConnectionItem>>(MarketDataConnections);
+
         public Task<IReadOnlyList<BankConnectionItem>> ListBankConnectionsAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<BankConnectionItem>>(BankConnections);
 
@@ -690,6 +781,18 @@ public class BackOfficePageTests
             if (tenantId == MissingTenantId)
             {
                 throw new PlatformApiException(404, "Tenant was not found.");
+            }
+
+            if (tenantId == MarketTenantId)
+            {
+                return Task.FromResult(new InstrumentPage(
+                    [
+                        new InstrumentItem(MarketInstrumentId, tenantId, "ACME.SIM", "Acme Simulated Holdings", "USD", true, "rv1", "simulator"),
+                        new InstrumentItem(SecondInstrumentId, tenantId, "VTI", "Vanguard", "USD", true, "rv2")
+                    ],
+                    page,
+                    pageSize,
+                    2));
             }
 
             if (tenantId == OutsideTenantId)
@@ -733,6 +836,11 @@ public class BackOfficePageTests
             if (id == SecondInstrumentId)
             {
                 return Task.FromResult(new InstrumentItem(id, TenantId, "CASH", "Cash", "NZD", false, "rv2"));
+            }
+
+            if (id == MarketInstrumentId)
+            {
+                return Task.FromResult(new InstrumentItem(id, TenantId, "ACME.SIM", "Acme Simulated Holdings", "USD", true, "rv3", "simulator"));
             }
 
             return Task.FromResult(new InstrumentItem(id, TenantId, "VTI", "Vanguard", "USD", true, "rv1"));

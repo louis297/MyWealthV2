@@ -15,12 +15,14 @@ public class TestSeedInstrumentsTests
         ("7203", "Toyota Motor", "JPY", true, 3000m),
         ("9984", "SoftBank Group", "JPY", true, 8000m),
         ("AAPL", "Apple Inc.", "USD", true, 180m),
+        ("ACME.SIM", "Acme Simulated Holdings", "USD", true, 100m),
         ("AIA", "Auckland International Airport", "NZD", true, 8.50m),
         ("AIR", "Airbus SE", "EUR", true, 150m),
         ("BHP", "BHP Group", "AUD", true, 45m),
         ("CBA", "Commonwealth Bank of Australia", "AUD", true, 130m),
         ("FPH", "Fisher & Paykel Healthcare", "NZD", true, 30m),
         ("HSBA", "HSBC Holdings", "GBP", true, 7m),
+        ("KIWI.SIM", "Kiwi Simulated Fund", "NZD", true, 5m),
         ("MEL", "Meridian Energy", "NZD", true, 5.50m),
         ("MSFT", "Microsoft Corporation", "USD", true, 400m),
         ("NZD-CASH", "Demo disabled cash proxy", "NZD", false, null),
@@ -70,7 +72,8 @@ public class TestSeedInstrumentsTests
 
             price.ShouldNotBeNull();
             price.Price.ShouldBe(expected.Price.Value);
-            price.Source.ShouldBe("EODHD");
+            // Simulated instruments §9.1: a .SIM row is the simulator's price.
+            price.Source.ShouldBe(expected.Symbol.EndsWith(".SIM", StringComparison.Ordinal) ? "Simulator" : "EODHD");
         }
 
         (await db.InstrumentPrices.AsNoTracking().CountAsync(row => ids.Contains(row.InstrumentId)))

@@ -45,7 +45,7 @@ Session is the Back Office cookie. Calls go to `webapi` with Bearer. No BFF. No 
 
 **Out**
 
-- Price display or price edit (catalog HTTP does not return a price; `IMarketData` is server-side only).
+- Price display or price edit (catalog HTTP does not return a price; `IMarketData` is server-side only). The item names the market data connection that prices it (amendment 2026-11-22 below); that is not a price.
 - Changing `QuoteCurrency` after create.
 - Physical delete.
 - Cross-tenant ledger pages (Accounts, Transactions, Holdings, Net worth) — separate later slice.
@@ -136,3 +136,13 @@ Back Office tests assert routes, the tenant-required list, and that the UI clien
 - SystemAdmin already has the three instrument policies. No policy amendment.
 - Adviser Portal continues to have no Instruments management page. Firm users create and read via existing firm flows or Scalar; management UI for SystemAdmin is this host.
 - Later: optional link from tenant detail to this list pre-filtered to that tenant. Not required for this slice.
+
+---
+
+## Amendment 2026-11-22 (market data connection) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [simulated-instruments.md](../features/simulated-instruments.md) R6 and [back-office.md](back-office.md) BO22.
+
+- List and detail: under the symbol of an instrument whose `marketDataConnection` is set, the line "Prices from <connection>". No line when it is `null`. No filter on it.
+- Create: under the symbol field, the note "A symbol that ends with a market data suffix (for example .SIM) is priced by that connection." The create body does not change.
+- Rename: renaming the symbol can change the line, from the item the page reloads.

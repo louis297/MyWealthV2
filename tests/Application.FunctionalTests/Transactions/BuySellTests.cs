@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Application.FunctionalTests.Accounts;
 using MyWealthV2.Application.FunctionalTests.Custody;
 using MyWealthV2.Application.FunctionalTests.Instruments;
+using MyWealthV2.Application.FunctionalTests.MarketData;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Entities;
 
@@ -156,6 +157,27 @@ public class BuySellTests : TestBase
             HttpMethod.Post, $"/transactions/{sellId}/reverse", tokens.AccessToken, idempotencyKey: Guid.NewGuid());
         reversal.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(0m);
+    }
+
+    /// <summary>Simulated instruments R13: a served instrument trades on the price its connection stored.</summary>
+    [Test]
+    public async Task CustodialBuy_OfAServedInstrument_UsesThePriceTheMarketDataRunStored()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId, "USD");
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "ACME.SIM", "USD");
+        MarketDataHttp.Prices.Answer(MarketDataHttp.Item("ACME.SIM", "USD", 12.5m));
+        (await MarketDataHttp.RunAsync()).Stored.ShouldBe(1);
+        (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 100m, custodial: true)).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+
+        var buy = await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 4m, custodial: true);
+
+        buy.StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(50.0000m);
+        var holding = await HoldingAsync(tokens.AccessToken, accountId, instrumentId);
+        holding.Quantity.ShouldBe(4m);
+        holding.Cost.ShouldBe(50.0000m);
     }
 
     [Test]

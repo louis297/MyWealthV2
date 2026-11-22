@@ -2,6 +2,7 @@ using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Domain.Enums;
+using MyWealthV2.Domain.MarketData;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 
 namespace MyWealthV2.Application.Instruments.Queries.GetInstruments;
@@ -39,7 +40,7 @@ public class GetInstrumentsQueryValidator : AbstractValidator<GetInstrumentsQuer
     }
 }
 
-public class GetInstrumentsQueryHandler(IApplicationDbContext db, ICurrentUser currentUser)
+public class GetInstrumentsQueryHandler(IApplicationDbContext db, ICurrentUser currentUser, MarketDataConnections connections)
     : IRequestHandler<GetInstrumentsQuery, PagedList<InstrumentDto>>
 {
     public async Task<PagedList<InstrumentDto>> Handle(
@@ -99,7 +100,9 @@ public class GetInstrumentsQueryHandler(IApplicationDbContext db, ICurrentUser c
 
         return new PagedList<InstrumentDto>
         {
-            Items = items.Select(row => InstrumentDto.From(row.instrument, row.tenant)).ToList(),
+            Items = items
+                .Select(row => InstrumentDto.From(row.instrument, row.tenant, connections.For(row.instrument.Symbol)?.Name))
+                .ToList(),
             Page = request.Page,
             PageSize = request.PageSize,
             TotalCount = totalCount

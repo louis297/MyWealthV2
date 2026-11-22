@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using MyWealthV2.Domain.MarketData;
 
 namespace MyWealthV2.Application.MarketData;
 
@@ -6,6 +7,7 @@ public sealed class InstrumentPriceSyncJob(
     IActiveInstrumentCatalog catalog,
     IInstrumentPriceSource source,
     IInstrumentPriceStore store,
+    MarketDataConnections connections,
     TimeProvider time,
     TimeSpan requestSpacing,
     ILogger<InstrumentPriceSyncJob> logger)
@@ -14,7 +16,10 @@ public sealed class InstrumentPriceSyncJob(
     {
         try
         {
-            var active = await catalog.ListActiveAsync(cancellationToken);
+            // Simulated instruments R12: an instrument a market data connection serves is priced by it, never here.
+            var active = (await catalog.ListActiveAsync(cancellationToken))
+                .Where(instrument => connections.For(instrument.Symbol) is null)
+                .ToList();
             var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
             if (await store.HasAsOfDateForEveryActiveInstrumentAsync(
                     active.Select(instrument => instrument.Id).ToList(),

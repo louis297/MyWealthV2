@@ -64,6 +64,10 @@ services:
       Reports__StorageRoot: /reports
       # Bank connection `simulator` (docs/features/deposit-matching.md R1): webapi knows only its name and adapter.
       BankConnections__simulator__Adapter: Simulator
+      # Market data connection `simulator` (docs/features/simulated-instruments.md R1): an instrument whose symbol
+      # ends with .SIM is priced by the simulator market, never by EODHD.
+      MarketDataConnections__simulator__Adapter: Simulator
+      MarketDataConnections__simulator__SymbolSuffix: .SIM
       # First start only; remove from .env after the first SystemAdmin sign-in (§12 step 11).
       Bootstrap__SystemAdmin__Email: ${BOOTSTRAP_SYSTEMADMIN_EMAIL:-}
       Bootstrap__SystemAdmin__Password: ${BOOTSTRAP_SYSTEMADMIN_PASSWORD:-}
@@ -127,6 +131,13 @@ services:
       BankConnections__simulator__BaseUrl: http://simulator:8082
       BankConnections__simulator__ApiKey: ${SIMULATOR_PARTY_API_KEY:?}
       BankConnections__simulator__PollMinutes: ${BANK_SIMULATOR_POLL_MINUTES:-1}
+      # Market data connection `simulator` (simulated-instruments R1, R7): with the simulator off, each run of the
+      # market data job fails with Unreachable and the last stored prices stay.
+      MarketDataConnections__simulator__Adapter: Simulator
+      MarketDataConnections__simulator__SymbolSuffix: .SIM
+      MarketDataConnections__simulator__BaseUrl: http://simulator:8082
+      MarketDataConnections__simulator__ApiKey: ${SIMULATOR_PARTY_API_KEY:?}
+      MarketDataConnections__simulator__PollMinutes: ${MARKET_SIMULATOR_POLL_MINUTES:-1}
     volumes:
       - ./data/reports:/reports
     depends_on:
@@ -230,6 +241,16 @@ services:
       Simulator__Bank__StandingAccounts__1__AccountNumber: ${SIM_BANK_NZD_ACCOUNT_NUMBER:-SIM-DEMO-NZD}
       Simulator__Bank__StandingAccounts__1__Currency: NZD
       Simulator__Bank__StandingAccounts__1__Name: ${SIM_BANK_ACCOUNT_NAME:-Demo Advisory Client Funds Trust Account}
+      # Standing simulated instruments (simulated-instruments R20): added on first start and after every reset.
+      # The operator adds the same symbols to the demo tenant's catalog in the Back Office.
+      Simulator__Market__StandingInstruments__0__Symbol: ACME.SIM
+      Simulator__Market__StandingInstruments__0__Name: Acme Simulated Holdings
+      Simulator__Market__StandingInstruments__0__Currency: USD
+      Simulator__Market__StandingInstruments__0__Price: "100.00"
+      Simulator__Market__StandingInstruments__1__Symbol: KIWI.SIM
+      Simulator__Market__StandingInstruments__1__Name: Kiwi Simulated Fund
+      Simulator__Market__StandingInstruments__1__Currency: NZD
+      Simulator__Market__StandingInstruments__1__Price: "5.00"
       DataProtection__KeysPath: /keys
       ForwardedHeaders__KnownNetworks__0: 172.30.0.0/24
     volumes:
