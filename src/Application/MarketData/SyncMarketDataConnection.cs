@@ -21,8 +21,18 @@ public sealed record MarketDataSyncOutcome(
 /// prices. When the pull fails, the stored announcements are still processed and applied, and the price read is
 /// skipped: a price on the new basis must not arrive before its corporate action.
 /// </summary>
-public sealed class SyncMarketDataConnection
+public sealed class SyncMarketDataConnection(
+    PullCorporateActions pull,
+    ProcessCorporateActionAnnouncements process,
+    ApplyCorporateActions apply,
+    SyncMarketPrices prices)
 {
-    public Task<MarketDataSyncOutcome> RunAsync(string connection, CancellationToken cancellationToken = default) =>
-        throw new NotImplementedException();
+    public async Task<MarketDataSyncOutcome> RunAsync(string connection, CancellationToken cancellationToken = default)
+    {
+        var pulled = await pull.RunAsync(connection, cancellationToken);
+        var processed = await process.RunAsync(connection, cancellationToken);
+        var applied = await apply.RunAsync(connection, cancellationToken);
+        var priced = pulled.Failed ? null : await prices.RunAsync(connection, cancellationToken);
+        return new MarketDataSyncOutcome(pulled, processed, applied, priced);
+    }
 }

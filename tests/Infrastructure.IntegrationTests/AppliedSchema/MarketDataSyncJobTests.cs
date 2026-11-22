@@ -105,7 +105,8 @@ public class MarketDataSyncJobTests
 
             prices.Calls.ShouldBe(2);
             await using var db = OpenDb();
-            var feed = await db.MarketDataFeeds.AsNoTracking().SingleAsync(row => row.Connection == Connection);
+            var feed = await db.MarketDataFeeds.AsNoTracking()
+                .SingleAsync(row => row.Connection == Connection && row.Kind == MarketDataFeedKind.Prices);
             feed.LastSucceededAt.ShouldNotBeNull();
             feed.LastFailure.ShouldBe(MarketDataFailure.Unavailable);
         }
