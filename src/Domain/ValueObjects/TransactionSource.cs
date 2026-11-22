@@ -77,7 +77,15 @@ public sealed class TransactionSource : ValueObject
     }
 
     /// <summary>An entitlement posting's source: the PublicId of the corporate action (corporate-actions R26).</summary>
-    public static TransactionSource CorporateAction(Guid corporateActionPublicId) => throw new NotImplementedException();
+    public static TransactionSource CorporateAction(Guid corporateActionPublicId)
+    {
+        if (corporateActionPublicId == Guid.Empty)
+        {
+            throw new DomainException("A corporate action source needs the corporate action's PublicId.");
+        }
+
+        return new TransactionSource(TransactionSourceKind.CorporateAction, corporateActionPublicId);
+    }
 
     /// <summary>The source as stored on a Transaction row.</summary>
     internal static TransactionSource FromStored(TransactionSourceKind kind, Guid? publicId) =>
@@ -90,6 +98,7 @@ public sealed class TransactionSource : ValueObject
             TransactionSourceKind.Payment => Payment(publicId ?? Guid.Empty),
             TransactionSourceKind.AccountClosure => AccountClosure(publicId ?? Guid.Empty),
             TransactionSourceKind.InterestRun => InterestRun(publicId ?? Guid.Empty),
+            TransactionSourceKind.CorporateAction => CorporateAction(publicId ?? Guid.Empty),
             _ => new TransactionSource(kind, publicId)
         };
 
