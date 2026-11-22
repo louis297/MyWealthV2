@@ -438,6 +438,47 @@ public class OrdersSchemaTests
         }
     }
 
+    [Test]
+    public async Task EfRoundTrip_KeepsAFillsTransactionAndItsExecutionDetail()
+    {
+        await using var db = await ScratchSchemaDatabase.CreateAsync("OrderFillPostingEf");
+        await db.ApplyAllAsync();
+        var row = (await db.ReadAsync($"""
+            {ScratchSchemaDatabase.TenantRows("a", Guid.NewGuid().ToString("N")[..12])}
+            SELECT @a_tenant, @a_instrument, @a_bank;
+            """)).Single();
+        var (tenantId, instrumentId, accountId) = (Convert.ToInt32(row[0]), Convert.ToInt32(row[1]), Convert.ToInt32(row[2]));
+        var orderId = Guid.NewGuid();
+        var fillId = Guid.NewGuid();
+        var day = new DateOnly(2026, 11, 23);
+        var posting = Transaction.PostBuy(
+            tenantId, accountId, AccountType.Brokerage, "USD", instrumentId, 4m,
+            MyWealthV2.Domain.ValueObjects.Money.Create(100.12m, "USD"), 1m, new DateTimeOffset(2026, 11, 23, 2, 11, 2, TimeSpan.Zero),
+            Transaction.BuyOrderMemo, null, MyWealthV2.Domain.ValueObjects.TransactionSource.OrderFill(orderId), currentCashSum: 5000m,
+            execution: new MyWealthV2.Domain.ValueObjects.TradeExecution(fillId, day, day.AddDays(2), "CN-1"));
+        posting.CreatedBy = "worker";
+        posting.CashLegs.ForEach(leg => leg.CreatedBy = "worker");
+        posting.SecurityLegs.ForEach(leg => leg.CreatedBy = "worker");
+
+        await using (var context = OpenDb(db.ConnectionString))
+        {
+            context.Set<Transaction>().Add(posting);
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = OpenDb(db.ConnectionString))
+        {
+            var stored = await context.Set<Transaction>().AsNoTracking()
+                .Include(transaction => transaction.ExecutionDetail)
+                .SingleAsync(transaction => transaction.Id == posting.Id);
+            (stored.Type, stored.SourceKind, stored.SourcePublicId, stored.Memo)
+                .ShouldBe((TransactionType.Buy, TransactionSourceKind.OrderFill, (Guid?)orderId, "Buy order"));
+            var detail = stored.ExecutionDetail.ShouldNotBeNull();
+            (detail.TenantId, detail.FillPublicId, detail.Price, detail.TradeDate, detail.SettlementDate, detail.BrokerReference)
+                .ShouldBe((tenantId, fillId, 100.12m, day, day.AddDays(2), "CN-1"));
+        }
+    }
+
     private static async Task<OrderFeeTerms> FeesAsync(ApplicationDbContext context, int scheduleId) =>
         new(await context.Set<TradeFeeSchedule>().Include(schedule => schedule.BandRows).SingleAsync(schedule => schedule.Id == scheduleId), 2);
 

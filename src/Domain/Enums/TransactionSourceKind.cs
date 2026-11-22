@@ -30,5 +30,8 @@ public enum TransactionSourceKind
 
     /// <summary>A corporate action's entitlement posting; the source id is the corporate action's PublicId
     /// (corporate-actions R26).</summary>
-    CorporateAction = 7
+    CorporateAction = 7,
+
+    /// <summary>A fill of an order, as the broker reported it; the source id is the order's PublicId (orders R32).</summary>
+    OrderFill = 8
 }

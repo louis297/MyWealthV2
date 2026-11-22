@@ -68,3 +68,22 @@ public class TransactionCorporateActionDetailConfiguration : IEntityTypeConfigur
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+/// <summary>Orders §6.1: 0..1 execution detail per Transaction (script 0051).</summary>
+public class TransactionExecutionDetailConfiguration : IEntityTypeConfiguration<TransactionExecutionDetail>
+{
+    public void Configure(EntityTypeBuilder<TransactionExecutionDetail> builder)
+    {
+        builder.ToTable("TransactionExecutionDetails");
+        builder.HasKey(detail => detail.TransactionId);
+        builder.Property(detail => detail.TransactionId).ValueGeneratedNever();
+        builder.Property(detail => detail.Price).HasColumnType("decimal(18,8)").IsRequired();
+        builder.Property(detail => detail.TradeDate).HasColumnType("date").IsRequired();
+        builder.Property(detail => detail.SettlementDate).HasColumnType("date").IsRequired();
+        builder.Property(detail => detail.BrokerReference).HasMaxLength(TransactionExecutionDetail.BrokerReferenceMaxLength);
+        builder.HasOne<Tenant>()
+            .WithMany()
+            .HasForeignKey(detail => detail.TenantId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}

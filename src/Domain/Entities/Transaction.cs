@@ -66,6 +66,15 @@ public class Transaction : BaseAuditableEntity
     /// <summary>The event behind an entitlement posting, on the posting and its Reversal (corporate-actions R27).</summary>
     public TransactionCorporateActionDetail? CorporateActionDetail { get; private set; }
 
+    /// <summary>Orders R35: the execution detail of an order fill and of its Reversal; null on every other Transaction.</summary>
+    public TransactionExecutionDetail? ExecutionDetail { get; private set; }
+
+    /// <summary>Orders R32: the memo of a buy order's fill.</summary>
+    public const string BuyOrderMemo = "Buy order";
+
+    /// <summary>Orders R32: the memo of a sell order's fill.</summary>
+    public const string SellOrderMemo = "Sell order";
+
     /// <summary>The memo every interest posting carries (interest-run R23).</summary>
     public const string InterestMemo = "Interest";
 
@@ -712,7 +721,8 @@ public class Transaction : BaseAuditableEntity
         TradeFeeSchedule? feeSchedule = null,
         int quoteDecimalPlaces = 2,
         decimal? enteredFee = null,
-        AppliedFxRate? appliedRate = null)
+        AppliedFxRate? appliedRate = null,
+        TradeExecution? execution = null)
     {
         EnsureSecurityAccount(accountType);
         EnsurePriced(price);
@@ -768,7 +778,8 @@ public class Transaction : BaseAuditableEntity
         TradeFeeSchedule? feeSchedule = null,
         int quoteDecimalPlaces = 2,
         decimal? enteredFee = null,
-        AppliedFxRate? appliedRate = null)
+        AppliedFxRate? appliedRate = null,
+        TradeExecution? execution = null)
     {
         EnsureSecurityAccount(accountType);
         EnsurePriced(price);

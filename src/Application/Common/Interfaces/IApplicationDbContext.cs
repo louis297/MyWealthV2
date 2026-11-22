@@ -82,6 +82,8 @@ public interface IApplicationDbContext
 
     DbSet<TransactionCorporateActionDetail> TransactionCorporateActionDetails { get; }
 
+    DbSet<TransactionExecutionDetail> TransactionExecutionDetails { get; }
+
     DbSet<IdempotencyRecord> IdempotencyRecords { get; }
 
     DbSet<Report> Reports { get; }

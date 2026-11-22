@@ -87,6 +87,9 @@ public sealed class TransactionSource : ValueObject
         return new TransactionSource(TransactionSourceKind.CorporateAction, corporateActionPublicId);
     }
 
+    /// <summary>A fill's source: the PublicId of its order, shared by every fill of the order (orders R32).</summary>
+    public static TransactionSource OrderFill(Guid orderPublicId) => throw new NotImplementedException();
+
     /// <summary>The source as stored on a Transaction row.</summary>
     internal static TransactionSource FromStored(TransactionSourceKind kind, Guid? publicId) =>
         kind switch
