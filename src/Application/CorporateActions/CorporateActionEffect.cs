@@ -20,6 +20,21 @@ internal static class CorporateActionEffect
         int? byUserId,
         CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        action.MakeEffective(at, byUserId);
+        var accountIds = await (
+                from holding in db.Holdings.IgnoreQueryFilters()
+                join account in db.Accounts.IgnoreQueryFilters() on holding.AccountId equals account.Id
+                where holding.TenantId == action.TenantId
+                      && holding.InstrumentId == action.InstrumentId
+                      && holding.Quantity > 0
+                      && account.CustodyMode == CustodyMode.Custodial
+                select account.Id)
+            .Distinct()
+            .OrderBy(id => id)
+            .ToListAsync(cancellationToken);
+        foreach (var accountId in accountIds)
+        {
+            db.CorporateActionEntitlements.Add(CorporateActionEntitlement.Create(action.TenantId, action.Id, accountId));
+        }
     }
 }

@@ -216,7 +216,25 @@ public class CancelCorporateActionCommandHandler(IApplicationDbContext db, ICurr
     }
 }
 
-public class ApplyCorporateActionCommandHandler : IRequestHandler<ApplyCorporateActionCommand>
+public class ApplyCorporateActionCommandHandler(IApplicationDbContext db, ICurrentUser currentUser, TimeProvider time)
+    : IRequestHandler<ApplyCorporateActionCommand>
 {
-    public Task Handle(ApplyCorporateActionCommand request, CancellationToken cancellationToken) => throw new NotImplementedException();
+    public async Task Handle(ApplyCorporateActionCommand request, CancellationToken cancellationToken)
+    {
+        var action = await CorporateActionReader.FindAsync(db, currentUser, request.Id, cancellationToken);
+        CorporateActionReader.EnsureChangeable(action, request.RowVersion, "applied");
+        var now = time.GetUtcNow();
+        if (DateOnly.FromDateTime(now.UtcDateTime) < action.ExDate)
+        {
+            throw CorporateActionReader.Error(
+                nameof(CorporateAction.ExDate), "A corporate action cannot be applied before its ex-date.");
+        }
+
+        var actor = currentUser.Person?.Id ?? throw new ForbiddenAccessException();
+        await db.ExecuteInTransactionAsync(async token =>
+        {
+            await CorporateActionEffect.MakeEffectiveAsync(db, action, now, actor, token);
+            await CorporateActionReader.SaveAsync(db, token);
+        }, cancellationToken);
+    }
 }
