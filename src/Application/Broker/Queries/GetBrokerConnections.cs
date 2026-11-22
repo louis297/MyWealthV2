@@ -17,8 +17,32 @@ public sealed record BrokerConnectionDto(string Name, string Adapter, BrokerFeed
 /// name of <c>BrokerFailure</c>, never a message from the party.</summary>
 public sealed record BrokerFeedDto(DateTimeOffset? LastSucceededAt, DateTimeOffset? LastFailedAt, string? LastFailure);
 
-public class GetBrokerConnectionsQueryHandler : IRequestHandler<GetBrokerConnectionsQuery, PagedList<BrokerConnectionDto>>
+public class GetBrokerConnectionsQueryHandler(IApplicationDbContext db, IBrokerConnections connections)
+    : IRequestHandler<GetBrokerConnectionsQuery, PagedList<BrokerConnectionDto>>
 {
-    public Task<PagedList<BrokerConnectionDto>> Handle(GetBrokerConnectionsQuery request, CancellationToken cancellationToken) =>
-        throw new NotImplementedException();
+    private const int DefaultPageSize = 20;
+
+    public async Task<PagedList<BrokerConnectionDto>> Handle(GetBrokerConnectionsQuery request, CancellationToken cancellationToken)
+    {
+        var names = connections.All.Select(connection => connection.Name).ToList();
+        var feeds = await db.BrokerFeeds.AsNoTracking()
+            .Where(feed => names.Contains(feed.Connection))
+            .ToDictionaryAsync(feed => feed.Connection, cancellationToken);
+        var items = connections.All
+            .OrderBy(connection => connection.Name, StringComparer.Ordinal)
+            .Select(connection => new BrokerConnectionDto(
+                connection.Name,
+                connection.Adapter,
+                feeds.TryGetValue(connection.Name, out var feed)
+                    ? new BrokerFeedDto(feed.LastSucceededAt, feed.LastFailedAt, feed.LastFailure?.ToString())
+                    : null))
+            .ToList();
+        return new PagedList<BrokerConnectionDto>
+        {
+            Items = items,
+            Page = 1,
+            PageSize = Math.Max(DefaultPageSize, items.Count),
+            TotalCount = items.Count
+        };
+    }
 }

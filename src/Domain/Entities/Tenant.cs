@@ -86,7 +86,15 @@ public class Tenant : BaseAuditableEntity
     }
 
     /// <summary>Orders R3: names the broker connection new orders of the Tenant go to. It cannot be cleared.</summary>
-    public void SetBrokerConnection(string name) => throw new NotImplementedException();
+    public void SetBrokerConnection(string name)
+    {
+        if (!ValueObjects.BankConnectionName.IsValid(name))
+        {
+            throw new DomainException("A broker connection name is 1 to 50 characters: a lower-case letter, then lower-case letters, digits and hyphens.");
+        }
+
+        BrokerConnection = name;
+    }
 
     /// <summary>The custody modes new Accounts of this Tenant may be opened with, External before Custodial.</summary>
     public IReadOnlyList<CustodyMode> AllowedCustodyModes =>
