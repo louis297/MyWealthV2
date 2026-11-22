@@ -1,3 +1,4 @@
+using MyWealthV2.Application.CorporateActions;
 using MyWealthV2.Infrastructure.BankReconciliations;
 using MyWealthV2.Application.BankReconciliations;
 using Hangfire;
@@ -143,6 +144,7 @@ public static class DependencyInjection
         builder.Services.AddSingleton<IMarketPricesAdapter, SimulatorMarketPrices>();
         builder.Services.AddScoped<IMarketPrices, MarketPricesDispatcher>();
         builder.Services.AddScoped<SyncMarketPrices>();
+        builder.Services.AddScoped<ApplyCorporateActions>();
         if (host == MarketDataHost.Worker)
         {
             builder.Services.TryAddSingleton(sp =>

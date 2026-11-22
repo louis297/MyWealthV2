@@ -19,4 +19,8 @@ public interface IInstrumentPriceStore
         IReadOnlyList<int> instrumentIds,
         DateOnly asOf,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Corporate-actions R23: a price of <paramref name="instrumentId"/> is stored for
+    /// <paramref name="from"/> or a later date.</summary>
+    Task<bool> HasPriceFromAsync(int instrumentId, DateOnly from, CancellationToken cancellationToken = default);
 }

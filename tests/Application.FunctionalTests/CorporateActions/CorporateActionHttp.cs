@@ -201,4 +201,15 @@ internal static class CorporateActionHttp
     }
 }
 
+internal static class CorporateActionRuns
+{
+    /// <summary>Runs the apply step once, as the job <c>corporate-action-apply</c> does.</summary>
+    public static async Task<MyWealthV2.Application.CorporateActions.ApplyCorporateActionsOutcome> RunApplyAsync(string? connection = null)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<MyWealthV2.Application.CorporateActions.ApplyCorporateActions>()
+            .RunAsync(connection);
+    }
+}
+
 internal sealed record Holders(Guid InstrumentId, Guid Ned, Guid Olga, Guid External, Guid Empty);
