@@ -34,10 +34,13 @@ public class MarketDataFeed
     /// <summary>A read was stored (R9). The last failure stays, so the page can tell which came later.</summary>
     public void Succeeded(DateTimeOffset at)
     {
+        LastSucceededAt = at;
     }
 
     /// <summary>A read failed (R8). The last success stays.</summary>
     public void Failed(MarketDataFailure failure, DateTimeOffset at)
     {
+        LastFailure = failure;
+        LastFailedAt = at;
     }
 }
