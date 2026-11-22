@@ -49,7 +49,7 @@ public class GetMarketDataConnectionsQueryHandler(IApplicationDbContext db, Mark
                     connection.Adapter,
                     connection.SymbolSuffix,
                     State(MarketDataFeedKind.Prices),
-                    null);
+                    State(MarketDataFeedKind.CorporateActions));
             })
             .ToList();
         return new PagedList<MarketDataConnectionDto>
