@@ -200,4 +200,15 @@ public class RolePermissionsTests
         RolePermissions.Has(UserRole.Customer, policy).ShouldBe(customer);
         RolePermissions.Has(UserRole.SimulatorOperator, policy).ShouldBeFalse();
     }
+
+    [TestCase(Policies.CorporateActionsRead, true, true)]
+    [TestCase(Policies.CorporateActionsManage, true, false)]
+    public void CorporateActions_MatchTheCorporateActionGrants(string policy, bool tenantAdmin, bool adviser)
+    {
+        RolePermissions.Has(UserRole.TenantAdmin, policy).ShouldBe(tenantAdmin);
+        RolePermissions.Has(UserRole.Adviser, policy).ShouldBe(adviser);
+        RolePermissions.Has(UserRole.Customer, policy).ShouldBeFalse();
+        RolePermissions.Has(UserRole.SystemAdmin, policy).ShouldBeFalse();
+        RolePermissions.Has(UserRole.SimulatorOperator, policy).ShouldBeFalse();
+    }
 }
