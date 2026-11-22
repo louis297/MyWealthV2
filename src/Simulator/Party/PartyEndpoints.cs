@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Simulator.Bank;
 using MyWealthV2.Simulator.Data;
+using MyWealthV2.Simulator.Market;
 using MyWealthV2.Simulator.Hosting;
 
 namespace MyWealthV2.Simulator.Party;
@@ -61,6 +62,7 @@ public static class PartyEndpoints
 
         party.MapGet("/status", GetStatusAsync);
         party.MapBankPartyEndpoints();
+        party.MapMarketPartyEndpoints();
 
         return app;
     }
