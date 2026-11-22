@@ -18,6 +18,7 @@ public static class MarketControlEndpoints
         market.MapPost("/instruments/{symbol}/price", SetPriceAsync);
         market.MapPost("/instruments/{symbol}/daily-move", SetDailyMoveAsync);
         market.MapGet("/instruments/{symbol}/prices", GetPricesAsync);
+        market.MapMarketCorporateActionEndpoints();
         return control;
     }
 

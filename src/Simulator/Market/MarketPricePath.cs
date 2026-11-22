@@ -4,7 +4,8 @@ using MyWealthV2.Simulator.Worlds;
 
 namespace MyWealthV2.Simulator.Market;
 
-/// <summary>Simulated instruments R17, R18: one price per simulator day, each a seeded step from the day before.</summary>
+/// <summary>Simulated instruments R17, R18: one price per simulator day, each a seeded step from the day before;
+/// corporate-actions R42: rebased on the ex-date of a corporate action.</summary>
 public static class MarketPricePath
 {
     public static readonly DateOnly Epoch = new(2000, 1, 1);
@@ -43,9 +44,24 @@ public static class MarketPricePath
                 await db.Database.ExecuteSqlInterpolatedAsync(
                     $"SELECT 1 FROM [MarketInstruments] WITH (UPDLOCK, HOLDLOCK) WHERE [Id] = {id}", cancellationToken);
                 var instrument = await db.MarketInstruments.SingleAsync(row => row.Id == id, cancellationToken);
+                var announced = await db.MarketCorporateActions
+                    .Where(action => action.InstrumentId == id && action.Status == MarketCorporateActionStatus.Announced)
+                    .OrderBy(action => action.ExDate)
+                    .ThenBy(action => action.Number)
+                    .ToListAsync(cancellationToken);
                 for (var day = instrument.PriceDate.AddDays(1); day <= today; day = day.AddDays(1))
                 {
-                    var price = Step(instrument.Price, instrument.DailyMovePercent, seed, instrument.Symbol, day);
+                    // Corporate-actions R42: an action whose ex-date has come is effective, and the price of the day
+                    // before is rebased before the day's move.
+                    var previous = instrument.Price;
+                    foreach (var action in announced.Where(action => action.Status == MarketCorporateActionStatus.Announced
+                                                                     && action.ExDate <= day))
+                    {
+                        previous = action.Rebase(previous);
+                        action.MakeEffective();
+                    }
+
+                    var price = Step(previous, instrument.DailyMovePercent, seed, instrument.Symbol, day);
                     db.MarketPrices.Add(instrument.StepTo(day, price));
                 }
 
