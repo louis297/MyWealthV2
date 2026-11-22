@@ -5,6 +5,7 @@ using System.Xml;
 using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Simulator.Bank;
 using MyWealthV2.Simulator.Data;
+using MyWealthV2.Simulator.Market;
 using MyWealthV2.Simulator.Worlds;
 
 namespace MyWealthV2.Simulator.Control;
@@ -36,6 +37,7 @@ public static class ControlEndpoints
         control.MapPost("/reset", ResetAsync);
         control.MapGet("/log", GetLogAsync);
         control.MapBankControlEndpoints();
+        control.MapMarketControlEndpoints();
 
         return app;
     }
@@ -103,7 +105,8 @@ public static class ControlEndpoints
         HttpContext http,
         SimulatorDbContext db,
         TimeProvider time,
-        BankStandingAccounts standing)
+        BankStandingAccounts standing,
+        MarketStandingInstruments standingInstruments)
     {
         var seed = body.Seed ?? SeededRandom.NewSeed();
 
@@ -120,6 +123,12 @@ public static class ControlEndpoints
             await db.BankLines.ExecuteDeleteAsync(http.RequestAborted);
             await db.BankAccounts.ExecuteDeleteAsync(http.RequestAborted);
             await standing.OpenMissingAsync(db, time.GetUtcNow(), http.RequestAborted);
+
+            // Simulated instruments R23: the market is emptied and its standing instruments added again, priced on
+            // the first day of the new world (its clock starts at real now).
+            await db.MarketPrices.ExecuteDeleteAsync(http.RequestAborted);
+            await db.MarketInstruments.ExecuteDeleteAsync(http.RequestAborted);
+            await standingInstruments.AddMissingAsync(db, MarketPricePath.Day(time.GetUtcNow()), http.RequestAborted);
             var result = await WriteAsync(http, db, time, ControlActions.WorldReset, body, (world, now) =>
                 world.Reset(Guid.NewGuid(), seed, now));
             if (result is IStatusCodeHttpResult { StatusCode: StatusCodes.Status200OK })

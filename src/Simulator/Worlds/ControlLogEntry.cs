@@ -53,4 +53,7 @@ public static class ControlActions
     public const string BankReceiptRecalled = "BankReceiptRecalled";
     public const string BankChargeAdded = "BankChargeAdded";
     public const string BankInterestPaid = "BankInterestPaid";
+    public const string MarketInstrumentAdded = "MarketInstrumentAdded";
+    public const string MarketPriceSet = "MarketPriceSet";
+    public const string MarketDailyMoveSet = "MarketDailyMoveSet";
 }

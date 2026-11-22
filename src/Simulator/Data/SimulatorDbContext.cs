@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Simulator.Bank;
+using MyWealthV2.Simulator.Market;
 using MyWealthV2.Simulator.Worlds;
 
 namespace MyWealthV2.Simulator.Data;
@@ -21,6 +22,10 @@ public sealed class SimulatorDbContext(DbContextOptions<SimulatorDbContext> opti
     public DbSet<BankFeedPlace> BankFeedPlaces => Set<BankFeedPlace>();
 
     public DbSet<BankPayment> BankPayments => Set<BankPayment>();
+
+    public DbSet<MarketInstrument> MarketInstruments => Set<MarketInstrument>();
+
+    public DbSet<MarketPrice> MarketPrices => Set<MarketPrice>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -76,6 +81,26 @@ public sealed class SimulatorDbContext(DbContextOptions<SimulatorDbContext> opti
             payment.Property(row => row.PayeeName).HasMaxLength(BankRules.NameMaxLength);
             payment.Property(row => row.RejectReason).HasMaxLength(30);
             payment.Property(row => row.ReturnOf).HasMaxLength(BankRules.InstructionIdMaxLength);
+        });
+
+        modelBuilder.Entity<MarketInstrument>(instrument =>
+        {
+            instrument.ToTable("MarketInstruments");
+            instrument.HasKey(row => row.Id);
+            instrument.Property(row => row.Symbol).HasMaxLength(MarketRules.SymbolMaxLength);
+            instrument.Property(row => row.Name).HasMaxLength(MarketRules.NameMaxLength);
+            instrument.Property(row => row.Currency).HasColumnType("char(3)").IsFixedLength();
+            instrument.Property(row => row.DailyMovePercent).HasColumnType("decimal(5,2)");
+            instrument.Property(row => row.Price).HasColumnType("decimal(18,4)");
+            instrument.Property(row => row.RowVersion).IsRowVersion();
+            instrument.HasMany(row => row.Prices).WithOne().HasForeignKey(price => price.InstrumentId);
+        });
+
+        modelBuilder.Entity<MarketPrice>(price =>
+        {
+            price.ToTable("MarketPrices");
+            price.HasKey(row => new { row.InstrumentId, row.PriceDate });
+            price.Property(row => row.Price).HasColumnType("decimal(18,4)");
         });
 
         modelBuilder.Entity<BankFeedPlace>(place =>
