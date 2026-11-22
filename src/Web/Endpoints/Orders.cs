@@ -18,6 +18,7 @@ public class Orders : IEndpointGroup
         groupBuilder.MapGet(GetOrders).RequireAuthorization(Policies.OrdersRead);
         groupBuilder.MapGet(GetOrder, "{id:guid}").RequireAuthorization(Policies.OrdersRead);
         groupBuilder.MapPost(PlaceOrder).RequireAuthorization(Policies.OrdersPlace);
+        groupBuilder.MapPost(PreviewOrder, "preview").RequireAuthorization(Policies.OrdersPlace);
     }
 
     [EndpointSummary("List orders")]
@@ -40,6 +41,11 @@ public class Orders : IEndpointGroup
     [EndpointDescription("Returns one order in the caller's scope with its fills (R15).")]
     public static async Task<Ok<OrderDto>> GetOrder(ISender sender, Guid id) =>
         TypedResults.Ok(await sender.Send(new GetOrderByIdQuery(id)));
+
+    [EndpointSummary("Preview an order")]
+    [EndpointDescription("Returns about what an order would cost, the most it can cost and what it would reserve, with the refusals of placing it. Writes nothing (R17).")]
+    public static async Task<Ok<OrderPreviewDto>> PreviewOrder(ISender sender, PreviewOrderQuery query) =>
+        TypedResults.Ok(await sender.Send(query));
 
     [EndpointSummary("Place an order")]
     [EndpointDescription("Places a market day order on a Custodial account and reserves the most it can cost (a buy) or its quantity (a sell). Nothing is sent to the broker in the request. Requires Idempotency-Key (R6–R13).")]
