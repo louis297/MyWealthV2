@@ -74,15 +74,15 @@ public class DevelopmentSeedSecondFirmTests : TestBase
             firstAccountIds = items.Select(item => item.GetProperty("id").GetString()!).OrderBy(id => id).ToList();
         }
 
-        var instruments = await InstrumentHttp.Send(HttpMethod.Get, "/instruments", adviser.AccessToken);
+        var instruments = await InstrumentHttp.Send(HttpMethod.Get, "/instruments?pageSize=100", adviser.AccessToken);
         instruments.StatusCode.ShouldBe(HttpStatusCode.OK);
         using (var json = JsonDocument.Parse(await instruments.Content.ReadAsStringAsync()))
         {
             json.RootElement.GetProperty("items").EnumerateArray()
                 .Select(item => item.GetProperty("symbol").GetString())
                 .ShouldBe([
-                    "6758", "7203", "9984", "AAPL", "AIA", "AIR", "BHP", "CBA", "FPH", "HSBA",
-                    "MEL", "MSFT", "NZD-CASH", "OR", "SAP", "SHEL", "ULVR", "VTI", "WOW"
+                    "6758", "7203", "9984", "AAPL", "ACME.SIM", "AIA", "AIR", "BHP", "CBA", "FPH", "HSBA",
+                    "KIWI.SIM", "MEL", "MSFT", "NZD-CASH", "OR", "SAP", "SHEL", "ULVR", "VTI", "WOW"
                 ]);
         }
 
