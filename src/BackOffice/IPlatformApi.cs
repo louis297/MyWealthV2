@@ -64,6 +64,11 @@ public interface IPlatformApi
     /// <summary>The configured market data connections with their price feed state (simulated-instruments R5).</summary>
     Task<IReadOnlyList<MarketDataConnectionItem>> ListMarketDataConnectionsAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Corporate actions BO25: the newest twenty announcements, optionally of one status.</summary>
+    Task<IReadOnlyList<CorporateActionAnnouncementItem>> ListCorporateActionAnnouncementsAsync(
+        string? status,
+        CancellationToken cancellationToken = default);
+
     Task DisableClientMoneyAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default);
 
     Task EnableClientMoneyAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default);

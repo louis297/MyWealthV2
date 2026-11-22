@@ -183,8 +183,9 @@ public class BackOfficeApiTests
         api.Enqueue(HttpStatusCode.OK, """
             {"items":[
               {"name":"simulator","adapter":"Simulator","symbolSuffix":".SIM",
-               "prices":{"lastSucceededAt":"2026-11-22T03:15:01Z","lastFailedAt":null,"lastFailure":null}},
-              {"name":"other","adapter":"Simulator","symbolSuffix":".OTH","prices":null}
+               "prices":{"lastSucceededAt":"2026-11-22T03:15:01Z","lastFailedAt":null,"lastFailure":null},
+               "corporateActions":{"lastSucceededAt":null,"lastFailedAt":"2026-11-22T03:15:01Z","lastFailure":"InvalidItem"}},
+              {"name":"other","adapter":"Simulator","symbolSuffix":".OTH","prices":null,"corporateActions":null}
             ],"page":1,"pageSize":20,"totalCount":2}
             """);
         var platform = Create(api);
@@ -193,10 +194,34 @@ public class BackOfficeApiTests
 
         connections.ShouldBe([
             new MarketDataConnectionItem("simulator", "Simulator", ".SIM",
-                new MarketDataFeed(new DateTimeOffset(2026, 11, 22, 3, 15, 1, TimeSpan.Zero), null, null)),
-            new MarketDataConnectionItem("other", "Simulator", ".OTH", null)
+                new MarketDataFeed(new DateTimeOffset(2026, 11, 22, 3, 15, 1, TimeSpan.Zero), null, null),
+                new MarketDataFeed(null, new DateTimeOffset(2026, 11, 22, 3, 15, 1, TimeSpan.Zero), "InvalidItem")),
+            new MarketDataConnectionItem("other", "Simulator", ".OTH", null, null)
         ]);
         AssertRequest(api.Requests[0], "GET", "/market-data-connections");
+    }
+
+    [Test]
+    public async Task CorporateActionAnnouncements_ReadsTheNewestTwenty_WithTheStatusFilter()
+    {
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.OK, """
+            {"items":[{"id":"5a1c0000-0000-0000-0000-0000000000c7","connection":"simulator","outsideId":"w-CA1-V1","partyActionId":"w-CA1",
+              "version":1,"partyStatus":"Announced","symbol":"ACME.SIM","currency":"USD","kind":null,"ratioNew":2,"ratioHeld":1,
+              "exDate":"2026-11-24","recordDate":null,"paymentDate":null,"receivedAt":"2026-11-22T03:15:02Z","status":"Skipped",
+              "skipReason":"UnsupportedKind","processedAt":"2026-11-22T03:15:03Z"}],"page":1,"pageSize":20,"totalCount":1}
+            """);
+        api.Enqueue(HttpStatusCode.OK, """{"items":[],"page":1,"pageSize":20,"totalCount":0}""");
+        var platform = Create(api);
+
+        var items = await platform.ListCorporateActionAnnouncementsAsync(null);
+        await platform.ListCorporateActionAnnouncementsAsync("Skipped");
+
+        var item = items.ShouldHaveSingleItem();
+        (item.OutsideId, item.Kind, item.Status, item.SkipReason, item.ExDate).ShouldBe(
+            ("w-CA1-V1", (string?)null, "Skipped", (string?)"UnsupportedKind", new DateOnly(2026, 11, 24)));
+        AssertRequest(api.Requests[0], "GET", "/corporate-action-announcements?page=1&pageSize=20");
+        AssertRequest(api.Requests[1], "GET", "/corporate-action-announcements?page=1&pageSize=20&status=Skipped");
     }
 
     [Test]
