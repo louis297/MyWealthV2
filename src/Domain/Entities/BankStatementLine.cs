@@ -32,6 +32,12 @@ public class BankStatementLine : BaseAuditableEntity
 
     public BankLineDirection Direction { get; private set; }
 
+    /// <summary>Interest-run R39: a transfer or the bank's own interest; immutable, from the port.</summary>
+    public StatementLineKind Kind { get; private set; }
+
+    /// <summary>Interest-run R40: the note of a bank interest line the platform sets aside.</summary>
+    public const string BankInterestNote = "Bank interest";
+
     public decimal Amount { get; private set; }
 
     public string Currency { get; private set; } = string.Empty;
@@ -98,7 +104,8 @@ public class BankStatementLine : BaseAuditableEntity
         Guid? publicId = null,
         string? endToEndId = null,
         string? returnOfOutsideId = null,
-        string? returnReason = null)
+        string? returnReason = null,
+        StatementLineKind kind = StatementLineKind.Transfer)
     {
         if (!IsStorable(outsideId, direction, amount))
         {
@@ -311,6 +318,10 @@ public class BankStatementLine : BaseAuditableEntity
         Status = BankStatementLineStatus.Ignored;
         Record(StatementLineAction.Ignored, trimmed, byUserId, at);
     }
+
+    /// <summary>Interest-run R40: a <c>Received</c> credit line of kind <c>Interest</c> is set aside by the platform:
+    /// <c>Ignored</c>, last action <c>Ignored</c>, the note <see cref="BankInterestNote"/>, no person.</summary>
+    public void SetAsideAsBankInterest(DateTimeOffset at) => throw new NotImplementedException();
 
     /// <summary>Must go back to the payer (R28); the caller creates the return payment (bank-returns R5).</summary>
     public void RequestReturn(string note, int byUserId, DateTimeOffset at)

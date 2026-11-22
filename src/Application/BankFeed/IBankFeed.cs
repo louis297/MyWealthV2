@@ -30,7 +30,8 @@ public sealed record BankFeedLine(
     string? Reference,
     string? EndToEndId = null,
     string? ReturnOf = null,
-    string? ReturnReason = null);
+    string? ReturnReason = null,
+    StatementLineKind Kind = StatementLineKind.Transfer);
 
 /// <summary>One page: its lines, oldest first, the party's new cursor, whether more lines follow, and the bank's
 /// balance of the account after the last line up to the cursor, or null when the party sends none

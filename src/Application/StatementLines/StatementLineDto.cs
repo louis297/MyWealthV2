@@ -11,6 +11,9 @@ public sealed class StatementLineDto
 
     public required string Direction { get; init; }
 
+    /// <summary><c>Transfer</c> or <c>Interest</c> (interest-run R39).</summary>
+    public string Kind { get; init; } = "Transfer";
+
     public required decimal Amount { get; init; }
 
     public required string ValueDate { get; init; }

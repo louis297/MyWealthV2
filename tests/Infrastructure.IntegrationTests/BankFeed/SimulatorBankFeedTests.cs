@@ -83,6 +83,39 @@ public class SimulatorBankFeedTests
         lines[1].ReturnReason.ShouldBe("Account closed");
     }
 
+    [TestCase("\"kind\": \"Interest\",", StatementLineKind.Interest)]
+    [TestCase("", StatementLineKind.Transfer)]
+    [TestCase("\"kind\": null,", StatementLineKind.Transfer)]
+    [TestCase("\"kind\": \"Dividend\",", StatementLineKind.Transfer)]
+    public async Task Kind_IsInterestOnlyForTheTextInterest(string kind, StatementLineKind expected)
+    {
+        // Interest-run R45: a code the adapter does not know is a transfer.
+        var handler = new StubHandler(HttpStatusCode.OK, $$"""
+            { "items": [ { "id": "L1", {{kind}} "valueDate": "2026-12-31", "direction": "Credit", "amount": 520, "currency": "USD" } ],
+              "cursor": "w:1", "hasMore": false }
+            """);
+
+        var result = await Feed(handler).GetStatementLinesAsync(
+            Connection, new BankFeedRequest("simulator", "SIM-DEMO-USD", null, 100), CancellationToken.None);
+
+        result.Page!.Lines.ShouldHaveSingleItem().Kind.ShouldBe(expected);
+    }
+
+    [Test]
+    public async Task AKindThatIsNotText_IsABadResponse()
+    {
+        var handler = new StubHandler(HttpStatusCode.OK, """
+            { "items": [ { "id": "L1", "kind": 1, "valueDate": "2026-12-31", "direction": "Credit", "amount": 520, "currency": "USD" } ],
+              "cursor": "w:1", "hasMore": false }
+            """);
+
+        var result = await Feed(handler).GetStatementLinesAsync(
+            Connection, new BankFeedRequest("simulator", "SIM-DEMO-USD", null, 100), CancellationToken.None);
+
+        result.Page.ShouldBeNull();
+        result.Failure.ShouldBe(BankFeedFailure.BadResponse);
+    }
+
     [Test]
     public async Task FirstRead_SendsNoCursor()
     {

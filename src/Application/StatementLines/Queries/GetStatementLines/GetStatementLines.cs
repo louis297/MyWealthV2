@@ -14,7 +14,8 @@ public sealed record GetStatementLinesQuery(
     string? Currency = null,
     Guid? ClientMoneyAccountId = null,
     Guid? TenantId = null,
-    string? Direction = null) : IRequest<PagedList<StatementLineDto>>
+    string? Direction = null,
+    string? Kind = null) : IRequest<PagedList<StatementLineDto>>
 {
     /// <summary>The status names in <see cref="Status"/>, comma-separated; empty when there is no filter.</summary>
     internal static IReadOnlyList<string> StatusNames(string? status) =>
