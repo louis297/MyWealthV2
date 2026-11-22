@@ -20,6 +20,8 @@ import { useGetAccountHoldingsQuery, useGetAccountQuery } from "@/features/accou
 import { closureAmounts, isCustodial } from "@/features/accounts/custodyRules";
 import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
 import { useGetNominatedBankAccountsQuery } from "@/features/nominatedBankAccounts/nominatedBankAccountsApi";
+import { orderFilters } from "@/features/orders/orderLabels";
+import { useGetOrdersQuery } from "@/features/orders/ordersApi";
 import { useGetAccountPortfolioQuery } from "@/features/portfolios/portfoliosApi";
 import { problemMessages } from "@/features/statementLines/statementLineLabels";
 import { maskAccountNumber } from "@/features/withdrawals/WithdrawPage";
@@ -28,6 +30,8 @@ import { formatMoney } from "@/shared/format/money";
 
 /** Account closure R5, R6: the sentences of the preconditions, as the server words them. */
 export const holdingSentence = "Sell every holding before closing the account.";
+export const openOrderSentence = "Open orders must be filled, cancelled or expired before the account can be closed.";
+export const unsettledSentence = "Trades must settle before the account can be closed.";
 export const portfolioSentence = "Unassign the portfolio before closing the account.";
 export const openWithdrawalSentence = "Open withdrawals must be paid, rejected or cancelled before the account can be closed.";
 
@@ -63,6 +67,7 @@ export function CloseAccountPage() {
   const holdings = useGetAccountHoldingsQuery(accountId, { skip: !accountId });
   const assignment = useGetAccountPortfolioQuery(accountId, { skip: !accountId });
   const open = useGetWithdrawalsQuery({ accountId, status: "Requested,Approved,Sent" }, { skip: !accountId });
+  const orders = useGetOrdersQuery({ accountId, status: orderFilters.Open.status }, { skip: !accountId });
   const currencies = useGetCurrenciesQuery();
   const places = currencies.data?.find((item) => item.code === account.data?.currency)?.decimalPlaces;
   const amounts = account.data ? closureAmounts(account.data.cashBalance, places) : { payout: 0, remainder: 0 };
@@ -88,7 +93,10 @@ export function CloseAccountPage() {
 
   const activeAssignment = assignment.data?.status === "Active" ? assignment.data : null;
   const openWithdrawal = open.data.items[0];
-  const checksPass = holdings.data.items.length === 0 && !activeAssignment && !openWithdrawal;
+  // D75 (orders R47): a live order and a trade that has not settled block the closure.
+  const openOrder = orders.data?.items[0];
+  const unsettled = (data.unsettledCash ?? 0) > 0;
+  const checksPass = holdings.data.items.length === 0 && !activeAssignment && !openWithdrawal && !openOrder && !unsettled;
   const withPayout = amounts.payout > 0;
   const choices = payees.data?.items ?? [];
   const payee = choices.find((item) => item.id === payeeId);
@@ -135,6 +143,15 @@ export function CloseAccountPage() {
             {activeAssignment ? (
               <Link to={`/portfolios/${activeAssignment.portfolioId}`} className={recordLinkClass}>View the portfolio</Link>
             ) : null}
+          </Check>
+          <Check label="No open orders" passed={!openOrder}>
+            {openOrderSentence}{" "}
+            {openOrder ? (
+              <Link to={`/orders/${openOrder.id}`} className={recordLinkClass}>View the order</Link>
+            ) : null}
+          </Check>
+          <Check label="Every trade settled" passed={!unsettled}>
+            {unsettledSentence}
           </Check>
           <Check label="No open withdrawals" passed={!openWithdrawal}>
             {openWithdrawalSentence}{" "}

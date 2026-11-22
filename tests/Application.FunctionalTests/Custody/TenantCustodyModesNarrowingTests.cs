@@ -34,7 +34,7 @@ public class TenantCustodyModesNarrowingTests : TestBase
 
         (await FundAsync(tokens.AccessToken, assigned, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
         (await FundAsync(tokens.AccessToken, trading, 500m)).StatusCode.ShouldBe(HttpStatusCode.Created);
-        var buy = await PostAsync(tokens.AccessToken, Trade(trading, "Buy", instrumentId, 5m));
+        var buy = await TradeAsync(trading, "Buy", instrumentId, 5m);
         buy.StatusCode.ShouldBe(HttpStatusCode.Created, await buy.Content.ReadAsStringAsync());
         var transfer = await PostAsync(tokens.AccessToken, TransferBody(trading, spare, 40m), TransferPath);
         transfer.StatusCode.ShouldBe(HttpStatusCode.Created, await transfer.Content.ReadAsStringAsync());

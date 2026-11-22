@@ -80,6 +80,8 @@ public static class TestApp
 
         FunctionalTestSetup.WebApiServices.GetRequiredService<InMemoryBankFeed>().Reset();
         FunctionalTestSetup.WebApiServices.GetRequiredService<InMemoryBankPayments>().Reset();
+        FunctionalTestSetup.WebApiServices.GetRequiredService<Broker.InMemoryBrokerOrders>().Reset();
+        FunctionalTestSetup.WebApiServices.GetRequiredService<Broker.InMemoryBrokerFeed>().Reset();
         FunctionalTestSetup.WebApiServices.GetRequiredService<InMemoryMarketPrices>().Reset();
         FunctionalTestSetup.WebApiServices.GetRequiredService<CorporateActions.InMemoryCorporateActionFeed>().Reset();
         _userId = null;
@@ -88,17 +90,25 @@ public static class TestApp
 
     /// <summary>
     /// Creates a Tenant through the Domain factory. It allows both custody modes unless
-    /// <paramref name="allowedCustodyModes"/> narrows it (tenant-custody-modes R6).
+    /// <paramref name="allowedCustodyModes"/> narrows it (tenant-custody-modes R6), and names the broker connection
+    /// <c>simulator</c> unless <paramref name="brokerConnection"/> says otherwise (orders R3).
     /// </summary>
     public static async Task<Tenant> CreateTenantAsync(
         string name,
         string code,
-        IReadOnlyCollection<CustodyMode>? allowedCustodyModes = null)
+        IReadOnlyCollection<CustodyMode>? allowedCustodyModes = null,
+        string? brokerConnection = Broker.FakeBrokerConnections.Simulator)
     {
         var tenant = Tenant.Create(name, code, Currency.Create("NZD", "New Zealand Dollar", 2));
         if (allowedCustodyModes is not null)
         {
             tenant.SetAllowedCustodyModes(allowedCustodyModes);
+        }
+
+        // Orders R3: a test firm routes its orders to the functional host's broker connection.
+        if (brokerConnection is not null)
+        {
+            tenant.SetBrokerConnection(brokerConnection);
         }
 
         await AddAsync(tenant);

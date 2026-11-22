@@ -35,20 +35,8 @@ public class TradeLockTests : TestBase
     public async Task AssignedAccount_RejectsReverseOfASecurityTrade()
     {
         var (tokens, accountId, instrumentId) = await FundedAccountAsync("Reverse Lock", "reverse-lock");
-        var buy = await Transactions.TransactionHttp.Send(
-            HttpMethod.Post,
-            "/transactions",
-            tokens.AccessToken,
-            new
-            {
-                accountId,
-                type = "Buy",
-                security = new[] { new { instrumentId, quantity = 1m } }
-            },
-            Guid.NewGuid());
-        buy.StatusCode.ShouldBe(HttpStatusCode.Created);
-        using var buyJson = JsonDocument.Parse(await buy.Content.ReadAsStringAsync());
-        var buyId = buyJson.RootElement.GetProperty("id").GetGuid();
+        // A trade typed before orders (orders R48), which a person could reverse were the account not assigned.
+        var buyId = await Custody.CustodialHttp.InsertManualTradeAsync(accountId, "Buy", instrumentId, 1m, price: 10m);
 
         var portfolioId = await CreatePortfolioAsync(tokens.AccessToken, instrumentId);
         var assign = await PortfolioHttp.Send(HttpMethod.Post, $"/accounts/{accountId}/portfolio", tokens.AccessToken, new

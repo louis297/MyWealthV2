@@ -3,9 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Application.FunctionalTests.Accounts;
-using MyWealthV2.Application.FunctionalTests.Custody;
 using MyWealthV2.Application.FunctionalTests.Instruments;
-using MyWealthV2.Application.FunctionalTests.MarketData;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Entities;
 
@@ -15,33 +13,6 @@ namespace MyWealthV2.Application.FunctionalTests.Transactions;
 public class BuySellTests : TestBase
 {
     private const string BookedAt = "2026-10-11T10:00:00Z";
-
-    [Test]
-    public async Task CustodialBuyThenSell_UsesTheStoredPriceAndAverageCostWithoutAnFxRow()
-    {
-        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
-        var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId, "USD");
-        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
-        await SetPriceAsync(instrumentId, 10m / 3m, "USD");
-        (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 20m, custodial: true)).StatusCode
-            .ShouldBe(HttpStatusCode.Created);
-
-        var buy = await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 3m, custodial: true);
-        buy.StatusCode.ShouldBe(HttpStatusCode.Created);
-
-        (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(10.0000m);
-        var afterBuy = await HoldingAsync(tokens.AccessToken, accountId, instrumentId);
-        afterBuy.Quantity.ShouldBe(3m);
-        afterBuy.Cost.ShouldBe(10.0000m);
-
-        var sell = await PostSecurityAsync(tokens.AccessToken, accountId, "Sell", instrumentId, 1m, custodial: true);
-        sell.StatusCode.ShouldBe(HttpStatusCode.Created);
-
-        (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(13.3333m);
-        var afterSell = await HoldingAsync(tokens.AccessToken, accountId, instrumentId);
-        afterSell.Quantity.ShouldBe(2m);
-        afterSell.Cost.ShouldBe(6.6667m);
-    }
 
     [Test]
     public async Task StockInThenStockOut_MovesQuantityAndCostWithoutCash()
@@ -159,69 +130,6 @@ public class BuySellTests : TestBase
         (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(0m);
     }
 
-    /// <summary>Simulated instruments R13: a served instrument trades on the price its connection stored.</summary>
-    [Test]
-    public async Task CustodialBuy_OfAServedInstrument_UsesThePriceTheMarketDataRunStored()
-    {
-        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
-        var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId, "USD");
-        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "ACME.SIM", "USD");
-        MarketDataHttp.Prices.Answer(MarketDataHttp.Item("ACME.SIM", "USD", 12.5m));
-        (await MarketDataHttp.RunAsync()).Stored.ShouldBe(1);
-        (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 100m, custodial: true)).StatusCode
-            .ShouldBe(HttpStatusCode.Created);
-
-        var buy = await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 4m, custodial: true);
-
-        buy.StatusCode.ShouldBe(HttpStatusCode.Created);
-        (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(50.0000m);
-        var holding = await HoldingAsync(tokens.AccessToken, accountId, instrumentId);
-        holding.Quantity.ShouldBe(4m);
-        holding.Cost.ShouldBe(50.0000m);
-    }
-
-    [Test]
-    public async Task CustodialMissingPrice_Returns400()
-    {
-        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
-        var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId, "USD");
-        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
-        (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 100m, custodial: true)).StatusCode
-            .ShouldBe(HttpStatusCode.Created);
-
-        var buy = await PostSecurityAsync(tokens.AccessToken, accountId, "Buy", instrumentId, 1m, custodial: true);
-        buy.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(100m);
-        (await HoldingCountAsync(tokens.AccessToken, accountId)).ShouldBe(0);
-    }
-
-    [Test]
-    public async Task CustodialMissingFxPair_Returns400_AndAStoredPairSetsTheCashAmount()
-    {
-        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
-        var jpy = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId, "JPY");
-        var eur = await CreateInstrumentAsync(tokens.AccessToken, "EZU", "EUR");
-        await SetPriceAsync(eur, 12m, "EUR");
-        (await PostCashAsync(tokens.AccessToken, jpy, "TransferIn", 1000m, custodial: true)).StatusCode
-            .ShouldBe(HttpStatusCode.Created);
-        (await PostSecurityAsync(tokens.AccessToken, jpy, "Buy", eur, 1m, custodial: true)).StatusCode
-            .ShouldBe(HttpStatusCode.BadRequest);
-        (await CashBalanceAsync(tokens.AccessToken, jpy)).ShouldBe(1000m);
-
-        var nzd = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId, "NZD");
-        var vti = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
-        await SetPriceAsync(vti, 10m, "USD");
-        await SetRateAsync("USD", "NZD", 1.6m);
-        (await PostCashAsync(tokens.AccessToken, nzd, "TransferIn", 100m, custodial: true)).StatusCode
-            .ShouldBe(HttpStatusCode.Created);
-        (await PostSecurityAsync(tokens.AccessToken, nzd, "Buy", vti, 2m, custodial: true)).StatusCode
-            .ShouldBe(HttpStatusCode.Created);
-        (await CashBalanceAsync(tokens.AccessToken, nzd)).ShouldBe(68.0000m);
-        var holding = await HoldingAsync(tokens.AccessToken, nzd, vti);
-        holding.Quantity.ShouldBe(2m);
-        holding.Cost.ShouldBe(20.0000m);
-    }
-
     [Test]
     public async Task SellAndStockOut_AboveTheHolding_Return400()
     {
@@ -328,29 +236,6 @@ public class BuySellTests : TestBase
         })).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         (await PostSecurityAsync(tokens.AccessToken, accountId, "StockIn", instrumentId, 1m)).StatusCode
             .ShouldBe(HttpStatusCode.BadRequest);
-        (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(100m);
-        (await HoldingCountAsync(tokens.AccessToken, accountId)).ShouldBe(0);
-    }
-
-    [Test]
-    public async Task CustodialBuy_WithAPrice_Returns400AndWritesNothing()
-    {
-        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
-        var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId, "USD");
-        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "VTI", "USD");
-        await SetPriceAsync(instrumentId, 10m, "USD");
-        (await PostCashAsync(tokens.AccessToken, accountId, "TransferIn", 100m, custodial: true)).StatusCode
-            .ShouldBe(HttpStatusCode.Created);
-
-        var response = await PostBodyAsync(tokens.AccessToken, new
-        {
-            accountId,
-            type = "Buy",
-            security = new[] { new { instrumentId, quantity = 1m, price = 10m } }
-        });
-
-        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        (await ErrorKeysAsync(response)).ShouldContain("Security[0].Price");
         (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(100m);
         (await HoldingCountAsync(tokens.AccessToken, accountId)).ShouldBe(0);
     }
@@ -526,37 +411,28 @@ public class BuySellTests : TestBase
         return (item.GetProperty("quantity").GetDecimal(), item.GetProperty("cost").GetDecimal());
     }
 
-    /// <summary>A cash body. A Custodial account is booked by the server and takes no <c>bookedAt</c>.</summary>
+    /// <summary>A cash body on an External account.</summary>
     private static Task<HttpResponseMessage> PostCashAsync(
         string accessToken,
         Guid accountId,
         string type,
-        decimal amount,
-        bool custodial = false)
+        decimal amount)
     {
-        // A Custodial account is funded through the bank feed (deposit-matching R35).
-        if (custodial && type == "TransferIn")
-        {
-            return CustodialHttp.FundAsync(accessToken, accountId, amount);
-        }
-
         var body = new Dictionary<string, object?>
         {
             ["accountId"] = accountId,
             ["type"] = type,
-            ["amount"] = amount
+            ["amount"] = amount,
+            ["bookedAt"] = BookedAt
         };
-        if (!custodial)
-        {
-            body["bookedAt"] = BookedAt;
-        }
 
         return TransactionHttp.Send(HttpMethod.Post, "/transactions", accessToken, body, Guid.NewGuid());
     }
 
     /// <summary>
-    /// A security body. A Custodial account is booked by the server and takes no <c>bookedAt</c>; an External
-    /// <c>Buy</c> / <c>Sell</c> carries the executed price (external-caller-numbers R5) and, across currencies, the rate.
+    /// A security body on an External account: a <c>Buy</c> / <c>Sell</c> carries the executed price
+    /// (external-caller-numbers R5) and, across currencies, the rate. A trade on a Custodial account is an order
+    /// (orders R48).
     /// </summary>
     private static Task<HttpResponseMessage> PostSecurityAsync(
         string accessToken,
@@ -566,7 +442,6 @@ public class BuySellTests : TestBase
         decimal quantity,
         decimal? cost = null,
         Guid? key = null,
-        bool custodial = false,
         decimal? price = null,
         decimal? fxRate = null)
     {
@@ -574,6 +449,7 @@ public class BuySellTests : TestBase
         {
             ["accountId"] = accountId,
             ["type"] = type,
+            ["bookedAt"] = BookedAt,
             ["security"] = new[]
             {
                 cost is not null ? new { instrumentId, quantity, cost }
@@ -581,10 +457,6 @@ public class BuySellTests : TestBase
                     : (object)new { instrumentId, quantity }
             }
         };
-        if (!custodial)
-        {
-            body["bookedAt"] = BookedAt;
-        }
 
         if (fxRate is not null)
         {
@@ -646,11 +518,6 @@ public class BuySellTests : TestBase
     {
         return await AccountHttp.OpenAccountAsync(accessToken, customerId, name: type + " " + currency, type: type, currency: currency);
     }
-
-    private static Task<Guid> OpenCustodialAsync(string accessToken, Guid customerId, string currency) =>
-        AccountHttp.OpenAccountAsync(
-            accessToken, customerId, name: "Custodial " + currency, type: "Brokerage", currency: currency,
-            custodyMode: "Custodial");
 
     private static async Task<Guid> CreateInstrumentAsync(string accessToken, string symbol, string quoteCurrency)
     {

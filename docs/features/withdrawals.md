@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-20
-last_updated: 2026-11-22
+last_updated: 2026-11-23
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -809,3 +809,17 @@ Status of this amendment: `accepted` (2026-11-22), together with [account-closur
 Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rule R28 lives there; this section records what changes here.
 
 - R36: no rule changes. The net of an interest posting is never negative, so it only raises available cash; the portfolio trade lock does not apply to it and no rebalance is enqueued.
+
+---
+
+## Amendment 2026-11-23 (orders and settlement) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R39, R44 and R45 live there; this section records what changes here.
+
+- R21: the amount must not be more than the Account's **withdrawable cash** (available cash minus unsettled cash, never below 0) when the request is made; otherwise 400 `errors.Amount` with the message `The account's withdrawable cash is 120.00 USD. 500.00 USD is from sales that have not settled.` With no unsettled cash the rule and its message are as before.
+- R35: reserved cash is the sum of the open withdrawals plus the reserved cash of the Account's live buy orders (orders R39).
+- R36: unchanged in words. It now also bounds a buy order when it is placed (orders R12), and a buy fill is checked with its own order's reservation recomputed (orders R36). The payout stays the only exempt write.
+- R37: the message reads `Available cash cannot become negative: 1055.25 USD is reserved for withdrawals and orders.`
+- The account item ([accounts.md](accounts.md)) gains `unsettledCash` and `withdrawableCash` next to `reservedCash` and `availableCash` (orders R44).
+- R29, R40: approve and the payout check no cash, as before; unsettled cash is checked only when the withdrawal is requested.
+- §2 Out: "Settled versus unsettled cash (O2)" and "Buy orders and their reservations (O1)" are no longer out; they are [orders.md](orders.md).

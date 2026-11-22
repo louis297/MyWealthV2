@@ -1,11 +1,11 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router";
-import { Messages, Muted, Page, PageHeading, SelectField, TextField } from "@/components/portal";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { Messages, Muted, Page, PageHeading, recordLinkClass, SelectField, TextField } from "@/components/portal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { SelectItem } from "@/components/ui/select";
 import { useGetAccountHoldingsQuery, useGetAccountQuery } from "@/features/accounts/accountsApi";
-import { allowsManualEntry, bookedWhenPosted, isCustodial } from "@/features/accounts/custodyRules";
+import { allowsManualEntry, isCustodial } from "@/features/accounts/custodyRules";
 import { useGetAccountPortfolioQuery } from "@/features/portfolios/portfoliosApi";
 import { useGetInstrumentsQuery } from "@/features/instruments/instrumentsApi";
 import { useCreateTransactionMutation } from "@/features/transactions/transactionsApi";
@@ -121,7 +121,7 @@ export function CreateTransactionPage() {
     }
 
     const trimmedMemo = memo.trim();
-    const booking = custodial ? {} : { bookedAt: toUtcIso(bookedAt) };
+    const booking = { bookedAt: toUtcIso(bookedAt) };
     if (isCashType(type)) {
       const signError = cashSignError(type, Number(amount));
       if (signError) {
@@ -194,6 +194,21 @@ export function CreateTransactionPage() {
 
   if (isNotFound(account.error)) {
     return <Muted>Not found</Muted>;
+  }
+
+  // D69 (orders R48, R51): a person types no transaction on a Custodial account; a trade there is an order.
+  if (account.data && custodial) {
+    return (
+      <Page className="max-w-lg">
+        <PageHeading title="New transaction" />
+        <p className="text-sm">Trades on a Custodial account go through the broker.</p>
+        {account.data.status === "Open" ? (
+          <Link to={`/accounts/${account.data.id}/order`} className={recordLinkClass}>
+            Place an order
+          </Link>
+        ) : null}
+      </Page>
+    );
   }
 
   return (
@@ -298,11 +313,6 @@ export function CreateTransactionPage() {
                         ) : null}
                       </>
                     ) : null}
-                    {pricedType && custodial ? (
-                      <p className="text-sm text-muted-foreground">
-                        Brokerage is added by the server from the trade fee schedule.
-                      </p>
-                    ) : null}
                     {type === "StockIn" ? (
                       <TextField
                         id="transaction-cost"
@@ -314,18 +324,14 @@ export function CreateTransactionPage() {
                     ) : null}
                   </>
                 )}
-                {custodial ? (
-                  <Muted>{bookedWhenPosted}</Muted>
-                ) : (
-                  <TextField
-                    id="transaction-booked-at"
-                    label="Booked at"
-                    type="datetime-local"
-                    value={bookedAt}
-                    onChange={(event) => setBookedAt(event.target.value)}
-                    required
-                  />
-                )}
+                <TextField
+                  id="transaction-booked-at"
+                  label="Booked at"
+                  type="datetime-local"
+                  value={bookedAt}
+                  onChange={(event) => setBookedAt(event.target.value)}
+                  required
+                />
                 <Button type="submit">Post transaction</Button>
               </>
             )}

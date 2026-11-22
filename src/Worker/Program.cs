@@ -6,6 +6,7 @@ using MyWealthV2.Application.Fx;
 using MyWealthV2.Application.MarketData;
 using MyWealthV2.Domain.MarketData;
 using MyWealthV2.Infrastructure.BankFeed;
+using MyWealthV2.Infrastructure.Broker;
 using MyWealthV2.Infrastructure.BankReconciliations;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Schema;
@@ -24,6 +25,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.AddInfrastructureServices();
 builder.AddBankConnections(BankConnectionHost.Worker);
+builder.AddBrokerConnections(BrokerConnectionHost.Worker);
 builder.AddMarketDataConnections(MarketDataHost.Worker);
 builder.Services.AddScoped<IUser, SystemUser>();
 builder.Services.AddScoped<OutboxProcessor>();
@@ -38,7 +40,7 @@ builder.Services.AddScoped(sp => new InstrumentPriceSyncJob(
     sp.GetRequiredService<ILogger<InstrumentPriceSyncJob>>()));
 builder.Services.AddHangfireServer(options =>
 {
-    options.Queues = ["reports", "rebalance", "outbox", "fx", "prices", BankStatementRecurringJob.Queue, InterestRunJob.Queue, MarketDataRecurringJob.Queue];
+    options.Queues = ["reports", "rebalance", "outbox", "fx", "prices", BankStatementRecurringJob.Queue, InterestRunJob.Queue, MarketDataRecurringJob.Queue, BrokerSyncRecurringJob.Queue];
 });
 
 var app = builder.Build();
@@ -62,6 +64,10 @@ BankStatementRecurringJob.Register(
     app.Services.GetRequiredService<IRecurringJobManager>(),
     app.Services.GetRequiredService<JobStorage>(),
     app.Services.GetRequiredService<ConfiguredBankConnections>());
+BrokerSyncRecurringJob.Register(
+    app.Services.GetRequiredService<IRecurringJobManager>(),
+    app.Services.GetRequiredService<JobStorage>(),
+    app.Services.GetRequiredService<ConfiguredBrokerConnections>());
 MarketDataRecurringJob.Register(
     app.Services.GetRequiredService<IRecurringJobManager>(),
     app.Services.GetRequiredService<JobStorage>(),

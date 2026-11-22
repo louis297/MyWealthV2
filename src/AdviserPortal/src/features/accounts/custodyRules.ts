@@ -10,6 +10,9 @@ const refusedOnCustodial: ReadonlySet<string> = new Set([
   // D53 (account-closure R23): the account closure writes off a remainder.
   "CloseOut",
   "Interest",
+  // D69 (orders R48): a trade on a Custodial account is an order.
+  "Buy",
+  "Sell",
   "Opening",
   "OpeningHoldings",
   "StockIn",

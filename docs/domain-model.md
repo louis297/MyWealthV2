@@ -3,7 +3,7 @@ title: Domain model
 status: accepted
 language: en
 created: 2026-09-11
-updated: 2026-11-22
+updated: 2026-11-23
 related:
   - README.md
   - glossary.md
@@ -107,6 +107,7 @@ Authorization (named policies, `RolePermissions`, handler scope checks) is not a
 - `RowVersion` conflict → HTTP 409.
 - `Rename` changes `Name` (non-empty; uniqueness is application). `Enable` / `Disable` flip `IsActive` and raise `TenantEnabled` / `TenantDisabled` only when the flag actually changes. `Create` raises `TenantCreated`.
 - (tenant custody modes) A Tenant has **allowed custody modes**, `External`, `Custodial` or both, never none. `Create` allows both and keeps its signature. `SetAllowedCustodyModes` replaces the set and refuses an empty one; `Allows(CustodyMode)` reads it. No event. An account is opened only in a mode its Tenant allows at the time of open; Application holds that check, and narrowing the setting changes no existing account ([features/tenant-custody-modes.md](features/tenant-custody-modes.md)).
+- (orders) A Tenant may name a **broker connection** (`BrokerConnection`, a name from configuration, or none). `SetBrokerConnection(name)` sets it; it is not cleared. An order keeps the connection it was placed on ([features/orders.md](features/orders.md) R3).
 
 ### 4.2 Person
 
@@ -325,6 +326,7 @@ Close requires cash `SUM = 0` and no `Holdings` rows ([features/holdings.md](fea
 
 - (Account closure) A Custodial account is closed only by an `AccountClosure` (§8.13); the plain close is refused for it in Application. While a closure is `InProgress` the Account is **closing**: it stays Open but accepts no hand write and no portfolio assignment, and deposit matching sends its receipts to suspense ([features/account-closure.md](features/account-closure.md)).
 - (Interest run) An Account has `InterestAccruedThrough` (`DateOnly?`): the last UTC day its daily accrual was worked out for. `MarkInterestAccrued(through)` only moves it forward and is refused on an External account. Only Open Custodial accounts that are not closing are accrued (§8.14, [features/interest-run.md](features/interest-run.md)).
+- (Orders) Reserved cash of a Custodial account also counts its live buy orders, each for the most that what is left of it can still cost. A holding has a **reserved quantity** (live sell orders) and an **available quantity**. **Unsettled cash** is the net cash of posted sell fills that are not settled; **withdrawable cash** is available cash minus unsettled cash, never below 0, and is what a withdrawal, a transfer out or a conversion out may take (`AvailableCash.Withdrawable`, `AvailableQuantity`). None of these is stored on the Account. A Custodial account with a live order or an unsettled fill is not closed and gets no portfolio assignment while the order is live ([features/orders.md](features/orders.md) R39–R47, R49).
 
 ### 8.6 Transaction (accepted — posting slice; landed)
 
@@ -368,6 +370,7 @@ Invariants:
 - (Account closure) Source kind `AccountClosure` (5) has the closure's PublicId as its id and is not hand-reversible. `PostRemainderWriteOff` builds the remainder write-off: one `Principal` `CloseOut` cash leg of minus the cash `SUM`, where `0 < SUM <` one minor unit, source `AccountClosure`. On a Custodial account no person enters a `CloseOut` (`CustodyRules`).
 - (Interest run) Source kind `InterestRun` (6) has the run's PublicId as its id and is not hand-reversible. `PostInterest` builds an interest posting: one `Principal` `Interest` cash leg of `+gross` (the accrued amount rounded to the minor unit, above 0), a `Tax` cash leg of `−tax` with its tax detail when the withholding tax is above 0, and an interest detail; source `InterestRun`. A cash leg has a tax detail if and only if its role is `Tax`; every factory other than `PostInterest` and `Reverse` refuses a `Tax` leg. `Reverse` copies the `Tax` leg, its tax detail and the interest detail. On a Custodial account no person enters an `Interest` (`CustodyRules`, unchanged) ([features/interest-run.md](features/interest-run.md)).
 - (Corporate actions) Source kind `CorporateAction` (7) has the corporate action's PublicId as its id and is not hand-reversible. `PostCorporateAction` builds an entitlement posting: type `Split` (split or consolidation) or `Bonus`, one security leg of `quantityAfter − quantityBefore` with cost `0` in the quote currency, no cash leg, source `CorporateAction`, and a corporate action detail (`TransactionCorporateActionDetail`: kind, ratio, ex-date, record date, payment date, quantity before and after; 0..1 per Transaction, copied by `Reverse`). It refuses another source kind and a `quantityAfter` that is 0 or equal to `quantityBefore`. It is built outside the manual entry matrix; on a Custodial account a hand `Split`, `Bonus` or `Scrip` stays refused.
+- (Orders) Source kind `OrderFill` (8) has the order's PublicId as its id and is not hand-reversible. A fill is posted with `PostBuy` / `PostSell` at the broker's price, with the fee of its order and an execution detail (`TransactionExecutionDetail`: the fill's PublicId, price, trade date, settlement date, broker reference; 0..1 per Transaction, required with source `OrderFill` and refused with any other, copied by `Reverse`). The legs and the cost rules are those of any `Buy` / `Sell`. On a Custodial account a hand `Buy` or `Sell` is refused by `CustodyRules`; rebalance still builds them with source `Rebalance`.
 
 Field rules: [features/posting.md](features/posting.md), [features/holdings.md](features/holdings.md), [features/buy-sell.md](features/buy-sell.md), [features/split.md](features/split.md), [features/leg-accounts.md](features/leg-accounts.md), and [features/adjustments.md](features/adjustments.md).
 
@@ -486,6 +489,21 @@ Invariants: an `(Account, day)` has at most one accrual row, never after the acc
 
 Invariants: a `Feed` action is unique per (Instrument, connection, party action id); a live `Manual` action per (Instrument, kind, ex-date); an account has at most one entitlement per action; an entitlement is `Posted` iff it has a Transaction with source `CorporateAction`; an entitlement posting never changes a holding's total cost. Field rules: [features/corporate-actions.md](features/corporate-actions.md).
 
+### 8.16 Orders and execution reports (accepted — orders slice)
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `Order` | Aggregate | An instruction to buy or sell a quantity of one Instrument for one Custodial account at the Tenant's broker: side, `Market`, `Day`, quantity, reference price and its date, price limit, the trade fee schedule of the day it was placed, the broker connection, status, filled quantity, posted gross and charged fee, what it reserves, the send attempts, a cancel request, how it ended. `Place`, `Accept`, `Reject`, `RecordFailure`, `CancelUnsent`, `RequestCancel`, `AnswerCancel`, `EndAsUnknown`, `AddFill`, `End`, `RecordPostedFill`. Open while `Placed`, `Working` or `PartlyFilled`; live while open or with a fill not posted |
+| `OrderFill` | Entity (child of `Order`) | One fill the broker reported: quantity, price, trade date, settlement date, broker reference. `Pending` (with a hold reason when it cannot be posted yet) then `Posted` with its Transaction and net cash, once. `Settle(date, at)` once |
+| `OrderSide`, `OrderType`, `TimeInForce` | Enums | `Buy`, `Sell`; `Market`; `Day` |
+| `OrderStatus`, `OrderRejectReason` | Enums | `Placed`, `Working`, `PartlyFilled`, `Filled`, `Cancelled`, `Rejected`, `Expired`; `UnknownInstrument`, `InvalidOrder`, `MarketClosed`, `Refused` |
+| `OrderFillStatus`, `FillHoldReason` | Enums | `Pending`, `Posted`; `InsufficientCash`, `InsufficientHolding`, `AccountClosed`, `NoFxRate` |
+| `OrderRules` | Static | `CollarPercent = 5`, `ReferencePriceMaxAgeDays = 4`; `PriceLimit(side, referencePrice)`; `MaximumGross(quantity, priceLimit)` |
+| `ExecutionReport` | Aggregate (platform data) | One thing a broker says about one order, unique per (connection, outside id): kind (`Fill`, `Cancelled`, `Expired`, `Settled`, or none when unknown), client order id and the kind's fields. `Received`, then `Processed` or `Skipped` with a reason (`UnsupportedKind`, `UnknownOrder`, `UnknownFill`, `Overfill`, `Repeated`) |
+| `BrokerFeed` | Entity (platform data) | One per broker connection: the feed cursor, last success, last failure (`BrokerFailure`) |
+
+Invariants: a report is the source of at most one fill; an order's filled quantity never exceeds its quantity; a fill is `Posted` iff it has a Transaction with source `OrderFill`, its order's PublicId and an execution detail naming the fill; a buy order reserves `Round(q × PriceLimit, 4)` plus the schedule's fee on the posted gross with that amount added, minus the fee charged, and a sell order reserves `q`, with `q` the open quantity plus the fills not posted; the fee of a fill is the schedule's fee on the posted gross including it, minus the fee charged. Field rules: [features/orders.md](features/orders.md).
+
 ---
 
 ## 9. Value objects (Domain assembly; may exist in Phase 1)
@@ -546,6 +564,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-22 | Interest run accepted: `CustomerTaxProfile`, `WithholdingRates`, `InterestRateSchedule`, `InterestAccrual`, `InterestRun` and their enums (§8.14); `Account.InterestAccruedThrough` (§8.5); cash leg role `Tax`, `TransactionTaxDetail`, `TransactionInterestDetail`, source kind `InterestRun` and `PostInterest` (§8.6); statement line kind (§8.9); three reconciliation item kinds (§8.12). [features/interest-run.md](features/interest-run.md) |
 | 2026-11-22 | Simulated instruments accepted: `MarketDataConnection`, `MarketDataConnections`, `MarketDataFeed`, `MarketDataFeedKind`, `MarketDataFailure` (§8.4). `Instrument` unchanged. [features/simulated-instruments.md](features/simulated-instruments.md) |
 | 2026-11-22 | Corporate actions accepted: `CorporateAction`, `CorporateActionRatio`, `CorporateActionEntitlement`, `CorporateActionAnnouncement` and their enums (§8.15); source kind `CorporateAction`, `TransactionCorporateActionDetail` and `PostCorporateAction` (§8.6); `MarketDataFeedKind.CorporateActions` (§8.4). [features/corporate-actions.md](features/corporate-actions.md) |
+| 2026-11-23 | Orders and settlement accepted: `Order`, `OrderFill`, `OrderRules`, `ExecutionReport`, `BrokerFeed` and their enums (§8.16); source kind `OrderFill`, `TransactionExecutionDetail` and `PostBuy` / `PostSell` with it (§8.6); reserved quantity, unsettled and withdrawable cash (§8.5); `Tenant.BrokerConnection` (§4.1). [features/orders.md](features/orders.md) |
 
 ---
 

@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-13
-last_updated: 2026-11-20
+last_updated: 2026-11-23
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -395,3 +395,14 @@ Status of this amendment: `accepted` (2026-11-20), together with [client-money-a
 - §2 Out "per-tenant currency allow-lists" still holds: `clientMoneyCurrencies` is read from the client money accounts, not a setting, and it limits only the currency of a new Custodial account (client-money-accounts R11).
 - Disabling or enabling the Tenant does not touch its client money accounts.
 
+---
+
+## Amendment 2026-11-23 (orders and settlement) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rule R3 lives there; this section records what changes here.
+
+- §8.1: the item on list, get-by-id and by-code carries `brokerConnection`: the name of the Tenant's broker connection, or `null`.
+- §8.3: `POST /tenants` and `PUT /tenants/{id}` take an optional `brokerConnection`, a name configured on `webapi`; unknown → 400 `errors.BrokerConnection` (`Unknown broker connection.`). Omitted or `null` on PUT leaves the setting unchanged. It cannot be cleared in this slice.
+- §5: `Tenant.BrokerConnection` (`null` or a name) and `SetBrokerConnection(name)`. `Create` keeps its signature and sets none.
+- §6: script `0051_orders.sql` adds `Tenants.BrokerConnection nvarchar(50) NULL` and sets `simulator` on every existing row (roadmap D19).
+- A Tenant with no broker connection, or with one that is not configured on `webapi`, can place no order (orders R7). Changing it routes only new orders. Disabling or enabling the Tenant does not touch it.

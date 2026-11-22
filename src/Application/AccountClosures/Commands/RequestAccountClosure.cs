@@ -72,6 +72,8 @@ public class RequestAccountClosureCommandHandler(
 {
     public const string ExternalMessage = "Only a Custodial account is closed with an account closure.";
     public const string InProgressMessage = "This account is already being closed.";
+    public const string LiveOrderMessage = "Open orders must be filled, cancelled or expired before the account can be closed.";
+    public const string UnsettledFillMessage = "Trades must settle before the account can be closed.";
     public const string OpenWithdrawalMessage =
         "Open withdrawals must be paid, rejected or cancelled before the account can be closed.";
     public const string AssignmentMessage = "Unassign the portfolio before closing the account.";
@@ -175,6 +177,19 @@ public class RequestAccountClosureCommandHandler(
                 row => row.AccountId == account.Id && row.Status == AssignmentStatus.Active, cancellationToken))
         {
             throw Error(nameof(RequestAccountClosureCommand.AccountId), AssignmentMessage);
+        }
+
+        // Orders R47: a live order (open, or with a fill not posted yet) and a fill that has not settled both wait.
+        if (await Orders.OrderReservations.HasLiveOrderAsync(db, account.Id, cancellationToken))
+        {
+            throw Error(nameof(RequestAccountClosureCommand.AccountId), LiveOrderMessage);
+        }
+
+        if (await db.OrderFills.AnyAsync(
+                fill => fill.SettledAt == null && db.Orders.Any(row => row.Id == fill.OrderId && row.AccountId == account.Id),
+                cancellationToken))
+        {
+            throw Error(nameof(RequestAccountClosureCommand.AccountId), UnsettledFillMessage);
         }
 
         // R6: the closure does not sell or move holdings.

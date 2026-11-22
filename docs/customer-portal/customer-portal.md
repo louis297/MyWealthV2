@@ -4,7 +4,7 @@ status: accepted
 phase: 3
 language: en
 created: 2026-11-02
-updated: 2026-11-22
+updated: 2026-11-23
 related:
   - README.md
   - ../adviser-portal/frontend-conventions.md
@@ -316,3 +316,16 @@ Status of this amendment: `accepted` (2026-11-22), together with [corporate-acti
 | ID | Given | When | Then |
 | --- | --- | --- | --- |
 | C31 | A Customer with an entitlement posting | Account page activity | The row is labelled "Share split 2 for 1", "Share consolidation 1 for 10" or "Bonus issue 1 for 5", with "<quantityBefore> → <quantityAfter> shares" and "Ex-date <exDate>". No cash amount. A hand-entered `Split` on an External account keeps today's row. |
+
+---
+
+## Amendment 2026-11-23 (orders and settlement) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [orders](../features/orders.md). The Customer Portal reads the Customer's own orders, the transaction item's `execution`, the account item's `unsettledCash` and `withdrawableCash`, and the holding item's `reservedQuantity`. It stays read-only: a Customer places and cancels no order (roadmap D6). The Customer Portal BFF gains the prefix `/orders` ([bff-customer-portal](../features/bff-customer-portal.md) amendment 2026-11-23).
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| C32 | A Customer with an open order | Account page | An "Orders" block from `GET /orders?accountId=` lists open orders and those that ended in the last 30 days: "Buy 10 ACME.SIM", the status label of D71 in the Customer's words (Placed and Working "With the broker", PartlyFilled "Partly filled (4 of 10)", Filled "Done", Cancelled "Cancelled", Rejected "Not accepted", Expired "Expired") and the placed date. No action. |
+| C33 | A Custodial account with unsettled or reserved cash | Account page cash block | "Cash", "Reserved" (when not 0), "From sales, not settled yet" (when not 0) and "Available to withdraw" from `withdrawableCash`. |
+| C34 | A Customer with a fill | Account page activity | The row is labelled "Bought 4 ACME.SIM at 100.12" or "Sold …", with the trade date, "Settles 25 Nov" or "Settled", and the contract note. A trade that is not a fill keeps today's row. |
+| C35 | A holding with a reserved quantity | Holdings | "<n> reserved for a sell order" under the quantity. |

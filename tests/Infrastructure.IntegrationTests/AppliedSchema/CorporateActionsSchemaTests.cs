@@ -206,7 +206,7 @@ public class CorporateActionsSchemaTests
     }
 
     [Test]
-    public async Task SourceKind7_NeedsASourcePublicId_And8Violates()
+    public async Task SourceKind7_NeedsASourcePublicId_And9Violates()
     {
         (await RunAsync($"""
             {World()}
@@ -221,12 +221,12 @@ public class CorporateActionsSchemaTests
         noId.Number.ShouldBe(547);
         noId.Message.ShouldContain("CK_Transactions_SourcePublicId");
 
-        var eight = await Should.ThrowAsync<SqlException>(() => RunAsync($"""
+        var nine = await Should.ThrowAsync<SqlException>(() => RunAsync($"""
             {World()}
-            {InsertTransaction(8, "NEWID()")}
+            {InsertTransaction(9, "NEWID()")}
             """));
-        eight.Number.ShouldBe(547);
-        eight.Message.ShouldContain("CK_Transactions_SourceKind");
+        nine.Number.ShouldBe(547);
+        nine.Message.ShouldContain("CK_Transactions_SourceKind");
     }
 
     [Test]

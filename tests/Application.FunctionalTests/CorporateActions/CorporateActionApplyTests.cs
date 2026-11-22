@@ -102,8 +102,7 @@ public class CorporateActionApplyTests : TestBase
         var world = await NominatedWorld.CreateAsync();
         var holders = await HoldersAsync(world);
         var id = await ApplyNowAsync(world, CreateBody(holders.InstrumentId, ratioNew: 2, exDate: Today));
-        (await CustodialHttp.PostAsync(world.TenantAdmin.AccessToken, CustodialHttp.Trade(holders.Empty, "Buy", holders.InstrumentId, 2m)))
-            .StatusCode.ShouldBe(HttpStatusCode.Created);
+        await CustodialHttp.InsertManualTradeAsync(holders.Empty, "Buy", holders.InstrumentId, 2m);
 
         await RunApplyAsync();
 
@@ -117,8 +116,7 @@ public class CorporateActionApplyTests : TestBase
         var world = await NominatedWorld.CreateAsync();
         var holders = await HoldersAsync(world);
         var id = await ApplyNowAsync(world, CreateBody(holders.InstrumentId, ratioNew: 2, exDate: Today));
-        (await CustodialHttp.PostAsync(world.TenantAdmin.AccessToken, CustodialHttp.Trade(holders.Olga, "Sell", holders.InstrumentId, 10m)))
-            .StatusCode.ShouldBe(HttpStatusCode.Created);
+        await CustodialHttp.InsertManualTradeAsync(holders.Olga, "Sell", holders.InstrumentId, 10m);
 
         var outcome = await RunApplyAsync();
 

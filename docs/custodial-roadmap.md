@@ -3,7 +3,7 @@ title: Custodial accounts roadmap
 status: note
 language: en
 created: 2026-11-19
-updated: 2026-11-22
+updated: 2026-11-23
 related:
   - future-plans.md
   - adr/0020-account-custody-mode.md
@@ -34,6 +34,7 @@ related:
   - features/interest-run.md
   - features/simulated-instruments.md
   - features/corporate-actions.md
+  - features/orders.md
 ---
 
 # Custodial accounts roadmap
@@ -90,7 +91,7 @@ The manual entry matrix at the end of the plan. The External column stays as tod
 | `TransferIn` | refused (from deposit matching, landed 2026-11-20) | refused | Deposit matching (B4) |
 | `TransferOut` | refused (from withdrawals, landed 2026-11-21) | refused | Withdrawal (B6) |
 | `CloseOut` | refused (from account closure, landed 2026-11-22) | refused | Account closure (B8) |
-| `Buy` / `Sell` | allowed, filled at once | refused | Order fills (O1); rebalance through orders (O3) |
+| `Buy` / `Sell` | refused (from orders, landed 2026-11-23) | refused | Order fills (O1); rebalance through orders (O3) |
 | `InternalTransfer` | allowed, same Customer only (D14, from withdrawals, landed 2026-11-21) | allowed, same Customer only (D14) | Hand entry |
 | `FxConversion` | allowed, both Custodial | allowed (later through an outside FX party, O5) | Hand entry |
 | `Interest` | refused (written by the interest run, landed 2026-11-22) | refused | Interest run (I2) |
@@ -318,11 +319,13 @@ The event belongs to the instrument, not to an account. The platform computes ea
 - **Prices:** the server price on today's immediate trade is no longer used for Custodial fills; the estimate for the reservation still uses the latest close.
 - **Simulator:** S2 broker and exchange.
 - **Depends on:** F1, F2, B6 (available cash).
+- **Spec:** O1, O2 and S2 are one spec, [orders.md](features/orders.md) (accepted and landed 2026-11-23). Its §11 decides, every point as recommended: a broker connection in configuration, named by the Tenant and kept on the order; ports `IBrokerOrders` (place, cancel) and `IBrokerFeed`, with one feed of execution reports per connection (`Fill`, `Cancelled`, `Expired`, `Settled`) stored as platform data and an order named by its PublicId; `Market` and `Day` orders by quantity, with no draft and no second approval (drafts come with O3); a price limit of 5 % around the reference price, set by the platform, so a buy reserves the most it can cost and no fill costs more (this refines "the estimated cash"); a reference price at most 4 days old; each fill one `Buy` or `Sell` with source `OrderFill`, the order's PublicId as source id and an execution detail; the trade fee charged on the order across its fills, from the schedule of the day it was placed; a fill that cannot be posted waits and is tried again on every run; a fill of an ended order is still booked; cancelling at once before the first send, otherwise a request the broker answers; no broken trade and no flow that reverses a fill yet (step 11b in §13, as 6b was); an order and a portfolio assignment never on one account, with rebalance unchanged until O3; a corporate action that takes effect ends the open orders in its instrument; hand `Buy` / `Sell` refused on a Custodial account for every caller.
 
 ### O2. Settlement
 
 - **What:** fills settle on their settlement date (T+2 for NZX and ASX, T+1 for US shares; check when specified). Cash from a sale is in the balance from the trade date but available to withdraw only after settlement. Settlement is confirmed by a signal from the broker or custodian, not by the platform's calendar (D9).
 - **Depends on:** O1.
+- **Spec:** [orders.md](features/orders.md) (accepted and landed 2026-11-23), with O1. Its §11 decides: the platform holds no settlement cycle or calendar, and stores the trade date and settlement date the broker sends (this answers "check when specified": the cycle is the party's); a fill settles when the broker's `Settled` report names it, with no ledger write; unsettled cash is the net proceeds of sell fills not settled yet, with unsettled buys not netted; withdrawable cash is available cash minus unsettled cash; a withdrawal and the from side of an internal transfer or an FX conversion need withdrawable cash, while orders, adjustments and rebalance use available cash; an account closure waits for open orders and unsettled fills. Paying and receiving settlement cash through the client money account, and its bank reconciliation, is a later step (11b in §13); until then trades stay the known difference `Trades` of B7.
 
 ### O3. Rebalance through orders
 
@@ -406,6 +409,8 @@ The receipts side (the first two rows, without recalls) is in [deposit-matching.
 
 Accept, reject, partly fill, fill, cancel, expire an order; fill price from its price source with a configurable slippage; contract note; settlement on the settlement date; a broken trade after a fill.
 
+The party is the **simulator broker**, in [orders.md](features/orders.md) (accepted and landed 2026-11-23) §4.10: an order route idempotent on the platform's client order id, an order mode (fill with a percentage, hold, reject), fill and cancel of a working order by the operator, a cancel route, a fill price from the simulator market for a simulated instrument and from the order's reference price for any other (D11; simulator §11 point 8), a seeded slippage, expiry at the end of the simulator day, settlement after a number of weekdays when the clock reaches the settlement date, working orders cancelled when a corporate action takes effect, and every fill, cancellation, expiry and settlement as a report on one feed. The contract note is a number on the fill. It checks no position and no cash. A broken trade is not in that spec (step 11b in §13), and it adds no scenario library.
+
 ### S3. Custodian and registry (with T1, T3)
 
 Daily holding statement per instrument; in-kind transfer arrival and departure; a position that disagrees with the platform.
@@ -443,7 +448,7 @@ Each question has a status. Decided items were confirmed in discussion on 2026-1
 | D17 | How are the platform's calls to the simulator protected? (from D10) | **Decided:** the feed, payment and order routes listen only on the internal network and are not routed by Caddy, and the platform calls them with a machine credential. Only the control pages go through Caddy, behind the sign-in of D16. | S0 |
 | D18 | Where is the manual "run for a date" trigger of date-driven platform jobs available? (from D9, D10) | **Decided:** (b) on production and (c) in Development. This concerns jobs whose result depends on a business date or period (the interest run, later the advisory fee accrual), not the price, FX or outbox jobs. The platform keeps the real clock, so a month-end run would otherwise wait for the real month end. The trigger is a SystemAdmin route on `webapi` in every environment, not a simulator action. The command refuses an as-of date after today unless a configuration option allows future dates. The option is off by default and on in the Development settings. The rule reads the option, not the environment name, so functional tests can cover both settings. A host outside Development with the option on fails at startup, before it listens (as `SystemAdminBootstrap` does with bad configuration). Every date-driven job is idempotent per (Account, period) whatever the option: a catch-up run and the scheduled run can meet the same period. Rejected: (a) Development only, because production needs catch-up after a missed run; (c) on production, because it posts periods that have not happened. Refined by [interest-run.md](features/interest-run.md) R32 (accepted 2026-11-22): the as-of date is at most yesterday (UTC), not today, because today's closing balance does not exist yet; the option is `Interest:AllowFutureAsOfDates`. | I2 |
 | D19 | Is the simulator one tenant's outside world or every tenant's? | **Decided:** every tenant's, because the deployment is a showcase. Every client money account (B1) points at the simulator bank. Revisit before a real launch. | B1, S1 |
-| D20 | An order in an instrument whose quote currency differs from the account's currency (from D13) | **Decided:** refuse it for now. The Customer opens a Custodial account in the quote currency and converts first. Automatic FX at the fill (as buy-sell R12 does today) is revisited with multi-currency cash (future-plans §5). | O1 |
+| D20 | An order in an instrument whose quote currency differs from the account's currency (from D13) | **Decided:** refuse it for now. The Customer opens a Custodial account in the quote currency and converts first. Automatic FX at the fill (as buy-sell R12 does today) is revisited with multi-currency cash (future-plans §5). Refined by [orders.md](features/orders.md) R9 and R34 (accepted 2026-11-23, §11 point 7): a buy order is refused as decided here; a sell order is allowed and converted at the reference rate when its fill is posted, so that a holding in another currency that a rebalance or an earlier hand trade left on a Custodial account can still be sold. | O1 |
 
 ---
 
@@ -466,7 +471,8 @@ Each step depends only on earlier steps. "Closes" names the matrix cell or known
 | 9 | I1 tax profile, I2 interest run | S1 trust interest | "No interest" | [interest-run](features/interest-run.md) | accepted 2026-11-22, landed 2026-11-22 |
 | 10a | D11 simulated instruments and their prices | S4 data vendor | — | [simulated-instruments](features/simulated-instruments.md) | accepted 2026-11-22, landed 2026-11-22 |
 | 10b | C1 corporate actions (split, consolidation, bonus) | S4 issuer | "A split cannot be recorded" | [corporate-actions](features/corporate-actions.md) | accepted 2026-11-22, landed 2026-11-22 |
-| 11 | O1 orders, O2 settlement | S2 | Immediate `Buy` / `Sell` | — | not started |
+| 11 | O1 orders, O2 settlement | S2 | Immediate `Buy` / `Sell` | [orders](features/orders.md) | accepted 2026-11-23, landed 2026-11-23 |
+| 11b | O1 / O2 remainder: settlement cash through the client money account and its reconciliation; a broken trade after a fill | S2 broken trade, S1 | The known difference `Trades` of B7 | — | not started |
 | 12 | O3 rebalance through orders | S2 | — | — | not started |
 | 13 | T2 migration batch | — | "No opening balance" | — | not started |
 | 14 | T1 in-kind transfer, T3 custodian reconciliation | S3 | "Existing positions cannot be moved in" | — | not started |
@@ -484,12 +490,12 @@ Steps 9, 10 (10a, then 10b) and 13 do not depend on each other or on the bank st
 | [custody-modes.md](features/custody-modes.md) | Each flow changes one cell of the matrix (R5) and the reverse rule | F, B, C, O, T |
 | [known-issues/custodial-account-gaps.md](known-issues/custodial-account-gaps.md) | Remove one row per closed gap | B, I, C, O, T |
 | [posting.md](features/posting.md) | Source on the Transaction; §1 clarified for instructions (D3); available cash | F, B |
-| [portfolios.md](features/portfolios.md) | Trade lock does not apply to corporate actions (amended by [corporate-actions.md](features/corporate-actions.md), accepted 2026-11-22); rebalance through orders | C, O |
-| [buy-sell.md](features/buy-sell.md), [trade-fees.md](features/trade-fees.md) | Custodial trades come from fills; fee schedule unchanged | O |
+| [portfolios.md](features/portfolios.md) | Trade lock does not apply to corporate actions (amended by [corporate-actions.md](features/corporate-actions.md), accepted 2026-11-22); an order is refused on an assigned account, and an assignment on an account with a live order (amended by [orders.md](features/orders.md), accepted 2026-11-23); rebalance through orders | C, O |
+| [buy-sell.md](features/buy-sell.md), [trade-fees.md](features/trade-fees.md) | Custodial trades come from fills; the fee schedule is unchanged, and an order is charged once across its fills from the schedule of the day it was placed (amended by [orders.md](features/orders.md), accepted 2026-11-23) | O |
 | [split.md](features/split.md), [holdings.md](features/holdings.md) | Corporate actions replace hand entry on Custodial accounts (amended by [corporate-actions.md](features/corporate-actions.md), accepted 2026-11-22) | C |
 | [instrument-prices.md](features/instrument-prices.md) | Prices of simulated instruments come from the simulator (D11; amended by [simulated-instruments.md](features/simulated-instruments.md), accepted 2026-11-22) | S, O |
 | [internal-transfers.md](features/internal-transfers.md) | Same Customer only on Custodial accounts (D14) | B |
-| [accounts.md](features/accounts.md), [customers.md](features/customers.md), [tenants.md](features/tenants.md) | Deposit reference, nominated bank account, tax profile, client money accounts | B, I |
+| [accounts.md](features/accounts.md), [customers.md](features/customers.md), [tenants.md](features/tenants.md) | Deposit reference, nominated bank account, tax profile, client money accounts; unsettled and withdrawable cash on the account and the broker connection on the Tenant ([orders.md](features/orders.md), accepted 2026-11-23) | B, I, O |
 | [adr/0013](adr/0013-roles-authorization-single-user-table.md) | Operations permissions, maybe a role; the fifth role `SimulatorOperator` (ADR 0021 rule 25) | F, B, S |
 | [adr/0021](adr/0021-outside-parties-behind-ports.md) | Outside parties behind ports (F2) and the simulator host, one ADR (accepted) | F, S |
 | [reports.md](features/reports.md) | Reconciliation reports; source in the Customer Transactions Report | F, B, T |

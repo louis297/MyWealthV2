@@ -3,9 +3,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using MyWealthV2.Application.Broker;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
+using MyWealthV2.Infrastructure.Broker;
 using MyWealthV2.Infrastructure.Currencies;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Interceptors;
@@ -63,6 +65,35 @@ public class DemoTenantSeedTests
         instruments.ShouldAllBe(row => row.CreatedBy == "system");
 
         (await GrantedCodesAsync(db, tenant.Id)).ShouldBe(["adviser-balances", "bank-reconciliation", "customer-transactions"]);
+    }
+
+    // Orders §9.1: the demo tenant this run creates gets the broker connection `simulator` when the host has it.
+    [Test]
+    public async Task WithTheSimulatorBrokerConnectionConfigured_TheTenantItCreatesGetsIt()
+    {
+        await using var provider = BuildProvider(withBroker: true);
+
+        await RunAsync(provider);
+
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        (await db.Tenants.AsNoTracking().SingleAsync()).BrokerConnection.ShouldBe("simulator");
+    }
+
+    [Test]
+    public async Task WithoutTheBrokerConnection_TheTenantGetsNone_AndALaterRunLeavesTheExistingTenantAlone()
+    {
+        await using (var bare = BuildProvider())
+        {
+            await RunAsync(bare);
+        }
+
+        await using var provider = BuildProvider(withBroker: true);
+        await RunAsync(provider);
+
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        (await db.Tenants.AsNoTracking().SingleAsync()).BrokerConnection.ShouldBeNull();
     }
 
     [Test]
@@ -258,9 +289,16 @@ public class DemoTenantSeedTests
     }
 
     // Mirrors the DbContext registration in src/Infrastructure/DependencyInjection.cs.
-    private ServiceProvider BuildProvider()
+    private ServiceProvider BuildProvider(bool withBroker = false)
     {
         var services = new ServiceCollection();
+        if (withBroker)
+        {
+            services.AddSingleton<IBrokerConnections>(new ConfiguredBrokerConnections([
+                new BrokerConnectionSettings("simulator", "Simulator", null, null, 10, 1)
+            ]));
+        }
+
         services.AddLogging(logging => logging.AddProvider(_logs));
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IUser, NoUser>();

@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-11-02
-last_updated: 2026-11-20
+last_updated: 2026-11-23
 related:
   - ../function-plan.md
   - ../architecture.md
@@ -371,3 +371,13 @@ Add `/nominated-bank-accounts` and `/withdrawals` to the R20 prefix allow-list s
 
 - Prefixes: `/nominated-bank-accounts`, `/withdrawals`
 - Methods: GET only is used by the portal. `webapi` refuses every write for a Customer (403), so the BFF forwards the methods it already forwards and does not filter by role.
+
+---
+
+## Amendment 2026-11-23 (orders prefix) — accepted
+
+Add `/orders` to the R20 prefix allow-list so the Customer Portal can read the Customer's own orders ([orders.md](orders.md) C32).
+
+- Prefix: `/orders`
+- Methods: GET only is used by the portal. `webapi` refuses every write for a Customer (403), so the BFF forwards the methods it already forwards and does not filter by role.
+- A fill, unsettled cash and reserved quantities are read through `/transactions` and `/accounts`, which are already proxied.

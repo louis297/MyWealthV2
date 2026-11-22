@@ -29,6 +29,10 @@
                 <MudText Typo="Typo.caption">Allowed custody modes</MudText>
                 <MudText Typo="Typo.body1">@string.Join(", ", item.AllowedCustodyModes)</MudText>
             </div>
+            <div>
+                <MudText Typo="Typo.caption">Broker connection</MudText>
+                <MudText Typo="Typo.body1">@BrokerConnectionChoice.Label(item.BrokerConnection)</MudText>
+            </div>
             <EditForm Model="form" OnValidSubmit="Save" FormName="edit-tenant">
                 <MudStack Spacing="3">
                     <MudTextField @bind-Value="form.Name" Label="Name" Variant="Variant.Outlined" />
@@ -36,6 +40,13 @@
                         @foreach (var currency in currencies)
                         {
                             <MudSelectItem T="string" Value="@currency.Code">@currency.Code</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudSelect T="string" @bind-Value="form.BrokerConnection" Label="Broker connection" Variant="Variant.Outlined"
+                               ToStringFunc="BrokerConnectionChoice.Label" Error="@(brokerError is not null)" ErrorText="@brokerError">
+                        @foreach (var option in brokerOptions)
+                        {
+                            <MudSelectItem T="string" Value="@option">@BrokerConnectionChoice.Label(option)</MudSelectItem>
                         }
                     </MudSelect>
                     <MudStack Spacing="0">
@@ -70,7 +81,9 @@
     private IReadOnlyList<CurrencyItem> currencies = [];
     private readonly FormModel form = new();
     private CustodyModeChoice custody = CustodyModeChoice.Both();
+    private IReadOnlyList<string> brokerOptions = [];
     private string? error;
+    private string? brokerError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -81,6 +94,9 @@
             form.Name = item.Name;
             form.ReportingCurrency = item.ReportingCurrency;
             custody = CustodyModeChoice.From(item.AllowedCustodyModes);
+            // BO26: the configured broker connections; no "None" on edit.
+            form.BrokerConnection = item.BrokerConnection ?? BrokerConnectionChoice.None;
+            brokerOptions = BrokerConnectionChoice.Options(await Api.ListBrokerConnectionsAsync(), create: false, item.BrokerConnection);
         }
         catch (PlatformApiException exception)
         {
@@ -97,15 +113,19 @@
 
         try
         {
-            await Api.UpdateTenantAsync(Id, form.Name, form.ReportingCurrency, custody.ToList(), item.RowVersion);
+            await Api.UpdateTenantAsync(
+                Id, form.Name, form.ReportingCurrency, custody.ToList(), item.RowVersion, BrokerConnectionChoice.ToBody(form.BrokerConnection));
             item = await Api.GetTenantAsync(Id);
             error = null;
+            brokerError = null;
         }
         catch (PlatformApiException exception)
         {
+            // BO26: an unknown broker connection is shown at its field.
+            brokerError = ValidationErrors.From(exception).GetValueOrDefault("BrokerConnection");
             error = exception.Status == 409
                 ? "This tenant changed. Reload the page."
-                : exception.Message;
+                : brokerError is null ? exception.Message : null;
         }
     }
 
@@ -135,5 +155,6 @@
     {
         public string Name { get; set; } = "";
         public string ReportingCurrency { get; set; } = "";
+        public string BrokerConnection { get; set; } = BrokerConnectionChoice.None;
     }
 }

@@ -39,12 +39,13 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         string code,
         string reportingCurrency,
         IReadOnlyList<string> allowedCustodyModes,
+        string? brokerConnection = null,
         CancellationToken cancellationToken = default)
     {
         var created = await ReadAsync<Created>(
             HttpMethod.Post,
             "/tenants",
-            JsonSerializer.Serialize(new { name, code, reportingCurrency, allowedCustodyModes }, Json),
+            JsonSerializer.Serialize(new { name, code, reportingCurrency, allowedCustodyModes, brokerConnection }, Json),
             cancellationToken);
         return created.Id;
     }
@@ -55,11 +56,12 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         string reportingCurrency,
         IReadOnlyList<string> allowedCustodyModes,
         string rowVersion,
+        string? brokerConnection = null,
         CancellationToken cancellationToken = default) =>
         SendExpectingSuccessAsync(
             HttpMethod.Put,
             $"/tenants/{id}",
-            JsonSerializer.Serialize(new { name, reportingCurrency, allowedCustodyModes, rowVersion }, Json),
+            JsonSerializer.Serialize(new { name, reportingCurrency, allowedCustodyModes, brokerConnection, rowVersion }, Json),
             cancellationToken);
 
     public Task DisableTenantAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
@@ -273,6 +275,22 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         var query = status is null ? "" : $"&status={Uri.EscapeDataString(status)}";
         var page = await ReadAsync<CorporateActionAnnouncementPage>(
             HttpMethod.Get, $"/corporate-action-announcements?page=1&pageSize=20{query}", json: null, cancellationToken);
+        return page.Items;
+    }
+
+    public async Task<IReadOnlyList<BrokerConnectionItem>> ListBrokerConnectionsAsync(CancellationToken cancellationToken = default)
+    {
+        var page = await ReadAsync<BrokerConnectionPage>(HttpMethod.Get, "/broker-connections", json: null, cancellationToken);
+        return page.Items;
+    }
+
+    public async Task<IReadOnlyList<ExecutionReportItem>> ListExecutionReportsAsync(
+        string? status,
+        CancellationToken cancellationToken = default)
+    {
+        var query = status is null ? "" : $"&status={Uri.EscapeDataString(status)}";
+        var page = await ReadAsync<ExecutionReportPage>(
+            HttpMethod.Get, $"/execution-reports?page=1&pageSize=20{query}", json: null, cancellationToken);
         return page.Items;
     }
 

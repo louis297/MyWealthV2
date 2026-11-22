@@ -23,4 +23,9 @@ public interface IInstrumentPriceStore
     /// <summary>Corporate-actions R23: a price of <paramref name="instrumentId"/> is stored for
     /// <paramref name="from"/> or a later date.</summary>
     Task<bool> HasPriceFromAsync(int instrumentId, DateOnly from, CancellationToken cancellationToken = default);
+
+    /// <summary>Orders R10: the date of the price <c>IMarketData.TryGetPrice</c> reads for
+    /// <paramref name="onOrBefore"/>: the latest stored price of <paramref name="instrumentId"/> dated on or before
+    /// it, or null when there is none.</summary>
+    Task<DateOnly?> LatestDateAsync(int instrumentId, DateOnly onOrBefore, CancellationToken cancellationToken = default);
 }

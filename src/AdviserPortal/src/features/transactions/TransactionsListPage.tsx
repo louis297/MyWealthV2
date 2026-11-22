@@ -14,6 +14,7 @@ import {
   type TransactionCash,
   type TransactionSecurity,
 } from "@/features/transactions/transactionsApi";
+import { shortDay } from "@/features/orders/orderLabels";
 import { Pager } from "@/shared/components/Pager";
 import { formatInstant } from "@/shared/time/instant";
 
@@ -131,7 +132,13 @@ export function TransactionsListPage() {
                           ))}
                         </div>
                       </TableCell>
-                      <TableCell>{cashText(item.cash)}</TableCell>
+                      <TableCell>
+                        {cashText(item.cash)}
+                        {/* D74: a fill that has not settled. */}
+                        {item.execution && !item.execution.settledAt ? (
+                          <p className="text-muted-foreground text-xs">{`Settles ${shortDay(item.execution.settlementDate)}`}</p>
+                        ) : null}
+                      </TableCell>
                       <TableCell>{securityText(item.security)}</TableCell>
                       <TableCell>{item.memo ?? ""}</TableCell>
                       <TableCell className="whitespace-normal">

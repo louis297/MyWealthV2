@@ -1,7 +1,5 @@
 using System.Net;
 using MyWealthV2.Application.FunctionalTests.Accounts;
-using MyWealthV2.Application.FunctionalTests.Fees;
-using MyWealthV2.Application.FunctionalTests.Transactions;
 using static MyWealthV2.Application.FunctionalTests.Custody.CustodialHttp;
 
 namespace MyWealthV2.Application.FunctionalTests.Custody;
@@ -23,40 +21,6 @@ public class CustodialManualEntryTests : TestBase
     }
 
     [Test]
-    public async Task BuyAndSell_Return201AtTheServerPrice()
-    {
-        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
-        var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
-        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, price: 25.00m);
-        (await FundAsync(tokens.AccessToken, accountId, 1000m)).StatusCode.ShouldBe(HttpStatusCode.Created);
-
-        (await PostAsync(tokens.AccessToken, Trade(accountId, "Buy", instrumentId, 4m))).StatusCode
-            .ShouldBe(HttpStatusCode.Created);
-        (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(900m);
-
-        (await PostAsync(tokens.AccessToken, Trade(accountId, "Sell", instrumentId, 1m))).StatusCode
-            .ShouldBe(HttpStatusCode.Created);
-        (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(925m);
-    }
-
-    [Test]
-    public async Task Buy_WithATradeFeeSchedule_CarriesAFeeLeg()
-    {
-        var (tenant, _, customer, tokens) = await AccountHttp.SignInAdviser();
-        var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
-        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, price: 25.00m);
-        (await FundAsync(tokens.AccessToken, accountId, 1000m)).StatusCode.ShouldBe(HttpStatusCode.Created);
-        await FeeHttp.AddScheduleAsync(tenant.Id, "USD", FeeHttp.ScheduleFrom);
-
-        var buyId = await ReadIdAsync(await PostAsync(tokens.AccessToken, Trade(accountId, "Buy", instrumentId, 4m)));
-
-        using var item = await GetTransactionAsync(tokens.AccessToken, buyId);
-        TransactionJson.CashLegs(item.RootElement)
-            .Select(leg => (leg.GetProperty("role").GetString(), leg.GetProperty("amount").GetDecimal()))
-            .ShouldBe([("Principal", -100m), ("Fee", -10m)], ignoreOrder: true);
-    }
-
-    [Test]
     public async Task AWithdrawalOfTheFullBalance_ThenTheAccountCloses()
     {
         var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
@@ -73,8 +37,10 @@ public class CustodialManualEntryTests : TestBase
         yield return new TestCaseData("Interest", "Interest cannot be entered by hand on a Custodial account.");
         yield return new TestCaseData("Opening", "A Custodial account starts empty. Fund it with TransferIn.");
         yield return new TestCaseData("OpeningHoldings", "A Custodial account starts empty. Fund it with TransferIn.");
-        yield return new TestCaseData("StockIn", "Securities cannot be moved in or out of a Custodial account by hand. Use Buy and Sell.");
-        yield return new TestCaseData("StockOut", "Securities cannot be moved in or out of a Custodial account by hand. Use Buy and Sell.");
+        yield return new TestCaseData("Buy", "Trades on a Custodial account go through the broker. Place an order.");
+        yield return new TestCaseData("Sell", "Trades on a Custodial account go through the broker. Place an order.");
+        yield return new TestCaseData("StockIn", "Securities cannot be moved in or out of a Custodial account by hand. Place an order.");
+        yield return new TestCaseData("StockOut", "Securities cannot be moved in or out of a Custodial account by hand. Place an order.");
         yield return new TestCaseData("Split", "Corporate actions cannot be entered by hand on a Custodial account.");
         yield return new TestCaseData("Bonus", "Corporate actions cannot be entered by hand on a Custodial account.");
         yield return new TestCaseData("Scrip", "Corporate actions cannot be entered by hand on a Custodial account.");
@@ -119,7 +85,7 @@ public class CustodialManualEntryTests : TestBase
         var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
         var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, price: 25.00m);
         var fundingId = await InsertManualTransferInAsync(accountId, 1000m);
-        var buyId = await ReadIdAsync(await PostAsync(tokens.AccessToken, Trade(accountId, "Buy", instrumentId, 4m)));
+        var buyId = await InsertManualTradeAsync(accountId, "Buy", instrumentId, 4m);
 
         (await ReverseAsync(tokens.AccessToken, buyId)).StatusCode.ShouldBe(HttpStatusCode.Created);
         (await ReverseAsync(tokens.AccessToken, fundingId)).StatusCode.ShouldBe(HttpStatusCode.Created);

@@ -326,6 +326,115 @@ public class BackOfficePageTests
         body.ShouldContain("A symbol that ends with a market data suffix (for example .SIM) is priced by that connection.");
     }
 
+    /// <summary>Orders BO26: the tenant forms offer the broker connection, and the tenant page shows it.</summary>
+    [Test]
+    public async Task TenantPages_OfferTheBrokerConnection_AndTheTenantPageShowsIt()
+    {
+        var create = await GetAsync("/tenants/new");
+        var detail = await GetAsync($"/tenants/{TenantId}");
+
+        create.ShouldContain("Broker connection");
+        detail.ShouldContain("Broker connection");
+        Regex.IsMatch(detail, "Broker connection</[^>]+>\\s*<[^>]+>simulator<").ShouldBeTrue("the tenant page shows its broker connection");
+    }
+
+    /// <summary>Orders BO27: the broker connections and the state of their report feed.</summary>
+    [Test]
+    public async Task Broker_ListsTheConnections_WithTheStateOfTheirReports_AndIsInTheMenu()
+    {
+        var at = new DateTimeOffset(2026, 11, 23, 2, 13, 0, TimeSpan.Zero);
+        _api.BrokerConnections =
+        [
+            new("alpha", "Simulator", null),
+            new("beta", "Simulator", new BrokerFeedState(at, null, null)),
+            new("gamma", "Simulator", new BrokerFeedState(at, at.AddMinutes(5), "InvalidItem")),
+            new("delta", "Simulator", new BrokerFeedState(null, at, "Unreachable"))
+        ];
+
+        try
+        {
+            var body = await GetAsync("/broker");
+
+            body.ShouldContain("href=\"/broker\"");
+            body.ShouldContain(">alpha<");
+            body.ShouldContain(">Simulator<");
+            body.ShouldContain("Not read yet");
+            body.ShouldContain("Read 2026-11-23 02:13 UTC");
+            body.ShouldContain("Failing since 2026-11-23 02:18 UTC: The party sent a record that cannot be read");
+            body.ShouldContain("Failing since 2026-11-23 02:13 UTC: Broker not reachable");
+            body.ShouldNotContain("No broker connection is configured.");
+
+            _api.BrokerConnections = [];
+            (await GetAsync("/broker")).ShouldContain("No broker connection is configured.");
+        }
+        finally
+        {
+            _api.BrokerConnections = [new("simulator", "Simulator", null)];
+        }
+    }
+
+    /// <summary>Orders BO28: the newest twenty execution reports, with a status filter; a report skipped as UnknownOrder,
+    /// UnknownFill or Overfill is shown in red.</summary>
+    [Test]
+    public async Task Broker_ListsTheNewestReports_WithTheirLabels_FiltersByStatus_AndMarksTheOnesThatNeedAPerson()
+    {
+        var at = new DateTimeOffset(2026, 11, 23, 2, 13, 0, TimeSpan.Zero);
+        _api.ExecutionReports =
+        [
+            Report("w-X5", "Fill", "Skipped", "Overfill", at.AddMinutes(4)),
+            Report("w-X4", "Settled", "Skipped", "UnknownFill", at.AddMinutes(3)),
+            Report("w-X3", "Cancelled", "Skipped", "UnknownOrder", at.AddMinutes(2)),
+            Report("w-X2", null, "Skipped", "UnsupportedKind", at.AddMinutes(1)),
+            Report("w-X1", "Fill", "Processed", null, at, quantity: 4m, price: 100.12m),
+            Report("w-X0", "Fill", "Skipped", "Repeated", at.AddMinutes(-1))
+        ];
+        var before = _api.ExecutionReportStatuses.Count;
+
+        try
+        {
+            var body = await GetAsync("/broker");
+
+            body.ShouldContain("Execution reports");
+            body.ShouldContain("2026-11-23 02:13 UTC");
+            body.ShouldContain(">Unknown<");
+            body.ShouldContain("Kind not supported");
+            body.ShouldContain("No such order");
+            body.ShouldContain("No such fill");
+            body.ShouldContain("More than the order");
+            body.ShouldContain("Already known");
+            body.ShouldContain(">100.12<");
+            body.ShouldContain(">4<");
+            body.ShouldContain(">Processed<");
+            body.ShouldContain("2c0c8e1e-7c7c-4d55-9b53-0b8f5d3f6a11");
+            Regex.Matches(body, "report-needs-person").Count.ShouldBe(3);
+            _api.ExecutionReportStatuses.Skip(before).ShouldBe([null]);
+
+            var skipped = await GetAsync("/broker?status=Skipped");
+            skipped.ShouldContain("href=\"/broker?status=Processed\"");
+            // The processed fill is not in the filtered list.
+            skipped.ShouldNotContain(">100.12<");
+            _api.ExecutionReportStatuses.Last().ShouldBe("Skipped");
+
+            await GetAsync("/broker?status=Broken");
+            _api.ExecutionReportStatuses.Last().ShouldBeNull();
+        }
+        finally
+        {
+            _api.ExecutionReports = [];
+        }
+    }
+
+    private static ExecutionReportItem Report(
+        string outsideId,
+        string? kind,
+        string status,
+        string? skipReason,
+        DateTimeOffset receivedAt,
+        decimal? quantity = null,
+        decimal? price = null) =>
+        new(Guid.NewGuid(), "simulator", outsideId, kind, "2c0c8e1e-7c7c-4d55-9b53-0b8f5d3f6a11", "w-O1", quantity, price, null, null,
+            null, null, null, null, receivedAt, status, skipReason, status == "Received" ? null : receivedAt.AddSeconds(1));
+
     /// <summary>Simulated instruments BO23: the market data connections and the state of their price feed.</summary>
     [Test]
     public async Task MarketData_ListsTheConnections_WithTheStateOfTheirPrices()
@@ -721,13 +830,29 @@ public class BackOfficePageTests
         }
 
         public Task<TenantItem> GetTenantAsync(Guid id, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new TenantItem(id, "North Advisory", "north-advisory", "NZD", ["External"], true, "rv1"));
+            Task.FromResult(new TenantItem(id, "North Advisory", "north-advisory", "NZD", ["External"], true, "rv1", "simulator"));
 
-        public Task<Guid> CreateTenantAsync(string name, string code, string reportingCurrency, IReadOnlyList<string> allowedCustodyModes, CancellationToken cancellationToken = default) =>
+        public Task<Guid> CreateTenantAsync(string name, string code, string reportingCurrency, IReadOnlyList<string> allowedCustodyModes, string? brokerConnection = null, CancellationToken cancellationToken = default) =>
             Task.FromResult(TenantId);
 
-        public Task UpdateTenantAsync(Guid id, string name, string reportingCurrency, IReadOnlyList<string> allowedCustodyModes, string rowVersion, CancellationToken cancellationToken = default) =>
+        public Task UpdateTenantAsync(Guid id, string name, string reportingCurrency, IReadOnlyList<string> allowedCustodyModes, string rowVersion, string? brokerConnection = null, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
+
+        public List<BrokerConnectionItem> BrokerConnections { get; set; } = [new("simulator", "Simulator", null)];
+
+        public List<ExecutionReportItem> ExecutionReports { get; set; } = [];
+
+        public List<string?> ExecutionReportStatuses { get; } = [];
+
+        public Task<IReadOnlyList<BrokerConnectionItem>> ListBrokerConnectionsAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<BrokerConnectionItem>>(BrokerConnections);
+
+        public Task<IReadOnlyList<ExecutionReportItem>> ListExecutionReportsAsync(string? status, CancellationToken cancellationToken = default)
+        {
+            ExecutionReportStatuses.Add(status);
+            return Task.FromResult<IReadOnlyList<ExecutionReportItem>>(
+                ExecutionReports.Where(item => status is null || item.Status == status).ToList());
+        }
 
         public Task DisableTenantAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;

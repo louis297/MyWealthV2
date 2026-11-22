@@ -15,6 +15,7 @@ import {
 } from "@/features/transactions/transactionsApi";
 import { rateLine } from "@/features/transactions/fxFormat";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
+import { WithdrawableCash } from "@/features/accounts/WithdrawableCash";
 import { bookedWhenPosted, differentCustodyMode, isCustodial } from "@/features/accounts/custodyRules";
 import { toUtcIso } from "@/shared/time/instant";
 import { cn } from "cn";
@@ -341,6 +342,8 @@ export function CreateFxConversionPage() {
                 ) : null}
               </>
             )}
+            {/* D75: unsettled sale proceeds cannot leave a Custodial account (orders R45). */}
+            {custodial ? <WithdrawableCash account={from} /> : null}
             {custodial ? (
               <Muted>{bookedWhenPosted}</Muted>
             ) : (

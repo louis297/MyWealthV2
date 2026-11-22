@@ -14,19 +14,7 @@ namespace MyWealthV2.Application.FunctionalTests.Custody;
 [Parallelizable]
 public class CustodialAvailableCashTests : TestBase
 {
-    private const string Refusal = "Available cash cannot become negative: 300.00 USD is reserved for withdrawals.";
-
-    [Test]
-    public async Task Buy_AboveTheAvailableCash_Returns400_AndWithinIt_Returns201()
-    {
-        var world = await ReservedWorldAsync();
-        var instrument = await CreateInstrumentAsync(world.TenantAdmin, price: 25.00m);
-
-        (await ErrorsAsync(await PostAsync(world.TenantAdmin, Trade(world.AccountId, "Buy", instrument, 32m))))[""].ShouldBe([Refusal]);
-        (await PostAsync(world.TenantAdmin, Trade(world.AccountId, "Buy", instrument, 28m))).StatusCode.ShouldBe(HttpStatusCode.Created);
-
-        (await world.CashAsync()).ShouldBe((300m, 300m, 0m));
-    }
+    private const string Refusal = "Available cash cannot become negative: 300.00 USD is reserved for withdrawals and orders.";
 
     [Test]
     public async Task InternalTransfer_FromIt_AboveTheAvailableCash_Returns400()
@@ -69,12 +57,13 @@ public class CustodialAvailableCashTests : TestBase
     {
         var world = await WithdrawalWorld.CreateAsync();
         var instrument = await CreateInstrumentAsync(world.TenantAdmin, price: 25.00m);
-        (await PostAsync(world.TenantAdmin, Trade(world.AccountId, "Buy", instrument, 28m))).StatusCode.ShouldBe(HttpStatusCode.Created);
-        var sell = await ReadIdAsync(await PostAsync(world.TenantAdmin, Trade(world.AccountId, "Sell", instrument, 28m)));
+        // Trades typed before orders (orders R48): a person can still reverse them.
+        await InsertManualTradeAsync(world.AccountId, "Buy", instrument, 28m);
+        var sell = await InsertManualTradeAsync(world.AccountId, "Sell", instrument, 28m);
         await world.RequestAsync(400m);
 
         (await ErrorsAsync(await ReverseAsync(world.TenantAdmin, sell)))[""]
-            .ShouldBe(["Available cash cannot become negative: 400.00 USD is reserved for withdrawals."]);
+            .ShouldBe(["Available cash cannot become negative: 400.00 USD is reserved for withdrawals and orders."]);
         (await world.CashAsync()).ShouldBe((1000m, 400m, 600m));
     }
 
@@ -90,7 +79,7 @@ public class CustodialAvailableCashTests : TestBase
         var response = await StatementLineHttp.ActAsync(world.TenantAdmin, line.PublicId, "unmatch", new() { ["note"] = "Wrong account" });
 
         (await ErrorsAsync(response)).Values.SelectMany(messages => messages)
-            .ShouldContain("Available cash cannot become negative: 1100.00 USD is reserved for withdrawals.");
+            .ShouldContain("Available cash cannot become negative: 1100.00 USD is reserved for withdrawals and orders.");
         (await world.CashAsync()).ShouldBe((1200m, 1100m, 100m));
     }
 

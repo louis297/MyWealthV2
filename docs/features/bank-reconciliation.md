@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-21
-last_updated: 2026-11-22
+last_updated: 2026-11-23
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -567,3 +567,13 @@ Status of this amendment: `accepted` (2026-11-22), together with [interest-run.m
 - R10: the cash legs of Transactions with source `InterestRun` on the Tenant's Custodial accounts in the currency become two items: `InterestCredited` (Known) = minus the sum of their `Principal` legs, `count` = the Transactions; `TaxWithheld` (Known) = minus the sum of their `Tax` legs, `count` = the Transactions with a `Tax` leg. These legs no longer count in `OtherLedgerCash`. An item whose amount is `0` is left out; the items still add up to the difference.
 - §5: `ReconciliationItemKind` gains `BankInterest = 12`, `InterestCredited = 13`, `TaxWithheld = 14`; `ReconciliationInputs` gains the two ledger sums with their counts and each line's kind. `0048` widens `CK_BankReconciliationItems_Kind` to 0–14 and `CK_BankReconciliationItems_Line` to the kinds `2, 3, 4, 6, 12`.
 - §2 Out and "Still open": the bank's interest on the trust account as its own item is no longer out; it is `BankInterest`. The platform still computes no margin (interest-run R42).
+
+---
+
+## Amendment 2026-11-23 (orders and settlement) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R32 and R44 live there; this section records what changes here.
+
+- R10: the cash legs of an order's fill are legs of a `Buy` or `Sell` with source `OrderFill`. They never passed through the trust account, so they stay in the item `Trades` (Known), with rebalance trades and the trades typed before orders.
+- Settlement is a status on the fill and moves no money at the bank in that slice; unsettled cash is not a reconciliation item.
+- §11 point 6 ("until orders and settlement exist"): trades stay a known difference until settlement cash moves through the client money account, which is a later step of the roadmap (orders §11 point 1).

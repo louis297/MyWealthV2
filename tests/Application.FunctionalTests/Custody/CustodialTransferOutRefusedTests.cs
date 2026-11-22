@@ -82,7 +82,7 @@ public class CustodialTransferOutRefusedTests : TestBase
         var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
         var instrument = await CreateInstrumentAsync(tokens.AccessToken, price: 3.00m);
         (await FundAsync(tokens.AccessToken, accountId, 1.00m)).StatusCode.ShouldBe(HttpStatusCode.Created);
-        (await PostAsync(tokens.AccessToken, Trade(accountId, "Buy", instrument, 0.332m))).StatusCode.ShouldBe(HttpStatusCode.Created);
+        await InsertManualTradeAsync(accountId, "Buy", instrument, 0.332m, price: 3.00m);
         (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(0.004m);
         var system = await TenantHttp.SignInSystemAdmin();
         var systemBody = Cash(accountId, "CloseOut", -0.004m);

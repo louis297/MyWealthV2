@@ -41,6 +41,9 @@ import { roles } from "@/features/session/roles";
 import { SessionProbePage } from "@/features/session/SessionProbePage";
 import { AddBankAccountPage } from "@/features/nominatedBankAccounts/AddBankAccountPage";
 import { BankAccountChecksPage } from "@/features/nominatedBankAccounts/BankAccountChecksPage";
+import { OrderDetailPage } from "@/features/orders/OrderDetailPage";
+import { OrdersListPage } from "@/features/orders/OrdersListPage";
+import { PlaceOrderPage } from "@/features/orders/PlaceOrderPage";
 import { WithdrawalDetailPage } from "@/features/withdrawals/WithdrawalDetailPage";
 import { WithdrawalsListPage } from "@/features/withdrawals/WithdrawalsListPage";
 import { CloseAccountPage } from "@/features/accountClosures/CloseAccountPage";
@@ -147,6 +150,7 @@ export const appRoutes: RouteObject[] = [
               { path: ":id/transfer", element: <CreateInternalTransferPage /> },
               { path: ":id/convert", element: <CreateFxConversionPage /> },
               { path: ":id/withdraw", element: <WithdrawPage /> },
+              { path: ":id/order", element: <PlaceOrderPage /> },
               { path: ":id/close", element: <CloseAccountPage /> },
               {
                 element: <RoleGate allow={[roles.tenantAdmin]} />,
@@ -180,6 +184,14 @@ export const appRoutes: RouteObject[] = [
               { index: true, element: <BankReconciliationOverviewPage /> },
               { path: "history", element: <BankReconciliationHistoryPage /> },
               { path: ":id", element: <BankReconciliationDetailPage /> },
+            ],
+          },
+          {
+            path: "/orders",
+            element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
+            children: [
+              { index: true, element: <OrdersListPage /> },
+              { path: ":id", element: <OrderDetailPage /> },
             ],
           },
           {

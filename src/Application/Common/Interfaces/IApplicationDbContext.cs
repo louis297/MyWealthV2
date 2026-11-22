@@ -44,6 +44,14 @@ public interface IApplicationDbContext
 
     DbSet<CorporateActionAnnouncement> CorporateActionAnnouncements { get; }
 
+    DbSet<Order> Orders { get; }
+
+    DbSet<OrderFill> OrderFills { get; }
+
+    DbSet<ExecutionReport> ExecutionReports { get; }
+
+    DbSet<BrokerFeed> BrokerFeeds { get; }
+
     DbSet<Instrument> Instruments { get; }
 
     DbSet<Account> Accounts { get; }
@@ -73,6 +81,8 @@ public interface IApplicationDbContext
     DbSet<TransactionInterestDetail> TransactionInterestDetails { get; }
 
     DbSet<TransactionCorporateActionDetail> TransactionCorporateActionDetails { get; }
+
+    DbSet<TransactionExecutionDetail> TransactionExecutionDetails { get; }
 
     DbSet<IdempotencyRecord> IdempotencyRecords { get; }
 

@@ -30,6 +30,7 @@ public static class RolePermissions
             Policies.FeesRead, Policies.FeesManage,
             Policies.InterestRatesRead, Policies.InterestRatesManage, Policies.InterestRunsRead,
             Policies.CorporateActionsRead, Policies.CorporateActionsManage,
+            Policies.OrdersRead, Policies.OrdersPlace,
             Policies.ReportsCustomerRead, Policies.ReportsCustomerCreate,
             Policies.ReportsBookRead, Policies.ReportsBookCreate,
             Policies.ReportsTenantRead, Policies.ReportsTenantCreate
@@ -47,6 +48,7 @@ public static class RolePermissions
             Policies.FeesRead,
             Policies.InterestRatesRead,
             Policies.CorporateActionsRead,
+            Policies.OrdersRead, Policies.OrdersPlace,
             Policies.ReportsCustomerRead, Policies.ReportsCustomerCreate,
             Policies.ReportsBookRead, Policies.ReportsBookCreate
         ],
@@ -58,6 +60,7 @@ public static class RolePermissions
             Policies.NominatedBankAccountsRead,
             Policies.WithdrawalsRead,
             Policies.AccountClosuresRead,
+            Policies.OrdersRead,
             Policies.ReportsCustomerRead,
             Policies.ReportsCustomerCreate
         ]

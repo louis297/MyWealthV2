@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-21
-last_updated: 2026-11-22
+last_updated: 2026-11-23
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -490,3 +490,13 @@ Status of this amendment: `accepted` (2026-11-22), together with [interest-run.m
 - R17 and §8.1: the item on list and get gains `accruedInterest` (the sum of the account's daily accrual rows not yet posted, 8 decimals) and `interestAccruedThrough` (a date or `null`). On an External account `0` and `null`. Neither is a body field.
 - §8: new route `GET /accounts/{accountId}/interest-accruals` (`accounts.read`, the Account's scope): the daily accrual rows, newest day first, with filters `from`, `to`, `transactionId` and `posted` (interest-run R36). An External account → an empty list.
 - Closing, reopening and renaming are unchanged. A Closed or closing account is not accrued; a reopened account earns nothing for the days it had no cash (interest-run R20).
+
+---
+
+## Amendment 2026-11-23 (orders and settlement) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R39, R41 and R44 live there; this section records what changes here.
+
+- The account item on list and get, and `GET /accounts/{id}/cash-balance`, gain `unsettledCash` (the net cash of the account's posted sell fills that are not settled) and `withdrawableCash` (available cash minus unsettled cash, never below 0). On an External account they are `0` and the cash balance.
+- `reservedCash` now also counts the reserved cash of the account's live buy orders; `availableCash` follows.
+- Closing a Custodial account stays with the account closure, which now also waits for open orders and unsettled fills (account-closure R5 as amended).

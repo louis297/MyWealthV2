@@ -28,6 +28,10 @@ export type Account = {
   reservedCash?: number;
   /** withdrawals R35: cash balance minus reserved cash. */
   availableCash?: number;
+  /** orders R44: the net cash of posted sell fills that have not settled; 0 on an External account. */
+  unsettledCash?: number;
+  /** orders R44: available cash minus unsettled cash, never below 0. */
+  withdrawableCash?: number;
   status: string;
   isActive: boolean;
   rowVersion: string;
@@ -76,6 +80,10 @@ export type AccountHolding = {
   quantity: number;
   cost: number;
   costCurrency: string;
+  /** orders R41: the quantity live sell orders reserve. */
+  reservedQuantity?: number;
+  /** orders R41: quantity minus reserved quantity. */
+  availableQuantity?: number;
 };
 
 export const accountsApi = api.injectEndpoints({

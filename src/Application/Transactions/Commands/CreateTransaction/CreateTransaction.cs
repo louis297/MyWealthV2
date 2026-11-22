@@ -1,5 +1,4 @@
 using MyWealthV2.Application.AccountClosures;
-using MyWealthV2.Application.Fees.TradeSchedules;
 using System.Text.Json;
 using FluentValidation.Results;
 using MyWealthV2.Application.Accounts;
@@ -246,8 +245,6 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
 public class CreateTransactionCommandHandler(
     IApplicationDbContext db,
     ICurrentUser currentUser,
-    IMarketData marketData,
-    IFxRate fxRates,
     ICurrencyCatalog catalog,
     TimeProvider time)
     : IRequestHandler<CreateTransactionCommand, IdempotentResult>
@@ -561,75 +558,10 @@ public class CreateTransactionCommandHandler(
         var holding = await db.Holdings.SingleOrDefaultAsync(
             row => row.AccountId == loaded.Account.Id && row.InstrumentId == instrument.Id,
             cancellationToken);
-        if (loaded.Account.CustodyMode == CustodyMode.External)
-        {
-            return PostExternalTrade(
-                request, item, instrument.Id, bookedAt, tenant, loaded, type, accountCurrency, quote,
-                quoteDecimalPlaces, currentCashSum, holding);
-        }
-
-        RefuseCallerNumbers(request, item);
-        var price = marketData.TryGetPrice(instrument.Id, bookedAt);
-        if (price is null || price.Amount <= 0 || !string.Equals(price.Currency, quote, StringComparison.Ordinal))
-        {
-            throw new ValidationException([
-                new ValidationFailure(nameof(CreateTransactionCommand.Security), "Price is not available.")
-            ]);
-        }
-
-        var bookingCurrency = Money.Create(0m, accountCurrency).Currency;
-        decimal fxRate = 1m;
-        if (!string.Equals(quote, bookingCurrency, StringComparison.Ordinal))
-        {
-            try
-            {
-                fxRate = await fxRates.GetRateAsync(quote, bookingCurrency, bookedAt, cancellationToken);
-            }
-            catch (FxRateNotFoundException)
-            {
-                throw new ValidationException([
-                    new ValidationFailure(nameof(CreateTransactionCommand.Security), "FX rate is not available.")
-                ]);
-            }
-        }
-
-        var feeSchedule = await ApplicableTradeFeeSchedule.ForAsync(
-            db, tenant.Id, quote, ApplicableTradeFeeSchedule.DateOf(bookedAt), cancellationToken);
-        return type == TransactionType.Buy
-            ? Domain.Entities.Transaction.PostBuy(
-                tenant.Id,
-                loaded.Account.Id,
-                loaded.Account.Type,
-                bookingCurrency,
-                instrument.Id,
-                item.Quantity,
-                price,
-                fxRate,
-                bookedAt,
-                request.Memo,
-                request.Reference,
-                TransactionSource.Manual,
-                currentCashSum,
-                feeSchedule,
-                quoteDecimalPlaces)
-            : Domain.Entities.Transaction.PostSell(
-                tenant.Id,
-                loaded.Account.Id,
-                loaded.Account.Type,
-                bookingCurrency,
-                instrument.Id,
-                item.Quantity,
-                price,
-                fxRate,
-                bookedAt,
-                request.Memo,
-                request.Reference,
-                TransactionSource.Manual,
-                currentCashSum,
-                holding?.Quantity ?? 0m,
-                holding?.CostAmount ?? 0m,
-                feeSchedule,
-                quoteDecimalPlaces);
+        // Orders R48: the matrix refuses a hand Buy or Sell on a Custodial account, so this trade is on an External one.
+        return PostExternalTrade(
+            request, item, instrument.Id, bookedAt, tenant, loaded, type, accountCurrency, quote,
+            quoteDecimalPlaces, currentCashSum, holding);
     }
 
     private const string PriceKey = "Security[0].Price";
@@ -733,35 +665,6 @@ public class CreateTransactionCommandHandler(
     }
 
     /// <summary>External caller numbers R13: a Custodial account refuses the caller's price, fee and FX rate.</summary>
-    private static void RefuseCallerNumbers(
-        CreateTransactionCommand request,
-        CreateTransactionCommand.OpeningHoldingSecurity item)
-    {
-        var failures = new List<ValidationFailure>();
-        if (item.Price is not null)
-        {
-            failures.Add(new ValidationFailure(PriceKey, "Price cannot be set on a buy or sell."));
-        }
-
-        if (request.Fee is not null)
-        {
-            failures.Add(new ValidationFailure(
-                nameof(CreateTransactionCommand.Fee), CreateTransactionCommandValidator.FeeRefusedMessage));
-        }
-
-        if (request.FxRate is not null)
-        {
-            failures.Add(new ValidationFailure(
-                nameof(CreateTransactionCommand.FxRate),
-                "FxRate cannot be set on a Custodial account. The server reads the rate."));
-        }
-
-        if (failures.Count > 0)
-        {
-            throw new ValidationException(failures);
-        }
-    }
-
     private async Task<Domain.Entities.Transaction> PostStockAsync(
         CreateTransactionCommand request,
         DateTimeOffset bookedAt,

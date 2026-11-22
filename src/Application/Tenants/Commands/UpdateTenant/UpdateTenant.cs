@@ -1,4 +1,5 @@
 using FluentValidation.Results;
+using MyWealthV2.Application.Broker;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
@@ -18,6 +19,9 @@ public class UpdateTenantCommand : IRequest
     public string? ReportingCurrency { get; init; }
 
     public IReadOnlyList<string>? AllowedCustodyModes { get; init; }
+
+    /// <summary>Orders R3: a broker connection configured on this host. Omitted or null leaves it as it is.</summary>
+    public string? BrokerConnection { get; init; }
 
     public string? RowVersion { get; init; }
 
@@ -41,7 +45,7 @@ public class UpdateTenantCommandValidator : AbstractValidator<UpdateTenantComman
     }
 }
 
-public class UpdateTenantCommandHandler(IApplicationDbContext db, ICurrencyCatalog catalog)
+public class UpdateTenantCommandHandler(IApplicationDbContext db, ICurrencyCatalog catalog, IBrokerConnections brokerConnections)
     : IRequestHandler<UpdateTenantCommand>
 {
     public async Task Handle(UpdateTenantCommand request, CancellationToken cancellationToken)
@@ -94,6 +98,13 @@ public class UpdateTenantCommandHandler(IApplicationDbContext db, ICurrencyCatal
         if (request.AllowedCustodyModes is not null)
         {
             tenant.SetAllowedCustodyModes(AllowedCustodyModesRule.Parse(request.AllowedCustodyModes));
+        }
+
+        // Orders R3: omitted or null leaves the connection as it is; it cannot be cleared.
+        if (request.BrokerConnection is not null)
+        {
+            BrokerConnectionRule.Ensure(brokerConnections, request.BrokerConnection);
+            tenant.SetBrokerConnection(request.BrokerConnection);
         }
 
         await db.SaveChangesAsync(cancellationToken);

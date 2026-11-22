@@ -25,7 +25,7 @@ public class TradeFeeTradeTests : TestBase
         var (accountId, instrumentId) = await FeeHttp.TradingAccountAsync(admin.AccessToken, customer.PublicId);
         await FeeHttp.AddScheduleAsync(tenant.Id, "USD", FeeHttp.Today);
 
-        var buy = await FeeHttp.PostTradeAsync(admin.AccessToken, accountId, "Buy", instrumentId, 50m);
+        var buy = await FeeHttp.TradeAsync(accountId, "Buy", instrumentId, 50m);
 
         buy.StatusCode.ShouldBe(HttpStatusCode.Created);
         (await CashAmountsAsync(admin.AccessToken, await ReadIdAsync(buy))).ShouldBe([-1250m, -10m], ignoreOrder: true);
@@ -39,11 +39,11 @@ public class TradeFeeTradeTests : TestBase
     {
         var (tenant, _, customer, admin) = await AccountHttp.SignInTenantAdmin();
         var (accountId, instrumentId) = await FeeHttp.TradingAccountAsync(admin.AccessToken, customer.PublicId);
-        (await FeeHttp.PostTradeAsync(admin.AccessToken, accountId, "Buy", instrumentId, 100m)).StatusCode
+        (await FeeHttp.TradeAsync(accountId, "Buy", instrumentId, 100m)).StatusCode
             .ShouldBe(HttpStatusCode.Created);
         await FeeHttp.AddScheduleAsync(tenant.Id, "USD", FeeHttp.Today);
 
-        var sell = await FeeHttp.PostTradeAsync(admin.AccessToken, accountId, "Sell", instrumentId, 50m);
+        var sell = await FeeHttp.TradeAsync(accountId, "Sell", instrumentId, 50m);
 
         sell.StatusCode.ShouldBe(HttpStatusCode.Created);
         (await CashAmountsAsync(admin.AccessToken, await ReadIdAsync(sell))).ShouldBe([1250m, -10m], ignoreOrder: true);
@@ -56,13 +56,13 @@ public class TradeFeeTradeTests : TestBase
     {
         var (tenant, _, customer, admin) = await AccountHttp.SignInTenantAdmin();
         var (accountId, instrumentId) = await FeeHttp.TradingAccountAsync(admin.AccessToken, customer.PublicId);
-        var beforeAny = await FeeHttp.PostTradeAsync(admin.AccessToken, accountId, "Buy", instrumentId, 1m);
+        var beforeAny = await FeeHttp.TradeAsync(accountId, "Buy", instrumentId, 1m);
         await FeeHttp.AddScheduleAsync(tenant.Id, "USD", FeeHttp.Today.AddDays(-9));
-        var underTheFirst = await FeeHttp.PostTradeAsync(admin.AccessToken, accountId, "Buy", instrumentId, 1m);
+        var underTheFirst = await FeeHttp.TradeAsync(accountId, "Buy", instrumentId, 1m);
         await FeeHttp.AddScheduleAsync(tenant.Id, "USD", FeeHttp.Today, minimum: 20.00m, new FeeBand(0m, 0.5m));
         await FeeHttp.AddScheduleAsync(tenant.Id, "USD", FeeHttp.Today.AddDays(1), minimum: 30.00m, new FeeBand(0m, 0.5m));
 
-        var underTheSecond = await FeeHttp.PostTradeAsync(admin.AccessToken, accountId, "Buy", instrumentId, 1m);
+        var underTheSecond = await FeeHttp.TradeAsync(accountId, "Buy", instrumentId, 1m);
 
         (await CashAmountsAsync(admin.AccessToken, await ReadIdAsync(beforeAny))).ShouldBe([-25m]);
         (await CashAmountsAsync(admin.AccessToken, await ReadIdAsync(underTheFirst))).ShouldBe([-25m, -10m], ignoreOrder: true);
@@ -78,33 +78,14 @@ public class TradeFeeTradeTests : TestBase
         await FeeHttp.SetPriceAsync(instrumentId, 25.00m, "USD");
         await SetRateAsync("USD", "NZD", 1.6543m);
         (await FeeHttp.FundCustodialAsync(admin.AccessToken, accountId, 10000m)).StatusCode.ShouldBe(HttpStatusCode.Created);
-        (await FeeHttp.PostTradeAsync(admin.AccessToken, accountId, "Buy", instrumentId, 100m)).StatusCode
-            .ShouldBe(HttpStatusCode.Created);
+        await Custody.CustodialHttp.InsertManualTradeAsync(accountId, "Buy", instrumentId, 100m);
         await FeeHttp.AddScheduleAsync(tenant.Id, "USD", FeeHttp.Today);
 
-        var sell = await FeeHttp.PostTradeAsync(admin.AccessToken, accountId, "Sell", instrumentId, 50m);
+        var sell = await FeeHttp.TradeAsync(accountId, "Sell", instrumentId, 50m);
 
         sell.StatusCode.ShouldBe(HttpStatusCode.Created);
         (await CashAmountsAsync(admin.AccessToken, await ReadIdAsync(sell))).ShouldBe([2067.875m, -16.543m], ignoreOrder: true);
         (await FeeDetailsAsync()).ShouldBe([(0, 1250m, 10m, "USD")]);
-    }
-
-    [Test]
-    public async Task FeeFieldOnTheCreateBody_Returns400()
-    {
-        var (_, _, customer, admin) = await AccountHttp.SignInTenantAdmin();
-        var (accountId, instrumentId) = await FeeHttp.TradingAccountAsync(admin.AccessToken, customer.PublicId);
-
-        var response = await TransactionHttp.Send(HttpMethod.Post, "/transactions", admin.AccessToken, new
-        {
-            accountId,
-            type = "Buy",
-            fee = 5m,
-            security = new[] { new { instrumentId, quantity = 1m } }
-        }, Guid.NewGuid());
-
-        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        (await FeeHttp.ErrorsAsync(response)).ShouldContainKey("Fee");
     }
 
     [Test]
@@ -114,7 +95,7 @@ public class TradeFeeTradeTests : TestBase
         var (accountId, instrumentId) = await FeeHttp.TradingAccountAsync(admin.AccessToken, customer.PublicId, cash: 1255m);
         await FeeHttp.AddScheduleAsync(tenant.Id, "USD", FeeHttp.Today);
 
-        var buy = await FeeHttp.PostTradeAsync(admin.AccessToken, accountId, "Buy", instrumentId, 50m);
+        var buy = await FeeHttp.TradeAsync(accountId, "Buy", instrumentId, 50m);
 
         buy.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         (await CashBalanceAsync(admin.AccessToken, accountId)).ShouldBe(1255m);
@@ -131,7 +112,7 @@ public class TradeFeeTradeTests : TestBase
         await FeeHttp.AddScheduleAsync(northTenant.Id, "USD", FeeHttp.Today);
         var (accountId, instrumentId) = await FeeHttp.TradingAccountAsync(south.AccessToken, southCustomer.PublicId);
 
-        var buy = await FeeHttp.PostTradeAsync(south.AccessToken, accountId, "Buy", instrumentId, 50m);
+        var buy = await FeeHttp.TradeAsync(accountId, "Buy", instrumentId, 50m);
 
         buy.StatusCode.ShouldBe(HttpStatusCode.Created);
         (await CashAmountsAsync(south.AccessToken, await ReadIdAsync(buy))).ShouldBe([-1250m]);
@@ -143,8 +124,8 @@ public class TradeFeeTradeTests : TestBase
         var (tenant, _, customer, admin) = await AccountHttp.SignInTenantAdmin();
         var (accountId, instrumentId) = await FeeHttp.TradingAccountAsync(admin.AccessToken, customer.PublicId);
         var scheduleId = await FeeHttp.AddScheduleAsync(tenant.Id, "USD", FeeHttp.Today);
-        var buyId = await ReadIdAsync(
-            await FeeHttp.PostTradeAsync(admin.AccessToken, accountId, "Buy", instrumentId, 50m));
+        // A buy typed before orders (orders R48), with the schedule's fee: a person can still reverse it.
+        var buyId = await Custody.CustodialHttp.InsertManualTradeAsync(accountId, "Buy", instrumentId, 50m, withScheduleFee: true);
 
         var reverse = await TransactionHttp.Send(HttpMethod.Post, $"/transactions/{buyId}/reverse", admin.AccessToken, null, Guid.NewGuid());
 

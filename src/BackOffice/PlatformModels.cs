@@ -7,7 +7,8 @@ public sealed record TenantItem(
     string ReportingCurrency,
     IReadOnlyList<string> AllowedCustodyModes,
     bool IsActive,
-    string RowVersion);
+    string RowVersion,
+    string? BrokerConnection = null);
 
 public sealed record TenantPage(
     IReadOnlyList<TenantItem> Items,
@@ -120,6 +121,37 @@ public sealed record CorporateActionAnnouncementItem(
     DateTimeOffset? ProcessedAt);
 
 public sealed record CorporateActionAnnouncementPage(IReadOnlyList<CorporateActionAnnouncementItem> Items, int Page, int PageSize, int TotalCount);
+
+/// <summary>The state of a broker connection's report feed (orders R4).</summary>
+public sealed record BrokerFeedState(DateTimeOffset? LastSucceededAt, DateTimeOffset? LastFailedAt, string? LastFailure);
+
+/// <summary>A configured broker connection (orders R4).</summary>
+public sealed record BrokerConnectionItem(string Name, string Adapter, BrokerFeedState? Reports);
+
+public sealed record BrokerConnectionPage(IReadOnlyList<BrokerConnectionItem> Items, int Page, int PageSize, int TotalCount);
+
+/// <summary>A stored execution report (orders R30). <see cref="Kind"/> is null for a kind the adapter did not know.</summary>
+public sealed record ExecutionReportItem(
+    Guid Id,
+    string Connection,
+    string OutsideId,
+    string? Kind,
+    string? ClientOrderId,
+    string? BrokerOrderId,
+    decimal? Quantity,
+    decimal? Price,
+    DateOnly? TradeDate,
+    DateOnly? SettlementDate,
+    string? ContractNote,
+    string? FillOutsideId,
+    DateOnly? SettledDate,
+    string? Reason,
+    DateTimeOffset ReceivedAt,
+    string Status,
+    string? SkipReason,
+    DateTimeOffset? ProcessedAt);
+
+public sealed record ExecutionReportPage(IReadOnlyList<ExecutionReportItem> Items, int Page, int PageSize, int TotalCount);
 
 public sealed record MarketDataConnectionPage(IReadOnlyList<MarketDataConnectionItem> Items, int Page, int PageSize, int TotalCount);
 

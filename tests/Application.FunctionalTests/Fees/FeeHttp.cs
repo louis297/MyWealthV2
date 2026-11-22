@@ -168,21 +168,12 @@ internal static class FeeHttp
         }, Guid.NewGuid());
 
     /// <summary>
-    /// A server-priced trade on a Custodial account: no <c>bookedAt</c>, the server clock books it, so the
-    /// schedule in effect on today's UTC date applies (custody-modes R10; external-caller-numbers R22).
+    /// A trade on a Custodial account: an order filled by the fake broker at the stored price
+    /// (<see cref="Custody.CustodialHttp.TradeAsync"/>). The fee is the one of the schedule in effect on today's UTC
+    /// date, when the order is placed (orders R33).
     /// </summary>
-    public static Task<HttpResponseMessage> PostTradeAsync(
-        string accessToken,
-        Guid accountId,
-        string type,
-        Guid instrumentId,
-        decimal quantity) =>
-        TransactionHttp.Send(HttpMethod.Post, "/transactions", accessToken, new
-        {
-            accountId,
-            type,
-            security = new[] { new { instrumentId, quantity } }
-        }, Guid.NewGuid());
+    public static Task<HttpResponseMessage> TradeAsync(Guid accountId, string type, Guid instrumentId, decimal quantity) =>
+        Custody.CustodialHttp.TradeAsync(accountId, type, instrumentId, quantity);
 
     /// <summary>A funded Custodial brokerage Account in <paramref name="currency"/> with an instrument priced at 25.00.</summary>
     public static async Task<(Guid AccountId, Guid InstrumentId)> TradingAccountAsync(
@@ -199,7 +190,7 @@ internal static class FeeHttp
         return (accountId, instrumentId);
     }
 
-    /// <summary>A Custodial brokerage Account, where the server prices trades and charges the schedule's fee.</summary>
+    /// <summary>A Custodial brokerage Account, where a trade is an order fill and carries the schedule's fee.</summary>
     public static Task<Guid> OpenCustodialAsync(string accessToken, Guid customerId, string currency) =>
         AccountHttp.OpenAccountAsync(accessToken, customerId, "Custodial " + currency, "Brokerage", currency, "Custodial");
 

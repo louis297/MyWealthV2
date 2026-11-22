@@ -3,7 +3,7 @@ title: API design
 status: accepted
 language: en
 created: 2026-09-11
-updated: 2026-11-22
+updated: 2026-11-23
 related:
   - README.md
   - glossary.md
@@ -148,6 +148,8 @@ The fifth role `SimulatorOperator` ([ADR 0013](adr/0013-roles-authorization-sing
 | `interest-runs.start` | ✓ | | | | [interest-run](features/interest-run.md) (accepted 2026-11-22) |
 | `corporate-actions.read` | | ✓ | ✓ | | [corporate-actions](features/corporate-actions.md) (accepted 2026-11-22) |
 | `corporate-actions.manage` | | ✓ | | | [corporate-actions](features/corporate-actions.md) (accepted 2026-11-22) |
+| `orders.read` | | ✓ | ✓ | ✓ | [orders](features/orders.md) (accepted 2026-11-23) |
+| `orders.place` | | ✓ | ✓ | | [orders](features/orders.md) (accepted 2026-11-23) |
 | `portfolios.read` | ✓ | ✓ | ✓ | | [portfolios](features/portfolios.md) |
 | `portfolios.manage` | ✓ | ✓ | ✓ | | [portfolios](features/portfolios.md) |
 | `reports.customer.read` | | ✓ | ✓ | ✓ | [reports](features/reports.md) |
@@ -318,6 +320,8 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Bank connections | `/bank-connections` | list (names and adapters from configuration). See features/deposit-matching.md | `tenants.manage` |
 | Market data connections | `/market-data-connections` | list (names, adapters, symbol suffixes from configuration, and the state of each price feed and corporate action feed). See features/simulated-instruments.md and features/corporate-actions.md | `tenants.manage` |
 | Corporate action announcements | `/corporate-action-announcements` | list (platform data, newest first; filters `connection`, `status`). See features/corporate-actions.md | `tenants.manage` |
+| Broker connections | `/broker-connections` | list (names and adapters from configuration, and the state of each execution report feed). See features/orders.md | `tenants.manage` |
+| Execution reports | `/execution-reports` | list (platform data, newest first; filters `connection`, `status`). See features/orders.md | `tenants.manage` |
 | Statement lines | `/statement-lines` | list / get; match / ignore / request-return / reopen / unmatch. See features/deposit-matching.md and features/bank-returns.md (returns, recalls, debit lines) | `statement-lines.manage` |
 | Nominated bank accounts | `/nominated-bank-accounts` | list / get / create; verify / reject / remove. No PUT. See features/withdrawals.md | `nominated-bank-accounts.read` / `.manage` / `.verify` |
 | Withdrawals | `/withdrawals` | list / get / create (`Idempotency-Key`); approve / reject / cancel. See features/withdrawals.md | `withdrawals.read` / `.request` / `.approve` |
@@ -330,6 +334,7 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Fees | `/fees/trade-schedules` (namespace `/fees`) | list / get / create / update / delete. See features/trade-fees.md | `fees.read` / `fees.manage` |
 | Interest | `/interest/rate-schedules`, `/interest/runs` (namespace `/interest`) | rate schedules: list / get / create / update / delete; runs: list / get / create (start a run). See features/interest-run.md | `interest-rates.read` / `.manage`; `interest-runs.read` / `.start` |
 | Corporate actions | `/corporate-actions` | list / get / create / update; cancel / apply; entitlements. See features/corporate-actions.md | `corporate-actions.read` / `corporate-actions.manage` |
+| Orders | `/orders` | list / get / create (`Idempotency-Key`) / preview; cancel. No PUT: an order never changes. See features/orders.md | `orders.read` / `orders.place` |
 | Reports | `/reports` | list / request / schedules / executions / download | `reports.customer.read` / `reports.customer.create` / `reports.book.read` / `reports.book.create` / `reports.tenant.read` / `reports.tenant.create` |
 
 Path `{id}` is always PublicId.
@@ -395,6 +400,7 @@ Lookup: `GET /tenants/by-code/{code}` uses `tenants.read` (SystemAdmin, TenantAd
 - Amendment 2026-11-18 (tenant custody modes, accepted, landed; field rules in [features/tenant-custody-modes.md](features/tenant-custody-modes.md)): POST body adds required `allowedCustodyModes` (array of `External` / `Custodial`, non-empty, no repeats); PUT body may carry it (omitted = unchanged); the item on list, get and by-code carries it. Bad shape → 400 `errors.AllowedCustodyModes`. `POST /accounts` with a custody mode the Tenant does not allow → 400 `errors.CustodyMode`. No new route, policy or problem code.
 - Amendment 2026-11-20 (client money accounts, accepted; field rules in [features/client-money-accounts.md](features/client-money-accounts.md)): sub-resource `/tenants/{tenantId}/client-money-accounts` with list, get, create (201 `{ id }`), `POST …/{id}/disable` and `POST …/{id}/enable` (`rowVersion`), all `tenants.manage`. No PUT. One active row per currency and an account number active on one row only, else 400 `errors.Currency` / `errors.AccountNumber`. The tenant item on list, get and by-code carries `clientMoneyCurrencies`. No new policy or problem code.
 - Amendment 2026-11-20 (bank feed and deposit matching, accepted; field rules in [features/deposit-matching.md](features/deposit-matching.md)): creating a client money account requires `bankConnection`, a name from configuration (else 400 `errors.BankConnection`); the item carries `bankConnection` and `bankFeed` (`{ lastSucceededAt, lastFailedAt, lastFailure }` or `null`). `GET /bank-connections` (`tenants.manage`) lists the configured connections without secrets.
+- Amendment 2026-11-23 (orders and settlement, accepted; field rules in [features/orders.md](features/orders.md) R3, R4): POST and PUT bodies take an optional `brokerConnection`, a name from configuration (else 400 `errors.BrokerConnection`); omitted or `null` on PUT leaves it unchanged. The item carries `brokerConnection` (`null` when none). `GET /broker-connections` (`tenants.manage`) lists the configured names with the state of each execution report feed, and `GET /execution-reports` (`tenants.manage`) lists the stored reports.
 
 ### 7.4 People (TenantAdmin / Adviser / Customer)
 
@@ -483,6 +489,7 @@ Field rules: [features/accounts.md](features/accounts.md).
 - Amendment 2026-11-21 (receipt returns, recalls and other debit lines, accepted; field rules in [features/bank-returns.md](features/bank-returns.md)): no new route or permission. `POST /statement-lines/{id}/request-return` also creates the return payment the bank sends; `reopen` of a `ReturnRequested` line is refused (400 `errors.Status`) once the bank was asked. `ignore` (from `Unmatched`) and `reopen` (from `Ignored`) apply to debit lines too. The statement line item gains statuses `ReturnSent` and `Returned`, reasons `UnknownPayment`, `UnknownReturn`, `RecallNotCovered`, `ReturnRejected`, method `Recall`, and `returnPayment: { status, attempts, lastFailure }` (`null` without a return payment); `match.accountId`, `match.customerId` and `match.transactionId` are `null` on a match with no Transaction. A recalled deposit is reversed by the flow (source `BankFeed`).
 - Amendment 2026-11-22 (account closure, accepted; field rules in [features/account-closure.md](features/account-closure.md)): sub-resource `/accounts/{accountId}/closures` — `POST` (`account-closures.request`, `Idempotency-Key`, 201 `{ id }`), `GET` and `GET …/{id}` (`account-closures.read`); SystemAdmin has neither. The item gains `closure` (the latest closure, or `null`). `POST /accounts/{id}/close` on an Open Custodial account → 400 for every caller; External accounts unchanged. While a closure is `InProgress` the Account is closing and every hand write on it → 400. No problem code.
 - Amendment 2026-11-22 (interest run, accepted; field rules in [features/interest-run.md](features/interest-run.md) R33, R35, R36): the item gains `accruedInterest` (unposted daily accruals, 8 decimals; `0` on an External account) and `interestAccruedThrough` (a date or `null`). `GET /accounts/{accountId}/interest-accruals` (`accounts.read`, the Account's scope) → list envelope of the daily accrual rows, newest first; filters `from`, `to`, `transactionId`, `posted`. `POST /accounts/{accountId}/closures` posts the interest accrued through yesterday before the payout is worked out.
+- Amendment 2026-11-23 (orders and settlement, accepted; field rules in [features/orders.md](features/orders.md) R39–R41, R44, R47): `reservedCash` also counts the account's live buy orders. The item and `GET /accounts/{id}/cash-balance` gain `unsettledCash` (the net cash of posted sell fills that are not settled) and `withdrawableCash` (available cash minus unsettled cash, never below 0); on an External account `0` and the cash balance. The holding item of `GET /accounts/{id}/holdings` gains `reservedQuantity` and `availableQuantity`. An account closure is refused while the account has a live order or a fill that is not settled.
 
 ### 7.7 Transactions
 
@@ -512,6 +519,7 @@ Field rules: [features/posting.md](features/posting.md) for cash types, [feature
 - Amendment 2026-11-20 (withdrawals, accepted; field rules in [features/withdrawals.md](features/withdrawals.md)): on a Custodial account `POST /transactions` refuses `TransferOut` (400 `errors.Type`, every caller) and a `CloseOut` of more than a remainder below the currency's minor unit (400 `errors.Type`); `POST /transactions/transfer` between Custodial accounts of two Customers → 400 `errors.ToAccountId`. Every Custodial write that lowers cash (create, transfer, fx, adjustment, reverse, rebalance, unmatch) is refused when it would leave available cash below 0. A payout is a `TransferOut` with `source: { kind: "Payment", id: <withdrawal id> }` and the new item field `payment: { valueDate, reference, payeeName, payeeAccount }` (`null` on other Transactions); a hand reverse of it → 400. New resources `/nominated-bank-accounts` and `/withdrawals` (§6). `GET /statement-lines` takes an optional `direction` (`Credit`, `Debit`; else 400 `errors.Direction`); the line item gains `relatedLineId`, `withdrawalId` and `returnReason`. No problem code added.
 - Amendment 2026-11-22 (account closure, accepted; field rules in [features/account-closure.md](features/account-closure.md)): on a Custodial account `POST /transactions` refuses `CloseOut` for every amount (400 `errors.Type`, every caller). Source kind `AccountClosure` marks the remainder write-off; it is not hand-reversible. Every create, quote and reverse with a leg on a closing account → 400 under the empty `errors` key.
 - Amendment 2026-11-22 (interest run, accepted; field rules in [features/interest-run.md](features/interest-run.md) R23–R27, R34, R39): source kind `InterestRun` marks an interest posting; it is not hand-reversible. A cash leg's `role` may be `Tax`; every cash leg gains `tax` (`{ kind, ratePercent, basisAmount, amount, currency }` on a `Tax` leg, `null` otherwise) and the item gains `interest` (`{ periodFrom, periodTo, days, accruedAmount, grossAmount }` on an interest posting and its Reversal, `null` otherwise). A hand `Interest` on a Custodial account stays refused. The statement line item gains `kind` (`Transfer`, `Interest`), and `GET /statement-lines` an optional `kind` filter (else 400 `errors.Kind`).
+- Amendment 2026-11-23 (orders and settlement, accepted; field rules in [features/orders.md](features/orders.md) R32, R35, R37, R38, R45, R48): on a Custodial account `POST /transactions` refuses `Buy` and `Sell` (400 `errors.Type`, `Trades on a Custodial account go through the broker. Place an order.`); the caller places an order (§7.12). Source kind `OrderFill` marks the `Buy` or `Sell` the platform posts for a fill, with the order's PublicId as source id; it is not hand-reversible. The item gains `execution` `{ orderId, fillId, price, tradeDate, settlementDate, brokerReference, settledAt }` on a fill and its Reversal, `null` otherwise. `POST /transactions/transfer`, `POST /transactions/fx` and the FX quote from a Custodial account refuse an amount that would take out cash from sales that have not settled (400).
 
 **Type-specific create routes.** When a type's create body differs from the common shape (one top-level `accountId`), that type gets its own `POST /transactions/{action}`. Each type has exactly one create route: a type with its own route is rejected by `POST /transactions` (400). Read (`GET /transactions`, `GET /transactions/{id}`) and reverse (`POST /transactions/{id}/reverse`) stay shared by every type. Every new type gets its own `POST /transactions/{action}` route, whatever its body shape (decided 2026-11-10). Existing types keep `POST /transactions` until each is moved in its own spec amendment ([future-plans.md](future-plans.md) §4).
 
@@ -605,6 +613,22 @@ A corporate action is an event of one Instrument of the caller's Tenant. Its ent
 
 Field rules: [features/corporate-actions.md](features/corporate-actions.md). No `Idempotency-Key`: the status and `rowVersion` make a repeat a 400 or a 409 `stale_row_version`. A served instrument takes no hand entry (400 `errors.InstrumentId`); a `Feed` action cannot be changed by hand (400 `errors.Origin`). No new problem code.
 
+### 7.12 Orders
+
+An order is an instruction to buy or sell a quantity of one Instrument for one Custodial account at the Tenant's broker. It is not a Transaction; each fill the broker reports is posted as a `Buy` or `Sell` (§7.7). No caller names a tenant: `tenantId` in a query or body → 400. `{id}` is a GUID.
+
+| Method | Route | Policy | Success |
+| --- | --- | --- | --- |
+| GET | `/orders` | `orders.read` | 200 envelope (filters `accountId`, `customerId`, `instrumentId`, `side`, `status`, `pendingFill`) |
+| GET | `/orders/{id}` | `orders.read` | 200 item with its fills |
+| POST | `/orders` | `orders.place` | 201 `{ id }` |
+| POST | `/orders/preview` | `orders.place` | 200 preview (writes nothing) |
+| POST | `/orders/{id}/cancel` | `orders.place` | 204 |
+| GET | `/broker-connections` | `tenants.manage` | 200 envelope |
+| GET | `/execution-reports` | `tenants.manage` | 200 envelope (filters `connection`, `status`) |
+
+Field rules: [features/orders.md](features/orders.md). `POST /orders` requires `Idempotency-Key` ([ADR 0015](adr/0015-idempotency-keys.md)); cancel takes `rowVersion` and no key, and a stale one is 409 `stale_row_version`. The body carries no price: the platform sets a price limit from the latest stored price, reserves the cash of a buy or the quantity of a sell, and the `worker` sends the order. Nothing is sent to the broker in the request. A Customer reads own orders and writes nothing. No new problem code.
+
 ---
 
 ## 8. Explicitly out (until a later phase promotes them)
@@ -688,3 +712,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-22 | §2, §3.1, §4.2, §6, §7.4, §7.6, §7.7, §7.10: interest run accepted. Namespace `/interest` with `/interest/rate-schedules` and `/interest/runs`; permissions `interest-rates.read`, `interest-rates.manage`, `interest-runs.read`, `interest-runs.start`; problem code `interest_schedule_in_effect`; sub-resources `/users/customers/{customerId}/tax-profile`, `/users/me/tax-profile` and `/accounts/{accountId}/interest-accruals`; account item `accruedInterest`, `interestAccruedThrough`; transaction item `interest`, leg role `Tax` and leg `tax`; source kind `InterestRun`; statement line `kind` and its filter ([features/interest-run.md](features/interest-run.md)). |
 | 2026-11-22 | §6, §7.5: simulated instruments accepted. Resource `/market-data-connections` (`tenants.manage`, list from configuration with the price feed state); instrument item `marketDataConnection`. No new permission or problem code. |
 | 2026-11-22 | §3.1, §6, §7.7, §7.11: corporate actions accepted. Permissions `corporate-actions.read` and `corporate-actions.manage`; resource `/corporate-actions` (list, get, create, update, cancel, apply, entitlements) and `/corporate-action-announcements` (`tenants.manage`); source kind `CorporateAction`; transaction item `corporateAction`; connection item `corporateActions`. No new problem code. |
+| 2026-11-23 | §3.1, §6, §7.3, §7.6, §7.7, §7.12: orders and settlement accepted. Permissions `orders.read` and `orders.place`; resource `/orders` (list, get, create, preview, cancel), `/broker-connections` and `/execution-reports` (`tenants.manage`); `brokerConnection` on the tenant; source kind `OrderFill`; transaction item `execution`; account item `unsettledCash` and `withdrawableCash`; holding item `reservedQuantity` and `availableQuantity`; hand `Buy` / `Sell` refused on a Custodial account. No new problem code. |

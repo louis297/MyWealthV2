@@ -99,6 +99,19 @@ export type Transaction = {
   interest?: TransactionInterest | null;
   /** corporate-actions R37: on an entitlement posting and its Reversal; otherwise null. */
   corporateAction?: TransactionCorporateAction | null;
+  /** orders R38: on an order fill and its Reversal; otherwise null. */
+  execution?: TransactionExecution | null;
+};
+
+/** orders R38: the broker's execution behind a fill. */
+export type TransactionExecution = {
+  orderId: string;
+  fillId: string;
+  price: number;
+  tradeDate: string;
+  settlementDate: string;
+  brokerReference: string | null;
+  settledAt: string | null;
 };
 
 /** corporate-actions R37: the event behind an entitlement posting. */

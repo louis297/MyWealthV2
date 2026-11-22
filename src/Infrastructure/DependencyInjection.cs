@@ -13,6 +13,8 @@ using MyWealthV2.Application.Reports;
 using MyWealthV2.Application.BankFeed;
 using MyWealthV2.Infrastructure.Accounts;
 using MyWealthV2.Infrastructure.BankFeed;
+using MyWealthV2.Application.Broker;
+using MyWealthV2.Infrastructure.Broker;
 using MyWealthV2.Infrastructure.Currencies;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Interceptors;
@@ -162,6 +164,39 @@ public static class DependencyInjection
             });
             builder.Services.AddScoped<MarketDataSyncJob>();
             builder.Services.AddScoped<CorporateActionApplyJob>();
+        }
+    }
+
+    /// <summary>
+    /// Reads <c>BrokerConnections</c> for <paramref name="host"/> and registers <see cref="IBrokerConnections"/>
+    /// (orders R2). Throws on a bad entry, so call it before <c>Build()</c>.
+    /// </summary>
+    public static void AddBrokerConnections(this IHostApplicationBuilder builder, BrokerConnectionHost host)
+    {
+        var connections = new ConfiguredBrokerConnections(BrokerConnectionsConfiguration.Read(builder.Configuration, host));
+        builder.Services.AddSingleton(connections);
+        builder.Services.AddSingleton<IBrokerConnections>(connections);
+        // ADR 0021 rule 3: each port is dispatched to the adapter its connection names.
+        builder.Services.AddHttpClient(SimulatorBrokerOrders.HttpClientName);
+        builder.Services.AddSingleton<IBrokerOrdersAdapter, SimulatorBrokerOrders>();
+        builder.Services.AddHttpClient(SimulatorBrokerFeed.HttpClientName);
+        builder.Services.AddSingleton<IBrokerFeedAdapter, SimulatorBrokerFeed>();
+        builder.Services.AddScoped<IBrokerOrders, BrokerOrdersDispatcher>();
+        builder.Services.AddScoped<IBrokerFeed, BrokerFeedDispatcher>();
+        builder.Services.AddScoped<SendBrokerOrders>();
+        builder.Services.AddScoped<PullExecutionReports>();
+        builder.Services.AddScoped<ProcessExecutionReports>();
+        builder.Services.AddScoped<PostOrderFills>();
+        if (host == BrokerConnectionHost.Worker)
+        {
+            // One run of a connection at a time (R19); the bank sync registers the same lock when it runs first.
+            builder.Services.TryAddSingleton(sp =>
+            {
+                var connectionString = sp.GetRequiredService<IConfiguration>().GetConnectionString(Services.Database);
+                Guard.Against.Null(connectionString, message: $"Connection string '{Services.Database}' not found.");
+                return new SqlRunLock(connectionString);
+            });
+            builder.Services.AddScoped<BrokerSyncJob>();
         }
     }
 

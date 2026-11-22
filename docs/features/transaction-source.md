@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-19
-last_updated: 2026-11-22
+last_updated: 2026-11-23
 related:
   - ../custodial-roadmap.md
   - posting.md
@@ -404,3 +404,14 @@ Status of this amendment: `accepted` (2026-11-22), together with [corporate-acti
 - R12, R13: `CorporateAction` is not hand-reversible. `POST /transactions/{id}/reverse` of an entitlement posting → 400 by R13.
 - §6: script `0050_corporate_actions.sql` widens `CK_Transactions_SourceKind` to 0–7 and requires a `SourcePublicId` for kinds 2–7.
 - R18 (item): `source.kind` may be `CorporateAction`, with `id` the corporate action's PublicId.
+
+---
+
+## Amendment 2026-11-23 (orders and settlement) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R32, R35 and R37 live there; this section records what changes here.
+
+- R2, R3: new source kind `OrderFill = 8`, with the **order's** PublicId as source id (required). Every fill of one order has the same source id, as every trade of one rebalance has the same handle. `TransactionSource.OrderFill(Guid orderPublicId)` refuses an empty id.
+- R12, R13: `OrderFill` is not hand-reversible. `POST /transactions/{id}/reverse` of a fill → 400 by R13. `Rebalance` stays hand-reversible until roadmap O3 (orders R49).
+- §6: script `0051_orders.sql` widens `CK_Transactions_SourceKind` to 0–8 and requires a `SourcePublicId` for kinds 2–8.
+- R10 (item): `source.kind` may be `OrderFill`, with `id` the order's PublicId; the fill itself is named in the item's `execution` (orders R38).

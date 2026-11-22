@@ -249,6 +249,9 @@ public class CreateFxConversionCommandHandler(
 
         await AvailableCashGuard.EnsureAsync(db, currencies, pair.From, fromSumAfter, cancellationToken);
 
+        // Orders R45: the sell amount comes from the account's withdrawable cash.
+        await WithdrawableCashGuard.EnsureAsync(db, currencies, pair.From, fromSumAfter, cancellationToken);
+
         return new IdempotentResult(201, body);
     }
 

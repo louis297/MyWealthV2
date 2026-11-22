@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using FluentValidation.Results;
+using MyWealthV2.Application.Broker;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Domain.Entities;
@@ -18,6 +19,9 @@ public class CreateTenantCommand : IRequest<Guid>
     public required string ReportingCurrency { get; init; }
 
     public IReadOnlyList<string>? AllowedCustodyModes { get; init; }
+
+    /// <summary>Orders R3: a broker connection configured on this host, or none.</summary>
+    public string? BrokerConnection { get; init; }
 }
 
 public class CreateTenantCommandValidator : AbstractValidator<CreateTenantCommand>
@@ -41,7 +45,7 @@ public class CreateTenantCommandValidator : AbstractValidator<CreateTenantComman
     }
 }
 
-public class CreateTenantCommandHandler(IApplicationDbContext db, ICurrencyCatalog catalog)
+public class CreateTenantCommandHandler(IApplicationDbContext db, ICurrencyCatalog catalog, IBrokerConnections brokerConnections)
     : IRequestHandler<CreateTenantCommand, Guid>
 {
     public async Task<Guid> Handle(CreateTenantCommand request, CancellationToken cancellationToken)
@@ -57,6 +61,8 @@ public class CreateTenantCommandHandler(IApplicationDbContext db, ICurrencyCatal
                     "Reporting currency must be an enabled catalog code.")
             ]);
         }
+
+        BrokerConnectionRule.Ensure(brokerConnections, request.BrokerConnection);
 
         if (await db.Tenants.AnyAsync(tenant => tenant.Name == name, cancellationToken))
         {
@@ -74,6 +80,11 @@ public class CreateTenantCommandHandler(IApplicationDbContext db, ICurrencyCatal
 
         var tenant = Tenant.Create(name, code, currency);
         tenant.SetAllowedCustodyModes(AllowedCustodyModesRule.Parse(request.AllowedCustodyModes!));
+        if (request.BrokerConnection is not null)
+        {
+            tenant.SetBrokerConnection(request.BrokerConnection);
+        }
+
         db.Tenants.Add(tenant);
         await db.SaveChangesAsync(cancellationToken);
         return tenant.PublicId;

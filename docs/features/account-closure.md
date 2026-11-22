@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-22
-last_updated: 2026-11-22
+last_updated: 2026-11-23
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -541,3 +541,14 @@ Status of this amendment: `accepted` (2026-11-22), together with [interest-run.m
 - R4–R7: when an account closure is requested, after the checks of R3, R5 and R6 and before the payout is worked out (R7), under the same Account lock and in the same database transaction, the platform accrues the account through yesterday (UTC) and posts every accrual row not yet posted, whatever its month. When that posts a Transaction it also stores an interest run with trigger `AccountClosure`, that one account and the requester, which is the Transaction's source. The payout and `cashBalanceAtRequest` then include the net interest (interest-run R33).
 - R11: a closing account is not accrued. When the closure ends with its withdrawal, the next interest run accrues the days in between; when it completes, the account is Closed and earns nothing more. The day of the request and the days the payout is on its way earn no interest.
 - §2 Out and "Still open": interest to the closing date is no longer out or open; it is the step above. The final advisory fee stays open.
+
+---
+
+## Amendment 2026-11-23 (orders and settlement) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R7 and R47 live there; this section records what changes here.
+
+- R5 gains two refusals, each 400 `errors.AccountId`: a live order (an open order, or one with a fill not posted yet) → `Open orders must be filled, cancelled or expired before the account can be closed.`; a fill that is not settled → `Trades must settle before the account can be closed.` (orders R47). This is the "later instruction kind" R5 named.
+- R7: with no live order and no unsettled fill, the cash `SUM` is all withdrawable, so the payout rule is unchanged.
+- R12: `POST /orders` and `POST /orders/preview` for a closing account → 400 with `This account is being closed and accepts no new activity.` (orders R7).
+- R16 still holds: a closing account has no holding and no live order, so no fill can reach it.

@@ -83,6 +83,8 @@ function renderAt(
     depositInstructions?: () => Response;
     cash?: Record<string, unknown>;
     withdrawals?: unknown[];
+    orders?: unknown[];
+    holdings?: unknown[];
     nominated?: unknown[];
     taxProfile?: unknown;
   } = {},
@@ -127,8 +129,12 @@ function renderAt(
       const items = options.withdrawals ?? [];
       return json({ items, page: 1, pageSize: 100, totalCount: items.length });
     }
+    if (url.includes("/orders?accountId=")) {
+      const items = options.orders ?? [];
+      return json({ items, page: 1, pageSize: 100, totalCount: items.length });
+    }
     if (url.includes("/accounts/") && url.endsWith("/holdings")) {
-      return json({ items: [] });
+      return json({ items: options.holdings ?? [] });
     }
     if (url.includes("/transactions?accountId=")) {
       return json({ items: activity, page: 1, pageSize: 20, totalCount: activity.length });
@@ -693,7 +699,7 @@ describe("Customer Portal bank accounts and withdrawals (withdrawals C22–C25)"
     expect(within(section).queryByRole("button")).not.toBeInTheDocument();
   });
 
-  it("shows Available to withdraw, and Withdrawals in progress when cash is reserved (C23)", async () => {
+  it("shows Available to withdraw, and Reserved when cash is reserved (C23, C33)", async () => {
     renderAt("/accounts/account-1", me, [], "Custodial", {
       account: custodialUsd,
       cash: { currency: "USD", cashBalance: 1000, reservedCash: 300, availableCash: 700 },
@@ -701,18 +707,131 @@ describe("Customer Portal bank accounts and withdrawals (withdrawals C22–C25)"
 
     expect(await screen.findByText("Available to withdraw")).toBeInTheDocument();
     expect(screen.getByText("700 USD")).toBeInTheDocument();
-    expect(screen.getByText("Withdrawals in progress")).toBeInTheDocument();
+    expect(screen.getByText("Reserved")).toBeInTheDocument();
     expect(screen.getByText("300 USD")).toBeInTheDocument();
+    expect(screen.getByText("Cash")).toBeInTheDocument();
+    expect(screen.queryByText("From sales, not settled yet")).not.toBeInTheDocument();
   });
 
-  it("hides Withdrawals in progress when nothing is reserved (C23)", async () => {
+  it("shows the cash from sales that has not settled, and Available to withdraw without it (C33)", async () => {
+    renderAt("/accounts/account-1", me, [], "Custodial", {
+      account: custodialUsd,
+      cash: { currency: "USD", cashBalance: 6200, reservedCash: 1055.25, availableCash: 5144.75, unsettledCash: 2000, withdrawableCash: 3144.75 },
+    });
+
+    expect(await screen.findByText("From sales, not settled yet")).toBeInTheDocument();
+    expect(screen.getByText("2000 USD")).toBeInTheDocument();
+    expect(screen.getByText("1055.25 USD")).toBeInTheDocument();
+    expect(screen.getByText("3144.75 USD")).toBeInTheDocument();
+    expect(screen.queryByText("5144.75 USD")).not.toBeInTheDocument();
+  });
+
+  it("lists open orders and those that ended in the last 30 days, in the Customer's words, with no action (C32)", async () => {
+    const days = (count: number) => new Date(Date.now() - count * 86400000).toISOString();
+    const order = (id: string, overrides: Record<string, unknown>) => ({
+      id,
+      instrument: { id: "i-1", symbol: "ACME.SIM", name: "Acme Holdings" },
+      side: "Buy",
+      quantity: 10,
+      filledQuantity: 0,
+      status: "Working",
+      placedAt: "2026-11-23T02:10:00Z",
+      closedAt: null,
+      ...overrides,
+    });
+    const { fetchMock } = renderAt("/accounts/account-1", me, [], "Custodial", {
+      account: custodialUsd,
+      orders: [
+        order("o-1", { status: "Placed" }),
+        order("o-2", { status: "PartlyFilled", filledQuantity: 4, side: "Sell", quantity: 10 }),
+        order("o-3", { status: "Filled", filledQuantity: 10, closedAt: days(2) }),
+        order("o-4", { status: "Rejected", closedAt: days(3), instrument: { id: "i-2", symbol: "BETA.SIM", name: "Beta" } }),
+        order("o-5", { status: "Cancelled", closedAt: days(4) }),
+        order("o-6", { status: "Expired", closedAt: days(5) }),
+        order("o-7", { status: "Filled", closedAt: days(40), instrument: { id: "i-3", symbol: "OLD.SIM", name: "Old" } }),
+      ],
+    });
+
+    const table = await screen.findByRole("table", { name: "Orders" });
+    const rows = within(table).getAllByRole("row").slice(1).map((row) =>
+      within(row).getAllByRole("cell").slice(0, 2).map((cell) => cell.textContent));
+    expect(rows).toEqual([
+      ["Buy 10 ACME.SIM", "With the broker"],
+      ["Sell 10 ACME.SIM", "Partly filled (4 of 10)"],
+      ["Buy 10 ACME.SIM", "Done"],
+      ["Buy 10 BETA.SIM", "Not accepted"],
+      ["Buy 10 ACME.SIM", "Cancelled"],
+      ["Buy 10 ACME.SIM", "Expired"],
+    ]);
+    expect(within(table).queryByText(/OLD\.SIM/)).not.toBeInTheDocument();
+    expect(within(table).queryByRole("button")).not.toBeInTheDocument();
+    expect(within(table).queryByRole("link")).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([input]) => String(input instanceof Request ? input.url : input).includes("/orders?accountId=account-1")))
+      .toBe(true);
+  });
+
+  it("asks for no orders on an External account (C32)", async () => {
+    const { fetchMock } = renderAt("/accounts/account-1");
+
+    expect(await screen.findByText("No holdings.")).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([input]) => String(input instanceof Request ? input.url : input).includes("/orders")))
+      .toBe(false);
+    expect(screen.queryByRole("table", { name: "Orders" })).not.toBeInTheDocument();
+  });
+
+  it("labels a fill by what was bought or sold, with its trade date, settlement and contract note (C34)", async () => {
+    const fill = (id: string, type: string, quantity: number, settledAt: string | null) => ({
+      id,
+      type,
+      bookedAt: "2026-11-23T02:13:00Z",
+      memo: null,
+      cash: [{ accountId: "account-1", amount: type === "Buy" ? -400.48 : 400.48, currency: "USD" }],
+      security: [{ accountId: "account-1", instrumentId: "i-1", quantity }],
+      source: { kind: "OrderFill", id: "o-1" },
+      execution: { orderId: "o-1", price: 100.12, tradeDate: "2026-11-23", settlementDate: "2026-11-25", brokerReference: "CN-1", settledAt },
+    });
+    const hand = {
+      id: "t-3", type: "Buy", bookedAt: "2026-10-01T02:13:00Z", memo: null, cash: [], security: [], source: { kind: "Rebalance", id: "r" },
+    };
+    renderAt("/accounts/account-1", me, [fill("t-1", "Buy", 4, null), fill("t-2", "Sell", -4, "2026-11-25T00:10:00Z"), hand], "Custodial", {
+      account: custodialUsd,
+      orders: [{
+        id: "o-1", instrument: { id: "i-1", symbol: "ACME.SIM", name: "Acme Holdings" }, side: "Buy", quantity: 4, filledQuantity: 4,
+        status: "Filled", placedAt: "2026-11-23T02:10:00Z", closedAt: "2026-11-23T02:13:00Z",
+      }],
+    });
+
+    expect(await screen.findByText("Bought 4 ACME.SIM at 100.12")).toBeInTheDocument();
+    expect(screen.getByText("Sold 4 ACME.SIM at 100.12")).toBeInTheDocument();
+    expect(screen.getByText("Settles 25 Nov")).toBeInTheDocument();
+    expect(screen.getByText("Settled")).toBeInTheDocument();
+    expect(screen.getAllByText("Trade date 2026-11-23")).toHaveLength(2);
+    expect(screen.getAllByText("Contract note CN-1")).toHaveLength(2);
+    // A trade that is not a fill keeps its row.
+    expect(screen.getByText("Buy")).toBeInTheDocument();
+  });
+
+  it("shows the quantity a sell order reserves under a holding (C35)", async () => {
+    renderAt("/accounts/account-1", me, [], "Custodial", {
+      account: custodialUsd,
+      holdings: [
+        { id: "h-1", instrumentId: "i-1", symbol: "ACME.SIM", name: "Acme Holdings", quantity: 100, reservedQuantity: 40 },
+        { id: "h-2", instrumentId: "i-2", symbol: "BETA.SIM", name: "Beta", quantity: 5, reservedQuantity: 0 },
+      ],
+    });
+
+    expect(await screen.findByText("40 reserved for a sell order")).toBeInTheDocument();
+    expect(screen.getAllByText(/reserved for a sell order/)).toHaveLength(1);
+  });
+
+  it("hides Reserved when nothing is reserved (C23)", async () => {
     renderAt("/accounts/account-1", me, [], "Custodial", {
       account: custodialUsd,
       cash: { currency: "USD", cashBalance: 1000, reservedCash: 0, availableCash: 1000 },
     });
 
     expect(await screen.findByText("Available to withdraw")).toBeInTheDocument();
-    expect(screen.queryByText("Withdrawals in progress")).not.toBeInTheDocument();
+    expect(screen.queryByText("Reserved")).not.toBeInTheDocument();
   });
 
   it("lists open withdrawals and those of the last 90 days, with no action (C24)", async () => {

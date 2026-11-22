@@ -219,7 +219,7 @@ public class BankReconciliationRunTests : TestBase
         var (tenant, _, customer, admin) = await AccountHttp.SignInTenantAdmin();
         var (accountId, instrumentId) = await FeeHttp.TradingAccountAsync(admin.AccessToken, customer.PublicId, cash: 2000m);
         await FeeHttp.AddScheduleAsync(tenant.Id, "USD", FeeHttp.Today);
-        (await FeeHttp.PostTradeAsync(admin.AccessToken, accountId, "Buy", instrumentId, 50m)).StatusCode
+        (await FeeHttp.TradeAsync(accountId, "Buy", instrumentId, 50m)).StatusCode
             .ShouldBe(HttpStatusCode.Created);
         var clientMoney = await BankFeedHttp.ClientMoneyAccountAsync(tenant.Id);
 

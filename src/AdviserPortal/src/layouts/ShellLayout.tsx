@@ -14,6 +14,7 @@ import {
   WalletIcon,
   ShieldCheckIcon,
   BanknoteArrowUpIcon,
+  ClipboardListIcon,
   ScaleIcon,
   PercentIcon,
   SplitIcon,
@@ -51,6 +52,7 @@ import {
   canAccessPortfolios,
   canAccessProfile,
   canAccessReports,
+  canAccessOrders,
   canAccessWithdrawals,
   canCheckBankAccounts,
   canManageBankReconciliations,
@@ -134,6 +136,12 @@ export function ShellLayout({ children }: { children?: ReactNode }) {
       label: "Bank reconciliation",
       icon: ScaleIcon,
       visible: canManageBankReconciliations(role),
+    },
+    {
+      to: "/orders",
+      label: "Orders",
+      icon: ClipboardListIcon,
+      visible: canAccessOrders(role),
     },
     {
       to: "/withdrawals",

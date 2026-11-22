@@ -35,7 +35,11 @@ public class GetAccountCashBalanceQueryHandler(IApplicationDbContext db, ICurren
                   ?? throw new NotFoundException("Account", request.Id);
         var cashBalance = await TransactionCash.SumAsync(db, row.Id, cancellationToken);
         var reserved = await AccountCash.ReservedAsync(db, row.Id, cancellationToken);
+        var unsettled = await AccountCash.UnsettledAsync(db, row.Id, cancellationToken);
         return new AccountCashBalanceDto(
-            row.PublicId, row.Currency, cashBalance, reserved, Domain.Custody.AvailableCash.Of(cashBalance, reserved));
+            row.PublicId, row.Currency, cashBalance, reserved, Domain.Custody.AvailableCash.Of(cashBalance, reserved), unsettled,
+            row.CustodyMode == CustodyMode.Custodial
+                ? Domain.Custody.AvailableCash.Withdrawable(cashBalance, reserved, unsettled)
+                : cashBalance);
     }
 }

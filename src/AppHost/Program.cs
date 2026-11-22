@@ -238,6 +238,9 @@ var eodhdApiKey = builder.AddParameter("eodhd-api-key", secret: true);
 // key. worker does not wait for the simulator: a missing party is a normal state (ADR 0021 rule 15).
 web.WithEnvironment("BankConnections__simulator__Adapter", "Simulator");
 
+// Orders R2, §9.1: the same pattern for the broker connection. worker sends the orders and reads the reports.
+web.WithEnvironment("BrokerConnections__simulator__Adapter", "Simulator");
+
 // Simulated instruments R1, §9.1: the same pattern for the market data connection; its suffix decides which
 // instruments the simulator prices.
 web.WithEnvironment("MarketDataConnections__simulator__Adapter", "Simulator")
@@ -249,6 +252,9 @@ builder.AddProject<Projects.Worker>(Services.Worker)
     .WithEnvironment("BankConnections__simulator__Adapter", "Simulator")
     .WithEnvironment("BankConnections__simulator__BaseUrl", simulator.GetEndpoint("party"))
     .WithEnvironment("BankConnections__simulator__ApiKey", simulatorPartyApiKey)
+    .WithEnvironment("BrokerConnections__simulator__Adapter", "Simulator")
+    .WithEnvironment("BrokerConnections__simulator__BaseUrl", simulator.GetEndpoint("party"))
+    .WithEnvironment("BrokerConnections__simulator__ApiKey", simulatorPartyApiKey)
     .WithEnvironment("MarketDataConnections__simulator__Adapter", "Simulator")
     .WithEnvironment("MarketDataConnections__simulator__SymbolSuffix", ".SIM")
     .WithEnvironment("MarketDataConnections__simulator__BaseUrl", simulator.GetEndpoint("party"))

@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-17
-last_updated: 2026-11-22
+last_updated: 2026-11-23
 related:
   - account-custody-mode.md
   - accounts.md
@@ -598,3 +598,16 @@ Status of this amendment: `accepted` (2026-11-22), together with [corporate-acti
 - R5 matrix: the cell `Split` / `Bonus` / `Scrip` on a Custodial account stays **refused**; its "written by" is now corporate actions for `Split` and `Bonus` (corporate-actions R33). `Scrip` waits for roadmap C3. The refusal message and `errors.Type` are unchanged.
 - R7: the corporate action apply step builds the posting with `Transaction.PostCorporateAction`, outside the matrix, with the platform time as `bookedAt`.
 - §11 point 3 (a Custodial account cannot record a split) closes when [corporate-actions.md](corporate-actions.md) lands.
+
+---
+
+## Amendment 2026-11-23 (orders and settlement) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R48, R49 and R51 live there; this section records what changes here.
+
+- R5 matrix: the cell `Buy` / `Sell` on a Custodial account becomes **refused**: `POST /transactions` → 400 `errors.Type` with the message `Trades on a Custodial account go through the broker. Place an order.`, for every caller. Its "written by" is order fills, and rebalance until roadmap O3. The External column is unchanged.
+- §4.2.1: the message for `StockIn` / `StockOut` becomes `Securities cannot be moved in or out of a Custodial account by hand. Place an order.`
+- R7: a fill is built with `Transaction.PostBuy` / `PostSell` outside the matrix, with the platform time as `bookedAt`. Rebalance still posts `Buy` / `Sell` the same way.
+- R17: on a Custodial account the trade lock now decides an order: `POST /orders` on an account with an Active assignment is refused (orders R8).
+- R18: "`Buy` / `Sell` are priced by the server and carry the trade fee of the tenant's schedule" now describes rebalance trades only. A fill is priced by the broker and carries the fee of its order (orders R32, R33).
+- After this slice a person enters on a Custodial account only `InternalTransfer`, `FxConversion`, an `Adjustment` and the reverse of a hand-reversible source (orders R51). No transitional cell is left in the matrix.

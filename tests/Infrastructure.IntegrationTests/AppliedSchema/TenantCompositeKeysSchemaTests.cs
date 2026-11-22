@@ -539,6 +539,32 @@ public class TenantCompositeKeysSchemaTests
             INSERT INTO [TransactionCorporateActionDetails] ([TransactionId], [TenantId], [Kind], [RatioNew], [RatioHeld], [ExDate], [QuantityBefore], [QuantityAfter])
             VALUES (@{p}_buy, @a_tenant, 0, 2, 1, '2026-12-01', 1, 2);
             """),
+        ("FK_Orders_Accounts_TenantId_AccountId", "Accounts", OrderRow(account: "@{p}_brokerage")),
+        ("FK_Orders_Instruments_TenantId_InstrumentId", "Instruments", OrderRow(instrument: "@{p}_instrument")),
+        ("FK_Orders_TradeFeeSchedules_TenantId_TradeFeeScheduleId", "TradeFeeSchedules", OrderRow(schedule: "@{p}_feeschedule")),
+        ("FK_Orders_Users_TenantId_PlacedByUserId", "Users", OrderRow(placedBy: "@{p}_adviser")),
+        ("FK_Orders_Users_TenantId_CancelRequestedByUserId", "Users", OrderRow(cancelledBy: "@{p}_adviser")),
+        ("FK_OrderFills_Orders_TenantId_OrderId", "Orders", OrderRow(tenant: "@{p}_tenant", account: "@{p}_brokerage",
+            instrument: "@{p}_instrument", placedBy: "@{p}_adviser") + """
+            DECLARE @order int = SCOPE_IDENTITY();
+            INSERT INTO [ExecutionReports] ([PublicId], [Connection], [OutsideId], [Kind], [ReceivedAt], [Status])
+            VALUES (NEWID(), N'simulator', CONVERT(nvarchar(100), NEWID()), 0, SYSDATETIMEOFFSET(), 0);
+            INSERT INTO [OrderFills] ([PublicId], [TenantId], [OrderId], [ExecutionReportId], [Quantity], [Price], [TradeDate], [SettlementDate], [Status])
+            VALUES (NEWID(), @a_tenant, @order, SCOPE_IDENTITY(), 4, 100, '2026-11-23', '2026-11-25', 0);
+            """),
+        ("FK_OrderFills_Transactions_TenantId_TransactionId", "Transactions", OrderRow() + """
+            DECLARE @order int = SCOPE_IDENTITY();
+            INSERT INTO [ExecutionReports] ([PublicId], [Connection], [OutsideId], [Kind], [ReceivedAt], [Status])
+            VALUES (NEWID(), N'simulator', CONVERT(nvarchar(100), NEWID()), 0, SYSDATETIMEOFFSET(), 0);
+            INSERT INTO [OrderFills]
+                ([PublicId], [TenantId], [OrderId], [ExecutionReportId], [Quantity], [Price], [TradeDate], [SettlementDate], [Status],
+                 [TransactionId], [NetCash], [PostedAt])
+            VALUES (NEWID(), @a_tenant, @order, SCOPE_IDENTITY(), 4, 100, '2026-11-23', '2026-11-25', 1, @{p}_buy, -400, SYSDATETIMEOFFSET());
+            """),
+        ("FK_TransactionExecutionDetails_Transactions_TenantId_TransactionId", "Transactions", """
+            INSERT INTO [TransactionExecutionDetails] ([TransactionId], [TenantId], [FillPublicId], [Price], [TradeDate], [SettlementDate])
+            VALUES (@{p}_buy, @a_tenant, NEWID(), 100, '2026-11-23', '2026-11-25');
+            """),
         ("FK_ReportExecutions_ReportSchedules_TenantId_ScheduleId", "ReportSchedules", """
             INSERT INTO [ReportExecutions] ([PublicId], [ReportId], [ScheduleId], [TenantId], [TriggerKind], [Status], [ParametersJson], [Created], [CreatedBy])
             VALUES (NEWID(), @report, @{p}_schedule, @a_tenant, N'Scheduled', N'Queued', N'{}', SYSDATETIMEOFFSET(), N'test');
@@ -572,7 +598,27 @@ public class TenantCompositeKeysSchemaTests
     ];
 
     private static readonly string[] Parents =
-        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines", "BankReconciliations", "InterestRateSchedules", "CorporateActions"];
+        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines", "BankReconciliations", "InterestRateSchedules", "CorporateActions", "Orders"];
+
+    /// <summary>An order of tenant <c>a</c> (script 0051); one argument names a row of the other tenant.</summary>
+    private static string OrderRow(
+        string tenant = "@a_tenant",
+        string account = "@a_brokerage",
+        string instrument = "@a_instrument",
+        string schedule = "NULL",
+        string placedBy = "@a_adviser",
+        string cancelledBy = "NULL") => $"""
+        INSERT INTO [Orders]
+            ([PublicId], [TenantId], [AccountId], [InstrumentId], [Side], [Type], [TimeInForce], [Quantity], [Currency],
+             [ReferencePrice], [ReferencePriceDate], [PriceLimit], [TradeFeeScheduleId], [Connection], [Status], [FilledQuantity],
+             [PostedGross], [FeeCharged], [ReservedCash], [ReservedQuantity], [PlacedByUserId], [PlacedAt], [Attempts],
+             [CancelRequestedAt], [CancelRequestedByUserId], [Created], [CreatedBy])
+        VALUES (NEWID(), {tenant}, {account}, {instrument}, 0, 0, 0, 10, 'USD',
+                100, '2026-11-23', 105, {schedule}, N'simulator', 0, 0,
+                0, 0, 0, 0, {placedBy}, SYSDATETIMEOFFSET(), 0,
+                {(cancelledBy == "NULL" ? "NULL" : "SYSDATETIMEOFFSET()")}, {cancelledBy}, SYSDATETIMEOFFSET(), N'test');
+
+        """;
 
     private static IEnumerable<TestCaseData> CompositeKeyCases() =>
         CompositeKeys.Select(key => new TestCaseData(key.ForeignKey).SetName($"Insert_ChildPointingAtOtherTenant_IsRejected({key.ForeignKey})"));

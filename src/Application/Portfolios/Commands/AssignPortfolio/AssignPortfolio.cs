@@ -46,6 +46,15 @@ public class AssignPortfolioCommandHandler(
                 "Only an open Custodial account that is not being closed can be assigned a portfolio.");
         }
 
+        // Orders R49: an order and an assignment never share an account, so a rebalance never plans around a
+        // reservation.
+        if (await Orders.OrderReservations.HasLiveOrderAsync(db, account.Id, cancellationToken))
+        {
+            throw new RebalanceException(
+                "account_not_eligible",
+                "Cancel the account's open orders before assigning a portfolio.");
+        }
+
         var portfolio = await db.Portfolios.SingleOrDefaultAsync(
             row => row.PublicId == request.PortfolioId && row.TenantId == account.TenantId,
             cancellationToken) ?? throw new NotFoundException("Portfolio", request.PortfolioId);

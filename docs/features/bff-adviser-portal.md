@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-01
-last_updated: 2026-11-22
+last_updated: 2026-11-23
 related:
   - ../function-plan.md
   - ../architecture.md
@@ -502,3 +502,14 @@ Add `/corporate-actions` to the BFF prefix allow-list (R20) so the Adviser Porta
 - Who: TenantAdmin and Adviser. `webapi` checks `corporate-actions.read` and `corporate-actions.manage`; the BFF does not filter by role, so an Adviser gets the 403 from `webapi` on writes.
 - `GET /corporate-action-announcements` is a Back Office route and is not proxied.
 - The Customer Portal BFF does not change: the Customer sees an entitlement through `/transactions`.
+
+---
+
+## Amendment 2026-11-23 (orders prefix) — accepted
+
+Add `/orders` to the BFF prefix allow-list (R20) so the Adviser Portal can call the routes of [orders.md](orders.md) through `/api`.
+
+- Prefix: `/orders`
+- Methods: GET, POST
+- Who: TenantAdmin and Adviser. `webapi` checks `orders.read` and `orders.place`; the BFF does not filter by role.
+- `GET /broker-connections` and `GET /execution-reports` are Back Office routes and are not proxied.

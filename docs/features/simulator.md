@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-19
-last_updated: 2026-11-22
+last_updated: 2026-11-23
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -500,3 +500,18 @@ Status of this amendment: `accepted` (2026-11-22), together with [corporate-acti
 - R24: a reset also empties the corporate actions and their versions.
 - R28: new control log actions `CorporateActionAnnounced`, `CorporateActionAmended` and `CorporateActionCancelled`.
 - R33: the simulator never learns who holds an instrument or what the platform posted.
+
+---
+
+## Amendment 2026-11-23 (orders and settlement) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R52–R65 and the simulator script `0010_broker.sql` live there (§4.10, §6.2); this section records what changes here.
+
+- A new party, the **simulator broker**: it accepts, rejects, fills, partly fills, cancels and expires orders, and settles fills. It holds no positions and no cash and checks neither. Broker order id `{WorldId:N}-O{n}`, report outside id `{WorldId:N}-X{n}`, contract note `CN-{n}`.
+- Control routes: `GET /control/broker`, `POST /control/broker/order-mode`, `POST /control/broker/slippage`, `POST /control/broker/settlement-days`, `GET /control/broker/orders`, `GET /control/broker/orders/{brokerOrderId}`, `POST /control/broker/orders/{brokerOrderId}/fill`, `POST /control/broker/orders/{brokerOrderId}/cancel`. Party routes: `POST /party/broker/orders` (idempotent on the client order id), `POST /party/broker/orders/{clientOrderId}/cancel`, `GET /party/broker/reports?after={cursor}&limit={n}` (cursor, limit, key and outage as deposit-matching R44).
+- R22: advancing the clock is how the operator lets working orders expire (the end of the simulator day they were accepted on) and fills settle (the settlement date, a number of weekdays after the trade date).
+- R24: a reset also empties the broker's orders, fills and reports and restores its settings (mode `Fill` at 100, slippage `0.10`, settlement days 2).
+- R28: new control log actions `BrokerOrderModeChanged`, `BrokerSlippageSet`, `BrokerSettlementDaysSet`, `BrokerOrderFilled` and `BrokerOrderCancelled`.
+- R33: the simulator stores the client order id as an opaque string and never learns the Tenant, Account or Customer of an order.
+- §11 point 8 is answered: the order call carries the platform's reference price, and the broker fills a symbol it does not own near that price; a simulated instrument fills at the simulator market's own price. The simulator reads nothing from the platform.
+- "Still open": business calendars and settlement dates are answered for S2 by a settlement-days setting that skips Saturday and Sunday, with no holiday calendar.

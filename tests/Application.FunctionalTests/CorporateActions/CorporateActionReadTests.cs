@@ -18,8 +18,7 @@ public class CorporateActionReadTests : TestBase
         var world = await NominatedWorld.CreateAsync();
         var holders = await HoldersAsync(world);
         var id = await ApplyNowAsync(world, CreateBody(holders.InstrumentId, ratioNew: 2, exDate: Today));
-        (await CustodialHttp.PostAsync(world.TenantAdmin.AccessToken, CustodialHttp.Trade(holders.Olga, "Sell", holders.InstrumentId, 10m)))
-            .StatusCode.ShouldBe(HttpStatusCode.Created);
+        await CustodialHttp.InsertManualTradeAsync(holders.Olga, "Sell", holders.InstrumentId, 10m);
         await RunApplyAsync();
 
         var page = await GetAsync(world.TenantAdmin.AccessToken, $"{Root}/{id}/entitlements");

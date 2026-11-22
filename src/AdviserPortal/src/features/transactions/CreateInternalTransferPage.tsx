@@ -8,6 +8,7 @@ import { type Account, useGetAccountQuery, useGetAccountsQuery } from "@/feature
 import { useGetCustomerQuery, useGetCustomersQuery } from "@/features/customers/customersApi";
 import { useCreateInternalTransferMutation } from "@/features/transactions/transactionsApi";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
+import { WithdrawableCash } from "@/features/accounts/WithdrawableCash";
 import { anotherCustomer, bookedWhenPosted, differentCustodyMode, isCustodial } from "@/features/accounts/custodyRules";
 import { toUtcIso } from "@/shared/time/instant";
 import { cn } from "cn";
@@ -224,6 +225,8 @@ export function CreateInternalTransferPage() {
                 setReviewing(false);
               }}
             />
+            {/* D75: unsettled sale proceeds cannot leave a Custodial account (orders R45). */}
+            {custodial ? <WithdrawableCash account={from} /> : null}
             {custodial ? (
               <Muted>{bookedWhenPosted}</Muted>
             ) : (

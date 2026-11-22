@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-25
-last_updated: 2026-11-22
+last_updated: 2026-11-23
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -487,3 +487,15 @@ Status of this amendment: `accepted` (2026-11-22), together with [corporate-acti
 - The §5 type table: on a Custodial account `Split` and `Bonus` are still refused on `POST /transactions` for every caller; they are written only by the platform from a corporate action (`Transaction.PostCorporateAction`, source `CorporateAction`), one security leg of the quantity difference with cost `0`, no cash leg (corporate-actions R26). External accounts unchanged.
 - R20: an entitlement posting has no cash leg. Its `bookedAt` is the platform time of the posting; the party's dates are in its corporate action detail (corporate-actions R26, R27).
 - R22: each entitlement is posted in its own database transaction with the Account row locked (corporate-actions R25).
+
+---
+
+## Amendment 2026-11-23 (orders and settlement) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R31, R32, R39 and R48 live there; this section records what changes here.
+
+- The §5 type table: on a Custodial account `Buy` and `Sell` are refused on `POST /transactions` for every caller (400 `errors.Type`). They are written by the platform from the fill of an order (`Transaction.PostBuy` / `PostSell` with source `OrderFill` and an execution detail) and, until roadmap O3, by a rebalance. External accounts unchanged.
+- §1: an order is an instruction with its own lifecycle, like a withdrawal (roadmap D3). It is not a Transaction; a Transaction is posted for each fill the broker reports.
+- R9: on a Custodial account available cash is the cash `SUM` minus reserved cash, and reserved cash now also counts the live buy orders (orders R39). Cash from a sale that has not settled is in the `SUM` (orders R44).
+- R20: a fill's `bookedAt` is the platform time of the posting; the broker's trade date and settlement date are in its execution detail (orders R32, R35).
+- R22: placing an order locks the Account row, and each fill is posted in its own database transaction with the Account row locked (orders R12, R31).

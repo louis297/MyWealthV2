@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-22
-last_updated: 2026-11-22
+last_updated: 2026-11-23
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -728,3 +728,14 @@ Do not put dividends, a reversing flow, External accounts or a real vendor adapt
 ### Docs amended when this spec was accepted
 
 [split.md](split.md) (R8 and §13: on a Custodial account `Split` and `Bonus` are written by corporate actions from a ratio; hand entry stays for External accounts), [holdings.md](holdings.md) (the type table: an entitlement posting), [posting.md](posting.md) (the type table and R20: `Split` / `Bonus` on a Custodial account are written by the platform), [custody-modes.md](custody-modes.md) (R5 matrix: "written by" corporate actions; the known issue of §11 point 3 closes when this lands), [transaction-source.md](transaction-source.md) (kind `CorporateAction` = 7, not hand-reversible, check widened), [portfolios.md](portfolios.md) (R18: the trade lock does not apply to an entitlement posting), [adjustments.md](adjustments.md) (a note: reason `CorporateAction` corrects one account after a corporate action), [instruments.md](instruments.md) (a disabled instrument may still get a corporate action), [simulated-instruments.md](simulated-instruments.md) (R8: the steps before the price read and the skipped read; R17 and R18: the rebased price; the feed kind and failure), [simulator.md](simulator.md) (R39–R47, script `0009`, the routes and log actions), [bff-adviser-portal.md](bff-adviser-portal.md) (prefix `/corporate-actions`), [api-design.md](../api-design.md) (§3.1 two permission rows, §6 resource rows, a new §7.11 Corporate actions, §7.7 note, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [architecture.md](../architecture.md) (port `ICorporateActionFeed`, the job `corporate-action-apply`), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D64–D68), [customer-portal.md](../customer-portal/customer-portal.md) (C31), [back-office.md](../backoffice/back-office.md) (BO24, BO25), [known-issues/custodial-account-gaps.md](../known-issues/custodial-account-gaps.md) (the "A split cannot be recorded" row notes this spec; it is removed when the slice lands), [glossary.md](../glossary.md) (the review terms become accepted; Transaction source gains its new value), [function-plan.md](../function-plan.md) §5 (the roadmap step; §5.2: a split on a Custodial account comes from a corporate action), [features/README.md](README.md) row status, [future-plans.md](../future-plans.md) §9, and the roadmap §2 matrix, §7 C1, §11 S4, §13 status and §14.
+
+---
+
+## Amendment 2026-11-23 (orders and settlement) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R50 and R62 live there; this section records what changes here.
+
+- R22: when a corporate action is made effective, in the same database transaction every open order of the Tenant in that Instrument that has no cancel request gets one from the platform (no person, note `Corporate action`); a `Placed` order with no send attempt becomes `Cancelled` at once (orders R50). The order's quantity and price limit are on the old share basis.
+- R25: a sell fill that arrives after a consolidation made the holding smaller than the fill waits with `InsufficientHolding` until the account is corrected (orders R36).
+- R42: when a corporate action of a simulated instrument becomes effective, the simulator broker cancels every working order in that symbol (orders R62).
+- "Still open": the halt on trades between the ex-date and the posting is answered for orders by the two points above. A trade the broker made before the action and the platform posts after it stays open (§11 point 6).

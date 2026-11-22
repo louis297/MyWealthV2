@@ -1,4 +1,5 @@
 import { Link, useParams } from "react-router";
+import { shortDay } from "@/features/orders/orderLabels";
 import { DetailGrid, DetailItem, Muted, Page, PageHeading, recordLinkClass, Section } from "@/components/portal";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -74,6 +75,24 @@ export function TransactionDetailPage() {
                   <DetailItem label="Payer">{data.bankReceipt.payerName ?? "—"}</DetailItem>
                   <DetailItem label="Payer account">{data.bankReceipt.payerAccount ?? "—"}</DetailItem>
                 </DetailGrid>
+              </Section>
+            ) : null}
+            {data.execution ? (
+              // D74: the broker's execution behind an order fill.
+              <Section title="Trade">
+                <DetailGrid>
+                  <DetailItem label="Price">{data.execution.price}</DetailItem>
+                  <DetailItem label="Trade date">{data.execution.tradeDate}</DetailItem>
+                  <DetailItem label="Settlement date">
+                    {`${data.execution.settlementDate} (${
+                      data.execution.settledAt ? `Settled ${shortDay(data.execution.settlementDate)}` : "Not settled yet"
+                    })`}
+                  </DetailItem>
+                  <DetailItem label="Contract note">{data.execution.brokerReference ?? "—"}</DetailItem>
+                </DetailGrid>
+                <Link to={`/orders/${data.execution.orderId}`} className={recordLinkClass}>
+                  View the order
+                </Link>
               </Section>
             ) : null}
             {data.interest ? <InterestPostingBlock transaction={data} /> : null}

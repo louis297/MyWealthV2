@@ -1,6 +1,7 @@
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Interest.Runs;
 using MyWealthV2.Infrastructure.BankFeed;
+using MyWealthV2.Infrastructure.Broker;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.MarketData;
 using MyWealthV2.Schema;
@@ -25,6 +26,7 @@ builder.AddKeyVaultIfConfigured();
 builder.AddApplicationServices();
 builder.AddInfrastructureServices();
 builder.AddBankConnections(BankConnectionHost.WebApi);
+builder.AddBrokerConnections(BrokerConnectionHost.WebApi);
 builder.AddMarketDataConnections(MarketDataHost.WebApi);
 builder.AddWebServices();
 
