@@ -65,6 +65,9 @@ public sealed class TransactionSource : ValueObject
         return new TransactionSource(TransactionSourceKind.AccountClosure, closurePublicId);
     }
 
+    /// <summary>An interest posting's source: the PublicId of the interest run (interest-run R23).</summary>
+    public static TransactionSource InterestRun(Guid runPublicId) => throw new NotImplementedException();
+
     /// <summary>The source as stored on a Transaction row.</summary>
     internal static TransactionSource FromStored(TransactionSourceKind kind, Guid? publicId) =>
         kind switch

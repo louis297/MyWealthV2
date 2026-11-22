@@ -23,6 +23,9 @@ public class TransactionCashLeg : BaseAuditableEntity
     /// <summary>The fee behind a <see cref="CashLegRole.Fee"/> leg; null on a <see cref="CashLegRole.Principal"/> leg.</summary>
     public TransactionFeeDetail? FeeDetail { get; private set; }
 
+    /// <summary>The withholding tax behind a <see cref="CashLegRole.Tax"/> leg; null on every other leg (interest-run R25).</summary>
+    public TransactionTaxDetail? TaxDetail { get; private set; }
+
     internal static TransactionCashLeg Create(int tenantId, int accountId, decimal amount, string currency) =>
         new()
         {
