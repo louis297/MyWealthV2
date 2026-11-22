@@ -73,6 +73,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<AccountClosure> AccountClosures => Set<AccountClosure>();
 
+    public DbSet<CustomerTaxProfile> CustomerTaxProfiles => Set<CustomerTaxProfile>();
+
     public DbSet<Instrument> Instruments => Set<Instrument>();
 
     public DbSet<Account> Accounts => Set<Account>();

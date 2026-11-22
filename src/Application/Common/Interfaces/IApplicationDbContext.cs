@@ -26,6 +26,8 @@ public interface IApplicationDbContext
 
     DbSet<AccountClosure> AccountClosures { get; }
 
+    DbSet<CustomerTaxProfile> CustomerTaxProfiles { get; }
+
     DbSet<Instrument> Instruments { get; }
 
     DbSet<Account> Accounts { get; }
