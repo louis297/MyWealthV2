@@ -161,6 +161,41 @@ internal static class OrderHttp
         return buy.PublicId;
     }
 
+    /// <summary>Changes a holding under its orders, as a corporate action can (R50): an <c>Adjustment</c> written
+    /// straight to the database, which the reserved quantity rule of the adjustment route would refuse.</summary>
+    public static async Task ChangeHoldingAsync(Guid accountPublicId, Guid instrumentPublicId, decimal quantityChange, decimal costChange)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var account = await db.Accounts.IgnoreQueryFilters().SingleAsync(row => row.PublicId == accountPublicId);
+        var instrument = await db.Instruments.IgnoreQueryFilters().SingleAsync(row => row.PublicId == instrumentPublicId);
+        var holding = await db.Holdings.IgnoreQueryFilters().SingleAsync(row => row.AccountId == account.Id && row.InstrumentId == instrument.Id);
+        var cash = await db.TransactionCashLegs.IgnoreQueryFilters().Where(leg => leg.AccountId == account.Id).SumAsync(leg => leg.Amount);
+        var adjustment = Transaction.PostAdjustment(
+            account.TenantId, account.Id, account.Type, account.Currency, Domain.Enums.AdjustmentReason.CorporateAction,
+            "Holding changed for a test", null, DateTimeOffset.UtcNow, TransactionSource.Manual, null, cash,
+            new AdjustmentHoldingChange(
+                instrument.Id, instrument.QuoteCurrency.Trim(), quantityChange, costChange, holding.Quantity, holding.CostAmount));
+        adjustment.CreatedBy = "test";
+        adjustment.SecurityLegs.ForEach(leg => leg.CreatedBy = "test");
+        db.Transactions.Add(adjustment);
+        if (holding.ReplaceTotals(holding.Quantity + quantityChange, holding.CostAmount + costChange, holding.CostCurrency))
+        {
+            db.Holdings.Remove(holding);
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>Sets the status of an account straight in the database.</summary>
+    public static async Task SetAccountStatusAsync(Guid accountPublicId, Domain.Enums.AccountStatus status)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE [Accounts] SET [Status] = {(int)status} WHERE [PublicId] = {accountPublicId}");
+    }
+
     /// <summary>Sets or clears the broker connection of a tenant straight in the database.</summary>
     public static async Task SetBrokerConnectionAsync(int tenantId, string? connection)
     {

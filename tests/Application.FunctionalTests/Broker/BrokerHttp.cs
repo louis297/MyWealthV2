@@ -30,6 +30,13 @@ internal static class BrokerHttp
         return await scope.ServiceProvider.GetRequiredService<ProcessExecutionReports>().RunAsync(connection);
     }
 
+    /// <summary>The last step: the fills that wait are tried again (R36).</summary>
+    public static async Task<FillPostingOutcome> PostFillsAsync(string connection = Connection)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<PostOrderFills>().RunAsync(connection);
+    }
+
     /// <summary>The pull step, then the processing step.</summary>
     public static async Task<ReportProcessingOutcome> RunReportsAsync(string connection = Connection)
     {

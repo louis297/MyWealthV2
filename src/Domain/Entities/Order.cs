@@ -404,6 +404,11 @@ public class Order : BaseAuditableEntity
         return Math.Max(0m, fees.FeeFor(PostedGross + gross) - FeeCharged);
     }
 
+    /// <summary>R36, R39: what the order would reserve once its <c>Pending</c> <paramref name="fill"/> is posted with
+    /// <paramref name="gross"/> and <paramref name="fee"/>; 0 for a sell.</summary>
+    public decimal ReservedCashAfterPosting(OrderFill fill, decimal gross, decimal fee, OrderFeeTerms fees) =>
+        throw new NotImplementedException();
+
     /// <summary>R31: a fill of the order was posted with <paramref name="gross"/> and <paramref name="fee"/>.</summary>
     public void RecordPostedFill(decimal gross, decimal fee, OrderFeeTerms fees)
     {

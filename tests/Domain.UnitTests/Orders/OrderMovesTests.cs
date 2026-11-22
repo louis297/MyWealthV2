@@ -494,6 +494,42 @@ public class OrderMovesTests
     }
 
     [Test]
+    public void ReservedCashAfterPosting_IsWhatTheOrderReservesOnceThePendingFillIsPosted()
+    {
+        var order = Working();
+        var first = Fill(order, 4m, 100.12m);
+
+        order.ReservedCashAfterPosting(first, 400.48m, 5.00m, Fees).ShouldBe(630.15m);
+        order.ReservedCash.ShouldBe(1055.25m);
+
+        Post(order, first);
+        order.ReservedCash.ShouldBe(630.15m);
+        var second = Fill(order, 6m, 100.17m, reportId: 2);
+        order.ReservedCashAfterPosting(second, 601.02m, 0.01m, Fees).ShouldBe(0m);
+    }
+
+    [Test]
+    public void ReservedCashAfterPosting_OfASell_IsZero()
+    {
+        var order = Working(OrderSide.Sell);
+        var fill = Fill(order, 4m, 99m);
+
+        order.ReservedCashAfterPosting(fill, 396m, 5m, Fees).ShouldBe(0m);
+    }
+
+    [Test]
+    public void ReservedCashAfterPosting_TakesOnlyAPendingFillOfTheOrder()
+    {
+        var order = Working();
+        var posted = Fill(order, 4m);
+        Post(order, posted);
+        var other = Fill(Working(), 4m);
+
+        Should.Throw<DomainException>(() => order.ReservedCashAfterPosting(posted, 400.48m, 5m, Fees));
+        Should.Throw<DomainException>(() => order.ReservedCashAfterPosting(other, 400.48m, 5m, Fees));
+    }
+
+    [Test]
     public void ABuy_WithNoSchedule_ReservesNoFee()
     {
         var order = Placed(fees: OrderFeeTerms.None);

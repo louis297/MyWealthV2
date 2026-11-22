@@ -182,6 +182,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<SendBrokerOrders>();
         builder.Services.AddScoped<PullExecutionReports>();
         builder.Services.AddScoped<ProcessExecutionReports>();
+        builder.Services.AddScoped<PostOrderFills>();
     }
 
     /// <summary>
