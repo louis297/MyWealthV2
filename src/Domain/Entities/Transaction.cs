@@ -730,7 +730,10 @@ public class Transaction : BaseAuditableEntity
         EnsureTradeRate(appliedRate, price.Currency, currency, fxRate);
         var cost = RoundMoney(quantity * price.Amount);
         var cash = -RoundMoney(cost * fxRate);
-        var brokerage = TradeFee(feeSchedule, enteredFee, cost, price.Currency, fxRate, quoteDecimalPlaces);
+        var executionDetail = ExecutionOf(tenantId, source, execution, price.Amount);
+        var brokerage = executionDetail is null
+            ? TradeFee(feeSchedule, enteredFee, cost, price.Currency, fxRate, quoteDecimalPlaces)
+            : FillFee(feeSchedule, enteredFee, cost, price.Currency, fxRate);
         if (currentCashSum + cash + (brokerage?.Leg ?? 0m) < 0)
         {
             throw new DomainException("Cash balance cannot become negative.");
@@ -752,7 +755,8 @@ public class Transaction : BaseAuditableEntity
                 TransactionSecurityLeg.Create(
                     tenantId, accountId, instrumentId, quantity, cost + (brokerage?.Fee ?? 0m), price.Currency)
             ],
-            FxDetail = appliedRate is null ? null : TransactionFxDetail.Create(tenantId, appliedRate)
+            FxDetail = appliedRate is null ? null : TransactionFxDetail.Create(tenantId, appliedRate),
+            ExecutionDetail = executionDetail
         };
         transaction.AddBrokerageLeg(accountId, currency, brokerage);
         transaction.AddDomainEvent(new TransactionPosted(transaction));
@@ -788,8 +792,11 @@ public class Transaction : BaseAuditableEntity
         EnsureTradeRate(appliedRate, price.Currency, currency, fxRate);
         var released = ReleaseCost(currentCost, quantity, currentQuantity);
         var cash = RoundMoney(quantity * price.Amount * fxRate);
-        var brokerage = TradeFee(
-            feeSchedule, enteredFee, RoundMoney(quantity * price.Amount), price.Currency, fxRate, quoteDecimalPlaces);
+        var gross = RoundMoney(quantity * price.Amount);
+        var executionDetail = ExecutionOf(tenantId, source, execution, price.Amount);
+        var brokerage = executionDetail is null
+            ? TradeFee(feeSchedule, enteredFee, gross, price.Currency, fxRate, quoteDecimalPlaces)
+            : FillFee(feeSchedule, enteredFee, gross, price.Currency, fxRate);
         if (brokerage is not null && currentCashSum + cash + brokerage.Leg < 0)
         {
             throw new DomainException("Cash balance cannot become negative.");
@@ -810,7 +817,8 @@ public class Transaction : BaseAuditableEntity
             [
                 TransactionSecurityLeg.Create(tenantId, accountId, instrumentId, -quantity, -released, price.Currency)
             ],
-            FxDetail = appliedRate is null ? null : TransactionFxDetail.Create(tenantId, appliedRate)
+            FxDetail = appliedRate is null ? null : TransactionFxDetail.Create(tenantId, appliedRate),
+            ExecutionDetail = executionDetail
         };
         transaction.AddBrokerageLeg(accountId, currency, brokerage);
         transaction.AddDomainEvent(new TransactionPosted(transaction));
@@ -1140,7 +1148,8 @@ public class Transaction : BaseAuditableEntity
             FeeDetails = cashLegs.Select(leg => leg.FeeDetail).OfType<TransactionFeeDetail>().ToList(),
             TaxDetails = cashLegs.Select(leg => leg.TaxDetail).OfType<TransactionTaxDetail>().ToList(),
             InterestDetail = InterestDetail?.Copy(),
-            CorporateActionDetail = CorporateActionDetail?.Copy()
+            CorporateActionDetail = CorporateActionDetail?.Copy(),
+            ExecutionDetail = ExecutionDetail?.Copy()
         };
         ReversedBy = reversal;
         reversal.AddDomainEvent(new TransactionReversed(reversal));
@@ -1271,6 +1280,56 @@ public class Transaction : BaseAuditableEntity
         return enteredFee.Value > 0m && leg < 0m
             ? new BrokerageCharge(null, gross, enteredFee.Value, quoteCurrency, leg)
             : null;
+    }
+
+    /// <summary>
+    /// Orders R35: the execution detail of a trade. Every Transaction with source <c>OrderFill</c> has exactly one;
+    /// no other Transaction has one.
+    /// </summary>
+    private static TransactionExecutionDetail? ExecutionOf(
+        int tenantId,
+        TransactionSource source,
+        TradeExecution? execution,
+        decimal price)
+    {
+        if (source.Kind == TransactionSourceKind.OrderFill)
+        {
+            return TransactionExecutionDetail.Create(
+                tenantId, execution ?? throw new DomainException("An order fill needs its execution detail."), price);
+        }
+
+        return execution is null ? null : throw new DomainException("Only an order fill has an execution detail.");
+    }
+
+    /// <summary>
+    /// Orders R33: the fee of an order fill is worked out on the order, across its fills, so the amount is given.
+    /// The fee detail names the order's schedule, with the fill's own gross as basis amount (trade-fees R18). A fill
+    /// under a schedule needs its amount; a fill of an order with no schedule takes none. None when the fee is 0.
+    /// </summary>
+    private static BrokerageCharge? FillFee(
+        TradeFeeSchedule? schedule,
+        decimal? fee,
+        decimal gross,
+        string quoteCurrency,
+        decimal fxRate)
+    {
+        if (schedule is null)
+        {
+            return fee is null or 0m ? null : throw new DomainException("An order with no trade fee schedule charges no fee.");
+        }
+
+        if (!string.Equals(schedule.QuoteCurrency, quoteCurrency, StringComparison.Ordinal))
+        {
+            throw new DomainException("The trade fee schedule is for another quote currency.");
+        }
+
+        if (fee is not { } amount || amount < 0m)
+        {
+            throw new DomainException("A fill under a trade fee schedule needs its fee, and the fee cannot be negative.");
+        }
+
+        var leg = -RoundMoney(amount * fxRate);
+        return amount > 0m && leg < 0m ? new BrokerageCharge(schedule.Id, gross, amount, quoteCurrency, leg) : null;
     }
 
     /// <summary>

@@ -88,7 +88,15 @@ public sealed class TransactionSource : ValueObject
     }
 
     /// <summary>A fill's source: the PublicId of its order, shared by every fill of the order (orders R32).</summary>
-    public static TransactionSource OrderFill(Guid orderPublicId) => throw new NotImplementedException();
+    public static TransactionSource OrderFill(Guid orderPublicId)
+    {
+        if (orderPublicId == Guid.Empty)
+        {
+            throw new DomainException("An order fill source needs the order's PublicId.");
+        }
+
+        return new TransactionSource(TransactionSourceKind.OrderFill, orderPublicId);
+    }
 
     /// <summary>The source as stored on a Transaction row.</summary>
     internal static TransactionSource FromStored(TransactionSourceKind kind, Guid? publicId) =>
@@ -102,6 +110,7 @@ public sealed class TransactionSource : ValueObject
             TransactionSourceKind.AccountClosure => AccountClosure(publicId ?? Guid.Empty),
             TransactionSourceKind.InterestRun => InterestRun(publicId ?? Guid.Empty),
             TransactionSourceKind.CorporateAction => CorporateAction(publicId ?? Guid.Empty),
+            TransactionSourceKind.OrderFill => OrderFill(publicId ?? Guid.Empty),
             _ => new TransactionSource(kind, publicId)
         };
 

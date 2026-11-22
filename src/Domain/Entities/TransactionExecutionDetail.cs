@@ -30,9 +30,46 @@ public class TransactionExecutionDetail
     /// <summary>The broker's contract note; null when the broker sent none.</summary>
     public string? BrokerReference { get; private set; }
 
-    internal static TransactionExecutionDetail Create(int tenantId, TradeExecution execution, decimal price) =>
-        throw new NotImplementedException();
+    internal static TransactionExecutionDetail Create(int tenantId, TradeExecution execution, decimal price)
+    {
+        if (execution.FillPublicId == Guid.Empty)
+        {
+            throw new DomainException("An execution detail needs the fill's PublicId.");
+        }
+
+        if (execution.SettlementDate < execution.TradeDate)
+        {
+            throw new DomainException("A fill cannot settle before its trade date.");
+        }
+
+        if (price <= 0m)
+        {
+            throw new DomainException("Price must be greater than 0.");
+        }
+
+        var reference = execution.BrokerReference?.Trim();
+        return new TransactionExecutionDetail
+        {
+            TenantId = tenantId,
+            FillPublicId = execution.FillPublicId,
+            Price = price,
+            TradeDate = execution.TradeDate,
+            SettlementDate = execution.SettlementDate,
+            BrokerReference = string.IsNullOrEmpty(reference)
+                ? null
+                : reference.Length > BrokerReferenceMaxLength ? reference[..BrokerReferenceMaxLength] : reference
+        };
+    }
 
     /// <summary>A new row with the same values, for the Reversal (R35).</summary>
-    internal TransactionExecutionDetail Copy() => throw new NotImplementedException();
+    internal TransactionExecutionDetail Copy() =>
+        new()
+        {
+            TenantId = TenantId,
+            FillPublicId = FillPublicId,
+            Price = Price,
+            TradeDate = TradeDate,
+            SettlementDate = SettlementDate,
+            BrokerReference = BrokerReference
+        };
 }
