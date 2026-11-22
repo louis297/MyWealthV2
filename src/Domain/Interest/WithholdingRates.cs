@@ -18,11 +18,17 @@ public static class WithholdingRates
     /// <summary>NRWT on interest where no double tax agreement applies.</summary>
     public const decimal NonResident = 15m;
 
-    public static bool IsElective(decimal ratePercent) => throw new NotImplementedException();
+    public static bool IsElective(decimal ratePercent) => Elective.Contains(ratePercent);
 
     /// <summary>R4 for the three attributes of a tax profile.</summary>
     public static Withholding For(TaxResidency residency, bool irdNumberHeld, decimal? rwtRatePercent) =>
-        throw new NotImplementedException();
+        residency switch
+        {
+            TaxResidency.Overseas => new Withholding(TaxKind.Nrwt, NonResident, WithholdingBasis.NonResident),
+            _ when !irdNumberHeld => new Withholding(TaxKind.Rwt, NonDeclaration, WithholdingBasis.NonDeclaration),
+            _ when rwtRatePercent is { } rate => new Withholding(TaxKind.Rwt, rate, WithholdingBasis.Elected),
+            _ => new Withholding(TaxKind.Rwt, Default, WithholdingBasis.Default)
+        };
 
     /// <summary>R4 for a stored or not-provided profile.</summary>
     public static Withholding For(CustomerTaxProfile profile) =>

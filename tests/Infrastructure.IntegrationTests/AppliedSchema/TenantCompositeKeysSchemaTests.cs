@@ -436,6 +436,16 @@ public class TenantCompositeKeysSchemaTests
             VALUES (NEWID(), @a_tenant, @a_bank, 1, N'Moving', @a_adviser, SYSDATETIMEOFFSET(), 'USD', 0.004,
                     0, NULL, NULL, 0.004, @{p}_buy, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
             """),
+        ("FK_CustomerTaxProfiles_Users_TenantId_UserId", "Users", """
+            INSERT INTO [CustomerTaxProfiles]
+                ([UserId], [TenantId], [TaxResidency], [IrdNumberHeld], [RwtRatePercent], [UpdatedByUserId], [UpdatedAt], [Created], [CreatedBy])
+            VALUES (@{p}_customer, @a_tenant, 0, 0, NULL, @a_adviser, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            """),
+        ("FK_CustomerTaxProfiles_Users_TenantId_UpdatedByUserId", "Users", """
+            INSERT INTO [CustomerTaxProfiles]
+                ([UserId], [TenantId], [TaxResidency], [IrdNumberHeld], [RwtRatePercent], [UpdatedByUserId], [UpdatedAt], [Created], [CreatedBy])
+            VALUES (@a_customer, @a_tenant, 0, 0, NULL, @{p}_adviser, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            """),
         ("FK_ReportExecutions_ReportSchedules_TenantId_ScheduleId", "ReportSchedules", """
             INSERT INTO [ReportExecutions] ([PublicId], [ReportId], [ScheduleId], [TenantId], [TriggerKind], [Status], [ParametersJson], [Created], [CreatedBy])
             VALUES (NEWID(), @report, @{p}_schedule, @a_tenant, N'Scheduled', N'Queued', N'{}', SYSDATETIMEOFFSET(), N'test');

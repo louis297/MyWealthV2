@@ -44,8 +44,12 @@ public class CustomerTaxProfile : BaseAuditableEntity
         bool irdNumberHeld,
         decimal? rwtRatePercent,
         int updatedByUserId,
-        DateTimeOffset updatedAt) =>
-        throw new NotImplementedException();
+        DateTimeOffset updatedAt)
+    {
+        var profile = new CustomerTaxProfile { TenantId = tenantId, UserId = userId };
+        profile.Set(residency, irdNumberHeld, rwtRatePercent, updatedByUserId, updatedAt);
+        return profile;
+    }
 
     /// <summary>R3, R6: replaces the three attributes.</summary>
     public void Set(
@@ -53,6 +57,43 @@ public class CustomerTaxProfile : BaseAuditableEntity
         bool irdNumberHeld,
         decimal? rwtRatePercent,
         int updatedByUserId,
-        DateTimeOffset updatedAt) =>
-        throw new NotImplementedException();
+        DateTimeOffset updatedAt)
+    {
+        if (RefusalOf(residency, irdNumberHeld, rwtRatePercent) is { } refusal)
+        {
+            throw new DomainException(refusal);
+        }
+
+        TaxResidency = residency;
+        IrdNumberHeld = irdNumberHeld;
+        RwtRatePercent = rwtRatePercent;
+        UpdatedByUserId = updatedByUserId;
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>R3: why the three attributes cannot be stored, or <c>null</c> when they can.</summary>
+    public static string? RefusalOf(TaxResidency residency, bool irdNumberHeld, decimal? rwtRatePercent)
+    {
+        if (!Enum.IsDefined(residency))
+        {
+            return "Tax residency must be NewZealand or Overseas.";
+        }
+
+        if (rwtRatePercent is not { } rate)
+        {
+            return null;
+        }
+
+        if (!WithholdingRates.IsElective(rate))
+        {
+            return "RWT rate must be 10.5, 17.5, 30, 33 or 39.";
+        }
+
+        if (residency == TaxResidency.Overseas)
+        {
+            return "An overseas customer has no RWT rate.";
+        }
+
+        return irdNumberHeld ? null : "A rate can be chosen only when the IRD number is held.";
+    }
 }
