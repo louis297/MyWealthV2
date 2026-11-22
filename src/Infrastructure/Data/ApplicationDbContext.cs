@@ -81,6 +81,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<InterestAccrual> InterestAccruals => Set<InterestAccrual>();
 
+    public DbSet<InterestRun> InterestRuns => Set<InterestRun>();
+
     public DbSet<Instrument> Instruments => Set<Instrument>();
 
     public DbSet<Account> Accounts => Set<Account>();

@@ -149,6 +149,10 @@ internal static class CustodialHttp
             : Json(HttpStatusCode.Created, new { id = payout.Value });
     }
 
+    /// <summary>A Verified nominated bank account of the account's Customer in its currency, added straight to the
+    /// database when there is none.</summary>
+    public static async Task<Guid> VerifiedPayeeAsync(Guid accountId) => (await PayeeAsync(accountId)).NominatedBankAccountId;
+
     /// <summary>Requests a withdrawal of <paramref name="amount"/> from a Custodial account and leaves it Requested,
     /// so its cash is reserved (withdrawals R36). Answers the withdrawal's id.</summary>
     public static async Task<Guid> RequestWithdrawalAsync(Guid accountId, decimal amount)

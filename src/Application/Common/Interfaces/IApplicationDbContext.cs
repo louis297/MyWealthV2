@@ -34,6 +34,8 @@ public interface IApplicationDbContext
 
     DbSet<InterestAccrual> InterestAccruals { get; }
 
+    DbSet<InterestRun> InterestRuns { get; }
+
     DbSet<Instrument> Instruments { get; }
 
     DbSet<Account> Accounts { get; }
