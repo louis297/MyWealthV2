@@ -5,6 +5,7 @@ using FluentValidation.Results;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
+using MyWealthV2.Application.Interest.Accruals;
 using MyWealthV2.Application.Transactions;
 using MyWealthV2.Application.Withdrawals;
 using MyWealthV2.Domain.Custody;
@@ -66,6 +67,7 @@ public class RequestAccountClosureCommandHandler(
     IApplicationDbContext db,
     ICurrentUser currentUser,
     ICurrencyCatalog currencies,
+    IAccountInterest accountInterest,
     TimeProvider time) : IRequestHandler<RequestAccountClosureCommand, IdempotentResult>
 {
     public const string ExternalMessage = "Only a Custodial account is closed with an account closure.";
@@ -181,13 +183,29 @@ public class RequestAccountClosureCommandHandler(
             throw Error(nameof(RequestAccountClosureCommand.AccountId), HoldingMessage);
         }
 
+        var requester = currentUser.Person?.Id ?? throw new ForbiddenAccessException();
+        var now = time.GetUtcNow();
+
+        // Interest-run R33: under the same lock, the interest accrued through yesterday is posted first, whatever
+        // its month; a posting is paid by a run with trigger AccountClosure for this account and the requester.
+        var yesterday = DateOnly.FromDateTime(now.UtcDateTime).AddDays(-1);
+        var interestRun = InterestRun.Start(
+            tenantId, yesterday, InterestRunTrigger.AccountClosure, requester, account.Id, now);
+        var interest = await accountInterest.AccrueAndPostAsync(
+            account, yesterday, yesterday, interestRun.PublicId, cancellationToken);
+        if (interest.Posting is not null)
+        {
+            interestRun.CreatedBy = SystemActor.Name;
+            interestRun.Complete(1, 0, 1, now);
+            db.InterestRuns.Add(interestRun);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
         // R7: no cash is reserved (R5), so the cash SUM is what is paid out and written off.
         var currency = account.Currency.Trim();
         var places = currencies.TryGet(currency)!.DecimalPlaces;
         var cash = await TransactionCash.SumAsync(db, account.Id, cancellationToken);
         var (payout, remainder) = ClosureAmounts.Split(cash, places);
-        var requester = currentUser.Person?.Id ?? throw new ForbiddenAccessException();
-        var now = time.GetUtcNow();
         var closurePublicId = Guid.NewGuid();
 
         if (payout > 0m)
