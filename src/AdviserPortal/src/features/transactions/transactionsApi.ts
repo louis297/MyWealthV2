@@ -97,6 +97,21 @@ export type Transaction = {
   payment?: TransactionPayment | null;
   /** interest-run R34: on an interest posting and its Reversal; otherwise null. */
   interest?: TransactionInterest | null;
+  /** corporate-actions R37: on an entitlement posting and its Reversal; otherwise null. */
+  corporateAction?: TransactionCorporateAction | null;
+};
+
+/** corporate-actions R37: the event behind an entitlement posting. */
+export type TransactionCorporateAction = {
+  id: string;
+  kind: string;
+  ratioNew: number;
+  ratioHeld: number;
+  exDate: string;
+  recordDate: string | null;
+  paymentDate: string | null;
+  quantityBefore: number;
+  quantityAfter: number;
 };
 
 export type TransactionPayment = {

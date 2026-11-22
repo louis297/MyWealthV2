@@ -41,7 +41,7 @@ import {
   useUnassignPortfolioMutation,
 } from "@/features/portfolios/portfoliosApi";
 import { rateLine } from "@/features/transactions/fxFormat";
-import { canReverse, ReverseTransactionButton } from "@/features/transactions/ReverseTransactionButton";
+import { canReverse, ReverseTransactionButton, transactionTypeLabel } from "@/features/transactions/ReverseTransactionButton";
 import { type TransactionCash, useGetTransactionsQuery } from "@/features/transactions/transactionsApi";
 import { formatMoney, sumAmounts } from "@/shared/format/money";
 import { formatInstant } from "@/shared/time/instant";
@@ -528,7 +528,7 @@ export function AccountDetailPage() {
                           {item.id}
                         </Link>
                       </TableCell>
-                      <TableCell>{item.type}</TableCell>
+                      <TableCell>{item.corporateAction ? transactionTypeLabel(item) : item.type}</TableCell>
                       <TableCell>{formatInstant(item.bookedAt)}</TableCell>
                       <TableCell>
                         <ActivityAmount

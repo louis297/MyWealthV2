@@ -16,6 +16,7 @@ import {
   BanknoteArrowUpIcon,
   ScaleIcon,
   PercentIcon,
+  SplitIcon,
 } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router";
 import { useAppSelector } from "@/app/hooks";
@@ -46,6 +47,7 @@ import {
   canAccessDashboard,
   canAccessFees,
   canAccessInterestRates,
+  canAccessCorporateActions,
   canAccessPortfolios,
   canAccessProfile,
   canAccessReports,
@@ -101,6 +103,13 @@ export function ShellLayout({ children }: { children?: ReactNode }) {
       label: "Interest rates",
       icon: PercentIcon,
       visible: canAccessInterestRates(role),
+    },
+    {
+      // corporate-actions D64.
+      to: "/corporate-actions",
+      label: "Corporate actions",
+      icon: SplitIcon,
+      visible: canAccessCorporateActions(role),
     },
     {
       to: "/accounts",

@@ -13,6 +13,7 @@ import {
   sourceLabel,
   transactionTypeLabel,
 } from "@/features/transactions/ReverseTransactionButton";
+import { CorporateActionPostingBlock } from "@/features/corporateActions/CorporateActionPostingBlock";
 import { InterestPostingBlock } from "@/features/interest/InterestPostingBlock";
 import { useGetTransactionQuery } from "@/features/transactions/transactionsApi";
 import { formatAmount, formatMoney } from "@/shared/format/money";
@@ -76,6 +77,7 @@ export function TransactionDetailPage() {
               </Section>
             ) : null}
             {data.interest ? <InterestPostingBlock transaction={data} /> : null}
+            {data.corporateAction ? <CorporateActionPostingBlock detail={data.corporateAction} /> : null}
             {data.adjustment ? (
               <p className="text-muted-foreground text-sm">{`Reason: ${adjustmentReasonLabel(data.adjustment.reason)}`}</p>
             ) : null}
