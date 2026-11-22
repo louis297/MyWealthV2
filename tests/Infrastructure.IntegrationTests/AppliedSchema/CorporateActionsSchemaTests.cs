@@ -120,7 +120,8 @@ public class CorporateActionsSchemaTests
     [TestCase("origin: 1", "CK_CorporateActions_Feed")]
     [TestCase("status: 4", "CK_CorporateActions_Status")]
     [TestCase("status: 1", "CK_CorporateActions_EffectiveAt")]
-    [TestCase("status: 2, effective: 1", "CK_CorporateActions_AppliedAt")]
+    [TestCase("status: 2, effective: 1, applied: 0", "CK_CorporateActions_AppliedAt")]
+    [TestCase("status: 1, effective: 1, applied: 1", "CK_CorporateActions_AppliedAt")]
     [TestCase("effective: 1", "CK_CorporateActions_EffectiveAt")]
     [TestCase("status: 0, cancelled: 1", "CK_CorporateActions_CancelledAt")]
     public async Task ACorporateActionOutsideTheChecks_Violates(string change, string constraint)
@@ -135,7 +136,8 @@ public class CorporateActionsSchemaTests
                 origin: values.GetValueOrDefault("origin", 0),
                 status: values.GetValueOrDefault("status", 0),
                 effectiveAt: values.GetValueOrDefault("effective", 0) == 1,
-                cancelledAt: values.GetValueOrDefault("cancelled", 0) == 1)}
+                cancelledAt: values.GetValueOrDefault("cancelled", 0) == 1,
+                appliedAt: values.TryGetValue("applied", out var applied) ? applied == 1 : null)}
             """));
 
         exception.Number.ShouldBe(547);
@@ -370,9 +372,10 @@ public class CorporateActionsSchemaTests
         int origin = 0,
         int status = 0,
         bool effectiveAt = false,
-        bool cancelledAt = false)
+        bool cancelledAt = false,
+        bool? appliedAt = null)
     {
-        var applied = status == 2 ? "SYSDATETIMEOFFSET()" : "NULL";
+        var applied = appliedAt ?? status == 2 ? "SYSDATETIMEOFFSET()" : "NULL";
         var effective = effectiveAt ? "SYSDATETIMEOFFSET()" : "NULL";
         var cancelled = status == 3 || cancelledAt ? "SYSDATETIMEOFFSET()" : "NULL";
         return $"""

@@ -79,7 +79,10 @@ public class CorporateAction : BaseAuditableEntity
         DateOnly? paymentDate,
         string? memo)
     {
-        throw new NotImplementedException();
+        var action = New(tenantId, instrumentId, kind, CorporateActionOrigin.Manual);
+        action.SetTerms(ratio, exDate, recordDate, paymentDate);
+        action.Memo = TrimMemo(memo);
+        return action;
     }
 
     /// <summary>R12: a <c>Feed</c> corporate action from version <paramref name="version"/> of the party's action
@@ -96,7 +99,27 @@ public class CorporateAction : BaseAuditableEntity
         DateOnly? recordDate,
         DateOnly? paymentDate)
     {
-        throw new NotImplementedException();
+        if (string.IsNullOrWhiteSpace(connection) || connection.Length > ConnectionMaxLength)
+        {
+            throw new DomainException("A feed corporate action needs its connection.");
+        }
+
+        if (string.IsNullOrWhiteSpace(partyActionId) || partyActionId.Length > PartyActionIdMaxLength)
+        {
+            throw new DomainException("A feed corporate action needs the party's action id.");
+        }
+
+        if (version < 1)
+        {
+            throw new DomainException("A feed version is 1 or more.");
+        }
+
+        var action = New(tenantId, instrumentId, kind, CorporateActionOrigin.Feed);
+        action.SetTerms(ratio, exDate, recordDate, paymentDate);
+        action.Connection = connection;
+        action.PartyActionId = partyActionId;
+        action.FeedVersion = version;
+        return action;
     }
 
     /// <summary>R18: a person changes a <c>Manual</c> action that is still <c>Announced</c>. The Instrument stays.</summary>
@@ -108,7 +131,26 @@ public class CorporateAction : BaseAuditableEntity
         DateOnly? paymentDate,
         string? memo)
     {
-        throw new NotImplementedException();
+        EnsureManual();
+        EnsureAnnounced();
+        if (!Enum.IsDefined(kind))
+        {
+            throw new DomainException("Unknown corporate action kind.");
+        }
+
+        var kindBefore = Kind;
+        Kind = kind;
+        try
+        {
+            SetTerms(ratio, exDate, recordDate, paymentDate);
+        }
+        catch
+        {
+            Kind = kindBefore;
+            throw;
+        }
+
+        Memo = TrimMemo(memo);
     }
 
     /// <summary>R12: a later version of the party's action replaces the ratio and the dates of a <c>Feed</c> action
@@ -116,32 +158,76 @@ public class CorporateAction : BaseAuditableEntity
     /// <c>false</c>.</summary>
     public bool Amend(int version, CorporateActionRatio ratio, DateOnly exDate, DateOnly? recordDate, DateOnly? paymentDate)
     {
-        throw new NotImplementedException();
+        EnsureFeed();
+        EnsureAnnounced();
+        if (version <= FeedVersion)
+        {
+            return false;
+        }
+
+        SetTerms(ratio, exDate, recordDate, paymentDate);
+        FeedVersion = version;
+        return true;
     }
 
     /// <summary>R19: a person cancels a <c>Manual</c> action that is still <c>Announced</c>, with a note.</summary>
     public void Cancel(int byUserId, string note, DateTimeOffset at)
     {
-        throw new NotImplementedException();
+        EnsureManual();
+        EnsureAnnounced();
+        var trimmed = note?.Trim() ?? string.Empty;
+        if (trimmed.Length is 0 or > NoteMaxLength)
+        {
+            throw new DomainException($"A cancel note is 1 to {NoteMaxLength} characters.");
+        }
+
+        Status = CorporateActionStatus.Cancelled;
+        CancelledAt = at.ToUniversalTime();
+        CancelledByUserId = byUserId;
+        CancelNote = trimmed;
     }
 
     /// <summary>R12: the party cancelled its action in version <paramref name="version"/>. No person, no note.</summary>
     public bool CancelFromFeed(int version, DateTimeOffset at)
     {
-        throw new NotImplementedException();
+        EnsureFeed();
+        EnsureAnnounced();
+        if (version <= FeedVersion)
+        {
+            return false;
+        }
+
+        Status = CorporateActionStatus.Cancelled;
+        CancelledAt = at.ToUniversalTime();
+        FeedVersion = version;
+        return true;
     }
 
     /// <summary>R22: the action takes effect at <paramref name="at"/>, by <paramref name="byUserId"/> (R20) or by the
     /// platform (<c>null</c>). The caller stores the entitlements in the same database transaction.</summary>
     public void MakeEffective(DateTimeOffset at, int? byUserId = null)
     {
-        throw new NotImplementedException();
+        EnsureAnnounced();
+        if (byUserId is not null && Origin != CorporateActionOrigin.Manual)
+        {
+            throw new DomainException("Only a hand-entered corporate action can be applied by a person.");
+        }
+
+        Status = CorporateActionStatus.Effective;
+        EffectiveAt = at.ToUniversalTime();
+        EffectiveByUserId = byUserId;
     }
 
     /// <summary>R24: no entitlement is <c>Pending</c> any more.</summary>
     public void MarkApplied(DateTimeOffset at)
     {
-        throw new NotImplementedException();
+        if (Status != CorporateActionStatus.Effective)
+        {
+            throw new DomainException($"A corporate action that is {Status} cannot be marked applied.");
+        }
+
+        Status = CorporateActionStatus.Applied;
+        AppliedAt = at.ToUniversalTime();
     }
 
     private static CorporateAction New(int tenantId, int instrumentId, CorporateActionKind kind, CorporateActionOrigin origin)

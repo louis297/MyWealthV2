@@ -34,19 +34,49 @@ public class CorporateActionEntitlement
 
     public byte[] RowVersion { get; private set; } = null!;
 
-    public static CorporateActionEntitlement Create(int tenantId, int corporateActionId, int accountId) => throw new NotImplementedException();
+    public static CorporateActionEntitlement Create(int tenantId, int corporateActionId, int accountId) =>
+        new()
+        {
+            TenantId = tenantId,
+            CorporateActionId = corporateActionId,
+            AccountId = accountId,
+            Status = EntitlementStatus.Pending
+        };
 
     /// <summary>R25: posted as <paramref name="transactionId"/>, from <paramref name="quantityBefore"/> to
     /// <paramref name="quantityAfter"/>.</summary>
     public void MarkPosted(decimal quantityBefore, decimal quantityAfter, int transactionId, DateTimeOffset at)
     {
-        throw new NotImplementedException();
+        EnsurePending();
+        if (quantityBefore <= 0m || quantityAfter <= 0m || quantityAfter == quantityBefore)
+        {
+            throw new DomainException("A posted entitlement changes a holding above 0 to another quantity above 0.");
+        }
+
+        if (transactionId <= 0)
+        {
+            throw new DomainException("A posted entitlement needs its Transaction.");
+        }
+
+        Status = EntitlementStatus.Posted;
+        QuantityBefore = quantityBefore;
+        QuantityAfter = quantityAfter;
+        TransactionId = transactionId;
+        PostedAt = at.ToUniversalTime();
     }
 
     /// <summary>R25: nothing was posted, for <paramref name="reason"/>.</summary>
     public void MarkNotApplied(EntitlementReason reason, DateTimeOffset at)
     {
-        throw new NotImplementedException();
+        EnsurePending();
+        if (!Enum.IsDefined(reason))
+        {
+            throw new DomainException("Unknown entitlement reason.");
+        }
+
+        Status = EntitlementStatus.NotApplied;
+        Reason = reason;
+        PostedAt = at.ToUniversalTime();
     }
 
     private void EnsurePending()

@@ -38,6 +38,10 @@ public interface IApplicationDbContext
 
     DbSet<InterestRun> InterestRuns { get; }
 
+    DbSet<CorporateAction> CorporateActions { get; }
+
+    DbSet<CorporateActionEntitlement> CorporateActionEntitlements { get; }
+
     DbSet<Instrument> Instruments { get; }
 
     DbSet<Account> Accounts { get; }
