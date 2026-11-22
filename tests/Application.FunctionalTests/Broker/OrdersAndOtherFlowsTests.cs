@@ -94,7 +94,7 @@ public class OrdersAndOtherFlowsTests : TestBase
 
         assigned.StatusCode.ShouldBe(HttpStatusCode.OK, await assigned.Content.ReadAsStringAsync());
         using var json = JsonDocument.Parse(await assigned.Content.ReadAsStringAsync());
-        json.RootElement.GetProperty("status").GetString().ShouldBe("Completed");
+        json.RootElement.GetProperty("status").GetString().ShouldBe("Success");
         // More than the 200.00 that was withdrawable went into the model.
         (await world.CashAsync()).Cash.ShouldBeLessThan(200.00m);
     }

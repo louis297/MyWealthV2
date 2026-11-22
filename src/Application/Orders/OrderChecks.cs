@@ -203,6 +203,18 @@ internal static class OrderReservations
             .Where(row => row.AccountId == accountId && row.InstrumentId == instrumentId && row.Side == OrderSide.Sell)
             .SumAsync(row => (decimal?)row.ReservedQuantity, cancellationToken) ?? 0m;
 
+    /// <summary>Orders R14: true when the Account has a live order: an open one, or one with a fill that is not
+    /// posted yet.</summary>
+    public static Task<bool> HasLiveOrderAsync(IApplicationDbContext db, int accountId, CancellationToken cancellationToken)
+    {
+        var open = Enum.GetValues<OrderStatus>().Where(Order.IsOpenStatus).ToArray();
+        return db.Orders.IgnoreQueryFilters().AnyAsync(
+            row => row.AccountId == accountId
+                   && (open.Contains(row.Status)
+                       || db.OrderFills.IgnoreQueryFilters().Any(fill => fill.OrderId == row.Id && fill.Status == OrderFillStatus.Pending)),
+            cancellationToken);
+    }
+
     /// <summary>The holding's quantity minus its reserved quantity; no holding is 0.</summary>
     public static async Task<decimal> AvailableQuantityAsync(
         IApplicationDbContext db,

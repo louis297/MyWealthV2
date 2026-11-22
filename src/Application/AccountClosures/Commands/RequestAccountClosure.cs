@@ -180,12 +180,7 @@ public class RequestAccountClosureCommandHandler(
         }
 
         // Orders R47: a live order (open, or with a fill not posted yet) and a fill that has not settled both wait.
-        var open = Enum.GetValues<OrderStatus>().Where(Order.IsOpenStatus).ToArray();
-        if (await db.Orders.AnyAsync(
-                row => row.AccountId == account.Id
-                       && (open.Contains(row.Status)
-                           || db.OrderFills.Any(fill => fill.OrderId == row.Id && fill.Status == OrderFillStatus.Pending)),
-                cancellationToken))
+        if (await Orders.OrderReservations.HasLiveOrderAsync(db, account.Id, cancellationToken))
         {
             throw Error(nameof(RequestAccountClosureCommand.AccountId), LiveOrderMessage);
         }
