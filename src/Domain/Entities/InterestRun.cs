@@ -37,7 +37,12 @@ public class InterestRun : BaseAuditableEntity
     public DateOnly PostingDate => PostingDateFor(AsOfDate);
 
     /// <summary>R21: <paramref name="asOfDate"/> when it is the last day of its month, else the last day of the month before.</summary>
-    public static DateOnly PostingDateFor(DateOnly asOfDate) => throw new NotImplementedException();
+    public static DateOnly PostingDateFor(DateOnly asOfDate)
+    {
+        var firstOfMonth = new DateOnly(asOfDate.Year, asOfDate.Month, 1);
+        var lastOfMonth = firstOfMonth.AddMonths(1).AddDays(-1);
+        return asOfDate == lastOfMonth ? asOfDate : firstOfMonth.AddDays(-1);
+    }
 
     public static InterestRun Start(
         int tenantId,
@@ -46,10 +51,51 @@ public class InterestRun : BaseAuditableEntity
         int? ranByUserId,
         int? accountId,
         DateTimeOffset startedAt,
-        Guid? publicId = null) =>
-        throw new NotImplementedException();
+        Guid? publicId = null)
+    {
+        if (!Enum.IsDefined(trigger))
+        {
+            throw new DomainException("Unknown interest run trigger.");
+        }
+
+        if ((trigger == InterestRunTrigger.Scheduled) != (ranByUserId is null))
+        {
+            throw new DomainException("A scheduled run has no person; every other run names the person who started it.");
+        }
+
+        if ((trigger == InterestRunTrigger.AccountClosure) != (accountId is not null))
+        {
+            throw new DomainException("Only an account closure run names one account.");
+        }
+
+        return new InterestRun
+        {
+            PublicId = publicId ?? Guid.NewGuid(),
+            TenantId = tenantId,
+            AsOfDate = asOfDate,
+            Trigger = trigger,
+            RanByUserId = ranByUserId,
+            AccountId = accountId,
+            StartedAt = startedAt
+        };
+    }
 
     /// <summary>R30: the run ended with these counts; once.</summary>
-    public void Complete(int accountsProcessed, int accountsFailed, int postingCount, DateTimeOffset completedAt) =>
-        throw new NotImplementedException();
+    public void Complete(int accountsProcessed, int accountsFailed, int postingCount, DateTimeOffset completedAt)
+    {
+        if (CompletedAt is not null)
+        {
+            throw new DomainException("An interest run ends once.");
+        }
+
+        if (accountsProcessed < 0 || accountsFailed < 0 || postingCount < 0 || accountsFailed > accountsProcessed)
+        {
+            throw new DomainException("The counts of an interest run are not valid.");
+        }
+
+        AccountsProcessed = accountsProcessed;
+        AccountsFailed = accountsFailed;
+        PostingCount = postingCount;
+        CompletedAt = completedAt;
+    }
 }

@@ -1,4 +1,5 @@
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.Interest.Runs;
 using MyWealthV2.Infrastructure.BankFeed;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Schema;
@@ -26,6 +27,10 @@ builder.AddBankConnections(BankConnectionHost.WebApi);
 builder.AddWebServices();
 
 var app = builder.Build();
+
+// interest-run R32: the future as-of option is refused outside Development, before the host listens.
+InterestOptions.EnsureAllowedOnHost(
+    app.Environment.IsDevelopment(), app.Configuration.GetValue<bool>(InterestOptions.AllowFutureAsOfDatesKey));
 
 await using (var scope = app.Services.CreateAsyncScope())
 {
