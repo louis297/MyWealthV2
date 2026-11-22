@@ -4,7 +4,7 @@
 <PageTitle>Market data</PageTitle>
 
 <MudText Typo="Typo.h4" Class="mb-2">Market data</MudText>
-<MudText Typo="Typo.body1" Class="mb-4">Configured market data connections. An instrument whose symbol ends with a connection's suffix is priced by that connection.</MudText>
+<MudText Typo="Typo.body1" Class="mb-4">Configured market data connections. An instrument whose symbol ends with a connection's suffix is priced by that connection, and its corporate actions come from it.</MudText>
 
 @if (error is not null)
 {
@@ -20,7 +20,7 @@ else if (connections is not null)
     {
         <MudSimpleTable Hover="true" Dense="true" Bordered="true" Class="mt-4">
             <thead>
-                <tr><th>Name</th><th>Adapter</th><th>Suffix</th><th>Prices</th></tr>
+                <tr><th>Name</th><th>Adapter</th><th>Suffix</th><th>Prices</th><th>Corporate actions</th></tr>
             </thead>
             <tbody>
             @foreach (var connection in connections)
@@ -30,22 +30,71 @@ else if (connections is not null)
                     <td>@connection.Adapter</td>
                     <td>@connection.SymbolSuffix</td>
                     <td>@MarketDataStatus.Text(connection.Prices)</td>
+                    <td>@MarketDataStatus.Text(connection.CorporateActions)</td>
                 </tr>
             }
             </tbody>
         </MudSimpleTable>
     }
+
+    <MudText Typo="Typo.h5" Class="mt-8 mb-2">Announcements</MudText>
+    <MudText Typo="Typo.body2" Class="mb-2">The newest twenty corporate action announcements the connections delivered. A row in red needs a person: the party cancelled an action that was already applied.</MudText>
+    <div class="d-flex gap-4 mb-2">
+        <MudLink Href="/market-data">All</MudLink>
+        @foreach (var item in AnnouncementText.Statuses)
+        {
+            <MudLink Href="@($"/market-data?status={item}")">@item</MudLink>
+        }
+    </div>
+    @if (announcements is { Count: > 0 })
+    {
+        <MudSimpleTable Hover="true" Dense="true" Bordered="true">
+            <thead>
+                <tr>
+                    <th>Received</th><th>Connection</th><th>Symbol</th><th>Kind</th><th>Ratio</th><th>Ex-date</th>
+                    <th>Party status</th><th>Version</th><th>Status</th><th>Reason</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var item in announcements)
+            {
+                <tr class="@(AnnouncementText.NeedsPerson(item) ? "announcement-needs-person mud-error-text" : null)">
+                    <td>@AnnouncementText.Instant(item.ReceivedAt)</td>
+                    <td>@item.Connection</td>
+                    <td>@item.Symbol</td>
+                    <td>@AnnouncementText.Kind(item.Kind)</td>
+                    <td>@AnnouncementText.Ratio(item)</td>
+                    <td>@item.ExDate.ToString("yyyy-MM-dd")</td>
+                    <td>@item.PartyStatus</td>
+                    <td>@item.Version</td>
+                    <td>@item.Status</td>
+                    <td>@AnnouncementText.Reason(item.SkipReason)</td>
+                </tr>
+            }
+            </tbody>
+        </MudSimpleTable>
+    }
+    else if (announcements is not null)
+    {
+        <MudText>No announcements.</MudText>
+    }
 }
 
 @code {
     private IReadOnlyList<MarketDataConnectionItem>? connections;
+    private IReadOnlyList<CorporateActionAnnouncementItem>? announcements;
     private string? error;
+
+    [SupplyParameterFromQuery(Name = "status")]
+    public string? Status { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
             connections = await Api.ListMarketDataConnectionsAsync();
+            var status = AnnouncementText.Statuses.Contains(Status) ? Status : null;
+            announcements = await Api.ListCorporateActionAnnouncementsAsync(status);
         }
         catch (PlatformApiException exception)
         {

@@ -266,9 +266,15 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         return page.Items;
     }
 
-    public Task<IReadOnlyList<CorporateActionAnnouncementItem>> ListCorporateActionAnnouncementsAsync(
+    public async Task<IReadOnlyList<CorporateActionAnnouncementItem>> ListCorporateActionAnnouncementsAsync(
         string? status,
-        CancellationToken cancellationToken = default) => throw new NotImplementedException();
+        CancellationToken cancellationToken = default)
+    {
+        var query = status is null ? "" : $"&status={Uri.EscapeDataString(status)}";
+        var page = await ReadAsync<CorporateActionAnnouncementPage>(
+            HttpMethod.Get, $"/corporate-action-announcements?page=1&pageSize=20{query}", json: null, cancellationToken);
+        return page.Items;
+    }
 
     private static string ClientMoneyAccountsPath(Guid tenantId) => $"/tenants/{tenantId}/client-money-accounts";
 
