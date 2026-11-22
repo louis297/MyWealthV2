@@ -248,6 +248,34 @@ public class BffApiTests
     }
 
     [Test]
+    public async Task Session_ProxiesInterest_RateSchedulesAndRuns()
+    {
+        // bff-adviser-portal amendment 2026-11-22 (interest): /interest is on the prefix allow-list.
+        var id = Guid.NewGuid();
+        _api.Scripts["/interest/rate-schedules"] = (HttpStatusCode.OK, """{"items":[],"page":1,"pageSize":100,"totalCount":0}""");
+        _api.Scripts[$"/interest/rate-schedules/{id}"] = (HttpStatusCode.NoContent, "");
+        _api.Scripts["/interest/runs"] = (HttpStatusCode.OK, """{"items":[],"page":1,"pageSize":20,"totalCount":0}""");
+
+        using var list = new HttpRequestMessage(HttpMethod.Get, "/api/interest/rate-schedules?pageSize=100");
+        list.Headers.TryAddWithoutValidation("Cookie", _sessionCookie);
+        var read = await _bff.SendAsync(list);
+        using var delete = new HttpRequestMessage(HttpMethod.Delete, $"/api/interest/rate-schedules/{id}");
+        delete.Headers.TryAddWithoutValidation("Cookie", _sessionCookie);
+        delete.Headers.TryAddWithoutValidation(RequestHeader, "1");
+        var deleted = await _bff.SendAsync(delete);
+        using var runs = new HttpRequestMessage(HttpMethod.Get, "/api/interest/runs");
+        runs.Headers.TryAddWithoutValidation("Cookie", _sessionCookie);
+        var runsRead = await _bff.SendAsync(runs);
+
+        read.StatusCode.ShouldBe(HttpStatusCode.OK);
+        deleted.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        runsRead.StatusCode.ShouldBe(HttpStatusCode.OK);
+        _api.Calls.ShouldContain(call => call.Path == "/interest/rate-schedules");
+        _api.Calls.ShouldContain(call => call.Path == $"/interest/rate-schedules/{id}");
+        _api.Calls.ShouldContain(call => call.Path == "/interest/runs");
+    }
+
+    [Test]
     public async Task Session_ProxiesNominatedBankAccountsAndWithdrawals_ReadsAndActions()
     {
         // bff-adviser-portal amendment 2026-11-20 (withdrawals): /nominated-bank-accounts and /withdrawals are on the
