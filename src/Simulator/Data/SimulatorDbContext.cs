@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Simulator.Bank;
+using MyWealthV2.Simulator.Broker;
 using MyWealthV2.Simulator.Market;
 using MyWealthV2.Simulator.Worlds;
 
@@ -30,6 +31,14 @@ public sealed class SimulatorDbContext(DbContextOptions<SimulatorDbContext> opti
     public DbSet<MarketCorporateAction> MarketCorporateActions => Set<MarketCorporateAction>();
 
     public DbSet<MarketCorporateActionVersion> MarketCorporateActionVersions => Set<MarketCorporateActionVersion>();
+
+    public DbSet<BrokerSettings> BrokerSettings => Set<BrokerSettings>();
+
+    public DbSet<BrokerOrder> BrokerOrders => Set<BrokerOrder>();
+
+    public DbSet<BrokerFill> BrokerFills => Set<BrokerFill>();
+
+    public DbSet<BrokerReport> BrokerReports => Set<BrokerReport>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -125,6 +134,54 @@ public sealed class SimulatorDbContext(DbContextOptions<SimulatorDbContext> opti
             version.Property(row => row.ExDate).HasColumnType("date");
             version.Property(row => row.RecordDate).HasColumnType("date");
             version.Property(row => row.PaymentDate).HasColumnType("date");
+        });
+
+        modelBuilder.Entity<BrokerSettings>(settings =>
+        {
+            settings.ToTable("BrokerSettings");
+            settings.HasKey(row => row.Id);
+            settings.Property(row => row.Id).ValueGeneratedNever();
+            settings.Property(row => row.SlippagePercent).HasColumnType("decimal(5,2)");
+            settings.Property(row => row.RowVersion).IsRowVersion();
+        });
+
+        modelBuilder.Entity<BrokerOrder>(order =>
+        {
+            order.ToTable("BrokerOrders");
+            order.HasKey(row => row.Id);
+            order.Property(row => row.ClientOrderId).HasMaxLength(BrokerRules.ClientOrderIdMaxLength);
+            order.Property(row => row.BodyHash).HasMaxLength(32);
+            order.Property(row => row.Symbol).HasMaxLength(BrokerRules.SymbolMaxLength);
+            order.Property(row => row.Currency).HasColumnType("char(3)").IsFixedLength();
+            order.Property(row => row.Quantity).HasColumnType("decimal(18,8)");
+            order.Property(row => row.PriceLimit).HasColumnType("decimal(18,8)");
+            order.Property(row => row.ReferencePrice).HasColumnType("decimal(18,8)");
+            order.Property(row => row.FilledQuantity).HasColumnType("decimal(18,8)");
+            order.Property(row => row.AcceptedDay).HasColumnType("date");
+            order.Property(row => row.RowVersion).IsRowVersion();
+            order.Ignore(row => row.Rest);
+            order.HasMany(row => row.Fills).WithOne().HasForeignKey(fill => fill.OrderId);
+        });
+
+        modelBuilder.Entity<BrokerFill>(fill =>
+        {
+            fill.ToTable("BrokerFills");
+            fill.HasKey(row => row.Id);
+            fill.Property(row => row.Quantity).HasColumnType("decimal(18,8)");
+            fill.Property(row => row.Price).HasColumnType("decimal(18,4)");
+            fill.Property(row => row.TradeDate).HasColumnType("date");
+            fill.Property(row => row.SettlementDate).HasColumnType("date");
+            fill.Property(row => row.ContractNote).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<BrokerReport>(report =>
+        {
+            report.ToTable("BrokerReports");
+            report.HasKey(row => row.Id);
+            report.Property(row => row.SettledDate).HasColumnType("date");
+            report.Property(row => row.Reason).HasMaxLength(140);
+            report.HasOne(row => row.Order).WithMany().HasForeignKey(row => row.OrderId);
+            report.HasOne(row => row.Fill).WithMany().HasForeignKey(row => row.FillId);
         });
 
         modelBuilder.Entity<BankFeedPlace>(place =>

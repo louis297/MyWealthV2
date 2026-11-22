@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using System.Xml;
 using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Simulator.Bank;
+using MyWealthV2.Simulator.Broker;
 using MyWealthV2.Simulator.Data;
 using MyWealthV2.Simulator.Market;
 using MyWealthV2.Simulator.Worlds;
@@ -38,6 +39,7 @@ public static class ControlEndpoints
         control.MapGet("/log", GetLogAsync);
         control.MapBankControlEndpoints();
         control.MapMarketControlEndpoints();
+        control.MapBrokerControlEndpoints();
 
         return app;
     }
