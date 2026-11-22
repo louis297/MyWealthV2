@@ -86,7 +86,7 @@ public class TradeFeesSchemaTests
     }
 
     [TestCase(-1)]
-    [TestCase(2)]
+    [TestCase(3)]
     public async Task Insert_UnknownRole_IsRejected(int role)
     {
         var exception = await Should.ThrowAsync<SqlException>(() => RunAsync($"""

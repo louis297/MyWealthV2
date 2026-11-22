@@ -28,6 +28,10 @@ public interface IApplicationDbContext
 
     DbSet<CustomerTaxProfile> CustomerTaxProfiles { get; }
 
+    DbSet<InterestRateSchedule> InterestRateSchedules { get; }
+
+    DbSet<InterestRateBand> InterestRateBands { get; }
+
     DbSet<Instrument> Instruments { get; }
 
     DbSet<Account> Accounts { get; }

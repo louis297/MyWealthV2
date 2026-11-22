@@ -44,19 +44,66 @@ public class InterestRateSchedule : BaseAuditableEntity
         DateOnly effectiveFrom,
         IReadOnlyList<FeeBand> bands,
         DateOnly cutOffDate,
-        Guid? publicId = null) =>
-        throw new NotImplementedException();
+        Guid? publicId = null)
+    {
+        if (currency is null || string.IsNullOrWhiteSpace(currency.Code))
+        {
+            throw new DomainException("Currency is required.");
+        }
+
+        var schedule = new InterestRateSchedule
+        {
+            TenantId = tenantId,
+            Currency = currency.Code.Trim().ToUpperInvariant(),
+            PublicId = publicId ?? Guid.NewGuid()
+        };
+        schedule.Apply(effectiveFrom, bands, currency.DecimalPlaces, cutOffDate);
+        return schedule;
+    }
 
     /// <summary>R12: a row is in effect when it starts on or before the cut-off date.</summary>
-    public bool IsInEffect(DateOnly cutOffDate) => throw new NotImplementedException();
+    public bool IsInEffect(DateOnly cutOffDate) => EffectiveFrom <= cutOffDate;
 
     /// <summary>R13: replaces the date and the whole band set of a pending row. <c>Currency</c> is immutable.</summary>
-    public void Update(DateOnly effectiveFrom, IReadOnlyList<FeeBand> bands, int decimalPlaces, DateOnly cutOffDate) =>
-        throw new NotImplementedException();
+    public void Update(DateOnly effectiveFrom, IReadOnlyList<FeeBand> bands, int decimalPlaces, DateOnly cutOffDate)
+    {
+        EnsureDeletable(cutOffDate);
+        Apply(effectiveFrom, bands, decimalPlaces, cutOffDate);
+    }
 
     /// <summary>R13: refuses delete of a row in effect.</summary>
-    public void EnsureDeletable(DateOnly cutOffDate) => throw new NotImplementedException();
+    public void EnsureDeletable(DateOnly cutOffDate)
+    {
+        if (IsInEffect(cutOffDate))
+        {
+            throw new InterestScheduleInEffectException();
+        }
+    }
 
     /// <summary>R17, R18: the interest one day balance earns, and the effective annual rate.</summary>
-    public DayAccrual AccrualFor(decimal dayBalance) => throw new NotImplementedException();
+    public DayAccrual AccrualFor(decimal dayBalance)
+    {
+        if (dayBalance <= 0m)
+        {
+            return new DayAccrual(0m, 0m);
+        }
+
+        var yearly = FeeBands.Create(Bands, FeeBands.RateDecimalPlaces).Apply(dayBalance);
+        var amount = decimal.Round(yearly / DaysInYear, AccrualDecimalPlaces, MidpointRounding.AwayFromZero);
+        var rate = decimal.Round(yearly / dayBalance * 100m, FeeBands.RateDecimalPlaces, MidpointRounding.AwayFromZero);
+        return new DayAccrual(amount, rate);
+    }
+
+    private void Apply(DateOnly effectiveFrom, IReadOnlyList<FeeBand> bands, int decimalPlaces, DateOnly cutOffDate)
+    {
+        if (effectiveFrom <= cutOffDate)
+        {
+            throw new DomainException("EffectiveFrom must be after the cut-off date.");
+        }
+
+        var shape = FeeBands.Create(bands, decimalPlaces);
+        EffectiveFrom = effectiveFrom;
+        _bands.Clear();
+        _bands.AddRange(shape.Items.Select(band => InterestRateBand.Create(TenantId, band.From, band.RatePercent)));
+    }
 }

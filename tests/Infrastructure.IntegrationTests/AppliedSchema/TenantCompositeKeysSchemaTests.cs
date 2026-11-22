@@ -446,6 +446,59 @@ public class TenantCompositeKeysSchemaTests
                 ([UserId], [TenantId], [TaxResidency], [IrdNumberHeld], [RwtRatePercent], [UpdatedByUserId], [UpdatedAt], [Created], [CreatedBy])
             VALUES (@a_customer, @a_tenant, 0, 0, NULL, @{p}_adviser, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
             """),
+        ("FK_InterestRateBands_InterestRateSchedules_TenantId_InterestRateScheduleId", "InterestRateSchedules", """
+            INSERT INTO [InterestRateSchedules] ([PublicId], [TenantId], [Currency], [EffectiveFrom], [Created], [CreatedBy])
+            VALUES (NEWID(), @{p}_tenant, 'USD', '2026-12-01', SYSDATETIMEOFFSET(), N'test');
+            DECLARE @{p}_rate int = SCOPE_IDENTITY();
+            INSERT INTO [InterestRateBands] ([TenantId], [InterestRateScheduleId], [FromAmount], [RatePercent])
+            VALUES (@a_tenant, @{p}_rate, 0, 3);
+            """),
+        ("FK_InterestAccruals_Accounts_TenantId_AccountId", "Accounts", """
+            INSERT INTO [InterestRateSchedules] ([PublicId], [TenantId], [Currency], [EffectiveFrom], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, 'USD', '2026-12-01', SYSDATETIMEOFFSET(), N'test');
+            DECLARE @rate int = SCOPE_IDENTITY();
+            INSERT INTO [InterestAccruals] ([TenantId], [AccountId], [AccrualDate], [Balance], [InterestRateScheduleId], [EffectiveRatePercent], [Amount])
+            VALUES (@a_tenant, @{p}_bank, '2026-12-01', 5000, @rate, 3, 0.41095890);
+            """),
+        ("FK_InterestAccruals_InterestRateSchedules_TenantId_InterestRateScheduleId", "InterestRateSchedules", """
+            INSERT INTO [InterestRateSchedules] ([PublicId], [TenantId], [Currency], [EffectiveFrom], [Created], [CreatedBy])
+            VALUES (NEWID(), @{p}_tenant, 'USD', '2026-12-01', SYSDATETIMEOFFSET(), N'test');
+            DECLARE @{p}_rate int = SCOPE_IDENTITY();
+            INSERT INTO [InterestAccruals] ([TenantId], [AccountId], [AccrualDate], [Balance], [InterestRateScheduleId], [EffectiveRatePercent], [Amount])
+            VALUES (@a_tenant, @a_bank, '2026-12-01', 5000, @{p}_rate, 3, 0.41095890);
+            """),
+        ("FK_InterestAccruals_Transactions_TenantId_PostedTransactionId", "Transactions", """
+            INSERT INTO [InterestRateSchedules] ([PublicId], [TenantId], [Currency], [EffectiveFrom], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, 'USD', '2026-12-01', SYSDATETIMEOFFSET(), N'test');
+            DECLARE @rate int = SCOPE_IDENTITY();
+            INSERT INTO [InterestAccruals]
+                ([TenantId], [AccountId], [AccrualDate], [Balance], [InterestRateScheduleId], [EffectiveRatePercent], [Amount], [PostedTransactionId])
+            VALUES (@a_tenant, @a_bank, '2026-12-01', 5000, @rate, 3, 0.41095890, @{p}_buy);
+            """),
+        ("FK_InterestRuns_Accounts_TenantId_AccountId", "Accounts", """
+            INSERT INTO [InterestRuns]
+                ([PublicId], [TenantId], [AsOfDate], [Trigger], [RanByUserId], [AccountId], [StartedAt], [AccountsProcessed],
+                 [AccountsFailed], [PostingCount], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, '2026-12-31', 2, @a_adviser, @{p}_bank, SYSDATETIMEOFFSET(), 1, 0, 1, SYSDATETIMEOFFSET(), N'test');
+            """),
+        ("FK_TransactionTaxDetails_TransactionCashLegs_TenantId_CashLegId", "TransactionCashLegs", """
+            INSERT INTO [TransactionCashLegs] ([TenantId], [TransactionId], [AccountId], [Role], [Amount], [Currency], [Created], [CreatedBy])
+            VALUES (@{p}_tenant, @{p}_buy, @{p}_bank, 2, -2.16, 'USD', SYSDATETIMEOFFSET(), N'test');
+            DECLARE @taxleg int = SCOPE_IDENTITY();
+            INSERT INTO [TransactionTaxDetails] ([CashLegId], [TenantId], [TransactionId], [Kind], [RatePercent], [BasisAmount], [TaxAmount], [Currency])
+            VALUES (@taxleg, @a_tenant, @a_buy, 0, 17.5, 12.33, 2.16, 'USD');
+            """),
+        ("FK_TransactionTaxDetails_Transactions_TenantId_TransactionId", "Transactions", """
+            INSERT INTO [TransactionCashLegs] ([TenantId], [TransactionId], [AccountId], [Role], [Amount], [Currency], [Created], [CreatedBy])
+            VALUES (@a_tenant, @a_buy, @a_bank, 2, -2.16, 'USD', SYSDATETIMEOFFSET(), N'test');
+            DECLARE @taxleg int = SCOPE_IDENTITY();
+            INSERT INTO [TransactionTaxDetails] ([CashLegId], [TenantId], [TransactionId], [Kind], [RatePercent], [BasisAmount], [TaxAmount], [Currency])
+            VALUES (@taxleg, @a_tenant, @{p}_buy, 0, 17.5, 12.33, 2.16, 'USD');
+            """),
+        ("FK_TransactionInterestDetails_Transactions_TenantId_TransactionId", "Transactions", """
+            INSERT INTO [TransactionInterestDetails] ([TransactionId], [TenantId], [PeriodFrom], [PeriodTo], [Days], [AccruedAmount], [GrossAmount])
+            VALUES (@{p}_buy, @a_tenant, '2026-12-01', '2026-12-31', 31, 12.32876700, 12.33);
+            """),
         ("FK_ReportExecutions_ReportSchedules_TenantId_ScheduleId", "ReportSchedules", """
             INSERT INTO [ReportExecutions] ([PublicId], [ReportId], [ScheduleId], [TenantId], [TriggerKind], [Status], [ParametersJson], [Created], [CreatedBy])
             VALUES (NEWID(), @report, @{p}_schedule, @a_tenant, N'Scheduled', N'Queued', N'{}', SYSDATETIMEOFFSET(), N'test');
@@ -479,7 +532,7 @@ public class TenantCompositeKeysSchemaTests
     ];
 
     private static readonly string[] Parents =
-        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines", "BankReconciliations"];
+        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines", "BankReconciliations", "InterestRateSchedules"];
 
     private static IEnumerable<TestCaseData> CompositeKeyCases() =>
         CompositeKeys.Select(key => new TestCaseData(key.ForeignKey).SetName($"Insert_ChildPointingAtOtherTenant_IsRejected({key.ForeignKey})"));

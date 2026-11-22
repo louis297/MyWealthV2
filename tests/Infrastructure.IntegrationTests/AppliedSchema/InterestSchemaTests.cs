@@ -40,8 +40,8 @@ public class InterestSchemaTests
     }
 
     [TestCase("-1", "3", "CK_InterestRateBands_FromAmount")]
-    [TestCase("0", "100.0001", "CK_InterestRateBands_RatePercent")]
-    [TestCase("0", "-0.5", "CK_InterestRateBands_RatePercent")]
+    [TestCase("1000", "100.0001", "CK_InterestRateBands_RatePercent")]
+    [TestCase("1000", "-0.5", "CK_InterestRateBands_RatePercent")]
     public async Task ABandOutsideTheChecks_Violates(string from, string rate, string constraint)
     {
         var exception = await Should.ThrowAsync<SqlException>(() => RunAsync($"""
