@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Application.Interest.Accruals;
+using MyWealthV2.Application.Interest.Runs;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Infrastructure.Data;
@@ -80,6 +81,49 @@ internal static class InterestDb
         using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         return await db.InterestRateSchedules.IgnoreQueryFilters().Where(row => row.PublicId == scheduleId).Select(row => row.Id).SingleAsync();
+    }
+
+    /// <summary>A schedule straight in the database from a past day, which the routes cannot create (R13).</summary>
+    public static async Task InsertScheduleAsync(int tenantId, string currency, DateOnly effectiveFrom, decimal ratePercent = 3m)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var catalog = await db.Set<Currency>().AsNoTracking().SingleAsync(row => row.Code == currency);
+        var schedule = InterestRateSchedule.Create(
+            tenantId, catalog, effectiveFrom, [new Domain.ValueObjects.FeeBand(0m, ratePercent)], effectiveFrom.AddDays(-1));
+        schedule.CreatedBy = "test";
+        db.InterestRateSchedules.Add(schedule);
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>Moves the account's open date and every Transaction on it back to <paramref name="day"/>, as if it had
+    /// been funded then (a Custodial account cannot be dated by a caller).</summary>
+    public static async Task BackdateAsync(Guid accountId, DateOnly day)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var at = new DateTimeOffset(day.ToDateTime(new TimeOnly(1, 0)), TimeSpan.Zero);
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            UPDATE [Accounts] SET [Created] = {at} WHERE [PublicId] = {accountId};
+            UPDATE [Transactions] SET [BookedAt] = {at}
+            WHERE [Id] IN (SELECT leg.[TransactionId] FROM [TransactionCashLegs] leg
+                           JOIN [Accounts] account ON account.[Id] = leg.[AccountId] WHERE account.[PublicId] = {accountId});
+            """);
+    }
+
+    /// <summary>Calls <see cref="IRunInterest"/> as the daily job does, with any as-of date.</summary>
+    public static async Task RunAsync(int tenantId, DateOnly asOfDate)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IRunInterest>()
+            .RunAsync(tenantId, asOfDate, InterestRunTrigger.Scheduled, null, CancellationToken.None);
+    }
+
+    public static async Task<List<InterestRun>> RunsAsync(int tenantId)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await db.InterestRuns.IgnoreQueryFilters().AsNoTracking().Where(row => row.TenantId == tenantId).ToListAsync();
     }
 
     /// <summary>R17: <c>Round(balance × rate / 100 / 365, 8)</c> for one band.</summary>
