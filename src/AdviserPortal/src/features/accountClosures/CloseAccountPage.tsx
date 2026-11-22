@@ -52,6 +52,9 @@ function Check({ label, passed, children }: { label: string; passed: boolean; ch
  * the cash balance, the payout and the remainder written off (R7), the payee when there is a payout (R8), a memo,
  * then a review. Confirm posts `POST /accounts/{id}/closures` with one Idempotency-Key per form open.
  */
+export const accruedInterestSentence =
+  "Interest accrued so far is added before the payout. The amount to pay out may be higher than shown.";
+
 export function CloseAccountPage() {
   const { id: accountId = "" } = useParams();
   const navigate = useNavigate();
@@ -148,6 +151,10 @@ export function CloseAccountPage() {
             <DetailItem label="To pay out">{payout}</DetailItem>
             {amounts.remainder > 0 ? <DetailItem label="Written off">{remainder}</DetailItem> : null}
           </DetailGrid>
+          {(data.accruedInterest ?? 0) > 0 ? (
+            // interest-run D62, R33: the closure posts the interest accrued so far before the payout.
+            <p className="text-muted-foreground mt-3 text-sm">{accruedInterestSentence}</p>
+          ) : null}
         </CardContent>
       </Card>
       <Card>

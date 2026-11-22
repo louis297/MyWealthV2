@@ -7,6 +7,8 @@ export type StatementLine = {
   clientMoneyAccountId: string;
   currency: string;
   direction: string;
+  /** interest-run R39: `Transfer` or `Interest`. */
+  kind?: string;
   amount: number;
   valueDate: string;
   payerName: string | null;
@@ -26,7 +28,8 @@ export type StatementLine = {
   lastAction: {
     action: string;
     note: string | null;
-    by: { id: string; name: string };
+    /** Null when the platform acted (interest-run R40). */
+    by: { id: string; name: string } | null;
     at: string;
   } | null;
   /** withdrawals R44: the line this line returns, the withdrawal of a payout line, and the bank's return reason. */
@@ -38,16 +41,19 @@ export type StatementLine = {
   rowVersion: string;
 };
 
-export type StatementLineListArgs = { status: string; direction?: string; page?: number };
+export type StatementLineListArgs = { status: string; direction?: string; kind?: string; page?: number };
 
 export type NoteAction = "ignore" | "request-return" | "unmatch";
 
 export const statementLinesApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getStatementLines: builder.query<PagedList<StatementLine>, StatementLineListArgs>({
-      query: ({ status, direction, page }) => {
+      query: ({ status, direction, kind, page }) => {
         const params = new URLSearchParams();
         params.set("status", status);
+        if (kind) {
+          params.set("kind", kind);
+        }
         if (direction) {
           params.set("direction", direction);
         }

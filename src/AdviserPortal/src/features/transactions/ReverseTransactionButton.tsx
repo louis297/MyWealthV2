@@ -63,6 +63,8 @@ export function sourceLabel(kind: string | undefined) {
       return "Withdrawal";
     case "AccountClosure":
       return "Account closure";
+    case "InterestRun":
+      return "Interest run";
     default:
       return kind;
   }

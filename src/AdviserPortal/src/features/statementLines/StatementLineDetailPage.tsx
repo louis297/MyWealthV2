@@ -237,7 +237,7 @@ export function StatementLineDetailPage() {
               <DetailGrid>
                 <DetailItem label="Action">{actionLabel(line.lastAction.action)}</DetailItem>
                 <DetailItem label="Note">{line.lastAction.note ?? "—"}</DetailItem>
-                <DetailItem label="By">{line.lastAction.by.name}</DetailItem>
+                <DetailItem label="By">{line.lastAction.by?.name ?? "The platform"}</DetailItem>
                 <DetailItem label="At">{formatInstant(line.lastAction.at)}</DetailItem>
               </DetailGrid>
             </CardContent>

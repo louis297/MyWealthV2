@@ -132,6 +132,17 @@ function path(request: Request) {
   return new URL(request.url).pathname;
 }
 
+/** What the account pages read besides the account: no holdings and no withdrawals. */
+function accountPages(request: Request) {
+  if (path(request) === `/api/accounts/${accountId}/holdings`) {
+    return json({ items: [] });
+  }
+  if (path(request) === "/api/withdrawals") {
+    return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+  }
+  return undefined;
+}
+
 describe("Interest (interest-run D58–D63)", () => {
   beforeEach(() => {
     stubBrowser("/");
@@ -239,6 +250,7 @@ describe("Interest (interest-run D58–D63)", () => {
       renderFees(adviser(), routes, "/interest/rates", list);
 
       const usd = await screen.findByRole("table", { name: "USD interest rates" });
+      expect(await within(usd).findByText("In effect")).toBeInTheDocument();
       expect(screen.getAllByRole("table").map((table) => table.getAttribute("aria-label"))).toEqual([
         "NZD interest rates",
         "USD interest rates",
@@ -319,7 +331,7 @@ describe("Interest (interest-run D58–D63)", () => {
         return list(request);
       });
 
-      fireEvent.change(await screen.findByLabelText("Band 1 rate %"), { target: { value: "2.75" } });
+      fireEvent.change(await screen.findByDisplayValue("2.5"), { target: { value: "2.75" } });
       fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
       await waitFor(() => expect(body).toEqual({
@@ -343,11 +355,11 @@ describe("Interest (interest-run D58–D63)", () => {
           : undefined);
 
       const table = await screen.findByRole("table", { name: "Interest runs" });
-      expect(within(table).getByText("Daily run")).toBeInTheDocument();
+      expect(await within(table).findByText("Daily run")).toBeInTheDocument();
       expect(within(table).getByText("Account closure")).toBeInTheDocument();
       expect(within(table).getAllByText("42")).toHaveLength(2);
-      expect(within(table).getByText("96.12 NZD, 410.55 USD")).toBeInTheDocument();
-      expect(within(table).getByText("21.07 NZD, 93.40 USD")).toBeInTheDocument();
+      expect(within(table).getAllByText("96.12 NZD, 410.55 USD")).toHaveLength(2);
+      expect(within(table).getAllByText("21.07 NZD, 93.40 USD")).toHaveLength(2);
       expect(within(table).getByText("1").className).toContain("text-destructive");
       expect(screen.queryByRole("button", { name: /run/i })).not.toBeInTheDocument();
     });
@@ -394,7 +406,7 @@ describe("Interest (interest-run D58–D63)", () => {
       expect(screen.queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "Daily interest" }));
       const daily = await screen.findByRole("table", { name: "Daily interest" });
-      expect(within(daily).getByText("0.41095890")).toBeInTheDocument();
+      expect(await within(daily).findByText("0.41095890")).toBeInTheDocument();
     });
 
     it("shows the net with the tax under it in the transactions list", async () => {
@@ -408,7 +420,7 @@ describe("Interest (interest-run D58–D63)", () => {
   describe("D62 accrued interest", () => {
     it("shows the interest accrued and not yet paid on a Custodial account", async () => {
       renderFees(feeUser(), [{ path: "/accounts/:id", element: <AccountDetailPage /> }], `/accounts/${accountId}`, (request) =>
-        path(request) === `/api/accounts/${accountId}` ? json(account()) : undefined);
+        path(request) === `/api/accounts/${accountId}` ? json(account()) : accountPages(request));
 
       expect(await screen.findByText("Interest accrued, not yet paid")).toBeInTheDocument();
       expect(screen.getByText("4.5205 USD up to 2026-12-12")).toBeInTheDocument();
@@ -422,7 +434,7 @@ describe("Interest (interest-run D58–D63)", () => {
         if (path(request) === "/api/transactions") {
           return json({ items: [posting], page: 1, pageSize: 20, totalCount: 1 });
         }
-        return undefined;
+        return accountPages(request);
       });
 
       expect(await screen.findByText("incl. tax 2.16 USD")).toBeInTheDocument();
@@ -431,7 +443,7 @@ describe("Interest (interest-run D58–D63)", () => {
 
     it("warns on the Close account page that the accrued interest is added before the payout", async () => {
       renderFees(feeUser(), [{ path: "/accounts/:id/close", element: <CloseAccountPage /> }], `/accounts/${accountId}/close`, (request) =>
-        path(request) === `/api/accounts/${accountId}` ? json(account()) : undefined);
+        path(request) === `/api/accounts/${accountId}` ? json(account()) : accountPages(request));
 
       expect(await screen.findByText("Interest accrued so far is added before the payout. The amount to pay out may be higher than shown.")).toBeInTheDocument();
     });
