@@ -40,8 +40,9 @@ public class CustodyRulesTests
             [TransactionType.Opening] = false,
             [TransactionType.Reversal] = true,
             [TransactionType.Dividend] = false,
-            [TransactionType.Buy] = true,
-            [TransactionType.Sell] = true,
+            // Orders R48: a trade on a Custodial account goes through the broker.
+            [TransactionType.Buy] = false,
+            [TransactionType.Sell] = false,
             [TransactionType.OpeningHoldings] = false,
             [TransactionType.StockIn] = false,
             [TransactionType.StockOut] = false,
@@ -77,8 +78,10 @@ public class CustodyRulesTests
     [TestCase(TransactionType.Interest, "Interest cannot be entered by hand on a Custodial account.")]
     [TestCase(TransactionType.Opening, "A Custodial account starts empty. Fund it with TransferIn.")]
     [TestCase(TransactionType.OpeningHoldings, "A Custodial account starts empty. Fund it with TransferIn.")]
-    [TestCase(TransactionType.StockIn, "Securities cannot be moved in or out of a Custodial account by hand. Use Buy and Sell.")]
-    [TestCase(TransactionType.StockOut, "Securities cannot be moved in or out of a Custodial account by hand. Use Buy and Sell.")]
+    [TestCase(TransactionType.Buy, "Trades on a Custodial account go through the broker. Place an order.")]
+    [TestCase(TransactionType.Sell, "Trades on a Custodial account go through the broker. Place an order.")]
+    [TestCase(TransactionType.StockIn, "Securities cannot be moved in or out of a Custodial account by hand. Place an order.")]
+    [TestCase(TransactionType.StockOut, "Securities cannot be moved in or out of a Custodial account by hand. Place an order.")]
     [TestCase(TransactionType.Split, "Corporate actions cannot be entered by hand on a Custodial account.")]
     [TestCase(TransactionType.Bonus, "Corporate actions cannot be entered by hand on a Custodial account.")]
     [TestCase(TransactionType.Scrip, "Corporate actions cannot be entered by hand on a Custodial account.")]
