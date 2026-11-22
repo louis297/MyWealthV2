@@ -177,6 +177,29 @@ public class BackOfficeApiTests
     }
 
     [Test]
+    public async Task MarketDataConnections_ReadsTheListWithTheFeedState()
+    {
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.OK, """
+            {"items":[
+              {"name":"simulator","adapter":"Simulator","symbolSuffix":".SIM",
+               "prices":{"lastSucceededAt":"2026-11-22T03:15:01Z","lastFailedAt":null,"lastFailure":null}},
+              {"name":"other","adapter":"Simulator","symbolSuffix":".OTH","prices":null}
+            ],"page":1,"pageSize":20,"totalCount":2}
+            """);
+        var platform = Create(api);
+
+        var connections = await platform.ListMarketDataConnectionsAsync();
+
+        connections.ShouldBe([
+            new MarketDataConnectionItem("simulator", "Simulator", ".SIM",
+                new MarketDataFeed(new DateTimeOffset(2026, 11, 22, 3, 15, 1, TimeSpan.Zero), null, null)),
+            new MarketDataConnectionItem("other", "Simulator", ".OTH", null)
+        ]);
+        AssertRequest(api.Requests[0], "GET", "/market-data-connections");
+    }
+
+    [Test]
     public async Task InstrumentCalls_ListUsesTenantAndFilters()
     {
         var instrumentId = Guid.Parse("33333333-3333-3333-3333-333333333333");

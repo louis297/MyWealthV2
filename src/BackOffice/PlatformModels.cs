@@ -55,7 +55,8 @@ public sealed record InstrumentItem(
     string Name,
     string QuoteCurrency,
     bool IsActive,
-    string RowVersion);
+    string RowVersion,
+    string? MarketDataConnection = null);
 
 public sealed record InstrumentPage(
     IReadOnlyList<InstrumentItem> Items,
@@ -84,6 +85,14 @@ public sealed record ClientMoneyAccountFeed(DateTimeOffset? LastSucceededAt, Dat
 public sealed record BankConnectionItem(string Name, string Adapter);
 
 public sealed record BankConnectionPage(IReadOnlyList<BankConnectionItem> Items, int Page, int PageSize, int TotalCount);
+
+/// <summary>How the last read of a market data feed went (docs/features/simulated-instruments.md R5).</summary>
+public sealed record MarketDataFeed(DateTimeOffset? LastSucceededAt, DateTimeOffset? LastFailedAt, string? LastFailure);
+
+/// <summary>A configured market data connection and the state of its price feed (simulated-instruments R5).</summary>
+public sealed record MarketDataConnectionItem(string Name, string Adapter, string SymbolSuffix, MarketDataFeed? Prices);
+
+public sealed record MarketDataConnectionPage(IReadOnlyList<MarketDataConnectionItem> Items, int Page, int PageSize, int TotalCount);
 
 public sealed record ClientMoneyAccountPage(
     IReadOnlyList<ClientMoneyAccountItem> Items,
