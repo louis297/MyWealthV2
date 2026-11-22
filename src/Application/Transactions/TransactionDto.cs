@@ -43,6 +43,37 @@ public sealed class TransactionDto
 
     /// <summary>The bank's details, on a payout and on its Reversal; otherwise null (withdrawals R41).</summary>
     public TransactionPaymentDto? Payment { get; init; }
+
+    /// <summary>The period an interest posting pays, on the posting and its Reversal; otherwise null (interest-run R34).</summary>
+    public TransactionInterestDto? Interest { get; init; }
+}
+
+/// <summary>An interest posting's interest detail (interest-run R26, R34).</summary>
+public sealed class TransactionInterestDto
+{
+    public required string PeriodFrom { get; init; }
+
+    public required string PeriodTo { get; init; }
+
+    public required int Days { get; init; }
+
+    public required decimal AccruedAmount { get; init; }
+
+    public required decimal GrossAmount { get; init; }
+}
+
+/// <summary>A <c>Tax</c> leg's tax detail (interest-run R25, R34). <see cref="Amount"/> is the tax, positive.</summary>
+public sealed class TransactionTaxDto
+{
+    public required string Kind { get; init; }
+
+    public required decimal RatePercent { get; init; }
+
+    public required decimal BasisAmount { get; init; }
+
+    public required decimal Amount { get; init; }
+
+    public required string Currency { get; init; }
 }
 
 /// <summary>A payout's payment detail (withdrawals R41). <see cref="PayeeAccount"/> is masked.</summary>
@@ -92,7 +123,7 @@ public sealed class TransactionCashDto
 
     public required Guid CustomerId { get; init; }
 
-    /// <summary><c>Principal</c> or <c>Fee</c> (trade-fees §8.1).</summary>
+    /// <summary><c>Principal</c>, <c>Fee</c> (trade-fees §8.1) or <c>Tax</c> (interest-run R34).</summary>
     public required string Role { get; init; }
 
     /// <summary>In the Account currency.</summary>
@@ -102,6 +133,9 @@ public sealed class TransactionCashDto
 
     /// <summary>The fee detail on a <c>Fee</c> leg; null on a <c>Principal</c> leg (trade-fees §8.1).</summary>
     public TransactionFeeDto? Fee { get; init; }
+
+    /// <summary>The tax detail on a <c>Tax</c> leg; null on any other leg (interest-run R34).</summary>
+    public TransactionTaxDto? Tax { get; init; }
 }
 
 /// <summary>A <c>Fee</c> leg's fee detail. <see cref="Amount"/> is in the quote currency (trade-fees R18).</summary>

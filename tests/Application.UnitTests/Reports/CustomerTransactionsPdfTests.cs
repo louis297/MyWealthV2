@@ -103,6 +103,37 @@ public class CustomerTransactionsPdfTests
         text.IndexOf("-10.00 USD", StringComparison.Ordinal).ShouldBeGreaterThan(text.IndexOf("-1260.00 USD", StringComparison.Ordinal));
     }
 
+    [Test]
+    public void Render_ShowsTheTaxColumn_AfterTheFeeColumn()
+    {
+        var pdf = CustomerTransactionsPdf.Render(new CustomerTransactionsPdfModel(
+            "Firm Queue",
+            new DateTimeOffset(2027, 1, 31, 14, 5, 6, TimeSpan.Zero),
+            "Cee",
+            new DateOnly(2027, 1, 1),
+            new DateOnly(2027, 1, 31),
+            IncludeClosedAccounts: false,
+            [
+                new CustomerTransactionsPdfRow(
+                    new DateTimeOffset(2027, 1, 1, 0, 30, 4, TimeSpan.Zero),
+                    "Managed",
+                    "Interest",
+                    "10.17 USD",
+                    "",
+                    "",
+                    "Interest",
+                    Tax: "-2.16 USD")
+            ]));
+
+        var text = Read(pdf);
+        var fee = text.IndexOf("Fee", StringComparison.Ordinal);
+        var tax = text.IndexOf("Tax", StringComparison.Ordinal);
+        var instrument = text.IndexOf("Instrument", StringComparison.Ordinal);
+        tax.ShouldBeGreaterThan(fee);
+        instrument.ShouldBeGreaterThan(tax);
+        text.IndexOf("-2.16 USD", StringComparison.Ordinal).ShouldBeGreaterThan(text.IndexOf("10.17 USD", StringComparison.Ordinal));
+    }
+
     private const string Note =
         "Held elsewhere: recorded by your adviser from outside statements. The platform has not checked these figures.";
 
