@@ -54,7 +54,22 @@ An Adviser no longer types a `Buy` or a `Sell` on a Custodial account. The Advis
 
 New: permissions `orders.read` and `orders.place`; routes under `/orders`, `GET /broker-connections`, `GET /execution-reports`; ports `IBrokerOrders` and `IBrokerFeed` with adapters `SimulatorBrokerOrders` and `SimulatorBrokerFeed`; broker connections in configuration and `brokerConnection` on the Tenant; source kind `OrderFill`; the execution detail on the Transaction; `worker` job `broker-sync:{connection}` on the new queue `broker`; item fields `unsettledCash` and `withdrawableCash` (account), `reservedQuantity` and `availableQuantity` (holding), `execution` (transaction). Script `0051_orders.sql`; simulator script `database/simulator/0010_broker.sql`. No new `TransactionType`, problem code or domain event.
 
-**Status is `accepted` (2026-11-23).** The twenty-one points of §11 were confirmed on 2026-11-23, every one as recommended, and are written into the rules. The amendments to accepted docs listed in §12 were made when it was accepted. It is a build contract.
+**Status is `accepted` (2026-11-23), landed 2026-11-23.** The twenty-one points of §11 were confirmed on 2026-11-23, every one as recommended, and are written into the rules. The amendments to accepted docs listed in §12 were made when it was accepted. It is a build contract.
+
+Notes from landing:
+
+- R2–R4, R66, R67: the connections are read by `BrokerConnectionsConfiguration` (Infrastructure); `IBrokerOrders` and `IBrokerFeed` are `BrokerOrdersDispatcher` and `BrokerFeedDispatcher` over `SimulatorBrokerOrders` and `SimulatorBrokerFeed`, registered on `webapi` and `worker` by `AddBrokerConnections`. A connection with no adapter on the host answers `Unreachable`.
+- R6–R13, R17: the checks of placing and of the preview are one helper, `OrderChecks` (Application). The date of the reference price comes from `IInstrumentPriceStore.LatestDateAsync`, added for R10, because `IMarketData.TryGetPrice` carries no date.
+- R19: `BrokerSyncJob` (Infrastructure) runs send, cancel, pull, process, post in that order under `SqlRunLock` and throws `BrokerSyncFailedException` after every step was tried. The recurring job is registered per connection on queue `broker` by `BrokerSyncRecurringJob`.
+- R31–R36: `PostOrderFills` (Application) is the one place a fill is posted; `ProcessExecutionReports` calls it in the report's own transaction and the last step of a run tries the `Pending` fills again. The posting's `CreatedBy` is `SystemActor.Name`.
+- R33, R35: `Transaction.PostBuy` and `PostSell` take one optional `TradeExecution`. With it, `feeSchedule` and `enteredFee` together mean "this amount, charged under this schedule", so the fee detail names the order's schedule and its basis is the fill's gross; without it the factories behave as before.
+- R39, R44: reserved, unsettled and withdrawable cash are plain sums read by `AccountCash` (Application); the rules are `AvailableCash.Withdrawable` and `AvailableCash.AllowsLeaving` (Domain).
+- R48: `CreateTransaction` no longer prices a trade. The matrix refuses `Buy` and `Sell` on a Custodial account before any type-specific check, so a body with a price, a fee, a rate or a `bookedAt` gets the same 400 at `errors.Type`. The functional tests that only needed a holding write a `Manual` trade straight to the database (`CustodialHttp.InsertManualTradeAsync`); those about a platform trade place an order and feed the fake broker a fill (`CustodialHttp.TradeAsync`). The tests whose only subject was a hand trade on a Custodial account were removed with the branch; the commit that refuses the trade names them.
+- R50: `CorporateActionEffect.MakeEffectiveAsync` requests the cancel of the open orders in the same transaction, with the note `Corporate action`.
+- R52–R65: the simulator broker is `src/Simulator/Broker`. Every write on its books holds a lock on the `BrokerSettings` row, so the numbers of orders and fills and the places of reports follow the order the writes happen in. `BrokerReports` has no number column: the `n` of a report's outside id is its count among the reports of the world, which is stable because a report is removed only by a reset. R62 is applied when the broker is brought up to date: a working order accepted before the ex-date of an action that is now effective is cancelled before the day's expiries.
+- D71: the list item carries no fills, so the Orders page reads `pendingFill=true` once more to mark the orders that need attention.
+- D69: the new transaction form offers nothing on a Custodial account and links to Place order.
+- BO26: the tenant edit form offers no "None", because an update without `brokerConnection` leaves the tenant's connection as it is (R3).
 
 ---
 
