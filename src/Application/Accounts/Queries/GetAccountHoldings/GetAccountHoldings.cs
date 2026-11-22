@@ -42,9 +42,19 @@ public class GetAccountHoldingsQueryHandler(IApplicationDbContext db, ICurrentUs
             orderby instrument.Symbol
             select new { holding, instrument }).ToListAsync(cancellationToken);
 
+        // Orders R40: what the Account's live sell orders reserve, per Instrument. An order that is not live reserves 0.
+        var reserved = await db.Orders.AsNoTracking()
+            .Where(order => order.AccountId == accountRow.Id && order.ReservedQuantity > 0)
+            .GroupBy(order => order.InstrumentId)
+            .Select(group => new { InstrumentId = group.Key, Quantity = group.Sum(order => order.ReservedQuantity) })
+            .ToDictionaryAsync(row => row.InstrumentId, row => row.Quantity, cancellationToken);
+
         return new AccountHoldingsDto
         {
-            Items = rows.Select(row => AccountHoldingDto.From(accountRow, row.holding, row.instrument)).ToList()
+            Items = rows
+                .Select(row => AccountHoldingDto.From(
+                    accountRow, row.holding, row.instrument, reserved.GetValueOrDefault(row.instrument.Id)))
+                .ToList()
         };
     }
 }

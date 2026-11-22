@@ -239,6 +239,26 @@ public class CreateAdjustmentCommandHandler(
             ? null
             : await HoldingChangeAsync(request.Security, tenant.Id, account.Id, cancellationToken);
 
+        // Orders R40: an adjustment that lowers a holding leaves its available quantity at or above zero.
+        if (holdingChange is { QuantityChange: < 0m })
+        {
+            var reserved = await Orders.OrderReservations.ReservedQuantityAsync(
+                db, account.Id, holdingChange.InstrumentId, cancellationToken);
+            if (reserved > 0m
+                && !AvailableQuantity.Allows(holdingChange.CurrentQuantity + holdingChange.QuantityChange, reserved))
+            {
+                var symbol = await db.Instruments.AsNoTracking()
+                    .Where(row => row.Id == holdingChange.InstrumentId)
+                    .Select(row => row.Symbol)
+                    .SingleAsync(cancellationToken);
+                throw new ValidationException([
+                    new ValidationFailure(
+                        nameof(CreateAdjustmentCommand.Security),
+                        $"{Orders.OrderChecks.Units(reserved)} {symbol} is reserved for sell orders.")
+                ]);
+            }
+        }
+
         if (request.Amount is { } amount)
         {
             CashAmountPlaces.EnsureFits(catalog, Money.Create(0m, account.Currency).Currency, amount);
