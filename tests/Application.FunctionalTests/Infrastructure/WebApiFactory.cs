@@ -71,6 +71,9 @@ public class WebApiFactory(
             services.RemoveAll<MyWealthV2.Application.Broker.IBrokerOrders>();
             services.AddSingleton<Broker.InMemoryBrokerOrders>();
             services.AddSingleton<MyWealthV2.Application.Broker.IBrokerOrders>(sp => sp.GetRequiredService<Broker.InMemoryBrokerOrders>());
+            services.RemoveAll<MyWealthV2.Application.Broker.IBrokerFeed>();
+            services.AddSingleton<Broker.InMemoryBrokerFeed>();
+            services.AddSingleton<MyWealthV2.Application.Broker.IBrokerFeed>(sp => sp.GetRequiredService<Broker.InMemoryBrokerFeed>());
             services.RemoveAll<IBankFeed>();
             services.AddSingleton<InMemoryBankFeed>();
             services.AddSingleton<IBankFeed>(sp => sp.GetRequiredService<InMemoryBankFeed>());

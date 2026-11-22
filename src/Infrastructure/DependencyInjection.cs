@@ -177,6 +177,7 @@ public static class DependencyInjection
         builder.Services.AddSingleton(connections);
         builder.Services.AddSingleton<IBrokerConnections>(connections);
         builder.Services.AddScoped<SendBrokerOrders>();
+        builder.Services.AddScoped<PullExecutionReports>();
     }
 
     /// <summary>

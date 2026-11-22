@@ -81,6 +81,7 @@ public static class TestApp
         FunctionalTestSetup.WebApiServices.GetRequiredService<InMemoryBankFeed>().Reset();
         FunctionalTestSetup.WebApiServices.GetRequiredService<InMemoryBankPayments>().Reset();
         FunctionalTestSetup.WebApiServices.GetRequiredService<Broker.InMemoryBrokerOrders>().Reset();
+        FunctionalTestSetup.WebApiServices.GetRequiredService<Broker.InMemoryBrokerFeed>().Reset();
         FunctionalTestSetup.WebApiServices.GetRequiredService<InMemoryMarketPrices>().Reset();
         FunctionalTestSetup.WebApiServices.GetRequiredService<CorporateActions.InMemoryCorporateActionFeed>().Reset();
         _userId = null;
