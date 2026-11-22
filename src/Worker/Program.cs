@@ -3,6 +3,7 @@ using MyWealthV2.Application.Common.Interfaces;
 using Microsoft.Extensions.Logging;
 using MyWealthV2.Application.Fx;
 using MyWealthV2.Application.MarketData;
+using MyWealthV2.Domain.MarketData;
 using MyWealthV2.Infrastructure.BankFeed;
 using MyWealthV2.Infrastructure.BankReconciliations;
 using MyWealthV2.Infrastructure.Data;
@@ -30,6 +31,7 @@ builder.Services.AddScoped(sp => new InstrumentPriceSyncJob(
     sp.GetRequiredService<IActiveInstrumentCatalog>(),
     sp.GetRequiredService<IInstrumentPriceSource>(),
     sp.GetRequiredService<IInstrumentPriceStore>(),
+    sp.GetRequiredService<MarketDataConnections>(),
     sp.GetRequiredService<TimeProvider>(),
     TimeSpan.FromSeconds(8),
     sp.GetRequiredService<ILogger<InstrumentPriceSyncJob>>()));
