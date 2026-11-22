@@ -13,6 +13,18 @@ public class Order : BaseAuditableEntity
     public const int MemoMaxLength = 200;
     public const int NoteMaxLength = 200;
     public const int QuantityDecimals = 8;
+    public const int BrokerOrderIdMaxLength = 100;
+    public const int CloseReasonMaxLength = 140;
+
+    /// <summary>R22: the close reason of an order the broker never had.</summary>
+    public const string NotAtTheBrokerReason = "Not at the broker";
+
+    /// <summary>R50: the note of the cancel request a corporate action makes.</summary>
+    public const string CorporateActionNote = "Corporate action";
+
+    public const string CancelAlreadyRequestedMessage = "A cancellation was already requested for this order.";
+
+    private readonly List<OrderFill> _fills = [];
 
     private Order()
     {
@@ -70,6 +82,43 @@ public class Order : BaseAuditableEntity
     public int PlacedByUserId { get; private set; }
 
     public DateTimeOffset PlacedAt { get; private set; }
+
+    /// <summary>Send attempts (R20).</summary>
+    public int Attempts { get; private set; }
+
+    public DateTimeOffset? LastAttemptAt { get; private set; }
+
+    /// <summary>The failure of the last send that failed (R21); never <c>InvalidItem</c>.</summary>
+    public BrokerFailure? LastFailure { get; private set; }
+
+    public DateTimeOffset? AcceptedAt { get; private set; }
+
+    public string? BrokerOrderId { get; private set; }
+
+    public OrderRejectReason? RejectReason { get; private set; }
+
+    public DateTimeOffset? CancelRequestedAt { get; private set; }
+
+    /// <summary>The person who asked; null for a request the platform made (R50).</summary>
+    public int? CancelRequestedByUserId { get; private set; }
+
+    public string? CancelNote { get; private set; }
+
+    /// <summary>When the broker answered the cancel request (R22).</summary>
+    public DateTimeOffset? CancelAnsweredAt { get; private set; }
+
+    public DateTimeOffset? ClosedAt { get; private set; }
+
+    /// <summary>The broker's text on a <c>Cancelled</c> or <c>Expired</c> order.</summary>
+    public string? CloseReason { get; private set; }
+
+    /// <summary>The fills of R26, in the order they were added.</summary>
+    public IReadOnlyList<OrderFill> Fills => _fills;
+
+    public bool HasCancelRequest => CancelRequestedAt is not null;
+
+    /// <summary>R18: <c>Placed</c> with no send attempt, so the broker cannot hold it.</summary>
+    public bool IsUnsent => throw new NotImplementedException();
 
     public byte[] RowVersion { get; private set; } = null!;
 
@@ -155,6 +204,56 @@ public class Order : BaseAuditableEntity
         order.Reserve(fees);
         return order;
     }
+
+    /// <summary>R20: one more send attempt, recorded before the call. Only a <c>Placed</c> order with no cancel
+    /// request is sent.</summary>
+    public void RecordAttempt(DateTimeOffset at) => throw new NotImplementedException();
+
+    /// <summary>R21: the broker accepted it: <c>Placed</c> becomes <c>Working</c>. An order a report already moved on
+    /// keeps its status and only takes the broker's order id.</summary>
+    public void Accept(string brokerOrderId, DateTimeOffset at) => throw new NotImplementedException();
+
+    /// <summary>R21: the broker refused it: <c>Placed</c> becomes <c>Rejected</c> and reserves nothing.</summary>
+    public void Reject(OrderRejectReason reason, DateTimeOffset at) => throw new NotImplementedException();
+
+    /// <summary>R21: the send failed; the order stays as it is and is sent again.</summary>
+    public void RecordFailure(BrokerFailure failure) => throw new NotImplementedException();
+
+    /// <summary>R18: an order the broker cannot hold is <c>Cancelled</c> at once and reserves nothing.</summary>
+    public void CancelUnsent(int? byUserId, string? note, DateTimeOffset at) => throw new NotImplementedException();
+
+    /// <summary>R18: an open order the broker may hold gets a cancel request; its status does not change.</summary>
+    public void RequestCancel(int? byUserId, string? note, DateTimeOffset at) => throw new NotImplementedException();
+
+    /// <summary>R22: the broker answered the cancel request.</summary>
+    public void AnswerCancel(DateTimeOffset at) => throw new NotImplementedException();
+
+    /// <summary>R22: the broker never had the order: it is <c>Cancelled</c> with <see cref="NotAtTheBrokerReason"/>.</summary>
+    public void EndAsUnknown(DateTimeOffset at, OrderFeeTerms fees) => throw new NotImplementedException();
+
+    /// <summary>R26, R28: adds a <c>Pending</c> fill within <c>Quantity − FilledQuantity</c>, whatever the status, and
+    /// moves the status: <c>Filled</c> when the whole quantity is filled, else an ended order stays ended and an open
+    /// one is <c>PartlyFilled</c>.</summary>
+    public OrderFill AddFill(
+        long executionReportId,
+        decimal quantity,
+        decimal price,
+        DateOnly tradeDate,
+        DateOnly settlementDate,
+        string? brokerReference,
+        DateTimeOffset at,
+        OrderFeeTerms fees) => throw new NotImplementedException();
+
+    /// <summary>R27: the broker ended an open order: <c>Cancelled</c> or <c>Expired</c>, with its reason.</summary>
+    public void End(OrderStatus status, string? reason, DateTimeOffset at, OrderFeeTerms fees) =>
+        throw new NotImplementedException();
+
+    /// <summary>R33: the fee of a fill of <paramref name="gross"/>: the schedule's fee on the posted gross with this
+    /// fill, minus the fee already charged.</summary>
+    public decimal FeeOfFill(decimal gross, OrderFeeTerms fees) => throw new NotImplementedException();
+
+    /// <summary>R31: a fill of the order was posted with <paramref name="gross"/> and <paramref name="fee"/>.</summary>
+    public void RecordPostedFill(decimal gross, decimal fee, OrderFeeTerms fees) => throw new NotImplementedException();
 
     /// <summary>
     /// R39, R40: what the order reserves now, with <c>q</c> the quantity that can still be posted. A buy reserves the
