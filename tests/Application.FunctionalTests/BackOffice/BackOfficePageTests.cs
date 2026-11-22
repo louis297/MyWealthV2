@@ -186,7 +186,9 @@ public class BackOfficePageTests
         body.ShouldNotContain("Report id");
         body.ShouldNotContain(">Grant<");
         body.ShouldNotContain(">Revoke<");
-        body.ShouldNotContain(">Run<");
+        // The reports part of the page: the interest run form below it has its own Run button (interest-run BO21).
+        var reports = body[..body.IndexOf("Client money accounts", StringComparison.Ordinal)];
+        reports.ShouldNotContain(">Run<");
         body.ShouldNotContain(">Schedule<");
         body.ShouldNotContain("/reports/request");
         body.ShouldNotContain("/reports/schedules");
