@@ -101,6 +101,7 @@ internal static class CorporateActionHttp
         yield return (HttpMethod.Post, Root, CreateBody(instrumentId, exDate: Today.AddDays(30)));
         yield return (HttpMethod.Put, $"{Root}/{id}", UpdateBody(StaleRowVersion));
         yield return (HttpMethod.Post, $"{Root}/{id}/cancel", new { rowVersion = StaleRowVersion, note = "No" });
+        yield return (HttpMethod.Post, $"{Root}/{id}/apply", new { rowVersion = StaleRowVersion });
     }
 
     /// <summary>A <c>Feed</c> corporate action on <paramref name="instrumentId"/>, written straight to the database as
@@ -146,4 +147,58 @@ internal static class CorporateActionHttp
         });
         await db.SaveChangesAsync();
     }
+
+    /// <summary>
+    /// Holders of one instrument in the tenant of <paramref name="world"/>: Ned's Custodial account with 100 shares,
+    /// Olga's Custodial account (Bob's Customer) with 10, Ned's External account with 50 (an <c>OpeningHoldings</c>), and
+    /// a Custodial account of Ned's with cash and no holding.
+    /// </summary>
+    public static async Task<Holders> HoldersAsync(NominatedBankAccounts.NominatedWorld world, string symbol = "AAPL")
+    {
+        var token = world.TenantAdmin.AccessToken;
+        var instrumentId = await CustodialHttp.CreateInstrumentAsync(token, symbol);
+        var ned = await Interest.InterestHttp.OpenCustodialAsync(world.Tenant.Id, token, world.Customer.PublicId);
+        var olga = await Interest.InterestHttp.OpenCustodialAsync(world.Tenant.Id, token, world.OtherCustomer.PublicId);
+        var empty = await Interest.InterestHttp.OpenCustodialAsync(world.Tenant.Id, token, world.Customer.PublicId);
+        var external = await CustodialHttp.OpenExternalAsync(token, world.Customer.PublicId);
+        foreach (var (account, quantity) in new[] { (ned, 100m), (olga, 10m) })
+        {
+            (await CustodialHttp.FundAsync(token, account, 5000m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+            var buy = await CustodialHttp.PostAsync(token, CustodialHttp.Trade(account, "Buy", instrumentId, quantity));
+            buy.StatusCode.ShouldBe(HttpStatusCode.Created, await buy.Content.ReadAsStringAsync());
+        }
+
+        (await CustodialHttp.FundAsync(token, empty, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        var opening = await Transactions.TransactionHttp.Send(HttpMethod.Post, "/transactions", token, new Dictionary<string, object?>
+        {
+            ["accountId"] = external,
+            ["type"] = "OpeningHoldings",
+            ["bookedAt"] = "2026-10-11T10:00:00Z",
+            ["security"] = new[] { new { instrumentId, quantity = 50m, cost = 1000.00m } }
+        }, Guid.NewGuid());
+        opening.StatusCode.ShouldBe(HttpStatusCode.Created, await opening.Content.ReadAsStringAsync());
+        return new Holders(instrumentId, ned, olga, external, empty);
+    }
+
+    /// <summary>The entitlements of <paramref name="actionId"/> straight from the database, account <c>Id</c> order.</summary>
+    public static async Task<List<CorporateActionEntitlement>> EntitlementsAsync(Guid actionId)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var action = await db.CorporateActions.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.PublicId == actionId);
+        return await db.CorporateActionEntitlements.IgnoreQueryFilters().AsNoTracking()
+            .Where(row => row.CorporateActionId == action.Id)
+            .OrderBy(row => row.AccountId)
+            .ToListAsync();
+    }
+
+    /// <summary>The internal id of an account, to compare with an entitlement.</summary>
+    public static async Task<int> AccountIdAsync(Guid accountId)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await db.Accounts.IgnoreQueryFilters().Where(row => row.PublicId == accountId).Select(row => row.Id).SingleAsync();
+    }
 }
+
+internal sealed record Holders(Guid InstrumentId, Guid Ned, Guid Olga, Guid External, Guid Empty);

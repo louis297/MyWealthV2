@@ -75,6 +75,31 @@ public sealed class CancelCorporateActionCommand : IRequest
     public JsonElement? TenantId { get; init; }
 }
 
+/// <summary>Corporate-actions R20: a TenantAdmin makes a <c>Manual</c> action effective on or after its ex-date,
+/// for an instrument whose price does not arrive. The apply job posts the entitlements (R24).</summary>
+[Authorize(Policy = Policies.CorporateActionsManage)]
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed class ApplyCorporateActionCommand : IRequest
+{
+    [JsonIgnore]
+    public Guid Id { get; set; }
+
+    public string? RowVersion { get; init; }
+
+    public JsonElement? TenantId { get; init; }
+}
+
+public class ApplyCorporateActionCommandValidator : AbstractValidator<ApplyCorporateActionCommand>
+{
+    public ApplyCorporateActionCommandValidator()
+    {
+        RuleFor(command => command.RowVersion).NotEmpty();
+        RuleFor(command => command.TenantId)
+            .Must(tenantId => tenantId is null)
+            .WithMessage("TenantId cannot be set; the tenant is the caller's.");
+    }
+}
+
 public class CreateCorporateActionCommandValidator : AbstractValidator<CreateCorporateActionCommand>
 {
     public CreateCorporateActionCommandValidator()
@@ -189,4 +214,9 @@ public class CancelCorporateActionCommandHandler(IApplicationDbContext db, ICurr
         action.Cancel(actor, request.Note!, time.GetUtcNow());
         await CorporateActionReader.SaveAsync(db, cancellationToken);
     }
+}
+
+public class ApplyCorporateActionCommandHandler : IRequestHandler<ApplyCorporateActionCommand>
+{
+    public Task Handle(ApplyCorporateActionCommand request, CancellationToken cancellationToken) => throw new NotImplementedException();
 }

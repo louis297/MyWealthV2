@@ -20,6 +20,7 @@ public class CorporateActions : IEndpointGroup
         groupBuilder.MapPost(CreateCorporateAction).RequireAuthorization(Policies.CorporateActionsManage);
         groupBuilder.MapPut(UpdateCorporateAction, "{id:guid}").RequireAuthorization(Policies.CorporateActionsManage);
         groupBuilder.MapPost(CancelCorporateAction, "{id:guid}/cancel").RequireAuthorization(Policies.CorporateActionsManage);
+        groupBuilder.MapPost(ApplyCorporateAction, "{id:guid}/apply").RequireAuthorization(Policies.CorporateActionsManage);
     }
 
     [EndpointSummary("List corporate actions")]
@@ -59,6 +60,15 @@ public class CorporateActions : IEndpointGroup
     [EndpointSummary("Cancel a corporate action")]
     [EndpointDescription("Cancels a hand-entered corporate action that is still Announced, with a note.")]
     public static async Task<NoContent> CancelCorporateAction(ISender sender, Guid id, CancelCorporateActionCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Apply a corporate action now")]
+    [EndpointDescription("Makes a hand-entered corporate action effective on or after its ex-date, for an instrument whose price does not arrive.")]
+    public static async Task<NoContent> ApplyCorporateAction(ISender sender, Guid id, ApplyCorporateActionCommand command)
     {
         command.Id = id;
         await sender.Send(command);
