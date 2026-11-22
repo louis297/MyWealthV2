@@ -244,7 +244,7 @@ public class PlaceOrderTests : TestBase
         var world = await OrderWorld.CreateAsync();
         var payee = await CustodialHttp.VerifiedPayeeAsync(world.AccountId);
         var closure = await TransactionHttp.Send(HttpMethod.Post, $"/accounts/{world.AccountId}/closures", world.Adviser,
-            new Dictionary<string, object?> { ["nominatedBankAccountId"] = payee }, Guid.NewGuid());
+            new Dictionary<string, object?> { ["nominatedBankAccountId"] = payee, ["memo"] = "Customer is leaving" }, Guid.NewGuid());
         closure.StatusCode.ShouldBe(HttpStatusCode.Created, await closure.Content.ReadAsStringAsync());
 
         var response = await world.TryPlaceAsync("Buy", 1m);

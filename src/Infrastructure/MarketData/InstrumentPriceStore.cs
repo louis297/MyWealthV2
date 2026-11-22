@@ -117,8 +117,12 @@ public sealed class InstrumentPriceStore(ApplicationDbContext db, TimeProvider t
         return stored == ids.Count;
     }
 
-    public Task<DateOnly?> LatestDateAsync(int instrumentId, DateOnly onOrBefore, CancellationToken cancellationToken = default) =>
-        throw new NotImplementedException();
+    public async Task<DateOnly?> LatestDateAsync(int instrumentId, DateOnly onOrBefore, CancellationToken cancellationToken = default) =>
+        await db.InstrumentPrices.AsNoTracking()
+            .Where(row => row.InstrumentId == instrumentId && row.AsOfDate <= onOrBefore)
+            .OrderByDescending(row => row.AsOfDate)
+            .Select(row => (DateOnly?)row.AsOfDate)
+            .FirstOrDefaultAsync(cancellationToken);
 
     public Task<bool> HasPriceFromAsync(int instrumentId, DateOnly from, CancellationToken cancellationToken = default) =>
         db.InstrumentPrices.AsNoTracking().AnyAsync(row => row.InstrumentId == instrumentId && row.AsOfDate >= from, cancellationToken);

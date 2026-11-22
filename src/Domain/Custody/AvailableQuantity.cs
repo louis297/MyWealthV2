@@ -7,8 +7,8 @@ namespace MyWealthV2.Domain.Custody;
 /// </summary>
 public static class AvailableQuantity
 {
-    public static decimal Of(decimal quantity, decimal reserved) => throw new NotImplementedException();
+    public static decimal Of(decimal quantity, decimal reserved) => quantity - reserved;
 
     /// <summary>True when a holding of <paramref name="quantityAfter"/> still covers the reserved quantity.</summary>
-    public static bool Allows(decimal quantityAfter, decimal reserved) => throw new NotImplementedException();
+    public static bool Allows(decimal quantityAfter, decimal reserved) => Of(quantityAfter, reserved) >= 0m;
 }
