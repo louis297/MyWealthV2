@@ -1,6 +1,6 @@
 ---
 title: Simulated instruments
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -34,7 +34,7 @@ The simulator gets its second outside party, the **simulator market**. It holds 
 
 New: configuration `MarketDataConnections:{name}`; port `IMarketPrices` with adapter `SimulatorMarketPrices`; `worker` job `market-data-sync:{connection}` on the new queue `market`; table `MarketDataFeeds`; route `GET /market-data-connections`; instrument item field `marketDataConnection`. Script `0049_market_data_feeds.sql`; simulator script `database/simulator/0008_market.sql`. No new permission, `TransactionType`, problem code or domain event.
 
-**Status is `review` (2026-11-22).** Not a build contract. The points of §11 need confirmation before it is accepted; the amendments to accepted docs listed in §12 are made when it is accepted.
+**Status is `accepted` (2026-11-22).** The thirteen points of §11 were confirmed on 2026-11-22, every one as recommended, and are written into the rules. The amendments to accepted docs listed in §12 were made when it was accepted. It is a build contract. [corporate-actions.md](corporate-actions.md) (step 10b) stays in review and is not part of this contract.
 
 ---
 
@@ -141,7 +141,7 @@ Amendment to [simulator.md](simulator.md). The party routes add under `/party/ma
 | R14 | **The party.** The simulator market plays the issuer and the data vendor of its own instruments. It never reads the platform's catalog (ADR 0021 rule 22); a Tenant adds the same symbols to its catalog by hand or by seed. |
 | R15 | **Simulated instrument.** Symbol (5–32 characters of letters, digits, `.` and `-`, stored upper case, ending in `.SIM`, unique), name (1–200), currency (three letters, upper case; the simulator holds no currency catalog), price (`> 0`, at most 4 decimal places) and `dailyMovePercent` (0 to 20, at most 2 decimal places, default 2). The suffix `.SIM` is fixed in the simulator, so a simulated symbol never looks like a real ticker. |
 | R16 | **Add an instrument.** `POST /control/market/instruments` `{ symbol, name, currency, price, dailyMovePercent? }` → 201 with the instrument. A symbol that already exists → 400 `errors.Symbol`. The price is the price of the current simulator day. Log action `MarketInstrumentAdded`. Nothing but `dailyMovePercent` and the price can change later, and an instrument is never removed except by a reset. |
-| R17 | **Price path.** An instrument has exactly one price per **simulator day**, the UTC date of simulator now. The price of day `d` is `Max(0.0001, Round(price(d − 1) × (1 + move), 4))`, with `move = dailyMovePercent / 100 × (2u − 1)` and `u` the first value in `[0, 1)` of `SeededRandom.For(seed, "market-price:{symbol}", n)`, `n` being the day number of `d` counted from 2000-01-01 (simulator R26). Same seed, same instruments and same clock steps give the same prices. With `dailyMovePercent` `0` the price never moves by itself. |
+| R17 | **Price path.** An instrument has exactly one price per **simulator day**, the UTC date of simulator now. The price of day `d` is `Max(0.0001, Round(price(d − 1) × (1 + move), 4))`, rounded half away from zero, with `move = dailyMovePercent / 100 × (2u − 1)` and `u` the first value in `[0, 1)` of `SeededRandom.For(seed, "market-price:{symbol}", n)`, `n` being the day number of `d` counted from 2000-01-01 (simulator R26). Same seed, same instruments and same clock steps give the same prices. With `dailyMovePercent` `0` the price never moves by itself. |
 | R18 | **Bringing the market up to date.** Before any market route answers, control or party, the simulator works out and stores the price of every day from each instrument's last priced day up to the current simulator day, in day order, under a lock on the instrument row, so two requests at once step a day once. A clock advance of 366 days (simulator R22) therefore stores at most 366 prices per instrument on the next request. |
 | R19 | **Set a price.** `POST /control/market/instruments/{symbol}/price` `{ price }` → 200 with the instrument. It replaces the price of the current simulator day; the next day steps from it. Unknown symbol → 404. Log action `MarketPriceSet`. `POST /control/market/instruments/{symbol}/daily-move` `{ dailyMovePercent }` → 200; it applies from the next day. Log action `MarketDailyMoveSet`. |
 | R20 | **Standing instruments.** Configuration `Simulator:Market:StandingInstruments` lists instruments (`Symbol`, `Name`, `Currency`, `Price`, optional `DailyMovePercent`) that the simulator adds when the world is created and after every reset; one that already exists is left as it is. A bad entry stops the host before it listens. Development lists `ACME.SIM` (USD, 100.00, "Acme Simulated Holdings") and `KIWI.SIM` (NZD, 5.00, "Kiwi Simulated Fund"), the symbols `TestSeed` adds to the demo catalog (§9.1). |
@@ -181,7 +181,7 @@ Domain events: none.
 
 The simulator has no shared Domain project. Its own types live in `src/Simulator/Market`: `MarketInstrument`, `MarketPrice`, `MarketPricePath` (R17, R18), `MarketStandingInstruments`.
 
-Recorded in [domain-model.md](../domain-model.md) §8.4 when accepted.
+Recorded in [domain-model.md](../domain-model.md) §8.4.
 
 ---
 
@@ -214,7 +214,7 @@ Forward only. Do not add EF migrations.
 | `MarketInstruments` | `Id int` identity PK, `Symbol nvarchar(32)` unique, `Name nvarchar(200)`, `Currency char(3)`, `DailyMovePercent decimal(5,2)` CHECK 0–20, `Price decimal(18,4)` CHECK `> 0`, `PriceDate date` (the last priced day), `RowVersion rowversion` |
 | `MarketPrices` | PK `(InstrumentId, PriceDate)`, FK → `MarketInstruments`, `Price decimal(18,4)` CHECK `> 0`, `IsSet bit` |
 
-Recorded in [database-design.md](../database-design.md) §9, §14.3 and §15 when accepted.
+Recorded in [database-design.md](../database-design.md) §9, §13, §14.3 and §15.
 
 ---
 
@@ -233,7 +233,7 @@ Where each rule lives:
 
 | Rule | Where |
 | --- | --- |
-| Suffix shape and uniqueness (R2, R3) | The options validation of each host |
+| Suffix shape and uniqueness (R2, R3) | The configuration reader each host calls at start-up, before it builds (the pattern of bank connections; no options validation class) |
 | Served or not (R4) | `MarketDataConnections.For(symbol)` |
 | The platform's date (R10) | `SyncMarketPrices`, from `TimeProvider` |
 | Price path (R17, R18) | `MarketPricePath` in the simulator |
@@ -317,14 +317,14 @@ Keep the resource catalog in [api-design.md](../api-design.md) pointing here for
 
 ## 9. UI
 
-Page contract: [back-office.md](../backoffice/back-office.md) (BO22, BO23), amended and accepted together with this spec. No Adviser Portal, Customer Portal or BFF change: prices have no page, and the portals show a simulated instrument like any other.
+Page contract: [back-office.md](../backoffice/back-office.md) (BO22, BO23) and [back-office-instruments.md](../backoffice/back-office-instruments.md), amended and accepted together with this spec. No Adviser Portal, Customer Portal or BFF change: prices have no page, and the portals show a simulated instrument like any other.
 
 **Back Office**
 
 | ID | Behaviour |
 | --- | --- |
 | BO22 | The Instruments page ([back-office-instruments.md](../backoffice/back-office-instruments.md)) shows "Prices from <connection>" under the symbol of an instrument whose `marketDataConnection` is set. The create form notes: "A symbol that ends with a market data suffix (for example .SIM) is priced by that connection." |
-| BO23 | A new page "Market data" (`/market-data`) lists `GET /market-data-connections`: Name, Adapter, Suffix and Prices: `null` → "Not read yet"; `lastFailedAt` later than `lastSucceededAt` (or no success) → "Failing since <lastFailedAt>: <failure label>"; otherwise "Read <lastSucceededAt>". Failure labels as BO18. With no connection: "No market data connection is configured. Every instrument is priced by EODHD." |
+| BO23 | A new page "Market data" (`/market-data`) lists `GET /market-data-connections`: Name, Adapter, Suffix and Prices: `null` → "Not read yet"; `lastFailedAt` later than `lastSucceededAt` (or no success) → "Failing since <lastFailedAt>: <failure label>"; otherwise "Read <lastSucceededAt>". Times as BO18. Failure labels: Unreachable "Market data source not reachable", Timeout "Market data source did not answer in time", Unauthorized "Market data source refused the key", Unavailable "Market data source unavailable", BadResponse "Market data answer not understood" (BO18's labels name the bank). With no connection: "No market data connection is configured. Every instrument is priced by EODHD." |
 
 ### 9.1 Seeds and hosting
 
@@ -339,8 +339,8 @@ Page contract: [back-office.md](../backoffice/back-office.md) (BO22, BO23), amen
 | Project | Assert |
 | --- | --- |
 | Domain.UnitTests | `MarketDataConnection.Serves`: `ACME.SIM` and `acme.sim` yes, `ACME`, `SIM` and `ACME.SIMX` no. `MarketDataConnections.For`: the one connection or none; two connections with the same suffix are refused. `MarketDataFeed.Succeeded` / `Failed` keep the other time |
-| Application.FunctionalTests | With a fake `IMarketPrices` and a configured connection on the test host. A run stores one row per active served instrument dated the platform's today, whatever `date` the item carries; a second run the same day updates it; a run on the next day adds a row. The same symbol in two Tenants gets the price in both. An inactive instrument, an instrument with another quote currency, and an item without the suffix get none. A bad item is skipped and the others stored. A failed call stores nothing, keeps the old row and sets `lastFailure`. `InstrumentPriceSyncJob` with a fake EODHD source is never asked for a served symbol and still skips the call when every other instrument has today's date. `Buy` of a served instrument on a Custodial account uses the stored price. `GET /market-data-connections`: SystemAdmin sees the connection and its feed state; TenantAdmin, Adviser, Customer → 403; no Bearer → 401. The instrument item carries `marketDataConnection`; renaming the symbol to one without the suffix makes it `null` |
-| Infrastructure.IntegrationTests | `0049`: a second row for the same `(Connection, Kind)` violates; `Kind = 1` and `LastFailure = 5` violate. EF round-trip. Options validation: each bad entry of R3 stops the host; none configured starts. `SimulatorMarketPrices` against canned responses: a good body; 401, 503, a timeout, no connection, a body with a text price → the failures of R25. `MarketDataSyncJob` on a worker host: one job per connection, a job of a removed connection is deleted, a second run at once does nothing |
+| Application.FunctionalTests | With a fake `IMarketPrices` and a configured connection on the test host. A run stores one row per active served instrument dated the platform's today, whatever `date` the item carries; a second run the same day updates it; a run on the next day adds a row. The same symbol in two Tenants gets the price in both. An inactive instrument, an instrument with another quote currency, and an item without the suffix get none. A bad item is skipped and the others stored. A failed call stores nothing, keeps the old row and sets `lastFailure`. `Buy` of a served instrument on a Custodial account uses the stored price. `GET /market-data-connections`: SystemAdmin sees the connection and its feed state; TenantAdmin, Adviser, Customer → 403; no Bearer → 401. The instrument item carries `marketDataConnection`; renaming the symbol to one without the suffix makes it `null` |
+| Infrastructure.IntegrationTests | `0049`: a second row for the same `(Connection, Kind)` violates; `Kind = 1` and `LastFailure = 5` violate. EF round-trip. Start-up check: each bad entry of R3 stops the host; none configured starts. `InstrumentPriceSyncJob` with a fake EODHD source (next to the job's existing tests) is never asked for a served symbol and still skips the call when every other instrument has today's date. `SimulatorMarketPrices` against canned responses: a good body; 401, 503, a timeout, no connection, a body with a text price → the failures of R25. `MarketDataSyncJob` on a worker host: one job per connection, a job of a removed connection is deleted, a second run at once does nothing |
 | Simulator.Tests | `0008` applies. Add an instrument; a duplicate, a symbol without `.SIM`, a bad price → 400. The price of day `d + 1` follows R17 for a known seed; the same seed and steps give the same path after a reset; `dailyMovePercent` 0 keeps the price; an advance of three days stores three prices on the next read; two reads at once store each day once. Set a price replaces today's and the next day steps from it. Standing instruments exist after start and after a reset. `GET /party/market/prices`: items sorted by symbol; 401 without the key; 503 in an outage; 404 on the control port. The control log rows |
 | Back Office | BO22, BO23 |
 
@@ -364,9 +364,9 @@ No new ADR. ADR 0021 applies through rules 1–4 (a port per party role, the sim
 | Routes | `GET /market-data-connections`; `marketDataConnection` on the instrument item |
 | Permissions, problem codes, events, `TransactionType` | None added |
 
-### Points to confirm
+### Points confirmed (2026-11-22)
 
-Each point states a recommendation, written into the rules above, and the alternative.
+Each point states the decision (confirmed as recommended on 2026-11-22), written into the rules above, and the alternative that was not taken.
 
 1. **Two specs for step 10, this one first.** Recommended: prices of simulated instruments are useful and testable alone (a controllable price for demos), and [corporate-actions.md](corporate-actions.md) is large enough without them. Alternative: one spec for C1 and all of S4.
 2. **Roadmap D11 is built now, for prices only.** Recommended: a simulated split on a real instrument would not show in EODHD prices, so the corporate action demo needs instruments whose price the simulator owns; fills (the other half of D11) wait for S2. Alternative: announce simulated splits on real symbols and accept a wrong market value in the demo.
@@ -409,6 +409,6 @@ The repository should build after each commit. Agents split each behaviour into 
 
 Do not put corporate actions, orders or a calendar in these commits.
 
-### Docs amended when this spec is accepted
+### Docs amended when this spec was accepted
 
 [instrument-prices.md](instrument-prices.md) (R1, R3, R5, R14, R15: served instruments are priced by their connection under the platform's date; the EODHD job leaves them out), [instruments.md](instruments.md) (`marketDataConnection` on the item), [simulator.md](simulator.md) (the market party, script `0008`, the new control and party routes and log actions), [deposit-matching.md](deposit-matching.md) (a note that market data connections follow the shape of bank connections), [back-office.md](../backoffice/back-office.md) (BO22, BO23), [back-office-instruments.md](../backoffice/back-office-instruments.md) (the connection line), [api-design.md](../api-design.md) (§6 resource row, §7.5 note, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [architecture.md](../architecture.md) (port `IMarketPrices`, the job and queue `market`), [deployment.md](../deployment.md) (the connection keys and the standing instruments), [glossary.md](../glossary.md) (the review terms become accepted), [function-plan.md](../function-plan.md) §5 (the roadmap step), [features/README.md](README.md) row status, and the roadmap §11 S4, §12 D11, §13 status and §14.

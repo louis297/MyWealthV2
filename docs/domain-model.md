@@ -283,6 +283,18 @@ Invariants:
 
 Field rules: [features/instruments.md](features/instruments.md). Landed in repo 2026-09-20 `9ea2f2a`.
 
+Amendment 2026-11-22 (simulated instruments, accepted; [features/simulated-instruments.md](features/simulated-instruments.md) §5): where an instrument's price comes from is a fact about its symbol and the configuration, not a field on the aggregate. `Instrument` does not change.
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `MarketDataConnection` | Value (from configuration) | `Name`, `Adapter`, `SymbolSuffix`. `Serves(symbol)`: the symbol ends with the suffix, compared without regard to case |
+| `MarketDataConnections` | Service | The configured connections. `For(symbol)` → the connection that serves it, or none. Refuses two connections with the same suffix |
+| `MarketDataFeed` | Entity | Platform data, no `TenantId`. One per connection and feed kind: `LastSucceededAt`, `LastFailedAt`, `LastFailure`, `Cursor` (unused by `Prices`). `Succeeded(at)`, `Failed(failure, at)` |
+| `MarketDataFeedKind` | Enum | `Prices = 0` |
+| `MarketDataFailure` | Enum | `Unreachable = 0`, `Timeout = 1`, `Unauthorized = 2`, `Unavailable = 3`, `BadResponse = 4` |
+
+Invariants: an instrument is served by at most one connection; a price row written from a connection has the platform's UTC date; a served instrument is never sent to EODHD.
+
 ### 8.5 Account (accepted, landed)
 
 | Type | Kind | Notes |
@@ -517,6 +529,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-21 | Bank reconciliation accepted: `BankReconciliation`, `BankReconciliationItem` and their enums (§8.12); `BankFeedCursor` statement balance and opening balance (§8.9); report scope `Tenant` (§11). [features/bank-reconciliation.md](features/bank-reconciliation.md) |
 | 2026-11-22 | Account closure accepted: `AccountClosure`, its enums and `ClosureAmounts` (§8.13); the closing account (§8.5); source kind `AccountClosure` and `PostRemainderWriteOff`, hand `CloseOut` refused on Custodial (§8.6); unmatched reason `AccountClosing` (§8.9). [features/account-closure.md](features/account-closure.md) |
 | 2026-11-22 | Interest run accepted: `CustomerTaxProfile`, `WithholdingRates`, `InterestRateSchedule`, `InterestAccrual`, `InterestRun` and their enums (§8.14); `Account.InterestAccruedThrough` (§8.5); cash leg role `Tax`, `TransactionTaxDetail`, `TransactionInterestDetail`, source kind `InterestRun` and `PostInterest` (§8.6); statement line kind (§8.9); three reconciliation item kinds (§8.12). [features/interest-run.md](features/interest-run.md) |
+| 2026-11-22 | Simulated instruments accepted: `MarketDataConnection`, `MarketDataConnections`, `MarketDataFeed`, `MarketDataFeedKind`, `MarketDataFailure` (§8.4). `Instrument` unchanged. [features/simulated-instruments.md](features/simulated-instruments.md) |
 
 ---
 

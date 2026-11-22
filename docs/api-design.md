@@ -314,6 +314,7 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Tenants | `/tenants` | list / get / create / update / disable / enable | `tenants.manage` |
 | Client money accounts | `/tenants/{tenantId}/client-money-accounts` | list / get / create / disable / enable. See features/client-money-accounts.md; `bankConnection`, `bankFeed` in features/deposit-matching.md | `tenants.manage` |
 | Bank connections | `/bank-connections` | list (names and adapters from configuration). See features/deposit-matching.md | `tenants.manage` |
+| Market data connections | `/market-data-connections` | list (names, adapters, symbol suffixes from configuration, and the state of each price feed). See features/simulated-instruments.md | `tenants.manage` |
 | Statement lines | `/statement-lines` | list / get; match / ignore / request-return / reopen / unmatch. See features/deposit-matching.md and features/bank-returns.md (returns, recalls, debit lines) | `statement-lines.manage` |
 | Nominated bank accounts | `/nominated-bank-accounts` | list / get / create; verify / reject / remove. No PUT. See features/withdrawals.md | `nominated-bank-accounts.read` / `.manage` / `.verify` |
 | Withdrawals | `/withdrawals` | list / get / create (`Idempotency-Key`); approve / reject / cancel. See features/withdrawals.md | `withdrawals.read` / `.request` / `.approve` |
@@ -446,6 +447,7 @@ Field rules: [features/instruments.md](features/instruments.md).
 - SystemAdmin: list and create require tenant PublicId. Get / PUT / disable / enable may cross tenants.
 - Customer → 403.
 - Item includes `id`, `tenantId`, `symbol`, `name`, `quoteCurrency`, `isActive`, `rowVersion`. No price.
+- Amendment 2026-11-22 (simulated instruments, accepted; field rules in [features/simulated-instruments.md](features/simulated-instruments.md) R6): the item gains `marketDataConnection`, the name of the market data connection whose symbol suffix the symbol ends with, or `null`. Worked out from the symbol and the configuration; no filter on it. Still no price.
 - Create on a disabled tenant → §4.1 `target=tenant`.
 
 ### 7.6 Accounts
@@ -662,3 +664,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-21 | §3.1, §6, §7.8: bank reconciliation accepted. Permissions `bank-reconciliations.manage`, `reports.tenant.read` and `reports.tenant.create` (TenantAdmin only); resource `/bank-reconciliations` (overview, list, get, run now); report scope `Tenant` and report `bank-reconciliation`. No problem code ([features/bank-reconciliation.md](features/bank-reconciliation.md)). |
 | 2026-11-22 | §3.1, §6, §7.6, §7.7: account closure accepted. Permissions `account-closures.read` and `account-closures.request`; sub-resource `/accounts/{accountId}/closures` (request, list, get); account item `closure`, withdrawal item `accountClosureId`; source kind `AccountClosure`; hand `CloseOut` and `POST /accounts/{id}/close` refused on a Custodial account; a closing account refuses every hand write. No problem code ([features/account-closure.md](features/account-closure.md)). |
 | 2026-11-22 | §2, §3.1, §4.2, §6, §7.4, §7.6, §7.7, §7.10: interest run accepted. Namespace `/interest` with `/interest/rate-schedules` and `/interest/runs`; permissions `interest-rates.read`, `interest-rates.manage`, `interest-runs.read`, `interest-runs.start`; problem code `interest_schedule_in_effect`; sub-resources `/users/customers/{customerId}/tax-profile`, `/users/me/tax-profile` and `/accounts/{accountId}/interest-accruals`; account item `accruedInterest`, `interestAccruedThrough`; transaction item `interest`, leg role `Tax` and leg `tax`; source kind `InterestRun`; statement line `kind` and its filter ([features/interest-run.md](features/interest-run.md)). |
+| 2026-11-22 | §6, §7.5: simulated instruments accepted. Resource `/market-data-connections` (`tenants.manage`, list from configuration with the price feed state); instrument item `marketDataConnection`. No new permission or problem code. |

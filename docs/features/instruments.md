@@ -403,3 +403,13 @@ Accepted with [demo-tenant-seed.md](demo-tenant-seed.md). Narrows §2 Out "Seedi
 - The 18-row demo catalog (demo-tenant-seed §5.1) may be written for tenant `demo` in any environment by `webapi --seed-demo`, without prices.
 - `TestSeed` takes the same catalog and keeps its Development-only extras: the disabled `NZD-CASH` row and the fake table prices.
 - Seeding from `0010_instruments.sql` stays out.
+
+---
+
+## Amendment 2026-11-22 (market data connection on the item) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [simulated-instruments.md](simulated-instruments.md). Rules R4 and R6 live there; this section records what changes here.
+
+- The instrument item of `GET /instruments` and `GET /instruments/{id}` gains `marketDataConnection`: the name of the configured market data connection whose symbol suffix the symbol ends with (compared without regard to case), or `null`. Every caller who can read the instrument sees it. No filter on it, and no column: it is worked out from the symbol and the configuration on each read.
+- R14 (rename): renaming the symbol can change `marketDataConnection`, and with it where the instrument's price comes from, from the next price run. A symbol like `ACME.SIM` is an ordinary catalog symbol under R6; no create rule changes.
+- `TestSeed` (§9.1) adds `ACME.SIM` (USD) and `KIWI.SIM` (NZD) to each firm it seeds. The demo catalog of `webapi --seed-demo` does not change.

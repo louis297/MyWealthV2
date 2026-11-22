@@ -770,3 +770,12 @@ Status of this amendment: `accepted` (2026-11-22), together with [interest-run.m
 - R27: interest the bank pays on the trust account no longer needs a person to ignore it when the bank names it as interest; a line the bank sends as a transfer is still handled by hand.
 - R45: the wire item gains `"kind"`: `"Interest"` on such a line, absent on every other.
 - R49: `SimulatorBankFeed` reads `kind`: `"Interest"` → `Interest`; absent, `null` or any other text → `Transfer`; a value that is not text → `BadResponse`.
+
+---
+
+## Amendment 2026-11-22 (market data connections) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [simulated-instruments.md](simulated-instruments.md). No rule of this spec changes.
+
+- A **market data connection** (`MarketDataConnections:{name}`, simulated-instruments R1–R3) follows the shape of a bank connection (R1): a name in configuration with the same name rule, adapter `Simulator`, the address, key, `TimeoutSeconds` and `PollMinutes` only on `worker`, a start-up check that reads the configuration and not the environment name, one recurring job per connection with no automatic retries, and a job of a connection no longer configured removed at start. It adds a symbol suffix and has its own section, job (`market-data-sync:{connection}`), queue (`market`), feed state table (`MarketDataFeeds`) and list route (`GET /market-data-connections`). The two kinds of connection do not share names, jobs or state.
+- The AppHost and the VPS give `worker` the same simulator party address and key for both connections.

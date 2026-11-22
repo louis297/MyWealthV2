@@ -90,6 +90,7 @@ Redirect URI and post-logout follow the same pattern as the Adviser Portal BFF (
 | `/instruments` | SystemAdmin | Tenant instrument catalog. Requires tenant selection. See [back-office-instruments.md](back-office-instruments.md) |
 | `/instruments/new` | SystemAdmin | Create instrument for the chosen tenant |
 | `/instruments/{id}` | SystemAdmin | Detail + rename / disable / enable |
+| `/market-data` | SystemAdmin | Market data connections and the state of each price feed. `GET /market-data-connections`. See the amendment of 2026-11-22 (simulated instruments) |
 | `/tenant-admins` | SystemAdmin | List (filter by tenant, search); links to create / detail |
 | `/tenant-admins/new` | SystemAdmin | Create (tenant, name, email, password) |
 | `/tenant-admins/{id}` | SystemAdmin | Detail + rename / disable / enable |
@@ -248,6 +249,17 @@ Status of this amendment: `accepted` (2026-11-22), together with [interest-run.m
 | --- | --- |
 | BO20 | `/tenants/{id}/config` gains an "Interest runs" section: the newest ten runs from `GET /interest/runs?tenantId=` with As of, Trigger, Accounts, Failed, Posted and the totals per currency. |
 | BO21 | A "Run for a date" form in that section: an as-of date (default yesterday, UTC) and Run, which posts `POST /interest/runs` and reloads the table. A 400 `errors.AsOfDate` is shown at the date. Under the form: "Runs every day by itself. Use this after a missed run. A run for a day already done changes nothing." |
+
+---
+
+## Amendment 2026-11-22 (simulated instruments) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [simulated-instruments.md](../features/simulated-instruments.md). Field rules live there. The Instruments pages show which instruments a market data connection prices, and a new page lists the connections. New call: `GET /market-data-connections` (`tenants.manage`). The instrument item carries `marketDataConnection`.
+
+| ID | Behaviour |
+| --- | --- |
+| BO22 | The Instruments list and detail pages ([back-office-instruments.md](back-office-instruments.md)) show "Prices from <connection>" under the symbol of an instrument whose `marketDataConnection` is set. The create form notes: "A symbol that ends with a market data suffix (for example .SIM) is priced by that connection." |
+| BO23 | A new page "Market data" (`/market-data`, in the navigation) lists `GET /market-data-connections`: Name, Adapter, Suffix and Prices: `null` → "Not read yet"; `lastFailedAt` later than `lastSucceededAt` (or no success) → "Failing since <lastFailedAt>: <failure label>"; otherwise "Read <lastSucceededAt>". Times as BO18. Failure labels: Unreachable "Market data source not reachable", Timeout "Market data source did not answer in time", Unauthorized "Market data source refused the key", Unavailable "Market data source unavailable", BadResponse "Market data answer not understood". With no connection: "No market data connection is configured. Every instrument is priced by EODHD." |
 
 ---
 
