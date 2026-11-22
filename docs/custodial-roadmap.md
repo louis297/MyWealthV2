@@ -31,6 +31,7 @@ related:
   - features/bank-returns.md
   - features/bank-reconciliation.md
   - features/account-closure.md
+  - features/interest-run.md
 ---
 
 # Custodial accounts roadmap
@@ -264,6 +265,7 @@ Real-world shape: Customers pay into the firm's client money trust account at a 
 - **What:** the few tax attributes the interest run needs: RWT rate (or "not provided"), whether an IRD number is held, tax residency. Not a KYC module.
 - **Check against IRD** when the spec is written ([future-plans.md](future-plans.md) §1). This note settles no rate.
 - **Depends on:** nothing. Coordinate with roadmap step 2 (income events), which needs the same profile.
+- **Spec:** I1 and I2 are one spec, with S1 trust interest, [interest-run.md](features/interest-run.md) (`review`, 2026-11-22). Its §11 proposes: three attributes per Customer (tax residency, IRD number held, the chosen RWT rate), and the IRD number itself is not stored; a Customer with nothing saved is withheld at the non-declaration rate; the rates are constants checked against Inland Revenue on 2026-11-22 (individuals only: 10.5, 17.5, 30, 33 or 39 % chosen, 33 % with no rate chosen, 45 % without an IRD number, NRWT 15 % for an overseas Customer); the Adviser or TenantAdmin sets it with the existing Customer permissions, and the Customer reads it; the profile is read when interest is paid, with no history table.
 
 ### I2. Interest run
 
@@ -273,6 +275,7 @@ Real-world shape: Customers pay into the firm's client money trust account at a 
 - **Open:** whether the firm keeps a margin between the bank's rate and the Customer's rate, and how B7 shows it.
 - **Closes:** the interest gap. `Interest` stays refused by hand.
 - **Depends on:** F1, I1.
+- **Spec:** [interest-run.md](features/interest-run.md) (`review`, 2026-11-22), with I1. Its §11 proposes: an interest rate schedule per Tenant and currency with marginal bands of annual rates; an accrual per Custodial account and UTC day on the closing balance (Actual/365, 8 decimals), stored once, with a cursor per account; a posting per calendar month as one `Interest` with a `Principal` leg, a `Tax` cash leg with a tax detail (the shape dividends reuse) and an interest detail, source `InterestRun`; the tax decided from the tax profile when the interest is paid; a stored run per Tenant and as-of date, daily at 00:30 UTC for yesterday; the SystemAdmin trigger of D18 with an as-of date of at most yesterday (this refines "up to today"), a later date only with the option `Interest:AllowFutureAsOfDates`; an account closure posts the interest accrued so far before its payout, and a closing account is not accrued; for D12, the firm sets the Customer rate and the margin is what the bank pays above it; the bank's interest on the trust account is a statement line of kind `Interest` that the platform sets aside, and the bank reconciliation shows it, the interest credited and the tax withheld as three known differences (this answers the "Open" of B7); no flow reverses an interest posting; permissions `interest-rates.read` / `.manage` and `interest-runs.read` / `.start`.
 
 ---
 
@@ -385,7 +388,7 @@ A separate project that plays the outside parties for manual testing and demos. 
 
 ### S1. Bank (with B3–B7)
 
-The receipts side (the first two rows, without recalls) is in [deposit-matching.md](features/deposit-matching.md) (accepted 2026-11-20) §4.6: bank accounts, standing accounts from configuration, receipts with a delay or delivered twice, and the statement feed. It adds no scenario library yet (simulator §11 point 7 put it with S1). The payments side is in [withdrawals.md](features/withdrawals.md) (accepted 2026-11-20, landed 2026-11-21) §4.7: a payment route idempotent on the platform's instruction id, a payment mode (execute, hold, reject), execute a held payment, return a payment. Returning a receipt and recalling a receipt are in [bank-returns.md](features/bank-returns.md) (accepted 2026-11-21, landed 2026-11-21) §4.5. Neither adds a scenario library; it is proposed for B7. Balances for reconciliation are in [bank-reconciliation.md](features/bank-reconciliation.md) (accepted and landed 2026-11-21) §4.7: the statement balance on each feed page, a bank charge, and a line left out of the feed; it adds no scenario library either (§11 point 12).
+The receipts side (the first two rows, without recalls) is in [deposit-matching.md](features/deposit-matching.md) (accepted 2026-11-20) §4.6: bank accounts, standing accounts from configuration, receipts with a delay or delivered twice, and the statement feed. It adds no scenario library yet (simulator §11 point 7 put it with S1). The payments side is in [withdrawals.md](features/withdrawals.md) (accepted 2026-11-20, landed 2026-11-21) §4.7: a payment route idempotent on the platform's instruction id, a payment mode (execute, hold, reject), execute a held payment, return a payment. Returning a receipt and recalling a receipt are in [bank-returns.md](features/bank-returns.md) (accepted 2026-11-21, landed 2026-11-21) §4.5. Neither adds a scenario library; it is proposed for B7. Balances for reconciliation are in [bank-reconciliation.md](features/bank-reconciliation.md) (accepted and landed 2026-11-21) §4.7: the statement balance on each feed page, a bank charge, and a line left out of the feed; it adds no scenario library either (§11 point 12). Interest on the trust account is in [interest-run.md](features/interest-run.md) (`review`, 2026-11-22) §4.8: a control route that adds a credit line of kind `Interest` with an amount the operator types, and `kind` on the feed item; no scenario library.
 
 | Signal or action | Platform flow |
 | --- | --- |
@@ -427,7 +430,7 @@ Each question has a status. Decided items were confirmed in discussion on 2026-1
 | D9 | One clock or two? | **Decided:** two. The platform keeps the real clock. The simulator's clock sets outside dates only. Settlement and other outside events arrive as signals. Clock-driven platform jobs (interest) get a manual trigger with an as-of date; where it is available is D18. | S0, I2 |
 | D10 | Is the simulator deployed? | **Decided:** yes, also to production (today the VPS showcase). The simulator is a client of `identity`, and its control pages need a dedicated sign-in. The operator can stop its container at any time, so every pull job must survive an unreachable simulator: the job fails, the cursor stays, the next run continues. Follow-up questions: D16–D18. | S0 |
 | D11 | Where does the simulator get prices? | **Decided:** two kinds of instrument. *Simulated instruments* (made-up symbols under a simulator exchange suffix, for example `.SIM`) are owned by the simulator end to end: a seeded daily random walk from the previous close, corporate actions that move the price (a 2:1 split halves it), and fills. The platform reads their prices from the simulator through an `IMarketData` adapter chosen by the suffix (an amendment to instrument-prices). *Real instruments* (EODHD) fill at the platform's reference close plus a seeded slippage; the simulator does not invent their price path. A free random walk on a real instrument would drift away from the price the platform values holdings and reserves cash with, and a simulated split would not show in EODHD prices. | S2, C1 |
-| D12 | Does the firm keep an interest margin? | **Open.** Decide with I2. | I2 |
+| D12 | Does the firm keep an interest margin? | **Open.** Decide with I2. Proposed in [interest-run.md](features/interest-run.md) §11 point 6 (`review`): the firm sets the Customer rate by schedule, and the margin is whatever the bank pays above it; it is not booked, and the bank reconciliation shows the bank's interest, the interest credited and the tax withheld as known differences. The alternative there is to pass the bank's interest through. | I2 |
 | D13 | A dividend in a currency other than the account's | **Decided:** convert at the reference rate on the payment date and store the FX detail, until multi-currency cash exists. Multi-currency cash stays out of this plan (future-plans §5); the part this plan cannot avoid is D20. | C2 |
 | D14 | `InternalTransfer` between Custodial accounts of two different Customers | **Decided:** refused on Custodial accounts (same Customer only); it is a third-party payment. External accounts unchanged. | B6 or its own small amendment |
 | D15 | Is a rebalance trade a `Manual` source for P6? | **Decided:** yes until O3, then rebalance writes through orders. | F4 |
@@ -455,7 +458,7 @@ Each step depends only on earlier steps. "Closes" names the matrix cell or known
 | 6b | B4 / B6 remainder: receipt returns, recalls, other debit lines | S1 returns and recalls | — | [bank-returns](features/bank-returns.md) | accepted 2026-11-21, landed 2026-11-21 |
 | 7 | B7 bank reconciliation | S1 balances | — | [bank-reconciliation](features/bank-reconciliation.md) | accepted 2026-11-21, landed 2026-11-21 |
 | 8 | B8 account closure | — | Hand `CloseOut` | [account-closure](features/account-closure.md) | accepted 2026-11-22, landed 2026-11-22 |
-| 9 | I1 tax profile, I2 interest run | S1 trust interest | "No interest" | — | not started |
+| 9 | I1 tax profile, I2 interest run | S1 trust interest | "No interest" | [interest-run](features/interest-run.md) | review 2026-11-22 |
 | 10 | C1 corporate actions (split, consolidation, bonus) | S4 | "A split cannot be recorded" | — | not started |
 | 11 | O1 orders, O2 settlement | S2 | Immediate `Buy` / `Sell` | — | not started |
 | 12 | O3 rebalance through orders | S2 | — | — | not started |
