@@ -48,3 +48,23 @@ public class TransactionInterestDetailConfiguration : IEntityTypeConfiguration<T
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+/// <summary>Corporate actions §6.1: 0..1 corporate action detail per Transaction (script 0050).</summary>
+public class TransactionCorporateActionDetailConfiguration : IEntityTypeConfiguration<TransactionCorporateActionDetail>
+{
+    public void Configure(EntityTypeBuilder<TransactionCorporateActionDetail> builder)
+    {
+        builder.ToTable("TransactionCorporateActionDetails");
+        builder.HasKey(detail => detail.TransactionId);
+        builder.Property(detail => detail.TransactionId).ValueGeneratedNever();
+        builder.Property(detail => detail.ExDate).HasColumnType("date").IsRequired();
+        builder.Property(detail => detail.RecordDate).HasColumnType("date");
+        builder.Property(detail => detail.PaymentDate).HasColumnType("date");
+        builder.Property(detail => detail.QuantityBefore).HasColumnType("decimal(18,8)").IsRequired();
+        builder.Property(detail => detail.QuantityAfter).HasColumnType("decimal(18,8)").IsRequired();
+        builder.HasOne<Tenant>()
+            .WithMany()
+            .HasForeignKey(detail => detail.TenantId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}

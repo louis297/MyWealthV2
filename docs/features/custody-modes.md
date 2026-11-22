@@ -588,3 +588,13 @@ Status of this amendment: `accepted` (2026-11-22), together with [interest-run.m
 
 - R5 matrix: the cell `Interest` / Custodial stays **refused**; its "written by" is now the interest run (interest-run R29). The refusal message and `errors.Type` are unchanged.
 - R7: the interest run builds the posting with `Transaction.PostInterest`, outside the matrix, with the platform time as `bookedAt`.
+
+---
+
+## Amendment 2026-11-22 (corporate actions) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions.md](corporate-actions.md). Rules R26 and R33 live there; this section records what changes here.
+
+- R5 matrix: the cell `Split` / `Bonus` / `Scrip` on a Custodial account stays **refused**; its "written by" is now corporate actions for `Split` and `Bonus` (corporate-actions R33). `Scrip` waits for roadmap C3. The refusal message and `errors.Type` are unchanged.
+- R7: the corporate action apply step builds the posting with `Transaction.PostCorporateAction`, outside the matrix, with the platform time as `bookedAt`.
+- §11 point 3 (a Custodial account cannot record a split) closes when [corporate-actions.md](corporate-actions.md) lands.

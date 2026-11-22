@@ -89,8 +89,37 @@ public sealed record BankConnectionPage(IReadOnlyList<BankConnectionItem> Items,
 /// <summary>How the last read of a market data feed went (docs/features/simulated-instruments.md R5).</summary>
 public sealed record MarketDataFeed(DateTimeOffset? LastSucceededAt, DateTimeOffset? LastFailedAt, string? LastFailure);
 
-/// <summary>A configured market data connection and the state of its price feed (simulated-instruments R5).</summary>
-public sealed record MarketDataConnectionItem(string Name, string Adapter, string SymbolSuffix, MarketDataFeed? Prices);
+/// <summary>A configured market data connection and the state of its price feed (simulated-instruments R5) and its
+/// corporate action feed (corporate-actions R38).</summary>
+public sealed record MarketDataConnectionItem(
+    string Name,
+    string Adapter,
+    string SymbolSuffix,
+    MarketDataFeed? Prices,
+    MarketDataFeed? CorporateActions);
+
+/// <summary>A stored corporate action announcement (corporate-actions R14).</summary>
+public sealed record CorporateActionAnnouncementItem(
+    Guid Id,
+    string Connection,
+    string OutsideId,
+    string PartyActionId,
+    int Version,
+    string PartyStatus,
+    string Symbol,
+    string Currency,
+    string? Kind,
+    int RatioNew,
+    int RatioHeld,
+    DateOnly ExDate,
+    DateOnly? RecordDate,
+    DateOnly? PaymentDate,
+    DateTimeOffset ReceivedAt,
+    string Status,
+    string? SkipReason,
+    DateTimeOffset? ProcessedAt);
+
+public sealed record CorporateActionAnnouncementPage(IReadOnlyList<CorporateActionAnnouncementItem> Items, int Page, int PageSize, int TotalCount);
 
 public sealed record MarketDataConnectionPage(IReadOnlyList<MarketDataConnectionItem> Items, int Page, int PageSize, int TotalCount);
 

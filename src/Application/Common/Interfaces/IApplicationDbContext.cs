@@ -38,6 +38,12 @@ public interface IApplicationDbContext
 
     DbSet<InterestRun> InterestRuns { get; }
 
+    DbSet<CorporateAction> CorporateActions { get; }
+
+    DbSet<CorporateActionEntitlement> CorporateActionEntitlements { get; }
+
+    DbSet<CorporateActionAnnouncement> CorporateActionAnnouncements { get; }
+
     DbSet<Instrument> Instruments { get; }
 
     DbSet<Account> Accounts { get; }
@@ -65,6 +71,8 @@ public interface IApplicationDbContext
     DbSet<TransactionTaxDetail> TransactionTaxDetails { get; }
 
     DbSet<TransactionInterestDetail> TransactionInterestDetails { get; }
+
+    DbSet<TransactionCorporateActionDetail> TransactionCorporateActionDetails { get; }
 
     DbSet<IdempotencyRecord> IdempotencyRecords { get; }
 

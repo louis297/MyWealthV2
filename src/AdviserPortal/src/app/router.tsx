@@ -17,6 +17,9 @@ import { FeesTradePage } from "@/features/fees/FeesTradePage";
 import { TradeScheduleDetailPage } from "@/features/fees/TradeScheduleDetailPage";
 import { InterestRateFormPage } from "@/features/interest/InterestRateFormPage";
 import { InterestRatesPage } from "@/features/interest/InterestRatesPage";
+import { CorporateActionFormPage } from "@/features/corporateActions/CorporateActionFormPage";
+import { CorporateActionPage } from "@/features/corporateActions/CorporateActionPage";
+import { CorporateActionsPage } from "@/features/corporateActions/CorporateActionsPage";
 import { InterestRunPage } from "@/features/interest/InterestRunPage";
 import { InterestRunsPage } from "@/features/interest/InterestRunsPage";
 import { CreatePortfolioPage } from "@/features/portfolios/CreatePortfolioPage";
@@ -109,6 +112,22 @@ export const appRoutes: RouteObject[] = [
                   { path: "rates/:id/edit", element: <InterestRateFormPage /> },
                 ],
               },
+            ],
+          },
+          {
+            // corporate-actions D64–D67: an Adviser reads; the form is a TenantAdmin's.
+            path: "/corporate-actions",
+            element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
+            children: [
+              { index: true, element: <CorporateActionsPage /> },
+              {
+                element: <RoleGate allow={[roles.tenantAdmin]} />,
+                children: [
+                  { path: "new", element: <CorporateActionFormPage /> },
+                  { path: ":id/edit", element: <CorporateActionFormPage /> },
+                ],
+              },
+              { path: ":id", element: <CorporateActionPage /> },
             ],
           },
           { path: "/session", element: <SessionProbePage /> },

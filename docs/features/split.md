@@ -285,3 +285,13 @@ The repository should build after each commit. Agents split each line into red t
 ## Amendment 2026-11-14 (UTC instants)
 
 Accepted with [utc-instants](../fixes/utc-instants.md). R16 follows posting R24. The item example shows the UTC form.
+
+---
+
+## Amendment 2026-11-22 (corporate actions) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions.md](corporate-actions.md). Rules R22–R33 live there; this section records what changes here.
+
+- R8 and §13: on a Custodial account `Split` and `Bonus` are written by **corporate actions** from a ratio (`Transaction.PostCorporateAction`, source `CorporateAction`): one security leg of `quantityAfter − quantityBefore` with cost `0`, no cash leg, and a corporate action detail (corporate-actions R26, R27). A consolidation is posted as `Split`. A hand `Split`, `Bonus` or `Scrip` on a Custodial account is still refused (400 `errors.Type`).
+- External accounts are unchanged: the hand entry sends the new total quantity (R9), keeps source `Manual` and has no corporate action detail. `Scrip` stays a hand entry of External accounts until roadmap C3.
+- R12 and R13 hold for an entitlement posting too: the holding's total cost is unchanged and average cost becomes total cost / `quantityAfter` (corporate-actions R29).

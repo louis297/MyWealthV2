@@ -1,3 +1,4 @@
+using MyWealthV2.Infrastructure.CorporateActions;
 using Hangfire;
 using MyWealthV2.Application.Common.Interfaces;
 using Microsoft.Extensions.Logging;
@@ -56,6 +57,7 @@ FxRateRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager
 BankReconciliationRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 InterestRunRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 InstrumentPriceRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
+CorporateActionApplyRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 BankStatementRecurringJob.Register(
     app.Services.GetRequiredService<IRecurringJobManager>(),
     app.Services.GetRequiredService<JobStorage>(),

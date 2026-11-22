@@ -26,5 +26,9 @@ public enum TransactionSourceKind
     AccountClosure = 5,
 
     /// <summary>An interest run; the source id is the run's PublicId (interest-run R23).</summary>
-    InterestRun = 6
+    InterestRun = 6,
+
+    /// <summary>A corporate action's entitlement posting; the source id is the corporate action's PublicId
+    /// (corporate-actions R26).</summary>
+    CorporateAction = 7
 }

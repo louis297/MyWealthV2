@@ -48,17 +48,18 @@ public class MarketDataFeedsSchemaTests
     }
 
     [Test]
-    public async Task KindOne_ViolatesTheKindCheck()
+    public async Task KindTwo_ViolatesTheKindCheck()
     {
+        // Kind 1 (CorporateActions) is allowed since script 0050 (corporate-actions §6.1).
         var exception = await Should.ThrowAsync<SqlException>(() => RunAsync("""
-            INSERT INTO [MarketDataFeeds] ([Connection], [Kind]) VALUES (N'simulator', 1);
+            INSERT INTO [MarketDataFeeds] ([Connection], [Kind]) VALUES (N'simulator', 2);
             """));
 
         exception.Number.ShouldBe(547);
         exception.Message.ShouldContain("CK_MarketDataFeeds_Kind");
     }
 
-    [TestCase(5)]
+    [TestCase(6)]
     [TestCase(-1)]
     public async Task ALastFailureOutsideItsValues_ViolatesTheCheck(int failure)
     {

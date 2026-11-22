@@ -146,6 +146,8 @@ The fifth role `SimulatorOperator` ([ADR 0013](adr/0013-roles-authorization-sing
 | `interest-rates.manage` | | ✓ | | | [interest-run](features/interest-run.md) (accepted 2026-11-22) |
 | `interest-runs.read` | ✓ | ✓ | | | [interest-run](features/interest-run.md) (accepted 2026-11-22) |
 | `interest-runs.start` | ✓ | | | | [interest-run](features/interest-run.md) (accepted 2026-11-22) |
+| `corporate-actions.read` | | ✓ | ✓ | | [corporate-actions](features/corporate-actions.md) (accepted 2026-11-22) |
+| `corporate-actions.manage` | | ✓ | | | [corporate-actions](features/corporate-actions.md) (accepted 2026-11-22) |
 | `portfolios.read` | ✓ | ✓ | ✓ | | [portfolios](features/portfolios.md) |
 | `portfolios.manage` | ✓ | ✓ | ✓ | | [portfolios](features/portfolios.md) |
 | `reports.customer.read` | | ✓ | ✓ | ✓ | [reports](features/reports.md) |
@@ -314,7 +316,8 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Tenants | `/tenants` | list / get / create / update / disable / enable | `tenants.manage` |
 | Client money accounts | `/tenants/{tenantId}/client-money-accounts` | list / get / create / disable / enable. See features/client-money-accounts.md; `bankConnection`, `bankFeed` in features/deposit-matching.md | `tenants.manage` |
 | Bank connections | `/bank-connections` | list (names and adapters from configuration). See features/deposit-matching.md | `tenants.manage` |
-| Market data connections | `/market-data-connections` | list (names, adapters, symbol suffixes from configuration, and the state of each price feed). See features/simulated-instruments.md | `tenants.manage` |
+| Market data connections | `/market-data-connections` | list (names, adapters, symbol suffixes from configuration, and the state of each price feed and corporate action feed). See features/simulated-instruments.md and features/corporate-actions.md | `tenants.manage` |
+| Corporate action announcements | `/corporate-action-announcements` | list (platform data, newest first; filters `connection`, `status`). See features/corporate-actions.md | `tenants.manage` |
 | Statement lines | `/statement-lines` | list / get; match / ignore / request-return / reopen / unmatch. See features/deposit-matching.md and features/bank-returns.md (returns, recalls, debit lines) | `statement-lines.manage` |
 | Nominated bank accounts | `/nominated-bank-accounts` | list / get / create; verify / reject / remove. No PUT. See features/withdrawals.md | `nominated-bank-accounts.read` / `.manage` / `.verify` |
 | Withdrawals | `/withdrawals` | list / get / create (`Idempotency-Key`); approve / reject / cancel. See features/withdrawals.md | `withdrawals.read` / `.request` / `.approve` |
@@ -326,6 +329,7 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Portfolios | `/portfolios`, `/accounts/{id}/portfolio`, `/accounts/{id}/rebalance` | list / get / create / update / disable; assign / unassign / rebalance. See features/portfolios.md | `portfolios.read` / `portfolios.manage` + `transactions.create` |
 | Fees | `/fees/trade-schedules` (namespace `/fees`) | list / get / create / update / delete. See features/trade-fees.md | `fees.read` / `fees.manage` |
 | Interest | `/interest/rate-schedules`, `/interest/runs` (namespace `/interest`) | rate schedules: list / get / create / update / delete; runs: list / get / create (start a run). See features/interest-run.md | `interest-rates.read` / `.manage`; `interest-runs.read` / `.start` |
+| Corporate actions | `/corporate-actions` | list / get / create / update; cancel / apply; entitlements. See features/corporate-actions.md | `corporate-actions.read` / `corporate-actions.manage` |
 | Reports | `/reports` | list / request / schedules / executions / download | `reports.customer.read` / `reports.customer.create` / `reports.book.read` / `reports.book.create` / `reports.tenant.read` / `reports.tenant.create` |
 
 Path `{id}` is always PublicId.
@@ -429,6 +433,7 @@ Rule summary:
 People lists reuse the tenants envelope `{ items, page, pageSize, totalCount }` (page default 1, size default 20, max 100). Currencies, people collections, and instruments use `enabledOnly` (omit / `false` = all, `true` = enabled / Active only). Each person item includes `status`. Create on a disabled tenant uses §4.1.
 
 - Amendment 2026-11-22 (interest run, accepted; field rules in [features/interest-run.md](features/interest-run.md) R1–R8): sub-resource `GET` / `PUT /users/customers/{customerId}/tax-profile` (`customers.manage` or `customers.manage-own`, scope as every `/users/customers` route; a Customer → 403) and `GET /users/me/tax-profile` (`users.me`; a caller who is not a Customer → 404). The item is `{ taxResidency, irdNumberHeld, rwtRatePercent, withholding: { kind, ratePercent, basis }, updatedBy, updatedAt, rowVersion }`; `PUT` takes the three attributes and `rowVersion` (`null` for the first write) and answers 204; stale → 409 `stale_row_version`. The IRD number itself is never stored.
+- Amendment 2026-11-22 (corporate actions, accepted; field rules in [features/corporate-actions.md](features/corporate-actions.md) R26, R27, R32, R33, R37): source kind `CorporateAction` marks an entitlement posting (`Split` or `Bonus` written by the platform, one security leg of the quantity difference with cost 0); it is not hand-reversible. The item gains `corporateAction` `{ id, kind, ratioNew, ratioHeld, exDate, recordDate, paymentDate, quantityBefore, quantityAfter }` on an entitlement posting and its Reversal, `null` otherwise. A hand `Split`, `Bonus` or `Scrip` on a Custodial account stays refused (400 `errors.Type`).
 
 ### 7.5 Instruments
 
@@ -583,6 +588,23 @@ Field rules: [features/trade-fees.md](features/trade-fees.md). Update or delete 
 
 Field rules: [features/interest-run.md](features/interest-run.md). Update or delete of a rate schedule row in effect → 409 `interest_schedule_in_effect`. `asOfDate` after yesterday (UTC) → 400 `errors.AsOfDate` unless `Interest:AllowFutureAsOfDates` is on. No `Idempotency-Key` on these routes.
 
+### 7.11 Corporate actions
+
+A corporate action is an event of one Instrument of the caller's Tenant. Its entitlement postings are Transactions (§7.7), never entered by hand on a Custodial account. No caller names a tenant: `tenantId` in a query or body → 400. `{id}` is a GUID.
+
+| Method | Route | Policy | Success |
+| --- | --- | --- | --- |
+| GET | `/corporate-actions` | `corporate-actions.read` | 200 envelope (filters `status`, `instrumentId`, `origin`) |
+| GET | `/corporate-actions/{id}` | `corporate-actions.read` | 200 item |
+| GET | `/corporate-actions/{id}/entitlements` | `corporate-actions.read` | 200 envelope (filter `status`; an Adviser sees assigned Customers' accounts only) |
+| POST | `/corporate-actions` | `corporate-actions.manage` | 201 `{ id }` |
+| PUT | `/corporate-actions/{id}` | `corporate-actions.manage` | 204 |
+| POST | `/corporate-actions/{id}/cancel` | `corporate-actions.manage` | 204 |
+| POST | `/corporate-actions/{id}/apply` | `corporate-actions.manage` | 204 |
+| GET | `/corporate-action-announcements` | `tenants.manage` | 200 envelope (filters `connection`, `status`) |
+
+Field rules: [features/corporate-actions.md](features/corporate-actions.md). No `Idempotency-Key`: the status and `rowVersion` make a repeat a 400 or a 409 `stale_row_version`. A served instrument takes no hand entry (400 `errors.InstrumentId`); a `Feed` action cannot be changed by hand (400 `errors.Origin`). No new problem code.
+
 ---
 
 ## 8. Explicitly out (until a later phase promotes them)
@@ -665,3 +687,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-22 | §3.1, §6, §7.6, §7.7: account closure accepted. Permissions `account-closures.read` and `account-closures.request`; sub-resource `/accounts/{accountId}/closures` (request, list, get); account item `closure`, withdrawal item `accountClosureId`; source kind `AccountClosure`; hand `CloseOut` and `POST /accounts/{id}/close` refused on a Custodial account; a closing account refuses every hand write. No problem code ([features/account-closure.md](features/account-closure.md)). |
 | 2026-11-22 | §2, §3.1, §4.2, §6, §7.4, §7.6, §7.7, §7.10: interest run accepted. Namespace `/interest` with `/interest/rate-schedules` and `/interest/runs`; permissions `interest-rates.read`, `interest-rates.manage`, `interest-runs.read`, `interest-runs.start`; problem code `interest_schedule_in_effect`; sub-resources `/users/customers/{customerId}/tax-profile`, `/users/me/tax-profile` and `/accounts/{accountId}/interest-accruals`; account item `accruedInterest`, `interestAccruedThrough`; transaction item `interest`, leg role `Tax` and leg `tax`; source kind `InterestRun`; statement line `kind` and its filter ([features/interest-run.md](features/interest-run.md)). |
 | 2026-11-22 | §6, §7.5: simulated instruments accepted. Resource `/market-data-connections` (`tenants.manage`, list from configuration with the price feed state); instrument item `marketDataConnection`. No new permission or problem code. |
+| 2026-11-22 | §3.1, §6, §7.7, §7.11: corporate actions accepted. Permissions `corporate-actions.read` and `corporate-actions.manage`; resource `/corporate-actions` (list, get, create, update, cancel, apply, entitlements) and `/corporate-action-announcements` (`tenants.manage`); source kind `CorporateAction`; transaction item `corporateAction`; connection item `corporateActions`. No new problem code. |

@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
   canReverse,
   ReverseTransactionButton,
+  transactionTypeLabel,
 } from "@/features/transactions/ReverseTransactionButton";
 import {
   useGetTransactionsQuery,
@@ -108,7 +109,7 @@ export function TransactionsListPage() {
                     <TableRow key={item.id}>
                       <TableCell>
                         <Link to={`/transactions/${item.id}`} className={recordLinkClass}>
-                          {item.type}
+                          {item.corporateAction ? transactionTypeLabel(item) : item.type}
                         </Link>
                       </TableCell>
                       <TableCell>{formatInstant(item.bookedAt)}</TableCell>

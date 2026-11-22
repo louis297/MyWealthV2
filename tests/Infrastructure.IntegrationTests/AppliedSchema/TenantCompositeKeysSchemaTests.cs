@@ -499,6 +499,46 @@ public class TenantCompositeKeysSchemaTests
             INSERT INTO [TransactionInterestDetails] ([TransactionId], [TenantId], [PeriodFrom], [PeriodTo], [Days], [AccruedAmount], [GrossAmount])
             VALUES (@{p}_buy, @a_tenant, '2026-12-01', '2026-12-31', 31, 12.32876700, 12.33);
             """),
+        ("FK_CorporateActions_Instruments_TenantId_InstrumentId", "Instruments", """
+            INSERT INTO [CorporateActions] ([PublicId], [TenantId], [InstrumentId], [Kind], [RatioNew], [RatioHeld], [ExDate], [Origin], [Status], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @{p}_instrument, 0, 2, 1, '2026-12-01', 0, 0, SYSDATETIMEOFFSET(), N'test');
+            """),
+        ("FK_CorporateActions_Users_TenantId_EffectiveByUserId", "Users", """
+            INSERT INTO [CorporateActions]
+                ([PublicId], [TenantId], [InstrumentId], [Kind], [RatioNew], [RatioHeld], [ExDate], [Origin], [Status], [EffectiveAt], [EffectiveByUserId], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_instrument, 0, 2, 1, '2026-12-01', 0, 1, SYSDATETIMEOFFSET(), @{p}_adviser, SYSDATETIMEOFFSET(), N'test');
+            """),
+        ("FK_CorporateActions_Users_TenantId_CancelledByUserId", "Users", """
+            INSERT INTO [CorporateActions]
+                ([PublicId], [TenantId], [InstrumentId], [Kind], [RatioNew], [RatioHeld], [ExDate], [Origin], [Status], [CancelledAt], [CancelledByUserId], [CancelNote], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_instrument, 0, 2, 1, '2026-12-01', 0, 3, SYSDATETIMEOFFSET(), @{p}_adviser, N'No', SYSDATETIMEOFFSET(), N'test');
+            """),
+        ("FK_CorporateActionEntitlements_CorporateActions_TenantId_CorporateActionId", "CorporateActions", """
+            INSERT INTO [CorporateActions] ([PublicId], [TenantId], [InstrumentId], [Kind], [RatioNew], [RatioHeld], [ExDate], [Origin], [Status], [EffectiveAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @{p}_tenant, @{p}_instrument, 0, 2, 1, '2026-12-01', 0, 1, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            DECLARE @{p}_action int = SCOPE_IDENTITY();
+            INSERT INTO [CorporateActionEntitlements] ([TenantId], [CorporateActionId], [AccountId], [Status])
+            VALUES (@a_tenant, @{p}_action, @a_brokerage, 0);
+            """),
+        ("FK_CorporateActionEntitlements_Accounts_TenantId_AccountId", "Accounts", """
+            INSERT INTO [CorporateActions] ([PublicId], [TenantId], [InstrumentId], [Kind], [RatioNew], [RatioHeld], [ExDate], [Origin], [Status], [EffectiveAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_instrument, 0, 2, 1, '2026-12-01', 0, 1, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            DECLARE @action int = SCOPE_IDENTITY();
+            INSERT INTO [CorporateActionEntitlements] ([TenantId], [CorporateActionId], [AccountId], [Status])
+            VALUES (@a_tenant, @action, @{p}_brokerage, 0);
+            """),
+        ("FK_CorporateActionEntitlements_Transactions_TenantId_TransactionId", "Transactions", """
+            INSERT INTO [CorporateActions] ([PublicId], [TenantId], [InstrumentId], [Kind], [RatioNew], [RatioHeld], [ExDate], [Origin], [Status], [EffectiveAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @a_instrument, 0, 2, 1, '2026-12-01', 0, 1, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            DECLARE @action int = SCOPE_IDENTITY();
+            INSERT INTO [CorporateActionEntitlements]
+                ([TenantId], [CorporateActionId], [AccountId], [Status], [QuantityBefore], [QuantityAfter], [TransactionId], [PostedAt])
+            VALUES (@a_tenant, @action, @a_brokerage, 1, 1, 2, @{p}_buy, SYSDATETIMEOFFSET());
+            """),
+        ("FK_TransactionCorporateActionDetails_Transactions_TenantId_TransactionId", "Transactions", """
+            INSERT INTO [TransactionCorporateActionDetails] ([TransactionId], [TenantId], [Kind], [RatioNew], [RatioHeld], [ExDate], [QuantityBefore], [QuantityAfter])
+            VALUES (@{p}_buy, @a_tenant, 0, 2, 1, '2026-12-01', 1, 2);
+            """),
         ("FK_ReportExecutions_ReportSchedules_TenantId_ScheduleId", "ReportSchedules", """
             INSERT INTO [ReportExecutions] ([PublicId], [ReportId], [ScheduleId], [TenantId], [TriggerKind], [Status], [ParametersJson], [Created], [CreatedBy])
             VALUES (NEWID(), @report, @{p}_schedule, @a_tenant, N'Scheduled', N'Queued', N'{}', SYSDATETIMEOFFSET(), N'test');
@@ -532,7 +572,7 @@ public class TenantCompositeKeysSchemaTests
     ];
 
     private static readonly string[] Parents =
-        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines", "BankReconciliations", "InterestRateSchedules"];
+        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines", "BankReconciliations", "InterestRateSchedules", "CorporateActions"];
 
     private static IEnumerable<TestCaseData> CompositeKeyCases() =>
         CompositeKeys.Select(key => new TestCaseData(key.ForeignKey).SetName($"Insert_ChildPointingAtOtherTenant_IsRejected({key.ForeignKey})"));

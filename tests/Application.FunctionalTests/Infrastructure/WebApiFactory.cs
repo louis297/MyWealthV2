@@ -1,5 +1,7 @@
 extern alias WebHost;
 
+using MyWealthV2.Application.CorporateActions;
+using MyWealthV2.Application.FunctionalTests.CorporateActions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
@@ -75,6 +77,9 @@ public class WebApiFactory(
             services.RemoveAll<IMarketPrices>();
             services.AddSingleton<InMemoryMarketPrices>();
             services.AddSingleton<IMarketPrices>(sp => sp.GetRequiredService<InMemoryMarketPrices>());
+            services.RemoveAll<ICorporateActionFeed>();
+            services.AddSingleton<InMemoryCorporateActionFeed>();
+            services.AddSingleton<ICorporateActionFeed>(sp => sp.GetRequiredService<InMemoryCorporateActionFeed>());
             services.AddSingleton<CollidingAccountSaveInterceptor>();
             services.AddScoped<ISaveChangesInterceptor>(sp => sp.GetRequiredService<CollidingAccountSaveInterceptor>());
 

@@ -980,3 +980,71 @@ describe("Customer Portal interest (interest-run C28–C30)", () => {
     expect(hand).not.toHaveTextContent("Tax withheld");
   });
 });
+
+describe("Customer Portal corporate actions (corporate-actions C31)", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal("location", {
+      origin: "http://localhost:3000",
+      pathname: "/accounts/account-1",
+      search: "",
+      href: "http://localhost:3000/accounts/account-1",
+      assign: vi.fn(),
+    });
+  });
+
+  const custodialUsd = { type: "Brokerage", currency: "USD", depositReference: "K7M3Q9PXB" };
+
+  function entitlementPosting(id: string, kind: string, ratioNew: number, ratioHeld: number, before: number, after: number) {
+    return {
+      id,
+      tenantId: "22222222-2222-2222-2222-222222222222",
+      type: kind === "Bonus" ? "Bonus" : "Split",
+      bookedAt: "2026-11-24T03:41:02Z",
+      memo: `${kind} ${ratioNew} for ${ratioHeld}`,
+      reference: null,
+      originalTransactionId: null,
+      reversedByTransactionId: null,
+      rowVersion: "AAAA",
+      source: { kind: "CorporateAction", id: "ca-1" },
+      corporateAction: {
+        id: "ca-1", kind, ratioNew, ratioHeld, exDate: "2026-11-24", recordDate: null, paymentDate: null,
+        quantityBefore: before, quantityAfter: after,
+      },
+      cash: [],
+      security: [{ accountId: "account-1", customerId: me.id, instrumentId: "i-1", quantity: after - before, cost: 0, costCurrency: "USD" }],
+      bankReceipt: null,
+      payment: null,
+      interest: null,
+    };
+  }
+
+  it("labels an entitlement posting with its kind and ratio, the quantities and the ex-date, and no cash amount", async () => {
+    const handSplit = {
+      ...entitlementPosting("74444444-4444-4444-4444-444444444444", "Split", 2, 1, 100, 200),
+      source: { kind: "Manual", id: null },
+      corporateAction: null,
+      memo: "Hand split",
+    };
+    renderAt("/accounts/account-1", me, [
+      entitlementPosting("71111111-1111-1111-1111-111111111111", "Split", 2, 1, 100, 200),
+      entitlementPosting("72222222-2222-2222-2222-222222222222", "Consolidation", 1, 10, 105, 10.5),
+      entitlementPosting("73333333-3333-3333-3333-333333333333", "Bonus", 1, 5, 12.34567891, 14.81481469),
+      handSplit,
+    ], "Custodial", {
+      account: custodialUsd,
+      cash: { currency: "USD", cashBalance: 0, reservedCash: 0, availableCash: 0 },
+    });
+
+    const split = await screen.findByRole("row", { name: /Share split 2 for 1/ });
+    expect(split).toHaveTextContent("100 → 200 shares");
+    expect(split).toHaveTextContent("Ex-date 2026-11-24");
+    expect(split).not.toHaveTextContent("USD");
+    expect(screen.getByRole("row", { name: /Share consolidation 1 for 10/ })).toHaveTextContent("105 → 10.5 shares");
+    expect(screen.getByRole("row", { name: /Bonus issue 1 for 5/ })).toHaveTextContent("12.34567891 → 14.81481469 shares");
+    const hand = screen.getAllByRole("row").filter((row) => row.textContent?.startsWith("Split"));
+    expect(hand).toHaveLength(1);
+    expect(hand[0]).not.toHaveTextContent("Ex-date");
+  });
+});

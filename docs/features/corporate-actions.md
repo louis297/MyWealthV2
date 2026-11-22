@@ -1,6 +1,6 @@
 ---
 title: Corporate actions
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -42,7 +42,23 @@ A **corporate action** is an event of one Instrument: a split, a consolidation o
 
 New: permissions `corporate-actions.read` and `corporate-actions.manage`; routes under `/corporate-actions`, `GET /corporate-action-announcements`; port `ICorporateActionFeed` with adapter `SimulatorCorporateActionFeed`; source kind `CorporateAction`; a corporate action detail on the Transaction; `worker` job `corporate-action-apply`; the feed kind `CorporateActions` on a market data connection. Script `0050_corporate_actions.sql`; simulator script `database/simulator/0009_market_corporate_actions.sql`. No new `TransactionType`, problem code or domain event.
 
-**Status is `review` (2026-11-22).** Not a build contract. It depends on [simulated-instruments.md](simulated-instruments.md) (`review`). The points of §11 need confirmation before it is accepted; the amendments to accepted docs listed in §12 are made when it is accepted.
+**Status is `accepted` (2026-11-22), landed 2026-11-22.** The eighteen points of §11 were confirmed on 2026-11-22, every one as recommended, and are written into the rules. It builds on [simulated-instruments.md](simulated-instruments.md) (accepted and landed 2026-11-22). The amendments to accepted docs listed in §12 were made when it was accepted.
+
+Notes from landing:
+
+- R1, R15–R21: the routes are `src/Web/Endpoints/CorporateActions.cs`; the commands and reads are in `src/Application/CorporateActions`. An unknown `kind` is 400 at `errors.Kind`; a missing `ratioHeld` is reported at `errors.RatioNew`; a blank or too long memo is 400 at `errors.Memo`; an unknown `origin` filter is 400 at `errors.Origin`. R17's message uses the kind in lower case (`A consolidation of AAPL with this ex-date already exists.`). R21: the origin, then the status, then the `rowVersion` are checked, so a repeat of an action that already succeeded is 400 at `errors.Status`, not 409.
+- R22: `CorporateActionEffect.MakeEffectiveAsync` is the one place an action becomes effective, for Apply now, the apply step and the feed processing.
+- R23: the due-by-price check is `IInstrumentPriceStore.HasPriceFromAsync`, one call per `Manual` action that is `Announced`.
+- R24, R25: `ApplyCorporateActions` (Application) is registered on both hosts; `CorporateActionApplyJob` (Infrastructure) reuses `SqlRunLock` and throws `CorporateActionApplyFailedException` when an item was left for the next run. The posting's `CreatedBy` is `SystemActor.Name`. The functional test of a failing account adds a temporary `WITH NOCHECK` CHECK constraint on `TransactionSecurityLegs`: SQL Server refuses EF Core's `OUTPUT` inserts on a table with a trigger.
+- R8: the run order lives in `SyncMarketDataConnection` (Application), which `MarketDataSyncJob` calls under its run lock: pull, process, apply the connection's instruments, then the price read unless the pull failed. The run is also reported as failed when an announcement or an entitlement was left for the next run (`MarketDataSyncOutcome.Failed`).
+- R9, R48: the adapter dispatch is `CorporateActionFeedDispatcher` over `ICorporateActionFeedAdapter` (`SimulatorCorporateActionFeed`), as for prices. The `CorporateActions` feed keeps the party's cursor through `MarketDataFeed.Advance`; a page without a cursor keeps the one stored. A `status` sent as a number is read as unknown.
+- R11, R12: an announcement that changes nothing and finds no action that is past `Announced` is skipped as `Superseded`; that covers a `Cancelled` version with no action yet and a version of another kind than its action.
+- R35: `createdBy` is read from the audit `CreatedBy` (the person's identity user id); a feed action, written by the platform, shows `null`. R37: `corporateAction.id` is the posting's source id, or the original's on a Reversal.
+- R42, R43: the rebase is in `MarketPricePath.BringUpToDateAsync`, before the day's step; several actions of one instrument due on the same day apply in ex-date, then number order. The number of a new action is the highest number plus one; the unique index answers a race with 409. An unknown kind on announce is 400 at `errors.Kind`.
+- R44: the feed cursor reuses `BankFeedCursor`'s `{WorldId:N}:{place}` format; the place is the version's `Id`.
+- D66: the instrument search lists up to ten matches of the symbol or name as buttons; a served instrument is a disabled button marked "(From market data)". D67: Apply now is shown when the browser's UTC date is on or after the ex-date; the server still decides. D68: the list and the account activity show the corporate action label only on an entitlement posting; other rows keep their type.
+- BO25: the status filter is a set of links (`/market-data?status=…`).
+- The schema tests that said source kind 7 or feed kind 1 is refused now refuse 8 and 2; the role grant unit test and the 401 and 403 route tests passed already in their red commits, as the policy grants and route shells carry them.
 
 ---
 
@@ -647,9 +663,9 @@ No new ADR. ADR 0021 applies as written: rule 1 (port `ICorporateActionFeed`), 5
 | Jobs | The announcement steps in `market-data-sync:{connection}`; `corporate-action-apply` every minute |
 | Problem codes, events, `TransactionType` | None added |
 
-### Points to confirm
+### Points confirmed
 
-Each point states a recommendation, written into the rules above, and the alternative.
+Each point states the decision, written into the rules above, and the alternative. All eighteen were confirmed on 2026-11-22 as recommended.
 
 1. **Two specs for step 10; this one carries C1 and the issuer of S4.** Recommended: the flow and its simulator party in one spec, as in every earlier step, on top of [simulated-instruments.md](simulated-instruments.md). Alternative: one spec for the whole step.
 2. **A corporate action is a Tenant's row on a Tenant's instrument; an announcement is platform data fanned out by symbol and quote currency** (R2, R12). Recommended: instruments are tenant rows, the ledger and every read are tenant-scoped, and prices already fan out the same way (instrument-prices R15). Alternative: one platform-level corporate action with entitlements in many Tenants.
@@ -709,6 +725,6 @@ The repository should build after each commit. Agents split each behaviour into 
 
 Do not put dividends, a reversing flow, External accounts or a real vendor adapter in these commits.
 
-### Docs amended when this spec is accepted
+### Docs amended when this spec was accepted
 
 [split.md](split.md) (R8 and §13: on a Custodial account `Split` and `Bonus` are written by corporate actions from a ratio; hand entry stays for External accounts), [holdings.md](holdings.md) (the type table: an entitlement posting), [posting.md](posting.md) (the type table and R20: `Split` / `Bonus` on a Custodial account are written by the platform), [custody-modes.md](custody-modes.md) (R5 matrix: "written by" corporate actions; the known issue of §11 point 3 closes when this lands), [transaction-source.md](transaction-source.md) (kind `CorporateAction` = 7, not hand-reversible, check widened), [portfolios.md](portfolios.md) (R18: the trade lock does not apply to an entitlement posting), [adjustments.md](adjustments.md) (a note: reason `CorporateAction` corrects one account after a corporate action), [instruments.md](instruments.md) (a disabled instrument may still get a corporate action), [simulated-instruments.md](simulated-instruments.md) (R8: the steps before the price read and the skipped read; R17 and R18: the rebased price; the feed kind and failure), [simulator.md](simulator.md) (R39–R47, script `0009`, the routes and log actions), [bff-adviser-portal.md](bff-adviser-portal.md) (prefix `/corporate-actions`), [api-design.md](../api-design.md) (§3.1 two permission rows, §6 resource rows, a new §7.11 Corporate actions, §7.7 note, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [architecture.md](../architecture.md) (port `ICorporateActionFeed`, the job `corporate-action-apply`), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D64–D68), [customer-portal.md](../customer-portal/customer-portal.md) (C31), [back-office.md](../backoffice/back-office.md) (BO24, BO25), [known-issues/custodial-account-gaps.md](../known-issues/custodial-account-gaps.md) (the "A split cannot be recorded" row notes this spec; it is removed when the slice lands), [glossary.md](../glossary.md) (the review terms become accepted; Transaction source gains its new value), [function-plan.md](../function-plan.md) §5 (the roadmap step; §5.2: a split on a Custodial account comes from a corporate action), [features/README.md](README.md) row status, [future-plans.md](../future-plans.md) §9, and the roadmap §2 matrix, §7 C1, §11 S4, §13 status and §14.

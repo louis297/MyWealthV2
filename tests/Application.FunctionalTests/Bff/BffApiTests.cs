@@ -276,6 +276,42 @@ public class BffApiTests
     }
 
     [Test]
+    public async Task Session_ProxiesCorporateActions_ReadsAndActions()
+    {
+        // bff-adviser-portal amendment 2026-11-22 (corporate actions): /corporate-actions is on the prefix allow-list;
+        // /corporate-action-announcements is a Back Office route and is not.
+        var id = Guid.NewGuid();
+        _api.Scripts["/corporate-actions"] = (HttpStatusCode.OK, """{"items":[],"page":1,"pageSize":20,"totalCount":0}""");
+        _api.Scripts[$"/corporate-actions/{id}/apply"] = (HttpStatusCode.NoContent, "");
+        _api.Scripts[$"/corporate-actions/{id}"] = (HttpStatusCode.NoContent, "");
+
+        using var list = new HttpRequestMessage(HttpMethod.Get, "/api/corporate-actions?status=Announced");
+        list.Headers.TryAddWithoutValidation("Cookie", _sessionCookie);
+        var read = await _bff.SendAsync(list);
+        using var apply = new HttpRequestMessage(HttpMethod.Post, $"/api/corporate-actions/{id}/apply");
+        apply.Headers.TryAddWithoutValidation("Cookie", _sessionCookie);
+        apply.Headers.TryAddWithoutValidation(RequestHeader, "1");
+        apply.Content = new StringContent("""{"rowVersion":"AAAAAAAAB9E="}""", System.Text.Encoding.UTF8, "application/json");
+        var applied = await _bff.SendAsync(apply);
+        using var update = new HttpRequestMessage(HttpMethod.Put, $"/api/corporate-actions/{id}");
+        update.Headers.TryAddWithoutValidation("Cookie", _sessionCookie);
+        update.Headers.TryAddWithoutValidation(RequestHeader, "1");
+        update.Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json");
+        var updated = await _bff.SendAsync(update);
+        using var announcements = new HttpRequestMessage(HttpMethod.Get, "/api/corporate-action-announcements");
+        announcements.Headers.TryAddWithoutValidation("Cookie", _sessionCookie);
+        var refused = await _bff.SendAsync(announcements);
+
+        read.StatusCode.ShouldBe(HttpStatusCode.OK);
+        applied.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        updated.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        refused.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        _api.Calls.ShouldContain(call => call.Path == "/corporate-actions");
+        _api.Calls.ShouldContain(call => call.Path == $"/corporate-actions/{id}/apply");
+        _api.Calls.ShouldNotContain(call => call.Path == "/corporate-action-announcements");
+    }
+
+    [Test]
     public async Task Session_ProxiesNominatedBankAccountsAndWithdrawals_ReadsAndActions()
     {
         // bff-adviser-portal amendment 2026-11-20 (withdrawals): /nominated-bank-accounts and /withdrawals are on the

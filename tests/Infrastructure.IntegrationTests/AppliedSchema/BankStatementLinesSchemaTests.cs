@@ -101,7 +101,7 @@ public class BankStatementLinesSchemaTests
     }
 
     [Test]
-    public async Task Transaction_SourceKind3_NeedsASourcePublicId_AndKind7IsRejected()
+    public async Task Transaction_SourceKind3_NeedsASourcePublicId_AndKind8IsRejected()
     {
         (await RunAsync($"""
             {World()}
@@ -116,13 +116,13 @@ public class BankStatementLinesSchemaTests
         withoutId.Number.ShouldBe(547);
         withoutId.Message.ShouldContain("CK_Transactions_SourcePublicId");
 
-        // Account closure widened the check to AccountClosure (5); 6 is still outside it.
-        var kind7 = await Should.ThrowAsync<SqlException>(() => RunAsync($"""
+        // Corporate actions widened the check to CorporateAction (7); 8 is still outside it.
+        var kind8 = await Should.ThrowAsync<SqlException>(() => RunAsync($"""
             {World()}
-            {InsertTransaction(7, "NEWID()")}
+            {InsertTransaction(8, "NEWID()")}
             """));
-        kind7.Number.ShouldBe(547);
-        kind7.Message.ShouldContain("CK_Transactions_SourceKind");
+        kind8.Number.ShouldBe(547);
+        kind8.Message.ShouldContain("CK_Transactions_SourceKind");
     }
 
     [Test]

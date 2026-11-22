@@ -10,6 +10,7 @@ related:
   - ../adr/0020-account-custody-mode.md
   - ../future-plans.md
   - ../features/adjustments.md
+  - ../features/corporate-actions.md
   - ../features/deposit-matching.md
   - ../features/withdrawals.md
   - ../features/account-closure.md
@@ -28,7 +29,6 @@ A Custodial account is meant to be the platform's own record: the server produce
 
 | Gap | Effect on a Custodial account | Closed by |
 | --- | --- | --- |
-| A split cannot be recorded | If a held instrument really splits, the quantity stays as it was while the price falls. The holding's market value, net worth and the next rebalance of that account are wrong until the quantity is corrected | Corporate action events |
 | Existing positions cannot be moved in | A Custodial account starts with cash only. `OpeningHoldings` and `StockIn` are refused, so a Customer's shares at another broker cannot arrive in kind | In-kind transfer |
 | No opening balance | The same for cash: `Opening` is refused. A balance arrives as a `TransferIn` booked on the day it is entered | Migration batches |
 | History cannot be entered | The server sets `bookedAt`. A deposit entered today cannot be dated yesterday, and no past activity can be built through the API | A simulator with its own clock; the test seed until then |
@@ -39,12 +39,10 @@ External accounts have none of these gaps: they keep every hand-entered type.
 
 - Allowing `Split`, `StockIn` or `Interest` on a Custodial account "for now". Each would put a hand-entered number into the record that the later flows have to trust.
 - A switch that lets one tenant or one caller bypass the matrix.
-- Moving the corporate action work in front of the bank simulator only to cover splits. Revisit this if a demo instrument splits.
 - Turning an External account into a Custodial one to bring its positions across.
 
 ## Revisit when
 
 - Each flow in the last column is specified. Its spec changes one cell of the manual entry matrix and removes its row here.
-- A seeded demo instrument announces a split while Custodial demo accounts hold it. Until corporate action events exist, the way out is to sell the holding before the split date, or to rebuild the demo data.
 
 The order of the flows is in [future-plans.md](../future-plans.md) §9.

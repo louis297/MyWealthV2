@@ -306,3 +306,13 @@ Status of this amendment: `accepted` (2026-11-22), together with [interest-run](
 | C28 | A Customer | Profile page | A "Tax details" section from `GET /users/me/tax-profile`: Tax residency, IRD number ("On file" / "Not on file"), RWT rate, and "Tax taken from your interest: <rate> %". Under it: "To change these details, contact your adviser." No form. |
 | C29 | A Customer with a Custodial account whose `accruedInterest` is above 0 | Account page | "Interest earned so far this period: <amount>" (the currency's minor unit, rounded down) under the balance, with "Paid after the end of the month." |
 | C30 | A Customer with an interest posting | Account page activity | The row is labelled "Interest" with its period, and shows Gross, "Tax withheld (<kind label> <rate> %)" and the net amount. A hand-entered `Interest` on an External account keeps today's row. |
+
+---
+
+## Amendment 2026-11-22 (corporate actions) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions](../features/corporate-actions.md). The Customer Portal reads the transaction item's `corporateAction`. The Customer Portal BFF does not change: it already proxies `/transactions`.
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| C31 | A Customer with an entitlement posting | Account page activity | The row is labelled "Share split 2 for 1", "Share consolidation 1 for 10" or "Bonus issue 1 for 5", with "<quantityBefore> → <quantityAfter> shares" and "Ex-date <exDate>". No cash amount. A hand-entered `Split` on an External account keeps today's row. |

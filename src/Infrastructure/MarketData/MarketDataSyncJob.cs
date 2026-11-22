@@ -2,21 +2,22 @@ using Hangfire;
 using Hangfire.Storage;
 using Microsoft.Extensions.Logging;
 using MyWealthV2.Application.MarketData;
-using MyWealthV2.Domain.Enums;
 using MyWealthV2.Infrastructure.BankFeed;
 
 namespace MyWealthV2.Infrastructure.MarketData;
 
-/// <summary>A run whose price read failed (docs/features/simulated-instruments.md R8).</summary>
-public sealed class MarketDataSyncFailedException(string connection, MarketDataFailure failure)
-    : Exception($"Market price read failed for connection {connection}: {failure}.");
+/// <summary>A run that failed (docs/features/simulated-instruments.md R8, corporate-actions R8, R25): the announcement
+/// pull or the price read failed, or an item was left for the next run.</summary>
+public sealed class MarketDataSyncFailedException(string connection, string reason)
+    : Exception($"Market data run failed for connection {connection}: {reason}.");
 
 /// <summary>
-/// One run of <c>market-data-sync:{connection}</c> (simulated-instruments R7, R8): read the connection's prices and
-/// store them. One run of a connection at a time; no automatic retries, the schedule is the retry (ADR 0021 rule 15).
+/// One run of <c>market-data-sync:{connection}</c> (simulated-instruments R7, R8; corporate-actions R8): pull, process and
+/// apply the connection's corporate actions, then read and store its prices. One run of a connection at a time; no
+/// automatic retries, the schedule is the retry (ADR 0021 rule 15).
 /// </summary>
 public sealed class MarketDataSyncJob(
-    SyncMarketPrices sync,
+    SyncMarketDataConnection sync,
     SqlRunLock runLock,
     ILogger<MarketDataSyncJob> logger)
 {
@@ -33,10 +34,15 @@ public sealed class MarketDataSyncJob(
         }
 
         var outcome = await sync.RunAsync(connection, cancellationToken);
-        if (outcome.Failure is { } failure)
+        if (outcome.Failed)
         {
             // R8: reported to Hangfire as failed; the next scheduled run is the retry.
-            throw new MarketDataSyncFailedException(connection, failure);
+            var reason = outcome.Pull.Failure is { } pullFailure
+                ? $"corporate action read {pullFailure}, price read skipped"
+                : outcome.Prices?.Failure is { } priceFailure
+                    ? $"price read {priceFailure}"
+                    : "corporate action items left for the next run";
+            throw new MarketDataSyncFailedException(connection, reason);
         }
     }
 }

@@ -4,5 +4,8 @@ namespace MyWealthV2.Domain.Enums;
 /// (docs/features/simulated-instruments.md §5, §6.1).</summary>
 public enum MarketDataFeedKind
 {
-    Prices = 0
+    Prices = 0,
+
+    /// <summary>Corporate action announcements, read after a cursor (corporate-actions R7).</summary>
+    CorporateActions = 1
 }

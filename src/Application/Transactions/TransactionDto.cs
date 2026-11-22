@@ -46,6 +46,32 @@ public sealed class TransactionDto
 
     /// <summary>The period an interest posting pays, on the posting and its Reversal; otherwise null (interest-run R34).</summary>
     public TransactionInterestDto? Interest { get; init; }
+
+    /// <summary>The event behind an entitlement posting, on the posting and its Reversal; otherwise null
+    /// (corporate-actions R37).</summary>
+    public TransactionCorporateActionDto? CorporateAction { get; init; }
+}
+
+/// <summary>An entitlement posting's corporate action detail (corporate-actions R27, R37).</summary>
+public sealed class TransactionCorporateActionDto
+{
+    public required Guid Id { get; init; }
+
+    public required string Kind { get; init; }
+
+    public required int RatioNew { get; init; }
+
+    public required int RatioHeld { get; init; }
+
+    public required string ExDate { get; init; }
+
+    public string? RecordDate { get; init; }
+
+    public string? PaymentDate { get; init; }
+
+    public required decimal QuantityBefore { get; init; }
+
+    public required decimal QuantityAfter { get; init; }
 }
 
 /// <summary>An interest posting's interest detail (interest-run R26, R34).</summary>

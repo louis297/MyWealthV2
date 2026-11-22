@@ -1,3 +1,5 @@
+using MyWealthV2.Infrastructure.CorporateActions;
+using MyWealthV2.Application.CorporateActions;
 using MyWealthV2.Infrastructure.BankReconciliations;
 using MyWealthV2.Application.BankReconciliations;
 using Hangfire;
@@ -143,6 +145,13 @@ public static class DependencyInjection
         builder.Services.AddSingleton<IMarketPricesAdapter, SimulatorMarketPrices>();
         builder.Services.AddScoped<IMarketPrices, MarketPricesDispatcher>();
         builder.Services.AddScoped<SyncMarketPrices>();
+        builder.Services.AddScoped<ApplyCorporateActions>();
+        builder.Services.AddScoped<ICorporateActionFeed, CorporateActionFeedDispatcher>();
+        builder.Services.AddScoped<PullCorporateActions>();
+        builder.Services.AddScoped<ProcessCorporateActionAnnouncements>();
+        builder.Services.AddHttpClient(SimulatorCorporateActionFeed.HttpClientName);
+        builder.Services.AddSingleton<ICorporateActionFeedAdapter, SimulatorCorporateActionFeed>();
+        builder.Services.AddScoped<SyncMarketDataConnection>();
         if (host == MarketDataHost.Worker)
         {
             builder.Services.TryAddSingleton(sp =>
@@ -152,6 +161,7 @@ public static class DependencyInjection
                 return new SqlRunLock(connectionString);
             });
             builder.Services.AddScoped<MarketDataSyncJob>();
+            builder.Services.AddScoped<CorporateActionApplyJob>();
         }
     }
 

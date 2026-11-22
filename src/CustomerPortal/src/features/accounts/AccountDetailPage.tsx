@@ -20,7 +20,19 @@ const typeLabels: Record<string, string> = {
   Adjustment: "Adjustment",
 };
 
+const corporateActionKinds: Record<string, string> = {
+  Split: "Share split",
+  Consolidation: "Share consolidation",
+  Bonus: "Bonus issue",
+};
+
 function typeLabel(row: Activity) {
+  // C31: an entitlement posting reads as its corporate action; a hand Split on an External account keeps its label.
+  if (row.corporateAction) {
+    const { kind, ratioNew, ratioHeld } = row.corporateAction;
+    return `${corporateActionKinds[kind] ?? kind} ${ratioNew} for ${ratioHeld}`;
+  }
+
   // C21: a deposit from the bank statement is a TransferIn with a bank receipt; its Reversal stays "Reversal".
   if (row.type === "TransferIn" && row.bankReceipt) {
     return "Deposit";
@@ -286,6 +298,14 @@ export function AccountDetailPage() {
                         ) : null}
                         {row.interest ? (
                           <p className="text-muted-foreground text-xs">{`${row.interest.periodFrom} to ${row.interest.periodTo}`}</p>
+                        ) : null}
+                        {row.corporateAction ? (
+                          <>
+                            <p className="text-muted-foreground text-xs">
+                              {`${row.corporateAction.quantityBefore} → ${row.corporateAction.quantityAfter} shares`}
+                            </p>
+                            <p className="text-muted-foreground text-xs">{`Ex-date ${row.corporateAction.exDate}`}</p>
+                          </>
                         ) : null}
                         {/* C18: an adjustment shows its memo, which the TenantAdmin wrote for the customer; not its reason. */}
                         {row.type === "Adjustment" && row.memo ? (

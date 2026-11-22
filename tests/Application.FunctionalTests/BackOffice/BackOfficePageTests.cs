@@ -333,9 +333,9 @@ public class BackOfficePageTests
         var at = new DateTimeOffset(2026, 11, 22, 3, 15, 0, TimeSpan.Zero);
         _api.MarketDataConnections =
         [
-            new("alpha", "Simulator", ".ALP", null),
-            new("beta", "Simulator", ".BET", new MarketDataFeed(at, null, null)),
-            new("gamma", "Simulator", ".GAM", new MarketDataFeed(at, at.AddMinutes(5), "Unavailable"))
+            new("alpha", "Simulator", ".ALP", null, null),
+            new("beta", "Simulator", ".BET", new MarketDataFeed(at, null, null), null),
+            new("gamma", "Simulator", ".GAM", new MarketDataFeed(at, at.AddMinutes(5), "Unavailable"), null)
         ];
 
         try
@@ -356,6 +356,92 @@ public class BackOfficePageTests
         }
     }
 
+    /// <summary>Corporate actions BO24: the state of each connection's corporate action feed.</summary>
+    [Test]
+    public async Task MarketData_ShowsTheCorporateActionFeedOfEachConnection()
+    {
+        var at = new DateTimeOffset(2026, 11, 22, 3, 15, 0, TimeSpan.Zero);
+        _api.MarketDataConnections =
+        [
+            new("alpha", "Simulator", ".ALP", null, null),
+            new("beta", "Simulator", ".BET", new MarketDataFeed(at, null, null), new MarketDataFeed(at, at.AddMinutes(5), "InvalidItem"))
+        ];
+
+        try
+        {
+            var body = await GetAsync("/market-data");
+
+            body.ShouldContain(">Corporate actions<");
+            body.ShouldContain("Failing since 2026-11-22 03:20 UTC: The party sent a record that cannot be read");
+        }
+        finally
+        {
+            _api.MarketDataConnections = [];
+        }
+    }
+
+    /// <summary>Corporate actions BO25: the newest twenty announcements, with a status filter; an announcement skipped as
+    /// AlreadyEffective is shown in red.</summary>
+    [Test]
+    public async Task MarketData_ListsTheNewestAnnouncements_WithTheirLabels_AndFiltersByStatus()
+    {
+        var at = new DateTimeOffset(2026, 11, 22, 3, 15, 0, TimeSpan.Zero);
+        _api.MarketDataConnections = [new("simulator", "Simulator", ".SIM", null, null)];
+        _api.Announcements =
+        [
+            Announcement("w-CA2-V2", null, "Skipped", "UnsupportedKind", at.AddMinutes(2)),
+            Announcement("w-CA1-V3", "Split", "Skipped", "AlreadyEffective", at.AddMinutes(1), partyStatus: "Cancelled"),
+            Announcement("w-CA1-V1", "Bonus", "Processed", null, at, ratioNew: 1, ratioHeld: 5)
+        ];
+        var before = _api.AnnouncementStatuses.Count;
+
+        try
+        {
+            var body = await GetAsync("/market-data");
+
+            body.ShouldContain("Announcements");
+            body.ShouldContain("2026-11-22 03:17 UTC");
+            body.ShouldContain("Unknown");
+            body.ShouldContain("Kind not supported");
+            body.ShouldContain("Already applied");
+            body.ShouldContain("1 for 5");
+            body.ShouldContain(">Cancelled<");
+            body.ShouldContain(">Processed<");
+            body.ShouldContain("ACME.SIM");
+            body.ShouldContain("announcement-needs-person");
+            _api.AnnouncementStatuses.Skip(before).ShouldBe([null]);
+
+            var skipped = await GetAsync("/market-data?status=Skipped");
+            skipped.ShouldContain("href=\"/market-data?status=Processed\"");
+            _api.AnnouncementStatuses.Last().ShouldBe("Skipped");
+        }
+        finally
+        {
+            _api.MarketDataConnections = [];
+            _api.Announcements = [];
+        }
+    }
+
+    [TestCase("UnsupportedKind", "Kind not supported")]
+    [TestCase("Invalid", "Not valid")]
+    [TestCase("NoInstrument", "No firm lists this instrument")]
+    [TestCase("AlreadyEffective", "Already applied")]
+    [TestCase("Superseded", "An older version")]
+    public void AnnouncementReason_LabelsEveryReason(string reason, string label) =>
+        BackOfficeHost::MyWealthV2.BackOffice.Components.Pages.AnnouncementText.Reason(reason).ShouldBe(label);
+
+    private static CorporateActionAnnouncementItem Announcement(
+        string outsideId,
+        string? kind,
+        string status,
+        string? skipReason,
+        DateTimeOffset receivedAt,
+        string partyStatus = "Announced",
+        int ratioNew = 2,
+        int ratioHeld = 1) =>
+        new(Guid.NewGuid(), "simulator", outsideId, outsideId[..5], 1, partyStatus, "ACME.SIM", "USD", kind, ratioNew, ratioHeld,
+            new DateOnly(2026, 11, 24), null, null, receivedAt, status, skipReason, status == "Received" ? null : receivedAt);
+
     [Test]
     public async Task MarketData_WithNoConnection_SaysEveryInstrumentIsPricedByEodhd()
     {
@@ -375,6 +461,7 @@ public class BackOfficePageTests
     [TestCase("Unauthorized", "Market data source refused the key")]
     [TestCase("Unavailable", "Market data source unavailable")]
     [TestCase("BadResponse", "Market data answer not understood")]
+    [TestCase("InvalidItem", "The party sent a record that cannot be read")]
     public void MarketDataStatus_LabelsEveryFailure(string failure, string label)
     {
         var at = new DateTimeOffset(2026, 11, 22, 3, 15, 0, TimeSpan.Zero);
@@ -743,6 +830,19 @@ public class BackOfficePageTests
         public List<BankConnectionItem> BankConnections { get; set; } = [new("simulator", "Simulator")];
 
         public List<MarketDataConnectionItem> MarketDataConnections { get; set; } = [];
+
+        public List<CorporateActionAnnouncementItem> Announcements { get; set; } = [];
+
+        public List<string?> AnnouncementStatuses { get; } = [];
+
+        public Task<IReadOnlyList<CorporateActionAnnouncementItem>> ListCorporateActionAnnouncementsAsync(
+            string? status,
+            CancellationToken cancellationToken = default)
+        {
+            AnnouncementStatuses.Add(status);
+            return Task.FromResult<IReadOnlyList<CorporateActionAnnouncementItem>>(
+                Announcements.Where(item => status is null || item.Status == status).ToList());
+        }
 
         public Task<IReadOnlyList<MarketDataConnectionItem>> ListMarketDataConnectionsAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<MarketDataConnectionItem>>(MarketDataConnections);

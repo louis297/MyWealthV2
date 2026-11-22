@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Messages } from "@/components/portal";
 import { Button } from "@/components/ui/button";
+import { kindLabel, ratioText } from "@/features/corporateActions/corporateActionText";
 import { roles } from "@/features/session/roles";
 import { useReverseTransactionMutation } from "@/features/transactions/transactionsApi";
 
@@ -43,8 +44,16 @@ export function adjustmentReasonLabel(reason: string) {
 /** D31: the sentence for a 403 from reverse, which only an adjustment returns. */
 export const adjustmentReverseForbidden = "Only a firm administrator can reverse an adjustment.";
 
-/** D57: the type of a transaction; the remainder write-off of an account closure reads as rounding. */
-export function transactionTypeLabel(item: { type: string; source?: { kind: string } | null }) {
+/** D57: the type of a transaction; the remainder write-off of an account closure reads as rounding. D68: an
+ * entitlement posting reads as its corporate action, for example "Share split 2 for 1". */
+export function transactionTypeLabel(item: {
+  type: string;
+  source?: { kind: string } | null;
+  corporateAction?: { kind: string; ratioNew: number; ratioHeld: number } | null;
+}) {
+  if (item.corporateAction) {
+    return `${kindLabel(item.corporateAction.kind)} ${ratioText(item.corporateAction)}`;
+  }
   return item.type === "CloseOut" && item.source?.kind === "AccountClosure" ? "Close out (rounding)" : item.type;
 }
 
@@ -65,6 +74,8 @@ export function sourceLabel(kind: string | undefined) {
       return "Account closure";
     case "InterestRun":
       return "Interest run";
+    case "CorporateAction":
+      return "Corporate action";
     default:
       return kind;
   }

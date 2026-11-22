@@ -63,6 +63,9 @@ public class Transaction : BaseAuditableEntity
     /// <summary>The period an interest posting pays, on the posting and its Reversal (interest-run R26).</summary>
     public TransactionInterestDetail? InterestDetail { get; private set; }
 
+    /// <summary>The event behind an entitlement posting, on the posting and its Reversal (corporate-actions R27).</summary>
+    public TransactionCorporateActionDetail? CorporateActionDetail { get; private set; }
+
     /// <summary>The memo every interest posting carries (interest-run R23).</summary>
     public const string InterestMemo = "Interest";
 
@@ -118,6 +121,69 @@ public class Transaction : BaseAuditableEntity
             CashLegs = cashLegs,
             TaxDetails = taxDetails,
             InterestDetail = TransactionInterestDetail.Create(tenantId, period, accrued, gross)
+        };
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
+    }
+
+    /// <summary>
+    /// Corporate-actions R26, R27: an entitlement posting. Type <c>Split</c> for a split or a consolidation, <c>Bonus</c>
+    /// for a bonus; one security leg on the Account of <c>quantityAfter − quantityBefore</c> with cost 0 in the quote
+    /// currency; no cash leg; source <c>CorporateAction</c>; memo <c>Split 2 for 1</c>; a corporate action detail.
+    /// Built without the manual entry matrix (custody-modes R7). The holding's total cost does not change (R29).
+    /// </summary>
+    public static Transaction PostCorporateAction(
+        int tenantId,
+        int accountId,
+        int instrumentId,
+        string quoteCurrency,
+        CorporateActionKind kind,
+        CorporateActions.CorporateActionRatio ratio,
+        DateOnly exDate,
+        DateOnly? recordDate,
+        DateOnly? paymentDate,
+        decimal quantityBefore,
+        decimal quantityAfter,
+        DateTimeOffset bookedAt,
+        TransactionSource source)
+    {
+        if (source.Kind != TransactionSourceKind.CorporateAction)
+        {
+            throw new DomainException("An entitlement posting comes from a corporate action.");
+        }
+
+        if (!ratio.IsValidFor(kind))
+        {
+            throw new DomainException($"A ratio of {ratio.Text} does not fit a {kind}.");
+        }
+
+        if (quantityBefore <= 0m)
+        {
+            throw new DomainException("A holding must already exist.");
+        }
+
+        if (quantityAfter <= 0m || quantityAfter == quantityBefore)
+        {
+            throw new DomainException("The quantity after must be above 0 and differ from the quantity before.");
+        }
+
+        var currency = Money.Create(0m, quoteCurrency).Currency;
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            Type = kind == CorporateActionKind.Bonus ? TransactionType.Bonus : TransactionType.Split,
+            BookedAt = bookedAt.ToUniversalTime(),
+            Memo = $"{kind} {ratio.Text}",
+            Reference = null,
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
+            PublicId = Guid.NewGuid(),
+            SecurityLegs =
+            [
+                TransactionSecurityLeg.Create(tenantId, accountId, instrumentId, quantityAfter - quantityBefore, 0m, currency)
+            ],
+            CorporateActionDetail = TransactionCorporateActionDetail.Create(
+                tenantId, kind, ratio, exDate, recordDate, paymentDate, quantityBefore, quantityAfter)
         };
         transaction.AddDomainEvent(new TransactionPosted(transaction));
         return transaction;
@@ -1062,7 +1128,8 @@ public class Transaction : BaseAuditableEntity
             PaymentDetail = PaymentDetail?.Copy(),
             FeeDetails = cashLegs.Select(leg => leg.FeeDetail).OfType<TransactionFeeDetail>().ToList(),
             TaxDetails = cashLegs.Select(leg => leg.TaxDetail).OfType<TransactionTaxDetail>().ToList(),
-            InterestDetail = InterestDetail?.Copy()
+            InterestDetail = InterestDetail?.Copy(),
+            CorporateActionDetail = CorporateActionDetail?.Copy()
         };
         ReversedBy = reversal;
         reversal.AddDomainEvent(new TransactionReversed(reversal));

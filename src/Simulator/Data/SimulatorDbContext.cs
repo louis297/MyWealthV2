@@ -27,6 +27,10 @@ public sealed class SimulatorDbContext(DbContextOptions<SimulatorDbContext> opti
 
     public DbSet<MarketPrice> MarketPrices => Set<MarketPrice>();
 
+    public DbSet<MarketCorporateAction> MarketCorporateActions => Set<MarketCorporateAction>();
+
+    public DbSet<MarketCorporateActionVersion> MarketCorporateActionVersions => Set<MarketCorporateActionVersion>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<World>(world =>
@@ -101,6 +105,26 @@ public sealed class SimulatorDbContext(DbContextOptions<SimulatorDbContext> opti
             price.ToTable("MarketPrices");
             price.HasKey(row => new { row.InstrumentId, row.PriceDate });
             price.Property(row => row.Price).HasColumnType("decimal(18,4)");
+        });
+
+        modelBuilder.Entity<MarketCorporateAction>(action =>
+        {
+            action.ToTable("MarketCorporateActions");
+            action.HasKey(row => row.Id);
+            action.Property(row => row.ExDate).HasColumnType("date");
+            action.Property(row => row.RecordDate).HasColumnType("date");
+            action.Property(row => row.PaymentDate).HasColumnType("date");
+            action.Property(row => row.RowVersion).IsRowVersion();
+            action.HasMany(row => row.Versions).WithOne().HasForeignKey(version => version.ActionId);
+        });
+
+        modelBuilder.Entity<MarketCorporateActionVersion>(version =>
+        {
+            version.ToTable("MarketCorporateActionVersions");
+            version.HasKey(row => row.Id);
+            version.Property(row => row.ExDate).HasColumnType("date");
+            version.Property(row => row.RecordDate).HasColumnType("date");
+            version.Property(row => row.PaymentDate).HasColumnType("date");
         });
 
         modelBuilder.Entity<BankFeedPlace>(place =>

@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.CorporateActions;
 using MyWealthV2.Application.MarketData;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.MarketData;
@@ -104,7 +105,8 @@ public class MarketDataSyncJobTests
 
             prices.Calls.ShouldBe(2);
             await using var db = OpenDb();
-            var feed = await db.MarketDataFeeds.AsNoTracking().SingleAsync(row => row.Connection == Connection);
+            var feed = await db.MarketDataFeeds.AsNoTracking()
+                .SingleAsync(row => row.Connection == Connection && row.Kind == MarketDataFeedKind.Prices);
             feed.LastSucceededAt.ShouldNotBeNull();
             feed.LastFailure.ShouldBe(MarketDataFailure.Unavailable);
         }
@@ -145,6 +147,33 @@ public class MarketDataSyncJobTests
         }
     }
 
+    [Test]
+    public async Task Run_WhoseCorporateActionReadFails_SkipsThePriceRead_AndFailsTheRun()
+    {
+        var prices = new ScriptedPrices();
+        var feed = new ScriptedFeed { FailWith = MarketDataFailure.Unreachable };
+        using var host = await WorkerHostAsync(prices, feed);
+
+        try
+        {
+            using (var scope = host.Services.CreateScope())
+            {
+                await Should.ThrowAsync<MarketDataSyncFailedException>(() =>
+                    scope.ServiceProvider.GetRequiredService<MarketDataSyncJob>().Run(Connection, CancellationToken.None));
+            }
+
+            (feed.Calls, prices.Calls).ShouldBe((1, 0));
+            await using var db = OpenDb();
+            var state = await db.MarketDataFeeds.AsNoTracking()
+                .SingleAsync(row => row.Connection == Connection && row.Kind == MarketDataFeedKind.CorporateActions);
+            state.LastFailure.ShouldBe(MarketDataFailure.Unreachable);
+        }
+        finally
+        {
+            await CleanupAsync();
+        }
+    }
+
     private static MarketDataConnectionSettings Settings(string name, string suffix, int pollMinutes) =>
         new(name, "Simulator", suffix, new Uri("http://simulator:8082"), "key", 10, pollMinutes);
 
@@ -155,7 +184,7 @@ public class MarketDataSyncJobTests
         return builder.Build();
     }
 
-    private static async Task<IHost> WorkerHostAsync(IMarketPrices prices)
+    private static async Task<IHost> WorkerHostAsync(IMarketPrices prices, ICorporateActionFeed? feed = null)
     {
         var builder = Host.CreateApplicationBuilder();
         builder.Configuration[$"ConnectionStrings:{Services.Database}"] = SchemaDatabaseSetup.ConnectionString;
@@ -169,6 +198,8 @@ public class MarketDataSyncJobTests
         builder.Services.AddSingleton(configured.Connections);
         builder.Services.RemoveAll<IMarketPrices>();
         builder.Services.AddSingleton(prices);
+        builder.Services.RemoveAll<ICorporateActionFeed>();
+        builder.Services.AddSingleton(feed ?? new ScriptedFeed());
         var host = builder.Build();
         await host.Services.GetRequiredService<ICurrencyCatalog>().ReloadAsync(CancellationToken.None);
         return host;
@@ -180,6 +211,7 @@ public class MarketDataSyncJobTests
     private static async Task CleanupAsync()
     {
         await using var db = OpenDb();
+        await db.Database.ExecuteSqlRawAsync("DELETE FROM [CorporateActionAnnouncements] WHERE [Connection] = {0}", Connection);
         await db.Database.ExecuteSqlRawAsync("DELETE FROM [MarketDataFeeds] WHERE [Connection] = {0}", Connection);
     }
 
@@ -196,6 +228,26 @@ public class MarketDataSyncJobTests
             return Task.FromResult(FailWith is { } failure
                 ? MarketPricesResult.Failed(failure)
                 : MarketPricesResult.Succeeded([]));
+        }
+    }
+
+    /// <summary>A party with no announcements, or that fails while <see cref="FailWith"/> is set.</summary>
+    private sealed class ScriptedFeed : ICorporateActionFeed
+    {
+        public int Calls { get; private set; }
+
+        public MarketDataFailure? FailWith { get; set; }
+
+        public Task<CorporateActionFeedResult> GetAnnouncementsAsync(
+            string connection,
+            string? cursor,
+            int limit,
+            CancellationToken cancellationToken)
+        {
+            Calls++;
+            return Task.FromResult(FailWith is { } failure
+                ? CorporateActionFeedResult.Failed(failure)
+                : CorporateActionFeedResult.Succeeded(new CorporateActionFeedPage([], cursor, false)));
         }
     }
 }

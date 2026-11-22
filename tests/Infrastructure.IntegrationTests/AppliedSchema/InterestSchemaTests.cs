@@ -202,7 +202,7 @@ public class InterestSchemaTests
     }
 
     [Test]
-    public async Task SourceKind6_NeedsASourcePublicId_And7Violates()
+    public async Task SourceKind6_NeedsASourcePublicId()
     {
         (await RunAsync($"""
             {World()}
@@ -217,12 +217,7 @@ public class InterestSchemaTests
         noId.Number.ShouldBe(547);
         noId.Message.ShouldContain("CK_Transactions_SourcePublicId");
 
-        var seven = await Should.ThrowAsync<SqlException>(() => RunAsync($"""
-            {World()}
-            {InsertTransaction(7, "NEWID()")}
-            """));
-        seven.Number.ShouldBe(547);
-        seven.Message.ShouldContain("CK_Transactions_SourceKind");
+        // Kind 7 (CorporateAction) and the upper bound are covered by CorporateActionsSchemaTests (script 0050).
     }
 
     [Test]

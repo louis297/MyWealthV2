@@ -97,3 +97,13 @@ export function canReadInterestRuns(role: string | null | undefined) {
 export function canAccessWithdrawals(role: string | null | undefined) {
   return role === roles.tenantAdmin || role === roles.adviser;
 }
+
+/** corporate-actions.read: the Corporate actions pages (D64, D65). */
+export function canAccessCorporateActions(role: string | null | undefined) {
+  return role === roles.tenantAdmin || role === roles.adviser;
+}
+
+/** corporate-actions.manage: enter, change, cancel and apply a corporate action (D66, D67). */
+export function canManageCorporateActions(role: string | null | undefined) {
+  return role === roles.tenantAdmin;
+}

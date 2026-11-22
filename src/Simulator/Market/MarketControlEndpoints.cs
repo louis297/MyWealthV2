@@ -18,6 +18,7 @@ public static class MarketControlEndpoints
         market.MapPost("/instruments/{symbol}/price", SetPriceAsync);
         market.MapPost("/instruments/{symbol}/daily-move", SetDailyMoveAsync);
         market.MapGet("/instruments/{symbol}/prices", GetPricesAsync);
+        market.MapMarketCorporateActionEndpoints();
         return control;
     }
 
@@ -205,7 +206,7 @@ public static class MarketControlEndpoints
         return Results.Ok(MarketInstrumentItem.From(instrument));
     }
 
-    private static void Log(SimulatorDbContext db, HttpContext http, World world, DateTimeOffset realNow, string action, object body) =>
+    internal static void Log(SimulatorDbContext db, HttpContext http, World world, DateTimeOffset realNow, string action, object body) =>
         db.ControlLog.Add(ControlLogEntry.Create(
             realNow,
             world.Now(realNow),

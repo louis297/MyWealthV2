@@ -59,6 +59,20 @@ internal static class TransactionLegReader
             .Where(detail => transactionIds.Contains(detail.TransactionId))
             .ToListAsync(cancellationToken);
 
+        var corporateActionRows = await (
+            from detail in db.TransactionCorporateActionDetails.AsNoTracking()
+            join transaction in db.Transactions.AsNoTracking() on detail.TransactionId equals transaction.Id
+            join original in db.Transactions.AsNoTracking() on transaction.OriginalTransactionId equals original.Id into originals
+            from original in originals.DefaultIfEmpty()
+            where transactionIds.Contains(detail.TransactionId)
+            select new
+            {
+                detail,
+                ActionId = transaction.SourceKind == Domain.Enums.TransactionSourceKind.CorporateAction
+                    ? transaction.SourcePublicId
+                    : original == null ? null : original.SourcePublicId
+            }).ToListAsync(cancellationToken);
+
         var securityRows = await (
             from leg in db.TransactionSecurityLegs.AsNoTracking()
             join account in db.Accounts.AsNoTracking() on leg.AccountId equals account.Id
@@ -190,6 +204,20 @@ internal static class TransactionLegReader
                     Days = row.Days,
                     AccruedAmount = row.AccruedAmount,
                     GrossAmount = row.GrossAmount
+                }),
+            corporateActionRows.ToDictionary(
+                row => row.detail.TransactionId,
+                row => new TransactionCorporateActionDto
+                {
+                    Id = row.ActionId ?? Guid.Empty,
+                    Kind = row.detail.Kind.ToString(),
+                    RatioNew = row.detail.RatioNew,
+                    RatioHeld = row.detail.RatioHeld,
+                    ExDate = row.detail.ExDate.ToString("yyyy-MM-dd"),
+                    RecordDate = row.detail.RecordDate?.ToString("yyyy-MM-dd"),
+                    PaymentDate = row.detail.PaymentDate?.ToString("yyyy-MM-dd"),
+                    QuantityBefore = row.detail.QuantityBefore,
+                    QuantityAfter = row.detail.QuantityAfter
                 }));
     }
 }
@@ -201,4 +229,5 @@ internal sealed record TransactionLegs(
     IReadOnlyDictionary<int, TransactionAdjustmentDto> Adjustment,
     IReadOnlyDictionary<int, TransactionBankReceiptDto> BankReceipt,
     IReadOnlyDictionary<int, TransactionPaymentDto> Payment,
-    IReadOnlyDictionary<int, TransactionInterestDto> Interest);
+    IReadOnlyDictionary<int, TransactionInterestDto> Interest,
+    IReadOnlyDictionary<int, TransactionCorporateActionDto> CorporateAction);
