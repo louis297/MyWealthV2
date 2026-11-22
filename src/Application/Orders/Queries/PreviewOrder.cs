@@ -1,5 +1,12 @@
 using System.Text.Json;
+using MyWealthV2.Application.Accounts;
+using MyWealthV2.Application.Broker;
+using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
+using MyWealthV2.Application.MarketData;
+using MyWealthV2.Application.Orders.Commands;
+using MyWealthV2.Domain.Enums;
+using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 
 namespace MyWealthV2.Application.Orders.Queries;
 
@@ -43,8 +50,49 @@ public sealed record OrderPreviewDto(
     decimal AvailableCash,
     decimal? AvailableQuantity);
 
-public class PreviewOrderQueryHandler : IRequestHandler<PreviewOrderQuery, OrderPreviewDto>
+public class PreviewOrderQueryValidator : AbstractValidator<PreviewOrderQuery>
 {
-    public Task<OrderPreviewDto> Handle(PreviewOrderQuery request, CancellationToken cancellationToken) =>
-        throw new NotImplementedException();
+    public PreviewOrderQueryValidator()
+    {
+        RuleFor(query => query.AccountId).NotEmpty();
+        RuleFor(query => query.InstrumentId).NotEmpty();
+        RuleFor(query => query.Side).Must(OrderBodyRules.IsSide).WithMessage(OrderBodyRules.SideMessage);
+        RuleFor(query => query.Quantity).Must(OrderBodyRules.IsQuantity).WithMessage(OrderBodyRules.QuantityMessage);
+        RuleFor(query => query.Type)
+            .Must(type => OrderBodyRules.IsOnly(type, nameof(OrderType.Market))).WithMessage("Type must be Market.");
+        RuleFor(query => query.TimeInForce)
+            .Must(timeInForce => OrderBodyRules.IsOnly(timeInForce, nameof(Domain.Enums.TimeInForce.Day)))
+            .WithMessage("TimeInForce must be Day.");
+        RuleFor(query => query.TenantId).Must(OrderBodyRules.IsAbsent).WithMessage("TenantId cannot be set.");
+    }
+}
+
+public class PreviewOrderQueryHandler(
+    IApplicationDbContext db,
+    ICurrentUser currentUser,
+    ICurrencyCatalog currencies,
+    IBrokerConnections connections,
+    IMarketData marketData,
+    IInstrumentPriceStore prices,
+    TimeProvider time) : IRequestHandler<PreviewOrderQuery, OrderPreviewDto>
+{
+    public async Task<OrderPreviewDto> Handle(PreviewOrderQuery request, CancellationToken cancellationToken)
+    {
+        // R1, R7: the Account is in scope, or the preview is 404.
+        var accountId = await AccountScope.ManagedAccounts(db, currentUser).AsNoTracking()
+                            .Where(row => row.PublicId == request.AccountId)
+                            .Select(row => (int?)row.Id)
+                            .SingleOrDefaultAsync(cancellationToken)
+                        ?? throw new NotFoundException("Account", request.AccountId!.Value);
+
+        var quote = await OrderChecks.RunAsync(
+            new OrderCheckServices(db, currencies, connections, marketData, prices),
+            accountId, request.InstrumentId!.Value, OrderBodyRules.Side(request.Side!), request.Quantity!.Value,
+            time.GetUtcNow(), cancellationToken);
+
+        return new OrderPreviewDto(
+            quote.Currency, quote.ReferencePrice, quote.ReferencePriceDate, quote.PriceLimit, quote.EstimatedGross,
+            quote.EstimatedFee, quote.MaximumGross, quote.MaximumFee, quote.MaximumCost, quote.AvailableCash,
+            quote.AvailableQuantity);
+    }
 }
