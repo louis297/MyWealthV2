@@ -61,6 +61,62 @@ internal static class BrokerHttp
         response.StatusCode.ShouldBe(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
     }
 
+    public static Task<HttpResponseMessage> SetSettlementDaysAsync(HttpClient control, int? settlementDays) =>
+        control.PostJsonAsync("/control/broker/settlement-days", JsonSerializer.Serialize(new { settlementDays }));
+
+    public static async Task SetSettlementDaysOkAsync(HttpClient control, int settlementDays)
+    {
+        var response = await SetSettlementDaysAsync(control, settlementDays);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+    }
+
+    /// <summary>The operator fills a working order (R58); a null field takes its default.</summary>
+    public static Task<HttpResponseMessage> FillAsync(HttpClient control, string brokerOrderId, decimal? quantity = null, decimal? price = null) =>
+        control.PostJsonAsync($"/control/broker/orders/{brokerOrderId}/fill", JsonSerializer.Serialize(new { quantity, price }));
+
+    /// <summary>The operator cancels a working order (R58).</summary>
+    public static Task<HttpResponseMessage> CancelAsync(HttpClient control, string brokerOrderId, string? reason = null) =>
+        control.PostJsonAsync($"/control/broker/orders/{brokerOrderId}/cancel", JsonSerializer.Serialize(new { reason }));
+
+    /// <summary>The platform asks to cancel an order by its client order id (R59).</summary>
+    public static Task<HttpResponseMessage> RequestCancelAsync(HttpClient party, string clientOrderId) =>
+        party.PostAsync($"/party/broker/orders/{clientOrderId}/cancel", null);
+
+    public static async Task<string> RequestCancelOkAsync(HttpClient party, string clientOrderId)
+    {
+        var response = await RequestCancelAsync(party, clientOrderId);
+        var content = await response.Content.ReadAsStringAsync();
+        response.StatusCode.ShouldBe(HttpStatusCode.OK, content);
+        using var json = JsonDocument.Parse(content);
+        json.RootElement.EnumerateObject().Select(property => property.Name).ShouldBe(["status"]);
+        return json.RootElement.GetProperty("status").GetString()!;
+    }
+
+    public static async Task<JsonElement> GetAsync(HttpClient control, string path)
+    {
+        var response = await control.GetAsync(path);
+        var content = await response.Content.ReadAsStringAsync();
+        response.StatusCode.ShouldBe(HttpStatusCode.OK, content);
+        using var json = JsonDocument.Parse(content);
+        return json.RootElement.Clone();
+    }
+
+    /// <summary>Any broker route: it brings the broker's books up to date before it answers (R52).</summary>
+    public static Task<JsonElement> SettingsAsync(HttpClient control) => GetAsync(control, "/control/broker");
+
+    /// <summary>One page of the feed (R63).</summary>
+    public static async Task<(List<JsonElement> Items, string Cursor, bool HasMore)> FeedAsync(HttpClient party, string query = "")
+    {
+        var response = await party.GetAsync("/party/broker/reports" + query);
+        var content = await response.Content.ReadAsStringAsync();
+        response.StatusCode.ShouldBe(HttpStatusCode.OK, content);
+        using var json = JsonDocument.Parse(content);
+        var root = json.RootElement;
+        root.EnumerateObject().Select(property => property.Name).ShouldBe(["items", "cursor", "hasMore"]);
+        return (root.GetProperty("items").EnumerateArray().Select(item => item.Clone()).ToList(),
+            root.GetProperty("cursor").GetString()!, root.GetProperty("hasMore").GetBoolean());
+    }
+
     /// <summary>The broker's orders, oldest first. Status: 0 Working, 1 Filled, 2 Cancelled, 3 Expired, 4 Rejected.</summary>
     public static async Task<List<OrderRow>> OrdersAsync()
     {
