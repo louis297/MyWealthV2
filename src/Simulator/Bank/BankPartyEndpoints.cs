@@ -81,7 +81,8 @@ public static class BankPartyEndpoints
             row.line.Reference,
             row.line.EndToEndId,
             row.ReturnOf,
-            row.line.ReturnReason)).ToList();
+            row.line.ReturnReason,
+            row.line.Kind == BankLine.InterestKind ? "Interest" : null)).ToList();
 
         // The place of the last item; with no item, the request's place in this world (0: before the first place).
         var cursor = BankFeedCursor.Format(world.WorldId, last);
@@ -309,6 +310,8 @@ public sealed record BankFeedItem(
     string? Reference,
     string? EndToEndId,
     string? ReturnOf,
-    string? ReturnReason);
+    string? ReturnReason,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    string? Kind = null);
 
 public sealed record BankFeedResponse(IReadOnlyList<BankFeedItem> Items, string Cursor, bool HasMore, decimal Balance);

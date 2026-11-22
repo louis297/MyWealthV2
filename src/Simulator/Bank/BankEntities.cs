@@ -60,6 +60,16 @@ public sealed class BankLine
     /// <summary>Bank-reconciliation R28: in the bank's books and in the feed order, but never returned by the feed.</summary>
     public bool OmitFromFeed { get; private set; }
 
+    /// <summary>Interest-run R43: <see cref="TransferKind"/> or <see cref="InterestKind"/> (script 0007).</summary>
+    public int Kind { get; private set; }
+
+    public const int TransferKind = 0;
+
+    public const int InterestKind = 1;
+
+    /// <summary>The payer name of the bank's interest line (R43).</summary>
+    public const string BankInterestPayer = "Bank interest";
+
     /// <summary>Withdrawals R53: the instruction id of the payment that caused a debit line, echoed as sent.</summary>
     public string? EndToEndId { get; private set; }
 
@@ -196,6 +206,31 @@ public sealed class BankLine
         PostedAt = postedAt,
         AvailableAt = availableAt,
         OmitFromFeed = omitFromFeed
+    };
+
+    /// <summary>Interest-run R43: interest the bank pays on the account, a credit line of kind Interest from
+    /// <see cref="BankInterestPayer"/> with no payer account and no payment ids.</summary>
+    public static BankLine Interest(
+        string outsideId,
+        int bankAccountId,
+        decimal amount,
+        DateOnly valueDate,
+        string reference,
+        DateTimeOffset postedAt,
+        DateTimeOffset availableAt,
+        bool omitFromFeed) => new()
+    {
+        OutsideId = outsideId,
+        BankAccountId = bankAccountId,
+        Direction = CreditDirection,
+        Amount = amount,
+        ValueDate = valueDate,
+        PayerName = BankInterestPayer,
+        Reference = reference,
+        PostedAt = postedAt,
+        AvailableAt = availableAt,
+        OmitFromFeed = omitFromFeed,
+        Kind = InterestKind
     };
 }
 

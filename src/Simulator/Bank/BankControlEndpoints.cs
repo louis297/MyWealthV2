@@ -18,6 +18,7 @@ public static class BankControlEndpoints
         bank.MapGet("/accounts/{accountNumber}/statement-lines", GetLinesAsync);
         bank.MapPost("/receipts", AddReceiptAsync);
         bank.MapPost("/charges", AddChargeAsync);
+        bank.MapPost("/interest", AddInterestAsync);
         bank.MapPost("/payment-mode", SetPaymentModeAsync);
         bank.MapGet("/payments", GetPaymentsAsync);
         bank.MapPost("/payments/{paymentId}/execute", ExecutePaymentAsync);
@@ -214,6 +215,77 @@ public static class BankControlEndpoints
             body.OmitFromFeed ?? false);
         db.BankLines.Add(line);
         Log(db, http, world, realNow, ControlActions.BankChargeAdded, body);
+        try
+        {
+            await db.SaveChangesAsync(http.RequestAborted);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "The world was changed by another write. Read it again and retry.");
+        }
+
+        return Results.Created($"/control/bank/accounts/{Uri.EscapeDataString(account.AccountNumber)}/statement-lines",
+            new AddedReceipt(line.OutsideId));
+    }
+
+    /// <summary>
+    /// Interest-run R43: interest the bank pays on an open account, as a credit line of kind Interest. The operator types
+    /// the amount; the fields follow a bank charge's rules (bank-reconciliation R27); a 400 writes nothing.
+    /// </summary>
+    private static async Task<IResult> AddInterestAsync(
+        AddInterestRequest body,
+        HttpContext http,
+        SimulatorDbContext db,
+        TimeProvider time)
+    {
+        var number = body.AccountNumber?.Trim() ?? "";
+        var account = number.Length == 0
+            ? null
+            : await db.BankAccounts.AsNoTracking().SingleOrDefaultAsync(row => row.AccountNumber == number, http.RequestAborted);
+        if (account is null)
+        {
+            return ControlEndpoints.Refused("AccountNumber", "accountNumber must be an open account.");
+        }
+
+        if (!BankRules.IsAmount(body.Amount))
+        {
+            return ControlEndpoints.Refused("Amount", "amount must be greater than zero, with at most 4 decimal places.");
+        }
+
+        if (body.Reference?.Length > BankRules.FreeTextMaxLength)
+        {
+            return ControlEndpoints.Refused("Reference", "reference must be at most 140 characters.");
+        }
+
+        var availableAfter = BankRules.AvailableAfter(body.AvailableAfter);
+        if (availableAfter is null)
+        {
+            return ControlEndpoints.Refused("AvailableAfter", "availableAfter must be an ISO 8601 duration from PT0S to P30D.");
+        }
+
+        var world = await db.Worlds.SingleAsync(http.RequestAborted);
+        var realNow = time.GetUtcNow();
+        var simulatorNow = world.Now(realNow);
+        var today = DateOnly.FromDateTime(simulatorNow.UtcDateTime);
+        var valueDate = body.ValueDate ?? today;
+        if (valueDate > today)
+        {
+            return ControlEndpoints.Refused("ValueDate", "valueDate cannot be after the simulator date.");
+        }
+
+        var line = BankLine.Interest(
+            world.TakeLineOutsideId(),
+            account.Id,
+            body.Amount!.Value,
+            valueDate,
+            BankRules.Text(body.Reference) ?? "Interest",
+            simulatorNow,
+            simulatorNow + availableAfter.Value,
+            body.OmitFromFeed ?? false);
+        db.BankLines.Add(line);
+        Log(db, http, world, realNow, ControlActions.BankInterestPaid, body);
         try
         {
             await db.SaveChangesAsync(http.RequestAborted);
@@ -480,7 +552,8 @@ public static class BankControlEndpoints
             line.AvailableAt,
             line.DeliverTwice,
             line.OmitFromFeed,
-            places[line.Id].Order().ToList())).ToList();
+            places[line.Id].Order().ToList(),
+            line.Kind == BankLine.InterestKind ? "Interest" : "Transfer")).ToList();
         return Results.Ok(new BankLineList(items));
     }
 
@@ -521,6 +594,15 @@ public sealed record AddChargeRequest(
     string? AvailableAfter,
     bool? OmitFromFeed);
 
+/// <summary>Interest-run R43: interest the bank pays on a trust account.</summary>
+public sealed record AddInterestRequest(
+    string? AccountNumber,
+    decimal? Amount,
+    string? Reference,
+    DateOnly? ValueDate,
+    string? AvailableAfter,
+    bool? OmitFromFeed);
+
 public sealed record AddedReceipt(string Id);
 
 /// <summary><c>Balance</c> is every line, placed or not (deposit-matching R46); <c>StatementBalance</c> the balance the
@@ -552,7 +634,8 @@ public sealed record BankLineItem(
     DateTimeOffset AvailableAt,
     bool DeliverTwice,
     bool OmitFromFeed,
-    IReadOnlyList<long> Places);
+    IReadOnlyList<long> Places,
+    string Kind = "Transfer");
 
 public sealed record BankLineList(IReadOnlyList<BankLineItem> Items);
 
