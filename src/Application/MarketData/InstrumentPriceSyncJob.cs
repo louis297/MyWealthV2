@@ -16,8 +16,10 @@ public sealed class InstrumentPriceSyncJob(
     {
         try
         {
-            _ = connections;
-            var active = await catalog.ListActiveAsync(cancellationToken);
+            // Simulated instruments R12: an instrument a market data connection serves is priced by it, never here.
+            var active = (await catalog.ListActiveAsync(cancellationToken))
+                .Where(instrument => connections.For(instrument.Symbol) is null)
+                .ToList();
             var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
             if (await store.HasAsOfDateForEveryActiveInstrumentAsync(
                     active.Select(instrument => instrument.Id).ToList(),
