@@ -69,7 +69,8 @@ public class GetTransactionByIdQueryHandler(IApplicationDbContext db, ICurrentUs
             Adjustment = legs.Adjustment.GetValueOrDefault(row.transaction.Id),
             BankReceipt = legs.BankReceipt.GetValueOrDefault(row.transaction.Id),
             Payment = legs.Payment.GetValueOrDefault(row.transaction.Id),
-            Interest = legs.Interest.GetValueOrDefault(row.transaction.Id)
+            Interest = legs.Interest.GetValueOrDefault(row.transaction.Id),
+            CorporateAction = legs.CorporateAction.GetValueOrDefault(row.transaction.Id)
         };
     }
 }

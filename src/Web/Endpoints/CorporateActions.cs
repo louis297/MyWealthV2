@@ -17,6 +17,7 @@ public class CorporateActions : IEndpointGroup
     {
         groupBuilder.MapGet(GetCorporateActions).RequireAuthorization(Policies.CorporateActionsRead);
         groupBuilder.MapGet(GetCorporateAction, "{id:guid}").RequireAuthorization(Policies.CorporateActionsRead);
+        groupBuilder.MapGet(GetCorporateActionEntitlements, "{id:guid}/entitlements").RequireAuthorization(Policies.CorporateActionsRead);
         groupBuilder.MapPost(CreateCorporateAction).RequireAuthorization(Policies.CorporateActionsManage);
         groupBuilder.MapPut(UpdateCorporateAction, "{id:guid}").RequireAuthorization(Policies.CorporateActionsManage);
         groupBuilder.MapPost(CancelCorporateAction, "{id:guid}/cancel").RequireAuthorization(Policies.CorporateActionsManage);
@@ -39,6 +40,16 @@ public class CorporateActions : IEndpointGroup
     [EndpointDescription("Returns one corporate action by PublicId, with the counts of its entitlements.")]
     public static async Task<Ok<CorporateActionDto>> GetCorporateAction(ISender sender, Guid id) =>
         TypedResults.Ok(await sender.Send(new GetCorporateActionByIdQuery(id)));
+
+    [EndpointSummary("List the entitlements of a corporate action")]
+    [EndpointDescription("Returns the entitlements the caller can see, in account order. Filter: status (comma-separated).")]
+    public static async Task<Ok<PagedList<CorporateActionEntitlementDto>>> GetCorporateActionEntitlements(
+        ISender sender,
+        Guid id,
+        int page = 1,
+        int pageSize = 20,
+        string? status = null) =>
+        TypedResults.Ok(await sender.Send(new GetCorporateActionEntitlementsQuery(id, page, pageSize, status)));
 
     [EndpointSummary("Enter a corporate action")]
     [EndpointDescription("Enters a split, consolidation or bonus issue of an instrument no market data connection serves. It is Announced.")]

@@ -98,6 +98,7 @@ internal static class CorporateActionHttp
     {
         yield return (HttpMethod.Get, Root, null);
         yield return (HttpMethod.Get, $"{Root}/{id}", null);
+        yield return (HttpMethod.Get, $"{Root}/{id}/entitlements", null);
         yield return (HttpMethod.Post, Root, CreateBody(instrumentId, exDate: Today.AddDays(30)));
         yield return (HttpMethod.Put, $"{Root}/{id}", UpdateBody(StaleRowVersion));
         yield return (HttpMethod.Post, $"{Root}/{id}/cancel", new { rowVersion = StaleRowVersion, note = "No" });

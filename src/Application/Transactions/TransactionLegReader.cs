@@ -190,7 +190,8 @@ internal static class TransactionLegReader
                     Days = row.Days,
                     AccruedAmount = row.AccruedAmount,
                     GrossAmount = row.GrossAmount
-                }));
+                }),
+            new Dictionary<int, TransactionCorporateActionDto>());
     }
 }
 
@@ -201,4 +202,5 @@ internal sealed record TransactionLegs(
     IReadOnlyDictionary<int, TransactionAdjustmentDto> Adjustment,
     IReadOnlyDictionary<int, TransactionBankReceiptDto> BankReceipt,
     IReadOnlyDictionary<int, TransactionPaymentDto> Payment,
-    IReadOnlyDictionary<int, TransactionInterestDto> Interest);
+    IReadOnlyDictionary<int, TransactionInterestDto> Interest,
+    IReadOnlyDictionary<int, TransactionCorporateActionDto> CorporateAction);
