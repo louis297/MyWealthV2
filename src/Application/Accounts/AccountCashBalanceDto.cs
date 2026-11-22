@@ -7,4 +7,6 @@ public sealed record AccountCashBalanceDto(
     string Currency,
     decimal CashBalance,
     decimal ReservedCash,
-    decimal AvailableCash);
+    decimal AvailableCash,
+    decimal UnsettledCash = 0m,
+    decimal WithdrawableCash = 0m);

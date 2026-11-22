@@ -30,6 +30,14 @@ public sealed class AccountDto
     /// <summary>Cash balance minus reserved cash (withdrawals R35).</summary>
     public required decimal AvailableCash { get; init; }
 
+    /// <summary>The net cash of the Account's posted sell fills that have not settled; 0 on an External account
+    /// (orders R44).</summary>
+    public required decimal UnsettledCash { get; init; }
+
+    /// <summary>Available cash minus unsettled cash, never below 0; the cash balance on an External account
+    /// (orders R44).</summary>
+    public required decimal WithdrawableCash { get; init; }
+
     public required string Status { get; init; }
 
     public required bool IsActive { get; init; }
@@ -65,6 +73,8 @@ public sealed class AccountDto
         CashBalance = cashBalance,
         ReservedCash = reservedCash,
         AvailableCash = Domain.Custody.AvailableCash.Of(cashBalance, reservedCash),
+        UnsettledCash = 0m,
+        WithdrawableCash = 0m,
         Status = account.Status.ToString(),
         IsActive = account.IsActive,
         RowVersion = Convert.ToBase64String(account.RowVersion ?? []),
