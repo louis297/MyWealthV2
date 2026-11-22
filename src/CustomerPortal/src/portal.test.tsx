@@ -755,3 +755,105 @@ describe("Customer Portal bank accounts and withdrawals (withdrawals C22–C25)"
     expect(screen.getByRole("row", { name: /^TransferOut/ })).toHaveTextContent("-20 USD");
   });
 });
+
+describe("Customer Portal account closure (account-closure C26, C27)", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal("location", {
+      origin: "http://localhost:3000",
+      pathname: "/accounts/account-1",
+      search: "",
+      href: "http://localhost:3000/accounts/account-1",
+      assign: vi.fn(),
+    });
+  });
+
+  const closure = {
+    id: "closure-1",
+    status: "InProgress",
+    payoutAmount: 300,
+    withdrawalId: "w-closure",
+    requestedAt: "2026-11-22T03:00:00Z",
+    completedAt: null,
+  };
+  const custodialUsd = { type: "Brokerage", currency: "USD", depositReference: "K7M3Q9PXB" };
+  const closureWithdrawal = {
+    id: "w-closure",
+    accountId: "account-1",
+    customerId: me.id,
+    nominatedBankAccount: { id: "payee", bankName: "ANZ", accountName: "J Smith", accountNumber: "****8900" },
+    amount: 300,
+    currency: "USD",
+    reference: "K7M3Q9PXB",
+    memo: null,
+    status: "Requested",
+    requestedBy: { id: "a", name: "Ann Adviser" },
+    requestedAt: "2026-11-22T03:00:00Z",
+    decision: null,
+    payment: null,
+    payoutTransactionId: null,
+    returnTransactionId: null,
+    failureReason: null,
+    returnReason: null,
+    accountClosureId: "closure-1",
+    rowVersion: "AAAA",
+  };
+
+  it("notes that a closing account is being closed, what is paid and to which bank account (C26)", async () => {
+    renderAt("/accounts/account-1", me, [], "Custodial", {
+      account: { ...custodialUsd, closure },
+      cash: { currency: "USD", cashBalance: 300.004, reservedCash: 300, availableCash: 0.004 },
+      withdrawals: [closureWithdrawal],
+    });
+
+    expect(await screen.findByText("This account is being closed. 300.00 USD is being paid to your bank account ****8900."))
+      .toBeInTheDocument();
+  });
+
+  it("notes when a Closed account was closed by its closure (C26)", async () => {
+    renderAt("/accounts/account-1", me, [], "Custodial", {
+      account: { ...custodialUsd, status: "Closed", closure: { ...closure, status: "Completed", completedAt: "2026-11-23T03:00:00Z" } },
+      withdrawals: [{ ...closureWithdrawal, status: "Paid" }],
+    });
+
+    expect(await screen.findByText("Closed on 2026-11-23.")).toBeInTheDocument();
+    expect(screen.queryByText(/is being closed/)).not.toBeInTheDocument();
+  });
+
+  it("shows no note for an account without a closure, or with a Cancelled one (C26)", async () => {
+    renderAt("/accounts/account-1", me, [], "Custodial", {
+      account: { ...custodialUsd, closure: { ...closure, status: "Cancelled" } },
+    });
+
+    expect(await screen.findByText("Available to withdraw")).toBeInTheDocument();
+    expect(screen.queryByText(/is being closed/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Closed on/)).not.toBeInTheDocument();
+  });
+
+  it("labels the closure's write-off Rounding write-off, and keeps the label of another CloseOut (C27)", async () => {
+    const writeOff = {
+      id: "78888888-8888-8888-8888-888888888888",
+      tenantId: "22222222-2222-2222-2222-222222222222",
+      type: "CloseOut",
+      bookedAt: "2026-11-23T03:00:00Z",
+      memo: "Account closure remainder",
+      reference: null,
+      originalTransactionId: null,
+      reversedByTransactionId: null,
+      rowVersion: "AAAA",
+      source: { kind: "AccountClosure", id: "closure-1" },
+      cash: [{ accountId: "account-1", customerId: me.id, amount: -0.004, currency: "USD" }],
+      security: [],
+      bankReceipt: null,
+      payment: null,
+    };
+    renderAt("/accounts/account-1", me, [
+      writeOff,
+      { ...writeOff, id: "79999999-9999-9999-9999-999999999999", source: { kind: "Manual", id: null }, memo: null },
+    ], "Custodial", { account: custodialUsd });
+
+    expect(await screen.findByRole("row", { name: /^Rounding write-off/ })).toHaveTextContent("-0.004 USD");
+    expect(screen.getByRole("row", { name: /^CloseOut/ })).toBeInTheDocument();
+  });
+});
