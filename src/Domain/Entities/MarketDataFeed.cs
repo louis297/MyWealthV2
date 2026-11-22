@@ -40,7 +40,16 @@ public class MarketDataFeed
 
     /// <summary>Corporate-actions R9: a page was stored; the cursor moves to the party's new cursor. A missing cursor
     /// keeps the one stored.</summary>
-    public void Advance(string? cursor, DateTimeOffset at) => throw new NotImplementedException();
+    public void Advance(string? cursor, DateTimeOffset at)
+    {
+        if (cursor is { Length: > CursorMaxLength })
+        {
+            throw new DomainException($"A feed cursor is at most {CursorMaxLength} characters.");
+        }
+
+        Cursor = cursor ?? Cursor;
+        LastSucceededAt = at;
+    }
 
     /// <summary>A read failed (R8). The last success stays.</summary>
     public void Failed(MarketDataFailure failure, DateTimeOffset at)

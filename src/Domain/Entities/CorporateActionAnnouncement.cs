@@ -66,7 +66,16 @@ public class CorporateActionAnnouncement
         string? currency,
         int? ratioNew,
         int? ratioHeld,
-        DateOnly? exDate) => throw new NotImplementedException();
+        DateOnly? exDate) =>
+        outsideId is { Length: >= 1 and <= IdMaxLength }
+        && partyActionId is { Length: >= 1 and <= IdMaxLength }
+        && version >= 1
+        && status is not null && Enum.IsDefined(status.Value)
+        && symbol is { Length: >= 1 and <= SymbolMaxLength }
+        && currency is { Length: 3 } && currency.All(char.IsAsciiLetter)
+        && ratioNew >= 1
+        && ratioHeld >= 1
+        && exDate is not null;
 
     /// <summary>R10: a new announcement, <c>Received</c> at platform time.</summary>
     public static CorporateActionAnnouncement Receive(
@@ -85,19 +94,48 @@ public class CorporateActionAnnouncement
         DateOnly? paymentDate,
         DateTimeOffset receivedAt)
     {
-        throw new NotImplementedException();
+        if (!IsStorable(outsideId, partyActionId, version, partyStatus, symbol, currency, ratioNew, ratioHeld, exDate)
+            || string.IsNullOrWhiteSpace(connection) || connection.Length > ConnectionMaxLength)
+        {
+            throw new DomainException("This corporate action announcement cannot be stored.");
+        }
+
+        return new CorporateActionAnnouncement
+        {
+            PublicId = Guid.NewGuid(),
+            Connection = connection,
+            OutsideId = outsideId,
+            PartyActionId = partyActionId,
+            Version = version,
+            PartyStatus = partyStatus,
+            Symbol = symbol,
+            Currency = currency.ToUpperInvariant(),
+            Kind = kind is { } known && Enum.IsDefined(known) ? known : null,
+            RatioNew = ratioNew,
+            RatioHeld = ratioHeld,
+            ExDate = exDate,
+            RecordDate = recordDate,
+            PaymentDate = paymentDate,
+            ReceivedAt = receivedAt.ToUniversalTime(),
+            Status = AnnouncementStatus.Received
+        };
     }
 
     /// <summary>R11: it created or changed at least one corporate action.</summary>
     public void MarkProcessed(DateTimeOffset at)
     {
-        throw new NotImplementedException();
+        EnsureReceived();
+        Status = AnnouncementStatus.Processed;
+        ProcessedAt = at.ToUniversalTime();
     }
 
     /// <summary>R11: it changed nothing, for <paramref name="reason"/>.</summary>
     public void Skip(AnnouncementSkipReason reason, DateTimeOffset at)
     {
-        throw new NotImplementedException();
+        EnsureReceived();
+        Status = AnnouncementStatus.Skipped;
+        SkipReason = reason;
+        ProcessedAt = at.ToUniversalTime();
     }
 
     private void EnsureReceived()
