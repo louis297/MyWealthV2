@@ -187,4 +187,17 @@ public class RolePermissionsTests
         RolePermissions.Has(UserRole.SystemAdmin, policy).ShouldBeFalse();
         RolePermissions.Has(UserRole.SimulatorOperator, policy).ShouldBeFalse();
     }
+
+    [TestCase(Policies.InterestRatesRead, false, true, true, false)]
+    [TestCase(Policies.InterestRatesManage, false, true, false, false)]
+    [TestCase(Policies.InterestRunsRead, true, true, false, false)]
+    [TestCase(Policies.InterestRunsStart, true, false, false, false)]
+    public void Interest_MatchTheInterestRunGrants(string policy, bool systemAdmin, bool tenantAdmin, bool adviser, bool customer)
+    {
+        RolePermissions.Has(UserRole.SystemAdmin, policy).ShouldBe(systemAdmin);
+        RolePermissions.Has(UserRole.TenantAdmin, policy).ShouldBe(tenantAdmin);
+        RolePermissions.Has(UserRole.Adviser, policy).ShouldBe(adviser);
+        RolePermissions.Has(UserRole.Customer, policy).ShouldBe(customer);
+        RolePermissions.Has(UserRole.SimulatorOperator, policy).ShouldBeFalse();
+    }
 }
