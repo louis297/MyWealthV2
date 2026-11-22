@@ -121,7 +121,8 @@ public class GetFxConversionQuoteQueryValidator : AbstractValidator<GetFxConvers
     }
 }
 
-/// <summary>Runs R1, R3–R11 like create; no lock, no cash SUM check, no write (R20).</summary>
+/// <summary>Runs R1, R3–R11 like create; no lock, no cash SUM check but the withdrawable cash rule (orders R45), no
+/// write (R20).</summary>
 public class GetFxConversionQuoteQueryHandler(
     IApplicationDbContext db,
     ICurrentUser currentUser,
@@ -176,6 +177,11 @@ public class GetFxConversionQuoteQueryHandler(
                 new ValidationFailure(string.Empty, exception.Message)
             ]);
         }
+
+        // Orders R45: the quote applies the withdrawable cash rule of the conversion, so a conversion that would take
+        // unsettled cash out is refused before it is confirmed. It still makes no other cash check.
+        var fromSum = await TransactionCash.SumAsync(db, pair.From.Id, cancellationToken);
+        await WithdrawableCashGuard.EnsureAsync(db, currencies, pair.From, fromSum - sell, cancellationToken);
 
         return new FxConversionQuoteDto(
             priced.Rate.BaseCurrency,

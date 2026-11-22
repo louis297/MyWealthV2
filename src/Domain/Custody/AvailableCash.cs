@@ -18,5 +18,6 @@ public static class AvailableCash
 
     /// <summary>Orders R45: true when a cash <c>SUM</c> of <paramref name="cashSumAfter"/> leaves the proceeds of
     /// unsettled sales on the account: cash leaves for somewhere else only from withdrawable cash.</summary>
-    public static bool AllowsLeaving(decimal cashSumAfter, decimal reserved, decimal unsettled) => throw new NotImplementedException();
+    public static bool AllowsLeaving(decimal cashSumAfter, decimal reserved, decimal unsettled) =>
+        Of(cashSumAfter, reserved) - unsettled >= 0m;
 }

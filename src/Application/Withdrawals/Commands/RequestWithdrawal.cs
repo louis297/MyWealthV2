@@ -163,13 +163,19 @@ public class RequestWithdrawalCommandHandler(
         // R21: precision, then the available cash under the lock.
         var amount = request.Amount!.Value;
         CashAmountPlaces.EnsureFits(currencies, currency, amount);
+        // Orders R45: with cash from sales that have not settled, the amount comes from the withdrawable cash.
         var available = await AccountCash.AvailableAsync(db, account.Id, cancellationToken);
-        if (amount > available)
+        var unsettled = await AccountCash.UnsettledAsync(db, account.Id, cancellationToken);
+        var withdrawable = Math.Max(0m, available - unsettled);
+        if (amount > withdrawable)
         {
             var places = currencies.TryGet(currency)!.DecimalPlaces;
+            string Amount(decimal value) => value.ToString($"F{places}", CultureInfo.InvariantCulture);
             throw Error(
                 nameof(RequestWithdrawalCommand.Amount),
-                $"The account's available cash is {available.ToString($"F{places}", CultureInfo.InvariantCulture)} {currency}.");
+                unsettled > 0m
+                    ? $"The account's withdrawable cash is {Amount(withdrawable)} {currency}. {Amount(unsettled)} {currency} is from sales that have not settled."
+                    : $"The account's available cash is {Amount(available)} {currency}.");
         }
 
         // R23: the reference defaults to the deposit reference, so the Customer recognises the payment.

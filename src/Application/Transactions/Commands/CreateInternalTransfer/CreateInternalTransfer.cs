@@ -289,6 +289,9 @@ public class CreateInternalTransferCommandHandler(
 
         await AvailableCashGuard.EnsureAsync(db, currencies, from.Account, fromSumAfter, cancellationToken);
 
+        // Orders R45: the cash that leaves comes from the account's withdrawable cash.
+        await WithdrawableCashGuard.EnsureAsync(db, currencies, from.Account, fromSumAfter, cancellationToken);
+
         return new IdempotentResult(201, body);
     }
 
