@@ -177,6 +177,78 @@ public class BackOfficeApiTests
     }
 
     [Test]
+    public async Task Tenant_CarriesTheBrokerConnection_OnTheItem_OnCreate_AndOnUpdateOnlyWhenGiven()
+    {
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.OK, TenantJson().Replace("\"isActive\"", "\"brokerConnection\":\"simulator\",\"isActive\""));
+        api.Enqueue(HttpStatusCode.Created, $$"""{"id":"{{TenantId}}"}""");
+        api.Enqueue(HttpStatusCode.Created, $$"""{"id":"{{TenantId}}"}""");
+        api.Enqueue(HttpStatusCode.NoContent, "");
+        api.Enqueue(HttpStatusCode.NoContent, "");
+        var platform = Create(api);
+
+        var item = await platform.GetTenantAsync(TenantId);
+        await platform.CreateTenantAsync("North", "north", "NZD", ["Custodial"], "simulator");
+        await platform.CreateTenantAsync("South", "south", "NZD", ["Custodial"]);
+        await platform.UpdateTenantAsync(TenantId, "North Ltd", "NZD", ["Custodial"], "rv1", "other-broker");
+        await platform.UpdateTenantAsync(TenantId, "North Ltd", "NZD", ["Custodial"], "rv2");
+
+        item.BrokerConnection.ShouldBe("simulator");
+        Body(api.Requests[1]).GetProperty("brokerConnection").GetString().ShouldBe("simulator");
+        Body(api.Requests[2]).GetProperty("brokerConnection").ValueKind.ShouldBe(JsonValueKind.Null);
+        Body(api.Requests[3]).GetProperty("brokerConnection").GetString().ShouldBe("other-broker");
+        Body(api.Requests[3]).GetProperty("rowVersion").GetString().ShouldBe("rv1");
+        Body(api.Requests[4]).GetProperty("brokerConnection").ValueKind.ShouldBe(JsonValueKind.Null);
+    }
+
+    [Test]
+    public async Task BrokerConnections_ReadsTheListWithTheReportsState()
+    {
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.OK, """
+            {"items":[
+              {"name":"simulator","adapter":"Simulator",
+               "reports":{"lastSucceededAt":"2026-11-23T02:13:00Z","lastFailedAt":"2026-11-23T02:14:00Z","lastFailure":"InvalidItem"}},
+              {"name":"other","adapter":"Simulator","reports":null}
+            ],"page":1,"pageSize":20,"totalCount":2}
+            """);
+        var platform = Create(api);
+
+        var connections = await platform.ListBrokerConnectionsAsync();
+
+        connections.ShouldBe([
+            new BrokerConnectionItem("simulator", "Simulator", new BrokerFeedState(
+                new DateTimeOffset(2026, 11, 23, 2, 13, 0, TimeSpan.Zero), new DateTimeOffset(2026, 11, 23, 2, 14, 0, TimeSpan.Zero), "InvalidItem")),
+            new BrokerConnectionItem("other", "Simulator", null)
+        ]);
+        AssertRequest(api.Requests[0], "GET", "/broker-connections");
+    }
+
+    [Test]
+    public async Task ExecutionReports_ReadsTheNewestTwenty_WithTheStatusFilter()
+    {
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.OK, """
+            {"items":[{"id":"5a1c0000-0000-0000-0000-0000000000c7","connection":"simulator","outsideId":"w-X1","kind":null,
+              "clientOrderId":"2c0c8e1e-7c7c-4d55-9b53-0b8f5d3f6a11","brokerOrderId":"w-O1","quantity":4,"price":100.12,
+              "tradeDate":"2026-11-23","settlementDate":"2026-11-25","contractNote":"CN-1","fillOutsideId":null,"settledDate":null,
+              "reason":null,"receivedAt":"2026-11-23T02:13:00Z","status":"Skipped","skipReason":"UnsupportedKind",
+              "processedAt":"2026-11-23T02:13:01Z"}],"page":1,"pageSize":20,"totalCount":1}
+            """);
+        api.Enqueue(HttpStatusCode.OK, """{"items":[],"page":1,"pageSize":20,"totalCount":0}""");
+        var platform = Create(api);
+
+        var items = await platform.ListExecutionReportsAsync(null);
+        await platform.ListExecutionReportsAsync("Skipped");
+
+        var item = items.ShouldHaveSingleItem();
+        (item.OutsideId, item.Kind, item.Quantity, item.Price, item.TradeDate, item.Status, item.SkipReason).ShouldBe(
+            ("w-X1", (string?)null, (decimal?)4m, (decimal?)100.12m, (DateOnly?)new DateOnly(2026, 11, 23), "Skipped", (string?)"UnsupportedKind"));
+        AssertRequest(api.Requests[0], "GET", "/execution-reports?page=1&pageSize=20");
+        AssertRequest(api.Requests[1], "GET", "/execution-reports?page=1&pageSize=20&status=Skipped");
+    }
+
+    [Test]
     public async Task MarketDataConnections_ReadsTheListWithTheFeedState()
     {
         var api = new ScriptedHandler();

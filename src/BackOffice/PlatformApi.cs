@@ -39,6 +39,7 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         string code,
         string reportingCurrency,
         IReadOnlyList<string> allowedCustodyModes,
+        string? brokerConnection = null,
         CancellationToken cancellationToken = default)
     {
         var created = await ReadAsync<Created>(
@@ -55,6 +56,7 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         string reportingCurrency,
         IReadOnlyList<string> allowedCustodyModes,
         string rowVersion,
+        string? brokerConnection = null,
         CancellationToken cancellationToken = default) =>
         SendExpectingSuccessAsync(
             HttpMethod.Put,
@@ -275,6 +277,12 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
             HttpMethod.Get, $"/corporate-action-announcements?page=1&pageSize=20{query}", json: null, cancellationToken);
         return page.Items;
     }
+
+    public Task<IReadOnlyList<BrokerConnectionItem>> ListBrokerConnectionsAsync(CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task<IReadOnlyList<ExecutionReportItem>> ListExecutionReportsAsync(string? status, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
 
     private static string ClientMoneyAccountsPath(Guid tenantId) => $"/tenants/{tenantId}/client-money-accounts";
 

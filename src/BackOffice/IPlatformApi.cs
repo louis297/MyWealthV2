@@ -6,9 +6,11 @@ public interface IPlatformApi
 
     Task<TenantItem> GetTenantAsync(Guid id, CancellationToken cancellationToken = default);
 
-    Task<Guid> CreateTenantAsync(string name, string code, string reportingCurrency, IReadOnlyList<string> allowedCustodyModes, CancellationToken cancellationToken = default);
+    /// <summary>Orders BO26: <paramref name="brokerConnection"/> is a configured connection, or null for none.</summary>
+    Task<Guid> CreateTenantAsync(string name, string code, string reportingCurrency, IReadOnlyList<string> allowedCustodyModes, string? brokerConnection = null, CancellationToken cancellationToken = default);
 
-    Task UpdateTenantAsync(Guid id, string name, string reportingCurrency, IReadOnlyList<string> allowedCustodyModes, string rowVersion, CancellationToken cancellationToken = default);
+    /// <summary>Orders BO26: a null <paramref name="brokerConnection"/> leaves the tenant's connection as it is.</summary>
+    Task UpdateTenantAsync(Guid id, string name, string reportingCurrency, IReadOnlyList<string> allowedCustodyModes, string rowVersion, string? brokerConnection = null, CancellationToken cancellationToken = default);
 
     Task DisableTenantAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default);
 
@@ -63,6 +65,12 @@ public interface IPlatformApi
 
     /// <summary>The configured market data connections with their price feed state (simulated-instruments R5).</summary>
     Task<IReadOnlyList<MarketDataConnectionItem>> ListMarketDataConnectionsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Orders BO27: the configured broker connections with the state of their report feed.</summary>
+    Task<IReadOnlyList<BrokerConnectionItem>> ListBrokerConnectionsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Orders BO28: the newest twenty execution reports, optionally of one status.</summary>
+    Task<IReadOnlyList<ExecutionReportItem>> ListExecutionReportsAsync(string? status, CancellationToken cancellationToken = default);
 
     /// <summary>Corporate actions BO25: the newest twenty announcements, optionally of one status.</summary>
     Task<IReadOnlyList<CorporateActionAnnouncementItem>> ListCorporateActionAnnouncementsAsync(
