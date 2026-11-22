@@ -23,7 +23,7 @@ public class TradeFeeReaderTests : TestBase
         var (accountId, instrumentId) = await FeeHttp.TradingAccountAsync(admin.AccessToken, customer.PublicId);
         var scheduleId = await FeeHttp.AddScheduleAsync(tenant.Id, "USD", FeeHttp.Today);
         var buyId = await TradeFeeTradeTests.ReadIdAsync(
-            await FeeHttp.PostTradeAsync(admin.AccessToken, accountId, "Buy", instrumentId, 50m));
+            await FeeHttp.TradeAsync(accountId, "Buy", instrumentId, 50m));
 
         using var item = await GetAsync(admin.AccessToken, $"/transactions/{buyId}");
 
@@ -51,7 +51,7 @@ public class TradeFeeReaderTests : TestBase
     }
 
     [Test]
-    public async Task CrossCurrencyBuy_FeeAmountIsInTheQuoteCurrency_LegAmountInTheAccountCurrency()
+    public async Task CrossCurrencySell_FeeAmountIsInTheQuoteCurrency_LegAmountInTheAccountCurrency()
     {
         var (tenant, _, customer, admin) = await AccountHttp.SignInTenantAdmin();
         var accountId = await FeeHttp.OpenCustodialAsync(admin.AccessToken, customer.PublicId, "NZD");
@@ -59,11 +59,12 @@ public class TradeFeeReaderTests : TestBase
         await FeeHttp.SetPriceAsync(instrumentId, 25.00m, "USD");
         await TradeFeeTradeTests.SetRateAsync("USD", "NZD", 1.6543m);
         (await FeeHttp.FundCustodialAsync(admin.AccessToken, accountId, 10000m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        await Custody.CustodialHttp.InsertManualTradeAsync(accountId, "Buy", instrumentId, 50m);
         await FeeHttp.AddScheduleAsync(tenant.Id, "USD", FeeHttp.Today);
-        var buyId = await TradeFeeTradeTests.ReadIdAsync(
-            await FeeHttp.PostTradeAsync(admin.AccessToken, accountId, "Buy", instrumentId, 50m));
+        var sellId = await TradeFeeTradeTests.ReadIdAsync(
+            await FeeHttp.TradeAsync(accountId, "Sell", instrumentId, 50m));
 
-        using var item = await GetAsync(admin.AccessToken, $"/transactions/{buyId}");
+        using var item = await GetAsync(admin.AccessToken, $"/transactions/{sellId}");
 
         var fee = TransactionJson.CashLegs(item.RootElement).Single(leg => leg.GetProperty("role").GetString() == "Fee");
         fee.GetProperty("amount").GetDecimal().ShouldBe(-16.543m);
@@ -97,7 +98,7 @@ public class TradeFeeReaderTests : TestBase
         var (accountId, instrumentId) = await FeeHttp.TradingAccountAsync(admin.AccessToken, customer.PublicId);
         await FeeHttp.AddScheduleAsync(tenant.Id, "USD", FeeHttp.Today);
         await TradeFeeTradeTests.ReadIdAsync(
-            await FeeHttp.PostTradeAsync(admin.AccessToken, accountId, "Buy", instrumentId, 50m));
+            await FeeHttp.TradeAsync(accountId, "Buy", instrumentId, 50m));
 
         using var list = await GetAsync(admin.AccessToken, $"/transactions?accountId={accountId}&type=Buy");
 
@@ -114,7 +115,7 @@ public class TradeFeeReaderTests : TestBase
         var (accountId, instrumentId) = await FeeHttp.TradingAccountAsync(admin.AccessToken, customer.PublicId);
         await FeeHttp.AddScheduleAsync(tenant.Id, "USD", FeeHttp.Today);
         await TradeFeeTradeTests.ReadIdAsync(
-            await FeeHttp.PostTradeAsync(admin.AccessToken, accountId, "Buy", instrumentId, 50m));
+            await FeeHttp.TradeAsync(accountId, "Buy", instrumentId, 50m));
 
         var created = await TenantHttp.Send(HttpMethod.Post, "/reports/request", admin.AccessToken, new
         {

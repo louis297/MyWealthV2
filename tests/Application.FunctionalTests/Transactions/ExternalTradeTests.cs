@@ -271,7 +271,7 @@ public class ExternalTradeTests : TestBase
     {
         var (_, _, customer, admin) = await AccountHttp.SignInTenantAdmin();
         var (accountId, instrumentId) = await FeeHttp.TradingAccountAsync(admin.AccessToken, customer.PublicId);
-        (await FeeHttp.PostTradeAsync(admin.AccessToken, accountId, "Buy", instrumentId, 10m)).StatusCode
+        (await FeeHttp.TradeAsync(accountId, "Buy", instrumentId, 10m)).StatusCode
             .ShouldBe(HttpStatusCode.Created);
         var before = await CustodialHttp.TransactionCountAsync(accountId);
 
@@ -299,7 +299,7 @@ public class ExternalTradeTests : TestBase
         await FeeHttp.AddScheduleAsync(tenant.Id, "USD", FeeHttp.Today);
 
         var id = await CustodialHttp.ReadIdAsync(
-            await FeeHttp.PostTradeAsync(admin.AccessToken, accountId, "Buy", instrumentId, 50m));
+            await FeeHttp.TradeAsync(accountId, "Buy", instrumentId, 50m));
 
         (await TradeFeeTradeTests.CashAmountsAsync(admin.AccessToken, id)).ShouldBe([-1250m, -10m], ignoreOrder: true);
     }

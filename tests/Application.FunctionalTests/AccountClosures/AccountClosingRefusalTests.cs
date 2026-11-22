@@ -157,7 +157,7 @@ public class AccountClosingRefusalTests : TestBase
         var world = closing.World;
         var instrument = await CreateInstrumentAsync(world.TenantAdmin, "VTI", "USD", 25m);
 
-        (await PostAsync(world.Adviser, Trade(closing.Spare, "Buy", instrument, 1m))).StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await TradeAsync(closing.Spare, "Buy", instrument, 1m)).StatusCode.ShouldBe(HttpStatusCode.Created);
         (await PostAsync(world.Adviser, Conversion(closing.Nzd, closing.Spare), FxPath)).StatusCode.ShouldBe(HttpStatusCode.Created);
         (await WithdrawalHttp.PostAsync(world.Adviser, WithdrawalHttp.Body(closing.Spare, world.NominatedBankAccountId, 10m)))
             .StatusCode.ShouldBe(HttpStatusCode.Created);

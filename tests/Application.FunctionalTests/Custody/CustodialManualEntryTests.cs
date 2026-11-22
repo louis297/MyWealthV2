@@ -119,7 +119,7 @@ public class CustodialManualEntryTests : TestBase
         var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
         var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, price: 25.00m);
         var fundingId = await InsertManualTransferInAsync(accountId, 1000m);
-        var buyId = await ReadIdAsync(await PostAsync(tokens.AccessToken, Trade(accountId, "Buy", instrumentId, 4m)));
+        var buyId = await InsertManualTradeAsync(accountId, "Buy", instrumentId, 4m);
 
         (await ReverseAsync(tokens.AccessToken, buyId)).StatusCode.ShouldBe(HttpStatusCode.Created);
         (await ReverseAsync(tokens.AccessToken, fundingId)).StatusCode.ShouldBe(HttpStatusCode.Created);

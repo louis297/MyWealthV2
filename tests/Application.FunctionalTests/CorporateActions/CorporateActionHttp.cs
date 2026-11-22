@@ -165,8 +165,7 @@ internal static class CorporateActionHttp
         foreach (var (account, quantity) in new[] { (ned, 100m), (olga, 10m) })
         {
             (await CustodialHttp.FundAsync(token, account, 5000m)).StatusCode.ShouldBe(HttpStatusCode.Created);
-            var buy = await CustodialHttp.PostAsync(token, CustodialHttp.Trade(account, "Buy", instrumentId, quantity));
-            buy.StatusCode.ShouldBe(HttpStatusCode.Created, await buy.Content.ReadAsStringAsync());
+            await CustodialHttp.InsertManualTradeAsync(account, "Buy", instrumentId, quantity);
         }
 
         (await CustodialHttp.FundAsync(token, empty, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);

@@ -69,8 +69,9 @@ public class CustodialAvailableCashTests : TestBase
     {
         var world = await WithdrawalWorld.CreateAsync();
         var instrument = await CreateInstrumentAsync(world.TenantAdmin, price: 25.00m);
-        (await PostAsync(world.TenantAdmin, Trade(world.AccountId, "Buy", instrument, 28m))).StatusCode.ShouldBe(HttpStatusCode.Created);
-        var sell = await ReadIdAsync(await PostAsync(world.TenantAdmin, Trade(world.AccountId, "Sell", instrument, 28m)));
+        // Trades typed before orders (orders R48): a person can still reverse them.
+        await InsertManualTradeAsync(world.AccountId, "Buy", instrument, 28m);
+        var sell = await InsertManualTradeAsync(world.AccountId, "Sell", instrument, 28m);
         await world.RequestAsync(400m);
 
         (await ErrorsAsync(await ReverseAsync(world.TenantAdmin, sell)))[""]

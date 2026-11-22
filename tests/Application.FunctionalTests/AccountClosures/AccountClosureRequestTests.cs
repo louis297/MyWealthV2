@@ -182,8 +182,7 @@ public class AccountClosureRequestTests : TestBase
     {
         var world = await WithdrawalWorld.CreateAsync(funding: 100m);
         var instrument = await CustodialHttp.CreateInstrumentAsync(world.TenantAdmin, "VTI", "USD", 25m);
-        (await CustodialHttp.PostAsync(world.Adviser, CustodialHttp.Trade(world.AccountId, "Buy", instrument, 1m)))
-            .StatusCode.ShouldBe(HttpStatusCode.Created);
+        await CustodialHttp.InsertManualTradeAsync(world.AccountId, "Buy", instrument, 1m);
 
         var errors = await CustodialHttp.ErrorsAsync(await AccountClosureHttp.PostAsync(
             world.Adviser, world.AccountId, AccountClosureHttp.Body(world.NominatedBankAccountId)));

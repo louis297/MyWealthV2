@@ -22,8 +22,7 @@ public class NetWorthByCustodyModeTests : TestBase
         (await CustodialHttp.FundAsync(tokens.AccessToken, external, 300m, external: true)).StatusCode.ShouldBe(HttpStatusCode.Created);
         (await CustodialHttp.FundAsync(tokens.AccessToken, bank, 50m, external: true)).StatusCode.ShouldBe(HttpStatusCode.Created);
         var vti = await CustodialHttp.CreateInstrumentAsync(tokens.AccessToken);
-        (await CustodialHttp.PostAsync(tokens.AccessToken, CustodialHttp.Trade(custodial, "Buy", vti, 4m)))
-            .StatusCode.ShouldBe(HttpStatusCode.Created);
+        await CustodialHttp.InsertManualTradeAsync(custodial, "Buy", vti, 4m);
 
         using var json = await ReadAsync("/net-worth", tokens.AccessToken);
         var root = json.RootElement;

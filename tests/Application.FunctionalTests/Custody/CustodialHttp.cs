@@ -149,6 +149,140 @@ internal static class CustodialHttp
             : Json(HttpStatusCode.Created, new { id = payout.Value });
     }
 
+    /// <summary>
+    /// Trades on a Custodial account as the platform does (orders §10 fan-out): the Customer's Adviser places an
+    /// order, the fake broker accepts it and reports one fill of the whole quantity at <paramref name="price"/> (the
+    /// instrument's stored price when null), and the report is processed. An order needs a price from the last 4 days
+    /// (orders R10), so the instrument's latest price is stored again for today. Answers 201 with the id of the
+    /// fill's Transaction, the refusal of the order, or 400 with the reason the fill is held.
+    /// </summary>
+    public static async Task<HttpResponseMessage> TradeAsync(
+        Guid accountId,
+        string side,
+        Guid instrumentId,
+        decimal quantity,
+        decimal? price = null,
+        Guid? idempotencyKey = null)
+    {
+        Domain.Entities.User adviser;
+        decimal reference;
+        using (var scope = FunctionalTestSetup.ScopeFactory.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var account = await db.Accounts.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.PublicId == accountId);
+            var customer = await db.DomainUsers.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.Id == account.CustomerId);
+            adviser = await db.DomainUsers.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.Id == customer.AdviserId);
+            var instrument = await db.Instruments.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.PublicId == instrumentId);
+            reference = await db.InstrumentPrices.AsNoTracking()
+                .Where(row => row.InstrumentId == instrument.Id)
+                .OrderByDescending(row => row.AsOfDate)
+                .Select(row => row.Price)
+                .FirstOrDefaultAsync();
+        }
+
+        if (reference > 0)
+        {
+            await Orders.OrderHttp.SetPriceAsync(instrumentId, reference, Orders.OrderHttp.Today);
+        }
+
+        var adviserToken = (await TestApp.IssueAccessTokenAsync(adviser)).AccessToken;
+        var placed = await Orders.OrderHttp.PostAsync(
+            adviserToken, Orders.OrderHttp.Body(accountId, instrumentId, side, quantity), idempotencyKey);
+        if (placed.StatusCode != HttpStatusCode.Created)
+        {
+            return placed;
+        }
+
+        var orderId = await ReadIdAsync(placed);
+        await Broker.BrokerHttp.SendAsync();
+        var order = await Orders.OrderHttp.OrderAsync(orderId);
+        if (order.Fills.Count == 0)
+        {
+            Broker.BrokerHttp.Feed.AddFill(orderId, quantity, price ?? reference);
+            await Broker.BrokerHttp.RunReportsAsync();
+            order = await Orders.OrderHttp.OrderAsync(orderId);
+        }
+
+        var fill = order.Fills.SingleOrDefault();
+        if (fill?.Status != OrderFillStatus.Posted)
+        {
+            return Json(HttpStatusCode.BadRequest, new
+            {
+                errors = new { Fill = new[] { fill is null ? $"Not filled: the order is {order.Status}." : $"Held: {fill.HoldReason}" } }
+            });
+        }
+
+        using var after = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var transaction = await after.ServiceProvider.GetRequiredService<ApplicationDbContext>().Transactions
+            .IgnoreQueryFilters().AsNoTracking()
+            .Where(row => row.Id == fill.TransactionId)
+            .Select(row => row.PublicId)
+            .SingleAsync();
+        return Json(HttpStatusCode.Created, new { id = transaction });
+    }
+
+    /// <summary>
+    /// A <c>Buy</c> or <c>Sell</c> with source <c>Manual</c>, written straight to the database at <paramref name="price"/>
+    /// as a person could type it on a Custodial account before orders (orders R48), with no fee or, with
+    /// <paramref name="withScheduleFee"/>, the fee of the tenant's schedule in effect today. The holding follows. It
+    /// can still be reversed by hand. Answers the Transaction's id.
+    /// </summary>
+    public static async Task<Guid> InsertManualTradeAsync(
+        Guid accountId,
+        string type,
+        Guid instrumentId,
+        decimal quantity,
+        decimal price = 25m,
+        bool withScheduleFee = false)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var account = await db.Accounts.IgnoreQueryFilters().SingleAsync(row => row.PublicId == accountId);
+        var instrument = await db.Instruments.IgnoreQueryFilters().SingleAsync(row => row.PublicId == instrumentId);
+        var holding = await db.Holdings.IgnoreQueryFilters()
+            .SingleOrDefaultAsync(row => row.AccountId == account.Id && row.InstrumentId == instrument.Id);
+        var cash = await db.TransactionCashLegs.IgnoreQueryFilters().Where(leg => leg.AccountId == account.Id).SumAsync(leg => leg.Amount);
+        var quote = instrument.QuoteCurrency.Trim();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var rate = string.Equals(quote, account.Currency.Trim(), StringComparison.Ordinal)
+            ? null
+            : AppliedFxRate.Create(quote, account.Currency.Trim(), 1m, today, "Test");
+        var schedule = withScheduleFee
+            ? await db.TradeFeeSchedules.IgnoreQueryFilters().Include(row => row.BandRows)
+                .Where(row => row.TenantId == account.TenantId && row.QuoteCurrency == quote && row.EffectiveFrom <= today)
+                .OrderByDescending(row => row.EffectiveFrom)
+                .FirstAsync()
+            : null;
+        var trade = type == "Buy"
+            ? Domain.Entities.Transaction.PostBuy(
+                account.TenantId, account.Id, account.Type, account.Currency, instrument.Id, quantity, Money.Create(price, quote),
+                fxRate: 1m, DateTimeOffset.UtcNow, memo: null, reference: null, TransactionSource.Manual, currentCashSum: cash,
+                feeSchedule: schedule, appliedRate: rate)
+            : Domain.Entities.Transaction.PostSell(
+                account.TenantId, account.Id, account.Type, account.Currency, instrument.Id, quantity, Money.Create(price, quote),
+                fxRate: 1m, DateTimeOffset.UtcNow, memo: null, reference: null, TransactionSource.Manual, currentCashSum: cash,
+                currentQuantity: holding?.Quantity ?? 0m, currentCost: holding?.CostAmount ?? 0m, feeSchedule: schedule,
+                appliedRate: rate);
+        trade.CreatedBy = "test";
+        trade.CashLegs.ForEach(leg => leg.CreatedBy = "test");
+        trade.SecurityLegs.ForEach(leg => leg.CreatedBy = "test");
+        db.Transactions.Add(trade);
+        var moved = trade.SecurityLegs.Single();
+        if (holding is null)
+        {
+            holding = Domain.Entities.Holding.Create(account.TenantId, account.Id, instrument.Id, moved.Quantity, moved.CostAmount, quote);
+            holding.CreatedBy = "test";
+            db.Holdings.Add(holding);
+        }
+        else if (holding.ReplaceTotals(holding.Quantity + moved.Quantity, holding.CostAmount + moved.CostAmount, holding.CostCurrency))
+        {
+            db.Holdings.Remove(holding);
+        }
+
+        await db.SaveChangesAsync();
+        return trade.PublicId;
+    }
+
     /// <summary>A Verified nominated bank account of the account's Customer in its currency, added straight to the
     /// database when there is none.</summary>
     public static async Task<Guid> VerifiedPayeeAsync(Guid accountId) => (await PayeeAsync(accountId)).NominatedBankAccountId;

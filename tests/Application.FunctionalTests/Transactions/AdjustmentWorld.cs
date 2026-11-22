@@ -91,11 +91,9 @@ internal sealed record AdjustmentWorld(
     public async Task FundAsync(decimal amount) =>
         (await Custody.CustodialHttp.FundAsync(Admin, AccountId, amount)).StatusCode.ShouldBe(HttpStatusCode.Created);
 
-    public async Task<Guid> BuyAsync(decimal quantity)
-    {
-        var response = await Custody.CustodialHttp.PostAsync(Admin, Trade(AccountId, "Buy", InstrumentId, quantity));
-        return await ReadIdAsync(response);
-    }
+    /// <summary>A <c>Buy</c> at 25.00 typed before orders (orders R48): source <c>Manual</c>, so it can be reversed by hand.</summary>
+    public Task<Guid> BuyAsync(decimal quantity) =>
+        Custody.CustodialHttp.InsertManualTradeAsync(AccountId, "Buy", InstrumentId, quantity);
 
     /// <summary>The holding's quantity and cost, or null when the Account holds none of the instrument.</summary>
     public async Task<(decimal Quantity, decimal Cost)?> HoldingAsync(Guid? accountId = null, Guid? instrumentId = null)
