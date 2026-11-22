@@ -34,6 +34,11 @@ public class InstrumentPriceReadTests
                 .Amount.ShouldBe(250m);
             store.TryGetPrice(instrument.Id, new DateTimeOffset(2026, 10, 11, 0, 30, 0, TimeSpan.Zero))!
                 .Amount.ShouldBe(260m);
+
+            // Orders R10: the date of the price TryGetPrice reads.
+            (await store.LatestDateAsync(instrument.Id, new DateOnly(2026, 10, 15))).ShouldBe(new DateOnly(2026, 10, 11));
+            (await store.LatestDateAsync(instrument.Id, new DateOnly(2026, 10, 10))).ShouldBe(new DateOnly(2026, 10, 10));
+            (await store.LatestDateAsync(instrument.Id, new DateOnly(2026, 10, 9))).ShouldBeNull();
         }
         finally
         {

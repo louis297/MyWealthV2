@@ -64,6 +64,8 @@ public static class DependencyInjection
                      Policies.InterestRunsStart,
                      Policies.CorporateActionsRead,
                      Policies.CorporateActionsManage,
+                     Policies.OrdersRead,
+                     Policies.OrdersPlace,
                      Policies.ReportsCustomerRead,
                      Policies.ReportsCustomerCreate,
                      Policies.ReportsBookRead,
