@@ -30,7 +30,9 @@ var web = builder.AddProject<Projects.Web>(Services.WebApi)
         url.Url = "/scalar";
     })
     //.WithBindMount(reportsPath, "/data/reports")
-    .WithEnvironment("Reports__StorageRoot", reportsPath);
+    .WithEnvironment("Reports__StorageRoot", reportsPath)
+    // Interest run R32, §9.1: a SystemAdmin may run interest for a day that has not ended, in Development only.
+    .WithEnvironment("Interest__AllowFutureAsOfDates", "true");
     //.WithVolume("reports", "/data/reports", env: "Reports__StorageRoot");
 
 // Smoke tenant passwords (docs/smoke-test.md §5). Set in user secrets as Smoke:AdviserPassword and
