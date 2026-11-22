@@ -13,6 +13,13 @@ public sealed class AccountHoldingDto
     public required Decimal Cost { get; init; }
     public required string CostCurrency { get; init; }
 
+    /// <summary>The quantity reserved for the Account's live sell orders in the Instrument; 0 on an External account
+    /// (orders R40).</summary>
+    public required decimal ReservedQuantity { get; init; }
+
+    /// <summary>The quantity minus the reserved quantity (orders R40).</summary>
+    public required decimal AvailableQuantity { get; init; }
+
     public static AccountHoldingDto From(Account account, Holding holding, Instrument instrument) => new()
     {
         Id = holding.PublicId,
@@ -23,5 +30,7 @@ public sealed class AccountHoldingDto
         Quantity = holding.Quantity,
         Cost = holding.CostAmount,
         CostCurrency = holding.CostCurrency,
+        ReservedQuantity = 0m,
+        AvailableQuantity = 0m,
     };
 }

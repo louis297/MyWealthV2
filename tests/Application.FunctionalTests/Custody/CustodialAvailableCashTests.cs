@@ -14,7 +14,7 @@ namespace MyWealthV2.Application.FunctionalTests.Custody;
 [Parallelizable]
 public class CustodialAvailableCashTests : TestBase
 {
-    private const string Refusal = "Available cash cannot become negative: 300.00 USD is reserved for withdrawals.";
+    private const string Refusal = "Available cash cannot become negative: 300.00 USD is reserved for withdrawals and orders.";
 
     [Test]
     public async Task Buy_AboveTheAvailableCash_Returns400_AndWithinIt_Returns201()
@@ -74,7 +74,7 @@ public class CustodialAvailableCashTests : TestBase
         await world.RequestAsync(400m);
 
         (await ErrorsAsync(await ReverseAsync(world.TenantAdmin, sell)))[""]
-            .ShouldBe(["Available cash cannot become negative: 400.00 USD is reserved for withdrawals."]);
+            .ShouldBe(["Available cash cannot become negative: 400.00 USD is reserved for withdrawals and orders."]);
         (await world.CashAsync()).ShouldBe((1000m, 400m, 600m));
     }
 
@@ -90,7 +90,7 @@ public class CustodialAvailableCashTests : TestBase
         var response = await StatementLineHttp.ActAsync(world.TenantAdmin, line.PublicId, "unmatch", new() { ["note"] = "Wrong account" });
 
         (await ErrorsAsync(response)).Values.SelectMany(messages => messages)
-            .ShouldContain("Available cash cannot become negative: 1100.00 USD is reserved for withdrawals.");
+            .ShouldContain("Available cash cannot become negative: 1100.00 USD is reserved for withdrawals and orders.");
         (await world.CashAsync()).ShouldBe((1200m, 1100m, 100m));
     }
 
