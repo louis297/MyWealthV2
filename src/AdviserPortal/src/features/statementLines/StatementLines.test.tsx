@@ -144,6 +144,7 @@ describe("StatementLinesListPage (deposit-matching D34)", () => {
     ["AccountClosed", "Account closed"],
     ["CustomerDisabled", "Customer disabled"],
     ["AmountPrecision", "Amount has too many decimals"],
+    ["AccountClosing", "Account being closed"],
   ])("labels the reason %s", async (reason, label) => {
     renderFees(feeUser(), routes, "/statement-lines", (request) =>
       path(request) === "/statement-lines" ? page([{ ...unmatched, unmatchedReason: reason }]) : undefined,

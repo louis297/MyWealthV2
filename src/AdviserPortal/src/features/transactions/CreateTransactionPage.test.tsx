@@ -815,25 +815,13 @@ describe("CreateTransactionPage", () => {
     expect(screen.queryByRole("option", { name: "CloseOut" })).not.toBeInTheDocument();
   });
 
-  it("closes out a Custodial remainder below the minor unit with no bookedAt (withdrawals D44)", async () => {
-    const { fetchMock } = renderForm(
-      user(), 201, "Price is not available.", { custodyMode: "Custodial", cashBalance: 0.004 }, "errors", "?type=CloseOut",
-    );
+  it("does not offer CloseOut on a Custodial account, even for a remainder (account-closure D53)", async () => {
+    renderForm(user(), 201, "Price is not available.", { custodyMode: "Custodial", cashBalance: 0.004 }, "errors", "?type=CloseOut");
 
     expect(await screen.findByText("Booked when posted.")).toBeInTheDocument();
-    expect(await screen.findByLabelText("Amount")).toHaveValue("-0.004");
-    fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
-
-    expect(await screen.findByText("account detail")).toBeInTheDocument();
-    const post = fetchMock.mock.calls
-      .map(([input]) => input)
-      .find((input): input is Request => input instanceof Request && input.method === "POST");
-    expect(JSON.parse(await post!.clone().text())).toEqual({
-      accountId,
-      type: "CloseOut",
-      amount: -0.004,
-      memo: null,
-    });
+    await openSelect("Type");
+    expect(await screen.findByRole("option", { name: "Buy" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "CloseOut" })).not.toBeInTheDocument();
   });
 
   it("does not take a TransferIn on a Custodial account from the address (D39)", async () => {
