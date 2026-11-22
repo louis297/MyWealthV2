@@ -18,6 +18,9 @@ public class CreateTenantCommand : IRequest<Guid>
     public required string ReportingCurrency { get; init; }
 
     public IReadOnlyList<string>? AllowedCustodyModes { get; init; }
+
+    /// <summary>Orders R3: a broker connection configured on this host, or none.</summary>
+    public string? BrokerConnection { get; init; }
 }
 
 public class CreateTenantCommandValidator : AbstractValidator<CreateTenantCommand>

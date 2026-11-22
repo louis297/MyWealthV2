@@ -24,6 +24,9 @@ public class Tenant : BaseAuditableEntity
 
     public bool AllowsCustodialAccounts { get; private set; }
 
+    /// <summary>The configured broker connection the Tenant's orders go to, or null (orders R3).</summary>
+    public string? BrokerConnection { get; private set; }
+
     public byte[] RowVersion { get; private set; } = null!;
 
     public static Tenant Create(string name, string code, Currency reportingCurrency, Guid? publicId = null)
@@ -81,6 +84,9 @@ public class Tenant : BaseAuditableEntity
         IsActive = false;
         AddDomainEvent(new TenantDisabled(this));
     }
+
+    /// <summary>Orders R3: names the broker connection new orders of the Tenant go to. It cannot be cleared.</summary>
+    public void SetBrokerConnection(string name) => throw new NotImplementedException();
 
     /// <summary>The custody modes new Accounts of this Tenant may be opened with, External before Custodial.</summary>
     public IReadOnlyList<CustodyMode> AllowedCustodyModes =>

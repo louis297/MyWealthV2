@@ -19,6 +19,9 @@ public class UpdateTenantCommand : IRequest
 
     public IReadOnlyList<string>? AllowedCustodyModes { get; init; }
 
+    /// <summary>Orders R3: a broker connection configured on this host. Omitted or null leaves it as it is.</summary>
+    public string? BrokerConnection { get; init; }
+
     public string? RowVersion { get; init; }
 
     public string? Code { get; init; }

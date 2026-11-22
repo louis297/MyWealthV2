@@ -141,6 +141,37 @@ public class TenantTests
     }
 
     [Test]
+    public void ANewTenant_NamesNoBrokerConnection() =>
+        Tenant.Create("Acme", "acme", Nzd()).BrokerConnection.ShouldBeNull();
+
+    [Test]
+    public void SetBrokerConnection_NamesTheConnection_AndAnotherReplacesIt()
+    {
+        var tenant = Tenant.Create("Acme", "acme", Nzd());
+
+        tenant.SetBrokerConnection("simulator");
+        tenant.BrokerConnection.ShouldBe("simulator");
+
+        tenant.SetBrokerConnection("broker-2");
+        tenant.BrokerConnection.ShouldBe("broker-2");
+    }
+
+    [TestCase("")]
+    [TestCase(" ")]
+    [TestCase("Simulator")]
+    [TestCase("1broker")]
+    [TestCase("broker_one")]
+    public void SetBrokerConnection_RefusesANameThatIsNotAConnectionName_AndKeepsTheSetting(string name)
+    {
+        var tenant = Tenant.Create("Acme", "acme", Nzd());
+        tenant.SetBrokerConnection("simulator");
+
+        Should.Throw<DomainException>(() => tenant.SetBrokerConnection(name));
+
+        tenant.BrokerConnection.ShouldBe("simulator");
+    }
+
+    [Test]
     public void SetAllowedCustodyModes_CustodialOnly_AllowsCustodialOnly()
     {
         var tenant = Tenant.Create("Acme", "acme", Nzd());

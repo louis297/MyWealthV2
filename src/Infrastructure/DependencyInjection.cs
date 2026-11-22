@@ -13,6 +13,8 @@ using MyWealthV2.Application.Reports;
 using MyWealthV2.Application.BankFeed;
 using MyWealthV2.Infrastructure.Accounts;
 using MyWealthV2.Infrastructure.BankFeed;
+using MyWealthV2.Application.Broker;
+using MyWealthV2.Infrastructure.Broker;
 using MyWealthV2.Infrastructure.Currencies;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Interceptors;
@@ -163,6 +165,17 @@ public static class DependencyInjection
             builder.Services.AddScoped<MarketDataSyncJob>();
             builder.Services.AddScoped<CorporateActionApplyJob>();
         }
+    }
+
+    /// <summary>
+    /// Reads <c>BrokerConnections</c> for <paramref name="host"/> and registers <see cref="IBrokerConnections"/>
+    /// (orders R2). Throws on a bad entry, so call it before <c>Build()</c>.
+    /// </summary>
+    public static void AddBrokerConnections(this IHostApplicationBuilder builder, BrokerConnectionHost host)
+    {
+        var connections = new ConfiguredBrokerConnections(BrokerConnectionsConfiguration.Read(builder.Configuration, host));
+        builder.Services.AddSingleton(connections);
+        builder.Services.AddSingleton<IBrokerConnections>(connections);
     }
 
     /// <summary>
