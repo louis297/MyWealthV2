@@ -15,4 +15,8 @@ public static class AvailableCash
     /// and never below 0.</summary>
     public static decimal Withdrawable(decimal cashSum, decimal reserved, decimal unsettled) =>
         Math.Max(0m, Of(cashSum, reserved) - unsettled);
+
+    /// <summary>Orders R45: true when a cash <c>SUM</c> of <paramref name="cashSumAfter"/> leaves the proceeds of
+    /// unsettled sales on the account: cash leaves for somewhere else only from withdrawable cash.</summary>
+    public static bool AllowsLeaving(decimal cashSumAfter, decimal reserved, decimal unsettled) => throw new NotImplementedException();
 }

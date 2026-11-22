@@ -30,4 +30,14 @@ public class AvailableCashTests
     public void Withdrawable_IsAvailableCashMinusUnsettledCash_AndNeverBelowZero(
         decimal sum, decimal reserved, decimal unsettled, decimal withdrawable) =>
         AvailableCash.Withdrawable(sum, reserved, unsettled).ShouldBe(withdrawable);
+
+    // Orders R45.
+    [TestCase(985, 0, 985, true)]
+    [TestCase(984.99, 0, 985, false)]
+    [TestCase(2040.25, 1055.25, 985, true)]
+    [TestCase(2040.24, 1055.25, 985, false)]
+    [TestCase(0, 0, 0, true)]
+    public void AllowsLeaving_WhenTheSumAfterTheWriteKeepsTheReservedAndTheUnsettledCash(
+        decimal after, decimal reserved, decimal unsettled, bool allowed) =>
+        AvailableCash.AllowsLeaving(after, reserved, unsettled).ShouldBe(allowed);
 }
