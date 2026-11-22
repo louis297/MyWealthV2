@@ -200,6 +200,55 @@ public class GetInstrumentTests : TestBase
             .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
+    /// <summary>Simulated instruments R4, R6: the item names the connection that serves its symbol.</summary>
+    [Test]
+    public async Task Item_NamesTheMarketDataConnection_AndARenameWithoutTheSuffixMakesItNull()
+    {
+        var (_, tokens) = await InstrumentHttp.SignInTenantAdmin();
+        var served = await CreateAsync(tokens.AccessToken, "acme.sim", "Acme Simulated Holdings", "USD");
+        var real = await CreateAsync(tokens.AccessToken, "AAPL.US", "Apple", "USD");
+
+        using (var item = await ReadItemAsync(served, tokens.AccessToken))
+        {
+            item.RootElement.GetProperty("marketDataConnection").GetString().ShouldBe("simulator");
+        }
+
+        using (var item = await ReadItemAsync(real, tokens.AccessToken))
+        {
+            item.RootElement.GetProperty("marketDataConnection").ValueKind.ShouldBe(JsonValueKind.Null);
+        }
+
+        var list = await InstrumentHttp.Send(HttpMethod.Get, "/instruments", tokens.AccessToken);
+        using (var page = JsonDocument.Parse(await list.Content.ReadAsStringAsync()))
+        {
+            var bySymbol = page.RootElement.GetProperty("items").EnumerateArray()
+                .ToDictionary(row => row.GetProperty("symbol").GetString()!, row => row.GetProperty("marketDataConnection"));
+            bySymbol["ACME.SIM"].GetString().ShouldBe("simulator");
+            bySymbol["AAPL.US"].ValueKind.ShouldBe(JsonValueKind.Null);
+        }
+
+        string rowVersion;
+        using (var item = await ReadItemAsync(served, tokens.AccessToken))
+        {
+            rowVersion = item.RootElement.GetProperty("rowVersion").GetString()!;
+        }
+
+        (await InstrumentHttp.Send(HttpMethod.Put, $"/instruments/{served}", tokens.AccessToken,
+            new { symbol = "ACME", rowVersion })).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        using (var item = await ReadItemAsync(served, tokens.AccessToken))
+        {
+            item.RootElement.GetProperty("marketDataConnection").ValueKind.ShouldBe(JsonValueKind.Null);
+        }
+    }
+
+    private static async Task<JsonDocument> ReadItemAsync(Guid id, string accessToken)
+    {
+        var response = await InstrumentHttp.Send(HttpMethod.Get, $"/instruments/{id}", accessToken);
+        var content = await response.Content.ReadAsStringAsync();
+        response.StatusCode.ShouldBe(HttpStatusCode.OK, content);
+        return JsonDocument.Parse(content);
+    }
+
     private static async Task<Guid> CreateAsync(
         string accessToken,
         string symbol,

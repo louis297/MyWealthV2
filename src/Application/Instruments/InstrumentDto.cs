@@ -18,7 +18,10 @@ public sealed class InstrumentDto
 
     public required string RowVersion { get; init; }
 
-    public static InstrumentDto From(Instrument instrument, Tenant tenant) => new()
+    /// <summary>Simulated instruments R6: the connection that serves the symbol, or <c>null</c>.</summary>
+    public string? MarketDataConnection { get; init; }
+
+    public static InstrumentDto From(Instrument instrument, Tenant tenant, string? marketDataConnection = null) => new()
     {
         Id = instrument.PublicId,
         TenantId = tenant.PublicId,
