@@ -156,8 +156,8 @@ public class CorporateActionApplyTests : TestBase
         var id = await ApplyNowAsync(world, CreateBody(holders.InstrumentId, ratioNew: 2, exDate: Today));
         var olga = await AccountIdAsync(holders.Olga);
         await ExecuteAsync($"""
-            CREATE TRIGGER [TR_Test_FailCorporateAction] ON [TransactionSecurityLegs] AFTER INSERT AS
-            IF EXISTS (SELECT 1 FROM inserted WHERE [AccountId] = {olga}) THROW 50001, 'Test failure', 1;
+            ALTER TABLE [TransactionSecurityLegs] WITH NOCHECK
+                ADD CONSTRAINT [CK_Test_FailCorporateAction] CHECK ([AccountId] <> {olga});
             """);
         try
         {
@@ -171,7 +171,7 @@ public class CorporateActionApplyTests : TestBase
         }
         finally
         {
-            await ExecuteAsync("DROP TRIGGER [TR_Test_FailCorporateAction];");
+            await ExecuteAsync("ALTER TABLE [TransactionSecurityLegs] DROP CONSTRAINT [CK_Test_FailCorporateAction];");
         }
 
         var next = await RunApplyAsync();
@@ -202,11 +202,12 @@ public class CorporateActionApplyTests : TestBase
             .StatusCode.ShouldBe(HttpStatusCode.OK);
         var scheduler = FunctionalTestSetup.WebApiServices.GetRequiredService<RecordingRebalanceScheduler>();
         var enqueued = scheduler.Enqueued.Count;
+        var before = (await HoldingAsync(token, holders.Ned, holders.InstrumentId)).Quantity;
         await ApplyNowAsync(world, CreateBody(holders.InstrumentId, ratioNew: 2, exDate: Today));
 
         await RunApplyAsync();
 
-        (await HoldingAsync(token, holders.Ned, holders.InstrumentId)).Quantity.ShouldBe(200m);
+        (await HoldingAsync(token, holders.Ned, holders.InstrumentId)).Quantity.ShouldBe(before * 2);
         var assignment = await PortfolioHttp.Send(HttpMethod.Get, $"/accounts/{holders.Ned}/portfolio", token);
         assignment.StatusCode.ShouldBe(HttpStatusCode.OK, await assignment.Content.ReadAsStringAsync());
         scheduler.Enqueued.Count.ShouldBe(enqueued);

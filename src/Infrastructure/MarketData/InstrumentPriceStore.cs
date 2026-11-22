@@ -118,5 +118,5 @@ public sealed class InstrumentPriceStore(ApplicationDbContext db, TimeProvider t
     }
 
     public Task<bool> HasPriceFromAsync(int instrumentId, DateOnly from, CancellationToken cancellationToken = default) =>
-        throw new NotImplementedException();
+        db.InstrumentPrices.AsNoTracking().AnyAsync(row => row.InstrumentId == instrumentId && row.AsOfDate >= from, cancellationToken);
 }
