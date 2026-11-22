@@ -19,6 +19,7 @@ public class Orders : IEndpointGroup
         groupBuilder.MapGet(GetOrder, "{id:guid}").RequireAuthorization(Policies.OrdersRead);
         groupBuilder.MapPost(PlaceOrder).RequireAuthorization(Policies.OrdersPlace);
         groupBuilder.MapPost(PreviewOrder, "preview").RequireAuthorization(Policies.OrdersPlace);
+        groupBuilder.MapPost(CancelOrder, "{id:guid}/cancel").RequireAuthorization(Policies.OrdersPlace);
     }
 
     [EndpointSummary("List orders")]
@@ -63,5 +64,14 @@ public class Orders : IEndpointGroup
         }
 
         return Results.Content(result.Body, "application/json", statusCode: result.StatusCode);
+    }
+
+    [EndpointSummary("Cancel an order")]
+    [EndpointDescription("Cancels an order that was not sent yet, or asks the broker to cancel one it may hold; a fill that arrives before the broker cancels is still booked (R18).")]
+    public static async Task<NoContent> CancelOrder(ISender sender, Guid id, CancelOrderCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
     }
 }

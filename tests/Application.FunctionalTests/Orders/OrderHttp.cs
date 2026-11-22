@@ -66,7 +66,24 @@ internal static class OrderHttp
     public static async Task<List<Guid>> ListIdsAsync(string accessToken, string query = "") =>
         (await ListAsync(accessToken, query)).Select(item => item.GetProperty("id").GetGuid()).ToList();
 
-    /// <summary>The routes of step 5: the two reads and place.</summary>
+    /// <summary>Posts a cancel with the order's current <c>rowVersion</c>.</summary>
+    public static async Task<HttpResponseMessage> CancelAsync(string accessToken, Guid id, string? note = null)
+    {
+        var rowVersion = (await OrderAsync(id)).RowVersion;
+        return await Send(HttpMethod.Post, $"{Path}/{id}/cancel", accessToken, new { note, rowVersion = Convert.ToBase64String(rowVersion) });
+    }
+
+    /// <summary>Records a send attempt on the order, as the send step does before it calls the broker (R20).</summary>
+    public static async Task RecordAttemptAsync(Guid id)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var order = await db.Orders.IgnoreQueryFilters().SingleAsync(row => row.PublicId == id);
+        order.RecordAttempt(DateTimeOffset.UtcNow);
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>The two reads and place.</summary>
     public static IEnumerable<(HttpMethod Method, string Route, object? Body)> Routes(Guid id)
     {
         yield return (HttpMethod.Get, Path, null);
