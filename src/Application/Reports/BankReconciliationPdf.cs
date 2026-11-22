@@ -32,7 +32,10 @@ public static class BankReconciliationPdf
         ["FxConversions"] = "FX conversions not settled through the trust account",
         ["Adjustments"] = "Adjustments",
         ["OtherLedgerCash"] = "Other cash entered on the platform",
-        ["OtherClientMoneyAccount"] = "Cash from another client money account"
+        ["OtherClientMoneyAccount"] = "Cash from another client money account",
+        ["BankInterest"] = "Interest paid by the bank",
+        ["InterestCredited"] = "Interest credited to customers",
+        ["TaxWithheld"] = "Tax withheld from customers' interest"
     };
 
     private static readonly (string Class, string Heading)[] Classes =

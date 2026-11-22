@@ -77,7 +77,7 @@ public sealed class ReconcileClientMoneyAccount(IApplicationDbContext db, TimePr
         var lines = await accountLines
             .Where(row => ItemStatuses.Contains(row.Status))
             .Select(row => new ReconciliationLine(
-                row.Id, row.Direction, row.ValueDate, row.Amount, row.Status, row.UnmatchedReason, row.LastActionNote))
+                row.Id, row.Direction, row.ValueDate, row.Amount, row.Status, row.UnmatchedReason, row.LastActionNote, row.Kind))
             .ToListAsync(cancellationToken);
 
         // R8: every cash leg of every role on the Tenant's Custodial accounts in the currency, whatever their status.
@@ -91,9 +91,20 @@ public sealed class ReconcileClientMoneyAccount(IApplicationDbContext db, TimePr
             select leg;
         var custodialCash = await custodialLegs.SumAsync(leg => (decimal?)leg.Amount, cancellationToken) ?? 0m;
 
+        // Interest-run R41: the legs of interest postings are their own two items, by role, not ledger cash.
+        var interestLegs = await (
+                from leg in custodialLegs
+                join transaction in db.Transactions.IgnoreQueryFilters() on leg.TransactionId equals transaction.Id
+                where transaction.SourceKind == TransactionSourceKind.InterestRun
+                select new { leg.TransactionId, leg.Role, leg.Amount })
+            .ToListAsync(cancellationToken);
+        var interestTransactions = interestLegs.Select(leg => leg.TransactionId).ToHashSet();
+
         // R10: the legs split by the client money account their BankFeed or Payment source belongs to, and by type.
         var perTransaction = await (
                 from leg in custodialLegs
+                where !db.Transactions.IgnoreQueryFilters().Any(transaction =>
+                    transaction.Id == leg.TransactionId && transaction.SourceKind == TransactionSourceKind.InterestRun)
                 group leg by leg.TransactionId
                 into legs
                 select new { TransactionId = legs.Key, Sum = legs.Sum(leg => leg.Amount) })
@@ -164,6 +175,10 @@ public sealed class ReconcileClientMoneyAccount(IApplicationDbContext db, TimePr
             Lines = lines,
             CustodialCash = custodialCash,
             Ledger = ledger,
+            InterestCredited = interestLegs.Where(leg => leg.Role == CashLegRole.Principal).Sum(leg => leg.Amount),
+            InterestCreditedCount = interestTransactions.Count,
+            TaxWithheld = interestLegs.Where(leg => leg.Role == CashLegRole.Tax).Sum(leg => leg.Amount),
+            TaxWithheldCount = interestLegs.Where(leg => leg.Role == CashLegRole.Tax).Select(leg => leg.TransactionId).Distinct().Count(),
             ReservedCash = reserved,
             PaymentsInFlightCount = inFlight?.Count ?? 0,
             PaymentsInFlightAmount = inFlight?.Amount ?? 0m,
