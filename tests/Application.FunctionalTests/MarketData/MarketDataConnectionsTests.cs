@@ -33,11 +33,12 @@ public class MarketDataConnectionsTests : TestBase
         root.GetProperty("totalCount").GetInt32().ShouldBe(1);
         var item = root.GetProperty("items").EnumerateArray().Single();
         item.EnumerateObject().Select(property => property.Name)
-            .ShouldBe(["name", "adapter", "symbolSuffix", "prices"], ignoreOrder: true);
+            .ShouldBe(["name", "adapter", "symbolSuffix", "prices", "corporateActions"], ignoreOrder: true);
         item.GetProperty("name").GetString().ShouldBe("simulator");
         item.GetProperty("adapter").GetString().ShouldBe("Simulator");
         item.GetProperty("symbolSuffix").GetString().ShouldBe(".SIM");
         item.GetProperty("prices").ValueKind.ShouldBe(JsonValueKind.Null);
+        item.GetProperty("corporateActions").ValueKind.ShouldBe(JsonValueKind.Null);
     }
 
     [Test]
