@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using MyWealthV2.Application.Broker;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.ValueObjects;
@@ -23,17 +24,21 @@ public static class DemoTenantSeed
 
     private const string ReportingCurrency = "USD";
 
+    /// <summary>Orders §9.1: the broker connection a seeded tenant gets when it is configured on the host.</summary>
+    public const string BrokerConnection = "simulator";
+
     public static async Task RunAsync(IServiceProvider services, CancellationToken cancellationToken)
     {
         var db = services.GetRequiredService<ApplicationDbContext>();
         var currencies = services.GetRequiredService<ICurrencyCatalog>();
         var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(DemoTenantSeed));
+        var withBroker = services.GetService<IBrokerConnections>()?.IsConfigured(BrokerConnection) == true;
 
         Summary summary = default;
         await db.ExecuteInTransactionAsync(async token =>
         {
             db.ClearTrackedChanges();
-            summary = await SeedAsync(db, currencies, logger, token);
+            summary = await SeedAsync(db, currencies, withBroker, logger, token);
         }, cancellationToken);
 
         logger.LogInformation(
@@ -49,6 +54,7 @@ public static class DemoTenantSeed
     private static async Task<Summary> SeedAsync(
         ApplicationDbContext db,
         ICurrencyCatalog currencies,
+        bool withBroker,
         ILogger logger,
         CancellationToken cancellationToken)
     {
@@ -59,6 +65,12 @@ public static class DemoTenantSeed
         {
             tenant = Tenant.Create(DemoCatalog.TenantName, DemoCatalog.TenantCode, Require(currencies, ReportingCurrency));
             tenant.CreatedBy = CreatedBy;
+            // Orders §9.1: only the tenant this run creates; an existing tenant is left alone.
+            if (withBroker)
+            {
+                tenant.SetBrokerConnection(BrokerConnection);
+            }
+
             db.Tenants.Add(tenant);
             await db.SaveChangesAsync(cancellationToken);
         }

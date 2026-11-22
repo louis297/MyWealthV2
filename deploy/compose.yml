@@ -64,6 +64,8 @@ services:
       Reports__StorageRoot: /reports
       # Bank connection `simulator` (docs/features/deposit-matching.md R1): webapi knows only its name and adapter.
       BankConnections__simulator__Adapter: Simulator
+      # Broker connection `simulator` (docs/features/orders.md R2): webapi knows only its name and adapter.
+      BrokerConnections__simulator__Adapter: Simulator
       # Market data connection `simulator` (docs/features/simulated-instruments.md R1): an instrument whose symbol
       # ends with .SIM is priced by the simulator market, never by EODHD.
       MarketDataConnections__simulator__Adapter: Simulator
@@ -131,6 +133,12 @@ services:
       BankConnections__simulator__BaseUrl: http://simulator:8082
       BankConnections__simulator__ApiKey: ${SIMULATOR_PARTY_API_KEY:?}
       BankConnections__simulator__PollMinutes: ${BANK_SIMULATOR_POLL_MINUTES:-1}
+      # Broker connection `simulator` (orders R2, R19): worker sends the orders and reads the execution reports on
+      # queue `broker`. With the simulator off, each run of the broker sync fails with Unreachable and orders wait.
+      BrokerConnections__simulator__Adapter: Simulator
+      BrokerConnections__simulator__BaseUrl: http://simulator:8082
+      BrokerConnections__simulator__ApiKey: ${SIMULATOR_PARTY_API_KEY:?}
+      BrokerConnections__simulator__PollMinutes: ${BROKER_SIMULATOR_POLL_MINUTES:-1}
       # Market data connection `simulator` (simulated-instruments R1, R7): with the simulator off, each run of the
       # market data job fails with Unreachable and the last stored prices stay.
       MarketDataConnections__simulator__Adapter: Simulator

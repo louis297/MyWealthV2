@@ -1,4 +1,5 @@
 using System.Reflection;
+using MyWealthV2.Application.Broker;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
@@ -81,6 +82,13 @@ public static class DevelopmentIdentitySeeder
             if (tenant is null)
             {
                 tenant = Tenant.Create(firm.Name, firm.Code, nzd);
+                // Orders §9.1: script 0051 gave the firms seeded before it the connection; a firm created now gets
+                // it here, when the host has it.
+                if (services.GetService<IBrokerConnections>()?.IsConfigured(DemoTenantSeed.BrokerConnection) == true)
+                {
+                    tenant.SetBrokerConnection(DemoTenantSeed.BrokerConnection);
+                }
+
                 db.Tenants.Add(tenant);
                 await db.SaveChangesAsync(cancellationToken);
             }
