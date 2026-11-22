@@ -11,5 +11,5 @@ public sealed record OrderFeeTerms(TradeFeeSchedule? Schedule, int DecimalPlaces
     public static OrderFeeTerms None { get; } = new(null, 2);
 
     /// <summary>The schedule's fee on <paramref name="gross"/> (trade-fees R8); 0 with no schedule.</summary>
-    public decimal FeeFor(decimal gross) => throw new NotImplementedException();
+    public decimal FeeFor(decimal gross) => Schedule?.FeeFor(gross, DecimalPlaces).Fee ?? 0m;
 }

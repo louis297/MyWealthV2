@@ -14,11 +14,17 @@ public static class OrderRules
 
     /// <summary>R10: <c>Round(referencePrice × 1.05, 8)</c> for a buy, <c>Round(referencePrice × 0.95, 8)</c> for a
     /// sell: the highest price the broker may buy at, the lowest it may sell at.</summary>
-    public static decimal PriceLimit(OrderSide side, decimal referencePrice) => throw new NotImplementedException();
+    public static decimal PriceLimit(OrderSide side, decimal referencePrice)
+    {
+        var factor = side == OrderSide.Buy ? 100m + CollarPercent : 100m - CollarPercent;
+        return decimal.Round(referencePrice * factor / 100m, 8, MidpointRounding.AwayFromZero);
+    }
 
     /// <summary>R12: <c>Round(quantity × priceLimit, 4)</c>.</summary>
-    public static decimal MaximumGross(decimal quantity, decimal priceLimit) => throw new NotImplementedException();
+    public static decimal MaximumGross(decimal quantity, decimal priceLimit) =>
+        decimal.Round(quantity * priceLimit, 4, MidpointRounding.AwayFromZero);
 
     /// <summary>R10: the price is dated at most <see cref="ReferencePriceMaxAgeDays"/> days before <paramref name="placedOn"/>.</summary>
-    public static bool IsReferencePriceFresh(DateOnly priceDate, DateOnly placedOn) => throw new NotImplementedException();
+    public static bool IsReferencePriceFresh(DateOnly priceDate, DateOnly placedOn) =>
+        placedOn.DayNumber - priceDate.DayNumber <= ReferencePriceMaxAgeDays;
 }
