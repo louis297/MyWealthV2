@@ -1,4 +1,5 @@
 using Hangfire;
+using Hangfire.Storage;
 using Microsoft.Extensions.Logging;
 using MyWealthV2.Application.MarketData;
 using MyWealthV2.Domain.Enums;
@@ -21,10 +22,22 @@ public sealed class MarketDataSyncJob(
 {
     public static string JobId(string connection) => $"market-data-sync:{connection}";
 
-    public Task Run(string connection, CancellationToken cancellationToken)
+    [AutomaticRetry(Attempts = 0, OnAttemptsExceeded = AttemptsExceededAction.Fail)]
+    public async Task Run(string connection, CancellationToken cancellationToken)
     {
-        _ = (sync, runLock, logger);
-        return Task.CompletedTask;
+        await using var held = await runLock.TryAcquireAsync(JobId(connection), cancellationToken);
+        if (held is null)
+        {
+            logger.LogInformation("Another run of {JobId} is still going; this run does nothing.", JobId(connection));
+            return;
+        }
+
+        var outcome = await sync.RunAsync(connection, cancellationToken);
+        if (outcome.Failure is { } failure)
+        {
+            // R8: reported to Hangfire as failed; the next scheduled run is the retry.
+            throw new MarketDataSyncFailedException(connection, failure);
+        }
     }
 }
 
@@ -33,6 +46,8 @@ public static class MarketDataRecurringJob
 {
     public const string Queue = "market";
 
+    private const string Prefix = "market-data-sync:";
+
     /// <summary>Every <paramref name="pollMinutes"/> minutes from the hour, UTC; 60 is once an hour.</summary>
     public static string Cron(int pollMinutes) => BankStatementRecurringJob.Cron(pollMinutes);
 
@@ -40,6 +55,25 @@ public static class MarketDataRecurringJob
     /// no longer configured.</summary>
     public static void Register(IRecurringJobManager recurring, JobStorage storage, ConfiguredMarketDataConnections connections)
     {
-        _ = (recurring, storage, connections);
+        foreach (var connection in connections.Settings)
+        {
+            var name = connection.Name;
+            recurring.AddOrUpdate<MarketDataSyncJob>(
+                MarketDataSyncJob.JobId(name),
+                Queue,
+                job => job.Run(name, CancellationToken.None),
+                Cron(connection.PollMinutes),
+                new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+        }
+
+        var configured = connections.Settings.Select(entry => MarketDataSyncJob.JobId(entry.Name)).ToHashSet(StringComparer.Ordinal);
+        using var storageConnection = storage.GetConnection();
+        foreach (var job in storageConnection.GetRecurringJobs())
+        {
+            if (job.Id.StartsWith(Prefix, StringComparison.Ordinal) && !configured.Contains(job.Id))
+            {
+                recurring.RemoveIfExists(job.Id);
+            }
+        }
     }
 }

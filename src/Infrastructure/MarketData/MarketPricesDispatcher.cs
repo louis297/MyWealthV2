@@ -24,7 +24,14 @@ public sealed class MarketPricesDispatcher(
 {
     public Task<MarketPricesResult> GetPricesAsync(string connection, CancellationToken cancellationToken)
     {
-        _ = (connections, adapters, logger);
-        return Task.FromResult(MarketPricesResult.Succeeded([]));
+        var settings = connections.Settings.SingleOrDefault(entry => entry.Name == connection);
+        var adapter = settings is null ? null : adapters.SingleOrDefault(entry => entry.Adapter == settings.Adapter);
+        if (settings is null || adapter is null)
+        {
+            logger.LogWarning("Market data connection {Connection} has no adapter on this host.", connection);
+            return Task.FromResult(MarketPricesResult.Failed(MarketDataFailure.Unreachable));
+        }
+
+        return adapter.GetPricesAsync(settings, cancellationToken);
     }
 }
