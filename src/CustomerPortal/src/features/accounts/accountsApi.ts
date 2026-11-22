@@ -76,6 +76,18 @@ export type Activity = {
   payment?: { valueDate: string; reference: string | null; payeeName: string | null; payeeAccount: string | null } | null;
   /** interest-run R34: the period an interest posting pays; otherwise null. */
   interest?: { periodFrom: string; periodTo: string; days: number; accruedAmount: number; grossAmount: number } | null;
+  /** corporate-actions R37: the event behind an entitlement posting; otherwise null. */
+  corporateAction?: {
+    id: string;
+    kind: string;
+    ratioNew: number;
+    ratioHeld: number;
+    exDate: string;
+    recordDate: string | null;
+    paymentDate: string | null;
+    quantityBefore: number;
+    quantityAfter: number;
+  } | null;
 };
 
 /** withdrawals R25: a withdrawal as the Customer reads it; the payee number is masked, no memo, no note. */
