@@ -121,29 +121,72 @@ public class CancelCorporateActionCommandValidator : AbstractValidator<CancelCor
     }
 }
 
-public class CreateCorporateActionCommandHandler
+public class CreateCorporateActionCommandHandler(
+    IApplicationDbContext db,
+    ICurrentUser currentUser,
+    MarketDataConnections connections,
+    TimeProvider time)
     : IRequestHandler<CreateCorporateActionCommand, Guid>
 {
     public async Task<Guid> Handle(CreateCorporateActionCommand request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var tenantId = currentUser.TenantId!.Value;
+        var instrumentId = request.InstrumentId!.Value;
+        var instrument = await db.Instruments.AsNoTracking()
+                             .SingleOrDefaultAsync(row => row.TenantId == tenantId && row.PublicId == instrumentId, cancellationToken)
+                         ?? throw new NotFoundException("Instrument", instrumentId);
+
+        // R16: a served instrument's corporate actions come from its connection's feed only.
+        if (connections.For(instrument.Symbol) is not null)
+        {
+            throw CorporateActionReader.Error(
+                nameof(CreateCorporateActionCommand.InstrumentId),
+                $"Corporate actions of {instrument.Symbol} come from its market data connection.");
+        }
+
+        var kind = CorporateActionTerms.ParseKind(request.Kind!);
+        var ratio = CorporateActionTerms.Ratio(kind, request.RatioNew!.Value, request.RatioHeld!.Value);
+        var exDate = request.ExDate!.Value;
+        CorporateActionTerms.EnsureExDate(exDate, time);
+        await CorporateActionTerms.EnsureNoDuplicateAsync(db, instrument, kind, exDate, null, cancellationToken);
+
+        var action = CorporateAction.Enter(tenantId, instrument.Id, kind, ratio, exDate, request.RecordDate, request.PaymentDate, request.Memo);
+        db.CorporateActions.Add(action);
+        await db.SaveChangesAsync(cancellationToken);
+        return action.PublicId;
     }
 }
 
-public class UpdateCorporateActionCommandHandler
+public class UpdateCorporateActionCommandHandler(IApplicationDbContext db, ICurrentUser currentUser, TimeProvider time)
     : IRequestHandler<UpdateCorporateActionCommand>
 {
     public async Task Handle(UpdateCorporateActionCommand request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var action = await CorporateActionReader.FindAsync(db, currentUser, request.Id, cancellationToken);
+        CorporateActionReader.EnsureChangeable(action, request.RowVersion, "changed");
+        var instrument = await db.Instruments.AsNoTracking().SingleAsync(row => row.Id == action.InstrumentId, cancellationToken);
+
+        var kind = CorporateActionTerms.ParseKind(request.Kind!);
+        var ratio = CorporateActionTerms.Ratio(kind, request.RatioNew!.Value, request.RatioHeld!.Value);
+        var exDate = request.ExDate!.Value;
+        CorporateActionTerms.EnsureExDate(exDate, time);
+        await CorporateActionTerms.EnsureNoDuplicateAsync(db, instrument, kind, exDate, action.Id, cancellationToken);
+
+        action.Change(kind, ratio, exDate, request.RecordDate, request.PaymentDate, request.Memo);
+        await CorporateActionReader.SaveAsync(db, cancellationToken);
     }
 }
 
-public class CancelCorporateActionCommandHandler
+public class CancelCorporateActionCommandHandler(IApplicationDbContext db, ICurrentUser currentUser, TimeProvider time)
     : IRequestHandler<CancelCorporateActionCommand>
 {
     public async Task Handle(CancelCorporateActionCommand request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var action = await CorporateActionReader.FindAsync(db, currentUser, request.Id, cancellationToken);
+        CorporateActionReader.EnsureChangeable(action, request.RowVersion, "cancelled");
+        var actor = currentUser.Person?.Id ?? throw new ForbiddenAccessException();
+
+        action.Cancel(actor, request.Note!, time.GetUtcNow());
+        await CorporateActionReader.SaveAsync(db, cancellationToken);
     }
 }

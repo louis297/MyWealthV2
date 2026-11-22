@@ -46,20 +46,59 @@ public class GetCorporateActionsQueryValidator : AbstractValidator<GetCorporateA
     }
 }
 
-public class GetCorporateActionsQueryHandler
+public class GetCorporateActionsQueryHandler(IApplicationDbContext db, ICurrentUser currentUser)
     : IRequestHandler<GetCorporateActionsQuery, PagedList<CorporateActionDto>>
 {
     public async Task<PagedList<CorporateActionDto>> Handle(GetCorporateActionsQuery request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var query = CorporateActionReader.Scope(db, currentUser).AsNoTracking();
+        var statuses = GetCorporateActionsQuery.Names(request.Status)
+            .Select(name => Enum.Parse<CorporateActionStatus>(name, ignoreCase: true))
+            .Distinct()
+            .ToList();
+        if (statuses.Count > 0)
+        {
+            query = query.Where(action => statuses.Contains(action.Status));
+        }
+
+        if (request.InstrumentId is Guid instrumentId)
+        {
+            query = query.Where(action => db.Instruments.Any(instrument =>
+                instrument.Id == action.InstrumentId && instrument.PublicId == instrumentId));
+        }
+
+        if (request.Origin is not null)
+        {
+            var origin = Enum.Parse<CorporateActionOrigin>(request.Origin.Trim(), ignoreCase: true);
+            query = query.Where(action => action.Origin == origin);
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var rows = await query
+            .OrderByDescending(action => action.ExDate)
+            .ThenByDescending(action => action.Id)
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedList<CorporateActionDto>
+        {
+            Items = await CorporateActionReader.ToDtosAsync(db, currentUser, rows, cancellationToken),
+            Page = request.Page,
+            PageSize = request.PageSize,
+            TotalCount = totalCount
+        };
     }
 }
 
-public class GetCorporateActionByIdQueryHandler
+public class GetCorporateActionByIdQueryHandler(IApplicationDbContext db, ICurrentUser currentUser)
     : IRequestHandler<GetCorporateActionByIdQuery, CorporateActionDto>
 {
     public async Task<CorporateActionDto> Handle(GetCorporateActionByIdQuery request, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var action = await CorporateActionReader.Scope(db, currentUser).AsNoTracking()
+                         .SingleOrDefaultAsync(row => row.PublicId == request.Id, cancellationToken)
+                     ?? throw new Common.Exceptions.NotFoundException("CorporateAction", request.Id);
+        return (await CorporateActionReader.ToDtosAsync(db, currentUser, [action], cancellationToken)).Single();
     }
 }
