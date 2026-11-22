@@ -15,25 +15,17 @@ public static class CustodyRules
     public const string TransferOutMessage =
         "Withdrawals from a Custodial account are paid to the customer's nominated bank account. Request a withdrawal.";
 
+    /// <summary>Account closure R23: the <c>errors.Type</c> message for a hand <c>CloseOut</c> on a Custodial account.</summary>
+    public const string CloseOutMessage =
+        "The remainder of a Custodial account is written off by its account closure. Request an account closure.";
+
     /// <summary>
-    /// Withdrawals R46: the <c>errors.Type</c> message for a hand <c>CloseOut</c> of <paramref name="cashSum"/>, or null
-    /// when it is allowed: always on an External account, and on a Custodial account only for a remainder smaller than
-    /// one minor unit of the currency (<c>0 &lt; SUM &lt; 10^−decimalPlaces</c>).
+    /// Account closure R23 (replaces withdrawals R46): the <c>errors.Type</c> message for a hand <c>CloseOut</c> of
+    /// <paramref name="cashSum"/>, or null when it is allowed. Always allowed on an External account; refused for every
+    /// amount on a Custodial account, whose remainder the account closure writes off.
     /// </summary>
-    public static string? CloseOutRefusal(CustodyMode custodyMode, decimal cashSum, string currency, int decimalPlaces)
-    {
-        if (custodyMode == CustodyMode.External)
-        {
-            return null;
-        }
-
-        var minorUnit = MinorUnit(decimalPlaces);
-        return cashSum > 0 && cashSum < minorUnit
-            ? null
-            : $"Only a remainder smaller than {minorUnit.ToString(System.Globalization.CultureInfo.InvariantCulture)} {currency} can be closed out on a Custodial account. Withdraw the balance first.";
-    }
-
-    private static decimal MinorUnit(int decimalPlaces) => ClosureAmounts.MinorUnit(decimalPlaces);
+    public static string? CloseOutRefusal(CustodyMode custodyMode, decimal cashSum, string currency, int decimalPlaces) =>
+        custodyMode == CustodyMode.External ? null : CloseOutMessage;
 
     /// <summary>Withdrawals R47 (roadmap D14): the <c>errors.ToAccountId</c> message for a transfer between two
     /// Customers' Custodial accounts.</summary>
@@ -85,6 +77,7 @@ public static class CustodyRules
         {
             TransactionType.TransferIn => TransferInMessage,
             TransactionType.TransferOut => TransferOutMessage,
+            TransactionType.CloseOut => CloseOutMessage,
             TransactionType.Interest => InterestMessage,
             TransactionType.Opening or TransactionType.OpeningHoldings => OpeningMessage,
             TransactionType.StockIn or TransactionType.StockOut => StockMessage,
