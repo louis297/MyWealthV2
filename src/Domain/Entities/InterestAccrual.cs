@@ -36,9 +36,38 @@ public class InterestAccrual
         decimal balance,
         int interestRateScheduleId,
         decimal effectiveRatePercent,
-        decimal amount) =>
-        throw new NotImplementedException();
+        decimal amount)
+    {
+        if (balance <= 0m)
+        {
+            throw new DomainException("An accrual needs a day balance above 0.");
+        }
+
+        if (amount <= 0m)
+        {
+            throw new DomainException("An accrual needs an amount above 0.");
+        }
+
+        return new InterestAccrual
+        {
+            TenantId = tenantId,
+            AccountId = accountId,
+            Date = date,
+            Balance = balance,
+            InterestRateScheduleId = interestRateScheduleId,
+            EffectiveRatePercent = effectiveRatePercent,
+            Amount = amount
+        };
+    }
 
     /// <summary>R22: stamps the row with the Transaction that paid it, once.</summary>
-    public void MarkPosted(int transactionId) => throw new NotImplementedException();
+    public void MarkPosted(int transactionId)
+    {
+        if (PostedTransactionId is not null)
+        {
+            throw new DomainException("An accrual is posted once.");
+        }
+
+        PostedTransactionId = transactionId;
+    }
 }

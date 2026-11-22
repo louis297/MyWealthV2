@@ -86,7 +86,20 @@ public class Account : BaseAuditableEntity
 
     /// <summary>Interest-run R19: the account was accrued through <paramref name="through"/>. Only moves forward; only
     /// on a Custodial account.</summary>
-    public void MarkInterestAccrued(DateOnly through) => throw new NotImplementedException();
+    public void MarkInterestAccrued(DateOnly through)
+    {
+        if (CustodyMode != CustodyMode.Custodial)
+        {
+            throw new DomainException("Only a Custodial account is accrued.");
+        }
+
+        if (InterestAccruedThrough is { } current && through < current)
+        {
+            throw new DomainException("An account's interest is never accrued back to an earlier day.");
+        }
+
+        InterestAccruedThrough = through;
+    }
 
     public void Rename(string name)
     {
