@@ -11,6 +11,9 @@ export type Account = {
   status: string;
   /** client-money-accounts R14: set on a Custodial account, null on an External one. */
   depositReference?: string | null;
+  /** interest-run R35: unposted daily accruals, 8 decimals; 0 on an External account. */
+  accruedInterest?: number;
+  interestAccruedThrough?: string | null;
   /** account-closure R27: the Account's latest account closure, or null. */
   closure?: {
     id: string;
@@ -43,6 +46,10 @@ export type ActivityCash = {
   accountId: string;
   amount: number;
   currency: string;
+  /** `Principal`, `Fee` or `Tax` (interest-run R34). */
+  role?: string;
+  /** interest-run R34: the tax detail of a `Tax` leg. */
+  tax?: { kind: string; ratePercent: number; basisAmount: number; amount: number; currency: string } | null;
 };
 
 export type ActivityFx = {
@@ -67,6 +74,8 @@ export type Activity = {
   source?: { kind: string; id: string | null } | null;
   /** withdrawals R41: the bank's details on a payout and its Reversal; otherwise null. */
   payment?: { valueDate: string; reference: string | null; payeeName: string | null; payeeAccount: string | null } | null;
+  /** interest-run R34: the period an interest posting pays; otherwise null. */
+  interest?: { periodFrom: string; periodTo: string; days: number; accruedAmount: number; grossAmount: number } | null;
 };
 
 /** withdrawals R25: a withdrawal as the Customer reads it; the payee number is masked, no memo, no note. */
