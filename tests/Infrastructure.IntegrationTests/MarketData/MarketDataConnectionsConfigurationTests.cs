@@ -84,7 +84,7 @@ public class MarketDataConnectionsConfigurationTests
     [TestCase("1market")]
     [TestCase("-market")]
     [TestCase("market_one")]
-    [TestCase("marketnamemarketnamemarketnamemarketnamemarketnam1")]
+    [TestCase("marketnamemarketnamemarketnamemarketnamemarketname1")]
     public void BadName_StopsTheHost(string name)
     {
         var builder = Builder(WebApi(name, ".SIM"));

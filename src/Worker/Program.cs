@@ -22,6 +22,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.AddInfrastructureServices();
 builder.AddBankConnections(BankConnectionHost.Worker);
+builder.AddMarketDataConnections(MarketDataHost.Worker);
 builder.Services.AddScoped<IUser, SystemUser>();
 builder.Services.AddScoped<OutboxProcessor>();
 builder.Services.AddScoped<FxRateSyncJob>();
