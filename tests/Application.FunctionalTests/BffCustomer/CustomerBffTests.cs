@@ -186,7 +186,8 @@ public class CustomerBffTests : TestBase
         callback.Headers.TryAddWithoutValidation("Cookie", CookieHeader(login));
         var session = CookieHeader(await _bff.SendAsync(callback));
 
-        foreach (var path in new[] { "/api/nominated-bank-accounts", "/api/withdrawals" })
+        // bff-customer-portal amendment 2026-11-23 (orders): /orders is on the allow-list too.
+        foreach (var path in new[] { "/api/nominated-bank-accounts", "/api/withdrawals", "/api/orders" })
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, path);
             request.Headers.TryAddWithoutValidation("Cookie", session);
