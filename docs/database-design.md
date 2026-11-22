@@ -609,6 +609,7 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-21 | Bank reconciliation accepted (`0045`, not written yet): `BankReconciliations` and `BankReconciliationItems` (§11.12), the balance columns of `BankFeedCursors` (§11.9), snapshot isolation, report scope `Tenant` and the third catalog row (§14). Simulator script `0006_bank_balances.sql` (§15). §9 lists `0044` and `0045`. All are build contracts. |
 | 2026-11-21 | Bank reconciliation landed: `0045` and simulator `0006` written. `0045` names the composite FKs `FK_<child>_<parent>_TenantId_<column>`, adds `UX_BankReconciliationItems_ReconciliationId_Position` and the item CHECKs `CK_BankReconciliationItems_Line`, `_UnmatchedReason`, `_OtherClientMoneyAccount`, `_Position`, `_Count` (§11.12). |
 | 2026-11-22 | Account closure accepted (`0046`, not written yet): `AccountClosures` (§11.13), `UnmatchedReason` 0–12 (§11.9), `CK_Transactions_SourceKind` 0–5 (§11.4). §9 lists `0046`. All are build contracts. |
+| 2026-11-22 | Account closure landed: `0046` written. It names the CHECKs `CK_AccountClosures_Status`, `_CancelReason`, `_CashBalanceAtRequest`, `_PayoutAmount`, `_WriteOffAmount`, `_Cancel`, `_Completed`, `_Ended`, `_Payout`, `_WriteOff`, the composite FKs `FK_AccountClosures_<parent>_TenantId_<column>` and the index `IX_AccountClosures_TenantId_Status_RequestedAt` (§11.13). |
 
 ---
 
