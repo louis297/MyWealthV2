@@ -176,6 +176,9 @@ public static class DependencyInjection
         var connections = new ConfiguredBrokerConnections(BrokerConnectionsConfiguration.Read(builder.Configuration, host));
         builder.Services.AddSingleton(connections);
         builder.Services.AddSingleton<IBrokerConnections>(connections);
+        // ADR 0021 rule 3: each port is dispatched to the adapter its connection names.
+        builder.Services.AddScoped<IBrokerOrders, BrokerOrdersDispatcher>();
+        builder.Services.AddScoped<IBrokerFeed, BrokerFeedDispatcher>();
         builder.Services.AddScoped<SendBrokerOrders>();
         builder.Services.AddScoped<PullExecutionReports>();
         builder.Services.AddScoped<ProcessExecutionReports>();
