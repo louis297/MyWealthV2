@@ -84,6 +84,10 @@ public class Account : BaseAuditableEntity
         return account;
     }
 
+    /// <summary>Interest-run R19: the account was accrued through <paramref name="through"/>. Only moves forward; only
+    /// on a Custodial account.</summary>
+    public void MarkInterestAccrued(DateOnly through) => throw new NotImplementedException();
+
     public void Rename(string name)
     {
         Name = NormaliseName(name);

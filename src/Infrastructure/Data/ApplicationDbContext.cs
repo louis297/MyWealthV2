@@ -79,6 +79,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<InterestRateBand> InterestRateBands => Set<InterestRateBand>();
 
+    public DbSet<InterestAccrual> InterestAccruals => Set<InterestAccrual>();
+
     public DbSet<Instrument> Instruments => Set<Instrument>();
 
     public DbSet<Account> Accounts => Set<Account>();
