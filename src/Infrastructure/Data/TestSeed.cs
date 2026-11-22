@@ -143,11 +143,19 @@ public static class TestSeed
         ["9984"] = 8000m
     };
 
+    private const string SimulatedSuffix = ".SIM";
+    private const string SimulatorSource = "Simulator";
+
     private static readonly SeedInstrument[] Catalog =
     [
         .. DemoCatalog.Instruments.Select(item =>
             new SeedInstrument(item.Symbol, item.Name, item.QuoteCurrency, true, DevelopmentPrices[item.Symbol])),
-        new("NZD-CASH", "Demo disabled cash proxy", "NZD", false, null)
+        new("NZD-CASH", "Demo disabled cash proxy", "NZD", false, null),
+
+        // Simulated instruments §9.1: the simulator's standing instruments, so a host without the simulator still
+        // has a price. A market data connection with suffix .SIM prices them from then on.
+        new("ACME.SIM", "Acme Simulated Holdings", "USD", true, 100m),
+        new("KIWI.SIM", "Kiwi Simulated Fund", "NZD", true, 5m)
     ];
 
     private static async Task SeedFirmAsync(
@@ -381,7 +389,7 @@ public static class TestSeed
                 InstrumentId = instrument.Id,
                 Price = price,
                 AsOfDate = asOf,
-                Source = "EODHD",
+                Source = item.Symbol.EndsWith(SimulatedSuffix, StringComparison.Ordinal) ? SimulatorSource : "EODHD",
                 FetchedAt = fetchedAt
             });
         }
