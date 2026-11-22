@@ -108,7 +108,8 @@ public sealed class SimulatorBankFeed(IHttpClientFactory httpClients) : IBankFee
                 item.Reference,
                 item.EndToEndId,
                 item.ReturnOf,
-                item.ReturnReason))
+                item.ReturnReason,
+                item.Kind == "Interest" ? StatementLineKind.Interest : StatementLineKind.Transfer))
             .ToList();
         return BankFeedResult.Succeeded(new BankFeedPage(lines, page.Cursor, page.HasMore, page.Balance));
     }
@@ -130,5 +131,6 @@ public sealed class SimulatorBankFeed(IHttpClientFactory httpClients) : IBankFee
         [property: JsonPropertyName("reference")] string? Reference,
         [property: JsonPropertyName("endToEndId")] string? EndToEndId = null,
         [property: JsonPropertyName("returnOf")] string? ReturnOf = null,
-        [property: JsonPropertyName("returnReason")] string? ReturnReason = null);
+        [property: JsonPropertyName("returnReason")] string? ReturnReason = null,
+        [property: JsonPropertyName("kind")] string? Kind = null);
 }

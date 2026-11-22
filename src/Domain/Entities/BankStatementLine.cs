@@ -125,6 +125,7 @@ public class BankStatementLine : BaseAuditableEntity
 
         return new BankStatementLine
         {
+            Kind = kind,
             PublicId = publicId ?? Guid.NewGuid(),
             TenantId = tenantId,
             ClientMoneyAccountId = clientMoneyAccountId,
@@ -321,7 +322,18 @@ public class BankStatementLine : BaseAuditableEntity
 
     /// <summary>Interest-run R40: a <c>Received</c> credit line of kind <c>Interest</c> is set aside by the platform:
     /// <c>Ignored</c>, last action <c>Ignored</c>, the note <see cref="BankInterestNote"/>, no person.</summary>
-    public void SetAsideAsBankInterest(DateTimeOffset at) => throw new NotImplementedException();
+    public void SetAsideAsBankInterest(DateTimeOffset at)
+    {
+        EnsureCredit("set aside as bank interest");
+        EnsureStatus("set aside as bank interest", BankStatementLineStatus.Received);
+        if (Kind != StatementLineKind.Interest)
+        {
+            throw new DomainException("Only a line of kind Interest is set aside as bank interest.");
+        }
+
+        Status = BankStatementLineStatus.Ignored;
+        Record(StatementLineAction.Ignored, BankInterestNote, null, at);
+    }
 
     /// <summary>Must go back to the payer (R28); the caller creates the return payment (bank-returns R5).</summary>
     public void RequestReturn(string note, int byUserId, DateTimeOffset at)
@@ -376,7 +388,7 @@ public class BankStatementLine : BaseAuditableEntity
         MatchedAt = at;
     }
 
-    private void Record(StatementLineAction action, string? note, int byUserId, DateTimeOffset at)
+    private void Record(StatementLineAction action, string? note, int? byUserId, DateTimeOffset at)
     {
         LastAction = action;
         LastActionNote = note;

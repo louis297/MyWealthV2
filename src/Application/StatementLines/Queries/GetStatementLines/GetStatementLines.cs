@@ -41,6 +41,10 @@ public class GetStatementLinesQueryValidator : AbstractValidator<GetStatementLin
             .Must(direction => direction is null || Enum.TryParse<BankLineDirection>(direction, ignoreCase: true, out var parsed)
                 && Enum.IsDefined(parsed) && !int.TryParse(direction, out _))
             .WithMessage("Direction must be Credit or Debit.");
+        RuleFor(query => query.Kind)
+            .Must(kind => kind is null || Enum.TryParse<StatementLineKind>(kind, ignoreCase: true, out var parsed)
+                && Enum.IsDefined(parsed) && !int.TryParse(kind, out _))
+            .WithMessage("Kind must be Transfer or Interest.");
     }
 }
 
@@ -66,6 +70,13 @@ public class GetStatementLinesQueryHandler(IApplicationDbContext db, ICurrentUse
         {
             var direction = Enum.Parse<BankLineDirection>(request.Direction, ignoreCase: true);
             query = query.Where(row => row.Direction == direction);
+        }
+
+        // Interest-run R39: transfers or the bank's own interest.
+        if (request.Kind is not null)
+        {
+            var kind = Enum.Parse<StatementLineKind>(request.Kind, ignoreCase: true);
+            query = query.Where(row => row.Kind == kind);
         }
 
         if (!string.IsNullOrWhiteSpace(request.Currency))

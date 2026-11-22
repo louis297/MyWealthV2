@@ -69,7 +69,8 @@ public sealed class StatementLineLastActionDto
 
     public string? Note { get; init; }
 
-    public required StatementLinePersonDto By { get; init; }
+    /// <summary>The person, or null when the platform acted (interest-run R40).</summary>
+    public StatementLinePersonDto? By { get; init; }
 
     public required DateTimeOffset At { get; init; }
 }

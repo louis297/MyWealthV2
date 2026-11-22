@@ -55,6 +55,14 @@ public sealed class ProcessStatementLines(
             return;
         }
 
+        // Interest-run R40: the bank's interest on the trust account is not a Customer's receipt; nothing is posted.
+        if (line.Direction == BankLineDirection.Credit && line.Kind == StatementLineKind.Interest)
+        {
+            line.SetAsideAsBankInterest(time.GetUtcNow());
+            await db.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
         var payouts = new BankPayouts(db, time, catalog, logger);
         if (line.Direction == BankLineDirection.Debit)
         {

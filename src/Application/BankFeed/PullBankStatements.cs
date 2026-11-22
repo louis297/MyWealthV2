@@ -155,7 +155,8 @@ public sealed class PullBankStatements(
                     now,
                     endToEndId: line.EndToEndId,
                     returnOfOutsideId: line.ReturnOf,
-                    returnReason: line.ReturnReason);
+                    returnReason: line.ReturnReason,
+                    kind: line.Kind);
 
                 // The worker's system user, also when the pull runs outside the worker (deposit-matching R32).
                 stored.CreatedBy = SystemActor.Name;
