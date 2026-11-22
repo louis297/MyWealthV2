@@ -69,6 +69,38 @@ function formatPayout(amount: number, currency: string) {
   return `${new Intl.NumberFormat("en-US", { minimumFractionDigits: digits, maximumFractionDigits: 4 }).format(amount)} ${currency}`;
 }
 
+/** C29: an amount rounded down to the currency's minor unit, as "4.52 USD". */
+function formatDown(amount: number, currency: string) {
+  const digits = minorDigits(currency);
+  const factor = 10 ** digits;
+  const down = Math.floor(amount * factor + 1e-9) / factor;
+  return `${new Intl.NumberFormat("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(down)} ${currency}`;
+}
+
+function minorDigits(currency: string) {
+  try {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency }).resolvedOptions().minimumFractionDigits ?? 2;
+  } catch {
+    return 2;
+  }
+}
+
+/** C30: the gross and the tax withheld of an interest posting; the amount above is the net. */
+function InterestLines({ row }: { row: Activity }) {
+  const tax = row.cash.find((leg) => leg.role === "Tax")?.tax;
+  const currency = row.cash[0]?.currency ?? "";
+  return (
+    <>
+      <p className="text-muted-foreground text-xs">{`Gross ${formatPayout(row.interest!.grossAmount, currency)}`}</p>
+      {tax ? (
+        <p className="text-muted-foreground text-xs">
+          {`Tax withheld (${tax.kind === "Nrwt" ? "NRWT" : "RWT"} ${tax.ratePercent} %) ${formatPayout(tax.amount, currency)}`}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
 function isNotFound(error: unknown) {
   return typeof error === "object" && error !== null && "status" in error && error.status === 404;
 }
@@ -135,6 +167,13 @@ export function AccountDetailPage() {
             {custodial && cash.data ? (
               <DetailItem label="Available to withdraw">
                 {cash.data.availableCash ?? cash.data.cashBalance} {cash.data.currency}
+              </DetailItem>
+            ) : null}
+            {custodial && (account.data.accruedInterest ?? 0) > 0 ? (
+              // C29: the interest accrued so far, rounded down to the currency's minor unit.
+              <DetailItem label="Interest">
+                {`Interest earned so far this period: ${formatDown(account.data.accruedInterest ?? 0, account.data.currency)}`}
+                <span className="mt-1 block text-xs text-muted-foreground">Paid after the end of the month.</span>
               </DetailItem>
             ) : null}
             {custodial && cash.data && (cash.data.reservedCash ?? 0) !== 0 ? (
@@ -245,6 +284,9 @@ export function AccountDetailPage() {
                         {row.type === "TransferOut" && row.payment ? (
                           <p className="text-muted-foreground text-xs">{`Value date ${row.payment.valueDate}`}</p>
                         ) : null}
+                        {row.interest ? (
+                          <p className="text-muted-foreground text-xs">{`${row.interest.periodFrom} to ${row.interest.periodTo}`}</p>
+                        ) : null}
                         {/* C18: an adjustment shows its memo, which the TenantAdmin wrote for the customer; not its reason. */}
                         {row.type === "Adjustment" && row.memo ? (
                           <p className="text-muted-foreground text-xs">{row.memo}</p>
@@ -252,10 +294,16 @@ export function AccountDetailPage() {
                       </TableCell>
                       <TableCell>{formatInstant(row.bookedAt)}</TableCell>
                       <TableCell>
-                        {(row.cash ?? [])
-                          .filter((leg) => leg.accountId === id)
-                          .map((leg) => `${leg.amount} ${leg.currency}`)
-                          .join(", ")}
+                        {row.interest
+                          ? formatPayout(
+                            (row.cash ?? []).filter((leg) => leg.accountId === id)
+                              .reduce((sum, leg) => sum + Math.round(leg.amount * 10000), 0) / 10000,
+                            row.cash[0]?.currency ?? "")
+                          : (row.cash ?? [])
+                            .filter((leg) => leg.accountId === id)
+                            .map((leg) => `${leg.amount} ${leg.currency}`)
+                            .join(", ")}
+                        {row.interest ? <InterestLines row={row} /> : null}
                         {row.fx ? (
                           <p className="text-muted-foreground text-xs">
                             {`1 ${row.fx.baseCurrency} = ${Number(row.fx.rate)} ${row.fx.quoteCurrency} (as of ${row.fx.rateAsOfDate})`}

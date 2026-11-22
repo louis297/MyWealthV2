@@ -32,6 +32,10 @@ public static class Policies
     public const string PortfoliosManage = "portfolios.manage";
     public const string FeesRead = "fees.read";
     public const string FeesManage = "fees.manage";
+    public const string InterestRatesRead = "interest-rates.read";
+    public const string InterestRatesManage = "interest-rates.manage";
+    public const string InterestRunsRead = "interest-runs.read";
+    public const string InterestRunsStart = "interest-runs.start";
     public const string ReportsCustomerRead = "reports.customer.read";
     public const string ReportsCustomerCreate = "reports.customer.create";
     public const string ReportsBookRead = "reports.book.read";

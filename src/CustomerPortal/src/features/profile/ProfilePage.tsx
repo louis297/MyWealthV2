@@ -4,6 +4,7 @@ import { Muted, Page, PageHeading, TextField } from "@/components/portal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BankAccountsSection } from "@/features/profile/BankAccountsSection";
+import { TaxDetailsSection } from "@/features/profile/TaxDetailsSection";
 import { useUpdateMeMutation, useUpdateMePasswordMutation } from "@/features/profile/profileApi";
 import { startLogin } from "@/features/session/session";
 import { clearSession } from "@/features/session/sessionSlice";
@@ -79,6 +80,7 @@ export function ProfilePage() {
           </form>
         </CardContent>
       </Card>
+      <TaxDetailsSection />
       <BankAccountsSection />
     </Page>
   );

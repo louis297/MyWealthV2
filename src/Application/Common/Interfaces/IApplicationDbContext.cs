@@ -26,6 +26,16 @@ public interface IApplicationDbContext
 
     DbSet<AccountClosure> AccountClosures { get; }
 
+    DbSet<CustomerTaxProfile> CustomerTaxProfiles { get; }
+
+    DbSet<InterestRateSchedule> InterestRateSchedules { get; }
+
+    DbSet<InterestRateBand> InterestRateBands { get; }
+
+    DbSet<InterestAccrual> InterestAccruals { get; }
+
+    DbSet<InterestRun> InterestRuns { get; }
+
     DbSet<Instrument> Instruments { get; }
 
     DbSet<Account> Accounts { get; }
@@ -49,6 +59,10 @@ public interface IApplicationDbContext
     DbSet<TradeFeeBand> TradeFeeBands { get; }
 
     DbSet<TransactionFeeDetail> TransactionFeeDetails { get; }
+
+    DbSet<TransactionTaxDetail> TransactionTaxDetails { get; }
+
+    DbSet<TransactionInterestDetail> TransactionInterestDetails { get; }
 
     DbSet<IdempotencyRecord> IdempotencyRecords { get; }
 

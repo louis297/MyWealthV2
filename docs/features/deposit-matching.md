@@ -31,6 +31,7 @@ related:
   - bank-returns.md
   - bank-reconciliation.md
   - account-closure.md
+  - interest-run.md
 ---
 
 # Bank feed and deposit matching
@@ -757,3 +758,15 @@ Status of this amendment: `accepted` (2026-11-22), together with [account-closur
 - R18: new unmatched reason `AccountClosing` (12), checked directly after `AccountClosed`: the reference names an Account with an account closure `InProgress`. Nothing is posted; the TenantAdmin returns the line or matches it by hand once the closure has ended (account-closure R14).
 - R26, R30: a match by hand to a closing account, and an undo match of a deposit on one → 400 with `This account is being closed and accepts no new activity.` under the empty `errors` key (account-closure R12).
 - §6: script `0046_account_closures.sql` widens the `UnmatchedReason` CHECK of `BankStatementLines` to 0–12. The item's `unmatchedReason` may be `AccountClosing`.
+
+---
+
+## Amendment 2026-11-22 (interest run) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rules R39, R40 and R45 live there; this section records what changes here.
+
+- R10: a bank statement line has a **kind**: `Transfer` (the default) or `Interest` (interest the bank pays or charges on the account itself). The port's line carries it; a kind is never a reason to refuse a page. Lines stored before `0048` are `Transfer`. The statement line item gains `kind`, and `GET /statement-lines` an optional `kind` filter (unknown → 400 `errors.Kind`).
+- R13: in the processing step a `Received` **credit** line of kind `Interest` is not matched and its reference is not read: in one database transaction it becomes `Ignored`, with last action `Ignored`, the note `Bank interest`, the time and no person. Nothing is written to the ledger. A TenantAdmin may reopen it and handle it like any receipt (R29).
+- R27: interest the bank pays on the trust account no longer needs a person to ignore it when the bank names it as interest; a line the bank sends as a transfer is still handled by hand.
+- R45: the wire item gains `"kind"`: `"Interest"` on such a line, absent on every other.
+- R49: `SimulatorBankFeed` reads `kind`: `"Interest"` → `Interest`; absent, `null` or any other text → `Transfer`; a value that is not text → `BadResponse`.

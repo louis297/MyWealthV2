@@ -73,6 +73,16 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<AccountClosure> AccountClosures => Set<AccountClosure>();
 
+    public DbSet<CustomerTaxProfile> CustomerTaxProfiles => Set<CustomerTaxProfile>();
+
+    public DbSet<InterestRateSchedule> InterestRateSchedules => Set<InterestRateSchedule>();
+
+    public DbSet<InterestRateBand> InterestRateBands => Set<InterestRateBand>();
+
+    public DbSet<InterestAccrual> InterestAccruals => Set<InterestAccrual>();
+
+    public DbSet<InterestRun> InterestRuns => Set<InterestRun>();
+
     public DbSet<Instrument> Instruments => Set<Instrument>();
 
     public DbSet<Account> Accounts => Set<Account>();
@@ -96,6 +106,10 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
     public DbSet<TradeFeeBand> TradeFeeBands => Set<TradeFeeBand>();
 
     public DbSet<TransactionFeeDetail> TransactionFeeDetails => Set<TransactionFeeDetail>();
+
+    public DbSet<TransactionTaxDetail> TransactionTaxDetails => Set<TransactionTaxDetail>();
+
+    public DbSet<TransactionInterestDetail> TransactionInterestDetails => Set<TransactionInterestDetail>();
 
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 

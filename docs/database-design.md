@@ -369,6 +369,8 @@ Beyond PK / unique constraints already listed:
 0044_bank_returns.sql                       -- OutgoingPayments.Kind and ReturnOfLineId; BankStatementLines statuses 0–6, reasons 0–11, methods 0–4, new Matched CHECK
 0045_bank_reconciliations.sql               -- ALLOW_SNAPSHOT_ISOLATION; BankFeedCursors balance columns; BankReconciliations, BankReconciliationItems; CK_Reports_Scope adds Tenant; report bank-reconciliation
 0046_account_closures.sql                   -- AccountClosures; BankStatementLines reasons 0–12; CK_Transactions_SourceKind 0–5
+0047_customer_tax_profiles.sql              -- CustomerTaxProfiles
+0048_interest.sql                           -- InterestRateSchedules, InterestRateBands, InterestAccruals, InterestRuns, TransactionTaxDetails, TransactionInterestDetails; Accounts.InterestAccruedThrough; cash leg Role 0–2; CK_Transactions_SourceKind 0–6; BankStatementLines.Kind; reconciliation item kinds 0–14
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -429,6 +431,8 @@ Amendment 2026-11-20 (client money accounts, accepted, landed; [features/client-
 
 Amendment 2026-11-22 (account closure, accepted; [features/account-closure.md](features/account-closure.md) §6): no column on `Accounts`. The closures of an Account are rows of `AccountClosures` (§11.13); the account item's `closure` is the latest of them.
 
+Amendment 2026-11-22 (interest run, accepted; [features/interest-run.md](features/interest-run.md) §6.2): script `0048_interest.sql` adds `InterestAccruedThrough date NULL` to `Accounts` (no index, no back-fill): the last UTC day the account was accrued through, set under the Account lock (§11.14).
+
 ### 11.4 Transactions (accepted spec; landed)
 
 Script `0013_transactions.sql`. Columns and rules: [features/posting.md](features/posting.md) §6. Header `Transactions` plus child `TransactionCashLegs` (one cash leg per header this increment). Idempotency table in the same script ([ADR 0015](adr/0015-idempotency-keys.md)). No `Accounts.Balance`. No seed in the script — `TestSeed` only.
@@ -454,6 +458,8 @@ Amendment 2026-11-20 (bank feed and deposit matching, accepted; [features/deposi
 Amendment 2026-11-20 (withdrawals, accepted, landed; [features/withdrawals.md](features/withdrawals.md) §6.2): script `0043_withdrawals.sql` widens `CK_Transactions_SourceKind` to 0–4 (`Payment`) and requires a `SourcePublicId` for kinds 2, 3 and 4. It adds `TransactionPaymentDetails`: `TransactionId int` (PK), `TenantId int NOT NULL`, FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)` RESTRICT, as `TransactionBankReceiptDetails`; `ValueDate date NOT NULL`, `Reference nvarchar(18) NULL`, `PayeeName nvarchar(140) NULL`, `PayeeAccount nvarchar(40) NULL` (masked). 0..1 per Transaction, on a payout and its Reversal only. No back-fill.
 
 Amendment 2026-11-22 (account closure, accepted; [features/account-closure.md](features/account-closure.md) §6): script `0046_account_closures.sql` widens `CK_Transactions_SourceKind` to 0–5 (`AccountClosure`) and requires a `SourcePublicId` for kinds 2–5. No back-fill.
+
+Amendment 2026-11-22 (interest run, accepted; [features/interest-run.md](features/interest-run.md) §6.2): script `0048_interest.sql` widens `CK_TransactionCashLegs_Role` to 0–2 (`Tax`), `CK_Transactions_SourceKind` to 0–6 (`InterestRun`) and requires a `SourcePublicId` for kinds 2–6. It adds `TransactionTaxDetails`: one row per `Tax` cash leg (PK `CashLegId`, FK `(TenantId, CashLegId)` → `TransactionCashLegs`), `TenantId`, `TransactionId` (FK `(TenantId, TransactionId)` → `Transactions`), `Kind int` (CHECK 0–1: `Rwt`, `Nrwt`), `RatePercent decimal(5,2)` (CHECK `> 0` and `≤ 100`), `BasisAmount` and `TaxAmount decimal(18,4)` (CHECK `> 0`), `Currency char(3)` (FK); UQ `(TransactionId, Kind)`. And `TransactionInterestDetails`: `TransactionId` (PK), `TenantId`, FK `(TenantId, TransactionId)` → `Transactions`, `PeriodFrom` and `PeriodTo date` (CHECK from `≤` to), `Days int` (CHECK `≥ 1`), `AccruedAmount decimal(18,8)` and `GrossAmount decimal(18,4)` (CHECK `> 0`). No `PublicId` or `RowVersion`: both are part of an immutable Transaction. All FKs RESTRICT. No back-fill.
 
 ### 11.5 Holdings (accepted, landed)
 
@@ -513,6 +519,8 @@ Amendment 2026-11-21 (bank reconciliation, accepted; [features/bank-reconciliati
 
 Amendment 2026-11-22 (account closure, accepted; [features/account-closure.md](features/account-closure.md) §6): script `0046_account_closures.sql` widens the `UnmatchedReason` CHECK of `BankStatementLines` to 0–12 (`AccountClosing`). No back-fill.
 
+Amendment 2026-11-22 (interest run, accepted; [features/interest-run.md](features/interest-run.md) §6.2): script `0048_interest.sql` adds `Kind int NOT NULL` (default 0 `Transfer`, CHECK 0–1; `1` is `Interest`) to `BankStatementLines`. Existing lines are `Transfer`.
+
 ### 11.10 Nominated bank accounts (accepted)
 
 Feature spec: [features/withdrawals.md](features/withdrawals.md) (accepted 2026-11-20, landed 2026-11-21) §6.1. Script `0042_nominated_bank_accounts.sql`:
@@ -541,6 +549,8 @@ Feature spec: [features/bank-reconciliation.md](features/bank-reconciliation.md)
 
 No back-fill. A run and its items are never updated or deleted; no purge.
 
+Amendment 2026-11-22 (interest run, accepted; [features/interest-run.md](features/interest-run.md) §6.2): script `0048_interest.sql` widens `CK_BankReconciliationItems_Kind` to 0–14 (`BankInterest`, `InterestCredited`, `TaxWithheld`) and `CK_BankReconciliationItems_Line` to the kinds `2, 3, 4, 6, 12` as the kinds with a line. No back-fill.
+
 ### 11.13 Account closures (accepted)
 
 Feature spec: [features/account-closure.md](features/account-closure.md) (accepted 2026-11-22) §6. Script `0046_account_closures.sql`:
@@ -548,6 +558,19 @@ Feature spec: [features/account-closure.md](features/account-closure.md) (accept
 - `AccountClosures` — TenantId, PublicId (unique), `(TenantId, AccountId)` FK → `Accounts`, `Status int` (CHECK 0–2), `CancelReason int NULL` (CHECK 0–3, set iff `Status = 2`), `Memo nvarchar(200)`, `RequestedByUserId` (FK `(TenantId, RequestedByUserId)` → `Users`), `RequestedAt`, `Currency char(3)`, `CashBalanceAtRequest` and `PayoutAmount` (`decimal(18,4)`, CHECK `≥ 0`), `NominatedBankAccountId` and `WithdrawalId` (FKs to `NominatedBankAccounts` and `Withdrawals`, both set iff `PayoutAmount > 0`), `WriteOffAmount decimal(18,4) NULL` (CHECK `> 0`) with `WriteOffTransactionId` (FK → `Transactions`, set together), `CompletedAt` (set iff `Status = 1`), `EndedAt` (set iff `Status = 2`), audit, `RowVersion`. All FKs RESTRICT. Unique filtered `UX_AccountClosures_InProgress` on `(TenantId, AccountId) WHERE Status = 0`; unique filtered `UX_AccountClosures_Withdrawal` on `WithdrawalId WHERE WithdrawalId IS NOT NULL`; index `(TenantId, Status, RequestedAt DESC)`.
 
 No back-fill: Accounts closed before the script have no closure.
+
+### 11.14 Tax profiles and interest (accepted)
+
+Feature spec: [features/interest-run.md](features/interest-run.md) (accepted 2026-11-22) §6. Scripts `0047_customer_tax_profiles.sql` and `0048_interest.sql`:
+
+- `CustomerTaxProfiles` (`0047`) — PK `UserId` (the Customer), `TenantId`, `TaxResidency int` (CHECK 0–1), `IrdNumberHeld bit`, `RwtRatePercent decimal(5,2) NULL` (CHECK `IN (10.5, 17.5, 30, 33, 39)`; CHECK null unless `TaxResidency = 0 AND IrdNumberHeld = 1`), `UpdatedByUserId`, `UpdatedAt`, audit, `RowVersion`. FKs `(TenantId, UserId)` and `(TenantId, UpdatedByUserId)` → `Users (TenantId, Id)` RESTRICT. No back-fill: a Customer without a row is "not provided".
+- `InterestRateSchedules` — `Id`, `PublicId` (unique), `TenantId`, `Currency char(3)` (FK `Currencies`), `EffectiveFrom date`, audit, `RowVersion`. UQ `(TenantId, Currency, EffectiveFrom)`, UQ `(TenantId, Id)`.
+- `InterestRateBands` — `TenantId`, `InterestRateScheduleId` (tenant composite FK), `FromAmount decimal(18,4)` (CHECK `≥ 0`), `RatePercent decimal(7,4)` (CHECK 0–100). UQ `(InterestRateScheduleId, FromAmount)`.
+- `InterestAccruals` — `Id bigint`, `TenantId`, `AccountId`, `AccrualDate date`, `Balance decimal(18,4)` (CHECK `> 0`), `InterestRateScheduleId`, `EffectiveRatePercent decimal(7,4)`, `Amount decimal(18,8)` (CHECK `> 0`), `PostedTransactionId NULL` (set once). Tenant composite FKs to `Accounts`, `InterestRateSchedules` and `Transactions`, RESTRICT. UQ `(AccountId, AccrualDate)`; filtered index `(AccountId, AccrualDate) WHERE PostedTransactionId IS NULL`; index `(PostedTransactionId)`. Rows are never deleted; the only update is the stamp.
+- `InterestRuns` — `Id`, `PublicId` (unique, the source id of its Transactions), `TenantId`, `AsOfDate date`, `Trigger int` (CHECK 0–2), `RanByUserId NULL` (FK `Users (Id)`, not composite: a SystemAdmin has no tenant; null iff `Trigger = 0`), `AccountId NULL` (FK `(TenantId, AccountId)` → `Accounts`; set iff `Trigger = 2`), `StartedAt`, `CompletedAt NULL`, `AccountsProcessed`, `AccountsFailed`, `PostingCount`, audit. Index `(TenantId, StartedAt DESC)`. Never changed after it ends.
+- `Accounts.InterestAccruedThrough` (§11.3); `TransactionTaxDetails`, `TransactionInterestDetails`, the cash leg role and the source kind (§11.4); `BankStatementLines.Kind` (§11.9); the reconciliation item kinds (§11.12).
+
+No back-fill: no account was accrued before `0048`.
 
 ## 12. Still not a schema decision
 
@@ -610,6 +633,8 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-21 | Bank reconciliation landed: `0045` and simulator `0006` written. `0045` names the composite FKs `FK_<child>_<parent>_TenantId_<column>`, adds `UX_BankReconciliationItems_ReconciliationId_Position` and the item CHECKs `CK_BankReconciliationItems_Line`, `_UnmatchedReason`, `_OtherClientMoneyAccount`, `_Position`, `_Count` (§11.12). |
 | 2026-11-22 | Account closure accepted (`0046`, not written yet): `AccountClosures` (§11.13), `UnmatchedReason` 0–12 (§11.9), `CK_Transactions_SourceKind` 0–5 (§11.4). §9 lists `0046`. All are build contracts. |
 | 2026-11-22 | Account closure landed: `0046` written. It names the CHECKs `CK_AccountClosures_Status`, `_CancelReason`, `_CashBalanceAtRequest`, `_PayoutAmount`, `_WriteOffAmount`, `_Cancel`, `_Completed`, `_Ended`, `_Payout`, `_WriteOff`, the composite FKs `FK_AccountClosures_<parent>_TenantId_<column>` and the index `IX_AccountClosures_TenantId_Status_RequestedAt` (§11.13). |
+| 2026-11-22 | Interest run accepted (`0047`, `0048`, not written yet): `CustomerTaxProfiles` and the interest tables (§11.14), `Accounts.InterestAccruedThrough` (§11.3), `TransactionTaxDetails`, `TransactionInterestDetails`, role 0–2 and source kind 0–6 (§11.4), `BankStatementLines.Kind` (§11.9), item kinds 0–14 (§11.12). Simulator script `0007_bank_line_kind.sql` (§15). §9 lists `0047` and `0048`. All are build contracts. |
+| 2026-11-22 | Interest run landed: `0047`, `0048` and simulator `0007` written. `0048` names the CHECKs `CK_InterestRateBands_FromAmount`, `_RatePercent`, `CK_InterestAccruals_Balance`, `_Amount`, `_EffectiveRatePercent`, `CK_InterestRuns_Trigger`, `_RanBy`, `_Account`, `_Counts`, `CK_TransactionTaxDetails_Kind`, `_RatePercent`, `_BasisAmount`, `_TaxAmount`, `CK_TransactionInterestDetails_Period`, `_Days`, `_AccruedAmount`, `_GrossAmount` and `CK_BankStatementLines_Kind`, and the unique keys `UQ_InterestAccruals_AccountId_AccrualDate` and `UQ_TransactionTaxDetails_TransactionId_Kind` (§11.14). `0047` adds `IX_CustomerTaxProfiles_TenantId`. |
 
 ---
 
@@ -711,5 +736,6 @@ Owner: [features/simulator.md](features/simulator.md) §6.2, [ADR 0021](adr/0021
 - S1 payments ([features/withdrawals.md](features/withdrawals.md) §6.3, accepted 2026-11-20, landed 2026-11-21; `0004_bank_payments.sql`): `BankPayments` (payment id unique; `(BankAccountId, InstructionId)` unique, with the request hash), `BankLines` gains `EndToEndId`, `ReturnOfLineId` and `ReturnReason`, and `World` gains `NextPaymentNumber`, `BankPaymentMode` and `BankPaymentRejectReason`. A reset empties `BankPayments` and sets the mode to `Execute`.
 - S1 returns and recalls ([features/bank-returns.md](features/bank-returns.md) §6.2, accepted and landed 2026-11-21; `0005_bank_returns.sql`): `BankPayments.PayeeAccountNumber` and `PayeeName` become NULL and `BankPayments` gains `ReturnOf` (the outside id as sent) and `ReturnOfLineId` (FK `BankLines`, the line when the account has it), with a CHECK of exactly one of a payee and `ReturnOf`. A recall is a `BankLines` row with `ReturnOfLineId`. A reset is unchanged.
 - S1 balances ([features/bank-reconciliation.md](features/bank-reconciliation.md) §6.2, accepted and landed 2026-11-21; `0006_bank_balances.sql`): `BankLines.OmitFromFeed bit NOT NULL DEFAULT 0`. The feed's `balance` and the account list's `statementBalance` are computed from the lines and their places, not stored. A reset is unchanged.
+- S1 trust interest ([features/interest-run.md](features/interest-run.md) §6.3, accepted 2026-11-22; `0007_bank_line_kind.sql`): `BankLines.Kind int NOT NULL DEFAULT 0` (`0` transfer, `1` interest), CHECK 0–1. Existing lines are transfers. A reset is unchanged.
 - Development: Aspire creates the database. VPS: created by hand once, like `MyWealthDbV2` ([deployment.md](deployment.md) §15).
 

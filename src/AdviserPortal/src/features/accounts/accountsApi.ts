@@ -33,6 +33,10 @@ export type Account = {
   rowVersion: string;
   /** account-closure R27: null when the Account has no closure. */
   closure?: AccountClosureSummary | null;
+  /** interest-run R35: unposted daily accruals, 8 decimals; 0 on an External account. */
+  accruedInterest?: number;
+  /** interest-run R35: the last UTC day accrued through, or null. */
+  interestAccruedThrough?: string | null;
 };
 
 export type AccountListArgs = {

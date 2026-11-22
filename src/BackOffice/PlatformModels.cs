@@ -91,6 +91,21 @@ public sealed record ClientMoneyAccountPage(
     int PageSize,
     int TotalCount);
 
+/// <summary>An interest run of a tenant (docs/features/interest-run.md R37).</summary>
+public sealed record InterestRunItem(
+    Guid Id,
+    DateOnly AsOfDate,
+    DateOnly PostingDate,
+    string Trigger,
+    int AccountsProcessed,
+    int AccountsFailed,
+    int PostingCount,
+    IReadOnlyList<InterestRunTotal> Totals);
+
+public sealed record InterestRunTotal(string Currency, int PostingCount, decimal GrossAmount, decimal TaxAmount);
+
+public sealed record InterestRunPage(IReadOnlyList<InterestRunItem> Items, int Page, int PageSize, int TotalCount);
+
 public sealed class PlatformApiException(int status, string body) : Exception(body)
 {
     public int Status { get; } = status;

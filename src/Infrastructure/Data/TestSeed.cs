@@ -1,4 +1,5 @@
 using MyWealthV2.Application.Fees.TradeSchedules;
+using MyWealthV2.Application.Interest.RateSchedules;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -174,6 +175,64 @@ public static class TestSeed
         await EnsureAccountsAsync(db, tenant.Id, firm.CustomerEmail, cancellationToken);
         await EnsureTradeFeeScheduleAsync(db, tenant.Id, cancellationToken);
         await EnsureNominatedBankAccountAsync(db, tenant, firm, cancellationToken);
+        if (firm.TenantCode == DevelopmentIdentitySeeder.DemoTenantCode)
+        {
+            await EnsureInterestRateScheduleAsync(db, tenant.Id, "USD", "United States Dollar", [new FeeBand(0m, 3m), new FeeBand(100000m, 2m)], cancellationToken);
+            await EnsureInterestRateScheduleAsync(db, tenant.Id, "NZD", "New Zealand Dollar", [new FeeBand(0m, 3.5m)], cancellationToken);
+            await EnsureTaxProfileAsync(db, tenant, firm, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Interest run §9.1: one interest rate schedule per currency in the demo tenant, from the day after the cut-off
+    /// date at seed time, so it obeys interest-run R13. Idempotent per (tenant, currency).
+    /// </summary>
+    private static async Task EnsureInterestRateScheduleAsync(
+        ApplicationDbContext db,
+        int tenantId,
+        string currency,
+        string currencyName,
+        FeeBand[] bands,
+        CancellationToken cancellationToken)
+    {
+        if (await db.InterestRateSchedules.AnyAsync(row => row.TenantId == tenantId && row.Currency == currency, cancellationToken))
+        {
+            return;
+        }
+
+        var cutOff = await InterestCutOff.ForAsync(db, tenantId, currency, InterestCutOff.Today(TimeProvider.System), cancellationToken);
+        var schedule = InterestRateSchedule.Create(tenantId, Currency.Create(currency, currencyName, 2), cutOff.AddDays(1), bands, cutOff);
+        schedule.Created = TimeProvider.System.GetUtcNow();
+        schedule.CreatedBy = CreatedBy;
+        db.InterestRateSchedules.Add(schedule);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>Interest run §9.1: the demo Customer's tax profile, IRD number held and 17.5 % chosen, saved by the demo
+    /// TenantAdmin. The other seeded Customers stay not provided. Skipped while either person is missing.</summary>
+    private static async Task EnsureTaxProfileAsync(
+        ApplicationDbContext db,
+        Tenant tenant,
+        SeedFirm firm,
+        CancellationToken cancellationToken)
+    {
+        var people = await db.DomainUsers
+            .Where(row => row.TenantId == tenant.Id && (row.Email == firm.TenantAdminEmail || row.Email == firm.CustomerEmail))
+            .ToListAsync(cancellationToken);
+        var admin = people.SingleOrDefault(row => row.Email == firm.TenantAdminEmail);
+        var customer = people.SingleOrDefault(row => row.Email == firm.CustomerEmail);
+        if (admin is null || customer is null
+            || await db.CustomerTaxProfiles.AnyAsync(row => row.UserId == customer.Id, cancellationToken))
+        {
+            return;
+        }
+
+        var profile = CustomerTaxProfile.Create(
+            tenant.Id, customer.Id, TaxResidency.NewZealand, true, 17.5m, admin.Id, TimeProvider.System.GetUtcNow());
+        profile.Created = TimeProvider.System.GetUtcNow();
+        profile.CreatedBy = CreatedBy;
+        db.CustomerTaxProfiles.Add(profile);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     /// <summary>The account number of the seeded nominated bank account (withdrawals §9.1).</summary>

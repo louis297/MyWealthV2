@@ -23,5 +23,8 @@ public enum TransactionSourceKind
 
     /// <summary>The remainder write-off of an account closure; the source id is the closure's PublicId
     /// (account-closure R18, R24).</summary>
-    AccountClosure = 5
+    AccountClosure = 5,
+
+    /// <summary>An interest run; the source id is the run's PublicId (interest-run R23).</summary>
+    InterestRun = 6
 }

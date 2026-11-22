@@ -57,6 +57,72 @@ public class Transaction : BaseAuditableEntity
     /// <summary>One per <see cref="CashLegRole.Fee"/> cash leg (trade-fees R18).</summary>
     public List<TransactionFeeDetail> FeeDetails { get; private set; } = [];
 
+    /// <summary>One per <see cref="CashLegRole.Tax"/> cash leg (interest-run R25).</summary>
+    public List<TransactionTaxDetail> TaxDetails { get; private set; } = [];
+
+    /// <summary>The period an interest posting pays, on the posting and its Reversal (interest-run R26).</summary>
+    public TransactionInterestDetail? InterestDetail { get; private set; }
+
+    /// <summary>The memo every interest posting carries (interest-run R23).</summary>
+    public const string InterestMemo = "Interest";
+
+    /// <summary>
+    /// Interest-run R22–R26: an interest posting. One <c>Principal</c> <c>Interest</c> cash leg of
+    /// <c>gross = Round(accrued, decimalPlaces)</c>; when the tax of <paramref name="withholding"/> on the gross is above
+    /// 0, a <c>Tax</c> cash leg of <c>−tax</c> with its tax detail; an interest detail; source <c>InterestRun</c>. Built
+    /// without the manual entry matrix (custody-modes R7).
+    /// </summary>
+    public static Transaction PostInterest(
+        int tenantId,
+        int accountId,
+        string accountCurrency,
+        int decimalPlaces,
+        decimal accrued,
+        Interest.InterestPeriod period,
+        Interest.Withholding withholding,
+        DateTimeOffset bookedAt,
+        TransactionSource source)
+    {
+        if (source.Kind != TransactionSourceKind.InterestRun)
+        {
+            throw new DomainException("An interest posting comes from an interest run.");
+        }
+
+        var gross = decimal.Round(accrued, decimalPlaces, MidpointRounding.AwayFromZero);
+        if (gross <= 0m)
+        {
+            throw new DomainException("An interest posting needs a gross amount above 0.");
+        }
+
+        var currency = Money.Create(0m, accountCurrency).Currency;
+        var tax = decimal.Round(gross * withholding.RatePercent / 100m, decimalPlaces, MidpointRounding.AwayFromZero);
+        var cashLegs = new List<TransactionCashLeg> { TransactionCashLeg.Create(tenantId, accountId, gross, currency) };
+        var taxDetails = new List<TransactionTaxDetail>();
+        if (tax > 0m)
+        {
+            var detail = TransactionTaxDetail.Create(tenantId, withholding.Kind, withholding.RatePercent, gross, tax, currency);
+            cashLegs.Add(TransactionCashLeg.CreateTax(tenantId, accountId, -tax, currency, detail));
+            taxDetails.Add(detail);
+        }
+
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            Type = TransactionType.Interest,
+            BookedAt = bookedAt.ToUniversalTime(),
+            Memo = InterestMemo,
+            Reference = null,
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
+            PublicId = Guid.NewGuid(),
+            CashLegs = cashLegs,
+            TaxDetails = taxDetails,
+            InterestDetail = TransactionInterestDetail.Create(tenantId, period, accrued, gross)
+        };
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
+    }
+
     public static Transaction Post(
         int tenantId,
         int accountId,
@@ -994,7 +1060,9 @@ public class Transaction : BaseAuditableEntity
             AdjustmentDetail = AdjustmentDetail?.Copy(),
             BankReceiptDetail = BankReceiptDetail?.Copy(),
             PaymentDetail = PaymentDetail?.Copy(),
-            FeeDetails = cashLegs.Select(leg => leg.FeeDetail).OfType<TransactionFeeDetail>().ToList()
+            FeeDetails = cashLegs.Select(leg => leg.FeeDetail).OfType<TransactionFeeDetail>().ToList(),
+            TaxDetails = cashLegs.Select(leg => leg.TaxDetail).OfType<TransactionTaxDetail>().ToList(),
+            InterestDetail = InterestDetail?.Copy()
         };
         ReversedBy = reversal;
         reversal.AddDomainEvent(new TransactionReversed(reversal));

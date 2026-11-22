@@ -4,7 +4,7 @@ status: accepted
 phase: 1
 language: en
 created: 2026-10-24
-updated: 2026-11-20
+updated: 2026-11-22
 related:
   - README.md
   - ../function-plan.md
@@ -20,6 +20,7 @@ related:
   - ../features/client-money-accounts.md
   - ../adr/0014-openiddict-authorization-code-pkce.md
   - ../features/deposit-matching.md
+  - ../features/interest-run.md
 ---
 
 # Back Office
@@ -236,6 +237,17 @@ Status of this amendment: `accepted` (2026-11-20), together with [deposit-matchi
 | --- | --- |
 | BO18 | The client money accounts table (BO16) gains a "Connection" column (`bankConnection`) and a "Statement" column from `bankFeed`: `null` → "Not read yet"; `lastFailedAt` later than `lastSucceededAt` (or no success) → "Failing since <lastFailedAt>: <failure label>"; otherwise "Read <lastSucceededAt>". Failure labels: Unreachable "Bank not reachable", Timeout "Bank did not answer in time", Unauthorized "Bank refused the key", Unavailable "Bank unavailable", UnknownAccount "Bank does not know this account", BadResponse "Bank answer not understood", InvalidLine "Statement line rejected". |
 | BO19 | The add form gains a required "Bank connection" select from `GET /bank-connections`. With one connection it is preselected. With none the form shows "No bank connection is configured." and cannot be submitted. A 400 `errors.BankConnection` is shown at the select. |
+
+---
+
+## Amendment 2026-11-22 (interest runs) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](../features/interest-run.md). Field rules live there. The tenant configuration page gains the Tenant's interest runs and the manual trigger of roadmap D18. Calls: `GET /interest/runs?tenantId=` (`interest-runs.read`) and `POST /interest/runs` (`interest-runs.start`). No interest rate page: a SystemAdmin has no interest rate permission.
+
+| ID | Behaviour |
+| --- | --- |
+| BO20 | `/tenants/{id}/config` gains an "Interest runs" section: the newest ten runs from `GET /interest/runs?tenantId=` with As of, Trigger, Accounts, Failed, Posted and the totals per currency. |
+| BO21 | A "Run for a date" form in that section: an as-of date (default yesterday, UTC) and Run, which posts `POST /interest/runs` and reloads the table. A 400 `errors.AsOfDate` is shown at the date. Under the form: "Runs every day by itself. Use this after a missed run. A run for a day already done changes nothing." |
 
 ---
 

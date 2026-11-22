@@ -59,6 +59,7 @@ public sealed class CustomerTransactionsReportGenerator(
         var sources = new List<CustomerTransactionSource>(transactions.Count);
         var cashByRow = new Dictionary<(int Id, int AccountId), string>();
         var feeByRow = new Dictionary<(int Id, int AccountId), string>();
+        var taxByRow = new Dictionary<(int Id, int AccountId), string>();
         var instrumentByRow = new Dictionary<(int Id, int AccountId), string>();
         var quantityByRow = new Dictionary<(int Id, int AccountId), string>();
         foreach (var transaction in transactions)
@@ -86,6 +87,8 @@ public sealed class CustomerTransactionsReportGenerator(
                 var cashLegs = transaction.CashLegs.Where(leg => leg.AccountId == accountId).ToList();
                 cashByRow[key] = FormatCash(cashLegs);
                 feeByRow[key] = FormatCash(cashLegs.Where(leg => leg.Role == CashLegRole.Fee).ToList());
+                // Interest-run R38: the Tax column sums the Tax legs; the cash amount stays the net.
+                taxByRow[key] = FormatCash(cashLegs.Where(leg => leg.Role == CashLegRole.Tax).ToList());
                 var legs = transaction.SecurityLegs
                     .Where(leg => leg.AccountId == accountId)
                     .OrderBy(leg => leg.Id)
@@ -112,7 +115,8 @@ public sealed class CustomerTransactionsReportGenerator(
                 quantityByRow[(row.Id, row.AccountId)],
                 row.Memo,
                 feeByRow[(row.Id, row.AccountId)],
-                CustodyLabel(row.CustodyMode)))
+                CustodyLabel(row.CustodyMode),
+                taxByRow[(row.Id, row.AccountId)]))
             .ToList();
 
         return CustomerTransactionsPdf.Render(new CustomerTransactionsPdfModel(

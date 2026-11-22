@@ -78,6 +78,21 @@ export function canCheckBankAccounts(role: string | null | undefined) {
   return role === roles.tenantAdmin;
 }
 
+/** interest-rates.read: the Interest rates page (interest-run D59). */
+export function canAccessInterestRates(role: string | null | undefined) {
+  return role === roles.tenantAdmin || role === roles.adviser;
+}
+
+/** interest-rates.manage: create, edit and delete a pending interest rate (D59). */
+export function canManageInterestRates(role: string | null | undefined) {
+  return role === roles.tenantAdmin;
+}
+
+/** interest-runs.read: the Interest runs pages (D60). */
+export function canReadInterestRuns(role: string | null | undefined) {
+  return role === roles.tenantAdmin;
+}
+
 /** withdrawals.read for staff: the Withdrawals pages (withdrawals D46). */
 export function canAccessWithdrawals(role: string | null | undefined) {
   return role === roles.tenantAdmin || role === roles.adviser;

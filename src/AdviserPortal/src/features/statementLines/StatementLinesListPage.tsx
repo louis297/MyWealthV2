@@ -1,5 +1,6 @@
 import { Link, useSearchParams } from "react-router";
 import { FilterBar, Muted, Page, PageHeading, recordLinkClass, SelectField, StatusBadge } from "@/components/portal";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { SelectItem } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -28,16 +29,25 @@ const directions: Record<string, { label: string; direction?: string }> = {
   All: { label: "All" },
 };
 
+/** D63: transfers, the bank's interest, or both. */
+const kinds: Record<string, { label: string; kind?: string }> = {
+  All: { label: "All" },
+  Transfer: { label: "Payments and receipts", kind: "Transfer" },
+  Interest: { label: "Bank interest", kind: "Interest" },
+};
+
 export const forbiddenSentence = "Only a firm administrator can see bank receipts.";
 
 export function StatementLinesListPage() {
   const [params, setParams] = useSearchParams();
   const filter = filters[params.get("status") ?? ""] ? params.get("status")! : "Unmatched";
   const direction = directions[params.get("direction") ?? ""] ? params.get("direction")! : "Credit";
+  const kind = kinds[params.get("kind") ?? ""] ? params.get("kind")! : "All";
   const page = Number(params.get("page") ?? "1") || 1;
   const { data, error } = useGetStatementLinesQuery({
     status: filters[filter].status,
     direction: directions[direction].direction,
+    kind: kinds[kind].kind,
     page,
   });
   const currencies = useGetCurrenciesQuery();
@@ -90,6 +100,19 @@ export function StatementLinesListPage() {
                 </SelectItem>
               ))}
             </SelectField>
+            <SelectField
+              id="statement-lines-kind"
+              label="Kind"
+              className="w-56"
+              value={kind}
+              onChange={(event) => update("kind", event.target.value || null)}
+            >
+              {Object.entries(kinds).map(([value, item]) => (
+                <SelectItem key={value} value={value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectField>
           </FilterBar>
           <Card className="gap-0 py-0">
             <CardContent className="px-0">
@@ -118,7 +141,13 @@ export function StatementLinesListPage() {
                       <TableCell>{formatAmount(item.amount, places(item.currency))}</TableCell>
                       <TableCell>{item.currency}</TableCell>
                       <TableCell>{item.payerName ?? ""}</TableCell>
-                      <TableCell>{item.reference ?? ""}</TableCell>
+                      <TableCell>
+                        {item.reference ?? ""}
+                        {item.kind === "Interest" ? (
+                          // D63: the bank's interest on the trust account.
+                          <Badge variant="secondary" className="ml-2">Bank interest</Badge>
+                        ) : null}
+                      </TableCell>
                       <TableCell>
                         <StatusBadge status={statusLabel(item.status)} />
                       </TableCell>

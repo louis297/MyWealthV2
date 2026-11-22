@@ -34,6 +34,14 @@ internal static class TradeFeeScheduleRules
             }
         }
 
+        failures.AddRange(CheckBands(bands, decimalPlaces));
+        return failures;
+    }
+
+    /// <summary>The R5 band shape with the request field names; reused by interest rate schedules (interest-run R9).</summary>
+    public static List<ValidationFailure> CheckBands(IReadOnlyList<FeeBandInput>? bands, int decimalPlaces)
+    {
+        var failures = new List<ValidationFailure>();
         if (bands is null || bands.Count is < 1 or > FeeBands.MaxBands)
         {
             failures.Add(new ValidationFailure("Bands", $"A schedule needs 1 to {FeeBands.MaxBands} bands."));

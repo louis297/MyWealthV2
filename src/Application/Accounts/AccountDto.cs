@@ -39,13 +39,20 @@ public sealed class AccountDto
     /// <summary>The Account's latest account closure, or null when it has none (account-closure R27).</summary>
     public AccountClosureSummaryDto? Closure { get; init; }
 
+    /// <summary>The sum of the account's daily accrual rows not yet posted, 8 decimals; 0 on an External account (interest-run R35).</summary>
+    public decimal AccruedInterest { get; init; }
+
+    /// <summary>The last UTC day the account was accrued through, or null (interest-run R35).</summary>
+    public DateOnly? InterestAccruedThrough { get; init; }
+
     public static AccountDto From(
         Account account,
         Tenant tenant,
         User customer,
         decimal cashBalance,
         decimal reservedCash,
-        AccountClosureSummaryDto? closure = null) => new()
+        AccountClosureSummaryDto? closure = null,
+        decimal accruedInterest = 0m) => new()
     {
         Id = account.PublicId,
         TenantId = tenant.PublicId,
@@ -61,6 +68,8 @@ public sealed class AccountDto
         Status = account.Status.ToString(),
         IsActive = account.IsActive,
         RowVersion = Convert.ToBase64String(account.RowVersion ?? []),
-        Closure = closure
+        Closure = closure,
+        AccruedInterest = accruedInterest,
+        InterestAccruedThrough = account.InterestAccruedThrough
     };
 }

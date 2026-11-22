@@ -67,6 +67,12 @@ public interface IPlatformApi
 
     Task<IReadOnlyList<CurrencyItem>> ListCurrenciesAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>The tenant's newest ten interest runs (interest-run BO20).</summary>
+    Task<IReadOnlyList<InterestRunItem>> ListInterestRunsAsync(Guid tenantId, CancellationToken cancellationToken = default);
+
+    /// <summary>Runs interest for the tenant and an as-of date at once (interest-run R32, BO21).</summary>
+    Task<Guid> StartInterestRunAsync(Guid tenantId, DateOnly asOfDate, CancellationToken cancellationToken = default);
+
     Task<InstrumentPage> ListInstrumentsAsync(
         int page,
         int pageSize,

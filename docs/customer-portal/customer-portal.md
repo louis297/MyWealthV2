@@ -25,6 +25,7 @@ related:
   - ../features/deposit-matching.md
   - ../features/withdrawals.md
   - ../features/account-closure.md
+  - ../features/interest-run.md
 ---
 
 # Customer Portal
@@ -293,3 +294,15 @@ Status of this amendment: `accepted` (2026-11-22), together with [account-closur
 | --- | --- | --- | --- |
 | C26 | Customer with a closing Custodial account | Account page | A note above the balance: "This account is being closed. 300.00 USD is being paid to your bank account ****8900." (amount from `closure.payoutAmount`, the number from the withdrawal). A Closed account whose latest closure is `Completed` shows "Closed on <date>." |
 | C27 | Customer with a write-off on a Custodial account | Account page activity | The row is labelled "Rounding write-off" instead of the `CloseOut` label. A `CloseOut` with another source keeps today's label. |
+
+---
+
+## Amendment 2026-11-22 (interest run) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [interest-run](../features/interest-run.md). The Customer Portal reads `GET /users/me/tax-profile`, the account item's `accruedInterest` and `interestAccruedThrough`, and the transaction item's `interest` and leg `tax`. The Customer Portal BFF does not change: it already proxies `/users`, `/accounts` and `/transactions`.
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| C28 | A Customer | Profile page | A "Tax details" section from `GET /users/me/tax-profile`: Tax residency, IRD number ("On file" / "Not on file"), RWT rate, and "Tax taken from your interest: <rate> %". Under it: "To change these details, contact your adviser." No form. |
+| C29 | A Customer with a Custodial account whose `accruedInterest` is above 0 | Account page | "Interest earned so far this period: <amount>" (the currency's minor unit, rounded down) under the balance, with "Paid after the end of the month." |
+| C30 | A Customer with an interest posting | Account page activity | The row is labelled "Interest" with its period, and shows Gross, "Tax withheld (<kind label> <rate> %)" and the net amount. A hand-entered `Interest` on an External account keeps today's row. |

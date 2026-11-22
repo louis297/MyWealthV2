@@ -21,6 +21,7 @@ related:
   - deposit-matching.md
   - withdrawals.md
   - account-closure.md
+  - interest-run.md
 ---
 
 # Transaction source
@@ -381,3 +382,14 @@ Status of this amendment: `accepted` (2026-11-22), together with [account-closur
 - R12, R13: `AccountClosure` is not hand-reversible. `POST /transactions/{id}/reverse` of a write-off → 400 with the R13 message.
 - §6: script `0046_account_closures.sql` widens `CK_Transactions_SourceKind` to 0–5 and requires a `SourcePublicId` for kinds 2–5.
 - R18 (item): `source.kind` may be `AccountClosure`, with `id` the closure's PublicId.
+
+---
+
+## Amendment 2026-11-22 (interest run) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rules R23 and R27 live there; this section records what changes here.
+
+- R2, R4: new source kind `InterestRun = 6`, with the interest run's PublicId as source id (required). `TransactionSource.InterestRun(Guid runPublicId)` refuses an empty id.
+- R12, R13: `InterestRun` is not hand-reversible. `POST /transactions/{id}/reverse` of an interest posting → 400 by R13.
+- §6: script `0048_interest.sql` widens `CK_Transactions_SourceKind` to 0–6 and requires a `SourcePublicId` for kinds 2–6.
+- R18 (item): `source.kind` may be `InterestRun`, with `id` the run's PublicId.

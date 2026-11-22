@@ -20,6 +20,7 @@ related:
   - ../api-design.md
   - ../glossary.md
   - account-closure.md
+  - interest-run.md
 ---
 
 # Receipt returns, recalls and other debit lines
@@ -322,3 +323,11 @@ The repository should build after each commit. Agents split each behaviour into 
 Status of this amendment: `accepted` (2026-11-22), together with [account-closure.md](account-closure.md).
 
 - R3: no rule changes. On a closing account (an account closure `InProgress`) available cash is the remainder below the minor unit, so a recall of one of its receipts is not covered and waits in suspense as `RecallNotCovered` (account-closure R15), as on any account whose cash is reserved for a withdrawal.
+
+---
+
+## Amendment 2026-11-22 (interest run) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rule R40 lives there; this section records what changes here.
+
+- R2–R4: no rule changes. A **debit** line of kind `Interest` (interest the bank charges on the trust account) gets no special rule: it is processed as any debit line and waits in suspense with reason `UnknownPayment`, where a TenantAdmin ignores it with a note.

@@ -1,4 +1,5 @@
 using MyWealthV2.Application.Common.Security;
+using MyWealthV2.Application.Interest.TaxProfiles;
 using MyWealthV2.Application.Users;
 using MyWealthV2.Application.Users.Commands.ChangeCurrentUserPassword;
 using MyWealthV2.Application.Users.Commands.UpdateCurrentUser;
@@ -16,7 +17,13 @@ public class Users : IEndpointGroup
         groupBuilder.MapGet(GetMe, "me").RequireAuthorization(Policies.UsersMe);
         groupBuilder.MapPut(UpdateMe, "me").RequireAuthorization(Policies.UsersMe);
         groupBuilder.MapPut(ChangePassword, "me/password").RequireAuthorization(Policies.UsersMe);
+        groupBuilder.MapGet(GetMyTaxProfile, "me/tax-profile").RequireAuthorization(Policies.UsersMe);
     }
+
+    [EndpointSummary("Get my tax profile")]
+    [EndpointDescription("The signed-in Customer's own tax profile, without who last changed it. Any other role gets 404.")]
+    public static async Task<Ok<TaxProfileDto>> GetMyTaxProfile(ISender sender) =>
+        TypedResults.Ok(await sender.Send(new GetMyTaxProfileQuery()));
 
     [EndpointSummary("Get the current user")]
     [EndpointDescription("Returns the authenticated person's profile. Does not issue tokens.")]

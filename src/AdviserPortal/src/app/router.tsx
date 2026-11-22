@@ -15,6 +15,10 @@ import { CreateTradeSchedulePage } from "@/features/fees/CreateTradeSchedulePage
 import { EditTradeSchedulePage } from "@/features/fees/EditTradeSchedulePage";
 import { FeesTradePage } from "@/features/fees/FeesTradePage";
 import { TradeScheduleDetailPage } from "@/features/fees/TradeScheduleDetailPage";
+import { InterestRateFormPage } from "@/features/interest/InterestRateFormPage";
+import { InterestRatesPage } from "@/features/interest/InterestRatesPage";
+import { InterestRunPage } from "@/features/interest/InterestRunPage";
+import { InterestRunsPage } from "@/features/interest/InterestRunsPage";
 import { CreatePortfolioPage } from "@/features/portfolios/CreatePortfolioPage";
 import { PortfolioDetailPage } from "@/features/portfolios/PortfolioDetailPage";
 import { PortfoliosListPage } from "@/features/portfolios/PortfoliosListPage";
@@ -85,6 +89,24 @@ export const appRoutes: RouteObject[] = [
                 children: [
                   { path: "trade/new", element: <CreateTradeSchedulePage /> },
                   { path: "trade/:id/edit", element: <EditTradeSchedulePage /> },
+                ],
+              },
+            ],
+          },
+          {
+            // interest-run D59, D60: an Adviser reads rates; the forms and the runs are a TenantAdmin's.
+            path: "/interest",
+            element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
+            children: [
+              { index: true, element: <Navigate to="/interest/rates" replace /> },
+              { path: "rates", element: <InterestRatesPage /> },
+              { path: "runs", element: <InterestRunsPage /> },
+              { path: "runs/:id", element: <InterestRunPage /> },
+              {
+                element: <RoleGate allow={[roles.tenantAdmin]} />,
+                children: [
+                  { path: "rates/new", element: <InterestRateFormPage /> },
+                  { path: "rates/:id/edit", element: <InterestRateFormPage /> },
                 ],
               },
             ],

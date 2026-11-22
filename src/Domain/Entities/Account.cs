@@ -18,6 +18,9 @@ public class Account : BaseAuditableEntity
 
     public AccountType Type { get; private set; }
 
+    /// <summary>Interest-run R19: the last UTC day this account was accrued through; null before the first time.</summary>
+    public DateOnly? InterestAccruedThrough { get; private set; }
+
     public CustodyMode CustodyMode { get; private set; }
 
     public AccountStatus Status { get; private set; }
@@ -79,6 +82,23 @@ public class Account : BaseAuditableEntity
         };
         account.AddDomainEvent(new AccountOpened(account));
         return account;
+    }
+
+    /// <summary>Interest-run R19: the account was accrued through <paramref name="through"/>. Only moves forward; only
+    /// on a Custodial account.</summary>
+    public void MarkInterestAccrued(DateOnly through)
+    {
+        if (CustodyMode != CustodyMode.Custodial)
+        {
+            throw new DomainException("Only a Custodial account is accrued.");
+        }
+
+        if (InterestAccruedThrough is { } current && through < current)
+        {
+            throw new DomainException("An account's interest is never accrued back to an earlier day.");
+        }
+
+        InterestAccruedThrough = through;
     }
 
     public void Rename(string name)

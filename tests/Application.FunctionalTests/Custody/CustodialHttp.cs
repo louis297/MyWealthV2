@@ -149,6 +149,25 @@ internal static class CustodialHttp
             : Json(HttpStatusCode.Created, new { id = payout.Value });
     }
 
+    /// <summary>A Verified nominated bank account of the account's Customer in its currency, added straight to the
+    /// database when there is none.</summary>
+    public static async Task<Guid> VerifiedPayeeAsync(Guid accountId) => (await PayeeAsync(accountId)).NominatedBankAccountId;
+
+    /// <summary>Requests a withdrawal of <paramref name="amount"/> from a Custodial account and leaves it Requested,
+    /// so its cash is reserved (withdrawals R36). Answers the withdrawal's id.</summary>
+    public static async Task<Guid> RequestWithdrawalAsync(Guid accountId, decimal amount)
+    {
+        var payee = await PayeeAsync(accountId);
+        var adviserToken = (await TestApp.IssueAccessTokenAsync(payee.Adviser)).AccessToken;
+        var request = await TransactionHttp.Send(HttpMethod.Post, "/withdrawals", adviserToken, new Dictionary<string, object?>
+        {
+            ["accountId"] = accountId,
+            ["nominatedBankAccountId"] = payee.NominatedBankAccountId,
+            ["amount"] = amount
+        }, Guid.NewGuid());
+        return await ReadIdAsync(request);
+    }
+
     /// <summary>The Customer's Adviser, a TenantAdmin of the tenant to approve (one is added when there is none), and
     /// a Verified nominated bank account in the Account's currency (added straight to the database when there is
     /// none).</summary>

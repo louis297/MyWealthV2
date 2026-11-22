@@ -65,6 +65,7 @@ Minimal API, TypedResults, endpoints dispatch MediatR only. Paths are kebab-case
 | Docs | `[EndpointSummary]` / `[EndpointDescription]` on every action |
 | People paths | `/users` is a **namespace prefix**, not a parent resource. People collections hang under it. Do not nest advisers / customers under `/users/{id}`. Tenants, currencies, and ledger routes stay outside this prefix |
 | Fee paths | `/fees` is a namespace prefix for fee configuration and calculation, like `/users`; it is not a resource. Fee transactions stay under `/transactions` (§7.9) |
+| Interest paths | `/interest` is a namespace prefix for interest configuration and runs, like `/fees`; it is not a resource. Interest postings stay under `/transactions` (§7.10) |
 
 Success codes:
 
@@ -141,6 +142,10 @@ The fifth role `SimulatorOperator` ([ADR 0013](adr/0013-roles-authorization-sing
 | `account-closures.read` | | ✓ | ✓ | ✓ | [account-closure](features/account-closure.md) (accepted 2026-11-22) |
 | `account-closures.request` | | ✓ | ✓ | | [account-closure](features/account-closure.md) (accepted 2026-11-22) |
 | `bank-reconciliations.manage` | | ✓ | | | [bank-reconciliation](features/bank-reconciliation.md) (accepted 2026-11-21) |
+| `interest-rates.read` | | ✓ | ✓ | | [interest-run](features/interest-run.md) (accepted 2026-11-22) |
+| `interest-rates.manage` | | ✓ | | | [interest-run](features/interest-run.md) (accepted 2026-11-22) |
+| `interest-runs.read` | ✓ | ✓ | | | [interest-run](features/interest-run.md) (accepted 2026-11-22) |
+| `interest-runs.start` | ✓ | | | | [interest-run](features/interest-run.md) (accepted 2026-11-22) |
 | `portfolios.read` | ✓ | ✓ | ✓ | | [portfolios](features/portfolios.md) |
 | `portfolios.manage` | ✓ | ✓ | ✓ | | [portfolios](features/portfolios.md) |
 | `reports.customer.read` | | ✓ | ✓ | ✓ | [reports](features/reports.md) |
@@ -239,6 +244,7 @@ Status of this section: `accepted` (2026-11-13). The build contract for it is [f
 | `portfolio_already_assigned` | 409 | The account's Active assignment is already this portfolio. | — | [features/portfolios.md](features/portfolios.md) §7 `AssignPortfolio` |
 | `portfolio_shared` | 409 | The caller is an Adviser and the portfolio is a Shared portfolio. | — | [features/portfolios.md](features/portfolios.md) amendment 2026-11-13 |
 | `fee_schedule_in_effect` | 409 | The trade fee schedule row may already apply to a posted trade, so it cannot be updated or deleted. Add a new row instead. | — | [features/trade-fees.md](features/trade-fees.md) R11 |
+| `interest_schedule_in_effect` | 409 | The interest rate schedule row may already apply to an accrued day, so it cannot be updated or deleted. Add a new row instead. | — | [features/interest-run.md](features/interest-run.md) R13 |
 | `disabled` | 400 | §4.1 | `target`, `targetId` | §4.1 |
 | `missing_price`, `missing_fx`, `insufficient_cash`, `account_not_eligible`, `portfolio_inactive`, `concurrent_modification` | 400 | Rebalance failure | — | [features/portfolios.md](features/portfolios.md) §11 |
 
@@ -303,7 +309,7 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Current user | `/users/me` | GET, PUT, PUT password | `users.me` |
 | Tenant admins | `/users/tenant-admins` | list / get / create / update / disable / enable | `tenant-admins.manage` |
 | Advisers | `/users/advisers` | same | `advisers.manage` |
-| Customers | `/users/customers` | same | `customers.manage` or `customers.manage-own` |
+| Customers | `/users/customers` | same; sub-resource `…/{customerId}/tax-profile` GET / PUT (features/interest-run.md) | `customers.manage` or `customers.manage-own` |
 | Currencies | `/currencies` | GET | Authenticated |
 | Tenants | `/tenants` | list / get / create / update / disable / enable | `tenants.manage` |
 | Client money accounts | `/tenants/{tenantId}/client-money-accounts` | list / get / create / disable / enable. See features/client-money-accounts.md; `bankConnection`, `bankFeed` in features/deposit-matching.md | `tenants.manage` |
@@ -313,11 +319,12 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Withdrawals | `/withdrawals` | list / get / create (`Idempotency-Key`); approve / reject / cancel. See features/withdrawals.md | `withdrawals.read` / `.request` / `.approve` |
 | Bank reconciliations | `/bank-reconciliations` | overview / list / get / create (run now). No PUT or DELETE: a run never changes. See features/bank-reconciliation.md | `bank-reconciliations.manage` |
 | Instruments | `/instruments` | list / get / create / update / disable / enable | `instruments.read` / `instruments.create` / `instruments.manage` |
-| Accounts | `/accounts` | list / get / create / update / close / reopen; `GET …/cash-balance`; `GET …/deposit-instructions` (features/client-money-accounts.md); sub-resource `…/closures`: request (`Idempotency-Key`) / list / get (features/account-closure.md) | `accounts.read` / `accounts.create` / `accounts.manage`; closures `account-closures.read` / `.request` |
+| Accounts | `/accounts` | list / get / create / update / close / reopen; `GET …/cash-balance`; `GET …/deposit-instructions` (features/client-money-accounts.md); sub-resource `…/closures`: request (`Idempotency-Key`) / list / get (features/account-closure.md); `GET …/interest-accruals` (features/interest-run.md) | `accounts.read` / `accounts.create` / `accounts.manage`; closures `account-closures.read` / `.request` |
 | Transactions | `/transactions` | list / get / create / reverse | `transactions.read` / `transactions.create` |
 | Net worth | `/net-worth`, `/users/customers/{id}/net-worth` | GET. See features/net-worth.md; `breakdowns.byCustodyMode` in features/custody-mode-grouping.md | `accounts.read` |
 | Portfolios | `/portfolios`, `/accounts/{id}/portfolio`, `/accounts/{id}/rebalance` | list / get / create / update / disable; assign / unassign / rebalance. See features/portfolios.md | `portfolios.read` / `portfolios.manage` + `transactions.create` |
 | Fees | `/fees/trade-schedules` (namespace `/fees`) | list / get / create / update / delete. See features/trade-fees.md | `fees.read` / `fees.manage` |
+| Interest | `/interest/rate-schedules`, `/interest/runs` (namespace `/interest`) | rate schedules: list / get / create / update / delete; runs: list / get / create (start a run). See features/interest-run.md | `interest-rates.read` / `.manage`; `interest-runs.read` / `.start` |
 | Reports | `/reports` | list / request / schedules / executions / download | `reports.customer.read` / `reports.customer.create` / `reports.book.read` / `reports.book.create` / `reports.tenant.read` / `reports.tenant.create` |
 
 Path `{id}` is always PublicId.
@@ -420,6 +427,8 @@ Rule summary:
 
 People lists reuse the tenants envelope `{ items, page, pageSize, totalCount }` (page default 1, size default 20, max 100). Currencies, people collections, and instruments use `enabledOnly` (omit / `false` = all, `true` = enabled / Active only). Each person item includes `status`. Create on a disabled tenant uses §4.1.
 
+- Amendment 2026-11-22 (interest run, accepted; field rules in [features/interest-run.md](features/interest-run.md) R1–R8): sub-resource `GET` / `PUT /users/customers/{customerId}/tax-profile` (`customers.manage` or `customers.manage-own`, scope as every `/users/customers` route; a Customer → 403) and `GET /users/me/tax-profile` (`users.me`; a caller who is not a Customer → 404). The item is `{ taxResidency, irdNumberHeld, rwtRatePercent, withholding: { kind, ratePercent, basis }, updatedBy, updatedAt, rowVersion }`; `PUT` takes the three attributes and `rowVersion` (`null` for the first write) and answers 204; stale → 409 `stale_row_version`. The IRD number itself is never stored.
+
 ### 7.5 Instruments
 
 Field rules: [features/instruments.md](features/instruments.md).
@@ -466,6 +475,7 @@ Field rules: [features/accounts.md](features/accounts.md).
 - Amendment 2026-11-20 (withdrawals, accepted; field rules in [features/withdrawals.md](features/withdrawals.md)): the item and `GET /accounts/{id}/cash-balance` include `reservedCash` (the sum of open withdrawals; 0 on an External account) and `availableCash` (cash balance minus reserved cash).
 - Amendment 2026-11-21 (receipt returns, recalls and other debit lines, accepted; field rules in [features/bank-returns.md](features/bank-returns.md)): no new route or permission. `POST /statement-lines/{id}/request-return` also creates the return payment the bank sends; `reopen` of a `ReturnRequested` line is refused (400 `errors.Status`) once the bank was asked. `ignore` (from `Unmatched`) and `reopen` (from `Ignored`) apply to debit lines too. The statement line item gains statuses `ReturnSent` and `Returned`, reasons `UnknownPayment`, `UnknownReturn`, `RecallNotCovered`, `ReturnRejected`, method `Recall`, and `returnPayment: { status, attempts, lastFailure }` (`null` without a return payment); `match.accountId`, `match.customerId` and `match.transactionId` are `null` on a match with no Transaction. A recalled deposit is reversed by the flow (source `BankFeed`).
 - Amendment 2026-11-22 (account closure, accepted; field rules in [features/account-closure.md](features/account-closure.md)): sub-resource `/accounts/{accountId}/closures` — `POST` (`account-closures.request`, `Idempotency-Key`, 201 `{ id }`), `GET` and `GET …/{id}` (`account-closures.read`); SystemAdmin has neither. The item gains `closure` (the latest closure, or `null`). `POST /accounts/{id}/close` on an Open Custodial account → 400 for every caller; External accounts unchanged. While a closure is `InProgress` the Account is closing and every hand write on it → 400. No problem code.
+- Amendment 2026-11-22 (interest run, accepted; field rules in [features/interest-run.md](features/interest-run.md) R33, R35, R36): the item gains `accruedInterest` (unposted daily accruals, 8 decimals; `0` on an External account) and `interestAccruedThrough` (a date or `null`). `GET /accounts/{accountId}/interest-accruals` (`accounts.read`, the Account's scope) → list envelope of the daily accrual rows, newest first; filters `from`, `to`, `transactionId`, `posted`. `POST /accounts/{accountId}/closures` posts the interest accrued through yesterday before the payout is worked out.
 
 ### 7.7 Transactions
 
@@ -494,6 +504,7 @@ Field rules: [features/posting.md](features/posting.md) for cash types, [feature
 - Amendment 2026-11-20 (bank feed and deposit matching, accepted; field rules in [features/deposit-matching.md](features/deposit-matching.md)): on a Custodial account `POST /transactions` refuses `TransferIn` (400 `errors.Type`): deposits come from the bank statement. A deposit is a `TransferIn` with `source: { kind: "BankFeed", id: <statement line id> }` and the new item field `bankReceipt: { valueDate, reference, payerName, payerAccount }` (`null` on other Transactions); a hand reverse of it → 400. New resource `/statement-lines` (`statement-lines.manage`, TenantAdmin only): list (filters `status`, `currency`, `clientMoneyAccountId`), get, and `POST …/{id}/match` `{ accountId, rowVersion, note? }`, `…/ignore`, `…/request-return`, `…/unmatch` `{ note, rowVersion }`, `…/reopen` `{ rowVersion }`, each 204; stale `rowVersion` → 409 `stale_row_version`. No `Idempotency-Key` on these actions. No problem code added.
 - Amendment 2026-11-20 (withdrawals, accepted; field rules in [features/withdrawals.md](features/withdrawals.md)): on a Custodial account `POST /transactions` refuses `TransferOut` (400 `errors.Type`, every caller) and a `CloseOut` of more than a remainder below the currency's minor unit (400 `errors.Type`); `POST /transactions/transfer` between Custodial accounts of two Customers → 400 `errors.ToAccountId`. Every Custodial write that lowers cash (create, transfer, fx, adjustment, reverse, rebalance, unmatch) is refused when it would leave available cash below 0. A payout is a `TransferOut` with `source: { kind: "Payment", id: <withdrawal id> }` and the new item field `payment: { valueDate, reference, payeeName, payeeAccount }` (`null` on other Transactions); a hand reverse of it → 400. New resources `/nominated-bank-accounts` and `/withdrawals` (§6). `GET /statement-lines` takes an optional `direction` (`Credit`, `Debit`; else 400 `errors.Direction`); the line item gains `relatedLineId`, `withdrawalId` and `returnReason`. No problem code added.
 - Amendment 2026-11-22 (account closure, accepted; field rules in [features/account-closure.md](features/account-closure.md)): on a Custodial account `POST /transactions` refuses `CloseOut` for every amount (400 `errors.Type`, every caller). Source kind `AccountClosure` marks the remainder write-off; it is not hand-reversible. Every create, quote and reverse with a leg on a closing account → 400 under the empty `errors` key.
+- Amendment 2026-11-22 (interest run, accepted; field rules in [features/interest-run.md](features/interest-run.md) R23–R27, R34, R39): source kind `InterestRun` marks an interest posting; it is not hand-reversible. A cash leg's `role` may be `Tax`; every cash leg gains `tax` (`{ kind, ratePercent, basisAmount, amount, currency }` on a `Tax` leg, `null` otherwise) and the item gains `interest` (`{ periodFrom, periodTo, days, accruedAmount, grossAmount }` on an interest posting and its Reversal, `null` otherwise). A hand `Interest` on a Custodial account stays refused. The statement line item gains `kind` (`Transfer`, `Interest`), and `GET /statement-lines` an optional `kind` filter (else 400 `errors.Kind`).
 
 **Type-specific create routes.** When a type's create body differs from the common shape (one top-level `accountId`), that type gets its own `POST /transactions/{action}`. Each type has exactly one create route: a type with its own route is rejected by `POST /transactions` (400). Read (`GET /transactions`, `GET /transactions/{id}`) and reverse (`POST /transactions/{id}/reverse`) stay shared by every type. Every new type gets its own `POST /transactions/{action}` route, whatever its body shape (decided 2026-11-10). Existing types keep `POST /transactions` until each is moved in its own spec amendment ([future-plans.md](future-plans.md) §4).
 
@@ -552,6 +563,23 @@ Back Office tenant configuration lists the active catalog and calls the existing
 | POST | `/fees/trade-schedules/preview` | `fees.read` | 200 fee preview ([features/trade-fees.md](features/trade-fees.md) R30–R33; no write) |
 
 Field rules: [features/trade-fees.md](features/trade-fees.md). Update or delete of a schedule row in effect → 409 `fee_schedule_in_effect`. Every cash leg in the transaction item carries `role` (`Principal` or `Fee`) and `fee` (the fee detail on a `Fee` leg, null otherwise).
+
+### 7.10 Interest
+
+`/interest` is a namespace prefix, like `/fees`: there is no `GET /interest`. Interest postings are Transactions (§7.7), never entered by hand on a Custodial account.
+
+| Method | Route | Policy | Success |
+| --- | --- | --- | --- |
+| GET | `/interest/rate-schedules` | `interest-rates.read` | 200 envelope (optional `currency`) |
+| GET | `/interest/rate-schedules/{id}` | `interest-rates.read` | 200 item |
+| POST | `/interest/rate-schedules` | `interest-rates.manage` | 201 `{ id }` |
+| PUT | `/interest/rate-schedules/{id}` | `interest-rates.manage` | 204 |
+| DELETE | `/interest/rate-schedules/{id}` | `interest-rates.manage` | 204 |
+| GET | `/interest/runs` | `interest-runs.read` | 200 envelope (SystemAdmin must send `tenantId`; filters `trigger`, `from`, `to`) |
+| GET | `/interest/runs/{id}` | `interest-runs.read` | 200 item |
+| POST | `/interest/runs` | `interest-runs.start` | 201 `{ id }` (`{ tenantId, asOfDate }`; runs at once) |
+
+Field rules: [features/interest-run.md](features/interest-run.md). Update or delete of a rate schedule row in effect → 409 `interest_schedule_in_effect`. `asOfDate` after yesterday (UTC) → 400 `errors.AsOfDate` unless `Interest:AllowFutureAsOfDates` is on. No `Idempotency-Key` on these routes.
 
 ---
 
@@ -633,3 +661,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-21 | §6, §7.7: receipt returns, recalls and other debit lines accepted. No route, permission or problem code; statement line statuses `ReturnSent`, `Returned`, four unmatched reasons, method `Recall`, item `returnPayment`, nullable match ids; ignore and reopen on debit lines; request return sends the payment ([features/bank-returns.md](features/bank-returns.md)). |
 | 2026-11-21 | §3.1, §6, §7.8: bank reconciliation accepted. Permissions `bank-reconciliations.manage`, `reports.tenant.read` and `reports.tenant.create` (TenantAdmin only); resource `/bank-reconciliations` (overview, list, get, run now); report scope `Tenant` and report `bank-reconciliation`. No problem code ([features/bank-reconciliation.md](features/bank-reconciliation.md)). |
 | 2026-11-22 | §3.1, §6, §7.6, §7.7: account closure accepted. Permissions `account-closures.read` and `account-closures.request`; sub-resource `/accounts/{accountId}/closures` (request, list, get); account item `closure`, withdrawal item `accountClosureId`; source kind `AccountClosure`; hand `CloseOut` and `POST /accounts/{id}/close` refused on a Custodial account; a closing account refuses every hand write. No problem code ([features/account-closure.md](features/account-closure.md)). |
+| 2026-11-22 | §2, §3.1, §4.2, §6, §7.4, §7.6, §7.7, §7.10: interest run accepted. Namespace `/interest` with `/interest/rate-schedules` and `/interest/runs`; permissions `interest-rates.read`, `interest-rates.manage`, `interest-runs.read`, `interest-runs.start`; problem code `interest_schedule_in_effect`; sub-resources `/users/customers/{customerId}/tax-profile`, `/users/me/tax-profile` and `/accounts/{accountId}/interest-accruals`; account item `accruedInterest`, `interestAccruedThrough`; transaction item `interest`, leg role `Tax` and leg `tax`; source kind `InterestRun`; statement line `kind` and its filter ([features/interest-run.md](features/interest-run.md)). |

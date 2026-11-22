@@ -23,6 +23,11 @@ public class TransactionCashLegConfiguration : IEntityTypeConfiguration<Transact
             .HasForeignKey<TransactionFeeDetail>(detail => detail.CashLegId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_TransactionFeeDetails_TransactionCashLegs_TenantId_CashLegId");
+        builder.HasOne(leg => leg.TaxDetail)
+            .WithOne()
+            .HasForeignKey<TransactionTaxDetail>(detail => detail.CashLegId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_TransactionTaxDetails_TransactionCashLegs_TenantId_CashLegId");
         builder.HasIndex(leg => leg.AccountId).IncludeProperties(leg => leg.Amount);
         builder.HasOne<Account>()
             .WithMany()

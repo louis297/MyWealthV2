@@ -46,6 +46,48 @@ public class BankStatementLineTests
     }
 
     [Test]
+    public void Receive_IsATransferByDefault_AndKeepsTheKind()
+    {
+        BankStatementLine.Receive(3, 9, "simulator", "w-L1", new DateOnly(2026, 12, 31), BankLineDirection.Credit, 520m, "USD",
+            "Bank interest", null, null, At).Kind.ShouldBe(StatementLineKind.Transfer);
+        BankStatementLine.Receive(3, 9, "simulator", "w-L2", new DateOnly(2026, 12, 31), BankLineDirection.Credit, 520m, "USD",
+            "Bank interest", null, null, At, kind: StatementLineKind.Interest).Kind.ShouldBe(StatementLineKind.Interest);
+    }
+
+    [Test]
+    public void SetAsideAsBankInterest_IgnoresAReceivedCreditInterestLine_WithTheNoteAndNoPerson()
+    {
+        var line = BankStatementLine.Receive(3, 9, "simulator", "w-L1", new DateOnly(2026, 12, 31), BankLineDirection.Credit, 520m,
+            "USD", "Bank interest", null, null, At, kind: StatementLineKind.Interest);
+
+        line.SetAsideAsBankInterest(At.AddMinutes(1));
+
+        line.Status.ShouldBe(BankStatementLineStatus.Ignored);
+        (line.LastAction, line.LastActionNote, line.LastActionByUserId, line.LastActionAt)
+            .ShouldBe((StatementLineAction.Ignored, "Bank interest", (int?)null, (DateTimeOffset?)At.AddMinutes(1)));
+        line.Reopen(Admin, At.AddMinutes(2));
+        line.Status.ShouldBe(BankStatementLineStatus.Unmatched);
+    }
+
+    [Test]
+    public void SetAsideAsBankInterest_RefusesATransfer_ADebit_AndALineNotReceived()
+    {
+        var transfer = BankStatementLine.Receive(3, 9, "simulator", "w-L1", new DateOnly(2026, 12, 31), BankLineDirection.Credit, 520m,
+            "USD", null, null, null, At);
+        var debit = BankStatementLine.Receive(3, 9, "simulator", "w-L2", new DateOnly(2026, 12, 31), BankLineDirection.Debit, 5m,
+            "USD", null, null, null, At, kind: StatementLineKind.Interest);
+        var done = BankStatementLine.Receive(3, 9, "simulator", "w-L3", new DateOnly(2026, 12, 31), BankLineDirection.Credit, 520m,
+            "USD", null, null, null, At, kind: StatementLineKind.Interest);
+        done.SetAsideAsBankInterest(At);
+
+        Should.Throw<DomainException>(() => transfer.SetAsideAsBankInterest(At));
+        Should.Throw<DomainException>(() => debit.SetAsideAsBankInterest(At));
+        Should.Throw<DomainException>(() => done.SetAsideAsBankInterest(At));
+        transfer.Status.ShouldBe(BankStatementLineStatus.Received);
+        debit.Status.ShouldBe(BankStatementLineStatus.Received);
+    }
+
+    [Test]
     public void LinkReturnedLine_KeepsTheStoredLine()
     {
         var line = BankStatementLine.Receive(

@@ -220,6 +220,26 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         return created.Id;
     }
 
+    public async Task<IReadOnlyList<InterestRunItem>> ListInterestRunsAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        var page = await ReadAsync<InterestRunPage>(
+            HttpMethod.Get,
+            $"/interest/runs?tenantId={tenantId}&pageSize=10",
+            json: null,
+            cancellationToken);
+        return page.Items;
+    }
+
+    public async Task<Guid> StartInterestRunAsync(Guid tenantId, DateOnly asOfDate, CancellationToken cancellationToken = default)
+    {
+        var created = await ReadAsync<Created>(
+            HttpMethod.Post,
+            "/interest/runs",
+            JsonSerializer.Serialize(new { tenantId, asOfDate = asOfDate.ToString("yyyy-MM-dd") }, Json),
+            cancellationToken);
+        return created.Id;
+    }
+
     public Task DisableClientMoneyAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
         SendExpectingSuccessAsync(
             HttpMethod.Post,

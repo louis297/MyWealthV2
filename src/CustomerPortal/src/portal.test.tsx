@@ -84,6 +84,7 @@ function renderAt(
     cash?: Record<string, unknown>;
     withdrawals?: unknown[];
     nominated?: unknown[];
+    taxProfile?: unknown;
   } = {},
 ) {
   const accounts = options.accounts ?? [
@@ -97,6 +98,17 @@ function renderAt(
     }
     if (url.endsWith("/users/me/password") && method === "PUT") {
       return new Response(null, { status: 204 });
+    }
+    if (url.endsWith("/users/me/tax-profile")) {
+      return json(options.taxProfile ?? {
+        taxResidency: "NewZealand",
+        irdNumberHeld: false,
+        rwtRatePercent: null,
+        withholding: { kind: "Rwt", ratePercent: 45, basis: "NonDeclaration" },
+        updatedBy: null,
+        updatedAt: null,
+        rowVersion: null,
+      });
     }
     if (url.endsWith("/users/me")) {
       return json(person);
@@ -855,5 +867,116 @@ describe("Customer Portal account closure (account-closure C26, C27)", () => {
 
     expect(await screen.findByRole("row", { name: /^Rounding write-off/ })).toHaveTextContent("-0.004 USD");
     expect(screen.getByRole("row", { name: /^CloseOut/ })).toBeInTheDocument();
+  });
+});
+
+describe("Customer Portal interest (interest-run C28–C30)", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal("location", {
+      origin: "http://localhost:3000",
+      pathname: "/profile",
+      search: "",
+      href: "http://localhost:3000/profile",
+      assign: vi.fn(),
+    });
+  });
+
+  const custodialUsd = { type: "Brokerage", currency: "USD", depositReference: "K7M3Q9PXB" };
+  const posting = {
+    id: "71111111-1111-1111-1111-111111111111",
+    tenantId: "22222222-2222-2222-2222-222222222222",
+    type: "Interest",
+    bookedAt: "2027-01-01T00:30:04Z",
+    memo: "Interest",
+    reference: null,
+    originalTransactionId: null,
+    reversedByTransactionId: null,
+    rowVersion: "AAAA",
+    source: { kind: "InterestRun", id: "run-1" },
+    interest: { periodFrom: "2026-12-02", periodTo: "2026-12-31", days: 30, accruedAmount: 12.328767, grossAmount: 12.33 },
+    cash: [
+      { accountId: "account-1", customerId: me.id, role: "Principal", amount: 12.33, currency: "USD", tax: null },
+      {
+        accountId: "account-1", customerId: me.id, role: "Tax", amount: -2.16, currency: "USD",
+        tax: { kind: "Rwt", ratePercent: 17.5, basisAmount: 12.33, amount: 2.16, currency: "USD" },
+      },
+    ],
+    security: [],
+    bankReceipt: null,
+    payment: null,
+  };
+
+  it("shows the Customer's tax details, read only (C28)", async () => {
+    renderAt("/profile", me, [], "External", {
+      taxProfile: {
+        taxResidency: "NewZealand",
+        irdNumberHeld: true,
+        rwtRatePercent: 17.5,
+        withholding: { kind: "Rwt", ratePercent: 17.5, basis: "Elected" },
+        updatedBy: null,
+        updatedAt: "2026-11-22T03:00:00Z",
+        rowVersion: "AAAB",
+      },
+    });
+
+    expect(await screen.findByText("Tax details")).toBeInTheDocument();
+    expect(screen.getByText("New Zealand")).toBeInTheDocument();
+    expect(screen.getByText("On file")).toBeInTheDocument();
+    expect(screen.getByText("17.5 %")).toBeInTheDocument();
+    expect(screen.getByText("Tax taken from your interest: 17.5 %")).toBeInTheDocument();
+    expect(screen.getByText("To change these details, contact your adviser.")).toBeInTheDocument();
+  });
+
+  it("shows Not on file and the non-declaration rate when nothing is saved (C28)", async () => {
+    renderAt("/profile", me);
+
+    expect(await screen.findByText("Not on file")).toBeInTheDocument();
+    expect(screen.getByText("Not chosen")).toBeInTheDocument();
+    expect(screen.getByText("Tax taken from your interest: 45 %")).toBeInTheDocument();
+  });
+
+  it("shows the interest earned so far on a Custodial account, rounded down to the cent (C29)", async () => {
+    renderAt("/accounts/account-1", me, [], "Custodial", {
+      account: { ...custodialUsd, accruedInterest: 4.5295479, interestAccruedThrough: "2026-12-12" },
+      cash: { currency: "USD", cashBalance: 5000, reservedCash: 0, availableCash: 5000 },
+    });
+
+    expect(await screen.findByText("Interest earned so far this period: 4.52 USD")).toBeInTheDocument();
+    expect(screen.getByText("Paid after the end of the month.")).toBeInTheDocument();
+  });
+
+  it("shows no interest line without accrued interest (C29)", async () => {
+    renderAt("/accounts/account-1", me, [], "Custodial", {
+      account: { ...custodialUsd, accruedInterest: 0, interestAccruedThrough: null },
+      cash: { currency: "USD", cashBalance: 5000, reservedCash: 0, availableCash: 5000 },
+    });
+
+    expect(await screen.findByText("Available to withdraw")).toBeInTheDocument();
+    expect(screen.queryByText(/Interest earned so far/)).not.toBeInTheDocument();
+  });
+
+  it("labels an interest posting with its period, gross, tax withheld and net (C30)", async () => {
+    const handInterest = {
+      ...posting,
+      id: "72222222-2222-2222-2222-222222222222",
+      source: { kind: "Manual", id: null },
+      interest: null,
+      cash: [{ accountId: "account-1", customerId: me.id, role: "Principal", amount: 5, currency: "USD", tax: null }],
+    };
+    renderAt("/accounts/account-1", me, [posting, handInterest], "Custodial", {
+      account: custodialUsd,
+      cash: { currency: "USD", cashBalance: 5000, reservedCash: 0, availableCash: 5000 },
+    });
+
+    const row = await screen.findByRole("row", { name: /2026-12-02 to 2026-12-31/ });
+    expect(row).toHaveTextContent("Interest");
+    expect(row).toHaveTextContent("Gross 12.33 USD");
+    expect(row).toHaveTextContent("Tax withheld (RWT 17.5 %) 2.16 USD");
+    expect(row).toHaveTextContent("10.17 USD");
+    const hand = screen.getAllByRole("row").find((item) => item.textContent?.includes("5 USD"));
+    expect(hand).toBeDefined();
+    expect(hand).not.toHaveTextContent("Tax withheld");
   });
 });

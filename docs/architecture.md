@@ -3,7 +3,7 @@ title: Architecture
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-11-21
+updated: 2026-11-22
 related:
   - README.md
   - glossary.md
@@ -332,7 +332,7 @@ Phase 3 introduces a general-purpose background worker (ADR 0017).
 - Manual work is enqueued from `webapi` after the normal policy and handler scope checks.
 - Recurring work is driven by Hangfire recurring jobs whose scope is owned by a schedule record. Generation re-validates that scope.
 - Queues (`reports`, `email`, default) provide light isolation. One worker project is enough until a concrete resource or failure-domain need appears.
-- First consumer: [features/reports.md](features/reports.md). The same worker delivers domain events from `OutboxMessages` (ADR 0018 and [features/outbox.md](features/outbox.md), both accepted), runs the hourly FX rate sync ([features/fx-rates.md](features/fx-rates.md), ADR 0019, both accepted), and runs the daily instrument price sync at 12:00 UTC ([features/instrument-prices.md](features/instrument-prices.md), accepted). From the custodial roadmap it also reads the bank statements: one recurring job `bank-statement-sync:{connection}` per configured bank connection, on queue `bank`, every `PollMinutes` of that connection, with no automatic retries ([features/deposit-matching.md](features/deposit-matching.md), accepted), and reconciles every active client money account once a day: job `bank-reconciliation`, queue `bank`, 17:00 UTC, reading local tables only ([features/bank-reconciliation.md](features/bank-reconciliation.md), accepted). Email and other async tasks land here later unless a later ADR splits them.
+- First consumer: [features/reports.md](features/reports.md). The same worker delivers domain events from `OutboxMessages` (ADR 0018 and [features/outbox.md](features/outbox.md), both accepted), runs the hourly FX rate sync ([features/fx-rates.md](features/fx-rates.md), ADR 0019, both accepted), and runs the daily instrument price sync at 12:00 UTC ([features/instrument-prices.md](features/instrument-prices.md), accepted). From the custodial roadmap it also reads the bank statements: one recurring job `bank-statement-sync:{connection}` per configured bank connection, on queue `bank`, every `PollMinutes` of that connection, with no automatic retries ([features/deposit-matching.md](features/deposit-matching.md), accepted), and reconciles every active client money account once a day: job `bank-reconciliation`, queue `bank`, 17:00 UTC, reading local tables only ([features/bank-reconciliation.md](features/bank-reconciliation.md), accepted), and runs the interest run once a day: job `interest-run`, queue `interest`, 00:30 UTC, for yesterday, for every Tenant with an interest rate schedule, reading local tables only and calling no outside party ([features/interest-run.md](features/interest-run.md), accepted). Email and other async tasks land here later unless a later ADR splits them.
 
 ---
 
@@ -397,3 +397,4 @@ Locked conclusions follow function-plan §0 and these ADRs. The `docs/adr/` fold
 | 2026-11-19 | ADR 0021 and [features/simulator.md](features/simulator.md) accepted. `simulator` and `src/Schema` added to §1, §2, §3.1 and §4; ADR table gains 0020 and 0021. |
 | 2026-11-20 | [features/deposit-matching.md](features/deposit-matching.md) accepted. §6 gains `IBankFeed`, the first outside party port; §10 gains the bank statement sync job and queue `bank`. |
 | 2026-11-20 | [features/withdrawals.md](features/withdrawals.md) accepted. §6 gains `IBankPayments`, the first outgoing port; the bank statement sync job sends pending outgoing payments before its pull. |
+| 2026-11-22 | [features/interest-run.md](features/interest-run.md) accepted. §10 gains the daily `interest-run` job and queue `interest`. A manual run (`POST /interest/runs`) runs on `webapi` in the request. |

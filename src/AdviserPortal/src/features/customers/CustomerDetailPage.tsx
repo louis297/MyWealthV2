@@ -1,3 +1,4 @@
+import { TaxDetailsSection } from "@/features/interest/TaxDetailsSection";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 import {
@@ -158,6 +159,7 @@ export function CustomerDetailPage() {
           />
         </Section>
       ) : null}
+      <TaxDetailsSection customerId={data.id} />
       <CustomerBankAccountsSection customerId={data.id} />
       <CustomerReportsSection customerId={data.id} />
     </Page>

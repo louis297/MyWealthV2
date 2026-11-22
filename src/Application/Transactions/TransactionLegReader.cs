@@ -43,6 +43,22 @@ internal static class TransactionLegReader
                 detail.Currency
             }).ToDictionaryAsync(row => row.CashLegId, cancellationToken);
 
+        var taxRows = await db.TransactionTaxDetails.AsNoTracking()
+            .Where(detail => transactionIds.Contains(detail.TransactionId))
+            .Select(detail => new
+            {
+                detail.CashLegId,
+                detail.Kind,
+                detail.RatePercent,
+                detail.BasisAmount,
+                detail.TaxAmount,
+                detail.Currency
+            }).ToDictionaryAsync(row => row.CashLegId, cancellationToken);
+
+        var interestRows = await db.TransactionInterestDetails.AsNoTracking()
+            .Where(detail => transactionIds.Contains(detail.TransactionId))
+            .ToListAsync(cancellationToken);
+
         var securityRows = await (
             from leg in db.TransactionSecurityLegs.AsNoTracking()
             join account in db.Accounts.AsNoTracking() on leg.AccountId equals account.Id
@@ -116,6 +132,16 @@ internal static class TransactionLegReader
                         Amount = fee.FeeAmount,
                         Currency = fee.Currency.Trim()
                     }
+                    : null,
+                Tax = taxRows.TryGetValue(row.Id, out var tax)
+                    ? new TransactionTaxDto
+                    {
+                        Kind = tax.Kind.ToString(),
+                        RatePercent = tax.RatePercent,
+                        BasisAmount = tax.BasisAmount,
+                        Amount = tax.TaxAmount,
+                        Currency = tax.Currency.Trim()
+                    }
                     : null
             }),
             securityRows.ToLookup(row => row.TransactionId, row => new TransactionSecurityDto
@@ -154,6 +180,16 @@ internal static class TransactionLegReader
                     Reference = row.Reference,
                     PayeeName = row.PayeeName,
                     PayeeAccount = row.PayeeAccount
+                }),
+            interestRows.ToDictionary(
+                row => row.TransactionId,
+                row => new TransactionInterestDto
+                {
+                    PeriodFrom = row.PeriodFrom.ToString("yyyy-MM-dd"),
+                    PeriodTo = row.PeriodTo.ToString("yyyy-MM-dd"),
+                    Days = row.Days,
+                    AccruedAmount = row.AccruedAmount,
+                    GrossAmount = row.GrossAmount
                 }));
     }
 }
@@ -164,4 +200,5 @@ internal sealed record TransactionLegs(
     IReadOnlyDictionary<int, TransactionFxDto> Fx,
     IReadOnlyDictionary<int, TransactionAdjustmentDto> Adjustment,
     IReadOnlyDictionary<int, TransactionBankReceiptDto> BankReceipt,
-    IReadOnlyDictionary<int, TransactionPaymentDto> Payment);
+    IReadOnlyDictionary<int, TransactionPaymentDto> Payment,
+    IReadOnlyDictionary<int, TransactionInterestDto> Interest);

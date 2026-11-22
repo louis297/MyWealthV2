@@ -30,6 +30,7 @@ related:
   - ../database-design.md
   - ../api-design.md
   - ../glossary.md
+  - interest-run.md
 ---
 
 # Account closure
@@ -109,7 +110,7 @@ The rule that distinguishes this slice: a Custodial account closes only through 
 **Out**
 
 - Selling or moving holdings as part of the closure. The account must hold nothing (R6); selling waits for orders (roadmap O1) and moving shares out for in-kind transfer (roadmap T1)
-- Interest to the closing date (roadmap I2) and a final advisory fee (future-plans §1 step 4). Each adds its step to the closure in its own spec (§11 point 1)
+- A final advisory fee (future-plans §1 step 4). It adds its step to the closure in its own spec (§11 point 1). Interest to the closing date is the step of [interest-run.md](interest-run.md) R33 (amendment 2026-11-22)
 - Closing every account of a Customer, or ending the Customer relationship (offboarding)
 - A closure statement or report for the Customer
 - A reason list for a closure (§11 point 11). The memo says why
@@ -502,7 +503,7 @@ Each point was confirmed on 2026-11-22 as recommended, and is written into the r
 
 Still open, not this slice:
 
-- Interest to the closing date (roadmap I2) and the final advisory fee, each as a step of the closure before the payout
+- The final advisory fee, as a step of the closure before the payout (interest to the closing date: [interest-run.md](interest-run.md) R33)
 - Selling holdings through orders (O1) or moving them out in kind (T1) as part of a closure
 - Closing every account of a Customer, and disabling the Customer with it
 - A closure statement for the Customer
@@ -530,3 +531,13 @@ Do not put interest, fees, orders, in-kind transfers or a closure report in thes
 ### Docs amended when this spec is accepted
 
 [accounts.md](accounts.md) (R16 and close: a Custodial account closes through an account closure; `closure` on the item), [posting.md](posting.md) (R12, R16, R17: `CloseOut` on a Custodial account is written only by the closure flow), [custody-modes.md](custody-modes.md) (R5 matrix: `CloseOut` refused on Custodial; §4.2.1 message; the `CloseOut` paragraph of §4.2), [transaction-source.md](transaction-source.md) (kind `AccountClosure` = 5, not hand-reversible, check widened), [withdrawals.md](withdrawals.md) (R46 replaced; R40 completes a closure; R27–R30 and R33 end it; R42 `AccountClosing`; `accountClosureId` on the item), [deposit-matching.md](deposit-matching.md) (R18 reason `AccountClosing`; R26 and R30 refused on a closing account), [bank-returns.md](bank-returns.md) (R3 on a closing account, unchanged rule, note), [portfolios.md](portfolios.md) (assign refused while closing), [adjustments.md](adjustments.md) (refused while closing; §2 Out on the B8 write-off), [internal-transfers.md](internal-transfers.md) and [fx-conversions.md](fx-conversions.md) (refused with a closing account on either side), [api-design.md](../api-design.md) (§3.1 two permission rows, the `/accounts` catalog row and §7.6 gain the `closures` sub-resource, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D53–D57, D18, D39, D46, D47), [customer-portal.md](../customer-portal/customer-portal.md) (C26, C27), [known-issues/custodial-account-gaps.md](../known-issues/custodial-account-gaps.md) (the `CloseOut` row notes this spec; it is removed when the slice lands), [glossary.md](../glossary.md) (the review terms become accepted), [function-plan.md](../function-plan.md) §5, [features/README.md](README.md) row status, the roadmap §5 B8 and §13 status.
+
+---
+
+## Amendment 2026-11-22 (interest run) — accepted
+
+Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rule R33 lives there; this section records what changes here.
+
+- R4–R7: when an account closure is requested, after the checks of R3, R5 and R6 and before the payout is worked out (R7), under the same Account lock and in the same database transaction, the platform accrues the account through yesterday (UTC) and posts every accrual row not yet posted, whatever its month. When that posts a Transaction it also stores an interest run with trigger `AccountClosure`, that one account and the requester, which is the Transaction's source. The payout and `cashBalanceAtRequest` then include the net interest (interest-run R33).
+- R11: a closing account is not accrued. When the closure ends with its withdrawal, the next interest run accrues the days in between; when it completes, the account is Closed and earns nothing more. The day of the request and the days the payout is on its way earn no interest.
+- §2 Out and "Still open": interest to the closing date is no longer out or open; it is the step above. The final advisory fee stays open.

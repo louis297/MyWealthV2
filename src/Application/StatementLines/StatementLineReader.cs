@@ -71,6 +71,7 @@ internal static class StatementLineReader
             ClientMoneyAccountId = clientMoney[line.ClientMoneyAccountId],
             Currency = line.Currency.Trim(),
             Direction = line.Direction.ToString(),
+            Kind = line.Kind.ToString(),
             Amount = line.Amount,
             ValueDate = line.ValueDate.ToString("yyyy-MM-dd"),
             PayerName = line.PayerName,
@@ -90,12 +91,12 @@ internal static class StatementLineReader
                     At = line.MatchedAt!.Value
                 }
                 : null,
-            LastAction = line.LastAction is { } action && line.LastActionByUserId is int byUserId
+            LastAction = line.LastAction is { } action && line.LastActionAt is not null
                 ? new StatementLineLastActionDto
                 {
                     Action = action.ToString(),
                     Note = line.LastActionNote,
-                    By = users[byUserId],
+                    By = line.LastActionByUserId is int byUserId ? users[byUserId] : null,
                     At = line.LastActionAt!.Value
                 }
                 : null,

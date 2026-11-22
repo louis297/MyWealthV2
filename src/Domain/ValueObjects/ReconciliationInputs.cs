@@ -29,8 +29,19 @@ public sealed record ReconciliationInputs
     /// <summary>Every cash leg on every Custodial account of the Tenant in the currency (R8).</summary>
     public decimal CustodialCash { get; init; }
 
-    /// <summary>Those legs, summed per group (R10).</summary>
+    /// <summary>Those legs, summed per group (R10), without the legs of interest postings.</summary>
     public IReadOnlyList<ReconciliationLedgerCash> Ledger { get; init; } = [];
+
+    /// <summary>Interest-run R41: the <c>Principal</c> legs of Transactions with source <c>InterestRun</c>, and how many
+    /// Transactions.</summary>
+    public decimal InterestCredited { get; init; }
+
+    public int InterestCreditedCount { get; init; }
+
+    /// <summary>Interest-run R41: their <c>Tax</c> legs (negative), and how many Transactions have one.</summary>
+    public decimal TaxWithheld { get; init; }
+
+    public int TaxWithheldCount { get; init; }
 
     public decimal ReservedCash { get; init; }
 
@@ -53,7 +64,8 @@ public sealed record ReconciliationLine(
     decimal Amount,
     BankStatementLineStatus Status,
     UnmatchedReason? UnmatchedReason,
-    string? Note);
+    string? Note,
+    StatementLineKind Kind = StatementLineKind.Transfer);
 
 /// <summary>
 /// The cash legs of the Transactions of one <see cref="Type"/> (with the <see cref="OriginalType"/> of a Reversal)

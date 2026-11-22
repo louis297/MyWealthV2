@@ -122,6 +122,9 @@ public class BankReconciliation : BaseAuditableEntity
         var items = new List<BankReconciliationItem>();
         items.AddRange(LineItems(inputs));
         items.AddRange(LedgerItems(inputs));
+        AddUnlessZero(items, inputs.TenantId, ReconciliationItemKind.InterestCredited, -inputs.InterestCredited,
+            inputs.InterestCreditedCount);
+        AddUnlessZero(items, inputs.TenantId, ReconciliationItemKind.TaxWithheld, -inputs.TaxWithheld, inputs.TaxWithheldCount);
         AddUnlessZero(items, inputs.TenantId, ReconciliationItemKind.OpeningBalance, opening);
         AddUnlessZero(items, inputs.TenantId, ReconciliationItemKind.StatementDifference,
             bank - opening - inputs.StatementLinesTotal);
@@ -162,6 +165,9 @@ public class BankReconciliation : BaseAuditableEntity
                 BankStatementLineStatus.Unmatched => ReconciliationItemKind.Suspense,
                 BankStatementLineStatus.Received => ReconciliationItemKind.NotProcessed,
                 BankStatementLineStatus.ReturnRequested or BankStatementLineStatus.ReturnSent => ReconciliationItemKind.ReturnInProgress,
+                // Interest-run R41: the bank's own interest, set aside, is its own known item.
+                BankStatementLineStatus.Ignored when line.Kind == StatementLineKind.Interest
+                                                     && line.Direction == BankLineDirection.Credit => ReconciliationItemKind.BankInterest,
                 BankStatementLineStatus.Ignored => ReconciliationItemKind.Ignored,
                 _ => null
             };
@@ -200,11 +206,16 @@ public class BankReconciliation : BaseAuditableEntity
     };
 
     /// <summary>R11: a check whose amount is zero is left out.</summary>
-    private static void AddUnlessZero(List<BankReconciliationItem> items, int tenantId, ReconciliationItemKind kind, decimal amount)
+    private static void AddUnlessZero(
+        List<BankReconciliationItem> items,
+        int tenantId,
+        ReconciliationItemKind kind,
+        decimal amount,
+        int count = 1)
     {
         if (amount != 0m)
         {
-            items.Add(BankReconciliationItem.Create(tenantId, kind, amount, 1));
+            items.Add(BankReconciliationItem.Create(tenantId, kind, amount, Math.Max(count, 1)));
         }
     }
 

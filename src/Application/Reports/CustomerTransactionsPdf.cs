@@ -14,7 +14,8 @@ public sealed record CustomerTransactionsPdfRow(
     string Quantity,
     string? Memo,
     string Fee = "",
-    string Custody = "");
+    string Custody = "",
+    string Tax = "");
 
 public sealed record CustomerTransactionsPdfModel(
     string TenantName,
@@ -66,15 +67,17 @@ public static class CustomerTransactionsPdf
                         {
                             table.ColumnsDefinition(columns =>
                             {
-                                columns.RelativeColumn(2);
+                                // Booked at, Account, Custody, Type, Cash, Fee, Tax, Instrument, Quantity, Memo.
+                                columns.RelativeColumn(1.6f);
+                                columns.RelativeColumn();
+                                columns.RelativeColumn(1.4f);
                                 columns.RelativeColumn();
                                 columns.RelativeColumn();
+                                columns.RelativeColumn(0.9f);
+                                columns.RelativeColumn(0.9f);
                                 columns.RelativeColumn();
-                                columns.RelativeColumn();
-                                columns.RelativeColumn();
-                                columns.RelativeColumn();
-                                columns.RelativeColumn(2);
-                                columns.RelativeColumn();
+                                columns.RelativeColumn(0.8f);
+                                columns.RelativeColumn(1.4f);
                             });
                             table.Header(header =>
                             {
@@ -84,6 +87,7 @@ public static class CustomerTransactionsPdf
                                 header.Cell().Text("Type").Bold();
                                 header.Cell().Text("Cash").Bold();
                                 header.Cell().Text("Fee").Bold();
+                                header.Cell().Text("Tax").Bold();
                                 header.Cell().Text("Instrument").Bold();
                                 header.Cell().Text("Quantity").Bold();
                                 header.Cell().Text("Memo").Bold();
@@ -98,6 +102,7 @@ public static class CustomerTransactionsPdf
                                 table.Cell().Text(row.Type);
                                 table.Cell().Text(row.Cash);
                                 table.Cell().Text(row.Fee);
+                                table.Cell().Text(row.Tax);
                                 table.Cell().Text(row.Instrument);
                                 table.Cell().Text(row.Quantity);
                                 table.Cell().Text(row.Memo ?? string.Empty);

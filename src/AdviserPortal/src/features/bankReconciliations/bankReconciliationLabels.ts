@@ -20,6 +20,12 @@ export function kindLabel(kind: string) {
   switch (kind) {
     case "Unexplained":
       return "Not explained";
+    case "BankInterest":
+      return "Interest paid by the bank";
+    case "InterestCredited":
+      return "Interest credited to customers";
+    case "TaxWithheld":
+      return "Tax withheld from customers' interest";
     case "StatementDifference":
       return "Bank balance differs from the statement lines";
     case "Suspense":

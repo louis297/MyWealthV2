@@ -186,7 +186,9 @@ public class BackOfficePageTests
         body.ShouldNotContain("Report id");
         body.ShouldNotContain(">Grant<");
         body.ShouldNotContain(">Revoke<");
-        body.ShouldNotContain(">Run<");
+        // The reports part of the page: the interest run form below it has its own Run button (interest-run BO21).
+        var reports = body[..body.IndexOf("Client money accounts", StringComparison.Ordinal)];
+        reports.ShouldNotContain(">Run<");
         body.ShouldNotContain(">Schedule<");
         body.ShouldNotContain("/reports/request");
         body.ShouldNotContain("/reports/schedules");
@@ -450,6 +452,29 @@ public class BackOfficePageTests
         var match = Regex.Match(body, $"<input[^>]*data-custody-mode=\"{mode}\"[^>]*>");
         match.Success.ShouldBeTrue($"no {mode} custody mode box");
         return match.Value;
+    }
+
+    [Test]
+    public async Task Configuration_ShowsTheNewestInterestRuns_AndTheRunForADateForm()
+    {
+        var body = await GetAsync($"/tenants/{TenantId}/config");
+
+        body.ShouldContain("Interest runs");
+        foreach (var header in new[] { "As of", "Trigger", "Accounts", "Failed", "Posted", "Interest paid", "Tax withheld" })
+        {
+            body.ShouldContain($"<th>{header}</th>");
+        }
+
+        body.ShouldContain("Daily run");
+        body.ShouldContain("Run by the platform team");
+        body.ShouldContain("410.55 USD");
+        body.ShouldContain("93.40 USD");
+        body.ShouldContain("Run for a date");
+        var yesterday = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1).ToString("yyyy-MM-dd");
+        Regex.IsMatch(body, $"<input[^>]*value=\"{yesterday}\"").ShouldBeTrue("the as-of date defaults to yesterday (UTC)");
+        SubmitButton(body, "Run").ShouldNotContain(" disabled");
+        body.ShouldContain("Runs every day by itself. Use this after a missed run. A run for a day already done changes nothing.");
+        _api.InterestRunLists.ShouldContain(TenantId);
     }
 
     /// <summary>The Disable or Enable button of one client money account row (marked with its id).</summary>
@@ -726,5 +751,20 @@ public class BackOfficePageTests
 
         public Task EnableInstrumentAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
+
+        public List<Guid> InterestRunLists { get; } = [];
+
+        public Task<IReadOnlyList<InterestRunItem>> ListInterestRunsAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        {
+            InterestRunLists.Add(tenantId);
+            return Task.FromResult<IReadOnlyList<InterestRunItem>>([
+                new InterestRunItem(Guid.NewGuid(), new DateOnly(2026, 12, 31), new DateOnly(2026, 12, 31), "Scheduled", 42, 1, 37,
+                    [new InterestRunTotal("USD", 25, 410.55m, 93.40m)]),
+                new InterestRunItem(Guid.NewGuid(), new DateOnly(2026, 12, 15), new DateOnly(2026, 11, 30), "Manual", 42, 0, 0, [])
+            ]);
+        }
+
+        public Task<Guid> StartInterestRunAsync(Guid tenantId, DateOnly asOfDate, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Guid.NewGuid());
     }
 }

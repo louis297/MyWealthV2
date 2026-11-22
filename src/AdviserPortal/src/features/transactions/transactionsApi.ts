@@ -14,13 +14,33 @@ export type TransactionFee = {
 export type TransactionCash = {
   accountId: string;
   customerId: string;
-  /** `Principal` or `Fee` (trade-fees §8.1). */
+  /** `Principal`, `Fee` (trade-fees §8.1) or `Tax` (interest-run R34). */
   role: string;
   /** In the Account currency. */
   amount: number;
   currency: string;
   /** Set on a `Fee` leg; null on a `Principal` leg. */
   fee: TransactionFee | null;
+  /** interest-run R34: set on a `Tax` leg; null on any other. */
+  tax?: TransactionTax | null;
+};
+
+/** interest-run R34: how a `Tax` leg was computed. `amount` is the tax, positive. */
+export type TransactionTax = {
+  kind: string;
+  ratePercent: number;
+  basisAmount: number;
+  amount: number;
+  currency: string;
+};
+
+/** interest-run R34: the period an interest posting pays. */
+export type TransactionInterest = {
+  periodFrom: string;
+  periodTo: string;
+  days: number;
+  accruedAmount: number;
+  grossAmount: number;
 };
 
 export type TransactionSecurity = {
@@ -75,6 +95,8 @@ export type Transaction = {
   bankReceipt?: TransactionBankReceipt | null;
   /** withdrawals R41: the bank's details on a payout and on its Reversal; otherwise null. */
   payment?: TransactionPayment | null;
+  /** interest-run R34: on an interest posting and its Reversal; otherwise null. */
+  interest?: TransactionInterest | null;
 };
 
 export type TransactionPayment = {

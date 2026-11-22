@@ -277,6 +277,36 @@ public class BackOfficeApiTests
     }
 
     [Test]
+    public async Task InterestRunCalls_ReadTheNewestTenOfTheTenant_AndStartARunForADate()
+    {
+        var runId = Guid.Parse("77777777-7777-7777-7777-777777777777");
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.OK, $$"""
+            {"items":[{"id":"{{runId}}","asOfDate":"2026-12-31","postingDate":"2026-12-31","trigger":"Scheduled","ranBy":null,"accountId":null,
+              "startedAt":"2027-01-01T00:30:02Z","completedAt":"2027-01-01T00:30:09Z","accountsProcessed":42,"accountsFailed":1,"postingCount":37,
+              "totals":[{"currency":"USD","postingCount":25,"grossAmount":410.55,"taxAmount":93.40}]}],"page":1,"pageSize":10,"totalCount":1}
+            """);
+        api.Enqueue(HttpStatusCode.Created, $$"""{"id":"{{runId}}"}""");
+        var platform = Create(api);
+
+        var run = (await platform.ListInterestRunsAsync(TenantId)).ShouldHaveSingleItem();
+        var started = await platform.StartInterestRunAsync(TenantId, new DateOnly(2026, 12, 31));
+
+        run.Id.ShouldBe(runId);
+        run.AsOfDate.ShouldBe(new DateOnly(2026, 12, 31));
+        run.Trigger.ShouldBe("Scheduled");
+        (run.AccountsProcessed, run.AccountsFailed, run.PostingCount).ShouldBe((42, 1, 37));
+        run.Totals.ShouldHaveSingleItem().ShouldBe(new InterestRunTotal("USD", 25, 410.55m, 93.40m));
+        started.ShouldBe(runId);
+        AssertRequest(api.Requests[0], "GET", $"/interest/runs?tenantId={TenantId}&pageSize=10");
+        AssertRequest(api.Requests[1], "POST", "/interest/runs");
+        var body = Body(api.Requests[1]);
+        body.GetProperty("tenantId").GetGuid().ShouldBe(TenantId);
+        body.GetProperty("asOfDate").GetString().ShouldBe("2026-12-31");
+        body.EnumerateObject().Count().ShouldBe(2);
+    }
+
+    [Test]
     public async Task ReportGrantList_ReadsGranted()
     {
         var api = new ScriptedHandler();

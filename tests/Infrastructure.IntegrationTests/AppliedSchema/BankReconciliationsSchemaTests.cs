@@ -238,7 +238,7 @@ public class BankReconciliationsSchemaTests
         exception.Message.ShouldContain("CK_BankReconciliationItems_OtherClientMoneyAccount");
     }
 
-    [TestCase("[Kind] = 12", "CK_BankReconciliationItems_Kind")]
+    [TestCase("[Kind] = 15", "CK_BankReconciliationItems_Kind")]
     [TestCase("[Class] = 3", "CK_BankReconciliationItems_Class")]
     [TestCase("[Position] = 0", "CK_BankReconciliationItems_Position")]
     public async Task AnItemValueOutsideItsCheck_IsRejected(string set, string check)

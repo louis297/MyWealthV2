@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-01
-last_updated: 2026-11-21
+last_updated: 2026-11-22
 related:
   - ../function-plan.md
   - ../architecture.md
@@ -20,6 +20,7 @@ related:
   - production-hosting.md
   - ../deployment.md
   - withdrawals.md
+  - interest-run.md
 ---
 
 # Adviser Portal BFF
@@ -477,3 +478,15 @@ Add `/bank-reconciliations` to the BFF prefix allow-list (R20) so the Adviser Po
 - Who: TenantAdmin. `webapi` checks `bank-reconciliations.manage`; the BFF does not filter by role, so an Adviser gets the 403 from `webapi`.
 - The Tenant-scoped report uses the existing `/reports` prefix.
 - The Customer Portal BFF does not change.
+
+---
+
+## Amendment 2026-11-22 (interest prefix) — accepted
+
+Add `/interest` to the BFF prefix allow-list (R20) so the Adviser Portal can call the routes of [interest-run.md](interest-run.md) (`/interest/rate-schedules`, `/interest/runs`) through `/api`.
+
+- Prefix: `/interest`
+- Methods: GET, POST, PUT, DELETE
+- Who: TenantAdmin and Adviser. `webapi` checks `interest-rates.read`, `interest-rates.manage` and `interest-runs.read`; the BFF does not filter by role, so an Adviser gets the 403 from `webapi` on writes and on runs.
+- The tax profile and the accrual rows use the existing `/users` and `/accounts` prefixes.
+- The Customer Portal BFF does not change: it already proxies `/users`, `/accounts` and `/transactions`.

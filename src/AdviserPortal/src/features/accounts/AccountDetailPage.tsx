@@ -78,12 +78,19 @@ function ActivityAmount({ legs, decimalPlaces }: { legs: TransactionCash[]; deci
   }
   const currency = legs[0].currency;
   const fees = legs.filter((leg) => leg.role === "Fee");
+  const taxes = legs.filter((leg) => leg.role === "Tax");
   return (
     <>
       {`${sumAmounts(legs.map((leg) => leg.amount))} ${currency}`}
       {fees.length > 0 ? (
         <p className="text-muted-foreground text-xs">
           {`incl. fee ${formatMoney(Math.abs(sumAmounts(fees.map((leg) => leg.amount))), currency, decimalPlaces)}`}
+        </p>
+      ) : null}
+      {taxes.length > 0 ? (
+        // interest-run D61: the tax withheld from an interest posting, as a fee is shown.
+        <p className="text-muted-foreground text-xs">
+          {`incl. tax ${formatMoney(Math.abs(sumAmounts(taxes.map((leg) => leg.amount))), currency, decimalPlaces)}`}
         </p>
       ) : null}
     </>
@@ -369,6 +376,12 @@ export function AccountDetailPage() {
             ) : null}
             {isCustodial(data) && data.depositReference ? (
               <DetailItem label="Deposit reference">{data.depositReference}</DetailItem>
+            ) : null}
+            {isCustodial(data) && (data.accruedInterest ?? 0) > 0 ? (
+              // interest-run D62: interest accrued and not yet paid, to 4 decimals.
+              <DetailItem label="Interest accrued, not yet paid">
+                {`${(data.accruedInterest ?? 0).toFixed(4)} ${data.currency}${data.interestAccruedThrough ? ` up to ${data.interestAccruedThrough}` : ""}`}
+              </DetailItem>
             ) : null}
           </DetailGrid>
         </CardContent>

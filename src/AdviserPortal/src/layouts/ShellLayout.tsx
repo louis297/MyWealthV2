@@ -15,6 +15,7 @@ import {
   ShieldCheckIcon,
   BanknoteArrowUpIcon,
   ScaleIcon,
+  PercentIcon,
 } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router";
 import { useAppSelector } from "@/app/hooks";
@@ -44,6 +45,7 @@ import {
   canAccessCustomers,
   canAccessDashboard,
   canAccessFees,
+  canAccessInterestRates,
   canAccessPortfolios,
   canAccessProfile,
   canAccessReports,
@@ -92,6 +94,13 @@ export function ShellLayout({ children }: { children?: ReactNode }) {
       label: "Fees",
       icon: ReceiptIcon,
       visible: canAccessFees(role),
+    },
+    {
+      // interest-run D59: under Fees.
+      to: "/interest/rates",
+      label: "Interest rates",
+      icon: PercentIcon,
+      visible: canAccessInterestRates(role),
     },
     {
       to: "/accounts",
