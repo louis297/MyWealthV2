@@ -50,6 +50,30 @@ public sealed class TransactionDto
     /// <summary>The event behind an entitlement posting, on the posting and its Reversal; otherwise null
     /// (corporate-actions R37).</summary>
     public TransactionCorporateActionDto? CorporateAction { get; init; }
+
+    /// <summary>The broker's execution, on the Transaction of an order fill and on its Reversal; otherwise null
+    /// (orders R38).</summary>
+    public TransactionExecutionDto? Execution { get; init; }
+}
+
+/// <summary>An order fill's execution detail (orders R35, R38). <see cref="SettledAt"/> is read from the fill.</summary>
+public sealed class TransactionExecutionDto
+{
+    public required Guid OrderId { get; init; }
+
+    public required Guid FillId { get; init; }
+
+    public required decimal Price { get; init; }
+
+    public required string TradeDate { get; init; }
+
+    public required string SettlementDate { get; init; }
+
+    /// <summary>The broker's contract note; null when the broker sent none.</summary>
+    public string? BrokerReference { get; init; }
+
+    /// <summary>When the broker said the fill settled; null until then (R43).</summary>
+    public DateTimeOffset? SettledAt { get; init; }
 }
 
 /// <summary>An entitlement posting's corporate action detail (corporate-actions R27, R37).</summary>
