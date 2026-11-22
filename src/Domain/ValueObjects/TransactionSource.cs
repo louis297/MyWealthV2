@@ -66,7 +66,15 @@ public sealed class TransactionSource : ValueObject
     }
 
     /// <summary>An interest posting's source: the PublicId of the interest run (interest-run R23).</summary>
-    public static TransactionSource InterestRun(Guid runPublicId) => throw new NotImplementedException();
+    public static TransactionSource InterestRun(Guid runPublicId)
+    {
+        if (runPublicId == Guid.Empty)
+        {
+            throw new DomainException("An interest run source needs the run's PublicId.");
+        }
+
+        return new TransactionSource(TransactionSourceKind.InterestRun, runPublicId);
+    }
 
     /// <summary>The source as stored on a Transaction row.</summary>
     internal static TransactionSource FromStored(TransactionSourceKind kind, Guid? publicId) =>
@@ -78,6 +86,7 @@ public sealed class TransactionSource : ValueObject
             TransactionSourceKind.BankFeed => BankFeed(publicId ?? Guid.Empty),
             TransactionSourceKind.Payment => Payment(publicId ?? Guid.Empty),
             TransactionSourceKind.AccountClosure => AccountClosure(publicId ?? Guid.Empty),
+            TransactionSourceKind.InterestRun => InterestRun(publicId ?? Guid.Empty),
             _ => new TransactionSource(kind, publicId)
         };
 

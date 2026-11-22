@@ -81,8 +81,47 @@ public class Transaction : BaseAuditableEntity
         Interest.InterestPeriod period,
         Interest.Withholding withholding,
         DateTimeOffset bookedAt,
-        TransactionSource source) =>
-        throw new NotImplementedException();
+        TransactionSource source)
+    {
+        if (source.Kind != TransactionSourceKind.InterestRun)
+        {
+            throw new DomainException("An interest posting comes from an interest run.");
+        }
+
+        var gross = decimal.Round(accrued, decimalPlaces, MidpointRounding.AwayFromZero);
+        if (gross <= 0m)
+        {
+            throw new DomainException("An interest posting needs a gross amount above 0.");
+        }
+
+        var currency = Money.Create(0m, accountCurrency).Currency;
+        var tax = decimal.Round(gross * withholding.RatePercent / 100m, decimalPlaces, MidpointRounding.AwayFromZero);
+        var cashLegs = new List<TransactionCashLeg> { TransactionCashLeg.Create(tenantId, accountId, gross, currency) };
+        var taxDetails = new List<TransactionTaxDetail>();
+        if (tax > 0m)
+        {
+            var detail = TransactionTaxDetail.Create(tenantId, withholding.Kind, withholding.RatePercent, gross, tax, currency);
+            cashLegs.Add(TransactionCashLeg.CreateTax(tenantId, accountId, -tax, currency, detail));
+            taxDetails.Add(detail);
+        }
+
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            Type = TransactionType.Interest,
+            BookedAt = bookedAt.ToUniversalTime(),
+            Memo = InterestMemo,
+            Reference = null,
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
+            PublicId = Guid.NewGuid(),
+            CashLegs = cashLegs,
+            TaxDetails = taxDetails,
+            InterestDetail = TransactionInterestDetail.Create(tenantId, period, accrued, gross)
+        };
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
+    }
 
     public static Transaction Post(
         int tenantId,
@@ -1021,7 +1060,9 @@ public class Transaction : BaseAuditableEntity
             AdjustmentDetail = AdjustmentDetail?.Copy(),
             BankReceiptDetail = BankReceiptDetail?.Copy(),
             PaymentDetail = PaymentDetail?.Copy(),
-            FeeDetails = cashLegs.Select(leg => leg.FeeDetail).OfType<TransactionFeeDetail>().ToList()
+            FeeDetails = cashLegs.Select(leg => leg.FeeDetail).OfType<TransactionFeeDetail>().ToList(),
+            TaxDetails = cashLegs.Select(leg => leg.TaxDetail).OfType<TransactionTaxDetail>().ToList(),
+            InterestDetail = InterestDetail?.Copy()
         };
         ReversedBy = reversal;
         reversal.AddDomainEvent(new TransactionReversed(reversal));

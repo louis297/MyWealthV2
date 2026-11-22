@@ -25,4 +25,24 @@ public class TransactionTaxDetail
     public decimal TaxAmount { get; private set; }
 
     public string Currency { get; private set; } = string.Empty;
+
+    internal static TransactionTaxDetail Create(
+        int tenantId,
+        TaxKind kind,
+        decimal ratePercent,
+        decimal basisAmount,
+        decimal taxAmount,
+        string currency) =>
+        new()
+        {
+            TenantId = tenantId,
+            Kind = kind,
+            RatePercent = ratePercent,
+            BasisAmount = basisAmount,
+            TaxAmount = taxAmount,
+            Currency = currency
+        };
+
+    /// <summary>A new row with the same values, for the matching leg of a Reversal (interest-run R27).</summary>
+    internal TransactionTaxDetail Copy() => Create(TenantId, Kind, RatePercent, BasisAmount, TaxAmount, Currency);
 }
