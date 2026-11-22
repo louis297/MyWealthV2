@@ -10,8 +10,8 @@ using static MyWealthV2.Application.FunctionalTests.Custody.CustodialHttp;
 
 namespace MyWealthV2.Application.FunctionalTests.Custody;
 
-/// <summary>Withdrawals R45, R46: no hand <c>TransferOut</c> on a Custodial account, and a hand <c>CloseOut</c> only
-/// for a remainder smaller than the currency's minor unit.</summary>
+/// <summary>Withdrawals R45 and account closure R23: no hand <c>TransferOut</c> and no hand <c>CloseOut</c> on a
+/// Custodial account; the account closure writes off a remainder.</summary>
 [Parallelizable]
 public class CustodialTransferOutRefusedTests : TestBase
 {
@@ -19,7 +19,7 @@ public class CustodialTransferOutRefusedTests : TestBase
         "Withdrawals from a Custodial account are paid to the customer's nominated bank account. Request a withdrawal.";
 
     private const string CloseOutMessage =
-        "Only a remainder smaller than 0.01 USD can be closed out on a Custodial account. Withdraw the balance first.";
+        "The remainder of a Custodial account is written off by its account closure. Request an account closure.";
 
     [Test]
     public async Task TransferOut_ByTenantAdminAndAdviser_Gets400OnType_AndNothingIsWritten()
@@ -76,18 +76,36 @@ public class CustodialTransferOutRefusedTests : TestBase
     }
 
     [Test]
-    public async Task CloseOut_OfARemainderBelowTheMinorUnit_Returns201_AndTheAccountCanClose()
+    public async Task CloseOut_OfARemainderBelowTheMinorUnit_Gets400OnType_ForEveryCaller()
     {
-        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var (tenant, _, customer, tokens) = await AccountHttp.SignInAdviser();
         var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
         var instrument = await CreateInstrumentAsync(tokens.AccessToken, price: 3.00m);
         (await FundAsync(tokens.AccessToken, accountId, 1.00m)).StatusCode.ShouldBe(HttpStatusCode.Created);
         (await PostAsync(tokens.AccessToken, Trade(accountId, "Buy", instrument, 0.332m))).StatusCode.ShouldBe(HttpStatusCode.Created);
         (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(0.004m);
+        var system = await TenantHttp.SignInSystemAdmin();
+        var systemBody = Cash(accountId, "CloseOut", -0.004m);
+        systemBody["tenantId"] = tenant.PublicId;
 
-        (await PostAsync(tokens.AccessToken, Cash(accountId, "CloseOut", -0.004m))).StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await ErrorsAsync(await PostAsync(tokens.AccessToken, Cash(accountId, "CloseOut", -0.004m))))["Type"].ShouldBe([CloseOutMessage]);
+        (await ErrorsAsync(await PostAsync(system.AccessToken, systemBody)))["Type"].ShouldBe([CloseOutMessage]);
 
-        (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(0m);
+        (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(0.004m);
+    }
+
+    [Test]
+    public async Task AManualCloseOutEnteredBeforeThisSlice_CanStillBeReversedByHand()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
+        await InsertManualTransferInAsync(accountId, 0.004m);
+        var closeOut = await InsertManualCloseOutAsync(accountId, 0.004m);
+
+        var response = await ReverseAsync(tokens.AccessToken, closeOut);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
+        (await CashBalanceAsync(tokens.AccessToken, accountId)).ShouldBe(0.004m);
     }
 
     [Test]
@@ -107,7 +125,24 @@ public class CustodialTransferOutRefusedTests : TestBase
         var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
         var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId);
 
-        (await ErrorsAsync(await PostAsync(tokens.AccessToken, Cash(accountId, "CloseOut", 0m)))).ShouldContainKey("Type");
+        (await ErrorsAsync(await PostAsync(tokens.AccessToken, Cash(accountId, "CloseOut", 0m))))["Type"].ShouldBe([CloseOutMessage]);
+    }
+
+    /// <summary>A hand <c>CloseOut</c> of the remainder, source <c>Manual</c>, written straight to the database as
+    /// withdrawals R46 allowed before account closure.</summary>
+    private static async Task<Guid> InsertManualCloseOutAsync(Guid accountId, decimal remainder)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var account = await db.Accounts.IgnoreQueryFilters().SingleAsync(row => row.PublicId == accountId);
+        var transaction = Domain.Entities.Transaction.Post(
+            account.TenantId, account.Id, TransactionType.CloseOut, -remainder, account.Currency, DateTimeOffset.UtcNow,
+            memo: null, reference: null, TransactionSource.Manual, currentCashSum: remainder, existingTransactionCount: 1);
+        transaction.CreatedBy = "test";
+        transaction.CashLegs.ForEach(leg => leg.CreatedBy = "test");
+        db.Transactions.Add(transaction);
+        await db.SaveChangesAsync();
+        return transaction.PublicId;
     }
 
     private static async Task<Guid> InsertManualTransferOutAsync(Guid accountId, decimal amount)
