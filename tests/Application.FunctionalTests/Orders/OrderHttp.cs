@@ -170,6 +170,14 @@ internal static class OrderHttp
             $"UPDATE [Tenants] SET [BrokerConnection] = {connection} WHERE [Id] = {tenantId}");
     }
 
+    /// <summary>Moves an order to another broker connection straight in the database.</summary>
+    public static async Task SetConnectionAsync(Guid id, string connection)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE [Orders] SET [Connection] = {connection} WHERE [PublicId] = {id}");
+    }
+
     public static async Task<Order> OrderAsync(Guid id)
     {
         using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();

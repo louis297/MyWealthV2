@@ -23,6 +23,20 @@ internal static class BrokerHttp
         return await scope.ServiceProvider.GetRequiredService<PullExecutionReports>().RunAsync(connection);
     }
 
+    /// <summary>The processing step (R25).</summary>
+    public static async Task<ReportProcessingOutcome> ProcessAsync(string connection = Connection)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<ProcessExecutionReports>().RunAsync(connection);
+    }
+
+    /// <summary>The pull step, then the processing step.</summary>
+    public static async Task<ReportProcessingOutcome> RunReportsAsync(string connection = Connection)
+    {
+        await PullAsync(connection);
+        return await ProcessAsync(connection);
+    }
+
     /// <summary>The stored reports of a connection, in the order they were stored.</summary>
     public static async Task<List<ExecutionReport>> ReportsAsync(string connection = Connection)
     {
