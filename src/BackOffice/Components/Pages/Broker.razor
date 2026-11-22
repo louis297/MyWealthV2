@@ -1,0 +1,100 @@
+@page "/broker"
+@inject IPlatformApi Api
+
+<PageTitle>Broker</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">Broker</MudText>
+<MudText Typo="Typo.body1" Class="mb-4">Configured broker connections. A firm sends its orders through the connection set on its tenant.</MudText>
+
+@if (error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="my-4">@error</MudAlert>
+}
+else if (connections is not null)
+{
+    @if (connections.Count == 0)
+    {
+        <MudText Class="mt-4">No broker connection is configured. No firm can place orders.</MudText>
+    }
+    else
+    {
+        <MudSimpleTable Hover="true" Dense="true" Bordered="true" Class="mt-4">
+            <thead>
+                <tr><th>Name</th><th>Adapter</th><th>Reports</th></tr>
+            </thead>
+            <tbody>
+            @foreach (var connection in connections)
+            {
+                <tr>
+                    <td>@connection.Name</td>
+                    <td>@connection.Adapter</td>
+                    <td>@BrokerText.Reports(connection.Reports)</td>
+                </tr>
+            }
+            </tbody>
+        </MudSimpleTable>
+    }
+
+    <MudText Typo="Typo.h5" Class="mt-8 mb-2">Execution reports</MudText>
+    <MudText Typo="Typo.body2" Class="mb-2">The newest twenty reports the connections delivered. A row in red needs a person: the platform could not place the report on an order.</MudText>
+    <div class="d-flex gap-4 mb-2">
+        <MudLink Href="/broker">All</MudLink>
+        @foreach (var item in BrokerText.Statuses)
+        {
+            <MudLink Href="@($"/broker?status={item}")">@item</MudLink>
+        }
+    </div>
+    @if (reports is { Count: > 0 })
+    {
+        <MudSimpleTable Hover="true" Dense="true" Bordered="true">
+            <thead>
+                <tr>
+                    <th>Received</th><th>Connection</th><th>Kind</th><th>Client order id</th><th>Quantity</th><th>Price</th>
+                    <th>Status</th><th>Reason</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var item in reports)
+            {
+                <tr class="@(BrokerText.NeedsPerson(item) ? "report-needs-person mud-error-text" : null)">
+                    <td>@BrokerText.Instant(item.ReceivedAt)</td>
+                    <td>@item.Connection</td>
+                    <td>@BrokerText.Kind(item.Kind)</td>
+                    <td>@item.ClientOrderId</td>
+                    <td>@BrokerText.Number(item.Quantity)</td>
+                    <td>@BrokerText.Number(item.Price)</td>
+                    <td>@item.Status</td>
+                    <td>@BrokerText.Reason(item.SkipReason)</td>
+                </tr>
+            }
+            </tbody>
+        </MudSimpleTable>
+    }
+    else if (reports is not null)
+    {
+        <MudText>No execution reports.</MudText>
+    }
+}
+
+@code {
+    private IReadOnlyList<BrokerConnectionItem>? connections;
+    private IReadOnlyList<ExecutionReportItem>? reports;
+    private string? error;
+
+    [SupplyParameterFromQuery(Name = "status")]
+    public string? Status { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            connections = await Api.ListBrokerConnectionsAsync();
+            var status = BrokerText.Statuses.Contains(Status) ? Status : null;
+            reports = await Api.ListExecutionReportsAsync(status);
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+}

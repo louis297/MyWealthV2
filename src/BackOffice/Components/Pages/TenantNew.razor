@@ -22,6 +22,13 @@
                     <MudSelectItem T="string" Value="@currency.Code">@currency.Code</MudSelectItem>
                 }
             </MudSelect>
+            <MudSelect T="string" @bind-Value="form.BrokerConnection" Label="Broker connection" Variant="Variant.Outlined"
+                       ToStringFunc="BrokerConnectionChoice.Label" Error="@(brokerError is not null)" ErrorText="@brokerError">
+                @foreach (var option in brokerOptions)
+                {
+                    <MudSelectItem T="string" Value="@option">@BrokerConnectionChoice.Label(option)</MudSelectItem>
+                }
+            </MudSelect>
             <MudStack Spacing="0">
                 <MudText Typo="Typo.subtitle2">Custody modes</MudText>
                 <MudCheckBox T="bool" @bind-Value="custody.AllowsExternal" Label="External accounts"
@@ -41,12 +48,16 @@
     private readonly FormModel form = new();
     private readonly CustodyModeChoice custody = CustodyModeChoice.Both();
     private IReadOnlyList<CurrencyItem> currencies = [];
+    private IReadOnlyList<string> brokerOptions = [BrokerConnectionChoice.None];
     private string? error;
+    private string? brokerError;
 
     protected override async Task OnInitializedAsync()
     {
         currencies = await Api.ListCurrenciesAsync();
         form.ReportingCurrency = currencies.FirstOrDefault()?.Code ?? "";
+        // BO26: the configured broker connections, with "None".
+        brokerOptions = BrokerConnectionChoice.Options(await Api.ListBrokerConnectionsAsync(), create: true);
     }
 
     private async Task Create()
@@ -58,12 +69,15 @@
 
         try
         {
-            var id = await Api.CreateTenantAsync(form.Name, form.Code, form.ReportingCurrency, custody.ToList());
+            var id = await Api.CreateTenantAsync(
+                form.Name, form.Code, form.ReportingCurrency, custody.ToList(), BrokerConnectionChoice.ToBody(form.BrokerConnection));
             Navigation.NavigateTo($"/tenants/{id}");
         }
         catch (PlatformApiException exception)
         {
-            error = exception.Message;
+            // BO26: an unknown broker connection is shown at its field.
+            brokerError = ValidationErrors.From(exception).GetValueOrDefault("BrokerConnection");
+            error = brokerError is null ? exception.Message : null;
         }
     }
 
@@ -72,5 +86,6 @@
         public string Name { get; set; } = "";
         public string Code { get; set; } = "";
         public string ReportingCurrency { get; set; } = "";
+        public string BrokerConnection { get; set; } = BrokerConnectionChoice.None;
     }
 }

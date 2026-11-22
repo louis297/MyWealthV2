@@ -411,7 +411,8 @@ public class BackOfficePageTests
 
             var skipped = await GetAsync("/broker?status=Skipped");
             skipped.ShouldContain("href=\"/broker?status=Processed\"");
-            skipped.ShouldNotContain(">Processed<");
+            // The processed fill is not in the filtered list.
+            skipped.ShouldNotContain(">100.12<");
             _api.ExecutionReportStatuses.Last().ShouldBe("Skipped");
 
             await GetAsync("/broker?status=Broken");

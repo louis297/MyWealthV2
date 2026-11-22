@@ -45,7 +45,7 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         var created = await ReadAsync<Created>(
             HttpMethod.Post,
             "/tenants",
-            JsonSerializer.Serialize(new { name, code, reportingCurrency, allowedCustodyModes }, Json),
+            JsonSerializer.Serialize(new { name, code, reportingCurrency, allowedCustodyModes, brokerConnection }, Json),
             cancellationToken);
         return created.Id;
     }
@@ -61,7 +61,7 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         SendExpectingSuccessAsync(
             HttpMethod.Put,
             $"/tenants/{id}",
-            JsonSerializer.Serialize(new { name, reportingCurrency, allowedCustodyModes, rowVersion }, Json),
+            JsonSerializer.Serialize(new { name, reportingCurrency, allowedCustodyModes, brokerConnection, rowVersion }, Json),
             cancellationToken);
 
     public Task DisableTenantAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
@@ -278,11 +278,21 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         return page.Items;
     }
 
-    public Task<IReadOnlyList<BrokerConnectionItem>> ListBrokerConnectionsAsync(CancellationToken cancellationToken = default) =>
-        throw new NotImplementedException();
+    public async Task<IReadOnlyList<BrokerConnectionItem>> ListBrokerConnectionsAsync(CancellationToken cancellationToken = default)
+    {
+        var page = await ReadAsync<BrokerConnectionPage>(HttpMethod.Get, "/broker-connections", json: null, cancellationToken);
+        return page.Items;
+    }
 
-    public Task<IReadOnlyList<ExecutionReportItem>> ListExecutionReportsAsync(string? status, CancellationToken cancellationToken = default) =>
-        throw new NotImplementedException();
+    public async Task<IReadOnlyList<ExecutionReportItem>> ListExecutionReportsAsync(
+        string? status,
+        CancellationToken cancellationToken = default)
+    {
+        var query = status is null ? "" : $"&status={Uri.EscapeDataString(status)}";
+        var page = await ReadAsync<ExecutionReportPage>(
+            HttpMethod.Get, $"/execution-reports?page=1&pageSize=20{query}", json: null, cancellationToken);
+        return page.Items;
+    }
 
     private static string ClientMoneyAccountsPath(Guid tenantId) => $"/tenants/{tenantId}/client-money-accounts";
 
