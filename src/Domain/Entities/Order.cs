@@ -118,7 +118,7 @@ public class Order : BaseAuditableEntity
     public bool HasCancelRequest => CancelRequestedAt is not null;
 
     /// <summary>R18: <c>Placed</c> with no send attempt, so the broker cannot hold it.</summary>
-    public bool IsUnsent => throw new NotImplementedException();
+    public bool IsUnsent => Status == OrderStatus.Placed && Attempts == 0;
 
     public byte[] RowVersion { get; private set; } = null!;
 
@@ -129,7 +129,11 @@ public class Order : BaseAuditableEntity
         status is OrderStatus.Placed or OrderStatus.Working or OrderStatus.PartlyFilled;
 
     /// <summary>R14: open, or with a fill that is not posted yet. Only a live order reserves.</summary>
-    public bool IsLive => IsOpen;
+    public bool IsLive => IsOpen || PendingQuantity > 0m;
+
+    /// <summary>The quantity of the fills that are not posted yet.</summary>
+    private decimal PendingQuantity =>
+        _fills.Where(fill => fill.Status == OrderFillStatus.Pending).Sum(fill => fill.Quantity);
 
     /// <summary>R14: <c>Quantity − FilledQuantity</c> while open, 0 once final.</summary>
     public decimal OpenQuantity => IsOpen ? Quantity - FilledQuantity : 0m;
@@ -207,29 +211,128 @@ public class Order : BaseAuditableEntity
 
     /// <summary>R20: one more send attempt, recorded before the call. Only a <c>Placed</c> order with no cancel
     /// request is sent.</summary>
-    public void RecordAttempt(DateTimeOffset at) => throw new NotImplementedException();
+    public void RecordAttempt(DateTimeOffset at)
+    {
+        EnsureStatus("sent", OrderStatus.Placed);
+        if (HasCancelRequest)
+        {
+            throw new OrderStatusException("An order with a cancel request is not sent.");
+        }
+
+        Attempts++;
+        LastAttemptAt = at.ToUniversalTime();
+    }
 
     /// <summary>R21: the broker accepted it: <c>Placed</c> becomes <c>Working</c>. An order a report already moved on
     /// keeps its status and only takes the broker's order id.</summary>
-    public void Accept(string brokerOrderId, DateTimeOffset at) => throw new NotImplementedException();
+    public void Accept(string brokerOrderId, DateTimeOffset at)
+    {
+        var id = brokerOrderId?.Trim() ?? string.Empty;
+        if (id.Length is < 1 or > BrokerOrderIdMaxLength)
+        {
+            throw new DomainException($"The broker's order id must be 1 to {BrokerOrderIdMaxLength} characters.");
+        }
+
+        BrokerOrderId = id;
+        if (Status != OrderStatus.Placed)
+        {
+            return;
+        }
+
+        Status = OrderStatus.Working;
+        AcceptedAt = at.ToUniversalTime();
+        LastFailure = null;
+    }
 
     /// <summary>R21: the broker refused it: <c>Placed</c> becomes <c>Rejected</c> and reserves nothing.</summary>
-    public void Reject(OrderRejectReason reason, DateTimeOffset at) => throw new NotImplementedException();
+    public void Reject(OrderRejectReason reason, DateTimeOffset at)
+    {
+        EnsureStatus("rejected", OrderStatus.Placed);
+        Status = OrderStatus.Rejected;
+        RejectReason = reason;
+        ClosedAt = at.ToUniversalTime();
+        LastFailure = null;
+        Release();
+    }
 
     /// <summary>R21: the send failed; the order stays as it is and is sent again.</summary>
-    public void RecordFailure(BrokerFailure failure) => throw new NotImplementedException();
+    public void RecordFailure(BrokerFailure failure)
+    {
+        if (failure == BrokerFailure.InvalidItem)
+        {
+            throw new DomainException("InvalidItem is a failure of the feed, not of a send.");
+        }
+
+        LastFailure = failure;
+    }
 
     /// <summary>R18: an order the broker cannot hold is <c>Cancelled</c> at once and reserves nothing.</summary>
-    public void CancelUnsent(int? byUserId, string? note, DateTimeOffset at) => throw new NotImplementedException();
+    public void CancelUnsent(int? byUserId, string? note, DateTimeOffset at)
+    {
+        if (!IsUnsent)
+        {
+            throw new OrderStatusException("This order may be at the broker; only the broker can end it.");
+        }
+
+        var trimmed = OptionalText(note, NoteMaxLength, "Note");
+        Status = OrderStatus.Cancelled;
+        ClosedAt = at.ToUniversalTime();
+        CancelRequestedAt = at.ToUniversalTime();
+        CancelRequestedByUserId = byUserId;
+        CancelNote = trimmed;
+        Release();
+    }
 
     /// <summary>R18: an open order the broker may hold gets a cancel request; its status does not change.</summary>
-    public void RequestCancel(int? byUserId, string? note, DateTimeOffset at) => throw new NotImplementedException();
+    public void RequestCancel(int? byUserId, string? note, DateTimeOffset at)
+    {
+        if (!IsOpen)
+        {
+            throw new OrderStatusException($"This order is {Status} and cannot be cancelled.");
+        }
+
+        if (HasCancelRequest)
+        {
+            throw new OrderStatusException(CancelAlreadyRequestedMessage);
+        }
+
+        var trimmed = OptionalText(note, NoteMaxLength, "Note");
+        CancelRequestedAt = at.ToUniversalTime();
+        CancelRequestedByUserId = byUserId;
+        CancelNote = trimmed;
+    }
 
     /// <summary>R22: the broker answered the cancel request.</summary>
-    public void AnswerCancel(DateTimeOffset at) => throw new NotImplementedException();
+    public void AnswerCancel(DateTimeOffset at)
+    {
+        if (!HasCancelRequest)
+        {
+            throw new OrderStatusException("This order has no cancel request.");
+        }
+
+        CancelAnsweredAt ??= at.ToUniversalTime();
+    }
 
     /// <summary>R22: the broker never had the order: it is <c>Cancelled</c> with <see cref="NotAtTheBrokerReason"/>.</summary>
-    public void EndAsUnknown(DateTimeOffset at, OrderFeeTerms fees) => throw new NotImplementedException();
+    public void EndAsUnknown(DateTimeOffset at, OrderFeeTerms fees)
+    {
+        if (!IsOpen)
+        {
+            throw new OrderStatusException($"This order is {Status} already.");
+        }
+
+        if (!HasCancelRequest)
+        {
+            throw new OrderStatusException("This order has no cancel request.");
+        }
+
+        EnsureTerms(fees);
+        Status = OrderStatus.Cancelled;
+        ClosedAt = at.ToUniversalTime();
+        CloseReason = NotAtTheBrokerReason;
+        CancelAnsweredAt ??= at.ToUniversalTime();
+        Reserve(fees);
+    }
 
     /// <summary>R26, R28: adds a <c>Pending</c> fill within <c>Quantity − FilledQuantity</c>, whatever the status, and
     /// moves the status: <c>Filled</c> when the whole quantity is filled, else an ended order stays ended and an open
@@ -242,18 +345,78 @@ public class Order : BaseAuditableEntity
         DateOnly settlementDate,
         string? brokerReference,
         DateTimeOffset at,
-        OrderFeeTerms fees) => throw new NotImplementedException();
+        OrderFeeTerms fees)
+    {
+        EnsureTerms(fees);
+        if (quantity > Quantity - FilledQuantity)
+        {
+            throw new DomainException("A fill cannot be more than the order's quantity minus its filled quantity.");
+        }
+
+        var fill = OrderFill.Create(TenantId, executionReportId, quantity, price, tradeDate, settlementDate, brokerReference);
+        _fills.Add(fill);
+        FilledQuantity += quantity;
+
+        // R28: the whole quantity is filled, whatever the order was; else an ended order stays ended.
+        if (FilledQuantity == Quantity)
+        {
+            Status = OrderStatus.Filled;
+            RejectReason = null;
+            ClosedAt ??= at.ToUniversalTime();
+        }
+        else if (IsOpen)
+        {
+            Status = OrderStatus.PartlyFilled;
+        }
+
+        Reserve(fees);
+        return fill;
+    }
 
     /// <summary>R27: the broker ended an open order: <c>Cancelled</c> or <c>Expired</c>, with its reason.</summary>
-    public void End(OrderStatus status, string? reason, DateTimeOffset at, OrderFeeTerms fees) =>
-        throw new NotImplementedException();
+    public void End(OrderStatus status, string? reason, DateTimeOffset at, OrderFeeTerms fees)
+    {
+        if (status is not (OrderStatus.Cancelled or OrderStatus.Expired))
+        {
+            throw new DomainException("The broker ends an order as Cancelled or Expired.");
+        }
+
+        if (!IsOpen)
+        {
+            throw new OrderStatusException($"This order is {Status} already.");
+        }
+
+        EnsureTerms(fees);
+        var trimmed = reason?.Trim();
+        Status = status;
+        ClosedAt = at.ToUniversalTime();
+        CloseReason = string.IsNullOrEmpty(trimmed)
+            ? null
+            : trimmed.Length > CloseReasonMaxLength ? trimmed[..CloseReasonMaxLength] : trimmed;
+        Reserve(fees);
+    }
 
     /// <summary>R33: the fee of a fill of <paramref name="gross"/>: the schedule's fee on the posted gross with this
     /// fill, minus the fee already charged.</summary>
-    public decimal FeeOfFill(decimal gross, OrderFeeTerms fees) => throw new NotImplementedException();
+    public decimal FeeOfFill(decimal gross, OrderFeeTerms fees)
+    {
+        EnsureTerms(fees);
+        return Math.Max(0m, fees.FeeFor(PostedGross + gross) - FeeCharged);
+    }
 
     /// <summary>R31: a fill of the order was posted with <paramref name="gross"/> and <paramref name="fee"/>.</summary>
-    public void RecordPostedFill(decimal gross, decimal fee, OrderFeeTerms fees) => throw new NotImplementedException();
+    public void RecordPostedFill(decimal gross, decimal fee, OrderFeeTerms fees)
+    {
+        EnsureTerms(fees);
+        if (gross <= 0m || fee < 0m)
+        {
+            throw new DomainException("A posted fill has a gross above 0 and a fee that is not negative.");
+        }
+
+        PostedGross += gross;
+        FeeCharged += fee;
+        Reserve(fees);
+    }
 
     /// <summary>
     /// R39, R40: what the order reserves now, with <c>q</c> the quantity that can still be posted. A buy reserves the
@@ -262,7 +425,7 @@ public class Order : BaseAuditableEntity
     /// </summary>
     private void Reserve(OrderFeeTerms fees)
     {
-        var quantity = OpenQuantity;
+        var quantity = OpenQuantity + PendingQuantity;
         if (Side == OrderSide.Sell)
         {
             ReservedQuantity = quantity;
@@ -278,7 +441,31 @@ public class Order : BaseAuditableEntity
         }
 
         var gross = OrderRules.MaximumGross(quantity, PriceLimit);
-        ReservedCash = gross + fees.FeeFor(PostedGross + gross) - FeeCharged;
+        ReservedCash = gross + Math.Max(0m, fees.FeeFor(PostedGross + gross) - FeeCharged);
+    }
+
+    /// <summary>An order that ended with no fill to post reserves nothing.</summary>
+    private void Release()
+    {
+        ReservedCash = 0m;
+        ReservedQuantity = 0m;
+    }
+
+    /// <summary>The fee terms are the ones fixed when the order was placed (R11).</summary>
+    private void EnsureTerms(OrderFeeTerms fees)
+    {
+        if (fees.Schedule?.Id != TradeFeeScheduleId)
+        {
+            throw new DomainException("The fee terms are not the ones the order was placed with.");
+        }
+    }
+
+    private void EnsureStatus(string action, params OrderStatus[] from)
+    {
+        if (!from.Contains(Status))
+        {
+            throw new OrderStatusException($"This order is {Status} and cannot be {action}.");
+        }
     }
 
     private static string? OptionalText(string? value, int maxLength, string label)

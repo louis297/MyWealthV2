@@ -91,6 +91,14 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<CorporateActionAnnouncement> CorporateActionAnnouncements => Set<CorporateActionAnnouncement>();
 
+    public DbSet<Order> Orders => Set<Order>();
+
+    public DbSet<OrderFill> OrderFills => Set<OrderFill>();
+
+    public DbSet<ExecutionReport> ExecutionReports => Set<ExecutionReport>();
+
+    public DbSet<BrokerFeed> BrokerFeeds => Set<BrokerFeed>();
+
     public DbSet<Instrument> Instruments => Set<Instrument>();
 
     public DbSet<Account> Accounts => Set<Account>();

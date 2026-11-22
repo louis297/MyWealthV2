@@ -61,14 +61,70 @@ public class OrderFill
         decimal price,
         DateOnly tradeDate,
         DateOnly settlementDate,
-        string? brokerReference) => throw new NotImplementedException();
+        string? brokerReference)
+    {
+        if (quantity <= 0m || price <= 0m)
+        {
+            throw new DomainException("A fill has a quantity and a price above 0.");
+        }
+
+        if (settlementDate < tradeDate)
+        {
+            throw new DomainException("A fill cannot settle before its trade date.");
+        }
+
+        var reference = brokerReference?.Trim();
+        return new OrderFill
+        {
+            PublicId = Guid.NewGuid(),
+            TenantId = tenantId,
+            ExecutionReportId = executionReportId,
+            Quantity = quantity,
+            Price = price,
+            TradeDate = tradeDate,
+            SettlementDate = settlementDate,
+            BrokerReference = string.IsNullOrEmpty(reference)
+                ? null
+                : reference.Length > BrokerReferenceMaxLength ? reference[..BrokerReferenceMaxLength] : reference,
+            Status = OrderFillStatus.Pending
+        };
+    }
 
     /// <summary>R31: the fill's Transaction exists. Once, and only from <c>Pending</c>.</summary>
-    public void MarkPosted(int transactionId, decimal netCash, DateTimeOffset at) => throw new NotImplementedException();
+    public void MarkPosted(int transactionId, decimal netCash, DateTimeOffset at)
+    {
+        EnsurePending();
+        Status = OrderFillStatus.Posted;
+        HoldReason = null;
+        TransactionId = transactionId;
+        NetCash = netCash;
+        PostedAt = at.ToUniversalTime();
+    }
 
     /// <summary>R36: the fill cannot be posted now, for <paramref name="reason"/>; it stays <c>Pending</c>.</summary>
-    public void Hold(FillHoldReason reason) => throw new NotImplementedException();
+    public void Hold(FillHoldReason reason)
+    {
+        EnsurePending();
+        HoldReason = reason;
+    }
 
     /// <summary>R43: the broker said the fill has settled. Once; a fill can settle while it is still <c>Pending</c>.</summary>
-    public void Settle(DateOnly date, DateTimeOffset at) => throw new NotImplementedException();
+    public void Settle(DateOnly date, DateTimeOffset at)
+    {
+        if (IsSettled)
+        {
+            throw new DomainException("This fill has settled already.");
+        }
+
+        SettledAt = at.ToUniversalTime();
+        SettledDate = date;
+    }
+
+    private void EnsurePending()
+    {
+        if (Status != OrderFillStatus.Pending)
+        {
+            throw new DomainException("This fill is posted already.");
+        }
+    }
 }

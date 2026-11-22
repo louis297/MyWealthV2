@@ -26,12 +26,25 @@ public class BrokerFeed
     public byte[] RowVersion { get; private set; } = null!;
 
     /// <summary>A feed before its first read: nothing tried yet.</summary>
-    public static BrokerFeed Start(string connection) => throw new NotImplementedException();
+    public static BrokerFeed Start(string connection) => new() { Connection = connection };
 
     /// <summary>R24: a page was stored; the cursor moves to the party's new cursor. A missing cursor keeps the one
     /// stored. The last failure stays, so a reader can tell which came later.</summary>
-    public void Advance(string? cursor, DateTimeOffset at) => throw new NotImplementedException();
+    public void Advance(string? cursor, DateTimeOffset at)
+    {
+        if (cursor is { Length: > CursorMaxLength })
+        {
+            throw new DomainException($"A feed cursor is at most {CursorMaxLength} characters.");
+        }
+
+        Cursor = cursor ?? Cursor;
+        LastSucceededAt = at.ToUniversalTime();
+    }
 
     /// <summary>R24: a read failed. The cursor and the last success stay.</summary>
-    public void RecordFailure(BrokerFailure failure, DateTimeOffset at) => throw new NotImplementedException();
+    public void RecordFailure(BrokerFailure failure, DateTimeOffset at)
+    {
+        LastFailure = failure;
+        LastFailedAt = at.ToUniversalTime();
+    }
 }

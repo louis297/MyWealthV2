@@ -302,12 +302,25 @@ public class OrdersSchemaTests
         await db.ApplyAllAsync();
         var row = (await db.ReadAsync($"""
             {ScratchSchemaDatabase.TenantRows("a", Guid.NewGuid().ToString("N")[..12])}
-            {ScratchSchemaDatabase.FeeRows("a")}
-            SELECT @a_tenant, @a_instrument, @a_brokerage, @a_buy, @a_adviser, @a_feeschedule;
+            SELECT @a_tenant, @a_instrument, @a_brokerage, @a_buy, @a_adviser;
             """)).Single();
-        var (tenantId, instrumentId, accountId, transactionId, userId, scheduleId) = (
+        var (tenantId, instrumentId, accountId, transactionId, userId) = (
             Convert.ToInt32(row[0]), Convert.ToInt32(row[1]), Convert.ToInt32(row[2]), Convert.ToInt32(row[3]),
-            Convert.ToInt32(row[4]), Convert.ToInt32(row[5]));
+            Convert.ToInt32(row[4]));
+        int scheduleId;
+        await using (var context = OpenDb(db.ConnectionString))
+        {
+            // 0.5 % with a minimum of 10.00: the order of 10 at a limit of 105 reserves 1050 + 10.
+            var usd = await context.Set<Currency>().SingleAsync(currency => currency.Code == "USD");
+            var schedule = TradeFeeSchedule.Create(
+                tenantId, usd, new DateOnly(2026, 11, 1), 10m, null, [new MyWealthV2.Domain.ValueObjects.FeeBand(0m, 0.5m)],
+                new DateOnly(2026, 10, 15));
+            schedule.CreatedBy = "test";
+            context.Set<TradeFeeSchedule>().Add(schedule);
+            await context.SaveChangesAsync();
+            scheduleId = schedule.Id;
+        }
+
         var at = new DateTimeOffset(2026, 11, 23, 2, 10, 0, TimeSpan.Zero);
         var day = new DateOnly(2026, 11, 23);
         var report = ExecutionReport.Receive(
@@ -321,6 +334,7 @@ public class OrdersSchemaTests
                 tenantId, accountId, instrumentId, OrderSide.Buy, 10m, "USD", 100m, day, fees, "simulator", "Monthly top-up",
                 userId, at);
             order.CreatedBy = "test";
+            order.ReservedCash.ShouldBe(1060m);
             context.Set<Order>().Add(order);
             context.Set<ExecutionReport>().Add(report);
             await context.SaveChangesAsync();

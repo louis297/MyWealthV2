@@ -78,7 +78,27 @@ public class ExecutionReport
         DateOnly? tradeDate,
         DateOnly? settlementDate,
         string? fillOutsideId,
-        DateOnly? settledDate) => throw new NotImplementedException();
+        DateOnly? settledDate)
+    {
+        if (!IsId(outsideId))
+        {
+            return false;
+        }
+
+        return kind switch
+        {
+            null => true,
+            ExecutionReportKind.Fill => IsId(clientOrderId)
+                                        && IsAmount(quantity)
+                                        && IsAmount(price)
+                                        && tradeDate is { } traded
+                                        && settlementDate is { } settles
+                                        && settles >= traded,
+            ExecutionReportKind.Settled => IsId(clientOrderId) && IsId(fillOutsideId) && settledDate is not null,
+            ExecutionReportKind.Cancelled or ExecutionReportKind.Expired => IsId(clientOrderId),
+            _ => false
+        };
+    }
 
     /// <summary>R24: a new report, <c>Received</c> at platform time. The contract note is cut to 50 characters and the
     /// reason to 140.</summary>
@@ -96,11 +116,78 @@ public class ExecutionReport
         string? fillOutsideId,
         DateOnly? settledDate,
         string? reason,
-        DateTimeOffset receivedAt) => throw new NotImplementedException();
+        DateTimeOffset receivedAt)
+    {
+        var known = kind is { } value && Enum.IsDefined(value) ? kind : null;
+        if (!IsStorable(outsideId, known, clientOrderId, quantity, price, tradeDate, settlementDate, fillOutsideId, settledDate)
+            || string.IsNullOrWhiteSpace(connection) || connection.Length > ConnectionMaxLength)
+        {
+            throw new DomainException("This execution report cannot be stored.");
+        }
+
+        return new ExecutionReport
+        {
+            PublicId = Guid.NewGuid(),
+            Connection = connection,
+            OutsideId = outsideId,
+            Kind = known,
+            ClientOrderId = Cut(clientOrderId, IdMaxLength),
+            BrokerOrderId = Cut(brokerOrderId, IdMaxLength),
+            // A field its kind does not use is kept only when it fits its column.
+            Quantity = Fits(quantity) ? quantity : null,
+            Price = Fits(price) ? price : null,
+            TradeDate = tradeDate,
+            SettlementDate = settlementDate,
+            ContractNote = Cut(contractNote, ContractNoteMaxLength),
+            FillOutsideId = Cut(fillOutsideId, IdMaxLength),
+            SettledDate = settledDate,
+            Reason = Cut(reason, ReasonMaxLength),
+            ReceivedAt = receivedAt.ToUniversalTime(),
+            Status = ExecutionReportStatus.Received
+        };
+    }
 
     /// <summary>R25: it changed its order.</summary>
-    public void MarkProcessed(DateTimeOffset at) => throw new NotImplementedException();
+    public void MarkProcessed(DateTimeOffset at)
+    {
+        EnsureReceived();
+        Status = ExecutionReportStatus.Processed;
+        ProcessedAt = at.ToUniversalTime();
+    }
 
     /// <summary>R25: it changed nothing, for <paramref name="reason"/>.</summary>
-    public void Skip(ExecutionReportSkipReason reason, DateTimeOffset at) => throw new NotImplementedException();
+    public void Skip(ExecutionReportSkipReason reason, DateTimeOffset at)
+    {
+        EnsureReceived();
+        Status = ExecutionReportStatus.Skipped;
+        SkipReason = reason;
+        ProcessedAt = at.ToUniversalTime();
+    }
+
+    private void EnsureReceived()
+    {
+        if (Status != ExecutionReportStatus.Received)
+        {
+            throw new DomainException($"This execution report is {Status} already.");
+        }
+    }
+
+    private static bool IsId(string? value) => value is { Length: >= 1 and <= IdMaxLength };
+
+    /// <summary>Above 0, with at most 8 decimal places, within the column.</summary>
+    private static bool IsAmount(decimal? value) => value > 0m && Fits(value);
+
+    private static bool Fits(decimal? value) =>
+        value is { } number && Math.Abs(number) <= MaxStoredNumber && decimal.Round(number, Decimals) == number;
+
+    private static string? Cut(string? value, int maxLength)
+    {
+        var trimmed = value?.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return null;
+        }
+
+        return trimmed.Length > maxLength ? trimmed[..maxLength] : trimmed;
+    }
 }
