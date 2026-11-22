@@ -471,7 +471,8 @@ public class BackOfficePageTests
         body.ShouldContain("NZD");
         body.ShouldContain(">Create<");
         body.ShouldNotContain(">Delete<");
-        body.ShouldNotContain("Price");
+        // BO-I6: no price field. The BO22 note under the symbol says "priced" (simulated-instruments).
+        body.ShouldNotContain(">Price<");
     }
 
     [Test]

@@ -11,7 +11,13 @@
 @if (item is not null)
 {
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-        <MudText Typo="Typo.h4">@item.Symbol</MudText>
+        <div>
+            <MudText Typo="Typo.h4">@item.Symbol</MudText>
+            @if (item.MarketDataConnection is { } connection)
+            {
+                <MudText Typo="Typo.caption">@($"Prices from {connection}")</MudText>
+            }
+        </div>
         <MudChip T="string" Color="@(item.IsActive ? Color.Success : Color.Default)">@(item.IsActive ? "Active" : "Disabled")</MudChip>
     </MudStack>
 

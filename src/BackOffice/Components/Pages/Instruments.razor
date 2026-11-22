@@ -56,7 +56,13 @@ else if (list is not null)
                 <MudTh></MudTh>
             </HeaderContent>
             <RowTemplate>
-                <MudTd DataLabel="Symbol"><MudLink Href="@($"/instruments/{context.Id}")">@context.Symbol</MudLink></MudTd>
+                <MudTd DataLabel="Symbol">
+                    <MudLink Href="@($"/instruments/{context.Id}")">@context.Symbol</MudLink>
+                    @if (context.MarketDataConnection is { } connection)
+                    {
+                        <MudText Typo="Typo.caption" Class="d-block">@($"Prices from {connection}")</MudText>
+                    }
+                </MudTd>
                 <MudTd DataLabel="Name">@context.Name</MudTd>
                 <MudTd DataLabel="Quote currency">@context.QuoteCurrency</MudTd>
                 <MudTd DataLabel="Active">@(context.IsActive ? "Active" : "Disabled")</MudTd>
