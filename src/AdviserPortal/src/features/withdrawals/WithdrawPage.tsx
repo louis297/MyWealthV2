@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { SelectItem } from "@/components/ui/select";
 import { useGetAccountQuery } from "@/features/accounts/accountsApi";
+import { WithdrawableCash } from "@/features/accounts/WithdrawableCash";
 import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
 import { useGetNominatedBankAccountsQuery } from "@/features/nominatedBankAccounts/nominatedBankAccountsApi";
 import { problemMessages } from "@/features/statementLines/statementLineLabels";
@@ -104,9 +105,7 @@ export function WithdrawPage() {
               <FieldError messages={fields.nominatedbankaccountid} />
               <TextField id="withdraw-amount" label="Amount" inputMode="decimal" value={amount} required
                 onChange={(event) => { setAmount(event.target.value); setReviewing(false); }} />
-              <p className="text-muted-foreground text-sm">
-                {`Available ${formatMoney(from.availableCash ?? from.cashBalance, from.currency, places ?? 2)}`}
-              </p>
+              <WithdrawableCash account={from} />
               <FieldError messages={fields.amount} />
               <TextField id="withdraw-reference" label="Reference" value={reference} maxLength={18}
                 placeholder={from.depositReference ?? ""}

@@ -27,6 +27,7 @@ import {
   useReopenAccountMutation,
 } from "@/features/accounts/accountsApi";
 import { allowsManualEntry, isCustodial } from "@/features/accounts/custodyRules";
+import { AccountOrdersSection } from "@/features/orders/AccountOrdersSection";
 import { AccountWithdrawalsSection } from "@/features/withdrawals/AccountWithdrawalsSection";
 import { withdrawalStatusLabel } from "@/features/withdrawals/withdrawalLabels";
 import { useGetWithdrawalQuery } from "@/features/withdrawals/withdrawalsApi";
@@ -40,6 +41,7 @@ import {
   useRebalanceAccountMutation,
   useUnassignPortfolioMutation,
 } from "@/features/portfolios/portfoliosApi";
+import { shortDay } from "@/features/orders/orderLabels";
 import { rateLine } from "@/features/transactions/fxFormat";
 import { canReverse, ReverseTransactionButton, transactionTypeLabel } from "@/features/transactions/ReverseTransactionButton";
 import { type TransactionCash, useGetTransactionsQuery } from "@/features/transactions/transactionsApi";
@@ -242,6 +244,7 @@ export function AccountDetailPage() {
       symbol: item.symbol,
       name: item.name,
       quantity: String(item.quantity),
+      reserved: item.reservedQuantity ?? 0,
       cost: String(item.cost),
       costCurrency: item.costCurrency,
       target: weights.has(item.instrumentId) ? String(weights.get(item.instrumentId)) : "—",
@@ -255,6 +258,7 @@ export function AccountDetailPage() {
           symbol: instrument?.symbol ?? "—",
           name: instrument?.name ?? "—",
           quantity: "—",
+          reserved: 0,
           cost: "—",
           costCurrency: "—",
           target: String(line.targetWeight),
@@ -313,6 +317,21 @@ export function AccountDetailPage() {
       {closedByClosure ? <p className="text-muted-foreground text-sm">{`Closed by account closure on ${closedByClosure}`}</p> : null}
       {actions.length > 0 || withdrawable ? (
         <nav aria-label="Transaction actions" className="flex flex-wrap gap-2">
+          {withdrawable && (data.type === "Brokerage" || data.type === "Other") ? (
+            // D69: a trade on a Custodial account is an order; an assigned account follows its portfolio.
+            locked ? (
+              <span className="flex items-center gap-2">
+                <Button type="button" variant="outline" size="sm" disabled>
+                  Place order
+                </Button>
+                <span className="text-muted-foreground text-sm">This account follows a portfolio.</span>
+              </span>
+            ) : (
+              <Link to={`/accounts/${data.id}/order`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                Place order
+              </Link>
+            )
+          ) : null}
           {actions.map((action) => (
             <Link
               key={action}
@@ -367,12 +386,21 @@ export function AccountDetailPage() {
             <DetailItem label="Status">
               <StatusBadge status={data.status} />
             </DetailItem>
-            <DetailItem label="Cash balance">{data.cashBalance}</DetailItem>
+            <DetailItem label={isCustodial(data) ? "Cash" : "Cash balance"}>{data.cashBalance}</DetailItem>
             {isCustodial(data) && (data.reservedCash ?? 0) !== 0 ? (
-              <DetailItem label="Reserved for withdrawals">{formatMoney(data.reservedCash ?? 0, data.currency, places)}</DetailItem>
+              // D69: withdrawals and orders.
+              <DetailItem label="Reserved">{formatMoney(data.reservedCash ?? 0, data.currency, places)}</DetailItem>
             ) : null}
             {isCustodial(data) ? (
               <DetailItem label="Available">{formatMoney(data.availableCash ?? data.cashBalance, data.currency, places)}</DetailItem>
+            ) : null}
+            {isCustodial(data) && (data.unsettledCash ?? 0) !== 0 ? (
+              <DetailItem label="Not settled">{formatMoney(data.unsettledCash ?? 0, data.currency, places)}</DetailItem>
+            ) : null}
+            {isCustodial(data) ? (
+              <DetailItem label="Available to withdraw">
+                {formatMoney(data.withdrawableCash ?? data.availableCash ?? data.cashBalance, data.currency, places)}
+              </DetailItem>
             ) : null}
             {isCustodial(data) && data.depositReference ? (
               <DetailItem label="Deposit reference">{data.depositReference}</DetailItem>
@@ -484,6 +512,7 @@ export function AccountDetailPage() {
                     symbol: item.symbol,
                     name: item.name,
                     quantity: String(item.quantity),
+                    reserved: item.reservedQuantity ?? 0,
                     cost: String(item.cost),
                     costCurrency: item.costCurrency,
                     target: "",
@@ -491,7 +520,11 @@ export function AccountDetailPage() {
                     <TableRow key={item.key}>
                       <TableCell>{item.symbol}</TableCell>
                       <TableCell>{item.name}</TableCell>
-                      <TableCell>{item.quantity}</TableCell>
+                      <TableCell>
+                        {item.quantity}
+                        {/* D69: the part live sell orders reserve. */}
+                        {item.reserved > 0 ? <p className="text-muted-foreground text-xs">{`${item.reserved} reserved`}</p> : null}
+                      </TableCell>
                       <TableCell>{item.cost}</TableCell>
                       <TableCell>{item.costCurrency}</TableCell>
                       {locked ? <TableCell>{item.target}</TableCell> : null}
@@ -503,6 +536,7 @@ export function AccountDetailPage() {
           </Card>
         )}
       </Section>
+      {isCustodial(data) ? <AccountOrdersSection accountId={data.id} /> : null}
       {isCustodial(data) ? <AccountWithdrawalsSection accountId={data.id} /> : null}
       <Section title="Activity">
         {(transactions.data?.items.length ?? 0) === 0 ? <Muted>No activity.</Muted> : (
@@ -536,6 +570,10 @@ export function AccountDetailPage() {
                           decimalPlaces={currencies.data?.find((currency) => currency.code === data.currency)?.decimalPlaces}
                         />
                         {item.fx ? <p className="text-muted-foreground text-xs">{rateLine(item.fx)}</p> : null}
+                        {/* D74: a fill that has not settled. */}
+                        {item.execution && !item.execution.settledAt ? (
+                          <p className="text-muted-foreground text-xs">{`Settles ${shortDay(item.execution.settlementDate)}`}</p>
+                        ) : null}
                       </TableCell>
                       <TableCell>{canReverse(item, role) && !closing ? <ReverseTransactionButton id={item.id} /> : null}</TableCell>
                     </TableRow>

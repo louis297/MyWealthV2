@@ -98,6 +98,11 @@ export function canAccessWithdrawals(role: string | null | undefined) {
   return role === roles.tenantAdmin || role === roles.adviser;
 }
 
+/** orders.read and orders.place: the Orders pages (D71). */
+export function canAccessOrders(role: string | null | undefined) {
+  return role === roles.tenantAdmin || role === roles.adviser;
+}
+
 /** corporate-actions.read: the Corporate actions pages (D64, D65). */
 export function canAccessCorporateActions(role: string | null | undefined) {
   return role === roles.tenantAdmin || role === roles.adviser;

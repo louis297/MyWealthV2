@@ -76,6 +76,8 @@ export function sourceLabel(kind: string | undefined) {
       return "Interest run";
     case "CorporateAction":
       return "Corporate action";
+    case "OrderFill":
+      return "Order";
     default:
       return kind;
   }
