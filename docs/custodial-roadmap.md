@@ -91,7 +91,7 @@ The manual entry matrix at the end of the plan. The External column stays as tod
 | `Buy` / `Sell` | allowed, filled at once | refused | Order fills (O1); rebalance through orders (O3) |
 | `InternalTransfer` | allowed, same Customer only (D14, from withdrawals, landed 2026-11-21) | allowed, same Customer only (D14) | Hand entry |
 | `FxConversion` | allowed, both Custodial | allowed (later through an outside FX party, O5) | Hand entry |
-| `Interest` | refused | refused | Interest run (I2) |
+| `Interest` | refused (written by the interest run, landed 2026-11-22) | refused | Interest run (I2) |
 | `Opening` / `OpeningHoldings` | refused | refused | Migration batch (T2) |
 | `StockIn` / `StockOut` | refused | refused | In-kind transfer (T1) |
 | `Split` / `Bonus` / `Scrip` | refused | refused | Corporate action events (C1, C3) |
@@ -265,7 +265,7 @@ Real-world shape: Customers pay into the firm's client money trust account at a 
 - **What:** the few tax attributes the interest run needs: RWT rate (or "not provided"), whether an IRD number is held, tax residency. Not a KYC module.
 - **Check against IRD** when the spec is written ([future-plans.md](future-plans.md) §1). This note settles no rate.
 - **Depends on:** nothing. Coordinate with roadmap step 2 (income events), which needs the same profile.
-- **Spec:** I1 and I2 are one spec, with S1 trust interest, [interest-run.md](features/interest-run.md) (accepted 2026-11-22). Its §11 records: three attributes per Customer (tax residency, IRD number held, the chosen RWT rate), and the IRD number itself is not stored; a Customer with nothing saved is withheld at the non-declaration rate; the rates are constants checked against Inland Revenue on 2026-11-22 (individuals only: 10.5, 17.5, 30, 33 or 39 % chosen, 33 % with no rate chosen, 45 % without an IRD number, NRWT 15 % for an overseas Customer); the Adviser or TenantAdmin sets it with the existing Customer permissions, and the Customer reads it; the profile is read when interest is paid, with no history table.
+- **Spec:** I1 and I2 are one spec, with S1 trust interest, [interest-run.md](features/interest-run.md) (accepted and landed 2026-11-22). Its §11 records: three attributes per Customer (tax residency, IRD number held, the chosen RWT rate), and the IRD number itself is not stored; a Customer with nothing saved is withheld at the non-declaration rate; the rates are constants checked against Inland Revenue on 2026-11-22 (individuals only: 10.5, 17.5, 30, 33 or 39 % chosen, 33 % with no rate chosen, 45 % without an IRD number, NRWT 15 % for an overseas Customer); the Adviser or TenantAdmin sets it with the existing Customer permissions, and the Customer reads it; the profile is read when interest is paid, with no history table.
 
 ### I2. Interest run
 
@@ -275,7 +275,7 @@ Real-world shape: Customers pay into the firm's client money trust account at a 
 - **Open:** whether the firm keeps a margin between the bank's rate and the Customer's rate, and how B7 shows it.
 - **Closes:** the interest gap. `Interest` stays refused by hand.
 - **Depends on:** F1, I1.
-- **Spec:** [interest-run.md](features/interest-run.md) (accepted 2026-11-22), with I1. Its §11 records: an interest rate schedule per Tenant and currency with marginal bands of annual rates; an accrual per Custodial account and UTC day on the closing balance (Actual/365, 8 decimals), stored once, with a cursor per account; a posting per calendar month as one `Interest` with a `Principal` leg, a `Tax` cash leg with a tax detail (the shape dividends reuse) and an interest detail, source `InterestRun`; the tax decided from the tax profile when the interest is paid; a stored run per Tenant and as-of date, daily at 00:30 UTC for yesterday; the SystemAdmin trigger of D18 with an as-of date of at most yesterday (this refines "up to today"), a later date only with the option `Interest:AllowFutureAsOfDates`; an account closure posts the interest accrued so far before its payout, and a closing account is not accrued; for D12, the firm sets the Customer rate and the margin is what the bank pays above it; the bank's interest on the trust account is a statement line of kind `Interest` that the platform sets aside, and the bank reconciliation shows it, the interest credited and the tax withheld as three known differences (this answers the "Open" of B7); no flow reverses an interest posting; permissions `interest-rates.read` / `.manage` and `interest-runs.read` / `.start`.
+- **Spec:** [interest-run.md](features/interest-run.md) (accepted and landed 2026-11-22), with I1. Its §11 records: an interest rate schedule per Tenant and currency with marginal bands of annual rates; an accrual per Custodial account and UTC day on the closing balance (Actual/365, 8 decimals), stored once, with a cursor per account; a posting per calendar month as one `Interest` with a `Principal` leg, a `Tax` cash leg with a tax detail (the shape dividends reuse) and an interest detail, source `InterestRun`; the tax decided from the tax profile when the interest is paid; a stored run per Tenant and as-of date, daily at 00:30 UTC for yesterday; the SystemAdmin trigger of D18 with an as-of date of at most yesterday (this refines "up to today"), a later date only with the option `Interest:AllowFutureAsOfDates`; an account closure posts the interest accrued so far before its payout, and a closing account is not accrued; for D12, the firm sets the Customer rate and the margin is what the bank pays above it; the bank's interest on the trust account is a statement line of kind `Interest` that the platform sets aside, and the bank reconciliation shows it, the interest credited and the tax withheld as three known differences (this answers the "Open" of B7); no flow reverses an interest posting; permissions `interest-rates.read` / `.manage` and `interest-runs.read` / `.start`.
 
 ---
 
@@ -458,7 +458,7 @@ Each step depends only on earlier steps. "Closes" names the matrix cell or known
 | 6b | B4 / B6 remainder: receipt returns, recalls, other debit lines | S1 returns and recalls | — | [bank-returns](features/bank-returns.md) | accepted 2026-11-21, landed 2026-11-21 |
 | 7 | B7 bank reconciliation | S1 balances | — | [bank-reconciliation](features/bank-reconciliation.md) | accepted 2026-11-21, landed 2026-11-21 |
 | 8 | B8 account closure | — | Hand `CloseOut` | [account-closure](features/account-closure.md) | accepted 2026-11-22, landed 2026-11-22 |
-| 9 | I1 tax profile, I2 interest run | S1 trust interest | "No interest" | [interest-run](features/interest-run.md) | accepted 2026-11-22 |
+| 9 | I1 tax profile, I2 interest run | S1 trust interest | "No interest" | [interest-run](features/interest-run.md) | accepted 2026-11-22, landed 2026-11-22 |
 | 10 | C1 corporate actions (split, consolidation, bonus) | S4 | "A split cannot be recorded" | — | not started |
 | 11 | O1 orders, O2 settlement | S2 | Immediate `Buy` / `Sell` | — | not started |
 | 12 | O3 rebalance through orders | S2 | — | — | not started |

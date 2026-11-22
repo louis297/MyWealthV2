@@ -28,7 +28,6 @@ A Custodial account is meant to be the platform's own record: the server produce
 
 | Gap | Effect on a Custodial account | Closed by |
 | --- | --- | --- |
-| No interest | Cash on the platform earns nothing. `Interest` is refused | An interest job: [interest-run](../features/interest-run.md) (accepted 2026-11-22). The row is removed when it lands |
 | A split cannot be recorded | If a held instrument really splits, the quantity stays as it was while the price falls. The holding's market value, net worth and the next rebalance of that account are wrong until the quantity is corrected | Corporate action events |
 | Existing positions cannot be moved in | A Custodial account starts with cash only. `OpeningHoldings` and `StockIn` are refused, so a Customer's shares at another broker cannot arrive in kind | In-kind transfer |
 | No opening balance | The same for cash: `Opening` is refused. A balance arrives as a `TransferIn` booked on the day it is entered | Migration batches |
