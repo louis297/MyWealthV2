@@ -26,6 +26,9 @@ public abstract class SmokeTest : PageTest
     {
         Page.SetDefaultNavigationTimeout(NavigationTimeout);
         Page.SetDefaultTimeout(NavigationTimeout);
+        // Expect(...) assertions keep Playwright's own 5-second default unless set here. The first
+        // sign-in after a deploy (OIDC redirect through the BFF, first identity page) can take longer.
+        SetDefaultExpectTimeout(NavigationTimeout);
         _tracing = SmokeSettings.TargetsOnlyLocalhost;
         if (_tracing)
         {

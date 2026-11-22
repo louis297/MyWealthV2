@@ -3,7 +3,7 @@ title: Smoke test
 status: accepted
 language: en
 created: 2026-11-12
-updated: 2026-11-17
+updated: 2026-11-23
 related:
   - README.md
   - glossary.md
@@ -93,7 +93,7 @@ Seeding the smoke tenant in Development is allowed by [tenants.md](features/tena
 - Browsers are installed with the Playwright script that the build writes to the output folder (`playwright.ps1 install --with-deps chromium`). Chromium only.
 - On failure the suite keeps a full-page screenshot per case under `playwright/` in the test work directory (`artifacts/bin/Smoke.Tests/<configuration>/playwright/`).
 - It records a Playwright trace (screenshots and snapshots) only when **both** portal URLs are loopback, and keeps it next to the screenshot when a case fails. A trace holds the typed password, the login form body and the session cookies. Against any other host, including production from a developer machine, no trace is recorded (amendment 2026-11-13).
-- Time limits: 30 seconds per navigation, 2 minutes per case. A cold start after deploy is covered by the health wait in [deployment.md](deployment.md) §9, not by long test timeouts.
+- Time limits: 30 seconds per navigation, per action and per `Expect` assertion, 2 minutes per case. The assertion limit is set explicitly; Playwright's own default is 5 seconds. Container start-up after deploy is covered by the health wait in [deployment.md](deployment.md) §9, but a healthy container can still answer its first sign-in slowly (the OIDC redirect through the BFF, the first identity page), so the suite does not rely on the 5-second default (amendment 2026-11-23).
 
 ---
 
