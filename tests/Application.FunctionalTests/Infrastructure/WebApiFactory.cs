@@ -75,7 +75,6 @@ public class WebApiFactory(
             services.RemoveAll<IMarketPrices>();
             services.AddSingleton<InMemoryMarketPrices>();
             services.AddSingleton<IMarketPrices>(sp => sp.GetRequiredService<InMemoryMarketPrices>());
-            services.TryAddScoped<SyncMarketPrices>();
             services.AddSingleton<CollidingAccountSaveInterceptor>();
             services.AddScoped<ISaveChangesInterceptor>(sp => sp.GetRequiredService<CollidingAccountSaveInterceptor>());
 

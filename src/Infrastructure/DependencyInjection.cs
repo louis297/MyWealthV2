@@ -25,6 +25,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -138,6 +139,20 @@ public static class DependencyInjection
         var connections = new ConfiguredMarketDataConnections(MarketDataConnectionsConfiguration.Read(builder.Configuration, host));
         builder.Services.AddSingleton(connections);
         builder.Services.AddSingleton(connections.Connections);
+        builder.Services.AddHttpClient(SimulatorMarketPrices.HttpClientName);
+        builder.Services.AddSingleton<IMarketPricesAdapter, SimulatorMarketPrices>();
+        builder.Services.AddScoped<IMarketPrices, MarketPricesDispatcher>();
+        builder.Services.AddScoped<SyncMarketPrices>();
+        if (host == MarketDataHost.Worker)
+        {
+            builder.Services.TryAddSingleton(sp =>
+            {
+                var connectionString = sp.GetRequiredService<IConfiguration>().GetConnectionString(Services.Database);
+                Guard.Against.Null(connectionString, message: $"Connection string '{Services.Database}' not found.");
+                return new SqlRunLock(connectionString);
+            });
+            builder.Services.AddScoped<MarketDataSyncJob>();
+        }
     }
 
     /// <summary>
