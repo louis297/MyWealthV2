@@ -34,7 +34,7 @@ internal static class MigrationBatchHttp
     }
 
     /// <summary>The action routes this slice has so far (R17–R20).</summary>
-    public static string[] Actions { get; } = ["submit", "return", "cancel"];
+    public static string[] Actions { get; } = ["submit", "return", "cancel", "post"];
 
     public static Dictionary<string, object?> Body(
         IEnumerable<object> entries,
@@ -156,6 +156,29 @@ internal static class MigrationBatchHttp
         var response = await ActAsync(world.TenantAdmin, id, "submit");
         response.StatusCode.ShouldBe(HttpStatusCode.NoContent, await response.Content.ReadAsStringAsync());
         return (id, line);
+    }
+
+    /// <summary>A submitted batch posted by Tia, the second TenantAdmin (R20).</summary>
+    public static async Task<(Guid Id, BankStatementLine Line)> PostedAsync(MigrationWorld world)
+    {
+        var (id, line) = await SubmittedAsync(world);
+        var response = await ActAsync(world.Tia, id, "post");
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent, await response.Content.ReadAsStringAsync());
+        return (id, line);
+    }
+
+    /// <summary>The Transactions a batch wrote, oldest first, with their legs and migration detail.</summary>
+    public static async Task<List<Transaction>> TransactionsOfBatchAsync(Guid id)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await db.Transactions.IgnoreQueryFilters().AsNoTracking()
+            .Include(row => row.CashLegs)
+            .Include(row => row.SecurityLegs)
+            .Include(row => row.MigrationDetail)
+            .Where(row => row.SourceKind == TransactionSourceKind.Migration && row.SourcePublicId == id)
+            .OrderBy(row => row.Id)
+            .ToListAsync();
     }
 
     public static Task<HttpResponseMessage> MatchAsync(string accessToken, Guid lineId, Guid batchId) =>

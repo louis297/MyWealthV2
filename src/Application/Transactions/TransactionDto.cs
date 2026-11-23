@@ -54,7 +54,14 @@ public sealed class TransactionDto
     /// <summary>The broker's execution, on the Transaction of an order fill and on its Reversal; otherwise null
     /// (orders R38).</summary>
     public TransactionExecutionDto? Execution { get; init; }
+
+    /// <summary>Where a migrated opening balance came from, on a Transaction a migration batch wrote; otherwise null
+    /// (migration-batches R31).</summary>
+    public TransactionMigrationDto? Migration { get; init; }
 }
+
+/// <summary>Migration-batches R31: the date the previous provider's statement was taken and the provider.</summary>
+public sealed record TransactionMigrationDto(string AsOfDate, string PreviousProvider);
 
 /// <summary>An order fill's execution detail (orders R35, R38). <see cref="SettledAt"/> is read from the fill.</summary>
 public sealed class TransactionExecutionDto

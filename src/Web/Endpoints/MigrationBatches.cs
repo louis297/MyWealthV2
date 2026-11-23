@@ -21,6 +21,7 @@ public class MigrationBatches : IEndpointGroup
         groupBuilder.MapPost(SubmitMigrationBatch, "{id:guid}/submit").RequireAuthorization(Policies.MigrationBatchesManage);
         groupBuilder.MapPost(ReturnMigrationBatch, "{id:guid}/return").RequireAuthorization(Policies.MigrationBatchesManage);
         groupBuilder.MapPost(CancelMigrationBatch, "{id:guid}/cancel").RequireAuthorization(Policies.MigrationBatchesManage);
+        groupBuilder.MapPost(PostMigrationBatch, "{id:guid}/post").RequireAuthorization(Policies.MigrationBatchesManage);
     }
 
     [EndpointSummary("List migration batches")]
@@ -76,6 +77,15 @@ public class MigrationBatches : IEndpointGroup
     [EndpointSummary("Cancel a migration batch")]
     [EndpointDescription("Ends a Draft or Submitted migration batch with a required note. Its funding lines go back to suspense (R19).")]
     public static async Task<NoContent> CancelMigrationBatch(ISender sender, Guid id, CancelMigrationBatchCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Post a migration batch")]
+    [EndpointDescription("Posts a Submitted migration batch: one Opening and one OpeningHoldings per entry with source Migration, all of them or none. The caller must not be the person who submitted it (R20–R23).")]
+    public static async Task<NoContent> PostMigrationBatch(ISender sender, Guid id, PostMigrationBatchCommand command)
     {
         command.Id = id;
         await sender.Send(command);
