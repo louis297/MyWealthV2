@@ -52,6 +52,8 @@ export type BankFeedStatus = { lastSucceededAt: string | null; lastFailedAt: str
 /** R21: a run with its items. */
 export type BankReconciliation = BankReconciliationListItem & {
   paymentsInFlight: { count: number; amount: number };
+  /** trade-settlement R25: the open trade settlements of the account, as information. */
+  openSettlements?: { count: number; amount: number };
   feed: BankFeedStatus;
   items: ReconciliationItem[];
 };

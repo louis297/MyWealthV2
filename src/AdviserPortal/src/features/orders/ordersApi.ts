@@ -14,6 +14,22 @@ export type OrderFill = {
   transactionId: string | null;
   postedAt: string | null;
   settledAt: string | null;
+  /** trade-settlement R34. */
+  brokerSettlementId?: string | null;
+  tradeSettlementId?: string | null;
+  break?: FillBreak | null;
+};
+
+/** trade-settlement R34: the broker took the fill back. */
+export type FillBreak = {
+  at: string;
+  reason: string | null;
+  outcome: string;
+  holdReason: string | null;
+  reversalTransactionId: string | null;
+  resolvedBy: { id: string; name: string } | null;
+  resolvedAt: string | null;
+  note: string | null;
 };
 
 /** orders R15: an order item. `fills` is on the single read only. */
@@ -111,6 +127,14 @@ export const ordersApi = api.injectEndpoints({
       }),
       invalidatesTags: ["Order", "Account"],
     }),
+    resolveBrokenFill: builder.mutation<void, { id: string; fillId: string; note: string; rowVersion: string }>({
+      query: ({ id, fillId, note, rowVersion }) => ({
+        url: `/orders/${id}/fills/${fillId}/resolve-break`,
+        method: "POST",
+        body: { note, rowVersion },
+      }),
+      invalidatesTags: ["Order", "Account"],
+    }),
   }),
 });
 
@@ -120,4 +144,5 @@ export const {
   useLazyPreviewOrderQuery,
   usePlaceOrderMutation,
   useCancelOrderMutation,
+  useResolveBrokenFillMutation,
 } = ordersApi;

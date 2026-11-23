@@ -220,6 +220,26 @@ describe("StatementLineDetailPage (deposit-matching D35, D37)", () => {
     }
   });
 
+  it("says Trade settlement for a line matched to one, links it and offers no action (trade-settlement D78)", async () => {
+    const settlementId = "55555555-0000-0000-0000-000000000001";
+    renderFees(feeUser(), routes, detailPath, serveLine({
+      ...matched,
+      match: { accountId: null, customerId: null, transactionId: null, method: "Settlement", at: "2026-11-25T02:01:08Z" },
+      tradeSettlementId: settlementId,
+    }));
+
+    expect(await screen.findByText("Trade settlement", { selector: "p" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Trade settlement" })).toHaveAttribute("href", `/trade-settlements/${settlementId}`);
+    expect(screen.queryByRole("button", { name: "Undo match" })).not.toBeInTheDocument();
+  });
+
+  it("explains a receipt that does not match its trade settlement (trade-settlement D78)", async () => {
+    renderFees(feeUser(), routes, detailPath, serveLine({ ...unmatched, unmatchedReason: "SettlementMismatch" }));
+
+    expect(await screen.findByText("Does not match the trade settlement")).toBeInTheDocument();
+    expect(screen.getByText("Return it to the broker, or ignore it with a note.")).toBeInTheDocument();
+  });
+
   it("says Matched by hand for a manual match", async () => {
     renderFees(feeUser(), routes, detailPath, serveLine({ ...matched, match: { ...matched.match, method: "Manual" } }));
 

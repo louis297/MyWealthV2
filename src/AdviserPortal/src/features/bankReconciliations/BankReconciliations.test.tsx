@@ -208,6 +208,28 @@ describe("BankReconciliationDetailPage (D51)", () => {
     expect(screen.queryByRole("button", { name: /PDF/ })).not.toBeInTheDocument();
   });
 
+  it("labels the items of order fills, links the trades that need action and shows the open settlements (trade-settlement D78)", async () => {
+    const settling = {
+      ...run,
+      openSettlements: { count: 2, amount: -1001.5 },
+      items: [
+        { kind: "TradesNeedingAction", class: "Break", amount: 400.48, count: 1, statementLine: null, clientMoneyAccountId: null },
+        { kind: "UnbookedFills", class: "Break", amount: -1100, count: 1, statementLine: null, clientMoneyAccountId: null },
+        { kind: "UnsettledTrades", class: "Timing", amount: 589.52, count: 2, statementLine: null, clientMoneyAccountId: null },
+        { kind: "TradeFees", class: "Known", amount: 10, count: 2, statementLine: null, clientMoneyAccountId: null },
+      ],
+    };
+    renderFees(feeUser(), routes, `/bank-reconciliations/${runId}`, (request) =>
+      path(request) === `/bank-reconciliations/${runId}` ? json(settling) : serve(request));
+
+    expect(await screen.findByText("Trades that need action")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open trade settlements" })).toHaveAttribute("href", "/trade-settlements?open=true");
+    expect(screen.getByText("Settled trades not booked yet")).toBeInTheDocument();
+    expect(screen.getByText("Trades waiting for settlement")).toBeInTheDocument();
+    expect(screen.getByText("Trade fees held in the trust account")).toBeInTheDocument();
+    expect(screen.getByText(/^Open trade settlements: 2, net -1,001.50/)).toBeInTheDocument();
+  });
+
   it("names the person of a manual run", async () => {
     renderFees(feeUser(), routes, `/bank-reconciliations/${runId}`, (request) =>
       path(request) === `/bank-reconciliations/${runId}`
