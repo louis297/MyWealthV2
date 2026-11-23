@@ -44,6 +44,8 @@ import { BankAccountChecksPage } from "@/features/nominatedBankAccounts/BankAcco
 import { OrderDetailPage } from "@/features/orders/OrderDetailPage";
 import { OrdersListPage } from "@/features/orders/OrdersListPage";
 import { PlaceOrderPage } from "@/features/orders/PlaceOrderPage";
+import { RebalanceDetailPage } from "@/features/rebalances/RebalanceDetailPage";
+import { RebalancesListPage } from "@/features/rebalances/RebalancesListPage";
 import { TradeSettlementDetailPage } from "@/features/tradeSettlements/TradeSettlementDetailPage";
 import { TradeSettlementsListPage } from "@/features/tradeSettlements/TradeSettlementsListPage";
 import { WithdrawalDetailPage } from "@/features/withdrawals/WithdrawalDetailPage";
@@ -194,6 +196,15 @@ export const appRoutes: RouteObject[] = [
             children: [
               { index: true, element: <OrdersListPage /> },
               { path: ":id", element: <OrderDetailPage /> },
+            ],
+          },
+          {
+            // rebalances P15–P19.
+            path: "/rebalances",
+            element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
+            children: [
+              { index: true, element: <RebalancesListPage /> },
+              { path: ":id", element: <RebalanceDetailPage /> },
             ],
           },
           {

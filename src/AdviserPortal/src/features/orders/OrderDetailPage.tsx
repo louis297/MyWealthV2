@@ -13,6 +13,8 @@ import {
   breakOutcomeLabel,
   brokerFailureLabel,
   canCancelOrder,
+  isOpenOrder,
+  rebalanceOrderSentence,
   fillHoldReasonLabel,
   fillNeedsAttention,
   orderRejectReasonLabel,
@@ -72,6 +74,7 @@ export function OrderDetailPage() {
           </Button>
         ) : null}
       />
+      {data.rebalanceId && isOpenOrder(data) ? <p className="text-sm">{rebalanceOrderSentence}</p> : null}
       <Card>
         <CardContent>
           <DetailGrid>
@@ -102,6 +105,11 @@ export function OrderDetailPage() {
             </DetailItem>
             <DetailItem label="Placed">{`${formatInstant(data.placedAt)} by ${data.placedBy.name}`}</DetailItem>
             {data.memo ? <DetailItem label="Memo">{data.memo}</DetailItem> : null}
+            {data.rebalanceId ? (
+              <DetailItem label="Rebalance">
+                <Link to={`/rebalances/${data.rebalanceId}`} className={recordLinkClass}>Rebalance</Link>
+              </DetailItem>
+            ) : null}
             {data.send ? (
               <DetailItem label="Sent to the broker">
                 {data.send.acceptedAt

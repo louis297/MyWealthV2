@@ -7,7 +7,8 @@ import { useReverseTransactionMutation } from "@/features/transactions/transacti
 
 /**
  * D27: Reverse is offered on a posted item that is not a Reversal, is not reversed, and has a hand-reversible
- * source (`Manual` or `Rebalance`). The portal does not read the custody mode for it (transaction-source §9).
+ * source (`Manual`; rebalances R28 took `Rebalance` out). The portal does not read the custody mode for it
+ * (transaction-source §9).
  * D31: an `Adjustment` is reversed only by a TenantAdmin (adjustments R17).
  */
 export function canReverse(
@@ -18,7 +19,7 @@ export function canReverse(
   },
   role: string | null | undefined,
 ) {
-  const handReversible = item.source?.kind === "Manual" || item.source?.kind === "Rebalance";
+  const handReversible = item.source?.kind === "Manual";
   if (item.type === "Adjustment" && role !== roles.tenantAdmin) {
     return false;
   }

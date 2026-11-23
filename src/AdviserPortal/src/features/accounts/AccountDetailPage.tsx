@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useAppSelector } from "@/app/hooks";
 import { roles } from "@/features/session/roles";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
+import { AssignmentRebalanceLine } from "@/features/rebalances/AssignmentRebalanceLine";
+import { noChangeSentence } from "@/features/rebalances/rebalanceLabels";
 import {
   ConflictNotice,
   DetailGrid,
@@ -34,6 +36,7 @@ import { useGetWithdrawalQuery } from "@/features/withdrawals/withdrawalsApi";
 import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
 import { useGetInstrumentsQuery } from "@/features/instruments/instrumentsApi";
 import {
+  type RebalanceProposal,
   useAssignPortfolioMutation,
   useGetAccountPortfolioQuery,
   useGetPortfolioQuery,
@@ -145,15 +148,25 @@ export function AccountDetailPage() {
   const [assignStatus, setAssignStatus] = useState<string | null>(null);
   const [messages, setMessages] = useState<string[]>([]);
   const [conflict, setConflict] = useState(false);
+  const navigate = useNavigate();
 
-  async function onRetry() {
+  /** P14: a proposal opens its page; nothing to trade says so; a refusal shows the server message. */
+  function onProposal(result: RebalanceProposal) {
+    setMessages([]);
+    if (result.status === "Proposed") {
+      setAssignStatus(null);
+      void navigate(`/rebalances/${result.rebalanceId}`);
+      return;
+    }
+    setAssignStatus(noChangeSentence);
+  }
+
+  async function onRebalance() {
     if (!id) {
       return;
     }
     try {
-      const result = await rebalanceAccount(id).unwrap();
-      setAssignStatus(result.status);
-      setMessages([]);
+      onProposal(await rebalanceAccount(id).unwrap());
     } catch (error: unknown) {
       const problems = problemMessages(error);
       setAssignStatus(null);
@@ -181,9 +194,8 @@ export function AccountDetailPage() {
     }
     try {
       const result = await assignPortfolio({ accountId: id, portfolioId }).unwrap();
-      setAssignStatus(result.status);
       setConflict(false);
-      setMessages([]);
+      onProposal(result);
     } catch (error: unknown) {
       setAssignStatus(null);
       setConflict(false);
@@ -447,7 +459,7 @@ export function AccountDetailPage() {
               <Button type="button" variant="outline" onClick={() => void onUnassign()}>
                 Unassign
               </Button>
-              <Button type="button" variant="outline" onClick={() => void onRetry()}>
+              <Button type="button" variant="outline" onClick={() => void onRebalance()}>
                 Rebalance
               </Button>
             </div>
@@ -474,21 +486,8 @@ export function AccountDetailPage() {
               </Button>
             </div>
           )}
-          {locked ? (
-            <p>
-              {assignment.data?.lastRebalanceStatus
-                ? assignment.data.lastRebalanceStatus === "Failed"
-                  ? assignment.data.lastRebalanceMessage || "Rebalance failed. Check the message and try again."
-                  : assignment.data.lastRebalanceStatus
-                : "No rebalance has run yet."}
-            </p>
-          ) : null}
+          {locked ? <AssignmentRebalanceLine rebalance={assignment.data?.rebalance ?? null} /> : null}
           {assignStatus ? <p>{assignStatus}</p> : null}
-          {locked && assignment.data?.lastRebalanceStatus === "Failed" ? (
-            <Button type="button" variant="outline" onClick={() => void onRetry()}>
-              Retry
-            </Button>
-          ) : null}
         </Section>
       ) : null}
       <Section title="Holdings">

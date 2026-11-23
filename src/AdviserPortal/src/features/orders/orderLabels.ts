@@ -23,10 +23,13 @@ export function isOpenOrder(order: Pick<Order, "status">) {
   return openStatuses.includes(order.status);
 }
 
-/** D73: Cancel is offered on an open order that has no cancel request yet. */
-export function canCancelOrder(order: Pick<Order, "status" | "cancelRequest">) {
-  return isOpenOrder(order) && !order.cancelRequest;
+/** D73: Cancel is offered on an open order that has no cancel request yet; D79: never on a rebalance order. */
+export function canCancelOrder(order: Pick<Order, "status" | "cancelRequest" | "rebalanceId">) {
+  return isOpenOrder(order) && !order.cancelRequest && !order.rebalanceId;
 }
+
+/** D79: what the page of a rebalance order says in place of Cancel. */
+export const rebalanceOrderSentence = "This order belongs to a rebalance. Cancel the rebalance to cancel it.";
 
 /** D71: the filter values of the Orders page. All sends no status; Needs attention reads `pendingFill=true`. */
 export const orderFilters: Record<string, { label: string; status?: string; pendingFill?: boolean }> = {

@@ -15,6 +15,8 @@ import {
   useUpdatePortfolioMutation,
   type PortfolioLine,
 } from "@/features/portfolios/portfoliosApi";
+import { AssignmentRebalanceLine } from "@/features/rebalances/AssignmentRebalanceLine";
+import { useConfirmRebalanceMutation, useLazyGetRebalancesQuery } from "@/features/rebalances/rebalancesApi";
 
 type DraftLine = {
   key: string;
@@ -105,6 +107,9 @@ export function PortfolioDetailPage() {
   const [messages, setMessages] = useState<string[]>([]);
   const [conflict, setConflict] = useState(false);
   const [queued, setQueued] = useState(false);
+  const [confirmed, setConfirmed] = useState<string[]>([]);
+  const [listProposals] = useLazyGetRebalancesQuery();
+  const [confirmRebalance] = useConfirmRebalanceMutation();
   const lineSeq = useRef(0);
 
   if (portfolio.data && syncedId !== portfolio.data.id) {
@@ -125,6 +130,34 @@ export function PortfolioDetailPage() {
       setQueued(false);
       setMessages(problemMessages(error));
     }
+  }
+
+  /** P20: confirms each Proposed rebalance of the portfolio in turn, then says how many were confirmed and why the
+   * others were refused. There is no bulk route (rebalances §11 point 4). */
+  async function onConfirmProposals() {
+    if (!id) {
+      return;
+    }
+    const proposals = (await listProposals({ portfolioId: id, status: "Proposed", pageSize: 100 }).unwrap()).items;
+    if (proposals.length === 0) {
+      setConfirmed(["No proposals wait for confirmation."]);
+      return;
+    }
+    if (!window.confirm(`Confirm ${proposals.length} proposals?`)) {
+      return;
+    }
+    let count = 0;
+    const refusals: string[] = [];
+    for (const proposal of proposals) {
+      try {
+        await confirmRebalance({ id: proposal.id, rowVersion: proposal.rowVersion }).unwrap();
+        count++;
+      } catch (error: unknown) {
+        const reasons = problemMessages(error);
+        refusals.push(reasons.length > 0 ? reasons.join(" ") : "This rebalance has changed.");
+      }
+    }
+    setConfirmed([`${count} of ${proposals.length} proposals confirmed.`, ...refusals]);
   }
 
   async function onDisable() {
@@ -161,7 +194,7 @@ export function PortfolioDetailPage() {
       return;
     }
     if (weightsChanged(current.lines, lines) && (assigned.data?.length ?? 0) > 0) {
-      if (!window.confirm("This will rebalance every account currently assigned to this portfolio. Continue?")) {
+      if (!window.confirm("This will propose a rebalance for every account assigned to this portfolio. Nothing is traded until each proposal is confirmed. Continue?")) {
         return;
       }
     }
@@ -216,7 +249,8 @@ export function PortfolioDetailPage() {
           ) : null
         }
       />
-      {queued ? <p>Rebalance queued.</p> : null}
+      {queued ? <p>Proposals queued.</p> : null}
+      <Messages messages={confirmed} />
       {conflict ? <ConflictNotice /> : null}
       <Messages messages={messages} />
       <Card>
@@ -290,9 +324,14 @@ export function PortfolioDetailPage() {
       <Section
         title="Assigned accounts"
         actions={
-          <Button type="button" variant="outline" onClick={() => void onRebalance()}>
-            Rebalance accounts
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={() => void onRebalance()}>
+              Rebalance accounts
+            </Button>
+            <Button type="button" variant="outline" onClick={() => void onConfirmProposals()}>
+              Confirm proposals
+            </Button>
+          </div>
         }
       >
         {assigned.data.length === 0 ? <Muted>No accounts are assigned to this portfolio.</Muted> : (
@@ -302,7 +341,7 @@ export function PortfolioDetailPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Account</TableHead>
-                    <TableHead>Last rebalance</TableHead>
+                    <TableHead>Rebalance</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -314,8 +353,7 @@ export function PortfolioDetailPage() {
                         </Link>
                       </TableCell>
                       <TableCell>
-                        {row.assignment.lastRebalanceStatus ?? "No rebalance has run yet."}
-                        {row.assignment.lastRebalanceMessage ? ` ${row.assignment.lastRebalanceMessage}` : ""}
+                        <AssignmentRebalanceLine rebalance={row.assignment.rebalance} as="span" />
                       </TableCell>
                     </TableRow>
                   ))}

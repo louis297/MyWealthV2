@@ -16,6 +16,7 @@ import {
   BanknoteArrowUpIcon,
   ClipboardListIcon,
   HandCoinsIcon,
+  RefreshCwIcon,
   ScaleIcon,
   PercentIcon,
   SplitIcon,
@@ -54,6 +55,7 @@ import {
   canAccessProfile,
   canAccessReports,
   canAccessOrders,
+  canAccessRebalances,
   canManageTradeSettlements,
   canAccessWithdrawals,
   canCheckBankAccounts,
@@ -144,6 +146,13 @@ export function ShellLayout({ children }: { children?: ReactNode }) {
       label: "Orders",
       icon: ClipboardListIcon,
       visible: canAccessOrders(role),
+    },
+    {
+      // rebalances P19.
+      to: "/rebalances",
+      label: "Rebalances",
+      icon: RefreshCwIcon,
+      visible: canAccessRebalances(role),
     },
     {
       // trade-settlement D76.
