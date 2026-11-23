@@ -55,6 +55,15 @@ internal static class TransactionLegReader
                 detail.Currency
             }).ToDictionaryAsync(row => row.CashLegId, cancellationToken);
 
+        var migrationRows = await db.Transactions.AsNoTracking()
+            .Where(transaction => transactionIds.Contains(transaction.Id) && transaction.MigrationDetail != null)
+            .Select(transaction => new
+            {
+                transaction.Id,
+                transaction.MigrationDetail!.AsOfDate,
+                transaction.MigrationDetail.PreviousProvider
+            }).ToListAsync(cancellationToken);
+
         var interestRows = await db.TransactionInterestDetails.AsNoTracking()
             .Where(detail => transactionIds.Contains(detail.TransactionId))
             .ToListAsync(cancellationToken);
@@ -251,7 +260,10 @@ internal static class TransactionLegReader
                     BrokerReference = row.detail.BrokerReference,
                     SettledAt = row.SettledAt,
                     BrokenAt = row.BrokenAt
-                }));
+                }),
+            migrationRows.ToDictionary(
+                row => row.Id,
+                row => new TransactionMigrationDto(row.AsOfDate.ToString("yyyy-MM-dd"), row.PreviousProvider)));
     }
 }
 
@@ -264,4 +276,5 @@ internal sealed record TransactionLegs(
     IReadOnlyDictionary<int, TransactionPaymentDto> Payment,
     IReadOnlyDictionary<int, TransactionInterestDto> Interest,
     IReadOnlyDictionary<int, TransactionCorporateActionDto> CorporateAction,
-    IReadOnlyDictionary<int, TransactionExecutionDto> Execution);
+    IReadOnlyDictionary<int, TransactionExecutionDto> Execution,
+    IReadOnlyDictionary<int, TransactionMigrationDto> Migration);

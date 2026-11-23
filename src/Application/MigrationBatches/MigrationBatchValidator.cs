@@ -10,6 +10,7 @@ internal sealed record MigrationAccountRow(
     int Id,
     Guid PublicId,
     string Name,
+    AccountType Type,
     CustodyMode CustodyMode,
     AccountStatus Status,
     string Currency,
@@ -62,11 +63,11 @@ internal static class MigrationBatchValidator
                 from account in db.Accounts.IgnoreQueryFilters().AsNoTracking()
                 join customer in db.Users.IgnoreQueryFilters().AsNoTracking() on account.CustomerId equals customer.Id
                 where accountIds.Contains(account.Id)
-                select new { account.Id, account.PublicId, account.Name, account.CustodyMode, account.Status, account.Currency,
+                select new { account.Id, account.PublicId, account.Name, account.Type, account.CustodyMode, account.Status, account.Currency,
                     account.DepositReference, account.CustomerId, CustomerPublicId = customer.PublicId, CustomerName = customer.Name,
                     CustomerStatus = customer.Status })
             .ToListAsync(cancellationToken))
-            .ToDictionary(row => row.Id, row => new MigrationAccountRow(row.Id, row.PublicId, row.Name, row.CustodyMode, row.Status,
+            .ToDictionary(row => row.Id, row => new MigrationAccountRow(row.Id, row.PublicId, row.Name, row.Type, row.CustodyMode, row.Status,
                 row.Currency.Trim(), row.DepositReference?.Value, row.CustomerId, row.CustomerPublicId, row.CustomerName,
                 row.CustomerStatus, used.Contains(row.Id)));
         var instruments = await db.Instruments.IgnoreQueryFilters().AsNoTracking()

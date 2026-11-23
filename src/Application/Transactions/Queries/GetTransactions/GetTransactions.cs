@@ -176,7 +176,8 @@ public class GetTransactionsQueryHandler(IApplicationDbContext db, ICurrentUser 
                     Payment = legs.Payment.GetValueOrDefault(row.transaction.Id),
                     Interest = legs.Interest.GetValueOrDefault(row.transaction.Id),
                     CorporateAction = legs.CorporateAction.GetValueOrDefault(row.transaction.Id),
-                    Execution = legs.Execution.GetValueOrDefault(row.transaction.Id)
+                    Execution = legs.Execution.GetValueOrDefault(row.transaction.Id),
+                    Migration = legs.Migration.GetValueOrDefault(row.transaction.Id)
                 };
             }).ToList(),
             Page = request.Page,
