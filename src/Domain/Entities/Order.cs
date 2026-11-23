@@ -213,6 +213,18 @@ public class Order : BaseAuditableEntity
             PlacedAt = placedAt.ToUniversalTime(),
             PublicId = publicId ?? Guid.NewGuid()
         };
+        if (settlementAccount is not null)
+        {
+            if (settlementAccount.TenantId != tenantId
+                || !string.Equals(settlementAccount.Currency.Trim(), quoteCurrency, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new DomainException("The settlement account must be a client money account of the tenant in the order's currency.");
+            }
+
+            order.ClientMoneyAccountId = settlementAccount.Id;
+            order.SettlementAccountNumber = settlementAccount.AccountNumber;
+        }
+
         order.Reserve(fees);
         return order;
     }

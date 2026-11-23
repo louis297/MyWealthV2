@@ -134,7 +134,7 @@ public sealed class SendBrokerOrders(
             .SingleAsync(cancellationToken);
         var request = new BrokerOrderRequest(
             ClientOrderId(order), symbol, order.Currency.Trim(), order.Side, order.Quantity, order.Type, order.TimeInForce,
-            order.PriceLimit, order.ReferencePrice);
+            order.PriceLimit, order.ReferencePrice, order.SettlementAccountNumber);
 
         order.RecordAttempt(time.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);

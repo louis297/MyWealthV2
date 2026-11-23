@@ -31,7 +31,7 @@ public sealed class SimulatorBrokerOrders(IHttpClientFactory httpClients) : IBro
         message.Content = JsonContent.Create(
             new WireOrder(
                 order.ClientOrderId, order.Symbol, order.Currency, order.Side.ToString(), order.Quantity, order.Type.ToString(),
-                order.TimeInForce.ToString(), order.PriceLimit, order.ReferencePrice),
+                order.TimeInForce.ToString(), order.PriceLimit, order.ReferencePrice, order.SettlementAccount),
             options: Json);
         var (status, body, failure) = await SendAsync(connection, message, cancellationToken);
         if (failure is not null)
@@ -148,7 +148,9 @@ public sealed class SimulatorBrokerOrders(IHttpClientFactory httpClients) : IBro
         [property: JsonPropertyName("type")] string Type,
         [property: JsonPropertyName("timeInForce")] string TimeInForce,
         [property: JsonPropertyName("priceLimit")] decimal PriceLimit,
-        [property: JsonPropertyName("referencePrice")] decimal ReferencePrice);
+        [property: JsonPropertyName("referencePrice")] decimal ReferencePrice,
+        [property: JsonPropertyName("settlementAccount"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        string? SettlementAccount);
 
     private sealed record WireAnswer(
         [property: JsonPropertyName("brokerOrderId")] string? BrokerOrderId,
