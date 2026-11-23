@@ -34,7 +34,7 @@ internal static class MigrationBatchHttp
     }
 
     /// <summary>The action routes this slice has so far (R17–R20).</summary>
-    public static string[] Actions { get; } = [];
+    public static string[] Actions { get; } = ["submit", "return", "cancel"];
 
     public static Dictionary<string, object?> Body(
         IEnumerable<object> entries,
@@ -146,6 +146,16 @@ internal static class MigrationBatchHttp
         var response = await MatchAsync(world.TenantAdmin, line.PublicId, batchId);
         response.StatusCode.ShouldBe(HttpStatusCode.NoContent, await response.Content.ReadAsStringAsync());
         return line;
+    }
+
+    /// <summary>A valid batch funded by one receipt, then submitted by Tess (R17).</summary>
+    public static async Task<(Guid Id, BankStatementLine Line)> SubmittedAsync(MigrationWorld world)
+    {
+        var id = await CreateIdAsync(world.TenantAdmin, world.ValidBody());
+        var line = await FundAsync(world, id, 250000m);
+        var response = await ActAsync(world.TenantAdmin, id, "submit");
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent, await response.Content.ReadAsStringAsync());
+        return (id, line);
     }
 
     public static Task<HttpResponseMessage> MatchAsync(string accessToken, Guid lineId, Guid batchId) =>

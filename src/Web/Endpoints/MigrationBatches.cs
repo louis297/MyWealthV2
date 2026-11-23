@@ -18,6 +18,9 @@ public class MigrationBatches : IEndpointGroup
         groupBuilder.MapGet(GetMigrationBatch, "{id:guid}").RequireAuthorization(Policies.MigrationBatchesManage);
         groupBuilder.MapPost(CreateMigrationBatch).RequireAuthorization(Policies.MigrationBatchesManage);
         groupBuilder.MapPut(ReplaceMigrationBatch, "{id:guid}").RequireAuthorization(Policies.MigrationBatchesManage);
+        groupBuilder.MapPost(SubmitMigrationBatch, "{id:guid}/submit").RequireAuthorization(Policies.MigrationBatchesManage);
+        groupBuilder.MapPost(ReturnMigrationBatch, "{id:guid}/return").RequireAuthorization(Policies.MigrationBatchesManage);
+        groupBuilder.MapPost(CancelMigrationBatch, "{id:guid}/cancel").RequireAuthorization(Policies.MigrationBatchesManage);
     }
 
     [EndpointSummary("List migration batches")]
@@ -46,6 +49,33 @@ public class MigrationBatches : IEndpointGroup
     [EndpointSummary("Replace a migration batch")]
     [EndpointDescription("Replaces the header, the control totals and every entry of a Draft migration batch. Its funding lines stay (R6, R7).")]
     public static async Task<NoContent> ReplaceMigrationBatch(ISender sender, Guid id, ReplaceMigrationBatchCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Submit a migration batch")]
+    [EndpointDescription("Submits a valid Draft migration batch for a second TenantAdmin to post. A batch with an issue is refused with migration_batch_not_valid (R17).")]
+    public static async Task<NoContent> SubmitMigrationBatch(ISender sender, Guid id, SubmitMigrationBatchCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Return a migration batch")]
+    [EndpointDescription("Sends a Submitted migration batch back to Draft with a required note (R18).")]
+    public static async Task<NoContent> ReturnMigrationBatch(ISender sender, Guid id, ReturnMigrationBatchCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Cancel a migration batch")]
+    [EndpointDescription("Ends a Draft or Submitted migration batch with a required note. Its funding lines go back to suspense (R19).")]
+    public static async Task<NoContent> CancelMigrationBatch(ISender sender, Guid id, CancelMigrationBatchCommand command)
     {
         command.Id = id;
         await sender.Send(command);
