@@ -54,11 +54,12 @@ public static class CustodyRules
     /// <summary>
     /// Transaction source R12, R13, R15: whether a person may reverse a Transaction of <paramref name="sourceKind"/>
     /// on an Account of <paramref name="custodyMode"/>. Application calls it in the reverse handler only;
-    /// <see cref="Transaction.Reverse"/> does not, so a later flow can undo its own write (R16).
+    /// <see cref="Transaction.Reverse"/> does not, so a later flow can undo its own write (R16). Rebalances R28:
+    /// <c>Rebalance</c> left the hand-reversible sources (roadmap D15), so on a Custodial account a person reverses
+    /// only <c>Manual</c>.
     /// </summary>
     public static bool AllowsHandReverse(CustodyMode custodyMode, TransactionSourceKind sourceKind) =>
-        custodyMode == CustodyMode.External
-        || sourceKind is TransactionSourceKind.Manual or TransactionSourceKind.Rebalance;
+        custodyMode == CustodyMode.External || sourceKind == TransactionSourceKind.Manual;
 
     public static bool AllowsManualEntry(CustodyMode custodyMode, TransactionType type) =>
         RefusalMessage(custodyMode, type) is null;
