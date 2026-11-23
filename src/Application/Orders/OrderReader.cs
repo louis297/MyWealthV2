@@ -70,6 +70,10 @@ internal static class OrderReader
         var settlements = await db.TradeSettlements.AsNoTracking()
             .Where(row => settlementIds.Contains(row.Id))
             .ToDictionaryAsync(row => row.Id, row => row.PublicId, cancellationToken);
+        var rebalanceIds = rows.Where(row => row.RebalanceId is not null).Select(row => row.RebalanceId!.Value).Distinct().ToList();
+        var rebalances = await db.Rebalances.AsNoTracking()
+            .Where(row => rebalanceIds.Contains(row.Id))
+            .ToDictionaryAsync(row => row.Id, row => row.PublicId, cancellationToken);
         var transactions = await db.Transactions.AsNoTracking()
             .Where(row => transactionIds.Contains(row.Id))
             .ToDictionaryAsync(row => row.Id, row => row.PublicId, cancellationToken);
@@ -111,7 +115,8 @@ internal static class OrderReader
                     ? null
                     : new OrderSendDto(row.Attempts, row.LastAttemptAt, row.LastFailure?.ToString(), row.AcceptedAt),
                 RejectReason = row.RejectReason?.ToString(),
-                RebalanceId = null,
+                // Rebalances R27: every caller who reads the order sees its rebalance, the Customer included.
+                RebalanceId = row.RebalanceId is int rebalanceId ? rebalances[rebalanceId] : null,
                 CancelRequest = row.CancelRequestedAt is { } requestedAt
                     ? new OrderCancelRequestDto(
                         row.CancelRequestedByUserId is int by ? users[by] : null,

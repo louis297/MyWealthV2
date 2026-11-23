@@ -86,6 +86,12 @@ public class GetOrdersQueryHandler(IApplicationDbContext db, ICurrentUser curren
             query = query.Where(row => statuses.Contains(row.Status));
         }
 
+        // Rebalances R27: the orders of one rebalance.
+        if (request.RebalanceId is Guid rebalanceId)
+        {
+            query = query.Where(row => db.Rebalances.Any(rebalance => rebalance.Id == row.RebalanceId && rebalance.PublicId == rebalanceId));
+        }
+
         // R16: only orders with a fill that is not posted yet.
         if (request.PendingFill == true)
         {
