@@ -16,6 +16,10 @@ public class ExecutionReport
     /// <summary>The largest value a <c>decimal(18,8)</c> column holds.</summary>
     public const decimal MaxStoredNumber = 9_999_999_999.99999999m;
 
+    public const int SettlementAccountMaxLength = 34;
+    public const int NetAmountDecimals = 4;
+    public const decimal MaxNetAmount = 99_999_999_999_999.9999m;
+
     private ExecutionReport()
     {
     }
@@ -110,7 +114,16 @@ public class ExecutionReport
                                         && tradeDate is { } traded
                                         && settlementDate is { } settles
                                         && settles >= traded,
-            ExecutionReportKind.Settled => IsId(clientOrderId) && IsId(fillOutsideId) && settledDate is not null,
+            ExecutionReportKind.Settled => IsId(clientOrderId) && IsId(fillOutsideId) && settledDate is not null
+                                           && (settlement?.SettlementId is null || IsId(settlement.SettlementId)),
+            // Trade-settlement R7: a Settlement report names no order.
+            ExecutionReportKind.Settlement => settlement is { } closing
+                                              && IsId(closing.SettlementId)
+                                              && closing.SettlementAccount is { Length: >= 1 and <= SettlementAccountMaxLength }
+                                              && IsCurrency(closing.Currency)
+                                              && settledDate is not null
+                                              && closing.FillCount >= 1
+                                              && IsNet(closing.NetAmount),
             ExecutionReportKind.Cancelled or ExecutionReportKind.Expired => IsId(clientOrderId),
             _ => false
         };
@@ -136,7 +149,7 @@ public class ExecutionReport
         Orders.ExecutionReportSettlement? settlement = null)
     {
         var known = kind is { } value && Enum.IsDefined(value) ? kind : null;
-        if (!IsStorable(outsideId, known, clientOrderId, quantity, price, tradeDate, settlementDate, fillOutsideId, settledDate)
+        if (!IsStorable(outsideId, known, clientOrderId, quantity, price, tradeDate, settlementDate, fillOutsideId, settledDate, settlement)
             || string.IsNullOrWhiteSpace(connection) || connection.Length > ConnectionMaxLength)
         {
             throw new DomainException("This execution report cannot be stored.");
@@ -159,6 +172,11 @@ public class ExecutionReport
             FillOutsideId = Cut(fillOutsideId, IdMaxLength),
             SettledDate = settledDate,
             Reason = Cut(reason, ReasonMaxLength),
+            SettlementId = Cut(settlement?.SettlementId, IdMaxLength),
+            SettlementAccount = Cut(settlement?.SettlementAccount, SettlementAccountMaxLength),
+            Currency = IsCurrency(settlement?.Currency) ? settlement!.Currency : null,
+            NetAmount = IsNet(settlement?.NetAmount) ? settlement!.NetAmount : null,
+            FillCount = settlement?.FillCount,
             ReceivedAt = receivedAt.ToUniversalTime(),
             Status = ExecutionReportStatus.Received
         };
@@ -190,6 +208,12 @@ public class ExecutionReport
     }
 
     private static bool IsId(string? value) => value is { Length: >= 1 and <= IdMaxLength };
+
+    private static bool IsCurrency(string? value) => value is { Length: 3 } code && code.All(char.IsAsciiLetterUpper);
+
+    /// <summary>Trade-settlement R7: at most 4 decimal places, within <c>decimal(18,4)</c>.</summary>
+    private static bool IsNet(decimal? value) =>
+        value is { } net && Math.Abs(net) <= MaxNetAmount && decimal.Round(net, NetAmountDecimals) == net;
 
     /// <summary>Above 0, with at most 8 decimal places, within the column.</summary>
     private static bool IsAmount(decimal? value) => value > 0m && Fits(value);

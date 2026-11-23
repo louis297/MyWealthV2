@@ -125,10 +125,19 @@ public class OrderFill
 
         SettledAt = at.ToUniversalTime();
         SettledDate = date;
+        BrokerSettlementId = brokerSettlementId;
     }
 
     /// <summary>Trade-settlement R8: the fill is put in a trade settlement, once.</summary>
-    public void AssignTo(int tradeSettlementId) => throw new NotImplementedException();
+    public void AssignTo(int tradeSettlementId)
+    {
+        if (TradeSettlementId is not null)
+        {
+            throw new DomainException("This fill is in a trade settlement already.");
+        }
+
+        TradeSettlementId = tradeSettlementId;
+    }
 
     private void EnsurePending()
     {

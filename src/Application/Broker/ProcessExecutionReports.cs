@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Logging;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Orders;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
+using MyWealthV2.Domain.Orders;
 
 namespace MyWealthV2.Application.Broker;
 
@@ -106,6 +108,12 @@ public sealed class ProcessExecutionReports(
             return ReportResult.Skipped(ExecutionReportSkipReason.UnsupportedKind);
         }
 
+        // Trade-settlement R7, R8: a Settlement report names no order.
+        if (kind == ExecutionReportKind.Settlement)
+        {
+            return await SettleAsync(report, cancellationToken);
+        }
+
         // R25: the client order id is the PublicId of an order that was placed on this connection.
         if (!Guid.TryParse(report.ClientOrderId, out var orderPublicId))
         {
@@ -175,12 +183,65 @@ public sealed class ProcessExecutionReports(
                     return ReportResult.Skipped(ExecutionReportSkipReason.Repeated);
                 }
 
-                settling.Settle(report.SettledDate!.Value, now);
+                settling.Settle(report.SettledDate!.Value, now, report.SettlementId);
                 return ReportResult.Processed;
         }
     }
 
     /// <summary>What one report came to: processed, skipped for a reason, or left <c>Received</c>.</summary>
+    /// <summary>
+    /// Trade-settlement R8, R9, R11–R13: the fills of the connection that carry the broker settlement id and are in no
+    /// trade settlement yet, grouped by the client money account of their order, each group stored as one trade
+    /// settlement with the platform's own figures.
+    /// </summary>
+    private async Task<ReportResult> SettleAsync(ExecutionReport report, CancellationToken cancellationToken)
+    {
+        var settlementId = report.SettlementId!;
+        if (await db.TradeSettlements.IgnoreQueryFilters()
+                .AnyAsync(row => row.Connection == report.Connection && row.BrokerSettlementId == settlementId, cancellationToken))
+        {
+            return ReportResult.Skipped(ExecutionReportSkipReason.Repeated);
+        }
+
+        var fills = await (
+                from fill in db.OrderFills.IgnoreQueryFilters()
+                join order in db.Orders.IgnoreQueryFilters() on fill.OrderId equals order.Id
+                where order.Connection == report.Connection
+                      && fill.BrokerSettlementId == settlementId
+                      && fill.TradeSettlementId == null
+                      && fill.Status != OrderFillStatus.Broken
+                      && order.ClientMoneyAccountId != null
+                select new { fill.Id, ClientMoneyAccountId = order.ClientMoneyAccountId!.Value, order.Side, fill.Quantity, fill.Price })
+            .ToListAsync(cancellationToken);
+        if (fills.Count == 0)
+        {
+            return ReportResult.Skipped(ExecutionReportSkipReason.UnknownSettlement);
+        }
+
+        var now = time.GetUtcNow();
+        foreach (var group in fills.GroupBy(fill => fill.ClientMoneyAccountId).OrderBy(group => group.Key))
+        {
+            var clientMoney = await db.ClientMoneyAccounts.IgnoreQueryFilters().AsNoTracking()
+                .SingleAsync(row => row.Id == group.Key, cancellationToken);
+            var settlement = TradeSettlement.Create(
+                clientMoney, report.Connection, settlementId, report.SettledDate!.Value, report.Id,
+                group.Select(fill => new SettlementFill(fill.Side, fill.Quantity, fill.Price)).ToList(),
+                report.FillCount!.Value, report.NetAmount!.Value, report.SettlementAccount!, report.Currency!,
+                connections.BankAccount(report.Connection, clientMoney.Currency.Trim()) is not null, now);
+            settlement.CreatedBy = SystemActor.Name;
+            db.TradeSettlements.Add(settlement);
+            await db.SaveChangesAsync(cancellationToken);
+
+            var ids = group.Select(fill => fill.Id).ToList();
+            foreach (var fill in await db.OrderFills.IgnoreQueryFilters().Where(row => ids.Contains(row.Id)).ToListAsync(cancellationToken))
+            {
+                fill.AssignTo(settlement.Id);
+            }
+        }
+
+        return ReportResult.Processed;
+    }
+
     private readonly record struct ReportResult(ExecutionReportSkipReason? SkipReason, bool Left)
     {
         public static ReportResult Processed => new(null, false);

@@ -71,7 +71,7 @@ public sealed class PullExecutionReports(
 
         return page.Items.All(item => ExecutionReport.IsStorable(
             item.Id, item.Kind, item.ClientOrderId, item.Quantity, item.Price, item.TradeDate, item.SettlementDate, item.FillId,
-            item.SettledDate))
+            item.SettledDate, item.Settlement))
             ? null
             : BrokerFailure.InvalidItem;
     }
@@ -106,7 +106,8 @@ public sealed class PullExecutionReports(
 
                 db.ExecutionReports.Add(ExecutionReport.Receive(
                     connection, item.Id!, item.Kind, item.ClientOrderId, item.BrokerOrderId, item.Quantity, item.Price,
-                    item.TradeDate, item.SettlementDate, item.ContractNote, item.FillId, item.SettledDate, item.Reason, now));
+                    item.TradeDate, item.SettlementDate, item.ContractNote, item.FillId, item.SettledDate, item.Reason, now,
+                    item.Settlement));
                 added++;
             }
 
