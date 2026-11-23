@@ -20,5 +20,19 @@ public class RebalanceTarget : BaseEntity
 
     public int SortOrder { get; private set; }
 
-    internal static RebalanceTarget Create(int tenantId, RebalanceTargetSpec spec, int sortOrder) => throw new NotImplementedException();
+    internal static RebalanceTarget Create(int tenantId, RebalanceTargetSpec spec, int sortOrder)
+    {
+        if (spec.TargetWeight is <= 0m or > 100m)
+        {
+            throw new DomainException("A target weight is above 0 and at most 100.");
+        }
+
+        return new RebalanceTarget
+        {
+            TenantId = tenantId,
+            InstrumentId = spec.InstrumentId,
+            TargetWeight = spec.TargetWeight,
+            SortOrder = sortOrder
+        };
+    }
 }
