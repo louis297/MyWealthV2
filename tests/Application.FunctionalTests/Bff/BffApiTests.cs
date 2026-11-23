@@ -385,6 +385,46 @@ public class BffApiTests
     }
 
     [Test]
+    public async Task Session_ProxiesTradeSettlements_ReadsPayAndSetAside_AndTheResolveOfABrokenFill()
+    {
+        // bff-adviser-portal amendment 2026-11-23 (trade settlements): /trade-settlements is on the prefix allow-list.
+        var id = Guid.NewGuid();
+        var fillId = Guid.NewGuid();
+        _api.Scripts["/trade-settlements"] = (HttpStatusCode.OK, """{"items":[],"page":1,"pageSize":20,"totalCount":0}""");
+        _api.Scripts[$"/trade-settlements/{id}"] = (HttpStatusCode.OK, "{}");
+        _api.Scripts[$"/trade-settlements/{id}/pay"] = (HttpStatusCode.NoContent, "");
+        _api.Scripts[$"/trade-settlements/{id}/set-aside"] = (HttpStatusCode.NoContent, "");
+        _api.Scripts[$"/orders/{id}/fills/{fillId}/resolve-break"] = (HttpStatusCode.NoContent, "");
+
+        foreach (var (method, path) in new[]
+                 {
+                     (HttpMethod.Get, "/api/trade-settlements?open=true"),
+                     (HttpMethod.Get, $"/api/trade-settlements/{id}"),
+                     (HttpMethod.Post, $"/api/trade-settlements/{id}/pay"),
+                     (HttpMethod.Post, $"/api/trade-settlements/{id}/set-aside"),
+                     (HttpMethod.Post, $"/api/orders/{id}/fills/{fillId}/resolve-break")
+                 })
+        {
+            using var request = new HttpRequestMessage(method, path);
+            request.Headers.TryAddWithoutValidation("Cookie", _sessionCookie);
+            if (method == HttpMethod.Post)
+            {
+                request.Headers.TryAddWithoutValidation(RequestHeader, "1");
+                request.Content = new StringContent("""{"note":"Note","rowVersion":"AAAA"}""", System.Text.Encoding.UTF8, "application/json");
+            }
+
+            var response = await _bff.SendAsync(request);
+            response.StatusCode.ShouldNotBe(HttpStatusCode.NotFound, path);
+        }
+
+        _api.Calls.ShouldContain(call => call.Path == "/trade-settlements");
+        _api.Calls.ShouldContain(call => call.Path == $"/trade-settlements/{id}");
+        _api.Calls.ShouldContain(call => call.Path == $"/trade-settlements/{id}/pay");
+        _api.Calls.ShouldContain(call => call.Path == $"/trade-settlements/{id}/set-aside");
+        _api.Calls.ShouldContain(call => call.Path == $"/orders/{id}/fills/{fillId}/resolve-break");
+    }
+
+    [Test]
     public async Task Session_ProxiesTheFeePreviewPost()
     {
         _api.Scripts["/fees/trade-schedules/preview"] = (HttpStatusCode.OK, """{"currency":"NZD","items":[]}""");
