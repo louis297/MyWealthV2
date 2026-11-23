@@ -299,7 +299,7 @@ describe("CloseAccountPage (account-closure D54)", () => {
   it("shows each failed check with its sentence and link, and disables Confirm", async () => {
     renderFees(adviser(), routes, `/accounts/${accountId}/close`, serve({
       holdings: [{ id: "h1", accountId, instrumentId: "i1", symbol: "VTI", name: "Vanguard", quantity: 1, cost: 25, costCurrency: "USD" }],
-      assignment: { accountId, portfolioId: "pppppppp-0000-0000-0000-000000000001", status: "Active", lastRebalanceAt: null, lastRebalanceStatus: null, lastRebalanceMessage: null },
+      assignment: { accountId, portfolioId: "pppppppp-0000-0000-0000-000000000001", status: "Active", rebalance: null },
       open: [withdrawal({ accountClosureId: null })],
     }));
 

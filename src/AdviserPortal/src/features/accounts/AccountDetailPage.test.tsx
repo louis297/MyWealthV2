@@ -100,6 +100,7 @@ function renderDetail(
     [
       { path: "/accounts", element: <p>accounts list</p> },
       { path: "/accounts/:id", element: <AccountDetailPage /> },
+      { path: "/rebalances/:id", element: <p>rebalance page</p> },
     ],
     { initialEntries: [`/accounts/${accountId}`] },
   );
@@ -1062,7 +1063,7 @@ describe("AccountDetailPage", () => {
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 
-  it("assigns an active portfolio and shows Success", async () => {
+  it("assigns an active portfolio and opens its proposal (P14)", async () => {
     const portfolioId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
     const posted: string[] = [];
     const { fetchMock } = renderDetail((url, method, body) => {
@@ -1088,7 +1089,7 @@ describe("AccountDetailPage", () => {
       }
       if (url.endsWith(`/accounts/${accountId}/portfolio`) && method === "POST") {
         posted.push(body ?? "");
-        return json({ status: "Success" });
+        return json({ status: "Proposed", rebalanceId: "12121212-0000-0000-0000-000000000001" });
       }
       return new Response("", { status: 404 });
     });
@@ -1100,7 +1101,7 @@ describe("AccountDetailPage", () => {
     await pickOption("Balanced Growth");
     fireEvent.click(screen.getByRole("button", { name: "Assign" }));
 
-    expect(await screen.findByText("Success")).toBeInTheDocument();
+    expect(await screen.findByText("rebalance page")).toBeInTheDocument();
     expect(posted).toEqual([JSON.stringify({ portfolioId })]);
     const request = fetchMock.mock.calls
       .map(([input]) => input)
@@ -1148,7 +1149,7 @@ describe("AccountDetailPage", () => {
       }
       if (url.endsWith(`/accounts/${accountId}/portfolio`) && method === "POST") {
         assigned = true;
-        return json({ status: "Success" });
+        return json({ status: "NoChange", rebalanceId: "12121212-0000-0000-0000-000000000001" });
       }
       if (url.endsWith(`/accounts/${accountId}/portfolio`) && method === "DELETE") {
         assigned = false;
@@ -1160,9 +1161,7 @@ describe("AccountDetailPage", () => {
               accountId,
               portfolioId,
               status: "Active",
-              lastRebalanceAt: null,
-              lastRebalanceStatus: "Success",
-              lastRebalanceMessage: null,
+              rebalance: null,
             })
           : new Response("", { status: 404 });
       }
@@ -1183,7 +1182,7 @@ describe("AccountDetailPage", () => {
     expect(screen.queryByRole("button", { name: "Unassign" })).not.toBeInTheDocument();
   });
 
-  it("shows NoChange when assign does not trade", async () => {
+  it("says there is nothing to trade when assign proposes no trade (P14)", async () => {
     const portfolioId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
     renderDetail((url, method) => {
       if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
@@ -1204,7 +1203,7 @@ describe("AccountDetailPage", () => {
         });
       }
       if (url.endsWith(`/accounts/${accountId}/portfolio`) && method === "POST") {
-        return json({ status: "NoChange" });
+        return json({ status: "NoChange", rebalanceId: "12121212-0000-0000-0000-000000000001" });
       }
       return new Response("", { status: 404 });
     });
@@ -1212,7 +1211,7 @@ describe("AccountDetailPage", () => {
     expect(await screen.findByLabelText("Portfolio")).toBeInTheDocument();
     await chooseOption("Portfolio", "Balanced Growth");
     fireEvent.click(screen.getByRole("button", { name: "Assign" }));
-    expect(await screen.findByText("NoChange")).toBeInTheDocument();
+    expect(await screen.findByText("Nothing to trade. The account is in line with its portfolio.")).toBeInTheDocument();
   });
 
   it("does not offer assign on External or Closed accounts (P13)", async () => {
@@ -1298,9 +1297,7 @@ describe("AccountDetailPage", () => {
               accountId,
               portfolioId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
               status: "Active",
-              lastRebalanceAt: null,
-              lastRebalanceStatus: "Success",
-              lastRebalanceMessage: null,
+              rebalance: null,
             })
           : new Response("", { status: 404 });
       }
@@ -1320,7 +1317,7 @@ describe("AccountDetailPage", () => {
     expect(screen.queryByRole("button", { name: "Unassign" })).not.toBeInTheDocument();
   });
 
-  it("shows a failed rebalance message and retries the account", async () => {
+  it("shows a failed rebalance with its message and proposes again (P14, P17)", async () => {
     const posted: string[] = [];
     renderDetail((url, method) => {
       if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
@@ -1334,24 +1331,30 @@ describe("AccountDetailPage", () => {
       }
       if (url.endsWith(`/accounts/${accountId}/rebalance`) && method === "POST") {
         posted.push(url);
-        return json({ status: "Success" });
+        return json({ status: "Proposed", rebalanceId: "12121212-0000-0000-0000-000000000002" });
       }
       if (url.endsWith(`/accounts/${accountId}/portfolio`) && method === "GET") {
         return json({
           accountId,
           portfolioId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
           status: "Active",
-          lastRebalanceAt: "2026-11-02T00:00:00+00:00",
-          lastRebalanceStatus: "Failed",
-          lastRebalanceMessage: "Missing price for VTI.",
+          rebalance: {
+            id: "12121212-0000-0000-0000-000000000001",
+            status: "Failed",
+            failure: { code: "missing_price", message: "Missing price for VTI." },
+            proposedAt: "2026-11-02T00:00:00+00:00",
+            endedAt: "2026-11-02T00:00:00+00:00",
+          },
         });
       }
       return new Response("", { status: 404 });
     });
 
-    expect(await screen.findByText("Missing price for VTI.")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-    expect(await screen.findByText("Success")).toBeInTheDocument();
+    expect(await screen.findByText("Missing price for VTI.", { exact: false })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Could not be planned" })).toHaveAttribute(
+      "href", "/rebalances/12121212-0000-0000-0000-000000000001");
+    fireEvent.click(screen.getByRole("button", { name: "Rebalance" }));
+    expect(await screen.findByText("rebalance page")).toBeInTheDocument();
     expect(posted.some((url) => url.includes(`/api/accounts/${accountId}/rebalance`))).toBe(true);
   });
 
@@ -1371,19 +1374,17 @@ describe("AccountDetailPage", () => {
           accountId,
           portfolioId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
           status: "Active",
-          lastRebalanceAt: null,
-          lastRebalanceStatus: null,
-          lastRebalanceMessage: null,
+          rebalance: null,
         });
       }
       return new Response("", { status: 404 });
     });
 
-    expect(await screen.findByText("No rebalance has run yet.")).toBeInTheDocument();
+    expect(await screen.findByText("No rebalance yet.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
   });
 
-  it("rebalances an assigned account after cash moves", async () => {
+  it("proposes a rebalance of an assigned account after cash moves", async () => {
     const { fetchMock } = renderDetail((url, method) => {
       if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
         return json({ items: [] });
@@ -1395,16 +1396,14 @@ describe("AccountDetailPage", () => {
         return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
       }
       if (url.endsWith(`/accounts/${accountId}/rebalance`) && method === "POST") {
-        return json({ status: "NoChange" });
+        return json({ status: "NoChange", rebalanceId: "12121212-0000-0000-0000-000000000001" });
       }
       if (url.endsWith(`/accounts/${accountId}/portfolio`) && method === "GET") {
         return json({
           accountId,
           portfolioId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
           status: "Active",
-          lastRebalanceAt: "2026-11-02T00:00:00+00:00",
-          lastRebalanceStatus: "Success",
-          lastRebalanceMessage: null,
+          rebalance: null,
         });
       }
       return new Response("", { status: 404 });
@@ -1423,7 +1422,7 @@ describe("AccountDetailPage", () => {
     expect(new URL(request.url).pathname).toBe(`/api/accounts/${accountId}/rebalance`);
     expect(request.headers.get("X-MyWealth-Request")).toBe("1");
     expect(request.headers.get("Authorization")).toBeNull();
-    expect(await screen.findByText("NoChange")).toBeInTheDocument();
+    expect(await screen.findByText("Nothing to trade. The account is in line with its portfolio.")).toBeInTheDocument();
   });
 
   it("shows current quantity beside the target weight", async () => {
@@ -1473,9 +1472,7 @@ describe("AccountDetailPage", () => {
           accountId,
           portfolioId,
           status: "Active",
-          lastRebalanceAt: null,
-          lastRebalanceStatus: "Success",
-          lastRebalanceMessage: null,
+          rebalance: null,
         });
       }
       return new Response("", { status: 404 });
@@ -1567,13 +1564,13 @@ describe("AccountDetailPage activity Reverse (adviser-portal-dashboard D27)", ()
     return within(screen.getByRole("link", { name: id }).closest("tr") as HTMLElement);
   }
 
-  it("offers Reverse on Manual and Rebalance rows only, never on a Seed, reversed or Reversal row", async () => {
+  it("offers Reverse on Manual rows only, never on a Rebalance, Seed, reversed or Reversal row (D27, rebalances R28)", async () => {
     serve();
 
     const table = await screen.findByRole("table", { name: "Activity" });
-    expect(within(table).getAllByRole("button", { name: "Reverse" })).toHaveLength(2);
+    expect(within(table).getAllByRole("button", { name: "Reverse" })).toHaveLength(1);
     expect(row(manualId).getByRole("button", { name: "Reverse" })).toBeInTheDocument();
-    expect(row(rebalanceId).getByRole("button", { name: "Reverse" })).toBeInTheDocument();
+    expect(row(rebalanceId).queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
     expect(row(seedId).queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
     expect(row(reversedId).queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
     expect(row(reversalId).queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();

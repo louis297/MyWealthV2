@@ -135,9 +135,13 @@ function renderDetail(options?: {
           accountId,
           portfolioId,
           status: "Active",
-          lastRebalanceAt: null,
-          lastRebalanceStatus: "Success",
-          lastRebalanceMessage: null,
+          rebalance: {
+            id: "12121212-0000-0000-0000-000000000001",
+            status: "Proposed",
+            failure: null,
+            proposedAt: "2026-11-23T02:10:00Z",
+            endedAt: null,
+          },
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
@@ -282,7 +286,7 @@ describe("PortfolioDetailPage edit", () => {
     expect(screen.queryByRole("button", { name: "Remove line" })).not.toBeInTheDocument();
   });
 
-  it("confirms a weight change when an account is assigned and shows the queued rebalance", async () => {
+  it("confirms a weight change when an account is assigned and shows the queued proposals (P20)", async () => {
     const { fetchMock } = renderDetail({
       assigned: true,
       putStatus: 202,
@@ -299,7 +303,7 @@ describe("PortfolioDetailPage edit", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(window.confirm).toHaveBeenCalledWith(
-      "This will rebalance every account currently assigned to this portfolio. Continue?",
+      "This will propose a rebalance for every account assigned to this portfolio. Nothing is traded until each proposal is confirmed. Continue?",
     );
     const request = await vi.waitFor(() => {
       const found = putRequest(fetchMock);
@@ -312,7 +316,7 @@ describe("PortfolioDetailPage edit", () => {
         { instrumentId: fph, targetWeight: 30 },
       ],
     });
-    expect(await screen.findByText("Rebalance queued.")).toBeInTheDocument();
+    expect(await screen.findByText("Proposals queued.")).toBeInTheDocument();
   });
 
   it("does not save when the weight-change confirm is cancelled", async () => {
@@ -363,11 +367,13 @@ describe("PortfolioDetailPage edit", () => {
     expect(await screen.findByText("No accounts are assigned to this portfolio.")).toBeInTheDocument();
   });
 
-  it("lists an assigned account and queues a bulk rebalance", async () => {
+  it("lists an assigned account with its rebalance and queues proposals (P20)", async () => {
     const { fetchMock } = renderDetail({ assigned: true });
 
     expect(await screen.findByRole("link", { name: "Growth account" })).toHaveAttribute("href", `/accounts/${accountId}`);
-    expect(screen.getByText("Success")).toBeInTheDocument();
+    // P20: the account's newest rebalance, linked to its page.
+    expect(screen.getByRole("link", { name: "Waiting for confirmation" })).toHaveAttribute(
+      "href", "/rebalances/12121212-0000-0000-0000-000000000001");
     fireEvent.click(screen.getByRole("button", { name: "Rebalance accounts" }));
 
     const request = await vi.waitFor(() => {
@@ -379,7 +385,7 @@ describe("PortfolioDetailPage edit", () => {
     });
     expect(new URL(request.url).pathname).toBe(`/api/portfolios/${portfolioId}/rebalance`);
     expect(request.headers.get("X-MyWealth-Request")).toBe("1");
-    expect(await screen.findByText("Rebalance queued.")).toBeInTheDocument();
+    expect(await screen.findByText("Proposals queued.")).toBeInTheDocument();
   });
 
   it("shows the server detail when an update is refused as portfolio_shared and keeps the edits", async () => {

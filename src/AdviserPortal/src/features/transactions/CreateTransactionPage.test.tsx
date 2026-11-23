@@ -122,9 +122,7 @@ function renderForm(
             accountId,
             portfolioId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
             status: "Active",
-            lastRebalanceAt: null,
-            lastRebalanceStatus: null,
-            lastRebalanceMessage: null,
+            rebalance: null,
           })
         : new Response("", { status: 404 });
     }
