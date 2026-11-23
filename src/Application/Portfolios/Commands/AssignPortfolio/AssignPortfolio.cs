@@ -21,7 +21,7 @@ public class AssignPortfolioCommand : IRequest<RebalanceResultDto>
 public class AssignPortfolioCommandHandler(
     IApplicationDbContext db,
     ICurrentUser currentUser,
-    ISender sender,
+    AccountRebalancer rebalancer,
     TimeProvider time)
     : IRequestHandler<AssignPortfolioCommand, RebalanceResultDto>
 {
@@ -81,10 +81,6 @@ public class AssignPortfolioCommandHandler(
         db.AccountPortfolioAssignments.Add(assignment);
         await db.SaveChangesAsync(cancellationToken);
 
-        return await sender.Send(new RebalanceAccountCommand
-        {
-            AccountId = account.PublicId,
-            Handle = Guid.NewGuid()
-        }, cancellationToken);
+        return await rebalancer.RebalanceAsync(account.PublicId, Guid.NewGuid(), cancellationToken);
     }
 }

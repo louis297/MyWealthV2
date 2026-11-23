@@ -1,3 +1,4 @@
+using MyWealthV2.Application.Rebalances;
 using MyWealthV2.Infrastructure.CorporateActions;
 using MyWealthV2.Application.CorporateActions;
 using MyWealthV2.Infrastructure.BankReconciliations;
@@ -187,6 +188,9 @@ public static class DependencyInjection
         builder.Services.AddScoped<PullExecutionReports>();
         builder.Services.AddScoped<ProcessExecutionReports>();
         builder.Services.AddScoped<PostOrderFills>();
+        // Rebalances R6, R13–R17: a rebalance needs the broker connections.
+        builder.Services.AddScoped<RebalancePlanning>();
+        builder.Services.AddScoped<ProposeRebalance>();
         if (host == BrokerConnectionHost.Worker)
         {
             // One run of a connection at a time (R19); the bank sync registers the same lock when it runs first.

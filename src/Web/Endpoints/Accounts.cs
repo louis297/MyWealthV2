@@ -20,6 +20,8 @@ using MyWealthV2.Application.Portfolios.Commands.UnassignPortfolio;
 using MyWealthV2.Application.Portfolios.Queries.GetAccountPortfolio;
 using MyWealthV2.Web.Infrastructure;
 
+using MyWealthV2.Application.Rebalances;
+
 namespace MyWealthV2.Web.Endpoints;
 
 public class Accounts : IEndpointGroup
@@ -177,15 +179,8 @@ public class Accounts : IEndpointGroup
         return TypedResults.NoContent();
     }
 
-    [EndpointSummary("Rebalance an account")]
-    [EndpointDescription("Runs a full rebalance for the account's active portfolio.")]
-    public static async Task<Ok<RebalanceResultDto>> RebalanceAccount(ISender sender, Guid id)
-    {
-        var result = await sender.Send(new RebalanceAccountCommand
-        {
-            AccountId = id,
-            Handle = Guid.NewGuid()
-        });
-        return TypedResults.Ok(result);
-    }
+    [EndpointSummary("Propose a rebalance of an account")]
+    [EndpointDescription("Proposes a rebalance of the account towards its portfolio's targets. Nothing is traded until a person confirms it at POST /rebalances/{id}/confirm (rebalances R10).")]
+    public static async Task<Ok<RebalanceProposalDto>> RebalanceAccount(ISender sender, Guid id) =>
+        TypedResults.Ok(await sender.Send(new RebalanceAccountCommand { AccountId = id }));
 }

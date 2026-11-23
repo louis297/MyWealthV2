@@ -1,6 +1,8 @@
+using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Domain.Enums;
+using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 
 namespace MyWealthV2.Application.Rebalances.Queries;
 
@@ -42,14 +44,69 @@ public class GetRebalancesQueryValidator : AbstractValidator<GetRebalancesQuery>
     }
 }
 
-public class GetRebalancesQueryHandler : IRequestHandler<GetRebalancesQuery, PagedList<RebalanceDto>>
+public class GetRebalancesQueryHandler(IApplicationDbContext db, ICurrentUser currentUser)
+    : IRequestHandler<GetRebalancesQuery, PagedList<RebalanceDto>>
 {
-    public Task<PagedList<RebalanceDto>> Handle(GetRebalancesQuery request, CancellationToken cancellationToken) =>
-        throw new NotImplementedException();
+    public async Task<PagedList<RebalanceDto>> Handle(GetRebalancesQuery request, CancellationToken cancellationToken)
+    {
+        var query = RebalanceReader.Scope(db, currentUser).AsNoTracking();
+        if (request.AccountId is Guid accountId)
+        {
+            query = query.Where(row => db.Accounts.Any(account => account.Id == row.AccountId && account.PublicId == accountId));
+        }
+
+        if (request.CustomerId is Guid customerId)
+        {
+            query = query.Where(row => db.Accounts.Any(account => account.Id == row.AccountId
+                && db.Users.Any(user => user.Id == account.CustomerId && user.PublicId == customerId)));
+        }
+
+        if (request.PortfolioId is Guid portfolioId)
+        {
+            query = query.Where(row => db.Portfolios.Any(portfolio => portfolio.Id == row.PortfolioId && portfolio.PublicId == portfolioId));
+        }
+
+        var statuses = GetRebalancesQuery.Names(request.Status)
+            .Select(name => Enum.Parse<RebalanceStatus>(name, ignoreCase: true))
+            .Distinct()
+            .ToList();
+        if (statuses.Count > 0)
+        {
+            query = query.Where(row => statuses.Contains(row.Status));
+        }
+
+        if (request.Open == true)
+        {
+            query = query.Where(row => row.Status == RebalanceStatus.Proposed || row.Status == RebalanceStatus.Selling
+                || row.Status == RebalanceStatus.Buying);
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var rows = await query
+            .OrderByDescending(row => row.ProposedAt)
+            .ThenByDescending(row => row.Id)
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedList<RebalanceDto>
+        {
+            Items = await RebalanceReader.ToDtosAsync(db, rows, withDetail: false, cancellationToken),
+            Page = request.Page,
+            PageSize = request.PageSize,
+            TotalCount = totalCount
+        };
+    }
 }
 
-public class GetRebalanceByIdQueryHandler : IRequestHandler<GetRebalanceByIdQuery, RebalanceDto>
+public class GetRebalanceByIdQueryHandler(IApplicationDbContext db, ICurrentUser currentUser)
+    : IRequestHandler<GetRebalanceByIdQuery, RebalanceDto>
 {
-    public Task<RebalanceDto> Handle(GetRebalanceByIdQuery request, CancellationToken cancellationToken) =>
-        throw new NotImplementedException();
+    public async Task<RebalanceDto> Handle(GetRebalanceByIdQuery request, CancellationToken cancellationToken)
+    {
+        var row = await RebalanceReader.Scope(db, currentUser).AsNoTracking()
+                      .SingleOrDefaultAsync(item => item.PublicId == request.Id, cancellationToken)
+                  ?? throw new NotFoundException("Rebalance", request.Id);
+        return (await RebalanceReader.ToDtosAsync(db, [row], withDetail: true, cancellationToken)).Single();
+    }
 }

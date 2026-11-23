@@ -96,25 +96,23 @@ public class TransactionSourceTests : TestBase
     }
 
     [Test]
-    public async Task AssignAndRebalance_TradesAreRebalanceWithOneIdPerRun()
+    public async Task AssignTradesShareOneRebalanceId_AndTheAccountRouteWritesNoTransaction()
     {
         var world = await RebalanceTrades.AssignedAsync();
         var assigned = await RebalanceTrades.TradesAsync(world.AccessToken, world.AccountId);
         (await RebalanceTrades.SplitHalfAndHalfAsync(world)).Dispose();
+        // Rebalances R8: a proposal needs prices from the last 4 days.
+        await Orders.OrderHttp.SetPriceAsync(world.First, 10m, Orders.OrderHttp.Today);
+        await Orders.OrderHttp.SetPriceAsync(world.Second, 20m, Orders.OrderHttp.Today);
 
+        // Rebalances R10, R26: the account route proposes, and no Transaction gets source Rebalance from it.
         var response = await PortfolioHttp.Send(
             HttpMethod.Post, $"/accounts/{world.AccountId}/rebalance", world.AccessToken);
         response.StatusCode.ShouldBe(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
 
-        var assignedIds = assigned.Select(trade => trade.GetProperty("id").GetGuid()).ToHashSet();
-        var rebalanced = (await RebalanceTrades.TradesAsync(world.AccessToken, world.AccountId))
-            .Where(trade => !assignedIds.Contains(trade.GetProperty("id").GetGuid()))
-            .ToList();
         assigned.ShouldNotBeEmpty();
-        rebalanced.Count.ShouldBeGreaterThanOrEqualTo(2);
-        var assignRun = SingleRebalanceId(assigned);
-        var rebalanceRun = SingleRebalanceId(rebalanced);
-        rebalanceRun.ShouldNotBe(assignRun);
+        SingleRebalanceId(assigned).ShouldNotBe(Guid.Empty);
+        (await RebalanceTrades.TradesAsync(world.AccessToken, world.AccountId)).Count.ShouldBe(assigned.Count);
     }
 
     [Test]
