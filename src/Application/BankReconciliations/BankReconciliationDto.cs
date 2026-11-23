@@ -59,6 +59,9 @@ public sealed class BankReconciliationDto : BankReconciliationListItemDto
 {
     public required BankReconciliationPaymentsDto PaymentsInFlight { get; init; }
 
+    /// <summary>Trade-settlement R25: the open trade settlements of the account, recorded without an item.</summary>
+    public required BankReconciliationPaymentsDto OpenSettlements { get; init; }
+
     public required ClientMoneyAccountFeedDto Feed { get; init; }
 
     public required IReadOnlyList<BankReconciliationItemDto> Items { get; init; }

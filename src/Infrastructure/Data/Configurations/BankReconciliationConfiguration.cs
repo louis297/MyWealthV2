@@ -19,7 +19,8 @@ public class BankReconciliationConfiguration : IEntityTypeConfiguration<BankReco
                      nameof(BankReconciliation.StatementLinesTotal), nameof(BankReconciliation.CustodialCash),
                      nameof(BankReconciliation.Difference), nameof(BankReconciliation.BreakTotal),
                      nameof(BankReconciliation.TimingTotal), nameof(BankReconciliation.KnownTotal),
-                     nameof(BankReconciliation.ReservedCash), nameof(BankReconciliation.PaymentsInFlightAmount)
+                     nameof(BankReconciliation.ReservedCash), nameof(BankReconciliation.PaymentsInFlightAmount),
+                     nameof(BankReconciliation.OpenSettlementsAmount)
                  })
         {
             builder.Property(amount).HasColumnType("decimal(18,4)");

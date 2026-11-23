@@ -43,6 +43,34 @@ public sealed record ReconciliationInputs
 
     public int TaxWithheldCount { get; init; }
 
+    /// <summary>Trade-settlement R23: the <c>Principal</c> legs of order fills that settle through this account and
+    /// whose trade settlement has not completed, with their Transactions.</summary>
+    public decimal UnsettledTrades { get; init; }
+
+    public int UnsettledTradesCount { get; init; }
+
+    /// <summary>Trade-settlement R23: the <c>Principal</c> legs of fills whose settlement failed or is disputed, or
+    /// that were broken and not reversed.</summary>
+    public decimal TradesNeedingAction { get; init; }
+
+    public int TradesNeedingActionCount { get; init; }
+
+    /// <summary>Trade-settlement R23: the <c>Fee</c> legs of order fills that settle through this account.</summary>
+    public decimal TradeFees { get; init; }
+
+    public int TradeFeesCount { get; init; }
+
+    /// <summary>Trade-settlement R24: the cash of fills still <c>Pending</c> in a completed trade settlement, seen
+    /// from the trust account, and the number of those fills.</summary>
+    public decimal UnbookedFills { get; init; }
+
+    public int UnbookedFillsCount { get; init; }
+
+    /// <summary>Trade-settlement R25: the open trade settlements of this account, as information.</summary>
+    public int OpenSettlementsCount { get; init; }
+
+    public decimal OpenSettlementsAmount { get; init; }
+
     public decimal ReservedCash { get; init; }
 
     public int PaymentsInFlightCount { get; init; }

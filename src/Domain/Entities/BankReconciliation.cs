@@ -57,6 +57,11 @@ public class BankReconciliation : BaseAuditableEntity
 
     public decimal ReservedCash { get; private set; }
 
+    /// <summary>Trade-settlement R25: the open trade settlements of the account at the run, as information.</summary>
+    public int OpenSettlementsCount { get; private set; }
+
+    public decimal OpenSettlementsAmount { get; private set; }
+
     public int PaymentsInFlightCount { get; private set; }
 
     public decimal PaymentsInFlightAmount { get; private set; }

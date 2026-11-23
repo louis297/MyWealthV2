@@ -77,6 +77,7 @@ internal static class BankReconciliationReader
             Totals = item.Totals,
             ReservedCash = item.ReservedCash,
             PaymentsInFlight = new BankReconciliationPaymentsDto(run.PaymentsInFlightCount, run.PaymentsInFlightAmount),
+            OpenSettlements = new BankReconciliationPaymentsDto(run.OpenSettlementsCount, run.OpenSettlementsAmount),
             Feed = new ClientMoneyAccountFeedDto(run.FeedLastSucceededAt, run.FeedLastFailedAt, run.FeedLastFailure?.ToString()),
             Items = items.Select(row => new BankReconciliationItemDto(
                 row.Kind.ToString(),
