@@ -181,6 +181,12 @@ public class BankStatementLine : BaseAuditableEntity
             // Withdrawals R43: a returned payout is the flow's own write; it is not undone by hand.
             throw new StatementLineStatusException("This line returned a payment and cannot be unmatched.");
         }
+
+        if (MatchMethod == StatementLineMatchMethod.Settlement)
+        {
+            // Trade-settlement R21: a settlement line accepts no action; only a returned payment undoes it.
+            throw new StatementLineStatusException("This line is the cash of a trade settlement and cannot be unmatched.");
+        }
     }
 
     /// <summary>The platform matched it by its deposit reference (R17).</summary>
