@@ -602,6 +602,40 @@ public class TenantCompositeKeysSchemaTests
             VALUES (NEWID(), @a_tenant, @cma, N'simulator', CONVERT(nvarchar(100), NEWID()), '2026-11-25', 1, 5, 'USD',
                     SYSDATETIMEOFFSET(), 1, 5, SYSDATETIMEOFFSET(), @pts, SYSDATETIMEOFFSET(), N'test');
             """),
+        ("FK_Rebalances_Accounts_TenantId_AccountId", "Accounts", Assignment("a") + RebalanceRow(account: "@{p}_brokerage")),
+        ("FK_Rebalances_Portfolios_TenantId_PortfolioId", "Portfolios", Assignment("a") + RebalanceRow(portfolio: "@{p}_portfolio")),
+        ("FK_Rebalances_AccountPortfolioAssignments_TenantId_AssignmentId", "AccountPortfolioAssignments",
+            Assignment("{p}") + RebalanceRow(assignment: "@{p}_assignment")),
+        ("FK_Rebalances_Users_TenantId_ProposedByUserId", "Users", Assignment("a") + RebalanceRow(proposedBy: "@{p}_adviser")),
+        ("FK_Rebalances_Users_TenantId_ConfirmedByUserId", "Users", Assignment("a") + RebalanceRow(confirmedBy: "@{p}_adviser")),
+        ("FK_Rebalances_Users_TenantId_CancelRequestedByUserId", "Users", Assignment("a") + RebalanceRow(cancelledBy: "@{p}_adviser")),
+        ("FK_RebalanceTargets_Rebalances_TenantId_RebalanceId", "Rebalances", Assignment("{p}") + RebalanceRow(
+            tenant: "@{p}_tenant", account: "@{p}_brokerage", portfolio: "@{p}_portfolio", assignment: "@{p}_assignment",
+            proposedBy: "NULL") + """
+            INSERT INTO [RebalanceTargets] ([TenantId], [RebalanceId], [InstrumentId], [TargetWeight], [SortOrder])
+            VALUES (@a_tenant, SCOPE_IDENTITY(), @a_instrument, 100, 0);
+            """),
+        ("FK_RebalanceTargets_Instruments_TenantId_InstrumentId", "Instruments", Assignment("a") + RebalanceRow() + """
+            INSERT INTO [RebalanceTargets] ([TenantId], [RebalanceId], [InstrumentId], [TargetWeight], [SortOrder])
+            VALUES (@a_tenant, SCOPE_IDENTITY(), @{p}_instrument, 100, 0);
+            """),
+        ("FK_RebalanceLines_Rebalances_TenantId_RebalanceId", "Rebalances", Assignment("{p}") + RebalanceRow(
+            tenant: "@{p}_tenant", account: "@{p}_brokerage", portfolio: "@{p}_portfolio", assignment: "@{p}_assignment",
+            proposedBy: "NULL") + """
+            INSERT INTO [RebalanceLines] ([TenantId], [RebalanceId], [InstrumentId], [Quantity], [Weight], [Currency])
+            VALUES (@a_tenant, SCOPE_IDENTITY(), @a_instrument, 1, 10, 'USD');
+            """),
+        ("FK_RebalanceLines_Instruments_TenantId_InstrumentId", "Instruments", Assignment("a") + RebalanceRow() + """
+            INSERT INTO [RebalanceLines] ([TenantId], [RebalanceId], [InstrumentId], [Quantity], [Weight], [Currency])
+            VALUES (@a_tenant, SCOPE_IDENTITY(), @{p}_instrument, 1, 10, 'USD');
+            """),
+        ("FK_Orders_Rebalances_TenantId_RebalanceId", "Rebalances", Assignment("{p}") + RebalanceRow(
+            tenant: "@{p}_tenant", account: "@{p}_brokerage", portfolio: "@{p}_portfolio", assignment: "@{p}_assignment",
+            proposedBy: "NULL") + """
+            DECLARE @prebalance int = SCOPE_IDENTITY();
+            """ + OrderRow() + """
+            UPDATE [Orders] SET [RebalanceId] = @prebalance WHERE [Id] = SCOPE_IDENTITY();
+            """),
         ("FK_ReportExecutions_ReportSchedules_TenantId_ScheduleId", "ReportSchedules", """
             INSERT INTO [ReportExecutions] ([PublicId], [ReportId], [ScheduleId], [TenantId], [TriggerKind], [Status], [ParametersJson], [Created], [CreatedBy])
             VALUES (NEWID(), @report, @{p}_schedule, @a_tenant, N'Scheduled', N'Queued', N'{}', SYSDATETIMEOFFSET(), N'test');
@@ -635,7 +669,7 @@ public class TenantCompositeKeysSchemaTests
     ];
 
     private static readonly string[] Parents =
-        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines", "BankReconciliations", "InterestRateSchedules", "CorporateActions", "Orders", "ClientMoneyAccounts", "TradeSettlements"];
+        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines", "BankReconciliations", "InterestRateSchedules", "CorporateActions", "Orders", "ClientMoneyAccounts", "TradeSettlements", "AccountPortfolioAssignments", "Rebalances"];
 
     /// <summary>An order of tenant <c>a</c> (script 0051); one argument names a row of the other tenant.</summary>
     private static string OrderRow(
@@ -653,6 +687,35 @@ public class TenantCompositeKeysSchemaTests
         VALUES (NEWID(), {tenant}, {account}, {instrument}, 0, 0, 0, 10, 'USD',
                 100, '2026-11-23', 105, {schedule}, N'simulator', 0, 0,
                 0, 0, 0, 0, {placedBy}, SYSDATETIMEOFFSET(), 0,
+                {(cancelledBy == "NULL" ? "NULL" : "SYSDATETIMEOFFSET()")}, {cancelledBy}, SYSDATETIMEOFFSET(), N'test');
+
+        """;
+
+    /// <summary>An Active assignment of the portfolio of <c>@{prefix}_*</c> on its brokerage account, in
+    /// <c>@{prefix}_assignment</c> (script 0053 gives the table its tenant key).</summary>
+    private static string Assignment(string prefix) => $"""
+        INSERT INTO [AccountPortfolioAssignments] ([PublicId], [TenantId], [AccountId], [PortfolioId], [Status], [AssignedAt], [AssignedBy], [Created], [CreatedBy])
+        VALUES (NEWID(), @{prefix}_tenant, @{prefix}_brokerage, @{prefix}_portfolio, 0, SYSDATETIMEOFFSET(), N'test', SYSDATETIMEOFFSET(), N'test');
+        DECLARE @{prefix}_assignment int = SCOPE_IDENTITY();
+
+        """;
+
+    /// <summary>A <c>Proposed</c> rebalance (script 0053).</summary>
+    private static string RebalanceRow(
+        string tenant = "@a_tenant",
+        string account = "@a_brokerage",
+        string portfolio = "@a_portfolio",
+        string assignment = "@a_assignment",
+        string proposedBy = "@a_adviser",
+        string confirmedBy = "NULL",
+        string cancelledBy = "NULL") => $"""
+        INSERT INTO [Rebalances]
+            ([PublicId], [TenantId], [AccountId], [PortfolioId], [AssignmentId], [Trigger], [Status], [BaseCurrency],
+             [MinimumTrade], [CashResidualPercent], [Waves], [BuyWaves], [ProposedByUserId], [ProposedAt], [ExpiresAt],
+             [ConfirmedByUserId], [ConfirmedAt], [CancelRequestedAt], [CancelRequestedByUserId], [Created], [CreatedBy])
+        VALUES (NEWID(), {tenant}, {account}, {portfolio}, {assignment}, 1, 0, 'NZD',
+                100, 1, 0, 0, {proposedBy}, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(),
+                {confirmedBy}, {(confirmedBy == "NULL" ? "NULL" : "SYSDATETIMEOFFSET()")},
                 {(cancelledBy == "NULL" ? "NULL" : "SYSDATETIMEOFFSET()")}, {cancelledBy}, SYSDATETIMEOFFSET(), N'test');
 
         """;

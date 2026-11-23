@@ -15,7 +15,6 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Ignore(order => order.IsUnsent);
         builder.Ignore(order => order.OpenQuantity);
         builder.Ignore(order => order.HasCancelRequest);
-        builder.Ignore(order => order.RebalanceId);
         builder.Property(order => order.PublicId).IsRequired();
         builder.Property(order => order.Quantity).HasColumnType("decimal(18,8)");
         builder.Property(order => order.Currency).HasColumnType("char(3)").IsFixedLength().IsRequired();
@@ -65,6 +64,14 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
             .WithMany()
             .HasForeignKey(order => order.CancelRequestedByUserId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Rebalance>()
+            .WithMany()
+            .HasForeignKey(order => order.RebalanceId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(order => order.RebalanceId)
+            .HasFilter("[RebalanceId] IS NOT NULL")
+            .HasDatabaseName("IX_Orders_RebalanceId");
         builder.HasMany(order => order.Fills)
             .WithOne()
             .HasForeignKey(fill => fill.OrderId)

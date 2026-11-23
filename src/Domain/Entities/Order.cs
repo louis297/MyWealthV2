@@ -218,7 +218,8 @@ public class Order : BaseAuditableEntity
             Memo = OptionalText(memo, MemoMaxLength, "Memo"),
             PlacedByUserId = placedByUserId,
             PlacedAt = placedAt.ToUniversalTime(),
-            PublicId = publicId ?? Guid.NewGuid()
+            PublicId = publicId ?? Guid.NewGuid(),
+            RebalanceId = rebalanceId
         };
         if (settlementAccount is not null)
         {

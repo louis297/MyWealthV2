@@ -54,6 +54,8 @@ public interface IApplicationDbContext
 
     DbSet<TradeSettlement> TradeSettlements { get; }
 
+    DbSet<Rebalance> Rebalances { get; }
+
     DbSet<Instrument> Instruments { get; }
 
     DbSet<Account> Accounts { get; }
