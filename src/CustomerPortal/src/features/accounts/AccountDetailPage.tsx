@@ -35,6 +35,15 @@ function typeLabel(row: Activity) {
     return `${corporateActionKinds[kind] ?? kind} ${ratioNew} for ${ratioHeld}`;
   }
 
+  // C38: an opening balance a migration batch wrote says so; a hand Opening on an External account keeps its label.
+  if (row.migration && row.type === "Opening") {
+    return "Opening balance";
+  }
+
+  if (row.migration && row.type === "OpeningHoldings") {
+    return "Holdings transferred in";
+  }
+
   // C21: a deposit from the bank statement is a TransferIn with a bank receipt; its Reversal stays "Reversal".
   if (row.type === "TransferIn" && row.bankReceipt) {
     return "Deposit";
@@ -383,6 +392,11 @@ export function AccountDetailPage() {
                     <TableRow key={row.id}>
                       <TableCell>
                         {fillLabel(row) ?? typeLabel(row)}
+                        {row.migration && (row.type === "Opening" || row.type === "OpeningHoldings") ? (
+                          <p className="text-muted-foreground text-xs">
+                            {`From ${row.migration.previousProvider}, as at ${row.migration.asOfDate}`}
+                          </p>
+                        ) : null}
                         {fillLabel(row) && row.execution && row.type !== "Reversal" ? (
                           // C34: the trade date, the settlement and the contract note of a fill.
                           <>
