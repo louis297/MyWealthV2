@@ -97,6 +97,12 @@ public sealed class ProcessStatementLines(
             return;
         }
 
+        // Trade-settlement R19: the broker's settlement cash is checked before deposit matching.
+        if (await new BankSettlements(db, time).ProcessReceiptAsync(line, cancellationToken))
+        {
+            return;
+        }
+
         var (account, reason) = await ChooseAsync(line, cancellationToken);
         if (account is null)
         {

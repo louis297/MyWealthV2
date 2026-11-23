@@ -47,4 +47,44 @@ internal sealed class BankSettlements(IApplicationDbContext db, TimeProvider tim
         await db.SaveChangesAsync(cancellationToken);
         return true;
     }
+
+    /// <summary>R19: a credit transfer with no <c>returnOf</c> whose reference text, trimmed and without regard to
+    /// case, is the broker settlement id of a trade settlement of the line's Tenant and client money account. It is
+    /// settlement cash, never a deposit. True when the line was this case.</summary>
+    public async Task<bool> ProcessReceiptAsync(BankStatementLine line, CancellationToken cancellationToken)
+    {
+        var reference = line.ReferenceText?.Trim();
+        if (line.Direction != BankLineDirection.Credit
+            || line.Kind != StatementLineKind.Transfer
+            || line.ReturnOfOutsideId is not null
+            || string.IsNullOrEmpty(reference))
+        {
+            return false;
+        }
+
+        var key = reference.ToUpperInvariant();
+        var settlement = await db.TradeSettlements.IgnoreQueryFilters()
+            .Where(row => row.TenantId == line.TenantId
+                          && row.ClientMoneyAccountId == line.ClientMoneyAccountId
+                          && row.BrokerSettlementId.ToUpper() == key)
+            .OrderBy(row => row.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (settlement is null)
+        {
+            return false;
+        }
+
+        if (settlement.Status != TradeSettlementStatus.AwaitingReceipt || line.Amount != settlement.NetAmount)
+        {
+            line.MarkUnmatched(UnmatchedReason.SettlementMismatch);
+            await db.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+
+        var now = time.GetUtcNow();
+        settlement.Complete(now);
+        line.MarkSettlement(settlement.Id, now);
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
 }
