@@ -13,14 +13,17 @@ public enum BrokerConnectionHost
 }
 
 /// <summary>One configured broker connection (orders R2). <see cref="BaseUrl"/> and <see cref="ApiKey"/> are set only
-/// on <c>worker</c>.</summary>
+/// on <c>worker</c>; <see cref="BankAccounts"/> (trade-settlement R2) on both hosts, sorted by currency.</summary>
 public sealed record BrokerConnectionSettings(
     string Name,
     string Adapter,
     Uri? BaseUrl,
     string? ApiKey,
     int TimeoutSeconds,
-    int PollMinutes);
+    int PollMinutes)
+{
+    public IReadOnlyList<BrokerBankAccount> BankAccounts { get; init; } = [];
+}
 
 /// <summary>
 /// Reads <c>BrokerConnections:{name}</c> (orders R2). Throws <see cref="InvalidOperationException"/> on a bad entry, so
@@ -118,4 +121,8 @@ public sealed class ConfiguredBrokerConnections(IReadOnlyList<BrokerConnectionSe
         .ToList();
 
     public bool IsConfigured(string? name) => All.Any(entry => entry.Name == name);
+
+    public BrokerBankAccount? BankAccount(string? connection, string currency) => null;
+
+    public IReadOnlyList<string> SettlementCurrencies(string connection) => [];
 }

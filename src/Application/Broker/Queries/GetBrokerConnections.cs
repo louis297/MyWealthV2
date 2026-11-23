@@ -10,8 +10,13 @@ namespace MyWealthV2.Application.Broker.Queries;
 public sealed record GetBrokerConnectionsQuery : IRequest<PagedList<BrokerConnectionDto>>;
 
 /// <summary>A connection as the platform may show it: never its URL, key or timeout. <see cref="Reports"/> is the
-/// state of its execution report feed.</summary>
-public sealed record BrokerConnectionDto(string Name, string Adapter, BrokerFeedDto? Reports);
+/// state of its execution report feed; <see cref="SettlementCurrencies"/> the currencies it has a broker bank account
+/// in (trade-settlement R2).</summary>
+public sealed record BrokerConnectionDto(
+    string Name,
+    string Adapter,
+    BrokerFeedDto? Reports,
+    IReadOnlyList<string> SettlementCurrencies);
 
 /// <summary>The state of the feed; <c>null</c> on the connection until the first read was tried. The failure is a
 /// name of <c>BrokerFailure</c>, never a message from the party.</summary>
@@ -35,7 +40,8 @@ public class GetBrokerConnectionsQueryHandler(IApplicationDbContext db, IBrokerC
                 connection.Adapter,
                 feeds.TryGetValue(connection.Name, out var feed)
                     ? new BrokerFeedDto(feed.LastSucceededAt, feed.LastFailedAt, feed.LastFailure?.ToString())
-                    : null))
+                    : null,
+                []))
             .ToList();
         return new PagedList<BrokerConnectionDto>
         {
