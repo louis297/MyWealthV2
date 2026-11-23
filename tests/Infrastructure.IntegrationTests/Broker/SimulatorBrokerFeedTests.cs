@@ -75,7 +75,7 @@ public class SimulatorBrokerFeedTests
         handler.Requests.Single().RequestUri!.AbsoluteUri.ShouldBe("http://simulator:8082/party/broker/reports?limit=100");
     }
 
-    [TestCase("\"Broken\"")]
+    [TestCase("\"Breaks\"")]
     [TestCase("\"fill\"")]
     [TestCase("null")]
     [TestCase("7")]

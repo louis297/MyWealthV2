@@ -177,5 +177,46 @@ public sealed class PostOrderFills(
         return true;
     }
 
+    /// <summary>
+    /// Trade-settlement R28, R29, R32: the broker took <paramref name="fill"/> back. A fill that was never posted is
+    /// <c>NotPosted</c> and nothing is written; a posted one is reversed by the flow, with the order's source, and the
+    /// holdings follow. Runs in the report's own database transaction, under the Account lock.
+    /// </summary>
+    public async Task BreakAsync(Order order, OrderFill fill, ExecutionReport report, OrderFeeTerms fees, CancellationToken cancellationToken)
+    {
+        var now = time.GetUtcNow();
+        if (fill.Status == OrderFillStatus.Pending)
+        {
+            order.BreakFill(fill, report.Id, report.Reason, now, FillBreakOutcome.NotPosted, fees);
+            return;
+        }
+
+        var original = await db.Transactions.IgnoreQueryFilters()
+            .Include(row => row.FxDetail)
+            .Include(row => row.FeeDetails)
+            .Include(row => row.ExecutionDetail)
+            .SingleAsync(row => row.Id == fill.TransactionId, cancellationToken);
+        await db.LoadCashLegsAsync(original, cancellationToken);
+        await db.LoadSecurityLegsAsync(original, cancellationToken);
+        var cashSum = await TransactionCash.SumAsync(db, order.AccountId, cancellationToken);
+        var holding = await db.Holdings.IgnoreQueryFilters().AsNoTracking()
+            .SingleOrDefaultAsync(row => row.AccountId == order.AccountId && row.InstrumentId == order.InstrumentId, cancellationToken);
+        var reversal = original.Reverse(
+            TransactionSource.OrderFill(order.PublicId), now,
+            new Dictionary<int, decimal> { [order.AccountId] = cashSum },
+            new Dictionary<(int AccountId, int InstrumentId), decimal> { [(order.AccountId, order.InstrumentId)] = holding?.Quantity ?? 0m });
+        reversal.CreatedBy = SystemActor.Name;
+        reversal.CashLegs.ForEach(leg => leg.CreatedBy = SystemActor.Name);
+        reversal.SecurityLegs.ForEach(leg => leg.CreatedBy = SystemActor.Name);
+        db.Transactions.Add(reversal);
+        await db.SaveChangesAsync(cancellationToken);
+        await HoldingProjection.SyncAsync(
+            db, order.TenantId, order.AccountId, [order.InstrumentId], cancellationToken, SystemActor.Name);
+
+        order.BreakFill(
+            fill, report.Id, report.Reason, now, FillBreakOutcome.Reversed, fees,
+            original.FeeDetails.Sum(detail => detail.FeeAmount), reversal.Id);
+    }
+
     private static decimal Round(decimal amount) => decimal.Round(amount, 4, MidpointRounding.AwayFromZero);
 }

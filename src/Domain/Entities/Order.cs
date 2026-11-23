@@ -412,8 +412,35 @@ public class Order : BaseAuditableEntity
         OrderFeeTerms fees,
         decimal fee = 0m,
         int? reversalTransactionId = null,
-        FillBreakHoldReason? holdReason = null) =>
-        throw new NotImplementedException();
+        FillBreakHoldReason? holdReason = null)
+    {
+        if (!_fills.Contains(fill))
+        {
+            throw new DomainException("The fill is not one of this order's.");
+        }
+
+        EnsureTerms(fees);
+        fill.Break(breakReportId, reason, at, outcome, reversalTransactionId, holdReason);
+        FilledQuantity -= fill.Quantity;
+        if (outcome == FillBreakOutcome.Reversed)
+        {
+            PostedGross -= OrderRules.MaximumGross(fill.Quantity, fill.Price);
+            FeeCharged = Math.Max(0m, FeeCharged - fee);
+        }
+
+        if (Status == OrderStatus.Filled)
+        {
+            Status = OrderStatus.Cancelled;
+            CloseReason = TradeBrokenReason;
+            ClosedAt ??= at.ToUniversalTime();
+        }
+        else if (IsOpen)
+        {
+            Status = _fills.Any(item => item.Status != OrderFillStatus.Broken) ? OrderStatus.PartlyFilled : OrderStatus.Working;
+        }
+
+        Reserve(fees);
+    }
 
     /// <summary>R27: the broker ended an open order: <c>Cancelled</c> or <c>Expired</c>, with its reason.</summary>
     public void End(OrderStatus status, string? reason, DateTimeOffset at, OrderFeeTerms fees)

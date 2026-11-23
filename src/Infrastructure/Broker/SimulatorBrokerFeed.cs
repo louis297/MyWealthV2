@@ -95,6 +95,7 @@ public sealed class SimulatorBrokerFeed(IHttpClientFactory httpClients) : IBroke
                 "Expired" => ExecutionReportKind.Expired,
                 "Settled" => ExecutionReportKind.Settled,
                 "Settlement" => ExecutionReportKind.Settlement,
+                "Broken" => ExecutionReportKind.Broken,
                 _ => null
             },
             Text(item.ClientOrderId),

@@ -125,6 +125,8 @@ public class ExecutionReport
                                               && closing.FillCount >= 1
                                               && IsNet(closing.NetAmount),
             ExecutionReportKind.Cancelled or ExecutionReportKind.Expired => IsId(clientOrderId),
+            // Trade-settlement R26: a Broken report names the fill by the outside id of its Fill report.
+            ExecutionReportKind.Broken => IsId(clientOrderId) && IsId(fillOutsideId),
             _ => false
         };
     }

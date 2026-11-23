@@ -163,8 +163,42 @@ public class OrderFill
         DateTimeOffset at,
         FillBreakOutcome outcome,
         int? reversalTransactionId = null,
-        FillBreakHoldReason? holdReason = null) =>
-        throw new NotImplementedException();
+        FillBreakHoldReason? holdReason = null)
+    {
+        if (IsBroken)
+        {
+            throw new DomainException("This fill was broken already.");
+        }
+
+        if (IsSettled)
+        {
+            throw new DomainException("A fill that has settled cannot be broken.");
+        }
+
+        var fits = outcome switch
+        {
+            FillBreakOutcome.NotPosted => Status == OrderFillStatus.Pending && reversalTransactionId is null && holdReason is null,
+            FillBreakOutcome.Reversed => Status == OrderFillStatus.Posted && reversalTransactionId is not null && holdReason is null,
+            FillBreakOutcome.NotApplied => Status == OrderFillStatus.Posted && reversalTransactionId is null && holdReason is not null,
+            _ => false
+        };
+        if (!fits)
+        {
+            throw new DomainException($"A {Status} fill cannot be broken as {outcome}.");
+        }
+
+        var trimmed = reason?.Trim();
+        Status = OrderFillStatus.Broken;
+        HoldReason = null;
+        BrokenAt = at.ToUniversalTime();
+        BreakReportId = breakReportId;
+        BreakReason = string.IsNullOrEmpty(trimmed)
+            ? null
+            : trimmed.Length > ExecutionReport.ReasonMaxLength ? trimmed[..ExecutionReport.ReasonMaxLength] : trimmed;
+        BreakOutcome = outcome;
+        BreakHoldReason = holdReason;
+        ReversalTransactionId = reversalTransactionId;
+    }
 
     /// <summary>Trade-settlement R8: the fill is put in a trade settlement, once.</summary>
     public void AssignTo(int tradeSettlementId)

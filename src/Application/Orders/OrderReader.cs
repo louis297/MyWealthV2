@@ -62,7 +62,9 @@ internal static class OrderReader
         return rows.Select(row =>
         {
             var orderFills = fills[row.Id].ToList();
-            var filled = orderFills.Sum(fill => fill.Quantity);
+            // Trade-settlement R32: a broken fill counts in neither the filled quantity nor the average price.
+            var counted = orderFills.Where(fill => fill.Status != OrderFillStatus.Broken).ToList();
+            var filled = counted.Sum(fill => fill.Quantity);
             return new OrderDto
             {
                 Id = row.PublicId,
@@ -83,7 +85,7 @@ internal static class OrderReader
                 ReservedQuantity = row.ReservedQuantity,
                 AveragePrice = filled == 0m
                     ? null
-                    : decimal.Round(orderFills.Sum(fill => fill.Quantity * fill.Price) / filled, 8, MidpointRounding.AwayFromZero),
+                    : decimal.Round(counted.Sum(fill => fill.Quantity * fill.Price) / filled, 8, MidpointRounding.AwayFromZero),
                 Status = row.Status.ToString(),
                 Memo = customerView ? null : row.Memo,
                 PlacedBy = users[row.PlacedByUserId],

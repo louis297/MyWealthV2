@@ -166,16 +166,38 @@ public sealed class ProcessExecutionReports(
                     kind == ExecutionReportKind.Cancelled ? OrderStatus.Cancelled : OrderStatus.Expired, report.Reason, now, fees);
                 return ReportResult.Processed;
 
+            case ExecutionReportKind.Broken:
+                // Trade-settlement R27: a fill is broken once, and never after it settled.
+                var breaking = await FillNamedAsync(order, report, cancellationToken);
+                if (breaking is null)
+                {
+                    return ReportResult.Skipped(ExecutionReportSkipReason.UnknownFill);
+                }
+
+                if (breaking.IsBroken)
+                {
+                    return ReportResult.Skipped(ExecutionReportSkipReason.Repeated);
+                }
+
+                if (breaking.IsSettled)
+                {
+                    return ReportResult.Skipped(ExecutionReportSkipReason.FillSettled);
+                }
+
+                await poster.BreakAsync(order, breaking, report, fees, cancellationToken);
+                return ReportResult.Processed;
+
             default:
                 // R43: the fill is named by the outside id of its Fill report. Settlement writes nothing to the ledger.
-                var fillReportId = await db.ExecutionReports.AsNoTracking()
-                    .Where(row => row.Connection == report.Connection && row.OutsideId == report.FillOutsideId)
-                    .Select(row => (long?)row.Id)
-                    .SingleOrDefaultAsync(cancellationToken);
-                var settling = order.Fills.SingleOrDefault(row => row.ExecutionReportId == fillReportId);
+                var settling = await FillNamedAsync(order, report, cancellationToken);
                 if (settling is null)
                 {
                     return ReportResult.Skipped(ExecutionReportSkipReason.UnknownFill);
+                }
+
+                if (settling.IsBroken)
+                {
+                    return ReportResult.Skipped(ExecutionReportSkipReason.FillBroken);
                 }
 
                 if (settling.IsSettled)
@@ -189,6 +211,16 @@ public sealed class ProcessExecutionReports(
     }
 
     /// <summary>What one report came to: processed, skipped for a reason, or left <c>Received</c>.</summary>
+    /// <summary>R43, trade-settlement R26: the fill of the order named by the outside id of its Fill report.</summary>
+    private async Task<OrderFill?> FillNamedAsync(Order order, ExecutionReport report, CancellationToken cancellationToken)
+    {
+        var fillReportId = await db.ExecutionReports.AsNoTracking()
+            .Where(row => row.Connection == report.Connection && row.OutsideId == report.FillOutsideId)
+            .Select(row => (long?)row.Id)
+            .SingleOrDefaultAsync(cancellationToken);
+        return order.Fills.SingleOrDefault(row => row.ExecutionReportId == fillReportId);
+    }
+
     /// <summary>
     /// Trade-settlement R8, R9, R11–R13: the fills of the connection that carry the broker settlement id and are in no
     /// trade settlement yet, grouped by the client money account of their order, each group stored as one trade
