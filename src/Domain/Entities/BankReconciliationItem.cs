@@ -49,8 +49,10 @@ public class BankReconciliationItem
     public static ReconciliationItemClass ClassOf(ReconciliationItemKind kind) => kind switch
     {
         ReconciliationItemKind.Unexplained or ReconciliationItemKind.StatementDifference or ReconciliationItemKind.Suspense
+            or ReconciliationItemKind.TradesNeedingAction or ReconciliationItemKind.UnbookedFills
             => ReconciliationItemClass.Break,
-        ReconciliationItemKind.NotProcessed or ReconciliationItemKind.ReturnInProgress => ReconciliationItemClass.Timing,
+        ReconciliationItemKind.NotProcessed or ReconciliationItemKind.ReturnInProgress or ReconciliationItemKind.UnsettledTrades
+            => ReconciliationItemClass.Timing,
         _ => ReconciliationItemClass.Known
     };
 

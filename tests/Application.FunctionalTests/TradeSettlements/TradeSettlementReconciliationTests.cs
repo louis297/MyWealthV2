@@ -38,8 +38,11 @@ public class TradeSettlementReconciliationTests : TestBase
         var run = await RunAndGetAsync(world.TenantAdmin, clientMoney.PublicId);
 
         Status(run).ShouldBe("Agreed");
-        // The sell's 990.00 is cash the broker owes; the buy's 400.48 cash the firm owes.
-        Items(run).ShouldBe([("UnsettledTrades", "Timing", -589.52m, 2), ("TradeFees", "Known", 10.00m, 2)]);
+        // The sell's 990.00 is cash the broker owes; the buy's 400.48 cash the firm owes. The holding typed in before
+        // orders stays in Trades.
+        Items(run).ShouldBe([
+            ("UnsettledTrades", "Timing", -589.52m, 2), ("Trades", "Known", 1000.00m, 1), ("TradeFees", "Known", 10.00m, 2)
+        ]);
     }
 
     [Test]

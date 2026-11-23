@@ -3,6 +3,7 @@ using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
+using MyWealthV2.Domain.Orders;
 using MyWealthV2.Domain.ValueObjects;
 
 namespace MyWealthV2.Application.BankReconciliations;
@@ -109,6 +110,85 @@ public sealed class ReconcileClientMoneyAccount(IApplicationDbContext db, TimePr
                 into legs
                 select new { TransactionId = legs.Key, Sum = legs.Sum(leg => leg.Amount) })
             .ToListAsync(cancellationToken);
+        // Trade-settlement R23: the legs of an order fill (and of its Reversal) follow the fill's order. An order that
+        // settles through this account makes its own items; one that settles through another account is that
+        // account's cash; any other fill and a set-aside settlement stay in Trades.
+        var fillLegs = await (
+                from leg in custodialLegs
+                join transaction in db.Transactions.IgnoreQueryFilters() on leg.TransactionId equals transaction.Id
+                where transaction.SourceKind == TransactionSourceKind.OrderFill && transaction.ExecutionDetail != null
+                select new { leg.TransactionId, leg.Role, leg.Amount, transaction.ExecutionDetail!.FillPublicId })
+            .ToListAsync(cancellationToken);
+        var fillIds = fillLegs.Select(leg => leg.FillPublicId).Distinct().ToList();
+        var fillStates = await (
+                from fill in db.OrderFills.IgnoreQueryFilters()
+                join order in db.Orders.IgnoreQueryFilters() on fill.OrderId equals order.Id
+                where fill.TenantId == tenantId && fillIds.Contains(fill.PublicId)
+                select new
+                {
+                    fill.PublicId,
+                    order.ClientMoneyAccountId,
+                    SettlementStatus = db.TradeSettlements.IgnoreQueryFilters()
+                        .Where(settlement => settlement.Id == fill.TradeSettlementId)
+                        .Select(settlement => (TradeSettlementStatus?)settlement.Status)
+                        .FirstOrDefault()
+                })
+            .ToDictionaryAsync(row => row.PublicId, cancellationToken);
+        var settledHere = new HashSet<int>();
+        var throughOther = new Dictionary<int, int>();
+        var (unsettled, needingAction, fees) = (new Bucket(), new Bucket(), new Bucket());
+        foreach (var legs in fillLegs.GroupBy(leg => leg.TransactionId))
+        {
+            if (!fillStates.TryGetValue(legs.First().FillPublicId, out var state)
+                || state.ClientMoneyAccountId is null
+                || state.SettlementStatus == TradeSettlementStatus.SetAside)
+            {
+                continue;
+            }
+
+            var settlesThrough = state.ClientMoneyAccountId.Value;
+
+            if (settlesThrough != account.Id)
+            {
+                throughOther[legs.Key] = settlesThrough;
+                continue;
+            }
+
+            settledHere.Add(legs.Key);
+            var principal = state.SettlementStatus == TradeSettlementStatus.Completed
+                ? null
+                : state.SettlementStatus is TradeSettlementStatus.PaymentFailed or TradeSettlementStatus.Disputed
+                    ? needingAction
+                    : unsettled;
+            foreach (var leg in legs)
+            {
+                (leg.Role == CashLegRole.Fee ? fees : principal)?.Add(legs.Key, leg.Amount);
+            }
+        }
+
+        // Trade-settlement R24: fills the broker settled and the bank paid, which the ledger has not booked yet.
+        var unbookedFills = await (
+                from fill in db.OrderFills.IgnoreQueryFilters()
+                join order in db.Orders.IgnoreQueryFilters() on fill.OrderId equals order.Id
+                join settlement in db.TradeSettlements.IgnoreQueryFilters() on fill.TradeSettlementId equals (int?)settlement.Id
+                where settlement.TenantId == tenantId
+                      && settlement.ClientMoneyAccountId == account.Id
+                      && settlement.Status == TradeSettlementStatus.Completed
+                      && fill.Status == OrderFillStatus.Pending
+                select new { order.Side, fill.Quantity, fill.Price })
+            .ToListAsync(cancellationToken);
+
+        // Trade-settlement R25: information, not items.
+        var openSettlements = await db.TradeSettlements.IgnoreQueryFilters().AsNoTracking()
+            .Where(row => row.TenantId == tenantId && row.ClientMoneyAccountId == account.Id
+                          && (row.Status == TradeSettlementStatus.AwaitingPayment
+                              || row.Status == TradeSettlementStatus.AwaitingReceipt
+                              || row.Status == TradeSettlementStatus.PaymentFailed
+                              || row.Status == TradeSettlementStatus.Disputed))
+            .Select(row => row.NetAmount)
+            .ToListAsync(cancellationToken);
+
+        perTransaction = perTransaction.Where(row => !settledHere.Contains(row.TransactionId)).ToList();
         var transactionIds = perTransaction.Select(row => row.TransactionId).ToList();
         var transactions = await (
                 from transaction in db.Transactions.IgnoreQueryFilters()
@@ -137,8 +217,9 @@ public sealed class ReconcileClientMoneyAccount(IApplicationDbContext db, TimePr
                 })
             .ToDictionaryAsync(row => row.Id, cancellationToken);
         var ledger = perTransaction
-            .Select(row => (Sum: row.Sum, Info: transactions[row.TransactionId]))
-            .GroupBy(row => (row.Info.Type, row.Info.OriginalType, row.Info.Through))
+            .Select(row => (Sum: row.Sum, Info: transactions[row.TransactionId],
+                Through: throughOther.TryGetValue(row.TransactionId, out var other) ? other : transactions[row.TransactionId].Through))
+            .GroupBy(row => (row.Info.Type, row.Info.OriginalType, row.Through))
             .Select(group => new ReconciliationLedgerCash(
                 group.Key.Type, group.Key.OriginalType, group.Key.Through, group.Sum(row => row.Sum), group.Count()))
             .ToList();
@@ -179,6 +260,16 @@ public sealed class ReconcileClientMoneyAccount(IApplicationDbContext db, TimePr
             InterestCreditedCount = interestTransactions.Count,
             TaxWithheld = interestLegs.Where(leg => leg.Role == CashLegRole.Tax).Sum(leg => leg.Amount),
             TaxWithheldCount = interestLegs.Where(leg => leg.Role == CashLegRole.Tax).Select(leg => leg.TransactionId).Distinct().Count(),
+            UnsettledTrades = unsettled.Amount,
+            UnsettledTradesCount = unsettled.Count,
+            TradesNeedingAction = needingAction.Amount,
+            TradesNeedingActionCount = needingAction.Count,
+            TradeFees = fees.Amount,
+            TradeFeesCount = fees.Count,
+            UnbookedFills = unbookedFills.Sum(fill => new SettlementFill(fill.Side, fill.Quantity, fill.Price).Cash),
+            UnbookedFillsCount = unbookedFills.Count,
+            OpenSettlementsCount = openSettlements.Count,
+            OpenSettlementsAmount = openSettlements.Sum(),
             ReservedCash = reserved,
             PaymentsInFlightCount = inFlight?.Count ?? 0,
             PaymentsInFlightAmount = inFlight?.Amount ?? 0m,
@@ -186,5 +277,21 @@ public sealed class ReconcileClientMoneyAccount(IApplicationDbContext db, TimePr
             FeedLastFailedAt = cursor?.LastFailedAt,
             FeedLastFailure = cursor?.LastFailure
         };
+    }
+
+    /// <summary>A sum of legs with the Transactions it came from.</summary>
+    private sealed class Bucket
+    {
+        private readonly HashSet<int> _transactions = [];
+
+        public decimal Amount { get; private set; }
+
+        public int Count => _transactions.Count;
+
+        public void Add(int transactionId, decimal amount)
+        {
+            Amount += amount;
+            _transactions.Add(transactionId);
+        }
     }
 }
