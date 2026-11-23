@@ -22,6 +22,7 @@ public static class BrokerControlEndpoints
         broker.MapGet("/orders/{brokerOrderId}", GetOrderAsync);
         broker.MapPost("/orders/{brokerOrderId}/fill", FillOrderAsync);
         broker.MapPost("/orders/{brokerOrderId}/cancel", CancelOrderAsync);
+        broker.MapPost("/fills/{fillReportId}/break", BreakFillAsync);
         broker.MapPost("/settlement-mode", SetSettlementModeAsync);
         broker.MapGet("/settlements", GetSettlementsAsync);
         broker.MapPost("/settlements/{settlementId}/pay", PaySettlementAsync);
@@ -105,6 +106,57 @@ public static class BrokerControlEndpoints
 
         return await WriteAsync(http, accounts, db, time, ControlActions.BrokerSettlementDaysSet, body,
             settings => settings.SetSettlementDays(body.SettlementDays!.Value));
+    }
+
+    /// <summary>
+    /// Trade-settlement R40: the operator breaks a fill named by the outside id of its <c>Fill</c> report. Only a fill
+    /// that is neither settled nor broken; an id that names no <c>Fill</c> report → 404. The fill never settles, its
+    /// order takes the quantity back, and a <c>Broken</c> report is appended.
+    /// </summary>
+    private static async Task<IResult> BreakFillAsync(
+        string fillReportId,
+        BrokerBreakRequest body,
+        HttpContext http,
+        BrokerBankAccounts accounts,
+        SimulatorDbContext db,
+        TimeProvider time)
+    {
+        var cancellationToken = http.RequestAborted;
+        var reason = body.Reason ?? BrokerRules.BrokenReason;
+        if (reason.Length is < 1 or > BrokerRules.ReasonMaxLength)
+        {
+            return ControlEndpoints.Refused("Reason", "reason must be 1 to 140 characters.");
+        }
+
+        var world = await BrokerBook.UpToDateAsync(db, time, accounts, cancellationToken);
+        var realNow = time.GetUtcNow();
+        return await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            db.ChangeTracker.Clear();
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+            await BrokerBook.LockAsync(db, cancellationToken);
+            var report = BrokerBook.TryReadReportNumber(fillReportId, world.WorldId, out var number) && number >= 1
+                ? await db.BrokerReports.AsNoTracking().OrderBy(row => row.Id).Skip(number - 1).FirstOrDefaultAsync(cancellationToken)
+                : null;
+            if (report is not { Kind: BrokerReportKind.Fill, FillId: int fillId, OrderId: int orderId })
+            {
+                return Results.NotFound();
+            }
+
+            var order = await db.BrokerOrders.SingleAsync(row => row.Id == orderId, cancellationToken);
+            var fill = await db.BrokerFills.SingleAsync(row => row.Id == fillId, cancellationToken);
+            if (fill.Settled || fill.Broken)
+            {
+                return ControlEndpoints.Refused("Status", "Only a fill that is neither settled nor broken can be broken.");
+            }
+
+            order.TakeBack(fill);
+            db.BrokerReports.Add(BrokerReport.OfBreak(order, fill, reason));
+            MarketControlEndpoints.Log(db, http, world, realNow, ControlActions.BrokerFillBroken, new { fillReportId, body.Reason });
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return Results.Ok(await DetailAsync(db, world, order, cancellationToken));
+        });
     }
 
     /// <summary>Trade-settlement R38: whether the broker pays its settlement receipts at once or holds them.</summary>
@@ -472,6 +524,8 @@ public sealed record BrokerFillRequest(decimal? Quantity, decimal? Price);
 public sealed record BrokerCancelRequest(string? Reason);
 
 public sealed record BrokerSettlementModeRequest(string? Mode);
+
+public sealed record BrokerBreakRequest(string? Reason);
 
 public sealed record BrokerSettlementPayRequest(decimal? Amount);
 

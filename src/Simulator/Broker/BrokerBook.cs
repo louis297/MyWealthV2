@@ -233,6 +233,16 @@ public static class BrokerBook
     public static string ReportId(Guid worldId, int number) =>
         $"{worldId:N}-X{number.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
 
+    /// <summary>R63: the number of a report outside id of <paramref name="worldId"/>, or false.</summary>
+    public static bool TryReadReportNumber(string id, Guid worldId, out int number)
+    {
+        number = 0;
+        var prefix = $"{worldId:N}-X";
+        return id.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+               && int.TryParse(id[prefix.Length..], System.Globalization.NumberStyles.None,
+                   System.Globalization.CultureInfo.InvariantCulture, out number);
+    }
+
     /// <summary>R56: the market's price of the current simulator day for a simulated instrument; the order's
     /// reference price for any other symbol.</summary>
     private static async Task<decimal> BasePriceAsync(SimulatorDbContext db, BrokerOrder order, CancellationToken cancellationToken)

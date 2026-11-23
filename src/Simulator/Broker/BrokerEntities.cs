@@ -249,6 +249,18 @@ public sealed class BrokerOrder
         return fill;
     }
 
+    /// <summary>Trade-settlement R40: a fill of the order was broken. A working order takes the quantity back and
+    /// stays working; a <c>Filled</c> order becomes <c>Cancelled</c>.</summary>
+    public void TakeBack(BrokerFill fill)
+    {
+        fill.Break();
+        FilledQuantity -= fill.Quantity;
+        if (Status == BrokerOrderStatus.Filled)
+        {
+            Status = BrokerOrderStatus.Cancelled;
+        }
+    }
+
     /// <summary>R58, R59, R62: a working order is cancelled; what was filled stays filled.</summary>
     public void Cancel() => End(BrokerOrderStatus.Cancelled);
 
@@ -308,6 +320,17 @@ public sealed class BrokerFill
     /// <summary>Trade-settlement R36: the broker settlement the fill settled in, when its order named a settlement
     /// account.</summary>
     public int? SettlementId { get; private set; }
+
+    /// <summary>Trade-settlement R40: only a fill that is neither settled nor broken.</summary>
+    public void Break()
+    {
+        if (Settled || Broken)
+        {
+            throw new InvalidOperationException("Only a fill that is neither settled nor broken can be broken.");
+        }
+
+        Broken = true;
+    }
 
     /// <summary>R61: the simulator day reached the settlement date; trade-settlement R36: in its settlement, if
     /// any.</summary>
