@@ -192,6 +192,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<RebalancePlanning>();
         builder.Services.AddScoped<ProposeRebalance>();
         builder.Services.AddScoped<PlaceRebalanceWave>();
+        builder.Services.AddScoped<AdvanceRebalances>();
         if (host == BrokerConnectionHost.Worker)
         {
             // One run of a connection at a time (R19); the bank sync registers the same lock when it runs first.

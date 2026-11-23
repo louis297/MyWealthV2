@@ -9,6 +9,7 @@ using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Orders;
+using MyWealthV2.Domain.Rebalances;
 using MyWealthV2.Domain.ValueObjects;
 using MyWealthV2.Infrastructure.Accounts;
 using MyWealthV2.Infrastructure.BankFeed;
@@ -126,6 +127,27 @@ public class BrokerSyncJobTests
     }
 
     [Test]
+    public async Task Run_AdvancesARebalanceAfterItsFillsArePosted_InTheSixthStep()
+    {
+        var world = await InsertWorldAsync(rebalance: true);
+        var broker = new ScriptedBroker();
+        broker.FillWhenPlaced(world.OrderPublicId, 10m, 101.50m);
+        using var host = await WorkerHostAsync(broker, world.Connection);
+
+        using (var scope = host.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<BrokerSyncJob>().Run(world.Connection, CancellationToken.None);
+        }
+
+        (await OrderAsync(world)).Fills.ShouldHaveSingleItem().Status.ShouldBe(OrderFillStatus.Posted);
+        await using var db = OpenDb();
+        var rebalance = await db.Rebalances.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.Id == world.RebalanceId);
+        // Rebalances R17 (c): its two buy waves are filled, so the run that posted the fill completes it.
+        (rebalance.Status, rebalance.LastModifiedBy).ShouldBe((RebalanceStatus.Completed, SystemUser.Name));
+        rebalance.EndedAt.ShouldNotBeNull();
+    }
+
+    [Test]
     public async Task Run_WithAFailedPull_StillSendsTheOrder_AndProcessesWhatIsStored_ThenFails()
     {
         var world = await InsertWorldAsync();
@@ -233,7 +255,7 @@ public class BrokerSyncJobTests
         return host;
     }
 
-    private sealed record World(Guid OrderPublicId, string Connection);
+    private sealed record World(Guid OrderPublicId, string Connection, int? RebalanceId = null);
 
     private static async Task<Order> OrderAsync(World world)
     {
@@ -245,7 +267,7 @@ public class BrokerSyncJobTests
     /// <summary>A tenant with an Open Custodial USD account holding 5 000.00 and a <c>Placed</c> buy order of 10 at a
     /// reference price of 100.00, with no fee schedule, on a broker connection of its own, so a run meets no order,
     /// report or cursor of another test.</summary>
-    private static async Task<World> InsertWorldAsync()
+    private static async Task<World> InsertWorldAsync(bool rebalance = false)
     {
         var connection = "job-" + Guid.NewGuid().ToString("N")[..12];
         await using var db = OpenDb();
@@ -269,14 +291,43 @@ public class BrokerSyncJobTests
             reference: null, TransactionSource.Manual, currentCashSum: 0m, existingTransactionCount: 0);
         funding.CreatedBy = "test";
         funding.CashLegs.ForEach(leg => leg.CreatedBy = "test");
+        db.Transactions.Add(funding);
+        await db.SaveChangesAsync();
+        int? rebalanceId = null;
+        if (rebalance)
+        {
+            // A rebalance in its top-up wave (rebalances R14): its last order is the one the run sends.
+            var portfolio = Portfolio.Create(tenant.Id, "Job", usd, [(instrument.Id, 100m)]);
+            portfolio.CreatedBy = "test";
+            db.Portfolios.Add(portfolio);
+            await db.SaveChangesAsync();
+            var assignment = AccountPortfolioAssignment.Assign(null, tenant.Id, account.Id, portfolio.Id, "test", now);
+            assignment.CreatedBy = "test";
+            db.AccountPortfolioAssignments.Add(assignment);
+            await db.SaveChangesAsync();
+            var proposed = Rebalance.Propose(
+                new RebalanceSubject(tenant.Id, account.Id, portfolio.Id, assignment.Id, RebalanceTrigger.Account, "USD", 100m, 1m,
+                    [new RebalanceTargetSpec(instrument.Id, 100m)], adviser.Id),
+                5000m, 5000m,
+                [new RebalanceLineSpec(instrument.Id, 0m, 0m, 100m, "USD",
+                    new RebalanceLineTrade(OrderSide.Buy, 49.5m, 100m, DateOnly.FromDateTime(now.UtcDateTime), 4950m, 0m))],
+                now);
+            proposed.Confirm(adviser.Id, connection, now);
+            proposed.StartWave(OrderSide.Buy);
+            proposed.StartWave(OrderSide.Buy);
+            proposed.CreatedBy = "test";
+            db.Rebalances.Add(proposed);
+            await db.SaveChangesAsync();
+            rebalanceId = proposed.Id;
+        }
+
         var order = Order.Place(
             tenant.Id, account.Id, instrument.Id, OrderSide.Buy, 10m, "USD", 100m, DateOnly.FromDateTime(now.UtcDateTime),
-            OrderFeeTerms.None, connection, memo: null, adviser.Id, now);
+            OrderFeeTerms.None, connection, memo: null, adviser.Id, now, rebalanceId: rebalanceId);
         order.CreatedBy = "test";
-        db.Transactions.Add(funding);
         db.Orders.Add(order);
         await db.SaveChangesAsync();
-        return new World(order.PublicId, connection);
+        return new World(order.PublicId, connection, rebalanceId);
     }
 
     private static ApplicationDbContext OpenDb() =>

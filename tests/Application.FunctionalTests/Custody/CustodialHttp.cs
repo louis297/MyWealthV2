@@ -6,6 +6,7 @@ using MyWealthV2.Application.FunctionalTests.Accounts;
 using MyWealthV2.Application.FunctionalTests.BankFeed;
 using MyWealthV2.Application.FunctionalTests.Instruments;
 using MyWealthV2.Application.FunctionalTests.Transactions;
+using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.ValueObjects;
 using MyWealthV2.Infrastructure.Data;
@@ -534,4 +535,9 @@ internal static class CustodialHttp
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         return await db.IdempotencyRecords.AnyAsync(row => row.Key == key);
     }
+
+    /// <summary>Rebalances §10: proposes a rebalance of the account, confirms it and fills every wave at the
+    /// reference price (or <paramref name="price"/>) until it ends. The trades are the fills of its orders.</summary>
+    public static Task<Guid> RebalanceAsync(string accessToken, Guid accountId, Func<Order, decimal>? price = null) =>
+        Rebalances.RebalanceHttp.RebalanceAsync(accessToken, accountId, price);
 }

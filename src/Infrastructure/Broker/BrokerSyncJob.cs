@@ -2,6 +2,7 @@ using Hangfire;
 using Hangfire.Storage;
 using Microsoft.Extensions.Logging;
 using MyWealthV2.Application.Broker;
+using MyWealthV2.Application.Rebalances;
 using MyWealthV2.Infrastructure.BankFeed;
 
 namespace MyWealthV2.Infrastructure.Broker;
@@ -12,8 +13,8 @@ public sealed class BrokerSyncFailedException(string connection, IReadOnlyList<s
 
 /// <summary>
 /// One run of <c>broker-sync:{connection}</c> (orders R19): send the orders, send the cancel requests, pull the
-/// execution reports, process them, post the fills that wait, in this order, so an order and its fill can meet in
-/// one run. A failed step is recorded and the run goes on with the next step on what is already stored; a run in
+/// execution reports, process them, post the fills that wait, then advance the rebalances in progress (rebalances
+/// R17), in this order, so an order and its fill can meet in one run. A failed step is recorded and the run goes on with the next step on what is already stored; a run in
 /// which any step failed or left work is reported to Hangfire as failed after every step was tried. One run of a
 /// connection at a time; no automatic retries, the schedule is the retry (ADR 0021 rule 15).
 /// </summary>
@@ -22,6 +23,7 @@ public sealed class BrokerSyncJob(
     PullExecutionReports pull,
     ProcessExecutionReports process,
     PostOrderFills post,
+    AdvanceRebalances advance,
     SqlRunLock runLock,
     ILogger<BrokerSyncJob> logger)
 {
@@ -62,6 +64,12 @@ public sealed class BrokerSyncJob(
         {
             var outcome = await post.RunAsync(connection, cancellationToken);
             return outcome.Failed + outcome.Waiting > 0 ? $"{outcome.Failed + outcome.Waiting} fill(s) not posted" : null;
+        }, cancellationToken);
+        // Rebalances R17: after the fills are posted, so a wave is placed only when the wave before it is in the ledger.
+        await StepAsync("advance", failed, async () =>
+        {
+            var outcome = await advance.RunAsync(connection, cancellationToken);
+            return outcome.Failed > 0 ? $"{outcome.Failed} rebalance(s) not advanced" : null;
         }, cancellationToken);
 
         if (failed.Count > 0)

@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using MyWealthV2.Application.FunctionalTests.Broker;
 using MyWealthV2.Application.FunctionalTests.Custody;
 using MyWealthV2.Application.FunctionalTests.Orders;
 using MyWealthV2.Application.FunctionalTests.Portfolios;
@@ -85,6 +86,46 @@ internal static class RebalanceHttp
             .Where(row => row.RebalanceId == rebalance.Id)
             .OrderBy(row => row.Id)
             .ToListAsync();
+    }
+
+    /// <summary>
+    /// One run of the broker job for a rebalance's wave: sends its orders, feeds the fake broker a fill of each open
+    /// order in full at <paramref name="price"/> (by default its reference price), processes and posts the fills, then
+    /// advances. Returns the orders that were filled.
+    /// </summary>
+    public static async Task<List<Order>> FillWaveAsync(Guid rebalanceId, Func<Order, decimal>? price = null)
+    {
+        await BrokerHttp.SendAsync();
+        var open = (await OrdersOfAsync(rebalanceId)).Where(order => Order.IsOpenStatus(order.Status)).ToList();
+        foreach (var order in open)
+        {
+            BrokerHttp.Feed.AddFill(order.PublicId, order.Quantity - order.FilledQuantity, price?.Invoke(order) ?? order.ReferencePrice,
+                $"CN-{Guid.NewGuid():N}"[..20]);
+        }
+
+        await BrokerHttp.RunReportsAsync();
+        await BrokerHttp.PostFillsAsync();
+        await BrokerHttp.AdvanceAsync();
+        return open;
+    }
+
+    /// <summary>Proposes a rebalance of the account, confirms it and fills every wave until it ends (rebalances §10
+    /// fan-out). Returns the rebalance's id.</summary>
+    public static async Task<Guid> RebalanceAsync(string accessToken, Guid accountId, Func<Order, decimal>? price = null)
+    {
+        var (status, id) = await ProposedAsync(accessToken, accountId);
+        if (status != "Proposed")
+        {
+            return id;
+        }
+
+        await ConfirmedAsync(accessToken, id);
+        for (var run = 0; run < 5 && Rebalance.IsInProgressStatus((await RebalanceAsync(id)).Status); run++)
+        {
+            await FillWaveAsync(id, price);
+        }
+
+        return id;
     }
 
     /// <summary>The <c>errors.Status</c> messages of a 400.</summary>
