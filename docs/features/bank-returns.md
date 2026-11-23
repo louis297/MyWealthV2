@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-20
-last_updated: 2026-11-22
+last_updated: 2026-11-23
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -21,6 +21,7 @@ related:
   - ../glossary.md
   - account-closure.md
   - interest-run.md
+  - trade-settlement.md
 ---
 
 # Receipt returns, recalls and other debit lines
@@ -331,3 +332,13 @@ Status of this amendment: `accepted` (2026-11-22), together with [account-closur
 Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rule R40 lives there; this section records what changes here.
 
 - R2–R4: no rule changes. A **debit** line of kind `Interest` (interest the bank charges on the trust account) gets no special rule: it is processed as any debit line and waits in suspense with reason `UnknownPayment`, where a TenantAdmin ignores it with a note.
+
+---
+
+## Amendment 2026-11-23 (trade settlement and broken trades) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [trade-settlement.md](trade-settlement.md). Rules R18–R21 live there; this section records what changes here.
+
+- R2: the classification of a debit line gains the settlement payment (trade-settlement R18) next to the receipt return.
+- R8: a credit line that returns the debit line of a `Paid` settlement payment, with the same amount, is `Matched` with method `PaymentReturn` and the trade settlement; the payment is `Returned` and the settlement `PaymentFailed` (trade-settlement R20).
+- R10: a `Matched` line has an Account and a Transaction, or a related line, or a trade settlement. A line matched to a trade settlement accepts no action.

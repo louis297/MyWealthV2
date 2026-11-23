@@ -150,6 +150,7 @@ The fifth role `SimulatorOperator` ([ADR 0013](adr/0013-roles-authorization-sing
 | `corporate-actions.manage` | | ✓ | | | [corporate-actions](features/corporate-actions.md) (accepted 2026-11-22) |
 | `orders.read` | | ✓ | ✓ | ✓ | [orders](features/orders.md) (accepted 2026-11-23) |
 | `orders.place` | | ✓ | ✓ | | [orders](features/orders.md) (accepted 2026-11-23) |
+| `trade-settlements.manage` | | ✓ | | | [trade-settlement](features/trade-settlement.md) (accepted 2026-11-23) |
 | `portfolios.read` | ✓ | ✓ | ✓ | | [portfolios](features/portfolios.md) |
 | `portfolios.manage` | ✓ | ✓ | ✓ | | [portfolios](features/portfolios.md) |
 | `reports.customer.read` | | ✓ | ✓ | ✓ | [reports](features/reports.md) |
@@ -334,7 +335,8 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Fees | `/fees/trade-schedules` (namespace `/fees`) | list / get / create / update / delete. See features/trade-fees.md | `fees.read` / `fees.manage` |
 | Interest | `/interest/rate-schedules`, `/interest/runs` (namespace `/interest`) | rate schedules: list / get / create / update / delete; runs: list / get / create (start a run). See features/interest-run.md | `interest-rates.read` / `.manage`; `interest-runs.read` / `.start` |
 | Corporate actions | `/corporate-actions` | list / get / create / update; cancel / apply; entitlements. See features/corporate-actions.md | `corporate-actions.read` / `corporate-actions.manage` |
-| Orders | `/orders` | list / get / create (`Idempotency-Key`) / preview; cancel. No PUT: an order never changes. See features/orders.md | `orders.read` / `orders.place` |
+| Orders | `/orders` | list / get / create (`Idempotency-Key`) / preview; cancel; resolve the break of a fill (`transactions.adjust`). No PUT: an order never changes. See features/orders.md and features/trade-settlement.md | `orders.read` / `orders.place` |
+| Trade settlements | `/trade-settlements` | list / get; pay again / set aside. No create: the `worker` creates them from the broker's `Settlement` report. See features/trade-settlement.md | `trade-settlements.manage` |
 | Reports | `/reports` | list / request / schedules / executions / download | `reports.customer.read` / `reports.customer.create` / `reports.book.read` / `reports.book.create` / `reports.tenant.read` / `reports.tenant.create` |
 
 Path `{id}` is always PublicId.
@@ -629,6 +631,18 @@ An order is an instruction to buy or sell a quantity of one Instrument for one C
 
 Field rules: [features/orders.md](features/orders.md). `POST /orders` requires `Idempotency-Key` ([ADR 0015](adr/0015-idempotency-keys.md)); cancel takes `rowVersion` and no key, and a stale one is 409 `stale_row_version`. The body carries no price: the platform sets a price limit from the latest stored price, reserves the cash of a buy or the quantity of a sell, and the `worker` sends the order. Nothing is sent to the broker in the request. A Customer reads own orders and writes nothing. No new problem code.
 
+Amendment 2026-11-23 (trade settlement and broken trades, accepted; field rules in [features/trade-settlement.md](features/trade-settlement.md)):
+
+| Method | Route | Policy | Success |
+| --- | --- | --- | --- |
+| GET | `/trade-settlements` | `trade-settlements.manage` | 200 envelope (filters `status`, `clientMoneyAccountId`, `open`) |
+| GET | `/trade-settlements/{id}` | `trade-settlements.manage` | 200 item with its fills and payments |
+| POST | `/trade-settlements/{id}/pay` | `trade-settlements.manage` | 204 |
+| POST | `/trade-settlements/{id}/set-aside` | `trade-settlements.manage` | 204 |
+| POST | `/orders/{id}/fills/{fillId}/resolve-break` | `transactions.adjust` | 204 |
+
+A fill item gains `brokerSettlementId`, `tradeSettlementId` and `break`, and its `status` may be `Broken`; `execution` on the transaction item gains `brokenAt`. The statement line item gains `tradeSettlementId`, match method `Settlement` and unmatched reason `SettlementMismatch`. The bank reconciliation item gains four kinds, and the run gains `openSettlements`. `GET /broker-connections` gains `settlementCurrencies`; `GET /execution-reports` gains the two kinds, three skip reasons and five fields. Writes take `rowVersion` (409 `stale_row_version`) and no `Idempotency-Key`. No new problem code.
+
 ---
 
 ## 8. Explicitly out (until a later phase promotes them)
@@ -713,3 +727,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-22 | §6, §7.5: simulated instruments accepted. Resource `/market-data-connections` (`tenants.manage`, list from configuration with the price feed state); instrument item `marketDataConnection`. No new permission or problem code. |
 | 2026-11-22 | §3.1, §6, §7.7, §7.11: corporate actions accepted. Permissions `corporate-actions.read` and `corporate-actions.manage`; resource `/corporate-actions` (list, get, create, update, cancel, apply, entitlements) and `/corporate-action-announcements` (`tenants.manage`); source kind `CorporateAction`; transaction item `corporateAction`; connection item `corporateActions`. No new problem code. |
 | 2026-11-23 | §3.1, §6, §7.3, §7.6, §7.7, §7.12: orders and settlement accepted. Permissions `orders.read` and `orders.place`; resource `/orders` (list, get, create, preview, cancel), `/broker-connections` and `/execution-reports` (`tenants.manage`); `brokerConnection` on the tenant; source kind `OrderFill`; transaction item `execution`; account item `unsettledCash` and `withdrawableCash`; holding item `reservedQuantity` and `availableQuantity`; hand `Buy` / `Sell` refused on a Custodial account. No new problem code. |
+| 2026-11-23 | §3.1, §6, §7.12: trade settlement and broken trades accepted. Permission `trade-settlements.manage`; resource `/trade-settlements` (list, get, pay, set aside); `POST /orders/{id}/fills/{fillId}/resolve-break` (`transactions.adjust`); fill `break`, transaction `execution.brokenAt`, statement line `tradeSettlementId`, reconciliation `openSettlements` and four item kinds, connection `settlementCurrencies`. No new problem code. |

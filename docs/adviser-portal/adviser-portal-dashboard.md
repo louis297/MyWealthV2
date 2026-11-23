@@ -33,6 +33,7 @@ related:
   - ../features/bank-reconciliation.md
   - ../features/account-closure.md
   - ../features/interest-run.md
+  - ../features/trade-settlement.md
 ---
 
 # Adviser Portal — Dashboard and ledger pages
@@ -370,3 +371,15 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders](../fea
 | D73 | Cancel on `/orders/:id` and in the list, on an open order with no cancel request: a dialog with an optional note and "If the broker has already filled part of this order, that part stays." A 400 shows its sentence; a 409 reloads with "This order has changed." |
 | D74 | `/transactions/:id` of a fill or its Reversal shows a "Trade" section: Price, Trade date, Settlement date with "Settled <date>" or "Not settled yet", Contract note, and a link to the order; the Source line (D26) shows "Order". Reverse is not offered (D27). The transactions list and the account activity show a fill like any `Buy` or `Sell`, with "Settles <date>" under the amount while it is not settled. |
 | D75 | The Withdraw form (D45) shows "Available to withdraw 3,144.75 USD" from `withdrawableCash`, with "2,000.00 USD from sales settles later." when `unsettledCash` is above 0. The transfer and conversion forms (D19) show the same figure for a Custodial from account. The Close account page shows the two new refusals as its other blockers. The Assign control shows the 400 of R49 as its sentence. |
+
+---
+
+## Amendment 2026-11-23 (trade settlement and broken trades) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [trade-settlement](../features/trade-settlement.md). Field rules live there.
+
+| ID | Behaviour |
+| --- | --- |
+| D76 | A TenantAdmin sees a nav item "Trade settlements" (`/trade-settlements`); an Adviser does not. The list: Settled date, Broker reference, Currency, Trades, Net ("Pay broker 1,001.50" or "Receive 2,340.00"), Status, with a status filter, default "Open". Labels: AwaitingPayment "Paying the broker", AwaitingReceipt "Waiting for the broker's payment", Completed "Completed", PaymentFailed "Payment failed", Disputed "Figures differ", SetAside "Set aside". `/trade-settlements/:id` shows the platform's and the broker's figures side by side (a difference in red), the fills with links to their orders, the payments with the labels of D46, the failure ("The bank refused the payment: <reason>", "The bank returned the payment: <reason>", "The broker connection has no bank account in <currency>"), the matched statement line as a link, and the set-aside note. "Pay again" on `PaymentFailed`; "Set aside" with a required note and the sentence "The platform stops waiting for this settlement. Its trades are then shown in the bank reconciliation as not settled through the trust account." |
+| D77 | The fills table of `/orders/:id` (D72) shows a broken fill struck through with "Cancelled by the broker <date>: <reason>" and, by outcome: Reversed "Reversed" with a link to the Reversal; NotPosted "Was not booked"; NotApplied "Could not be reversed" with the reason (AccountClosed "The account is closed", LaterActivity "Later activity on this holding", InsufficientCash "The proceeds have been spent") and, for a TenantAdmin, "Correct the account with an adjustment, then mark this resolved." with a "Mark resolved" action that takes a note; ResolvedByHand "Resolved by <name>". "Needs attention" (D71) also marks an order with a NotApplied break. `/transactions/:id` of a broken fill shows "Cancelled by the broker" in the Trade section (D74). The Close account page shows the new refusal. |
+| D78 | Bank receipts pages (D34, D50): method label Settlement "Trade settlement" with a link to it for a TenantAdmin; reason label SettlementMismatch "Does not match the trade settlement", with the sentence "Return it to the broker, or ignore it with a note." Bank reconciliation (D51): kind labels UnsettledTrades "Trades waiting for settlement", TradesNeedingAction "Trades that need action" (linking to `/trade-settlements?open=true`), UnbookedFills "Settled trades not booked yet", TradeFees "Trade fees held in the trust account"; Trades becomes "Trades not settled through the trust account"; under the items, "Open trade settlements: <n>, net <amount>". |

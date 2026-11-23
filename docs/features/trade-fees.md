@@ -24,6 +24,7 @@ related:
   - custody-modes.md
   - external-caller-numbers.md
   - interest-run.md
+  - trade-settlement.md
 ---
 
 # Trade fees
@@ -477,3 +478,12 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders.md](ord
 - R9, R11, R12: unchanged. An order's schedule applies on the day it is placed, so it is in effect and can no longer change; no schedule write changes the fee of a later fill.
 - R19: no flow reverses a fill, and a fill is not hand-reversible (orders R37).
 - R24–R29: rebalance is unchanged until roadmap O3.
+
+---
+
+## Amendment 2026-11-23 (trade settlement and broken trades) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [trade-settlement.md](trade-settlement.md). Rules R29 and R33 live there; this section records what changes here.
+
+- R8, R14: the fee of a fill (orders R33) is never below 0. After a broken fill was reversed, the order's charged fee falls by that fill's fee; the fees of the order's other fills are not worked out again.
+- R19: a flow reverses a broken fill, and the Reversal gives its fee back. A fill is still not hand-reversible.

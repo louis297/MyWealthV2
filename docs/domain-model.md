@@ -415,6 +415,8 @@ Amendment 2026-11-22 (account closure, accepted): unmatched reason `AccountClosi
 
 Amendment 2026-11-22 (interest run, accepted): `BankStatementLine` gains `Kind` (`StatementLineKind`: `Transfer` = 0, `Interest` = 1; immutable, from the port). `SetAsideAsBankInterest(at)`: a `Received` credit line of kind `Interest` → `Ignored` with the note `Bank interest` and no person; `Reopen` works on it as on any ignored line ([features/interest-run.md](features/interest-run.md)).
 
+Amendment 2026-11-23 (trade settlement and broken trades, accepted): `BankStatementLine` gains `TradeSettlementId`; `MarkSettlement(tradeSettlementId, at)`; `MarkPaymentReturn` accepts a trade settlement in place of an Account and a Transaction. Match method `Settlement` (5); unmatched reason `SettlementMismatch` (13). A `Matched` line has an Account and a Transaction, or a related line, or a trade settlement ([features/trade-settlement.md](features/trade-settlement.md)).
+
 ### 8.10 Nominated bank account (accepted — withdrawals slice)
 
 | Type | Kind | Notes |
@@ -436,6 +438,8 @@ Invariants: a withdrawal is approved or rejected by someone other than its reque
 
 Amendment 2026-11-21 (bank returns, accepted): `OutgoingPaymentKind` (`Withdrawal`, `ReceiptReturn`); `OutgoingPayment` gains `Kind` and `ReturnOfLineId`, and `WithdrawalId` becomes optional: exactly one of the two, by kind. `ForReceiptReturn(line, clientMoneyAccount)` creates a return with its own PublicId as instruction id, the line's amount and currency, no reference and no payee. A line has at most one open (`Pending` or `Accepted`) return payment, held by a filtered unique index. `PaymentRejectReason` gains `UnknownLine` ([features/bank-returns.md](features/bank-returns.md)).
 
+Amendment 2026-11-23 (trade settlement and broken trades, accepted): `OutgoingPaymentKind` gains `TradeSettlement` (2); `OutgoingPayment` gains `TradeSettlementId`, and exactly one of a withdrawal, a returned line and a trade settlement is set, by kind. `ForTradeSettlement(settlement, payee, reference?)` creates a payment with its own PublicId as instruction id. A trade settlement has at most one `Pending` or `Accepted` payment ([features/trade-settlement.md](features/trade-settlement.md)).
+
 ### 8.12 Bank reconciliation (accepted — bank-reconciliation slice)
 
 | Type | Kind | Notes |
@@ -446,6 +450,8 @@ Amendment 2026-11-21 (bank returns, accepted): `OutgoingPaymentKind` (`Withdrawa
 | `ReconciliationItemClass` | Enum | `Break`, `Timing`, `Known`; one fixed class per kind |
 
 Invariants: the items of an `Agreed` or `Breaks` run add up to bank balance minus Custodial cash; a run is `Agreed` exactly when it has no Break item; a run and its items never change; a run counts only its own Tenant's accounts and lines. No domain event. Field rules: [features/bank-reconciliation.md](features/bank-reconciliation.md).
+
+Amendment 2026-11-23 (trade settlement and broken trades, accepted): `ReconciliationItemKind` gains `UnsettledTrades` (15, Timing), `TradesNeedingAction` (16, Break), `UnbookedFills` (17, Break) and `TradeFees` (18, Known). `ReconciliationInputs` gains the four sums with their counts and the open trade settlements (count, amount), which the run records without an item ([features/trade-settlement.md](features/trade-settlement.md)).
 
 ### 8.13 Account closure (accepted — account-closure slice)
 
@@ -505,6 +511,18 @@ Invariants: a `Feed` action is unique per (Instrument, connection, party action 
 Invariants: a report is the source of at most one fill; an order's filled quantity never exceeds its quantity; a fill is `Posted` iff it has a Transaction with source `OrderFill`, its order's PublicId and an execution detail naming the fill; a buy order reserves `Round(q × PriceLimit, 4)` plus the schedule's fee on the posted gross with that amount added, minus the fee charged, and a sell order reserves `q`, with `q` the open quantity plus the fills not posted; the fee of a fill is the schedule's fee on the posted gross including it, minus the fee charged. Field rules: [features/orders.md](features/orders.md).
 
 ---
+
+Amendment 2026-11-23 (trade settlement and broken trades, accepted): `Order` gains `ClientMoneyAccountId` and `SettlementAccountNumber`, both or neither, set by `Place`; `BreakFill(fill, …)` takes a broken fill out of the filled quantity (and, when reversed, out of the posted gross and charged fee), gives an open order its quantity back and makes a `Filled` order `Cancelled`. `OrderFill` gains `BrokerSettlementId`, `TradeSettlementId` and a break (`BrokenAt`, report, reason, `FillBreakOutcome` `Reversed`/`NotPosted`/`NotApplied`/`ResolvedByHand`, `FillBreakHoldReason` `AccountClosed`/`LaterActivity`/`InsufficientCash`, the Reversal, who resolved it). `OrderFillStatus` gains `Broken` (2). `ExecutionReportKind` gains `Broken` (4) and `Settlement` (5); `ExecutionReportSkipReason` gains `FillSettled` (5), `FillBroken` (6) and `UnknownSettlement` (7); `ExecutionReport` gains the settlement fields. A fill is broken at most once and never after it settled ([features/trade-settlement.md](features/trade-settlement.md)).
+
+### 8.17 Trade settlements (accepted — trade-settlement slice)
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `TradeSettlement` | Aggregate | The platform's record of one broker settlement for one client money account: connection, broker settlement id, currency, settled date, the platform's fill count and net, the broker's fill count, net and settlement account, the `Settlement` report, status, failure, completion, set aside (by, at, note). `Create` decides the first status; `Complete`, `FailPayment`, `PayAgain`, `SetAside`. Writes no Transaction |
+| `TradeSettlementStatus` | Enum | `AwaitingPayment`, `AwaitingReceipt`, `Completed`, `PaymentFailed`, `Disputed`, `SetAside` |
+| `TradeSettlementFailure` | Enum | `PaymentRejected`, `PaymentReturned`, `NoBrokerAccount` |
+
+Invariants: a trade settlement is unique on (connection, broker settlement id, client money account); a fill is in at most one; a settlement has at most one open outgoing payment; it is `Completed` by exactly one statement line or by a net of 0; `SetAside` is final. No domain event. Field rules: [features/trade-settlement.md](features/trade-settlement.md).
 
 ## 9. Value objects (Domain assembly; may exist in Phase 1)
 

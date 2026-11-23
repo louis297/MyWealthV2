@@ -1,6 +1,6 @@
 ---
 title: Trade settlement cash and broken trades
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -41,7 +41,7 @@ A **broken trade** is a fill the broker takes back. The broker says so with a `B
 
 New: permission `trade-settlements.manage`; routes under `/trade-settlements` and `POST /orders/{id}/fills/{fillId}/resolve-break`; execution report kinds `Broken` and `Settlement`; outgoing payment kind `TradeSettlement`; statement line match method `Settlement` and unmatched reason `SettlementMismatch`; fill status `Broken`; four reconciliation item kinds; the broker's bank accounts in the broker connection configuration; the simulator broker's settlements, settlement mode and broken fills. Script `0052_trade_settlement.sql`; simulator script `database/simulator/0011_broker_settlement.sql`. No new `TransactionType`, source kind, port, job, problem code or domain event.
 
-**Status is `review` (2026-11-23).** It is not a build contract. The sixteen points of §11 each carry a recommendation and wait for confirmation. The amendments to accepted docs listed in §12 are made when this spec is accepted.
+**Status is `accepted` (2026-11-23).** The sixteen points of §11 were confirmed on 2026-11-23, every one as recommended, and are written into the rules. The amendments to accepted docs listed in §12 were made when it was accepted. It is a build contract.
 
 ---
 
@@ -171,7 +171,7 @@ Amendment to [orders.md](orders.md) R23–R25 and R43.
 | R11 | **Net of 0.** An agreed settlement whose `netAmount` is 0 is `Completed` at once. Nothing is paid. |
 | R12 | **The firm pays.** An agreed settlement with `netAmount < 0` is `AwaitingPayment`, and the same database transaction creates an outgoing payment (withdrawals R31) of the new kind `TradeSettlement`: `Pending`, from the settlement's client money account, amount `−netAmount`, instruction id = the payment's own new PublicId (as bank-returns R5), payee = the broker's bank account for the currency (R2), reference = the broker's settlement id when it is a valid payment reference (withdrawals R23), else none. With no broker bank account configured on the `worker`, no payment is created and the settlement is `PaymentFailed` with failure `NoBrokerAccount`. No person approves the payment, no Account row is locked and no available cash is checked: the cash left the Custodial accounts when the fills were posted. |
 | R13 | **The broker pays.** An agreed settlement with `netAmount > 0` is `AwaitingReceipt` until a statement line matches it (R19). |
-| R14 | **Pay again.** `POST /trade-settlements/{id}/pay` with `rowVersion` → 204, from `PaymentFailed` only (else 400 `errors.Status`, `This settlement is <status> and cannot be paid again.`). It creates a new outgoing payment as R12, with a new instruction id, and the settlement is `AwaitingPayment`. With no broker account configured on `webapi` → 400 `errors.Status` (`The broker connection has no bank account in USD.`). A settlement has at most one open payment (`Pending` or `Accepted`); earlier ones stay as a record. |
+| R14 | **Pay again.** `POST /trade-settlements/{id}/pay` with `rowVersion` → 204, from `PaymentFailed` only (else 400 `errors.Status`, `This settlement is <status> and cannot be paid again.`). It creates a new outgoing payment as R12, with a new instruction id, and the settlement is `AwaitingPayment`. With no broker account configured on `webapi` → 400 `errors.Status` (`The broker connection has no bank account in <currency>.`). A settlement has at most one open payment (`Pending` or `Accepted`); earlier ones stay as a record. |
 | R15 | **Set aside.** `POST /trade-settlements/{id}/set-aside` with `rowVersion` and `note` (trimmed, 1–200, required) → 204, from `AwaitingReceipt`, `PaymentFailed` or `Disputed`, or from `AwaitingPayment` while its payment has no send attempt, which becomes `Cancelled` in the same database transaction. After an attempt → 400 `errors.Status` (`The bank has been asked to pay this settlement, so it cannot be set aside.`). The settlement records the person, the time and the note, and never changes again. Its fills stay settled; from then on their cash counts as cash that did not pass through the trust account (R23), and a later statement line that names the settlement goes to suspense (R19). It is the way to end a settlement the firm and the broker resolve outside the platform. |
 | R16 | **Reads.** `GET /trade-settlements` → list envelope, newest first. Optional filters: `status` (one or more names, comma-separated; unknown → 400 `errors.Status`), `clientMoneyAccountId`, `open=true`. `GET /trade-settlements/{id}` → the item with its fills and payments (§8.1). Stale `rowVersion` on a write → 409 `stale_row_version`; missing → 400. |
 
@@ -279,7 +279,7 @@ Invariants:
 
 Domain events: none new. The Reversal of a broken fill raises `TransactionPosted` as every Transaction does.
 
-Recorded in [domain-model.md](../domain-model.md) §8.9, §8.11, §8.12, §8.16 and a new §8.17 when accepted.
+Recorded in [domain-model.md](../domain-model.md) §8.9, §8.11, §8.12, §8.16 and a new §8.17.
 
 ---
 
@@ -312,7 +312,7 @@ No back-fill. Existing orders have no settlement account, existing fills no sett
 | `BrokerFills` | Add `Broken bit NOT NULL` default 0, `SettlementId int NULL` FK `BrokerSettlements` |
 | `BrokerReports` | Add `SettlementId int NULL` FK `BrokerSettlements`; widen the `Kind` CHECK to the two new kinds |
 
-Recorded in [database-design.md](../database-design.md) §11.9, §11.11, §11.12, §11.16, a new §11.17 and §15 when accepted.
+Recorded in [database-design.md](../database-design.md) §11.9, §11.11, §11.12, §11.16, a new §11.17 and §15.
 
 ---
 
@@ -427,11 +427,11 @@ Cross-tenant or wrong-collection id → **404**, not 403. Keep the resource cata
 
 ## 9. UI
 
-Page contracts are amended when this spec is accepted: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D76–D78), [customer-portal.md](../customer-portal/customer-portal.md) (C36) and [back-office.md](../backoffice/back-office.md) (BO29). The Adviser Portal BFF gains the prefix `/trade-settlements` ([bff-adviser-portal.md](bff-adviser-portal.md) R20).
+Page contracts amended when this spec was accepted: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D76–D78), [customer-portal.md](../customer-portal/customer-portal.md) (C36) and [back-office.md](../backoffice/back-office.md) (BO29). The Adviser Portal BFF gains the prefix `/trade-settlements` ([bff-adviser-portal.md](bff-adviser-portal.md) R20).
 
 | ID | Behaviour |
 | --- | --- |
-| D76 | A TenantAdmin sees a nav item "Trade settlements" (`/trade-settlements`); an Adviser does not. The list: Settled date, Broker reference, Currency, Trades, Net ("Pay broker 1,001.50" or "Receive 2,340.00"), Status, with a status filter, default "Open". Labels: AwaitingPayment "Paying the broker", AwaitingReceipt "Waiting for the broker's payment", Completed "Completed", PaymentFailed "Payment failed", Disputed "Figures differ", SetAside "Set aside". `/trade-settlements/:id` shows the platform's and the broker's figures side by side (a difference in red), the fills with links to their orders, the payments with the labels of D46, the failure ("The bank refused the payment: <reason>", "The bank returned the payment: <reason>", "The broker connection has no bank account in USD"), the matched statement line as a link, and the set-aside note. "Pay again" on `PaymentFailed`; "Set aside" with a required note and the sentence "The platform stops waiting for this settlement. Its trades are then shown in the bank reconciliation as not settled through the trust account." |
+| D76 | A TenantAdmin sees a nav item "Trade settlements" (`/trade-settlements`); an Adviser does not. The list: Settled date, Broker reference, Currency, Trades, Net ("Pay broker 1,001.50" or "Receive 2,340.00"), Status, with a status filter, default "Open". Labels: AwaitingPayment "Paying the broker", AwaitingReceipt "Waiting for the broker's payment", Completed "Completed", PaymentFailed "Payment failed", Disputed "Figures differ", SetAside "Set aside". `/trade-settlements/:id` shows the platform's and the broker's figures side by side (a difference in red), the fills with links to their orders, the payments with the labels of D46, the failure ("The bank refused the payment: <reason>", "The bank returned the payment: <reason>", "The broker connection has no bank account in <currency>"), the matched statement line as a link, and the set-aside note. "Pay again" on `PaymentFailed`; "Set aside" with a required note and the sentence "The platform stops waiting for this settlement. Its trades are then shown in the bank reconciliation as not settled through the trust account." |
 | D77 | The fills table of `/orders/:id` (D72) shows a broken fill struck through with "Cancelled by the broker <date>: <reason>" and, by outcome: Reversed "Reversed" with a link to the Reversal; NotPosted "Was not booked"; NotApplied "Could not be reversed" with the reason (AccountClosed "The account is closed", LaterActivity "Later activity on this holding", InsufficientCash "The proceeds have been spent") and, for a TenantAdmin, "Correct the account with an adjustment, then mark this resolved." with a "Mark resolved" action that takes a note; ResolvedByHand "Resolved by <name>". "Needs attention" (D71) also marks an order with a NotApplied break. `/transactions/:id` of a broken fill shows "Cancelled by the broker" in the Trade section (D74). The Close account page shows the new refusal. |
 | D78 | Bank receipts pages (D34, D50): method label Settlement "Trade settlement" with a link to it for a TenantAdmin; reason label SettlementMismatch "Does not match the trade settlement", with the sentence "Return it to the broker, or ignore it with a note." Bank reconciliation (D51): kind labels UnsettledTrades "Trades waiting for settlement", TradesNeedingAction "Trades that need action" (linking to `/trade-settlements?open=true`), UnbookedFills "Settled trades not booked yet", TradeFees "Trade fees held in the trust account"; Trades becomes "Trades not settled through the trust account"; under the items, "Open trade settlements: <n>, net <amount>". |
 | C36 | Customer Portal, account activity: the Reversal of a fill is labelled "Trade cancelled by the broker: Bought 4 ACME.SIM at 100.12", and the fill's own row shows "Cancelled" in place of the settlement text. A broken fill that was never booked shows nothing. |
@@ -476,9 +476,9 @@ No new ADR. ADR 0021 applies as written: rule 3 (the broker's account is configu
 | Permissions | `trade-settlements.manage`; `transactions.adjust` for resolve |
 | Ports, jobs, problem codes, events, `TransactionType`, source kinds | None added |
 
-### Points to confirm
+### Points confirmed
 
-Each point states the recommended decision, written into the rules above, and the alternative.
+Each point states the decision, written into the rules above, and the alternative. All sixteen were confirmed on 2026-11-23 as recommended.
 
 1. **One spec for both halves of step 11b.** Recommended: settlement cash and broken trades touch the same reports, fills and reconciliation rules, and a broken fill must be kept out of a settlement. Alternative: two specs, settlement cash first.
 2. **The order carries its settlement account, and only some orders settle through the bank** (R3–R5). Recommended: the broker must know which trust account a trade settles against, and orders §11 point 3 gave it no firm; the trust account number on the order is the smallest addition. An order that cannot settle through the bank is still placed and stays in `Trades`, so the slice never blocks a trade. Alternatives: a broker account per Tenant, registered at the broker; refuse an order that cannot settle through the bank.
@@ -535,6 +535,6 @@ The repository should build after each commit. Agents split each behaviour into 
 
 Do not put rebalance through orders, a fee sweep or a break after settlement in these commits.
 
-### Docs to amend when this spec is accepted
+### Docs amended when this spec was accepted
 
 [orders.md](orders.md) (R2, R4, R20, R53: the settlement account; R23–R25: the two kinds, their fields and skip reasons; R28, R33, R36–R38, R44, R47: the broken fill; §2 Out and §11 points 1 and 12 answered), [bank-reconciliation.md](bank-reconciliation.md) (R9, R10, R13, R14, §5 kinds, §11 point 6), [withdrawals.md](withdrawals.md) (R31 kinds, R32, R33), [bank-returns.md](bank-returns.md) (R2 classification, R8, R10), [deposit-matching.md](deposit-matching.md) (R13: settlement receipts before deposit matching; the line item), [transaction-source.md](transaction-source.md) (R7: a broken trade is reversed by its flow; `OrderFill` stays not hand-reversible), [account-closure.md](account-closure.md) (R5), [trade-fees.md](trade-fees.md) (a fill's fee is never below 0), [simulator.md](simulator.md) (R35–R42, script `0011`, the routes and log actions), [bff-adviser-portal.md](bff-adviser-portal.md) (prefix `/trade-settlements`), [api-design.md](../api-design.md) (§3.1 one permission row, §6 resource row, §7.12 notes, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [architecture.md](../architecture.md) (broker connection configuration), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D76–D78), [customer-portal.md](../customer-portal/customer-portal.md) (C36), [back-office.md](../backoffice/back-office.md) (BO29), [glossary.md](../glossary.md) (the review terms become accepted; Fill, Settled, Unsettled cash, Outgoing payment, Known difference, Timing difference, Break, Hand-reversible source and Broker connection change), [function-plan.md](../function-plan.md) §5, [features/README.md](README.md) row status, [future-plans.md](../future-plans.md) §9, and the roadmap §8 O1 and O2, §11 S1 and S2, §13 and §14.

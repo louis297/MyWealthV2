@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-20
-last_updated: 2026-11-22
+last_updated: 2026-11-23
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -32,6 +32,7 @@ related:
   - bank-reconciliation.md
   - account-closure.md
   - interest-run.md
+  - trade-settlement.md
 ---
 
 # Bank feed and deposit matching
@@ -779,3 +780,12 @@ Status of this amendment: `accepted` (2026-11-22), together with [simulated-inst
 
 - A **market data connection** (`MarketDataConnections:{name}`, simulated-instruments R1–R3) follows the shape of a bank connection (R1): a name in configuration with the same name rule, adapter `Simulator`, the address, key, `TimeoutSeconds` and `PollMinutes` only on `worker`, a start-up check that reads the configuration and not the environment name, one recurring job per connection with no automatic retries, and a job of a connection no longer configured removed at start. It adds a symbol suffix and has its own section, job (`market-data-sync:{connection}`), queue (`market`), feed state table (`MarketDataFeeds`) and list route (`GET /market-data-connections`). The two kinds of connection do not share names, jobs or state.
 - The AppHost and the VPS give `worker` the same simulator party address and key for both connections.
+
+---
+
+## Amendment 2026-11-23 (trade settlement and broken trades) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [trade-settlement.md](trade-settlement.md). Rules R19 and R21 live there; this section records what changes here.
+
+- R13: before deposit matching, and after the `Interest` rule, a credit `Transfer` line with no `returnOf` whose reference text (trimmed, case-insensitive) equals the broker settlement id of a trade settlement of the line's Tenant and client money account is settlement cash and is never matched as a deposit. It is `Matched` with method `Settlement = 5` when the settlement is `AwaitingReceipt` and the amount equals its net, else `Unmatched` with the new reason `SettlementMismatch = 13`.
+- The statement line item gains `tradeSettlementId` (`null` unless matched to a trade settlement).

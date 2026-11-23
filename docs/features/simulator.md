@@ -25,6 +25,7 @@ related:
   - bank-returns.md
   - bank-reconciliation.md
   - interest-run.md
+  - trade-settlement.md
 ---
 
 # Simulator
@@ -515,3 +516,15 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders.md](ord
 - R33: the simulator stores the client order id as an opaque string and never learns the Tenant, Account or Customer of an order.
 - §11 point 8 is answered: the order call carries the platform's reference price, and the broker fills a symbol it does not own near that price; a simulated instrument fills at the simulator market's own price. The simulator reads nothing from the platform.
 - "Still open": business calendars and settlement dates are answered for S2 by a settlement-days setting that skips Saturday and Sunday, with no holiday calendar.
+
+---
+
+## Amendment 2026-11-23 (trade settlement and broken trades) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [trade-settlement.md](trade-settlement.md). Rules R35–R42 and the simulator script `0011_broker_settlement.sql` live there (§4.8, §6.2); this section records what changes here.
+
+- Party port: `POST /party/broker/orders` takes an optional `settlementAccount`; the feed item gains `settlementId`, `settlementAccount`, `currency`, `netAmount` and `fillCount`, and kinds `Broken` and `Settlement`. The simulator bank has no new route; the broker's receipt is a credit line on the trust account.
+- Control port: `POST /control/broker/settlement-mode`, `GET /control/broker/settlements`, `POST /control/broker/settlements/{settlementId}/pay`, `POST /control/broker/fills/{fillReportId}/break`.
+- Configuration `Simulator:Broker:BankAccounts` (`Currency`, `AccountNumber`, `Name`); a bad entry stops start-up.
+- Control log actions `BrokerSettlementModeChanged`, `BrokerSettlementPaid`, `BrokerFillBroken`.
+- Reset (R24) also empties the broker settlements and sets the settlement mode to `Pay`.

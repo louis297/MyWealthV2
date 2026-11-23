@@ -530,6 +530,8 @@ Amendment 2026-11-22 (account closure, accepted; [features/account-closure.md](f
 
 Amendment 2026-11-22 (interest run, accepted; [features/interest-run.md](features/interest-run.md) §6.2): script `0048_interest.sql` adds `Kind int NOT NULL` (default 0 `Transfer`, CHECK 0–1; `1` is `Interest`) to `BankStatementLines`. Existing lines are `Transfer`.
 
+Amendment 2026-11-23 (trade settlement and broken trades, accepted; [features/trade-settlement.md](features/trade-settlement.md) §6.1): script `0052_trade_settlement.sql` adds `TradeSettlementId int NULL` (FK `(TenantId, TradeSettlementId)` → `TradeSettlements` RESTRICT) to `BankStatementLines`, widens `MatchMethod` to 0–5 and `UnmatchedReason` to 0–13, and replaces the Matched CHECK: `Status = 1` needs `MatchMethod`, `MatchedAt` and exactly one of (an Account and a Transaction), (a related line with no Account) and (a trade settlement).
+
 ### 11.10 Nominated bank accounts (accepted)
 
 Feature spec: [features/withdrawals.md](features/withdrawals.md) (accepted 2026-11-20, landed 2026-11-21) §6.1. Script `0042_nominated_bank_accounts.sql`:
@@ -548,6 +550,8 @@ Reserved cash is computed from `Withdrawals`, not stored. No seed in the script.
 
 Amendment 2026-11-21 (bank returns, accepted; [features/bank-returns.md](features/bank-returns.md) §6.1): script `0044_bank_returns.sql` adds to `OutgoingPayments` `Kind int NOT NULL` (CHECK 0–1; existing rows get 0 through a temporary default, then the default is dropped) and `ReturnOfLineId int NULL` (FK `(TenantId, ReturnOfLineId)` → `BankStatementLines` RESTRICT); `WithdrawalId` becomes NULL; CHECK exactly one of `WithdrawalId` and `ReturnOfLineId` by kind; the `RejectReason` CHECK widens to 0–4; unique filtered `UX_OutgoingPayments_ReturnOfLineId_Open` on `ReturnOfLineId WHERE Kind = 1 AND Status IN (0, 1)`.
 
+Amendment 2026-11-23 (trade settlement and broken trades, accepted; [features/trade-settlement.md](features/trade-settlement.md) §6.1): script `0052_trade_settlement.sql` adds `TradeSettlementId int NULL` to `OutgoingPayments` (FK → `TradeSettlements` RESTRICT; filtered unique `WHERE Kind = 2 AND Status IN (0, 1)`), widens `Kind` to 0–2 and replaces `CK_OutgoingPayments_Target` with three arms, by kind.
+
 ### 11.12 Bank reconciliations (accepted)
 
 Feature spec: [features/bank-reconciliation.md](features/bank-reconciliation.md) (accepted 2026-11-21) §6.1. Script `0045_bank_reconciliations.sql`:
@@ -559,6 +563,8 @@ Feature spec: [features/bank-reconciliation.md](features/bank-reconciliation.md)
 No back-fill. A run and its items are never updated or deleted; no purge.
 
 Amendment 2026-11-22 (interest run, accepted; [features/interest-run.md](features/interest-run.md) §6.2): script `0048_interest.sql` widens `CK_BankReconciliationItems_Kind` to 0–14 (`BankInterest`, `InterestCredited`, `TaxWithheld`) and `CK_BankReconciliationItems_Line` to the kinds `2, 3, 4, 6, 12` as the kinds with a line. No back-fill.
+
+Amendment 2026-11-23 (trade settlement and broken trades, accepted; [features/trade-settlement.md](features/trade-settlement.md) §6.1): script `0052_trade_settlement.sql` widens `CK_BankReconciliationItems_Kind` to 0–18 and adds `OpenSettlementsCount int NOT NULL` and `OpenSettlementsAmount decimal(18,4) NOT NULL` (default 0 for existing rows) to `BankReconciliations`.
 
 ### 11.13 Account closures (accepted)
 
@@ -603,6 +609,16 @@ Feature spec: [features/orders.md](features/orders.md) (accepted 2026-11-23) §6
 - `TransactionExecutionDetails` and the source kind (§11.4); `Tenants.BrokerConnection` (§6.5).
 
 Reserved cash, reserved quantity, unsettled cash and withdrawable cash of an Account are sums over `Orders`, `OrderFills` and `Withdrawals`; no column on `Accounts` or `Holdings` stores them. No back-fill: no order exists before `0051`.
+
+Amendment 2026-11-23 (trade settlement and broken trades, accepted; [features/trade-settlement.md](features/trade-settlement.md) §6.1): script `0052_trade_settlement.sql` adds to `Orders` `ClientMoneyAccountId` and `SettlementAccountNumber` (both or neither); to `OrderFills` the broker settlement id, the trade settlement and the break columns, widens `Status` to 0–2 and replaces the `TransactionId` CHECK; to `ExecutionReports` the five settlement fields, and widens `Kind` to 0–5 and `SkipReason` to 0–7. No back-fill.
+
+### 11.17 Trade settlements (accepted)
+
+Feature spec: [features/trade-settlement.md](features/trade-settlement.md) (accepted 2026-11-23) §6.1. Script `0052_trade_settlement.sql`:
+
+- `TradeSettlements` — `Id`, `PublicId` (unique), `TenantId`, `ClientMoneyAccountId` (tenant composite FK), `Connection nvarchar(50)`, `BrokerSettlementId nvarchar(100)`, `Currency`, `SettledDate`, the platform's `FillCount` and `NetAmount decimal(18,4)`, the broker's `BrokerFillCount`, `BrokerNetAmount` and `BrokerSettlementAccount nvarchar(34)`, `ExecutionReportId` (FK), `Status int` (CHECK 0–5), `Failure int NULL` (CHECK 0–2, set iff `Status = 3`), `FailureDetail nvarchar(140) NULL`, `CompletedAt` (set iff `Status = 2`), set aside by, at and note (all set iff `Status = 5`), audit columns, `RowVersion`. Unique `(Connection, BrokerSettlementId, ClientMoneyAccountId)`; index `(TenantId, Status, Id DESC)`.
+
+A trade settlement writes no Transaction. No back-fill.
 
 ## 12. Still not a schema decision
 
@@ -672,6 +688,8 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-22 | Corporate actions accepted (`0050`, not written yet): `CorporateActionAnnouncements`, `CorporateActions`, `CorporateActionEntitlements` (§11.15), `TransactionCorporateActionDetails` and `CK_Transactions_SourceKind` 0–7 (§11.4), `MarketDataFeeds` Kind 0–1 and LastFailure 0–5; simulator `0009_market_corporate_actions.sql` (§15). §9 lists `0050`. |
 | 2026-11-22 | Corporate actions landed: `0050` and simulator `0009` written. `0050` names `UX_CorporateActionAnnouncements_Connection_OutsideId`, `UX_CorporateActions_InstrumentId_Connection_PartyActionId`, `UX_CorporateActions_InstrumentId_Kind_ExDate`, `UQ_CorporateActionEntitlements_CorporateActionId_AccountId` and the set-iff CHECKs (`CK_CorporateActionAnnouncements_Skipped`, `CK_CorporateActions_Feed`, `_EffectiveAt`, `_AppliedAt`, `_CancelledAt`, `CK_CorporateActionEntitlements_NotApplied`, `_Posted`, `_PostedAt`); `0009` names `UX_MarketCorporateActions_Number` and `UX_MarketCorporateActionVersions_ActionId_Version`. |
 | 2026-11-23 | Orders and settlement accepted (`0051`, not written yet): `Orders`, `OrderFills`, `ExecutionReports`, `BrokerFeeds` (§11.16), `TransactionExecutionDetails` and `CK_Transactions_SourceKind` 0–8 (§11.4), `Tenants.BrokerConnection` (§6.5); simulator `0010_broker.sql` (§15). §9 lists `0051`. |
+
+| 2026-11-23 | Trade settlement and broken trades accepted (`0052`, not written yet): `TradeSettlements` (§11.17); columns on `Orders`, `OrderFills`, `ExecutionReports` (§11.16), `OutgoingPayments` (§11.11), `BankStatementLines` (§11.9) and `BankReconciliations` (§11.12); simulator `0011_broker_settlement.sql` (§15). |
 
 ---
 
@@ -791,5 +809,6 @@ Owner: [features/simulator.md](features/simulator.md) §6.2, [ADR 0021](adr/0021
 - S4 market, data vendor half ([features/simulated-instruments.md](features/simulated-instruments.md) §6.2, accepted 2026-11-22; `0008_market.sql`): `MarketInstruments` (symbol unique, ending in `.SIM`; currency; `DailyMovePercent decimal(5,2)` CHECK 0–20; the current `Price decimal(18,4)` CHECK `> 0` and its `PriceDate`; RowVersion) and `MarketPrices` (PK `(InstrumentId, PriceDate)`, FK `MarketInstruments`, `Price` CHECK `> 0`, `IsSet bit` for a price the operator typed). A reset empties both and adds the standing instruments again.
 - S4 market, issuer half ([features/corporate-actions.md](features/corporate-actions.md) §6.2, accepted 2026-11-22; `0009_market_corporate_actions.sql`): `MarketCorporateActions` (`Number` unique, the `n` of the party action id; FK `MarketInstruments`; `Kind` CHECK 0–2; ratio; dates; `Status` CHECK 0–2; current `Version`; `RowVersion`) and `MarketCorporateActionVersions` (`Id bigint` identity, the place in the feed; FK the action; `Version`, `Status`, ratio and dates; UQ `(ActionId, Version)`). A reset empties both.
 - S2 broker ([features/orders.md](features/orders.md) §6.2, accepted 2026-11-23; `0010_broker.sql`): `BrokerSettings` (one row: order mode, fill percent, reject reason, slippage percent, settlement days), `BrokerOrders` (`Number` unique, the `n` of the broker order id; `ClientOrderId` unique; body hash; symbol, currency, side, quantity, price limit, reference price; `Status` CHECK 0–4; filled quantity; accepted day), `BrokerFills` (`Number` unique, the `n` of the contract note; FK the order; quantity, price, trade date, settlement date, settled flag) and `BrokerReports` (`Id bigint` identity, the place in the feed; kind; FK the order and the fill). A reset empties the three and restores the settings.
+- S2 broker settlements and broken trades ([features/trade-settlement.md](features/trade-settlement.md) §6.2, accepted 2026-11-23; `0011_broker_settlement.sql`): `BrokerSettings.SettlementMode` (CHECK 0–1, default `Pay`), `BrokerOrders.SettlementAccount`, `BrokerSettlements` (`Number` unique, the `n` of the settlement id; settlement account, currency, settlement date, net, fill count, paid amount), `BrokerFills.Broken` and `SettlementId`, `BrokerReports.SettlementId`, and the `Kind` CHECK widened to the two new kinds.
 - Development: Aspire creates the database. VPS: created by hand once, like `MyWealthDbV2` ([deployment.md](deployment.md) §15).
 
