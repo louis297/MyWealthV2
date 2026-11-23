@@ -38,8 +38,90 @@ public class ConfirmRebalanceCommandValidator : AbstractValidator<ConfirmRebalan
     }
 }
 
-public class ConfirmRebalanceCommandHandler : IRequestHandler<ConfirmRebalanceCommand>
+public class ConfirmRebalanceCommandHandler(
+    IApplicationDbContext db,
+    ICurrentUser currentUser,
+    ProposeRebalance proposals,
+    RebalancePlanning planning,
+    PlaceRebalanceWave waves,
+    TimeProvider time) : IRequestHandler<ConfirmRebalanceCommand>
 {
-    public Task Handle(ConfirmRebalanceCommand request, CancellationToken cancellationToken) =>
-        throw new NotImplementedException();
+    public async Task Handle(ConfirmRebalanceCommand request, CancellationToken cancellationToken)
+    {
+        // R1: a rebalance outside scope, of another tenant, or missing is 404.
+        var found = await RebalanceReader.Scope(db, currentUser).AsNoTracking()
+                        .Select(row => new { row.Id, row.PublicId, row.AccountId })
+                        .SingleOrDefaultAsync(row => row.PublicId == request.Id, cancellationToken)
+                    ?? throw new NotFoundException("Rebalance", request.Id);
+        var person = currentUser.Person?.Id ?? throw new ForbiddenAccessException();
+
+        try
+        {
+            await db.ExecuteInTransactionAsync(async token =>
+            {
+                await db.LockAccountAsync(found.AccountId, token);
+                var rebalance = await db.Rebalances.Include(row => row.Targets).SingleAsync(row => row.Id == found.Id, token);
+                if (!string.Equals(Convert.ToBase64String(rebalance.RowVersion ?? []), request.RowVersion, StringComparison.Ordinal))
+                {
+                    throw new ConcurrencyException();
+                }
+
+                var now = time.GetUtcNow();
+                if (rebalance.Status != RebalanceStatus.Proposed)
+                {
+                    throw StatusError($"This rebalance is {rebalance.Status} and cannot be confirmed.");
+                }
+
+                if (rebalance.IsExpired(now))
+                {
+                    throw StatusError(Rebalance.ExpiredMessage);
+                }
+
+                var account = await db.Accounts.SingleAsync(row => row.Id == rebalance.AccountId, token);
+                var portfolio = await db.Portfolios.SingleAsync(row => row.Id == rebalance.PortfolioId, token);
+                if (await proposals.EligibilityProblemAsync(account, portfolio, token) is { } problem)
+                {
+                    throw new RebalanceException(problem.Code, problem.Message);
+                }
+
+                var planned = await planning.PlanAsync(
+                    account, RebalanceTargets.Of(rebalance), sizeBuysByReservation: true, now, token);
+                if (planned.Failed)
+                {
+                    // R13: the rebalance stays Proposed.
+                    throw new RebalanceException(planned.Plan.Code!, planned.Plan.Message!);
+                }
+
+                if (planned.Plan.Trades.Count == 0)
+                {
+                    rebalance.EndNoChange(now);
+                }
+                else
+                {
+                    var connection = await db.Tenants
+                        .Where(row => row.Id == account.TenantId)
+                        .Select(row => row.BrokerConnection)
+                        .SingleAsync(token);
+                    rebalance.Confirm(person, connection!, now);
+                    if ((await waves.PlaceAsync(rebalance, account, planned, now, token)).Count == 0)
+                    {
+                        rebalance.EndNoChange(now);
+                    }
+                }
+
+                await db.SaveChangesAsync(token);
+            }, cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConcurrencyException();
+        }
+        catch (RebalanceStatusException exception)
+        {
+            throw StatusError(exception.Message);
+        }
+    }
+
+    private static ValidationException StatusError(string message) =>
+        new([new ValidationFailure("Status", message)]);
 }
