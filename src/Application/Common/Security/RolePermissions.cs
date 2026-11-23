@@ -31,6 +31,7 @@ public static class RolePermissions
             Policies.InterestRatesRead, Policies.InterestRatesManage, Policies.InterestRunsRead,
             Policies.CorporateActionsRead, Policies.CorporateActionsManage,
             Policies.OrdersRead, Policies.OrdersPlace,
+            Policies.TradeSettlementsManage,
             Policies.ReportsCustomerRead, Policies.ReportsCustomerCreate,
             Policies.ReportsBookRead, Policies.ReportsBookCreate,
             Policies.ReportsTenantRead, Policies.ReportsTenantCreate

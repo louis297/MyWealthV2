@@ -87,4 +87,34 @@ internal sealed class BankSettlements(IApplicationDbContext db, TimeProvider tim
         await db.SaveChangesAsync(cancellationToken);
         return true;
     }
+
+    /// <summary>R20: a credit line that returns the debit line of a <c>Paid</c> settlement payment. True when the
+    /// line was this case.</summary>
+    public async Task<bool> ProcessReturnAsync(BankStatementLine line, CancellationToken cancellationToken)
+    {
+        var returned = await BankRecalls.ReturnedLineAsync(db, line, cancellationToken);
+        if (returned is not { Direction: BankLineDirection.Debit, MatchMethod: StatementLineMatchMethod.Settlement, TradeSettlementId: int settlementId }
+            || !Guid.TryParse(returned.EndToEndId, out var instruction))
+        {
+            return false;
+        }
+
+        var settlement = await db.TradeSettlements.IgnoreQueryFilters()
+            .SingleAsync(row => row.Id == settlementId, cancellationToken);
+        var payment = await db.OutgoingPayments.IgnoreQueryFilters()
+            .SingleOrDefaultAsync(row => row.InstructionPublicId == instruction && row.TradeSettlementId == settlementId, cancellationToken);
+        if (payment is not { Status: OutgoingPaymentStatus.Paid } || line.Amount != payment.Amount
+            || settlement.Status != TradeSettlementStatus.Completed)
+        {
+            line.MarkPaymentMismatch();
+            await db.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+
+        payment.MarkReturned();
+        settlement.FailPayment(TradeSettlementFailure.PaymentReturned, line.ReturnReason);
+        line.MarkSettlementReturn(settlement.Id, returned.Id, time.GetUtcNow());
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
 }

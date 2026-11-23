@@ -88,7 +88,8 @@ public sealed class ProcessStatementLines(
         if (line.ReturnOfOutsideId is not null)
         {
             // R8: a credit that takes back a line other than a payout is a receipt again, for a person to place.
-            if (!await payouts.ProcessReturnAsync(line, cancellationToken))
+            if (!await payouts.ProcessReturnAsync(line, cancellationToken)
+                && !await new BankSettlements(db, time).ProcessReturnAsync(line, cancellationToken))
             {
                 line.MarkUnknown(UnmatchedReason.UnknownReturn);
                 await db.SaveChangesAsync(cancellationToken);

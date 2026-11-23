@@ -215,8 +215,14 @@ public class BankStatementLine : BaseAuditableEntity
 
     /// <summary>Trade-settlement R20: the credit line that returns a settlement payment's debit line. No Account and
     /// no Transaction.</summary>
-    public void MarkSettlementReturn(int tradeSettlementId, int relatedLineId, DateTimeOffset at) =>
-        throw new NotImplementedException();
+    public void MarkSettlementReturn(int tradeSettlementId, int relatedLineId, DateTimeOffset at)
+    {
+        EnsureCredit("matched");
+        EnsureStatus("matched", BankStatementLineStatus.Received);
+        SetMatch(null, null, StatementLineMatchMethod.PaymentReturn, at);
+        TradeSettlementId = tradeSettlementId;
+        RelatedLineId = relatedLineId;
+    }
 
     /// <summary>Withdrawals R42: the credit line that returns a payout; the payout is reversed.</summary>
     public void MarkPaymentReturn(int accountId, int transactionId, int withdrawalId, int relatedLineId, DateTimeOffset at)
