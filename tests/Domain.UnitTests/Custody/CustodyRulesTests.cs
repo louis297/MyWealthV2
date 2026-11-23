@@ -76,8 +76,8 @@ public class CustodyRulesTests
     [TestCase(TransactionType.TransferIn,
         "Deposits to a Custodial account come from the bank statement. The customer pays in with the account's deposit instructions.")]
     [TestCase(TransactionType.Interest, "Interest cannot be entered by hand on a Custodial account.")]
-    [TestCase(TransactionType.Opening, "A Custodial account starts empty. Fund it with TransferIn.")]
-    [TestCase(TransactionType.OpeningHoldings, "A Custodial account starts empty. Fund it with TransferIn.")]
+    [TestCase(TransactionType.Opening, "Opening balances on a Custodial account come from a migration batch.")]
+    [TestCase(TransactionType.OpeningHoldings, "Opening balances on a Custodial account come from a migration batch.")]
     [TestCase(TransactionType.Buy, "Trades on a Custodial account go through the broker. Place an order.")]
     [TestCase(TransactionType.Sell, "Trades on a Custodial account go through the broker. Place an order.")]
     [TestCase(TransactionType.StockIn, "Securities cannot be moved in or out of a Custodial account by hand. Place an order.")]
@@ -124,6 +124,8 @@ public class CustodyRulesTests
     [TestCase(CustodyMode.Custodial, TransactionSourceKind.OrderFill, false)]
     [TestCase(CustodyMode.Custodial, TransactionSourceKind.BankFeed, false)]
     [TestCase(CustodyMode.Custodial, TransactionSourceKind.AccountClosure, false)]
+    // Migration batches R25, R27: Migration is not hand-reversible.
+    [TestCase(CustodyMode.Custodial, TransactionSourceKind.Migration, false)]
     public void AllowsHandReverse_MatchesTransactionSourceR12ToR15(
         CustodyMode custodyMode,
         TransactionSourceKind sourceKind,
