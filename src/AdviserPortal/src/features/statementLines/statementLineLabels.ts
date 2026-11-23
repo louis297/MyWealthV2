@@ -100,6 +100,8 @@ export function methodLabel(method: string) {
       return "Recalled by the payer's bank";
     case "Settlement":
       return "Trade settlement";
+    case "Migration":
+      return "Migration batch";
     default:
       return "Matched by reference";
   }

@@ -38,6 +38,8 @@ export type StatementLine = {
   returnReason?: string | null;
   /** trade-settlement R21: the trade settlement whose cash this line is. */
   tradeSettlementId?: string | null;
+  /** migration-batches R30: the migration batch this line funds. */
+  migrationBatchId?: string | null;
   /** bank-returns R11: the newest return payment of a receipt marked for return. */
   returnPayment?: { status: string; attempts: number; lastFailure: string | null } | null;
   rowVersion: string;
@@ -69,9 +71,12 @@ export const statementLinesApi = api.injectEndpoints({
       query: (id) => `/statement-lines/${id}`,
       providesTags: (_result, _error, id) => [{ type: "StatementLine", id }],
     }),
-    matchStatementLine: builder.mutation<void, { id: string; accountId: string; rowVersion: string; note: string | null }>({
+    matchStatementLine: builder.mutation<
+      void,
+      { id: string; rowVersion: string; note: string | null } & ({ accountId: string } | { migrationBatchId: string })
+    >({
       query: ({ id, ...body }) => ({ url: `/statement-lines/${id}/match`, method: "POST", body }),
-      invalidatesTags: ["StatementLine", "Account", "Transaction"],
+      invalidatesTags: ["StatementLine", "Account", "Transaction", "MigrationBatch"],
     }),
     noteStatementLine: builder.mutation<void, { id: string; action: NoteAction; note: string; rowVersion: string }>({
       query: ({ id, action, note, rowVersion }) => ({
