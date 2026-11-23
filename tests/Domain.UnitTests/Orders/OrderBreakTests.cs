@@ -166,6 +166,25 @@ public class OrderBreakTests
         order.FeeOfFill(1m, Fees).ShouldBeGreaterThanOrEqualTo(0m);
     }
 
+    [Test]
+    public void ResolveBreak_OnlyFromNotApplied_RecordsThePersonTheTimeAndTheNote()
+    {
+        var order = Working();
+        var fill = Fill(order, 4m);
+        Post(order, fill);
+        Should.Throw<OrderStatusException>(() => fill.ResolveBreak(22, "Note", At))
+            .Message.ShouldBe("This trade has no break that waits for a decision.");
+        order.BreakFill(fill, 90, null, At, FillBreakOutcome.NotApplied, Fees, holdReason: FillBreakHoldReason.LaterActivity);
+
+        Should.Throw<DomainException>(() => fill.ResolveBreak(22, "   ", At));
+        fill.ResolveBreak(22, "  Corrected  ", At.AddDays(1));
+
+        (fill.BreakOutcome, fill.BreakResolvedByUserId, fill.BreakResolvedAt, fill.BreakNote, fill.BreakHoldReason).ShouldBe((
+            (FillBreakOutcome?)FillBreakOutcome.ResolvedByHand, (int?)22, (DateTimeOffset?)At.AddDays(1), "Corrected",
+            (FillBreakHoldReason?)FillBreakHoldReason.LaterActivity));
+        Should.Throw<OrderStatusException>(() => fill.ResolveBreak(22, "Again", At));
+    }
+
     private static OrderFeeTerms Terms()
     {
         var schedule = TradeFeeSchedule.Create(

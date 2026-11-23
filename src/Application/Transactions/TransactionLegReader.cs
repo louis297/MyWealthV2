@@ -89,7 +89,8 @@ internal static class TransactionLegReader
                 OrderId = transaction.SourceKind == Domain.Enums.TransactionSourceKind.OrderFill
                     ? transaction.SourcePublicId
                     : original == null ? null : original.SourcePublicId,
-                SettledAt = fill == null ? null : fill.SettledAt
+                SettledAt = fill == null ? null : fill.SettledAt,
+                BrokenAt = fill == null ? null : fill.BrokenAt
             }).ToListAsync(cancellationToken);
 
         var securityRows = await (
@@ -248,7 +249,8 @@ internal static class TransactionLegReader
                     TradeDate = row.detail.TradeDate.ToString("yyyy-MM-dd"),
                     SettlementDate = row.detail.SettlementDate.ToString("yyyy-MM-dd"),
                     BrokerReference = row.detail.BrokerReference,
-                    SettledAt = row.SettledAt
+                    SettledAt = row.SettledAt,
+                    BrokenAt = row.BrokenAt
                 }));
     }
 }

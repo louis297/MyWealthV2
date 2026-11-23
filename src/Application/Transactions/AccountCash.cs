@@ -68,7 +68,9 @@ internal static class AccountCash
                     join order in db.Orders.AsNoTracking() on fill.OrderId equals order.Id
                     where accountIds.Contains(order.AccountId)
                           && order.Side == OrderSide.Sell
-                          && fill.Status == OrderFillStatus.Posted
+                          // Trade-settlement R33: a broken sell that could not be reversed still counts.
+                          && (fill.Status == OrderFillStatus.Posted
+                              || (fill.Status == OrderFillStatus.Broken && fill.BreakOutcome == FillBreakOutcome.NotApplied))
                           && fill.SettledAt == null
                           && fill.NetCash > 0
                     group fill by order.AccountId

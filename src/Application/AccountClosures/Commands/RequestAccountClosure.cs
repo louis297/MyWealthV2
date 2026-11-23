@@ -74,6 +74,7 @@ public class RequestAccountClosureCommandHandler(
     public const string InProgressMessage = "This account is already being closed.";
     public const string LiveOrderMessage = "Open orders must be filled, cancelled or expired before the account can be closed.";
     public const string UnsettledFillMessage = "Trades must settle before the account can be closed.";
+    public const string BrokenTradeMessage = "A broken trade on this account waits for a decision.";
     public const string OpenWithdrawalMessage =
         "Open withdrawals must be paid, rejected or cancelled before the account can be closed.";
     public const string AssignmentMessage = "Unassign the portfolio before closing the account.";
@@ -185,8 +186,18 @@ public class RequestAccountClosureCommandHandler(
             throw Error(nameof(RequestAccountClosureCommand.AccountId), LiveOrderMessage);
         }
 
+        // Trade-settlement R33: a break that could not be reversed waits for a TenantAdmin; a broken fill never settles.
         if (await db.OrderFills.AnyAsync(
-                fill => fill.SettledAt == null && db.Orders.Any(row => row.Id == fill.OrderId && row.AccountId == account.Id),
+                fill => fill.BreakOutcome == FillBreakOutcome.NotApplied
+                        && db.Orders.Any(row => row.Id == fill.OrderId && row.AccountId == account.Id),
+                cancellationToken))
+        {
+            throw Error(nameof(RequestAccountClosureCommand.AccountId), BrokenTradeMessage);
+        }
+
+        if (await db.OrderFills.AnyAsync(
+                fill => fill.SettledAt == null && fill.Status != OrderFillStatus.Broken
+                        && db.Orders.Any(row => row.Id == fill.OrderId && row.AccountId == account.Id),
                 cancellationToken))
         {
             throw Error(nameof(RequestAccountClosureCommand.AccountId), UnsettledFillMessage);

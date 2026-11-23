@@ -202,7 +202,27 @@ public class OrderFill
 
     /// <summary>Trade-settlement R31: a TenantAdmin corrected the account and resolves a break that could not be
     /// applied. Only from <c>NotApplied</c>.</summary>
-    public void ResolveBreak(int byUserId, string note, DateTimeOffset at) => throw new NotImplementedException();
+    public void ResolveBreak(int byUserId, string note, DateTimeOffset at)
+    {
+        if (BreakOutcome != FillBreakOutcome.NotApplied)
+        {
+            throw new OrderStatusException(NoBreakWaitsMessage);
+        }
+
+        var trimmed = note?.Trim() ?? string.Empty;
+        if (trimmed.Length is 0 or > Order.NoteMaxLength)
+        {
+            throw new DomainException($"Note must be 1 to {Order.NoteMaxLength} characters.");
+        }
+
+        BreakOutcome = FillBreakOutcome.ResolvedByHand;
+        BreakResolvedByUserId = byUserId;
+        BreakResolvedAt = at.ToUniversalTime();
+        BreakNote = trimmed;
+    }
+
+    /// <summary>Trade-settlement R31: the refusal of a resolve for a fill with no break that waits.</summary>
+    public const string NoBreakWaitsMessage = "This trade has no break that waits for a decision.";
 
     /// <summary>Trade-settlement R8: the fill is put in a trade settlement, once.</summary>
     public void AssignTo(int tradeSettlementId)

@@ -203,11 +203,11 @@ public class BrokenTradeDecisionTests : TestBase
         Items(run).ShouldBeEmpty();
     }
 
-    /// <summary>40 ACME typed in; a sell of 10 at 99.00 nets 985.00; a buy of 9 BETA at 100.00 spends 905.00 of it;
-    /// then the broker breaks the sell.</summary>
+    /// <summary>1 000.00 received and spent on 40 ACME typed in; a sell of 10 at 99.00 nets 985.00; a buy of 9 BETA at
+    /// 100.00 spends 905.00 of it; then the broker breaks the sell.</summary>
     private static async Task<(OrderWorld World, Guid Sell, Guid Buy)> SpentSaleAsync()
     {
-        var world = await OrderWorld.CreateAsync(funding: 0m);
+        var world = await OrderWorld.CreateAsync(funding: 1000m);
         await OrderHttp.InsertHoldingAsync(world.AccountId, world.InstrumentId, 40m);
         var sell = await world.PlaceAsync("Sell", 10m);
         await BrokerHttp.SendAsync();

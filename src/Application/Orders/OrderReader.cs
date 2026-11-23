@@ -49,10 +49,27 @@ internal static class OrderReader
                 .ToListAsync(cancellationToken))
             .ToLookup(fill => fill.OrderId);
         var transactionIds = fills.SelectMany(group => group)
-            .Where(fill => fill.TransactionId is not null)
-            .Select(fill => fill.TransactionId!.Value)
+            .SelectMany(fill => new[] { fill.TransactionId, fill.ReversalTransactionId })
+            .Where(id => id is not null)
+            .Select(id => id!.Value)
             .Distinct()
             .ToList();
+        var resolverIds = fills.SelectMany(group => group)
+            .Where(fill => fill.BreakResolvedByUserId is not null)
+            .Select(fill => fill.BreakResolvedByUserId!.Value)
+            .Distinct()
+            .ToList();
+        var resolvers = await db.Users.AsNoTracking()
+            .Where(row => resolverIds.Contains(row.Id))
+            .ToDictionaryAsync(row => row.Id, row => new PersonRefDto(row.PublicId, row.Name), cancellationToken);
+        var settlementIds = fills.SelectMany(group => group)
+            .Where(fill => fill.TradeSettlementId is not null)
+            .Select(fill => fill.TradeSettlementId!.Value)
+            .Distinct()
+            .ToList();
+        var settlements = await db.TradeSettlements.AsNoTracking()
+            .Where(row => settlementIds.Contains(row.Id))
+            .ToDictionaryAsync(row => row.Id, row => row.PublicId, cancellationToken);
         var transactions = await db.Transactions.AsNoTracking()
             .Where(row => transactionIds.Contains(row.Id))
             .ToDictionaryAsync(row => row.Id, row => row.PublicId, cancellationToken);
@@ -114,7 +131,20 @@ internal static class OrderReader
                         fill.HoldReason?.ToString(),
                         fill.TransactionId is int transactionId ? transactions[transactionId] : null,
                         fill.PostedAt,
-                        fill.SettledAt)).ToList()
+                        fill.SettledAt,
+                        fill.BrokerSettlementId,
+                        customerView || fill.TradeSettlementId is not int settlementId ? null : settlements[settlementId],
+                        fill.BrokenAt is { } brokenAt
+                            ? new OrderFillBreakDto(
+                                brokenAt,
+                                fill.BreakReason,
+                                fill.BreakOutcome!.Value.ToString(),
+                                fill.BreakHoldReason?.ToString(),
+                                fill.ReversalTransactionId is int reversalId ? transactions[reversalId] : null,
+                                fill.BreakResolvedByUserId is int resolver ? resolvers.GetValueOrDefault(resolver) : null,
+                                fill.BreakResolvedAt,
+                                customerView ? null : fill.BreakNote)
+                            : null)).ToList()
                     : null,
                 RowVersion = Convert.ToBase64String(row.RowVersion ?? [])
             };

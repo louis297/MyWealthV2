@@ -112,7 +112,7 @@ public sealed class ReconcileClientMoneyAccount(IApplicationDbContext db, TimePr
             .ToListAsync(cancellationToken);
         // Trade-settlement R23: the legs of an order fill (and of its Reversal) follow the fill's order. An order that
         // settles through this account makes its own items; one that settles through another account is that
-        // account's cash; any other fill and a set-aside settlement stay in Trades.
+        // account's cash; any other fill, a set-aside settlement and a break resolved by hand stay in Trades.
         var fillLegs = await (
                 from leg in custodialLegs
                 join transaction in db.Transactions.IgnoreQueryFilters() on leg.TransactionId equals transaction.Id
@@ -128,6 +128,7 @@ public sealed class ReconcileClientMoneyAccount(IApplicationDbContext db, TimePr
                 {
                     fill.PublicId,
                     order.ClientMoneyAccountId,
+                    fill.BreakOutcome,
                     SettlementStatus = db.TradeSettlements.IgnoreQueryFilters()
                         .Where(settlement => settlement.Id == fill.TradeSettlementId)
                         .Select(settlement => (TradeSettlementStatus?)settlement.Status)
@@ -141,7 +142,8 @@ public sealed class ReconcileClientMoneyAccount(IApplicationDbContext db, TimePr
         {
             if (!fillStates.TryGetValue(legs.First().FillPublicId, out var state)
                 || state.ClientMoneyAccountId is null
-                || state.SettlementStatus == TradeSettlementStatus.SetAside)
+                || state.SettlementStatus == TradeSettlementStatus.SetAside
+                || state.BreakOutcome == FillBreakOutcome.ResolvedByHand)
             {
                 continue;
             }
@@ -158,6 +160,7 @@ public sealed class ReconcileClientMoneyAccount(IApplicationDbContext db, TimePr
             var principal = state.SettlementStatus == TradeSettlementStatus.Completed
                 ? null
                 : state.SettlementStatus is TradeSettlementStatus.PaymentFailed or TradeSettlementStatus.Disputed
+                  || state.BreakOutcome == FillBreakOutcome.NotApplied
                     ? needingAction
                     : unsettled;
             foreach (var leg in legs)

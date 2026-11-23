@@ -199,6 +199,15 @@ public sealed class PostOrderFills(
         await db.LoadCashLegsAsync(original, cancellationToken);
         await db.LoadSecurityLegsAsync(original, cancellationToken);
         var cashSum = await TransactionCash.SumAsync(db, order.AccountId, cancellationToken);
+
+        // Trade-settlement R30: decided once, when the report is processed; the first reason that applies.
+        var holdReason = await BreakHoldReasonAsync(order, original, cashSum, cancellationToken);
+        if (holdReason is not null)
+        {
+            order.BreakFill(fill, report.Id, report.Reason, now, FillBreakOutcome.NotApplied, fees, holdReason: holdReason);
+            return;
+        }
+
         var holding = await db.Holdings.IgnoreQueryFilters().AsNoTracking()
             .SingleOrDefaultAsync(row => row.AccountId == order.AccountId && row.InstrumentId == order.InstrumentId, cancellationToken);
         var reversal = original.Reverse(
@@ -216,6 +225,50 @@ public sealed class PostOrderFills(
         order.BreakFill(
             fill, report.Id, report.Reason, now, FillBreakOutcome.Reversed, fees,
             original.FeeDetails.Sum(detail => detail.FeeAmount), reversal.Id);
+    }
+
+    /// <summary>Trade-settlement R30: why the fill's Transaction cannot be reversed now, or <c>null</c>.</summary>
+    private async Task<FillBreakHoldReason?> BreakHoldReasonAsync(
+        Order order,
+        Transaction original,
+        decimal cashSum,
+        CancellationToken cancellationToken)
+    {
+        var account = await db.Accounts.IgnoreQueryFilters().AsNoTracking()
+            .SingleAsync(row => row.Id == order.AccountId, cancellationToken);
+        if (account.Status == AccountStatus.Closed)
+        {
+            return FillBreakHoldReason.AccountClosed;
+        }
+
+        // ledger-write-guards Decision 1: only the latest live security activity on a holding is reversed.
+        var later = await (
+                from leg in db.TransactionSecurityLegs.IgnoreQueryFilters().AsNoTracking()
+                join transaction in db.Transactions.IgnoreQueryFilters().AsNoTracking() on leg.TransactionId equals transaction.Id
+                where leg.AccountId == order.AccountId
+                      && leg.InstrumentId == order.InstrumentId
+                      && transaction.Id > original.Id
+                      && transaction.Type != TransactionType.Reversal
+                      && transaction.ReversedByTransactionId == null
+                select leg.TransactionId)
+            .AnyAsync(cancellationToken);
+        if (later)
+        {
+            return FillBreakHoldReason.LaterActivity;
+        }
+
+        // Withdrawals R36: a broken sell takes its proceeds back; available cash must not fall below 0.
+        if (order.Side == OrderSide.Sell)
+        {
+            var reversalCash = -original.CashLegs.Sum(leg => leg.Amount);
+            var reserved = await AccountCash.ReservedExceptOrderAsync(db, order.AccountId, order.Id, cancellationToken);
+            if (!AvailableCash.Allows(cashSum + reversalCash, reserved))
+            {
+                return FillBreakHoldReason.InsufficientCash;
+            }
+        }
+
+        return null;
     }
 
     private static decimal Round(decimal amount) => decimal.Round(amount, 4, MidpointRounding.AwayFromZero);
