@@ -216,6 +216,17 @@ public class TradeSettlementTests
     }
 
     [Test]
+    public void SetAside_FromPaymentFailed_ClearsTheFailure()
+    {
+        var settlement = InStatus(TradeSettlementStatus.PaymentFailed);
+
+        settlement.SetAside(22, "Paid by hand", At, paymentAttempted: false);
+
+        (settlement.Status, settlement.Failure, settlement.FailureDetail)
+            .ShouldBe((TradeSettlementStatus.SetAside, (TradeSettlementFailure?)null, (string?)null));
+    }
+
+    [Test]
     public void SetAside_AwaitingPayment_AfterASendAttempt_Throws()
     {
         var exception = Should.Throw<TradeSettlementStatusException>(() =>

@@ -218,6 +218,8 @@ public class TradeSettlement : BaseAuditableEntity
         }
 
         Status = TradeSettlementStatus.SetAside;
+        Failure = null;
+        FailureDetail = null;
         SetAsideByUserId = byUserId;
         SetAsideAt = at;
         SetAsideNote = trimmed;

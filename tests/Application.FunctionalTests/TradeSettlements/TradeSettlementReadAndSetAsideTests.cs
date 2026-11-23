@@ -66,13 +66,12 @@ public class TradeSettlementReadAndSetAsideTests : TestBase
     public async Task TheList_IsNewestFirst_WithoutFillsOrPayments_AndFiltersByStatusOpenAndClientMoneyAccount()
     {
         var (world, clientMoney, paying) = await TradeSettlementPaymentTests.PayingAsync();
-        await Orders.OrderHttp.InsertHoldingAsync(world.AccountId, world.InstrumentId, 40m);
-        var (sell, sellFill) = await TradeSettlementReportsTests.FilledAsync(world, "Sell", 1m, 100m);
         var (buy, buyFill) = await TradeSettlementReportsTests.FilledAsync(world, "Buy", 1m, 100m);
-        BrokerHttp.Feed.AddSettled(sell, sellFill, settlementId: "w-S7");
         BrokerHttp.Feed.AddSettled(buy, buyFill, settlementId: "w-S7");
-        BrokerHttp.Feed.AddSettlement("w-S7", clientMoney.AccountNumber, 0m, 2);
+        BrokerHttp.Feed.AddSettlement("w-S7", clientMoney.AccountNumber, -100m, 1);
         await BrokerHttp.RunReportsAsync();
+        var second = (await TradeSettlementReportsTests.SettlementsAsync(world.Tenant.Id)).Single(row => row.BrokerSettlementId == "w-S7");
+        (await SetAsideAsync(world.TenantAdmin, second, "Paid by hand")).StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
         var all = await ReadAsync(world.TenantAdmin, Path);
         var open = await ReadAsync(world.TenantAdmin, $"{Path}?open=true");

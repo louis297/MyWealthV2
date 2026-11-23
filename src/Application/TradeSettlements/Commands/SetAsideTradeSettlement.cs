@@ -1,7 +1,11 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using MyWealthV2.Application.Common.Exceptions;
+using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Domain.Entities;
+using MyWealthV2.Domain.Enums;
+using MyWealthV2.Domain.Exceptions;
 
 namespace MyWealthV2.Application.TradeSettlements.Commands;
 
@@ -32,8 +36,28 @@ public class SetAsideTradeSettlementCommandValidator : AbstractValidator<SetAsid
     }
 }
 
-public class SetAsideTradeSettlementCommandHandler : IRequestHandler<SetAsideTradeSettlementCommand>
+public class SetAsideTradeSettlementCommandHandler(IApplicationDbContext db, ICurrentUser currentUser, TimeProvider time)
+    : IRequestHandler<SetAsideTradeSettlementCommand>
 {
-    public Task Handle(SetAsideTradeSettlementCommand request, CancellationToken cancellationToken) =>
-        throw new NotImplementedException();
+    public async Task Handle(SetAsideTradeSettlementCommand request, CancellationToken cancellationToken)
+    {
+        var settlement = await TradeSettlementRules.FindAsync(db, currentUser, request.Id, request.RowVersion, cancellationToken);
+        var actor = currentUser.Person?.Id ?? throw new ForbiddenAccessException();
+        var open = await db.OutgoingPayments
+            .Where(row => row.TradeSettlementId == settlement.Id
+                          && (row.Status == OutgoingPaymentStatus.Pending || row.Status == OutgoingPaymentStatus.Accepted))
+            .SingleOrDefaultAsync(cancellationToken);
+        try
+        {
+            settlement.SetAside(actor, request.Note!, time.GetUtcNow(), paymentAttempted: open is { Attempts: > 0 } or { Status: OutgoingPaymentStatus.Accepted });
+        }
+        catch (TradeSettlementStatusException exception)
+        {
+            throw TradeSettlementRules.StatusError(exception.Message);
+        }
+
+        // R15: the payment the bank was never asked for is cancelled with it.
+        open?.Cancel();
+        await TradeSettlementRules.SaveAsync(db, cancellationToken);
+    }
 }
