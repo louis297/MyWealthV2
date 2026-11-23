@@ -46,7 +46,9 @@ public static class BrokerRules
         && IsNumber(body.PriceLimit)
         && IsNumber(body.ReferencePrice)
         && body.Type == "Market"
-        && body.TimeInForce == "Day";
+        && body.TimeInForce == "Day"
+        // Trade-settlement R35: optional, in the shape of an account number.
+        && (body.SettlementAccount is null || BankRules.IsAccountNumber(body.SettlementAccount));
 
     public static bool IsFillPercent(int? percent) => percent is >= 1 and <= 100;
 

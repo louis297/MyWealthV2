@@ -130,6 +130,7 @@ public static class ControlEndpoints
             await db.BrokerReports.ExecuteDeleteAsync(http.RequestAborted);
             await db.BrokerFills.ExecuteDeleteAsync(http.RequestAborted);
             await db.BrokerOrders.ExecuteDeleteAsync(http.RequestAborted);
+            await db.BrokerSettlements.ExecuteDeleteAsync(http.RequestAborted);
             await db.BrokerSettings.ExecuteUpdateAsync(
                 setters => setters
                     .SetProperty(settings => settings.Mode, BrokerOrderMode.Fill)

@@ -75,25 +75,58 @@ public static class BrokerBook
                 await db.SaveChangesAsync(cancellationToken);
             }
 
-            // R61: settlement, in the order the fills were made.
+            // R61: settlement, in the order the fills were made, date by date. Trade-settlement R36: the fills of
+            // orders with a settlement account are netted per account and currency into one broker settlement, whose
+            // Settlement report follows their Settled reports. A broken fill never settles (R40).
             var settling = await (
                     from fill in db.BrokerFills
                     join order in db.BrokerOrders on fill.OrderId equals order.Id
-                    where !fill.Settled && fill.SettlementDate <= today
+                    where !fill.Settled && !fill.Broken && fill.SettlementDate <= today
                     orderby fill.SettlementDate, fill.Number
                     select new { fill, order })
                 .ToListAsync(cancellationToken);
-            foreach (var item in settling)
+            foreach (var day in settling.GroupBy(item => item.fill.SettlementDate))
             {
-                item.fill.Settle();
-                db.BrokerReports.Add(BrokerReport.OfSettlement(item.order, item.fill));
-                await db.SaveChangesAsync(cancellationToken);
+                foreach (var item in day.Where(item => item.order.SettlementAccount is null))
+                {
+                    item.fill.Settle();
+                    db.BrokerReports.Add(BrokerReport.OfSettlement(item.order, item.fill));
+                    await db.SaveChangesAsync(cancellationToken);
+                }
+
+                foreach (var batch in day.Where(item => item.order.SettlementAccount is not null)
+                             .GroupBy(item => (Account: item.order.SettlementAccount!.ToUpperInvariant(), Currency: item.order.Currency.Trim())))
+                {
+                    var number = (await db.BrokerSettlements.MaxAsync(row => (int?)row.Number, cancellationToken) ?? 0) + 1;
+                    var settlement = BrokerSettlement.Open(number, batch.First().order.SettlementAccount!, batch.Key.Currency, day.Key);
+                    foreach (var item in batch)
+                    {
+                        settlement.Add(item.order, item.fill);
+                    }
+
+                    db.BrokerSettlements.Add(settlement);
+                    await db.SaveChangesAsync(cancellationToken);
+                    foreach (var item in batch)
+                    {
+                        item.fill.Settle(settlement.Id);
+                        db.BrokerReports.Add(BrokerReport.OfSettlement(item.order, item.fill, settlement));
+                        await db.SaveChangesAsync(cancellationToken);
+                    }
+
+                    db.BrokerReports.Add(BrokerReport.OfSettlementClosed(settlement));
+                    await db.SaveChangesAsync(cancellationToken);
+                    await AfterSettlementAsync(db, settlement, cancellationToken);
+                }
             }
 
             await transaction.CommitAsync(cancellationToken);
         });
         db.ChangeTracker.Clear();
     }
+
+    /// <summary>Trade-settlement R37: what the broker does once a settlement is closed. Nothing yet.</summary>
+    private static Task AfterSettlementAsync(SimulatorDbContext db, BrokerSettlement settlement, CancellationToken cancellationToken) =>
+        Task.CompletedTask;
 
     /// <summary>
     /// R56–R58: fills <paramref name="quantity"/> of a working order and appends its <c>Fill</c> report. Without a
