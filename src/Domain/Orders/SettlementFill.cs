@@ -7,5 +7,12 @@ public readonly record struct SettlementFill(OrderSide Side, decimal Quantity, d
 {
     /// <summary>R9: <c>Round(quantity × price, 4)</c>, plus for a sell and minus for a buy, seen from the trust
     /// account.</summary>
-    public decimal Cash => throw new NotImplementedException();
+    public decimal Cash
+    {
+        get
+        {
+            var gross = decimal.Round(Quantity * Price, 4, MidpointRounding.AwayFromZero);
+            return Side == OrderSide.Sell ? gross : -gross;
+        }
+    }
 }

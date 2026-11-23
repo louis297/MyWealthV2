@@ -32,7 +32,7 @@ public class TradeSettlementSchemaTests
         await db.ApplyBeforeAsync(Script);
         await db.ExecuteAsync($"""
             {World()}
-            {OrderRow()}
+            {OrderRow(settlementColumns: false)}
             INSERT INTO [BankReconciliations]
                 ([PublicId], [TenantId], [ClientMoneyAccountId], [Currency], [Trigger], [RanAt], [Status], [CustodialCash],
                  [BreakCount], [BreakTotal], [TimingCount], [TimingTotal], [KnownCount], [KnownTotal], [ReservedCash],
@@ -458,16 +458,17 @@ public class TradeSettlementSchemaTests
         string status = "0",
         string filled = "0",
         string clientMoney = "NULL",
-        string accountNumber = "NULL") => $"""
+        string accountNumber = "NULL",
+        bool settlementColumns = true) => $"""
         INSERT INTO [Orders]
             ([PublicId], [TenantId], [AccountId], [InstrumentId], [Side], [Type], [TimeInForce], [Quantity], [Currency],
              [ReferencePrice], [ReferencePriceDate], [PriceLimit], [Connection], [Status], [FilledQuantity], [PostedGross],
-             [FeeCharged], [ReservedCash], [ReservedQuantity], [PlacedByUserId], [PlacedAt], [Attempts], [Created], [CreatedBy],
-             [ClientMoneyAccountId], [SettlementAccountNumber])
+             [FeeCharged], [ReservedCash], [ReservedQuantity], [PlacedByUserId], [PlacedAt], [Attempts], [Created], [CreatedBy]
+             {(settlementColumns ? ", [ClientMoneyAccountId], [SettlementAccountNumber]" : "")})
         VALUES (NEWID(), @a_tenant, @a_brokerage, @a_instrument, 0, 0, 0, 10, 'USD',
                 100, '2026-11-23', 105, N'simulator', {status}, {filled}, 0,
-                0, 0, 0, @a_adviser, SYSDATETIMEOFFSET(), 0, SYSDATETIMEOFFSET(), N'test',
-                {clientMoney}, {accountNumber});
+                0, 0, 0, @a_adviser, SYSDATETIMEOFFSET(), 0, SYSDATETIMEOFFSET(), N'test'
+                {(settlementColumns ? $", {clientMoney}, {accountNumber}" : "")});
         DELETE FROM #order; INSERT INTO #order VALUES (SCOPE_IDENTITY());
         """;
 

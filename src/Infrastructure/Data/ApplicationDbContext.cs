@@ -99,6 +99,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<BrokerFeed> BrokerFeeds => Set<BrokerFeed>();
 
+    public DbSet<TradeSettlement> TradeSettlements => Set<TradeSettlement>();
+
     public DbSet<Instrument> Instruments => Set<Instrument>();
 
     public DbSet<Account> Accounts => Set<Account>();

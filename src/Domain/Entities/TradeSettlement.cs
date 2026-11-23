@@ -62,7 +62,8 @@ public class TradeSettlement : BaseAuditableEntity
     public byte[] RowVersion { get; private set; } = null!;
 
     /// <summary>R10: open while the platform still waits for the bank or a person.</summary>
-    public bool IsOpen => throw new NotImplementedException();
+    public bool IsOpen => Status is TradeSettlementStatus.AwaitingPayment or TradeSettlementStatus.AwaitingReceipt
+        or TradeSettlementStatus.PaymentFailed or TradeSettlementStatus.Disputed;
 
     /// <summary>
     /// R8, R9, R11–R13: stores one broker settlement for <paramref name="clientMoney"/>. The platform's figures come
@@ -83,21 +84,142 @@ public class TradeSettlement : BaseAuditableEntity
         string brokerSettlementAccount,
         string brokerCurrency,
         bool brokerAccountConfigured,
-        DateTimeOffset at) =>
-        throw new NotImplementedException();
+        DateTimeOffset at)
+    {
+        if (fills.Count == 0)
+        {
+            throw new DomainException("A trade settlement has at least one fill.");
+        }
+
+        if (string.IsNullOrWhiteSpace(brokerSettlementId) || brokerSettlementId.Length > BrokerSettlementIdMaxLength)
+        {
+            throw new DomainException($"Broker settlement id must be 1 to {BrokerSettlementIdMaxLength} characters.");
+        }
+
+        if (string.IsNullOrWhiteSpace(brokerSettlementAccount) || brokerSettlementAccount.Length > SettlementAccountMaxLength)
+        {
+            throw new DomainException($"Settlement account must be 1 to {SettlementAccountMaxLength} characters.");
+        }
+
+        var currency = clientMoney.Currency.Trim();
+        var settlement = new TradeSettlement
+        {
+            PublicId = Guid.NewGuid(),
+            TenantId = clientMoney.TenantId,
+            ClientMoneyAccountId = clientMoney.Id,
+            Connection = connection,
+            BrokerSettlementId = brokerSettlementId,
+            Currency = currency,
+            SettledDate = settledDate,
+            ExecutionReportId = executionReportId,
+            FillCount = fills.Count,
+            NetAmount = fills.Sum(fill => fill.Cash),
+            BrokerFillCount = brokerFillCount,
+            BrokerNetAmount = brokerNetAmount,
+            BrokerSettlementAccount = brokerSettlementAccount
+        };
+
+        var agreed = settlement.FillCount == brokerFillCount
+            && settlement.NetAmount == brokerNetAmount
+            && NominatedBankAccount.KeyOf(brokerSettlementAccount) == NominatedBankAccount.KeyOf(clientMoney.AccountNumber)
+            && string.Equals(brokerCurrency.Trim(), currency, StringComparison.OrdinalIgnoreCase);
+        if (!agreed)
+        {
+            settlement.Status = TradeSettlementStatus.Disputed;
+        }
+        else if (settlement.NetAmount == 0m)
+        {
+            settlement.Status = TradeSettlementStatus.Completed;
+            settlement.CompletedAt = at;
+        }
+        else if (settlement.NetAmount > 0m)
+        {
+            settlement.Status = TradeSettlementStatus.AwaitingReceipt;
+        }
+        else if (brokerAccountConfigured)
+        {
+            settlement.Status = TradeSettlementStatus.AwaitingPayment;
+        }
+        else
+        {
+            settlement.Status = TradeSettlementStatus.PaymentFailed;
+            settlement.Failure = TradeSettlementFailure.NoBrokerAccount;
+        }
+
+        return settlement;
+    }
 
     /// <summary>R18, R19: the statement line showed the cash.</summary>
-    public void Complete(DateTimeOffset at) => throw new NotImplementedException();
+    public void Complete(DateTimeOffset at)
+    {
+        if (Status is not (TradeSettlementStatus.AwaitingPayment or TradeSettlementStatus.AwaitingReceipt))
+        {
+            throw new TradeSettlementStatusException($"This settlement is {Status} and cannot be completed.");
+        }
+
+        Status = TradeSettlementStatus.Completed;
+        CompletedAt = at;
+    }
 
     /// <summary>R17, R20: the bank refused or returned the payment. A returned payment fails a completed
     /// settlement.</summary>
-    public void FailPayment(TradeSettlementFailure failure, string? detail) => throw new NotImplementedException();
+    public void FailPayment(TradeSettlementFailure failure, string? detail)
+    {
+        var from = Status == TradeSettlementStatus.AwaitingPayment
+            || (Status == TradeSettlementStatus.Completed && failure == TradeSettlementFailure.PaymentReturned && NetAmount < 0m);
+        if (!from)
+        {
+            throw new TradeSettlementStatusException($"This settlement is {Status} and its payment cannot fail.");
+        }
+
+        if (detail is { Length: > FailureDetailMaxLength })
+        {
+            throw new DomainException($"Failure detail must be at most {FailureDetailMaxLength} characters.");
+        }
+
+        Status = TradeSettlementStatus.PaymentFailed;
+        Failure = failure;
+        FailureDetail = detail;
+        CompletedAt = null;
+    }
 
     /// <summary>R14: a new payment is made after a failure.</summary>
-    public void PayAgain() => throw new NotImplementedException();
+    public void PayAgain()
+    {
+        if (Status != TradeSettlementStatus.PaymentFailed)
+        {
+            throw new TradeSettlementStatusException($"This settlement is {Status} and cannot be paid again.");
+        }
+
+        Status = TradeSettlementStatus.AwaitingPayment;
+        Failure = null;
+        FailureDetail = null;
+    }
 
     /// <summary>R15: a TenantAdmin ends it by hand. From <c>AwaitingPayment</c> only while its payment has no send
     /// attempt.</summary>
-    public void SetAside(int byUserId, string note, DateTimeOffset at, bool paymentAttempted) =>
-        throw new NotImplementedException();
+    public void SetAside(int byUserId, string note, DateTimeOffset at, bool paymentAttempted)
+    {
+        if (!IsOpen)
+        {
+            throw new TradeSettlementStatusException($"This settlement is {Status} and cannot be set aside.");
+        }
+
+        if (Status == TradeSettlementStatus.AwaitingPayment && paymentAttempted)
+        {
+            throw new TradeSettlementStatusException(
+                "The bank has been asked to pay this settlement, so it cannot be set aside.");
+        }
+
+        var trimmed = note?.Trim() ?? string.Empty;
+        if (trimmed.Length is 0 or > NoteMaxLength)
+        {
+            throw new DomainException($"Note must be 1 to {NoteMaxLength} characters.");
+        }
+
+        Status = TradeSettlementStatus.SetAside;
+        SetAsideByUserId = byUserId;
+        SetAsideAt = at;
+        SetAsideNote = trimmed;
+    }
 }
