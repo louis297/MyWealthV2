@@ -119,7 +119,9 @@ public class CustodyRulesTests
     [TestCase(CustodyMode.External, TransactionSourceKind.Rebalance, true)]
     [TestCase(CustodyMode.Custodial, TransactionSourceKind.Manual, true)]
     [TestCase(CustodyMode.Custodial, TransactionSourceKind.Seed, false)]
-    [TestCase(CustodyMode.Custodial, TransactionSourceKind.Rebalance, true)]
+    // Rebalances R28: Rebalance leaves the hand-reversible sources on a Custodial account.
+    [TestCase(CustodyMode.Custodial, TransactionSourceKind.Rebalance, false)]
+    [TestCase(CustodyMode.Custodial, TransactionSourceKind.OrderFill, false)]
     [TestCase(CustodyMode.Custodial, TransactionSourceKind.BankFeed, false)]
     [TestCase(CustodyMode.Custodial, TransactionSourceKind.AccountClosure, false)]
     public void AllowsHandReverse_MatchesTransactionSourceR12ToR15(

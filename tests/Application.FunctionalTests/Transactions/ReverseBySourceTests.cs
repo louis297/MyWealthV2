@@ -34,16 +34,33 @@ public class ReverseBySourceTests : TestBase
     }
 
     [Test]
-    public async Task Custodial_RebalanceTradeAfterUnassign_Returns201()
+    public async Task Custodial_RebalanceTradeAfterUnassign_Returns400_AndWritesNothing()
     {
         var world = await RebalanceTrades.AssignedAsync();
-        // A rebalance trade posted before rebalances went through orders (rebalances R26).
         (await FundAsync(world.AccessToken, world.AccountId, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        // A rebalance trade posted before rebalances went through orders (rebalances R26).
         var trade = await InsertRebalanceTradeAsync(world.AccountId, world.Second, 1m, 20m);
         (await PortfolioHttp.Send(HttpMethod.Delete, $"/accounts/{world.AccountId}/portfolio", world.AccessToken))
             .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        var before = await TransactionCountAsync(world.AccountId);
 
         var response = await ReverseAsync(world.AccessToken, trade);
+
+        // Rebalances R28: it is corrected with an adjustment, not reversed by hand.
+        (await ErrorsAsync(response)).Values.SelectMany(messages => messages).ShouldBe([Message]);
+        (await TransactionCountAsync(world.AccountId)).ShouldBe(before);
+    }
+
+    [Test]
+    public async Task External_RebalanceTrade_Returns201()
+    {
+        var (_, _, customer, tokens) = await AccountHttp.SignInAdviser();
+        var accountId = await OpenExternalAsync(tokens.AccessToken, customer.PublicId, currency: "NZD");
+        (await FundAsync(tokens.AccessToken, accountId, 1000m, external: true)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        var instrumentId = await CreateInstrumentAsync(tokens.AccessToken, "AIA", "NZD", 10m);
+        var trade = await InsertRebalanceTradeAsync(accountId, instrumentId, 1m, 10m);
+
+        var response = await ReverseAsync(tokens.AccessToken, trade);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
     }
