@@ -17,7 +17,8 @@ public sealed record GetOrdersQuery(
     string? Side = null,
     string? Status = null,
     bool? PendingFill = null,
-    Guid? TenantId = null) : IRequest<PagedList<OrderDto>>
+    Guid? TenantId = null,
+    Guid? RebalanceId = null) : IRequest<PagedList<OrderDto>>
 {
     internal static IReadOnlyList<string> Names(string? value) =>
         string.IsNullOrWhiteSpace(value)

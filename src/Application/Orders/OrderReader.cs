@@ -111,6 +111,7 @@ internal static class OrderReader
                     ? null
                     : new OrderSendDto(row.Attempts, row.LastAttemptAt, row.LastFailure?.ToString(), row.AcceptedAt),
                 RejectReason = row.RejectReason?.ToString(),
+                RebalanceId = null,
                 CancelRequest = row.CancelRequestedAt is { } requestedAt
                     ? new OrderCancelRequestDto(
                         row.CancelRequestedByUserId is int by ? users[by] : null,

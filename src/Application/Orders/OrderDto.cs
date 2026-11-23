@@ -69,6 +69,9 @@ public sealed class OrderDto
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<OrderFillDto>? Fills { get; init; }
 
+    /// <summary>Rebalances R27: the rebalance that placed the order; null on a person's order.</summary>
+    public required Guid? RebalanceId { get; init; }
+
     public required string RowVersion { get; init; }
 }
 
