@@ -41,7 +41,24 @@ A **broken trade** is a fill the broker takes back. The broker says so with a `B
 
 New: permission `trade-settlements.manage`; routes under `/trade-settlements` and `POST /orders/{id}/fills/{fillId}/resolve-break`; execution report kinds `Broken` and `Settlement`; outgoing payment kind `TradeSettlement`; statement line match method `Settlement` and unmatched reason `SettlementMismatch`; fill status `Broken`; four reconciliation item kinds; the broker's bank accounts in the broker connection configuration; the simulator broker's settlements, settlement mode and broken fills. Script `0052_trade_settlement.sql`; simulator script `database/simulator/0011_broker_settlement.sql`. No new `TransactionType`, source kind, port, job, problem code or domain event.
 
-**Status is `accepted` (2026-11-23).** The sixteen points of §11 were confirmed on 2026-11-23, every one as recommended, and are written into the rules. The amendments to accepted docs listed in §12 were made when it was accepted. It is a build contract.
+**Status is `accepted` (2026-11-23), landed 2026-11-23.** The sixteen points of §11 were confirmed on 2026-11-23, every one as recommended, and are written into the rules. The amendments to accepted docs listed in §12 were made when it was accepted. It is a build contract.
+
+Notes from landing:
+
+- §6.1: `0052` also adds `UQ_ClientMoneyAccounts_TenantId_Id`, the key the tenant composite FKs to a client money account need, and `CK_TradeSettlements_FillCount` (both counts at least 1).
+- R2: the broker's bank accounts are read by `BrokerConnectionsConfiguration` on `webapi` and `worker`; `IBrokerConnections` answers `BankAccount(connection, currency)` and `SettlementCurrencies(connection)`.
+- R3: `PlaceOrder` decides the settlement account (`SettlementAccountAsync`) and `Order.Place` takes it; the preview does not show it.
+- R8–R13: `ProcessExecutionReports.SettleAsync` stores the trade settlements and, for an agreed net below 0, the `TradeSettlement` payment in the report's own transaction; their `CreatedBy` is `SystemActor.Name`.
+- R17: the send step reads the payee from `IBrokerConnections` on the `worker`. A payment whose broker account is no longer configured there is not sent: it stays `Pending`, with a warning in the log.
+- R18–R21: `BankSettlements` (Application) handles the paid debit line, the broker's receipt and the returned payment. A line matched to a trade settlement refuses `unmatch` with `This line is the cash of a trade settlement and cannot be unmatched.`
+- R14: the refusal names the settlement's currency: `The broker connection has no bank account in <currency>.`
+- R15: setting a `PaymentFailed` settlement aside clears its failure and failure detail, as the "set iff" CHECKs of `0052` ask.
+- R23, R24: `ReconcileClientMoneyAccount` reads the fill of each `OrderFill` Transaction through its execution detail, and the trade settlement and break of that fill.
+- R28–R30: `PostOrderFills.BreakAsync` is the one place a broken fill is reversed; it decides `NotApplied` before it builds the Reversal. The fee the order gives back is the fee detail's amount of the fill's Transaction.
+- R33: account closure checks a waiting break before unsettled fills, and a broken fill is never an unsettled fill there.
+- R35–R42: on the simulator a `Settlement` report names no order, so `BrokerReports.OrderId` becomes nullable in `0011`. The broker routes take `BrokerBankAccounts` (configuration `Simulator:Broker:BankAccounts`) to pay receipts. Breaking a fill by the outside id of a report that is not a `Fill` report answers 404.
+- §9.1: the AppHost and `compose.yml` give the broker accounts `BRK-SIM-USD` and `BRK-SIM-NZD` to `webapi`, `worker` and the simulator; `.env` may override them.
+- D76, D77: "Set aside" and "Mark resolved" use the note dialog of the Bank receipts pages. BO29 shows the settlement id in its own column.
 
 ---
 
