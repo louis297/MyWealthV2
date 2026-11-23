@@ -31,6 +31,10 @@ public class OutgoingPayment : BaseAuditableEntity
     /// <summary>The statement line it sends back; set only on a <see cref="OutgoingPaymentKind.ReceiptReturn"/>.</summary>
     public int? ReturnOfLineId { get; private set; }
 
+    /// <summary>The trade settlement whose net it pays to the broker; set only on a
+    /// <see cref="OutgoingPaymentKind.TradeSettlement"/> (trade-settlement R12).</summary>
+    public int? TradeSettlementId { get; private set; }
+
     public decimal Amount { get; private set; }
 
     public string Currency { get; private set; } = string.Empty;
@@ -118,6 +122,12 @@ public class OutgoingPayment : BaseAuditableEntity
             PublicId = publicId
         };
     }
+
+    /// <summary>Trade-settlement R12: the firm's net of an agreed trade settlement, <c>Pending</c>, from its client
+    /// money account, with its own PublicId as the instruction id and the broker settlement id as reference when it is
+    /// a valid payment reference. No person approves it.</summary>
+    public static OutgoingPayment ForTradeSettlement(TradeSettlement settlement, ClientMoneyAccount clientMoney) =>
+        throw new NotImplementedException();
 
     /// <summary>R32: an attempt is recorded and committed before the call.</summary>
     public void RecordAttempt(DateTimeOffset at)

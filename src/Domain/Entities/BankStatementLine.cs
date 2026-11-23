@@ -84,6 +84,9 @@ public class BankStatementLine : BaseAuditableEntity
     /// <summary>The withdrawal whose payout or returned payout this line is (withdrawals R40, R42).</summary>
     public int? WithdrawalId { get; private set; }
 
+    /// <summary>Trade-settlement R18–R21: the trade settlement whose cash this line is.</summary>
+    public int? TradeSettlementId { get; private set; }
+
     public byte[] RowVersion { get; private set; } = null!;
 
     /// <summary>A line as the bank sent it, in status <c>Received</c> (R10–R12). Payer name and reference are
@@ -200,6 +203,10 @@ public class BankStatementLine : BaseAuditableEntity
         SetMatch(accountId, transactionId, StatementLineMatchMethod.Payment, at);
         WithdrawalId = withdrawalId;
     }
+
+    /// <summary>Trade-settlement R18, R19: the cash of a trade settlement, paid to or received from the broker. No
+    /// Account and no Transaction: the fills were posted when they were reported.</summary>
+    public void MarkSettlement(int tradeSettlementId, DateTimeOffset at) => throw new NotImplementedException();
 
     /// <summary>Withdrawals R42: the credit line that returns a payout; the payout is reversed.</summary>
     public void MarkPaymentReturn(int accountId, int transactionId, int withdrawalId, int relatedLineId, DateTimeOffset at)
