@@ -41,7 +41,7 @@ public class GetBrokerConnectionsQueryHandler(IApplicationDbContext db, IBrokerC
                 feeds.TryGetValue(connection.Name, out var feed)
                     ? new BrokerFeedDto(feed.LastSucceededAt, feed.LastFailedAt, feed.LastFailure?.ToString())
                     : null,
-                []))
+                connections.SettlementCurrencies(connection.Name)))
             .ToList();
         return new PagedList<BrokerConnectionDto>
         {

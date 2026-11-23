@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using MyWealthV2.Application.Broker;
+using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.ValueObjects;
 
 namespace MyWealthV2.Infrastructure.Broker;
@@ -36,6 +37,7 @@ public static class BrokerConnectionsConfiguration
     public const string SimulatorAdapter = "Simulator";
     public const int DefaultTimeoutSeconds = 10;
     public const int DefaultPollMinutes = 1;
+    public const int AccountNameMaxLength = 140;
 
     /// <summary>Every value divides an hour, so every run starts on the same minutes of each hour.</summary>
     public static readonly IReadOnlyList<int> AllowedPollMinutes = [1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30, 60];
@@ -57,9 +59,13 @@ public static class BrokerConnectionsConfiguration
                 throw Bad(name, $"Adapter must be {SimulatorAdapter}");
             }
 
+            var bankAccounts = ReadBankAccounts(section, name);
             if (host == BrokerConnectionHost.WebApi)
             {
-                result.Add(new BrokerConnectionSettings(name, SimulatorAdapter, null, null, DefaultTimeoutSeconds, DefaultPollMinutes));
+                result.Add(new BrokerConnectionSettings(name, SimulatorAdapter, null, null, DefaultTimeoutSeconds, DefaultPollMinutes)
+                {
+                    BankAccounts = bankAccounts
+                });
                 continue;
             }
 
@@ -87,10 +93,44 @@ public static class BrokerConnectionsConfiguration
                 throw Bad(name, $"PollMinutes must be one of {string.Join(", ", AllowedPollMinutes)}");
             }
 
-            result.Add(new BrokerConnectionSettings(name, SimulatorAdapter, baseUrl, apiKey, timeoutSeconds, pollMinutes));
+            result.Add(new BrokerConnectionSettings(name, SimulatorAdapter, baseUrl, apiKey, timeoutSeconds, pollMinutes)
+            {
+                BankAccounts = bankAccounts
+            });
         }
 
         return result.OrderBy(entry => entry.Name, StringComparer.Ordinal).ToList();
+    }
+
+    /// <summary>Trade-settlement R2: <c>BankAccounts:{currency}:AccountNumber</c> and <c>:AccountName</c>, sorted by
+    /// currency.</summary>
+    private static IReadOnlyList<BrokerBankAccount> ReadBankAccounts(IConfigurationSection section, string name)
+    {
+        var accounts = new List<BrokerBankAccount>();
+        foreach (var entry in section.GetSection("BankAccounts").GetChildren())
+        {
+            var currency = entry.Key.ToUpperInvariant();
+            if (currency.Length != 3 || !currency.All(ch => ch is >= 'A' and <= 'Z'))
+            {
+                throw Bad(name, $"BankAccounts:{entry.Key} must be named by a three-letter currency code");
+            }
+
+            var number = entry["AccountNumber"];
+            if (!ClientMoneyAccount.IsValidAccountNumber(number))
+            {
+                throw Bad(name, $"BankAccounts:{currency}:AccountNumber must be 1 to {ClientMoneyAccount.AccountNumberMaxLength} letters, digits, spaces and hyphens, with no two spaces in a row");
+            }
+
+            var accountName = entry["AccountName"]?.Trim();
+            if (string.IsNullOrEmpty(accountName) || accountName.Length > AccountNameMaxLength)
+            {
+                throw Bad(name, $"BankAccounts:{currency}:AccountName must be 1 to {AccountNameMaxLength} characters");
+            }
+
+            accounts.Add(new BrokerBankAccount(currency, number!.Trim(), accountName));
+        }
+
+        return accounts.OrderBy(account => account.Currency, StringComparer.Ordinal).ToList();
     }
 
     private static int ReadInteger(IConfigurationSection section, string name, string key, int defaultValue)
@@ -122,7 +162,11 @@ public sealed class ConfiguredBrokerConnections(IReadOnlyList<BrokerConnectionSe
 
     public bool IsConfigured(string? name) => All.Any(entry => entry.Name == name);
 
-    public BrokerBankAccount? BankAccount(string? connection, string currency) => null;
+    public BrokerBankAccount? BankAccount(string? connection, string currency) =>
+        Settings.FirstOrDefault(entry => entry.Name == connection)?.BankAccounts
+            .FirstOrDefault(account => string.Equals(account.Currency, currency.Trim(), StringComparison.OrdinalIgnoreCase));
 
-    public IReadOnlyList<string> SettlementCurrencies(string connection) => [];
+    public IReadOnlyList<string> SettlementCurrencies(string connection) =>
+        Settings.FirstOrDefault(entry => entry.Name == connection)?.BankAccounts.Select(account => account.Currency).ToList()
+        ?? [];
 }
