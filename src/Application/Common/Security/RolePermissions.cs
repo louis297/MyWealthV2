@@ -33,6 +33,7 @@ public static class RolePermissions
             Policies.OrdersRead, Policies.OrdersPlace,
             Policies.TradeSettlementsManage,
             Policies.RebalancesRead, Policies.RebalancesConfirm,
+            Policies.MigrationBatchesManage,
             Policies.ReportsCustomerRead, Policies.ReportsCustomerCreate,
             Policies.ReportsBookRead, Policies.ReportsBookCreate,
             Policies.ReportsTenantRead, Policies.ReportsTenantCreate
