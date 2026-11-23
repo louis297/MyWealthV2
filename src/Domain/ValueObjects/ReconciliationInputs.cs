@@ -84,7 +84,9 @@ public sealed record ReconciliationInputs
     public BankFeedFailure? FeedLastFailure { get; init; }
 }
 
-/// <summary>A statement line as it was at the run (R9, R21). <see cref="Amount"/> is positive, as stored.</summary>
+/// <summary>A statement line as it was at the run (R9, R21). <see cref="Amount"/> is positive, as stored.
+/// <see cref="MigrationNotPosted"/> marks a <c>Matched</c> line that funds a migration batch not posted yet
+/// (migration-batches R32).</summary>
 public sealed record ReconciliationLine(
     int Id,
     BankLineDirection Direction,
@@ -93,7 +95,8 @@ public sealed record ReconciliationLine(
     BankStatementLineStatus Status,
     UnmatchedReason? UnmatchedReason,
     string? Note,
-    StatementLineKind Kind = StatementLineKind.Transfer);
+    StatementLineKind Kind = StatementLineKind.Transfer,
+    bool MigrationNotPosted = false);
 
 /// <summary>
 /// The cash legs of the Transactions of one <see cref="Type"/> (with the <see cref="OriginalType"/> of a Reversal)

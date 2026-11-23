@@ -39,5 +39,9 @@ public enum ReconciliationItemKind
     UnbookedFills = 17,
 
     /// <summary>The trade fees of order fills, held in the trust account (trade-settlement R25), Known.</summary>
-    TradeFees = 18
+    TradeFees = 18,
+
+    /// <summary>A receipt matched to a migration batch that is not posted yet: money in the trust account that is not
+    /// in the ledger yet (migration-batches R32), Timing.</summary>
+    MigrationNotPosted = 19
 }
