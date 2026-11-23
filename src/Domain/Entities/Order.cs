@@ -27,6 +27,12 @@ public class Order : BaseAuditableEntity
 
     public const string CancelAlreadyRequestedMessage = "A cancellation was already requested for this order.";
 
+    /// <summary>Rebalances R20: a person cancels a rebalance order only by cancelling its rebalance.</summary>
+    public const string RebalanceOrderMessage = "This order belongs to a rebalance. Cancel the rebalance.";
+
+    /// <summary>Rebalances R19: the note of the cancel a rebalance's cancellation makes on its open orders.</summary>
+    public const string RebalanceCancelledNote = "Rebalance cancelled";
+
     private readonly List<OrderFill> _fills = [];
 
     private Order()
@@ -130,6 +136,9 @@ public class Order : BaseAuditableEntity
     /// <summary>Trade-settlement R3, R4: the trust account number sent to the broker with the order.</summary>
     public string? SettlementAccountNumber { get; private set; }
 
+    /// <summary>Rebalances R15, R27: the rebalance that placed the order; null on a person's order.</summary>
+    public int? RebalanceId { get; private set; }
+
     public byte[] RowVersion { get; private set; } = null!;
 
     /// <summary>R14: <c>Placed</c>, <c>Working</c> or <c>PartlyFilled</c>.</summary>
@@ -167,7 +176,8 @@ public class Order : BaseAuditableEntity
         int placedByUserId,
         DateTimeOffset placedAt,
         Guid? publicId = null,
-        ClientMoneyAccount? settlementAccount = null)
+        ClientMoneyAccount? settlementAccount = null,
+        int? rebalanceId = null)
     {
         if (quantity <= 0m || decimal.Round(quantity, QuantityDecimals) != quantity)
         {
@@ -214,7 +224,8 @@ public class Order : BaseAuditableEntity
             Memo = OptionalText(memo, MemoMaxLength, "Memo"),
             PlacedByUserId = placedByUserId,
             PlacedAt = placedAt.ToUniversalTime(),
-            PublicId = publicId ?? Guid.NewGuid()
+            PublicId = publicId ?? Guid.NewGuid(),
+            RebalanceId = rebalanceId
         };
         if (settlementAccount is not null)
         {
@@ -290,8 +301,9 @@ public class Order : BaseAuditableEntity
     }
 
     /// <summary>R18: an order the broker cannot hold is <c>Cancelled</c> at once and reserves nothing.</summary>
-    public void CancelUnsent(int? byUserId, string? note, DateTimeOffset at)
+    public void CancelUnsent(int? byUserId, string? note, DateTimeOffset at, bool forRebalance = false)
     {
+        EnsureCancellableBy(byUserId, forRebalance);
         if (!IsUnsent)
         {
             throw new OrderStatusException("This order may be at the broker; only the broker can end it.");
@@ -307,8 +319,9 @@ public class Order : BaseAuditableEntity
     }
 
     /// <summary>R18: an open order the broker may hold gets a cancel request; its status does not change.</summary>
-    public void RequestCancel(int? byUserId, string? note, DateTimeOffset at)
+    public void RequestCancel(int? byUserId, string? note, DateTimeOffset at, bool forRebalance = false)
     {
+        EnsureCancellableBy(byUserId, forRebalance);
         if (!IsOpen)
         {
             throw new OrderStatusException($"This order is {Status} and cannot be cancelled.");
@@ -323,6 +336,16 @@ public class Order : BaseAuditableEntity
         CancelRequestedAt = at.ToUniversalTime();
         CancelRequestedByUserId = byUserId;
         CancelNote = trimmed;
+    }
+
+    /// <summary>Rebalances R20: a person's cancel of a rebalance order is refused unless it comes from cancelling the
+    /// rebalance; the platform's request (a corporate action, R50) is not.</summary>
+    private void EnsureCancellableBy(int? byUserId, bool forRebalance)
+    {
+        if (RebalanceId is not null && byUserId is not null && !forRebalance)
+        {
+            throw new OrderStatusException(RebalanceOrderMessage);
+        }
     }
 
     /// <summary>R22: the broker answered the cancel request.</summary>

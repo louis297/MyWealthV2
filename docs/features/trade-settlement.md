@@ -29,6 +29,7 @@ related:
   - ../database-design.md
   - ../api-design.md
   - ../glossary.md
+  - rebalances.md
 ---
 
 # Trade settlement cash and broken trades
@@ -555,3 +556,12 @@ Do not put rebalance through orders, a fee sweep or a break after settlement in 
 ### Docs amended when this spec was accepted
 
 [orders.md](orders.md) (R2, R4, R20, R53: the settlement account; R23–R25: the two kinds, their fields and skip reasons; R28, R33, R36–R38, R44, R47: the broken fill; §2 Out and §11 points 1 and 12 answered), [bank-reconciliation.md](bank-reconciliation.md) (R9, R10, R13, R14, §5 kinds, §11 point 6), [withdrawals.md](withdrawals.md) (R31 kinds, R32, R33), [bank-returns.md](bank-returns.md) (R2 classification, R8, R10), [deposit-matching.md](deposit-matching.md) (R13: settlement receipts before deposit matching; the line item), [transaction-source.md](transaction-source.md) (R7: a broken trade is reversed by its flow; `OrderFill` stays not hand-reversible), [account-closure.md](account-closure.md) (R5), [trade-fees.md](trade-fees.md) (a fill's fee is never below 0), [simulator.md](simulator.md) (R35–R42, script `0011`, the routes and log actions), [bff-adviser-portal.md](bff-adviser-portal.md) (prefix `/trade-settlements`), [api-design.md](../api-design.md) (§3.1 one permission row, §6 resource row, §7.12 notes, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [architecture.md](../architecture.md) (broker connection configuration), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D76–D78), [customer-portal.md](../customer-portal/customer-portal.md) (C36), [back-office.md](../backoffice/back-office.md) (BO29), [glossary.md](../glossary.md) (the review terms become accepted; Fill, Settled, Unsettled cash, Outgoing payment, Known difference, Timing difference, Break, Hand-reversible source and Broker connection change), [function-plan.md](../function-plan.md) §5, [features/README.md](README.md) row status, [future-plans.md](../future-plans.md) §9, and the roadmap §8 O1 and O2, §11 S1 and S2, §13 and §14.
+
+---
+
+## Amendment 2026-11-23 (rebalance through orders) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md](rebalances.md). Rule R26 lives there; this section records what changes here.
+
+- R5, R23: a rebalance order gets a settlement account like any order, so its fills settle through the client money account and leave the known difference `Trades`. `Trades` keeps the rebalance trades posted before this slice (source `Rebalance`).
+- "Still open": rebalance orders are no longer open; they settle like any order.

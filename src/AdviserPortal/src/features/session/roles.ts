@@ -103,6 +103,11 @@ export function canAccessOrders(role: string | null | undefined) {
   return role === roles.tenantAdmin || role === roles.adviser;
 }
 
+/** rebalances P19: the Rebalances pages are the TenantAdmin's and the Adviser's (R1). */
+export function canAccessRebalances(role: string | null | undefined) {
+  return role === roles.tenantAdmin || role === roles.adviser;
+}
+
 /** trade-settlement D76: the Trade settlements pages are the TenantAdmin's (R1). */
 export function canManageTradeSettlements(role: string | null | undefined) {
   return role === roles.tenantAdmin;

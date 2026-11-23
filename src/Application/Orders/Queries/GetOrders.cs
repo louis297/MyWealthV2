@@ -17,7 +17,8 @@ public sealed record GetOrdersQuery(
     string? Side = null,
     string? Status = null,
     bool? PendingFill = null,
-    Guid? TenantId = null) : IRequest<PagedList<OrderDto>>
+    Guid? TenantId = null,
+    Guid? RebalanceId = null) : IRequest<PagedList<OrderDto>>
 {
     internal static IReadOnlyList<string> Names(string? value) =>
         string.IsNullOrWhiteSpace(value)
@@ -83,6 +84,12 @@ public class GetOrdersQueryHandler(IApplicationDbContext db, ICurrentUser curren
         if (statuses.Count > 0)
         {
             query = query.Where(row => statuses.Contains(row.Status));
+        }
+
+        // Rebalances R27: the orders of one rebalance.
+        if (request.RebalanceId is Guid rebalanceId)
+        {
+            query = query.Where(row => db.Rebalances.Any(rebalance => rebalance.Id == row.RebalanceId && rebalance.PublicId == rebalanceId));
         }
 
         // R16: only orders with a fill that is not posted yet.

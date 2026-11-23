@@ -379,7 +379,8 @@ describe("TransactionDetailPage source (adviser-portal-dashboard D26, D27)", () 
 
   it.each([
     ["Manual", null, true],
-    ["Rebalance", handle, true],
+    // Rebalances R28: a rebalance trade is no longer reversed by hand.
+    ["Rebalance", handle, false],
     ["Seed", null, false],
   ])("offers Reverse on a %s transaction (source id %s): %s", async (kind, id, offered) => {
     renderFees(user(), routes, path, serve({ kind, id }));

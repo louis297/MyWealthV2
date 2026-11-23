@@ -32,6 +32,7 @@ public static class RolePermissions
             Policies.CorporateActionsRead, Policies.CorporateActionsManage,
             Policies.OrdersRead, Policies.OrdersPlace,
             Policies.TradeSettlementsManage,
+            Policies.RebalancesRead, Policies.RebalancesConfirm,
             Policies.ReportsCustomerRead, Policies.ReportsCustomerCreate,
             Policies.ReportsBookRead, Policies.ReportsBookCreate,
             Policies.ReportsTenantRead, Policies.ReportsTenantCreate
@@ -50,6 +51,7 @@ public static class RolePermissions
             Policies.InterestRatesRead,
             Policies.CorporateActionsRead,
             Policies.OrdersRead, Policies.OrdersPlace,
+            Policies.RebalancesRead, Policies.RebalancesConfirm,
             Policies.ReportsCustomerRead, Policies.ReportsCustomerCreate,
             Policies.ReportsBookRead, Policies.ReportsBookCreate
         ],

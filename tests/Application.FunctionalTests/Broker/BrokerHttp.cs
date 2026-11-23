@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Application.Broker;
+using MyWealthV2.Application.Rebalances;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Infrastructure.Data;
 
@@ -82,5 +83,12 @@ internal static class BrokerHttp
     {
         using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
         return await scope.ServiceProvider.GetRequiredService<SendBrokerOrders>().CancelAsync(connection);
+    }
+
+    /// <summary>The advance step (rebalances R17).</summary>
+    public static async Task<RebalanceAdvanceOutcome> AdvanceAsync(string connection = Connection)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<AdvanceRebalances>().RunAsync(connection);
     }
 }

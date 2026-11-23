@@ -32,6 +32,7 @@ related:
   - ../database-design.md
   - ../api-design.md
   - ../glossary.md
+  - rebalances.md
 ---
 
 # Corporate actions
@@ -739,3 +740,11 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders.md](ord
 - R25: a sell fill that arrives after a consolidation made the holding smaller than the fill waits with `InsufficientHolding` until the account is corrected (orders R36).
 - R42: when a corporate action of a simulated instrument becomes effective, the simulator broker cancels every working order in that symbol (orders R62).
 - "Still open": the halt on trades between the ex-date and the posting is answered for orders by the two points above. A trade the broker made before the action and the platform posts after it stays open (§11 point 6).
+
+---
+
+## Amendment 2026-11-23 (rebalance through orders) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md](rebalances.md). Rule R21 lives there; this section records what changes here.
+
+- A note: R22 requests the cancel of the open orders in the Instrument, a rebalance order included. Its wave then has an order that is not `Filled`, and the rebalance ends `Incomplete` with `order_not_filled` (rebalances R17 b, R21).

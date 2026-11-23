@@ -385,6 +385,42 @@ public class BffApiTests
     }
 
     [Test]
+    public async Task Session_ProxiesRebalances_ReadsConfirmAndCancel()
+    {
+        // bff-adviser-portal amendment 2026-11-23 (rebalances): /rebalances is on the prefix allow-list.
+        var id = Guid.NewGuid();
+        _api.Scripts["/rebalances"] = (HttpStatusCode.OK, """{"items":[],"page":1,"pageSize":20,"totalCount":0}""");
+        _api.Scripts[$"/rebalances/{id}"] = (HttpStatusCode.OK, "{}");
+        _api.Scripts[$"/rebalances/{id}/confirm"] = (HttpStatusCode.NoContent, "");
+        _api.Scripts[$"/rebalances/{id}/cancel"] = (HttpStatusCode.NoContent, "");
+
+        foreach (var (method, path) in new[]
+                 {
+                     (HttpMethod.Get, "/api/rebalances?open=true"),
+                     (HttpMethod.Get, $"/api/rebalances/{id}"),
+                     (HttpMethod.Post, $"/api/rebalances/{id}/confirm"),
+                     (HttpMethod.Post, $"/api/rebalances/{id}/cancel")
+                 })
+        {
+            using var request = new HttpRequestMessage(method, path);
+            request.Headers.TryAddWithoutValidation("Cookie", _sessionCookie);
+            if (method == HttpMethod.Post)
+            {
+                request.Headers.TryAddWithoutValidation(RequestHeader, "1");
+                request.Content = new StringContent("""{"rowVersion":"AAAA"}""", System.Text.Encoding.UTF8, "application/json");
+            }
+
+            var response = await _bff.SendAsync(request);
+            response.StatusCode.ShouldNotBe(HttpStatusCode.NotFound, path);
+        }
+
+        _api.Calls.ShouldContain(call => call.Path == "/rebalances");
+        _api.Calls.ShouldContain(call => call.Path == $"/rebalances/{id}");
+        _api.Calls.ShouldContain(call => call.Path == $"/rebalances/{id}/confirm");
+        _api.Calls.ShouldContain(call => call.Path == $"/rebalances/{id}/cancel");
+    }
+
+    [Test]
     public async Task Session_ProxiesTradeSettlements_ReadsPayAndSetAside_AndTheResolveOfABrokenFill()
     {
         // bff-adviser-portal amendment 2026-11-23 (trade settlements): /trade-settlements is on the prefix allow-list.

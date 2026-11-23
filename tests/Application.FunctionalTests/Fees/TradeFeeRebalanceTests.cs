@@ -11,12 +11,13 @@ using MyWealthV2.Infrastructure.Data;
 
 namespace MyWealthV2.Application.FunctionalTests.Fees;
 
-/// <summary>Trade fees R24–R29: rebalance trades carry fees, and the buys are scaled to leave cash for them.</summary>
+/// <summary>Trade fees R24–R29 (amended by rebalances R26): the planner's fees are estimates, and the buys are scaled to
+/// leave cash for them.</summary>
 [Parallelizable]
 public class TradeFeeRebalanceTests : TestBase
 {
     [Test]
-    public async Task Assign_WithAFeeThatThePlainPlanCannotFund_ScalesTheBuyAndPostsTheFee()
+    public async Task Assign_WithAFeeThatThePlainPlanCannotFund_ProposesAScaledBuyWithTheEstimatedFee()
     {
         var (tenant, _, customer, adviser) = await AccountHttp.SignInAdviser();
         var accountId = await AccountHttp.OpenAccountAsync(
@@ -45,14 +46,15 @@ public class TradeFeeRebalanceTests : TestBase
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        json.RootElement.GetProperty("status").GetString().ShouldBe("Success");
-        var cash = await TradeFeeTradeTests.CashBalanceAsync(adviser.AccessToken, accountId);
-        cash.ShouldBeGreaterThanOrEqualTo(0m);
-        cash.ShouldBeLessThan(1m);
-        var details = await TradeFeeTradeTests.FeeDetailsAsync();
-        details.Count.ShouldBe(1);
-        details[0].Fee.ShouldBe(50m);
-        details[0].Basis.ShouldBeLessThan(10000m);
-        details[0].Basis.ShouldBeGreaterThan(9900m);
+        // Rebalances R9, R26: the planner's fees are estimates on the proposal; the trades are order fills later.
+        json.RootElement.GetProperty("status").GetString().ShouldBe("Proposed");
+        var item = await Rebalances.RebalanceHttp.GetAsync(adviser.AccessToken, json.RootElement.GetProperty("rebalanceId").GetGuid());
+        var line = item.GetProperty("lines").EnumerateArray().Single();
+        line.GetProperty("estimatedFee").GetDecimal().ShouldBe(50m);
+        var gross = line.GetProperty("estimatedGross").GetDecimal();
+        gross.ShouldBeLessThan(10000m);
+        gross.ShouldBeGreaterThan(9900m);
+        (gross + 50m).ShouldBeLessThanOrEqualTo(10000m);
+        (await TradeFeeTradeTests.FeeDetailsAsync()).ShouldBeEmpty();
     }
 }

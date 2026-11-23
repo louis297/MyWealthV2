@@ -64,6 +64,14 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
             .WithMany()
             .HasForeignKey(order => order.CancelRequestedByUserId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Rebalance>()
+            .WithMany()
+            .HasForeignKey(order => order.RebalanceId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(order => order.RebalanceId)
+            .HasFilter("[RebalanceId] IS NOT NULL")
+            .HasDatabaseName("IX_Orders_RebalanceId");
         builder.HasMany(order => order.Fills)
             .WithOne()
             .HasForeignKey(fill => fill.OrderId)

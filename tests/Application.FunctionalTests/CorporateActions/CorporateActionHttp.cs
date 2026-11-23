@@ -157,7 +157,8 @@ internal static class CorporateActionHttp
     public static async Task<Holders> HoldersAsync(NominatedBankAccounts.NominatedWorld world, string symbol = "AAPL")
     {
         var token = world.TenantAdmin.AccessToken;
-        var instrumentId = await CustodialHttp.CreateInstrumentAsync(token, symbol);
+        // A price from long before any ex-date of these tests, so a price from the ex-date is the test's own.
+        var instrumentId = await CustodialHttp.CreateInstrumentAsync(token, symbol, priceDate: new DateOnly(2026, 1, 1));
         var ned = await Interest.InterestHttp.OpenCustodialAsync(world.Tenant.Id, token, world.Customer.PublicId);
         var olga = await Interest.InterestHttp.OpenCustodialAsync(world.Tenant.Id, token, world.OtherCustomer.PublicId);
         var empty = await Interest.InterestHttp.OpenCustodialAsync(world.Tenant.Id, token, world.Customer.PublicId);

@@ -26,6 +26,7 @@ related:
   - ../glossary.md
   - interest-run.md
   - trade-settlement.md
+  - rebalances.md
 ---
 
 # Bank reconciliation
@@ -590,3 +591,11 @@ Status of this amendment: `accepted` (2026-11-23), together with [trade-settleme
 - R13, R14: the items still add up to the difference. A run also records `openSettlements` (`{ count, amount }` of the open trade settlements of its account), which is not an item.
 - §5: `ReconciliationItemKind` gains `UnsettledTrades = 15` (Timing), `TradesNeedingAction = 16` (Break), `UnbookedFills = 17` (Break), `TradeFees = 18` (Known). `0052` widens `CK_BankReconciliationItems_Kind` to 0–18 and adds `OpenSettlementsCount` and `OpenSettlementsAmount` to `BankReconciliations`.
 - §11 point 6: trades of orders that settle through the trust account are no longer a known difference; `Trades` keeps rebalance trades, trades typed before orders, sells in another currency, and fills whose settlement was set aside or whose break was resolved by hand.
+
+---
+
+## Amendment 2026-11-23 (rebalance through orders) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md](rebalances.md). Rule R26 lives there; this section records what changes here.
+
+- R10: the fills of a rebalance order are split by their order like any order fill (`UnsettledTrades`, `TradeFees`). `Trades` keeps only the rebalance trades posted before this slice, with source `Rebalance`.

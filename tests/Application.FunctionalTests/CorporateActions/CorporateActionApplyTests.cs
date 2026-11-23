@@ -196,8 +196,9 @@ public class CorporateActionApplyTests : TestBase
         });
         portfolio.StatusCode.ShouldBe(HttpStatusCode.Created, await portfolio.Content.ReadAsStringAsync());
         var portfolioId = JsonDocument.Parse(await portfolio.Content.ReadAsStringAsync()).RootElement.GetProperty("id").GetGuid();
-        (await PortfolioHttp.Send(HttpMethod.Post, $"/accounts/{holders.Ned}/portfolio", token, new { portfolioId }))
-            .StatusCode.ShouldBe(HttpStatusCode.OK);
+        // Rebalances R10: the assignment is Active whatever its proposal's plan says (here the old price fails it).
+        await PortfolioHttp.Send(HttpMethod.Post, $"/accounts/{holders.Ned}/portfolio", token, new { portfolioId });
+        (await PortfolioHttp.Send(HttpMethod.Get, $"/accounts/{holders.Ned}/portfolio", token)).StatusCode.ShouldBe(HttpStatusCode.OK);
         var scheduler = FunctionalTestSetup.WebApiServices.GetRequiredService<RecordingRebalanceScheduler>();
         var enqueued = scheduler.Enqueued.Count;
         var before = (await HoldingAsync(token, holders.Ned, holders.InstrumentId)).Quantity;

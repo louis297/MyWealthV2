@@ -376,6 +376,8 @@ Beyond PK / unique constraints already listed:
 0049_market_data_feeds.sql                  -- MarketDataFeeds (platform data, PK (Connection, Kind))
 0050_corporate_actions.sql                  -- CorporateActionAnnouncements (platform data), CorporateActions, CorporateActionEntitlements, TransactionCorporateActionDetails; CK_Transactions_SourceKind 0–7; MarketDataFeeds Kind 0–1, LastFailure 0–5
 0051_orders.sql                             -- Orders, OrderFills, ExecutionReports (platform data), BrokerFeeds (platform data), TransactionExecutionDetails; Tenants.BrokerConnection (back-filled 'simulator'); CK_Transactions_SourceKind 0–8
+0052_trade_settlement.sql                   -- TradeSettlements; settlement columns on Orders, OrderFills, ExecutionReports, OutgoingPayments, BankStatementLines; BankReconciliations open settlements
+0053_rebalances.sql                         -- Rebalances, RebalanceTargets, RebalanceLines; Orders.RebalanceId; UQ_AccountPortfolioAssignments_TenantId_Id; drops the three LastRebalance columns of AccountPortfolioAssignments
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -490,6 +492,8 @@ Script `0023_portfolios.sql`:
 No seed in the script. Development / TestAppHost `TestSeed` adds one demo portfolio and one assignment, and does not post rebalance trades.
 
 Amendment 2026-11-17 (custody modes, accepted, landed; [features/custody-modes.md](features/custody-modes.md) §6): script `0032_remove_external_portfolio_assignments.sql` changes data only. Every `AccountPortfolioAssignments` row with `Status = 0` (Active) whose Account has `CustodyMode = 0` (External) gets `Status = 1` (Removed), with `LastModified` and `LastModifiedBy` filled. No table, column, index or constraint changes; holdings and transactions are not touched. One `UPDATE`, safe to run again. After it, an Active assignment exists only on a Custodial account; that is kept by Application, not by a constraint. `TestSeed` then puts the demo assignment on a Custodial demo account.
+
+Amendment 2026-11-23 (rebalance through orders, accepted; [features/rebalances.md](features/rebalances.md) §6): script `0053_rebalances.sql` drops `CK_AccountPortfolioAssignments_LastRebalanceStatus`, then `LastRebalanceAt`, `LastRebalanceStatus` and `LastRebalanceMessage`, with no back-fill, and adds `UQ_AccountPortfolioAssignments_TenantId_Id` on `(TenantId, Id)` for the tenant composite FK from `Rebalances`. The outcome of a rebalance is on its `Rebalances` row (§11.18).
 
 ### 11.7 Trade fee schedules (accepted)
 
@@ -612,6 +616,8 @@ Reserved cash, reserved quantity, unsettled cash and withdrawable cash of an Acc
 
 Amendment 2026-11-23 (trade settlement and broken trades, accepted; [features/trade-settlement.md](features/trade-settlement.md) §6.1): script `0052_trade_settlement.sql` adds to `Orders` `ClientMoneyAccountId` and `SettlementAccountNumber` (both or neither); to `OrderFills` the broker settlement id, the trade settlement and the break columns, widens `Status` to 0–2 and replaces the `TransactionId` CHECK; to `ExecutionReports` the five settlement fields, and widens `Kind` to 0–5 and `SkipReason` to 0–7. No back-fill.
 
+Amendment 2026-11-23 (rebalance through orders, accepted; [features/rebalances.md](features/rebalances.md) §6): script `0053_rebalances.sql` adds `RebalanceId int NULL` to `Orders` (FK `(TenantId, RebalanceId)` → `Rebalances` RESTRICT; filtered index `WHERE RebalanceId IS NOT NULL`). Existing orders have no rebalance.
+
 ### 11.17 Trade settlements (accepted)
 
 Feature spec: [features/trade-settlement.md](features/trade-settlement.md) (accepted 2026-11-23) §6.1. Script `0052_trade_settlement.sql`:
@@ -619,6 +625,16 @@ Feature spec: [features/trade-settlement.md](features/trade-settlement.md) (acce
 - `TradeSettlements` — `Id`, `PublicId` (unique), `TenantId`, `ClientMoneyAccountId` (tenant composite FK), `Connection nvarchar(50)`, `BrokerSettlementId nvarchar(100)`, `Currency`, `SettledDate`, the platform's `FillCount` and `NetAmount decimal(18,4)`, the broker's `BrokerFillCount`, `BrokerNetAmount` and `BrokerSettlementAccount nvarchar(34)`, `ExecutionReportId` (FK), `Status int` (CHECK 0–5), `Failure int NULL` (CHECK 0–2, set iff `Status = 3`), `FailureDetail nvarchar(140) NULL`, `CompletedAt` (set iff `Status = 2`), set aside by, at and note (all set iff `Status = 5`), audit columns, `RowVersion`. Unique `(Connection, BrokerSettlementId, ClientMoneyAccountId)`; index `(TenantId, Status, Id DESC)`.
 
 A trade settlement writes no Transaction. No back-fill.
+
+### 11.18 Rebalances (accepted)
+
+Feature spec: [features/rebalances.md](features/rebalances.md) (accepted 2026-11-23) §6. Script `0053_rebalances.sql`:
+
+- `Rebalances` — `Id`, `PublicId` (unique; the `handle` of the 202 body), `TenantId`, `AccountId`, `PortfolioId`, `AssignmentId` (tenant composite FKs, RESTRICT), `Trigger` (CHECK 0–3), `Status` (CHECK 0–7), `BaseCurrency char(3)`, `TotalValue` and `Cash decimal(18,4) NULL` (`NULL` on a `Failed` rebalance), `MinimumTrade decimal(18,4)`, `CashResidualPercent decimal(5,2)`, `Connection nvarchar(50) NULL`, `Waves`, `BuyWaves` (CHECK `BuyWaves <= 2 AND BuyWaves <= Waves`), `FailureCode nvarchar(50)` and `FailureMessage nvarchar(500)` (both set iff `Status IN (4, 7)`), proposed by and at, `ExpiresAt`, confirmed by and at (both or neither; required when `Status IN (1, 2, 3, 4)`), cancel requested at, by and note, `CancelReason` (CHECK 0–2, set iff `Status = 5`), `FollowUp bit`, `EndedAt` (set iff `Status >= 3`), audit columns, `RowVersion`. The three user columns have tenant composite FKs to `Users`. Filtered unique `(AccountId) WHERE Status IN (0, 1, 2)`; index `(TenantId, ProposedAt DESC)`; index `(PortfolioId, Status)`; filtered index `(Connection, Id) WHERE Status IN (1, 2)`.
+- `RebalanceTargets` — `Id`, `TenantId`, `RebalanceId`, `InstrumentId` (tenant composite FKs), `TargetWeight decimal(5,2)`, `SortOrder`. Unique `(RebalanceId, InstrumentId)`.
+- `RebalanceLines` — `Id`, `TenantId`, `RebalanceId`, `InstrumentId` (tenant composite FKs), `Quantity decimal(18,8)`, `Weight decimal(5,2)`, `TargetWeight decimal(5,2) NULL`, `Side int NULL` (CHECK 0–1), `TradeQuantity decimal(18,8) NULL`, `ReferencePrice decimal(18,8) NULL`, `ReferencePriceDate date NULL`, `EstimatedGross` and `EstimatedFee decimal(18,4) NULL` (the five trade columns set iff `Side` is set), `Currency char(3)`. Unique `(RebalanceId, InstrumentId)`.
+
+A rebalance writes no Transaction. No back-fill: no rebalance is created for a run before `0053`, and existing Transactions keep source `Rebalance`. No simulator script.
 
 ## 12. Still not a schema decision
 
@@ -690,6 +706,7 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-23 | Orders and settlement accepted (`0051`, not written yet): `Orders`, `OrderFills`, `ExecutionReports`, `BrokerFeeds` (§11.16), `TransactionExecutionDetails` and `CK_Transactions_SourceKind` 0–8 (§11.4), `Tenants.BrokerConnection` (§6.5); simulator `0010_broker.sql` (§15). §9 lists `0051`. |
 
 | 2026-11-23 | Trade settlement and broken trades accepted (`0052`, not written yet): `TradeSettlements` (§11.17); columns on `Orders`, `OrderFills`, `ExecutionReports` (§11.16), `OutgoingPayments` (§11.11), `BankStatementLines` (§11.9) and `BankReconciliations` (§11.12); simulator `0011_broker_settlement.sql` (§15). |
+| 2026-11-23 | Rebalance through orders accepted (`0053`, not written yet): `Rebalances`, `RebalanceTargets`, `RebalanceLines` (§11.18); `Orders.RebalanceId` (§11.16); the three `LastRebalance…` columns of `AccountPortfolioAssignments` dropped and `UQ_AccountPortfolioAssignments_TenantId_Id` added (§11.6). No simulator script. §9 lists `0053`. |
 
 ---
 

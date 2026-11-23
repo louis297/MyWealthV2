@@ -225,7 +225,7 @@ After slice 2, some writes on a Custodial account are still entered by hand or a
 - An interest job and income events (§1 step 2), replacing hand-entered `Interest`. The interest job is [features/interest-run.md](features/interest-run.md) (accepted 2026-11-22).
 - Corporate action events, replacing hand-entered `Split` / `Bonus` / `Scrip`. Splits, consolidations and bonus issues are [features/corporate-actions.md](features/corporate-actions.md) (accepted 2026-11-22); `Scrip` and dividends come later.
 - In-kind transfer and migration batches, replacing `Opening`, `OpeningHoldings`, `StockIn` and `StockOut`.
-- Orders, replacing the immediate `Buy` / `Sell`. Orders, fills and settlement are [features/orders.md](features/orders.md) (accepted 2026-11-23); settlement cash through the client money account and broken trades are [features/trade-settlement.md](features/trade-settlement.md) (accepted 2026-11-23); rebalance through orders comes later.
+- Orders, replacing the immediate `Buy` / `Sell`. Orders, fills and settlement are [features/orders.md](features/orders.md) (accepted 2026-11-23); settlement cash through the client money account and broken trades are [features/trade-settlement.md](features/trade-settlement.md) (accepted 2026-11-23); rebalance through orders is [features/rebalances.md](features/rebalances.md) (accepted 2026-11-23).
 - A controlled manual adjustment as the only hand-entered write.
 - A simulator of the outside parties (a bank first, then a broker) to drive these flows without real connections.
 - Rebuilding an account's position by replaying its transactions in order. Deferred until after the items above are under way.

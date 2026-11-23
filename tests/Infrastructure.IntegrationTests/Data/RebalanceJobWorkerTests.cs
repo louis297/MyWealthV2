@@ -1,12 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using MyWealthV2.Application.Broker;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Portfolios;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.ValueObjects;
 using MyWealthV2.Infrastructure.Accounts;
+using MyWealthV2.Infrastructure.Broker;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Identity;
 using MyWealthV2.Shared;
@@ -17,15 +20,15 @@ namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>
 /// The rebalance job as the Worker runs it: Infrastructure services with <see cref="SystemUser"/> as the
-/// <see cref="IUser"/>. Its trades carry the system name in <c>CreatedBy</c> (database-design §3: the actor's
-/// Identity id or a system name) and the rebalance handle as their source (transaction-source R5).
+/// <see cref="IUser"/>. It proposes a rebalance whose id is the handle, with the system name in <c>CreatedBy</c>
+/// (database-design §3), and writes no Transaction (rebalances R12, R26).
 /// </summary>
 public class RebalanceJobWorkerTests
 {
     private const decimal Price = 10m;
 
     [Test]
-    public async Task Execute_AsTheWorker_PostsTheTradesWithTheSystemNameAndTheHandle()
+    public async Task Execute_AsTheWorker_ProposesWithTheHandleAsItsId_AndTheSystemName_AndTradesNothing()
     {
         var (accountId, instrumentId) = await InsertAssignedCustodialAccountAsync();
         var handle = Guid.NewGuid();
@@ -39,12 +42,12 @@ public class RebalanceJobWorkerTests
 
         await using var db = OpenDb();
         var account = await db.Accounts.IgnoreQueryFilters().SingleAsync(row => row.PublicId == accountId);
-        var trades = await db.Transactions.IgnoreQueryFilters().AsNoTracking()
-            .Where(row => row.Type == TransactionType.Buy && row.CashLegs.Any(leg => leg.AccountId == account.Id))
-            .ToListAsync();
-        trades.ShouldNotBeEmpty();
-        trades.ShouldAllBe(row => row.CreatedBy == SystemUser.Name);
-        trades.ShouldAllBe(row => row.Source.Kind == TransactionSourceKind.Rebalance && row.Source.PublicId == handle);
+        var rebalance = await db.Rebalances.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.AccountId == account.Id);
+        (rebalance.PublicId, rebalance.Trigger, rebalance.Status, rebalance.ProposedByUserId, rebalance.CreatedBy)
+            .ShouldBe((handle, RebalanceTrigger.Portfolio, RebalanceStatus.Proposed, (int?)null, SystemUser.Name));
+        (await db.Transactions.IgnoreQueryFilters().AsNoTracking()
+                .CountAsync(row => row.Type == TransactionType.Buy && row.CashLegs.Any(leg => leg.AccountId == account.Id)))
+            .ShouldBe(0);
     }
 
     private static IHost WorkerHost(int pricedInstrumentId)
@@ -52,7 +55,11 @@ public class RebalanceJobWorkerTests
         var builder = Host.CreateApplicationBuilder();
         builder.Configuration[$"ConnectionStrings:{Services.Database}"] = SchemaDatabaseSetup.ConnectionString;
         builder.AddInfrastructureServices();
+        builder.AddBrokerConnections(BrokerConnectionHost.Worker);
         builder.Services.AddScoped<IUser, SystemUser>();
+        builder.Services.RemoveAll<IBrokerConnections>();
+        builder.Services.AddSingleton<IBrokerConnections>(new ConfiguredBrokerConnections(
+            [new BrokerConnectionSettings("simulator", "Simulator", new Uri("http://simulator:8082"), "key", 10, 1)]));
         // The last registration wins: a fixed price instead of the stored instrument prices.
         builder.Services.AddScoped<IMarketData>(_ => new FixedPrice(pricedInstrumentId));
         return builder.Build();
@@ -63,6 +70,8 @@ public class RebalanceJobWorkerTests
     {
         await using var db = OpenDb();
         var (tenant, otherTenant) = await TwoTenantFixture.InsertAsync(db);
+        // Rebalances R6: the firm names a broker connection.
+        tenant.SetBrokerConnection("simulator");
         var (adviser, otherAdviser) = await TwoTenantFixture.InsertAdvisersAsync(db, tenant, otherTenant);
         var (customer, _) = await TwoTenantFixture.InsertCustomersAsync(db, tenant, otherTenant, adviser, otherAdviser);
         var nzd = Currency.Create("NZD", "New Zealand Dollar", 2);
@@ -74,6 +83,9 @@ public class RebalanceJobWorkerTests
         instrument.CreatedBy = "test";
         db.Accounts.Add(account);
         db.Instruments.Add(instrument);
+        await db.SaveChangesAsync();
+        // Rebalances R8: a price from the last 4 days.
+        db.InstrumentPrices.Add(new() { InstrumentId = instrument.Id, Price = Price, AsOfDate = DateOnly.FromDateTime(DateTime.UtcNow), Source = "EODHD", FetchedAt = DateTimeOffset.UtcNow });
         await db.SaveChangesAsync();
 
         var portfolio = Portfolio.Create(tenant.Id, "Growth", nzd, [(instrument.Id, 100m)]);

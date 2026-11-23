@@ -1,13 +1,33 @@
-namespace MyWealthV2.Domain.Rebalance;
+using MyWealthV2.Domain.Orders;
 
+namespace MyWealthV2.Domain.Rebalances;
+
+/// <summary>
+/// The Full Rebalance plan of portfolios R8 against the targets and settings it is given (a portfolio's, or a
+/// rebalance's own: rebalances R7, R10). With <see cref="RebalanceInput.OrderChecks"/> it also refuses what an order
+/// refuses (rebalances R8); with <see cref="RebalanceInput.SizeBuysByReservation"/> each buy is costed at the cash its
+/// order reserves, so a wave of buys never reserves more than the available cash (rebalances R16).
+/// </summary>
 public static class RebalancePlanner
 {
     public static RebalancePlan Plan(RebalanceInput input)
     {
+        if (input.OrderChecks)
+        {
+            // R8 (roadmap D20): a target line must be quoted in the Account's currency. A holding in another currency
+            // is still sold.
+            foreach (var target in input.Targets.Where(target => !Same(target.QuoteCurrency, input.AccountCurrency)))
+            {
+                return Fail(
+                    "currency_mismatch",
+                    $"{target.Symbol} is quoted in {target.QuoteCurrency.ToUpperInvariant()} and this account is in {input.AccountCurrency.ToUpperInvariant()}. A rebalance buys only instruments quoted in the account's currency.");
+            }
+        }
+
         var holdings = input.Holdings.Where(holding => holding.Quantity > 0m).ToList();
         foreach (var holding in holdings)
         {
-            if (QuoteProblem(holding.Symbol, holding.QuoteCurrency, holding.Price, holding.QuoteToBase, holding.QuoteToAccount, input) is { } problem)
+            if (QuoteProblem(holding.Symbol, holding.QuoteCurrency, holding.Price, holding.PriceDate, holding.QuoteToBase, holding.QuoteToAccount, input) is { } problem)
             {
                 return problem;
             }
@@ -15,7 +35,7 @@ public static class RebalancePlanner
 
         foreach (var target in input.Targets)
         {
-            if (QuoteProblem(target.Symbol, target.QuoteCurrency, target.Price, target.QuoteToBase, target.QuoteToAccount, input) is { } problem)
+            if (QuoteProblem(target.Symbol, target.QuoteCurrency, target.Price, target.PriceDate, target.QuoteToBase, target.QuoteToAccount, input) is { } problem)
             {
                 return problem;
             }
@@ -75,7 +95,7 @@ public static class RebalancePlanner
 
         if (trades.Count == 0)
         {
-            return new RebalancePlan(RebalanceStatus.NoChange, null, null, []);
+            return new RebalancePlan(RebalancePlanOutcome.NoChange, null, null, []);
         }
 
         // Post every sell before any buy. Cash from an overweight line has to land
@@ -124,14 +144,56 @@ public static class RebalancePlanner
             trades = sells.Concat(scaled).ToList();
             if (trades.Count == 0)
             {
-                return new RebalancePlan(RebalanceStatus.NoChange, null, null, []);
+                return new RebalancePlan(RebalancePlanOutcome.NoChange, null, null, []);
             }
         }
 
-        return new RebalancePlan(RebalanceStatus.Success, null, null, trades);
+        if (input.OrderChecks && TradeProblem(input, trades) is { } refused)
+        {
+            return refused;
+        }
+
+        return new RebalancePlan(RebalancePlanOutcome.Success, null, null, trades);
     }
 
-    /// <summary>Cash after every sell and every buy scaled by <paramref name="k"/>, fees included (R26, R27).</summary>
+    /// <summary>R8: every Instrument the plan trades is active and has a price at most 4 days old.</summary>
+    private static RebalancePlan? TradeProblem(RebalanceInput input, IReadOnlyList<RebalanceTrade> trades)
+    {
+        var instruments = input.Holdings
+            .Select(holding => (holding.InstrumentId, holding.Symbol, holding.IsActive, holding.PriceDate))
+            .Concat(input.Targets.Select(target => (target.InstrumentId, target.Symbol, target.IsActive, target.PriceDate)))
+            .GroupBy(row => row.InstrumentId)
+            .ToDictionary(group => group.Key, group => group.First());
+        foreach (var trade in trades)
+        {
+            var instrument = instruments[trade.InstrumentId];
+            if (!instrument.IsActive)
+            {
+                return Fail("instrument_inactive", $"{instrument.Symbol} is disabled. A rebalance trades only active instruments.");
+            }
+        }
+
+        if (input.Today is not { } today)
+        {
+            return null;
+        }
+
+        foreach (var trade in trades)
+        {
+            var instrument = instruments[trade.InstrumentId];
+            if (instrument.PriceDate is { } date && !OrderRules.IsReferencePriceFresh(date, today))
+            {
+                return Fail(
+                    "stale_price",
+                    $"The latest price of {instrument.Symbol} is from {date:yyyy-MM-dd}. An order needs a price from the last {OrderRules.ReferencePriceMaxAgeDays} days.");
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Cash after every sell and every buy scaled by <paramref name="k"/>, fees included (R26, R27). Sized by
+    /// reservation (rebalances R16), the sells are left out and each buy costs what its order reserves.</summary>
     private static decimal PlannedCash(
         RebalanceInput input,
         IReadOnlyList<RebalanceTrade> sells,
@@ -139,6 +201,20 @@ public static class RebalancePlanner
         decimal k)
     {
         var cash = input.Cash;
+        if (input.SizeBuysByReservation)
+        {
+            foreach (var buy in buys)
+            {
+                var quantity = Scale(buy.Quantity, k);
+                if (quantity > 0m)
+                {
+                    cash -= Reservation(input, buy, quantity);
+                }
+            }
+
+            return cash;
+        }
+
         foreach (var sell in sells)
         {
             cash += Cash(input, sell, sell.Quantity);
@@ -164,6 +240,17 @@ public static class RebalancePlanner
             trade.Buy, quantity, trade.Price, trade.QuoteCurrency, trade.QuoteToAccount, fee?.Schedule, fee?.DecimalPlaces ?? 2);
     }
 
+    /// <summary>Orders R12: the most a buy of <paramref name="quantity"/> can cost at its price limit, with the
+    /// schedule's fee on that gross, in the account's currency.</summary>
+    private static decimal Reservation(RebalanceInput input, RebalanceTrade trade, decimal quantity)
+    {
+        PlannerFeeSchedule? fee = null;
+        input.FeeSchedules?.TryGetValue(trade.QuoteCurrency, out fee);
+        var gross = OrderRules.MaximumGross(quantity, OrderRules.PriceLimit(OrderSide.Buy, trade.Price));
+        var terms = new OrderFeeTerms(fee?.Schedule, fee?.DecimalPlaces ?? 2);
+        return (gross + terms.FeeFor(gross)) * trade.QuoteToAccount;
+    }
+
     private static decimal Scale(decimal quantity, decimal k) =>
         decimal.Round(k * quantity, 8, MidpointRounding.AwayFromZero);
 
@@ -171,11 +258,12 @@ public static class RebalancePlanner
         string symbol,
         string quote,
         decimal? price,
+        DateOnly? priceDate,
         decimal? quoteToBase,
         decimal? quoteToAccount,
         RebalanceInput input)
     {
-        if (price is null or <= 0m)
+        if (price is null or <= 0m || (input.OrderChecks && priceDate is null))
         {
             return Fail("missing_price", $"Price is not available for {symbol}.");
         }
@@ -194,7 +282,7 @@ public static class RebalancePlanner
     }
 
     private static RebalancePlan Fail(string code, string message) =>
-        new(RebalanceStatus.Failed, code, message, []);
+        new(RebalancePlanOutcome.Failed, code, message, []);
 
     private static bool Same(string left, string right) =>
         string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
@@ -256,7 +344,10 @@ public sealed record RebalanceInput(
     decimal CashResidualPercent,
     IReadOnlyList<PlannerHolding> Holdings,
     IReadOnlyList<PlannerTarget> Targets,
-    IReadOnlyDictionary<string, PlannerFeeSchedule>? FeeSchedules = null);
+    IReadOnlyDictionary<string, PlannerFeeSchedule>? FeeSchedules = null,
+    bool OrderChecks = false,
+    bool SizeBuysByReservation = false,
+    DateOnly? Today = null);
 
 /// <summary>The trade fee schedule that applies on the rebalance's UTC date for one quote currency (trade-fees R25).</summary>
 public sealed record PlannerFeeSchedule(TradeFeeSchedule Schedule, int DecimalPlaces);
@@ -268,7 +359,9 @@ public sealed record PlannerHolding(
     decimal Quantity,
     decimal? Price,
     decimal? QuoteToBase,
-    decimal? QuoteToAccount);
+    decimal? QuoteToAccount,
+    bool IsActive = true,
+    DateOnly? PriceDate = null);
 
 public sealed record PlannerTarget(
     int InstrumentId,
@@ -277,7 +370,9 @@ public sealed record PlannerTarget(
     decimal TargetWeight,
     decimal? Price,
     decimal? QuoteToBase,
-    decimal? QuoteToAccount);
+    decimal? QuoteToAccount,
+    bool IsActive = true,
+    DateOnly? PriceDate = null);
 
 public sealed record RebalanceTrade(
     int InstrumentId,
@@ -289,7 +384,7 @@ public sealed record RebalanceTrade(
     decimal QuoteToAccount);
 
 public sealed record RebalancePlan(
-    RebalanceStatus Status,
+    RebalancePlanOutcome Status,
     string? Code,
     string? Message,
     IReadOnlyList<RebalanceTrade> Trades);

@@ -2,6 +2,7 @@ using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Portfolios;
+using MyWealthV2.Application.Rebalances;
 using MyWealthV2.Domain.Enums;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 
@@ -23,7 +24,8 @@ public class DisablePortfolioCommandValidator : AbstractValidator<DisablePortfol
     }
 }
 
-public class DisablePortfolioCommandHandler(IApplicationDbContext db, ICurrentUser currentUser)
+public class DisablePortfolioCommandHandler(
+    IApplicationDbContext db, ICurrentUser currentUser, ProposeRebalance proposals, TimeProvider time)
     : IRequestHandler<DisablePortfolioCommand>
 {
     public async Task Handle(DisablePortfolioCommand request, CancellationToken cancellationToken)
@@ -42,15 +44,27 @@ public class DisablePortfolioCommandHandler(IApplicationDbContext db, ICurrentUs
             throw new ConcurrencyException();
         }
 
-        var assignments = await db.AccountPortfolioAssignments
-            .Where(assignment => assignment.PortfolioId == portfolio.Id && assignment.Status == AssignmentStatus.Active)
-            .ToListAsync(cancellationToken);
-        foreach (var assignment in assignments)
+        await db.ExecuteInTransactionAsync(async token =>
         {
-            assignment.Remove();
-        }
+            var assignments = await db.AccountPortfolioAssignments
+                .Where(assignment => assignment.PortfolioId == portfolio.Id && assignment.Status == AssignmentStatus.Active)
+                .OrderBy(assignment => assignment.AccountId)
+                .ToListAsync(token);
+            var now = time.GetUtcNow();
+            foreach (var assignment in assignments)
+            {
+                // Rebalances R22: the open rebalance of each account is cancelled by the platform, under its lock.
+                await db.LockAccountAsync(assignment.AccountId, token);
+                if (await proposals.OpenAsync(assignment.AccountId, token) is { } open)
+                {
+                    await RebalanceCancellation.CancelAsync(db, open, byUserId: null, note: null, now, token);
+                }
 
-        portfolio.Disable();
-        await db.SaveChangesAsync(cancellationToken);
+                assignment.Remove();
+            }
+
+            portfolio.Disable();
+            await db.SaveChangesAsync(token);
+        }, cancellationToken);
     }
 }

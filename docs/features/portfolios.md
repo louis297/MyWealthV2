@@ -29,6 +29,7 @@ related:
   - transaction-source.md
   - withdrawals.md
   - account-closure.md
+  - rebalances.md
 ---
 
 # Portfolios
@@ -479,3 +480,21 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders.md](ord
 - R4 (custody-modes R14): assigning a portfolio to an account with a live order → 400 `account_not_eligible` with the message `Cancel the account's open orders before assigning a portfolio.` (orders R49).
 - R8, R9: rebalance is unchanged until roadmap O3. It still posts `Buy` / `Sell` at once at the stored price, with the fee of the schedule for that day and source `Rebalance`, and its trades stay hand-reversible. They have no execution detail and no settlement, and count as settled.
 - R8 `V`, R11: a rebalance plans with available cash, which includes cash from sales that have not settled (orders R46).
+
+---
+
+## Amendment 2026-11-23 (rebalance through orders) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md](rebalances.md). Rules R2–R28 live there; this section records what changes here.
+
+- Summary, R8, R9: a rebalance no longer posts `Buy` / `Sell` at once. It is a stored **rebalance** (rebalances R2): a proposal at the stored prices that an Adviser or TenantAdmin confirms, then ordinary orders at the broker in waves, the sells first and the buys when the sells are in the ledger (rebalances R13–R17). Its trades are order fills with source `OrderFill`. The Full Rebalance of R8 (sell everything outside the targets, then align to `(weight / 100) × V × (1 − residual)`) is the plan of each wave (rebalances R7).
+- R10, R11: the plan also fails with `instrument_inactive`, `stale_price` (a price more than 4 days old) and `currency_mismatch` (a target line quoted in another currency than the Account's) (rebalances R8). The buys are sized so the cash they reserve at their price limits is not more than the available cash (rebalances R16), so `insufficient_cash` now means the sell fees cannot be paid.
+- R12, R23: a weight change and `POST /portfolios/{id}/rebalance` still answer 202 with `jobId` and one `handle` per Account, and the job now makes a proposal whose id is the handle; nothing trades until each proposal is confirmed (rebalances R12). An Account whose rebalance is in progress gets a follow-up proposal when that one ends.
+- R13: a failed plan is stored as a `Failed` rebalance with its code and message and is not retried. `LastRebalanceStatus` and its message are gone (rebalances R25).
+- R15, R22: unassign and disable cancel the Account's open rebalance in the same database transaction (rebalances R22). They are never refused because of a rebalance, and still make no trade.
+- R18: on an Account with an Active assignment only its rebalance places orders. `POST /orders` stays refused (orders R8), and a hand reverse of a rebalance trade is refused on a Custodial account (rebalances R24, R28).
+- R24: an already aligned Account is stored as a `NoChange` rebalance. R25: the confirmation is no longer a frontend concern only: `POST /rebalances/{id}/confirm` is required before any order (rebalances R13).
+- R5 (assign): assign on an Account whose rebalance is in progress → 400 `rebalance_in_progress`, nothing written; a `Proposed` rebalance is cancelled with reason `Unassigned` and a new proposal is made for the new portfolio (rebalances R23).
+- §8: assign and `POST /accounts/{id}/rebalance` answer 200 `{ "status", "rebalanceId" }` with `status` `Proposed` or `NoChange`; a failed plan → 400 with its code, and the `Failed` rebalance is stored (rebalances R10). `GET /accounts/{id}/portfolio` loses `lastRebalanceAt`, `lastRebalanceStatus` and `lastRebalanceMessage` and gains `rebalance` (rebalances R25).
+- §11 failure codes: `stale_price`, `instrument_inactive`, `currency_mismatch`, `no_broker_connection` and `rebalance_in_progress` are added (rebalances §8.2). `concurrent_modification` is not used: a stale `rowVersion` on confirm or cancel is 409 `stale_row_version`.
+- The amendment 2026-11-23 (orders and settlement) points "R8, R9: rebalance is unchanged until roadmap O3" and "R8 `V`, R11" are replaced by the points above. Available cash still includes cash from sales that have not settled, so the buys use unsettled sale proceeds.

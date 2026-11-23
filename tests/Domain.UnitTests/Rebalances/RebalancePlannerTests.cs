@@ -1,11 +1,11 @@
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
-using MyWealthV2.Domain.Rebalance;
+using MyWealthV2.Domain.Rebalances;
 using MyWealthV2.Domain.ValueObjects;
 using NUnit.Framework;
 using Shouldly;
 
-namespace MyWealthV2.Domain.UnitTests.Rebalance;
+namespace MyWealthV2.Domain.UnitTests.Rebalances;
 
 public class RebalancePlannerTests
 {
@@ -24,7 +24,7 @@ public class RebalancePlannerTests
                 Target(2, "AIA", "NZD", 100m, 10m, quoteToBase: 1m, quoteToAccount: 1m)
             ]));
 
-        plan.Status.ShouldBe(RebalanceStatus.Success);
+        plan.Status.ShouldBe(RebalancePlanOutcome.Success);
         plan.Trades.Select(trade => (trade.Symbol, trade.Buy, trade.Quantity)).ShouldBe([
             ("VTI", false, 10m),
             ("AIA", true, 50m)
@@ -46,7 +46,7 @@ public class RebalancePlannerTests
                 Target(2, "AIA", "NZD", 100m, 10m, quoteToBase: 1m, quoteToAccount: 1m)
             ]));
 
-        plan.Status.ShouldBe(RebalanceStatus.Success);
+        plan.Status.ShouldBe(RebalancePlanOutcome.Success);
         plan.Trades.Single(trade => trade.Symbol == "AIA").Quantity.ShouldBe(49.5m);
     }
 
@@ -65,7 +65,7 @@ public class RebalancePlannerTests
                 Target(2, "AIA", "NZD", 100m, 10m, 1m, 1m)
             ]));
 
-        plan.Status.ShouldBe(RebalanceStatus.Success);
+        plan.Status.ShouldBe(RebalancePlanOutcome.Success);
         plan.Trades.Select(trade => (trade.Symbol, trade.Buy, trade.Quantity)).ShouldBe([
             ("AIA", true, 19.9m)
         ]);
@@ -86,7 +86,7 @@ public class RebalancePlannerTests
                 Target(2, "AIA", "NZD", 80m, 10m, 1m, 1m)
             ]));
 
-        plan.Status.ShouldBe(RebalanceStatus.Success);
+        plan.Status.ShouldBe(RebalancePlanOutcome.Success);
         plan.Trades.Select(trade => (trade.Symbol, trade.Buy, trade.Quantity)).ShouldBe([
             ("AIA", false, 20m)
         ]);
@@ -109,7 +109,7 @@ public class RebalancePlannerTests
                 Target(1, "AAA", "NZD", 40m, 100m, 1m, 1m)
             ]));
 
-        plan.Status.ShouldBe(RebalanceStatus.Success);
+        plan.Status.ShouldBe(RebalancePlanOutcome.Success);
         plan.Trades.Select(trade => (trade.Symbol, trade.Buy, trade.Quantity)).ShouldBe([
             ("AAA", false, 20m),
             ("BBB", true, 20m)
@@ -132,7 +132,7 @@ public class RebalancePlannerTests
                 Target(2, "AIA", "NZD", 100m, 10m, 1m, 1m)
             ]));
 
-        plan.Status.ShouldBe(RebalanceStatus.NoChange);
+        plan.Status.ShouldBe(RebalancePlanOutcome.NoChange);
         plan.Trades.ShouldBeEmpty();
     }
 
@@ -145,7 +145,7 @@ public class RebalancePlannerTests
             holdings: [],
             targets: [Target(2, "AIA", "NZD", 100m, null, 1m, 1m)]));
 
-        plan.Status.ShouldBe(RebalanceStatus.Failed);
+        plan.Status.ShouldBe(RebalancePlanOutcome.Failed);
         plan.Code.ShouldBe("missing_price");
         plan.Message.ShouldNotBeNull().ShouldContain("AIA");
         plan.Trades.ShouldBeEmpty();
@@ -160,7 +160,7 @@ public class RebalancePlannerTests
             holdings: [Holding(1, "VTI", "USD", 10m, 25m, null, 2m)],
             targets: [Target(2, "AIA", "NZD", 100m, 10m, 1m, 1m)]));
 
-        plan.Status.ShouldBe(RebalanceStatus.Failed);
+        plan.Status.ShouldBe(RebalancePlanOutcome.Failed);
         plan.Code.ShouldBe("missing_fx");
         plan.Message.ShouldNotBeNull().ShouldContain("USD");
         plan.Message.ShouldContain("NZD");
@@ -181,7 +181,7 @@ public class RebalancePlannerTests
             [],
             [Target(2, "AIA", "USD", 100m, 10m, 1m, 2m)]));
 
-        plan.Status.ShouldBe(RebalanceStatus.Success);
+        plan.Status.ShouldBe(RebalancePlanOutcome.Success);
         var buy = plan.Trades.ShouldHaveSingleItem();
         (buy.Symbol, buy.Buy).ShouldBe(("AIA", true));
         // The largest quantity whose cash (rounded to 4 decimals) still fits: 5 plus what rounds away.
@@ -201,7 +201,7 @@ public class RebalancePlannerTests
             targets: [Target(2, "AIA", "NZD", 100m, 10m, 1m, 1m)],
             fees: Fees(minimum: 10m)));
 
-        plan.Status.ShouldBe(RebalanceStatus.Success);
+        plan.Status.ShouldBe(RebalancePlanOutcome.Success);
         plan.Trades.Single().Quantity.ShouldBe(990m);
     }
 
@@ -220,7 +220,7 @@ public class RebalancePlannerTests
             ],
             fees: Fees(schedule)));
 
-        plan.Status.ShouldBe(RebalanceStatus.Success);
+        plan.Status.ShouldBe(RebalancePlanOutcome.Success);
         plan.Trades.ShouldAllBe(trade => trade.Buy);
         var buys = plan.Trades;
         buys.Count.ShouldBe(2);
@@ -248,7 +248,7 @@ public class RebalancePlannerTests
             minimumTrade: 199m,
             fees: Fees(minimum: 50m)));
 
-        plan.Status.ShouldBe(RebalanceStatus.Success);
+        plan.Status.ShouldBe(RebalancePlanOutcome.Success);
         var buy = plan.Trades.ShouldHaveSingleItem();
         buy.Symbol.ShouldBe("AIA");
         buy.Quantity.ShouldBeLessThan(980m);
@@ -266,7 +266,7 @@ public class RebalancePlannerTests
             minimumTrade: 1m,
             fees: Fees(minimum: 100m)));
 
-        plan.Status.ShouldBe(RebalanceStatus.NoChange);
+        plan.Status.ShouldBe(RebalancePlanOutcome.NoChange);
         plan.Trades.ShouldBeEmpty();
     }
 
@@ -281,7 +281,7 @@ public class RebalancePlannerTests
             minimumTrade: 0m,
             fees: Fees(minimum: 10m)));
 
-        plan.Status.ShouldBe(RebalanceStatus.Failed);
+        plan.Status.ShouldBe(RebalancePlanOutcome.Failed);
         plan.Code.ShouldBe("insufficient_cash");
         plan.Message.ShouldNotBeNull().ShouldContain("NZD");
         plan.Trades.ShouldBeEmpty();
@@ -300,7 +300,7 @@ public class RebalancePlannerTests
                 ["USD"] = new(Schedule(minimum: 500m, currency: "USD"), 2)
             }));
 
-        plan.Status.ShouldBe(RebalanceStatus.Success);
+        plan.Status.ShouldBe(RebalancePlanOutcome.Success);
         plan.Trades.Single().Quantity.ShouldBe(1000m);
     }
 

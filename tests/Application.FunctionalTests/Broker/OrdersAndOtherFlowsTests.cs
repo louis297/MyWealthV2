@@ -94,7 +94,9 @@ public class OrdersAndOtherFlowsTests : TestBase
 
         assigned.StatusCode.ShouldBe(HttpStatusCode.OK, await assigned.Content.ReadAsStringAsync());
         using var json = JsonDocument.Parse(await assigned.Content.ReadAsStringAsync());
-        json.RootElement.GetProperty("status").GetString().ShouldBe("Success");
+        // Rebalances R10, R16: assign proposes; the buy wave, sized from the available cash, uses the unsettled proceeds.
+        json.RootElement.GetProperty("status").GetString().ShouldBe("Proposed");
+        await Rebalances.RebalanceHttp.CompleteAsync(world.Adviser, json.RootElement.GetProperty("rebalanceId").GetGuid());
         // More than the 200.00 that was withdrawable went into the model.
         (await world.CashAsync()).Cash.ShouldBeLessThan(200.00m);
     }

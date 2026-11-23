@@ -6,6 +6,7 @@ using MyWealthV2.Application.FunctionalTests.Accounts;
 using MyWealthV2.Application.FunctionalTests.BankFeed;
 using MyWealthV2.Application.FunctionalTests.Instruments;
 using MyWealthV2.Application.FunctionalTests.Transactions;
+using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.ValueObjects;
 using MyWealthV2.Infrastructure.Data;
@@ -227,13 +228,19 @@ internal static class CustodialHttp
     /// <paramref name="withScheduleFee"/>, the fee of the tenant's schedule in effect today. The holding follows. It
     /// can still be reversed by hand. Answers the Transaction's id.
     /// </summary>
+    /// <summary>A <c>Buy</c> with source <c>Rebalance</c>, as a rebalance posted before rebalances through orders
+    /// (rebalances R26: no Transaction gets this source any more).</summary>
+    public static Task<Guid> InsertRebalanceTradeAsync(Guid accountId, Guid instrumentId, decimal quantity, decimal price = 10m) =>
+        InsertManualTradeAsync(accountId, "Buy", instrumentId, quantity, price, source: TransactionSource.Rebalance(Guid.NewGuid()));
+
     public static async Task<Guid> InsertManualTradeAsync(
         Guid accountId,
         string type,
         Guid instrumentId,
         decimal quantity,
         decimal price = 25m,
-        bool withScheduleFee = false)
+        bool withScheduleFee = false,
+        TransactionSource? source = null)
     {
         using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -256,11 +263,11 @@ internal static class CustodialHttp
         var trade = type == "Buy"
             ? Domain.Entities.Transaction.PostBuy(
                 account.TenantId, account.Id, account.Type, account.Currency, instrument.Id, quantity, Money.Create(price, quote),
-                fxRate: 1m, DateTimeOffset.UtcNow, memo: null, reference: null, TransactionSource.Manual, currentCashSum: cash,
+                fxRate: 1m, DateTimeOffset.UtcNow, memo: null, reference: null, source ?? TransactionSource.Manual, currentCashSum: cash,
                 feeSchedule: schedule, appliedRate: rate)
             : Domain.Entities.Transaction.PostSell(
                 account.TenantId, account.Id, account.Type, account.Currency, instrument.Id, quantity, Money.Create(price, quote),
-                fxRate: 1m, DateTimeOffset.UtcNow, memo: null, reference: null, TransactionSource.Manual, currentCashSum: cash,
+                fxRate: 1m, DateTimeOffset.UtcNow, memo: null, reference: null, source ?? TransactionSource.Manual, currentCashSum: cash,
                 currentQuantity: holding?.Quantity ?? 0m, currentCost: holding?.CostAmount ?? 0m, feeSchedule: schedule,
                 appliedRate: rate);
         trade.CreatedBy = "test";
@@ -392,7 +399,8 @@ internal static class CustodialHttp
         string accessToken,
         string symbol = "VTI",
         string quoteCurrency = "USD",
-        decimal? price = 25.00m)
+        decimal? price = 25.00m,
+        DateOnly? priceDate = null)
     {
         var response = await InstrumentHttp.Send(HttpMethod.Post, "/instruments", accessToken, new
         {
@@ -407,7 +415,7 @@ internal static class CustodialHttp
         {
             using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            await TestPrices.UpsertAsync(db, id, price.Value, quoteCurrency);
+            await TestPrices.UpsertAsync(db, id, price.Value, quoteCurrency, priceDate);
         }
 
         return id;
@@ -534,4 +542,9 @@ internal static class CustodialHttp
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         return await db.IdempotencyRecords.AnyAsync(row => row.Key == key);
     }
+
+    /// <summary>Rebalances §10: proposes a rebalance of the account, confirms it and fills every wave at the
+    /// reference price (or <paramref name="price"/>) until it ends. The trades are the fills of its orders.</summary>
+    public static Task<Guid> RebalanceAsync(string accessToken, Guid accountId, Func<Order, decimal>? price = null) =>
+        Rebalances.RebalanceHttp.RebalanceAsync(accessToken, accountId, price);
 }

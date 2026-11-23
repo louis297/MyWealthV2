@@ -55,6 +55,8 @@ export type CustomerOrder = {
   status: string;
   placedAt: string;
   closedAt: string | null;
+  /** rebalances R27: the rebalance that placed the order; null on a person's order. */
+  rebalanceId?: string | null;
 };
 
 export type ActivityCash = {

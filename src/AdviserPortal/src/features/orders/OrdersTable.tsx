@@ -62,6 +62,11 @@ export function OrdersTable({ items, attention, compact = false }: {
                   <Link to={`/orders/${item.id}`} className={recordLinkClass}>
                     {formatInstant(item.placedAt)}
                   </Link>
+                  {item.rebalanceId ? (
+                    <Link to={`/rebalances/${item.rebalanceId}`} className={`${recordLinkClass} block text-xs`}>
+                      Rebalance
+                    </Link>
+                  ) : null}
                 </TableCell>
                 {compact ? null : (
                   <TableCell>

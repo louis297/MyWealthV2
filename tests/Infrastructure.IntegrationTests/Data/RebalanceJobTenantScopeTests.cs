@@ -2,11 +2,13 @@ using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Portfolios;
-using MyWealthV2.Application.Portfolios.Commands.RebalanceAccount;
+using MyWealthV2.Application.MarketData;
+using MyWealthV2.Application.Rebalances;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.ValueObjects;
 using MyWealthV2.Infrastructure.Accounts;
+using MyWealthV2.Infrastructure.Broker;
 using MyWealthV2.Infrastructure.Data;
 using NUnit.Framework;
 using Shouldly;
@@ -34,7 +36,7 @@ public class RebalanceJobTenantScopeTests
 
         var job = NewJob(db, accessor);
 
-        // The account has no portfolio assignment, so the rebalancer refuses it after loading it.
+        // The account has no portfolio assignment, so the proposal refuses it after loading it (rebalances R6).
         await Should.ThrowAsync<RebalanceException>(() => job.Execute(account.PublicId, Guid.NewGuid()));
 
         accessor.IsEngaged.ShouldBeTrue();
@@ -54,7 +56,13 @@ public class RebalanceJobTenantScopeTests
     }
 
     private static RebalanceJob NewJob(ApplicationDbContext db, TenantIdAccessor accessor) =>
-        new(new AccountRebalancer(db, new NoMarketData(), new NoFxRate(), new NoCatalog(), TimeProvider.System), db, accessor);
+        new(new ProposeRebalance(
+                db,
+                new RebalancePlanning(db, new NoMarketData(), new NoFxRate(), new NoCatalog(), new NoPrices()),
+                new ConfiguredBrokerConnections([]),
+                TimeProvider.System),
+            db,
+            accessor);
 
     private static async Task<string> IdentityAsync(ApplicationDbContext db, Tenant tenant)
     {
@@ -81,6 +89,24 @@ public class RebalanceJobTenantScopeTests
     private sealed class NoMarketData : IMarketData
     {
         public Money? TryGetPrice(int instrumentId, DateTimeOffset? asOf = null) => null;
+    }
+
+    private sealed class NoPrices : IInstrumentPriceStore
+    {
+        public Task UpsertAsync(IReadOnlyList<InstrumentPriceQuote> quotes, DateTimeOffset fetchedAt, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Not used.");
+
+        public Task UpsertAsync(IReadOnlyList<InstrumentPriceQuote> quotes, DateTimeOffset fetchedAt, string source, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Not used.");
+
+        public Task<DateOnly?> LatestDateAsync(int instrumentId, DateOnly onOrBefore, CancellationToken cancellationToken = default) =>
+            Task.FromResult<DateOnly?>(null);
+
+        public Task<bool> HasAsOfDateForEveryActiveInstrumentAsync(IReadOnlyList<int> instrumentIds, DateOnly asOf, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Not used.");
+
+        public Task<bool> HasPriceFromAsync(int instrumentId, DateOnly from, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Not used.");
     }
 
     private sealed class NoFxRate : IFxRate

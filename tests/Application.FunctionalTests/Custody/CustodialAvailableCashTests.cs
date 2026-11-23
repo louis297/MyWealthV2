@@ -101,10 +101,15 @@ public class CustodialAvailableCashTests : TestBase
         var assign = await PortfolioHttp.Send(HttpMethod.Post, $"/accounts/{world.AccountId}/portfolio", world.TenantAdmin, new { portfolioId });
 
         assign.StatusCode.ShouldBe(HttpStatusCode.OK, await assign.Content.ReadAsStringAsync());
+        // Rebalances R16: each buy wave is sized so its reservations fit the available cash; the withdrawal's 300.00
+        // is never invested. What a top-up cannot buy at its price limit stays as cash.
+        using var json = System.Text.Json.JsonDocument.Parse(await assign.Content.ReadAsStringAsync());
+        await Rebalances.RebalanceHttp.CompleteAsync(world.TenantAdmin, json.RootElement.GetProperty("rebalanceId").GetGuid());
         var (cash, reserved, available) = await world.CashAsync();
         reserved.ShouldBe(300m);
-        cash.ShouldBe(300m);
-        available.ShouldBe(0m);
+        cash.ShouldBeGreaterThanOrEqualTo(300m);
+        cash.ShouldBeLessThan(305m);
+        available.ShouldBeGreaterThanOrEqualTo(0m);
     }
 
     private static async Task<WithdrawalWorld> ReservedWorldAsync()

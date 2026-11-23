@@ -27,6 +27,7 @@ related:
   - ../features/account-closure.md
   - ../features/interest-run.md
   - ../features/trade-settlement.md
+  - ../features/rebalances.md
 ---
 
 # Customer Portal
@@ -340,3 +341,13 @@ Status of this amendment: `accepted` (2026-11-23), together with [trade-settleme
 | ID | Behaviour |
 | --- | --- |
 | C36 | Customer Portal, account activity: the Reversal of a fill is labelled "Trade cancelled by the broker: Bought 4 ACME.SIM at 100.12", and the fill's own row shows "Cancelled" in place of the settlement text. A broken fill that was never booked shows nothing. |
+
+---
+
+## Amendment 2026-11-23 (rebalance through orders) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [rebalances](../features/rebalances.md). Field rules live there. The Customer Portal BFF does not change: `rebalanceId` comes on the order item under `/orders`.
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| C37 | A Customer with an order that has a `rebalanceId` | Account page, Orders block (C32) | The row shows "Rebalance" under the order. No link and no action. The fill rows of C34 are unchanged. |

@@ -322,7 +322,11 @@ export function AccountDetailPage() {
                 <TableBody>
                   {shownOrders.map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell>{`${item.side} ${item.quantity} ${item.instrument.symbol}`}</TableCell>
+                      <TableCell>
+                        {`${item.side} ${item.quantity} ${item.instrument.symbol}`}
+                        {/* C37: an order of a rebalance says so, with no link and no action. */}
+                        {item.rebalanceId ? <p className="text-muted-foreground text-xs">Rebalance</p> : null}
+                      </TableCell>
                       <TableCell>{orderStatusLabel(item)}</TableCell>
                       <TableCell>{formatInstant(item.placedAt).slice(0, 10)}</TableCell>
                     </TableRow>

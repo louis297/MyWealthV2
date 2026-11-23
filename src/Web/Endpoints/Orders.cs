@@ -36,9 +36,10 @@ public class Orders : IEndpointGroup
         string? side = null,
         string? status = null,
         bool? pendingFill = null,
-        Guid? tenantId = null) =>
+        Guid? tenantId = null,
+        Guid? rebalanceId = null) =>
         TypedResults.Ok(await sender.Send(new GetOrdersQuery(
-            page, pageSize, accountId, customerId, instrumentId, side, status, pendingFill, tenantId)));
+            page, pageSize, accountId, customerId, instrumentId, side, status, pendingFill, tenantId, rebalanceId)));
 
     [EndpointSummary("Get an order")]
     [EndpointDescription("Returns one order in the caller's scope with its fills (R15).")]

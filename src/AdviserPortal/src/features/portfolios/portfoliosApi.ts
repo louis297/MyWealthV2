@@ -28,14 +28,24 @@ export type PortfolioLineInput = {
   targetWeight: number;
 };
 
+/** rebalances R25: the newest rebalance of an assignment. */
+export type AssignmentRebalance = {
+  id: string;
+  status: string;
+  failure: { code: string; message: string } | null;
+  proposedAt: string;
+  endedAt: string | null;
+};
+
 export type AccountPortfolio = {
   accountId: string;
   portfolioId: string;
   status: string;
-  lastRebalanceAt: string | null;
-  lastRebalanceStatus: string | null;
-  lastRebalanceMessage: string | null;
+  rebalance: AssignmentRebalance | null;
 };
+
+/** rebalances R10: the answer of a route that proposes a rebalance. */
+export type RebalanceProposal = { status: string; rebalanceId: string };
 
 export type AssignedAccount = {
   account: Account;
@@ -86,27 +96,27 @@ export const portfoliosApi = api.injectEndpoints({
       query: (accountId) => `/accounts/${accountId}/portfolio`,
       providesTags: (_result, _error, accountId) => [{ type: "Account", id: accountId }],
     }),
-    rebalanceAccount: builder.mutation<{ status: string }, string>({
+    rebalanceAccount: builder.mutation<RebalanceProposal, string>({
       query: (accountId) => ({
         url: `/accounts/${accountId}/rebalance`,
         method: "POST",
       }),
-      invalidatesTags: (_result, _error, accountId) => [{ type: "Account", id: accountId }, "Portfolio"],
+      invalidatesTags: (_result, _error, accountId) => [{ type: "Account", id: accountId }, "Portfolio", "Rebalance"],
     }),
     unassignPortfolio: builder.mutation<void, string>({
       query: (accountId) => ({
         url: `/accounts/${accountId}/portfolio`,
         method: "DELETE",
       }),
-      invalidatesTags: (_result, _error, accountId) => [{ type: "Account", id: accountId }, "Portfolio"],
+      invalidatesTags: (_result, _error, accountId) => [{ type: "Account", id: accountId }, "Portfolio", "Rebalance"],
     }),
-    assignPortfolio: builder.mutation<{ status: string }, { accountId: string; portfolioId: string }>({
+    assignPortfolio: builder.mutation<RebalanceProposal, { accountId: string; portfolioId: string }>({
       query: ({ accountId, portfolioId }) => ({
         url: `/accounts/${accountId}/portfolio`,
         method: "POST",
         body: { portfolioId },
       }),
-      invalidatesTags: (_result, _error, arg) => [{ type: "Account", id: arg.accountId }, "Portfolio"],
+      invalidatesTags: (_result, _error, arg) => [{ type: "Account", id: arg.accountId }, "Portfolio", "Rebalance"],
     }),
     getPortfolio: builder.query<Portfolio, string>({
       query: (id) => `/portfolios/${id}`,

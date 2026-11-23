@@ -60,6 +60,8 @@ export type Order = {
   cancelRequest: { by: { id: string; name: string } | null; at: string; note: string | null } | null;
   closedAt: string | null;
   closeReason: string | null;
+  /** rebalances R27: the rebalance that placed the order; null on a person's order. */
+  rebalanceId?: string | null;
   fills?: OrderFill[];
   rowVersion: string;
 };

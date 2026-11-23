@@ -309,7 +309,8 @@ describe("TransactionsListPage", () => {
 
     const row = async (memo: string) => within((await screen.findByText(memo)).closest("tr") as HTMLElement);
     expect((await row("manual-row")).getByRole("button", { name: "Reverse" })).toBeInTheDocument();
-    expect((await row("rebalance-row")).getByRole("button", { name: "Reverse" })).toBeInTheDocument();
+    // Rebalances R28: Manual is the only hand-reversible source.
+    expect((await row("rebalance-row")).queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
     expect((await row("seed-row")).queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
   });
 
