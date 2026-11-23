@@ -424,6 +424,41 @@ public class BackOfficePageTests
         }
     }
 
+    /// <summary>Trade-settlement BO29: the settlement currencies of a connection, the two new kinds with their settlement
+    /// id, the three new reasons, and the rows that need a person.</summary>
+    [Test]
+    public async Task Broker_ShowsTheSettlementCurrencies_TheNewKindsAndReasons_AndMarksFillSettledAndUnknownSettlement()
+    {
+        var at = new DateTimeOffset(2026, 11, 25, 2, 13, 0, TimeSpan.Zero);
+        _api.BrokerConnections = [new("simulator", "Simulator", null, ["NZD", "USD"])];
+        _api.ExecutionReports =
+        [
+            Report("w-X9", "Settlement", "Skipped", "UnknownSettlement", at.AddMinutes(3)) with { SettlementId = "0f8fad5b-S9" },
+            Report("w-X8", "Settled", "Skipped", "FillBroken", at.AddMinutes(2)) with { SettlementId = "0f8fad5b-S8" },
+            Report("w-X7", "Broken", "Skipped", "FillSettled", at.AddMinutes(1)),
+            Report("w-X6", "Settlement", "Processed", null, at) with { SettlementId = "0f8fad5b-S3" }
+        ];
+
+        try
+        {
+            var body = await GetAsync("/broker");
+
+            body.ShouldContain("Settles in NZD, USD");
+            body.ShouldContain(">Broken<");
+            body.ShouldContain(">Settlement<");
+            body.ShouldContain("0f8fad5b-S3");
+            body.ShouldContain("The trade has already settled");
+            body.ShouldContain("The trade was cancelled");
+            body.ShouldContain("No trades for this settlement");
+            Regex.Matches(body, "report-needs-person").Count.ShouldBe(2);
+        }
+        finally
+        {
+            _api.BrokerConnections = [new("simulator", "Simulator", null)];
+            _api.ExecutionReports = [];
+        }
+    }
+
     private static ExecutionReportItem Report(
         string outsideId,
         string? kind,
