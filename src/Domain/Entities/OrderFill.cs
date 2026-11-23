@@ -52,6 +52,13 @@ public class OrderFill
 
     public byte[] RowVersion { get; private set; } = null!;
 
+    /// <summary>Trade-settlement R6: the broker settlement the fill was settled in, from its <c>Settled</c>
+    /// report.</summary>
+    public string? BrokerSettlementId { get; private set; }
+
+    /// <summary>Trade-settlement R8: the trade settlement the fill is in; at most one.</summary>
+    public int? TradeSettlementId { get; private set; }
+
     public bool IsSettled => SettledAt is not null;
 
     internal static OrderFill Create(
@@ -109,7 +116,7 @@ public class OrderFill
     }
 
     /// <summary>R43: the broker said the fill has settled. Once; a fill can settle while it is still <c>Pending</c>.</summary>
-    public void Settle(DateOnly date, DateTimeOffset at)
+    public void Settle(DateOnly date, DateTimeOffset at, string? brokerSettlementId = null)
     {
         if (IsSettled)
         {
@@ -119,6 +126,9 @@ public class OrderFill
         SettledAt = at.ToUniversalTime();
         SettledDate = date;
     }
+
+    /// <summary>Trade-settlement R8: the fill is put in a trade settlement, once.</summary>
+    public void AssignTo(int tradeSettlementId) => throw new NotImplementedException();
 
     private void EnsurePending()
     {

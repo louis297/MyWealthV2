@@ -53,6 +53,21 @@ public class ExecutionReport
 
     public string? Reason { get; private set; }
 
+    /// <summary>Trade-settlement R6, R7: the broker settlement a <c>Settled</c> or <c>Settlement</c> report names.</summary>
+    public string? SettlementId { get; private set; }
+
+    /// <summary>Trade-settlement R7: the trust account number the broker settled against.</summary>
+    public string? SettlementAccount { get; private set; }
+
+    /// <summary>Trade-settlement R7: the currency of the broker settlement.</summary>
+    public string? Currency { get; private set; }
+
+    /// <summary>Trade-settlement R7: the broker's net, seen from the trust account.</summary>
+    public decimal? NetAmount { get; private set; }
+
+    /// <summary>Trade-settlement R7: the number of fills the broker settled.</summary>
+    public int? FillCount { get; private set; }
+
     public DateTimeOffset ReceivedAt { get; private set; }
 
     public ExecutionReportStatus Status { get; private set; }
@@ -78,7 +93,8 @@ public class ExecutionReport
         DateOnly? tradeDate,
         DateOnly? settlementDate,
         string? fillOutsideId,
-        DateOnly? settledDate)
+        DateOnly? settledDate,
+        Orders.ExecutionReportSettlement? settlement = null)
     {
         if (!IsId(outsideId))
         {
@@ -116,7 +132,8 @@ public class ExecutionReport
         string? fillOutsideId,
         DateOnly? settledDate,
         string? reason,
-        DateTimeOffset receivedAt)
+        DateTimeOffset receivedAt,
+        Orders.ExecutionReportSettlement? settlement = null)
     {
         var known = kind is { } value && Enum.IsDefined(value) ? kind : null;
         if (!IsStorable(outsideId, known, clientOrderId, quantity, price, tradeDate, settlementDate, fillOutsideId, settledDate)

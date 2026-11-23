@@ -27,7 +27,8 @@ public sealed record BrokerFeedItem(
     string? ContractNote,
     string? FillId,
     DateOnly? SettledDate,
-    string? Reason);
+    string? Reason,
+    Domain.Orders.ExecutionReportSettlement? Settlement = null);
 
 /// <summary>One page: its items, oldest first, the party's new cursor and whether more items follow.</summary>
 public sealed record BrokerFeedPage(IReadOnlyList<BrokerFeedItem> Items, string? Cursor, bool HasMore);
