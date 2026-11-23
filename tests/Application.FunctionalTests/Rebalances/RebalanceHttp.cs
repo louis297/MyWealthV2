@@ -49,6 +49,51 @@ internal static class RebalanceHttp
     public static async Task<List<Guid>> ListIdsAsync(string accessToken, string query = "") =>
         (await ListAsync(accessToken, query)).Select(item => item.GetProperty("id").GetGuid()).ToList();
 
+    /// <summary>The stored row version of a rebalance, base64.</summary>
+    public static async Task<string> RowVersionAsync(Guid id) => Convert.ToBase64String((await RebalanceAsync(id)).RowVersion);
+
+    /// <summary><c>POST /rebalances/{id}/confirm</c> with the stored row version, or <paramref name="rowVersion"/>.</summary>
+    public static async Task<HttpResponseMessage> ConfirmAsync(string accessToken, Guid id, string? rowVersion = null) =>
+        await Send(HttpMethod.Post, $"/rebalances/{id}/confirm", accessToken,
+            new { rowVersion = rowVersion ?? await RowVersionAsync(id) });
+
+    /// <summary>Confirms and expects 204.</summary>
+    public static async Task ConfirmedAsync(string accessToken, Guid id)
+    {
+        var response = await ConfirmAsync(accessToken, id);
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent, await response.Content.ReadAsStringAsync());
+    }
+
+    /// <summary>Moves the proposal's expiry into the past.</summary>
+    public static async Task ExpireAsync(Guid id)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await db.Rebalances.IgnoreQueryFilters()
+            .Where(row => row.PublicId == id)
+            .ExecuteUpdateAsync(set => set.SetProperty(row => row.ExpiresAt, DateTimeOffset.UtcNow.AddMinutes(-1)));
+    }
+
+    /// <summary>The orders of a rebalance, oldest first.</summary>
+    public static async Task<List<Order>> OrdersOfAsync(Guid rebalancePublicId)
+    {
+        var rebalance = await RebalanceAsync(rebalancePublicId);
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await db.Orders.IgnoreQueryFilters().AsNoTracking()
+            .Include(row => row.Fills)
+            .Where(row => row.RebalanceId == rebalance.Id)
+            .OrderBy(row => row.Id)
+            .ToListAsync();
+    }
+
+    /// <summary>The <c>errors.Status</c> messages of a 400.</summary>
+    public static async Task<string[]> StatusErrorsAsync(HttpResponseMessage response)
+    {
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest, await response.Content.ReadAsStringAsync());
+        return (await CustodialHttp.ErrorsAsync(response))["Status"];
+    }
+
     /// <summary>The problem <c>code</c> of a 400.</summary>
     public static async Task<string?> CodeAsync(HttpResponseMessage response)
     {
