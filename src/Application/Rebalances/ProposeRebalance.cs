@@ -1,6 +1,7 @@
 using MyWealthV2.Application.Broker;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Rebalances;
@@ -83,6 +84,7 @@ public sealed class ProposeRebalance(
             };
         }
 
+        rebalance.CreatedBy = SystemActor.Name;
         db.Rebalances.Add(rebalance);
         await db.SaveChangesAsync(cancellationToken);
         return rebalance;

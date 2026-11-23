@@ -1,6 +1,7 @@
 using MyWealthV2.Application.Broker;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Orders;
@@ -55,6 +56,8 @@ public sealed class PlaceRebalanceWave(IApplicationDbContext db, IBrokerConnecti
                 priceDates[trade.InstrumentId], terms, connection, Memo, placedBy, now,
                 settlementAccount: await SettlementAccountAsync(account, connection, trade.QuoteCurrency, cancellationToken),
                 rebalanceId: rebalance.Id);
+            // A wave the worker places has no person; the auditing interceptor keeps a person when there is one.
+            order.CreatedBy = SystemActor.Name;
             orders.Add(order);
         }
 
