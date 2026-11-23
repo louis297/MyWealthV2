@@ -87,6 +87,9 @@ public class BankStatementLine : BaseAuditableEntity
     /// <summary>Trade-settlement R18–R21: the trade settlement whose cash this line is.</summary>
     public int? TradeSettlementId { get; private set; }
 
+    /// <summary>Migration-batches R13: the migration batch this receipt funds, while it is matched to one.</summary>
+    public int? MigrationBatchId { get; private set; }
+
     public byte[] RowVersion { get; private set; } = null!;
 
     /// <summary>A line as the bank sent it, in status <c>Received</c> (R10–R12). Payer name and reference are

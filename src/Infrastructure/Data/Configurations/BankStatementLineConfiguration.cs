@@ -24,6 +24,11 @@ public class BankStatementLineConfiguration : IEntityTypeConfiguration<BankState
             .HasForeignKey(line => line.TradeSettlementId)
             .IsRequired(false)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<MigrationBatch>()
+            .WithMany()
+            .HasForeignKey(line => line.MigrationBatchId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.Property(line => line.LastActionNote).HasMaxLength(BankStatementLine.NoteMaxLength);
         builder.Property(line => line.EndToEndId).HasMaxLength(BankStatementLine.OutsideIdMaxLength);
         builder.Property(line => line.ReturnOfOutsideId).HasMaxLength(BankStatementLine.OutsideIdMaxLength);

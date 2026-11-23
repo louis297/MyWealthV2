@@ -21,6 +21,9 @@ public sealed class MatchStatementLineCommand : IRequest
 
     public Guid? AccountId { get; init; }
 
+    /// <summary>Migration-batches R13: the batch this receipt funds, in place of an account.</summary>
+    public Guid? MigrationBatchId { get; init; }
+
     public string? RowVersion { get; init; }
 
     public string? Note { get; init; }

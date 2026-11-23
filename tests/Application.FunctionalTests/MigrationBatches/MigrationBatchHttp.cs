@@ -138,6 +138,23 @@ internal static class MigrationBatchHttp
             .SingleAsync(batch => batch.PublicId == id);
     }
 
+    /// <summary>R13: the previous provider's bulk transfer arrives with no deposit reference and is matched to the
+    /// batch by a TenantAdmin.</summary>
+    public static async Task<BankStatementLine> FundAsync(MigrationWorld world, Guid batchId, decimal amount)
+    {
+        var line = await world.Bank.ReceiveAsync(amount, "ACME TRANSFER NOV");
+        var response = await MatchAsync(world.TenantAdmin, line.PublicId, batchId);
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent, await response.Content.ReadAsStringAsync());
+        return line;
+    }
+
+    public static Task<HttpResponseMessage> MatchAsync(string accessToken, Guid lineId, Guid batchId) =>
+        StatementLines.StatementLineHttp.ActAsync(accessToken, lineId, "match",
+            new() { ["migrationBatchId"] = batchId, ["note"] = "Bulk transfer from Acme Wealth" });
+
+    public static Task<HttpResponseMessage> UnmatchAsync(string accessToken, Guid lineId) =>
+        StatementLines.StatementLineHttp.ActAsync(accessToken, lineId, "unmatch", new() { ["note"] = "Wrong batch" });
+
     /// <summary>Closes an empty Custodial account in the database, as the account closure flow ends.</summary>
     public static async Task CloseInDatabaseAsync(Guid accountId)
     {
