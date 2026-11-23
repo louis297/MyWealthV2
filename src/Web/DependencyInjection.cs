@@ -66,6 +66,7 @@ public static class DependencyInjection
                      Policies.CorporateActionsManage,
                      Policies.OrdersRead,
                      Policies.OrdersPlace,
+                     Policies.TradeSettlementsManage,
                      Policies.ReportsCustomerRead,
                      Policies.ReportsCustomerCreate,
                      Policies.ReportsBookRead,
