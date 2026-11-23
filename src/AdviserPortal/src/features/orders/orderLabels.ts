@@ -71,6 +71,41 @@ export function fillHoldReasonLabel(reason: string | null) {
   }
 }
 
+/** D77: why the platform could not reverse a broken fill (trade-settlement R30). */
+export function breakHoldReasonLabel(reason: string | null) {
+  switch (reason) {
+    case "AccountClosed":
+      return "The account is closed";
+    case "LaterActivity":
+      return "Later activity on this holding";
+    case "InsufficientCash":
+      return "The proceeds have been spent";
+    default:
+      return reason ?? "—";
+  }
+}
+
+/** D77: what the platform did with a fill the broker broke. */
+export function breakOutcomeLabel(fillBreak: { outcome: string; holdReason: string | null; resolvedBy: { name: string } | null }) {
+  switch (fillBreak.outcome) {
+    case "Reversed":
+      return "Reversed";
+    case "NotPosted":
+      return "Was not booked";
+    case "NotApplied":
+      return `Could not be reversed: ${breakHoldReasonLabel(fillBreak.holdReason)}`;
+    case "ResolvedByHand":
+      return `Resolved by ${fillBreak.resolvedBy?.name ?? "a firm administrator"}`;
+    default:
+      return fillBreak.outcome;
+  }
+}
+
+/** D71, D77: a fill not booked yet, or a break that waits for a decision, needs attention. */
+export function fillNeedsAttention(fill: { status: string; break?: { outcome: string } | null }) {
+  return fill.status === "Pending" || fill.break?.outcome === "NotApplied";
+}
+
 /** D72: the label of a failed send attempt, as BO18 shows a feed failure. */
 export function brokerFailureLabel(failure: string | null) {
   switch (failure) {

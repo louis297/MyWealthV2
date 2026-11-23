@@ -15,8 +15,7 @@ import {
   problemMessages,
   problemStatus,
   reasonLabel,
-  statusLabel,
-} from "@/features/statementLines/statementLineLabels";
+  statusLabel, settlementMismatchSentence } from "@/features/statementLines/statementLineLabels";
 import {
   type NoteAction,
   useGetStatementLineQuery,
@@ -38,7 +37,7 @@ const dialogs: Record<NoteAction, string> = {
 export const adjustSentence = "Correct the account with an adjustment, then ignore this line.";
 
 /** D50: a match the platform made for a payment, a returned payment or a recall is undone only by its flow. */
-const platformMethods = ["Payment", "PaymentReturn", "Recall"];
+const platformMethods = ["Payment", "PaymentReturn", "Recall", "Settlement"];
 
 /** D35, D50: one bank statement line with its match, its last action and the actions its status allows (R23,
  * bank-returns R9). */
@@ -186,9 +185,18 @@ export function StatementLineDetailPage() {
               </DetailItem>
             ) : null}
             {line.returnReason ? <DetailItem label="Return reason">{line.returnReason}</DetailItem> : null}
+            {line.tradeSettlementId ? (
+              // trade-settlement D78.
+              <DetailItem label="Trade settlement">
+                <Link to={`/trade-settlements/${line.tradeSettlementId}`} className={recordLinkClass}>Trade settlement</Link>
+              </DetailItem>
+            ) : null}
           </DetailGrid>
         </CardContent>
       </Card>
+      {line.status === "Unmatched" && line.unmatchedReason === "SettlementMismatch" ? (
+        <p className="text-sm">{settlementMismatchSentence}</p>
+      ) : null}
       {line.status === "Unmatched" && line.unmatchedReason === "RecallNotCovered" ? (
         <p className="text-sm">
           {adjustSentence}{" "}

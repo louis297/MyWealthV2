@@ -89,6 +89,10 @@ export function TransactionDetailPage() {
                     })`}
                   </DetailItem>
                   <DetailItem label="Contract note">{data.execution.brokerReference ?? "—"}</DetailItem>
+                  {data.execution.brokenAt ? (
+                    // trade-settlement D77.
+                    <DetailItem label="Broken">{`Cancelled by the broker ${shortDay(data.execution.brokenAt)}`}</DetailItem>
+                  ) : null}
                 </DetailGrid>
                 <Link to={`/orders/${data.execution.orderId}`} className={recordLinkClass}>
                   View the order

@@ -10,14 +10,18 @@ import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
 import { CustomerName } from "@/features/nominatedBankAccounts/BankAccountChecksPage";
 import { CancelOrderDialog } from "@/features/orders/CancelOrderDialog";
 import {
+  breakOutcomeLabel,
   brokerFailureLabel,
   canCancelOrder,
   fillHoldReasonLabel,
+  fillNeedsAttention,
   orderRejectReasonLabel,
   settlementLabel,
   shortDay,
 } from "@/features/orders/orderLabels";
-import { useGetOrderQuery } from "@/features/orders/ordersApi";
+import { type OrderFill, useGetOrderQuery, useResolveBrokenFillMutation } from "@/features/orders/ordersApi";
+import { NoteDialog } from "@/features/statementLines/NoteDialog";
+import { problemMessages } from "@/features/statementLines/statementLineLabels";
 import { OrderStatus } from "@/features/orders/OrdersTable";
 import { roles } from "@/features/session/roles";
 import { formatAmount, formatMoney } from "@/shared/format/money";
@@ -31,6 +35,9 @@ export function OrderDetailPage() {
   const account = useGetAccountQuery(order.data?.accountId ?? "", { skip: !order.data });
   const currencies = useGetCurrenciesQuery();
   const [cancelling, setCancelling] = useState(false);
+  const [resolving, setResolving] = useState<OrderFill | null>(null);
+  const [resolve, { isLoading: resolveBusy }] = useResolveBrokenFillMutation();
+  const [messages, setMessages] = useState<string[]>([]);
 
   if (!order.data) {
     return <Muted>Loading…</Muted>;
@@ -40,6 +47,19 @@ export function OrderDetailPage() {
   const places = currencies.data?.find((item) => item.code === data.currency)?.decimalPlaces;
   const fills = data.fills ?? [];
   const waiting = fills.some((fill) => fill.status === "Pending");
+  const attention = fills.some(fillNeedsAttention);
+  const tenantAdmin = role === roles.tenantAdmin;
+
+  async function onResolve(fill: OrderFill, note: string) {
+    try {
+      await resolve({ id: data.id, fillId: fill.id, note, rowVersion: data.rowVersion }).unwrap();
+      setMessages([]);
+    } catch (error: unknown) {
+      const result = problemMessages(error);
+      setMessages([...Object.values(result.fields).flat(), ...result.messages]);
+    }
+    setResolving(null);
+  }
   const buy = data.side === "Buy";
 
   return (
@@ -56,7 +76,7 @@ export function OrderDetailPage() {
         <CardContent>
           <DetailGrid>
             <DetailItem label="Status">
-              <OrderStatus order={data} needsAttention={waiting} />
+              <OrderStatus order={data} needsAttention={attention} />
             </DetailItem>
             <DetailItem label="Customer">
               <CustomerName id={data.customerId} />
@@ -127,13 +147,15 @@ export function OrderDetailPage() {
                 <TableBody>
                   {fills.map((fill) => (
                     <TableRow key={fill.id}>
-                      <TableCell>{fill.tradeDate}</TableCell>
-                      <TableCell>{fill.quantity}</TableCell>
-                      <TableCell>{formatAmount(fill.price, 2)}</TableCell>
-                      <TableCell>{settlementLabel(fill.settlementDate, fill.settledAt)}</TableCell>
+                      <TableCell className={fill.break ? "line-through" : undefined}>{fill.tradeDate}</TableCell>
+                      <TableCell className={fill.break ? "line-through" : undefined}>{fill.quantity}</TableCell>
+                      <TableCell className={fill.break ? "line-through" : undefined}>{formatAmount(fill.price, 2)}</TableCell>
+                      <TableCell>{fill.break ? "—" : settlementLabel(fill.settlementDate, fill.settledAt)}</TableCell>
                       <TableCell>{fill.brokerReference ?? "—"}</TableCell>
                       <TableCell>
-                        {fill.status === "Posted" && fill.transactionId ? (
+                        {fill.break ? (
+                          <BrokenFill fill={fill} tenantAdmin={tenantAdmin} onResolve={() => setResolving(fill)} />
+                        ) : fill.status === "Posted" && fill.transactionId ? (
                           <Link to={`/transactions/${fill.transactionId}`} className={recordLinkClass}>
                             Booked
                           </Link>
@@ -152,7 +174,45 @@ export function OrderDetailPage() {
           <p className="text-sm">Correct the account with an adjustment. The platform books the fill on its next run.</p>
         ) : null}
       </Section>
+      {messages.map((message) => (
+        <p key={message} className="text-sm text-destructive">{message}</p>
+      ))}
       {cancelling ? <CancelOrderDialog order={data} onClose={() => setCancelling(false)} /> : null}
+      {resolving ? (
+        <NoteDialog
+          open
+          title="Mark this broken trade resolved"
+          warning="Correct the account with an adjustment first. This writes nothing to the ledger."
+          busy={resolveBusy}
+          onConfirm={(note) => void onResolve(resolving, note)}
+          onClose={() => setResolving(null)}
+        />
+      ) : null}
     </Page>
+  );
+}
+
+/** D77: a fill the broker took back, with what the platform did, and Mark resolved for a TenantAdmin. */
+function BrokenFill({ fill, tenantAdmin, onResolve }: { fill: OrderFill; tenantAdmin: boolean; onResolve: () => void }) {
+  const fillBreak = fill.break!;
+  return (
+    <div className="flex flex-col gap-1">
+      <span>{`Cancelled by the broker ${shortDay(fillBreak.at)}${fillBreak.reason ? `: ${fillBreak.reason}` : ""}`}</span>
+      {fillBreak.outcome === "Reversed" && fillBreak.reversalTransactionId ? (
+        <Link to={`/transactions/${fillBreak.reversalTransactionId}`} className={recordLinkClass}>
+          Reversed
+        </Link>
+      ) : (
+        <span className={fillBreak.outcome === "NotApplied" ? "text-amber-600" : "text-muted-foreground"}>
+          {breakOutcomeLabel(fillBreak)}
+        </span>
+      )}
+      {fillBreak.outcome === "NotApplied" && tenantAdmin ? (
+        <>
+          <span className="text-xs">Correct the account with an adjustment, then mark this resolved.</span>
+          <Button type="button" size="sm" variant="outline" onClick={onResolve}>Mark resolved</Button>
+        </>
+      ) : null}
+    </div>
   );
 }

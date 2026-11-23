@@ -93,6 +93,10 @@ export function BankReconciliationDetailPage() {
                     <span className="text-muted-foreground">{item.count} transactions</span>
                   ) : null}
                   {item.kind === "Unexplained" ? <span className="text-destructive">{unexplainedSentence}</span> : null}
+                  {item.kind === "TradesNeedingAction" ? (
+                    // trade-settlement D78.
+                    <Link to="/trade-settlements?open=true" className={recordLinkClass}>Open trade settlements</Link>
+                  ) : null}
                 </CardContent>
               </Card>
             ))}
@@ -105,6 +109,11 @@ export function BankReconciliationDetailPage() {
           Payments in flight: {run.paymentsInFlight.count} · {amount(run.paymentsInFlight.amount)}
         </p>
         <Muted>{inFlightSentence}</Muted>
+        {run.openSettlements ? (
+          <p className="text-sm">
+            {`Open trade settlements: ${run.openSettlements.count}, net ${amount(run.openSettlements.amount)}`}
+          </p>
+        ) : null}
       </Section>
     </Page>
   );
