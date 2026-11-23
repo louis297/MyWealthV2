@@ -9,9 +9,10 @@ import { type Customer, useGetCustomerQuery, useGetCustomersQuery } from "@/feat
 import { changedSentence } from "@/features/statementLines/StatementLineDetailPage";
 import { problemMessages, problemStatus } from "@/features/statementLines/statementLineLabels";
 import { useGetStatementLineQuery, useMatchStatementLineMutation } from "@/features/statementLines/statementLinesApi";
+import { type MigrationBatchSummary, useGetMigrationBatchesQuery } from "@/features/migrationBatches/migrationBatchesApi";
 import { formatMoney } from "@/shared/format/money";
 
-type Mode = "reference" | "customer";
+type Mode = "reference" | "customer" | "batch";
 
 /**
  * D36: match an unmatched receipt by hand. The account is found by its deposit reference, or by a Customer and
@@ -29,6 +30,7 @@ export function MatchStatementLinePage() {
   const [customerSearch, setCustomerSearch] = useState<string | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [selected, setSelected] = useState<Account | null>(null);
+  const [selectedBatch, setSelectedBatch] = useState<MigrationBatchSummary | null>(null);
   const [note, setNote] = useState("");
   const [messages, setMessages] = useState<string[]>([]);
   const [accountError, setAccountError] = useState<string[]>([]);
@@ -40,6 +42,8 @@ export function MatchStatementLinePage() {
     { customerId: customer?.id, custodyMode: "Custodial", pageSize: 100 },
     { skip: !customer },
   );
+  // migration-batches D83: a receipt can fund one of the firm's Draft migration batches.
+  const batches = useGetMigrationBatchesQuery({ status: "Draft" }, { skip: mode !== "batch" });
   const selectedCustomer = useGetCustomerQuery(selected?.customerId ?? "", { skip: !selected || selected.customerId === customer?.id });
 
   if (!line.data) {
@@ -56,18 +60,20 @@ export function MatchStatementLinePage() {
   function choose(next: Mode) {
     setMode(next);
     setSelected(null);
+    setSelectedBatch(null);
     setAccountError([]);
   }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!selected) {
+    if (!selected && !selectedBatch) {
       return;
     }
     try {
+      const target = selectedBatch ? { migrationBatchId: selectedBatch.id } : { accountId: selected!.id };
       await match({
         id: receipt.id,
-        accountId: selected.id,
+        ...target,
         rowVersion: receipt.rowVersion,
         note: note.trim().length > 0 ? note.trim() : null,
       }).unwrap();
@@ -96,10 +102,28 @@ export function MatchStatementLinePage() {
         <Button size="sm" variant={mode === "customer" ? "default" : "outline"} onClick={() => choose("customer")}>
           By customer
         </Button>
+        <Button size="sm" variant={mode === "batch" ? "default" : "outline"} onClick={() => choose("batch")}>
+          To a migration batch
+        </Button>
       </div>
       <Card>
         <CardContent className="flex flex-col gap-4">
-          {mode === "reference" ? (
+          {mode === "batch" ? (
+            <div className="flex flex-col items-start gap-1">
+              {batches.isSuccess && (batches.data?.items ?? []).length === 0 ? <Muted>No migration batch is a draft.</Muted> : null}
+              {(batches.data?.items ?? []).map((item) => (
+                <Button
+                  key={item.id}
+                  type="button"
+                  size="sm"
+                  variant={selectedBatch?.id === item.id ? "default" : "outline"}
+                  onClick={() => { setSelectedBatch(item); setAccountError([]); }}
+                >
+                  {`${item.name} · ${item.previousProvider} · as at ${item.asOfDate}`}
+                </Button>
+              ))}
+            </div>
+          ) : mode === "reference" ? (
             <div className="flex items-end gap-2">
               <TextField
                 id="match-reference"
@@ -157,11 +181,13 @@ export function MatchStatementLinePage() {
             ))}
           </div>
           {accountError.length > 0 ? <p className="text-sm text-destructive">{accountError.join(" ")}</p> : null}
-          {selected ? (
+          {selected || selectedBatch ? (
             <form className="flex flex-col gap-4" onSubmit={(event) => void onSubmit(event)}>
               <TextField id="match-note" label="Note" value={note} maxLength={200} onChange={(event) => setNote(event.target.value)} />
               <p className="text-sm font-medium">
-                {`Credit ${formatMoney(receipt.amount, receipt.currency, places)} to ${selected.name} of ${ownerName ?? "…"}.`}
+                {selectedBatch
+                  ? `Add ${formatMoney(receipt.amount, receipt.currency, places)} to ${selectedBatch.name} as its funding.`
+                  : `Credit ${formatMoney(receipt.amount, receipt.currency, places)} to ${selected!.name} of ${ownerName ?? "…"}.`}
               </p>
               <Button type="submit" disabled={isLoading}>
                 Confirm match

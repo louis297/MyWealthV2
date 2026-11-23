@@ -21,6 +21,7 @@ related:
   - accounts.md
   - posting.md
   - custody-modes.md
+  - migration-batches.md
 ---
 
 # Holdings
@@ -298,3 +299,12 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders.md](ord
 - The item of `GET /accounts/{id}/holdings` gains `reservedQuantity` (the open quantity of the Account's live sell orders in that Instrument plus their fills not posted yet) and `availableQuantity` (quantity minus reserved quantity). Neither is stored on `Holdings`; on an External account reserved quantity is always 0 (orders R40, R41).
 - On a Custodial account a sell order and an `Adjustment` that lowers a holding must leave available quantity `≥ 0` (orders R13, R40). A fill, a rebalance and an entitlement posting are not refused by this rule.
 - The type table: on a Custodial account a `Buy` or `Sell` is written by the platform from an order's fill (source `OrderFill`) or by a rebalance; the hand entry is refused. The projection is updated in the same Account-locked transaction (R14), and a fill counts as security activity for R15 (orders R31, R37).
+
+---
+
+## Amendment 2026-11-24 (migration batches) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [migration-batches.md](migration-batches.md). Rules R10 and R22 live there; this section records what changes here.
+
+- R8, R11: on a Custodial account an `OpeningHoldings` is written only by a migration batch (`Transaction.PostMigratedHoldings`, source `Migration`, a migration detail), on an empty account, with the cost the batch carries in the instrument's quote currency. The hand `OpeningHoldings` stays refused, with the message of migration-batches R26.
+- A migrated holding's instrument must be quoted in the Account's currency (issue `InstrumentCurrencyMismatch`) and be active (`InstrumentInactive`). The projection is updated in the post's transaction (R14).

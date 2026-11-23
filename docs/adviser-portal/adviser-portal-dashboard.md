@@ -35,6 +35,7 @@ related:
   - ../features/interest-run.md
   - ../features/trade-settlement.md
   - ../features/rebalances.md
+  - ../features/migration-batches.md
 ---
 
 # Adviser Portal — Dashboard and ledger pages
@@ -396,3 +397,22 @@ Status of this amendment: `accepted` (2026-11-23), together with [rebalances](..
 | D79 | Orders pages (D71–D73): an order with `rebalanceId` shows "Rebalance" with a link to `/rebalances/:id`, and Cancel is not offered on it; the detail page says "This order belongs to a rebalance. Cancel the rebalance to cancel it." The Source line of D26 keeps "Rebalance" for existing Transactions, and Reverse (D27) is offered only for `Manual`. |
 
 - D27: Reverse is offered only when `source.kind` is `Manual`; a `Rebalance` source is no longer hand-reversible on a Custodial account (rebalances R28). The portal still does not read the custody mode, so it also hides Reverse on a `Rebalance` Transaction of an External account, which the server would accept, as it does for `Seed`.
+
+---
+
+## Amendment 2026-11-24 (migration batches) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [migration-batches](../features/migration-batches.md). Field rules live there. Calls: `/migration-batches` (BFF prefix, bff-adviser-portal R20), `POST /statement-lines/{id}/match` with `migrationBatchId`, and the existing reads of statement lines, bank reconciliations and transactions.
+
+| ID | Behaviour |
+| --- | --- |
+| D80 | A TenantAdmin sees a nav item "Migration batches" (`/migration-batches`). An Adviser does not; a 403 on the route shows "Only a firm administrator can see migration batches." The page lists `GET /migration-batches` with a status filter (default Draft and Submitted): Name, Previous provider, As at, Status, Accounts, Holdings, Created, Submitted by, Posted. "New batch" opens `/migration-batches/new`. |
+| D81 | `/migration-batches/new` and `/migration-batches/:id/edit` (`Draft` only): Name, Previous provider, As at; the control totals (Number of accounts; a row per currency for Cash and for Cost; a row per instrument for Quantity), typed by hand and never filled in from the entries; and "Import CSV". The file has the header `account,externalReference,cash,symbol,quantity,cost`. `account` is the Account's deposit reference. A row has `cash`, or `symbol` with `quantity` and `cost`. The rows of one account become one entry. The portal reads the file in the browser, finds each account through the Tenant's Custodial accounts and each symbol through `GET /instruments`, and shows the rows it cannot read or place with their line number; such rows are not sent. Save posts or puts the whole body. A 400 of R7 is shown at its entry. |
+| D82 | `/migration-batches/:id`: the header and status; a totals table with, per row, Control, From the entries, and for cash From the bank, and a mark where they differ; the issues with their messages, each linking to its account or instrument; the entries (Account, Customer, Deposit reference, Previous reference, Cash, Holdings), with links to the Transactions once posted. Actions by status: `Draft`: Edit, Submit (disabled while `validation.isValid` is false, with "Fix <n> issues first."), Cancel. `Submitted`: Post, Return, Cancel. For the person who submitted, Post is disabled with "Someone else must post this batch." Post asks: "Post <n> accounts: <cash totals> and <m> holdings. This cannot be undone." Return and Cancel ask for a note. A `migration_batch_not_valid` answer reloads the batch and shows the issues. |
+| D83 | The batch page has a section "Bank receipts for this batch": the funding lines (Value date, Payer, Reference, Amount) with Remove, which calls undo match with a note, and, on a `Draft`, "Add receipt", which lists `GET /statement-lines?status=Unmatched` credit lines and matches the chosen one to the batch. On the Bank receipts pages (D34, D35) the Match dialog offers "To an account" (as today) or "To a migration batch", with the Tenant's `Draft` batches. Method label: Migration "Migration batch", with a link to the batch. Undo on such a line shows the sentence of R14 when the batch is not `Draft`. |
+| D84 | Bank reconciliation (D51): kind label MigrationNotPosted "Received for a migration batch not posted yet", linking to the batch through the line. |
+| D85 | `/transactions/:id` of a Transaction a batch wrote: the Source line (D26) shows "Migration batch", with a link to the batch for a TenantAdmin; a line "From <previousProvider>, balances as at <asOfDate>"; Reverse is not offered (D27). The refusal text for `Opening` and `OpeningHoldings` on a Custodial account in the portal's copy of the matrix becomes the message of R26. |
+
+- D26, D27: the Source line names "Migration batch"; Reverse is not offered on a Transaction a batch wrote (`Migration` is not hand-reversible).
+- D34, D35: the Match page offers "To an account" or "To a migration batch"; method label Migration "Migration batch".
+- D51: kind label MigrationNotPosted.

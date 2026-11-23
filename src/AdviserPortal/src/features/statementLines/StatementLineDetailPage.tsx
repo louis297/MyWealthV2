@@ -185,6 +185,12 @@ export function StatementLineDetailPage() {
               </DetailItem>
             ) : null}
             {line.returnReason ? <DetailItem label="Return reason">{line.returnReason}</DetailItem> : null}
+            {line.migrationBatchId ? (
+              // migration-batches D83.
+              <DetailItem label="Migration batch">
+                <Link to={`/migration-batches/${line.migrationBatchId}`} className={recordLinkClass}>Migration batch</Link>
+              </DetailItem>
+            ) : null}
             {line.tradeSettlementId ? (
               // trade-settlement D78.
               <DetailItem label="Trade settlement">
@@ -256,7 +262,11 @@ export function StatementLineDetailPage() {
         <NoteDialog
           open
           title={dialogs[dialog]}
-          warning={dialog === "unmatch" ? `This posts a reversal of the deposit on ${accountName}.` : undefined}
+          warning={dialog === "unmatch"
+            ? line.match?.method === "Migration"
+              ? "This takes the receipt out of the migration batch and puts it back in suspense."
+              : `This posts a reversal of the deposit on ${accountName}.`
+            : undefined}
           busy={noting}
           onConfirm={(note) => void onNote(dialog, note)}
           onClose={() => setDialog(null)}

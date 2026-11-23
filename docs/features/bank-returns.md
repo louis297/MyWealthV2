@@ -22,6 +22,7 @@ related:
   - account-closure.md
   - interest-run.md
   - trade-settlement.md
+  - migration-batches.md
 ---
 
 # Receipt returns, recalls and other debit lines
@@ -342,3 +343,12 @@ Status of this amendment: `accepted` (2026-11-23), together with [trade-settleme
 - R2: the classification of a debit line gains the settlement payment (trade-settlement R18) next to the receipt return.
 - R8: a credit line that returns the debit line of a `Paid` settlement payment, with the same amount, is `Matched` with method `PaymentReturn` and the trade settlement; the payment is `Returned` and the settlement `PaymentFailed` (trade-settlement R20).
 - R10: a `Matched` line has an Account and a Transaction, or a related line, or a trade settlement. A line matched to a trade settlement accepts no action.
+
+---
+
+## Amendment 2026-11-24 (migration batches) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [migration-batches.md](migration-batches.md). Rule R15 lives there; this section records what changes here.
+
+- R3: a recall of a credit line matched with method `Migration`: while its batch is not `Posted`, the credit line becomes `Returned` and loses its match, and the debit line is `Matched` with method `Recall` with no Account and no Transaction. When the batch is `Posted`, nothing is posted and the debit line is `Unmatched` with reason `RecallNotCovered`.
+- R10: a `Matched` line has an Account and a Transaction, or a related line, or a trade settlement, or a migration batch.

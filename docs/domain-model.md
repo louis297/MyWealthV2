@@ -372,6 +372,7 @@ Invariants:
 - (Interest run) Source kind `InterestRun` (6) has the run's PublicId as its id and is not hand-reversible. `PostInterest` builds an interest posting: one `Principal` `Interest` cash leg of `+gross` (the accrued amount rounded to the minor unit, above 0), a `Tax` cash leg of `−tax` with its tax detail when the withholding tax is above 0, and an interest detail; source `InterestRun`. A cash leg has a tax detail if and only if its role is `Tax`; every factory other than `PostInterest` and `Reverse` refuses a `Tax` leg. `Reverse` copies the `Tax` leg, its tax detail and the interest detail. On a Custodial account no person enters an `Interest` (`CustodyRules`, unchanged) ([features/interest-run.md](features/interest-run.md)).
 - (Corporate actions) Source kind `CorporateAction` (7) has the corporate action's PublicId as its id and is not hand-reversible. `PostCorporateAction` builds an entitlement posting: type `Split` (split or consolidation) or `Bonus`, one security leg of `quantityAfter − quantityBefore` with cost `0` in the quote currency, no cash leg, source `CorporateAction`, and a corporate action detail (`TransactionCorporateActionDetail`: kind, ratio, ex-date, record date, payment date, quantity before and after; 0..1 per Transaction, copied by `Reverse`). It refuses another source kind and a `quantityAfter` that is 0 or equal to `quantityBefore`. It is built outside the manual entry matrix; on a Custodial account a hand `Split`, `Bonus` or `Scrip` stays refused.
 - (Orders) Source kind `OrderFill` (8) has the order's PublicId as its id and is not hand-reversible. A fill is posted with `PostBuy` / `PostSell` at the broker's price, with the fee of its order and an execution detail (`TransactionExecutionDetail`: the fill's PublicId, price, trade date, settlement date, broker reference; 0..1 per Transaction, required with source `OrderFill` and refused with any other, copied by `Reverse`). The legs and the cost rules are those of any `Buy` / `Sell`. On a Custodial account a hand `Buy` or `Sell` is refused by `CustodyRules`; rebalance still builds them with source `Rebalance`.
+- (Migration batches) Source kind `Migration` (9) has the migration batch's PublicId as its id and is not hand-reversible. `PostMigratedCash` builds an `Opening` with one `Principal` cash leg of `+amount` (`> 0`); `PostMigratedHoldings` builds an `OpeningHoldings` with the legs of `PostOpeningHoldings`. Both need source `Migration`, set the memo `Opening balance` and carry a migration detail (`TransactionMigrationDetail`: as-of date, previous provider; 0..1 per Transaction, copied by `Reverse`). They are built outside the manual entry matrix; on a Custodial account a hand `Opening` or `OpeningHoldings` stays refused ([features/migration-batches.md](features/migration-batches.md)).
 
 Field rules: [features/posting.md](features/posting.md), [features/holdings.md](features/holdings.md), [features/buy-sell.md](features/buy-sell.md), [features/split.md](features/split.md), [features/leg-accounts.md](features/leg-accounts.md), and [features/adjustments.md](features/adjustments.md).
 
@@ -418,6 +419,8 @@ Amendment 2026-11-22 (interest run, accepted): `BankStatementLine` gains `Kind` 
 
 Amendment 2026-11-23 (trade settlement and broken trades, accepted): `BankStatementLine` gains `TradeSettlementId`; `MarkSettlement(tradeSettlementId, at)`; `MarkPaymentReturn` accepts a trade settlement in place of an Account and a Transaction. Match method `Settlement` (5); unmatched reason `SettlementMismatch` (13). A `Matched` line has an Account and a Transaction, or a related line, or a trade settlement ([features/trade-settlement.md](features/trade-settlement.md)).
 
+Amendment 2026-11-24 (migration batches, accepted): `BankStatementLine` gains `MigrationBatchId`; `MatchToMigrationBatch(batchId, note, by, at)`; `Unmatch` and the recall of a funding line clear it. Match method `Migration` (6). A `Matched` line has an Account and a Transaction, or a related line, or a trade settlement, or a migration batch ([features/migration-batches.md](features/migration-batches.md)).
+
 ### 8.10 Nominated bank account (accepted — withdrawals slice)
 
 | Type | Kind | Notes |
@@ -453,6 +456,8 @@ Amendment 2026-11-23 (trade settlement and broken trades, accepted): `OutgoingPa
 Invariants: the items of an `Agreed` or `Breaks` run add up to bank balance minus Custodial cash; a run is `Agreed` exactly when it has no Break item; a run and its items never change; a run counts only its own Tenant's accounts and lines. No domain event. Field rules: [features/bank-reconciliation.md](features/bank-reconciliation.md).
 
 Amendment 2026-11-23 (trade settlement and broken trades, accepted): `ReconciliationItemKind` gains `UnsettledTrades` (15, Timing), `TradesNeedingAction` (16, Break), `UnbookedFills` (17, Break) and `TradeFees` (18, Known). `ReconciliationInputs` gains the four sums with their counts and the open trade settlements (count, amount), which the run records without an item ([features/trade-settlement.md](features/trade-settlement.md)).
+
+Amendment 2026-11-24 (migration batches, accepted): `ReconciliationItemKind` gains `MigrationNotPosted` (19, Timing), an item with a line. `ReconciliationInputs` gains each line's match to a batch that is not posted and the migration cash per funding client money account ([features/migration-batches.md](features/migration-batches.md)).
 
 ### 8.13 Account closure (accepted — account-closure slice)
 
@@ -539,6 +544,20 @@ Amendment 2026-11-23 (rebalance through orders, accepted): `Order` gains `Rebala
 | `RebalanceRules` | Static | `ProposalValidHours = 24`, `MaxBuyWaves = 2` |
 
 Invariants: an Account has at most one open rebalance (Application and a filtered unique index); a rebalance has orders only after it was confirmed, each on its Account and its connection; a buy wave is placed only while no order of the rebalance is live and never reserves more than the available cash; on an Account with an Active assignment every order has a rebalance; on a Custodial account a person reverses only a `Manual` source. No domain event: `PortfolioWeightsChanged` still starts the job. Field rules: [features/rebalances.md](features/rebalances.md).
+
+### 8.19 Migration batches (accepted — migration-batches slice)
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `MigrationBatch` | Aggregate | A Tenant's load of opening positions from a previous provider: name, previous provider, as-of date, control totals, entries, status; submitted (by, at), returned (by, at, note), posted (by, at), cancelled (by, at, note). `Create`, `Replace`, `Touch`, `Submit`, `Return`, `Cancel`, `MarkPosted`. Holds the shape and limits of the body (500 entries, 5 000 holdings) and the four-eyes rule. Writes nothing to the ledger by itself |
+| `MigrationBatchEntry` | Entity (child) | Position, Account, external reference, cash, holdings, and the `Opening` and `OpeningHoldings` Transactions once posted |
+| `MigrationBatchHolding` | Entity (child of the entry) | Instrument, quantity, cost |
+| `MigrationControlTotals` | Value object | Account count; cash per currency; quantity per Instrument; cost per currency |
+| `MigrationBatchStatus` | Enum | `Draft`, `Submitted`, `Posted`, `Cancelled` |
+| `MigrationBatchValidation` | Static | `Compute(inputs)`: the computed totals, the funding totals and the issues; a pure function over the batch and the state of its Accounts, Instruments and funding lines |
+| `MigrationIssueCode` | Enum | `NoEntries`, `AccountNotCustodial`, `AccountNotOpen`, `CustomerDisabled`, `AccountNotEmpty`, `CashPrecision`, `InstrumentInactive`, `InstrumentCurrencyMismatch`, `ControlTotalMismatch`, `FundingMismatch` |
+
+Invariants: a batch is posted only from `Submitted`, by a person other than its submitter, and only with no issue under the locks of its Accounts; every Transaction of a batch is written in the database transaction that sets it `Posted`; a Transaction with source `Migration` is an `Opening` or `OpeningHoldings` on an Account that had no Transaction before; per currency the funding lines of a `Posted` batch equal its `Opening` cash; a statement line funds at most one batch, and only a `Draft` batch gains or loses a funding line. No domain event. Field rules: [features/migration-batches.md](features/migration-batches.md).
 
 ## 9. Value objects (Domain assembly; may exist in Phase 1)
 

@@ -795,6 +795,27 @@ describe("Customer Portal bank accounts and withdrawals (withdrawals C22–C25)"
     expect(within(table).queryByRole("button")).not.toBeInTheDocument();
   });
 
+  it("labels a migrated opening balance and holdings with where they came from (C38)", async () => {
+    const migration = { asOfDate: "2026-11-20", previousProvider: "Acme Wealth" };
+    const opening = {
+      id: "t-1", type: "Opening", bookedAt: "2026-11-24T02:15:00Z", memo: "Opening balance",
+      cash: [{ accountId: "account-1", amount: 150000, currency: "USD" }], security: [],
+      source: { kind: "Migration", id: "b-1" }, migration,
+    };
+    const holdings = {
+      id: "t-2", type: "OpeningHoldings", bookedAt: "2026-11-24T02:15:00Z", memo: "Opening balance", cash: [],
+      security: [{ accountId: "account-1", instrumentId: "i-1", quantity: 800 }],
+      source: { kind: "Migration", id: "b-1" }, migration,
+    };
+    const typed = { id: "t-3", type: "Opening", bookedAt: "2026-10-01T02:13:00Z", memo: null, cash: [], security: [], source: { kind: "Seed", id: null } };
+    renderAt("/accounts/account-1", me, [opening, holdings, typed], "Custodial", { account: custodialUsd, orders: [] });
+
+    expect(await screen.findByText("Opening balance")).toBeInTheDocument();
+    expect(screen.getByText("Holdings transferred in")).toBeInTheDocument();
+    expect(screen.getAllByText("From Acme Wealth, as at 2026-11-20")).toHaveLength(2);
+    expect(screen.getByText("Opening")).toBeInTheDocument();
+  });
+
   it("asks for no orders on an External account (C32)", async () => {
     const { fetchMock } = renderAt("/accounts/account-1");
 

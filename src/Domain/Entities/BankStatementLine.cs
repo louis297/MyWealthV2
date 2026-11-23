@@ -87,6 +87,9 @@ public class BankStatementLine : BaseAuditableEntity
     /// <summary>Trade-settlement R18–R21: the trade settlement whose cash this line is.</summary>
     public int? TradeSettlementId { get; private set; }
 
+    /// <summary>Migration-batches R13: the migration batch this receipt funds, while it is matched to one.</summary>
+    public int? MigrationBatchId { get; private set; }
+
     public byte[] RowVersion { get; private set; } = null!;
 
     /// <summary>A line as the bank sent it, in status <c>Received</c> (R10–R12). Payer name and reference are
@@ -340,6 +343,18 @@ public class BankStatementLine : BaseAuditableEntity
         Record(StatementLineAction.Matched, trimmed, byUserId, at);
     }
 
+    /// <summary>Migration-batches R13: a TenantAdmin matched the receipt to a migration batch as its funding. No Account
+    /// and no Transaction: the batch's post writes the opening balances.</summary>
+    public void MatchToMigrationBatch(int migrationBatchId, string? note, int byUserId, DateTimeOffset at)
+    {
+        EnsureCredit("matched");
+        EnsureStatus("matched", BankStatementLineStatus.Unmatched);
+        var trimmed = OptionalNote(note);
+        SetMatch(null, null, StatementLineMatchMethod.Migration, at);
+        MigrationBatchId = migrationBatchId;
+        Record(StatementLineAction.Matched, trimmed, byUserId, at);
+    }
+
     /// <summary>Not a Customer's money (R27); on a debit line, a debit that is not a Customer's (bank-returns R9).</summary>
     public void Ignore(string note, int byUserId, DateTimeOffset at)
     {
@@ -406,6 +421,7 @@ public class BankStatementLine : BaseAuditableEntity
         MatchedTransactionId = null;
         MatchMethod = null;
         MatchedAt = null;
+        MigrationBatchId = null;
     }
 
     private void SetMatch(int? accountId, int? transactionId, StatementLineMatchMethod method, DateTimeOffset at)

@@ -26,6 +26,7 @@ related:
   - withdrawals.md
   - account-closure.md
   - interest-run.md
+  - migration-batches.md
 ---
 
 # Posting
@@ -499,3 +500,13 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders.md](ord
 - R9: on a Custodial account available cash is the cash `SUM` minus reserved cash, and reserved cash now also counts the live buy orders (orders R39). Cash from a sale that has not settled is in the `SUM` (orders R44).
 - R20: a fill's `bookedAt` is the platform time of the posting; the broker's trade date and settlement date are in its execution detail (orders R32, R35).
 - R22: placing an order locks the Account row, and each fill is posted in its own database transaction with the Account row locked (orders R12, R31).
+
+---
+
+## Amendment 2026-11-24 (migration batches) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [migration-batches.md](migration-batches.md). Rules R22 and R26 live there; this section records what changes here.
+
+- R19 and the §5 type table: on a Custodial account an `Opening` is written only by a migration batch (`Transaction.PostMigratedCash`, source `Migration`, one `Principal` leg, memo `Opening balance`, a migration detail). The hand `Opening` stays refused for every caller, with the message `Opening balances on a Custodial account come from a migration batch.` External accounts are unchanged.
+- R19: the account must still be empty: a batch entry is refused (issue `AccountNotEmpty`) when any Transaction has a leg on the Account, reversed ones included.
+- R20: a migrated `Opening` is booked at the posting time of its batch; the previous provider's date is in its migration detail (`asOfDate`).

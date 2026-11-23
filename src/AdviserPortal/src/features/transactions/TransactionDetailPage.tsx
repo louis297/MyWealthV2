@@ -46,6 +46,15 @@ export function TransactionDetailPage() {
                 Statement line
               </Link>
             ) : null}
+            {data.source?.kind === "Migration" && data.source.id && role === roles.tenantAdmin ? (
+              // migration-batches D85.
+              <Link to={`/migration-batches/${data.source.id}`} className={recordLinkClass}>
+                Migration batch
+              </Link>
+            ) : null}
+            {data.migration ? (
+              <p className="text-sm">{`From ${data.migration.previousProvider}, balances as at ${data.migration.asOfDate}`}</p>
+            ) : null}
             {data.source?.kind === "Payment" && data.source.id ? (
               <Link to={`/withdrawals/${data.source.id}`} className={recordLinkClass}>
                 Withdrawal

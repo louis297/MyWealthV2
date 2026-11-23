@@ -13,5 +13,8 @@ public enum StatementLineMatchMethod
     Recall = 4,
 
     /// <summary>The cash of a trade settlement, paid or received (trade-settlement R18, R19).</summary>
-    Settlement = 5
+    Settlement = 5,
+
+    /// <summary>A TenantAdmin matched a receipt to a migration batch as its funding (migration-batches R13).</summary>
+    Migration = 6
 }

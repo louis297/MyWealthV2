@@ -636,6 +636,48 @@ public class TenantCompositeKeysSchemaTests
             """ + OrderRow() + """
             UPDATE [Orders] SET [RebalanceId] = @prebalance WHERE [Id] = SCOPE_IDENTITY();
             """),
+        ("FK_MigrationBatches_Users_TenantId_SubmittedByUserId", "Users", BatchRow(status: "1", submittedBy: "@{p}_adviser")),
+        ("FK_MigrationBatches_Users_TenantId_ReturnedByUserId", "Users", BatchRow(returnedBy: "@{p}_adviser")),
+        ("FK_MigrationBatches_Users_TenantId_PostedByUserId", "Users",
+            BatchRow(status: "2", submittedBy: "@a_adviser", postedBy: "@{p}_customer")),
+        ("FK_MigrationBatches_Users_TenantId_CancelledByUserId", "Users", BatchRow(status: "3", cancelledBy: "@{p}_adviser")),
+        ("FK_MigrationBatchControlTotals_MigrationBatches_TenantId_MigrationBatchId", "MigrationBatches",
+            BatchRow(tenant: "@{p}_tenant") + """
+            INSERT INTO [MigrationBatchControlTotals] ([TenantId], [MigrationBatchId], [Kind], [Currency], [Amount])
+            VALUES (@a_tenant, @pbatch, 0, 'USD', 1);
+            """),
+        ("FK_MigrationBatchControlTotals_Instruments_TenantId_InstrumentId", "Instruments", BatchRow() + """
+            INSERT INTO [MigrationBatchControlTotals] ([TenantId], [MigrationBatchId], [Kind], [InstrumentId], [Amount])
+            VALUES (@a_tenant, @pbatch, 1, @{p}_instrument, 1);
+            """),
+        ("FK_MigrationBatchEntries_MigrationBatches_TenantId_MigrationBatchId", "MigrationBatches",
+            BatchRow(tenant: "@{p}_tenant") + EntryRow(batch: "@pbatch")),
+        ("FK_MigrationBatchEntries_Accounts_TenantId_AccountId", "Accounts", BatchRow() + EntryRow(account: "@{p}_brokerage")),
+        ("FK_MigrationBatchEntries_Transactions_TenantId_OpeningTransactionId", "Transactions",
+            BatchRow() + EntryRow(opening: "@{p}_buy")),
+        ("FK_MigrationBatchEntries_Transactions_TenantId_OpeningHoldingsTransactionId", "Transactions",
+            BatchRow() + EntryRow(openingHoldings: "@{p}_buy")),
+        ("FK_MigrationBatchHoldings_MigrationBatchEntries_TenantId_MigrationBatchEntryId", "MigrationBatchEntries",
+            BatchRow(tenant: "@{p}_tenant") + EntryRow(tenant: "@{p}_tenant", account: "@{p}_brokerage") + """
+            INSERT INTO [MigrationBatchHoldings] ([TenantId], [MigrationBatchEntryId], [InstrumentId], [Quantity], [Cost])
+            VALUES (@a_tenant, @pentry, @a_instrument, 1, 1);
+            """),
+        ("FK_MigrationBatchHoldings_Instruments_TenantId_InstrumentId", "Instruments", BatchRow() + EntryRow() + """
+            INSERT INTO [MigrationBatchHoldings] ([TenantId], [MigrationBatchEntryId], [InstrumentId], [Quantity], [Cost])
+            VALUES (@a_tenant, @pentry, @{p}_instrument, 1, 1);
+            """),
+        ("FK_TransactionMigrationDetails_Transactions_TenantId_TransactionId", "Transactions", """
+            INSERT INTO [TransactionMigrationDetails] ([TransactionId], [TenantId], [AsOfDate], [PreviousProvider])
+            VALUES (@{p}_buy, @a_tenant, '2026-11-20', N'Acme Wealth');
+            """),
+        ("FK_BankStatementLines_MigrationBatches_TenantId_MigrationBatchId", "MigrationBatches",
+            ClientMoney("@a_tenant", "cma") + BatchRow(tenant: "@{p}_tenant") + """
+            INSERT INTO [BankStatementLines]
+                ([PublicId], [TenantId], [ClientMoneyAccountId], [Connection], [OutsideId], [ValueDate], [Direction], [Amount], [Currency],
+                 [ReceivedAt], [Status], [MatchMethod], [MatchedAt], [MigrationBatchId], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @cma, N'simulator', CONVERT(nvarchar(100), NEWID()), '2026-11-23', 0, 5, 'USD',
+                    SYSDATETIMEOFFSET(), 1, 6, SYSDATETIMEOFFSET(), @pbatch, SYSDATETIMEOFFSET(), N'test');
+            """),
         ("FK_ReportExecutions_ReportSchedules_TenantId_ScheduleId", "ReportSchedules", """
             INSERT INTO [ReportExecutions] ([PublicId], [ReportId], [ScheduleId], [TenantId], [TriggerKind], [Status], [ParametersJson], [Created], [CreatedBy])
             VALUES (NEWID(), @report, @{p}_schedule, @a_tenant, N'Scheduled', N'Queued', N'{}', SYSDATETIMEOFFSET(), N'test');
@@ -669,7 +711,7 @@ public class TenantCompositeKeysSchemaTests
     ];
 
     private static readonly string[] Parents =
-        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines", "BankReconciliations", "InterestRateSchedules", "CorporateActions", "Orders", "ClientMoneyAccounts", "TradeSettlements", "AccountPortfolioAssignments", "Rebalances"];
+        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines", "BankReconciliations", "InterestRateSchedules", "CorporateActions", "Orders", "ClientMoneyAccounts", "TradeSettlements", "AccountPortfolioAssignments", "Rebalances", "MigrationBatches", "MigrationBatchEntries"];
 
     /// <summary>An order of tenant <c>a</c> (script 0051); one argument names a row of the other tenant.</summary>
     private static string OrderRow(
@@ -697,6 +739,42 @@ public class TenantCompositeKeysSchemaTests
         INSERT INTO [AccountPortfolioAssignments] ([PublicId], [TenantId], [AccountId], [PortfolioId], [Status], [AssignedAt], [AssignedBy], [Created], [CreatedBy])
         VALUES (NEWID(), @{prefix}_tenant, @{prefix}_brokerage, @{prefix}_portfolio, 0, SYSDATETIMEOFFSET(), N'test', SYSDATETIMEOFFSET(), N'test');
         DECLARE @{prefix}_assignment int = SCOPE_IDENTITY();
+
+        """;
+
+    /// <summary>A migration batch in <c>@pbatch</c> (script 0054); a person column names a row of the other tenant.</summary>
+    private static string BatchRow(
+        string tenant = "@a_tenant",
+        string status = "0",
+        string submittedBy = "NULL",
+        string returnedBy = "NULL",
+        string postedBy = "NULL",
+        string cancelledBy = "NULL") => $"""
+        INSERT INTO [MigrationBatches]
+            ([PublicId], [TenantId], [Status], [Name], [PreviousProvider], [AsOfDate], [ControlAccountCount],
+             [SubmittedByUserId], [SubmittedAt], [ReturnedByUserId], [ReturnedAt], [ReturnNote], [PostedByUserId], [PostedAt],
+             [CancelledByUserId], [CancelledAt], [CancelNote], [Created], [CreatedBy])
+        VALUES (NEWID(), {tenant}, {status}, N'Acme', N'Acme Wealth', '2026-11-20', 1,
+                {submittedBy}, {(submittedBy == "NULL" ? "NULL" : "SYSDATETIMEOFFSET()")},
+                {returnedBy}, {(returnedBy == "NULL" ? "NULL" : "SYSDATETIMEOFFSET()")}, {(returnedBy == "NULL" ? "NULL" : "N'Note'")},
+                {postedBy}, {(postedBy == "NULL" ? "NULL" : "SYSDATETIMEOFFSET()")},
+                {cancelledBy}, {(cancelledBy == "NULL" ? "NULL" : "SYSDATETIMEOFFSET()")}, {(cancelledBy == "NULL" ? "NULL" : "N'Note'")},
+                SYSDATETIMEOFFSET(), N'test');
+        DECLARE @pbatch int = SCOPE_IDENTITY();
+
+        """;
+
+    /// <summary>An entry of <c>@pbatch</c> in <c>@pentry</c> (script 0054).</summary>
+    private static string EntryRow(
+        string tenant = "@a_tenant",
+        string batch = "@pbatch",
+        string account = "@a_brokerage",
+        string opening = "NULL",
+        string openingHoldings = "NULL") => $"""
+        INSERT INTO [MigrationBatchEntries]
+            ([TenantId], [MigrationBatchId], [Position], [AccountId], [CashAmount], [OpeningTransactionId], [OpeningHoldingsTransactionId])
+        VALUES ({tenant}, {batch}, 0, {account}, 5, {opening}, {openingHoldings});
+        DECLARE @pentry int = SCOPE_IDENTITY();
 
         """;
 

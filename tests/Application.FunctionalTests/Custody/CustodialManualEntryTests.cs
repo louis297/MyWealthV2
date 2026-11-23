@@ -35,8 +35,8 @@ public class CustodialManualEntryTests : TestBase
     private static IEnumerable<TestCaseData> RefusedTypes()
     {
         yield return new TestCaseData("Interest", "Interest cannot be entered by hand on a Custodial account.");
-        yield return new TestCaseData("Opening", "A Custodial account starts empty. Fund it with TransferIn.");
-        yield return new TestCaseData("OpeningHoldings", "A Custodial account starts empty. Fund it with TransferIn.");
+        yield return new TestCaseData("Opening", "Opening balances on a Custodial account come from a migration batch.");
+        yield return new TestCaseData("OpeningHoldings", "Opening balances on a Custodial account come from a migration batch.");
         yield return new TestCaseData("Buy", "Trades on a Custodial account go through the broker. Place an order.");
         yield return new TestCaseData("Sell", "Trades on a Custodial account go through the broker. Place an order.");
         yield return new TestCaseData("StockIn", "Securities cannot be moved in or out of a Custodial account by hand. Place an order.");

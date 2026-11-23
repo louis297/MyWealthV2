@@ -16,6 +16,7 @@ import {
   BanknoteArrowUpIcon,
   ClipboardListIcon,
   HandCoinsIcon,
+  ImportIcon,
   RefreshCwIcon,
   ScaleIcon,
   PercentIcon,
@@ -57,6 +58,7 @@ import {
   canAccessOrders,
   canAccessRebalances,
   canManageTradeSettlements,
+  canManageMigrationBatches,
   canAccessWithdrawals,
   canCheckBankAccounts,
   canManageBankReconciliations,
@@ -160,6 +162,13 @@ export function ShellLayout({ children }: { children?: ReactNode }) {
       label: "Trade settlements",
       icon: HandCoinsIcon,
       visible: canManageTradeSettlements(role),
+    },
+    {
+      // migration-batches D80.
+      to: "/migration-batches",
+      label: "Migration batches",
+      icon: ImportIcon,
+      visible: canManageMigrationBatches(role),
     },
     {
       to: "/withdrawals",

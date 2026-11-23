@@ -45,6 +45,9 @@ public sealed class StatementLineDto
     /// <summary>Trade-settlement R21: the trade settlement whose cash this line is, else null.</summary>
     public Guid? TradeSettlementId { get; init; }
 
+    /// <summary>Migration-batches R30: the batch the line funds, else null.</summary>
+    public Guid? MigrationBatchId { get; init; }
+
     /// <summary>The newest return payment of a receipt marked for return, else null (bank-returns R11).</summary>
     public StatementLineReturnPaymentDto? ReturnPayment { get; init; }
 

@@ -106,6 +106,8 @@ export type Activity = {
     /** trade-settlement R34: when the broker took the fill back. */
     brokenAt?: string | null;
   } | null;
+  /** migration-batches R31: where a migrated opening balance came from; otherwise null. */
+  migration?: { asOfDate: string; previousProvider: string } | null;
   /** corporate-actions R37: the event behind an entitlement posting; otherwise null. */
   corporateAction?: {
     id: string;

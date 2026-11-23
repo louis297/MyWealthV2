@@ -3,7 +3,7 @@ title: Custodial accounts roadmap
 status: note
 language: en
 created: 2026-11-19
-updated: 2026-11-23
+updated: 2026-11-24
 related:
   - future-plans.md
   - adr/0020-account-custody-mode.md
@@ -37,6 +37,7 @@ related:
   - features/orders.md
   - features/trade-settlement.md
   - features/rebalances.md
+  - features/migration-batches.md
 ---
 
 # Custodial accounts roadmap
@@ -97,7 +98,7 @@ The manual entry matrix at the end of the plan. The External column stays as tod
 | `InternalTransfer` | allowed, same Customer only (D14, from withdrawals, landed 2026-11-21) | allowed, same Customer only (D14) | Hand entry |
 | `FxConversion` | allowed, both Custodial | allowed (later through an outside FX party, O5) | Hand entry |
 | `Interest` | refused (written by the interest run, landed 2026-11-22) | refused | Interest run (I2) |
-| `Opening` / `OpeningHoldings` | refused | refused | Migration batch (T2) |
+| `Opening` / `OpeningHoldings` | refused (written by a migration batch, landed 2026-11-24) | refused | Migration batch (T2) |
 | `StockIn` / `StockOut` | refused | refused | In-kind transfer (T1) |
 | `Split` / `Bonus` / `Scrip` | refused (`Split` and `Bonus` written by corporate actions, landed 2026-11-22) | refused | Corporate action events (C1; `Scrip` with C3) |
 | `Dividend` | reserved | refused | Corporate action events (C2) |
@@ -360,6 +361,7 @@ A Custodial `FxConversion` priced by an FX provider with a spread, instead of th
 
 - **What:** a TenantAdmin bulk import of opening cash and holdings into empty Custodial accounts, with control totals that must agree before the batch posts. Source `Migration`. Replaces `Opening` / `OpeningHoldings` for Custodial accounts.
 - **Depends on:** F1.
+- **Spec:** step 13 is [migration-batches.md](features/migration-batches.md) (accepted and landed 2026-11-24). Its §11 decides, every point as recommended: a migration batch is a Tenant's record at `/migration-batches` with one entry per empty Custodial account (no Transaction on it yet), `Draft` → `Submitted` → `Posted`, or `Cancelled`; it writes the existing types `Opening` and `OpeningHoldings` with the new source `Migration` and a migration detail (the previous provider and the date the balances were taken), booked at the posting time (D2, D4); four control totals typed from the previous provider's closing statement (account count, cash per currency, quantity per instrument, cost per currency), compared exactly with the totals of the entries; the cash of a batch must be funded before it is submitted: the provider's bulk transfer is a receipt on the trust account that a TenantAdmin matches to the batch on the statement line, and per currency the funding must equal the batch's cash (this refines "Depends on: F1" above: it also builds on B3, B4 and B7); a TenantAdmin other than the submitter posts, with one permission `migration-batches.manage`; the post is one database transaction on `webapi`, all entries or none, validated again under the Account locks, with at most 500 entries and 5 000 holdings per batch; a holding's instrument must be quoted in the Account's currency (D20); an Active portfolio assignment does not stop an entry and no rebalance is proposed; no flow reverses a posted batch (an adjustment corrects an entry); in the bank reconciliation the funding of a batch not posted yet is the timing difference `MigrationNotPosted`, and a posted batch leaves no item; the API takes JSON and the Adviser Portal reads the CSV; the holdings have no outside proof until T3. The simulator does not change.
 
 ### T3. Custodian reconciliation
 
@@ -398,7 +400,7 @@ A separate project that plays the outside parties for manual testing and demos. 
 
 ### S1. Bank (with B3–B7)
 
-The receipts side (the first two rows, without recalls) is in [deposit-matching.md](features/deposit-matching.md) (accepted 2026-11-20) §4.6: bank accounts, standing accounts from configuration, receipts with a delay or delivered twice, and the statement feed. It adds no scenario library yet (simulator §11 point 7 put it with S1). The payments side is in [withdrawals.md](features/withdrawals.md) (accepted 2026-11-20, landed 2026-11-21) §4.7: a payment route idempotent on the platform's instruction id, a payment mode (execute, hold, reject), execute a held payment, return a payment. Returning a receipt and recalling a receipt are in [bank-returns.md](features/bank-returns.md) (accepted 2026-11-21, landed 2026-11-21) §4.5. Neither adds a scenario library; it is proposed for B7. Balances for reconciliation are in [bank-reconciliation.md](features/bank-reconciliation.md) (accepted and landed 2026-11-21) §4.7: the statement balance on each feed page, a bank charge, and a line left out of the feed; it adds no scenario library either (§11 point 12). Interest on the trust account is in [interest-run.md](features/interest-run.md) (accepted 2026-11-22) §4.8: a control route that adds a credit line of kind `Interest` with an amount the operator types, and `kind` on the feed item; no scenario library.
+The receipts side (the first two rows, without recalls) is in [deposit-matching.md](features/deposit-matching.md) (accepted 2026-11-20) §4.6: bank accounts, standing accounts from configuration, receipts with a delay or delivered twice, and the statement feed. It adds no scenario library yet (simulator §11 point 7 put it with S1). The payments side is in [withdrawals.md](features/withdrawals.md) (accepted 2026-11-20, landed 2026-11-21) §4.7: a payment route idempotent on the platform's instruction id, a payment mode (execute, hold, reject), execute a held payment, return a payment. Returning a receipt and recalling a receipt are in [bank-returns.md](features/bank-returns.md) (accepted 2026-11-21, landed 2026-11-21) §4.5. Neither adds a scenario library; it is proposed for B7. Balances for reconciliation are in [bank-reconciliation.md](features/bank-reconciliation.md) (accepted and landed 2026-11-21) §4.7: the statement balance on each feed page, a bank charge, and a line left out of the feed; it adds no scenario library either (§11 point 12). Interest on the trust account is in [interest-run.md](features/interest-run.md) (accepted 2026-11-22) §4.8: a control route that adds a credit line of kind `Interest` with an amount the operator types, and `kind` on the feed item; no scenario library. The migration batch ([migration-batches.md](features/migration-batches.md), accepted 2026-11-24) makes no change to the simulator bank: the previous provider's bulk transfer is an ordinary receipt with no deposit reference, which waits in suspense until a TenantAdmin matches it to the batch.
 
 | Signal or action | Platform flow |
 | --- | --- |
@@ -478,7 +480,7 @@ Each step depends only on earlier steps. "Closes" names the matrix cell or known
 | 11 | O1 orders, O2 settlement | S2 | Immediate `Buy` / `Sell` | [orders](features/orders.md) | accepted 2026-11-23, landed 2026-11-23 |
 | 11b | O1 / O2 remainder: settlement cash through the client money account and its reconciliation; a broken trade after a fill | S2 broken trade and settlements, S1 | The known difference `Trades` of B7, for order fills | [trade-settlement](features/trade-settlement.md) | accepted 2026-11-23, landed 2026-11-23 |
 | 12 | O3 rebalance through orders | S2 (no change) | Hand reverse of a rebalance trade (D15); the known difference `Trades` of B7, for rebalance trades | [rebalances](features/rebalances.md) | accepted 2026-11-23, landed 2026-11-23 |
-| 13 | T2 migration batch | — | "No opening balance" | — | not started |
+| 13 | T2 migration batch | S1 (no change) | "No opening balance" | [migration-batches](features/migration-batches.md) | accepted 2026-11-24, landed 2026-11-24 |
 | 14 | T1 in-kind transfer, T3 custodian reconciliation | S3 | "Existing positions cannot be moved in" | — | not started |
 | 15 | C2 dividends, C3 reinvestment | S4 | `Dividend` reserved | — | not started (with roadmap step 2) |
 | later | X1 adjustment review, O4, O5, X2, X3 | — | — | — | not planned |

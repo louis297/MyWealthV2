@@ -43,6 +43,7 @@ public static class Policies
     public const string TradeSettlementsManage = "trade-settlements.manage";
     public const string RebalancesRead = "rebalances.read";
     public const string RebalancesConfirm = "rebalances.confirm";
+    public const string MigrationBatchesManage = "migration-batches.manage";
     public const string ReportsCustomerRead = "reports.customer.read";
     public const string ReportsCustomerCreate = "reports.customer.create";
     public const string ReportsBookRead = "reports.book.read";

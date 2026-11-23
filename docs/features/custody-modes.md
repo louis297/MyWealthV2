@@ -36,6 +36,7 @@ related:
   - account-closure.md
   - interest-run.md
   - rebalances.md
+  - migration-batches.md
 ---
 
 # Custody modes
@@ -623,3 +624,14 @@ Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md]
 - R17: on an assigned Custodial account only the rebalance places orders; a hand reverse of a `Buy` / `Sell` typed before orders stays refused by the lock (rebalances R24).
 - R5 matrix, the reverse row: on a Custodial account a person reverses only a `Manual` source; `Rebalance` leaves the hand-reversible sources (rebalances R28). `CustodyRules.AllowsHandReverse(Custodial, Rebalance)` is `false`.
 - The amendment 2026-11-23 (orders and settlement) sentence "Rebalance still posts `Buy` / `Sell` the same way" (R7) and the R18 point no longer apply: a rebalance trade is an order fill, priced by the broker with the fee of its order.
+
+---
+
+## Amendment 2026-11-24 (migration batches) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [migration-batches.md](migration-batches.md). Rule R26 lives there; this section records what changes here.
+
+- R5 matrix: the cells `Opening` / Custodial and `OpeningHoldings` / Custodial stay refused for every caller; their "written by" is the migration batch.
+- §4.2.1: the refusal message of both becomes `Opening balances on a Custodial account come from a migration batch.`
+- R9: a Transaction of a refused type can now exist on a Custodial account with a flow's source: an `Opening` or `OpeningHoldings` with source `Migration`.
+- R5, the reverse row: `Migration` is not hand-reversible (`CustodyRules.AllowsHandReverse(Custodial, Migration)` is `false`).

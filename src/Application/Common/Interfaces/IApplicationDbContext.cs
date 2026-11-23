@@ -56,6 +56,8 @@ public interface IApplicationDbContext
 
     DbSet<Rebalance> Rebalances { get; }
 
+    DbSet<MigrationBatch> MigrationBatches { get; }
+
     DbSet<Instrument> Instruments { get; }
 
     DbSet<Account> Accounts { get; }

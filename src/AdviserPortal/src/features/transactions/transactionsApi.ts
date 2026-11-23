@@ -101,6 +101,8 @@ export type Transaction = {
   corporateAction?: TransactionCorporateAction | null;
   /** orders R38: on an order fill and its Reversal; otherwise null. */
   execution?: TransactionExecution | null;
+  /** migration-batches R31: where a migrated opening balance came from. */
+  migration?: { asOfDate: string; previousProvider: string } | null;
 };
 
 /** orders R38: the broker's execution behind a fill. */

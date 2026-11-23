@@ -48,6 +48,9 @@ import { RebalanceDetailPage } from "@/features/rebalances/RebalanceDetailPage";
 import { RebalancesListPage } from "@/features/rebalances/RebalancesListPage";
 import { TradeSettlementDetailPage } from "@/features/tradeSettlements/TradeSettlementDetailPage";
 import { TradeSettlementsListPage } from "@/features/tradeSettlements/TradeSettlementsListPage";
+import { MigrationBatchDetailPage } from "@/features/migrationBatches/MigrationBatchDetailPage";
+import { MigrationBatchEditPage } from "@/features/migrationBatches/MigrationBatchEditPage";
+import { MigrationBatchesListPage } from "@/features/migrationBatches/MigrationBatchesListPage";
 import { WithdrawalDetailPage } from "@/features/withdrawals/WithdrawalDetailPage";
 import { WithdrawalsListPage } from "@/features/withdrawals/WithdrawalsListPage";
 import { CloseAccountPage } from "@/features/accountClosures/CloseAccountPage";
@@ -214,6 +217,17 @@ export const appRoutes: RouteObject[] = [
             children: [
               { index: true, element: <TradeSettlementsListPage /> },
               { path: ":id", element: <TradeSettlementDetailPage /> },
+            ],
+          },
+          {
+            // migration-batches D80–D83: TenantAdmin only.
+            path: "/migration-batches",
+            element: <RoleGate allow={[roles.tenantAdmin]} />,
+            children: [
+              { index: true, element: <MigrationBatchesListPage /> },
+              { path: "new", element: <MigrationBatchEditPage /> },
+              { path: ":id", element: <MigrationBatchDetailPage /> },
+              { path: ":id/edit", element: <MigrationBatchEditPage /> },
             ],
           },
           {

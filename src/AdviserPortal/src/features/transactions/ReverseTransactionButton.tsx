@@ -79,6 +79,8 @@ export function sourceLabel(kind: string | undefined) {
       return "Corporate action";
     case "OrderFill":
       return "Order";
+    case "Migration":
+      return "Migration batch";
     default:
       return kind;
   }

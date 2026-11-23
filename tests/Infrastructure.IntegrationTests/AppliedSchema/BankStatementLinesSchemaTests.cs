@@ -101,7 +101,7 @@ public class BankStatementLinesSchemaTests
     }
 
     [Test]
-    public async Task Transaction_SourceKind3_NeedsASourcePublicId_AndKind9IsRejected()
+    public async Task Transaction_SourceKind3_NeedsASourcePublicId_AndKind10IsRejected()
     {
         (await RunAsync($"""
             {World()}
@@ -116,10 +116,10 @@ public class BankStatementLinesSchemaTests
         withoutId.Number.ShouldBe(547);
         withoutId.Message.ShouldContain("CK_Transactions_SourcePublicId");
 
-        // Corporate actions widened the check to CorporateAction (7); 8 is still outside it.
+        // Migration batches widened the check to Migration (9); 10 is still outside it.
         var kind9 = await Should.ThrowAsync<SqlException>(() => RunAsync($"""
             {World()}
-            {InsertTransaction(9, "NEWID()")}
+            {InsertTransaction(10, "NEWID()")}
             """));
         kind9.Number.ShouldBe(547);
         kind9.Message.ShouldContain("CK_Transactions_SourceKind");

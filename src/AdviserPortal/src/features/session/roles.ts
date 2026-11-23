@@ -113,6 +113,11 @@ export function canManageTradeSettlements(role: string | null | undefined) {
   return role === roles.tenantAdmin;
 }
 
+/** migration-batches D80: the Migration batches pages are the TenantAdmin's (R1). */
+export function canManageMigrationBatches(role: string | null | undefined) {
+  return role === roles.tenantAdmin;
+}
+
 /** corporate-actions.read: the Corporate actions pages (D64, D65). */
 export function canAccessCorporateActions(role: string | null | undefined) {
   return role === roles.tenantAdmin || role === roles.adviser;

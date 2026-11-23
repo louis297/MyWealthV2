@@ -48,6 +48,9 @@ internal sealed class BankRecalls(IApplicationDbContext db, TimeProvider time)
             case BankStatementLineStatus.Received:
                 // The receipt is processed first in the same run (oldest first); until then the recall waits.
                 return;
+            case BankStatementLineStatus.Matched when receipt.MatchMethod == StatementLineMatchMethod.Migration:
+                await RecallFundingAsync(line, receipt, cancellationToken);
+                return;
             case BankStatementLineStatus.Matched:
                 await ReverseAsync(line, receipt, cancellationToken);
                 return;
@@ -99,6 +102,22 @@ internal sealed class BankRecalls(IApplicationDbContext db, TimeProvider time)
         receipt.MarkReturned();
         line.MarkRecall(receipt.Id, accountId, reversal.Id, now);
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>Migration-batches R15: the funding line of a batch. Before the post nothing was credited, so the
+    /// receipt is returned like one that never was; after it the Customers hold the cash, so nothing is posted and a
+    /// TenantAdmin corrects the accounts with adjustments.</summary>
+    private async Task RecallFundingAsync(BankStatementLine line, BankStatementLine receipt, CancellationToken cancellationToken)
+    {
+        var posted = await db.MigrationBatches.IgnoreQueryFilters().AsNoTracking()
+            .AnyAsync(batch => batch.Id == receipt.MigrationBatchId && batch.Status == MigrationBatchStatus.Posted, cancellationToken);
+        if (posted)
+        {
+            await UnknownAsync(line, UnmatchedReason.RecallNotCovered, cancellationToken);
+            return;
+        }
+
+        await ReturnUncreditedAsync(line, receipt, cancellationToken);
     }
 
     private async Task ReturnUncreditedAsync(BankStatementLine line, BankStatementLine receipt, CancellationToken cancellationToken)

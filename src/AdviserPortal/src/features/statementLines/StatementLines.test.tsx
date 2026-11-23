@@ -233,6 +233,19 @@ describe("StatementLineDetailPage (deposit-matching D35, D37)", () => {
     expect(screen.queryByRole("button", { name: "Undo match" })).not.toBeInTheDocument();
   });
 
+  it("says Migration batch for a line that funds one, links it and offers Undo match (D83)", async () => {
+    const migrationBatchId = "7b1ae0a4-0000-0000-0000-000000000001";
+    renderFees(feeUser(), routes, detailPath, serveLine({
+      ...matched,
+      match: { accountId: null, customerId: null, transactionId: null, method: "Migration", at: "2026-11-25T02:01:08Z" },
+      migrationBatchId,
+    }));
+
+    expect(await screen.findByText("Migration batch", { selector: "p" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Migration batch" })).toHaveAttribute("href", `/migration-batches/${migrationBatchId}`);
+    expect(screen.getByRole("button", { name: "Undo match" })).toBeInTheDocument();
+  });
+
   it("explains a receipt that does not match its trade settlement (trade-settlement D78)", async () => {
     renderFees(feeUser(), routes, detailPath, serveLine({ ...unmatched, unmatchedReason: "SettlementMismatch" }));
 
@@ -379,6 +392,34 @@ describe("MatchStatementLinePage (deposit-matching D36)", () => {
       rowVersion: "AAAA",
       note: "Confirmed by phone",
     });
+  });
+
+  it("matches the receipt to a Draft migration batch (D83)", async () => {
+    const batchId = "7b1ae0a4-0000-0000-0000-000000000001";
+    const draft = {
+      id: batchId, name: "Acme transfer", previousProvider: "Acme Wealth", asOfDate: "2026-11-20", status: "Draft",
+      entryCount: 2, holdingCount: 2, createdBy: null, createdAt: "2026-11-24T01:00:00Z", submittedBy: null, submittedAt: null,
+      postedBy: null, postedAt: null,
+    };
+    const { requests, router } = renderFees(feeUser(), routes, matchPath, serveLine(unmatched, (request) => {
+      const p = path(request);
+      if (request.method === "POST" && p === `/statement-lines/${lineId}/match`) {
+        return new Response(null, { status: 204 });
+      }
+      return request.method === "GET" && p === "/migration-batches" ? page([draft]) : undefined;
+    }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "To a migration batch" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Acme transfer/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm match" }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/statement-lines/${lineId}`));
+    expect(await body(requestsTo(requests, "POST", `/statement-lines/${lineId}/match`)[0])).toEqual({
+      migrationBatchId: batchId,
+      rowVersion: "AAAA",
+      note: null,
+    });
+    expect(new URL(requestsTo(requests, "GET", "/migration-batches")[0].url).searchParams.get("status")).toBe("Draft");
   });
 
   it("finds the Customer's Open Custodial accounts in the line's currency", async () => {

@@ -24,6 +24,7 @@ related:
   - interest-run.md
   - trade-settlement.md
   - rebalances.md
+  - migration-batches.md
 ---
 
 # Transaction source
@@ -435,3 +436,13 @@ Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md]
 - R5: from this slice no Transaction gets source `Rebalance`. A rebalance trade is the fill of a rebalance order, with source `OrderFill` and the order's PublicId. The kind `Rebalance` stays for the rows that have it; `TransactionSource.Rebalance(handle)` is kept for reading them.
 - R9: the idempotency records a rebalance wrote per trade are no longer written.
 - R12, R13: `Rebalance` is no longer hand-reversible (roadmap D15 ends). On a Custodial account `POST /transactions/{id}/reverse` of a Transaction with source `Rebalance` → 400 with the message of R13; it is corrected with an adjustment. On an External account the reverse is unchanged. After this slice the only source a person reverses on a Custodial account is `Manual`.
+
+---
+
+## Amendment 2026-11-24 (migration batches) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [migration-batches.md](migration-batches.md). Rules R25 and R27 live there; this section records what changes here.
+
+- R5: source kind `Migration = 9`, with the migration batch's PublicId as source id (required). Every Transaction of one batch has the same source id.
+- R12, R13: `Migration` is not hand-reversible; `POST /transactions/{id}/reverse` of a Transaction a batch wrote → 400 with the message of R13. No flow reverses it; an adjustment corrects it.
+- `0054` widens `CK_Transactions_SourceKind` to 0–9 and requires a `SourcePublicId` for kinds 2–9.

@@ -23,6 +23,7 @@ related:
   - interest-run.md
   - trade-settlement.md
   - rebalances.md
+  - migration-batches.md
 ---
 
 # Adviser Portal BFF
@@ -537,3 +538,14 @@ Add `/rebalances` to the BFF prefix allow-list (R20) so the Adviser Portal can c
 - Methods: GET, POST
 - Who: TenantAdmin and Adviser. `webapi` checks `rebalances.read` and `rebalances.confirm`; the BFF does not filter by role.
 - The propose routes (`POST /accounts/{id}/rebalance`, `POST /accounts/{id}/portfolio`) are under the existing `/accounts` prefix.
+
+---
+
+## Amendment 2026-11-24 (migration batches prefix) — accepted
+
+Add `/migration-batches` to the BFF prefix allow-list (R20) so the Adviser Portal can call the routes of [migration-batches.md](migration-batches.md) through `/api`.
+
+- Prefix: `/migration-batches`
+- Methods: GET, POST, PUT
+- Who: TenantAdmin. `webapi` checks `migration-batches.manage`; the BFF does not filter by role, so an Adviser gets the 403 from `webapi`.
+- Funding a batch (`POST /statement-lines/{id}/match` with `migrationBatchId`) is under the existing `/statement-lines` prefix.

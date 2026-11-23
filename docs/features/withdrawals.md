@@ -37,6 +37,7 @@ related:
   - interest-run.md
   - trade-settlement.md
   - rebalances.md
+  - migration-batches.md
 ---
 
 # Nominated bank accounts and withdrawals
@@ -843,3 +844,12 @@ Status of this amendment: `accepted` (2026-11-23), together with [trade-settleme
 Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md](rebalances.md). Rules R14 and R16 live there; this section records what changes here.
 
 - R36: a rebalance lowers cash only through its orders. A buy order of a rebalance reserves its cash like any buy order, and a buy wave is sized so its reservations are not more than the available cash (rebalances R16).
+
+---
+
+## Amendment 2026-11-24 (migration batches) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [migration-batches.md](migration-batches.md). Rule R24 lives there; this section records what changes here.
+
+- R35, R36: migrated cash (an `Opening` with source `Migration`) is available and withdrawable at once: it is neither reserved nor unsettled, and it is already in the trust account through the batch's funding.
+- R28: the posting of a migration batch follows the same four-eyes rule: the person who posts is not the person who submitted.

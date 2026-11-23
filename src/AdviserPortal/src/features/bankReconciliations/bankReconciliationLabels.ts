@@ -20,6 +20,8 @@ export function kindLabel(kind: string) {
   switch (kind) {
     case "Unexplained":
       return "Not explained";
+    case "MigrationNotPosted":
+      return "Received for a migration batch not posted yet";
     case "BankInterest":
       return "Interest paid by the bank";
     case "InterestCredited":
