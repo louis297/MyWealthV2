@@ -41,6 +41,19 @@ public class RebalancesSchemaTests
         (order[0] is DBNull).ShouldBeTrue();
     }
 
+    [Test]
+    public async Task Apply0053_DropsTheThreeLastRebalanceColumnsOfTheAssignment()
+    {
+        var columns = await ScratchSchemaDatabase.ReadAsync(SchemaDatabaseSetup.ConnectionString, """
+            SELECT [name] FROM sys.columns WHERE [object_id] = OBJECT_ID(N'AccountPortfolioAssignments');
+            """);
+
+        columns.Select(row => (string)row[0]).ShouldNotContain(name => name.StartsWith("LastRebalance"));
+        (await ScratchSchemaDatabase.ReadAsync(SchemaDatabaseSetup.ConnectionString,
+                "SELECT [name] FROM sys.check_constraints WHERE [name] = N'CK_AccountPortfolioAssignments_LastRebalanceStatus';"))
+            .ShouldBeEmpty();
+    }
+
     [TestCase("0", false, false, false, false)]
     [TestCase("1", true, false, false, false)]
     [TestCase("2", true, false, false, false)]
