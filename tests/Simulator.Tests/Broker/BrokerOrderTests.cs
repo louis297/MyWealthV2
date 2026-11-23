@@ -160,7 +160,7 @@ public class BrokerOrderTests
         {
             var root = json.RootElement;
             root.EnumerateObject().Select(property => property.Name)
-                .ShouldBe(["mode", "fillPercent", "rejectReason", "slippagePercent", "settlementDays"]);
+                .ShouldBe(["mode", "fillPercent", "rejectReason", "slippagePercent", "settlementDays", "settlementMode"]);
             (root.GetProperty("mode").GetString(), root.GetProperty("fillPercent").GetInt32(), root.GetProperty("rejectReason").GetString(),
                     root.GetProperty("slippagePercent").GetDecimal(), root.GetProperty("settlementDays").GetInt32())
                 .ShouldBe(("Reject", 100, "MarketClosed", 0.10m, 2));
