@@ -58,6 +58,11 @@ internal static class RebalanceHttp
         await Send(HttpMethod.Post, $"/rebalances/{id}/confirm", accessToken,
             new { rowVersion = rowVersion ?? await RowVersionAsync(id) });
 
+    /// <summary><c>POST /rebalances/{id}/cancel</c> with the stored row version, or <paramref name="rowVersion"/>.</summary>
+    public static async Task<HttpResponseMessage> CancelAsync(string accessToken, Guid id, string? note = null, string? rowVersion = null) =>
+        await Send(HttpMethod.Post, $"/rebalances/{id}/cancel", accessToken,
+            new { rowVersion = rowVersion ?? await RowVersionAsync(id), note });
+
     /// <summary>Confirms and expects 204.</summary>
     public static async Task ConfirmedAsync(string accessToken, Guid id)
     {

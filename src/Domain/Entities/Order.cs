@@ -27,6 +27,12 @@ public class Order : BaseAuditableEntity
 
     public const string CancelAlreadyRequestedMessage = "A cancellation was already requested for this order.";
 
+    /// <summary>Rebalances R20: a person cancels a rebalance order only by cancelling its rebalance.</summary>
+    public const string RebalanceOrderMessage = "This order belongs to a rebalance. Cancel the rebalance.";
+
+    /// <summary>Rebalances R19: the note of the cancel a rebalance's cancellation makes on its open orders.</summary>
+    public const string RebalanceCancelledNote = "Rebalance cancelled";
+
     private readonly List<OrderFill> _fills = [];
 
     private Order()
@@ -295,7 +301,7 @@ public class Order : BaseAuditableEntity
     }
 
     /// <summary>R18: an order the broker cannot hold is <c>Cancelled</c> at once and reserves nothing.</summary>
-    public void CancelUnsent(int? byUserId, string? note, DateTimeOffset at)
+    public void CancelUnsent(int? byUserId, string? note, DateTimeOffset at, bool forRebalance = false)
     {
         if (!IsUnsent)
         {
@@ -312,7 +318,7 @@ public class Order : BaseAuditableEntity
     }
 
     /// <summary>R18: an open order the broker may hold gets a cancel request; its status does not change.</summary>
-    public void RequestCancel(int? byUserId, string? note, DateTimeOffset at)
+    public void RequestCancel(int? byUserId, string? note, DateTimeOffset at, bool forRebalance = false)
     {
         if (!IsOpen)
         {

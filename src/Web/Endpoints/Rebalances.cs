@@ -17,6 +17,7 @@ public class Rebalances : IEndpointGroup
         groupBuilder.MapGet(GetRebalances).RequireAuthorization(Policies.RebalancesRead);
         groupBuilder.MapGet(GetRebalance, "{id:guid}").RequireAuthorization(Policies.RebalancesRead);
         groupBuilder.MapPost(ConfirmRebalance, "{id:guid}/confirm").RequireAuthorization(Policies.RebalancesConfirm);
+        groupBuilder.MapPost(CancelRebalance, "{id:guid}/cancel").RequireAuthorization(Policies.RebalancesConfirm);
     }
 
     [EndpointSummary("List rebalances")]
@@ -42,6 +43,15 @@ public class Rebalances : IEndpointGroup
     [EndpointSummary("Confirm a rebalance")]
     [EndpointDescription("Confirms a proposal that has not expired: the plan is made again against the rebalance's own targets and the first wave of orders is placed. Nothing is sent to the broker in the request (R13, R14).")]
     public static async Task<NoContent> ConfirmRebalance(ISender sender, Guid id, ConfirmRebalanceCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Cancel a rebalance")]
+    [EndpointDescription("Cancels a proposal at once, or asks for a rebalance in progress to be cancelled: its open orders are cancelled and it places no further wave. Orders the broker has already filled stay (R19).")]
+    public static async Task<NoContent> CancelRebalance(ISender sender, Guid id, CancelRebalanceCommand command)
     {
         command.Id = id;
         await sender.Send(command);
