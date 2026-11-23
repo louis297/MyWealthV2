@@ -1,6 +1,6 @@
 ---
 title: Migration batches
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -41,7 +41,7 @@ Today a Custodial account starts empty and stays empty until a Customer pays in 
 
 New: permission `migration-batches.manage`; routes under `/migration-batches`; source kind `Migration`; statement line match method `Migration`, with `migrationBatchId` on the match body and on the statement line item; reconciliation item kind `MigrationNotPosted`; item field `migration` on the transaction item; problem code `migration_batch_not_valid`. Script `0054_migration_batches.sql`. No simulator script. No new `TransactionType`, port, job, queue or domain event.
 
-**Status is `review` (2026-11-24).** It is not a build contract. The seventeen points of §11 each carry a recommendation and wait for confirmation. The amendments to accepted docs listed in §12 are made when this spec is accepted.
+**Status is `accepted` (2026-11-24).** The seventeen points of §11 were confirmed on 2026-11-24, every one as recommended, and are written into the rules. The amendments to accepted docs listed in §12 were made when it was accepted. It is a build contract.
 
 ---
 
@@ -178,7 +178,7 @@ Every comparison is exact. There is no tolerance.
 
 ### 4.4 Funding
 
-Amendment to [deposit-matching.md](deposit-matching.md) R23, R26 and R30, [bank-returns.md](bank-returns.md) R3 and [trade-settlement.md](trade-settlement.md) R21.
+Amends [deposit-matching.md](deposit-matching.md) R23, R26 and R30, [bank-returns.md](bank-returns.md) R3 and [trade-settlement.md](trade-settlement.md) R21.
 
 | ID | Rule |
 | --- | --- |
@@ -269,7 +269,7 @@ Invariants:
 
 Domain events: none new. Each Transaction raises `TransactionPosted` as today.
 
-To be recorded in [domain-model.md](../domain-model.md) §8.6 (source kind, migration detail), §8.9 (match method), §8.12 (item kind) and a new §8.19 (migration batch) when this spec is accepted.
+Recorded in [domain-model.md](../domain-model.md) §8.6 (source kind, migration detail), §8.9 (match method), §8.12 (item kind) and §8.19 (migration batch).
 
 ---
 
@@ -312,7 +312,7 @@ Script: `database/schema/0054_migration_batches.sql`. Forward only. Do not add E
 
 The rule "at least cash or one holding" spans two tables and is held by the aggregate, not by a CHECK. No back-fill: no batch and no Transaction with source `Migration` exists before this slice.
 
-To be recorded in [database-design.md](../database-design.md) §9, §11.4, §11.9, §11.12 and a new §11.19 when this spec is accepted.
+Recorded in [database-design.md](../database-design.md) §9, §11.4, §11.9, §11.12 and §11.19.
 
 ---
 
@@ -497,7 +497,7 @@ New problem code: `migration_batch_not_valid` (400). Cross-tenant or wrong-colle
 
 ## 9. UI
 
-Page contracts: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D80–D85) and [customer-portal.md](../customer-portal/customer-portal.md) (C38), to be amended and accepted together with this spec. The Adviser Portal BFF gains the prefix `/migration-batches` ([bff-adviser-portal.md](bff-adviser-portal.md) R20). The Customer Portal reads the transaction item it already reads; its BFF does not change. Back Office: none.
+Page contracts amended when this spec was accepted: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D80–D85) and [customer-portal.md](../customer-portal/customer-portal.md) (C38). The Adviser Portal BFF gains the prefix `/migration-batches` ([bff-adviser-portal.md](bff-adviser-portal.md) R20). The Customer Portal reads the transaction item it already reads; its BFF does not change. Back Office: none.
 
 **Adviser Portal**
 
@@ -560,9 +560,9 @@ No new ADR. The batch calls no outside party; its cash arrives through the exist
 | Problem code | `migration_batch_not_valid` |
 | Events, `TransactionType`, ports, jobs, simulator | None added |
 
-### Points to confirm
+### Points confirmed
 
-Each point states the recommendation, written into the rules above, and the alternative.
+Each point states the recommendation, written into the rules above, and the alternative. All seventeen were confirmed as recommended on 2026-11-24.
 
 1. **One spec for T2, and the simulator does not change** (R16, §9.1). Recommended: the bulk transfer is an ordinary receipt the simulator bank can already add, and the batch calls no party (roadmap P11). Alternative: a simulator action "previous provider pays a bulk transfer" with its own payer.
 2. **The batch writes the existing types `Opening` and `OpeningHoldings` with a new source** (R22, R27). Recommended: roadmap D4 decided the same for deposits and withdrawals, the matrix already names these two cells for the migration batch, and balances, holdings, reports and both portals read the types as they are. Alternative: one new type `Migration` with a cash leg and security legs on one Transaction, which every read and report would have to learn.
@@ -614,6 +614,6 @@ The repository should build after each commit. Agents split each behaviour into 
 
 Do not put an in-kind transfer, a custodian statement, a server-side file upload or a reversal of a batch in these commits.
 
-### Docs to amend when this spec is accepted
+### Docs amended when this spec was accepted
 
 [posting.md](posting.md) (R19: on a Custodial account an `Opening` is written only by a migration batch), [holdings.md](holdings.md) (R8, R11: the same for `OpeningHoldings`), [custody-modes.md](custody-modes.md) (R5 matrix: the "written by" of `Opening` / `OpeningHoldings`; §4.2.1 the message; R9: a Transaction of a refused type can now exist on a Custodial account, with a flow's source), [transaction-source.md](transaction-source.md) (kind `Migration` = 9, not hand-reversible, the checks widened), [deposit-matching.md](deposit-matching.md) (R23, R26, R30: match to a batch and its undo; `migrationBatchId` and method `Migration` on the item), [bank-returns.md](bank-returns.md) (R3: the recall of a funding line), [trade-settlement.md](trade-settlement.md) (R21: what a `Matched` line has), [bank-reconciliation.md](bank-reconciliation.md) (R9, R10, §5: kind 19 and the migration cash legs), [adjustments.md](adjustments.md) (a note: an adjustment corrects a posted entry), [withdrawals.md](withdrawals.md) and [interest-run.md](interest-run.md) (notes: migrated cash is available at once and accrues from the day it is posted), [bff-adviser-portal.md](bff-adviser-portal.md) (the prefix), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D80–D85; D34, D35, D51, D26, D27), [customer-portal.md](../customer-portal/customer-portal.md) (C38), [api-design.md](../api-design.md) (§3.1 one permission row, §4.2 one problem code, §6 resource row, a new §7.13, §7.7 the `migration` field, change log), [domain-model.md](../domain-model.md) and [database-design.md](../database-design.md) (the sections named in §5 and §6), [glossary.md](../glossary.md) (the review terms become accepted; Transaction source gains `Migration`), [function-plan.md](../function-plan.md) §5, [features/README.md](README.md) row status, [known-issues/custodial-account-gaps.md](../known-issues/custodial-account-gaps.md) (the row "No opening balance" notes this spec and is removed when the slice lands; the row "Existing positions cannot be moved in" then names the in-kind transfer of one Customer's shares only), and the roadmap §2 matrix, §9 T2, §13 status and the sentence under the §13 table (step 13 then builds on the bank stage, steps 5 and 7).

@@ -25,6 +25,7 @@ related:
   - withdrawals.md
   - account-closure.md
   - rebalances.md
+  - migration-batches.md
 ---
 
 # Adjustments
@@ -443,3 +444,11 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders.md](ord
 Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md](rebalances.md). Rule R24 lives there; this section records what changes here.
 
 - R16: unchanged. An adjustment stays outside the trade lock, and the next rebalance plans from the adjusted holding. An adjustment is how a rebalance trade posted before this slice is corrected on a Custodial account, now that it is not hand-reversible (rebalances R28).
+
+---
+
+## Amendment 2026-11-24 (migration batches) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [migration-batches.md](migration-batches.md). Rule R25 lives there; this section records what changes here.
+
+- Use: a posted migration batch is not reversed. A wrong entry is corrected with an adjustment (reason `EntryError`) on the account.

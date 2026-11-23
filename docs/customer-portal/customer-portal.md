@@ -28,6 +28,7 @@ related:
   - ../features/interest-run.md
   - ../features/trade-settlement.md
   - ../features/rebalances.md
+  - ../features/migration-batches.md
 ---
 
 # Customer Portal
@@ -351,3 +352,13 @@ Status of this amendment: `accepted` (2026-11-23), together with [rebalances](..
 | ID | Given | When | Then |
 | --- | --- | --- | --- |
 | C37 | A Customer with an order that has a `rebalanceId` | Account page, Orders block (C32) | The row shows "Rebalance" under the order. No link and no action. The fill rows of C34 are unchanged. |
+
+---
+
+## Amendment 2026-11-24 (migration batches) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [migration-batches](../features/migration-batches.md). Field rules live there. The Customer Portal BFF does not change: `migration` comes on the transaction item it already reads.
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| C38 | Customer with a Transaction that has `migration` | Account page activity | An `Opening` row is labelled "Opening balance" and an `OpeningHoldings` row "Holdings transferred in", each with "From <previousProvider>, as at <asOfDate>" under it. A Transaction without `migration` keeps today's labels. |

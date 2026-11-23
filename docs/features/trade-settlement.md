@@ -30,6 +30,7 @@ related:
   - ../api-design.md
   - ../glossary.md
   - rebalances.md
+  - migration-batches.md
 ---
 
 # Trade settlement cash and broken trades
@@ -565,3 +566,11 @@ Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md]
 
 - R5, R23: a rebalance order gets a settlement account like any order, so its fills settle through the client money account and leave the known difference `Trades`. `Trades` keeps the rebalance trades posted before this slice (source `Rebalance`).
 - "Still open": rebalance orders are no longer open; they settle like any order.
+
+---
+
+## Amendment 2026-11-24 (migration batches) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [migration-batches.md](migration-batches.md). Rule R16 lives there; this section records what changes here.
+
+- R21: a `Matched` line now has an Account and a Transaction, or a related line, or a trade settlement, or a migration batch. `0054` replaces `CK_BankStatementLines_Match` with the four arms.

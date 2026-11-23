@@ -15,6 +15,7 @@ related:
   - ../features/withdrawals.md
   - ../features/account-closure.md
   - ../features/interest-run.md
+  - ../features/migration-batches.md
 ---
 
 # Known issue: Custodial accounts still rely on hand entry, and some writes are missing
@@ -30,7 +31,7 @@ A Custodial account is meant to be the platform's own record: the server produce
 | Gap | Effect on a Custodial account | Closed by |
 | --- | --- | --- |
 | Existing positions cannot be moved in | A Custodial account starts with cash only. `OpeningHoldings` and `StockIn` are refused, so a Customer's shares at another broker cannot arrive in kind | In-kind transfer |
-| No opening balance | The same for cash: `Opening` is refused. A balance arrives as a `TransferIn` booked on the day it is entered | Migration batches |
+| No opening balance | The same for cash: `Opening` is refused. A balance arrives as a `TransferIn` booked on the day it is entered | Migration batches ([migration-batches.md](../features/migration-batches.md), accepted 2026-11-24; this row is removed when the slice lands) |
 | History cannot be entered | The server sets `bookedAt`. A deposit entered today cannot be dated yesterday, and no past activity can be built through the API | A simulator with its own clock; the test seed until then |
 
 External accounts have none of these gaps: they keep every hand-entered type.

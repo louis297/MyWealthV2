@@ -27,6 +27,7 @@ related:
   - interest-run.md
   - trade-settlement.md
   - rebalances.md
+  - migration-batches.md
 ---
 
 # Bank reconciliation
@@ -599,3 +600,13 @@ Status of this amendment: `accepted` (2026-11-23), together with [trade-settleme
 Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md](rebalances.md). Rule R26 lives there; this section records what changes here.
 
 - R10: the fills of a rebalance order are split by their order like any order fill (`UnsettledTrades`, `TradeFees`). `Trades` keeps only the rebalance trades posted before this slice, with source `Rebalance`.
+
+---
+
+## Amendment 2026-11-24 (migration batches) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [migration-batches.md](migration-batches.md). Rule R32 lives there; this section records what changes here.
+
+- R9: a line `Matched` with method `Migration` to a batch that is not `Posted` is an item of the new kind `MigrationNotPosted` (Timing) with the line's amount. A line matched to a `Posted` batch is not an item.
+- R10: the cash legs of a Transaction with source `Migration` are explained by the funding lines of its batch: no item for the part funded through the run's client money account, one `OtherClientMoneyAccount` item per other client money account for the rest. They no longer count in `OtherLedgerCash`.
+- §5: `ReconciliationItemKind` gains `MigrationNotPosted = 19` (Timing), an item with a line. `0054` widens `CK_BankReconciliationItems_Kind` to 0–19 and adds 19 to `CK_BankReconciliationItems_Line`.

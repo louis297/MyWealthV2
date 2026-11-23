@@ -33,6 +33,7 @@ related:
   - account-closure.md
   - interest-run.md
   - trade-settlement.md
+  - migration-batches.md
 ---
 
 # Bank feed and deposit matching
@@ -789,3 +790,14 @@ Status of this amendment: `accepted` (2026-11-23), together with [trade-settleme
 
 - R13: before deposit matching, and after the `Interest` rule, a credit `Transfer` line with no `returnOf` whose reference text (trimmed, case-insensitive) equals the broker settlement id of a trade settlement of the line's Tenant and client money account is settlement cash and is never matched as a deposit. It is `Matched` with method `Settlement = 5` when the settlement is `AwaitingReceipt` and the amount equals its net, else `Unmatched` with the new reason `SettlementMismatch = 13`.
 - The statement line item gains `tradeSettlementId` (`null` unless matched to a trade settlement).
+
+---
+
+## Amendment 2026-11-24 (migration batches) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [migration-batches.md](migration-batches.md). Rules R12–R16 and R30 live there; this section records what changes here.
+
+- R23: `POST /statement-lines/{id}/match` takes `migrationBatchId` in place of `accountId`, exactly one of the two (else 400 `errors.AccountId`, `Give an account or a migration batch.`). With a batch the caller also needs `migration-batches.manage`; the batch must be a `Draft` of the Tenant (else 404, or 400 `errors.MigrationBatchId`). The line becomes `Matched` with the new method `Migration = 6` and the batch, with no Account and no Transaction; nothing is posted.
+- R26: an undo of a line matched to a batch posts nothing; it is allowed only while the batch is `Draft` (else 400 `errors.Status`). The line keeps its `unmatchedReason`.
+- R30: a bulk transfer that was matched as a deposit is undone before it can fund a batch. The platform never matches a line to a batch by itself.
+- The statement line item gains `migrationBatchId` (`null` unless the line funds a batch), and `method` may be `Migration`.

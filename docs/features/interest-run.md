@@ -34,6 +34,7 @@ related:
   - ../database-design.md
   - ../api-design.md
   - ../glossary.md
+  - migration-batches.md
 ---
 
 # Interest run
@@ -734,3 +735,11 @@ Do not put dividends, a tax statement, an Inland Revenue filing or an interest r
 ### Docs amended when this spec is accepted
 
 [customers.md](customers.md) (the tax profile sub-resource and `GET /users/me/tax-profile`), [posting.md](posting.md) (R16, R20 and the type table: `Interest` on a Custodial account is written by the interest run, with a `Tax` leg), [trade-fees.md](trade-fees.md) (the cash leg role `Tax`; R20 wording), [custody-modes.md](custody-modes.md) (R5 matrix: "written by" the interest run), [transaction-source.md](transaction-source.md) (kind `InterestRun` = 6, not hand-reversible, check widened), [accounts.md](accounts.md) (`accruedInterest`, `interestAccruedThrough`, the accrual rows route), [account-closure.md](account-closure.md) (R4–R7: final interest; R11: not accrued while closing; §2 Out and "Still open" updated), [deposit-matching.md](deposit-matching.md) (R10, R13, R27, R45, R49: line kind, the interest line set aside), [bank-returns.md](bank-returns.md) (a debit line of kind `Interest`, unchanged rule, note), [bank-reconciliation.md](bank-reconciliation.md) (R9–R11 and §5: three kinds; §2 Out and "Still open" updated), [withdrawals.md](withdrawals.md) (R36: an interest posting only raises available cash, note), [reports.md](reports.md) (Customer Transactions Report Tax column), [simulator.md](simulator.md) (R43, R44, script `0007`), [bff-adviser-portal.md](bff-adviser-portal.md) (prefix `/interest`), [api-design.md](../api-design.md) (§3.1 four permission rows, §4.2 the problem code, §6 resource rows, a new §7.10 Interest, §7.4 and §7.6 notes, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [architecture.md](../architecture.md) (the `worker` job and queue), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D58–D63), [customer-portal.md](../customer-portal/customer-portal.md) (C28–C30), [back-office.md](../backoffice/back-office.md) (BO20, BO21), [known-issues/custodial-account-gaps.md](../known-issues/custodial-account-gaps.md) (the "No interest" row notes this spec; it is removed when the slice lands), [glossary.md](../glossary.md) (the review terms become accepted; Cash leg role and Transaction source gain their new values), [function-plan.md](../function-plan.md) §5 (the roadmap step, and "Still later": tax residency and the IRD number flag now exist as the tax profile; KYC / AML stays later), [features/README.md](README.md) row status, [future-plans.md](../future-plans.md) §1 step 2 (the tax leg and the tax profile exist), and the roadmap §6 I1 and I2, §11 S1, §12 D12 and D18, and §13 status.
+
+---
+
+## Amendment 2026-11-24 (migration batches) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [migration-batches.md](migration-batches.md). Rule R24 lives there; this section records what changes here.
+
+- §4.4: migrated cash accrues interest from the closing balance of the UTC day its batch was posted, not from the batch's `asOfDate`.

@@ -378,6 +378,7 @@ Beyond PK / unique constraints already listed:
 0051_orders.sql                             -- Orders, OrderFills, ExecutionReports (platform data), BrokerFeeds (platform data), TransactionExecutionDetails; Tenants.BrokerConnection (back-filled 'simulator'); CK_Transactions_SourceKind 0–8
 0052_trade_settlement.sql                   -- TradeSettlements; settlement columns on Orders, OrderFills, ExecutionReports, OutgoingPayments, BankStatementLines; BankReconciliations open settlements
 0053_rebalances.sql                         -- Rebalances, RebalanceTargets, RebalanceLines; Orders.RebalanceId; UQ_AccountPortfolioAssignments_TenantId_Id; drops the three LastRebalance columns of AccountPortfolioAssignments
+0054_migration_batches.sql                  -- MigrationBatches, MigrationBatchControlTotals, MigrationBatchEntries, MigrationBatchHoldings, TransactionMigrationDetails; BankStatementLines.MigrationBatchId; source kind 9, match method 6, reconciliation item kind 19
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -472,6 +473,8 @@ Amendment 2026-11-22 (corporate actions, accepted; [features/corporate-actions.m
 
 Amendment 2026-11-23 (orders and settlement, accepted; [features/orders.md](features/orders.md) §6.1): script `0051_orders.sql` widens `CK_Transactions_SourceKind` to 0–8 (`OrderFill`) and requires a `SourcePublicId` for kinds 2–8, and adds `TransactionExecutionDetails`: `TransactionId` (PK; at most one row per Transaction), `TenantId`, `FillPublicId uniqueidentifier`, `Price decimal(18,8)` (CHECK `> 0`), `TradeDate date`, `SettlementDate date` (CHECK `≥ TradeDate`), `BrokerReference nvarchar(50) NULL`; FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)` RESTRICT. No `PublicId` or `RowVersion`: the row is part of an immutable Transaction. One row on every Transaction with source `OrderFill` and on its Reversal, held by the Domain. No back-fill: no `Buy` or `Sell` posted before `0051` gets a row.
 
+Amendment 2026-11-24 (migration batches, accepted; [features/migration-batches.md](features/migration-batches.md) §6): script `0054_migration_batches.sql` widens `CK_Transactions_SourceKind` to 0–9 (`Migration`) and requires a `SourcePublicId` for kinds 2–9, and adds `TransactionMigrationDetails`: `TransactionId` (PK; at most one row per Transaction), `TenantId`, `AsOfDate date`, `PreviousProvider nvarchar(100)`; FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)` RESTRICT. No `PublicId` or `RowVersion`. No back-fill.
+
 ### 11.5 Holdings (accepted, landed)
 
 Scripts `0014_holdings.sql` and `0015_transaction_type_opening_holdings.sql`. Columns: [features/holdings.md](features/holdings.md) §6. `0016_transaction_type_stock_in_out.sql` widens `CK_Transactions_Type` to 0–11 for `StockIn` (10) and `StockOut` (11). `0017_transaction_type_split.sql` widens that check to 0–14 for `Split` (12), `Bonus` (13), and `Scrip` (14). No new column. No seed in the scripts — `TestSeed` only.
@@ -536,6 +539,8 @@ Amendment 2026-11-22 (interest run, accepted; [features/interest-run.md](feature
 
 Amendment 2026-11-23 (trade settlement and broken trades, accepted; [features/trade-settlement.md](features/trade-settlement.md) §6.1): script `0052_trade_settlement.sql` adds `TradeSettlementId int NULL` (FK `(TenantId, TradeSettlementId)` → `TradeSettlements` RESTRICT) to `BankStatementLines`, widens `MatchMethod` to 0–5 and `UnmatchedReason` to 0–13, and replaces the Matched CHECK: `Status = 1` needs `MatchMethod`, `MatchedAt` and exactly one of (an Account and a Transaction), (a related line with no Account) and (a trade settlement).
 
+Amendment 2026-11-24 (migration batches, accepted; [features/migration-batches.md](features/migration-batches.md) §6): script `0054_migration_batches.sql` adds `MigrationBatchId int NULL` (FK `(TenantId, MigrationBatchId)` → `MigrationBatches` RESTRICT; filtered index where set) to `BankStatementLines`, widens `MatchMethod` to 0–6, and replaces the Matched CHECK with a fourth arm (a migration batch).
+
 ### 11.10 Nominated bank accounts (accepted)
 
 Feature spec: [features/withdrawals.md](features/withdrawals.md) (accepted 2026-11-20, landed 2026-11-21) §6.1. Script `0042_nominated_bank_accounts.sql`:
@@ -569,6 +574,8 @@ No back-fill. A run and its items are never updated or deleted; no purge.
 Amendment 2026-11-22 (interest run, accepted; [features/interest-run.md](features/interest-run.md) §6.2): script `0048_interest.sql` widens `CK_BankReconciliationItems_Kind` to 0–14 (`BankInterest`, `InterestCredited`, `TaxWithheld`) and `CK_BankReconciliationItems_Line` to the kinds `2, 3, 4, 6, 12` as the kinds with a line. No back-fill.
 
 Amendment 2026-11-23 (trade settlement and broken trades, accepted; [features/trade-settlement.md](features/trade-settlement.md) §6.1): script `0052_trade_settlement.sql` widens `CK_BankReconciliationItems_Kind` to 0–18 and adds `OpenSettlementsCount int NOT NULL` and `OpenSettlementsAmount decimal(18,4) NOT NULL` (default 0 for existing rows) to `BankReconciliations`.
+
+Amendment 2026-11-24 (migration batches, accepted; [features/migration-batches.md](features/migration-batches.md) §6): script `0054_migration_batches.sql` widens `CK_BankReconciliationItems_Kind` to 0–19 (`MigrationNotPosted`) and adds 19 to the kinds with a line in `CK_BankReconciliationItems_Line`.
 
 ### 11.13 Account closures (accepted)
 
@@ -635,6 +642,17 @@ Feature spec: [features/rebalances.md](features/rebalances.md) (accepted 2026-11
 - `RebalanceLines` — `Id`, `TenantId`, `RebalanceId`, `InstrumentId` (tenant composite FKs), `Quantity decimal(18,8)`, `Weight decimal(5,2)`, `TargetWeight decimal(5,2) NULL`, `Side int NULL` (CHECK 0–1), `TradeQuantity decimal(18,8) NULL`, `ReferencePrice decimal(18,8) NULL`, `ReferencePriceDate date NULL`, `EstimatedGross` and `EstimatedFee decimal(18,4) NULL` (the five trade columns set iff `Side` is set), `Currency char(3)`. Unique `(RebalanceId, InstrumentId)`.
 
 A rebalance writes no Transaction. No back-fill: no rebalance is created for a run before `0053`, and existing Transactions keep source `Rebalance`. No simulator script.
+
+### 11.19 Migration batches (accepted)
+
+Feature spec: [features/migration-batches.md](features/migration-batches.md) (accepted 2026-11-24) §6. Script `0054_migration_batches.sql`:
+
+- `MigrationBatches` — `Id`, `PublicId` (unique), `TenantId`, `Status` (CHECK 0–3), `Name` and `PreviousProvider nvarchar(100)`, `AsOfDate date`, `ControlAccountCount int` (CHECK `≥ 0`), submitted by and at (both set when `Status` is 1 or 2, both null when 0), returned by, at and note (all or none), posted by and at (set iff `Status = 2`, poster ≠ submitter), cancelled by, at and note (set iff `Status = 3`), audit columns, `RowVersion`. The user columns have tenant composite FKs to `Users`. Unique `(TenantId, Id)`; index `(TenantId, Status, Created DESC)`.
+- `MigrationBatchControlTotals` — `Id`, `TenantId`, `MigrationBatchId` (CASCADE), `Kind` (CHECK 0–2: `Cash`, `Quantity`, `Cost`), `Currency char(3) NULL`, `InstrumentId int NULL` (currency for kinds 0 and 2, instrument for kind 1), `Amount decimal(26,8)` (CHECK `≥ 0`). Unique `(MigrationBatchId, Kind, Currency, InstrumentId)`.
+- `MigrationBatchEntries` — `Id`, `TenantId`, `MigrationBatchId` (CASCADE), `Position`, `AccountId`, `ExternalReference nvarchar(100) NULL`, `CashAmount decimal(18,4) NULL` (CHECK `> 0`), `OpeningTransactionId` and `OpeningHoldingsTransactionId int NULL` (FKs to `Transactions`). Unique `(MigrationBatchId, AccountId)` and `(MigrationBatchId, Position)`; index `(TenantId, AccountId)`.
+- `MigrationBatchHoldings` — `Id`, `TenantId`, `MigrationBatchEntryId` (CASCADE), `InstrumentId`, `Quantity decimal(18,8)` (CHECK `> 0`), `Cost decimal(18,4)` (CHECK `≥ 0`). Unique `(MigrationBatchEntryId, InstrumentId)`.
+
+The rule "at least cash or one holding" spans two tables and is held by the aggregate. No back-fill. No simulator script.
 
 ## 12. Still not a schema decision
 
