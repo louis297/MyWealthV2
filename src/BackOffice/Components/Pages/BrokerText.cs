@@ -35,12 +35,20 @@ public static class BrokerText
         "UnknownFill" => "No such fill",
         "Overfill" => "More than the order",
         "Repeated" => "Already known",
+        // Trade-settlement BO29.
+        "FillSettled" => "The trade has already settled",
+        "FillBroken" => "The trade was cancelled",
+        "UnknownSettlement" => "No trades for this settlement",
         _ => skipReason
     };
 
+    /// <summary>Trade-settlement BO29: "Settles in USD, NZD" from the connection's settlement currencies.</summary>
+    public static string Settles(IReadOnlyList<string>? currencies) =>
+        currencies is { Count: > 0 } ? $"Settles in {string.Join(", ", currencies)}" : "";
+
     /// <summary>BO28: a report skipped for an order or a fill the platform cannot place needs a person.</summary>
     public static bool NeedsPerson(ExecutionReportItem item) =>
-        item.Status == "Skipped" && item.SkipReason is "UnknownOrder" or "UnknownFill" or "Overfill";
+        item.Status == "Skipped" && item.SkipReason is "UnknownOrder" or "UnknownFill" or "Overfill" or "FillSettled" or "UnknownSettlement";
 
     public static string Number(decimal? value) => value?.ToString("0.########", CultureInfo.InvariantCulture) ?? "";
 

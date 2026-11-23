@@ -837,8 +837,8 @@ describe("Customer Portal bank accounts and withdrawals (withdrawals C22–C25)"
     });
 
     expect(await screen.findByText("Trade cancelled by the broker: Bought 4 ACME.SIM at 100.12")).toBeInTheDocument();
-    expect(screen.getByText("Bought 4 ACME.SIM at 100.12")).toBeInTheDocument();
-    expect(screen.getByText("Cancelled")).toBeInTheDocument();
+    const fillRow = screen.getByText("Bought 4 ACME.SIM at 100.12").closest("tr")!;
+    expect(within(fillRow).getByText("Cancelled")).toBeInTheDocument();
     expect(screen.queryByText("Settles 25 Nov")).not.toBeInTheDocument();
   });
 

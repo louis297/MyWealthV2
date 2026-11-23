@@ -25,7 +25,12 @@ public sealed record ExecutionReportDto(
     DateTimeOffset ReceivedAt,
     string Status,
     string? SkipReason,
-    DateTimeOffset? ProcessedAt);
+    DateTimeOffset? ProcessedAt,
+    string? SettlementId,
+    string? SettlementAccount,
+    string? Currency,
+    decimal? NetAmount,
+    int? FillCount);
 
 /// <summary>Orders R30: the stored execution reports, newest first. Platform data for a SystemAdmin.</summary>
 [Authorize(Policy = Policies.TenantsManage)]
@@ -87,7 +92,7 @@ public class GetExecutionReportsQueryHandler(IApplicationDbContext db)
                 row.PublicId, row.Connection, row.OutsideId, row.Kind?.ToString(), row.ClientOrderId, row.BrokerOrderId,
                 row.Quantity, row.Price, row.TradeDate, row.SettlementDate, row.ContractNote, row.FillOutsideId,
                 row.SettledDate, row.Reason, row.ReceivedAt, row.Status.ToString(), row.SkipReason?.ToString(),
-                row.ProcessedAt)).ToList(),
+                row.ProcessedAt, row.SettlementId, row.SettlementAccount, row.Currency?.Trim(), row.NetAmount, row.FillCount)).ToList(),
             Page = request.Page,
             PageSize = request.PageSize,
             TotalCount = totalCount
