@@ -1,8 +1,15 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using FluentValidation.Results;
+using MyWealthV2.Application.Common.Exceptions;
+using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Orders.Commands;
+using MyWealthV2.Domain.Entities;
+using MyWealthV2.Domain.Exceptions;
 using MyWealthV2.Domain.Rebalances;
+using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
+using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationException;
 
 namespace MyWealthV2.Application.Rebalances.Commands;
 
@@ -33,8 +40,52 @@ public class CancelRebalanceCommandValidator : AbstractValidator<CancelRebalance
     }
 }
 
-public class CancelRebalanceCommandHandler : IRequestHandler<CancelRebalanceCommand>
+public class CancelRebalanceCommandHandler(IApplicationDbContext db, ICurrentUser currentUser, TimeProvider time)
+    : IRequestHandler<CancelRebalanceCommand>
 {
-    public Task Handle(CancelRebalanceCommand request, CancellationToken cancellationToken) =>
-        throw new NotImplementedException();
+    public async Task Handle(CancelRebalanceCommand request, CancellationToken cancellationToken)
+    {
+        var found = await RebalanceReader.Scope(db, currentUser).AsNoTracking()
+                        .Select(row => new { row.Id, row.PublicId, row.AccountId })
+                        .SingleOrDefaultAsync(row => row.PublicId == request.Id, cancellationToken)
+                    ?? throw new NotFoundException("Rebalance", request.Id);
+        var person = currentUser.Person?.Id ?? throw new ForbiddenAccessException();
+
+        try
+        {
+            await db.ExecuteInTransactionAsync(async token =>
+            {
+                await db.LockAccountAsync(found.AccountId, token);
+                var rebalance = await db.Rebalances.SingleAsync(row => row.Id == found.Id, token);
+                if (!string.Equals(Convert.ToBase64String(rebalance.RowVersion ?? []), request.RowVersion, StringComparison.Ordinal))
+                {
+                    throw new ConcurrencyException();
+                }
+
+                if (!rebalance.IsOpen)
+                {
+                    throw StatusError($"This rebalance is {rebalance.Status} and cannot be cancelled.");
+                }
+
+                if (rebalance.HasCancelRequest)
+                {
+                    throw StatusError(Rebalance.CancelAlreadyRequestedMessage);
+                }
+
+                await RebalanceCancellation.CancelAsync(db, rebalance, person, request.Note, time.GetUtcNow(), token);
+                await db.SaveChangesAsync(token);
+            }, cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConcurrencyException();
+        }
+        catch (RebalanceStatusException exception)
+        {
+            throw StatusError(exception.Message);
+        }
+    }
+
+    private static ValidationException StatusError(string message) =>
+        new([new ValidationFailure("Status", message)]);
 }

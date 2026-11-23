@@ -303,6 +303,7 @@ public class Order : BaseAuditableEntity
     /// <summary>R18: an order the broker cannot hold is <c>Cancelled</c> at once and reserves nothing.</summary>
     public void CancelUnsent(int? byUserId, string? note, DateTimeOffset at, bool forRebalance = false)
     {
+        EnsureCancellableBy(byUserId, forRebalance);
         if (!IsUnsent)
         {
             throw new OrderStatusException("This order may be at the broker; only the broker can end it.");
@@ -320,6 +321,7 @@ public class Order : BaseAuditableEntity
     /// <summary>R18: an open order the broker may hold gets a cancel request; its status does not change.</summary>
     public void RequestCancel(int? byUserId, string? note, DateTimeOffset at, bool forRebalance = false)
     {
+        EnsureCancellableBy(byUserId, forRebalance);
         if (!IsOpen)
         {
             throw new OrderStatusException($"This order is {Status} and cannot be cancelled.");
@@ -334,6 +336,16 @@ public class Order : BaseAuditableEntity
         CancelRequestedAt = at.ToUniversalTime();
         CancelRequestedByUserId = byUserId;
         CancelNote = trimmed;
+    }
+
+    /// <summary>Rebalances R20: a person's cancel of a rebalance order is refused unless it comes from cancelling the
+    /// rebalance; the platform's request (a corporate action, R50) is not.</summary>
+    private void EnsureCancellableBy(int? byUserId, bool forRebalance)
+    {
+        if (RebalanceId is not null && byUserId is not null && !forRebalance)
+        {
+            throw new OrderStatusException(RebalanceOrderMessage);
+        }
     }
 
     /// <summary>R22: the broker answered the cancel request.</summary>
