@@ -94,7 +94,7 @@ public class RebalancePlannerOrderTests
     public void Plan_ATargetQuotedInAnotherCurrency_FailsWithCurrencyMismatch()
     {
         var plan = RebalancePlanner.Plan(Input(10000m,
-            [Target(2, "ACME.SIM", "USD", 50m, 100m), Target(3, "BHP.AX", "AUD", 50m, 40m, quoteToBase: 0.65m, quoteToAccount: 0.65m)],
+            [Target(2, "AIR.NZ", "NZD", 50m, 100m), Target(3, "BHP.AX", "AUD", 50m, 40m, quoteToBase: 0.65m, quoteToAccount: 0.65m)],
             orderChecks: true, accountCurrency: "NZD", baseCurrency: "NZD"));
 
         plan.Status.ShouldBe(RebalancePlanOutcome.Failed);
