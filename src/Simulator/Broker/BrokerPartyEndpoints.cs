@@ -34,11 +34,12 @@ public static class BrokerPartyEndpoints
     private static async Task<IResult> GetReportsAsync(
         string? after,
         int? limit,
+        BrokerBankAccounts accounts,
         SimulatorDbContext db,
         TimeProvider time,
         CancellationToken cancellationToken)
     {
-        var world = await BrokerBook.UpToDateAsync(db, time, cancellationToken);
+        var world = await BrokerBook.UpToDateAsync(db, time, accounts, cancellationToken);
         if (!BankFeedCursor.TryRead(after, world.WorldId, out var afterPlace))
         {
             return Results.BadRequest();
@@ -119,6 +120,7 @@ public static class BrokerPartyEndpoints
     /// </summary>
     private static async Task<IResult> PlaceAsync(
         BrokerOrderRequest body,
+        BrokerBankAccounts accounts,
         SimulatorDbContext db,
         TimeProvider time,
         CancellationToken cancellationToken)
@@ -128,7 +130,7 @@ public static class BrokerPartyEndpoints
             return Results.BadRequest();
         }
 
-        var world = await BrokerBook.UpToDateAsync(db, time, cancellationToken);
+        var world = await BrokerBook.UpToDateAsync(db, time, accounts, cancellationToken);
         var day = MarketPricePath.Day(world.Now(time.GetUtcNow()));
         var hash = Hash(body);
         return await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
@@ -189,11 +191,12 @@ public static class BrokerPartyEndpoints
     /// </summary>
     private static async Task<IResult> CancelAsync(
         string clientOrderId,
+        BrokerBankAccounts accounts,
         SimulatorDbContext db,
         TimeProvider time,
         CancellationToken cancellationToken)
     {
-        await BrokerBook.UpToDateAsync(db, time, cancellationToken);
+        await BrokerBook.UpToDateAsync(db, time, accounts, cancellationToken);
         return await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
             db.ChangeTracker.Clear();

@@ -45,6 +45,9 @@ var partyApiKey = PartyEndpoints.ReadPartyApiKey(builder.Configuration);
 // Deposit matching R39: a bad standing account stops the host before it listens.
 builder.Services.AddSingleton(BankStandingAccounts.Read(builder.Configuration));
 
+// Trade-settlement R37: a bad broker bank account stops the host before it listens.
+builder.Services.AddSingleton(MyWealthV2.Simulator.Broker.BrokerBankAccounts.Read(builder.Configuration));
+
 // Simulated instruments R20: a bad standing instrument stops the host before it listens.
 builder.Services.AddSingleton(MarketStandingInstruments.Read(builder.Configuration));
 

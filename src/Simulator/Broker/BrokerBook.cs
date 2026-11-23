@@ -10,11 +10,15 @@ public static class BrokerBook
 {
     /// <summary>R52: before a broker route answers, the market is brought up to date (simulated-instruments R18) and
     /// then the broker: R62, R60, R61. Answers the world and leaves the change tracker empty.</summary>
-    public static async Task<World> UpToDateAsync(SimulatorDbContext db, TimeProvider time, CancellationToken cancellationToken)
+    public static async Task<World> UpToDateAsync(
+        SimulatorDbContext db,
+        TimeProvider time,
+        BrokerBankAccounts accounts,
+        CancellationToken cancellationToken)
     {
         var world = await MarketControlEndpoints.UpToDateAsync(db, time, cancellationToken);
-        await BringUpToDateAsync(db, MarketPricePath.Day(world.Now(time.GetUtcNow())), cancellationToken);
-        return world;
+        await BringUpToDateAsync(db, time, accounts, MarketPricePath.Day(world.Now(time.GetUtcNow())), cancellationToken);
+        return await db.Worlds.AsNoTracking().SingleAsync(cancellationToken);
     }
 
     /// <summary>Takes the lock every write on the broker's books holds until its transaction ends, so the numbers of
@@ -28,7 +32,12 @@ public static class BrokerBook
     /// that became effective cancels the working orders in its symbol (R62); an order still working from an earlier
     /// simulator day expires (R60); a fill whose settlement date has come settles (R61). Each appends one report.
     /// </summary>
-    private static async Task BringUpToDateAsync(SimulatorDbContext db, DateOnly today, CancellationToken cancellationToken)
+    private static async Task BringUpToDateAsync(
+        SimulatorDbContext db,
+        TimeProvider time,
+        BrokerBankAccounts accounts,
+        DateOnly today,
+        CancellationToken cancellationToken)
     {
         var due = await db.BrokerOrders.AsNoTracking()
                       .AnyAsync(order => order.Status == BrokerOrderStatus.Working && order.AcceptedDay < today, cancellationToken)
@@ -115,7 +124,7 @@ public static class BrokerBook
 
                     db.BrokerReports.Add(BrokerReport.OfSettlementClosed(settlement));
                     await db.SaveChangesAsync(cancellationToken);
-                    await AfterSettlementAsync(db, settlement, cancellationToken);
+                    await AfterSettlementAsync(db, time, accounts, settlement, cancellationToken);
                 }
             }
 
@@ -124,9 +133,61 @@ public static class BrokerBook
         db.ChangeTracker.Clear();
     }
 
-    /// <summary>Trade-settlement R37: what the broker does once a settlement is closed. Nothing yet.</summary>
-    private static Task AfterSettlementAsync(SimulatorDbContext db, BrokerSettlement settlement, CancellationToken cancellationToken) =>
-        Task.CompletedTask;
+    /// <summary>Trade-settlement R37, R38: in mode <c>Pay</c> the broker pays a net above 0 at once.</summary>
+    private static async Task AfterSettlementAsync(
+        SimulatorDbContext db,
+        TimeProvider time,
+        BrokerBankAccounts accounts,
+        BrokerSettlement settlement,
+        CancellationToken cancellationToken)
+    {
+        var settings = await db.BrokerSettings.AsNoTracking().SingleAsync(cancellationToken);
+        if (settlement.NetAmount > 0m && settings.SettlementMode == BrokerSettlementMode.Pay)
+        {
+            await PayAsync(db, time, accounts, settlement, settlement.NetAmount, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Trade-settlement R37, R38: the broker pays <paramref name="amount"/> of a settlement as a credit line on the
+    /// trust account at the simulator bank, with the settlement id as reference, entering the feed at once. False when
+    /// the settlement account is not an open account of the bank in that currency: no line is added. The caller
+    /// holds the lock and commits.
+    /// </summary>
+    public static async Task<bool> PayAsync(
+        SimulatorDbContext db,
+        TimeProvider time,
+        BrokerBankAccounts accounts,
+        BrokerSettlement settlement,
+        decimal amount,
+        CancellationToken cancellationToken)
+    {
+        var currency = settlement.Currency.Trim();
+        var trust = await db.BankAccounts.AsNoTracking()
+            .SingleOrDefaultAsync(row => row.AccountNumber == settlement.SettlementAccount && row.Currency == currency, cancellationToken);
+        if (trust is null)
+        {
+            return false;
+        }
+
+        var world = await db.Worlds.SingleAsync(cancellationToken);
+        var simulatorNow = world.Now(time.GetUtcNow());
+        var payer = accounts.In(currency);
+        db.BankLines.Add(Bank.BankLine.Receipt(
+            world.TakeLineOutsideId(),
+            trust.Id,
+            amount,
+            DateOnly.FromDateTime(simulatorNow.UtcDateTime),
+            payer?.Name ?? BrokerBankAccounts.DefaultPayerName,
+            payer?.AccountNumber,
+            BrokerSettlement.SettlementId(world.WorldId, settlement.Number),
+            simulatorNow,
+            simulatorNow,
+            deliverTwice: false));
+        settlement.RecordPaid(amount);
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
 
     /// <summary>
     /// R56–R58: fills <paramref name="quantity"/> of a working order and appends its <c>Fill</c> report. Without a

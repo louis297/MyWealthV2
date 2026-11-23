@@ -43,6 +43,7 @@ public class BrokerSettlementTests
     {
         _factory.Clock.Set(TestClock.Start);
         await Sql.ExecuteAsync(SimulatorTestSetup.ConnectionString, BrokerHttp.ResetBroker);
+        await Sql.ExecuteAsync(SimulatorTestSetup.ConnectionString, Bank.BankHttp.ResetBank);
         await Sql.ExecuteAsync(SimulatorTestSetup.ConnectionString, MarketHttp.ResetMarket);
         await Sql.ExecuteAsync(SimulatorTestSetup.ConnectionString, $"UPDATE [World] SET [Seed] = {Seed};");
         await BrokerHttp.SetSlippageOkAsync(_control, 0m);

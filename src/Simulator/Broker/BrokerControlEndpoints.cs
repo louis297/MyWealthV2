@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using MyWealthV2.Simulator.Bank;
 using MyWealthV2.Simulator.Control;
 using MyWealthV2.Simulator.Data;
 using MyWealthV2.Simulator.Market;
@@ -21,13 +22,20 @@ public static class BrokerControlEndpoints
         broker.MapGet("/orders/{brokerOrderId}", GetOrderAsync);
         broker.MapPost("/orders/{brokerOrderId}/fill", FillOrderAsync);
         broker.MapPost("/orders/{brokerOrderId}/cancel", CancelOrderAsync);
+        broker.MapPost("/settlement-mode", SetSettlementModeAsync);
+        broker.MapGet("/settlements", GetSettlementsAsync);
+        broker.MapPost("/settlements/{settlementId}/pay", PaySettlementAsync);
         return control;
     }
 
     /// <summary>R64: the order mode, the slippage and the settlement days.</summary>
-    private static async Task<IResult> GetSettingsAsync(SimulatorDbContext db, TimeProvider time, CancellationToken cancellationToken)
+    private static async Task<IResult> GetSettingsAsync(
+        BrokerBankAccounts accounts,
+        SimulatorDbContext db,
+        TimeProvider time,
+        CancellationToken cancellationToken)
     {
-        await BrokerBook.UpToDateAsync(db, time, cancellationToken);
+        await BrokerBook.UpToDateAsync(db, time, accounts, cancellationToken);
         return Results.Ok(BrokerSettingsItem.From(await db.BrokerSettings.AsNoTracking().SingleAsync(cancellationToken)));
     }
 
@@ -35,6 +43,7 @@ public static class BrokerControlEndpoints
     private static async Task<IResult> SetOrderModeAsync(
         BrokerOrderModeRequest body,
         HttpContext http,
+        BrokerBankAccounts accounts,
         SimulatorDbContext db,
         TimeProvider time)
     {
@@ -60,7 +69,7 @@ public static class BrokerControlEndpoints
             reason = named;
         }
 
-        return await WriteAsync(http, db, time, ControlActions.BrokerOrderModeChanged, body,
+        return await WriteAsync(http, accounts, db, time, ControlActions.BrokerOrderModeChanged, body,
             settings => settings.SetMode(mode, body.FillPercent ?? BrokerRules.DefaultFillPercent, reason));
     }
 
@@ -68,6 +77,7 @@ public static class BrokerControlEndpoints
     private static async Task<IResult> SetSlippageAsync(
         BrokerSlippageRequest body,
         HttpContext http,
+        BrokerBankAccounts accounts,
         SimulatorDbContext db,
         TimeProvider time)
     {
@@ -76,7 +86,7 @@ public static class BrokerControlEndpoints
             return ControlEndpoints.Refused("SlippagePercent", "slippagePercent must be 0 to 5 with at most 2 decimal places.");
         }
 
-        return await WriteAsync(http, db, time, ControlActions.BrokerSlippageSet, body,
+        return await WriteAsync(http, accounts, db, time, ControlActions.BrokerSlippageSet, body,
             settings => settings.SetSlippage(body.SlippagePercent!.Value));
     }
 
@@ -84,6 +94,7 @@ public static class BrokerControlEndpoints
     private static async Task<IResult> SetSettlementDaysAsync(
         BrokerSettlementDaysRequest body,
         HttpContext http,
+        BrokerBankAccounts accounts,
         SimulatorDbContext db,
         TimeProvider time)
     {
@@ -92,12 +103,132 @@ public static class BrokerControlEndpoints
             return ControlEndpoints.Refused("SettlementDays", "settlementDays must be a whole number from 0 to 5.");
         }
 
-        return await WriteAsync(http, db, time, ControlActions.BrokerSettlementDaysSet, body,
+        return await WriteAsync(http, accounts, db, time, ControlActions.BrokerSettlementDaysSet, body,
             settings => settings.SetSettlementDays(body.SettlementDays!.Value));
     }
 
+    /// <summary>Trade-settlement R38: whether the broker pays its settlement receipts at once or holds them.</summary>
+    private static async Task<IResult> SetSettlementModeAsync(
+        BrokerSettlementModeRequest body,
+        HttpContext http,
+        BrokerBankAccounts accounts,
+        SimulatorDbContext db,
+        TimeProvider time)
+    {
+        if (!TryName<BrokerSettlementMode>(body.Mode, out var mode))
+        {
+            return ControlEndpoints.Refused("Mode", "mode must be Pay or Hold.");
+        }
+
+        return await WriteAsync(http, accounts, db, time, ControlActions.BrokerSettlementModeChanged, body,
+            settings => settings.SetSettlementMode(mode));
+    }
+
+    /// <summary>Trade-settlement R39: the broker's settlements, newest first, with what was paid of each.</summary>
+    private static async Task<IResult> GetSettlementsAsync(
+        BrokerBankAccounts accounts,
+        SimulatorDbContext db,
+        TimeProvider time,
+        int? page,
+        int? pageSize,
+        CancellationToken cancellationToken)
+    {
+        var world = await BrokerBook.UpToDateAsync(db, time, accounts, cancellationToken);
+        var size = Math.Clamp(pageSize ?? ControlEndpoints.DefaultPageSize, 1, ControlEndpoints.MaxPageSize);
+        var number = Math.Max(page ?? 1, 1);
+        var total = await db.BrokerSettlements.CountAsync(cancellationToken);
+        var rows = await db.BrokerSettlements.AsNoTracking()
+            .OrderByDescending(settlement => settlement.Number)
+            .Skip((number - 1) * size)
+            .Take(size)
+            .ToListAsync(cancellationToken);
+        var items = new List<BrokerSettlementItem>();
+        foreach (var settlement in rows)
+        {
+            var id = BrokerSettlement.SettlementId(world.WorldId, settlement.Number);
+            var paid = settlement.NetAmount > 0m
+                ? settlement.PaidAmount
+                : await PaidToTheBrokerAsync(db, settlement, id, cancellationToken);
+            items.Add(new BrokerSettlementItem(
+                id, settlement.SettlementAccount, settlement.Currency.Trim(), settlement.SettlementDate, settlement.NetAmount,
+                settlement.FillCount, settlement.NetAmount == 0m || paid >= Math.Abs(settlement.NetAmount), paid));
+        }
+
+        return Results.Ok(new BrokerSettlementPage(items, number, size, total));
+    }
+
+    /// <summary>
+    /// Trade-settlement R38: the operator pays a settlement the broker owes, in mode <c>Hold</c> or again, with an
+    /// amount that defaults to the net. Only a net above 0; an unknown settlement → 404; a trust account the simulator
+    /// bank does not hold → 400.
+    /// </summary>
+    private static async Task<IResult> PaySettlementAsync(
+        string settlementId,
+        BrokerSettlementPayRequest body,
+        HttpContext http,
+        BrokerBankAccounts accounts,
+        SimulatorDbContext db,
+        TimeProvider time)
+    {
+        var cancellationToken = http.RequestAborted;
+        if (body.Amount is not null && !BankRules.IsAmount(body.Amount))
+        {
+            return ControlEndpoints.Refused("Amount", "amount must be greater than zero, with at most 4 decimal places.");
+        }
+
+        var world = await BrokerBook.UpToDateAsync(db, time, accounts, cancellationToken);
+        var realNow = time.GetUtcNow();
+        return await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            db.ChangeTracker.Clear();
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+            await BrokerBook.LockAsync(db, cancellationToken);
+            var settlement = BrokerSettlement.TryReadNumber(settlementId, world.WorldId, out var number)
+                ? await db.BrokerSettlements.SingleOrDefaultAsync(row => row.Number == number, cancellationToken)
+                : null;
+            if (settlement is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (settlement.NetAmount <= 0m)
+            {
+                return ControlEndpoints.Refused("Status", "Only a settlement the broker owes the firm can be paid.");
+            }
+
+            if (!await BrokerBook.PayAsync(db, time, accounts, settlement, body.Amount ?? settlement.NetAmount, cancellationToken))
+            {
+                return ControlEndpoints.Refused("SettlementAccount", "The settlement account is not an open account of the simulator bank.");
+            }
+
+            MarketControlEndpoints.Log(db, http, world, realNow, ControlActions.BrokerSettlementPaid, new { settlementId, body.Amount });
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return Results.Ok(new BrokerSettlementItem(
+                settlementId, settlement.SettlementAccount, settlement.Currency.Trim(), settlement.SettlementDate, settlement.NetAmount,
+                settlement.FillCount, settlement.PaidAmount >= settlement.NetAmount, settlement.PaidAmount));
+        });
+    }
+
+    /// <summary>Trade-settlement R39: for a net below 0, the executed and not returned payments of the simulator bank
+    /// from the trust account whose reference is the settlement id.</summary>
+    private static async Task<decimal> PaidToTheBrokerAsync(
+        SimulatorDbContext db,
+        BrokerSettlement settlement,
+        string settlementId,
+        CancellationToken cancellationToken) =>
+        await (
+                from payment in db.BankPayments.AsNoTracking()
+                join account in db.BankAccounts.AsNoTracking() on payment.BankAccountId equals account.Id
+                where account.AccountNumber == settlement.SettlementAccount
+                      && payment.Reference == settlementId
+                      && payment.Status == BankPaymentStatus.Executed
+                select (decimal?)payment.Amount)
+            .SumAsync(cancellationToken) ?? 0m;
+
     /// <summary>R64: the orders, newest first, with optional <c>status</c> and <c>symbol</c>.</summary>
     private static async Task<IResult> GetOrdersAsync(
+        BrokerBankAccounts accounts,
         SimulatorDbContext db,
         TimeProvider time,
         string? status,
@@ -106,7 +237,7 @@ public static class BrokerControlEndpoints
         int? pageSize,
         CancellationToken cancellationToken)
     {
-        var world = await BrokerBook.UpToDateAsync(db, time, cancellationToken);
+        var world = await BrokerBook.UpToDateAsync(db, time, accounts, cancellationToken);
         var orders = db.BrokerOrders.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(status))
         {
@@ -140,11 +271,12 @@ public static class BrokerControlEndpoints
     /// <summary>R64: one order with its fills and its reports.</summary>
     private static async Task<IResult> GetOrderAsync(
         string brokerOrderId,
+        BrokerBankAccounts accounts,
         SimulatorDbContext db,
         TimeProvider time,
         CancellationToken cancellationToken)
     {
-        var world = await BrokerBook.UpToDateAsync(db, time, cancellationToken);
+        var world = await BrokerBook.UpToDateAsync(db, time, accounts, cancellationToken);
         var order = await FindAsync(db, world, brokerOrderId, tracked: false, cancellationToken);
         return order is null ? Results.NotFound() : Results.Ok(await DetailAsync(db, world, order, cancellationToken));
     }
@@ -154,11 +286,12 @@ public static class BrokerControlEndpoints
         string brokerOrderId,
         BrokerFillRequest body,
         HttpContext http,
+        BrokerBankAccounts accounts,
         SimulatorDbContext db,
         TimeProvider time)
     {
         var cancellationToken = http.RequestAborted;
-        var world = await BrokerBook.UpToDateAsync(db, time, cancellationToken);
+        var world = await BrokerBook.UpToDateAsync(db, time, accounts, cancellationToken);
         var realNow = time.GetUtcNow();
         var day = MarketPricePath.Day(world.Now(realNow));
         return await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
@@ -210,6 +343,7 @@ public static class BrokerControlEndpoints
         string brokerOrderId,
         BrokerCancelRequest body,
         HttpContext http,
+        BrokerBankAccounts accounts,
         SimulatorDbContext db,
         TimeProvider time)
     {
@@ -220,7 +354,7 @@ public static class BrokerControlEndpoints
             return ControlEndpoints.Refused("Reason", "reason must be 1 to 140 characters.");
         }
 
-        var world = await BrokerBook.UpToDateAsync(db, time, cancellationToken);
+        var world = await BrokerBook.UpToDateAsync(db, time, accounts, cancellationToken);
         var realNow = time.GetUtcNow();
         return await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
@@ -296,13 +430,14 @@ public static class BrokerControlEndpoints
     /// saves both. A concurrent write on the row returns 409.</summary>
     private static async Task<IResult> WriteAsync(
         HttpContext http,
+        BrokerBankAccounts accounts,
         SimulatorDbContext db,
         TimeProvider time,
         string action,
         object body,
         Action<BrokerSettings> apply)
     {
-        var world = await BrokerBook.UpToDateAsync(db, time, http.RequestAborted);
+        var world = await BrokerBook.UpToDateAsync(db, time, accounts, http.RequestAborted);
         var settings = await db.BrokerSettings.SingleAsync(http.RequestAborted);
         apply(settings);
         MarketControlEndpoints.Log(db, http, world, time.GetUtcNow(), action, body);
@@ -336,15 +471,39 @@ public sealed record BrokerFillRequest(decimal? Quantity, decimal? Price);
 
 public sealed record BrokerCancelRequest(string? Reason);
 
+public sealed record BrokerSettlementModeRequest(string? Mode);
+
+public sealed record BrokerSettlementPayRequest(decimal? Amount);
+
+/// <summary>Trade-settlement R39: one broker settlement in the broker's own books.</summary>
+public sealed record BrokerSettlementItem(
+    string Id,
+    string SettlementAccount,
+    string Currency,
+    DateOnly SettlementDate,
+    decimal NetAmount,
+    int FillCount,
+    bool Paid,
+    decimal PaidAmount);
+
+public sealed record BrokerSettlementPage(IReadOnlyList<BrokerSettlementItem> Items, int Page, int PageSize, int TotalCount);
+
 /// <summary>R64: the broker's settings.</summary>
-public sealed record BrokerSettingsItem(string Mode, int FillPercent, string? RejectReason, decimal SlippagePercent, int SettlementDays)
+public sealed record BrokerSettingsItem(
+    string Mode,
+    int FillPercent,
+    string? RejectReason,
+    decimal SlippagePercent,
+    int SettlementDays,
+    string SettlementMode)
 {
     public static BrokerSettingsItem From(BrokerSettings settings) => new(
         settings.Mode.ToString(),
         settings.FillPercent,
         settings.RejectReason?.ToString(),
         settings.SlippagePercent,
-        settings.SettlementDays);
+        settings.SettlementDays,
+        settings.SettlementMode.ToString());
 }
 
 /// <summary>R64: an order in the simulator broker's books.</summary>
