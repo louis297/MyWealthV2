@@ -69,6 +69,44 @@ public class Transaction : BaseAuditableEntity
     /// <summary>Orders R35: the execution detail of an order fill and of its Reversal; null on every other Transaction.</summary>
     public TransactionExecutionDetail? ExecutionDetail { get; private set; }
 
+    /// <summary>Migration-batches R22: where a migrated opening balance came from, on the Transaction and its Reversal;
+    /// null on every other Transaction.</summary>
+    public TransactionMigrationDetail? MigrationDetail { get; private set; }
+
+    /// <summary>Migration-batches R22: the memo of every Transaction a migration batch writes.</summary>
+    public const string OpeningBalanceMemo = "Opening balance";
+
+    /// <summary>
+    /// Migration-batches R22: a migrated opening cash balance. One <c>Opening</c> <c>Principal</c> cash leg of
+    /// <c>+amount</c>, source <c>Migration</c>, memo <see cref="OpeningBalanceMemo"/>, the entry's reference and a
+    /// migration detail. Flows build it without the manual entry matrix (custody-modes R7).
+    /// </summary>
+    public static Transaction PostMigratedCash(
+        int tenantId,
+        int accountId,
+        string accountCurrency,
+        decimal amount,
+        DateTimeOffset bookedAt,
+        string? reference,
+        TransactionSource source,
+        Migrations.MigrationOrigin origin) =>
+        throw new NotImplementedException();
+
+    /// <summary>
+    /// Migration-batches R22: migrated opening holdings. The legs of <see cref="PostOpeningHoldings"/>, source
+    /// <c>Migration</c>, memo <see cref="OpeningBalanceMemo"/>, the entry's reference and a migration detail.
+    /// </summary>
+    public static Transaction PostMigratedHoldings(
+        int tenantId,
+        int accountId,
+        AccountType accountType,
+        DateTimeOffset bookedAt,
+        string? reference,
+        TransactionSource source,
+        Migrations.MigrationOrigin origin,
+        IEnumerable<OpeningSecurityLeg> securityLegs) =>
+        throw new NotImplementedException();
+
     /// <summary>Orders R32: the memo of a buy order's fill.</summary>
     public const string BuyOrderMemo = "Buy order";
 

@@ -98,6 +98,10 @@ public sealed class TransactionSource : ValueObject
         return new TransactionSource(TransactionSourceKind.OrderFill, orderPublicId);
     }
 
+    /// <summary>A migrated opening balance's source: the PublicId of its migration batch, shared by every Transaction
+    /// of the batch (migration-batches R27).</summary>
+    public static TransactionSource Migration(Guid batchPublicId) => throw new NotImplementedException();
+
     /// <summary>The source as stored on a Transaction row.</summary>
     internal static TransactionSource FromStored(TransactionSourceKind kind, Guid? publicId) =>
         kind switch

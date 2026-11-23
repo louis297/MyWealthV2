@@ -33,5 +33,8 @@ public enum TransactionSourceKind
     CorporateAction = 7,
 
     /// <summary>A fill of an order, as the broker reported it; the source id is the order's PublicId (orders R32).</summary>
-    OrderFill = 8
+    OrderFill = 8,
+
+    /// <summary>A migration batch's opening balance; the source id is the batch's PublicId (migration-batches R27).</summary>
+    Migration = 9
 }

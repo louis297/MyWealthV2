@@ -102,6 +102,7 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
     public DbSet<TradeSettlement> TradeSettlements => Set<TradeSettlement>();
 
     public DbSet<Rebalance> Rebalances => Set<Rebalance>();
+    public DbSet<MigrationBatch> MigrationBatches => Set<MigrationBatch>();
 
     public DbSet<Instrument> Instruments => Set<Instrument>();
 
