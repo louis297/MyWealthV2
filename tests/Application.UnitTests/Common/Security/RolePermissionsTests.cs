@@ -213,6 +213,16 @@ public class RolePermissionsTests
     }
 
     [Test]
+    public void MigrationBatchesManage_IsTenantAdminOnly()
+    {
+        RolePermissions.Has(UserRole.TenantAdmin, Policies.MigrationBatchesManage).ShouldBeTrue();
+        RolePermissions.Has(UserRole.Adviser, Policies.MigrationBatchesManage).ShouldBeFalse();
+        RolePermissions.Has(UserRole.Customer, Policies.MigrationBatchesManage).ShouldBeFalse();
+        RolePermissions.Has(UserRole.SystemAdmin, Policies.MigrationBatchesManage).ShouldBeFalse();
+        RolePermissions.Has(UserRole.SimulatorOperator, Policies.MigrationBatchesManage).ShouldBeFalse();
+    }
+
+    [Test]
     public void TradeSettlementsManage_IsTenantAdminOnly()
     {
         RolePermissions.Has(UserRole.TenantAdmin, Policies.TradeSettlementsManage).ShouldBeTrue();

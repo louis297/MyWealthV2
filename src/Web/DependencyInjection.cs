@@ -69,6 +69,7 @@ public static class DependencyInjection
                      Policies.TradeSettlementsManage,
                      Policies.RebalancesRead,
                      Policies.RebalancesConfirm,
+                     Policies.MigrationBatchesManage,
                      Policies.ReportsCustomerRead,
                      Policies.ReportsCustomerCreate,
                      Policies.ReportsBookRead,
