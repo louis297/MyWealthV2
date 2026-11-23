@@ -37,7 +37,7 @@ public static class CustodyRules
         custodyMode == CustodyMode.External || fromCustomerId == toCustomerId;
 
     private const string InterestMessage = "Interest cannot be entered by hand on a Custodial account.";
-    private const string OpeningMessage = "A Custodial account starts empty. Fund it with TransferIn.";
+    private const string OpeningMessage = "Opening balances on a Custodial account come from a migration batch.";
     private const string StockMessage = "Securities cannot be moved in or out of a Custodial account by hand. Place an order.";
 
     /// <summary>Orders R48: the <c>errors.Type</c> message for a hand <c>Buy</c> or <c>Sell</c> on a Custodial account.</summary>
