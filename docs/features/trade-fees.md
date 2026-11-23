@@ -25,6 +25,7 @@ related:
   - external-caller-numbers.md
   - interest-run.md
   - trade-settlement.md
+  - rebalances.md
 ---
 
 # Trade fees
@@ -487,3 +488,13 @@ Status of this amendment: `accepted` (2026-11-23), together with [trade-settleme
 
 - R8, R14: the fee of a fill (orders R33) is never below 0. After a broken fill was reversed, the order's charged fee falls by that fill's fee; the fees of the order's other fills are not worked out again.
 - R19: a flow reverses a broken fill, and the Reversal gives its fee back. A fill is still not hand-reversible.
+
+---
+
+## Amendment 2026-11-23 (rebalance through orders) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md](rebalances.md). Rules R7, R16 and R26 live there; this section records what changes here.
+
+- R24: the trade lock stays; on an assigned Account only its rebalance places orders (rebalances R24).
+- R25–R29: the planner's fees are **estimates**, used for the proposal's `estimatedFee` and for sizing the buys. A rebalance order is charged as any order (orders R11, R33): the fee of the schedule fixed when the order is placed, charged across its fills.
+- R27, R28: for a buy wave each buy is costed at its reservation, the most it can cost at its price limit with the schedule's fee on that gross, and the bisection and the drop below the minimum trade run on that cost (rebalances R16).

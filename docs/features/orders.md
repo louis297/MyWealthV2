@@ -45,6 +45,7 @@ related:
   - ../api-design.md
   - ../glossary.md
   - trade-settlement.md
+  - rebalances.md
 ---
 
 # Orders and settlement
@@ -930,3 +931,18 @@ Status of this amendment: `accepted` (2026-11-23), together with [trade-settleme
 - R43: settlement still writes nothing to the ledger and still decides withdrawable cash (trade-settlement §11 point 4). The settlement cash of an order with a settlement account moves through the client money account as a trade settlement.
 - R14, R28, R33, R36–R38, R44, R47: a fill may be `Broken = 2`. A broken fill no longer counts in `filledQuantity` or `averagePrice`, nor, when it was reversed, in the posted gross and charged fee; an open order takes its quantity back and a `Filled` order becomes `Cancelled` with close reason `Trade broken` (trade-settlement R32). The fee of a later fill is never below 0 (R33). A broken fill is not retried (R36). The flow reverses the fill's Transaction once with source `OrderFill` (R29); a hand reverse stays refused (R37). `execution` gains `brokenAt` (R38). A broken sell that could not be reversed still counts as unsettled cash (R44). Account closure is refused while a break waits (R47). `pendingFill=true` also returns an order with a break that waits.
 - §2 Out and §11 points 1 and 12: settlement cash at the bank and a broken trade after a fill are no longer out; they are [trade-settlement.md](trade-settlement.md). A trade broken after it settled stays out.
+
+---
+
+## Amendment 2026-11-23 (rebalance through orders) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md](rebalances.md). Rules R13–R24 live there; this section records what changes here.
+
+- R8: the trade lock stays for a person's order. On an assigned Account the only orders are the orders of its rebalance, which need the Active assignment where R8 refuses a person's order (rebalances R15, R24).
+- R15: the item gains `rebalanceId`, the rebalance's PublicId, `null` on a person's order; every caller who reads the order sees it, the Customer included (rebalances R27).
+- R16: `GET /orders` gains the filter `rebalanceId`.
+- R18: `POST /orders/{id}/cancel` on an order with a rebalance → 400 `errors.Status`, `This order belongs to a rebalance. Cancel the rebalance.` (rebalances R20). The platform cancels a rebalance's open orders as R18 does when the rebalance is cancelled, with the note `Rebalance cancelled`.
+- R19: `broker-sync:{connection}` gains a sixth step, **advance**, after the fills are posted: every rebalance in progress on the connection with no live order ends or places its next wave (rebalances R17). A failure in it is logged per rebalance and does not stop the run being reported.
+- R5, R10–R13: a rebalance order is an ordinary order: `Market`, `Day`, the reference price and price limit, the fee terms, the reservation and the settlement account; memo `Rebalance`; placed by the person who confirmed the rebalance. Its fills are posted as any fill (rebalances R15).
+- R49: replaced. A rebalance no longer posts `Buy` / `Sell` at once; its trades are order fills. "An order and an assignment never meet on one account" becomes "the only orders on an assigned Account are the orders of its rebalance". Assigning a portfolio to an Account with a live order stays refused.
+- §2 Out and §11 points 4 and 16: rebalance through orders is no longer out. The drafts of point 4 arrive as the lines of a rebalance proposal (rebalances §11 point 2); point 16 is answered by the trade lock staying (rebalances §11 point 12).

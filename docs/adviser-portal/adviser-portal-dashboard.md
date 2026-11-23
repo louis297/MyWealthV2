@@ -34,6 +34,7 @@ related:
   - ../features/account-closure.md
   - ../features/interest-run.md
   - ../features/trade-settlement.md
+  - ../features/rebalances.md
 ---
 
 # Adviser Portal — Dashboard and ledger pages
@@ -383,3 +384,15 @@ Status of this amendment: `accepted` (2026-11-23), together with [trade-settleme
 | D76 | A TenantAdmin sees a nav item "Trade settlements" (`/trade-settlements`); an Adviser does not. The list: Settled date, Broker reference, Currency, Trades, Net ("Pay broker 1,001.50" or "Receive 2,340.00"), Status, with a status filter, default "Open". Labels: AwaitingPayment "Paying the broker", AwaitingReceipt "Waiting for the broker's payment", Completed "Completed", PaymentFailed "Payment failed", Disputed "Figures differ", SetAside "Set aside". `/trade-settlements/:id` shows the platform's and the broker's figures side by side (a difference in red), the fills with links to their orders, the payments with the labels of D46, the failure ("The bank refused the payment: <reason>", "The bank returned the payment: <reason>", "The broker connection has no bank account in <currency>"), the matched statement line as a link, and the set-aside note. "Pay again" on `PaymentFailed`; "Set aside" with a required note and the sentence "The platform stops waiting for this settlement. Its trades are then shown in the bank reconciliation as not settled through the trust account." |
 | D77 | The fills table of `/orders/:id` (D72) shows a broken fill struck through with "Cancelled by the broker <date>: <reason>" and, by outcome: Reversed "Reversed" with a link to the Reversal; NotPosted "Was not booked"; NotApplied "Could not be reversed" with the reason (AccountClosed "The account is closed", LaterActivity "Later activity on this holding", InsufficientCash "The proceeds have been spent") and, for a TenantAdmin, "Correct the account with an adjustment, then mark this resolved." with a "Mark resolved" action that takes a note; ResolvedByHand "Resolved by <name>". "Needs attention" (D71) also marks an order with a NotApplied break. `/transactions/:id` of a broken fill shows "Cancelled by the broker" in the Trade section (D74). The Close account page shows the new refusal. |
 | D78 | Bank receipts pages (D34, D50): method label Settlement "Trade settlement" with a link to it for a TenantAdmin; reason label SettlementMismatch "Does not match the trade settlement", with the sentence "Return it to the broker, or ignore it with a note." Bank reconciliation (D51): kind labels UnsettledTrades "Trades waiting for settlement", TradesNeedingAction "Trades that need action" (linking to `/trade-settlements?open=true`), UnbookedFills "Settled trades not booked yet", TradeFees "Trade fees held in the trust account"; Trades becomes "Trades not settled through the trust account"; under the items, "Open trade settlements: <n>, net <amount>". |
+
+---
+
+## Amendment 2026-11-23 (rebalance through orders) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [rebalances](../features/rebalances.md). Field rules live there. The Rebalances pages are in [adviser-portal-portfolios.md](adviser-portal-portfolios.md) (P14–P20). Calls: the existing order and transaction reads, with `rebalanceId` on the order item.
+
+| ID | Behaviour |
+| --- | --- |
+| D79 | Orders pages (D71–D73): an order with `rebalanceId` shows "Rebalance" with a link to `/rebalances/:id`, and Cancel is not offered on it; the detail page says "This order belongs to a rebalance. Cancel the rebalance to cancel it." The Source line of D26 keeps "Rebalance" for existing Transactions, and Reverse (D27) is offered only for `Manual`. |
+
+- D27: Reverse is offered only when `source.kind` is `Manual`; a `Rebalance` source is no longer hand-reversible on a Custodial account (rebalances R28). The portal still does not read the custody mode, so it also hides Reverse on a `Rebalance` Transaction of an External account, which the server would accept, as it does for `Seed`.

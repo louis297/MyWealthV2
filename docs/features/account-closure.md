@@ -32,6 +32,7 @@ related:
   - ../glossary.md
   - interest-run.md
   - trade-settlement.md
+  - rebalances.md
 ---
 
 # Account closure
@@ -561,3 +562,11 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders.md](ord
 Status of this amendment: `accepted` (2026-11-23), together with [trade-settlement.md](trade-settlement.md). Rule R33 lives there; this section records what changes here.
 
 - R5 gains a refusal, 400 `errors.AccountId`: `A broken trade on this account waits for a decision.`, while a fill of the account has a break with outcome `NotApplied`.
+
+---
+
+## Amendment 2026-11-23 (rebalance through orders) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md](rebalances.md). Rule R22 lives there; this section records what changes here.
+
+- A note: R5 already refuses an Account with an Active assignment, so an Account with an open rebalance cannot be closed. Unassign cancels the open rebalance (rebalances R22); the closure then waits for its open orders as for any order.

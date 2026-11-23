@@ -16,6 +16,7 @@ related:
   - ../features/holdings.md
   - ../features/bff-adviser-portal.md
   - ../features/custody-modes.md
+  - ../features/rebalances.md
 ---
 
 # Adviser Portal — Portfolios
@@ -175,3 +176,25 @@ Status of this amendment: `accepted` (2026-11-17), together with [custody-modes]
 - P6, P7, P8 and P12 are unchanged.
 
 **Tests.** The account page offers the Assign control on a Custodial account and not on an External Brokerage or Other account. The other portfolio tests use a Custodial account.
+
+---
+
+## Amendment 2026-11-23 (rebalance through orders) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [rebalances](../features/rebalances.md). Field rules live there. Do not rewrite P5, P7, P8 or P9 in place. The BFF gains the prefix `/rebalances` ([bff-adviser-portal.md](../features/bff-adviser-portal.md) amendment 2026-11-23). Calls: `POST /accounts/{id}/rebalance`, `POST /accounts/{id}/portfolio`, `GET /accounts/{id}/portfolio` (`rebalance`), `GET /rebalances`, `GET /rebalances/{id}`, `POST /rebalances/{id}/confirm`, `POST /rebalances/{id}/cancel`, and the existing order reads.
+
+| ID | Behaviour |
+| --- | --- |
+| P14 | On an assigned account, "Rebalance" (P7) calls `POST /accounts/{id}/rebalance`. `Proposed` opens `/rebalances/:id`; `NoChange` shows "Nothing to trade. The account is in line with its portfolio."; a 400 shows the server message. Assign (P5, P13) does the same after `POST /accounts/{id}/portfolio`. |
+| P15 | `/rebalances/:id` of a `Proposed` rebalance: the account, the portfolio, "Proposed <time> by <name>" ("by the platform" for `null`) and the lines as a table: Instrument, Holding, Now %, Target %, Trade ("Sell 40", "Buy 59.4", "—"), About (the estimated gross), Fee. Under it: "Sales are placed first. Purchases are placed when the sales are filled and are worked out again from the cash then, so the quantities bought may differ. The broker fills at the market price." Buttons Confirm and Cancel. An expired proposal shows "This proposal has expired." and offers "Propose again" (P14) in place of Confirm. |
+| P16 | Confirm posts `POST /rebalances/{id}/confirm`. A 400 shows its message; a 409 reloads with "This rebalance has changed." After 204 the page shows the status and the orders by wave: Wave, Side, Instrument, Quantity, Filled, Status (labels of D71), each linked to `/orders/:id`. Manual refresh only. |
+| P17 | Status labels: Proposed "Waiting for confirmation", Selling "Selling", Buying "Buying", Completed "Completed", Incomplete "Ended early", Cancelled "Cancelled" (with "replaced by a newer proposal" for `Superseded` and "the portfolio was unassigned" for `Unassigned`), NoChange "Nothing to trade", Failed "Could not be planned". `Incomplete` and `Failed` show `failure.message`. A rebalance with a cancel request shows "Cancelling"; one with `followUp` shows "A new proposal follows when this one ends." |
+| P18 | Cancel on an open rebalance: a dialog with an optional note and, for one in progress, "Orders the broker has already filled stay." Posts `POST /rebalances/{id}/cancel`. |
+| P19 | Nav item "Rebalances" (`/rebalances`) for TenantAdmin and Adviser: Proposed, Customer, Account, Portfolio, Status, Started by (the trigger: Assign "Assignment", Account "Request", Portfolio "Portfolio change", FollowUp "Follow-up"). Status filter, default "Open"; options Open, Waiting for confirmation, Ended early, All. |
+| P20 | `/portfolios/:id`: the assigned accounts table (P7, P8) shows each account's `rebalance` status with a link, in place of the last rebalance status. The weight-change confirmation reads "This will propose a rebalance for every account assigned to this portfolio. Nothing is traded until each proposal is confirmed. Continue?" A "Confirm proposals" button lists the `Proposed` rebalances of the portfolio from `GET /rebalances?portfolioId=&status=Proposed`, and after a dialog ("Confirm <n> proposals?") calls confirm for each in turn and shows how many were confirmed and each refusal. The account page (P7) shows the same status line and links. |
+
+- P7, P8: the account page and the assigned accounts table show the account's `rebalance` status line and link (P17, P20) in place of the last rebalance status. "Retry" on a Failed status becomes "Rebalance" (P14).
+- The weight-change confirmation copy of the locked decisions becomes: "This will propose a rebalance for every account assigned to this portfolio. Nothing is traded until each proposal is confirmed. Continue?" After a 202 the page says "Proposals queued."
+- The message "No last rebalance yet" becomes "No rebalance yet."
+
+**Tests.** As rebalances §10, Adviser Portal row: P14 the three outcomes; P15 the table, the sentence, the expired state; P16 confirm and the orders by wave; P17 labels; P18 cancel; P19 list and filter; P20 the portfolio page, the new confirmation copy and "Confirm proposals".

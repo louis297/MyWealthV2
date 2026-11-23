@@ -36,6 +36,7 @@ related:
   - account-closure.md
   - interest-run.md
   - trade-settlement.md
+  - rebalances.md
 ---
 
 # Nominated bank accounts and withdrawals
@@ -834,3 +835,11 @@ Status of this amendment: `accepted` (2026-11-23), together with [trade-settleme
 - R31: `OutgoingPaymentKind` gains `TradeSettlement = 2`: a payment of the firm's net to the broker, from the client money account, to the broker's bank account in configuration, with its own PublicId as instruction id, a reference only when the broker settlement id is a valid payment reference, and no approval. Exactly one of a withdrawal, a returned line and a trade settlement, by kind. A trade settlement has at most one `Pending` or `Accepted` payment.
 - R32: the send step sends `TradeSettlement` payments with the same rules. `Rejected` makes the trade settlement `PaymentFailed`.
 - R33: a debit line whose `endToEndId` is the instruction id of a `TradeSettlement` payment with the same amount is `Matched` with method `Settlement`, the payment `Paid` and the settlement `Completed`; another amount → `PaymentMismatch`.
+
+---
+
+## Amendment 2026-11-23 (rebalance through orders) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md](rebalances.md). Rules R14 and R16 live there; this section records what changes here.
+
+- R36: a rebalance lowers cash only through its orders. A buy order of a rebalance reserves its cash like any buy order, and a buy wave is sized so its reservations are not more than the available cash (rebalances R16).

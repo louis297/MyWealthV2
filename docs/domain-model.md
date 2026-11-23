@@ -243,6 +243,7 @@ Tenant
               └── Holding              projection per (Account, Instrument)
         Portfolio                  target-weight model (base currency + lines)   [accepted]
         AccountPortfolioAssignment links Account to one Active Portfolio         [accepted]
+        Rebalance                  one run towards the targets, through orders   [accepted]
 ```
 
 A Transaction may carry security legs on the same header. `OpeningHoldings` / `StockIn` / `StockOut` are security only. `Buy` / `Sell` are cash plus security ([features/buy-sell.md](features/buy-sell.md)). `Split` / `Bonus` / `Scrip` are security only: the client sends the new total quantity, the leg stores the signed delta at cost `0`, and holding total cost does not move ([features/split.md](features/split.md)). Reversal is a new Transaction. The Reversal points at the original (`OriginalTransactionId`); the original points at the Reversal (`ReversedByTransactionId`, single write, then immutable again). Quantity 0 deletes the `Holdings` row. A split reverse that would leave quantity `≤ 0` is rejected.
@@ -524,6 +525,21 @@ Amendment 2026-11-23 (trade settlement and broken trades, accepted): `Order` gai
 
 Invariants: a trade settlement is unique on (connection, broker settlement id, client money account); a fill is in at most one; a settlement has at most one open outgoing payment; it is `Completed` by exactly one statement line or by a net of 0; `SetAside` is final. No domain event. Field rules: [features/trade-settlement.md](features/trade-settlement.md).
 
+Amendment 2026-11-23 (rebalance through orders, accepted): `Order` gains `RebalanceId`, set by `Place`; a person's `RequestCancel` is refused for an order with a rebalance, the platform's is not. `AccountPortfolioAssignment` loses `LastRebalanceAt`, `LastRebalanceStatus`, `LastRebalanceMessage` and `RecordRebalance`. `CustodyRules.AllowsHandReverse(Custodial, Rebalance)` is `false`; `TransactionSource.Rebalance(handle)` stays for reading existing rows and nothing calls it to write. `RebalancePlanner` takes the targets and settings it is given (a portfolio's or a rebalance's own), checks `instrument_inactive`, `stale_price` and `currency_mismatch`, and can cost each buy at its reservation; its outcome enum is renamed `RebalancePlanOutcome` ([features/rebalances.md](features/rebalances.md)).
+
+### 8.18 Rebalances (accepted — rebalances slice)
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `Rebalance` | Aggregate | One run that brings one assigned Custodial account towards its portfolio's targets through orders: account, portfolio, assignment, trigger, status, base currency, `V` and the cash it was planned with, its own minimum trade and cash residual, the broker connection it was confirmed with, the waves and buy waves placed, failure code and message, proposed (by, at, expires), confirmed (by, at), cancel request (by, at, note), cancel reason, follow-up, ended at. `Propose`, `NoChange`, `Fail`, `Confirm`, `StartWave`, `Complete`, `EndIncomplete`, `RequestCancel`, `Cancel`, `MarkFollowUp`; `IsOpen`, `IsInProgress`. Moves nothing in the ledger |
+| `RebalanceTarget` | Entity (child) | Instrument, target weight, sort order: the rebalance's own copy of the portfolio's lines |
+| `RebalanceLine` | Entity (child) | One per Instrument held or targeted when proposed: quantity, weight now, target weight, and the proposed trade (side, quantity, reference price and date, estimated gross and fee, currency). Never changed |
+| `RebalanceStatus` | Enum | `Proposed`, `Selling`, `Buying`, `Completed`, `Incomplete`, `Cancelled`, `NoChange`, `Failed`; open while one of the first three, in progress while `Selling` or `Buying` |
+| `RebalanceTrigger`, `RebalanceCancelReason` | Enums | `Assign`, `Account`, `Portfolio`, `FollowUp`; `Requested`, `Superseded`, `Unassigned` |
+| `RebalanceRules` | Static | `ProposalValidHours = 24`, `MaxBuyWaves = 2` |
+
+Invariants: an Account has at most one open rebalance (Application and a filtered unique index); a rebalance has orders only after it was confirmed, each on its Account and its connection; a buy wave is placed only while no order of the rebalance is live and never reserves more than the available cash; on an Account with an Active assignment every order has a rebalance; on a Custodial account a person reverses only a `Manual` source. No domain event: `PortfolioWeightsChanged` still starts the job. Field rules: [features/rebalances.md](features/rebalances.md).
+
 ## 9. Value objects (Domain assembly; may exist in Phase 1)
 
 | Object | Rules |
@@ -583,6 +599,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-22 | Simulated instruments accepted: `MarketDataConnection`, `MarketDataConnections`, `MarketDataFeed`, `MarketDataFeedKind`, `MarketDataFailure` (§8.4). `Instrument` unchanged. [features/simulated-instruments.md](features/simulated-instruments.md) |
 | 2026-11-22 | Corporate actions accepted: `CorporateAction`, `CorporateActionRatio`, `CorporateActionEntitlement`, `CorporateActionAnnouncement` and their enums (§8.15); source kind `CorporateAction`, `TransactionCorporateActionDetail` and `PostCorporateAction` (§8.6); `MarketDataFeedKind.CorporateActions` (§8.4). [features/corporate-actions.md](features/corporate-actions.md) |
 | 2026-11-23 | Orders and settlement accepted: `Order`, `OrderFill`, `OrderRules`, `ExecutionReport`, `BrokerFeed` and their enums (§8.16); source kind `OrderFill`, `TransactionExecutionDetail` and `PostBuy` / `PostSell` with it (§8.6); reserved quantity, unsettled and withdrawable cash (§8.5); `Tenant.BrokerConnection` (§4.1). [features/orders.md](features/orders.md) |
+| 2026-11-23 | Rebalance through orders accepted: `Rebalance`, `RebalanceTarget`, `RebalanceLine`, its enums and `RebalanceRules` (§8.18); `Order.RebalanceId`; the assignment loses its last-rebalance fields; `Rebalance` is no longer hand-reversible on a Custodial account. [features/rebalances.md](features/rebalances.md). |
 
 ---
 

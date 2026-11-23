@@ -35,6 +35,7 @@ related:
   - withdrawals.md
   - account-closure.md
   - interest-run.md
+  - rebalances.md
 ---
 
 # Custody modes
@@ -611,3 +612,14 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders.md](ord
 - R17: on a Custodial account the trade lock now decides an order: `POST /orders` on an account with an Active assignment is refused (orders R8).
 - R18: "`Buy` / `Sell` are priced by the server and carry the trade fee of the tenant's schedule" now describes rebalance trades only. A fill is priced by the broker and carries the fee of its order (orders R32, R33).
 - After this slice a person enters on a Custodial account only `InternalTransfer`, `FxConversion`, an `Adjustment` and the reverse of a hand-reversible source (orders R51). No transitional cell is left in the matrix.
+
+---
+
+## Amendment 2026-11-23 (rebalance through orders) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md](rebalances.md). Rules R6, R22 and R28 live there; this section records what changes here.
+
+- R15: a rebalance also needs the Account's Customer not Disabled, the Tenant active and a configured broker connection (`no_broker_connection`), checked when it is proposed, when it is confirmed and before every wave (rebalances R6).
+- R17: on an assigned Custodial account only the rebalance places orders; a hand reverse of a `Buy` / `Sell` typed before orders stays refused by the lock (rebalances R24).
+- R5 matrix, the reverse row: on a Custodial account a person reverses only a `Manual` source; `Rebalance` leaves the hand-reversible sources (rebalances R28). `CustodyRules.AllowsHandReverse(Custodial, Rebalance)` is `false`.
+- The amendment 2026-11-23 (orders and settlement) sentence "Rebalance still posts `Buy` / `Sell` the same way" (R7) and the R18 point no longer apply: a rebalance trade is an order fill, priced by the broker with the fee of its order.

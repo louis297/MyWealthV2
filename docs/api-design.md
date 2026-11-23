@@ -151,6 +151,8 @@ The fifth role `SimulatorOperator` ([ADR 0013](adr/0013-roles-authorization-sing
 | `orders.read` | | ✓ | ✓ | ✓ | [orders](features/orders.md) (accepted 2026-11-23) |
 | `orders.place` | | ✓ | ✓ | | [orders](features/orders.md) (accepted 2026-11-23) |
 | `trade-settlements.manage` | | ✓ | | | [trade-settlement](features/trade-settlement.md) (accepted 2026-11-23) |
+| `rebalances.read` | | ✓ | ✓ | | [rebalances](features/rebalances.md) (accepted 2026-11-23) |
+| `rebalances.confirm` | | ✓ | ✓ | | [rebalances](features/rebalances.md) (accepted 2026-11-23) |
 | `portfolios.read` | ✓ | ✓ | ✓ | | [portfolios](features/portfolios.md) |
 | `portfolios.manage` | ✓ | ✓ | ✓ | | [portfolios](features/portfolios.md) |
 | `reports.customer.read` | | ✓ | ✓ | ✓ | [reports](features/reports.md) |
@@ -252,6 +254,8 @@ Status of this section: `accepted` (2026-11-13). The build contract for it is [f
 | `interest_schedule_in_effect` | 409 | The interest rate schedule row may already apply to an accrued day, so it cannot be updated or deleted. Add a new row instead. | — | [features/interest-run.md](features/interest-run.md) R13 |
 | `disabled` | 400 | §4.1 | `target`, `targetId` | §4.1 |
 | `missing_price`, `missing_fx`, `insufficient_cash`, `account_not_eligible`, `portfolio_inactive`, `concurrent_modification` | 400 | Rebalance failure | — | [features/portfolios.md](features/portfolios.md) §11 |
+| `stale_price`, `instrument_inactive`, `currency_mismatch`, `no_broker_connection` | 400 | A rebalance cannot be planned or cannot place orders: a price more than 4 days old, an inactive instrument, a target line quoted in another currency than the account's, or no configured broker connection | — | [features/rebalances.md](features/rebalances.md) R6, R8 |
+| `rebalance_in_progress` | 400 | A rebalance of the account is in progress, so no new proposal or assignment is made | — | [features/rebalances.md](features/rebalances.md) R4, R23 |
 
 The five 409 codes above `portfolio_shared` are added to responses that exist today. Their status, `title`, `detail` and other fields do not change, so the change is additive for every client. The 400 codes already ship with these names.
 
@@ -337,6 +341,7 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Corporate actions | `/corporate-actions` | list / get / create / update; cancel / apply; entitlements. See features/corporate-actions.md | `corporate-actions.read` / `corporate-actions.manage` |
 | Orders | `/orders` | list / get / create (`Idempotency-Key`) / preview; cancel; resolve the break of a fill (`transactions.adjust`). No PUT: an order never changes. See features/orders.md and features/trade-settlement.md | `orders.read` / `orders.place` |
 | Trade settlements | `/trade-settlements` | list / get; pay again / set aside. No create: the `worker` creates them from the broker's `Settlement` report. See features/trade-settlement.md | `trade-settlements.manage` |
+| Rebalances | `/rebalances` | list / get; confirm / cancel. No create: `POST /accounts/{id}/rebalance`, assign and the rebalance job propose. See features/rebalances.md | `rebalances.read` / `rebalances.confirm` |
 | Reports | `/reports` | list / request / schedules / executions / download | `reports.customer.read` / `reports.customer.create` / `reports.book.read` / `reports.book.create` / `reports.tenant.read` / `reports.tenant.create` |
 
 Path `{id}` is always PublicId.
@@ -492,6 +497,7 @@ Field rules: [features/accounts.md](features/accounts.md).
 - Amendment 2026-11-22 (account closure, accepted; field rules in [features/account-closure.md](features/account-closure.md)): sub-resource `/accounts/{accountId}/closures` — `POST` (`account-closures.request`, `Idempotency-Key`, 201 `{ id }`), `GET` and `GET …/{id}` (`account-closures.read`); SystemAdmin has neither. The item gains `closure` (the latest closure, or `null`). `POST /accounts/{id}/close` on an Open Custodial account → 400 for every caller; External accounts unchanged. While a closure is `InProgress` the Account is closing and every hand write on it → 400. No problem code.
 - Amendment 2026-11-22 (interest run, accepted; field rules in [features/interest-run.md](features/interest-run.md) R33, R35, R36): the item gains `accruedInterest` (unposted daily accruals, 8 decimals; `0` on an External account) and `interestAccruedThrough` (a date or `null`). `GET /accounts/{accountId}/interest-accruals` (`accounts.read`, the Account's scope) → list envelope of the daily accrual rows, newest first; filters `from`, `to`, `transactionId`, `posted`. `POST /accounts/{accountId}/closures` posts the interest accrued through yesterday before the payout is worked out.
 - Amendment 2026-11-23 (orders and settlement, accepted; field rules in [features/orders.md](features/orders.md) R39–R41, R44, R47): `reservedCash` also counts the account's live buy orders. The item and `GET /accounts/{id}/cash-balance` gain `unsettledCash` (the net cash of posted sell fills that are not settled) and `withdrawableCash` (available cash minus unsettled cash, never below 0); on an External account `0` and the cash balance. The holding item of `GET /accounts/{id}/holdings` gains `reservedQuantity` and `availableQuantity`. An account closure is refused while the account has a live order or a fill that is not settled.
+- Amendment 2026-11-23 (rebalance through orders, accepted; field rules in [features/rebalances.md](features/rebalances.md) R10, R25): `POST /accounts/{id}/rebalance` and `POST /accounts/{id}/portfolio` answer 200 `{ status, rebalanceId }` with `status` `Proposed` or `NoChange`; a failed plan is 400 with its problem code. `GET /accounts/{id}/portfolio` loses `lastRebalanceAt`, `lastRebalanceStatus` and `lastRebalanceMessage` and gains `rebalance` (`{ id, status, failure, proposedAt, endedAt }`).
 
 ### 7.7 Transactions
 
@@ -643,6 +649,17 @@ Amendment 2026-11-23 (trade settlement and broken trades, accepted; field rules 
 
 A fill item gains `brokerSettlementId`, `tradeSettlementId` and `break`, and its `status` may be `Broken`; `execution` on the transaction item gains `brokenAt`. The statement line item gains `tradeSettlementId`, match method `Settlement` and unmatched reason `SettlementMismatch`. The bank reconciliation item gains four kinds, and the run gains `openSettlements`. `GET /broker-connections` gains `settlementCurrencies`; `GET /execution-reports` gains the two kinds, three skip reasons and five fields. Writes take `rowVersion` (409 `stale_row_version`) and no `Idempotency-Key`. No new problem code.
 
+Amendment 2026-11-23 (rebalance through orders, accepted; field rules in [features/rebalances.md](features/rebalances.md)):
+
+| Method | Route | Policy | Success |
+| --- | --- | --- | --- |
+| GET | `/rebalances` | `rebalances.read` | 200 envelope (filters `accountId`, `customerId`, `portfolioId`, `status`, `open`) |
+| GET | `/rebalances/{id}` | `rebalances.read` | 200 item with its targets, lines and orders |
+| POST | `/rebalances/{id}/confirm` | `rebalances.confirm` | 204 |
+| POST | `/rebalances/{id}/cancel` | `rebalances.confirm` | 204 |
+
+The order item gains `rebalanceId`, and `GET /orders` the filter `rebalanceId`. `POST /orders/{id}/cancel` of a rebalance order → 400 `errors.Status`. Confirm and cancel take `rowVersion` (409 `stale_row_version`) and no `Idempotency-Key`. Nothing is sent to the broker in the request: the advance step of `broker-sync:{connection}` places the later waves. On a Custodial account a Transaction with source `Rebalance` is no longer hand-reversible. Five new problem codes (§4.2).
+
 ---
 
 ## 8. Explicitly out (until a later phase promotes them)
@@ -728,3 +745,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-22 | §3.1, §6, §7.7, §7.11: corporate actions accepted. Permissions `corporate-actions.read` and `corporate-actions.manage`; resource `/corporate-actions` (list, get, create, update, cancel, apply, entitlements) and `/corporate-action-announcements` (`tenants.manage`); source kind `CorporateAction`; transaction item `corporateAction`; connection item `corporateActions`. No new problem code. |
 | 2026-11-23 | §3.1, §6, §7.3, §7.6, §7.7, §7.12: orders and settlement accepted. Permissions `orders.read` and `orders.place`; resource `/orders` (list, get, create, preview, cancel), `/broker-connections` and `/execution-reports` (`tenants.manage`); `brokerConnection` on the tenant; source kind `OrderFill`; transaction item `execution`; account item `unsettledCash` and `withdrawableCash`; holding item `reservedQuantity` and `availableQuantity`; hand `Buy` / `Sell` refused on a Custodial account. No new problem code. |
 | 2026-11-23 | §3.1, §6, §7.12: trade settlement and broken trades accepted. Permission `trade-settlements.manage`; resource `/trade-settlements` (list, get, pay, set aside); `POST /orders/{id}/fills/{fillId}/resolve-break` (`transactions.adjust`); fill `break`, transaction `execution.brokenAt`, statement line `tradeSettlementId`, reconciliation `openSettlements` and four item kinds, connection `settlementCurrencies`. No new problem code. |
+| 2026-11-23 | §3.1, §4.2, §6, §7.6, §7.12: rebalance through orders accepted. Permissions `rebalances.read` and `rebalances.confirm`; resource `/rebalances` (list, get, confirm, cancel); problem codes `stale_price`, `instrument_inactive`, `currency_mismatch`, `no_broker_connection`, `rebalance_in_progress`; propose and assign answer `{ status, rebalanceId }`; assignment item `rebalance` replaces the three `lastRebalance…` fields; order item `rebalanceId` and filter; `Rebalance` no longer hand-reversible on a Custodial account. |

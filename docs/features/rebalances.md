@@ -1,6 +1,6 @@
 ---
 title: Rebalance through orders
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -41,7 +41,7 @@ Today a rebalance posts `Buy` and `Sell` Transactions at once, at the platform's
 
 New: permissions `rebalances.read` and `rebalances.confirm`; routes under `/rebalances`; a sixth step in the `worker` job `broker-sync:{connection}`; `rebalanceId` on the order item and `rebalance` on the account's portfolio item; five problem codes. Script `0053_rebalances.sql`. No simulator script. No new `TransactionType`, source kind, port, job, queue or domain event. The source kind `Rebalance` is no longer written and is no longer hand-reversible on a Custodial account.
 
-**Status is `review` (2026-11-23).** It is not a build contract. The seventeen points of §11 each carry a recommendation and wait for confirmation. The amendments to accepted docs listed in §12 are made when this spec is accepted.
+**Status is `accepted` (2026-11-23).** The seventeen points of §11 were confirmed on 2026-11-23, every one as recommended, and are written into the rules. The amendments to accepted docs listed in §12 were made when it was accepted. It is a build contract.
 
 ---
 
@@ -241,7 +241,7 @@ Invariants:
 
 Domain events: none new. `PortfolioWeightsChanged` still starts the job.
 
-To be recorded in [domain-model.md](../domain-model.md) (portfolios, §8.16 and a new §8.18) when accepted.
+Recorded in [domain-model.md](../domain-model.md) (portfolios, §8.16 and §8.18).
 
 ---
 
@@ -287,7 +287,7 @@ Script `0053_rebalances.sql`:
 
 No back-fill. No rebalance is created for a run before this slice, existing orders have no rebalance, and existing Transactions keep source `Rebalance`. No simulator script.
 
-To be recorded in [database-design.md](../database-design.md) §9, §11.6, §11.16 and a new §11.18 when accepted.
+Recorded in [database-design.md](../database-design.md) §9, §11.6, §11.16 and §11.18.
 
 ---
 
@@ -419,7 +419,7 @@ Cross-tenant or wrong-collection id → **404**, not 403. Keep the resource cata
 
 ## 9. UI
 
-Page contracts to amend when this spec is accepted: [adviser-portal-portfolios.md](../adviser-portal/adviser-portal-portfolios.md) (P14–P20), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D79) and [customer-portal.md](../customer-portal/customer-portal.md) (C37). The Adviser Portal BFF gains the prefix `/rebalances` ([bff-adviser-portal.md](bff-adviser-portal.md) R20). The Customer Portal BFF and the Back Office do not change.
+Page contracts amended when this spec was accepted: [adviser-portal-portfolios.md](../adviser-portal/adviser-portal-portfolios.md) (P14–P20), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D79) and [customer-portal.md](../customer-portal/customer-portal.md) (C37). The Adviser Portal BFF gains the prefix `/rebalances` ([bff-adviser-portal.md](bff-adviser-portal.md) R20). The Customer Portal BFF and the Back Office do not change.
 
 **Adviser Portal**
 
@@ -490,9 +490,9 @@ No new ADR. ADR 0021 applies as written: rule 4 (no broker call in a request), 1
 | Problem codes | `stale_price`, `instrument_inactive`, `currency_mismatch`, `no_broker_connection`, `rebalance_in_progress`; failure code `order_not_filled` on the item |
 | Events, `TransactionType`, source kinds, ports | None added |
 
-### Points to confirm
+### Points confirmed
 
-Each point states the recommendation, written into the rules above, and the alternative.
+Each point states the recommendation, written into the rules above, and the alternative. All seventeen were confirmed as recommended on 2026-11-23.
 
 1. **One spec for O3, and the simulator broker does not change.** Recommended: rebalance orders are ordinary orders, and the order mode, the fill percentage and the clock already show every path (roadmap P11). Alternative: a simulator action that fills all working orders of one client in one step.
 2. **A rebalance is its own aggregate, and its proposal is lines on it, not draft orders** (R2, R9). Recommended: an order row exists only once it is placed, so the order statuses and reservations of orders R14 do not change, and nothing "draft" can be sent by mistake. This is how the drafts that orders §11 point 4 left to O3 arrive. Alternative: a `Draft` status on `Order` and a rebalance that only groups orders.
@@ -546,6 +546,6 @@ The repository should build after each commit. Agents split each behaviour into 
 
 Do not put a consent record, a bulk confirm route, a scheduled rebalance or order aggregation in these commits.
 
-### Docs to amend when this spec is accepted
+### Docs amended when this spec was accepted
 
 [portfolios.md](portfolios.md) (the summary; R8, R9, R11–R13, R15, R18, R22–R25; §8 answers and the `lastRebalance…` fields; the failure codes of §11), [orders.md](orders.md) (R8, R15, R16, R18, R19 the sixth step, R49; §2 Out and §11 points 4 and 16 answered), [transaction-source.md](transaction-source.md) (R5, R9: no longer written; R12: `Rebalance` not hand-reversible), [custody-modes.md](custody-modes.md) (R15, R17 and the reverse row of the matrix), [trade-fees.md](trade-fees.md) (R24–R29: the planner's fees are estimates; a rebalance order is charged as any order), [trade-settlement.md](trade-settlement.md) (R5, R23 and "still open": rebalance orders settle like any order), [bank-reconciliation.md](bank-reconciliation.md) (R10: `Trades` keeps only rebalance trades from before this slice), [withdrawals.md](withdrawals.md) (R36: a rebalance lowers cash only through its orders), [account-closure.md](account-closure.md) (a note: R5 already refuses an assigned account), [corporate-actions.md](corporate-actions.md) (a note: a cancelled rebalance order ends its rebalance), [adjustments.md](adjustments.md) (R16: the next rebalance sees the adjusted holding, unchanged), [bff-adviser-portal.md](bff-adviser-portal.md) (prefix `/rebalances`), [api-design.md](../api-design.md) (§3.1 two permission rows, §4.2 five codes, §6 resource row, §7.6 and §7.12 notes, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [architecture.md](../architecture.md) (the sixth step of `broker-sync:{connection}`), [adviser-portal-portfolios.md](../adviser-portal/adviser-portal-portfolios.md) (P14–P20; P7, P8 and the confirmation copy), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D79; D27), [customer-portal.md](../customer-portal/customer-portal.md) (C37), [glossary.md](../glossary.md) (the review terms become accepted; Portfolio, AccountPortfolioAssignment, Order, Manual entry matrix, Transaction source and Hand-reversible source change), [function-plan.md](../function-plan.md) §5, [features/README.md](README.md) row status, [future-plans.md](../future-plans.md) §9, and the roadmap §8 O3, §11 S2, §12 D15, §13 and §14. The roadmap §2 matrix (the `Buy` / `Sell` and Reverse rows) changes when the slice lands.

@@ -23,6 +23,7 @@ related:
   - account-closure.md
   - interest-run.md
   - trade-settlement.md
+  - rebalances.md
 ---
 
 # Transaction source
@@ -424,3 +425,13 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders.md](ord
 Status of this amendment: `accepted` (2026-11-23), together with [trade-settlement.md](trade-settlement.md). Rule R29 lives there; this section records what changes here.
 
 - R7: a broken trade is reversed by its own flow. The Reversal keeps source `OrderFill` and the order's PublicId as source id. `OrderFill` stays not hand-reversible, for the fill and for its Reversal.
+
+---
+
+## Amendment 2026-11-23 (rebalance through orders) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md](rebalances.md). Rules R26 and R28 live there; this section records what changes here.
+
+- R5: from this slice no Transaction gets source `Rebalance`. A rebalance trade is the fill of a rebalance order, with source `OrderFill` and the order's PublicId. The kind `Rebalance` stays for the rows that have it; `TransactionSource.Rebalance(handle)` is kept for reading them.
+- R9: the idempotency records a rebalance wrote per trade are no longer written.
+- R12, R13: `Rebalance` is no longer hand-reversible (roadmap D15 ends). On a Custodial account `POST /transactions/{id}/reverse` of a Transaction with source `Rebalance` → 400 with the message of R13; it is corrected with an adjustment. On an External account the reverse is unchanged. After this slice the only source a person reverses on a Custodial account is `Manual`.

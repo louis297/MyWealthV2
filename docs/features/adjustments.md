@@ -24,6 +24,7 @@ related:
   - ../known-issues/custodial-account-gaps.md
   - withdrawals.md
   - account-closure.md
+  - rebalances.md
 ---
 
 # Adjustments
@@ -434,3 +435,11 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders.md](ord
 - R11: on a Custodial account an adjustment that lowers a holding's quantity must also leave the holding's available quantity `≥ 0` (quantity minus the quantity reserved for live sell orders); otherwise 400 `errors.Security` with the message `40 ACME.SIM is reserved for sell orders.` (orders R40).
 - R9: reserved cash now also counts live buy orders (orders R39); the rule and its message follow withdrawals R36 and R37 as amended.
 - Use: a fill is not hand-reversible, so a fill booked wrongly is corrected with an adjustment; and an adjustment with reason `ReconciliationBreak` removes the cause of a fill that waits (not enough cash or shares), which the next run then posts (orders R36, R37).
+
+---
+
+## Amendment 2026-11-23 (rebalance through orders) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md](rebalances.md). Rule R24 lives there; this section records what changes here.
+
+- R16: unchanged. An adjustment stays outside the trade lock, and the next rebalance plans from the adjusted holding. An adjustment is how a rebalance trade posted before this slice is corrected on a Custodial account, now that it is not hand-reversible (rebalances R28).

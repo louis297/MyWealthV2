@@ -22,6 +22,7 @@ related:
   - withdrawals.md
   - interest-run.md
   - trade-settlement.md
+  - rebalances.md
 ---
 
 # Adviser Portal BFF
@@ -525,3 +526,14 @@ Add `/trade-settlements` to the BFF prefix allow-list (R20) so the Adviser Porta
 - Methods: GET, POST
 - Who: TenantAdmin. `webapi` checks `trade-settlements.manage`; the BFF does not filter by role, so an Adviser gets the 403 from `webapi`.
 - `POST /orders/{id}/fills/{fillId}/resolve-break` is under the existing `/orders` prefix.
+
+---
+
+## Amendment 2026-11-23 (rebalances prefix) — accepted
+
+Add `/rebalances` to the BFF prefix allow-list (R20) so the Adviser Portal can call the routes of [rebalances.md](rebalances.md) through `/api`.
+
+- Prefix: `/rebalances`
+- Methods: GET, POST
+- Who: TenantAdmin and Adviser. `webapi` checks `rebalances.read` and `rebalances.confirm`; the BFF does not filter by role.
+- The propose routes (`POST /accounts/{id}/rebalance`, `POST /accounts/{id}/portfolio`) are under the existing `/accounts` prefix.
