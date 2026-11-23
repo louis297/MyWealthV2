@@ -62,6 +62,16 @@ public class TradeSettlementCashTests
     }
 
     [Test]
+    public void ALineMatchedToATradeSettlement_CannotBeUnmatched()
+    {
+        var line = Line(BankLineDirection.Credit);
+        line.MarkSettlement(60, At);
+
+        Should.Throw<StatementLineStatusException>(() => line.EnsureCanUnmatch())
+            .Message.ShouldBe("This line is the cash of a trade settlement and cannot be unmatched.");
+    }
+
+    [Test]
     public void MarkSettlement_OnlyFromReceived()
     {
         var line = Line(BankLineDirection.Debit);

@@ -42,6 +42,9 @@ public sealed class StatementLineDto
 
     public string? ReturnReason { get; init; }
 
+    /// <summary>Trade-settlement R21: the trade settlement whose cash this line is, else null.</summary>
+    public Guid? TradeSettlementId { get; init; }
+
     /// <summary>The newest return payment of a receipt marked for return, else null (bank-returns R11).</summary>
     public StatementLineReturnPaymentDto? ReturnPayment { get; init; }
 

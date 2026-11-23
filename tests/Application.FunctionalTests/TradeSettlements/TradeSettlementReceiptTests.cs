@@ -34,6 +34,25 @@ public class TradeSettlementReceiptTests : TestBase
     }
 
     [Test]
+    public async Task TheLineItem_NamesItsTradeSettlement_AndTheLineCannotBeUnmatched()
+    {
+        var (world, clientMoney, settlement) = await ReceivingAsync();
+        var credit = BankFeedHttp.Feed.AddReceipt(clientMoney.AccountNumber, 990m, "USD", "w-S2");
+        await BankFeedHttp.RunAsync();
+        var line = await BankFeedHttp.LineAsync(credit.Id!);
+
+        var item = await StatementLines.StatementLineHttp.GetAsync(world.TenantAdmin, line.PublicId);
+        var unmatch = await StatementLines.StatementLineHttp.ActAsync(world.TenantAdmin, line.PublicId, "unmatch", new() { ["note"] = "Wrong" });
+
+        item.TryGetProperty("tradeSettlementId", out var named).ShouldBeTrue();
+        named.GetGuid().ShouldBe(settlement.PublicId);
+        item.GetProperty("match").GetProperty("method").GetString().ShouldBe("Settlement");
+        (await Custody.CustodialHttp.ErrorsAsync(unmatch))["Status"]
+            .ShouldBe(["This line is the cash of a trade settlement and cannot be unmatched."]);
+        (await TradeSettlementPaymentTests.SettlementAsync(settlement.Id)).Status.ShouldBe(TradeSettlementStatus.Completed);
+    }
+
+    [Test]
     public async Task TheSettlementIdIsComparedTrimmed_AndWithoutRegardToCase()
     {
         var (_, clientMoney, settlement) = await ReceivingAsync();
