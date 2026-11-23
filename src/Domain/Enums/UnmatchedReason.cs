@@ -28,5 +28,8 @@ public enum UnmatchedReason
     ReturnRejected = 11,
 
     /// <summary>The reference names an Account with an account closure in progress (account-closure R14).</summary>
-    AccountClosing = 12
+    AccountClosing = 12,
+
+    /// <summary>A receipt that names a trade settlement it does not match (trade-settlement R19).</summary>
+    SettlementMismatch = 13
 }

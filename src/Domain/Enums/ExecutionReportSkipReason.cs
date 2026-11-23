@@ -17,5 +17,14 @@ public enum ExecutionReportSkipReason
 
     /// <summary>A <c>Cancelled</c> or <c>Expired</c> report for an order that is not open, or a <c>Settled</c> report
     /// for a fill already settled.</summary>
-    Repeated = 4
+    Repeated = 4,
+
+    /// <summary>A <c>Broken</c> report for a fill that has settled (trade-settlement R27).</summary>
+    FillSettled = 5,
+
+    /// <summary>A <c>Settled</c> report for a fill that was broken (trade-settlement R27).</summary>
+    FillBroken = 6,
+
+    /// <summary>A <c>Settlement</c> report that names no fill of the connection (trade-settlement R8).</summary>
+    UnknownSettlement = 7
 }

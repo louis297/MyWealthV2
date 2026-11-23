@@ -13,5 +13,11 @@ public enum ExecutionReportKind
     Expired = 2,
 
     /// <summary>The fill named by its outside id has settled.</summary>
-    Settled = 3
+    Settled = 3,
+
+    /// <summary>The broker takes back the fill named by its outside id (trade-settlement R26).</summary>
+    Broken = 4,
+
+    /// <summary>One broker settlement is closed, with its net and its number of fills (trade-settlement R7).</summary>
+    Settlement = 5
 }

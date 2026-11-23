@@ -10,5 +10,8 @@ public enum StatementLineMatchMethod
     PaymentReturn = 3,
 
     /// <summary>The debit line of a recall or dishonour of a receipt (bank-returns R3).</summary>
-    Recall = 4
+    Recall = 4,
+
+    /// <summary>The cash of a trade settlement, paid or received (trade-settlement R18, R19).</summary>
+    Settlement = 5
 }
