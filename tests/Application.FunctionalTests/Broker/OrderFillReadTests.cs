@@ -40,7 +40,7 @@ public class OrderFillReadTests : TestBase
             source.GetProperty("id").GetGuid().ShouldBe(orderId);
             var execution = item.GetProperty("execution");
             execution.EnumerateObject().Select(property => property.Name).ShouldBe([
-                "orderId", "fillId", "price", "tradeDate", "settlementDate", "brokerReference", "settledAt"
+                "orderId", "fillId", "price", "tradeDate", "settlementDate", "brokerReference", "settledAt", "brokenAt"
             ], ignoreOrder: true);
             execution.GetProperty("orderId").GetGuid().ShouldBe(orderId);
             execution.GetProperty("fillId").GetGuid().ShouldBe(fillId);

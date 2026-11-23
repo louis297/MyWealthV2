@@ -200,6 +200,10 @@ public class OrderFill
         ReversalTransactionId = reversalTransactionId;
     }
 
+    /// <summary>Trade-settlement R31: a TenantAdmin corrected the account and resolves a break that could not be
+    /// applied. Only from <c>NotApplied</c>.</summary>
+    public void ResolveBreak(int byUserId, string note, DateTimeOffset at) => throw new NotImplementedException();
+
     /// <summary>Trade-settlement R8: the fill is put in a trade settlement, once.</summary>
     public void AssignTo(int tradeSettlementId)
     {

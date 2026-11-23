@@ -20,6 +20,8 @@ public class Orders : IEndpointGroup
         groupBuilder.MapPost(PlaceOrder).RequireAuthorization(Policies.OrdersPlace);
         groupBuilder.MapPost(PreviewOrder, "preview").RequireAuthorization(Policies.OrdersPlace);
         groupBuilder.MapPost(CancelOrder, "{id:guid}/cancel").RequireAuthorization(Policies.OrdersPlace);
+        groupBuilder.MapPost(ResolveBrokenFill, "{id:guid}/fills/{fillId:guid}/resolve-break")
+            .RequireAuthorization(Policies.TransactionsAdjust);
     }
 
     [EndpointSummary("List orders")]
@@ -71,6 +73,16 @@ public class Orders : IEndpointGroup
     public static async Task<NoContent> CancelOrder(ISender sender, Guid id, CancelOrderCommand command)
     {
         command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Resolve a broken trade by hand")]
+    [EndpointDescription("Marks as resolved a fill the broker broke that the platform could not reverse, once the account was corrected with an adjustment. Writes nothing to the ledger (trade-settlement R31).")]
+    public static async Task<NoContent> ResolveBrokenFill(ISender sender, Guid id, Guid fillId, ResolveBrokenFillCommand command)
+    {
+        command.Id = id;
+        command.FillId = fillId;
         await sender.Send(command);
         return TypedResults.NoContent();
     }
