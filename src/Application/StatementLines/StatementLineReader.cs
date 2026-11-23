@@ -35,6 +35,13 @@ internal static class StatementLineReader
         var userIds = lines.Where(line => line.LastActionByUserId is not null).Select(line => line.LastActionByUserId!.Value).Distinct().ToList();
         var relatedIds = lines.Where(line => line.RelatedLineId is not null).Select(line => line.RelatedLineId!.Value).Distinct().ToList();
         var withdrawalIds = lines.Where(line => line.WithdrawalId is not null).Select(line => line.WithdrawalId!.Value).Distinct().ToList();
+        var batchIds = lines.Where(line => line.MigrationBatchId is not null)
+            .Select(line => line.MigrationBatchId!.Value).Distinct().ToList();
+        var batches = batchIds.Count == 0
+            ? []
+            : await db.MigrationBatches.IgnoreQueryFilters().AsNoTracking()
+                .Where(row => batchIds.Contains(row.Id))
+                .ToDictionaryAsync(row => row.Id, row => row.PublicId, cancellationToken);
         var settlementIds = lines.Where(line => line.TradeSettlementId is not null)
             .Select(line => line.TradeSettlementId!.Value).Distinct().ToList();
         var settlements = settlementIds.Count == 0
@@ -111,6 +118,7 @@ internal static class StatementLineReader
             WithdrawalId = line.WithdrawalId is int withdrawalId ? withdrawals[withdrawalId] : null,
             ReturnReason = line.ReturnReason,
             TradeSettlementId = line.TradeSettlementId is int settlementId ? settlements[settlementId] : null,
+            MigrationBatchId = line.MigrationBatchId is int batchId ? batches[batchId] : null,
             ReturnPayment = returnPayments.TryGetValue(line.Id, out var payment)
                 ? new StatementLineReturnPaymentDto
                 {

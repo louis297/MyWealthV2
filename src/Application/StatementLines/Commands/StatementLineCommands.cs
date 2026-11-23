@@ -21,6 +21,8 @@ public sealed class MatchStatementLineCommand : IRequest
 
     public Guid? AccountId { get; init; }
 
+    public const string TargetMessage = "Give an account or a migration batch.";
+
     /// <summary>Migration-batches R13: the batch this receipt funds, in place of an account.</summary>
     public Guid? MigrationBatchId { get; init; }
 
@@ -79,11 +81,16 @@ public class MatchStatementLineCommandValidator : AbstractValidator<MatchStateme
 {
     public MatchStatementLineCommandValidator()
     {
-        RuleFor(command => command.AccountId).NotEmpty();
+        // Migration-batches R13: exactly one of an account and a migration batch.
+        RuleFor(command => command.AccountId)
+            .Must((command, accountId) => IsGiven(accountId) != IsGiven(command.MigrationBatchId))
+            .WithMessage(MatchStatementLineCommand.TargetMessage);
         RuleFor(command => command.RowVersion).NotEmpty();
         RuleFor(command => command.Note).Must(StatementLineActions.IsOptionalNote).WithMessage(StatementLineActions.NoteMessage);
         RuleFor(command => command.TenantId).Null().WithMessage("TenantId cannot be set.");
     }
+
+    private static bool IsGiven(Guid? id) => id is not null && id != Guid.Empty;
 }
 
 public class IgnoreStatementLineCommandValidator : AbstractValidator<IgnoreStatementLineCommand>
@@ -124,6 +131,13 @@ public class MatchStatementLineCommandHandler(
 {
     public async Task Handle(MatchStatementLineCommand request, CancellationToken cancellationToken)
     {
+        if (request.MigrationBatchId is Guid migrationBatchId)
+        {
+            await MigrationBatchFunding.MatchAsync(db, currentUser, time, request.Id, migrationBatchId, request.RowVersion,
+                request.Note, cancellationToken);
+            return;
+        }
+
         var line = await StatementLineReader.FindAsync(db, currentUser, request.Id, cancellationToken);
         StatementLineActions.CheckRowVersion(line, request.RowVersion);
         StatementLineActions.Guard(line.EnsureCanMatchByHand);

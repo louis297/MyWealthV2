@@ -3,6 +3,7 @@ using FluentValidation.Results;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Transactions;
+using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Exceptions;
 using MyWealthV2.Domain.ValueObjects;
 using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationException;
@@ -49,6 +50,12 @@ public class UnmatchStatementLineCommandHandler(
         StatementLineActions.CheckRowVersion(line, request.RowVersion);
         StatementLineActions.Guard(line.EnsureCanUnmatch);
         var actor = StatementLineActions.ActorId(currentUser);
+        if (line.MatchMethod == StatementLineMatchMethod.Migration)
+        {
+            await MigrationBatchFunding.UnmatchAsync(db, line, request.Note!, actor, time.GetUtcNow(), cancellationToken);
+            return;
+        }
+
         var accountId = line.MatchedAccountId!.Value;
         var depositId = line.MatchedTransactionId!.Value;
 

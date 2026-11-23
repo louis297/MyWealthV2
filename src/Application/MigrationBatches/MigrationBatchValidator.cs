@@ -95,5 +95,10 @@ internal static class MigrationBatchValidator
         IApplicationDbContext db,
         MigrationBatch batch,
         CancellationToken cancellationToken) =>
-        Task.FromResult(new List<MigrationFundingRow>());
+        db.BankStatementLines.IgnoreQueryFilters().AsNoTracking()
+            .Where(line => line.MigrationBatchId == batch.Id && line.Status == BankStatementLineStatus.Matched)
+            .OrderBy(line => line.Id)
+            .Select(line => new MigrationFundingRow(line.PublicId, line.Currency, line.Amount, line.ValueDate, line.PayerName,
+                line.ReferenceText))
+            .ToListAsync(cancellationToken);
 }
