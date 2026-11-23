@@ -28,6 +28,12 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(order => order.ReservedCash).HasColumnType("decimal(18,4)");
         builder.Property(order => order.ReservedQuantity).HasColumnType("decimal(18,8)");
         builder.Property(order => order.Memo).HasMaxLength(Order.MemoMaxLength);
+        builder.Property(order => order.SettlementAccountNumber).HasMaxLength(ClientMoneyAccount.AccountNumberMaxLength);
+        builder.HasOne<ClientMoneyAccount>()
+            .WithMany()
+            .HasForeignKey(order => order.ClientMoneyAccountId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.Property(order => order.BrokerOrderId).HasMaxLength(Order.BrokerOrderIdMaxLength);
         builder.Property(order => order.CancelNote).HasMaxLength(Order.NoteMaxLength);
         builder.Property(order => order.CloseReason).HasMaxLength(Order.CloseReasonMaxLength);

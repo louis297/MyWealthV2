@@ -120,6 +120,13 @@ public class Order : BaseAuditableEntity
     /// <summary>R18: <c>Placed</c> with no send attempt, so the broker cannot hold it.</summary>
     public bool IsUnsent => Status == OrderStatus.Placed && Attempts == 0;
 
+    /// <summary>Trade-settlement R3: the client money account the order's fills settle against at the bank, with
+    /// <see cref="SettlementAccountNumber"/>; both or neither, set when the order is placed and never changed.</summary>
+    public int? ClientMoneyAccountId { get; private set; }
+
+    /// <summary>Trade-settlement R3, R4: the trust account number sent to the broker with the order.</summary>
+    public string? SettlementAccountNumber { get; private set; }
+
     public byte[] RowVersion { get; private set; } = null!;
 
     /// <summary>R14: <c>Placed</c>, <c>Working</c> or <c>PartlyFilled</c>.</summary>
@@ -156,7 +163,8 @@ public class Order : BaseAuditableEntity
         string? memo,
         int placedByUserId,
         DateTimeOffset placedAt,
-        Guid? publicId = null)
+        Guid? publicId = null,
+        ClientMoneyAccount? settlementAccount = null)
     {
         if (quantity <= 0m || decimal.Round(quantity, QuantityDecimals) != quantity)
         {

@@ -51,6 +51,24 @@ public class SimulatorBrokerOrdersTests
         root.GetProperty("referencePrice").GetDecimal().ShouldBe(100.00m);
     }
 
+    [Test]
+    public async Task AnOrderWithASettlementAccount_SendsIt_AndOneWithoutLeavesTheFieldOut()
+    {
+        var handler = new StubHandler(HttpStatusCode.OK, """{ "brokerOrderId": "0f8f-O1", "status": "Accepted" }""");
+
+        await Orders(handler).PlaceAsync(Connection, Order with { SettlementAccount = "SIM-DEMO-USD" }, CancellationToken.None);
+
+        using var body = JsonDocument.Parse(handler.Bodies.Single());
+        body.RootElement.TryGetProperty("settlementAccount", out var settlementAccount).ShouldBeTrue();
+        settlementAccount.GetString().ShouldBe("SIM-DEMO-USD");
+        body.RootElement.EnumerateObject().Count().ShouldBe(10);
+
+        var without = new StubHandler(HttpStatusCode.OK, """{ "brokerOrderId": "0f8f-O1", "status": "Accepted" }""");
+        await Orders(without).PlaceAsync(Connection, Order, CancellationToken.None);
+        using var plain = JsonDocument.Parse(without.Bodies.Single());
+        plain.RootElement.TryGetProperty("settlementAccount", out _).ShouldBeFalse();
+    }
+
     [TestCase("UnknownInstrument", OrderRejectReason.UnknownInstrument)]
     [TestCase("InvalidOrder", OrderRejectReason.InvalidOrder)]
     [TestCase("MarketClosed", OrderRejectReason.MarketClosed)]

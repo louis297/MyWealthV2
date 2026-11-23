@@ -34,8 +34,10 @@ public class SendBrokerOrdersTests : TestBase
             id.ToString(), "ACME", "USD", OrderSide.Buy, 10m, OrderType.Market, TimeInForce.Day, 105m, 100m));
         // R20: the call carries no Tenant, Account or Customer.
         typeof(BrokerOrderRequest).GetProperties().Select(property => property.Name).ShouldBe([
-            "ClientOrderId", "Symbol", "Currency", "Side", "Quantity", "Type", "TimeInForce", "PriceLimit", "ReferencePrice"
+            "ClientOrderId", "Symbol", "Currency", "Side", "Quantity", "Type", "TimeInForce", "PriceLimit", "ReferencePrice",
+            "SettlementAccount"
         ], ignoreOrder: true);
+        request.SettlementAccount.ShouldBeNull();
     }
 
     [Test]

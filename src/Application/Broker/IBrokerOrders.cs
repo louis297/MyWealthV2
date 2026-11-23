@@ -26,7 +26,8 @@ public sealed record BrokerOrderRequest(
     OrderType Type,
     TimeInForce TimeInForce,
     decimal PriceLimit,
-    decimal ReferencePrice);
+    decimal ReferencePrice,
+    string? SettlementAccount = null);
 
 /// <summary>The broker's answer to a place call (R21): accepted with its order id, rejected with a reason, or a
 /// failure of the call itself.</summary>
