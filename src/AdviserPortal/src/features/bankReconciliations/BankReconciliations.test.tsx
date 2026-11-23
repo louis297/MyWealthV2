@@ -208,6 +208,21 @@ describe("BankReconciliationDetailPage (D51)", () => {
     expect(screen.queryByRole("button", { name: /PDF/ })).not.toBeInTheDocument();
   });
 
+  it("labels the funding of a migration batch not posted yet and links its line (D84)", async () => {
+    const migrating = {
+      ...run,
+      items: [{
+        kind: "MigrationNotPosted", class: "Timing", amount: 250000, count: 1, clientMoneyAccountId: null,
+        statementLine: { id: lineId, direction: "Credit", valueDate: "2026-11-23", status: "Matched", unmatchedReason: null, note: null },
+      }],
+    };
+    renderFees(feeUser(), routes, `/bank-reconciliations/${runId}`, (request) =>
+      path(request) === `/bank-reconciliations/${runId}` ? json(migrating) : serve(request));
+
+    expect(await screen.findByText("Received for a migration batch not posted yet")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /2026-11-23/ })).toHaveAttribute("href", `/statement-lines/${lineId}`);
+  });
+
   it("labels the items of order fills, links the trades that need action and shows the open settlements (trade-settlement D78)", async () => {
     const settling = {
       ...run,

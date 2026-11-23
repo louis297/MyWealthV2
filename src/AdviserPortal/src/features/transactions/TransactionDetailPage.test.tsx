@@ -393,6 +393,19 @@ describe("TransactionDetailPage source (adviser-portal-dashboard D26, D27)", () 
     }
   });
 
+  it("shows a migrated opening balance with its batch, its provider and no Reverse (D85)", async () => {
+    const batchId = "7b1ae0a4-0000-0000-0000-000000000001";
+    renderFees({ ...user(), role: "tenantAdmin" }, routes, path, (request) =>
+      request.method === "GET" && request.url.endsWith(path)
+        ? json({ ...original, type: "Opening", source: { kind: "Migration", id: batchId }, migration: { asOfDate: "2026-11-20", previousProvider: "Acme Wealth" } })
+        : undefined);
+
+    expect(await screen.findByText("Source: Migration batch")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Migration batch" })).toHaveAttribute("href", `/migration-batches/${batchId}`);
+    expect(screen.getByText("From Acme Wealth, balances as at 2026-11-20")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
+  });
+
   it("shows the sentence of a 400 from reverse", async () => {
     const sentence = "This transaction was written by the platform and cannot be reversed by hand.";
     renderFees(user(), routes, path, serve({ kind: "Manual", id: null }, () => json({
