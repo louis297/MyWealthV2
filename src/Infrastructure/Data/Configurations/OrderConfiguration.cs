@@ -15,6 +15,7 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Ignore(order => order.IsUnsent);
         builder.Ignore(order => order.OpenQuantity);
         builder.Ignore(order => order.HasCancelRequest);
+        builder.Ignore(order => order.RebalanceId);
         builder.Property(order => order.PublicId).IsRequired();
         builder.Property(order => order.Quantity).HasColumnType("decimal(18,8)");
         builder.Property(order => order.Currency).HasColumnType("char(3)").IsFixedLength().IsRequired();

@@ -130,6 +130,9 @@ public class Order : BaseAuditableEntity
     /// <summary>Trade-settlement R3, R4: the trust account number sent to the broker with the order.</summary>
     public string? SettlementAccountNumber { get; private set; }
 
+    /// <summary>Rebalances R15, R27: the rebalance that placed the order; null on a person's order.</summary>
+    public int? RebalanceId { get; private set; }
+
     public byte[] RowVersion { get; private set; } = null!;
 
     /// <summary>R14: <c>Placed</c>, <c>Working</c> or <c>PartlyFilled</c>.</summary>
@@ -167,7 +170,8 @@ public class Order : BaseAuditableEntity
         int placedByUserId,
         DateTimeOffset placedAt,
         Guid? publicId = null,
-        ClientMoneyAccount? settlementAccount = null)
+        ClientMoneyAccount? settlementAccount = null,
+        int? rebalanceId = null)
     {
         if (quantity <= 0m || decimal.Round(quantity, QuantityDecimals) != quantity)
         {
