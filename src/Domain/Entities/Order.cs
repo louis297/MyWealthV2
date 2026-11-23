@@ -19,6 +19,9 @@ public class Order : BaseAuditableEntity
     /// <summary>R22: the close reason of an order the broker never had.</summary>
     public const string NotAtTheBrokerReason = "Not at the broker";
 
+    /// <summary>Trade-settlement R32: the close reason of a <c>Filled</c> order whose fill was broken.</summary>
+    public const string TradeBrokenReason = "Trade broken";
+
     /// <summary>R50: the note of the cancel request a corporate action makes.</summary>
     public const string CorporateActionNote = "Corporate action";
 
@@ -392,6 +395,25 @@ public class Order : BaseAuditableEntity
         Reserve(fees);
         return fill;
     }
+
+    /// <summary>
+    /// Trade-settlement R32: a fill of the order was broken. It no longer counts in the filled quantity, nor, when it
+    /// was reversed, in the posted gross and the charged fee (<paramref name="fee"/> is what that fill charged). An
+    /// open order takes the quantity back and is <c>PartlyFilled</c> or <c>Working</c> by its remaining fills; a
+    /// <c>Filled</c> order becomes <c>Cancelled</c> with <see cref="TradeBrokenReason"/>; an ended order keeps its
+    /// status. The reservation is worked out again.
+    /// </summary>
+    public void BreakFill(
+        OrderFill fill,
+        long breakReportId,
+        string? reason,
+        DateTimeOffset at,
+        FillBreakOutcome outcome,
+        OrderFeeTerms fees,
+        decimal fee = 0m,
+        int? reversalTransactionId = null,
+        FillBreakHoldReason? holdReason = null) =>
+        throw new NotImplementedException();
 
     /// <summary>R27: the broker ended an open order: <c>Cancelled</c> or <c>Expired</c>, with its reason.</summary>
     public void End(OrderStatus status, string? reason, DateTimeOffset at, OrderFeeTerms fees)

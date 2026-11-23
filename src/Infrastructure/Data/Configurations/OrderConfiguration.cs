@@ -91,6 +91,9 @@ public class OrderFillConfiguration : IEntityTypeConfiguration<OrderFill>
         builder.Property(fill => fill.SettlementDate).HasColumnType("date").IsRequired();
         builder.Property(fill => fill.BrokerReference).HasMaxLength(OrderFill.BrokerReferenceMaxLength);
         builder.Property(fill => fill.BrokerSettlementId).HasMaxLength(ExecutionReport.IdMaxLength);
+        builder.Property(fill => fill.BreakReason).HasMaxLength(ExecutionReport.ReasonMaxLength);
+        builder.Property(fill => fill.BreakNote).HasMaxLength(Order.NoteMaxLength);
+        builder.Ignore(fill => fill.IsBroken);
         builder.HasOne<TradeSettlement>()
             .WithMany()
             .HasForeignKey(fill => fill.TradeSettlementId)

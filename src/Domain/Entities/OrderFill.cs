@@ -59,6 +59,31 @@ public class OrderFill
     /// <summary>Trade-settlement R8: the trade settlement the fill is in; at most one.</summary>
     public int? TradeSettlementId { get; private set; }
 
+    /// <summary>Trade-settlement R27: when the broker took the fill back.</summary>
+    public DateTimeOffset? BrokenAt { get; private set; }
+
+    /// <summary>Trade-settlement R27: the <c>Broken</c> report; a report breaks at most one fill.</summary>
+    public long? BreakReportId { get; private set; }
+
+    public string? BreakReason { get; private set; }
+
+    /// <summary>Trade-settlement R28–R31: what the platform did with the break.</summary>
+    public FillBreakOutcome? BreakOutcome { get; private set; }
+
+    /// <summary>Trade-settlement R30: why the fill's Transaction could not be reversed.</summary>
+    public FillBreakHoldReason? BreakHoldReason { get; private set; }
+
+    /// <summary>Trade-settlement R29: the Reversal the flow posted.</summary>
+    public int? ReversalTransactionId { get; private set; }
+
+    public int? BreakResolvedByUserId { get; private set; }
+
+    public DateTimeOffset? BreakResolvedAt { get; private set; }
+
+    public string? BreakNote { get; private set; }
+
+    public bool IsBroken => Status == OrderFillStatus.Broken;
+
     public bool IsSettled => SettledAt is not null;
 
     internal static OrderFill Create(
@@ -127,6 +152,19 @@ public class OrderFill
         SettledDate = date;
         BrokerSettlementId = brokerSettlementId;
     }
+
+    /// <summary>
+    /// Trade-settlement R27–R30: the broker took the fill back. Once, never after it settled. A <c>Pending</c> fill is
+    /// <c>NotPosted</c>; a posted one is <c>Reversed</c> with its Reversal, or <c>NotApplied</c> with a hold reason.
+    /// </summary>
+    public void Break(
+        long breakReportId,
+        string? reason,
+        DateTimeOffset at,
+        FillBreakOutcome outcome,
+        int? reversalTransactionId = null,
+        FillBreakHoldReason? holdReason = null) =>
+        throw new NotImplementedException();
 
     /// <summary>Trade-settlement R8: the fill is put in a trade settlement, once.</summary>
     public void AssignTo(int tradeSettlementId)

@@ -76,6 +76,12 @@ internal sealed class InMemoryBrokerFeed : IBrokerFeed
             settledDate ?? DateOnly.FromDateTime(DateTime.UtcNow).AddDays(2), null,
             settlementId is null ? null : new MyWealthV2.Domain.Orders.ExecutionReportSettlement(settlementId)));
 
+    /// <summary>Trade-settlement R26: the broker takes back the fill named by the outside id of its Fill report.</summary>
+    public BrokerFeedItem AddBroken(Guid orderId, string fillOutsideId, string? reason = "Broken by the exchange") =>
+        Add(new BrokerFeedItem(
+            NextId(), ExecutionReportKind.Broken, orderId.ToString(), "fake-O1", null, null, null, null, null, fillOutsideId, null,
+            reason));
+
     /// <summary>Trade-settlement R7: the broker closes one settlement with its net and its number of fills.</summary>
     public BrokerFeedItem AddSettlement(
         string settlementId,
