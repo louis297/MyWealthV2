@@ -52,6 +52,7 @@ public class BankReconciliationItem
             or ReconciliationItemKind.TradesNeedingAction or ReconciliationItemKind.UnbookedFills
             => ReconciliationItemClass.Break,
         ReconciliationItemKind.NotProcessed or ReconciliationItemKind.ReturnInProgress or ReconciliationItemKind.UnsettledTrades
+            or ReconciliationItemKind.MigrationNotPosted
             => ReconciliationItemClass.Timing,
         _ => ReconciliationItemClass.Known
     };

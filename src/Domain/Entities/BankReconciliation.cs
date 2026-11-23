@@ -169,7 +169,8 @@ public class BankReconciliation : BaseAuditableEntity
         return run;
     }
 
-    /// <summary>R9: one item per line in suspense, not processed, being returned or ignored.</summary>
+    /// <summary>R9: one item per line in suspense, not processed, being returned or ignored, and per line that funds a
+    /// migration batch not posted yet (migration-batches R32).</summary>
     private static IEnumerable<BankReconciliationItem> LineItems(ReconciliationInputs inputs)
     {
         foreach (var line in inputs.Lines)
@@ -183,6 +184,8 @@ public class BankReconciliation : BaseAuditableEntity
                 BankStatementLineStatus.Ignored when line.Kind == StatementLineKind.Interest
                                                      && line.Direction == BankLineDirection.Credit => ReconciliationItemKind.BankInterest,
                 BankStatementLineStatus.Ignored => ReconciliationItemKind.Ignored,
+                // Migration-batches R32: money in the trust account for a batch that is not in the ledger yet.
+                BankStatementLineStatus.Matched when line.MigrationNotPosted => ReconciliationItemKind.MigrationNotPosted,
                 _ => null
             };
             if (kind is not null)

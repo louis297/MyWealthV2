@@ -81,6 +81,17 @@ public sealed class ReconcileClientMoneyAccount(IApplicationDbContext db, TimePr
                 row.Id, row.Direction, row.ValueDate, row.Amount, row.Status, row.UnmatchedReason, row.LastActionNote, row.Kind))
             .ToListAsync(cancellationToken);
 
+        // Migration-batches R32: a line that funds a batch not posted yet is money the ledger does not hold yet.
+        var migrationLines = await (
+                from row in accountLines
+                join batch in db.MigrationBatches.IgnoreQueryFilters() on row.MigrationBatchId equals (int?)batch.Id
+                where row.Status == BankStatementLineStatus.Matched && batch.Status != MigrationBatchStatus.Posted
+                select new ReconciliationLine(
+                    row.Id, row.Direction, row.ValueDate, row.Amount, row.Status, row.UnmatchedReason, row.LastActionNote, row.Kind,
+                    true))
+            .ToListAsync(cancellationToken);
+        lines.AddRange(migrationLines);
+
         // R8: every cash leg of every role on the Tenant's Custodial accounts in the currency, whatever their status.
         var custodialLegs =
             from leg in db.TransactionCashLegs.IgnoreQueryFilters()
@@ -191,7 +202,44 @@ public sealed class ReconcileClientMoneyAccount(IApplicationDbContext db, TimePr
             .Select(row => row.NetAmount)
             .ToListAsync(cancellationToken);
 
-        perTransaction = perTransaction.Where(row => !settledHere.Contains(row.TransactionId)).ToList();
+        // Migration-batches R32: the opening cash of a posted batch came in through its funding lines. It is split by
+        // the client money account of those lines; what they do not cover stays other ledger cash.
+        var migrationLegs = await (
+                from leg in custodialLegs
+                join transaction in db.Transactions.IgnoreQueryFilters() on leg.TransactionId equals transaction.Id
+                where transaction.SourceKind == TransactionSourceKind.Migration
+                select new { leg.TransactionId, leg.Amount, transaction.SourcePublicId })
+            .ToListAsync(cancellationToken);
+        var migrationLedger = new List<ReconciliationLedgerCash>();
+        foreach (var batchLegs in migrationLegs.GroupBy(leg => leg.SourcePublicId))
+        {
+            var count = batchLegs.Select(leg => leg.TransactionId).Distinct().Count();
+            var funding = await (
+                    from line in db.BankStatementLines.IgnoreQueryFilters()
+                    join batch in db.MigrationBatches.IgnoreQueryFilters() on line.MigrationBatchId equals (int?)batch.Id
+                    where batch.TenantId == tenantId && batch.PublicId == batchLegs.Key
+                          && line.Status == BankStatementLineStatus.Matched && line.Currency == currency
+                    group line by line.ClientMoneyAccountId
+                    into byAccount
+                    select new { ClientMoneyAccountId = byAccount.Key, Sum = byAccount.Sum(line => line.Amount) })
+                .ToListAsync(cancellationToken);
+            var remainder = batchLegs.Sum(leg => leg.Amount);
+            foreach (var part in funding)
+            {
+                migrationLedger.Add(new ReconciliationLedgerCash(TransactionType.Opening, null, part.ClientMoneyAccountId, part.Sum, count));
+                remainder -= part.Sum;
+            }
+
+            if (remainder != 0m)
+            {
+                migrationLedger.Add(new ReconciliationLedgerCash(TransactionType.Opening, null, null, remainder, count));
+            }
+        }
+
+        var migrated = migrationLegs.Select(leg => leg.TransactionId).ToHashSet();
+        perTransaction = perTransaction
+            .Where(row => !settledHere.Contains(row.TransactionId) && !migrated.Contains(row.TransactionId))
+            .ToList();
         var transactionIds = perTransaction.Select(row => row.TransactionId).ToList();
         var transactions = await (
                 from transaction in db.Transactions.IgnoreQueryFilters()
@@ -225,6 +273,7 @@ public sealed class ReconcileClientMoneyAccount(IApplicationDbContext db, TimePr
             .GroupBy(row => (row.Info.Type, row.Info.OriginalType, row.Through))
             .Select(group => new ReconciliationLedgerCash(
                 group.Key.Type, group.Key.OriginalType, group.Key.Through, group.Sum(row => row.Sum), group.Count()))
+            .Concat(migrationLedger)
             .ToList();
 
         // R14: information, not items.
