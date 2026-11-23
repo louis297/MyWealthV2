@@ -206,7 +206,12 @@ public class BankStatementLine : BaseAuditableEntity
 
     /// <summary>Trade-settlement R18, R19: the cash of a trade settlement, paid to or received from the broker. No
     /// Account and no Transaction: the fills were posted when they were reported.</summary>
-    public void MarkSettlement(int tradeSettlementId, DateTimeOffset at) => throw new NotImplementedException();
+    public void MarkSettlement(int tradeSettlementId, DateTimeOffset at)
+    {
+        EnsureStatus("matched", BankStatementLineStatus.Received);
+        SetMatch(null, null, StatementLineMatchMethod.Settlement, at);
+        TradeSettlementId = tradeSettlementId;
+    }
 
     /// <summary>Withdrawals R42: the credit line that returns a payout; the payout is reversed.</summary>
     public void MarkPaymentReturn(int accountId, int transactionId, int withdrawalId, int relatedLineId, DateTimeOffset at)

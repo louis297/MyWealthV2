@@ -67,7 +67,8 @@ public sealed class ProcessStatementLines(
         if (line.Direction == BankLineDirection.Debit)
         {
             if (await payouts.ProcessDebitAsync(line, cancellationToken)
-                || await new BankReturns(db, time).ProcessReturnPaidAsync(line, cancellationToken))
+                || await new BankReturns(db, time).ProcessReturnPaidAsync(line, cancellationToken)
+                || await new BankSettlements(db, time).ProcessPaidAsync(line, cancellationToken))
             {
                 return;
             }

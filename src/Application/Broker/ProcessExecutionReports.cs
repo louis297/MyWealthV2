@@ -232,6 +232,14 @@ public sealed class ProcessExecutionReports(
             db.TradeSettlements.Add(settlement);
             await db.SaveChangesAsync(cancellationToken);
 
+            // Trade-settlement R12: the firm's net is paid by the worker's send step, with no approval.
+            if (settlement.Status == TradeSettlementStatus.AwaitingPayment)
+            {
+                var payment = OutgoingPayment.ForTradeSettlement(settlement, clientMoney);
+                payment.CreatedBy = SystemActor.Name;
+                db.OutgoingPayments.Add(payment);
+            }
+
             var ids = group.Select(fill => fill.Id).ToList();
             foreach (var fill in await db.OrderFills.IgnoreQueryFilters().Where(row => ids.Contains(row.Id)).ToListAsync(cancellationToken))
             {

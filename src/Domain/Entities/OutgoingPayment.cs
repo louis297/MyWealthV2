@@ -126,8 +126,39 @@ public class OutgoingPayment : BaseAuditableEntity
     /// <summary>Trade-settlement R12: the firm's net of an agreed trade settlement, <c>Pending</c>, from its client
     /// money account, with its own PublicId as the instruction id and the broker settlement id as reference when it is
     /// a valid payment reference. No person approves it.</summary>
-    public static OutgoingPayment ForTradeSettlement(TradeSettlement settlement, ClientMoneyAccount clientMoney) =>
-        throw new NotImplementedException();
+    public static OutgoingPayment ForTradeSettlement(TradeSettlement settlement, ClientMoneyAccount clientMoney)
+    {
+        if (settlement.Id == 0)
+        {
+            throw new DomainException("The trade settlement must be saved first.");
+        }
+
+        if (settlement.Status != TradeSettlementStatus.AwaitingPayment || settlement.NetAmount >= 0m)
+        {
+            throw new DomainException("Only a trade settlement the firm owes the broker is paid.");
+        }
+
+        if (clientMoney.Id != settlement.ClientMoneyAccountId || clientMoney.TenantId != settlement.TenantId)
+        {
+            throw new DomainException("The client money account must be the settlement's.");
+        }
+
+        var publicId = Guid.NewGuid();
+        return new OutgoingPayment
+        {
+            TenantId = settlement.TenantId,
+            ClientMoneyAccountId = clientMoney.Id,
+            Connection = clientMoney.BankConnection,
+            Kind = OutgoingPaymentKind.TradeSettlement,
+            InstructionPublicId = publicId,
+            TradeSettlementId = settlement.Id,
+            Amount = -settlement.NetAmount,
+            Currency = settlement.Currency,
+            Reference = Withdrawal.IsValidReference(settlement.BrokerSettlementId) ? settlement.BrokerSettlementId.Trim() : null,
+            Status = OutgoingPaymentStatus.Pending,
+            PublicId = publicId
+        };
+    }
 
     /// <summary>R32: an attempt is recorded and committed before the call.</summary>
     public void RecordAttempt(DateTimeOffset at)

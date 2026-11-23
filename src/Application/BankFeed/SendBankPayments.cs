@@ -1,5 +1,6 @@
 using MyWealthV2.Application.AccountClosures;
 using Microsoft.Extensions.Logging;
+using MyWealthV2.Application.Broker;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
@@ -17,6 +18,7 @@ public sealed class SendBankPayments(
     IApplicationDbContext db,
     IBankPayments payments,
     IBankConnections connections,
+    IBrokerConnections brokers,
     TimeProvider time,
     ILogger<SendBankPayments> logger)
 {
@@ -67,6 +69,14 @@ public sealed class SendBankPayments(
         }
 
         var request = await RequestAsync(payment, cancellationToken);
+        if (request is null)
+        {
+            logger.LogWarning(
+                "Outgoing payment {Instruction} pays a broker with no bank account in {Currency} on this host; it waits.",
+                payment.InstructionPublicId, payment.Currency);
+            return;
+        }
+
         payment.RecordAttempt(time.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
 
@@ -77,6 +87,13 @@ public sealed class SendBankPayments(
             if (payment.Kind == OutgoingPaymentKind.ReceiptReturn)
             {
                 await ApplyToReturnAsync(payment, result, token);
+                await db.SaveChangesAsync(token);
+                return;
+            }
+
+            if (payment.Kind == OutgoingPaymentKind.TradeSettlement)
+            {
+                await ApplyToSettlementAsync(payment, result, token);
                 await db.SaveChangesAsync(token);
                 return;
             }
@@ -133,6 +150,30 @@ public sealed class SendBankPayments(
         }
     }
 
+    /// <summary>Trade-settlement R17: accepted leaves the settlement waiting for the statement; a rejection fails
+    /// it.</summary>
+    private async Task ApplyToSettlementAsync(OutgoingPayment payment, BankPaymentResult result, CancellationToken cancellationToken)
+    {
+        if (result.PaymentId is { } paymentId)
+        {
+            payment.Accept(paymentId, time.GetUtcNow());
+        }
+        else if (result.RejectReason is { } reason)
+        {
+            payment.Reject(reason);
+            var settlement = await db.TradeSettlements.IgnoreQueryFilters()
+                .SingleAsync(row => row.Id == payment.TradeSettlementId, cancellationToken);
+            if (settlement.Status == TradeSettlementStatus.AwaitingPayment)
+            {
+                settlement.FailPayment(TradeSettlementFailure.PaymentRejected, reason.ToString());
+            }
+        }
+        else
+        {
+            RecordFailure(payment, result);
+        }
+    }
+
     private void RecordFailure(OutgoingPayment payment, BankPaymentResult result)
     {
         payment.RecordFailure(result.Failure!.Value);
@@ -142,7 +183,7 @@ public sealed class SendBankPayments(
     }
 
     /// <summary>R58: the call is built from stored data only, so every attempt sends the same body.</summary>
-    private async Task<BankPaymentRequest> RequestAsync(OutgoingPayment payment, CancellationToken cancellationToken)
+    private async Task<BankPaymentRequest?> RequestAsync(OutgoingPayment payment, CancellationToken cancellationToken)
     {
         var trustAccount = await db.ClientMoneyAccounts.IgnoreQueryFilters().AsNoTracking()
             .Where(row => row.Id == payment.ClientMoneyAccountId)
@@ -158,6 +199,21 @@ public sealed class SendBankPayments(
             return new BankPaymentRequest(
                 payment.Connection, trustAccount, payment.InstructionPublicId, payment.Amount, payment.Currency.Trim(),
                 null, null, returned);
+        }
+
+        if (payment.Kind == OutgoingPaymentKind.TradeSettlement)
+        {
+            // Trade-settlement R17, R44: the payee is the broker's own bank account, a standing instruction from
+            // configuration.
+            var connection = await db.TradeSettlements.IgnoreQueryFilters().AsNoTracking()
+                .Where(row => row.Id == payment.TradeSettlementId)
+                .Select(row => row.Connection)
+                .SingleAsync(cancellationToken);
+            return brokers.BankAccount(connection, payment.Currency.Trim()) is { } broker
+                ? new BankPaymentRequest(
+                    payment.Connection, trustAccount, payment.InstructionPublicId, payment.Amount, payment.Currency.Trim(),
+                    payment.Reference, new BankPaymentPayee(broker.AccountNumber, broker.AccountName))
+                : null;
         }
 
         var payee = await (
