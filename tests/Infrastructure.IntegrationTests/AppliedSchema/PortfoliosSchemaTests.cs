@@ -23,7 +23,7 @@ public class PortfoliosSchemaTests
         ]);
         (await Columns(db, "AccountPortfolioAssignments")).ShouldBe([
             "Id", "PublicId", "TenantId", "AccountId", "PortfolioId", "Status",
-            "AssignedAt", "AssignedBy", "LastRebalanceAt", "LastRebalanceStatus", "LastRebalanceMessage",
+            "AssignedAt", "AssignedBy",
             "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion"
         ]);
 

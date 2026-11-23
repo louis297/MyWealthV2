@@ -14,9 +14,9 @@ public class RebalanceReferenceTests : TestBase
 
         var trades = await RebalanceTrades.TradesAsync(world.AccessToken, world.AccountId);
 
+        // Rebalances R26: the trades are the fills of the rebalance's orders, with no reference.
         trades.ShouldNotBeEmpty();
         trades.ShouldAllBe(trade => trade.GetProperty("reference").ValueKind == System.Text.Json.JsonValueKind.Null);
-        trades.ShouldAllBe(trade => trade.GetProperty("memo").GetString() == "Rebalance");
     }
 
     [Test]

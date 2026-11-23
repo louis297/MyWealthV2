@@ -12,7 +12,8 @@ internal static class RebalanceTrades
 {
     public sealed record World(string AccessToken, User Customer, Guid AccountId, Guid PortfolioId, Guid First, Guid Second);
 
-    /// <summary>Opens and funds a Custodial NZD account and assigns a 100 % <c>AIA</c> portfolio, which buys.</summary>
+    /// <summary>Opens and funds a Custodial NZD account, assigns a 100 % <c>AIA</c> portfolio and completes the rebalance
+    /// it proposes, which buys through orders.</summary>
     public static async Task<World> AssignedAsync(
         string firm = "Rebalance Source",
         string code = "rebalance-source",
@@ -39,6 +40,8 @@ internal static class RebalanceTrades
         var assign = await PortfolioHttp.Send(
             HttpMethod.Post, $"/accounts/{accountId}/portfolio", tokens.AccessToken, new { portfolioId });
         assign.StatusCode.ShouldBe(HttpStatusCode.OK, await assign.Content.ReadAsStringAsync());
+        // Rebalances R10, R26: assign proposes; the buys are the fills of the rebalance's orders.
+        await Rebalances.RebalanceHttp.CompleteFromAsync(tokens.AccessToken, assign);
         return new World(tokens.AccessToken, customer, accountId, portfolioId, first, second);
     }
 

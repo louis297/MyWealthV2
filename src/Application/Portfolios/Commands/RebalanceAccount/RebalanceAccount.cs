@@ -54,21 +54,12 @@ public class AccountRebalancer(
 {
     public async Task<RebalanceResultDto> RebalanceAsync(Guid accountId, Guid handle, CancellationToken cancellationToken)
     {
-        try
+        RebalanceResultDto? result = null;
+        await db.ExecuteInTransactionAsync(async token =>
         {
-            RebalanceResultDto? result = null;
-            await db.ExecuteInTransactionAsync(async token =>
-            {
-                result = await RebalanceCoreAsync(accountId, handle, token);
-            }, cancellationToken);
-            return result!;
-        }
-        catch (RebalanceException exception)
-        {
-            db.ClearTrackedChanges();
-            await RecordFailureAsync(accountId, exception.Message, cancellationToken);
-            throw;
-        }
+            result = await RebalanceCoreAsync(accountId, handle, token);
+        }, cancellationToken);
+        return result!;
     }
 
     private async Task<RebalanceResultDto> RebalanceCoreAsync(
@@ -155,8 +146,6 @@ public class AccountRebalancer(
             }
         }
 
-        assignment.RecordRebalance(plan.Status, null, now);
-        await db.SaveChangesAsync(cancellationToken);
         return new RebalanceResultDto(plan.Status.ToString());
     }
 
@@ -288,26 +277,6 @@ public class AccountRebalancer(
         {
             return null;
         }
-    }
-
-    private async Task RecordFailureAsync(Guid accountId, string message, CancellationToken cancellationToken)
-    {
-        var account = await db.Accounts.SingleOrDefaultAsync(row => row.PublicId == accountId, cancellationToken);
-        if (account is null)
-        {
-            return;
-        }
-
-        var assignment = await db.AccountPortfolioAssignments.SingleOrDefaultAsync(
-            row => row.AccountId == account.Id && row.Status == AssignmentStatus.Active,
-            cancellationToken);
-        if (assignment is null)
-        {
-            return;
-        }
-
-        assignment.RecordRebalance(RebalancePlanOutcome.Failed, message, time.GetUtcNow());
-        await db.SaveChangesAsync(cancellationToken);
     }
 
     private static Guid Key(Guid accountId, Guid handle, int instrumentId, bool buy)

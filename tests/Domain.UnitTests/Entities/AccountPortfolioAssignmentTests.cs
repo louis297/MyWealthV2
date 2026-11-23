@@ -69,17 +69,4 @@ public class AccountPortfolioAssignmentTests
 
         current.DomainEvents.ShouldBeEmpty();
     }
-
-    [Test]
-    public void RecordRebalance_StoresTheOutcome()
-    {
-        var current = AccountPortfolioAssignment.Assign(null, 4, 8, 15, "adviser", At);
-
-        current.RecordRebalance(RebalancePlanOutcome.Failed, "missing price VTI", At.AddHours(1));
-
-        current.LastRebalanceStatus.ShouldBe(RebalancePlanOutcome.Failed);
-        current.LastRebalanceMessage.ShouldBe("missing price VTI");
-        current.LastRebalanceAt.ShouldBe(At.AddHours(1));
-        current.Status.ShouldBe(AssignmentStatus.Active);
-    }
 }

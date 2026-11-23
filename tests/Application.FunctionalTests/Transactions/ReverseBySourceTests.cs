@@ -37,11 +37,13 @@ public class ReverseBySourceTests : TestBase
     public async Task Custodial_RebalanceTradeAfterUnassign_Returns201()
     {
         var world = await RebalanceTrades.AssignedAsync();
-        var trade = (await RebalanceTrades.TradesAsync(world.AccessToken, world.AccountId)).First();
+        // A rebalance trade posted before rebalances went through orders (rebalances R26).
+        (await FundAsync(world.AccessToken, world.AccountId, 100m)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        var trade = await InsertRebalanceTradeAsync(world.AccountId, world.Second, 1m, 20m);
         (await PortfolioHttp.Send(HttpMethod.Delete, $"/accounts/{world.AccountId}/portfolio", world.AccessToken))
             .StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
-        var response = await ReverseAsync(world.AccessToken, trade.GetProperty("id").GetGuid());
+        var response = await ReverseAsync(world.AccessToken, trade);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
     }

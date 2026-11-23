@@ -11,7 +11,6 @@ public class AccountPortfolioAssignmentConfiguration : IEntityTypeConfiguration<
         builder.ToTable("AccountPortfolioAssignments");
         builder.Property(assignment => assignment.PublicId).IsRequired();
         builder.Property(assignment => assignment.AssignedBy).HasMaxLength(450).IsRequired();
-        builder.Property(assignment => assignment.LastRebalanceMessage).HasMaxLength(500);
         builder.Property(assignment => assignment.CreatedBy).HasMaxLength(450).IsRequired();
         builder.Property(assignment => assignment.RowVersion).IsRowVersion();
         builder.HasIndex(assignment => assignment.PublicId).IsUnique();

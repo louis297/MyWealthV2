@@ -1,5 +1,6 @@
 using MyWealthV2.Application.Accounts;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.Rebalances;
 using MyWealthV2.Domain.Enums;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 
@@ -21,12 +22,25 @@ public class GetAccountPortfolioQueryHandler(IApplicationDbContext db, ICurrentU
                 cancellationToken) ?? throw new NotFoundException("Portfolio", request.AccountId);
         var portfolio = await db.Portfolios.AsNoTracking()
             .SingleAsync(row => row.Id == assignment.PortfolioId, cancellationToken);
+        // Rebalances R25: the newest rebalance of the assignment, or null.
+        var rebalance = await db.Rebalances.AsNoTracking()
+            .Where(row => row.AssignmentId == assignment.Id)
+            .OrderByDescending(row => row.ProposedAt)
+            .ThenByDescending(row => row.Id)
+            .FirstOrDefaultAsync(cancellationToken);
         return new AccountPortfolioDto(
             account.PublicId,
             portfolio.PublicId,
             assignment.Status.ToString(),
-            assignment.LastRebalanceAt,
-            assignment.LastRebalanceStatus?.ToString(),
-            assignment.LastRebalanceMessage);
+            rebalance is null
+                ? null
+                : new AccountRebalanceDto(
+                    rebalance.PublicId,
+                    rebalance.Status.ToString(),
+                    rebalance.Status is RebalanceStatus.Failed or RebalanceStatus.Incomplete && rebalance.FailureCode is { } code
+                        ? new RebalanceFailureDto(code, rebalance.FailureMessage ?? code)
+                        : null,
+                    rebalance.ProposedAt,
+                    rebalance.EndedAt));
     }
 }

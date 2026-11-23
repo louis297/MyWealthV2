@@ -29,6 +29,7 @@ public class CustodialPortfolioTests : TestBase
         var response = await AssignAsync(tokens.AccessToken, accountId, portfolioId);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        await Rebalances.RebalanceHttp.CompleteFromAsync(tokens.AccessToken, response);
         (await ActiveAssignmentCountAsync(accountId)).ShouldBe(1);
         (await TransactionTypesAsync(tokens.AccessToken, accountId)).ShouldContain("Buy");
     }
@@ -120,7 +121,7 @@ public class CustodialPortfolioTests : TestBase
         var portfolioId = await CreatePortfolioAsync(tokens.AccessToken, instrumentId);
         var accountId = await OpenCustodialAsync(tokens.AccessToken, customer.PublicId, "Model", "NZD");
         (await FundAsync(tokens.AccessToken, accountId, 1000m)).StatusCode.ShouldBe(HttpStatusCode.Created);
-        (await AssignAsync(tokens.AccessToken, accountId, portfolioId)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        await Rebalances.RebalanceHttp.CompleteFromAsync(tokens.AccessToken, await AssignAsync(tokens.AccessToken, accountId, portfolioId));
         var rebalanceBuy = await LatestBuyIdAsync(tokens.AccessToken, accountId);
 
         (await PostAsync(tokens.AccessToken, Trade(accountId, "Buy", instrumentId, 1m))).StatusCode

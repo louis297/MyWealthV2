@@ -20,12 +20,6 @@ public class AccountPortfolioAssignment : BaseAuditableEntity
 
     public string AssignedBy { get; private set; } = string.Empty;
 
-    public DateTimeOffset? LastRebalanceAt { get; private set; }
-
-    public RebalancePlanOutcome? LastRebalanceStatus { get; private set; }
-
-    public string? LastRebalanceMessage { get; private set; }
-
     public byte[] RowVersion { get; private set; } = null!;
 
     public static AccountPortfolioAssignment Assign(
@@ -80,12 +74,5 @@ public class AccountPortfolioAssignment : BaseAuditableEntity
 
         Status = AssignmentStatus.Removed;
         AddDomainEvent(new PortfolioUnassigned(this));
-    }
-
-    public void RecordRebalance(RebalancePlanOutcome status, string? message, DateTimeOffset at)
-    {
-        LastRebalanceStatus = status;
-        LastRebalanceMessage = string.IsNullOrWhiteSpace(message) ? null : message.Trim();
-        LastRebalanceAt = at;
     }
 }

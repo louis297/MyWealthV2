@@ -22,7 +22,9 @@ public class AssignPortfolioTests : TestBase
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        json.RootElement.GetProperty("status").GetString().ShouldBe("Success");
+        // Rebalances R10: assign proposes; the buys are the fills of its orders once a person confirms.
+        json.RootElement.GetProperty("status").GetString().ShouldBe("Proposed");
+        await Rebalances.RebalanceHttp.CompleteAsync(tokens.AccessToken, json.RootElement.GetProperty("rebalanceId").GetGuid());
 
         var transactions = await PortfolioHttp.Send(
             HttpMethod.Get, $"/transactions?accountId={accountId}", tokens.AccessToken);
@@ -87,7 +89,7 @@ public class AssignPortfolioTests : TestBase
         var get = await PortfolioHttp.Send(HttpMethod.Get, $"/accounts/{accountId}/portfolio", tokens.AccessToken);
         get.StatusCode.ShouldBe(HttpStatusCode.OK);
         using var assignment = JsonDocument.Parse(await get.Content.ReadAsStringAsync());
-        assignment.RootElement.GetProperty("lastRebalanceStatus").GetString().ShouldBe("Failed");
+        assignment.RootElement.GetProperty("rebalance").GetProperty("status").GetString().ShouldBe("Failed");
     }
 
     private static async Task<(TokenResponse Tokens, Guid AccountId, Guid PortfolioId)> FundedBrokerageAsync(

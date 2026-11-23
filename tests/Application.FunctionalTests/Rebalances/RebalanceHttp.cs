@@ -124,13 +124,33 @@ internal static class RebalanceHttp
             return id;
         }
 
+        await CompleteAsync(accessToken, id, price);
+        return id;
+    }
+
+    /// <summary>Confirms the rebalance an assign or propose response proposed and fills every wave until it ends.</summary>
+    public static async Task<Guid> CompleteFromAsync(string accessToken, HttpResponseMessage response)
+    {
+        var content = await response.Content.ReadAsStringAsync();
+        response.StatusCode.ShouldBe(HttpStatusCode.OK, content);
+        using var json = JsonDocument.Parse(content);
+        var id = json.RootElement.GetProperty("rebalanceId").GetGuid();
+        if (json.RootElement.GetProperty("status").GetString() == "Proposed")
+        {
+            await CompleteAsync(accessToken, id);
+        }
+
+        return id;
+    }
+
+    /// <summary>Confirms a proposal and fills every wave until the rebalance ends.</summary>
+    public static async Task CompleteAsync(string accessToken, Guid id, Func<Order, decimal>? price = null)
+    {
         await ConfirmedAsync(accessToken, id);
         for (var run = 0; run < 5 && Rebalance.IsInProgressStatus((await RebalanceAsync(id)).Status); run++)
         {
             await FillWaveAsync(id, price);
         }
-
-        return id;
     }
 
     /// <summary>The <c>errors.Status</c> messages of a 400.</summary>

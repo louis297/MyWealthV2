@@ -10,7 +10,8 @@ internal static class TestPrices
         ApplicationDbContext db,
         Guid instrumentPublicId,
         decimal amount,
-        string currency)
+        string currency,
+        DateOnly? asOfDate = null)
     {
         var instrument = await db.Instruments.SingleAsync(row => row.PublicId == instrumentPublicId);
         if (!string.Equals(instrument.QuoteCurrency.Trim(), currency.Trim(), StringComparison.OrdinalIgnoreCase))
@@ -18,7 +19,8 @@ internal static class TestPrices
             throw new InvalidOperationException("Test price currency must match the instrument.");
         }
 
-        var asOf = new DateOnly(2026, 1, 1);
+        // By default today's UTC date, so the price is fresh for an order or a rebalance (orders R10, rebalances R8).
+        var asOf = asOfDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
         var row = await db.InstrumentPrices.SingleOrDefaultAsync(price =>
             price.InstrumentId == instrument.Id && price.AsOfDate == asOf);
         if (row is null)
@@ -33,7 +35,7 @@ internal static class TestPrices
 
         row.Price = amount;
         row.Source = "EODHD";
-        row.FetchedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        row.FetchedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
     }
 }

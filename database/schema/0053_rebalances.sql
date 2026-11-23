@@ -145,3 +145,8 @@ ALTER TABLE [Orders] ADD CONSTRAINT [FK_Orders_Rebalances_TenantId_RebalanceId]
     FOREIGN KEY ([TenantId], [RebalanceId]) REFERENCES [Rebalances] ([TenantId], [Id]);
 CREATE INDEX [IX_Orders_RebalanceId] ON [Orders] ([RebalanceId]) WHERE [RebalanceId] IS NOT NULL;
 ');
+
+-- R25: the outcome of a rebalance is on its Rebalances row. The three last-rebalance columns of the assignment are
+-- dropped with no back-fill; rebalances before this script are in the ledger as Transactions with source Rebalance.
+ALTER TABLE [AccountPortfolioAssignments] DROP CONSTRAINT [CK_AccountPortfolioAssignments_LastRebalanceStatus];
+ALTER TABLE [AccountPortfolioAssignments] DROP COLUMN [LastRebalanceAt], [LastRebalanceStatus], [LastRebalanceMessage];

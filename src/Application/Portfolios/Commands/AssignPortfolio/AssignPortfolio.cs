@@ -3,15 +3,17 @@ using MyWealthV2.Application.Accounts;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
-using MyWealthV2.Application.Portfolios.Commands.RebalanceAccount;
+using MyWealthV2.Application.Rebalances;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 
 namespace MyWealthV2.Application.Portfolios.Commands.AssignPortfolio;
 
+/// <summary>Portfolios R4, R5 and rebalances R10, R23: assigns a portfolio and proposes a rebalance (trigger
+/// <c>Assign</c>). A failed plan still leaves the assignment Active.</summary>
 [Authorize(Policy = Policies.TransactionsCreate)]
-public class AssignPortfolioCommand : IRequest<RebalanceResultDto>
+public class AssignPortfolioCommand : IRequest<RebalanceProposalDto>
 {
     public Guid AccountId { get; set; }
 
@@ -21,11 +23,11 @@ public class AssignPortfolioCommand : IRequest<RebalanceResultDto>
 public class AssignPortfolioCommandHandler(
     IApplicationDbContext db,
     ICurrentUser currentUser,
-    AccountRebalancer rebalancer,
+    ProposeRebalance proposals,
     TimeProvider time)
-    : IRequestHandler<AssignPortfolioCommand, RebalanceResultDto>
+    : IRequestHandler<AssignPortfolioCommand, RebalanceProposalDto>
 {
-    public async Task<RebalanceResultDto> Handle(AssignPortfolioCommand request, CancellationToken cancellationToken)
+    public async Task<RebalanceProposalDto> Handle(AssignPortfolioCommand request, CancellationToken cancellationToken)
     {
         var account = await AccountScope.ManagedAccounts(db, currentUser)
             .SingleOrDefaultAsync(row => row.PublicId == request.AccountId, cancellationToken)
@@ -46,8 +48,14 @@ public class AssignPortfolioCommandHandler(
                 "Only an open Custodial account that is not being closed can be assigned a portfolio.");
         }
 
-        // Orders R49: an order and an assignment never share an account, so a rebalance never plans around a
-        // reservation.
+        // Rebalances R23: an assignment is not replaced while its rebalance is in progress.
+        if (await proposals.OpenAsync(account.Id, cancellationToken) is { IsInProgress: true })
+        {
+            throw new RebalanceException("rebalance_in_progress", ProposeRebalance.InProgressMessage);
+        }
+
+        // Orders R49: a person's live order and an assignment never share an account, so a rebalance never plans
+        // around a reservation it did not make.
         if (await Orders.OrderReservations.HasLiveOrderAsync(db, account.Id, cancellationToken))
         {
             throw new RebalanceException(
@@ -71,16 +79,34 @@ public class AssignPortfolioCommandHandler(
             throw new AssignmentConflictException();
         }
 
-        var assignment = AccountPortfolioAssignment.Assign(
-            current,
-            account.TenantId,
-            account.Id,
-            portfolio.Id,
-            currentUser.PublicId?.ToString("D") ?? "system",
-            time.GetUtcNow());
-        db.AccountPortfolioAssignments.Add(assignment);
-        await db.SaveChangesAsync(cancellationToken);
+        Rebalance? rebalance = null;
+        await db.ExecuteInTransactionAsync(async token =>
+        {
+            await db.LockAccountAsync(account.Id, token);
+            var now = time.GetUtcNow();
+            // R23: a proposal of the assignment it replaces is cancelled, as unassign does (R22).
+            if (await proposals.OpenAsync(account.Id, token) is { } open)
+            {
+                if (open.IsInProgress)
+                {
+                    throw new RebalanceException("rebalance_in_progress", ProposeRebalance.InProgressMessage);
+                }
 
-        return await rebalancer.RebalanceAsync(account.PublicId, Guid.NewGuid(), cancellationToken);
+                open.Cancel(RebalanceCancelReason.Unassigned, now, anyOrderLive: false);
+            }
+
+            var assignment = AccountPortfolioAssignment.Assign(
+                current,
+                account.TenantId,
+                account.Id,
+                portfolio.Id,
+                currentUser.PublicId?.ToString("D") ?? "system",
+                now);
+            db.AccountPortfolioAssignments.Add(assignment);
+            await db.SaveChangesAsync(token);
+            rebalance = await proposals.ProposeAsync(account, RebalanceTrigger.Assign, currentUser.Person?.Id, publicId: null, token);
+        }, cancellationToken);
+
+        return RebalanceProposals.Answer(rebalance!);
     }
 }

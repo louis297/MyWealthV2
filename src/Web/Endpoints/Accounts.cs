@@ -160,8 +160,8 @@ public class Accounts : IEndpointGroup
     }
 
     [EndpointSummary("Assign a portfolio")]
-    [EndpointDescription("Assigns one portfolio to an open Custodial account and rebalances it.")]
-    public static async Task<Ok<RebalanceResultDto>> AssignPortfolio(
+    [EndpointDescription("Assigns one portfolio to an open Custodial account and proposes a rebalance of it (rebalances R10).")]
+    public static async Task<Ok<RebalanceProposalDto>> AssignPortfolio(
         ISender sender,
         Guid id,
         AssignPortfolioCommand command)
