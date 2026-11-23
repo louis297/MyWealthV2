@@ -355,6 +355,7 @@ public class MigrationBatchesSchemaTests
             var opening = Transaction.PostMigratedCash(tenantId, bankId, "USD", 100000m, at, null,
                 TransactionSource.Migration(batch.PublicId), new MigrationOrigin(new DateOnly(2026, 11, 20), "Acme Wealth"));
             opening.CreatedBy = "test";
+            opening.CashLegs.ForEach(leg => leg.CreatedBy = "test");
             context.Set<Transaction>().Add(opening);
             await context.SaveChangesAsync();
             batch.Entries[0].RecordTransactions(opening.Id, null);
@@ -370,7 +371,10 @@ public class MigrationBatchesSchemaTests
                 .SingleAsync(item => item.Id == batchId);
             (stored.Status, stored.SubmittedByUserId, stored.PostedByUserId)
                 .ShouldBe((MigrationBatchStatus.Posted, (int?)submitter, (int?)poster));
-            stored.ControlTotals.ShouldBeEquivalentTo(totals);
+            stored.ControlTotals.AccountCount.ShouldBe(2);
+            stored.ControlTotals.Cash.ShouldBe([new MigrationCurrencyAmount("USD", 250000m)]);
+            stored.ControlTotals.Quantity.ShouldBe([new MigrationInstrumentQuantity(instrumentId, 1200.5m)]);
+            stored.ControlTotals.Cost.ShouldBe([new MigrationCurrencyAmount("USD", 264000m)]);
             stored.Entries.OrderBy(e => e.Position).Select(e => (e.Position, e.AccountId, e.Cash, e.Holdings.Count))
                 .ShouldBe([(0, bankId, (decimal?)100000m, 0), (1, brokerageId, (decimal?)150000m, 1)]);
             var entry = stored.Entries.Single(e => e.Position == 0);

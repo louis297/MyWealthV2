@@ -54,6 +54,19 @@ public class MigrationBatchEntry : BaseEntity
     }
 
     /// <summary>R23: stores the Transactions the post wrote for this entry, once.</summary>
-    public void RecordTransactions(int? openingTransactionId, int? openingHoldingsTransactionId) =>
-        throw new NotImplementedException();
+    public void RecordTransactions(int? openingTransactionId, int? openingHoldingsTransactionId)
+    {
+        if (OpeningTransactionId is not null || OpeningHoldingsTransactionId is not null)
+        {
+            throw new DomainException("The Transactions of this entry are already recorded.");
+        }
+
+        if (openingTransactionId is null && openingHoldingsTransactionId is null)
+        {
+            throw new DomainException("An entry is posted with at least one Transaction.");
+        }
+
+        OpeningTransactionId = openingTransactionId;
+        OpeningHoldingsTransactionId = openingHoldingsTransactionId;
+    }
 }

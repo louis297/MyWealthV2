@@ -100,7 +100,15 @@ public sealed class TransactionSource : ValueObject
 
     /// <summary>A migrated opening balance's source: the PublicId of its migration batch, shared by every Transaction
     /// of the batch (migration-batches R27).</summary>
-    public static TransactionSource Migration(Guid batchPublicId) => throw new NotImplementedException();
+    public static TransactionSource Migration(Guid batchPublicId)
+    {
+        if (batchPublicId == Guid.Empty)
+        {
+            throw new DomainException("A migration source needs the migration batch's PublicId.");
+        }
+
+        return new TransactionSource(TransactionSourceKind.Migration, batchPublicId);
+    }
 
     /// <summary>The source as stored on a Transaction row.</summary>
     internal static TransactionSource FromStored(TransactionSourceKind kind, Guid? publicId) =>
@@ -115,6 +123,7 @@ public sealed class TransactionSource : ValueObject
             TransactionSourceKind.InterestRun => InterestRun(publicId ?? Guid.Empty),
             TransactionSourceKind.CorporateAction => CorporateAction(publicId ?? Guid.Empty),
             TransactionSourceKind.OrderFill => OrderFill(publicId ?? Guid.Empty),
+            TransactionSourceKind.Migration => Migration(publicId ?? Guid.Empty),
             _ => new TransactionSource(kind, publicId)
         };
 

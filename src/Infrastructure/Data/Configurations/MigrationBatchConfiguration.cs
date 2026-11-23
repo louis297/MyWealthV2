@@ -4,7 +4,8 @@ using MyWealthV2.Domain.Entities;
 
 namespace MyWealthV2.Infrastructure.Data.Configurations;
 
-/// <summary>Migration batches §6: a migration batch (script 0054).</summary>
+/// <summary>Migration batches §6: a migration batch (script 0054). The children are deleted by EF when <c>Replace</c>
+/// drops them (cascade in the model); the database FKs are RESTRICT, as every tenant FK is.</summary>
 public class MigrationBatchConfiguration : IEntityTypeConfiguration<MigrationBatch>
 {
     public void Configure(EntityTypeBuilder<MigrationBatch> builder)

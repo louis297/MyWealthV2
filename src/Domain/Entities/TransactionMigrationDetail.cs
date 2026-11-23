@@ -19,9 +19,18 @@ public class TransactionMigrationDetail
 
     public string PreviousProvider { get; private set; } = string.Empty;
 
-    internal static TransactionMigrationDetail Create(int tenantId, Migrations.MigrationOrigin origin) =>
-        throw new NotImplementedException();
+    internal static TransactionMigrationDetail Create(int tenantId, Migrations.MigrationOrigin origin)
+    {
+        var provider = origin.PreviousProvider?.Trim() ?? string.Empty;
+        if (provider.Length is 0 or > MigrationBatch.TextMaxLength)
+        {
+            throw new DomainException($"Previous provider must be 1 to {MigrationBatch.TextMaxLength} characters.");
+        }
+
+        return new TransactionMigrationDetail { TenantId = tenantId, AsOfDate = origin.AsOfDate, PreviousProvider = provider };
+    }
 
     /// <summary>A new row with the same values, for a Reversal.</summary>
-    internal TransactionMigrationDetail Copy() => throw new NotImplementedException();
+    internal TransactionMigrationDetail Copy() =>
+        new() { TenantId = TenantId, AsOfDate = AsOfDate, PreviousProvider = PreviousProvider };
 }
