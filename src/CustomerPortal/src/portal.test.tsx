@@ -770,6 +770,31 @@ describe("Customer Portal bank accounts and withdrawals (withdrawals C22–C25)"
       .toBe(true);
   });
 
+  it("labels the order of a rebalance with no link and no action (C37)", async () => {
+    const order = (id: string, rebalanceId: string | null) => ({
+      id,
+      instrument: { id: "i-1", symbol: "ACME.SIM", name: "Acme Holdings" },
+      side: "Buy",
+      quantity: 10,
+      filledQuantity: 0,
+      status: "Working",
+      placedAt: "2026-11-23T02:10:00Z",
+      closedAt: null,
+      rebalanceId,
+    });
+    renderAt("/accounts/account-1", me, [], "Custodial", {
+      account: custodialUsd,
+      orders: [order("o-1", "12121212-0000-0000-0000-000000000001"), order("o-2", null)],
+    });
+
+    const table = await screen.findByRole("table", { name: "Orders" });
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(within(rows[0]).getByText("Rebalance")).toBeInTheDocument();
+    expect(within(rows[1]).queryByText("Rebalance")).not.toBeInTheDocument();
+    expect(within(table).queryByRole("link")).not.toBeInTheDocument();
+    expect(within(table).queryByRole("button")).not.toBeInTheDocument();
+  });
+
   it("asks for no orders on an External account (C32)", async () => {
     const { fetchMock } = renderAt("/accounts/account-1");
 
