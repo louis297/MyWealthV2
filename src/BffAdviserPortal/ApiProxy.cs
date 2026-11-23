@@ -31,7 +31,8 @@ public static class ApiProxy
         "/interest",
         "/corporate-actions",
         "/orders",
-        "/trade-settlements"
+        "/trade-settlements",
+        "/rebalances"
     ];
 
     public static WebApplication MapBffApi(this WebApplication app)
