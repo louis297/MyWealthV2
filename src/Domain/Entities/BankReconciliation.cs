@@ -57,6 +57,11 @@ public class BankReconciliation : BaseAuditableEntity
 
     public decimal ReservedCash { get; private set; }
 
+    /// <summary>Trade-settlement R25: the open trade settlements of the account at the run, as information.</summary>
+    public int OpenSettlementsCount { get; private set; }
+
+    public decimal OpenSettlementsAmount { get; private set; }
+
     public int PaymentsInFlightCount { get; private set; }
 
     public decimal PaymentsInFlightAmount { get; private set; }
@@ -96,6 +101,8 @@ public class BankReconciliation : BaseAuditableEntity
             RanByUserId = ranByUserId,
             CustodialCash = inputs.CustodialCash,
             ReservedCash = inputs.ReservedCash,
+            OpenSettlementsCount = inputs.OpenSettlementsCount,
+            OpenSettlementsAmount = inputs.OpenSettlementsAmount,
             PaymentsInFlightCount = inputs.PaymentsInFlightCount,
             PaymentsInFlightAmount = inputs.PaymentsInFlightAmount,
             FeedLastSucceededAt = inputs.FeedLastSucceededAt,
@@ -125,6 +132,13 @@ public class BankReconciliation : BaseAuditableEntity
         AddUnlessZero(items, inputs.TenantId, ReconciliationItemKind.InterestCredited, -inputs.InterestCredited,
             inputs.InterestCreditedCount);
         AddUnlessZero(items, inputs.TenantId, ReconciliationItemKind.TaxWithheld, -inputs.TaxWithheld, inputs.TaxWithheldCount);
+        // Trade-settlement R23, R24: order fills that settle through this account.
+        AddUnlessZero(items, inputs.TenantId, ReconciliationItemKind.UnsettledTrades, -inputs.UnsettledTrades,
+            inputs.UnsettledTradesCount);
+        AddUnlessZero(items, inputs.TenantId, ReconciliationItemKind.TradesNeedingAction, -inputs.TradesNeedingAction,
+            inputs.TradesNeedingActionCount);
+        AddUnlessZero(items, inputs.TenantId, ReconciliationItemKind.TradeFees, -inputs.TradeFees, inputs.TradeFeesCount);
+        AddUnlessZero(items, inputs.TenantId, ReconciliationItemKind.UnbookedFills, inputs.UnbookedFills, inputs.UnbookedFillsCount);
         AddUnlessZero(items, inputs.TenantId, ReconciliationItemKind.OpeningBalance, opening);
         AddUnlessZero(items, inputs.TenantId, ReconciliationItemKind.StatementDifference,
             bank - opening - inputs.StatementLinesTotal);

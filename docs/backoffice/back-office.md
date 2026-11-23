@@ -21,6 +21,7 @@ related:
   - ../adr/0014-openiddict-authorization-code-pkce.md
   - ../features/deposit-matching.md
   - ../features/interest-run.md
+  - ../features/trade-settlement.md
 ---
 
 # Back Office
@@ -295,3 +296,13 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders.md](../
 - Further tenant configuration (invitation settings, etc.) as those slices land. Trade fee schedules: no Back Office page for now (decided 2026-11-15); SystemAdmin uses `/fees/trade-schedules` through Scalar ([features/trade-fees.md](../features/trade-fees.md) §9)
 
 These stay out until their own page slices are written.
+
+---
+
+## Amendment 2026-11-23 (trade settlement and broken trades) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [trade-settlement](../features/trade-settlement.md). Field rules live there.
+
+| ID | Behaviour |
+| --- | --- |
+| BO29 | Back Office Broker page (BO27, BO28): the connection row shows "Settles in USD, NZD" from `settlementCurrencies`; the report list shows kinds `Broken` and `Settlement` with the settlement id, and the reason labels FillSettled "The trade has already settled", FillBroken "The trade was cancelled", UnknownSettlement "No trades for this settlement". `FillSettled` and `UnknownSettlement` rows are red. |

@@ -75,11 +75,11 @@ public class OrdersSchemaTests
             """)).ShouldBe(1);
     }
 
-    [TestCase("kind: 4", "CK_ExecutionReports_Kind")]
+    [TestCase("kind: 6", "CK_ExecutionReports_Kind")]
     [TestCase("status: 3", "CK_ExecutionReports_Status")]
     [TestCase("status: 2", "CK_ExecutionReports_Skipped")]
     [TestCase("skipReason: 1", "CK_ExecutionReports_Skipped")]
-    [TestCase("status: 2, skipReason: 5", "CK_ExecutionReports_SkipReason")]
+    [TestCase("status: 2, skipReason: 8", "CK_ExecutionReports_SkipReason")]
     public async Task AReportOutsideTheChecks_Violates(string change, string constraint)
     {
         var values = Values(change);
@@ -191,7 +191,7 @@ public class OrdersSchemaTests
 
     [TestCase("quantity: 0", "CK_OrderFills_Quantity")]
     [TestCase("price: 0", "CK_OrderFills_Price")]
-    [TestCase("status: 2", "CK_OrderFills_Status")]
+    [TestCase("status: 3", "CK_OrderFills_Status")]
     [TestCase("holdReason: 4", "CK_OrderFills_HoldReason")]
     [TestCase("status: 1, posted: 1, holdReason: 0", "CK_OrderFills_Held")]
     [TestCase("status: 1", "CK_OrderFills_Posted")]

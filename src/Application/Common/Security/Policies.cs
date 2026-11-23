@@ -40,6 +40,7 @@ public static class Policies
     public const string CorporateActionsManage = "corporate-actions.manage";
     public const string OrdersRead = "orders.read";
     public const string OrdersPlace = "orders.place";
+    public const string TradeSettlementsManage = "trade-settlements.manage";
     public const string ReportsCustomerRead = "reports.customer.read";
     public const string ReportsCustomerCreate = "reports.customer.create";
     public const string ReportsBookRead = "reports.book.read";

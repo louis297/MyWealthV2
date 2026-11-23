@@ -35,6 +35,13 @@ internal static class StatementLineReader
         var userIds = lines.Where(line => line.LastActionByUserId is not null).Select(line => line.LastActionByUserId!.Value).Distinct().ToList();
         var relatedIds = lines.Where(line => line.RelatedLineId is not null).Select(line => line.RelatedLineId!.Value).Distinct().ToList();
         var withdrawalIds = lines.Where(line => line.WithdrawalId is not null).Select(line => line.WithdrawalId!.Value).Distinct().ToList();
+        var settlementIds = lines.Where(line => line.TradeSettlementId is not null)
+            .Select(line => line.TradeSettlementId!.Value).Distinct().ToList();
+        var settlements = settlementIds.Count == 0
+            ? []
+            : await db.TradeSettlements.IgnoreQueryFilters().AsNoTracking()
+                .Where(row => settlementIds.Contains(row.Id))
+                .ToDictionaryAsync(row => row.Id, row => row.PublicId, cancellationToken);
 
         var clientMoney = await db.ClientMoneyAccounts.AsNoTracking()
             .Where(row => clientMoneyIds.Contains(row.Id))
@@ -103,6 +110,7 @@ internal static class StatementLineReader
             RelatedLineId = line.RelatedLineId is int relatedId ? related[relatedId] : null,
             WithdrawalId = line.WithdrawalId is int withdrawalId ? withdrawals[withdrawalId] : null,
             ReturnReason = line.ReturnReason,
+            TradeSettlementId = line.TradeSettlementId is int settlementId ? settlements[settlementId] : null,
             ReturnPayment = returnPayments.TryGetValue(line.Id, out var payment)
                 ? new StatementLineReturnPaymentDto
                 {

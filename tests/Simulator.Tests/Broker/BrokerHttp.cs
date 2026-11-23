@@ -14,6 +14,8 @@ internal static class BrokerHttp
             EXEC(N'DELETE FROM [BrokerReports]; DELETE FROM [BrokerFills]; DELETE FROM [BrokerOrders];
                    UPDATE [BrokerSettings] SET [Mode] = 0, [FillPercent] = 100, [RejectReason] = NULL, [SlippagePercent] = 0.10,
                        [SettlementDays] = 2;');
+        IF OBJECT_ID(N'dbo.BrokerSettlements', N'U') IS NOT NULL
+            EXEC(N'DELETE FROM [BrokerSettlements]; UPDATE [BrokerSettings] SET [SettlementMode] = 0;');
         """;
 
     /// <summary>A market day order: a buy of 10 <c>VTI</c> in USD at a limit of 105.00 and a reference price of 100.00.</summary>
@@ -26,8 +28,28 @@ internal static class BrokerHttp
         decimal priceLimit = 105m,
         decimal referencePrice = 100m,
         string type = "Market",
-        string timeInForce = "Day") =>
-        JsonSerializer.Serialize(new { clientOrderId, symbol, currency, side, quantity, type, timeInForce, priceLimit, referencePrice });
+        string timeInForce = "Day",
+        string? settlementAccount = null)
+    {
+        var body = new Dictionary<string, object?>
+        {
+            ["clientOrderId"] = clientOrderId,
+            ["symbol"] = symbol,
+            ["currency"] = currency,
+            ["side"] = side,
+            ["quantity"] = quantity,
+            ["type"] = type,
+            ["timeInForce"] = timeInForce,
+            ["priceLimit"] = priceLimit,
+            ["referencePrice"] = referencePrice
+        };
+        if (settlementAccount is not null)
+        {
+            body["settlementAccount"] = settlementAccount;
+        }
+
+        return JsonSerializer.Serialize(body);
+    }
 
     public static Task<HttpResponseMessage> PlaceAsync(HttpClient party, string body) =>
         party.PostJsonAsync("/party/broker/orders", body);
@@ -148,12 +170,24 @@ internal static class BrokerHttp
     {
         var rows = await Sql.ReadAsync(SimulatorTestSetup.ConnectionString, """
             SELECT r.[Kind], o.[Number], f.[Number], r.[SettledDate], r.[Reason]
-            FROM [BrokerReports] r JOIN [BrokerOrders] o ON o.[Id] = r.[OrderId] LEFT JOIN [BrokerFills] f ON f.[Id] = r.[FillId]
+            FROM [BrokerReports] r LEFT JOIN [BrokerOrders] o ON o.[Id] = r.[OrderId] LEFT JOIN [BrokerFills] f ON f.[Id] = r.[FillId]
             ORDER BY r.[Id]
             """);
         return rows.Select(row => new ReportRow(
-            (int)row[0], (int)row[1], row[2] is DBNull ? null : (int)row[2],
+            (int)row[0], row[1] is DBNull ? null : (int)row[1], row[2] is DBNull ? null : (int)row[2],
             row[3] is DBNull ? null : DateOnly.FromDateTime((DateTime)row[3]), row[4] is DBNull ? null : (string)row[4])).ToList();
+    }
+
+    /// <summary>Trade-settlement R36: the broker settlements, oldest first.</summary>
+    public static async Task<List<SettlementRow>> SettlementsAsync()
+    {
+        var rows = await Sql.ReadAsync(SimulatorTestSetup.ConnectionString, """
+            SELECT [Number], [SettlementAccount], [Currency], [SettlementDate], [NetAmount], [FillCount], [PaidAmount]
+            FROM [BrokerSettlements] ORDER BY [Number]
+            """);
+        return rows.Select(row => new SettlementRow(
+            (int)row[0], (string)row[1], ((string)row[2]).Trim(), DateOnly.FromDateTime((DateTime)row[3]), (decimal)row[4],
+            (int)row[5], (decimal)row[6])).ToList();
     }
 
     /// <summary>R56: the fill price of fill <paramref name="n"/> of a world with <paramref name="seed"/>.</summary>
@@ -195,4 +229,14 @@ internal sealed record FillRow(
     string ContractNote,
     bool Settled);
 
-internal sealed record ReportRow(int Kind, int OrderNumber, int? FillNumber, DateOnly? SettledDate, string? Reason);
+internal sealed record ReportRow(int Kind, int? OrderNumber, int? FillNumber, DateOnly? SettledDate, string? Reason);
+
+/// <summary>Trade-settlement R36, R39: one broker settlement.</summary>
+internal sealed record SettlementRow(
+    int Number,
+    string SettlementAccount,
+    string Currency,
+    DateOnly SettlementDate,
+    decimal NetAmount,
+    int FillCount,
+    decimal PaidAmount);

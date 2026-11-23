@@ -52,6 +52,8 @@ public interface IApplicationDbContext
 
     DbSet<BrokerFeed> BrokerFeeds { get; }
 
+    DbSet<TradeSettlement> TradeSettlements { get; }
+
     DbSet<Instrument> Instruments { get; }
 
     DbSet<Account> Accounts { get; }

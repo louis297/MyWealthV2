@@ -202,7 +202,7 @@ public class AccountClosuresSchemaTests
         var exception = await Should.ThrowAsync<SqlException>(() => RunAsync($"""
             {World()}
             {InsertLine("w-L1")}
-            UPDATE [BankStatementLines] SET [Status] = 2, [UnmatchedReason] = 13 WHERE [OutsideId] = N'w-L1';
+            UPDATE [BankStatementLines] SET [Status] = 2, [UnmatchedReason] = 14 WHERE [OutsideId] = N'w-L1';
             """));
         exception.Number.ShouldBe(547);
         exception.Message.ShouldContain("CK_BankStatementLines_UnmatchedReason");

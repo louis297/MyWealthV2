@@ -130,13 +130,15 @@ public static class ControlEndpoints
             await db.BrokerReports.ExecuteDeleteAsync(http.RequestAborted);
             await db.BrokerFills.ExecuteDeleteAsync(http.RequestAborted);
             await db.BrokerOrders.ExecuteDeleteAsync(http.RequestAborted);
+            await db.BrokerSettlements.ExecuteDeleteAsync(http.RequestAborted);
             await db.BrokerSettings.ExecuteUpdateAsync(
                 setters => setters
                     .SetProperty(settings => settings.Mode, BrokerOrderMode.Fill)
                     .SetProperty(settings => settings.FillPercent, BrokerRules.DefaultFillPercent)
                     .SetProperty(settings => settings.RejectReason, (BrokerRejectReason?)null)
                     .SetProperty(settings => settings.SlippagePercent, BrokerRules.DefaultSlippagePercent)
-                    .SetProperty(settings => settings.SettlementDays, BrokerRules.DefaultSettlementDays),
+                    .SetProperty(settings => settings.SettlementDays, BrokerRules.DefaultSettlementDays)
+                    .SetProperty(settings => settings.SettlementMode, BrokerSettlementMode.Pay),
                 http.RequestAborted);
 
             // Simulated instruments R23, corporate-actions R47: the market and its corporate actions are emptied and its

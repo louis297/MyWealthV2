@@ -7,5 +7,8 @@ public enum OutgoingPaymentKind
     Withdrawal = 0,
 
     /// <summary>A receipt sent back to its payer (bank-returns R5).</summary>
-    ReceiptReturn = 1
+    ReceiptReturn = 1,
+
+    /// <summary>The firm's net of a trade settlement, paid to the broker (trade-settlement R12).</summary>
+    TradeSettlement = 2
 }

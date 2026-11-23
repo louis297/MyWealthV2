@@ -212,6 +212,16 @@ public class RolePermissionsTests
         RolePermissions.Has(UserRole.SimulatorOperator, policy).ShouldBeFalse();
     }
 
+    [Test]
+    public void TradeSettlementsManage_IsTenantAdminOnly()
+    {
+        RolePermissions.Has(UserRole.TenantAdmin, Policies.TradeSettlementsManage).ShouldBeTrue();
+        RolePermissions.Has(UserRole.Adviser, Policies.TradeSettlementsManage).ShouldBeFalse();
+        RolePermissions.Has(UserRole.Customer, Policies.TradeSettlementsManage).ShouldBeFalse();
+        RolePermissions.Has(UserRole.SystemAdmin, Policies.TradeSettlementsManage).ShouldBeFalse();
+        RolePermissions.Has(UserRole.SimulatorOperator, Policies.TradeSettlementsManage).ShouldBeFalse();
+    }
+
     [TestCase(Policies.CorporateActionsRead, true, true)]
     [TestCase(Policies.CorporateActionsManage, true, false)]
     public void CorporateActions_MatchTheCorporateActionGrants(string policy, bool tenantAdmin, bool adviser)

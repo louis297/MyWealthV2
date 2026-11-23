@@ -21,6 +21,7 @@ related:
   - ../deployment.md
   - withdrawals.md
   - interest-run.md
+  - trade-settlement.md
 ---
 
 # Adviser Portal BFF
@@ -513,3 +514,14 @@ Add `/orders` to the BFF prefix allow-list (R20) so the Adviser Portal can call 
 - Methods: GET, POST
 - Who: TenantAdmin and Adviser. `webapi` checks `orders.read` and `orders.place`; the BFF does not filter by role.
 - `GET /broker-connections` and `GET /execution-reports` are Back Office routes and are not proxied.
+
+---
+
+## Amendment 2026-11-23 (trade settlements prefix) — accepted
+
+Add `/trade-settlements` to the BFF prefix allow-list (R20) so the Adviser Portal can call the routes of [trade-settlement.md](trade-settlement.md) through `/api`.
+
+- Prefix: `/trade-settlements`
+- Methods: GET, POST
+- Who: TenantAdmin. `webapi` checks `trade-settlements.manage`; the BFF does not filter by role, so an Adviser gets the 403 from `webapi`.
+- `POST /orders/{id}/fills/{fillId}/resolve-break` is under the existing `/orders` prefix.

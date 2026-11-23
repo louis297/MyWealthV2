@@ -44,6 +44,8 @@ import { BankAccountChecksPage } from "@/features/nominatedBankAccounts/BankAcco
 import { OrderDetailPage } from "@/features/orders/OrderDetailPage";
 import { OrdersListPage } from "@/features/orders/OrdersListPage";
 import { PlaceOrderPage } from "@/features/orders/PlaceOrderPage";
+import { TradeSettlementDetailPage } from "@/features/tradeSettlements/TradeSettlementDetailPage";
+import { TradeSettlementsListPage } from "@/features/tradeSettlements/TradeSettlementsListPage";
 import { WithdrawalDetailPage } from "@/features/withdrawals/WithdrawalDetailPage";
 import { WithdrawalsListPage } from "@/features/withdrawals/WithdrawalsListPage";
 import { CloseAccountPage } from "@/features/accountClosures/CloseAccountPage";
@@ -192,6 +194,15 @@ export const appRoutes: RouteObject[] = [
             children: [
               { index: true, element: <OrdersListPage /> },
               { path: ":id", element: <OrderDetailPage /> },
+            ],
+          },
+          {
+            // trade-settlement D76: TenantAdmin only.
+            path: "/trade-settlements",
+            element: <RoleGate allow={[roles.tenantAdmin]} />,
+            children: [
+              { index: true, element: <TradeSettlementsListPage /> },
+              { path: ":id", element: <TradeSettlementDetailPage /> },
             ],
           },
           {

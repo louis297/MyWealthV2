@@ -26,6 +26,7 @@ related:
   - ../features/withdrawals.md
   - ../features/account-closure.md
   - ../features/interest-run.md
+  - ../features/trade-settlement.md
 ---
 
 # Customer Portal
@@ -329,3 +330,13 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders](../fea
 | C33 | A Custodial account with unsettled or reserved cash | Account page cash block | "Cash", "Reserved" (when not 0), "From sales, not settled yet" (when not 0) and "Available to withdraw" from `withdrawableCash`. |
 | C34 | A Customer with a fill | Account page activity | The row is labelled "Bought 4 ACME.SIM at 100.12" or "Sold …", with the trade date, "Settles 25 Nov" or "Settled", and the contract note. A trade that is not a fill keeps today's row. |
 | C35 | A holding with a reserved quantity | Holdings | "<n> reserved for a sell order" under the quantity. |
+
+---
+
+## Amendment 2026-11-23 (trade settlement and broken trades) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [trade-settlement](../features/trade-settlement.md). Field rules live there.
+
+| ID | Behaviour |
+| --- | --- |
+| C36 | Customer Portal, account activity: the Reversal of a fill is labelled "Trade cancelled by the broker: Bought 4 ACME.SIM at 100.12", and the fill's own row shows "Cancelled" in place of the settlement text. A broken fill that was never booked shows nothing. |

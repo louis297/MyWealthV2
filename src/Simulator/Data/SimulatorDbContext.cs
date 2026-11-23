@@ -40,6 +40,8 @@ public sealed class SimulatorDbContext(DbContextOptions<SimulatorDbContext> opti
 
     public DbSet<BrokerReport> BrokerReports => Set<BrokerReport>();
 
+    public DbSet<BrokerSettlement> BrokerSettlements => Set<BrokerSettlement>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<World>(world =>
@@ -158,6 +160,7 @@ public sealed class SimulatorDbContext(DbContextOptions<SimulatorDbContext> opti
             order.Property(row => row.ReferencePrice).HasColumnType("decimal(18,8)");
             order.Property(row => row.FilledQuantity).HasColumnType("decimal(18,8)");
             order.Property(row => row.AcceptedDay).HasColumnType("date");
+            order.Property(row => row.SettlementAccount).HasMaxLength(34);
             order.Property(row => row.RowVersion).IsRowVersion();
             order.Ignore(row => row.Rest);
             order.HasMany(row => row.Fills).WithOne().HasForeignKey(fill => fill.OrderId);
@@ -172,6 +175,18 @@ public sealed class SimulatorDbContext(DbContextOptions<SimulatorDbContext> opti
             fill.Property(row => row.TradeDate).HasColumnType("date");
             fill.Property(row => row.SettlementDate).HasColumnType("date");
             fill.Property(row => row.ContractNote).HasMaxLength(50);
+            fill.HasOne<BrokerSettlement>().WithMany().HasForeignKey(row => row.SettlementId);
+        });
+
+        modelBuilder.Entity<BrokerSettlement>(settlement =>
+        {
+            settlement.ToTable("BrokerSettlements");
+            settlement.HasKey(row => row.Id);
+            settlement.Property(row => row.SettlementAccount).HasMaxLength(34);
+            settlement.Property(row => row.Currency).HasColumnType("char(3)").IsFixedLength();
+            settlement.Property(row => row.SettlementDate).HasColumnType("date");
+            settlement.Property(row => row.NetAmount).HasColumnType("decimal(18,4)");
+            settlement.Property(row => row.PaidAmount).HasColumnType("decimal(18,4)");
         });
 
         modelBuilder.Entity<BrokerReport>(report =>
@@ -180,8 +195,9 @@ public sealed class SimulatorDbContext(DbContextOptions<SimulatorDbContext> opti
             report.HasKey(row => row.Id);
             report.Property(row => row.SettledDate).HasColumnType("date");
             report.Property(row => row.Reason).HasMaxLength(140);
-            report.HasOne(row => row.Order).WithMany().HasForeignKey(row => row.OrderId);
+            report.HasOne(row => row.Order).WithMany().HasForeignKey(row => row.OrderId).IsRequired(false);
             report.HasOne(row => row.Fill).WithMany().HasForeignKey(row => row.FillId);
+            report.HasOne(row => row.Settlement).WithMany().HasForeignKey(row => row.SettlementId);
         });
 
         modelBuilder.Entity<BankFeedPlace>(place =>

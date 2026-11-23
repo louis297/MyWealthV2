@@ -20,7 +20,7 @@ else if (connections is not null)
     {
         <MudSimpleTable Hover="true" Dense="true" Bordered="true" Class="mt-4">
             <thead>
-                <tr><th>Name</th><th>Adapter</th><th>Reports</th></tr>
+                <tr><th>Name</th><th>Adapter</th><th>Reports</th><th>Settlement</th></tr>
             </thead>
             <tbody>
             @foreach (var connection in connections)
@@ -29,6 +29,7 @@ else if (connections is not null)
                     <td>@connection.Name</td>
                     <td>@connection.Adapter</td>
                     <td>@BrokerText.Reports(connection.Reports)</td>
+                    <td>@BrokerText.Settles(connection.SettlementCurrencies)</td>
                 </tr>
             }
             </tbody>
@@ -49,8 +50,8 @@ else if (connections is not null)
         <MudSimpleTable Hover="true" Dense="true" Bordered="true">
             <thead>
                 <tr>
-                    <th>Received</th><th>Connection</th><th>Kind</th><th>Client order id</th><th>Quantity</th><th>Price</th>
-                    <th>Status</th><th>Reason</th>
+                    <th>Received</th><th>Connection</th><th>Kind</th><th>Client order id</th><th>Settlement id</th><th>Quantity</th>
+                    <th>Price</th><th>Status</th><th>Reason</th>
                 </tr>
             </thead>
             <tbody>
@@ -61,6 +62,7 @@ else if (connections is not null)
                     <td>@item.Connection</td>
                     <td>@BrokerText.Kind(item.Kind)</td>
                     <td>@item.ClientOrderId</td>
+                    <td>@item.SettlementId</td>
                     <td>@BrokerText.Number(item.Quantity)</td>
                     <td>@BrokerText.Number(item.Price)</td>
                     <td>@item.Status</td>

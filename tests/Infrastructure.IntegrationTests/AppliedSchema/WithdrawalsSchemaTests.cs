@@ -163,8 +163,8 @@ public class WithdrawalsSchemaTests
             """)).ShouldBe(2);
     }
 
-    [TestCase("[UnmatchedReason]", "13")]
-    [TestCase("[MatchMethod]", "5")]
+    [TestCase("[UnmatchedReason]", "14")]
+    [TestCase("[MatchMethod]", "6")]
     public async Task StatementLineValueOutsideItsWidenedCheck_IsRejected(string column, string value)
     {
         var exception = await Should.ThrowAsync<SqlException>(() => RunAsync($"""

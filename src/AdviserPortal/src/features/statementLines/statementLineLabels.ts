@@ -39,10 +39,15 @@ export function reasonLabel(reason: string | null | undefined) {
       return "Bank refused the return";
     case "AccountClosing":
       return "Account being closed";
+    case "SettlementMismatch":
+      return "Does not match the trade settlement";
     default:
       return reason ?? "";
   }
 }
+
+/** D78: what a TenantAdmin does with a receipt that does not match its trade settlement. */
+export const settlementMismatchSentence = "Return it to the broker, or ignore it with a note.";
 
 /** D35: the label of the last action. */
 export function actionLabel(action: string) {
@@ -93,6 +98,8 @@ export function methodLabel(method: string) {
       return "Payment returned";
     case "Recall":
       return "Recalled by the payer's bank";
+    case "Settlement":
+      return "Trade settlement";
     default:
       return "Matched by reference";
   }

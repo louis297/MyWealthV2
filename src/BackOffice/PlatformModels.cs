@@ -126,7 +126,11 @@ public sealed record CorporateActionAnnouncementPage(IReadOnlyList<CorporateActi
 public sealed record BrokerFeedState(DateTimeOffset? LastSucceededAt, DateTimeOffset? LastFailedAt, string? LastFailure);
 
 /// <summary>A configured broker connection (orders R4).</summary>
-public sealed record BrokerConnectionItem(string Name, string Adapter, BrokerFeedState? Reports);
+public sealed record BrokerConnectionItem(
+    string Name,
+    string Adapter,
+    BrokerFeedState? Reports,
+    IReadOnlyList<string>? SettlementCurrencies = null);
 
 public sealed record BrokerConnectionPage(IReadOnlyList<BrokerConnectionItem> Items, int Page, int PageSize, int TotalCount);
 
@@ -149,7 +153,8 @@ public sealed record ExecutionReportItem(
     DateTimeOffset ReceivedAt,
     string Status,
     string? SkipReason,
-    DateTimeOffset? ProcessedAt);
+    DateTimeOffset? ProcessedAt,
+    string? SettlementId = null);
 
 public sealed record ExecutionReportPage(IReadOnlyList<ExecutionReportItem> Items, int Page, int PageSize, int TotalCount);
 

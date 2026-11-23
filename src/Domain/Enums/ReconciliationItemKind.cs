@@ -26,5 +26,18 @@ public enum ReconciliationItemKind
     InterestCredited = 13,
 
     /// <summary>Tax withheld from that interest and still in the trust account (interest-run R41).</summary>
-    TaxWithheld = 14
+    TaxWithheld = 14,
+
+    /// <summary>The cash of order fills whose trade settlement has not completed (trade-settlement R23), Timing.</summary>
+    UnsettledTrades = 15,
+
+    /// <summary>The cash of order fills whose settlement failed or is disputed, or that were broken and not reversed
+    /// (trade-settlement R23), Break.</summary>
+    TradesNeedingAction = 16,
+
+    /// <summary>Fills still <c>Pending</c> in a completed trade settlement (trade-settlement R24), Break.</summary>
+    UnbookedFills = 17,
+
+    /// <summary>The trade fees of order fills, held in the trust account (trade-settlement R25), Known.</summary>
+    TradeFees = 18
 }

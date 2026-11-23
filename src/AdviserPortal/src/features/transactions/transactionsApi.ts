@@ -112,6 +112,8 @@ export type TransactionExecution = {
   settlementDate: string;
   brokerReference: string | null;
   settledAt: string | null;
+  /** trade-settlement R34: when the broker took the fill back. */
+  brokenAt?: string | null;
 };
 
 /** corporate-actions R37: the event behind an entitlement posting. */

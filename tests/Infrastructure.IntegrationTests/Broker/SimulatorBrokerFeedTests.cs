@@ -75,7 +75,7 @@ public class SimulatorBrokerFeedTests
         handler.Requests.Single().RequestUri!.AbsoluteUri.ShouldBe("http://simulator:8082/party/broker/reports?limit=100");
     }
 
-    [TestCase("\"Broken\"")]
+    [TestCase("\"Breaks\"")]
     [TestCase("\"fill\"")]
     [TestCase("null")]
     [TestCase("7")]
@@ -120,6 +120,46 @@ public class SimulatorBrokerFeedTests
             .Page.ShouldNotBeNull().Items.ShouldHaveSingleItem();
 
         (read.Kind, read.FillId, read.SettledDate).ShouldBe((ExecutionReportKind.Settled, "w-X1", (DateOnly?)null));
+    }
+
+    private const string Settlement = """
+        { "id": "w-X9", "kind": "Settlement", "clientOrderId": null, "brokerOrderId": null, "quantity": null, "price": null,
+          "tradeDate": null, "settlementDate": null, "contractNote": null, "fillId": null, "settledDate": "2026-11-25", "reason": null,
+          "settlementId": "0f8fad5b-S3", "settlementAccount": "SIM-DEMO-USD", "currency": "USD", "netAmount": -1001.5, "fillCount": 3 }
+        """;
+
+    [Test]
+    public async Task ASettlementItem_AndASettledItemWithItsSettlementId_MapWithTheSettlementFields()
+    {
+        var settled = Settled.Replace("\"reason\": null", "\"reason\": null, \"settlementId\": \"0f8fad5b-S3\", \"settlementAccount\": null, \"currency\": null, \"netAmount\": null, \"fillCount\": null");
+
+        var page = (await Feed(new StubHandler(HttpStatusCode.OK, Page(settled, Settlement))).GetReportsAsync(Connection, null, 100, CancellationToken.None))
+            .Page.ShouldNotBeNull();
+
+        page.Items.ShouldBe([
+            new BrokerFeedItem("w-X3", ExecutionReportKind.Settled, OrderId, "w-O1", null, null, null, null, null, "w-X1",
+                new DateOnly(2026, 11, 25), null, new MyWealthV2.Domain.Orders.ExecutionReportSettlement("0f8fad5b-S3")),
+            new BrokerFeedItem("w-X9", ExecutionReportKind.Settlement, null, null, null, null, null, null, null, null,
+                new DateOnly(2026, 11, 25), null,
+                new MyWealthV2.Domain.Orders.ExecutionReportSettlement("0f8fad5b-S3", "SIM-DEMO-USD", "USD", -1001.5m, 3))
+        ]);
+        page.Items.All(item => ExecutionReport.IsStorable(item.Id, item.Kind, item.ClientOrderId, item.Quantity, item.Price,
+            item.TradeDate, item.SettlementDate, item.FillId, item.SettledDate, item.Settlement)).ShouldBeTrue();
+    }
+
+    [TestCase("\"netAmount\": -1001.5", "\"netAmount\": \"-1001.5\"")]
+    [TestCase("\"fillCount\": 3", "\"fillCount\": 3.5")]
+    [TestCase("\"fillCount\": 3", "\"fillCount\": \"3\"")]
+    public async Task ASettlementFieldItCannotRead_ComesThroughEmpty_SoThePullRefusesThePage(string field, string broken)
+    {
+        var item = Settlement.Replace(field, broken);
+
+        var read = (await Feed(new StubHandler(HttpStatusCode.OK, Page(item))).GetReportsAsync(Connection, null, 100, CancellationToken.None))
+            .Page.ShouldNotBeNull().Items.ShouldHaveSingleItem();
+
+        read.Kind.ShouldBe(ExecutionReportKind.Settlement);
+        ExecutionReport.IsStorable(read.Id, read.Kind, read.ClientOrderId, read.Quantity, read.Price, read.TradeDate, read.SettlementDate,
+            read.FillId, read.SettledDate, read.Settlement).ShouldBeFalse();
     }
 
     [TestCase(HttpStatusCode.Unauthorized, BrokerFailure.Unauthorized)]

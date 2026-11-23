@@ -67,7 +67,8 @@ public sealed class ProcessStatementLines(
         if (line.Direction == BankLineDirection.Debit)
         {
             if (await payouts.ProcessDebitAsync(line, cancellationToken)
-                || await new BankReturns(db, time).ProcessReturnPaidAsync(line, cancellationToken))
+                || await new BankReturns(db, time).ProcessReturnPaidAsync(line, cancellationToken)
+                || await new BankSettlements(db, time).ProcessPaidAsync(line, cancellationToken))
             {
                 return;
             }
@@ -87,12 +88,19 @@ public sealed class ProcessStatementLines(
         if (line.ReturnOfOutsideId is not null)
         {
             // R8: a credit that takes back a line other than a payout is a receipt again, for a person to place.
-            if (!await payouts.ProcessReturnAsync(line, cancellationToken))
+            if (!await payouts.ProcessReturnAsync(line, cancellationToken)
+                && !await new BankSettlements(db, time).ProcessReturnAsync(line, cancellationToken))
             {
                 line.MarkUnknown(UnmatchedReason.UnknownReturn);
                 await db.SaveChangesAsync(cancellationToken);
             }
 
+            return;
+        }
+
+        // Trade-settlement R19: the broker's settlement cash is checked before deposit matching.
+        if (await new BankSettlements(db, time).ProcessReceiptAsync(line, cancellationToken))
+        {
             return;
         }
 

@@ -16,7 +16,7 @@ public class BrokerFeedTests
     private static readonly string[] Fields =
     [
         "id", "kind", "clientOrderId", "brokerOrderId", "quantity", "price", "tradeDate", "settlementDate", "contractNote", "fillId",
-        "settledDate", "reason"
+        "settledDate", "reason", "settlementId", "settlementAccount", "currency", "netAmount", "fillCount"
     ];
 
     private SimulatorFactory _factory = null!;

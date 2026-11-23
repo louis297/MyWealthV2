@@ -67,7 +67,8 @@ public class WebApiFactory(
             services.RemoveAll<IBankConnections>();
             services.AddSingleton<IBankConnections, FakeBankConnections>();
             services.RemoveAll<MyWealthV2.Application.Broker.IBrokerConnections>();
-            services.AddSingleton<MyWealthV2.Application.Broker.IBrokerConnections, Broker.FakeBrokerConnections>();
+            services.AddSingleton<Broker.FakeBrokerConnections>();
+            services.AddSingleton<MyWealthV2.Application.Broker.IBrokerConnections>(sp => sp.GetRequiredService<Broker.FakeBrokerConnections>());
             services.RemoveAll<MyWealthV2.Application.Broker.IBrokerOrders>();
             services.AddSingleton<Broker.InMemoryBrokerOrders>();
             services.AddSingleton<MyWealthV2.Application.Broker.IBrokerOrders>(sp => sp.GetRequiredService<Broker.InMemoryBrokerOrders>());

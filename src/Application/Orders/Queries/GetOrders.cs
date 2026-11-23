@@ -88,7 +88,8 @@ public class GetOrdersQueryHandler(IApplicationDbContext db, ICurrentUser curren
         // R16: only orders with a fill that is not posted yet.
         if (request.PendingFill == true)
         {
-            query = query.Where(row => db.OrderFills.Any(fill => fill.OrderId == row.Id && fill.Status == OrderFillStatus.Pending));
+            query = query.Where(row => db.OrderFills.Any(fill => fill.OrderId == row.Id
+                && (fill.Status == OrderFillStatus.Pending || fill.BreakOutcome == FillBreakOutcome.NotApplied)));
         }
 
         var totalCount = await query.CountAsync(cancellationToken);

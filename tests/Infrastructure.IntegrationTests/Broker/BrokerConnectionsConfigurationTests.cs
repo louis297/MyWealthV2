@@ -158,6 +158,79 @@ public class BrokerConnectionsConfigurationTests
             .Message.ShouldContain("BaseUrl");
     }
 
+    [TestCase(BrokerConnectionHost.WebApi)]
+    [TestCase(BrokerConnectionHost.Worker)]
+    public void BankAccounts_AreReadOnBothHosts_AndListedAsSettlementCurrencies(BrokerConnectionHost host)
+    {
+        var values = Worker("simulator");
+        values["BrokerConnections:simulator:BankAccounts:USD:AccountNumber"] = "BRK-SIM-USD";
+        values["BrokerConnections:simulator:BankAccounts:USD:AccountName"] = "Simulator Broker";
+        values["BrokerConnections:simulator:BankAccounts:NZD:AccountNumber"] = "BRK SIM NZD";
+        values["BrokerConnections:simulator:BankAccounts:NZD:AccountName"] = "Simulator Broker NZ";
+        var builder = Builder(values);
+
+        builder.AddBrokerConnections(host);
+
+        using var built = builder.Build();
+        var settings = built.Services.GetRequiredService<ConfiguredBrokerConnections>().Settings.ShouldHaveSingleItem();
+        settings.BankAccounts.ShouldBe([
+            new BrokerBankAccount("NZD", "BRK SIM NZD", "Simulator Broker NZ"),
+            new BrokerBankAccount("USD", "BRK-SIM-USD", "Simulator Broker")
+        ]);
+        var connections = built.Services.GetRequiredService<IBrokerConnections>();
+        connections.SettlementCurrencies("simulator").ShouldBe(["NZD", "USD"]);
+        connections.BankAccount("simulator", "USD").ShouldBe(new BrokerBankAccount("USD", "BRK-SIM-USD", "Simulator Broker"));
+        connections.BankAccount("simulator", "AUD").ShouldBeNull();
+        connections.BankAccount("other", "USD").ShouldBeNull();
+        connections.BankAccount(null, "USD").ShouldBeNull();
+        connections.SettlementCurrencies("other").ShouldBeEmpty();
+    }
+
+    [Test]
+    public void NoBankAccounts_IsValid_AndListsNoSettlementCurrency()
+    {
+        var builder = Builder(Worker("simulator"));
+
+        builder.AddBrokerConnections(BrokerConnectionHost.Worker);
+
+        using var built = builder.Build();
+        built.Services.GetRequiredService<IBrokerConnections>().SettlementCurrencies("simulator").ShouldBeEmpty();
+    }
+
+    [TestCase("US", "BRK-SIM-USD", "Simulator Broker")]
+    [TestCase("USDX", "BRK-SIM-USD", "Simulator Broker")]
+    [TestCase("U5D", "BRK-SIM-USD", "Simulator Broker")]
+    [TestCase("USD", null, "Simulator Broker")]
+    [TestCase("USD", "BRK-SIM-USD", null)]
+    [TestCase("USD", "BRK  SIM", "Simulator Broker")]
+    [TestCase("USD", "BRK_SIM", "Simulator Broker")]
+    [TestCase("USD", "BRK-SIM-USD", "   ")]
+    public void BadBankAccount_StopsTheHost_OnBothHosts(string currency, string? number, string? name)
+    {
+        var name141 = name == "   " ? new string('n', 141) : name;
+        foreach (var host in new[] { BrokerConnectionHost.WebApi, BrokerConnectionHost.Worker })
+        {
+            var values = Worker("simulator");
+            if (number is not null)
+            {
+                values[$"BrokerConnections:simulator:BankAccounts:{currency}:AccountNumber"] = number;
+            }
+
+            if (name141 is not null)
+            {
+                values[$"BrokerConnections:simulator:BankAccounts:{currency}:AccountName"] = name141;
+            }
+
+            if (number is null && name141 is null)
+            {
+                values[$"BrokerConnections:simulator:BankAccounts:{currency}:Other"] = "x";
+            }
+
+            Should.Throw<InvalidOperationException>(() => Builder(values).AddBrokerConnections(host))
+                .Message.ShouldContain("BankAccounts");
+        }
+    }
+
     private static Dictionary<string, string?> Worker(string name) => new()
     {
         [$"BrokerConnections:{name}:Adapter"] = "Simulator",

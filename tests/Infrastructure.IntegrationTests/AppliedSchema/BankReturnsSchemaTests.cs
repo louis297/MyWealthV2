@@ -100,7 +100,7 @@ public class BankReturnsSchemaTests
             {InsertLine("w-L1")}
             DECLARE @line int = SCOPE_IDENTITY();
             {InsertPayment(1, "NULL", "@line", 0)}
-            UPDATE [OutgoingPayments] SET [Kind] = 2 WHERE [Id] = SCOPE_IDENTITY();
+            UPDATE [OutgoingPayments] SET [Kind] = 3 WHERE [Id] = SCOPE_IDENTITY();
             """));
 
         exception.Number.ShouldBe(547);
@@ -183,8 +183,8 @@ public class BankReturnsSchemaTests
     }
 
     [TestCase("[Status]", "7", "CK_BankStatementLines_Status")]
-    [TestCase("[UnmatchedReason]", "13", "CK_BankStatementLines_UnmatchedReason")]
-    [TestCase("[MatchMethod]", "5", "CK_BankStatementLines_MatchMethod")]
+    [TestCase("[UnmatchedReason]", "14", "CK_BankStatementLines_UnmatchedReason")]
+    [TestCase("[MatchMethod]", "6", "CK_BankStatementLines_MatchMethod")]
     public async Task StatementLineValueOutsideItsWidenedCheck_IsRejected(string column, string value, string check)
     {
         var exception = await Should.ThrowAsync<SqlException>(() => RunAsync($"""

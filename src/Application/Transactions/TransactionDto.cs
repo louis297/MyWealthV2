@@ -74,6 +74,9 @@ public sealed class TransactionExecutionDto
 
     /// <summary>When the broker said the fill settled; null until then (R43).</summary>
     public DateTimeOffset? SettledAt { get; init; }
+
+    /// <summary>Trade-settlement R34: when the broker took the fill back; null when it did not.</summary>
+    public DateTimeOffset? BrokenAt { get; init; }
 }
 
 /// <summary>An entitlement posting's corporate action detail (corporate-actions R27, R37).</summary>

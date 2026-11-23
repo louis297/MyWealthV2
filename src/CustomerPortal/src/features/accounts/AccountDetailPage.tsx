@@ -179,16 +179,20 @@ export function AccountDetailPage() {
     openOrderStatuses.has(item.status)
     || (item.closedAt !== null && Date.now() - new Date(item.closedAt).getTime() <= thirtyDays));
 
-  /** C34: "Bought 4 ACME.SIM at 100.12" for a fill; null for any other row. */
+  /** C34: "Bought 4 ACME.SIM at 100.12" for a fill; C36: "Trade cancelled by the broker: …" for its Reversal; null
+   * for any other row. */
   function fillLabel(row: Activity) {
-    if (!row.execution || (row.type !== "Buy" && row.type !== "Sell")) {
+    if (!row.execution || (row.type !== "Buy" && row.type !== "Sell" && row.type !== "Reversal")) {
       return null;
     }
     const leg = (row.security ?? []).find((item) => item.accountId === id) ?? row.security?.[0];
     const symbol = orderItems.find((item) => item.id === row.execution?.orderId)?.instrument.symbol
       ?? holdingsItems.find((item) => item.instrumentId === leg?.instrumentId)?.symbol;
     const what = [leg ? String(Math.abs(leg.quantity)) : null, symbol].filter(Boolean).join(" ");
-    return `${row.type === "Buy" ? "Bought" : "Sold"}${what ? ` ${what}` : ""} at ${row.execution.price}`;
+    // A Reversal negates the fill's leg, so a reversed buy has a negative quantity.
+    const bought = row.type === "Reversal" ? (leg?.quantity ?? 0) < 0 : row.type === "Buy";
+    const trade = `${bought ? "Bought" : "Sold"}${what ? ` ${what}` : ""} at ${row.execution.price}`;
+    return row.type === "Reversal" ? `Trade cancelled by the broker: ${trade}` : trade;
   }
   // C26: a closing account, and a Closed one whose latest closure is Completed.
   const closure = account.data.closure;
@@ -375,12 +379,14 @@ export function AccountDetailPage() {
                     <TableRow key={row.id}>
                       <TableCell>
                         {fillLabel(row) ?? typeLabel(row)}
-                        {fillLabel(row) && row.execution ? (
+                        {fillLabel(row) && row.execution && row.type !== "Reversal" ? (
                           // C34: the trade date, the settlement and the contract note of a fill.
                           <>
                             <p className="text-muted-foreground text-xs">{`Trade date ${row.execution.tradeDate}`}</p>
                             <p className="text-muted-foreground text-xs">
-                              {row.execution.settledAt ? "Settled" : `Settles ${shortDay(row.execution.settlementDate)}`}
+                              {row.execution.brokenAt
+                                ? "Cancelled"
+                                : row.execution.settledAt ? "Settled" : `Settles ${shortDay(row.execution.settlementDate)}`}
                             </p>
                             {row.execution.brokerReference ? (
                               <p className="text-muted-foreground text-xs">{`Contract note ${row.execution.brokerReference}`}</p>

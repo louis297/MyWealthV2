@@ -44,6 +44,14 @@ export function kindLabel(kind: string) {
       return "Other cash entered on the platform";
     case "OtherClientMoneyAccount":
       return "Cash from another client money account";
+    case "UnsettledTrades":
+      return "Trades waiting for settlement";
+    case "TradesNeedingAction":
+      return "Trades that need action";
+    case "UnbookedFills":
+      return "Settled trades not booked yet";
+    case "TradeFees":
+      return "Trade fees held in the trust account";
     default:
       return kind;
   }

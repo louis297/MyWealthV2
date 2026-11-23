@@ -260,7 +260,7 @@ public class InterestSchemaTests
     }
 
     [TestCase(12, "CK_BankReconciliationItems_Line")]
-    [TestCase(15, "CK_BankReconciliationItems_Kind")]
+    [TestCase(19, "CK_BankReconciliationItems_Kind")]
     public async Task AnItemOutsideTheChecks_Violates(int kind, string constraint)
     {
         var exception = await Should.ThrowAsync<SqlException>(() => RunAsync($"""

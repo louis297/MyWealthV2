@@ -420,7 +420,7 @@ public class BrokerLifecycleTests
 
         var settings = await BrokerHttp.SettingsAsync(_control);
         settings.EnumerateObject().Select(property => property.Name)
-            .ShouldBe(["mode", "fillPercent", "rejectReason", "slippagePercent", "settlementDays"]);
+            .ShouldBe(["mode", "fillPercent", "rejectReason", "slippagePercent", "settlementDays", "settlementMode"]);
         (settings.GetProperty("mode").GetString(), settings.GetProperty("fillPercent").GetInt32(),
                 settings.GetProperty("rejectReason").ValueKind, settings.GetProperty("slippagePercent").GetDecimal(),
                 settings.GetProperty("settlementDays").GetInt32())

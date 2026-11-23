@@ -13,6 +13,7 @@ using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.ValueObjects;
 using MyWealthV2.Infrastructure.Accounts;
 using MyWealthV2.Infrastructure.BankFeed;
+using MyWealthV2.Infrastructure.Broker;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Identity;
 using MyWealthV2.Shared;
@@ -196,6 +197,7 @@ public class BankStatementSyncJobTests
         builder.Configuration[$"ConnectionStrings:{Services.Database}"] = SchemaDatabaseSetup.ConnectionString;
         builder.AddInfrastructureServices();
         builder.AddBankConnections(BankConnectionHost.Worker);
+        builder.AddBrokerConnections(BrokerConnectionHost.Worker);
         builder.Services.AddScoped<IUser, SystemUser>();
         builder.Services.RemoveAll<IBankConnections>();
         builder.Services.AddSingleton<IBankConnections>(new ConfiguredBankConnections([Settings("simulator", 1)]));

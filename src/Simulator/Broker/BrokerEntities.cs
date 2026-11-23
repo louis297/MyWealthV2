@@ -41,7 +41,20 @@ public enum BrokerReportKind
     Fill = 0,
     Cancelled = 1,
     Expired = 2,
-    Settled = 3
+    Settled = 3,
+
+    /// <summary>Trade-settlement R40: the broker took a fill back.</summary>
+    Broken = 4,
+
+    /// <summary>Trade-settlement R36: one broker settlement is closed.</summary>
+    Settlement = 5
+}
+
+/// <summary>Trade-settlement R38: whether the broker pays its settlement receipts at once or holds them.</summary>
+public enum BrokerSettlementMode
+{
+    Pay = 0,
+    Hold = 1
 }
 
 /// <summary>The one row of broker settings (orders R55, R56, R61): how new orders are answered, the slippage of a
@@ -68,6 +81,9 @@ public sealed class BrokerSettings
 
     public int SettlementDays { get; private set; }
 
+    /// <summary>Trade-settlement R38.</summary>
+    public BrokerSettlementMode SettlementMode { get; private set; }
+
     public byte[] RowVersion { get; private set; } = null!;
 
     /// <summary>R55: the mode, with the fill percent of <c>Fill</c> and the reason of <c>Reject</c>.</summary>
@@ -83,6 +99,9 @@ public sealed class BrokerSettings
 
     /// <summary>R61: applies to later fills.</summary>
     public void SetSettlementDays(int settlementDays) => SettlementDays = settlementDays;
+
+    /// <summary>Trade-settlement R38: applies to later settlements.</summary>
+    public void SetSettlementMode(BrokerSettlementMode mode) => SettlementMode = mode;
 }
 
 /// <summary>An order in the simulator broker's books (orders R52–R54). The broker does not know which Tenant,
@@ -124,6 +143,9 @@ public sealed class BrokerOrder
     /// <summary>R60: the simulator day the order was accepted on; null for a rejected order.</summary>
     public DateOnly? AcceptedDay { get; private set; }
 
+    /// <summary>Trade-settlement R35: the trust account number the order settles against, as the platform sent it.</summary>
+    public string? SettlementAccount { get; private set; }
+
     public byte[] RowVersion { get; private set; } = null!;
 
     public List<BrokerFill> Fills { get; private set; } = [];
@@ -155,7 +177,8 @@ public sealed class BrokerOrder
         decimal quantity,
         decimal priceLimit,
         decimal referencePrice,
-        DateOnly day) => new()
+        DateOnly day,
+        string? settlementAccount = null) => new()
     {
         Number = number,
         ClientOrderId = clientOrderId,
@@ -167,7 +190,8 @@ public sealed class BrokerOrder
         PriceLimit = priceLimit,
         ReferencePrice = referencePrice,
         Status = BrokerOrderStatus.Working,
-        AcceptedDay = day
+        AcceptedDay = day,
+        SettlementAccount = settlementAccount
     };
 
     /// <summary>R54: a rejected order, kept so a repeat of the request gets the same answer.</summary>
@@ -181,7 +205,8 @@ public sealed class BrokerOrder
         decimal quantity,
         decimal priceLimit,
         decimal referencePrice,
-        BrokerRejectReason reason) => new()
+        BrokerRejectReason reason,
+        string? settlementAccount = null) => new()
     {
         Number = number,
         ClientOrderId = clientOrderId,
@@ -193,7 +218,8 @@ public sealed class BrokerOrder
         PriceLimit = priceLimit,
         ReferencePrice = referencePrice,
         Status = BrokerOrderStatus.Rejected,
-        RejectReason = reason
+        RejectReason = reason,
+        SettlementAccount = settlementAccount
     };
 
     /// <summary>R56: a price above the limit of a buy, or below the limit of a sell, fills nothing.</summary>
@@ -221,6 +247,18 @@ public sealed class BrokerOrder
         }
 
         return fill;
+    }
+
+    /// <summary>Trade-settlement R40: a fill of the order was broken. A working order takes the quantity back and
+    /// stays working; a <c>Filled</c> order becomes <c>Cancelled</c>.</summary>
+    public void TakeBack(BrokerFill fill)
+    {
+        fill.Break();
+        FilledQuantity -= fill.Quantity;
+        if (Status == BrokerOrderStatus.Filled)
+        {
+            Status = BrokerOrderStatus.Cancelled;
+        }
     }
 
     /// <summary>R58, R59, R62: a working order is cancelled; what was filled stays filled.</summary>
@@ -276,8 +314,93 @@ public sealed class BrokerFill
 
     public bool Settled { get; private set; }
 
-    /// <summary>R61: the simulator day reached the settlement date.</summary>
-    public void Settle() => Settled = true;
+    /// <summary>Trade-settlement R40: the broker took the fill back; it never settles.</summary>
+    public bool Broken { get; private set; }
+
+    /// <summary>Trade-settlement R36: the broker settlement the fill settled in, when its order named a settlement
+    /// account.</summary>
+    public int? SettlementId { get; private set; }
+
+    /// <summary>Trade-settlement R40: only a fill that is neither settled nor broken.</summary>
+    public void Break()
+    {
+        if (Settled || Broken)
+        {
+            throw new InvalidOperationException("Only a fill that is neither settled nor broken can be broken.");
+        }
+
+        Broken = true;
+    }
+
+    /// <summary>R61: the simulator day reached the settlement date; trade-settlement R36: in its settlement, if
+    /// any.</summary>
+    public void Settle(int? settlementId = null)
+    {
+        Settled = true;
+        SettlementId = settlementId;
+    }
+}
+
+/// <summary>
+/// One broker settlement (trade-settlement R36): the fills of orders with a settlement account, grouped by settlement
+/// account, currency and settlement date, with their net seen from the trust account (above 0 the broker pays).
+/// </summary>
+public sealed class BrokerSettlement
+{
+    private BrokerSettlement()
+    {
+    }
+
+    public int Id { get; private set; }
+
+    /// <summary>The <c>n</c> of the settlement id, counting the settlements of the world from 1.</summary>
+    public int Number { get; private set; }
+
+    public string SettlementAccount { get; private set; } = "";
+
+    public string Currency { get; private set; } = "";
+
+    public DateOnly SettlementDate { get; private set; }
+
+    public decimal NetAmount { get; private set; }
+
+    public int FillCount { get; private set; }
+
+    /// <summary>Trade-settlement R37–R39: what the broker paid of a net above 0.</summary>
+    public decimal PaidAmount { get; private set; }
+
+    /// <summary>R36: the first 8 hexadecimal digits of the world id, <c>-S</c> and <c>n</c>: it fits a bank reference
+    /// of 18 characters.</summary>
+    public static string SettlementId(Guid worldId, int number) =>
+        $"{worldId.ToString("N")[..8]}-S{number.ToString(CultureInfo.InvariantCulture)}";
+
+    /// <summary>The number of a settlement id of <paramref name="worldId"/>, or false.</summary>
+    public static bool TryReadNumber(string id, Guid worldId, out int number)
+    {
+        number = 0;
+        var prefix = $"{worldId.ToString("N")[..8]}-S";
+        return id.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+               && int.TryParse(id[prefix.Length..], NumberStyles.None, CultureInfo.InvariantCulture, out number);
+    }
+
+    public static BrokerSettlement Open(int number, string settlementAccount, string currency, DateOnly settlementDate) => new()
+    {
+        Number = number,
+        SettlementAccount = settlementAccount,
+        Currency = currency,
+        SettlementDate = settlementDate
+    };
+
+    /// <summary>R36: one fill more, <c>Round(quantity × price, 4)</c>, plus for a sell and minus for a buy.</summary>
+    public void Add(BrokerOrder order, BrokerFill fill)
+    {
+        var gross = Math.Round(fill.Quantity * fill.Price, 4, MidpointRounding.AwayFromZero);
+        NetAmount += order.Side == BrokerOrderSide.Sell ? gross : -gross;
+        FillCount++;
+    }
+
+    /// <summary>R37, R38: the broker paid <paramref name="amount"/> of the settlement.</summary>
+    public void RecordPaid(decimal amount) => PaidAmount += amount;
 }
 
 /// <summary>One report of the broker's feed (orders R63). Its <see cref="Id"/> is its place in the feed.</summary>
@@ -291,11 +414,18 @@ public sealed class BrokerReport
 
     public BrokerReportKind Kind { get; private set; }
 
-    public int OrderId { get; private set; }
+    /// <summary>The order the report is about; none on a <c>Settlement</c> report.</summary>
+    public int? OrderId { get; private set; }
 
-    public BrokerOrder Order { get; private set; } = null!;
+    public BrokerOrder? Order { get; private set; }
 
     public int? FillId { get; private set; }
+
+    /// <summary>Trade-settlement R36: the settlement a <c>Settled</c> report names, or the one a <c>Settlement</c>
+    /// report closes.</summary>
+    public int? SettlementId { get; private set; }
+
+    public BrokerSettlement? Settlement { get; private set; }
 
     public BrokerFill? Fill { get; private set; }
 
@@ -314,7 +444,16 @@ public sealed class BrokerReport
     /// <summary>R60: the report of an expiry.</summary>
     public static BrokerReport OfExpiry(BrokerOrder order) => new() { Kind = BrokerReportKind.Expired, Order = order };
 
-    /// <summary>R61: the report of a settlement, on the fill's settlement date.</summary>
-    public static BrokerReport OfSettlement(BrokerOrder order, BrokerFill fill) =>
-        new() { Kind = BrokerReportKind.Settled, Order = order, Fill = fill, SettledDate = fill.SettlementDate };
+    /// <summary>R61: the report of a settlement, on the fill's settlement date; trade-settlement R36: naming its
+    /// broker settlement, if any.</summary>
+    public static BrokerReport OfSettlement(BrokerOrder order, BrokerFill fill, BrokerSettlement? settlement = null) =>
+        new() { Kind = BrokerReportKind.Settled, Order = order, Fill = fill, SettledDate = fill.SettlementDate, Settlement = settlement };
+
+    /// <summary>Trade-settlement R36: the report that closes a broker settlement; it names no order.</summary>
+    public static BrokerReport OfSettlementClosed(BrokerSettlement settlement) =>
+        new() { Kind = BrokerReportKind.Settlement, Settlement = settlement };
+
+    /// <summary>Trade-settlement R40: the report of a broken fill, with its reason.</summary>
+    public static BrokerReport OfBreak(BrokerOrder order, BrokerFill fill, string reason) =>
+        new() { Kind = BrokerReportKind.Broken, Order = order, Fill = fill, Reason = reason };
 }

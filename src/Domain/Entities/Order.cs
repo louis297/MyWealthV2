@@ -19,6 +19,9 @@ public class Order : BaseAuditableEntity
     /// <summary>R22: the close reason of an order the broker never had.</summary>
     public const string NotAtTheBrokerReason = "Not at the broker";
 
+    /// <summary>Trade-settlement R32: the close reason of a <c>Filled</c> order whose fill was broken.</summary>
+    public const string TradeBrokenReason = "Trade broken";
+
     /// <summary>R50: the note of the cancel request a corporate action makes.</summary>
     public const string CorporateActionNote = "Corporate action";
 
@@ -120,6 +123,13 @@ public class Order : BaseAuditableEntity
     /// <summary>R18: <c>Placed</c> with no send attempt, so the broker cannot hold it.</summary>
     public bool IsUnsent => Status == OrderStatus.Placed && Attempts == 0;
 
+    /// <summary>Trade-settlement R3: the client money account the order's fills settle against at the bank, with
+    /// <see cref="SettlementAccountNumber"/>; both or neither, set when the order is placed and never changed.</summary>
+    public int? ClientMoneyAccountId { get; private set; }
+
+    /// <summary>Trade-settlement R3, R4: the trust account number sent to the broker with the order.</summary>
+    public string? SettlementAccountNumber { get; private set; }
+
     public byte[] RowVersion { get; private set; } = null!;
 
     /// <summary>R14: <c>Placed</c>, <c>Working</c> or <c>PartlyFilled</c>.</summary>
@@ -156,7 +166,8 @@ public class Order : BaseAuditableEntity
         string? memo,
         int placedByUserId,
         DateTimeOffset placedAt,
-        Guid? publicId = null)
+        Guid? publicId = null,
+        ClientMoneyAccount? settlementAccount = null)
     {
         if (quantity <= 0m || decimal.Round(quantity, QuantityDecimals) != quantity)
         {
@@ -205,6 +216,18 @@ public class Order : BaseAuditableEntity
             PlacedAt = placedAt.ToUniversalTime(),
             PublicId = publicId ?? Guid.NewGuid()
         };
+        if (settlementAccount is not null)
+        {
+            if (settlementAccount.TenantId != tenantId
+                || !string.Equals(settlementAccount.Currency.Trim(), quoteCurrency, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new DomainException("The settlement account must be a client money account of the tenant in the order's currency.");
+            }
+
+            order.ClientMoneyAccountId = settlementAccount.Id;
+            order.SettlementAccountNumber = settlementAccount.AccountNumber;
+        }
+
         order.Reserve(fees);
         return order;
     }
@@ -371,6 +394,52 @@ public class Order : BaseAuditableEntity
 
         Reserve(fees);
         return fill;
+    }
+
+    /// <summary>
+    /// Trade-settlement R32: a fill of the order was broken. It no longer counts in the filled quantity, nor, when it
+    /// was reversed, in the posted gross and the charged fee (<paramref name="fee"/> is what that fill charged). An
+    /// open order takes the quantity back and is <c>PartlyFilled</c> or <c>Working</c> by its remaining fills; a
+    /// <c>Filled</c> order becomes <c>Cancelled</c> with <see cref="TradeBrokenReason"/>; an ended order keeps its
+    /// status. The reservation is worked out again.
+    /// </summary>
+    public void BreakFill(
+        OrderFill fill,
+        long breakReportId,
+        string? reason,
+        DateTimeOffset at,
+        FillBreakOutcome outcome,
+        OrderFeeTerms fees,
+        decimal fee = 0m,
+        int? reversalTransactionId = null,
+        FillBreakHoldReason? holdReason = null)
+    {
+        if (!_fills.Contains(fill))
+        {
+            throw new DomainException("The fill is not one of this order's.");
+        }
+
+        EnsureTerms(fees);
+        fill.Break(breakReportId, reason, at, outcome, reversalTransactionId, holdReason);
+        FilledQuantity -= fill.Quantity;
+        if (outcome == FillBreakOutcome.Reversed)
+        {
+            PostedGross -= OrderRules.MaximumGross(fill.Quantity, fill.Price);
+            FeeCharged = Math.Max(0m, FeeCharged - fee);
+        }
+
+        if (Status == OrderStatus.Filled)
+        {
+            Status = OrderStatus.Cancelled;
+            CloseReason = TradeBrokenReason;
+            ClosedAt ??= at.ToUniversalTime();
+        }
+        else if (IsOpen)
+        {
+            Status = _fills.Any(item => item.Status != OrderFillStatus.Broken) ? OrderStatus.PartlyFilled : OrderStatus.Working;
+        }
+
+        Reserve(fees);
     }
 
     /// <summary>R27: the broker ended an open order: <c>Cancelled</c> or <c>Expired</c>, with its reason.</summary>

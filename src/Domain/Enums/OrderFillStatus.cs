@@ -4,5 +4,8 @@ namespace MyWealthV2.Domain.Enums;
 public enum OrderFillStatus
 {
     Pending = 0,
-    Posted = 1
+    Posted = 1,
+
+    /// <summary>The broker took the fill back (trade-settlement R27).</summary>
+    Broken = 2
 }

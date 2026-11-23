@@ -28,6 +28,12 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(order => order.ReservedCash).HasColumnType("decimal(18,4)");
         builder.Property(order => order.ReservedQuantity).HasColumnType("decimal(18,8)");
         builder.Property(order => order.Memo).HasMaxLength(Order.MemoMaxLength);
+        builder.Property(order => order.SettlementAccountNumber).HasMaxLength(ClientMoneyAccount.AccountNumberMaxLength);
+        builder.HasOne<ClientMoneyAccount>()
+            .WithMany()
+            .HasForeignKey(order => order.ClientMoneyAccountId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.Property(order => order.BrokerOrderId).HasMaxLength(Order.BrokerOrderIdMaxLength);
         builder.Property(order => order.CancelNote).HasMaxLength(Order.NoteMaxLength);
         builder.Property(order => order.CloseReason).HasMaxLength(Order.CloseReasonMaxLength);
@@ -84,6 +90,15 @@ public class OrderFillConfiguration : IEntityTypeConfiguration<OrderFill>
         builder.Property(fill => fill.TradeDate).HasColumnType("date").IsRequired();
         builder.Property(fill => fill.SettlementDate).HasColumnType("date").IsRequired();
         builder.Property(fill => fill.BrokerReference).HasMaxLength(OrderFill.BrokerReferenceMaxLength);
+        builder.Property(fill => fill.BrokerSettlementId).HasMaxLength(ExecutionReport.IdMaxLength);
+        builder.Property(fill => fill.BreakReason).HasMaxLength(ExecutionReport.ReasonMaxLength);
+        builder.Property(fill => fill.BreakNote).HasMaxLength(Order.NoteMaxLength);
+        builder.Ignore(fill => fill.IsBroken);
+        builder.HasOne<TradeSettlement>()
+            .WithMany()
+            .HasForeignKey(fill => fill.TradeSettlementId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.Property(fill => fill.NetCash).HasColumnType("decimal(18,4)");
         builder.Property(fill => fill.SettledDate).HasColumnType("date");
         builder.Property(fill => fill.RowVersion).IsRowVersion();
@@ -125,6 +140,10 @@ public class ExecutionReportConfiguration : IEntityTypeConfiguration<ExecutionRe
         builder.Property(report => report.FillOutsideId).HasMaxLength(ExecutionReport.IdMaxLength);
         builder.Property(report => report.SettledDate).HasColumnType("date");
         builder.Property(report => report.Reason).HasMaxLength(ExecutionReport.ReasonMaxLength);
+        builder.Property(report => report.SettlementId).HasMaxLength(ExecutionReport.IdMaxLength);
+        builder.Property(report => report.SettlementAccount).HasMaxLength(TradeSettlement.SettlementAccountMaxLength);
+        builder.Property(report => report.Currency).HasColumnType("char(3)").IsFixedLength();
+        builder.Property(report => report.NetAmount).HasColumnType("decimal(18,4)");
         builder.Property(report => report.RowVersion).IsRowVersion();
         builder.HasIndex(report => report.PublicId).IsUnique();
         builder.HasIndex(report => new { report.Connection, report.OutsideId }).IsUnique();

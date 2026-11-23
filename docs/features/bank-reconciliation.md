@@ -25,6 +25,7 @@ related:
   - ../api-design.md
   - ../glossary.md
   - interest-run.md
+  - trade-settlement.md
 ---
 
 # Bank reconciliation
@@ -577,3 +578,15 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders.md](ord
 - R10: the cash legs of an order's fill are legs of a `Buy` or `Sell` with source `OrderFill`. They never passed through the trust account, so they stay in the item `Trades` (Known), with rebalance trades and the trades typed before orders.
 - Settlement is a status on the fill and moves no money at the bank in that slice; unsettled cash is not a reconciliation item.
 - §11 point 6 ("until orders and settlement exist"): trades stay a known difference until settlement cash moves through the client money account, which is a later step of the roadmap (orders §11 point 1).
+
+---
+
+## Amendment 2026-11-23 (trade settlement and broken trades) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [trade-settlement.md](trade-settlement.md). Rules R22–R25 live there; this section records what changes here.
+
+- R9: a line `Matched` to a trade settlement (method `Settlement`) is not an item, like every matched line. A `SettlementMismatch` line is a `Suspense` break.
+- R10: the cash legs of a Transaction with source `OrderFill` (and of its Reversal) are split by the fill's order. An order with no settlement account, a fill in a `SetAside` trade settlement and a break resolved by hand stay in `Trades`. An order that settles through another client money account → `OtherClientMoneyAccount`. An order that settles through the run's account: its `Fee` legs are `TradeFees` (Known), and its `Principal` legs are nothing once the trade settlement is `Completed`, `TradesNeedingAction` (Break) when the settlement is `PaymentFailed` or `Disputed` or the fill was broken and not reversed, and `UnsettledTrades` (Timing) otherwise. A `Pending` fill in a `Completed` settlement adds `UnbookedFills` (Break).
+- R13, R14: the items still add up to the difference. A run also records `openSettlements` (`{ count, amount }` of the open trade settlements of its account), which is not an item.
+- §5: `ReconciliationItemKind` gains `UnsettledTrades = 15` (Timing), `TradesNeedingAction = 16` (Break), `UnbookedFills = 17` (Break), `TradeFees = 18` (Known). `0052` widens `CK_BankReconciliationItems_Kind` to 0–18 and adds `OpenSettlementsCount` and `OpenSettlementsAmount` to `BankReconciliations`.
+- §11 point 6: trades of orders that settle through the trust account are no longer a known difference; `Trades` keeps rebalance trades, trades typed before orders, sells in another currency, and fills whose settlement was set aside or whose break was resolved by hand.

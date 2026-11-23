@@ -93,4 +93,18 @@ public sealed record OrderFillDto(
     string? HoldReason,
     Guid? TransactionId,
     DateTimeOffset? PostedAt,
-    DateTimeOffset? SettledAt);
+    DateTimeOffset? SettledAt,
+    string? BrokerSettlementId = null,
+    Guid? TradeSettlementId = null,
+    OrderFillBreakDto? Break = null);
+
+/// <summary>Trade-settlement R34: the break of a fill. A Customer sees it without <see cref="Note"/>.</summary>
+public sealed record OrderFillBreakDto(
+    DateTimeOffset At,
+    string? Reason,
+    string Outcome,
+    string? HoldReason,
+    Guid? ReversalTransactionId,
+    PersonRefDto? ResolvedBy,
+    DateTimeOffset? ResolvedAt,
+    string? Note);

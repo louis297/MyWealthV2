@@ -35,6 +35,7 @@ related:
   - ../glossary.md
   - account-closure.md
   - interest-run.md
+  - trade-settlement.md
 ---
 
 # Nominated bank accounts and withdrawals
@@ -823,3 +824,13 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders.md](ord
 - The account item ([accounts.md](accounts.md)) gains `unsettledCash` and `withdrawableCash` next to `reservedCash` and `availableCash` (orders R44).
 - R29, R40: approve and the payout check no cash, as before; unsettled cash is checked only when the withdrawal is requested.
 - §2 Out: "Settled versus unsettled cash (O2)" and "Buy orders and their reservations (O1)" are no longer out; they are [orders.md](orders.md).
+
+---
+
+## Amendment 2026-11-23 (trade settlement and broken trades) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [trade-settlement.md](trade-settlement.md). Rules R12, R17 and R18 live there; this section records what changes here.
+
+- R31: `OutgoingPaymentKind` gains `TradeSettlement = 2`: a payment of the firm's net to the broker, from the client money account, to the broker's bank account in configuration, with its own PublicId as instruction id, a reference only when the broker settlement id is a valid payment reference, and no approval. Exactly one of a withdrawal, a returned line and a trade settlement, by kind. A trade settlement has at most one `Pending` or `Accepted` payment.
+- R32: the send step sends `TradeSettlement` payments with the same rules. `Rejected` makes the trade settlement `PaymentFailed`.
+- R33: a debit line whose `endToEndId` is the instruction id of a `TradeSettlement` payment with the same amount is `Matched` with method `Settlement`, the payment `Paid` and the settlement `Completed`; another amount → `PaymentMismatch`.

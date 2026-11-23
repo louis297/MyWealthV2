@@ -31,6 +31,7 @@ related:
   - ../api-design.md
   - ../glossary.md
   - interest-run.md
+  - trade-settlement.md
 ---
 
 # Account closure
@@ -552,3 +553,11 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders.md](ord
 - R7: with no live order and no unsettled fill, the cash `SUM` is all withdrawable, so the payout rule is unchanged.
 - R12: `POST /orders` and `POST /orders/preview` for a closing account → 400 with `This account is being closed and accepts no new activity.` (orders R7).
 - R16 still holds: a closing account has no holding and no live order, so no fill can reach it.
+
+---
+
+## Amendment 2026-11-23 (trade settlement and broken trades) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [trade-settlement.md](trade-settlement.md). Rule R33 lives there; this section records what changes here.
+
+- R5 gains a refusal, 400 `errors.AccountId`: `A broken trade on this account waits for a decision.`, while a fill of the account has a break with outcome `NotApplied`.

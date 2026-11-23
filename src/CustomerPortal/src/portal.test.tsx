@@ -811,6 +811,37 @@ describe("Customer Portal bank accounts and withdrawals (withdrawals C22–C25)"
     expect(screen.getByText("Buy")).toBeInTheDocument();
   });
 
+  it("labels the Reversal of a broken fill, and shows Cancelled on the fill in place of the settlement (C36)", async () => {
+    const execution = {
+      orderId: "o-1", price: 100.12, tradeDate: "2026-11-23", settlementDate: "2026-11-25", brokerReference: "CN-1", settledAt: null,
+      brokenAt: "2026-11-24T04:10:02Z",
+    };
+    const fill = {
+      id: "t-1", type: "Buy", bookedAt: "2026-11-23T02:13:00Z", memo: null,
+      cash: [{ accountId: "account-1", amount: -405.48, currency: "USD" }],
+      security: [{ accountId: "account-1", instrumentId: "i-1", quantity: 4 }],
+      source: { kind: "OrderFill", id: "o-1" },
+      execution,
+    };
+    const reversal = {
+      ...fill, id: "t-2", type: "Reversal", bookedAt: "2026-11-24T04:10:03Z",
+      cash: [{ accountId: "account-1", amount: 405.48, currency: "USD" }],
+      security: [{ accountId: "account-1", instrumentId: "i-1", quantity: -4 }],
+    };
+    renderAt("/accounts/account-1", me, [reversal, fill], "Custodial", {
+      account: custodialUsd,
+      orders: [{
+        id: "o-1", instrument: { id: "i-1", symbol: "ACME.SIM", name: "Acme Holdings" }, side: "Buy", quantity: 4, filledQuantity: 0,
+        status: "Cancelled", placedAt: "2026-11-23T02:10:00Z", closedAt: "2026-11-24T04:10:03Z",
+      }],
+    });
+
+    expect(await screen.findByText("Trade cancelled by the broker: Bought 4 ACME.SIM at 100.12")).toBeInTheDocument();
+    const fillRow = screen.getByText("Bought 4 ACME.SIM at 100.12").closest("tr")!;
+    expect(within(fillRow).getByText("Cancelled")).toBeInTheDocument();
+    expect(screen.queryByText("Settles 25 Nov")).not.toBeInTheDocument();
+  });
+
   it("shows the quantity a sell order reserves under a holding (C35)", async () => {
     renderAt("/accounts/account-1", me, [], "Custodial", {
       account: custodialUsd,

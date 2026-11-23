@@ -84,6 +84,9 @@ public class BankStatementLine : BaseAuditableEntity
     /// <summary>The withdrawal whose payout or returned payout this line is (withdrawals R40, R42).</summary>
     public int? WithdrawalId { get; private set; }
 
+    /// <summary>Trade-settlement R18–R21: the trade settlement whose cash this line is.</summary>
+    public int? TradeSettlementId { get; private set; }
+
     public byte[] RowVersion { get; private set; } = null!;
 
     /// <summary>A line as the bank sent it, in status <c>Received</c> (R10–R12). Payer name and reference are
@@ -178,6 +181,12 @@ public class BankStatementLine : BaseAuditableEntity
             // Withdrawals R43: a returned payout is the flow's own write; it is not undone by hand.
             throw new StatementLineStatusException("This line returned a payment and cannot be unmatched.");
         }
+
+        if (MatchMethod == StatementLineMatchMethod.Settlement)
+        {
+            // Trade-settlement R21: a settlement line accepts no action; only a returned payment undoes it.
+            throw new StatementLineStatusException("This line is the cash of a trade settlement and cannot be unmatched.");
+        }
     }
 
     /// <summary>The platform matched it by its deposit reference (R17).</summary>
@@ -199,6 +208,26 @@ public class BankStatementLine : BaseAuditableEntity
         EnsureStatus("matched", BankStatementLineStatus.Received);
         SetMatch(accountId, transactionId, StatementLineMatchMethod.Payment, at);
         WithdrawalId = withdrawalId;
+    }
+
+    /// <summary>Trade-settlement R18, R19: the cash of a trade settlement, paid to or received from the broker. No
+    /// Account and no Transaction: the fills were posted when they were reported.</summary>
+    public void MarkSettlement(int tradeSettlementId, DateTimeOffset at)
+    {
+        EnsureStatus("matched", BankStatementLineStatus.Received);
+        SetMatch(null, null, StatementLineMatchMethod.Settlement, at);
+        TradeSettlementId = tradeSettlementId;
+    }
+
+    /// <summary>Trade-settlement R20: the credit line that returns a settlement payment's debit line. No Account and
+    /// no Transaction.</summary>
+    public void MarkSettlementReturn(int tradeSettlementId, int relatedLineId, DateTimeOffset at)
+    {
+        EnsureCredit("matched");
+        EnsureStatus("matched", BankStatementLineStatus.Received);
+        SetMatch(null, null, StatementLineMatchMethod.PaymentReturn, at);
+        TradeSettlementId = tradeSettlementId;
+        RelatedLineId = relatedLineId;
     }
 
     /// <summary>Withdrawals R42: the credit line that returns a payout; the payout is reversed.</summary>

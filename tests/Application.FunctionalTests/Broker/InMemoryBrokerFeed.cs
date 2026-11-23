@@ -70,10 +70,30 @@ internal sealed class InMemoryBrokerFeed : IBrokerFeed
         Add(new BrokerFeedItem(NextId(), kind, orderId.ToString(), "fake-O1", null, null, null, null, null, null, null, reason));
 
     /// <summary>A <c>Settled</c> report naming the fill by the outside id of its <c>Fill</c> report.</summary>
-    public BrokerFeedItem AddSettled(Guid orderId, string fillOutsideId, DateOnly? settledDate = null) =>
+    public BrokerFeedItem AddSettled(Guid orderId, string fillOutsideId, DateOnly? settledDate = null, string? settlementId = null) =>
         Add(new BrokerFeedItem(
             NextId(), ExecutionReportKind.Settled, orderId.ToString(), "fake-O1", null, null, null, null, null, fillOutsideId,
-            settledDate ?? DateOnly.FromDateTime(DateTime.UtcNow).AddDays(2), null));
+            settledDate ?? DateOnly.FromDateTime(DateTime.UtcNow).AddDays(2), null,
+            settlementId is null ? null : new MyWealthV2.Domain.Orders.ExecutionReportSettlement(settlementId)));
+
+    /// <summary>Trade-settlement R26: the broker takes back the fill named by the outside id of its Fill report.</summary>
+    public BrokerFeedItem AddBroken(Guid orderId, string fillOutsideId, string? reason = "Broken by the exchange") =>
+        Add(new BrokerFeedItem(
+            NextId(), ExecutionReportKind.Broken, orderId.ToString(), "fake-O1", null, null, null, null, null, fillOutsideId, null,
+            reason));
+
+    /// <summary>Trade-settlement R7: the broker closes one settlement with its net and its number of fills.</summary>
+    public BrokerFeedItem AddSettlement(
+        string settlementId,
+        string settlementAccount,
+        decimal netAmount,
+        int fillCount,
+        string currency = "USD",
+        DateOnly? settledDate = null) =>
+        Add(new BrokerFeedItem(
+            NextId(), ExecutionReportKind.Settlement, null, null, null, null, null, null, null, null,
+            settledDate ?? DateOnly.FromDateTime(DateTime.UtcNow).AddDays(2), null,
+            new MyWealthV2.Domain.Orders.ExecutionReportSettlement(settlementId, settlementAccount, currency, netAmount, fillCount)));
 
     /// <summary>Every call for <paramref name="connection"/> fails with <paramref name="failure"/> until cleared.</summary>
     public void Fail(BrokerFailure? failure, string connection = FakeBrokerConnections.Simulator)

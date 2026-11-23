@@ -15,6 +15,7 @@ import {
   ShieldCheckIcon,
   BanknoteArrowUpIcon,
   ClipboardListIcon,
+  HandCoinsIcon,
   ScaleIcon,
   PercentIcon,
   SplitIcon,
@@ -53,6 +54,7 @@ import {
   canAccessProfile,
   canAccessReports,
   canAccessOrders,
+  canManageTradeSettlements,
   canAccessWithdrawals,
   canCheckBankAccounts,
   canManageBankReconciliations,
@@ -142,6 +144,13 @@ export function ShellLayout({ children }: { children?: ReactNode }) {
       label: "Orders",
       icon: ClipboardListIcon,
       visible: canAccessOrders(role),
+    },
+    {
+      // trade-settlement D76.
+      to: "/trade-settlements",
+      label: "Trade settlements",
+      icon: HandCoinsIcon,
+      visible: canManageTradeSettlements(role),
     },
     {
       to: "/withdrawals",

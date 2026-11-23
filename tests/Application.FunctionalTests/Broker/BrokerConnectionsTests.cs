@@ -41,7 +41,27 @@ public class BrokerConnectionsTests : TestBase
         item.GetProperty("name").GetString().ShouldBe("simulator");
         item.GetProperty("adapter").GetString().ShouldBe("Simulator");
         item.GetProperty("reports").ValueKind.ShouldBe(JsonValueKind.Null);
-        item.EnumerateObject().Select(property => property.Name).ShouldBe(["name", "adapter", "reports"], ignoreOrder: true);
+        item.GetProperty("settlementCurrencies").GetArrayLength().ShouldBe(0);
+        item.EnumerateObject().Select(property => property.Name)
+            .ShouldBe(["name", "adapter", "reports", "settlementCurrencies"], ignoreOrder: true);
+    }
+
+    [Test]
+    public async Task SystemAdmin_SeesTheSettlementCurrencies_Sorted_AndNoAccountNumber()
+    {
+        var connections = FunctionalTestSetup.WebApiServices.GetRequiredService<FakeBrokerConnections>();
+        connections.SetBankAccount("USD");
+        connections.SetBankAccount("NZD");
+        var system = await TenantHttp.SignInSystemAdmin();
+
+        var response = await TenantHttp.Send(HttpMethod.Get, Path, system.AccessToken);
+
+        var content = await response.Content.ReadAsStringAsync();
+        response.StatusCode.ShouldBe(HttpStatusCode.OK, content);
+        using var json = JsonDocument.Parse(content);
+        json.RootElement.GetProperty("items").EnumerateArray().Single().GetProperty("settlementCurrencies")
+            .EnumerateArray().Select(currency => currency.GetString()).ShouldBe(["NZD", "USD"]);
+        content.ShouldNotContain("BRK-SIM-USD");
     }
 
     [Test]

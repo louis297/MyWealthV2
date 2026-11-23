@@ -22,6 +22,7 @@ related:
   - withdrawals.md
   - account-closure.md
   - interest-run.md
+  - trade-settlement.md
 ---
 
 # Transaction source
@@ -415,3 +416,11 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders.md](ord
 - R12, R13: `OrderFill` is not hand-reversible. `POST /transactions/{id}/reverse` of a fill → 400 by R13. `Rebalance` stays hand-reversible until roadmap O3 (orders R49).
 - §6: script `0051_orders.sql` widens `CK_Transactions_SourceKind` to 0–8 and requires a `SourcePublicId` for kinds 2–8.
 - R10 (item): `source.kind` may be `OrderFill`, with `id` the order's PublicId; the fill itself is named in the item's `execution` (orders R38).
+
+---
+
+## Amendment 2026-11-23 (trade settlement and broken trades) — accepted
+
+Status of this amendment: `accepted` (2026-11-23), together with [trade-settlement.md](trade-settlement.md). Rule R29 lives there; this section records what changes here.
+
+- R7: a broken trade is reversed by its own flow. The Reversal keeps source `OrderFill` and the order's PublicId as source id. `OrderFill` stays not hand-reversible, for the fill and for its Reversal.

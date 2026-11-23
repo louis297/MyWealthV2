@@ -64,4 +64,13 @@ public static class ControlActions
     public const string BrokerSettlementDaysSet = "BrokerSettlementDaysSet";
     public const string BrokerOrderFilled = "BrokerOrderFilled";
     public const string BrokerOrderCancelled = "BrokerOrderCancelled";
+
+    /// <summary>Trade-settlement R38.</summary>
+    public const string BrokerSettlementModeChanged = "BrokerSettlementModeChanged";
+
+    /// <summary>Trade-settlement R38.</summary>
+    public const string BrokerSettlementPaid = "BrokerSettlementPaid";
+
+    /// <summary>Trade-settlement R40.</summary>
+    public const string BrokerFillBroken = "BrokerFillBroken";
 }

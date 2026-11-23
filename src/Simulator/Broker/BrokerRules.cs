@@ -26,6 +26,9 @@ public static class BrokerRules
     /// <summary>R62: the reason of a cancel by a corporate action.</summary>
     public const string CorporateActionReason = "CorporateAction";
 
+    /// <summary>Trade-settlement R40: the reason of a break when the operator gives none.</summary>
+    public const string BrokenReason = "Broken by the exchange";
+
     /// <summary>The purpose name of the fill price draw (R56, simulator R26).</summary>
     public const string FillPurpose = "broker-fill";
 
@@ -46,7 +49,9 @@ public static class BrokerRules
         && IsNumber(body.PriceLimit)
         && IsNumber(body.ReferencePrice)
         && body.Type == "Market"
-        && body.TimeInForce == "Day";
+        && body.TimeInForce == "Day"
+        // Trade-settlement R35: optional, in the shape of an account number.
+        && (body.SettlementAccount is null || BankRules.IsAccountNumber(body.SettlementAccount));
 
     public static bool IsFillPercent(int? percent) => percent is >= 1 and <= 100;
 

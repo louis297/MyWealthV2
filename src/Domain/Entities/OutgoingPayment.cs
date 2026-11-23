@@ -31,6 +31,10 @@ public class OutgoingPayment : BaseAuditableEntity
     /// <summary>The statement line it sends back; set only on a <see cref="OutgoingPaymentKind.ReceiptReturn"/>.</summary>
     public int? ReturnOfLineId { get; private set; }
 
+    /// <summary>The trade settlement whose net it pays to the broker; set only on a
+    /// <see cref="OutgoingPaymentKind.TradeSettlement"/> (trade-settlement R12).</summary>
+    public int? TradeSettlementId { get; private set; }
+
     public decimal Amount { get; private set; }
 
     public string Currency { get; private set; } = string.Empty;
@@ -114,6 +118,43 @@ public class OutgoingPayment : BaseAuditableEntity
             Amount = line.Amount,
             Currency = line.Currency,
             Reference = null,
+            Status = OutgoingPaymentStatus.Pending,
+            PublicId = publicId
+        };
+    }
+
+    /// <summary>Trade-settlement R12: the firm's net of an agreed trade settlement, <c>Pending</c>, from its client
+    /// money account, with its own PublicId as the instruction id and the broker settlement id as reference when it is
+    /// a valid payment reference. No person approves it.</summary>
+    public static OutgoingPayment ForTradeSettlement(TradeSettlement settlement, ClientMoneyAccount clientMoney)
+    {
+        if (settlement.Id == 0)
+        {
+            throw new DomainException("The trade settlement must be saved first.");
+        }
+
+        if (settlement.Status != TradeSettlementStatus.AwaitingPayment || settlement.NetAmount >= 0m)
+        {
+            throw new DomainException("Only a trade settlement the firm owes the broker is paid.");
+        }
+
+        if (clientMoney.Id != settlement.ClientMoneyAccountId || clientMoney.TenantId != settlement.TenantId)
+        {
+            throw new DomainException("The client money account must be the settlement's.");
+        }
+
+        var publicId = Guid.NewGuid();
+        return new OutgoingPayment
+        {
+            TenantId = settlement.TenantId,
+            ClientMoneyAccountId = clientMoney.Id,
+            Connection = clientMoney.BankConnection,
+            Kind = OutgoingPaymentKind.TradeSettlement,
+            InstructionPublicId = publicId,
+            TradeSettlementId = settlement.Id,
+            Amount = -settlement.NetAmount,
+            Currency = settlement.Currency,
+            Reference = Withdrawal.IsValidReference(settlement.BrokerSettlementId) ? settlement.BrokerSettlementId.Trim() : null,
             Status = OutgoingPaymentStatus.Pending,
             PublicId = publicId
         };

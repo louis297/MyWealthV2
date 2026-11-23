@@ -36,6 +36,8 @@ export type StatementLine = {
   relatedLineId?: string | null;
   withdrawalId?: string | null;
   returnReason?: string | null;
+  /** trade-settlement R21: the trade settlement whose cash this line is. */
+  tradeSettlementId?: string | null;
   /** bank-returns R11: the newest return payment of a receipt marked for return. */
   returnPayment?: { status: string; attempts: number; lastFailure: string | null } | null;
   rowVersion: string;

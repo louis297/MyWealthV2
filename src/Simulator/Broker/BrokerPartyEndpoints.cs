@@ -34,11 +34,12 @@ public static class BrokerPartyEndpoints
     private static async Task<IResult> GetReportsAsync(
         string? after,
         int? limit,
+        BrokerBankAccounts accounts,
         SimulatorDbContext db,
         TimeProvider time,
         CancellationToken cancellationToken)
     {
-        var world = await BrokerBook.UpToDateAsync(db, time, cancellationToken);
+        var world = await BrokerBook.UpToDateAsync(db, time, accounts, cancellationToken);
         if (!BankFeedCursor.TryRead(after, world.WorldId, out var afterPlace))
         {
             return Results.BadRequest();
@@ -47,10 +48,16 @@ public static class BrokerPartyEndpoints
         var take = Math.Clamp(limit ?? DefaultLimit, 1, MaxLimit);
         var rows = await (
                 from report in db.BrokerReports.AsNoTracking()
-                join order in db.BrokerOrders.AsNoTracking() on report.OrderId equals order.Id
+                join order in db.BrokerOrders.AsNoTracking() on report.OrderId equals order.Id into orders
+                from order in orders.DefaultIfEmpty()
                 where report.Id > afterPlace
                 orderby report.Id
-                select new { report, order.ClientOrderId, OrderNumber = order.Number })
+                select new
+                {
+                    report,
+                    ClientOrderId = order == null ? null : order.ClientOrderId,
+                    OrderNumber = order == null ? (int?)null : order.Number
+                })
             .Take(take + 1)
             .ToListAsync(cancellationToken);
         var page = rows.Take(take).ToList();
@@ -66,6 +73,11 @@ public static class BrokerPartyEndpoints
             .Where(fill => fillIds.Contains(fill.Id))
             .ToDictionaryAsync(fill => fill.Id, cancellationToken);
         // The number of each fill's own Fill report, which a Settled report names.
+        var settlementIds = page.Where(row => row.report.SettlementId is not null)
+            .Select(row => row.report.SettlementId!.Value).Distinct().ToList();
+        var settlements = await db.BrokerSettlements.AsNoTracking()
+            .Where(settlement => settlementIds.Contains(settlement.Id))
+            .ToDictionaryAsync(settlement => settlement.Id, cancellationToken);
         var fillReports = await db.BrokerReports.AsNoTracking()
             .Where(report => report.Kind == BrokerReportKind.Fill && fillIds.Contains(report.FillId!.Value))
             .Select(report => new { FillId = report.FillId!.Value, Number = db.BrokerReports.Count(other => other.Id <= report.Id) })
@@ -75,19 +87,28 @@ public static class BrokerPartyEndpoints
         {
             var report = row.report;
             var fill = report.Kind == BrokerReportKind.Fill ? fills[report.FillId!.Value] : null;
+            var settlement = report.SettlementId is int settlementId ? settlements[settlementId] : null;
+            var closing = report.Kind == BrokerReportKind.Settlement ? settlement : null;
             return new BrokerFeedItem(
                 BrokerBook.ReportId(world.WorldId, firstNumber + index),
                 report.Kind.ToString(),
                 row.ClientOrderId,
-                BrokerOrder.BrokerOrderId(world.WorldId, row.OrderNumber),
+                row.OrderNumber is int orderNumber ? BrokerOrder.BrokerOrderId(world.WorldId, orderNumber) : null,
                 fill?.Quantity,
                 fill?.Price,
                 fill?.TradeDate,
                 fill?.SettlementDate,
                 fill?.ContractNote,
-                report.Kind == BrokerReportKind.Settled ? BrokerBook.ReportId(world.WorldId, fillReports[report.FillId!.Value]) : null,
-                report.SettledDate,
-                report.Reason);
+                report.Kind is BrokerReportKind.Settled or BrokerReportKind.Broken
+                    ? BrokerBook.ReportId(world.WorldId, fillReports[report.FillId!.Value])
+                    : null,
+                closing?.SettlementDate ?? report.SettledDate,
+                report.Reason,
+                settlement is null ? null : BrokerSettlement.SettlementId(world.WorldId, settlement.Number),
+                closing?.SettlementAccount,
+                closing?.Currency.Trim(),
+                closing?.NetAmount,
+                closing?.FillCount);
         }).ToList();
         return Results.Ok(new BrokerFeed(items, BankFeedCursor.Format(world.WorldId, last), rows.Count > take));
     }
@@ -99,6 +120,7 @@ public static class BrokerPartyEndpoints
     /// </summary>
     private static async Task<IResult> PlaceAsync(
         BrokerOrderRequest body,
+        BrokerBankAccounts accounts,
         SimulatorDbContext db,
         TimeProvider time,
         CancellationToken cancellationToken)
@@ -108,7 +130,7 @@ public static class BrokerPartyEndpoints
             return Results.BadRequest();
         }
 
-        var world = await BrokerBook.UpToDateAsync(db, time, cancellationToken);
+        var world = await BrokerBook.UpToDateAsync(db, time, accounts, cancellationToken);
         var day = MarketPricePath.Day(world.Now(time.GetUtcNow()));
         var hash = Hash(body);
         return await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
@@ -139,8 +161,12 @@ public static class BrokerPartyEndpoints
                     ? settings.RejectReason
                     : null;
             var order = reason is { } rejected
-                ? BrokerOrder.Reject(number, body.ClientOrderId!, hash, body.Symbol!, body.Currency!, side, quantity, limit, reference, rejected)
-                : BrokerOrder.Accept(number, body.ClientOrderId!, hash, body.Symbol!, body.Currency!, side, quantity, limit, reference, day);
+                ? BrokerOrder.Reject(
+                    number, body.ClientOrderId!, hash, body.Symbol!, body.Currency!, side, quantity, limit, reference, rejected,
+                    body.SettlementAccount?.Trim())
+                : BrokerOrder.Accept(
+                    number, body.ClientOrderId!, hash, body.Symbol!, body.Currency!, side, quantity, limit, reference, day,
+                    body.SettlementAccount?.Trim());
             db.BrokerOrders.Add(order);
             await db.SaveChangesAsync(cancellationToken);
 
@@ -165,11 +191,12 @@ public static class BrokerPartyEndpoints
     /// </summary>
     private static async Task<IResult> CancelAsync(
         string clientOrderId,
+        BrokerBankAccounts accounts,
         SimulatorDbContext db,
         TimeProvider time,
         CancellationToken cancellationToken)
     {
-        await BrokerBook.UpToDateAsync(db, time, cancellationToken);
+        await BrokerBook.UpToDateAsync(db, time, accounts, cancellationToken);
         return await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
             db.ChangeTracker.Clear();
@@ -205,7 +232,7 @@ public static class BrokerPartyEndpoints
             body.TimeInForce,
             Number(body.PriceLimit!.Value),
             Number(body.ReferencePrice!.Value)
-        })));
+        }.Concat(body.SettlementAccount is null ? [] : new object?[] { body.SettlementAccount }).ToArray())));
 
     private static string Number(decimal value) => value.ToString("0.########", CultureInfo.InvariantCulture);
 }
@@ -219,7 +246,8 @@ public sealed record BrokerOrderRequest(
     string? Type,
     string? TimeInForce,
     decimal? PriceLimit,
-    decimal? ReferencePrice);
+    decimal? ReferencePrice,
+    string? SettlementAccount = null);
 
 /// <summary>R63: one page of the broker's feed.</summary>
 public sealed record BrokerFeed(IReadOnlyList<BrokerFeedItem> Items, string Cursor, bool HasMore);
@@ -228,8 +256,8 @@ public sealed record BrokerFeed(IReadOnlyList<BrokerFeedItem> Items, string Curs
 public sealed record BrokerFeedItem(
     string Id,
     string Kind,
-    string ClientOrderId,
-    string BrokerOrderId,
+    string? ClientOrderId,
+    string? BrokerOrderId,
     decimal? Quantity,
     decimal? Price,
     DateOnly? TradeDate,
@@ -237,7 +265,12 @@ public sealed record BrokerFeedItem(
     string? ContractNote,
     string? FillId,
     DateOnly? SettledDate,
-    string? Reason);
+    string? Reason,
+    string? SettlementId,
+    string? SettlementAccount,
+    string? Currency,
+    decimal? NetAmount,
+    int? FillCount);
 
 /// <summary>R59: <c>Accepted</c> or <c>TooLate</c>.</summary>
 public sealed record BrokerCancelAnswer(string Status);

@@ -60,7 +60,7 @@ public class ExecutionReportReadTests : TestBase
         fill.EnumerateObject().Select(property => property.Name).ShouldBe([
             "id", "connection", "outsideId", "kind", "clientOrderId", "brokerOrderId", "quantity", "price", "tradeDate",
             "settlementDate", "contractNote", "fillOutsideId", "settledDate", "reason", "receivedAt", "status", "skipReason",
-            "processedAt"
+            "processedAt", "settlementId", "settlementAccount", "currency", "netAmount", "fillCount"
         ], ignoreOrder: true);
         fill.GetProperty("id").GetGuid().ShouldNotBe(Guid.Empty);
         fill.GetProperty("connection").GetString().ShouldBe("simulator");
@@ -96,6 +96,28 @@ public class ExecutionReportReadTests : TestBase
         (unknown.GetProperty("connection").GetString(), unknown.GetProperty("status").GetString(),
                 unknown.GetProperty("skipReason").GetString())
             .ShouldBe(("other-broker", "Skipped", "UnsupportedKind"));
+    }
+
+    [Test]
+    public async Task ASettlementReport_ShowsItsFiveFields()
+    {
+        using (var scope = FunctionalTestSetup.ScopeFactory.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            db.ExecutionReports.Add(ExecutionReport.Receive(
+                "simulator", "w-X9", ExecutionReportKind.Settlement, null, null, null, null, null, null, null, null, Day.AddDays(2),
+                null, At, new Domain.Orders.ExecutionReportSettlement("0f8fad5b-S3", "SIM-DEMO-USD", "USD", -1001.5m, 3)));
+            await db.SaveChangesAsync();
+        }
+
+        var system = await TenantHttp.SignInSystemAdmin();
+        var item = (await ReadAsync(system.AccessToken)).GetProperty("items").EnumerateArray().Single();
+
+        item.GetProperty("kind").GetString().ShouldBe("Settlement");
+        item.TryGetProperty("settlementId", out var settlementId).ShouldBeTrue();
+        (settlementId.GetString(), item.GetProperty("settlementAccount").GetString(), item.GetProperty("currency").GetString())
+            .ShouldBe(("0f8fad5b-S3", "SIM-DEMO-USD", "USD"));
+        (item.GetProperty("netAmount").GetDecimal(), item.GetProperty("fillCount").GetInt32()).ShouldBe((-1001.5m, 3));
     }
 
     [Test]

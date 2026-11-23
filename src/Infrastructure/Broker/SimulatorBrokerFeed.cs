@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using MyWealthV2.Application.Broker;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
+using MyWealthV2.Domain.Orders;
 
 namespace MyWealthV2.Infrastructure.Broker;
 
@@ -93,6 +94,8 @@ public sealed class SimulatorBrokerFeed(IHttpClientFactory httpClients) : IBroke
                 "Cancelled" => ExecutionReportKind.Cancelled,
                 "Expired" => ExecutionReportKind.Expired,
                 "Settled" => ExecutionReportKind.Settled,
+                "Settlement" => ExecutionReportKind.Settlement,
+                "Broken" => ExecutionReportKind.Broken,
                 _ => null
             },
             Text(item.ClientOrderId),
@@ -104,9 +107,22 @@ public sealed class SimulatorBrokerFeed(IHttpClientFactory httpClients) : IBroke
             Text(item.ContractNote),
             Text(item.FillId),
             Date(item.SettledDate),
-            Text(item.Reason))).ToList();
+            Text(item.Reason),
+            SettlementOf(item))).ToList();
         return BrokerFeedResult.Succeeded(new BrokerFeedPage(items, page.Cursor, page.HasMore ?? false));
     }
+
+    /// <summary>Trade-settlement R41, R43: the five settlement fields, or nothing when the item carries none. A net
+    /// that is not a JSON number or a count that is not a whole number comes through empty.</summary>
+    private static ExecutionReportSettlement? SettlementOf(WireItem item)
+    {
+        var settlement = new ExecutionReportSettlement(
+            Text(item.SettlementId), Text(item.SettlementAccount), Text(item.Currency), Number(item.NetAmount), WholeNumber(item.FillCount));
+        return settlement == new ExecutionReportSettlement(null) ? null : settlement;
+    }
+
+    private static int? WholeNumber(JsonElement? value) =>
+        value is { ValueKind: JsonValueKind.Number } number && number.TryGetInt32(out var whole) ? whole : null;
 
     /// <summary>A JSON string, or nothing: any other shape comes through empty.</summary>
     private static string? Text(JsonElement? value) =>
@@ -137,5 +153,10 @@ public sealed class SimulatorBrokerFeed(IHttpClientFactory httpClients) : IBroke
         [property: JsonPropertyName("contractNote")] JsonElement? ContractNote,
         [property: JsonPropertyName("fillId")] JsonElement? FillId,
         [property: JsonPropertyName("settledDate")] JsonElement? SettledDate,
-        [property: JsonPropertyName("reason")] JsonElement? Reason);
+        [property: JsonPropertyName("reason")] JsonElement? Reason,
+        [property: JsonPropertyName("settlementId")] JsonElement? SettlementId = null,
+        [property: JsonPropertyName("settlementAccount")] JsonElement? SettlementAccount = null,
+        [property: JsonPropertyName("currency")] JsonElement? Currency = null,
+        [property: JsonPropertyName("netAmount")] JsonElement? NetAmount = null,
+        [property: JsonPropertyName("fillCount")] JsonElement? FillCount = null);
 }

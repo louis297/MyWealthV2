@@ -29,6 +29,11 @@ public class OutgoingPaymentConfiguration : IEntityTypeConfiguration<OutgoingPay
             .WithMany()
             .HasForeignKey(row => row.ClientMoneyAccountId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<TradeSettlement>()
+            .WithMany()
+            .HasForeignKey(row => row.TradeSettlementId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Currency>()
             .WithMany()
             .HasForeignKey(row => row.Currency)

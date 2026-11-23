@@ -565,6 +565,43 @@ public class TenantCompositeKeysSchemaTests
             INSERT INTO [TransactionExecutionDetails] ([TransactionId], [TenantId], [FillPublicId], [Price], [TradeDate], [SettlementDate])
             VALUES (@{p}_buy, @a_tenant, NEWID(), 100, '2026-11-23', '2026-11-25');
             """),
+        ("FK_TradeSettlements_ClientMoneyAccounts_TenantId_ClientMoneyAccountId", "ClientMoneyAccounts",
+            ClientMoney("@{p}_tenant", "pcma") + Report() + Settlement("@a_tenant", "@pcma")),
+        ("FK_TradeSettlements_Users_TenantId_SetAsideByUserId", "Users",
+            ClientMoney("@a_tenant", "cma") + Report() + Settlement("@a_tenant", "@cma", setAsideBy: "@{p}_adviser")),
+        ("FK_Orders_ClientMoneyAccounts_TenantId_ClientMoneyAccountId", "ClientMoneyAccounts",
+            ClientMoney("@{p}_tenant", "pcma") + OrderRow() + """
+            UPDATE [Orders] SET [ClientMoneyAccountId] = @pcma, [SettlementAccountNumber] = N'SIM' WHERE [Id] = SCOPE_IDENTITY();
+            """),
+        ("FK_OrderFills_TradeSettlements_TenantId_TradeSettlementId", "TradeSettlements",
+            ClientMoney("@{p}_tenant", "pcma") + Report() + Settlement("@{p}_tenant", "@pcma") + """
+            DECLARE @pts int = SCOPE_IDENTITY();
+            """ + OrderRow() + """
+            DECLARE @order int = SCOPE_IDENTITY();
+            """ + Report() + """
+            INSERT INTO [OrderFills] ([PublicId], [TenantId], [OrderId], [ExecutionReportId], [Quantity], [Price], [TradeDate], [SettlementDate], [Status], [TradeSettlementId])
+            VALUES (NEWID(), @a_tenant, @order, SCOPE_IDENTITY(), 4, 100, '2026-11-23', '2026-11-25', 0, @pts);
+            """),
+        ("FK_OrderFills_Transactions_TenantId_ReversalTransactionId", "Transactions",
+            BrokenFill(outcome: "0", reversal: "@{p}_buy", holdReason: "NULL", resolvedBy: "NULL")),
+        ("FK_OrderFills_Users_TenantId_BreakResolvedByUserId", "Users",
+            BrokenFill(outcome: "3", reversal: "NULL", holdReason: "1", resolvedBy: "@{p}_adviser")),
+        ("FK_OutgoingPayments_TradeSettlements_TenantId_TradeSettlementId", "TradeSettlements",
+            ClientMoney("@a_tenant", "cma") + ClientMoney("@{p}_tenant", "pcma", "NZD") + Report() + Settlement("@{p}_tenant", "@pcma") + """
+            DECLARE @pts int = SCOPE_IDENTITY();
+            INSERT INTO [OutgoingPayments]
+                ([PublicId], [TenantId], [ClientMoneyAccountId], [Connection], [Kind], [InstructionPublicId], [TradeSettlementId], [Amount], [Currency], [Status], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @cma, N'simulator', 2, NEWID(), @pts, 5, 'USD', 0, SYSDATETIMEOFFSET(), N'test');
+            """),
+        ("FK_BankStatementLines_TradeSettlements_TenantId_TradeSettlementId", "TradeSettlements",
+            ClientMoney("@a_tenant", "cma") + ClientMoney("@{p}_tenant", "pcma", "NZD") + Report() + Settlement("@{p}_tenant", "@pcma") + """
+            DECLARE @pts int = SCOPE_IDENTITY();
+            INSERT INTO [BankStatementLines]
+                ([PublicId], [TenantId], [ClientMoneyAccountId], [Connection], [OutsideId], [ValueDate], [Direction], [Amount], [Currency],
+                 [ReceivedAt], [Status], [MatchMethod], [MatchedAt], [TradeSettlementId], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @cma, N'simulator', CONVERT(nvarchar(100), NEWID()), '2026-11-25', 1, 5, 'USD',
+                    SYSDATETIMEOFFSET(), 1, 5, SYSDATETIMEOFFSET(), @pts, SYSDATETIMEOFFSET(), N'test');
+            """),
         ("FK_ReportExecutions_ReportSchedules_TenantId_ScheduleId", "ReportSchedules", """
             INSERT INTO [ReportExecutions] ([PublicId], [ReportId], [ScheduleId], [TenantId], [TriggerKind], [Status], [ParametersJson], [Created], [CreatedBy])
             VALUES (NEWID(), @report, @{p}_schedule, @a_tenant, N'Scheduled', N'Queued', N'{}', SYSDATETIMEOFFSET(), N'test');
@@ -598,7 +635,7 @@ public class TenantCompositeKeysSchemaTests
     ];
 
     private static readonly string[] Parents =
-        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines", "BankReconciliations", "InterestRateSchedules", "CorporateActions", "Orders"];
+        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines", "BankReconciliations", "InterestRateSchedules", "CorporateActions", "Orders", "ClientMoneyAccounts", "TradeSettlements"];
 
     /// <summary>An order of tenant <c>a</c> (script 0051); one argument names a row of the other tenant.</summary>
     private static string OrderRow(
@@ -617,6 +654,52 @@ public class TenantCompositeKeysSchemaTests
                 100, '2026-11-23', 105, {schedule}, N'simulator', 0, 0,
                 0, 0, 0, 0, {placedBy}, SYSDATETIMEOFFSET(), 0,
                 {(cancelledBy == "NULL" ? "NULL" : "SYSDATETIMEOFFSET()")}, {cancelledBy}, SYSDATETIMEOFFSET(), N'test');
+
+        """;
+
+    /// <summary>A USD client money account of <paramref name="tenant"/> in <c>@{variable}</c> (script 0038).</summary>
+    private static string ClientMoney(string tenant, string variable, string currency = "USD") => $"""
+        INSERT INTO [ClientMoneyAccounts]
+            ([PublicId], [TenantId], [Currency], [BankName], [AccountName], [AccountNumber], [IsActive], [Created], [CreatedBy], [BankConnection])
+        VALUES (NEWID(), {tenant}, '{currency}', N'Simulator Bank', N'Trust', CONVERT(nvarchar(34), LEFT(REPLACE(CONVERT(nvarchar(36), NEWID()), N'-', N''), 30)), 1, SYSDATETIMEOFFSET(), N'test', N'simulator');
+        DECLARE @{variable} int = SCOPE_IDENTITY();
+
+        """;
+
+    /// <summary>An execution report, platform data; its Id is <c>SCOPE_IDENTITY()</c>.</summary>
+    private static string Report() => """
+        INSERT INTO [ExecutionReports] ([PublicId], [Connection], [OutsideId], [Kind], [ReceivedAt], [Status])
+        VALUES (NEWID(), N'simulator', CONVERT(nvarchar(100), NEWID()), 5, SYSDATETIMEOFFSET(), 0);
+
+        """;
+
+    /// <summary>A trade settlement (script 0052) from the report just inserted.</summary>
+    private static string Settlement(string tenant, string clientMoney, string setAsideBy = "NULL") => $"""
+        INSERT INTO [TradeSettlements]
+            ([PublicId], [TenantId], [ClientMoneyAccountId], [Connection], [BrokerSettlementId], [Currency], [SettledDate],
+             [FillCount], [NetAmount], [BrokerFillCount], [BrokerNetAmount], [BrokerSettlementAccount], [ExecutionReportId],
+             [Status], [SetAsideByUserId], [SetAsideAt], [SetAsideNote], [Created], [CreatedBy])
+        VALUES (NEWID(), {tenant}, {clientMoney}, N'simulator', CONVERT(nvarchar(100), NEWID()), 'USD', '2026-11-25',
+                1, -5, 1, -5, N'SIM', SCOPE_IDENTITY(), {(setAsideBy == "NULL" ? "0" : "5")}, {setAsideBy},
+                {(setAsideBy == "NULL" ? "NULL" : "SYSDATETIMEOFFSET()")}, {(setAsideBy == "NULL" ? "NULL" : "N'Note'")},
+                SYSDATETIMEOFFSET(), N'test');
+
+        """;
+
+    /// <summary>A broken posted fill of an order of tenant <c>a</c> (script 0052).</summary>
+    private static string BrokenFill(string outcome, string reversal, string holdReason, string resolvedBy) => OrderRow() + $"""
+        DECLARE @order int = SCOPE_IDENTITY();
+        {Report()}
+        DECLARE @fillReport bigint = SCOPE_IDENTITY();
+        {Report()}
+        INSERT INTO [OrderFills]
+            ([PublicId], [TenantId], [OrderId], [ExecutionReportId], [Quantity], [Price], [TradeDate], [SettlementDate], [Status],
+             [TransactionId], [NetCash], [PostedAt], [BrokenAt], [BreakReportId], [BreakOutcome], [BreakHoldReason],
+             [ReversalTransactionId], [BreakResolvedByUserId], [BreakResolvedAt], [BreakNote])
+        VALUES (NEWID(), @a_tenant, @order, @fillReport, 4, 100, '2026-11-23', '2026-11-25', 2,
+                @a_buy, -400, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), SCOPE_IDENTITY(), {outcome}, {holdReason},
+                {reversal}, {resolvedBy}, {(resolvedBy == "NULL" ? "NULL" : "SYSDATETIMEOFFSET()")},
+                {(resolvedBy == "NULL" ? "NULL" : "N'Corrected'")});
 
         """;
 

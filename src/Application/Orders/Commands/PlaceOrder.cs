@@ -197,12 +197,30 @@ public class PlaceOrderCommandHandler(
         var order = Order.Place(
             tenantId, quote.Account.Id, quote.Instrument.Id, quote.Side, quote.Quantity, quote.Currency, quote.ReferencePrice,
             quote.ReferencePriceDate, quote.Fees, quote.Connection, request.Memo,
-            currentUser.Person?.Id ?? throw new ForbiddenAccessException(), now);
+            currentUser.Person?.Id ?? throw new ForbiddenAccessException(), now,
+            settlementAccount: await SettlementAccountAsync(tenantId, quote, cancellationToken));
         db.Orders.Add(order);
         var body = JsonSerializer.Serialize(new { id = order.PublicId });
         db.IdempotencyRecords.Add(IdempotencyRecord.Create(tenantId, key, method, path, hash, 201, body, now));
         await db.SaveChangesAsync(cancellationToken);
         return new IdempotentResult(201, body);
+    }
+
+    /// <summary>Trade-settlement R3: the Tenant's active client money account in the Account's currency, when the
+    /// Instrument is quoted in that currency and the broker connection holds the broker's bank account for it.
+    /// Otherwise none; having none never refuses an order.</summary>
+    private async Task<ClientMoneyAccount?> SettlementAccountAsync(int tenantId, OrderQuote quote, CancellationToken cancellationToken)
+    {
+        var currency = quote.Currency.Trim().ToUpperInvariant();
+        if (!string.Equals(currency, quote.Account.Currency.Trim(), StringComparison.OrdinalIgnoreCase)
+            || connections.BankAccount(quote.Connection, currency) is null)
+        {
+            return null;
+        }
+
+        return await db.ClientMoneyAccounts.AsNoTracking()
+            .Where(row => row.TenantId == tenantId && row.IsActive && row.Currency == currency)
+            .SingleOrDefaultAsync(cancellationToken);
     }
 
     private static IdempotentResult ReplayOrConflict(IdempotencyRecord existing, string hash) =>
