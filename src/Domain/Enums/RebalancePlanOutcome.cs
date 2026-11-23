@@ -1,6 +1,6 @@
 namespace MyWealthV2.Domain.Enums;
 
-public enum RebalanceStatus
+public enum RebalancePlanOutcome
 {
     Success = 0,
     NoChange = 1,

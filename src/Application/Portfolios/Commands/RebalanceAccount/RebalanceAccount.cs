@@ -10,7 +10,7 @@ using MyWealthV2.Application.Transactions;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Exceptions;
-using MyWealthV2.Domain.Rebalance;
+using MyWealthV2.Domain.Rebalances;
 using MyWealthV2.Domain.ValueObjects;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 
@@ -92,7 +92,7 @@ public class AccountRebalancer(
 
         var now = time.GetUtcNow();
         var plan = await BuildPlanAsync(account, portfolio, now, cancellationToken);
-        if (plan.Status == RebalanceStatus.Failed)
+        if (plan.Status == RebalancePlanOutcome.Failed)
         {
             throw new RebalanceException(plan.Code!, plan.Message!);
         }
@@ -232,7 +232,7 @@ public class AccountRebalancer(
 
     private sealed record FeePlan(RebalancePlan Plan, IReadOnlyDictionary<string, PlannerFeeSchedule> FeeSchedules)
     {
-        public RebalanceStatus Status => Plan.Status;
+        public RebalancePlanOutcome Status => Plan.Status;
 
         public string? Code => Plan.Code;
 
@@ -297,7 +297,7 @@ public class AccountRebalancer(
             return;
         }
 
-        assignment.RecordRebalance(RebalanceStatus.Failed, message, time.GetUtcNow());
+        assignment.RecordRebalance(RebalancePlanOutcome.Failed, message, time.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
     }
 

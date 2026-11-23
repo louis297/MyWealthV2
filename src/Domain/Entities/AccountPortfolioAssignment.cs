@@ -22,7 +22,7 @@ public class AccountPortfolioAssignment : BaseAuditableEntity
 
     public DateTimeOffset? LastRebalanceAt { get; private set; }
 
-    public RebalanceStatus? LastRebalanceStatus { get; private set; }
+    public RebalancePlanOutcome? LastRebalanceStatus { get; private set; }
 
     public string? LastRebalanceMessage { get; private set; }
 
@@ -82,7 +82,7 @@ public class AccountPortfolioAssignment : BaseAuditableEntity
         AddDomainEvent(new PortfolioUnassigned(this));
     }
 
-    public void RecordRebalance(RebalanceStatus status, string? message, DateTimeOffset at)
+    public void RecordRebalance(RebalancePlanOutcome status, string? message, DateTimeOffset at)
     {
         LastRebalanceStatus = status;
         LastRebalanceMessage = string.IsNullOrWhiteSpace(message) ? null : message.Trim();

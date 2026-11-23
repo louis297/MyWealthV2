@@ -1,4 +1,4 @@
-namespace MyWealthV2.Domain.Rebalance;
+namespace MyWealthV2.Domain.Rebalances;
 
 public static class RebalancePlanner
 {
@@ -75,7 +75,7 @@ public static class RebalancePlanner
 
         if (trades.Count == 0)
         {
-            return new RebalancePlan(RebalanceStatus.NoChange, null, null, []);
+            return new RebalancePlan(RebalancePlanOutcome.NoChange, null, null, []);
         }
 
         // Post every sell before any buy. Cash from an overweight line has to land
@@ -124,11 +124,11 @@ public static class RebalancePlanner
             trades = sells.Concat(scaled).ToList();
             if (trades.Count == 0)
             {
-                return new RebalancePlan(RebalanceStatus.NoChange, null, null, []);
+                return new RebalancePlan(RebalancePlanOutcome.NoChange, null, null, []);
             }
         }
 
-        return new RebalancePlan(RebalanceStatus.Success, null, null, trades);
+        return new RebalancePlan(RebalancePlanOutcome.Success, null, null, trades);
     }
 
     /// <summary>Cash after every sell and every buy scaled by <paramref name="k"/>, fees included (R26, R27).</summary>
@@ -194,7 +194,7 @@ public static class RebalancePlanner
     }
 
     private static RebalancePlan Fail(string code, string message) =>
-        new(RebalanceStatus.Failed, code, message, []);
+        new(RebalancePlanOutcome.Failed, code, message, []);
 
     private static bool Same(string left, string right) =>
         string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
@@ -289,7 +289,7 @@ public sealed record RebalanceTrade(
     decimal QuoteToAccount);
 
 public sealed record RebalancePlan(
-    RebalanceStatus Status,
+    RebalancePlanOutcome Status,
     string? Code,
     string? Message,
     IReadOnlyList<RebalanceTrade> Trades);
