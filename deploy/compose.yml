@@ -64,8 +64,13 @@ services:
       Reports__StorageRoot: /reports
       # Bank connection `simulator` (docs/features/deposit-matching.md R1): webapi knows only its name and adapter.
       BankConnections__simulator__Adapter: Simulator
-      # Broker connection `simulator` (docs/features/orders.md R2): webapi knows only its name and adapter.
+      # Broker connection `simulator` (docs/features/orders.md R2): webapi knows only its name and adapter, and the
+      # broker's own bank accounts (docs/features/trade-settlement.md R2) to pay a settlement again.
       BrokerConnections__simulator__Adapter: Simulator
+      BrokerConnections__simulator__BankAccounts__USD__AccountNumber: ${BROKER_BANK_USD_ACCOUNT_NUMBER:-BRK-SIM-USD}
+      BrokerConnections__simulator__BankAccounts__USD__AccountName: ${BROKER_BANK_ACCOUNT_NAME:-Simulator Broker Settlement Account}
+      BrokerConnections__simulator__BankAccounts__NZD__AccountNumber: ${BROKER_BANK_NZD_ACCOUNT_NUMBER:-BRK-SIM-NZD}
+      BrokerConnections__simulator__BankAccounts__NZD__AccountName: ${BROKER_BANK_ACCOUNT_NAME:-Simulator Broker Settlement Account}
       # Market data connection `simulator` (docs/features/simulated-instruments.md R1): an instrument whose symbol
       # ends with .SIM is priced by the simulator market, never by EODHD.
       MarketDataConnections__simulator__Adapter: Simulator
@@ -139,6 +144,11 @@ services:
       BrokerConnections__simulator__BaseUrl: http://simulator:8082
       BrokerConnections__simulator__ApiKey: ${SIMULATOR_PARTY_API_KEY:?}
       BrokerConnections__simulator__PollMinutes: ${BROKER_SIMULATOR_POLL_MINUTES:-1}
+      # The broker's own bank accounts (trade-settlement R2): the payee of the firm's settlement payments.
+      BrokerConnections__simulator__BankAccounts__USD__AccountNumber: ${BROKER_BANK_USD_ACCOUNT_NUMBER:-BRK-SIM-USD}
+      BrokerConnections__simulator__BankAccounts__USD__AccountName: ${BROKER_BANK_ACCOUNT_NAME:-Simulator Broker Settlement Account}
+      BrokerConnections__simulator__BankAccounts__NZD__AccountNumber: ${BROKER_BANK_NZD_ACCOUNT_NUMBER:-BRK-SIM-NZD}
+      BrokerConnections__simulator__BankAccounts__NZD__AccountName: ${BROKER_BANK_ACCOUNT_NAME:-Simulator Broker Settlement Account}
       # Market data connection `simulator` (simulated-instruments R1, R7): with the simulator off, each run of the
       # market data job fails with Unreachable and the last stored prices stay.
       MarketDataConnections__simulator__Adapter: Simulator
@@ -249,6 +259,14 @@ services:
       Simulator__Bank__StandingAccounts__1__AccountNumber: ${SIM_BANK_NZD_ACCOUNT_NUMBER:-SIM-DEMO-NZD}
       Simulator__Bank__StandingAccounts__1__Currency: NZD
       Simulator__Bank__StandingAccounts__1__Name: ${SIM_BANK_ACCOUNT_NAME:-Demo Advisory Client Funds Trust Account}
+      # The simulator broker's own bank accounts (trade-settlement R37): the payer of its settlement receipts. The
+      # same numbers as the broker connection gives webapi and worker.
+      Simulator__Broker__BankAccounts__0__Currency: USD
+      Simulator__Broker__BankAccounts__0__AccountNumber: ${BROKER_BANK_USD_ACCOUNT_NUMBER:-BRK-SIM-USD}
+      Simulator__Broker__BankAccounts__0__Name: ${BROKER_BANK_ACCOUNT_NAME:-Simulator Broker Settlement Account}
+      Simulator__Broker__BankAccounts__1__Currency: NZD
+      Simulator__Broker__BankAccounts__1__AccountNumber: ${BROKER_BANK_NZD_ACCOUNT_NUMBER:-BRK-SIM-NZD}
+      Simulator__Broker__BankAccounts__1__Name: ${BROKER_BANK_ACCOUNT_NAME:-Simulator Broker Settlement Account}
       # Standing simulated instruments (simulated-instruments R20): added on first start and after every reset.
       # The operator adds the same symbols to the demo tenant's catalog in the Back Office.
       Simulator__Market__StandingInstruments__0__Symbol: ACME.SIM

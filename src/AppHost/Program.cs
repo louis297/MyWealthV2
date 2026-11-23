@@ -212,6 +212,21 @@ for (var i = 0; i < standingAccounts.Length; i++)
         .WithEnvironment($"Simulator__Bank__StandingAccounts__{i}__Name", standingAccounts[i][2]);
 }
 
+// Trade-settlement R2, R37, §9.1: the broker's own bank accounts, the payee of the firm's settlement payments and the
+// payer of the broker's receipts. webapi and worker read them on the broker connection; the simulator broker pays
+// from them.
+string[][] brokerBankAccounts =
+[
+    ["USD", "BRK-SIM-USD", "Simulator Broker USD Settlement Account"],
+    ["NZD", "BRK-SIM-NZD", "Simulator Broker NZD Settlement Account"]
+];
+for (var i = 0; i < brokerBankAccounts.Length; i++)
+{
+    simulator.WithEnvironment($"Simulator__Broker__BankAccounts__{i}__Currency", brokerBankAccounts[i][0])
+        .WithEnvironment($"Simulator__Broker__BankAccounts__{i}__AccountNumber", brokerBankAccounts[i][1])
+        .WithEnvironment($"Simulator__Broker__BankAccounts__{i}__Name", brokerBankAccounts[i][2]);
+}
+
 // Simulated instruments R20, §9.1: the simulator market's standing instruments, the symbols TestSeed adds to the
 // catalog of each firm.
 string[][] standingInstruments =
@@ -240,13 +255,18 @@ web.WithEnvironment("BankConnections__simulator__Adapter", "Simulator");
 
 // Orders R2, §9.1: the same pattern for the broker connection. worker sends the orders and reads the reports.
 web.WithEnvironment("BrokerConnections__simulator__Adapter", "Simulator");
+foreach (var account in brokerBankAccounts)
+{
+    web.WithEnvironment($"BrokerConnections__simulator__BankAccounts__{account[0]}__AccountNumber", account[1])
+        .WithEnvironment($"BrokerConnections__simulator__BankAccounts__{account[0]}__AccountName", account[2]);
+}
 
 // Simulated instruments R1, §9.1: the same pattern for the market data connection; its suffix decides which
 // instruments the simulator prices.
 web.WithEnvironment("MarketDataConnections__simulator__Adapter", "Simulator")
     .WithEnvironment("MarketDataConnections__simulator__SymbolSuffix", ".SIM");
 
-builder.AddProject<Projects.Worker>(Services.Worker)
+var worker = builder.AddProject<Projects.Worker>(Services.Worker)
     .WithReference(databaseServer)
     .WaitFor(databaseServer)
     .WithEnvironment("BankConnections__simulator__Adapter", "Simulator")
@@ -270,5 +290,12 @@ builder.AddProject<Projects.Worker>(Services.Worker)
         url.DisplayText = "Hangfire";
         url.Url = "/hangfire";
     });
+
+// Trade-settlement R2, §9.1: worker creates and sends the settlement payments to the broker's bank accounts.
+foreach (var account in brokerBankAccounts)
+{
+    worker.WithEnvironment($"BrokerConnections__simulator__BankAccounts__{account[0]}__AccountNumber", account[1])
+        .WithEnvironment($"BrokerConnections__simulator__BankAccounts__{account[0]}__AccountName", account[2]);
+}
 
 builder.Build().Run();
