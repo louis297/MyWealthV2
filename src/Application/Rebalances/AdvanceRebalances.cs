@@ -93,6 +93,8 @@ public sealed class AdvanceRebalances(
         var now = time.GetUtcNow();
         await EndOrPlaceAsync(rebalance, orders, now, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        // R12: a weight change during the rebalance is proposed when it ends.
+        await proposals.FollowUpAsync(rebalance, cancellationToken);
         return true;
     }
 

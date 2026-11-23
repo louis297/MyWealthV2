@@ -90,6 +90,27 @@ public sealed class ProposeRebalance(
         return rebalance;
     }
 
+    /// <summary>R12: a rebalance marked for a follow-up has ended, in any final status. While its account's assignment
+    /// is still Active the platform proposes again, with trigger <c>FollowUp</c> and a new id. Call it once the ended
+    /// rebalance is saved.</summary>
+    public async Task<Rebalance?> FollowUpAsync(Rebalance ended, CancellationToken cancellationToken)
+    {
+        if (!ended.FollowUp || ended.IsOpen)
+        {
+            return null;
+        }
+
+        var assigned = await db.AccountPortfolioAssignments.IgnoreQueryFilters()
+            .AnyAsync(row => row.AccountId == ended.AccountId && row.Status == AssignmentStatus.Active, cancellationToken);
+        if (!assigned)
+        {
+            return null;
+        }
+
+        var account = await db.Accounts.IgnoreQueryFilters().SingleAsync(row => row.Id == ended.AccountId, cancellationToken);
+        return await ProposeAsync(account, RebalanceTrigger.FollowUp, byUserId: null, publicId: null, cancellationToken);
+    }
+
     /// <summary>R6: the account, its Customer, its Tenant, the portfolio and the broker connection. Checked when a
     /// rebalance is proposed, when it is confirmed and before every wave.</summary>
     public async Task<(string Code, string Message)?> EligibilityProblemAsync(

@@ -40,7 +40,8 @@ public class CancelRebalanceCommandValidator : AbstractValidator<CancelRebalance
     }
 }
 
-public class CancelRebalanceCommandHandler(IApplicationDbContext db, ICurrentUser currentUser, TimeProvider time)
+public class CancelRebalanceCommandHandler(
+    IApplicationDbContext db, ICurrentUser currentUser, ProposeRebalance proposals, TimeProvider time)
     : IRequestHandler<CancelRebalanceCommand>
 {
     public async Task Handle(CancelRebalanceCommand request, CancellationToken cancellationToken)
@@ -74,6 +75,8 @@ public class CancelRebalanceCommandHandler(IApplicationDbContext db, ICurrentUse
 
                 await RebalanceCancellation.CancelAsync(db, rebalance, person, request.Note, time.GetUtcNow(), token);
                 await db.SaveChangesAsync(token);
+                // R12: a rebalance cancelled in the request may owe a follow-up.
+                await proposals.FollowUpAsync(rebalance, token);
             }, cancellationToken);
         }
         catch (DbUpdateConcurrencyException)

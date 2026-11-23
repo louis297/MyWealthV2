@@ -95,7 +95,7 @@ public class RebalancesSchemaTests
             {RebalanceRow("3", confirmed: true, ended: true)}
             {RebalanceRow("5", ended: true, cancelReason: "1")}
             {RebalanceRow("0")}
-            SELECT COUNT(*) FROM [Rebalances];
+            SELECT COUNT(*) FROM [Rebalances] WHERE [AccountId] = @a_brokerage;
             """)).ShouldBe(3);
     }
 
