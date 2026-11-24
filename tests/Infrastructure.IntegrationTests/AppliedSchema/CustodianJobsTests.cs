@@ -75,11 +75,12 @@ public class CustodianJobsTests
     [Test]
     public async Task Run_SendsThenPullsThenProcesses()
     {
-        var world = await InsertWorldAsync();
+        await using var scratch = await ScratchAsync("CustodianSyncRun");
+        var world = await InsertWorldAsync(scratch.ConnectionString);
         var feed = new ScriptedFeed();
         feed.Add(world.AccountNumber, "ACME", 800m);
         var transfers = new ScriptedTransfers(feed);
-        using var host = await WorkerHostAsync(feed, transfers);
+        using var host = await WorkerHostAsync(scratch.ConnectionString, feed, transfers);
 
         using (var scope = host.Services.CreateScope())
         {
@@ -88,7 +89,7 @@ public class CustodianJobsTests
 
         transfers.Requests.ShouldHaveSingleItem().InstructionId.ShouldBe(world.TransferPublicId!.Value);
         transfers.FeedCallsAtFirstSend.ShouldBe(0);
-        await using var db = OpenDb();
+        await using var db = OpenDb(scratch.ConnectionString);
         var movement = await db.CustodyMovements.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.SafekeepingAccountId == world.SafekeepingAccountId);
         (movement.Status, movement.UnmatchedReason).ShouldBe((CustodyMovementStatus.Unmatched, (CustodyUnmatchedReason?)CustodyUnmatchedReason.NoInstruction));
         movement.CreatedBy.ShouldBe(SystemUser.Name);
@@ -99,10 +100,11 @@ public class CustodianJobsTests
     [Test]
     public async Task Run_WithAFailedAccount_ProcessesWhatIsStored_ThenFails()
     {
-        var world = await InsertWorldAsync(transfer: false);
+        await using var scratch = await ScratchAsync("CustodianSyncFailed");
+        var world = await InsertWorldAsync(scratch.ConnectionString, transfer: false);
         var feed = new ScriptedFeed();
         feed.Add(world.AccountNumber, "ACME", 5m);
-        using var host = await WorkerHostAsync(feed, new ScriptedTransfers(feed));
+        using var host = await WorkerHostAsync(scratch.ConnectionString, feed, new ScriptedTransfers(feed));
         using (var scope = host.Services.CreateScope())
         {
             await scope.ServiceProvider.GetRequiredService<PullCustodyMovements>().RunAsync("simulator");
@@ -115,7 +117,7 @@ public class CustodianJobsTests
                 scope.ServiceProvider.GetRequiredService<CustodianSyncJob>().Run("simulator", CancellationToken.None));
         }
 
-        await using var db = OpenDb();
+        await using var db = OpenDb(scratch.ConnectionString);
         (await db.CustodyMovements.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.SafekeepingAccountId == world.SafekeepingAccountId))
             .Status.ShouldBe(CustodyMovementStatus.Unmatched);
     }
@@ -123,8 +125,9 @@ public class CustodianJobsTests
     [Test]
     public async Task Run_WhileAnotherRunOfTheConnectionHoldsTheLock_EndsAtOnce()
     {
+        await using var scratch = await ScratchAsync("CustodianSyncLock");
         var feed = new ScriptedFeed();
-        using var host = await WorkerHostAsync(feed, new ScriptedTransfers(feed));
+        using var host = await WorkerHostAsync(scratch.ConnectionString, feed, new ScriptedTransfers(feed));
         var runLock = host.Services.GetRequiredService<SqlRunLock>();
         await using var held = await runLock.TryAcquireAsync("custodian-sync:simulator", CancellationToken.None);
         held.ShouldNotBeNull();
@@ -138,16 +141,17 @@ public class CustodianJobsTests
     [Test]
     public async Task TheReconciliationJob_RunsEveryActiveSafekeepingAccount_ADisabledTenantsIncluded()
     {
-        var world = await InsertWorldAsync(transfer: false, disableTenant: true);
+        await using var scratch = await ScratchAsync("CustodianReconciliationJob");
+        var world = await InsertWorldAsync(scratch.ConnectionString, transfer: false, disableTenant: true);
         var feed = new ScriptedFeed();
-        using var host = await WorkerHostAsync(feed, new ScriptedTransfers(feed));
+        using var host = await WorkerHostAsync(scratch.ConnectionString, feed, new ScriptedTransfers(feed));
 
         using (var scope = host.Services.CreateScope())
         {
             await scope.ServiceProvider.GetRequiredService<CustodianReconciliationJob>().Run(CancellationToken.None);
         }
 
-        await using var db = OpenDb();
+        await using var db = OpenDb(scratch.ConnectionString);
         var run = await db.CustodianReconciliations.IgnoreQueryFilters().AsNoTracking()
             .SingleAsync(row => row.SafekeepingAccountId == world.SafekeepingAccountId);
         (run.Trigger, run.RanByUserId, run.Status).ShouldBe((ReconciliationTrigger.Scheduled, (int?)null, CustodianReconciliationStatus.NoPositions));
@@ -164,10 +168,17 @@ public class CustodianJobsTests
         return builder.Build();
     }
 
-    private static async Task<IHost> WorkerHostAsync(ScriptedFeed feed, ScriptedTransfers transfers)
+    private static async Task<ScratchSchemaDatabase> ScratchAsync(string name)
+    {
+        var scratch = await ScratchSchemaDatabase.CreateAsync(name);
+        await scratch.ApplyAllAsync();
+        return scratch;
+    }
+
+    private static async Task<IHost> WorkerHostAsync(string connectionString, ScriptedFeed feed, ScriptedTransfers transfers)
     {
         var builder = Host.CreateApplicationBuilder();
-        builder.Configuration[$"ConnectionStrings:{Services.Database}"] = SchemaDatabaseSetup.ConnectionString;
+        builder.Configuration[$"ConnectionStrings:{Services.Database}"] = connectionString;
         builder.AddInfrastructureServices();
         builder.AddBankConnections(BankConnectionHost.Worker);
         builder.AddBrokerConnections(BrokerConnectionHost.Worker);
@@ -188,9 +199,9 @@ public class CustodianJobsTests
 
     /// <summary>A tenant with an active USD safekeeping account on <c>simulator</c> and, optionally, an approved transfer
     /// in of 100 ACME on an Open Custodial USD account.</summary>
-    private static async Task<World> InsertWorldAsync(bool transfer = true, bool disableTenant = false)
+    private static async Task<World> InsertWorldAsync(string connectionString, bool transfer = true, bool disableTenant = false)
     {
-        await using var db = OpenDb();
+        await using var db = OpenDb(connectionString);
         var (tenant, otherTenant) = await TwoTenantFixture.InsertAsync(db);
         var (adviser, otherAdviser) = await TwoTenantFixture.InsertAdvisersAsync(db, tenant, otherTenant);
         var (customer, _) = await TwoTenantFixture.InsertCustomersAsync(db, tenant, otherTenant, adviser, otherAdviser);
@@ -229,8 +240,8 @@ public class CustodianJobsTests
         return new World(number, safekeeping.Id, transferId);
     }
 
-    private static ApplicationDbContext OpenDb() =>
-        new(new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlServer(SchemaDatabaseSetup.ConnectionString).Options);
+    private static ApplicationDbContext OpenDb(string connectionString) =>
+        new(new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlServer(connectionString).Options);
 
     /// <summary>A feed with movements for one account; every other account has none and no positions.</summary>
     private sealed class ScriptedFeed : ICustodianFeed
