@@ -35,7 +35,9 @@ public static class BankReconciliationPdf
         ["OtherClientMoneyAccount"] = "Cash from another client money account",
         ["BankInterest"] = "Interest paid by the bank",
         ["InterestCredited"] = "Interest credited to customers",
-        ["TaxWithheld"] = "Tax withheld from customers' interest"
+        ["TaxWithheld"] = "Tax withheld from customers' interest and dividends",
+        ["DividendsNotPosted"] = "Dividends received, not paid to customers yet",
+        ["DividendDifference"] = "Dividends: difference between the custodian's payment and the customers' credits"
     };
 
     private static readonly (string Class, string Heading)[] Classes =

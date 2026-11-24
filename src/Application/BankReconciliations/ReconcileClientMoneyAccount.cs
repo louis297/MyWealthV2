@@ -112,11 +112,66 @@ public sealed class ReconcileClientMoneyAccount(IApplicationDbContext db, TimePr
             .ToListAsync(cancellationToken);
         var interestTransactions = interestLegs.Select(leg => leg.TransactionId).ToHashSet();
 
+        // Dividends R44, R45: the legs of a Dividend are read on their own. Its RWT and NRWT legs are tax withheld; the
+        // Principal, Reinvestment and foreign tax legs of a dividend received on this account in this currency are
+        // what it credited; every other leg stays ledger cash.
+        var dividendLegs = await (
+                from leg in custodialLegs
+                join transaction in db.Transactions.IgnoreQueryFilters() on leg.TransactionId equals transaction.Id
+                join detail in db.TransactionDividendDetails.IgnoreQueryFilters() on transaction.Id equals detail.TransactionId
+                join tax in db.TransactionTaxDetails.IgnoreQueryFilters() on leg.Id equals tax.CashLegId into taxes
+                from tax in taxes.DefaultIfEmpty()
+                where transaction.Type == TransactionType.Dividend
+                select new
+                {
+                    leg.TransactionId,
+                    leg.Role,
+                    leg.Amount,
+                    TaxKind = tax == null ? (TaxKind?)null : tax.Kind,
+                    DetailCurrency = detail.Currency,
+                    transaction.SourcePublicId
+                })
+            .ToListAsync(cancellationToken);
+        var receivedDividends = await (
+                from action in db.CorporateActions.IgnoreQueryFilters()
+                join line in accountLines on action.ReceiptLineId equals (int?)line.Id
+                where action.Kind == CorporateActionKind.Dividend
+                select new
+                {
+                    action.PublicId,
+                    Received = action.ReceivedAmount ?? 0m,
+                    HasPending = db.CorporateActionEntitlements.IgnoreQueryFilters()
+                        .Any(entitlement => entitlement.CorporateActionId == action.Id && entitlement.Status == EntitlementStatus.Pending)
+                })
+            .ToListAsync(cancellationToken);
+        var receivedIds = receivedDividends.Select(row => (Guid?)row.PublicId).ToHashSet();
+        var dividendTax = dividendLegs
+            .Where(leg => leg.Role == CashLegRole.Tax && leg.TaxKind is TaxKind.Rwt or TaxKind.Nrwt)
+            .ToList();
+        var dividendCredited = dividendLegs
+            .Where(leg => !dividendTax.Contains(leg)
+                          && receivedIds.Contains(leg.SourcePublicId)
+                          && string.Equals(leg.DetailCurrency.Trim(), currency.Trim(), StringComparison.Ordinal))
+            .ToList();
+        var dividendLedger = dividendLegs
+            .Except(dividendTax)
+            .Except(dividendCredited)
+            .GroupBy(leg => leg.TransactionId)
+            .Select(group => group.Sum(leg => leg.Amount))
+            .ToList();
+        var dividends = receivedDividends
+            .Select(row => new ReconciliationDividend(
+                row.Received,
+                dividendCredited.Where(leg => leg.SourcePublicId == row.PublicId).Sum(leg => leg.Amount),
+                row.HasPending))
+            .ToList();
+
         // R10: the legs split by the client money account their BankFeed or Payment source belongs to, and by type.
         var perTransaction = await (
                 from leg in custodialLegs
                 where !db.Transactions.IgnoreQueryFilters().Any(transaction =>
-                    transaction.Id == leg.TransactionId && transaction.SourceKind == TransactionSourceKind.InterestRun)
+                    transaction.Id == leg.TransactionId
+                    && (transaction.SourceKind == TransactionSourceKind.InterestRun || transaction.Type == TransactionType.Dividend))
                 group leg by leg.TransactionId
                 into legs
                 select new { TransactionId = legs.Key, Sum = legs.Sum(leg => leg.Amount) })
@@ -274,6 +329,9 @@ public sealed class ReconcileClientMoneyAccount(IApplicationDbContext db, TimePr
             .Select(group => new ReconciliationLedgerCash(
                 group.Key.Type, group.Key.OriginalType, group.Key.Through, group.Sum(row => row.Sum), group.Count()))
             .Concat(migrationLedger)
+            .Concat(dividendLedger.Count == 0
+                ? []
+                : [new ReconciliationLedgerCash(TransactionType.Dividend, null, null, dividendLedger.Sum(), dividendLedger.Count)])
             .ToList();
 
         // R14: information, not items.
@@ -310,8 +368,11 @@ public sealed class ReconcileClientMoneyAccount(IApplicationDbContext db, TimePr
             Ledger = ledger,
             InterestCredited = interestLegs.Where(leg => leg.Role == CashLegRole.Principal).Sum(leg => leg.Amount),
             InterestCreditedCount = interestTransactions.Count,
-            TaxWithheld = interestLegs.Where(leg => leg.Role == CashLegRole.Tax).Sum(leg => leg.Amount),
-            TaxWithheldCount = interestLegs.Where(leg => leg.Role == CashLegRole.Tax).Select(leg => leg.TransactionId).Distinct().Count(),
+            TaxWithheld = interestLegs.Where(leg => leg.Role == CashLegRole.Tax).Sum(leg => leg.Amount)
+                          + dividendTax.Sum(leg => leg.Amount),
+            TaxWithheldCount = interestLegs.Where(leg => leg.Role == CashLegRole.Tax).Select(leg => leg.TransactionId).Distinct().Count()
+                               + dividendTax.Select(leg => leg.TransactionId).Distinct().Count(),
+            Dividends = dividends,
             UnsettledTrades = unsettled.Amount,
             UnsettledTradesCount = unsettled.Count,
             TradesNeedingAction = needingAction.Amount,
