@@ -55,7 +55,8 @@ public sealed class PlaceRebalanceWave(IApplicationDbContext db, IBrokerConnecti
                 account.TenantId, account.Id, trade.InstrumentId, side, trade.Quantity, trade.QuoteCurrency, trade.Price,
                 priceDates[trade.InstrumentId], terms, connection, Memo, placedBy, now,
                 settlementAccount: await SettlementAccountAsync(account, connection, trade.QuoteCurrency, cancellationToken),
-                rebalanceId: rebalance.Id);
+                rebalanceId: rebalance.Id,
+                safekeepingAccount: await Custodian.OrderSafekeeping.ActiveAsync(db, account.TenantId, trade.QuoteCurrency, cancellationToken));
             // A wave the worker places has no person; the auditing interceptor keeps a person when there is one.
             order.CreatedBy = SystemActor.Name;
             orders.Add(order);

@@ -247,6 +247,18 @@ public class Order : BaseAuditableEntity
             order.SettlementAccountNumber = settlementAccount.AccountNumber;
         }
 
+        if (safekeepingAccount is not null)
+        {
+            if (safekeepingAccount.TenantId != tenantId
+                || !string.Equals(safekeepingAccount.Currency.Trim(), quoteCurrency, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new DomainException("The safekeeping account must be one of the tenant's in the order's quote currency.");
+            }
+
+            order.SafekeepingAccountId = safekeepingAccount.Id;
+            order.SafekeepingAccountNumber = safekeepingAccount.AccountNumber;
+        }
+
         order.Reserve(fees);
         return order;
     }

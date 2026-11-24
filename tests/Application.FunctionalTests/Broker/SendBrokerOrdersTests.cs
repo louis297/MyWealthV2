@@ -35,7 +35,7 @@ public class SendBrokerOrdersTests : TestBase
         // R20: the call carries no Tenant, Account or Customer.
         typeof(BrokerOrderRequest).GetProperties().Select(property => property.Name).ShouldBe([
             "ClientOrderId", "Symbol", "Currency", "Side", "Quantity", "Type", "TimeInForce", "PriceLimit", "ReferencePrice",
-            "SettlementAccount"
+            "SettlementAccount", "SafekeepingAccount"
         ], ignoreOrder: true);
         request.SettlementAccount.ShouldBeNull();
     }
