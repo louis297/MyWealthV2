@@ -85,6 +85,7 @@ public class CustodyRulesTests
     [TestCase(TransactionType.Split, "Corporate actions cannot be entered by hand on a Custodial account.")]
     [TestCase(TransactionType.Bonus, "Corporate actions cannot be entered by hand on a Custodial account.")]
     [TestCase(TransactionType.Scrip, "Corporate actions cannot be entered by hand on a Custodial account.")]
+    [TestCase(TransactionType.Dividend, "Dividends are paid by the platform from the company's announcement.")]
     public void RefusalMessage_OnACustodialAccount_IsTheSentenceOfTheRule(TransactionType type, string message)
     {
         CustodyRules.RefusalMessage(CustodyMode.Custodial, type).ShouldBe(message);
@@ -96,6 +97,11 @@ public class CustodyRulesTests
         CustodyRules.RefusalMessage(CustodyMode.External, TransactionType.Adjustment)
             .ShouldBe("An adjustment can be entered only on a Custodial account.");
     }
+
+    [Test]
+    public void RefusalMessage_DividendOnAnExternalAccount_StaysNotAccepted() =>
+        CustodyRules.RefusalMessage(CustodyMode.External, TransactionType.Dividend)
+            .ShouldBe("Dividend is reserved and cannot be entered.");
 
     [Test]
     public void RefusalMessage_AdjustmentOnACustodialAccount_IsNull()
