@@ -280,9 +280,11 @@ services:
       Simulator__Custodian__StandingAccounts__0__AccountNumber: ${SIM_CUSTODY_USD_ACCOUNT_NUMBER:-SIM-DEMO-CUSTODY-USD}
       Simulator__Custodian__StandingAccounts__0__Currency: USD
       Simulator__Custodian__StandingAccounts__0__Name: ${SIM_CUSTODY_ACCOUNT_NAME:-Demo Advisory Nominees}
+      Simulator__Custodian__StandingAccounts__0__IncomeAccountNumber: ${SIM_BANK_USD_ACCOUNT_NUMBER:-SIM-DEMO-USD}
       Simulator__Custodian__StandingAccounts__1__AccountNumber: ${SIM_CUSTODY_NZD_ACCOUNT_NUMBER:-SIM-DEMO-CUSTODY-NZD}
       Simulator__Custodian__StandingAccounts__1__Currency: NZD
       Simulator__Custodian__StandingAccounts__1__Name: ${SIM_CUSTODY_ACCOUNT_NAME:-Demo Advisory Nominees}
+      Simulator__Custodian__StandingAccounts__1__IncomeAccountNumber: ${SIM_BANK_NZD_ACCOUNT_NUMBER:-SIM-DEMO-NZD}
       # Standing simulated instruments (simulated-instruments R20): added on first start and after every reset.
       # The operator adds the same symbols to the demo tenant's catalog in the Back Office.
       Simulator__Market__StandingInstruments__0__Symbol: ACME.SIM

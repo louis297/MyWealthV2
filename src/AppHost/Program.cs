@@ -214,19 +214,21 @@ for (var i = 0; i < standingAccounts.Length; i++)
 
 // In-kind transfers R61, §9.1: the simulator custodian opens the safekeeping accounts TestSeed gives each firm, with
 // the holdings TestSeed gives the firm's Custodial accounts as their positions, so the first reconciliation agrees.
+// Dividends R57, §9.1: each pays its income into the firm's client money account in its currency.
 string[][] standingCustody =
 [
-    ["SIM-DEMO-CUSTODY-USD", "USD", "Demo Advisory Nominees"],
-    ["SIM-DEMO-CUSTODY-NZD", "NZD", "Demo Advisory Nominees"],
-    ["SIM-DEMO2-CUSTODY-USD", "USD", "Demo Advisory 2 Nominees"],
-    ["SIM-DEMO2-CUSTODY-NZD", "NZD", "Demo Advisory 2 Nominees"]
+    ["SIM-DEMO-CUSTODY-USD", "USD", "Demo Advisory Nominees", "SIM-DEMO-USD"],
+    ["SIM-DEMO-CUSTODY-NZD", "NZD", "Demo Advisory Nominees", "SIM-DEMO-NZD"],
+    ["SIM-DEMO2-CUSTODY-USD", "USD", "Demo Advisory 2 Nominees", "SIM-DEMO2-USD"],
+    ["SIM-DEMO2-CUSTODY-NZD", "NZD", "Demo Advisory 2 Nominees", "SIM-DEMO2-NZD"]
 ];
 string[][] seededUsdPositions = [["VTI", "40"], ["AAPL", "20"]];
 for (var i = 0; i < standingCustody.Length; i++)
 {
     simulator.WithEnvironment($"Simulator__Custodian__StandingAccounts__{i}__AccountNumber", standingCustody[i][0])
         .WithEnvironment($"Simulator__Custodian__StandingAccounts__{i}__Currency", standingCustody[i][1])
-        .WithEnvironment($"Simulator__Custodian__StandingAccounts__{i}__Name", standingCustody[i][2]);
+        .WithEnvironment($"Simulator__Custodian__StandingAccounts__{i}__Name", standingCustody[i][2])
+        .WithEnvironment($"Simulator__Custodian__StandingAccounts__{i}__IncomeAccountNumber", standingCustody[i][3]);
     if (standingCustody[i][1] != "USD")
     {
         continue;
