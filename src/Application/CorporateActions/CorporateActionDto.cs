@@ -47,6 +47,10 @@ public sealed class CorporateActionDto
     /// <summary>Dividends R49: the terms of a dividend; <c>null</c> on another kind.</summary>
     public CorporateActionDividendDto? Dividend { get; init; }
 
+    /// <summary>Dividends R49: what the Customers are owed and what the custodian paid; <c>null</c> until the dividend
+    /// goes ex, and on another kind.</summary>
+    public CorporateActionPaymentDto? Payment { get; init; }
+
     public required CorporateActionEntitlementCountsDto Entitlements { get; init; }
 
     public required string RowVersion { get; init; }
@@ -62,6 +66,16 @@ public sealed record CorporateActionDividendDto(
     decimal ImputationCreditPerShare,
     decimal ForeignTaxRatePercent,
     decimal? ReinvestmentPrice);
+
+/// <summary>Dividends R15, R49: the payment of a dividend. The received amount, the difference and the statement line
+/// are <c>null</c> until the receipt; the statement line is <c>null</c> for an Adviser.</summary>
+public sealed record CorporateActionPaymentDto(
+    decimal ExpectedAmount,
+    decimal? ReceivedAmount,
+    decimal? Difference,
+    string Currency,
+    Guid? StatementLineId,
+    DateTimeOffset? PaidAt);
 
 /// <summary>R35: the entitlements the caller can see, by status; all 0 before the action is effective.</summary>
 public sealed record CorporateActionEntitlementCountsDto(int Total, int Posted, int Pending, int NotApplied);

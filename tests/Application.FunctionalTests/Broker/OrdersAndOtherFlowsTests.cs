@@ -142,6 +142,26 @@ public class OrdersAndOtherFlowsTests : TestBase
     }
 
     [Test]
+    public async Task ADividendThatGoesEx_LeavesTheOpenOrdersInItsInstrumentAlone()
+    {
+        var world = await OrderWorld.CreateAsync();
+        var sent = await world.PlaceAsync("Buy", 2m);
+        await BrokerHttp.SendAsync();
+        var unsent = await world.PlaceAsync("Buy", 3m);
+        var id = await CorporateActionHttp.CreateAsync(
+            world.TenantAdmin, CorporateActionHttp.DividendBody(world.InstrumentId, exDate: CorporateActionHttp.Today));
+        var rowVersion = await CorporateActionHttp.RowVersionAsync(world.TenantAdmin, id);
+
+        (await CorporateActionHttp.Send(HttpMethod.Post, $"{CorporateActionHttp.Root}/{id}/apply", world.TenantAdmin, new { rowVersion }))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        (await OrderHttp.GetAsync(world.TenantAdmin, sent)).GetProperty("cancelRequest").ValueKind.ShouldBe(JsonValueKind.Null);
+        var placed = await OrderHttp.GetAsync(world.TenantAdmin, unsent);
+        placed.GetProperty("status").GetString().ShouldBe("Placed");
+        placed.GetProperty("cancelRequest").ValueKind.ShouldBe(JsonValueKind.Null);
+    }
+
+    [Test]
     public async Task ACorporateAction_LeavesTheOrdersOfAnotherTenantAlone()
     {
         var north = await OrderWorld.CreateAsync();

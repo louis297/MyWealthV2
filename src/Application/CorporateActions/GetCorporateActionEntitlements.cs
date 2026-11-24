@@ -28,6 +28,25 @@ public sealed class CorporateActionEntitlementDto
     public Guid? TransactionId { get; init; }
 
     public DateTimeOffset? PostedAt { get; init; }
+
+    /// <summary>Dividends R51: the dividend fields, each <c>null</c> on an entitlement of another kind.</summary>
+    public decimal? EntitledQuantity { get; init; }
+
+    public decimal? GrossAmount { get; init; }
+
+    public decimal? ForeignTax { get; init; }
+
+    public string? Currency { get; init; }
+
+    public bool? Reinvests { get; init; }
+
+    public decimal? ParticipatingQuantity { get; init; }
+
+    public decimal? ReinvestedQuantity { get; init; }
+
+    public decimal? NetAmount { get; init; }
+
+    public string? NetCurrency { get; init; }
 }
 
 /// <summary>Corporate-actions R36: the entitlements of one corporate action the caller can see, account order.</summary>
