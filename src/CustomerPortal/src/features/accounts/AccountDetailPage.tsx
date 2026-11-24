@@ -8,6 +8,7 @@ import {
   useGetAccountOrdersQuery,
   useGetAccountQuery,
   useGetAccountWithdrawalsQuery,
+  useGetAccountInKindTransfersQuery,
   useGetActivityQuery,
   useGetCashBalanceQuery,
   useGetDepositInstructionsQuery,
@@ -44,6 +45,15 @@ function typeLabel(row: Activity) {
     return "Holdings transferred in";
   }
 
+  // C40: the postings of an in-kind transfer; a hand StockIn or StockOut keeps its label.
+  if (row.inKindTransfer && row.type === "StockIn") {
+    return "Shares transferred in";
+  }
+
+  if (row.inKindTransfer && row.type === "StockOut") {
+    return "Shares transferred out";
+  }
+
   // C21: a deposit from the bank statement is a TransferIn with a bank receipt; its Reversal stays "Reversal".
   if (row.type === "TransferIn" && row.bankReceipt) {
     return "Deposit";
@@ -61,6 +71,27 @@ function typeLabel(row: Activity) {
 
   return typeLabels[row.type] ?? row.type;
 }
+
+/** C39: the status of an in-kind transfer in the Customer's words. */
+function transferStatusLabel(status: string) {
+  switch (status) {
+    case "Requested":
+      return "Being checked";
+    case "Approved":
+    case "Sent":
+      return "On its way";
+    case "Completed":
+      return "Done";
+    case "Rejected":
+      return "Not accepted";
+    case "Cancelled":
+      return "Cancelled";
+    default:
+      return "Not completed";
+  }
+}
+
+const openTransferStatuses = new Set(["Requested", "Approved", "Sent"]);
 
 /** C24: the status words a Customer reads. */
 function withdrawalStatusLabel(status: string) {
@@ -168,6 +199,7 @@ export function AccountDetailPage() {
   const custodial = account.data?.custodyMode === "Custodial";
   const withdrawals = useGetAccountWithdrawalsQuery(id, { skip: !custodial });
   const orders = useGetAccountOrdersQuery(id, { skip: !custodial });
+  const transfers = useGetAccountInKindTransfersQuery(id, { skip: !custodial });
 
   if (isNotFound(account.error)) {
     return <Muted>Not found</Muted>;
@@ -182,6 +214,24 @@ export function AccountDetailPage() {
   const shownWithdrawals = (withdrawals.data?.items ?? []).filter((item) =>
     openStatuses.has(item.status) || Date.now() - new Date(item.requestedAt).getTime() <= ninetyDays);
   const activityItems = activity.data?.items ?? [];
+  // C39: open transfers, and those that ended in the last 30 days.
+  const transferItems = transfers.data?.items ?? [];
+  const shownTransfers = transferItems.filter((item) => {
+    const ended = item.completedAt ?? item.setAside?.at ?? item.decision?.at ?? item.requestedAt;
+    return openTransferStatuses.has(item.status) || Date.now() - new Date(ended).getTime() <= thirtyDays;
+  });
+
+  /** C40: "100 ACME.SIM, Harbour Brokers" under a posting of an in-kind transfer. */
+  function transferLine(row: Activity) {
+    if (!row.inKindTransfer) {
+      return null;
+    }
+    const leg = (row.security ?? []).find((item) => item.accountId === id) ?? row.security?.[0];
+    const symbol = transferItems.find((item) => item.id === row.inKindTransfer?.transferId)?.instrument.symbol
+      ?? holdingsItems.find((item) => item.instrumentId === leg?.instrumentId)?.symbol;
+    const what = [leg ? String(Math.abs(leg.quantity)) : null, symbol].filter(Boolean).join(" ");
+    return `${what}, ${row.inKindTransfer.counterpartyName}`;
+  }
   // C32: open orders, and those that ended in the last 30 days.
   const orderItems = orders.data?.items ?? [];
   const shownOrders = orderItems.filter((item) =>
@@ -305,7 +355,11 @@ export function AccountDetailPage() {
                       <TableCell>
                         {holding.quantity}
                         {(holding.reservedQuantity ?? 0) > 0 ? (
-                          <p className="text-muted-foreground text-xs">{`${holding.reservedQuantity} reserved for a sell order`}</p>
+                          <p className="text-muted-foreground text-xs">{`${holding.reservedQuantity} reserved for a sale or a transfer`}</p>
+                        ) : null}
+                        {(holding.unsettledQuantity ?? 0) > 0 ? (
+                          // C41: bought and not settled yet.
+                          <p className="text-muted-foreground text-xs">{`${holding.unsettledQuantity} not settled yet`}</p>
                         ) : null}
                       </TableCell>
                     </TableRow>
@@ -338,6 +392,34 @@ export function AccountDetailPage() {
                       </TableCell>
                       <TableCell>{orderStatusLabel(item)}</TableCell>
                       <TableCell>{formatInstant(item.placedAt).slice(0, 10)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </Section>
+      ) : null}
+      {custodial && shownTransfers.length > 0 ? (
+        <Section title="Transfers">
+          <Card className="gap-0 py-0">
+            <CardContent className="px-0">
+              <Table aria-label="Transfers">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Transfer</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Requested</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {shownTransfers.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>
+                        {`${item.quantity} ${item.instrument.symbol} ${item.direction === "In" ? "from" : "to"} ${item.counterparty.name}`}
+                      </TableCell>
+                      <TableCell>{transferStatusLabel(item.status)}</TableCell>
+                      <TableCell>{formatInstant(item.requestedAt).slice(0, 10)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -392,6 +474,7 @@ export function AccountDetailPage() {
                     <TableRow key={row.id}>
                       <TableCell>
                         {fillLabel(row) ?? typeLabel(row)}
+                        {transferLine(row) ? <p className="text-muted-foreground text-xs">{transferLine(row)}</p> : null}
                         {row.migration && (row.type === "Opening" || row.type === "OpeningHoldings") ? (
                           <p className="text-muted-foreground text-xs">
                             {`From ${row.migration.previousProvider}, as at ${row.migration.asOfDate}`}

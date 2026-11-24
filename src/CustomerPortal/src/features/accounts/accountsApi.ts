@@ -41,8 +41,10 @@ export type Holding = {
   symbol: string;
   name: string;
   quantity: number;
-  /** orders R41: the quantity live sell orders reserve. */
+  /** orders R41, in-kind-transfers R43: the quantity live sell orders and transfers out reserve. */
   reservedQuantity?: number;
+  /** in-kind-transfers R43: bought on the platform and not settled yet. */
+  unsettledQuantity?: number;
 };
 
 /** orders R15: an order as the Customer reads it; no memo, no cancel note and no send attempts. */
@@ -108,6 +110,8 @@ export type Activity = {
   } | null;
   /** migration-batches R31: where a migrated opening balance came from; otherwise null. */
   migration?: { asOfDate: string; previousProvider: string } | null;
+  /** in-kind-transfers R38: the transfer behind a StockIn or StockOut; otherwise null. */
+  inKindTransfer?: { transferId: string; direction: string; counterpartyName: string } | null;
   /** corporate-actions R37: the event behind an entitlement posting; otherwise null. */
   corporateAction?: {
     id: string;
@@ -123,6 +127,21 @@ export type Activity = {
 };
 
 /** withdrawals R25: a withdrawal as the Customer reads it; the payee number is masked, no memo, no note. */
+/** in-kind-transfers R28: a transfer as the Customer reads it; no memo, no send attempts and no decision note. */
+export type CustomerInKindTransfer = {
+  id: string;
+  accountId: string;
+  direction: string;
+  instrument: { id: string; symbol: string; name: string };
+  quantity: number;
+  counterparty: { name: string };
+  status: string;
+  requestedAt: string;
+  decision: { at: string } | null;
+  setAside: { at: string } | null;
+  completedAt: string | null;
+};
+
 export type CustomerWithdrawal = {
   id: string;
   amount: number;
@@ -175,6 +194,10 @@ export const accountsApi = api.injectEndpoints({
       query: (accountId) => `/withdrawals?accountId=${encodeURIComponent(accountId)}&page=1&pageSize=100`,
       providesTags: ["Withdrawal"],
     }),
+    getAccountInKindTransfers: builder.query<PagedList<CustomerInKindTransfer>, string>({
+      query: (accountId) => `/in-kind-transfers?accountId=${encodeURIComponent(accountId)}&page=1&pageSize=100`,
+      providesTags: ["InKindTransfer"],
+    }),
     getDepositInstructions: builder.query<DepositInstructions, string>({
       query: (id) => `/accounts/${id}/deposit-instructions`,
       providesTags: ["Account"],
@@ -192,6 +215,7 @@ export const accountsApi = api.injectEndpoints({
 export const {
   useGetAccountOrdersQuery,
   useGetAccountWithdrawalsQuery,
+  useGetAccountInKindTransfersQuery,
   useGetAccountsQuery,
   useGetAccountQuery,
   useGetCashBalanceQuery,
