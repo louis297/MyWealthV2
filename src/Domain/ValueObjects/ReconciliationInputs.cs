@@ -43,6 +43,11 @@ public sealed record ReconciliationInputs
 
     public int TaxWithheldCount { get; init; }
 
+    /// <summary>Dividends R44: each dividend with a receipt on this account: the amount received, the
+    /// <c>Principal</c>, <c>Reinvestment</c> and <c>ForeignWithholding</c> legs of its Transactions in this currency,
+    /// and whether an entitlement is still <c>Pending</c>.</summary>
+    public IReadOnlyList<ReconciliationDividend> Dividends { get; init; } = [];
+
     /// <summary>Trade-settlement R23: the <c>Principal</c> legs of order fills that settle through this account and
     /// whose trade settlement has not completed, with their Transactions.</summary>
     public decimal UnsettledTrades { get; init; }
@@ -83,6 +88,9 @@ public sealed record ReconciliationInputs
 
     public BankFeedFailure? FeedLastFailure { get; init; }
 }
+
+/// <summary>Dividends R44: one dividend received on the account.</summary>
+public sealed record ReconciliationDividend(decimal Received, decimal Credited, bool HasPending);
 
 /// <summary>A statement line as it was at the run (R9, R21). <see cref="Amount"/> is positive, as stored.
 /// <see cref="MigrationNotPosted"/> marks a <c>Matched</c> line that funds a migration batch not posted yet
