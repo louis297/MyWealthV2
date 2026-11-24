@@ -141,7 +141,12 @@ public sealed record CorporateActionAnnouncementItem(
     DateTimeOffset ReceivedAt,
     string Status,
     string? SkipReason,
-    DateTimeOffset? ProcessedAt);
+    DateTimeOffset? ProcessedAt,
+    decimal? AmountPerShare = null,
+    string? TaxSource = null,
+    decimal? ImputationCreditPerShare = null,
+    decimal? ForeignTaxRatePercent = null,
+    decimal? ReinvestmentPrice = null);
 
 public sealed record CorporateActionAnnouncementPage(IReadOnlyList<CorporateActionAnnouncementItem> Items, int Page, int PageSize, int TotalCount);
 
