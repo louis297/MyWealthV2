@@ -184,6 +184,20 @@ public class CorporateAction : BaseAuditableEntity
         ReceivedAmount = amount;
     }
 
+    /// <summary>Dividends R29: the dividend becomes paid at <paramref name="at"/> when it is <c>Effective</c> and has
+    /// its receipt. True when this call made it paid; false when it is not ready or was already paid.</summary>
+    public bool TryPay(DateTimeOffset at)
+    {
+        if (Kind != CorporateActionKind.Dividend || Status != CorporateActionStatus.Effective || PaidAt is not null
+            || ReceiptLineId is null)
+        {
+            return false;
+        }
+
+        PaidAt = at.ToUniversalTime();
+        return true;
+    }
+
     /// <summary>R15: a <c>Manual</c> corporate action, <c>Announced</c>.</summary>
     public static CorporateAction Enter(
         int tenantId,

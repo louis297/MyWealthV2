@@ -1,3 +1,5 @@
+using MyWealthV2.Domain.ValueObjects;
+
 namespace MyWealthV2.Domain.Entities;
 
 /// <summary>
@@ -141,6 +143,28 @@ public class CorporateActionEntitlement
         QuantityBefore = quantityBefore;
         QuantityAfter = quantityAfter;
         TransactionId = transactionId;
+        PostedAt = at.ToUniversalTime();
+    }
+
+    /// <summary>Dividends R36: the dividend entitlement was posted as <paramref name="transactionId"/>, with its net in
+    /// the Account's currency.</summary>
+    public void MarkDividendPosted(int transactionId, decimal netAmount, string netCurrency, DateTimeOffset at)
+    {
+        EnsurePending();
+        if (!IsDividend)
+        {
+            throw new DomainException("Only a dividend entitlement is posted with its net.");
+        }
+
+        if (transactionId <= 0 || netAmount < 0m)
+        {
+            throw new DomainException("A posted dividend entitlement needs its Transaction and a net of 0 or more.");
+        }
+
+        Status = EntitlementStatus.Posted;
+        TransactionId = transactionId;
+        NetAmount = netAmount;
+        NetCurrency = Money.Create(0m, netCurrency).Currency;
         PostedAt = at.ToUniversalTime();
     }
 

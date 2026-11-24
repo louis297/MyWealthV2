@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Logging;
+using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.MarketData;
 using MyWealthV2.Application.Transactions;
+using MyWealthV2.Domain.CorporateActions;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.MarketData;
@@ -27,6 +29,7 @@ public sealed class ApplyCorporateActions(
     IInstrumentPriceStore prices,
     MarketDataConnections connections,
     ICurrencyCatalog currencies,
+    IFxRate fxRates,
     TimeProvider time,
     ILogger<ApplyCorporateActions> logger)
 {
@@ -102,7 +105,7 @@ public sealed class ApplyCorporateActions(
                 from action in db.CorporateActions.IgnoreQueryFilters().AsNoTracking()
                 join instrument in db.Instruments.IgnoreQueryFilters().AsNoTracking() on action.InstrumentId equals instrument.Id
                 where action.Status == CorporateActionStatus.Effective
-                orderby action.EffectiveAt, action.Id
+                orderby action.PaidAt ?? action.EffectiveAt, action.Id
                 select new { Action = action, instrument.Symbol, instrument.QuoteCurrency })
             .ToListAsync(cancellationToken);
 
@@ -112,7 +115,7 @@ public sealed class ApplyCorporateActions(
             var action = row.Action;
 
             // Dividends R36: a dividend's entitlements are posted only once it is paid.
-            if (action.Kind == CorporateActionKind.Dividend)
+            if (action.Kind == CorporateActionKind.Dividend && action.PaidAt is null)
             {
                 continue;
             }
@@ -129,7 +132,9 @@ public sealed class ApplyCorporateActions(
                 db.ClearTrackedChanges();
                 try
                 {
-                    var result = await PostOneAsync(action, row.QuoteCurrency.Trim(), entitlement.Id, entitlement.AccountId, cancellationToken);
+                    var result = action.Kind == CorporateActionKind.Dividend
+                        ? await PostDividendAsync(action, row.Symbol, row.QuoteCurrency.Trim(), entitlement.Id, entitlement.AccountId, cancellationToken)
+                        : await PostOneAsync(action, row.QuoteCurrency.Trim(), entitlement.Id, entitlement.AccountId, cancellationToken);
                     if (result == EntitlementStatus.Posted)
                     {
                         posted++;
@@ -213,6 +218,89 @@ public sealed class ApplyCorporateActions(
             await db.SaveChangesAsync(token);
             await HoldingProjection.SyncAsync(db, action.TenantId, accountId, [action.InstrumentId], token);
             entitlement.MarkPosted(before, after, posting.Id, now);
+            await db.SaveChangesAsync(token);
+            outcome = EntitlementStatus.Posted;
+        }, cancellationToken);
+        return outcome;
+    }
+
+    /// <summary>
+    /// Dividends R32–R37: one dividend entitlement, under the Account lock. The entitled quantity decides, not the
+    /// holding. The tax follows the Customer's residency now; an Account in another currency is converted at the rate
+    /// of today, and with no rate the entitlement stays <c>Pending</c> for the next run.
+    /// </summary>
+    private async Task<EntitlementStatus?> PostDividendAsync(
+        CorporateAction action,
+        string symbol,
+        string quoteCurrency,
+        long entitlementId,
+        int accountId,
+        CancellationToken cancellationToken)
+    {
+        EntitlementStatus? outcome = null;
+        var terms = action.Terms!;
+        await db.ExecuteInTransactionAsync(async token =>
+        {
+            outcome = null;
+            await db.LockAccountAsync(accountId, token);
+            var entitlement = await db.CorporateActionEntitlements.IgnoreQueryFilters()
+                .SingleAsync(row => row.Id == entitlementId, token);
+            if (entitlement.Status != EntitlementStatus.Pending)
+            {
+                return;
+            }
+
+            var account = await db.Accounts.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.Id == accountId, token);
+            var accountCurrency = account.Currency.Trim();
+            var places = currencies.TryGet(accountCurrency)?.DecimalPlaces
+                         ?? throw new InvalidOperationException($"Currency {accountCurrency} is not in the catalog.");
+            var now = time.GetUtcNow();
+            AppliedFxRate? rate = null;
+            if (!string.Equals(accountCurrency, quoteCurrency, StringComparison.Ordinal))
+            {
+                try
+                {
+                    var reading = await fxRates.GetRateDetailAsync(quoteCurrency, accountCurrency, now, token);
+                    rate = AppliedFxRate.Create(quoteCurrency, accountCurrency, reading.Rate, reading.AsOfDate, reading.Source);
+                }
+                catch (FxRateNotFoundException)
+                {
+                    logger.LogInformation(
+                        "Dividend {CorporateActionId} waits for a {From}/{To} rate on account {AccountId}; the next run tries again.",
+                        action.PublicId, quoteCurrency, accountCurrency, account.PublicId);
+                    return;
+                }
+            }
+
+            var profile = await db.CustomerTaxProfiles.IgnoreQueryFilters()
+                              .SingleOrDefaultAsync(row => row.UserId == account.CustomerId, token)
+                          ?? CustomerTaxProfile.NotProvided;
+            var posting = Transaction.PostDividend(
+                action.TenantId, accountId, accountCurrency, places, action.InstrumentId, symbol, quoteCurrency, terms,
+                action.ExDate, action.RecordDate, action.PaymentDate, entitlement.EntitledQuantity!.Value,
+                new DividendSourceAmounts(entitlement.GrossAmount!.Value, entitlement.ImputationCredit!.Value, entitlement.ForeignTax!.Value),
+                DividendWithholding.For(profile.TaxResidency, terms.TaxSource), entitlement.ReinvestedQuantity, rate, now,
+                TransactionSource.CorporateAction(action.PublicId));
+            posting.CreatedBy = SystemActor.Name;
+            foreach (var leg in posting.CashLegs)
+            {
+                leg.CreatedBy = SystemActor.Name;
+            }
+
+            foreach (var leg in posting.SecurityLegs)
+            {
+                leg.CreatedBy = SystemActor.Name;
+            }
+
+            db.Transactions.Add(posting);
+            await db.SaveChangesAsync(token);
+            if (posting.SecurityLegs.Count > 0)
+            {
+                await HoldingProjection.SyncAsync(db, action.TenantId, accountId, [action.InstrumentId], token);
+            }
+
+            var net = posting.CashLegs.Where(leg => leg.Role != CashLegRole.Reinvestment).Sum(leg => leg.Amount);
+            entitlement.MarkDividendPosted(posting.Id, net, accountCurrency, now);
             await db.SaveChangesAsync(token);
             outcome = EntitlementStatus.Posted;
         }, cancellationToken);

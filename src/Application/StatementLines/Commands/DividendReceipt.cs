@@ -55,6 +55,7 @@ internal static class DividendReceipt
         var now = time.GetUtcNow();
         line.MatchToDividend(action.Id, note, actor, now);
         action.TakeReceipt(line.Id, line.Amount);
+        PayDividend.Try(action, now);
         await StatementLineActions.SaveAsync(db, cancellationToken);
     }
 

@@ -73,7 +73,8 @@ public class GetTransactionByIdQueryHandler(IApplicationDbContext db, ICurrentUs
             CorporateAction = legs.CorporateAction.GetValueOrDefault(row.transaction.Id),
             Execution = legs.Execution.GetValueOrDefault(row.transaction.Id),
             Migration = legs.Migration.GetValueOrDefault(row.transaction.Id),
-            InKindTransfer = legs.InKindTransfer.GetValueOrDefault(row.transaction.Id)
+            InKindTransfer = legs.InKindTransfer.GetValueOrDefault(row.transaction.Id),
+            Dividend = legs.Dividend.GetValueOrDefault(row.transaction.Id)
         };
     }
 }

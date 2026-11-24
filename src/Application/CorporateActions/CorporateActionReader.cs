@@ -161,5 +161,5 @@ internal static class CorporateActionReader
     /// <summary>Dividends R49: the payment block; the statement line only for a TenantAdmin.</summary>
     private static CorporateActionPaymentDto Payment(CorporateAction row, decimal expected, string currency, Guid? statementLineId) =>
         new(expected, row.ReceivedAmount, row.ReceivedAmount - expected, currency,
-            statementLineId == Guid.Empty ? null : statementLineId, null);
+            statementLineId == Guid.Empty ? null : statementLineId, row.PaidAt);
 }

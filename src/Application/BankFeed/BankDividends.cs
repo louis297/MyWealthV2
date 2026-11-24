@@ -54,8 +54,10 @@ internal sealed class BankDividends(IApplicationDbContext db, ICurrencyCatalog c
             return true;
         }
 
-        line.MarkDividendReceipt(action.Id, time.GetUtcNow());
+        var now = time.GetUtcNow();
+        line.MarkDividendReceipt(action.Id, now);
         action.TakeReceipt(line.Id, line.Amount);
+        PayDividend.Try(action, now);
         await db.SaveChangesAsync(cancellationToken);
         return true;
     }
