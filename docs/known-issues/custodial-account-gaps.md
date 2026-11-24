@@ -31,7 +31,6 @@ A Custodial account is meant to be the platform's own record: the server produce
 
 | Gap | Effect on a Custodial account | Closed by |
 | --- | --- | --- |
-| Existing positions cannot be moved in | A Custodial account in use cannot take one Customer's shares from another broker: `StockIn` is refused. A firm's whole book arrives by a migration batch into empty accounts ([migration-batches.md](../features/migration-batches.md), landed 2026-11-24) | In-kind transfer ([in-kind-transfers.md](../features/in-kind-transfers.md), accepted 2026-11-24; this row is removed when the slice lands) |
 | History cannot be entered | The server sets `bookedAt`. A deposit entered today cannot be dated yesterday, and no past activity can be built through the API | A simulator with its own clock; the test seed until then |
 
 External accounts have none of these gaps: they keep every hand-entered type.

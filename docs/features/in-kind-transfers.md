@@ -56,7 +56,19 @@ Today the securities on a Custodial account exist only in the platform's ledger.
 
 New: permissions `in-kind-transfers.read`, `in-kind-transfers.request`, `in-kind-transfers.approve`, `custody-movements.manage` and `custodian-reconciliations.manage`; routes under `/in-kind-transfers`, `/custody-movements`, `/custodian-reconciliations` and `/tenants/{tenantId}/safekeeping-accounts`, and `GET /custodian-connections`; ports `ICustodianFeed` and `ICustodianTransfers` with adapters `SimulatorCustodianFeed` and `SimulatorCustodianTransfers`; custodian connections in configuration; source kind `InKindTransfer`; the in-kind transfer detail on the Transaction; `worker` jobs `custodian-sync:{connection}` and `custodian-reconciliation` on the new queue `custodian`; item fields `unsettledQuantity` and `transferableQuantity` (holding) and `inKindTransfer` (transaction); `safekeepingAccount` on the broker's order call. Scripts `0055_custodian.sql` and `0056_custodian_reconciliations.sql`; simulator script `database/simulator/0012_custodian.sql`. No new `TransactionType`, problem code or domain event.
 
-**Status is `accepted` (2026-11-24).** The twenty-four points of §11 were confirmed on 2026-11-24, every one as recommended (point 2 was decided in discussion the same day), and are written into the rules. The amendments to accepted docs listed in §12 were made when it was accepted. It is a build contract.
+**Status is `accepted` (2026-11-24), landed 2026-11-24.** The twenty-four points of §11 were confirmed on 2026-11-24, every one as recommended (point 2 was decided in discussion the same day), and are written into the rules. The amendments to accepted docs listed in §12 were made when it was accepted. It is a build contract.
+
+Notes from landing:
+
+- §6.3: the simulator also has script `database/simulator/0013_custodian_corporate_actions.sql`. It adds `MarketCorporateActions.CustodianApplied`, so the simulator custodian applies an effective corporate action to its positions exactly once (R68). An action that was already effective when the script ran counts as applied.
+- R68: when the simulator brings its books up to date, each corporate action that became effective and is not applied yet first settles every open fill in its symbol on the ex-date. Their `Settled` reports carry that date. The action is then applied to every custodian account with a position in the symbol. A position that rounds to the same quantity adds no movement.
+- R67: the `Trade` movement of a settled fill names the broker as counterparty (`Simulator Broker`). It is added only when the order's `safekeepingAccount` is an account the custodian holds in the order's currency.
+- D86, D87: the request form is `/accounts/:id/transfer-securities`, because `/accounts/:id/transfer` is the internal transfer form. The instrument of a transfer in is a select of the firm's enabled instruments. An instrument quoted in another currency is listed as disabled. The open transfers on the account page are under "Open transfers". On a Custodial account, the new transaction form adds the R48 sentence and a "Request a transfer" link.
+- D88, D90: the nav counts are the `totalCount` of `GET /in-kind-transfers?status=Requested` and `GET /custody-movements?status=Unmatched`. Both are read only for a TenantAdmin. The movements status filter also offers "Not processed yet" (`Received`) and All.
+- D92: a suspense component links to `/custody-movements?status=Unmatched&instrumentId=<id>`, and an unbooked fills component links to the orders that need attention (`/orders?status=NeedsAttention`).
+- C41: the reserved sentence is "<n> reserved for a sale or a transfer" for a sell order as well.
+- BO30: the add form's submit button is "Add safekeeping account". A firm with no safekeeping account sees "No safekeeping accounts. Holdings of this firm are not checked against a custodian."
+- §9.1: TestSeed names the accounts "Simulator Custody" (custodian) and "<firm name> Nominees" (account name). The AppHost gives the two USD standing custodian accounts the positions VTI 40 and AAPL 20, the holdings of the seeded Custodial account.
 
 ---
 
