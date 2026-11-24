@@ -27,6 +27,7 @@ builder.AddApplicationServices();
 builder.AddInfrastructureServices();
 builder.AddBankConnections(BankConnectionHost.WebApi);
 builder.AddBrokerConnections(BrokerConnectionHost.WebApi);
+builder.AddCustodianConnections(MyWealthV2.Infrastructure.Custodian.CustodianConnectionHost.WebApi);
 builder.AddMarketDataConnections(MarketDataHost.WebApi);
 builder.AddWebServices();
 

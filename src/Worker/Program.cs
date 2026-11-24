@@ -26,6 +26,7 @@ builder.AddServiceDefaults();
 builder.AddInfrastructureServices();
 builder.AddBankConnections(BankConnectionHost.Worker);
 builder.AddBrokerConnections(BrokerConnectionHost.Worker);
+builder.AddCustodianConnections(MyWealthV2.Infrastructure.Custodian.CustodianConnectionHost.Worker);
 builder.AddMarketDataConnections(MarketDataHost.Worker);
 builder.Services.AddScoped<IUser, SystemUser>();
 builder.Services.AddScoped<OutboxProcessor>();

@@ -207,6 +207,18 @@ public static class DependencyInjection
     }
 
     /// <summary>
+    /// Reads <c>CustodianConnections</c> for <paramref name="host"/> and registers <see cref="ICustodianConnections"/>
+    /// (in-kind-transfers R2). Throws on a bad entry, so call it before <c>Build()</c>.
+    /// </summary>
+    public static void AddCustodianConnections(this IHostApplicationBuilder builder, MyWealthV2.Infrastructure.Custodian.CustodianConnectionHost host)
+    {
+        var connections = new MyWealthV2.Infrastructure.Custodian.ConfiguredCustodianConnections(
+            MyWealthV2.Infrastructure.Custodian.CustodianConnectionsConfiguration.Read(builder.Configuration, host));
+        builder.Services.AddSingleton(connections);
+        builder.Services.AddSingleton<MyWealthV2.Application.Custodian.ICustodianConnections>(connections);
+    }
+
+    /// <summary>
     /// Reads <c>BankConnections</c> for <paramref name="host"/> and registers <see cref="IBankConnections"/>
     /// (deposit-matching R1). Throws on a bad entry, so call it before <c>Build()</c>.
     /// </summary>
