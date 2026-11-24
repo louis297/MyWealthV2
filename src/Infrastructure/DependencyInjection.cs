@@ -221,6 +221,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<MyWealthV2.Application.Custodian.ICustodianTransfers, MyWealthV2.Infrastructure.Custodian.CustodianTransfersDispatcher>();
         builder.Services.AddScoped<MyWealthV2.Application.Custodian.SendInKindTransfers>();
         builder.Services.AddScoped<MyWealthV2.Application.Custodian.PullCustodyMovements>();
+        builder.Services.AddScoped<MyWealthV2.Application.Custodian.ProcessCustodyMovements>();
     }
 
     /// <summary>

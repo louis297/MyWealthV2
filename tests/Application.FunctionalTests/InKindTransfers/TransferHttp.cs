@@ -135,6 +135,36 @@ internal static class TransferHttp
         return (cursor, positions);
     }
 
+    /// <summary>Runs the processing step of <c>custodian-sync:simulator</c> (R14).</summary>
+    public static async Task ProcessAsync(string connection = SafekeepingHttp.Connection)
+    {
+        await using var scope = FunctionalTestSetup.WebApiServices.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<MyWealthV2.Application.Custodian.ProcessCustodyMovements>().RunAsync(connection);
+    }
+
+    /// <summary>Pull, then process (R9 without the send step).</summary>
+    public static async Task PullAndProcessAsync()
+    {
+        await PullAsync();
+        await ProcessAsync();
+    }
+
+    public static async Task<CustodyMovement> MovementAsync(string outsideId)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await db.CustodyMovements.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.OutsideId == outsideId);
+    }
+
+    public static async Task<JsonElement> TransactionAsync(string accessToken, Guid id)
+    {
+        var response = await Send(HttpMethod.Get, $"/transactions/{id}", accessToken);
+        var content = await response.Content.ReadAsStringAsync();
+        response.StatusCode.ShouldBe(HttpStatusCode.OK, content);
+        using var json = JsonDocument.Parse(content);
+        return json.RootElement.Clone();
+    }
+
     /// <summary>Records a send attempt on the transfer straight in the database, as the send step does first (R34).</summary>
     public static async Task RecordAttemptAsync(Guid id)
     {
