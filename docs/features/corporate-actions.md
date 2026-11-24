@@ -33,6 +33,7 @@ related:
   - ../api-design.md
   - ../glossary.md
   - rebalances.md
+  - in-kind-transfers.md
 ---
 
 # Corporate actions
@@ -748,3 +749,12 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders.md](ord
 Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md](rebalances.md). Rule R21 lives there; this section records what changes here.
 
 - A note: R22 requests the cancel of the open orders in the Instrument, a rebalance order included. Its wave then has an order that is not `Filled`, and the rebalance ends `Incomplete` with `order_not_filled` (rebalances R17 b, R21).
+
+---
+
+## Amendment 2026-11-24 (in-kind transfers) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rules R17, R53 and R68 live there; this section records what changes here.
+
+- R28 and its open point on custodian rounding: answered. The custodian applies the event to its pooled position by its own rule and reports a `CorporateAction` custody movement, matched to the platform's `Feed` corporate action by its party action id (R17). A difference between the custodian's change and the sum of the entitlements is `unexplained` in the custodian reconciliation (R53).
+- R42 (simulator): when an action becomes effective, the simulator first settles every open fill in the symbol, then changes each custodian position in it by the factor, rounded by the custodian's rounding mode (`Fractional` or `WholeShares`).

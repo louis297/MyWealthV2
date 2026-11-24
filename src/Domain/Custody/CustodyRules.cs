@@ -38,7 +38,8 @@ public static class CustodyRules
 
     private const string InterestMessage = "Interest cannot be entered by hand on a Custodial account.";
     private const string OpeningMessage = "Opening balances on a Custodial account come from a migration batch.";
-    private const string StockMessage = "Securities cannot be moved in or out of a Custodial account by hand. Place an order.";
+    /// <summary>In-kind-transfers R48: securities move in or out of a Custodial account only by an in-kind transfer.</summary>
+    public const string StockMessage = "Securities move in or out of a Custodial account by an in-kind transfer. Request a transfer.";
 
     /// <summary>Orders R48: the <c>errors.Type</c> message for a hand <c>Buy</c> or <c>Sell</c> on a Custodial account.</summary>
     public const string TradeMessage = "Trades on a Custodial account go through the broker. Place an order.";

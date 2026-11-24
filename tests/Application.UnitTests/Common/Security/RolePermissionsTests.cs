@@ -223,6 +223,37 @@ public class RolePermissionsTests
     }
 
     [Test]
+    public void InKindTransfersRead_IsTenantAdminAdviserAndCustomer()
+    {
+        RolePermissions.Has(UserRole.TenantAdmin, Policies.InKindTransfersRead).ShouldBeTrue();
+        RolePermissions.Has(UserRole.Adviser, Policies.InKindTransfersRead).ShouldBeTrue();
+        RolePermissions.Has(UserRole.Customer, Policies.InKindTransfersRead).ShouldBeTrue();
+        RolePermissions.Has(UserRole.SystemAdmin, Policies.InKindTransfersRead).ShouldBeFalse();
+        RolePermissions.Has(UserRole.SimulatorOperator, Policies.InKindTransfersRead).ShouldBeFalse();
+    }
+
+    [Test]
+    public void InKindTransfersRequest_IsTenantAdminAndAdviser()
+    {
+        RolePermissions.Has(UserRole.TenantAdmin, Policies.InKindTransfersRequest).ShouldBeTrue();
+        RolePermissions.Has(UserRole.Adviser, Policies.InKindTransfersRequest).ShouldBeTrue();
+        RolePermissions.Has(UserRole.Customer, Policies.InKindTransfersRequest).ShouldBeFalse();
+        RolePermissions.Has(UserRole.SystemAdmin, Policies.InKindTransfersRequest).ShouldBeFalse();
+    }
+
+    [TestCase(Policies.InKindTransfersApprove)]
+    [TestCase(Policies.CustodyMovementsManage)]
+    [TestCase(Policies.CustodianReconciliationsManage)]
+    public void InKindTransferAdminPermissions_AreTenantAdminOnly(string policy)
+    {
+        RolePermissions.Has(UserRole.TenantAdmin, policy).ShouldBeTrue();
+        RolePermissions.Has(UserRole.Adviser, policy).ShouldBeFalse();
+        RolePermissions.Has(UserRole.Customer, policy).ShouldBeFalse();
+        RolePermissions.Has(UserRole.SystemAdmin, policy).ShouldBeFalse();
+        RolePermissions.Has(UserRole.SimulatorOperator, policy).ShouldBeFalse();
+    }
+
+    [Test]
     public void TradeSettlementsManage_IsTenantAdminOnly()
     {
         RolePermissions.Has(UserRole.TenantAdmin, Policies.TradeSettlementsManage).ShouldBeTrue();

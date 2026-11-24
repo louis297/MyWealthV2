@@ -678,6 +678,72 @@ public class TenantCompositeKeysSchemaTests
             VALUES (NEWID(), @a_tenant, @cma, N'simulator', CONVERT(nvarchar(100), NEWID()), '2026-11-23', 0, 5, 'USD',
                     SYSDATETIMEOFFSET(), 1, 6, SYSDATETIMEOFFSET(), @pbatch, SYSDATETIMEOFFSET(), N'test');
             """),
+        ("FK_CustodianFeedCursors_SafekeepingAccounts_TenantId_SafekeepingAccountId", "SafekeepingAccounts",
+            SafekeepingRow("{p}") + """
+            INSERT INTO [CustodianFeedCursors] ([SafekeepingAccountId], [TenantId]) VALUES (@{p}_safekeeping, @a_tenant);
+            """),
+        ("FK_CustodianPositions_SafekeepingAccounts_TenantId_SafekeepingAccountId", "SafekeepingAccounts",
+            SafekeepingRow("{p}") + """
+            INSERT INTO [CustodianPositions] ([TenantId], [SafekeepingAccountId], [Symbol], [Quantity])
+            VALUES (@a_tenant, @{p}_safekeeping, N'VTI', 1);
+            """),
+        ("FK_InKindTransfers_Accounts_TenantId_AccountId", "Accounts", TransferRow(account: "@{p}_brokerage")),
+        ("FK_InKindTransfers_Instruments_TenantId_InstrumentId", "Instruments", TransferRow(instrument: "@{p}_instrument")),
+        ("FK_InKindTransfers_SafekeepingAccounts_TenantId_SafekeepingAccountId", "SafekeepingAccounts",
+            SafekeepingRow("{p}") + TransferRow(status: "1", safekeeping: "@{p}_safekeeping", decidedBy: "@a_customer")),
+        ("FK_InKindTransfers_Transactions_TenantId_TransactionId", "Transactions",
+            SafekeepingRow("a") + TransferRow(status: "3", safekeeping: "@a_safekeeping", decidedBy: "@a_customer", transaction: "@{p}_buy")),
+        ("FK_InKindTransfers_Users_TenantId_RequestedByUserId", "Users", TransferRow(requestedBy: "@{p}_adviser")),
+        ("FK_InKindTransfers_Users_TenantId_DecisionByUserId", "Users", TransferRow(status: "4", decidedBy: "@{p}_customer")),
+        ("FK_InKindTransfers_Users_TenantId_SetAsideByUserId", "Users",
+            SafekeepingRow("a") + TransferRow(status: "7", safekeeping: "@a_safekeeping", decidedBy: "@a_customer", setAsideBy: "@{p}_customer")),
+        ("FK_CustodyMovements_SafekeepingAccounts_TenantId_SafekeepingAccountId", "SafekeepingAccounts",
+            SafekeepingRow("{p}") + MovementRow(safekeeping: "@{p}_safekeeping")),
+        ("FK_CustodyMovements_Instruments_TenantId_InstrumentId", "Instruments",
+            SafekeepingRow("a") + MovementRow(instrument: "@{p}_instrument")),
+        ("FK_CustodyMovements_Accounts_TenantId_AccountId", "Accounts",
+            SafekeepingRow("a") + TransferRow() + MovementRow(method: "0", account: "@{p}_brokerage", transaction: "@a_buy", transfer: "@transfer")),
+        ("FK_CustodyMovements_Transactions_TenantId_TransactionId", "Transactions",
+            SafekeepingRow("a") + TransferRow() + MovementRow(method: "0", account: "@a_brokerage", transaction: "@{p}_buy", transfer: "@transfer")),
+        ("FK_CustodyMovements_InKindTransfers_TenantId_InKindTransferId", "InKindTransfers",
+            SafekeepingRow("a") + TransferRow(tenant: "@{p}_tenant", account: "@{p}_brokerage", instrument: "@{p}_instrument", requestedBy: "@{p}_adviser")
+            + MovementRow(method: "0", account: "@a_brokerage", transaction: "@a_buy", transfer: "@transfer")),
+        ("FK_CustodyMovements_OrderFills_TenantId_OrderFillId", "OrderFills",
+            SafekeepingRow("a") + FillRow("{p}") + MovementRow(method: "1", fill: "@{p}_fill")),
+        ("FK_CustodyMovements_CorporateActions_TenantId_CorporateActionId", "CorporateActions", SafekeepingRow("a") + """
+            INSERT INTO [CorporateActions] ([PublicId], [TenantId], [InstrumentId], [Kind], [RatioNew], [RatioHeld], [ExDate], [Origin], [Status], [EffectiveAt], [Created], [CreatedBy])
+            VALUES (NEWID(), @{p}_tenant, @{p}_instrument, 0, 2, 1, '2026-12-01', 0, 1, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), N'test');
+            DECLARE @paction int = SCOPE_IDENTITY();
+            """ + MovementRow(method: "2", corporateAction: "@paction")),
+        ("FK_CustodyMovements_Users_TenantId_LastActionByUserId", "Users",
+            SafekeepingRow("a") + MovementRow(status: "3", lastActionBy: "@{p}_customer")),
+        ("FK_TransactionInKindTransferDetails_Transactions_TenantId_TransactionId", "Transactions", """
+            INSERT INTO [TransactionInKindTransferDetails]
+                ([TransactionId], [TenantId], [TransferPublicId], [CounterpartyName], [CounterpartyAccountMasked], [ChangesBeneficialOwner],
+                 [SettlementDate], [CustodianReference])
+            VALUES (@{p}_buy, @a_tenant, NEWID(), N'Harbour Brokers', N'****4172', 0, '2026-11-24', N'w-M1');
+            """),
+        ("FK_Orders_SafekeepingAccounts_TenantId_SafekeepingAccountId", "SafekeepingAccounts", SafekeepingRow("{p}") + OrderRow() + """
+            UPDATE [Orders] SET [SafekeepingAccountId] = @{p}_safekeeping, [SafekeepingAccountNumber] = N'SK-1' WHERE [Id] = SCOPE_IDENTITY();
+            """),
+        ("FK_CustodianReconciliations_SafekeepingAccounts_TenantId_SafekeepingAccountId", "SafekeepingAccounts",
+            SafekeepingRow("{p}") + CustodianRunRow(safekeeping: "@{p}_safekeeping")),
+        ("FK_CustodianReconciliations_Users_TenantId_RanByUserId", "Users",
+            SafekeepingRow("a") + CustodianRunRow(ranBy: "@{p}_adviser")),
+        ("FK_CustodianReconciliationLines_CustodianReconciliations_TenantId_ReconciliationId", "CustodianReconciliations",
+            SafekeepingRow("{p}") + CustodianRunRow(tenant: "@{p}_tenant", safekeeping: "@{p}_safekeeping") + """
+            INSERT INTO [CustodianReconciliationLines]
+                ([TenantId], [ReconciliationId], [Position], [Symbol], [CustodianQuantity], [PlatformQuantity], [Difference],
+                 [NotProcessed], [UnsettledTrades], [Suspense], [UnbookedFills], [Unexplained], [Class])
+            VALUES (@a_tenant, @crun, 1, N'VTI', 0, 0, 0, 0, 0, 0, 0, 0, 2);
+            """),
+        ("FK_CustodianReconciliationLines_Instruments_TenantId_InstrumentId", "Instruments",
+            SafekeepingRow("a") + CustodianRunRow() + """
+            INSERT INTO [CustodianReconciliationLines]
+                ([TenantId], [ReconciliationId], [Position], [Symbol], [InstrumentId], [CustodianQuantity], [PlatformQuantity], [Difference],
+                 [NotProcessed], [UnsettledTrades], [Suspense], [UnbookedFills], [Unexplained], [Class])
+            VALUES (@a_tenant, @crun, 1, N'VTI', @{p}_instrument, 0, 0, 0, 0, 0, 0, 0, 0, 2);
+            """),
         ("FK_ReportExecutions_ReportSchedules_TenantId_ScheduleId", "ReportSchedules", """
             INSERT INTO [ReportExecutions] ([PublicId], [ReportId], [ScheduleId], [TenantId], [TriggerKind], [Status], [ParametersJson], [Created], [CreatedBy])
             VALUES (NEWID(), @report, @{p}_schedule, @a_tenant, N'Scheduled', N'Queued', N'{}', SYSDATETIMEOFFSET(), N'test');
@@ -711,7 +777,99 @@ public class TenantCompositeKeysSchemaTests
     ];
 
     private static readonly string[] Parents =
-        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines", "BankReconciliations", "InterestRateSchedules", "CorporateActions", "Orders", "ClientMoneyAccounts", "TradeSettlements", "AccountPortfolioAssignments", "Rebalances", "MigrationBatches", "MigrationBatchEntries"];
+        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines", "BankReconciliations", "InterestRateSchedules", "CorporateActions", "Orders", "ClientMoneyAccounts", "TradeSettlements", "AccountPortfolioAssignments", "Rebalances", "MigrationBatches", "MigrationBatchEntries", "SafekeepingAccounts", "OrderFills", "InKindTransfers", "CustodyMovements", "CustodianReconciliations"];
+
+    /// <summary>A safekeeping account of tenant <paramref name="prefix"/> in <c>@{prefix}_safekeeping</c> (script 0055).</summary>
+    private static string SafekeepingRow(string prefix) => $"""
+        INSERT INTO [SafekeepingAccounts]
+            ([PublicId], [TenantId], [Currency], [CustodianName], [AccountName], [AccountNumber], [CustodianConnection], [IsActive], [Created], [CreatedBy])
+        VALUES (NEWID(), @{prefix}_tenant, 'USD', N'Simulator Custody', N'Nominees', N'SK-' + LEFT(CONVERT(nvarchar(36), NEWID()), 12),
+                N'simulator', 0, SYSDATETIMEOFFSET(), N'test');
+        DECLARE @{prefix}_safekeeping int = SCOPE_IDENTITY();
+
+        """;
+
+    /// <summary>An in-kind transfer Out of tenant <c>a</c> in <c>@transfer</c> (script 0055); one argument names a row of
+    /// the other tenant.</summary>
+    private static string TransferRow(
+        string tenant = "@a_tenant",
+        string account = "@a_brokerage",
+        string instrument = "@a_instrument",
+        string status = "0",
+        string requestedBy = "@a_adviser",
+        string decidedBy = "NULL",
+        string safekeeping = "NULL",
+        string transaction = "NULL",
+        string setAsideBy = "NULL") => $"""
+        INSERT INTO [InKindTransfers]
+            ([PublicId], [TenantId], [AccountId], [InstrumentId], [Direction], [Quantity], [Currency], [ChangesBeneficialOwner],
+             [CounterpartyName], [CounterpartyAccount], [CounterpartyHolderName], [Status], [RequestedByUserId], [RequestedAt],
+             [DecisionAction], [DecisionByUserId], [DecisionAt], [SafekeepingAccountId], [Attempts], [TransactionId], [CompletedAt],
+             [SetAsideByUserId], [SetAsideAt], [SetAsideNote], [Created], [CreatedBy])
+        VALUES (NEWID(), {tenant}, {account}, {instrument}, 1, 4, 'USD', 0,
+                N'Harbour Brokers', N'HB-0044172', N'J Smith', {status}, {requestedBy}, SYSDATETIMEOFFSET(),
+                {(decidedBy == "NULL" ? "NULL" : status == "4" ? "1" : "0")}, {decidedBy}, {(decidedBy == "NULL" ? "NULL" : "SYSDATETIMEOFFSET()")},
+                {safekeeping}, 1, {transaction}, {(transaction == "NULL" ? "NULL" : "SYSDATETIMEOFFSET()")},
+                {setAsideBy}, {(setAsideBy == "NULL" ? "NULL" : "SYSDATETIMEOFFSET()")}, {(setAsideBy == "NULL" ? "NULL" : "N'Never executed'")},
+                SYSDATETIMEOFFSET(), N'test');
+        DECLARE @transfer int = SCOPE_IDENTITY();
+
+        """;
+
+    /// <summary>An order of tenant <paramref name="prefix"/> with one fill in <c>@{prefix}_fill</c> (scripts 0051, 0055).</summary>
+    private static string FillRow(string prefix) => OrderRow(tenant: $"@{prefix}_tenant", account: $"@{prefix}_brokerage",
+        instrument: $"@{prefix}_instrument", placedBy: $"@{prefix}_adviser") + $"""
+        DECLARE @{prefix}_order int = SCOPE_IDENTITY();
+        INSERT INTO [ExecutionReports] ([PublicId], [Connection], [OutsideId], [Kind], [ReceivedAt], [Status])
+        VALUES (NEWID(), N'simulator', CONVERT(nvarchar(100), NEWID()), 0, SYSDATETIMEOFFSET(), 0);
+        INSERT INTO [OrderFills] ([PublicId], [TenantId], [OrderId], [ExecutionReportId], [Quantity], [Price], [TradeDate], [SettlementDate], [Status])
+        VALUES (NEWID(), @{prefix}_tenant, @{prefix}_order, SCOPE_IDENTITY(), 4, 100, '2026-11-23', '2026-11-25', 0);
+        DECLARE @{prefix}_fill bigint = SCOPE_IDENTITY();
+
+        """;
+
+    /// <summary>A custody movement of tenant <c>a</c> on <c>@a_safekeeping</c> (script 0055); one argument names a row of
+    /// the other tenant. <paramref name="method"/> sets <c>Matched</c> with that method.</summary>
+    private static string MovementRow(
+        string safekeeping = "@a_safekeeping",
+        string instrument = "@a_instrument",
+        string status = "0",
+        string method = "NULL",
+        string account = "NULL",
+        string transaction = "NULL",
+        string transfer = "NULL",
+        string fill = "NULL",
+        string corporateAction = "NULL",
+        string lastActionBy = "NULL")
+    {
+        var stored = method == "NULL" ? status : "1";
+        var reason = stored is "2" or "3" ? "0" : "NULL";
+        return $"""
+            INSERT INTO [CustodyMovements]
+                ([PublicId], [TenantId], [SafekeepingAccountId], [Connection], [OutsideId], [Direction], [Kind], [Symbol], [Currency],
+                 [InstrumentId], [Quantity], [SettlementDate], [ReceivedAt], [Status], [MatchMethod], [UnmatchedReason], [AccountId],
+                 [TransactionId], [InKindTransferId], [OrderFillId], [CorporateActionId], [LastAction], [LastActionByUserId], [LastActionAt],
+                 [LastActionNote], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, {safekeeping}, N'simulator', CONVERT(nvarchar(100), NEWID()), 0, 0, N'VTI', 'USD',
+                    {instrument}, 4, '2026-11-24', SYSDATETIMEOFFSET(), {stored}, {method}, {reason}, {account},
+                    {transaction}, {transfer}, {fill}, {corporateAction}, {(lastActionBy == "NULL" ? "NULL" : "0")}, {lastActionBy},
+                    {(lastActionBy == "NULL" ? "NULL" : "SYSDATETIMEOFFSET()")}, {(lastActionBy == "NULL" ? "NULL" : "N'Dealt with'")},
+                    SYSDATETIMEOFFSET(), N'test');
+
+            """;
+    }
+
+    /// <summary>A Manual custodian reconciliation run in <c>@crun</c> (script 0056).</summary>
+    private static string CustodianRunRow(
+        string tenant = "@a_tenant", string safekeeping = "@a_safekeeping", string ranBy = "@a_adviser") => $"""
+        INSERT INTO [CustodianReconciliations]
+            ([PublicId], [TenantId], [SafekeepingAccountId], [Currency], [Trigger], [RanAt], [RanByUserId], [Status], [PositionsAt],
+             [BreakCount], [TimingCount], [AgreedCount], [TransfersInFlight], [FillsNotDelivered], [Created], [CreatedBy])
+        VALUES (NEWID(), {tenant}, {safekeeping}, 'USD', 1, SYSDATETIMEOFFSET(), {ranBy}, 0, SYSDATETIMEOFFSET(), 0, 0, 1, 0, 0,
+                SYSDATETIMEOFFSET(), N'test');
+        DECLARE @crun int = SCOPE_IDENTITY();
+
+        """;
 
     /// <summary>An order of tenant <c>a</c> (script 0051); one argument names a row of the other tenant.</summary>
     private static string OrderRow(

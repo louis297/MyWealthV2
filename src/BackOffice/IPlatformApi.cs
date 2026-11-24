@@ -60,6 +60,25 @@ public interface IPlatformApi
         string bankConnection,
         CancellationToken cancellationToken = default);
 
+    /// <summary>In-kind transfers BO30: the tenant's safekeeping accounts with their feed.</summary>
+    Task<IReadOnlyList<SafekeepingAccountItem>> ListSafekeepingAccountsAsync(Guid tenantId, CancellationToken cancellationToken = default);
+
+    Task<Guid> CreateSafekeepingAccountAsync(
+        Guid tenantId,
+        string currency,
+        string custodianName,
+        string accountName,
+        string accountNumber,
+        string custodianConnection,
+        CancellationToken cancellationToken = default);
+
+    Task DisableSafekeepingAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default);
+
+    Task EnableSafekeepingAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default);
+
+    /// <summary>In-kind transfers BO31: the configured custodian connections.</summary>
+    Task<IReadOnlyList<CustodianConnectionItem>> ListCustodianConnectionsAsync(CancellationToken cancellationToken = default);
+
     /// <summary>The configured bank connections (deposit-matching R3).</summary>
     Task<IReadOnlyList<BankConnectionItem>> ListBankConnectionsAsync(CancellationToken cancellationToken = default);
 

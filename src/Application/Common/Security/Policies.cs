@@ -44,6 +44,16 @@ public static class Policies
     public const string RebalancesRead = "rebalances.read";
     public const string RebalancesConfirm = "rebalances.confirm";
     public const string MigrationBatchesManage = "migration-batches.manage";
+
+    public const string InKindTransfersRead = "in-kind-transfers.read";
+
+    public const string InKindTransfersRequest = "in-kind-transfers.request";
+
+    public const string InKindTransfersApprove = "in-kind-transfers.approve";
+
+    public const string CustodyMovementsManage = "custody-movements.manage";
+
+    public const string CustodianReconciliationsManage = "custodian-reconciliations.manage";
     public const string ReportsCustomerRead = "reports.customer.read";
     public const string ReportsCustomerCreate = "reports.customer.create";
     public const string ReportsBookRead = "reports.book.read";

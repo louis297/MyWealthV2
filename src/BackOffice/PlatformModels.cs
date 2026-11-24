@@ -82,6 +82,29 @@ public sealed record ClientMoneyAccountItem(
 /// <summary>How the last read of a client money account's statement went (docs/features/deposit-matching.md R4).</summary>
 public sealed record ClientMoneyAccountFeed(DateTimeOffset? LastSucceededAt, DateTimeOffset? LastFailedAt, string? LastFailure);
 
+/// <summary>A tenant's safekeeping account at a custodian (docs/features/in-kind-transfers.md R7).</summary>
+public sealed record SafekeepingAccountItem(
+    Guid Id,
+    string Currency,
+    string CustodianName,
+    string AccountName,
+    string AccountNumber,
+    string CustodianConnection,
+    bool IsActive,
+    string RowVersion,
+    CustodianFeedState? CustodianFeed = null);
+
+/// <summary>How the last read of a safekeeping account's custodian feed went, and when its positions are from (R7).</summary>
+public sealed record CustodianFeedState(
+    DateTimeOffset? LastSucceededAt, DateTimeOffset? LastFailedAt, string? LastFailure, DateTimeOffset? PositionsAt);
+
+public sealed record SafekeepingAccountPage(IReadOnlyList<SafekeepingAccountItem> Items, int Page, int PageSize, int TotalCount);
+
+/// <summary>A configured custodian connection (in-kind-transfers R1).</summary>
+public sealed record CustodianConnectionItem(string Name, string Adapter);
+
+public sealed record CustodianConnectionPage(IReadOnlyList<CustodianConnectionItem> Items, int Page, int PageSize, int TotalCount);
+
 /// <summary>A configured bank connection (deposit-matching R3).</summary>
 public sealed record BankConnectionItem(string Name, string Adapter);
 

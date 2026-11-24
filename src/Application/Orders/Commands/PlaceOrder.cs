@@ -198,7 +198,8 @@ public class PlaceOrderCommandHandler(
             tenantId, quote.Account.Id, quote.Instrument.Id, quote.Side, quote.Quantity, quote.Currency, quote.ReferencePrice,
             quote.ReferencePriceDate, quote.Fees, quote.Connection, request.Memo,
             currentUser.Person?.Id ?? throw new ForbiddenAccessException(), now,
-            settlementAccount: await SettlementAccountAsync(tenantId, quote, cancellationToken));
+            settlementAccount: await SettlementAccountAsync(tenantId, quote, cancellationToken),
+            safekeepingAccount: await Custodian.OrderSafekeeping.ActiveAsync(db, tenantId, quote.Currency, cancellationToken));
         db.Orders.Add(order);
         var body = JsonSerializer.Serialize(new { id = order.PublicId });
         db.IdempotencyRecords.Add(IdempotencyRecord.Create(tenantId, key, method, path, hash, 201, body, now));

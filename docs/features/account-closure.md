@@ -33,6 +33,7 @@ related:
   - interest-run.md
   - trade-settlement.md
   - rebalances.md
+  - in-kind-transfers.md
 ---
 
 # Account closure
@@ -570,3 +571,13 @@ Status of this amendment: `accepted` (2026-11-23), together with [trade-settleme
 Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md](rebalances.md). Rule R22 lives there; this section records what changes here.
 
 - A note: R5 already refuses an Account with an Active assignment, so an Account with an open rebalance cannot be closed. Unassign cancels the open rebalance (rebalances R22); the closure then waits for its open orders as for any order.
+
+---
+
+## Amendment 2026-11-24 (in-kind transfers) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rule R45 lives there; this section records what changes here.
+
+- R5: a new refusal, 400 `errors.AccountId`: an open in-kind transfer → `Open transfers of securities must be completed, rejected, cancelled or set aside before the account can be closed.`
+- R6: the message becomes `Sell or transfer out every holding before closing the account.`
+- R12: `POST /in-kind-transfers` joins the routes a closing account refuses.

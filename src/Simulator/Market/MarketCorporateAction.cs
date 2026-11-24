@@ -124,6 +124,16 @@ public sealed class MarketCorporateAction
         AppendVersion();
     }
 
+    /// <summary>In-kind-transfers R68: the custodian has applied this effective action to its positions.</summary>
+    public bool CustodianApplied { get; private set; }
+
+    public void MarkCustodianApplied() => CustodianApplied = true;
+
+    /// <summary>In-kind-transfers R68: the factor of corporate-actions R3 a holding is multiplied by.</summary>
+    public decimal Factor => Kind == MarketCorporateActionKind.Bonus
+        ? (decimal)(RatioHeld + RatioNew) / RatioHeld
+        : (decimal)RatioNew / RatioHeld;
+
     /// <summary>R42: the clock reached the ex-date.</summary>
     public void MakeEffective()
     {

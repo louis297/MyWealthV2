@@ -164,6 +164,63 @@ public class BackOfficeApiTests
     }
 
     [Test]
+    public async Task SafekeepingAccountCalls_UseTheTenantRoutes_AndSendTheRowVersion()
+    {
+        // In-kind transfers BO30.
+        var rowId = Guid.Parse("88888888-8888-8888-8888-8888888888bb");
+        var item = $$"""
+            {"id":"{{rowId}}","currency":"USD","custodianName":"Simulator Custody","accountName":"Demo Advisory Nominees","accountNumber":"SIM-DEMO-CUSTODY-USD","custodianConnection":"simulator","isActive":true,"custodianFeed":{"lastSucceededAt":"2026-11-24T02:01:07Z","lastFailedAt":null,"lastFailure":null,"positionsAt":"2026-11-24T02:01:00Z"},"rowVersion":"rv1"}
+            """;
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.OK, $$"""{"items":[{{item}}],"page":1,"pageSize":100,"totalCount":1}""");
+        api.Enqueue(HttpStatusCode.Created, $$"""{"id":"{{rowId}}"}""");
+        api.Enqueue(HttpStatusCode.NoContent, "");
+        api.Enqueue(HttpStatusCode.NoContent, "");
+        var platform = Create(api);
+
+        var listed = (await platform.ListSafekeepingAccountsAsync(TenantId)).ShouldHaveSingleItem();
+        var created = await platform.CreateSafekeepingAccountAsync(
+            TenantId, "USD", "Simulator Custody", "Demo Advisory Nominees", "SIM-DEMO-CUSTODY-USD", "simulator");
+        await platform.DisableSafekeepingAccountAsync(TenantId, rowId, "rv1");
+        await platform.EnableSafekeepingAccountAsync(TenantId, rowId, "rv2");
+
+        listed.Id.ShouldBe(rowId);
+        listed.CustodianName.ShouldBe("Simulator Custody");
+        listed.AccountNumber.ShouldBe("SIM-DEMO-CUSTODY-USD");
+        listed.CustodianConnection.ShouldBe("simulator");
+        listed.RowVersion.ShouldBe("rv1");
+        listed.CustodianFeed.ShouldNotBeNull().PositionsAt.ShouldBe(new DateTimeOffset(2026, 11, 24, 2, 1, 0, TimeSpan.Zero));
+        created.ShouldBe(rowId);
+        AssertRequest(api.Requests[0], "GET", $"/tenants/{TenantId}/safekeeping-accounts?pageSize=100");
+        AssertRequest(api.Requests[1], "POST", $"/tenants/{TenantId}/safekeeping-accounts");
+        var body = Body(api.Requests[1]);
+        body.GetProperty("currency").GetString().ShouldBe("USD");
+        body.GetProperty("custodianName").GetString().ShouldBe("Simulator Custody");
+        body.GetProperty("accountName").GetString().ShouldBe("Demo Advisory Nominees");
+        body.GetProperty("accountNumber").GetString().ShouldBe("SIM-DEMO-CUSTODY-USD");
+        body.GetProperty("custodianConnection").GetString().ShouldBe("simulator");
+        body.EnumerateObject().Count().ShouldBe(5);
+        AssertRequest(api.Requests[2], "POST", $"/tenants/{TenantId}/safekeeping-accounts/{rowId}/disable");
+        Body(api.Requests[2]).GetProperty("rowVersion").GetString().ShouldBe("rv1");
+        AssertRequest(api.Requests[3], "POST", $"/tenants/{TenantId}/safekeeping-accounts/{rowId}/enable");
+        Body(api.Requests[3]).GetProperty("rowVersion").GetString().ShouldBe("rv2");
+    }
+
+    [Test]
+    public async Task CustodianConnections_ReadsTheList()
+    {
+        // In-kind transfers BO31.
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.OK, """{"items":[{"name":"simulator","adapter":"Simulator"}],"page":1,"pageSize":20,"totalCount":1}""");
+        var platform = Create(api);
+
+        var connections = await platform.ListCustodianConnectionsAsync();
+
+        connections.ShouldBe([new CustodianConnectionItem("simulator", "Simulator")]);
+        AssertRequest(api.Requests[0], "GET", "/custodian-connections");
+    }
+
+    [Test]
     public async Task BankConnections_ReadsTheList()
     {
         var api = new ScriptedHandler();

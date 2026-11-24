@@ -99,6 +99,18 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<BrokerFeed> BrokerFeeds => Set<BrokerFeed>();
 
+    public DbSet<SafekeepingAccount> SafekeepingAccounts => Set<SafekeepingAccount>();
+
+    public DbSet<CustodianFeedCursor> CustodianFeedCursors => Set<CustodianFeedCursor>();
+
+    public DbSet<CustodianPosition> CustodianPositions => Set<CustodianPosition>();
+
+    public DbSet<CustodyMovement> CustodyMovements => Set<CustodyMovement>();
+
+    public DbSet<InKindTransfer> InKindTransfers => Set<InKindTransfer>();
+
+    public DbSet<CustodianReconciliation> CustodianReconciliations => Set<CustodianReconciliation>();
+
     public DbSet<TradeSettlement> TradeSettlements => Set<TradeSettlement>();
 
     public DbSet<Rebalance> Rebalances => Set<Rebalance>();

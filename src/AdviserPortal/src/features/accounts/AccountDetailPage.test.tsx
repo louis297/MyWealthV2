@@ -578,8 +578,9 @@ describe("AccountDetailPage", () => {
 
   it.each([
     // D39: deposits to a Custodial account come from the bank statement. D44 (withdrawals R45): money leaves it as a
-    // withdrawal, not a hand TransferOut. D69 (orders R48): a trade on it is an order.
-    ["Custodial", ["Place order", "Transfer", "Convert", "Adjust", "Withdraw"]],
+    // withdrawal, not a hand TransferOut. D69 (orders R48): a trade on it is an order. In-kind-transfers D86 (R48):
+    // securities move in or out by an in-kind transfer.
+    ["Custodial", ["Place order", "Transfer securities", "Transfer", "Convert", "Adjust", "Withdraw"]],
     [
       "External",
       ["TransferIn", "TransferOut", "Buy", "Sell", "StockIn", "StockOut", "Split", "Bonus", "Scrip", "Transfer", "Convert"],
@@ -1308,7 +1309,9 @@ describe("AccountDetailPage", () => {
     // D69: an assigned account follows its portfolio, so no order can be placed.
     expect(screen.queryByRole("link", { name: "Place order" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Place order" })).toBeDisabled();
-    expect(screen.getByText("This account follows a portfolio.")).toBeInTheDocument();
+    // In-kind-transfers D86: Transfer securities is disabled with the same sentence.
+    expect(screen.getAllByText("This account follows a portfolio.")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Transfer securities" })).toBeDisabled();
     // D44 (withdrawals R45): cash leaves a Custodial account as a withdrawal, also while a portfolio is assigned.
     expect(screen.getByRole("link", { name: "Withdraw" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Unassign" }));

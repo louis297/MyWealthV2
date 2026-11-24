@@ -379,6 +379,8 @@ Beyond PK / unique constraints already listed:
 0052_trade_settlement.sql                   -- TradeSettlements; settlement columns on Orders, OrderFills, ExecutionReports, OutgoingPayments, BankStatementLines; BankReconciliations open settlements
 0053_rebalances.sql                         -- Rebalances, RebalanceTargets, RebalanceLines; Orders.RebalanceId; UQ_AccountPortfolioAssignments_TenantId_Id; drops the three LastRebalance columns of AccountPortfolioAssignments
 0054_migration_batches.sql                  -- MigrationBatches, MigrationBatchControlTotals, MigrationBatchEntries, MigrationBatchHoldings, TransactionMigrationDetails; BankStatementLines.MigrationBatchId; source kind 9, match method 6, reconciliation item kind 19
+0055_custodian.sql                          -- SafekeepingAccounts, CustodianFeedCursors, CustodianPositions, CustodyMovements, InKindTransfers, TransactionInKindTransferDetails; Orders safekeeping account columns; UQ_OrderFills_TenantId_Id; source kind 10
+0056_custodian_reconciliations.sql          -- CustodianReconciliations, CustodianReconciliationLines
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -474,6 +476,8 @@ Amendment 2026-11-22 (corporate actions, accepted; [features/corporate-actions.m
 Amendment 2026-11-23 (orders and settlement, accepted; [features/orders.md](features/orders.md) §6.1): script `0051_orders.sql` widens `CK_Transactions_SourceKind` to 0–8 (`OrderFill`) and requires a `SourcePublicId` for kinds 2–8, and adds `TransactionExecutionDetails`: `TransactionId` (PK; at most one row per Transaction), `TenantId`, `FillPublicId uniqueidentifier`, `Price decimal(18,8)` (CHECK `> 0`), `TradeDate date`, `SettlementDate date` (CHECK `≥ TradeDate`), `BrokerReference nvarchar(50) NULL`; FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)` RESTRICT. No `PublicId` or `RowVersion`: the row is part of an immutable Transaction. One row on every Transaction with source `OrderFill` and on its Reversal, held by the Domain. No back-fill: no `Buy` or `Sell` posted before `0051` gets a row.
 
 Amendment 2026-11-24 (migration batches, accepted; [features/migration-batches.md](features/migration-batches.md) §6): script `0054_migration_batches.sql` widens `CK_Transactions_SourceKind` to 0–9 (`Migration`) and requires a `SourcePublicId` for kinds 2–9, and adds `TransactionMigrationDetails`: `TransactionId` (PK; at most one row per Transaction), `TenantId`, `AsOfDate date`, `PreviousProvider nvarchar(100)`; FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)` RESTRICT. No `PublicId` or `RowVersion`. No back-fill.
+
+Amendment 2026-11-24 (in-kind transfers, accepted; [features/in-kind-transfers.md](features/in-kind-transfers.md) §6.1): script `0055_custodian.sql` widens `CK_Transactions_SourceKind` to 0–10 (`InKindTransfer`) and requires a `SourcePublicId` for kinds 2–10, and adds `TransactionInKindTransferDetails`: `TransactionId` (PK), `TenantId`, `TransferPublicId`, `CounterpartyName nvarchar(100)`, `CounterpartyAccountMasked nvarchar(34)`, `ChangesBeneficialOwner bit`, `AcquiredOn date NULL`, `SettlementDate date`, `CustodianReference nvarchar(100)`; FK `(TenantId, TransactionId)` → `Transactions` RESTRICT; no `PublicId`, `RowVersion` or audit columns.
 
 ### 11.5 Holdings (accepted, landed)
 
@@ -625,6 +629,8 @@ Amendment 2026-11-23 (trade settlement and broken trades, accepted; [features/tr
 
 Amendment 2026-11-23 (rebalance through orders, accepted; [features/rebalances.md](features/rebalances.md) §6): script `0053_rebalances.sql` adds `RebalanceId int NULL` to `Orders` (FK `(TenantId, RebalanceId)` → `Rebalances` RESTRICT; filtered index `WHERE RebalanceId IS NOT NULL`). Existing orders have no rebalance.
 
+Amendment 2026-11-24 (in-kind transfers, accepted; [features/in-kind-transfers.md](features/in-kind-transfers.md) §6.1): script `0055_custodian.sql` adds `Orders.SafekeepingAccountId int NULL` and `SafekeepingAccountNumber nvarchar(34) NULL` (CHECK both or neither; FK `(TenantId, SafekeepingAccountId)` → `SafekeepingAccounts` RESTRICT) and `UQ_OrderFills_TenantId_Id`.
+
 ### 11.17 Trade settlements (accepted)
 
 Feature spec: [features/trade-settlement.md](features/trade-settlement.md) (accepted 2026-11-23) §6.1. Script `0052_trade_settlement.sql`:
@@ -653,6 +659,23 @@ Feature spec: [features/migration-batches.md](features/migration-batches.md) (ac
 - `MigrationBatchHoldings` — `Id`, `TenantId`, `MigrationBatchEntryId` (CASCADE), `InstrumentId`, `Quantity decimal(18,8)` (CHECK `> 0`), `Cost decimal(18,4)` (CHECK `≥ 0`). Unique `(MigrationBatchEntryId, InstrumentId)`.
 
 The rule "at least cash or one holding" spans two tables and is held by the aggregate. No back-fill. No simulator script.
+
+### 11.20 Safekeeping accounts, custody movements, in-kind transfers and custodian reconciliations (accepted)
+
+Feature spec: [features/in-kind-transfers.md](features/in-kind-transfers.md) (accepted 2026-11-24) §6. Script `0055_custodian.sql`:
+
+- `SafekeepingAccounts` — `Id`, `PublicId` (unique), `TenantId`, `Currency char(3)`, `CustodianName nvarchar(100)`, `AccountName nvarchar(140)`, `AccountNumber nvarchar(34)`, `CustodianConnection nvarchar(50)`, `IsActive`, audit, `RowVersion`. Unique `(TenantId, Id)`; filtered unique `(TenantId, Currency) WHERE IsActive = 1` and `(AccountNumber) WHERE IsActive = 1`.
+- `CustodianFeedCursors` — `SafekeepingAccountId` (PK), `TenantId`, `Cursor nvarchar(500) NULL`, `LastSucceededAt`, `LastFailedAt`, `PositionsAt`, `LastFailure int NULL` (CHECK 0–6), `RowVersion`.
+- `CustodianPositions` — `Id`, `TenantId`, `SafekeepingAccountId`, `Symbol nvarchar(32)`, `Quantity decimal(18,8)`. Unique `(SafekeepingAccountId, Symbol)`.
+- `CustodyMovements` — the custodian's inbound records; unique `(Connection, OutsideId)`; status, match method and unmatched reason with CHECKs that tie each method to its links; filtered unique `(OrderFillId)` where set.
+- `InKindTransfers` — the instructions; CHECKs: cost iff `In`, no acquired on for `Out`, the decision maker is not the requester on an approve or reject, a safekeeping account from the approval on, a failure reason iff `Failed`, set aside iff `SetAside`, a Transaction and a completion time iff `Completed`.
+
+Script `0056_custodian_reconciliations.sql`:
+
+- `CustodianReconciliations` — `Id`, `PublicId`, `TenantId`, `SafekeepingAccountId`, `Currency`, `Trigger` (CHECK 0–1), `RanAt`, `RanByUserId` (null iff `Scheduled`), `Status` (CHECK 0–2), `PositionsAt` (null iff `NoPositions`), the line counts, `TransfersInFlight`, `FillsNotDelivered`, the feed status, audit.
+- `CustodianReconciliationLines` — `Id`, `TenantId`, `ReconciliationId`, `Position`, `Symbol`, `InstrumentId NULL`, the quantities and the five components (`decimal(26,8)`), `Class` (CHECK 0–2). CHECKs: `Difference = CustodianQuantity − PlatformQuantity`; the five components add up to `Difference`.
+
+No back-fill.
 
 ## 12. Still not a schema decision
 
@@ -725,6 +748,7 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 
 | 2026-11-23 | Trade settlement and broken trades accepted (`0052`, not written yet): `TradeSettlements` (§11.17); columns on `Orders`, `OrderFills`, `ExecutionReports` (§11.16), `OutgoingPayments` (§11.11), `BankStatementLines` (§11.9) and `BankReconciliations` (§11.12); simulator `0011_broker_settlement.sql` (§15). |
 | 2026-11-23 | Rebalance through orders accepted (`0053`, not written yet): `Rebalances`, `RebalanceTargets`, `RebalanceLines` (§11.18); `Orders.RebalanceId` (§11.16); the three `LastRebalance…` columns of `AccountPortfolioAssignments` dropped and `UQ_AccountPortfolioAssignments_TenantId_Id` added (§11.6). No simulator script. §9 lists `0053`. |
+| 2026-11-24 | In-kind transfers accepted (`0055`, `0056`, not written yet): `SafekeepingAccounts`, `CustodianFeedCursors`, `CustodianPositions`, `CustodyMovements`, `InKindTransfers`, `CustodianReconciliations`, `CustodianReconciliationLines` (§11.20); `TransactionInKindTransferDetails` and `CK_Transactions_SourceKind` 0–10 (§11.4); `Orders` safekeeping account columns (§11.16); simulator `0012_custodian.sql` (§15). §9 lists `0055` and `0056`. |
 
 ---
 
@@ -845,5 +869,6 @@ Owner: [features/simulator.md](features/simulator.md) §6.2, [ADR 0021](adr/0021
 - S4 market, issuer half ([features/corporate-actions.md](features/corporate-actions.md) §6.2, accepted 2026-11-22; `0009_market_corporate_actions.sql`): `MarketCorporateActions` (`Number` unique, the `n` of the party action id; FK `MarketInstruments`; `Kind` CHECK 0–2; ratio; dates; `Status` CHECK 0–2; current `Version`; `RowVersion`) and `MarketCorporateActionVersions` (`Id bigint` identity, the place in the feed; FK the action; `Version`, `Status`, ratio and dates; UQ `(ActionId, Version)`). A reset empties both.
 - S2 broker ([features/orders.md](features/orders.md) §6.2, accepted 2026-11-23; `0010_broker.sql`): `BrokerSettings` (one row: order mode, fill percent, reject reason, slippage percent, settlement days), `BrokerOrders` (`Number` unique, the `n` of the broker order id; `ClientOrderId` unique; body hash; symbol, currency, side, quantity, price limit, reference price; `Status` CHECK 0–4; filled quantity; accepted day), `BrokerFills` (`Number` unique, the `n` of the contract note; FK the order; quantity, price, trade date, settlement date, settled flag) and `BrokerReports` (`Id bigint` identity, the place in the feed; kind; FK the order and the fill). A reset empties the three and restores the settings.
 - S2 broker settlements and broken trades ([features/trade-settlement.md](features/trade-settlement.md) §6.2, accepted 2026-11-23; `0011_broker_settlement.sql`): `BrokerSettings.SettlementMode` (CHECK 0–1, default `Pay`), `BrokerOrders.SettlementAccount`, `BrokerSettlements` (`Number` unique, the `n` of the settlement id; settlement account, currency, settlement date, net, fill count, paid amount), `BrokerFills.Broken` and `SettlementId`, `BrokerReports.SettlementId`, and the `Kind` CHECK widened to the two new kinds.
+- S3 custodian ([features/in-kind-transfers.md](features/in-kind-transfers.md) §6.3, accepted 2026-11-24; `0012_custodian.sql`): `CustodianAccounts` (account number unique), `CustodianMovements` (`Number`, its place in the account's feed, `OmitFromFeed`), `CustodianTransfers` (`InstructionId` unique with the account, the body and its hash, status, mode at receipt), `CustodianSettings` (one row: transfer mode, reject reason, rounding mode); `BrokerOrders.SafekeepingAccount nvarchar(34) NULL`.
 - Development: Aspire creates the database. VPS: created by hand once, like `MyWealthDbV2` ([deployment.md](deployment.md) §15).
 

@@ -212,6 +212,33 @@ for (var i = 0; i < standingAccounts.Length; i++)
         .WithEnvironment($"Simulator__Bank__StandingAccounts__{i}__Name", standingAccounts[i][2]);
 }
 
+// In-kind transfers R61, §9.1: the simulator custodian opens the safekeeping accounts TestSeed gives each firm, with
+// the holdings TestSeed gives the firm's Custodial accounts as their positions, so the first reconciliation agrees.
+string[][] standingCustody =
+[
+    ["SIM-DEMO-CUSTODY-USD", "USD", "Demo Advisory Nominees"],
+    ["SIM-DEMO-CUSTODY-NZD", "NZD", "Demo Advisory Nominees"],
+    ["SIM-DEMO2-CUSTODY-USD", "USD", "Demo Advisory 2 Nominees"],
+    ["SIM-DEMO2-CUSTODY-NZD", "NZD", "Demo Advisory 2 Nominees"]
+];
+string[][] seededUsdPositions = [["VTI", "40"], ["AAPL", "20"]];
+for (var i = 0; i < standingCustody.Length; i++)
+{
+    simulator.WithEnvironment($"Simulator__Custodian__StandingAccounts__{i}__AccountNumber", standingCustody[i][0])
+        .WithEnvironment($"Simulator__Custodian__StandingAccounts__{i}__Currency", standingCustody[i][1])
+        .WithEnvironment($"Simulator__Custodian__StandingAccounts__{i}__Name", standingCustody[i][2]);
+    if (standingCustody[i][1] != "USD")
+    {
+        continue;
+    }
+
+    for (var j = 0; j < seededUsdPositions.Length; j++)
+    {
+        simulator.WithEnvironment($"Simulator__Custodian__StandingAccounts__{i}__Positions__{j}__Symbol", seededUsdPositions[j][0])
+            .WithEnvironment($"Simulator__Custodian__StandingAccounts__{i}__Positions__{j}__Quantity", seededUsdPositions[j][1]);
+    }
+}
+
 // Trade-settlement R2, R37, §9.1: the broker's own bank accounts, the payee of the firm's settlement payments and the
 // payer of the broker's receipts. webapi and worker read them on the broker connection; the simulator broker pays
 // from them.
@@ -255,6 +282,10 @@ web.WithEnvironment("BankConnections__simulator__Adapter", "Simulator");
 
 // Orders R2, §9.1: the same pattern for the broker connection. worker sends the orders and reads the reports.
 web.WithEnvironment("BrokerConnections__simulator__Adapter", "Simulator");
+
+// In-kind transfers R1, §9.1: the same pattern for the custodian connection. worker sends the transfers and reads the
+// custody feed.
+web.WithEnvironment("CustodianConnections__simulator__Adapter", "Simulator");
 foreach (var account in brokerBankAccounts)
 {
     web.WithEnvironment($"BrokerConnections__simulator__BankAccounts__{account[0]}__AccountNumber", account[1])
@@ -275,6 +306,9 @@ var worker = builder.AddProject<Projects.Worker>(Services.Worker)
     .WithEnvironment("BrokerConnections__simulator__Adapter", "Simulator")
     .WithEnvironment("BrokerConnections__simulator__BaseUrl", simulator.GetEndpoint("party"))
     .WithEnvironment("BrokerConnections__simulator__ApiKey", simulatorPartyApiKey)
+    .WithEnvironment("CustodianConnections__simulator__Adapter", "Simulator")
+    .WithEnvironment("CustodianConnections__simulator__BaseUrl", simulator.GetEndpoint("party"))
+    .WithEnvironment("CustodianConnections__simulator__ApiKey", simulatorPartyApiKey)
     .WithEnvironment("MarketDataConnections__simulator__Adapter", "Simulator")
     .WithEnvironment("MarketDataConnections__simulator__SymbolSuffix", ".SIM")
     .WithEnvironment("MarketDataConnections__simulator__BaseUrl", simulator.GetEndpoint("party"))

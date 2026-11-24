@@ -21,6 +21,7 @@ related:
   - production-hosting.md
   - ../deployment.md
   - withdrawals.md
+  - in-kind-transfers.md
 ---
 
 # Customer Portal BFF
@@ -381,3 +382,13 @@ Add `/orders` to the R20 prefix allow-list so the Customer Portal can read the C
 - Prefix: `/orders`
 - Methods: GET only is used by the portal. `webapi` refuses every write for a Customer (403), so the BFF forwards the methods it already forwards and does not filter by role.
 - A fill, unsettled cash and reserved quantities are read through `/transactions` and `/accounts`, which are already proxied.
+
+---
+
+## Amendment 2026-11-24 (in-kind transfers prefix) — accepted
+
+Add `/in-kind-transfers` to the BFF prefix allow-list (R20) so the Customer Portal can read the Customer's own transfers ([in-kind-transfers.md](in-kind-transfers.md) R29).
+
+- Prefix: `/in-kind-transfers`
+- Methods: GET (a Customer has no write permission; `webapi` answers 403 to any other method)
+- `/custody-movements` and `/custodian-reconciliations` stay blocked (404).

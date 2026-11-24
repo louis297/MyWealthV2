@@ -1,3 +1,4 @@
+using MyWealthV2.Simulator.Custodian;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
@@ -65,6 +66,7 @@ public static class PartyEndpoints
         party.MapBankPartyEndpoints();
         party.MapMarketPartyEndpoints();
         party.MapBrokerPartyEndpoints();
+        party.MapCustodianPartyEndpoints();
 
         return app;
     }

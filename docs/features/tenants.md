@@ -19,6 +19,7 @@ related:
   - identity-auth.md
   - tenant-custody-modes.md
   - client-money-accounts.md
+  - in-kind-transfers.md
 ---
 
 # Tenants
@@ -406,3 +407,11 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders.md](ord
 - §5: `Tenant.BrokerConnection` (`null` or a name) and `SetBrokerConnection(name)`. `Create` keeps its signature and sets none.
 - §6: script `0051_orders.sql` adds `Tenants.BrokerConnection nvarchar(50) NULL` and sets `simulator` on every existing row (roadmap D19).
 - A Tenant with no broker connection, or with one that is not configured on `webapi`, can place no order (orders R7). Changing it routes only new orders. Disabling or enabling the Tenant does not touch it.
+
+---
+
+## Amendment 2026-11-24 (in-kind transfers) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rules R2–R7 live there; this section records what changes here.
+
+- A Tenant gains safekeeping accounts under `/tenants/{tenantId}/safekeeping-accounts` (`tenants.manage`, SystemAdmin only): one active per currency, never edited, each naming a custodian connection. `GET /custodian-connections` lists the configured connections.

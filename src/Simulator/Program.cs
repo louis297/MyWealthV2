@@ -50,6 +50,7 @@ builder.Services.AddSingleton(MyWealthV2.Simulator.Broker.BrokerBankAccounts.Rea
 
 // Simulated instruments R20: a bad standing instrument stops the host before it listens.
 builder.Services.AddSingleton(MarketStandingInstruments.Read(builder.Configuration));
+builder.Services.AddSingleton(MyWealthV2.Simulator.Custodian.CustodianStandingAccounts.Read(builder.Configuration));
 
 var app = builder.Build();
 
@@ -62,6 +63,7 @@ await SchemaApplicator.ForDatabase(
 await WorldStartup.EnsureWorldAsync(app.Services, CancellationToken.None);
 await BankStandingAccounts.EnsureAsync(app.Services, CancellationToken.None);
 await MarketStandingInstruments.EnsureAsync(app.Services, CancellationToken.None);
+await MyWealthV2.Simulator.Custodian.CustodianStandingAccounts.EnsureAsync(app.Services, CancellationToken.None);
 
 app.UsePublicHostForwardedHeaders(trustAnyProxyInDevelopment: true);
 app.UseSurfacePorts();

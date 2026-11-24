@@ -187,7 +187,7 @@ public class AccountClosureRequestTests : TestBase
         var errors = await CustodialHttp.ErrorsAsync(await AccountClosureHttp.PostAsync(
             world.Adviser, world.AccountId, AccountClosureHttp.Body(world.NominatedBankAccountId)));
 
-        errors["AccountId"].ShouldBe(["Sell every holding before closing the account."]);
+        errors["AccountId"].ShouldBe(["Sell or transfer out every holding before closing the account."]);
         (await AccountClosureHttp.ClosuresAsync(world.AccountId)).ShouldBeEmpty();
     }
 

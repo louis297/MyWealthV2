@@ -103,6 +103,20 @@ export type Transaction = {
   execution?: TransactionExecution | null;
   /** migration-batches R31: where a migrated opening balance came from. */
   migration?: { asOfDate: string; previousProvider: string } | null;
+  /** in-kind-transfers R38: on a posting of an in-kind transfer and its Reversal; otherwise null. */
+  inKindTransfer?: TransactionInKindTransfer | null;
+};
+
+/** in-kind-transfers R38: the transfer behind a StockIn or StockOut. The counterparty account is masked. */
+export type TransactionInKindTransfer = {
+  transferId: string;
+  direction: string;
+  counterpartyName: string;
+  counterpartyAccount: string;
+  changesBeneficialOwner: boolean;
+  acquiredOn: string | null;
+  settlementDate: string;
+  custodianReference: string | null;
 };
 
 /** orders R38: the broker's execution behind a fill. */

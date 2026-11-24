@@ -29,6 +29,7 @@ related:
   - ../features/trade-settlement.md
   - ../features/rebalances.md
   - ../features/migration-batches.md
+  - ../features/in-kind-transfers.md
 ---
 
 # Customer Portal
@@ -362,3 +363,15 @@ Status of this amendment: `accepted` (2026-11-24), together with [migration-batc
 | ID | Given | When | Then |
 | --- | --- | --- | --- |
 | C38 | Customer with a Transaction that has `migration` | Account page activity | An `Opening` row is labelled "Opening balance" and an `OpeningHoldings` row "Holdings transferred in", each with "From <previousProvider>, as at <asOfDate>" under it. A Transaction without `migration` keeps today's labels. |
+
+---
+
+## Amendment 2026-11-24 (in-kind transfers) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers](../features/in-kind-transfers.md). Field rules live there. The Customer Portal BFF gains the prefix `/in-kind-transfers` (bff-customer-portal R20); `inKindTransfer` comes on the transaction item and the holding fields on the holdings item it already reads.
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| C39 | A Customer with an in-kind transfer | Account page | A "Transfers" block from `GET /in-kind-transfers?accountId=` lists open transfers and those that ended in the last 30 days: "100 ACME.SIM from Harbour Brokers" or "… to Harbour Brokers", the status in the Customer's words (Requested "Being checked", Approved and Sent "On its way", Completed "Done", Rejected "Not accepted", Cancelled "Cancelled", Failed and SetAside "Not completed") and the requested date. No action. |
+| C40 | A Customer with a Transaction that has `inKindTransfer` | Account page activity | A `StockIn` row is labelled "Shares transferred in" and a `StockOut` row "Shares transferred out", each with "100 ACME.SIM, Harbour Brokers" under it. A Transaction without `inKindTransfer` keeps today's labels. |
+| C41 | A holding with a reserved or unsettled quantity | Holdings | "<n> reserved" under the quantity now also covers a transfer out ("reserved for a sale or a transfer"); "<n> not settled yet" when the unsettled quantity is above 0. |

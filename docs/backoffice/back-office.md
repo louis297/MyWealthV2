@@ -22,6 +22,7 @@ related:
   - ../features/deposit-matching.md
   - ../features/interest-run.md
   - ../features/trade-settlement.md
+  - ../features/in-kind-transfers.md
 ---
 
 # Back Office
@@ -306,3 +307,15 @@ Status of this amendment: `accepted` (2026-11-23), together with [trade-settleme
 | ID | Behaviour |
 | --- | --- |
 | BO29 | Back Office Broker page (BO27, BO28): the connection row shows "Settles in USD, NZD" from `settlementCurrencies`; the report list shows kinds `Broken` and `Settlement` with the settlement id, and the reason labels FillSettled "The trade has already settled", FillBroken "The trade was cancelled", UnknownSettlement "No trades for this settlement". `FillSettled` and `UnknownSettlement` rows are red. |
+
+---
+
+## Amendment 2026-11-24 (in-kind transfers) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers](../features/in-kind-transfers.md). Field rules live there (R2–R7). Calls: `/tenants/{tenantId}/safekeeping-accounts` and `GET /custodian-connections`, both `tenants.manage`.
+
+| ID | Behaviour |
+| --- | --- |
+| BO30 | The Tenant page gains a "Safekeeping accounts" section from `GET /tenants/{tenantId}/safekeeping-accounts`: Currency, Custodian, Account name, Account number, Connection, Active, and the feed with the three states of the Prices column of BO23 (never read, last success, failing since with the failure label) and "Positions as at". "Add" opens a form with the R3 fields and a select of `GET /custodian-connections` names. Disable and Enable act with `rowVersion`. A 400 (a second active account in the currency, a number in use) is shown at its field. |
+| BO31 | A "Custodian" page lists `GET /custodian-connections`: Name and Adapter. |
+| BO32 | The failure labels add UnknownAccount "The custodian does not know this account". |

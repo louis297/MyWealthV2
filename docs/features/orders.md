@@ -46,6 +46,7 @@ related:
   - ../glossary.md
   - trade-settlement.md
   - rebalances.md
+  - in-kind-transfers.md
 ---
 
 # Orders and settlement
@@ -946,3 +947,15 @@ Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md]
 - R5, R10–R13: a rebalance order is an ordinary order: `Market`, `Day`, the reference price and price limit, the fee terms, the reservation and the settlement account; memo `Rebalance`; placed by the person who confirmed the rebalance. Its fills are posted as any fill (rebalances R15).
 - R49: replaced. A rebalance no longer posts `Buy` / `Sell` at once; its trades are order fills. "An order and an assignment never meet on one account" becomes "the only orders on an assigned Account are the orders of its rebalance". Assigning a portfolio to an Account with a live order stays refused.
 - §2 Out and §11 points 4 and 16: rebalance through orders is no longer out. The drafts of point 4 arrive as the lines of a rebalance proposal (rebalances §11 point 2); point 16 is answered by the trade lock staying (rebalances §11 point 12).
+
+---
+
+## Amendment 2026-11-24 (in-kind transfers) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rules R16, R43, R44, R46, R47 and R67 live there; this section records what changes here.
+
+- R20, R53: an order placed while the Tenant has an active safekeeping account in the Instrument's quote currency stores it with its account number, and the place call carries `safekeepingAccount` (the account number). An order with none leaves the field out, so an order sent before this slice is sent again with the same body.
+- R40, R41: the reserved quantity of a holding is the reserved quantity of the Account's live sell orders in the Instrument plus the quantity of its open in-kind transfers `Out`. The adjustment's refusal reads `40 ACME.SIM is reserved for sell orders and transfers out.`
+- R43: the unsettled quantity of a holding is read from the `Posted` buy fills that are not settled and not broken; a transfer out may not take it (in-kind-transfers R44).
+- R52, R53 (simulator): the broker instructs the simulator custodian to receive or deliver the shares of each fill of an order with a safekeeping account when the fill settles; the custodian's `Trade` movement names the fill by the outside id of its `Fill` report.
+- "Out" and "still open": the custodian side of a fill is now in [in-kind-transfers.md](in-kind-transfers.md).

@@ -78,7 +78,11 @@ public class RequestAccountClosureCommandHandler(
     public const string OpenWithdrawalMessage =
         "Open withdrawals must be paid, rejected or cancelled before the account can be closed.";
     public const string AssignmentMessage = "Unassign the portfolio before closing the account.";
-    public const string HoldingMessage = "Sell every holding before closing the account.";
+    public const string HoldingMessage = "Sell or transfer out every holding before closing the account.";
+
+    /// <summary>In-kind-transfers R45: an open transfer of securities keeps the account open.</summary>
+    public const string OpenTransferMessage =
+        "Open transfers of securities must be completed, rejected, cancelled or set aside before the account can be closed.";
 
     public async Task<IdempotentResult> Handle(RequestAccountClosureCommand request, CancellationToken cancellationToken)
     {
@@ -178,6 +182,12 @@ public class RequestAccountClosureCommandHandler(
                 row => row.AccountId == account.Id && row.Status == AssignmentStatus.Active, cancellationToken))
         {
             throw Error(nameof(RequestAccountClosureCommand.AccountId), AssignmentMessage);
+        }
+
+        // In-kind-transfers R45: an open transfer in or out waits.
+        if (await InKindTransfers.InKindTransferRules.HasOpenTransferAsync(db, account.Id, cancellationToken))
+        {
+            throw Error(nameof(RequestAccountClosureCommand.AccountId), OpenTransferMessage);
         }
 
         // Orders R47: a live order (open, or with a fill not posted yet) and a fill that has not settled both wait.

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { SelectItem } from "@/components/ui/select";
 import { useGetAccountHoldingsQuery, useGetAccountQuery } from "@/features/accounts/accountsApi";
-import { allowsManualEntry, isCustodial } from "@/features/accounts/custodyRules";
+import { allowsManualEntry, isCustodial, transferSentence } from "@/features/accounts/custodyRules";
 import { useGetAccountPortfolioQuery } from "@/features/portfolios/portfoliosApi";
 import { useGetInstrumentsQuery } from "@/features/instruments/instrumentsApi";
 import { useCreateTransactionMutation } from "@/features/transactions/transactionsApi";
@@ -205,6 +205,13 @@ export function CreateTransactionPage() {
         {account.data.status === "Open" ? (
           <Link to={`/accounts/${account.data.id}/order`} className={recordLinkClass}>
             Place an order
+          </Link>
+        ) : null}
+        {/* in-kind-transfers D86 (R48): StockIn and StockOut are an in-kind transfer. */}
+        <p className="text-sm">{transferSentence}</p>
+        {account.data.status === "Open" ? (
+          <Link to={`/accounts/${account.data.id}/transfer-securities`} className={recordLinkClass}>
+            Request a transfer
           </Link>
         ) : null}
       </Page>

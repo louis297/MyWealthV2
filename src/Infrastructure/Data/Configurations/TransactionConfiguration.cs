@@ -93,5 +93,10 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
             .HasForeignKey<TransactionMigrationDetail>(detail => detail.TransactionId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_TransactionMigrationDetails_Transactions_TenantId_TransactionId");
+        builder.HasOne(transaction => transaction.InKindTransferDetail)
+            .WithOne()
+            .HasForeignKey<TransactionInKindTransferDetail>(detail => detail.TransactionId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_TransactionInKindTransferDetails_Transactions_TenantId_TransactionId");
     }
 }

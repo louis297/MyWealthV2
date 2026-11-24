@@ -31,6 +31,7 @@ related:
   - ../database-design.md
   - ../api-design.md
   - ../glossary.md
+  - in-kind-transfers.md
 ---
 
 # Migration batches
@@ -632,3 +633,11 @@ Do not put an in-kind transfer, a custodian statement, a server-side file upload
 ### Docs amended when this spec was accepted
 
 [posting.md](posting.md) (R19: on a Custodial account an `Opening` is written only by a migration batch), [holdings.md](holdings.md) (R8, R11: the same for `OpeningHoldings`), [custody-modes.md](custody-modes.md) (R5 matrix: the "written by" of `Opening` / `OpeningHoldings`; §4.2.1 the message; R9: a Transaction of a refused type can now exist on a Custodial account, with a flow's source), [transaction-source.md](transaction-source.md) (kind `Migration` = 9, not hand-reversible, the checks widened), [deposit-matching.md](deposit-matching.md) (R23, R26, R30: match to a batch and its undo; `migrationBatchId` and method `Migration` on the item), [bank-returns.md](bank-returns.md) (R3: the recall of a funding line), [trade-settlement.md](trade-settlement.md) (R21: what a `Matched` line has), [bank-reconciliation.md](bank-reconciliation.md) (R9, R10, §5: kind 19 and the migration cash legs), [adjustments.md](adjustments.md) (a note: an adjustment corrects a posted entry), [withdrawals.md](withdrawals.md) and [interest-run.md](interest-run.md) (notes: migrated cash is available at once and accrues from the day it is posted), [bff-adviser-portal.md](bff-adviser-portal.md) (the prefix), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D80–D85; D34, D35, D51, D26, D27), [customer-portal.md](../customer-portal/customer-portal.md) (C38), [api-design.md](../api-design.md) (§3.1 one permission row, §4.2 one problem code, §6 resource row, a new §7.13, §7.7 the `migration` field, change log), [domain-model.md](../domain-model.md) and [database-design.md](../database-design.md) (the sections named in §5 and §6), [glossary.md](../glossary.md) (the review terms become accepted; Transaction source gains `Migration`), [function-plan.md](../function-plan.md) §5, [features/README.md](README.md) row status, [known-issues/custodial-account-gaps.md](../known-issues/custodial-account-gaps.md) (the row "No opening balance" notes this spec and is removed when the slice lands; the row "Existing positions cannot be moved in" then names the in-kind transfer of one Customer's shares only), and the roadmap §2 matrix, §9 T2, §13 status and the sentence under the §13 table (step 13 then builds on the bank stage, steps 5 and 7).
+
+---
+
+## Amendment 2026-11-24 (in-kind transfers) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rule R18 and §11 point 14 live there; this section records what changes here.
+
+- §11 point 9 and "still open" (no outside proof of migrated holdings): a migrated holding shows as `unexplained` in the custodian reconciliation until the previous provider delivers it to the safekeeping account. The bulk delivery arrives as a custody movement with no instruction (`NoInstruction`), which a TenantAdmin ignores with a note; the batch already posted the holdings. The batch does not change.

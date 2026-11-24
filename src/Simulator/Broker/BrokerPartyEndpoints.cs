@@ -163,10 +163,10 @@ public static class BrokerPartyEndpoints
             var order = reason is { } rejected
                 ? BrokerOrder.Reject(
                     number, body.ClientOrderId!, hash, body.Symbol!, body.Currency!, side, quantity, limit, reference, rejected,
-                    body.SettlementAccount?.Trim())
+                    body.SettlementAccount?.Trim(), body.SafekeepingAccount?.Trim())
                 : BrokerOrder.Accept(
                     number, body.ClientOrderId!, hash, body.Symbol!, body.Currency!, side, quantity, limit, reference, day,
-                    body.SettlementAccount?.Trim());
+                    body.SettlementAccount?.Trim(), body.SafekeepingAccount?.Trim());
             db.BrokerOrders.Add(order);
             await db.SaveChangesAsync(cancellationToken);
 
@@ -232,7 +232,9 @@ public static class BrokerPartyEndpoints
             body.TimeInForce,
             Number(body.PriceLimit!.Value),
             Number(body.ReferencePrice!.Value)
-        }.Concat(body.SettlementAccount is null ? [] : new object?[] { body.SettlementAccount }).ToArray())));
+        }.Concat(body.SettlementAccount is null ? [] : new object?[] { body.SettlementAccount })
+            // In-kind-transfers R67: part of the comparison only when it is sent.
+            .Concat(body.SafekeepingAccount is null ? [] : new object?[] { "safekeepingAccount", body.SafekeepingAccount }).ToArray())));
 
     private static string Number(decimal value) => value.ToString("0.########", CultureInfo.InvariantCulture);
 }
@@ -247,7 +249,8 @@ public sealed record BrokerOrderRequest(
     string? TimeInForce,
     decimal? PriceLimit,
     decimal? ReferencePrice,
-    string? SettlementAccount = null);
+    string? SettlementAccount = null,
+    string? SafekeepingAccount = null);
 
 /// <summary>R63: one page of the broker's feed.</summary>
 public sealed record BrokerFeed(IReadOnlyList<BrokerFeedItem> Items, string Cursor, bool HasMore);

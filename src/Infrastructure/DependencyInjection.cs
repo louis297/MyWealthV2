@@ -116,6 +116,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<IReportGeneratorRegistry, ReportGeneratorRegistry>();
         builder.Services.AddScoped<ReportJob>();
         builder.Services.AddScoped<IReconcileClientMoneyAccount, ReconcileClientMoneyAccount>();
+        builder.Services.AddScoped<MyWealthV2.Application.CustodianReconciliations.IReconcileSafekeepingAccount, MyWealthV2.Application.CustodianReconciliations.ReconcileSafekeepingAccount>();
         builder.Services.AddScoped<BankReconciliationJob>();
         builder.Services.AddScoped<MyWealthV2.Infrastructure.Interest.InterestRunJob>();
         builder.Services.AddScoped<MyWealthV2.Application.Interest.Accruals.IAccountInterest, MyWealthV2.Application.Interest.Accruals.AccountInterest>();
@@ -203,6 +204,40 @@ public static class DependencyInjection
                 return new SqlRunLock(connectionString);
             });
             builder.Services.AddScoped<BrokerSyncJob>();
+        }
+    }
+
+    /// <summary>
+    /// Reads <c>CustodianConnections</c> for <paramref name="host"/> and registers <see cref="ICustodianConnections"/>
+    /// (in-kind-transfers R2). Throws on a bad entry, so call it before <c>Build()</c>.
+    /// </summary>
+    public static void AddCustodianConnections(this IHostApplicationBuilder builder, MyWealthV2.Infrastructure.Custodian.CustodianConnectionHost host)
+    {
+        var connections = new MyWealthV2.Infrastructure.Custodian.ConfiguredCustodianConnections(
+            MyWealthV2.Infrastructure.Custodian.CustodianConnectionsConfiguration.Read(builder.Configuration, host));
+        builder.Services.AddSingleton(connections);
+        builder.Services.AddSingleton<MyWealthV2.Application.Custodian.ICustodianConnections>(connections);
+        // ADR 0021 rule 3: each port is dispatched to the adapter its connection names.
+        builder.Services.AddHttpClient(MyWealthV2.Infrastructure.Custodian.SimulatorCustodianFeed.HttpClientName);
+        builder.Services.AddSingleton<MyWealthV2.Infrastructure.Custodian.ICustodianFeedAdapter, MyWealthV2.Infrastructure.Custodian.SimulatorCustodianFeed>();
+        builder.Services.AddHttpClient(MyWealthV2.Infrastructure.Custodian.SimulatorCustodianTransfers.HttpClientName);
+        builder.Services.AddSingleton<MyWealthV2.Infrastructure.Custodian.ICustodianTransfersAdapter, MyWealthV2.Infrastructure.Custodian.SimulatorCustodianTransfers>();
+        builder.Services.AddScoped<MyWealthV2.Application.Custodian.ICustodianFeed, MyWealthV2.Infrastructure.Custodian.CustodianFeedDispatcher>();
+        builder.Services.AddScoped<MyWealthV2.Application.Custodian.ICustodianTransfers, MyWealthV2.Infrastructure.Custodian.CustodianTransfersDispatcher>();
+        builder.Services.AddScoped<MyWealthV2.Application.Custodian.SendInKindTransfers>();
+        builder.Services.AddScoped<MyWealthV2.Application.Custodian.PullCustodyMovements>();
+        builder.Services.AddScoped<MyWealthV2.Application.Custodian.ProcessCustodyMovements>();
+        if (host == MyWealthV2.Infrastructure.Custodian.CustodianConnectionHost.Worker)
+        {
+            // R9: one run of a connection at a time; the bank and broker syncs register the same lock.
+            builder.Services.TryAddSingleton(sp =>
+            {
+                var connectionString = sp.GetRequiredService<IConfiguration>().GetConnectionString(Services.Database);
+                Guard.Against.Null(connectionString, message: $"Connection string '{Services.Database}' not found.");
+                return new SqlRunLock(connectionString);
+            });
+            builder.Services.AddScoped<MyWealthV2.Infrastructure.Custodian.CustodianSyncJob>();
+            builder.Services.AddScoped<MyWealthV2.Infrastructure.Custodian.CustodianReconciliationJob>();
         }
     }
 

@@ -26,6 +26,7 @@ related:
   - account-closure.md
   - rebalances.md
   - migration-batches.md
+  - in-kind-transfers.md
 ---
 
 # Adjustments
@@ -452,3 +453,12 @@ Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md]
 Status of this amendment: `accepted` (2026-11-24), together with [migration-batches.md](migration-batches.md). Rule R25 lives there; this section records what changes here.
 
 - Use: a posted migration batch is not reversed. A wrong entry is corrected with an adjustment (reason `EntryError`) on the account.
+
+---
+
+## Amendment 2026-11-24 (in-kind transfers) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rules R18, R39, R41 and R43 live there; this section records what changes here.
+
+- The reserved quantity of a holding now counts open in-kind transfers `Out`; the refusal of an adjustment that lowers a holding below it reads `40 ACME.SIM is reserved for sell orders and transfers out.`
+- An adjustment is the correction after a custody movement in suspense, a transfer set aside, or a wrong cost or quantity on a completed transfer (reasons `ReconciliationBreak`, `EntryError`, `CorporateAction`).

@@ -83,6 +83,7 @@ function renderAt(
     depositInstructions?: () => Response;
     cash?: Record<string, unknown>;
     withdrawals?: unknown[];
+    transfers?: unknown[];
     orders?: unknown[];
     holdings?: unknown[];
     nominated?: unknown[];
@@ -123,6 +124,10 @@ function renderAt(
     }
     if (url.includes("/nominated-bank-accounts")) {
       const items = options.nominated ?? [];
+      return json({ items, page: 1, pageSize: 100, totalCount: items.length });
+    }
+    if (url.includes("/in-kind-transfers")) {
+      const items = options.transfers ?? [];
       return json({ items, page: 1, pageSize: 100, totalCount: items.length });
     }
     if (url.includes("/withdrawals")) {
@@ -888,7 +893,7 @@ describe("Customer Portal bank accounts and withdrawals (withdrawals C22–C25)"
     expect(screen.queryByText("Settles 25 Nov")).not.toBeInTheDocument();
   });
 
-  it("shows the quantity a sell order reserves under a holding (C35)", async () => {
+  it("shows the quantity a sell order or a transfer out reserves under a holding (C35, in-kind-transfers C41)", async () => {
     renderAt("/accounts/account-1", me, [], "Custodial", {
       account: custodialUsd,
       holdings: [
@@ -897,8 +902,8 @@ describe("Customer Portal bank accounts and withdrawals (withdrawals C22–C25)"
       ],
     });
 
-    expect(await screen.findByText("40 reserved for a sell order")).toBeInTheDocument();
-    expect(screen.getAllByText(/reserved for a sell order/)).toHaveLength(1);
+    expect(await screen.findByText("40 reserved for a sale or a transfer")).toBeInTheDocument();
+    expect(screen.getAllByText(/reserved for a sale or a transfer/)).toHaveLength(1);
   });
 
   it("hides Reserved when nothing is reserved (C23)", async () => {
@@ -1242,5 +1247,115 @@ describe("Customer Portal corporate actions (corporate-actions C31)", () => {
     const hand = screen.getAllByRole("row").filter((row) => row.textContent?.startsWith("Split"));
     expect(hand).toHaveLength(1);
     expect(hand[0]).not.toHaveTextContent("Ex-date");
+  });
+});
+
+describe("Customer Portal in-kind transfers (in-kind-transfers C39–C41)", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal("location", {
+      origin: "http://localhost:3000",
+      pathname: "/accounts/account-1",
+      search: "",
+      href: "http://localhost:3000/accounts/account-1",
+      assign: vi.fn(),
+    });
+  });
+
+  const custodialUsd = { type: "Brokerage", currency: "USD", depositReference: "K7M3Q9PXB" };
+
+  function transfer(id: string, status: string, direction: string, requestedAt: string, completedAt: string | null = null) {
+    return {
+      id,
+      accountId: "account-1",
+      customerId: me.id,
+      direction,
+      instrument: { id: "i-1", symbol: "ACME.SIM", name: "Acme Simulated" },
+      quantity: 100,
+      currency: "USD",
+      cost: null,
+      acquiredOn: null,
+      changesBeneficialOwner: false,
+      counterparty: { name: "Harbour Brokers", account: "HB-0044172", holderName: "J Smith" },
+      memo: null,
+      status,
+      requestedBy: { id: "a", name: "Ann Adviser" },
+      requestedAt,
+      decision: null,
+      send: null,
+      failureReason: null,
+      setAside: null,
+      transactionId: null,
+      completedAt,
+      rowVersion: "AAAA",
+    };
+  }
+
+  it("lists open transfers and those that ended in the last 30 days, in the Customer's words, with no action (C39)", async () => {
+    const recent = new Date(Date.now() - 5 * 86400000).toISOString();
+    const old = new Date(Date.now() - 60 * 86400000).toISOString();
+    const { fetchMock } = renderAt("/accounts/account-1", me, [], "Custodial", {
+      account: custodialUsd,
+      transfers: [
+        transfer("t-open", "Sent", "In", old),
+        transfer("t-done", "Completed", "Out", old, recent),
+        transfer("t-old", "Completed", "In", old, old),
+      ],
+    });
+
+    const section = (await screen.findByRole("heading", { name: "Transfers" })).closest("section")!;
+    expect(await within(section).findByText("100 ACME.SIM from Harbour Brokers")).toBeInTheDocument();
+    expect(within(section).getByText("On its way")).toBeInTheDocument();
+    expect(within(section).getByText("100 ACME.SIM to Harbour Brokers")).toBeInTheDocument();
+    expect(within(section).getAllByText("Done")).toHaveLength(1);
+    expect(within(section).queryByRole("button")).not.toBeInTheDocument();
+    const lookup = urls(fetchMock).find((url) => url.includes("/in-kind-transfers"))!;
+    expect(new URL(lookup, "http://localhost").searchParams.get("accountId")).toBe("account-1");
+  });
+
+  it("labels the postings of a transfer, and keeps StockIn without one (C40)", async () => {
+    const posting = (id: string, type: string, quantity: number, inKindTransfer: unknown) => ({
+      id,
+      type,
+      bookedAt: "2026-11-24T01:12:00Z",
+      memo: null,
+      cash: [],
+      security: [{ accountId: "account-1", instrumentId: "i-1", quantity, cost: 9500 }],
+      inKindTransfer,
+    });
+    const detail = (direction: string) => ({
+      transferId: "t-1",
+      direction,
+      counterpartyName: "Harbour Brokers",
+      counterpartyAccount: "****4172",
+      changesBeneficialOwner: false,
+      acquiredOn: null,
+      settlementDate: "2026-11-24",
+      custodianReference: "w-M12",
+    });
+    renderAt("/accounts/account-1", me, [
+      posting("tx-in", "StockIn", 100, detail("In")),
+      posting("tx-out", "StockOut", -40, detail("Out")),
+      posting("tx-hand", "StockIn", 5, null),
+    ], "Custodial", {
+      account: custodialUsd,
+      holdings: [{ id: "h-1", instrumentId: "i-1", symbol: "ACME.SIM", name: "Acme Simulated", quantity: 65 }],
+    });
+
+    expect(await screen.findByText("Shares transferred in")).toBeInTheDocument();
+    expect(screen.getByText("Shares transferred out")).toBeInTheDocument();
+    expect(screen.getByText("100 ACME.SIM, Harbour Brokers")).toBeInTheDocument();
+    expect(screen.getByText("40 ACME.SIM, Harbour Brokers")).toBeInTheDocument();
+    expect(screen.getByText("StockIn")).toBeInTheDocument();
+  });
+
+  it("shows the quantity not settled yet under a holding (C41)", async () => {
+    renderAt("/accounts/account-1", me, [], "Custodial", {
+      account: custodialUsd,
+      holdings: [{ id: "h-1", instrumentId: "i-1", symbol: "ACME.SIM", name: "Acme Simulated", quantity: 100, unsettledQuantity: 10 }],
+    });
+
+    expect(await screen.findByText("10 not settled yet")).toBeInTheDocument();
   });
 });

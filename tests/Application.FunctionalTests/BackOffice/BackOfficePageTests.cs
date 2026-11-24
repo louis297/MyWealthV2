@@ -29,6 +29,8 @@ public class BackOfficePageTests
     private static readonly Guid ClientMoneyUsdId = Guid.Parse("88888888-8888-8888-8888-888888888888");
     private static readonly Guid ClientMoneyAudId = Guid.Parse("88888888-8888-8888-8888-8888888888aa");
     private static readonly Guid ClientMoneyNzdId = Guid.Parse("99999999-9999-9999-9999-999999999999");
+    private static readonly Guid SafekeepingUsdId = Guid.Parse("aaaaaaaa-8888-8888-8888-888888888888");
+    private static readonly Guid SafekeepingNzdId = Guid.Parse("aaaaaaaa-9999-9999-9999-999999999999");
 
     private BackOfficeFactory _factory = null!;
     private HttpClient _client = null!;
@@ -249,6 +251,43 @@ public class BackOfficePageTests
         BackOfficeHost::MyWealthV2.BackOffice.Components.Pages.FeedStatus.Text(null).ShouldBe("Not read yet");
         BackOfficeHost::MyWealthV2.BackOffice.Components.Pages.FeedStatus.Text(new ClientMoneyAccountFeed(at, at.AddMinutes(-1), failure))
             .ShouldBe("Read 2026-11-20 03:05 UTC");
+    }
+
+    /// <summary>In-kind transfers BO30: the safekeeping accounts of the tenant, their feed and positions, Disable or
+    /// Enable, and the add form with the custodian connections.</summary>
+    [Test]
+    public async Task Configuration_ListsSafekeepingAccounts_WithTheirFeedAndPositions_AndTheAddForm()
+    {
+        var body = await GetAsync($"/tenants/{TenantId}/config");
+
+        body.ShouldContain("Safekeeping accounts");
+        foreach (var header in new[] { "Custodian", "Feed", "Positions as at" })
+        {
+            body.ShouldContain($"<th>{header}</th>");
+        }
+
+        body.ShouldContain("Simulator Custody");
+        body.ShouldContain("SIM-DEMO-CUSTODY-USD");
+        body.ShouldContain("Read 2026-11-24 02:01 UTC");
+        body.ShouldContain("2026-11-24 02:00 UTC");
+        body.ShouldContain("Failing since 2026-11-24 03:05 UTC: The custodian does not know this account");
+        SafekeepingButton(body, SafekeepingUsdId).ShouldContain(">Disable<");
+        SafekeepingButton(body, SafekeepingNzdId).ShouldContain(">Enable<");
+        body.ShouldContain("Add safekeeping account");
+        body.ShouldContain("Custodian connection");
+        _api.SafekeepingLists.ShouldContain(TenantId);
+    }
+
+    /// <summary>In-kind transfers BO31: the Custodian page lists the connections and is in the menu.</summary>
+    [Test]
+    public async Task Custodian_ListsTheConnections_AndIsInTheMenu()
+    {
+        var body = await GetAsync("/custodian");
+
+        body.ShouldContain("href=\"/custodian\"");
+        body.ShouldContain(">simulator<");
+        body.ShouldContain(">Simulator<");
+        body.ShouldNotContain("No custodian connection is configured.");
     }
 
     [Test]
@@ -850,8 +889,43 @@ public class BackOfficePageTests
         return SessionCookieName + "=" + options.TicketDataFormat.Protect(ticket);
     }
 
+    private static string SafekeepingButton(string body, Guid id)
+    {
+        var match = Regex.Match(body, $"<button[^>]*data-safekeeping-account=\"{id}\"[^>]*>.*?</button>", RegexOptions.Singleline);
+        match.Success.ShouldBeTrue($"a button for safekeeping account {id}");
+        return match.Value;
+    }
+
     private sealed class StubApi : IPlatformApi
     {
+        public List<Guid> SafekeepingLists { get; } = [];
+
+        public Task<IReadOnlyList<SafekeepingAccountItem>> ListSafekeepingAccountsAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        {
+            SafekeepingLists.Add(tenantId);
+            var at = new DateTimeOffset(2026, 11, 24, 2, 1, 0, TimeSpan.Zero);
+            return Task.FromResult<IReadOnlyList<SafekeepingAccountItem>>([
+                new SafekeepingAccountItem(SafekeepingUsdId, "USD", "Simulator Custody", "Demo Advisory Nominees", "SIM-DEMO-CUSTODY-USD",
+                    "simulator", true, "rv1", new CustodianFeedState(at, null, null, at.AddMinutes(-1))),
+                new SafekeepingAccountItem(SafekeepingNzdId, "NZD", "Simulator Custody", "Demo Advisory Nominees", "SIM-DEMO-CUSTODY-NZD",
+                    "simulator", false, "rv2", new CustodianFeedState(null, at.AddHours(1).AddMinutes(4), "UnknownAccount", null))
+            ]);
+        }
+
+        public Task<Guid> CreateSafekeepingAccountAsync(
+            Guid tenantId, string currency, string custodianName, string accountName, string accountNumber, string custodianConnection,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(SafekeepingUsdId);
+
+        public Task DisableSafekeepingAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task EnableSafekeepingAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<IReadOnlyList<CustodianConnectionItem>> ListCustodianConnectionsAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<CustodianConnectionItem>>([new("simulator", "Simulator")]);
+
         public List<TenantListRequest> TenantLists { get; } = [];
 
         public Task<TenantPage> ListTenantsAsync(int page, int pageSize, bool? isEnabled, string? search, CancellationToken cancellationToken = default)

@@ -52,6 +52,18 @@ public interface IApplicationDbContext
 
     DbSet<BrokerFeed> BrokerFeeds { get; }
 
+    DbSet<SafekeepingAccount> SafekeepingAccounts { get; }
+
+    DbSet<CustodianFeedCursor> CustodianFeedCursors { get; }
+
+    DbSet<CustodianPosition> CustodianPositions { get; }
+
+    DbSet<CustodyMovement> CustodyMovements { get; }
+
+    DbSet<InKindTransfer> InKindTransfers { get; }
+
+    DbSet<CustodianReconciliation> CustodianReconciliations { get; }
+
     DbSet<TradeSettlement> TradeSettlements { get; }
 
     DbSet<Rebalance> Rebalances { get; }

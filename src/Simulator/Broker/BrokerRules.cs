@@ -51,7 +51,9 @@ public static class BrokerRules
         && body.Type == "Market"
         && body.TimeInForce == "Day"
         // Trade-settlement R35: optional, in the shape of an account number.
-        && (body.SettlementAccount is null || BankRules.IsAccountNumber(body.SettlementAccount));
+        && (body.SettlementAccount is null || BankRules.IsAccountNumber(body.SettlementAccount))
+        // In-kind-transfers R67: optional, in the shape of an account number.
+        && (body.SafekeepingAccount is null || BankRules.IsAccountNumber(body.SafekeepingAccount));
 
     public static bool IsFillPercent(int? percent) => percent is >= 1 and <= 100;
 

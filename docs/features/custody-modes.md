@@ -37,6 +37,7 @@ related:
   - interest-run.md
   - rebalances.md
   - migration-batches.md
+  - in-kind-transfers.md
 ---
 
 # Custody modes
@@ -635,3 +636,15 @@ Status of this amendment: `accepted` (2026-11-24), together with [migration-batc
 - §4.2.1: the refusal message of both becomes `Opening balances on a Custodial account come from a migration batch.`
 - R9: a Transaction of a refused type can now exist on a Custodial account with a flow's source: an `Opening` or `OpeningHoldings` with source `Migration`.
 - R5, the reverse row: `Migration` is not hand-reversible (`CustodyRules.AllowsHandReverse(Custodial, Migration)` is `false`).
+
+---
+
+## Amendment 2026-11-24 (in-kind transfers) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rules R37, R41, R48 and R49 live there; this section records what changes here.
+
+- R5 matrix: the cells `StockIn` / Custodial and `StockOut` / Custodial stay refused for every caller; their "written by" is the in-kind transfer (`Transaction.PostTransferIn` / `PostTransferOut`, source `InKindTransfer`), posted only when a custody movement confirms the transfer.
+- §4.2.1: the refusal message of both becomes `Securities move in or out of a Custodial account by an in-kind transfer. Request a transfer.`
+- R9: a `StockIn` or `StockOut` can now exist on a Custodial account with source `InKindTransfer`.
+- R5, the reverse row: `InKindTransfer` is not hand-reversible (`CustodyRules.AllowsHandReverse(Custodial, InKindTransfer)` is `false`).
+- External accounts are unchanged: they keep hand `StockIn` and `StockOut`.

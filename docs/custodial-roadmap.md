@@ -38,6 +38,7 @@ related:
   - features/trade-settlement.md
   - features/rebalances.md
   - features/migration-batches.md
+  - features/in-kind-transfers.md
 ---
 
 # Custodial accounts roadmap
@@ -99,7 +100,7 @@ The manual entry matrix at the end of the plan. The External column stays as tod
 | `FxConversion` | allowed, both Custodial | allowed (later through an outside FX party, O5) | Hand entry |
 | `Interest` | refused (written by the interest run, landed 2026-11-22) | refused | Interest run (I2) |
 | `Opening` / `OpeningHoldings` | refused (written by a migration batch, landed 2026-11-24) | refused | Migration batch (T2) |
-| `StockIn` / `StockOut` | refused | refused | In-kind transfer (T1) |
+| `StockIn` / `StockOut` | refused (written by an in-kind transfer, landed 2026-11-24) | refused | In-kind transfer (T1) |
 | `Split` / `Bonus` / `Scrip` | refused (`Split` and `Bonus` written by corporate actions, landed 2026-11-22) | refused | Corporate action events (C1; `Scrip` with C3) |
 | `Dividend` | reserved | refused | Corporate action events (C2) |
 | `Adjustment` (new) | — | allowed with its own permission | Hand entry (F3) |
@@ -356,6 +357,7 @@ A Custodial `FxConversion` priced by an FX provider with a spread, instead of th
 - **Matrix:** `StockIn` / `StockOut` stay refused by hand; the flow writes them (or new type names, decided with the type route moves of [future-plans.md](future-plans.md) §4).
 - **Simulator:** S3 custodian and registry.
 - **Depends on:** F1, F2. Better after tax lots exist, which is not planned yet (§10).
+- **Spec:** T1, T3 and S3 are one spec, step 14, [in-kind-transfers.md](features/in-kind-transfers.md) (accepted and landed 2026-11-24). Its §11 decides, every point as recommended: an in-kind transfer is an instruction at `/in-kind-transfers`, `In` or `Out`, between a Custodial account and a counterparty (another broker, custodian or registry) typed on the transfer; requested by an Adviser or TenantAdmin and approved by another TenantAdmin in both directions, with no register of verified counterparty accounts; `Requested` → `Approved` → `Sent` → `Completed`, or `Rejected`, `Cancelled`, `Failed`, `SetAside` (this refines "requested → in transit → arrived → posted" above: the arrival and the posting are one step); the `worker` instructs the custodian with the transfer's PublicId as the key, the custodian answers at once, and the custody movement that names the transfer is the confirmation (no status feed); the movement posts the existing types `StockIn` or `StockOut` with the new source `InKindTransfer` and an in-kind transfer detail, booked at the processing time (D2, D4); a transfer in carries one total cost and an optional acquisition date, the caller's numbers, and whether beneficial ownership changes is recorded and not acted on; a transfer in needs an instrument quoted in the Account's currency (D20); a transfer out reserves its quantity and takes only the transferable quantity (available quantity minus purchases that have not settled); a movement that does not match its transfer exactly posts nothing and waits in suspense, and a TenantAdmin sets the transfer aside and corrects with an adjustment; no transfer on an account that follows a portfolio; no flow reverses a completed transfer; account closure waits for open transfers, and a transfer out is the second way to empty an account; hand `StockIn` / `StockOut` stay refused on a Custodial account. Tax lots are still not planned; the acquisition date waits in the detail.
 
 ### T2. Migration batch
 
@@ -367,6 +369,7 @@ A Custodial `FxConversion` priced by an FX provider with a spread, instead of th
 
 - **What:** a custodian statement port; a daily comparison of the custodian's holdings per instrument against the sum of Custodial holdings; breaks listed like B7.
 - **Depends on:** O1 (otherwise nothing changes positions), S3.
+- **Spec:** [in-kind-transfers.md](features/in-kind-transfers.md) (accepted and landed 2026-11-24), with T1. Its §11 decides, every point as recommended: a safekeeping account per Tenant and currency at a custodian (the firm's pooled account for the securities quoted in that currency, the twin of the client money account), set by SystemAdmin in the Back Office, never edited, at most one active per currency (decided 2026-11-24), on a custodian connection kept in configuration; a Custodial account can still be opened without one; port `ICustodianFeed` returns the custody movements after a cursor and, with every page, the custodian's positions at that cursor, instead of a statement per day (two clocks, D9; this refines "a custodian statement port" and "daily holding statement"); one job per connection, `custodian-sync:{connection}`; a movement is matched to an in-kind transfer, to the fill it delivers (an order now carries the safekeeping account, and the broker's fill id names the trade) or to a corporate action, and anything else waits in suspense, where a TenantAdmin can only ignore it with a note; a run is one safekeeping account at one instant, read at SNAPSHOT, stored and never edited, with one line per instrument quoted in its currency: the custodian quantity, the platform quantity and five components that add up to the difference (movements not processed and trades not settled are timing; movements in suspense, delivered fills not booked and the unexplained rest are breaks); there is no known difference, so a holding from a seed, from a trade before orders or from a migration batch not delivered yet is a break until the custodian holds it (this refines "breaks listed like B7": B7 has known differences); quantities are compared exactly, with no tolerance and no value in money; daily at 17:10 UTC and "Run now"; permissions `custody-movements.manage` and `custodian-reconciliations.manage`, TenantAdmin only; no PDF report. It answers the open points of [migration-batches.md](features/migration-batches.md) (the outside proof of migrated holdings) and [corporate-actions.md](features/corporate-actions.md) (rounding at the custodian).
 
 ---
 
@@ -420,6 +423,8 @@ The party is the **simulator broker**, in [orders.md](features/orders.md) (accep
 ### S3. Custodian and registry (with T1, T3)
 
 Daily holding statement per instrument; in-kind transfer arrival and departure; a position that disagrees with the platform.
+
+The party is the **simulator custodian**, in [in-kind-transfers.md](features/in-kind-transfers.md) (accepted and landed 2026-11-24) §4.12: safekeeping accounts, each in one currency, with standing accounts and their opening positions from configuration; a transfer route idempotent on the platform's instruction id; a transfer mode (execute, hold, reject) and execute of a held transfer, also with another quantity; a movement nobody asked for, which may be left out of the feed so that only the position changes; a feed of movements per account with the positions at the cursor on every page (in place of a statement per day); and a rounding mode (fractional, whole shares) for corporate actions. It also stands in for the other broker or the registry on the far side of a transfer, and checks no position. It changes the simulator broker and market: the order route takes `safekeepingAccount` and a settled fill is delivered there as a movement that names the fill, and a corporate action first settles the open trades of its symbol and then changes the custodian's positions. It adds no scenario library.
 
 ### S4. Issuer and data vendor (with C1–C3)
 
@@ -481,7 +486,7 @@ Each step depends only on earlier steps. "Closes" names the matrix cell or known
 | 11b | O1 / O2 remainder: settlement cash through the client money account and its reconciliation; a broken trade after a fill | S2 broken trade and settlements, S1 | The known difference `Trades` of B7, for order fills | [trade-settlement](features/trade-settlement.md) | accepted 2026-11-23, landed 2026-11-23 |
 | 12 | O3 rebalance through orders | S2 (no change) | Hand reverse of a rebalance trade (D15); the known difference `Trades` of B7, for rebalance trades | [rebalances](features/rebalances.md) | accepted 2026-11-23, landed 2026-11-23 |
 | 13 | T2 migration batch | S1 (no change) | "No opening balance" | [migration-batches](features/migration-batches.md) | accepted 2026-11-24, landed 2026-11-24 |
-| 14 | T1 in-kind transfer, T3 custodian reconciliation | S3 | "Existing positions cannot be moved in" | — | not started |
+| 14 | T1 in-kind transfer, T3 custodian reconciliation | S3; S2 and S4 (deliveries and corporate actions at the custodian) | "Existing positions cannot be moved in" | [in-kind-transfers](features/in-kind-transfers.md) | accepted 2026-11-24, landed 2026-11-24 |
 | 15 | C2 dividends, C3 reinvestment | S4 | `Dividend` reserved | — | not started (with roadmap step 2) |
 | later | X1 adjustment review, O4, O5, X2, X3 | — | — | — | not planned |
 

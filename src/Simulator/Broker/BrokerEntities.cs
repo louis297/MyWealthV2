@@ -146,6 +146,9 @@ public sealed class BrokerOrder
     /// <summary>Trade-settlement R35: the trust account number the order settles against, as the platform sent it.</summary>
     public string? SettlementAccount { get; private set; }
 
+    /// <summary>In-kind-transfers R67: the safekeeping account the fills are delivered to or from, as the platform sent it.</summary>
+    public string? SafekeepingAccount { get; private set; }
+
     public byte[] RowVersion { get; private set; } = null!;
 
     public List<BrokerFill> Fills { get; private set; } = [];
@@ -178,7 +181,8 @@ public sealed class BrokerOrder
         decimal priceLimit,
         decimal referencePrice,
         DateOnly day,
-        string? settlementAccount = null) => new()
+        string? settlementAccount = null,
+        string? safekeepingAccount = null) => new()
     {
         Number = number,
         ClientOrderId = clientOrderId,
@@ -191,7 +195,8 @@ public sealed class BrokerOrder
         ReferencePrice = referencePrice,
         Status = BrokerOrderStatus.Working,
         AcceptedDay = day,
-        SettlementAccount = settlementAccount
+        SettlementAccount = settlementAccount,
+        SafekeepingAccount = safekeepingAccount
     };
 
     /// <summary>R54: a rejected order, kept so a repeat of the request gets the same answer.</summary>
@@ -206,7 +211,8 @@ public sealed class BrokerOrder
         decimal priceLimit,
         decimal referencePrice,
         BrokerRejectReason reason,
-        string? settlementAccount = null) => new()
+        string? settlementAccount = null,
+        string? safekeepingAccount = null) => new()
     {
         Number = number,
         ClientOrderId = clientOrderId,
@@ -219,7 +225,8 @@ public sealed class BrokerOrder
         ReferencePrice = referencePrice,
         Status = BrokerOrderStatus.Rejected,
         RejectReason = reason,
-        SettlementAccount = settlementAccount
+        SettlementAccount = settlementAccount,
+        SafekeepingAccount = safekeepingAccount
     };
 
     /// <summary>R56: a price above the limit of a buy, or below the limit of a sell, fills nothing.</summary>
@@ -446,8 +453,9 @@ public sealed class BrokerReport
 
     /// <summary>R61: the report of a settlement, on the fill's settlement date; trade-settlement R36: naming its
     /// broker settlement, if any.</summary>
-    public static BrokerReport OfSettlement(BrokerOrder order, BrokerFill fill, BrokerSettlement? settlement = null) =>
-        new() { Kind = BrokerReportKind.Settled, Order = order, Fill = fill, SettledDate = fill.SettlementDate, Settlement = settlement };
+    public static BrokerReport OfSettlement(
+        BrokerOrder order, BrokerFill fill, BrokerSettlement? settlement = null, DateOnly? settledDate = null) =>
+        new() { Kind = BrokerReportKind.Settled, Order = order, Fill = fill, SettledDate = settledDate ?? fill.SettlementDate, Settlement = settlement };
 
     /// <summary>Trade-settlement R36: the report that closes a broker settlement; it names no order.</summary>
     public static BrokerReport OfSettlementClosed(BrokerSettlement settlement) =>

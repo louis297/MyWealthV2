@@ -63,6 +63,14 @@ public class AssignPortfolioCommandHandler(
                 "Cancel the account's open orders before assigning a portfolio.");
         }
 
+        // In-kind-transfers R24: a transfer changes holdings outside the model, so the two never share an account.
+        if (await InKindTransfers.InKindTransferRules.HasOpenTransferAsync(db, account.Id, cancellationToken))
+        {
+            throw new RebalanceException(
+                "account_not_eligible",
+                "Complete or cancel the account's open transfers of securities before assigning a portfolio.");
+        }
+
         var portfolio = await db.Portfolios.SingleOrDefaultAsync(
             row => row.PublicId == request.PortfolioId && row.TenantId == account.TenantId,
             cancellationToken) ?? throw new NotFoundException("Portfolio", request.PortfolioId);

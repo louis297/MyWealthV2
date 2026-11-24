@@ -73,6 +73,73 @@ public class Transaction : BaseAuditableEntity
     /// null on every other Transaction.</summary>
     public TransactionMigrationDetail? MigrationDetail { get; private set; }
 
+    /// <summary>In-kind-transfers R38: the transfer behind a <c>StockIn</c> or <c>StockOut</c>, on the Transaction and its
+    /// Reversal; null on every other Transaction.</summary>
+    public TransactionInKindTransferDetail? InKindTransferDetail { get; private set; }
+
+    /// <summary>In-kind-transfers R37: the memo of a transfer in.</summary>
+    public const string TransferInMemo = "Transfer in";
+
+    /// <summary>In-kind-transfers R37: the memo of a transfer out.</summary>
+    public const string TransferOutMemo = "Transfer out";
+
+    /// <summary>
+    /// In-kind-transfers R37: the <c>StockIn</c> of a transfer in. One security leg of <c>+quantity</c> with the
+    /// transfer's cost, no cash leg, source <c>InKindTransfer</c>, memo <see cref="TransferInMemo"/>, no reference and an
+    /// in-kind transfer detail. Built without the manual entry matrix (custody-modes R7).
+    /// </summary>
+    public static Transaction PostTransferIn(
+        int tenantId,
+        int accountId,
+        AccountType accountType,
+        int instrumentId,
+        decimal quantity,
+        decimal cost,
+        string quoteCurrency,
+        DateTimeOffset bookedAt,
+        TransactionSource source,
+        Custody.InKindTransferOrigin origin)
+    {
+        EnsureInKindTransfer(source);
+        var transaction = PostStockIn(tenantId, accountId, accountType, instrumentId, quantity, cost, quoteCurrency, bookedAt,
+            TransferInMemo, null, source);
+        transaction.InKindTransferDetail = TransactionInKindTransferDetail.Create(tenantId, origin);
+        return transaction;
+    }
+
+    /// <summary>
+    /// In-kind-transfers R37: the <c>StockOut</c> of a transfer out. One security leg of <c>−quantity</c> releasing cost
+    /// at the holding's average (buy-sell R15), memo <see cref="TransferOutMemo"/>, and the rest as
+    /// <see cref="PostTransferIn"/>.
+    /// </summary>
+    public static Transaction PostTransferOut(
+        int tenantId,
+        int accountId,
+        AccountType accountType,
+        int instrumentId,
+        decimal quantity,
+        string quoteCurrency,
+        DateTimeOffset bookedAt,
+        TransactionSource source,
+        Custody.InKindTransferOrigin origin,
+        decimal currentQuantity,
+        decimal currentCost)
+    {
+        EnsureInKindTransfer(source);
+        var transaction = PostStockOut(tenantId, accountId, accountType, instrumentId, quantity, quoteCurrency, bookedAt,
+            TransferOutMemo, null, source, currentQuantity, currentCost);
+        transaction.InKindTransferDetail = TransactionInKindTransferDetail.Create(tenantId, origin);
+        return transaction;
+    }
+
+    private static void EnsureInKindTransfer(TransactionSource source)
+    {
+        if (source.Kind != TransactionSourceKind.InKindTransfer)
+        {
+            throw new DomainException("A transfer of securities in kind comes from an in-kind transfer.");
+        }
+    }
+
     /// <summary>Migration-batches R22: the memo of every Transaction a migration batch writes.</summary>
     public const string OpeningBalanceMemo = "Opening balance";
 
@@ -1225,7 +1292,8 @@ public class Transaction : BaseAuditableEntity
             InterestDetail = InterestDetail?.Copy(),
             CorporateActionDetail = CorporateActionDetail?.Copy(),
             ExecutionDetail = ExecutionDetail?.Copy(),
-            MigrationDetail = MigrationDetail?.Copy()
+            MigrationDetail = MigrationDetail?.Copy(),
+            InKindTransferDetail = InKindTransferDetail?.Copy()
         };
         ReversedBy = reversal;
         reversal.AddDomainEvent(new TransactionReversed(reversal));

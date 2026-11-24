@@ -24,6 +24,7 @@ related:
   - trade-settlement.md
   - rebalances.md
   - migration-batches.md
+  - in-kind-transfers.md
 ---
 
 # Adviser Portal BFF
@@ -549,3 +550,13 @@ Add `/migration-batches` to the BFF prefix allow-list (R20) so the Adviser Porta
 - Methods: GET, POST, PUT
 - Who: TenantAdmin. `webapi` checks `migration-batches.manage`; the BFF does not filter by role, so an Adviser gets the 403 from `webapi`.
 - Funding a batch (`POST /statement-lines/{id}/match` with `migrationBatchId`) is under the existing `/statement-lines` prefix.
+
+---
+
+## Amendment 2026-11-24 (in-kind transfers prefixes) — accepted
+
+Add `/in-kind-transfers`, `/custody-movements` and `/custodian-reconciliations` to the BFF prefix allow-list (R20) so the Adviser Portal can call the routes of [in-kind-transfers.md](in-kind-transfers.md) through `/api`.
+
+- Prefixes: `/in-kind-transfers`, `/custody-movements`, `/custodian-reconciliations`
+- Methods: GET, POST
+- Who: TenantAdmin and Adviser for `/in-kind-transfers`; TenantAdmin for the other two. `webapi` checks the policies; the BFF does not filter by role, so an Adviser gets the 403 from `webapi`.

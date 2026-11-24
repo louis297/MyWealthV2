@@ -84,6 +84,10 @@ export type AccountHolding = {
   reservedQuantity?: number;
   /** orders R41: quantity minus reserved quantity. */
   availableQuantity?: number;
+  /** in-kind-transfers R43: bought on the platform and not settled yet. */
+  unsettledQuantity?: number;
+  /** in-kind-transfers R43: what a transfer out may take now. */
+  transferableQuantity?: number;
 };
 
 export const accountsApi = api.injectEndpoints({

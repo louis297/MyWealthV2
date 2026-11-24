@@ -21,6 +21,7 @@ related:
   - ../api-design.md
   - ../glossary.md
   - custody-modes.md
+  - in-kind-transfers.md
 ---
 
 # Leg accounts
@@ -303,3 +304,11 @@ Only after `accepted`. Tree must build after each commit. Split each behaviour i
 4. Item JSON per-leg shape (§8.1) + functional tests.
 5. Adviser Portal and Customer Portal consume the new item shape + frontend tests.
 6. Repo docs: this file `accepted`; amend posting, holdings, buy-sell, split, net-worth, portfolios, reports, customer-portal, adviser-portal-dashboard, ADR 0011, domain-model, database-design, api-design, glossary (Transaction, Leg).
+
+---
+
+## Amendment 2026-11-24 (in-kind transfers) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md).
+
+- The open item "in-kind transfer" now means only a transfer of securities between two Accounts of the firm. A transfer in or out of one Custodial account is [in-kind-transfers.md](in-kind-transfers.md): one security leg, on one Account.

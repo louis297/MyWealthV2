@@ -15,6 +15,7 @@ const refusedOnCustodial: ReadonlySet<string> = new Set([
   "Sell",
   "Opening",
   "OpeningHoldings",
+  // D86 (in-kind-transfers R48): securities move in or out by an in-kind transfer.
   "StockIn",
   "StockOut",
   "Split",
@@ -55,3 +56,6 @@ export function closureAmounts(cashBalance: number, decimalPlaces: number | unde
 
 /** D44 (withdrawals R47): a Custodial account of another Customer is not a transfer destination. */
 export const anotherCustomer = "Another customer";
+
+/** D86 (in-kind-transfers R48): the server's sentence for a hand StockIn or StockOut on a Custodial account. */
+export const transferSentence = "Securities move in or out of a Custodial account by an in-kind transfer.";
