@@ -71,7 +71,83 @@ public sealed class ProcessCustodyMovements(
             return;
         }
 
-        // R15 rows 3–6 are processed by a later step of this slice; the movement waits.
+        switch (movement.Kind)
+        {
+            case CustodyMovementKind.Trade:
+                await MatchTradeAsync(movement, cancellationToken);
+                break;
+            case CustodyMovementKind.CorporateAction:
+                await MatchCorporateActionAsync(movement, cancellationToken);
+                break;
+            case CustodyMovementKind.Transfer:
+                // R15 row 5: securities came or went that nobody on the platform asked for.
+                movement.Leave(CustodyUnmatchedReason.NoInstruction);
+                break;
+            default:
+                movement.Leave(CustodyUnmatchedReason.UnsupportedKind);
+                break;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>R16: the delivery of a fill of an order of the movement's Tenant that carries this safekeeping account,
+    /// named by the outside id of the broker's <c>Fill</c> report. It writes nothing to the ledger.</summary>
+    private async Task MatchTradeAsync(CustodyMovement movement, CancellationToken cancellationToken)
+    {
+        var fill = movement.TradeReference is null
+            ? null
+            : await (
+                    from candidate in db.OrderFills.IgnoreQueryFilters()
+                    join report in db.ExecutionReports on candidate.ExecutionReportId equals report.Id
+                    join order in db.Orders.IgnoreQueryFilters() on candidate.OrderId equals order.Id
+                    where report.OutsideId == movement.TradeReference
+                          && order.TenantId == movement.TenantId
+                          && order.SafekeepingAccountId == movement.SafekeepingAccountId
+                    select new { candidate.Id, candidate.Quantity, candidate.Status, order.Side, order.InstrumentId })
+                .FirstOrDefaultAsync(cancellationToken);
+        if (fill is null)
+        {
+            movement.Leave(CustodyUnmatchedReason.UnknownTrade);
+            return;
+        }
+
+        var direction = fill.Side == OrderSide.Buy ? CustodyMovementDirection.In : CustodyMovementDirection.Out;
+        var delivered = await db.CustodyMovements.IgnoreQueryFilters().AnyAsync(row => row.OrderFillId == fill.Id, cancellationToken);
+        if (movement.InstrumentId != fill.InstrumentId
+            || movement.Direction != direction
+            || movement.Quantity != fill.Quantity
+            || fill.Status == OrderFillStatus.Broken
+            || delivered)
+        {
+            movement.Leave(CustodyUnmatchedReason.TradeMismatch);
+            return;
+        }
+
+        movement.MatchToFill(fill.Id);
+    }
+
+    /// <summary>R17: the custodian's side of a <c>Feed</c> corporate action of the Tenant in the movement's Instrument,
+    /// named by the issuer's id of the event, whatever its status. It writes nothing to the ledger.</summary>
+    private async Task MatchCorporateActionAsync(CustodyMovement movement, CancellationToken cancellationToken)
+    {
+        var actionId = movement.InstrumentId is null || movement.CorporateActionReference is null
+            ? null
+            : await db.CorporateActions.IgnoreQueryFilters()
+                .Where(row => row.TenantId == movement.TenantId
+                              && row.Origin == CorporateActionOrigin.Feed
+                              && row.InstrumentId == movement.InstrumentId
+                              && row.PartyActionId == movement.CorporateActionReference)
+                .OrderBy(row => row.Id)
+                .Select(row => (int?)row.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+        if (actionId is null)
+        {
+            movement.Leave(CustodyUnmatchedReason.UnknownCorporateAction);
+            return;
+        }
+
+        movement.MatchToCorporateAction(actionId.Value);
     }
 
     /// <summary>R36–R40: the movement confirms its transfer and posts its Transaction, or waits in suspense.</summary>
