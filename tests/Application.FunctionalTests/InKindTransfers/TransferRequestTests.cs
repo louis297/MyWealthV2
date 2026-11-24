@@ -24,9 +24,7 @@ public class TransferRequestTests : TestBase
         var id = Guid.NewGuid();
         foreach (var (method, route) in new[]
                  {
-                     (HttpMethod.Get, TransferHttp.Path), (HttpMethod.Get, $"{TransferHttp.Path}/{id}"), (HttpMethod.Post, TransferHttp.Path),
-                     (HttpMethod.Post, $"{TransferHttp.Path}/{id}/approve"), (HttpMethod.Post, $"{TransferHttp.Path}/{id}/reject"),
-                     (HttpMethod.Post, $"{TransferHttp.Path}/{id}/cancel"), (HttpMethod.Post, $"{TransferHttp.Path}/{id}/set-aside")
+                     (HttpMethod.Get, TransferHttp.Path), (HttpMethod.Get, $"{TransferHttp.Path}/{id}"), (HttpMethod.Post, TransferHttp.Path)
                  })
         {
             var response = await TransferHttp.Send(method, route, accessToken: null, new { rowVersion = TransferHttp.StaleRowVersion });

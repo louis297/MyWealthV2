@@ -34,6 +34,8 @@ public static class RolePermissions
             Policies.TradeSettlementsManage,
             Policies.RebalancesRead, Policies.RebalancesConfirm,
             Policies.MigrationBatchesManage,
+            Policies.InKindTransfersRead, Policies.InKindTransfersRequest, Policies.InKindTransfersApprove,
+            Policies.CustodyMovementsManage, Policies.CustodianReconciliationsManage,
             Policies.ReportsCustomerRead, Policies.ReportsCustomerCreate,
             Policies.ReportsBookRead, Policies.ReportsBookCreate,
             Policies.ReportsTenantRead, Policies.ReportsTenantCreate
@@ -53,6 +55,7 @@ public static class RolePermissions
             Policies.CorporateActionsRead,
             Policies.OrdersRead, Policies.OrdersPlace,
             Policies.RebalancesRead, Policies.RebalancesConfirm,
+            Policies.InKindTransfersRead, Policies.InKindTransfersRequest,
             Policies.ReportsCustomerRead, Policies.ReportsCustomerCreate,
             Policies.ReportsBookRead, Policies.ReportsBookCreate
         ],
@@ -65,6 +68,7 @@ public static class RolePermissions
             Policies.WithdrawalsRead,
             Policies.AccountClosuresRead,
             Policies.OrdersRead,
+            Policies.InKindTransfersRead,
             Policies.ReportsCustomerRead,
             Policies.ReportsCustomerCreate
         ]
