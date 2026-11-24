@@ -24,7 +24,12 @@ public sealed record CorporateActionAnnouncementDto(
     DateTimeOffset ReceivedAt,
     string Status,
     string? SkipReason,
-    DateTimeOffset? ProcessedAt);
+    DateTimeOffset? ProcessedAt,
+    decimal? AmountPerShare = null,
+    string? TaxSource = null,
+    decimal? ImputationCreditPerShare = null,
+    decimal? ForeignTaxRatePercent = null,
+    decimal? ReinvestmentPrice = null);
 
 /// <summary>Corporate-actions R14: the stored announcements, newest first. Platform data for a SystemAdmin.</summary>
 [Authorize(Policy = Policies.TenantsManage)]

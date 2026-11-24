@@ -53,7 +53,7 @@ public class SimulatorCorporateActionFeedTests
 
     [TestCase("Consolidation", CorporateActionKind.Consolidation)]
     [TestCase("Bonus", CorporateActionKind.Bonus)]
-    [TestCase("Dividend", null)]
+    [TestCase("Rights", null)]
     [TestCase("split", null)]
     public async Task TheKind_MapsToAKind_OrToNone(string kind, CorporateActionKind? expected)
     {
@@ -79,6 +79,41 @@ public class SimulatorCorporateActionFeedTests
         var read = result.Page.ShouldNotBeNull().Items.Single();
         new object?[] { read.Status, read.ExDate, read.RatioNew, read.RatioHeld, read.Version }.ShouldContain(value => value == null);
         CorporateActionAnnouncementStorable(read).ShouldBeFalse();
+    }
+
+    private const string DividendItem = """
+        { "id": "w-CA3-V1", "actionId": "w-CA3", "version": 1, "status": "Announced", "symbol": "ACME.SIM", "currency": "USD",
+          "kind": "Dividend", "ratioNew": null, "ratioHeld": null, "amountPerShare": 1.00, "taxSource": "Foreign",
+          "imputationCreditPerShare": 0, "foreignTaxRatePercent": 15, "reinvestmentPrice": 25.00,
+          "exDate": "2026-11-26", "recordDate": null, "paymentDate": "2026-11-30" }
+        """;
+
+    [Test]
+    public async Task ADividendItem_MapsToTheKindAndItsTerms_WithNoRatio()
+    {
+        var result = await Feed(new StubHandler(HttpStatusCode.OK, $$"""{ "items": [ {{DividendItem}} ], "cursor": "w:1", "hasMore": false }"""))
+            .GetAnnouncementsAsync(Connection, null, 100, CancellationToken.None);
+
+        var read = result.Page.ShouldNotBeNull().Items.Single();
+        read.ShouldBe(new CorporateActionFeedItem("w-CA3-V1", "w-CA3", 1, PartyActionStatus.Announced, "ACME.SIM", "USD",
+            CorporateActionKind.Dividend, null, null, new DateOnly(2026, 11, 26), null, new DateOnly(2026, 11, 30),
+            1.00m, DividendTaxSource.Foreign, 0m, 15m, 25.00m));
+        CorporateActionAnnouncementStorable(read).ShouldBeTrue();
+    }
+
+    [TestCase("\"amountPerShare\": 1.00", "\"amountPerShare\": null")]
+    [TestCase("\"amountPerShare\": 1.00", "\"amountPerShare\": \"1.00\"")]
+    [TestCase("\"taxSource\": \"Foreign\"", "\"taxSource\": \"Mars\"")]
+    [TestCase("\"taxSource\": \"Foreign\"", "\"taxSource\": \"1\"")]
+    [TestCase("\"foreignTaxRatePercent\": 15", "\"foreignTaxRatePercent\": \"15\"")]
+    [TestCase("\"reinvestmentPrice\": 25.00", "\"reinvestmentPrice\": true")]
+    public async Task ADividendItem_WithATermItCannotRead_ComesThroughEmpty(string from, string to)
+    {
+        var item = DividendItem.Replace(from, to);
+        var result = await Feed(new StubHandler(HttpStatusCode.OK, $$"""{ "items": [ {{item}} ], "cursor": "w:1", "hasMore": false }"""))
+            .GetAnnouncementsAsync(Connection, null, 100, CancellationToken.None);
+
+        CorporateActionAnnouncementStorable(result.Page.ShouldNotBeNull().Items.Single()).ShouldBeFalse();
     }
 
     [TestCase(HttpStatusCode.Unauthorized, MarketDataFailure.Unauthorized)]
@@ -131,7 +166,8 @@ public class SimulatorCorporateActionFeedTests
 
     private static bool CorporateActionAnnouncementStorable(CorporateActionFeedItem item) =>
         Domain.Entities.CorporateActionAnnouncement.IsStorable(
-            item.Id, item.ActionId, item.Version, item.Status, item.Symbol, item.Currency, item.RatioNew, item.RatioHeld, item.ExDate);
+            item.Id, item.ActionId, item.Version, item.Status, item.Symbol, item.Currency, item.RatioNew, item.RatioHeld, item.ExDate,
+            item.Kind, item.AmountPerShare, item.TaxSource);
 
     private static SimulatorCorporateActionFeed Feed(HttpMessageHandler handler) => new(new Clients(handler));
 

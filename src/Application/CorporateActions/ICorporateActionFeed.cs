@@ -18,7 +18,7 @@ public interface ICorporateActionFeed
 
 /// <summary>An announcement as the party sent it. A field the party left out or sent in a shape the adapter cannot
 /// read is null, and the pull refuses the page (R9), except <paramref name="Kind"/>: an unknown kind is null and is
-/// stored.</summary>
+/// stored. A dividend carries its terms in place of a ratio (dividends R8).</summary>
 public sealed record CorporateActionFeedItem(
     string? Id,
     string? ActionId,
@@ -31,7 +31,12 @@ public sealed record CorporateActionFeedItem(
     int? RatioHeld,
     DateOnly? ExDate,
     DateOnly? RecordDate,
-    DateOnly? PaymentDate);
+    DateOnly? PaymentDate,
+    decimal? AmountPerShare = null,
+    DividendTaxSource? TaxSource = null,
+    decimal? ImputationCreditPerShare = null,
+    decimal? ForeignTaxRatePercent = null,
+    decimal? ReinvestmentPrice = null);
 
 /// <summary>One page: its items, oldest first, the party's new cursor and whether more items follow.</summary>
 public sealed record CorporateActionFeedPage(IReadOnlyList<CorporateActionFeedItem> Items, string? Cursor, bool HasMore);
