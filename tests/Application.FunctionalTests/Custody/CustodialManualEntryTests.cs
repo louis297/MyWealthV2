@@ -39,8 +39,8 @@ public class CustodialManualEntryTests : TestBase
         yield return new TestCaseData("OpeningHoldings", "Opening balances on a Custodial account come from a migration batch.");
         yield return new TestCaseData("Buy", "Trades on a Custodial account go through the broker. Place an order.");
         yield return new TestCaseData("Sell", "Trades on a Custodial account go through the broker. Place an order.");
-        yield return new TestCaseData("StockIn", "Securities cannot be moved in or out of a Custodial account by hand. Place an order.");
-        yield return new TestCaseData("StockOut", "Securities cannot be moved in or out of a Custodial account by hand. Place an order.");
+        yield return new TestCaseData("StockIn", "Securities move in or out of a Custodial account by an in-kind transfer. Request a transfer.");
+        yield return new TestCaseData("StockOut", "Securities move in or out of a Custodial account by an in-kind transfer. Request a transfer.");
         yield return new TestCaseData("Split", "Corporate actions cannot be entered by hand on a Custodial account.");
         yield return new TestCaseData("Bonus", "Corporate actions cannot be entered by hand on a Custodial account.");
         yield return new TestCaseData("Scrip", "Corporate actions cannot be entered by hand on a Custodial account.");
