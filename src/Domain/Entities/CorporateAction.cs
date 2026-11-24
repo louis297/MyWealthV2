@@ -53,6 +53,14 @@ public class CorporateAction : BaseAuditableEntity
     /// <summary>Dividends R29: when the dividend became paid; from then its entitlements are posted.</summary>
     public DateTimeOffset? PaidAt { get; private set; }
 
+    /// <summary>Dividends R20: the election of a dividend: <c>None</c>, or the quantity of the firm's shares that take
+    /// part and the safekeeping account they are held in; <c>null</c> on another kind.</summary>
+    public ReinvestmentElectionStatus? ElectionStatus { get; private set; }
+
+    public decimal? ElectionQuantity { get; private set; }
+
+    public int? SafekeepingAccountId { get; private set; }
+
     public DateOnly ExDate { get; private set; }
 
     public DateOnly? RecordDate { get; private set; }

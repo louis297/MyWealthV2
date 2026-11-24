@@ -51,6 +51,9 @@ public sealed class CorporateActionDto
     /// goes ex, and on another kind.</summary>
     public CorporateActionPaymentDto? Payment { get; init; }
 
+    /// <summary>Dividends R49: the reinvestment election; <c>null</c> on a dividend with no plan and on another kind.</summary>
+    public CorporateActionElectionDto? Election { get; init; }
+
     public required CorporateActionEntitlementCountsDto Entitlements { get; init; }
 
     public required string RowVersion { get; init; }
@@ -76,6 +79,17 @@ public sealed record CorporateActionPaymentDto(
     string Currency,
     Guid? StatementLineId,
     DateTimeOffset? PaidAt);
+
+/// <summary>Dividends R49: the election of a dividend with the custodian.</summary>
+public sealed record CorporateActionElectionDto(
+    string Status,
+    decimal? Quantity,
+    int Attempts,
+    string? Reason,
+    decimal? SharesReceived,
+    PersonRefDto? ReleasedBy,
+    DateTimeOffset? ReleasedAt,
+    string? Note);
 
 /// <summary>R35: the entitlements the caller can see, by status; all 0 before the action is effective.</summary>
 public sealed record CorporateActionEntitlementCountsDto(int Total, int Posted, int Pending, int NotApplied);

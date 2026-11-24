@@ -18,6 +18,7 @@ public class CorporateActionConfiguration : IEntityTypeConfiguration<CorporateAc
         builder.Property(action => action.ForeignTaxRatePercent).HasColumnType("decimal(5,2)");
         builder.Property(action => action.ReinvestmentPrice).HasColumnType("decimal(18,8)");
         builder.Property(action => action.ReceivedAmount).HasColumnType("decimal(18,4)");
+        builder.Property(action => action.ElectionQuantity).HasColumnType("decimal(18,8)");
         builder.Property(action => action.PublicId).IsRequired();
         builder.Property(action => action.ExDate).HasColumnType("date").IsRequired();
         builder.Property(action => action.RecordDate).HasColumnType("date");
