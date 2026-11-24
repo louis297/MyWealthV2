@@ -223,6 +223,18 @@ public static class DependencyInjection
         builder.Services.AddScoped<MyWealthV2.Application.Custodian.SendInKindTransfers>();
         builder.Services.AddScoped<MyWealthV2.Application.Custodian.PullCustodyMovements>();
         builder.Services.AddScoped<MyWealthV2.Application.Custodian.ProcessCustodyMovements>();
+        if (host == MyWealthV2.Infrastructure.Custodian.CustodianConnectionHost.Worker)
+        {
+            // R9: one run of a connection at a time; the bank and broker syncs register the same lock.
+            builder.Services.TryAddSingleton(sp =>
+            {
+                var connectionString = sp.GetRequiredService<IConfiguration>().GetConnectionString(Services.Database);
+                Guard.Against.Null(connectionString, message: $"Connection string '{Services.Database}' not found.");
+                return new SqlRunLock(connectionString);
+            });
+            builder.Services.AddScoped<MyWealthV2.Infrastructure.Custodian.CustodianSyncJob>();
+            builder.Services.AddScoped<MyWealthV2.Infrastructure.Custodian.CustodianReconciliationJob>();
+        }
     }
 
     /// <summary>
