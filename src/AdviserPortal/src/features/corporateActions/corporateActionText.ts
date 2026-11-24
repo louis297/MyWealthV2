@@ -7,15 +7,62 @@ export function kindLabel(kind: string) {
       return "Share consolidation";
     case "Bonus":
       return "Bonus issue";
+    case "Dividend":
+      return "Dividend";
     default:
       return kind;
   }
 }
 
-/** D64: "2 for 1". */
-export function ratioText(item: { ratioNew: number; ratioHeld: number }) {
+/** D64: "2 for 1"; D94: a dividend reads "0.72 USD per share". */
+export function ratioText(item: { ratioNew: number | null; ratioHeld: number | null; dividend?: { amountPerShare: number; currency: string } | null }) {
+  if (item.dividend) {
+    return `${perShare(item.dividend.amountPerShare)} ${item.dividend.currency} per share`;
+  }
   return `${item.ratioNew} for ${item.ratioHeld}`;
 }
+
+/** An amount per share with at least two decimals: "1.00", "0.2575". */
+export function perShare(value: number) {
+  return new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8, useGrouping: false }).format(value);
+}
+
+/** D94: the status of a dividend, which waits for its payment once it went ex. */
+export function dividendStatusLabel(status: string, paidAt: string | null | undefined) {
+  switch (status) {
+    case "Effective":
+      return paidAt ? "Being paid" : "Waiting for payment";
+    case "Applied":
+      return "Paid";
+    default:
+      return statusLabel(status);
+  }
+}
+
+/** D95: the status of the reinvestment election. */
+export function electionLabel(status: string, reason: string | null) {
+  switch (status) {
+    case "Pending":
+      return "To be sent to the custodian";
+    case "Accepted":
+      return "Accepted by the custodian";
+    case "Rejected":
+      return `Rejected: ${reason ?? ""}`;
+    case "Lapsed":
+      return "Not used";
+    default:
+      return "No reinvestment";
+  }
+}
+
+/** D95: who the company is, for its tax. */
+export function taxSourceLabel(source: string) {
+  return source === "NewZealand" ? "New Zealand company" : "Foreign company";
+}
+
+export const dividendExDateHelp =
+  "The customers who hold the shares when the first price from this date arrives are entitled. They are paid when you match the custodian's payment.";
+export const payInCashSentence = "No new shares arrived for this dividend. Every customer is paid in cash.";
 
 /** D65: the ratio as a sentence. */
 export function ratioSentence(kind: string, ratioNew: number, ratioHeld: number) {
@@ -58,6 +105,9 @@ export function entitlementLabel(status: string, reason: string | null) {
   }
   if (reason === "TooSmall") {
     return "Holding too small to change";
+  }
+  if (reason === "NothingToPay") {
+    return "Nothing to pay";
   }
   return status;
 }
