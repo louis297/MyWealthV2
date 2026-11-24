@@ -67,6 +67,9 @@ public class UpdateAccountCommandValidator : AbstractValidator<UpdateAccountComm
         RuleFor(command => command.DepositReference)
             .Must(reference => reference is null)
             .WithMessage("DepositReference cannot be changed.");
+        RuleFor(command => command.ReinvestDividends)
+            .Null()
+            .WithMessage("ReinvestDividends is set with PUT /accounts/{accountId}/dividend-reinvestment.");
     }
 }
 

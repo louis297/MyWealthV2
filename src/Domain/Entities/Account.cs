@@ -110,8 +110,22 @@ public class Account : BaseAuditableEntity
     }
 
     /// <summary>Dividends R17: the standing reinvestment election, set by <paramref name="byUserId"/>.</summary>
-    public void SetDividendReinvestment(bool reinvest, int byUserId, DateTimeOffset at) =>
-        throw new NotImplementedException();
+    public void SetDividendReinvestment(bool reinvest, int byUserId, DateTimeOffset at)
+    {
+        if (CustodyMode != CustodyMode.Custodial)
+        {
+            throw new DomainException("Dividends are reinvested only on a Custodial account.");
+        }
+
+        if (Status != AccountStatus.Open)
+        {
+            throw new DomainException("Cannot change the election of a closed account. Reopen the account first.");
+        }
+
+        ReinvestDividends = reinvest;
+        ReinvestDividendsChangedByUserId = byUserId;
+        ReinvestDividendsChangedAt = at.ToUniversalTime();
+    }
 
     public void Rename(string name)
     {
