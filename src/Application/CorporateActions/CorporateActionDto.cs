@@ -44,12 +44,24 @@ public sealed class CorporateActionDto
 
     public string? CancelNote { get; init; }
 
+    /// <summary>Dividends R49: the terms of a dividend; <c>null</c> on another kind.</summary>
+    public CorporateActionDividendDto? Dividend { get; init; }
+
     public required CorporateActionEntitlementCountsDto Entitlements { get; init; }
 
     public required string RowVersion { get; init; }
 }
 
 public sealed record CorporateActionInstrumentDto(Guid Id, string Symbol, string Name);
+
+/// <summary>Dividends R49: the terms of a dividend, in the Instrument's quote currency.</summary>
+public sealed record CorporateActionDividendDto(
+    decimal AmountPerShare,
+    string Currency,
+    string TaxSource,
+    decimal ImputationCreditPerShare,
+    decimal ForeignTaxRatePercent,
+    decimal? ReinvestmentPrice);
 
 /// <summary>R35: the entitlements the caller can see, by status; all 0 before the action is effective.</summary>
 public sealed record CorporateActionEntitlementCountsDto(int Total, int Posted, int Pending, int NotApplied);

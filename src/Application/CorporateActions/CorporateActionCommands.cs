@@ -22,6 +22,18 @@ public sealed class CreateCorporateActionCommand : IRequest<Guid>
 
     public int? RatioHeld { get; init; }
 
+    /// <summary>Dividends R3, R11: the terms of a dividend, in place of the ratio.</summary>
+    public decimal? AmountPerShare { get; init; }
+
+    public string? TaxSource { get; init; }
+
+    public decimal? ImputationCreditPerShare { get; init; }
+
+    public decimal? ForeignTaxRatePercent { get; init; }
+
+    /// <summary>Dividends R7: refused by hand; a plan comes only from the feed.</summary>
+    public decimal? ReinvestmentPrice { get; init; }
+
     public DateOnly? ExDate { get; init; }
 
     public DateOnly? RecordDate { get; init; }
@@ -46,6 +58,18 @@ public sealed class UpdateCorporateActionCommand : IRequest
     public int? RatioNew { get; init; }
 
     public int? RatioHeld { get; init; }
+
+    /// <summary>Dividends R3, R11: the terms of a dividend, in place of the ratio.</summary>
+    public decimal? AmountPerShare { get; init; }
+
+    public string? TaxSource { get; init; }
+
+    public decimal? ImputationCreditPerShare { get; init; }
+
+    public decimal? ForeignTaxRatePercent { get; init; }
+
+    /// <summary>Dividends R7: refused by hand; a plan comes only from the feed.</summary>
+    public decimal? ReinvestmentPrice { get; init; }
 
     public DateOnly? ExDate { get; init; }
 

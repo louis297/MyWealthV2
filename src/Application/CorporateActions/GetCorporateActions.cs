@@ -13,7 +13,8 @@ public sealed record GetCorporateActionsQuery(
     string? Status = null,
     Guid? InstrumentId = null,
     string? Origin = null,
-    string? TenantId = null) : IRequest<PagedList<CorporateActionDto>>
+    string? TenantId = null,
+    string? Kind = null) : IRequest<PagedList<CorporateActionDto>>
 {
     internal static IReadOnlyList<string> Names(string? value) =>
         string.IsNullOrWhiteSpace(value)

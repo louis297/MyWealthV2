@@ -33,8 +33,9 @@ public class CorporateActions : IEndpointGroup
         string? status = null,
         Guid? instrumentId = null,
         string? origin = null,
-        string? tenantId = null) =>
-        TypedResults.Ok(await sender.Send(new GetCorporateActionsQuery(page, pageSize, status, instrumentId, origin, tenantId)));
+        string? tenantId = null,
+        string? kind = null) =>
+        TypedResults.Ok(await sender.Send(new GetCorporateActionsQuery(page, pageSize, status, instrumentId, origin, tenantId, kind)));
 
     [EndpointSummary("Get a corporate action")]
     [EndpointDescription("Returns one corporate action by PublicId, with the counts of its entitlements.")]
