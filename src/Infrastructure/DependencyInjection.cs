@@ -116,6 +116,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<IReportGeneratorRegistry, ReportGeneratorRegistry>();
         builder.Services.AddScoped<ReportJob>();
         builder.Services.AddScoped<IReconcileClientMoneyAccount, ReconcileClientMoneyAccount>();
+        builder.Services.AddScoped<MyWealthV2.Application.CustodianReconciliations.IReconcileSafekeepingAccount, MyWealthV2.Application.CustodianReconciliations.ReconcileSafekeepingAccount>();
         builder.Services.AddScoped<BankReconciliationJob>();
         builder.Services.AddScoped<MyWealthV2.Infrastructure.Interest.InterestRunJob>();
         builder.Services.AddScoped<MyWealthV2.Application.Interest.Accruals.IAccountInterest, MyWealthV2.Application.Interest.Accruals.AccountInterest>();

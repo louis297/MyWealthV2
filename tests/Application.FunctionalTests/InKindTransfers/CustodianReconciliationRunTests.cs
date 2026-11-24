@@ -241,7 +241,7 @@ public class CustodianReconciliationRunTests : TestBase
         Deliver(world, 100m);
         await TransferHttp.PullAndProcessAsync();
         var run = await RunAsync(world);
-        await OrderHttp.InsertHoldingAsync(world.AccountId, world.InstrumentId, 0.5m);
+        await OrderHttp.ChangeHoldingAsync(world.AccountId, world.InstrumentId, 0.5m, 12.5m);
 
         var again = await ReadAsync(world.TenantAdmin, $"{Path}/{run.GetProperty("id").GetGuid()}");
 
