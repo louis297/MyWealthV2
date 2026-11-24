@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Simulator.Bank;
 using MyWealthV2.Simulator.Broker;
+using MyWealthV2.Simulator.Custodian;
 using MyWealthV2.Simulator.Market;
 using MyWealthV2.Simulator.Worlds;
 
@@ -42,8 +43,54 @@ public sealed class SimulatorDbContext(DbContextOptions<SimulatorDbContext> opti
 
     public DbSet<BrokerSettlement> BrokerSettlements => Set<BrokerSettlement>();
 
+    public DbSet<CustodianAccount> CustodianAccounts => Set<CustodianAccount>();
+
+    public DbSet<CustodianMovement> CustodianMovements => Set<CustodianMovement>();
+
+    public DbSet<CustodianTransfer> CustodianTransfers => Set<CustodianTransfer>();
+
+    public DbSet<CustodianSettings> CustodianSettings => Set<CustodianSettings>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<CustodianAccount>(account =>
+        {
+            account.ToTable("CustodianAccounts");
+            account.HasKey(row => row.Id);
+            account.Property(row => row.AccountNumber).HasMaxLength(34);
+            account.Property(row => row.Currency).HasColumnType("char(3)").IsFixedLength();
+            account.Property(row => row.Name).HasMaxLength(140);
+        });
+
+        modelBuilder.Entity<CustodianMovement>(movement =>
+        {
+            movement.ToTable("CustodianMovements");
+            movement.HasKey(row => row.Id);
+            movement.Ignore(row => row.Signed);
+            movement.Property(row => row.AccountNumber).HasMaxLength(34);
+            movement.Property(row => row.Symbol).HasMaxLength(32);
+            movement.Property(row => row.Currency).HasColumnType("char(3)").IsFixedLength();
+            movement.Property(row => row.Quantity).HasColumnType("decimal(18,8)");
+        });
+
+        modelBuilder.Entity<CustodianTransfer>(transfer =>
+        {
+            transfer.ToTable("CustodianTransfers");
+            transfer.HasKey(row => row.Id);
+            transfer.Property(row => row.AccountNumber).HasMaxLength(34);
+            transfer.Property(row => row.InstructionId).HasMaxLength(100);
+            transfer.Property(row => row.RejectReason).HasMaxLength(40);
+        });
+
+        modelBuilder.Entity<CustodianSettings>(settings =>
+        {
+            settings.ToTable("CustodianSettings");
+            settings.HasKey(row => row.Id);
+            settings.Property(row => row.Id).ValueGeneratedNever();
+            settings.Property(row => row.RejectReason).HasMaxLength(40);
+            settings.Property(row => row.RowVersion).IsRowVersion();
+        });
+
         modelBuilder.Entity<World>(world =>
         {
             world.ToTable("World");

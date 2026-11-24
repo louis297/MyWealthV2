@@ -73,4 +73,14 @@ public static class ControlActions
 
     /// <summary>Trade-settlement R40.</summary>
     public const string BrokerFillBroken = "BrokerFillBroken";
+
+    public const string CustodianAccountOpened = "CustodianAccountOpened";
+
+    public const string CustodianTransferModeChanged = "CustodianTransferModeChanged";
+
+    public const string CustodianTransferExecuted = "CustodianTransferExecuted";
+
+    public const string CustodianMovementAdded = "CustodianMovementAdded";
+
+    public const string CustodianRoundingModeChanged = "CustodianRoundingModeChanged";
 }

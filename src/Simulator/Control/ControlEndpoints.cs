@@ -5,6 +5,7 @@ using System.Xml;
 using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Simulator.Bank;
 using MyWealthV2.Simulator.Broker;
+using MyWealthV2.Simulator.Custodian;
 using MyWealthV2.Simulator.Data;
 using MyWealthV2.Simulator.Market;
 using MyWealthV2.Simulator.Worlds;
@@ -40,6 +41,7 @@ public static class ControlEndpoints
         control.MapBankControlEndpoints();
         control.MapMarketControlEndpoints();
         control.MapBrokerControlEndpoints();
+        control.MapCustodianControlEndpoints();
 
         return app;
     }
@@ -108,7 +110,8 @@ public static class ControlEndpoints
         SimulatorDbContext db,
         TimeProvider time,
         BankStandingAccounts standing,
-        MarketStandingInstruments standingInstruments)
+        MarketStandingInstruments standingInstruments,
+        CustodianStandingAccounts standingCustody)
     {
         var seed = body.Seed ?? SeededRandom.NewSeed();
 
@@ -148,6 +151,18 @@ public static class ControlEndpoints
             await db.MarketPrices.ExecuteDeleteAsync(http.RequestAborted);
             await db.MarketInstruments.ExecuteDeleteAsync(http.RequestAborted);
             await standingInstruments.AddMissingAsync(db, MarketPricePath.Day(time.GetUtcNow()), http.RequestAborted);
+            // In-kind-transfers R71: the custodian's books are emptied, its settings set back, and its standing accounts
+            // opened again with their positions.
+            await db.CustodianTransfers.ExecuteDeleteAsync(http.RequestAborted);
+            await db.CustodianMovements.ExecuteDeleteAsync(http.RequestAborted);
+            await db.CustodianAccounts.ExecuteDeleteAsync(http.RequestAborted);
+            await db.CustodianSettings.ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(settings => settings.TransferMode, CustodianTransferMode.Execute)
+                    .SetProperty(settings => settings.RejectReason, (string?)null)
+                    .SetProperty(settings => settings.RoundingMode, CustodianRoundingMode.Fractional),
+                http.RequestAborted);
+            await standingCustody.OpenMissingAsync(db, time.GetUtcNow(), http.RequestAborted);
             var result = await WriteAsync(http, db, time, ControlActions.WorldReset, body, (world, now) =>
                 world.Reset(Guid.NewGuid(), seed, now));
             if (result is IStatusCodeHttpResult { StatusCode: StatusCodes.Status200OK })
