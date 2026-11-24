@@ -19,10 +19,10 @@ public static class WithholdingRates
     public const decimal NonResident = 15m;
 
     /// <summary>Dividends R33: RWT on a dividend, one rate for every New Zealand Customer.</summary>
-    public const decimal DividendRwt = 0m;
+    public const decimal DividendRwt = 33m;
 
     /// <summary>Dividends R33: NRWT on a New Zealand company's dividend where no double tax agreement applies.</summary>
-    public const decimal DividendNrwt = 0m;
+    public const decimal DividendNrwt = 30m;
 
     public static bool IsElective(decimal ratePercent) => Elective.Contains(ratePercent);
 
