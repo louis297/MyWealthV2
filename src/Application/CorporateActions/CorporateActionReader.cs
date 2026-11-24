@@ -69,6 +69,7 @@ internal static class CorporateActionReader
     public static async Task<List<CorporateActionDto>> ToDtosAsync(
         IApplicationDbContext db,
         ICurrentUser currentUser,
+        ICurrencyCatalog currencies,
         IReadOnlyList<CorporateAction> rows,
         CancellationToken cancellationToken)
     {
@@ -143,13 +144,14 @@ internal static class CorporateActionReader
                 CancelledBy = row.CancelledByUserId is int cancelledBy ? users.GetValueOrDefault(cancelledBy) : null,
                 CancelNote = row.CancelNote,
                 Payment = row.Kind == CorporateActionKind.Dividend && row.EffectiveAt is not null
-                    ? Payment(row, DividendPayment.ExpectedAmount(dividendEntitlements.Where(item => item.CorporateActionId == row.Id), 0m),
+                    ? Payment(row, DividendPayment.ExpectedAmount(dividendEntitlements.Where(item => item.CorporateActionId == row.Id),
+                            row.ReinvestedByCustodian(currencies.TryGet(instruments[row.InstrumentId].QuoteCurrency.Trim())?.DecimalPlaces ?? 2)),
                         instruments[row.InstrumentId].QuoteCurrency.Trim(),
                         row.ReceiptLineId is int lineId ? receipts.GetValueOrDefault(lineId) : null)
                     : null,
                 Election = row.Kind == CorporateActionKind.Dividend && row.ReinvestmentPrice is not null && row.ElectionStatus is { } election
-                    ? new CorporateActionElectionDto(election.ToString(), row.ElectionQuantity, 0, null, row.SharesReceived, null,
-                        row.ReleasedAt, null)
+                    ? new CorporateActionElectionDto(election.ToString(), row.ElectionQuantity, row.ElectionAttempts,
+                        row.ElectionReason?.ToString(), row.SharesReceived, null, row.ReleasedAt, null)
                     : null,
                 Dividend = row.Terms is { } terms
                     ? new CorporateActionDividendDto(

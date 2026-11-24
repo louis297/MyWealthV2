@@ -216,6 +216,58 @@ public class CorporateAction : BaseAuditableEntity
         SafekeepingAccountId = null;
     }
 
+    /// <summary>Dividends R22: an attempt to send the election is recorded and committed before the call.</summary>
+    public void RecordElectionAttempt(DateTimeOffset at)
+    {
+        EnsureElection(ReinvestmentElectionStatus.Pending);
+        ElectionAttempts++;
+        ElectionLastAttemptAt = at.ToUniversalTime();
+    }
+
+    /// <summary>Dividends R22: the custodian accepted; it reinvests the elected quantity.</summary>
+    public void AcceptElection()
+    {
+        EnsureElection(ReinvestmentElectionStatus.Pending);
+        ElectionStatus = ReinvestmentElectionStatus.Accepted;
+    }
+
+    /// <summary>Dividends R22: the custodian rejected, for <paramref name="reason"/>; the dividend is paid in cash.</summary>
+    public void RejectElection(ElectionRejectReason reason)
+    {
+        EnsureElection(ReinvestmentElectionStatus.Pending);
+        if (!Enum.IsDefined(reason))
+        {
+            throw new DomainException("Unknown election reject reason.");
+        }
+
+        ElectionStatus = ReinvestmentElectionStatus.Rejected;
+        ElectionReason = reason;
+    }
+
+    /// <summary>Dividends R22: the election is not sent, because the receipt came first or the safekeeping account is
+    /// no longer active; the dividend is paid in cash.</summary>
+    public void LapseElection()
+    {
+        EnsureElection(ReinvestmentElectionStatus.Pending);
+        ElectionStatus = ReinvestmentElectionStatus.Lapsed;
+    }
+
+    /// <summary>Dividends R15, R22: what the custodian reinvests under an accepted election, net of foreign tax,
+    /// rounded to <paramref name="decimalPlaces"/>; 0 otherwise.</summary>
+    public decimal ReinvestedByCustodian(int decimalPlaces) =>
+        ElectionStatus == ReinvestmentElectionStatus.Accepted && ElectionQuantity is { } quantity && Terms is { } terms
+            ? decimal.Round(quantity * terms.NetPerShare, decimalPlaces, MidpointRounding.AwayFromZero)
+            : 0m;
+
+    private void EnsureElection(ReinvestmentElectionStatus status)
+    {
+        EnsureDividend();
+        if (ElectionStatus != status)
+        {
+            throw new DomainException($"The election of this dividend is {ElectionStatus}.");
+        }
+    }
+
     /// <summary>Dividends R24, R26: the dividend takes its one receipt, the statement line
     /// <paramref name="lineId"/> of <paramref name="amount"/>. Only while it waits for its payment.</summary>
     public void TakeReceipt(int lineId, decimal amount)

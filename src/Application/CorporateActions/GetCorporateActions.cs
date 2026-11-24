@@ -52,7 +52,7 @@ public class GetCorporateActionsQueryValidator : AbstractValidator<GetCorporateA
     }
 }
 
-public class GetCorporateActionsQueryHandler(IApplicationDbContext db, ICurrentUser currentUser)
+public class GetCorporateActionsQueryHandler(IApplicationDbContext db, ICurrentUser currentUser, ICurrencyCatalog currencies)
     : IRequestHandler<GetCorporateActionsQuery, PagedList<CorporateActionDto>>
 {
     public async Task<PagedList<CorporateActionDto>> Handle(GetCorporateActionsQuery request, CancellationToken cancellationToken)
@@ -98,7 +98,7 @@ public class GetCorporateActionsQueryHandler(IApplicationDbContext db, ICurrentU
 
         return new PagedList<CorporateActionDto>
         {
-            Items = await CorporateActionReader.ToDtosAsync(db, currentUser, rows, cancellationToken),
+            Items = await CorporateActionReader.ToDtosAsync(db, currentUser, currencies, rows, cancellationToken),
             Page = request.Page,
             PageSize = request.PageSize,
             TotalCount = totalCount
@@ -106,7 +106,7 @@ public class GetCorporateActionsQueryHandler(IApplicationDbContext db, ICurrentU
     }
 }
 
-public class GetCorporateActionByIdQueryHandler(IApplicationDbContext db, ICurrentUser currentUser)
+public class GetCorporateActionByIdQueryHandler(IApplicationDbContext db, ICurrentUser currentUser, ICurrencyCatalog currencies)
     : IRequestHandler<GetCorporateActionByIdQuery, CorporateActionDto>
 {
     public async Task<CorporateActionDto> Handle(GetCorporateActionByIdQuery request, CancellationToken cancellationToken)
@@ -114,6 +114,6 @@ public class GetCorporateActionByIdQueryHandler(IApplicationDbContext db, ICurre
         var action = await CorporateActionReader.Scope(db, currentUser).AsNoTracking()
                          .SingleOrDefaultAsync(row => row.PublicId == request.Id, cancellationToken)
                      ?? throw new Common.Exceptions.NotFoundException("CorporateAction", request.Id);
-        return (await CorporateActionReader.ToDtosAsync(db, currentUser, [action], cancellationToken)).Single();
+        return (await CorporateActionReader.ToDtosAsync(db, currentUser, currencies, [action], cancellationToken)).Single();
     }
 }

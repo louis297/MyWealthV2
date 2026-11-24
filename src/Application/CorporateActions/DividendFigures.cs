@@ -23,6 +23,7 @@ internal sealed record DividendFigures(string Currency, int DecimalPlaces, int E
         var entitlements = await db.CorporateActionEntitlements.IgnoreQueryFilters().AsNoTracking()
             .Where(row => row.CorporateActionId == action.Id)
             .ToListAsync(cancellationToken);
-        return new DividendFigures(currency, places, entitlements.Count, DividendPayment.ExpectedAmount(entitlements, 0m));
+        return new DividendFigures(
+            currency, places, entitlements.Count, DividendPayment.ExpectedAmount(entitlements, action.ReinvestedByCustodian(places)));
     }
 }
