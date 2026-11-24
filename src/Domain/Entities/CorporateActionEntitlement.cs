@@ -51,7 +51,8 @@ public class CorporateActionEntitlement
 
     public string? NetCurrency { get; private set; }
 
-    public bool IsDividend => throw new NotImplementedException();
+    /// <summary>An entitlement of a dividend carries its entitled quantity from the moment it is stored.</summary>
+    public bool IsDividend => EntitledQuantity is not null;
 
     public int? TransactionId { get; private set; }
 
@@ -79,14 +80,53 @@ public class CorporateActionEntitlement
         CorporateActions.DividendSourceAmounts amounts,
         bool reinvests,
         decimal? participatingQuantity,
-        DateTimeOffset at) =>
-        throw new NotImplementedException();
+        DateTimeOffset at)
+    {
+        if (entitledQuantity <= 0m)
+        {
+            throw new DomainException("A dividend entitlement needs an entitled quantity above 0.");
+        }
+
+        if (amounts.Gross < 0m || amounts.ImputationCredit < 0m || amounts.ForeignTax < 0m || amounts.ForeignTax > amounts.Gross)
+        {
+            throw new DomainException("The source amounts of a dividend entitlement are 0 or more, the foreign tax not above the gross.");
+        }
+
+        if (reinvests && (participatingQuantity is not { } part || part <= 0m || part > entitledQuantity || amounts.Gross == 0m))
+        {
+            throw new DomainException("A reinvesting entitlement takes part with a quantity above 0 and not above its entitled quantity.");
+        }
+
+        if (!reinvests && participatingQuantity is not null)
+        {
+            throw new DomainException("Only a reinvesting entitlement has a participating quantity.");
+        }
+
+        var entitlement = Create(tenantId, corporateActionId, accountId);
+        entitlement.EntitledQuantity = entitledQuantity;
+        entitlement.GrossAmount = amounts.Gross;
+        entitlement.ImputationCredit = amounts.ImputationCredit;
+        entitlement.ForeignTax = amounts.ForeignTax;
+        entitlement.Reinvests = reinvests;
+        entitlement.ParticipatingQuantity = participatingQuantity;
+        if (amounts.Gross == 0m)
+        {
+            entitlement.MarkNotApplied(EntitlementReason.NothingToPay, at);
+        }
+
+        return entitlement;
+    }
 
     /// <summary>R25: posted as <paramref name="transactionId"/>, from <paramref name="quantityBefore"/> to
     /// <paramref name="quantityAfter"/>.</summary>
     public void MarkPosted(decimal quantityBefore, decimal quantityAfter, int transactionId, DateTimeOffset at)
     {
         EnsurePending();
+        if (IsDividend)
+        {
+            throw new DomainException("A dividend entitlement is posted with its net, not with quantities.");
+        }
+
         if (quantityBefore <= 0m || quantityAfter <= 0m || quantityAfter == quantityBefore)
         {
             throw new DomainException("A posted entitlement changes a holding above 0 to another quantity above 0.");

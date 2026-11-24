@@ -744,6 +744,41 @@ public class TenantCompositeKeysSchemaTests
                  [NotProcessed], [UnsettledTrades], [Suspense], [UnbookedFills], [Unexplained], [Class])
             VALUES (@a_tenant, @crun, 1, N'VTI', @{p}_instrument, 0, 0, 0, 0, 0, 0, 0, 0, 2);
             """),
+        ("FK_CorporateActions_BankStatementLines_TenantId_ReceiptLineId", "BankStatementLines",
+            ClientMoney("@{p}_tenant", "pcma") + """
+            INSERT INTO [BankStatementLines]
+                ([PublicId], [TenantId], [ClientMoneyAccountId], [Connection], [OutsideId], [ValueDate], [Direction], [Amount], [Currency],
+                 [ReceivedAt], [Status], [UnmatchedReason], [Created], [CreatedBy])
+            VALUES (NEWID(), @{p}_tenant, @pcma, N'simulator', CONVERT(nvarchar(100), NEWID()), '2026-11-30', 0, 103, 'USD',
+                    SYSDATETIMEOFFSET(), 2, 0, SYSDATETIMEOFFSET(), N'test');
+            DECLARE @pline int = SCOPE_IDENTITY();
+            """ + DividendRow(receiptLine: "@pline")),
+        ("FK_CorporateActions_SafekeepingAccounts_TenantId_SafekeepingAccountId", "SafekeepingAccounts",
+            SafekeepingRow("{p}") + DividendRow(safekeeping: "@{p}_safekeeping")),
+        ("FK_CorporateActions_CustodyMovements_TenantId_SharesMovementId", "CustodyMovements", SafekeepingRow("{p}") + """
+            INSERT INTO [CustodyMovements]
+                ([PublicId], [TenantId], [SafekeepingAccountId], [Connection], [OutsideId], [Direction], [Kind], [Symbol], [Currency],
+                 [Quantity], [SettlementDate], [ReceivedAt], [Status], [Created], [CreatedBy])
+            VALUES (NEWID(), @{p}_tenant, @{p}_safekeeping, N'simulator', CONVERT(nvarchar(100), NEWID()), 0, 0, N'VTI', 'USD',
+                    2.68, '2026-11-30', SYSDATETIMEOFFSET(), 0, SYSDATETIMEOFFSET(), N'test');
+            DECLARE @pmovement int = SCOPE_IDENTITY();
+            """ + DividendRow(movement: "@pmovement")),
+        ("FK_CorporateActions_Users_TenantId_ReleasedByUserId", "Users", DividendRow(releasedBy: "@{p}_adviser")),
+        ("FK_TransactionDividendDetails_Transactions_TenantId_TransactionId", "Transactions", DividendDetailRow(transaction: "@{p}_buy")),
+        ("FK_TransactionDividendDetails_Instruments_TenantId_InstrumentId", "Instruments", DividendDetailRow(instrument: "@{p}_instrument")),
+        ("FK_Accounts_Users_TenantId_ReinvestDividendsChangedByUserId", "Users", """
+            UPDATE [Accounts] SET [ReinvestDividendsChangedByUserId] = @{p}_adviser, [ReinvestDividendsChangedAt] = SYSDATETIMEOFFSET()
+            WHERE [Id] = @a_brokerage;
+            """),
+        ("FK_BankStatementLines_CorporateActions_TenantId_CorporateActionId", "CorporateActions",
+            ClientMoney("@a_tenant", "cma") + DividendRow(tenant: "@{p}_tenant", instrument: "@{p}_instrument") + """
+            DECLARE @pdividend int = SCOPE_IDENTITY();
+            INSERT INTO [BankStatementLines]
+                ([PublicId], [TenantId], [ClientMoneyAccountId], [Connection], [OutsideId], [ValueDate], [Direction], [Amount], [Currency],
+                 [ReceivedAt], [Status], [MatchMethod], [MatchedAt], [CorporateActionId], [Created], [CreatedBy])
+            VALUES (NEWID(), @a_tenant, @cma, N'simulator', CONVERT(nvarchar(100), NEWID()), '2026-11-30', 0, 103, 'USD',
+                    SYSDATETIMEOFFSET(), 1, 7, SYSDATETIMEOFFSET(), @pdividend, SYSDATETIMEOFFSET(), N'test');
+            """),
         ("FK_ReportExecutions_ReportSchedules_TenantId_ScheduleId", "ReportSchedules", """
             INSERT INTO [ReportExecutions] ([PublicId], [ReportId], [ScheduleId], [TenantId], [TriggerKind], [Status], [ParametersJson], [Created], [CreatedBy])
             VALUES (NEWID(), @report, @{p}_schedule, @a_tenant, N'Scheduled', N'Queued', N'{}', SYSDATETIMEOFFSET(), N'test');
@@ -780,6 +815,33 @@ public class TenantCompositeKeysSchemaTests
         ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines", "BankReconciliations", "InterestRateSchedules", "CorporateActions", "Orders", "ClientMoneyAccounts", "TradeSettlements", "AccountPortfolioAssignments", "Rebalances", "MigrationBatches", "MigrationBatchEntries", "SafekeepingAccounts", "OrderFills", "InKindTransfers", "CustodyMovements", "CustodianReconciliations"];
 
     /// <summary>A safekeeping account of tenant <paramref name="prefix"/> in <c>@{prefix}_safekeeping</c> (script 0055).</summary>
+    /// <summary>An effective Manual dividend; the optional columns point at the parent under test.</summary>
+    private static string DividendRow(
+        string tenant = "@a_tenant",
+        string instrument = "@a_instrument",
+        string receiptLine = "NULL",
+        string safekeeping = "NULL",
+        string movement = "NULL",
+        string releasedBy = "NULL") => $"""
+        INSERT INTO [CorporateActions]
+            ([PublicId], [TenantId], [InstrumentId], [Kind], [AmountPerShare], [TaxSource], [ImputationCreditPerShare],
+             [ForeignTaxRatePercent], [ExDate], [Origin], [Status], [EffectiveAt], [ReceiptLineId], [ReceivedAmount],
+             [ElectionStatus], [SafekeepingAccountId], [SharesMovementId], [SharesReceived], [ReleasedByUserId], [ReleasedAt],
+             [Created], [CreatedBy])
+        VALUES (NEWID(), {tenant}, {instrument}, 3, 0.72, 0, 0, 0, '2026-12-01', 0, 1, SYSDATETIMEOFFSET(), {receiptLine},
+                {(receiptLine == "NULL" ? "NULL" : "103")}, {(safekeeping == "NULL" && movement == "NULL" ? "NULL" : "2")},
+                {safekeeping}, {movement}, {(movement == "NULL" ? "NULL" : "2.68")}, {releasedBy},
+                {(releasedBy == "NULL" ? "NULL" : "SYSDATETIMEOFFSET()")}, SYSDATETIMEOFFSET(), N'test');
+
+        """;
+
+    private static string DividendDetailRow(string transaction = "@a_buy", string instrument = "@a_instrument") => $"""
+        INSERT INTO [TransactionDividendDetails]
+            ([TransactionId], [TenantId], [InstrumentId], [Quantity], [AmountPerShare], [Currency], [TaxSource], [ImputationCredit], [ExDate])
+        VALUES ({transaction}, @a_tenant, {instrument}, 100, 0.72, 'USD', 0, 28, '2026-12-01');
+
+        """;
+
     private static string SafekeepingRow(string prefix) => $"""
         INSERT INTO [SafekeepingAccounts]
             ([PublicId], [TenantId], [Currency], [CustodianName], [AccountName], [AccountNumber], [CustodianConnection], [IsActive], [Created], [CreatedBy])

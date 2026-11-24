@@ -68,7 +68,9 @@ public class CorporateActionAnnouncement
 
     public byte[] RowVersion { get; private set; } = null!;
 
-    /// <summary>R9: the fields every item needs before a page can be stored. The kind may be missing.</summary>
+    /// <summary>R9 and dividends R8: the fields every item needs before a page can be stored. The kind may be missing.
+    /// A dividend needs an amount per share and a tax source and has no ratio; any other item needs both ratio numbers.
+    /// The terms are checked against dividends R3 when the announcement is processed, not here.</summary>
     public static bool IsStorable(
         string? outsideId,
         string? partyActionId,
@@ -88,9 +90,11 @@ public class CorporateActionAnnouncement
         && status is not null && Enum.IsDefined(status.Value)
         && symbol is { Length: >= 1 and <= SymbolMaxLength }
         && currency is { Length: 3 } && currency.All(char.IsAsciiLetter)
-        && ratioNew >= 1
-        && ratioHeld >= 1
-        && exDate is not null;
+        && exDate is not null
+        && (kind == CorporateActionKind.Dividend
+            ? amountPerShare is not null && taxSource is not null && Enum.IsDefined(taxSource.Value)
+              && ratioNew is null && ratioHeld is null
+            : ratioNew >= 1 && ratioHeld >= 1);
 
     /// <summary>R10: a new announcement, <c>Received</c> at platform time.</summary>
     public static CorporateActionAnnouncement Receive(
@@ -114,7 +118,9 @@ public class CorporateActionAnnouncement
         decimal? foreignTaxRatePercent = null,
         decimal? reinvestmentPrice = null)
     {
-        if (!IsStorable(outsideId, partyActionId, version, partyStatus, symbol, currency, ratioNew, ratioHeld, exDate)
+        var knownKind = kind is { } known && Enum.IsDefined(known) ? known : (CorporateActionKind?)null;
+        if (!IsStorable(outsideId, partyActionId, version, partyStatus, symbol, currency, ratioNew, ratioHeld, exDate,
+                knownKind, amountPerShare, taxSource)
             || string.IsNullOrWhiteSpace(connection) || connection.Length > ConnectionMaxLength)
         {
             throw new DomainException("This corporate action announcement cannot be stored.");
@@ -130,9 +136,14 @@ public class CorporateActionAnnouncement
             PartyStatus = partyStatus,
             Symbol = symbol,
             Currency = currency.ToUpperInvariant(),
-            Kind = kind is { } known && Enum.IsDefined(known) ? known : null,
+            Kind = knownKind,
             RatioNew = ratioNew,
             RatioHeld = ratioHeld,
+            AmountPerShare = amountPerShare,
+            TaxSource = taxSource,
+            ImputationCreditPerShare = imputationCreditPerShare,
+            ForeignTaxRatePercent = foreignTaxRatePercent,
+            ReinvestmentPrice = reinvestmentPrice,
             ExDate = exDate,
             RecordDate = recordDate,
             PaymentDate = paymentDate,

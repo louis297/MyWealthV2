@@ -4,7 +4,8 @@ namespace MyWealthV2.Domain.Entities;
 
 /// <summary>
 /// A corporate action of one Instrument of one Tenant (docs/features/corporate-actions.md §4.2, §5): a split, a
-/// consolidation or a bonus issue with a ratio and its dates. Origin <c>Manual</c> (entered by a TenantAdmin) or
+/// consolidation or a bonus issue with a ratio and its dates, or a dividend with its terms per share and no ratio
+/// (docs/features/dividends.md §4.2). Origin <c>Manual</c> (entered by a TenantAdmin) or
 /// <c>Feed</c> (created from an announcement). <c>Announced</c> → <c>Effective</c> → <c>Applied</c>, or
 /// <c>Announced</c> → <c>Cancelled</c>; no status goes back (R6). The Instrument and the kind never change (R12, R18).
 /// </summary>
@@ -78,10 +79,16 @@ public class CorporateAction : BaseAuditableEntity
 
     public byte[] RowVersion { get; private set; } = null!;
 
-    public CorporateActionRatio Ratio => new(RatioNew!.Value, RatioHeld!.Value);
+    /// <summary>The ratio of a split, a consolidation or a bonus issue. A dividend has none (dividends R2).</summary>
+    public CorporateActionRatio Ratio => Kind == CorporateActionKind.Dividend || RatioNew is null || RatioHeld is null
+        ? throw new DomainException("A dividend has no ratio.")
+        : new(RatioNew.Value, RatioHeld.Value);
 
     /// <summary>The terms of a dividend; <c>null</c> on another kind.</summary>
-    public DividendTerms? Terms => throw new NotImplementedException();
+    public DividendTerms? Terms => Kind == CorporateActionKind.Dividend
+        ? new DividendTerms(AmountPerShare!.Value, TaxSource!.Value, ImputationCreditPerShare!.Value,
+            ForeignTaxRatePercent!.Value, ReinvestmentPrice)
+        : null;
 
     /// <summary>Dividends R11: a <c>Manual</c> dividend, <c>Announced</c>. A plan comes only from the feed (R7).</summary>
     public static CorporateAction EnterDividend(
@@ -91,10 +98,17 @@ public class CorporateAction : BaseAuditableEntity
         DateOnly exDate,
         DateOnly? recordDate,
         DateOnly? paymentDate,
-        string? memo) =>
-        throw new NotImplementedException();
+        string? memo)
+    {
+        EnsureNoPlan(terms);
+        var action = New(tenantId, instrumentId, CorporateActionKind.Dividend, CorporateActionOrigin.Manual);
+        action.SetDividendTerms(terms, exDate, recordDate, paymentDate);
+        action.Memo = TrimMemo(memo);
+        return action;
+    }
 
-    /// <summary>Dividends R9: a <c>Feed</c> dividend from version <paramref name="version"/> of the party's action.</summary>
+    /// <summary>Dividends R9: a <c>Feed</c> dividend from version <paramref name="version"/> of the party's action
+    /// <paramref name="partyActionId"/> on <paramref name="connection"/>, <c>Announced</c>.</summary>
     public static CorporateAction AnnounceDividend(
         int tenantId,
         int instrumentId,
@@ -104,16 +118,43 @@ public class CorporateAction : BaseAuditableEntity
         DividendTerms terms,
         DateOnly exDate,
         DateOnly? recordDate,
-        DateOnly? paymentDate) =>
-        throw new NotImplementedException();
+        DateOnly? paymentDate)
+    {
+        var action = NewFeed(tenantId, instrumentId, connection, partyActionId, version, CorporateActionKind.Dividend);
+        action.SetDividendTerms(terms, exDate, recordDate, paymentDate);
+        return action;
+    }
 
-    /// <summary>Dividends R11: a person changes a <c>Manual</c> dividend that is still <c>Announced</c>.</summary>
-    public void ChangeDividend(DividendTerms terms, DateOnly exDate, DateOnly? recordDate, DateOnly? paymentDate, string? memo) =>
-        throw new NotImplementedException();
+    /// <summary>Dividends R11: a person changes a <c>Manual</c> dividend that is still <c>Announced</c>. The kind and
+    /// the Instrument stay.</summary>
+    public void ChangeDividend(DividendTerms terms, DateOnly exDate, DateOnly? recordDate, DateOnly? paymentDate, string? memo)
+    {
+        EnsureManual();
+        EnsureAnnounced();
+        EnsureDividend();
+        EnsureNoPlan(terms);
+        var trimmed = TrimMemo(memo);
+        SetDividendTerms(terms, exDate, recordDate, paymentDate);
+        Memo = trimmed;
+    }
 
-    /// <summary>Dividends R9: a later version replaces the terms and dates of an <c>Announced</c> feed dividend.</summary>
-    public bool AmendDividend(int version, DividendTerms terms, DateOnly exDate, DateOnly? recordDate, DateOnly? paymentDate) =>
-        throw new NotImplementedException();
+    /// <summary>Dividends R9: a later version of the party's action replaces the terms and the dates of a <c>Feed</c>
+    /// dividend that is still <c>Announced</c>. A version not above <see cref="FeedVersion"/> changes nothing and
+    /// returns <c>false</c>.</summary>
+    public bool AmendDividend(int version, DividendTerms terms, DateOnly exDate, DateOnly? recordDate, DateOnly? paymentDate)
+    {
+        EnsureFeed();
+        EnsureAnnounced();
+        EnsureDividend();
+        if (version <= FeedVersion)
+        {
+            return false;
+        }
+
+        SetDividendTerms(terms, exDate, recordDate, paymentDate);
+        FeedVersion = version;
+        return true;
+    }
 
     /// <summary>R15: a <c>Manual</c> corporate action, <c>Announced</c>.</summary>
     public static CorporateAction Enter(
@@ -146,26 +187,8 @@ public class CorporateAction : BaseAuditableEntity
         DateOnly? recordDate,
         DateOnly? paymentDate)
     {
-        if (string.IsNullOrWhiteSpace(connection) || connection.Length > ConnectionMaxLength)
-        {
-            throw new DomainException("A feed corporate action needs its connection.");
-        }
-
-        if (string.IsNullOrWhiteSpace(partyActionId) || partyActionId.Length > PartyActionIdMaxLength)
-        {
-            throw new DomainException("A feed corporate action needs the party's action id.");
-        }
-
-        if (version < 1)
-        {
-            throw new DomainException("A feed version is 1 or more.");
-        }
-
-        var action = New(tenantId, instrumentId, kind, CorporateActionOrigin.Feed);
+        var action = NewFeed(tenantId, instrumentId, connection, partyActionId, version, kind);
         action.SetTerms(ratio, exDate, recordDate, paymentDate);
-        action.Connection = connection;
-        action.PartyActionId = partyActionId;
-        action.FeedVersion = version;
         return action;
     }
 
@@ -183,6 +206,11 @@ public class CorporateAction : BaseAuditableEntity
         if (!Enum.IsDefined(kind))
         {
             throw new DomainException("Unknown corporate action kind.");
+        }
+
+        if (Kind == CorporateActionKind.Dividend || kind == CorporateActionKind.Dividend)
+        {
+            throw new DomainException("The kind of a dividend never changes, and a dividend has no ratio.");
         }
 
         var kindBefore = Kind;
@@ -293,6 +321,65 @@ public class CorporateAction : BaseAuditableEntity
             Origin = origin,
             Status = CorporateActionStatus.Announced
         };
+    }
+
+    private static CorporateAction NewFeed(
+        int tenantId, int instrumentId, string connection, string partyActionId, int version, CorporateActionKind kind)
+    {
+        if (string.IsNullOrWhiteSpace(connection) || connection.Length > ConnectionMaxLength)
+        {
+            throw new DomainException("A feed corporate action needs its connection.");
+        }
+
+        if (string.IsNullOrWhiteSpace(partyActionId) || partyActionId.Length > PartyActionIdMaxLength)
+        {
+            throw new DomainException("A feed corporate action needs the party's action id.");
+        }
+
+        if (version < 1)
+        {
+            throw new DomainException("A feed version is 1 or more.");
+        }
+
+        var action = New(tenantId, instrumentId, kind, CorporateActionOrigin.Feed);
+        action.Connection = connection;
+        action.PartyActionId = partyActionId;
+        action.FeedVersion = version;
+        return action;
+    }
+
+    private void SetDividendTerms(DividendTerms terms, DateOnly exDate, DateOnly? recordDate, DateOnly? paymentDate)
+    {
+        if (DividendTerms.RefusalOf(terms.AmountPerShare, terms.TaxSource, terms.ImputationCreditPerShare,
+                terms.ForeignTaxRatePercent, terms.ReinvestmentPrice) is { } refusal)
+        {
+            throw new DomainException(refusal.Message);
+        }
+
+        AmountPerShare = terms.AmountPerShare;
+        TaxSource = terms.TaxSource;
+        ImputationCreditPerShare = terms.ImputationCreditPerShare;
+        ForeignTaxRatePercent = terms.ForeignTaxRatePercent;
+        ReinvestmentPrice = terms.ReinvestmentPrice;
+        ExDate = exDate;
+        RecordDate = recordDate;
+        PaymentDate = paymentDate;
+    }
+
+    private static void EnsureNoPlan(DividendTerms terms)
+    {
+        if (terms.ReinvestmentPrice is not null)
+        {
+            throw new DomainException("Reinvestment is available only for dividends that come from a market data connection.");
+        }
+    }
+
+    private void EnsureDividend()
+    {
+        if (Kind != CorporateActionKind.Dividend)
+        {
+            throw new DomainException("Only a dividend has dividend terms.");
+        }
     }
 
     private void SetTerms(CorporateActionRatio ratio, DateOnly exDate, DateOnly? recordDate, DateOnly? paymentDate)

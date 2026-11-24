@@ -270,7 +270,7 @@ public class DividendsSchemaTests
     {
         (await RunAsync($"""
             {World()}
-            UPDATE [Accounts] SET [CustodyMode] = 1, [ReinvestDividends] = 1 WHERE [Id] = @a_brokerage;
+            UPDATE [Accounts] SET [CustodyMode] = 1, [DepositReference] = N'D' + LEFT(CONVERT(nvarchar(36), NEWID()), 8), [ReinvestDividends] = 1 WHERE [Id] = @a_brokerage;
             SELECT COUNT(*) FROM [Accounts] WHERE [Id] = @a_brokerage AND [ReinvestDividends] = 1;
             """)).ShouldBe(1);
 
