@@ -23,6 +23,7 @@ related:
   - holdings.md
   - custody-modes.md
   - external-caller-numbers.md
+  - in-kind-transfers.md
 ---
 
 # Buy / Sell / Stock in-out
@@ -325,3 +326,12 @@ The repository should build after each commit. Agents split each line into red t
 ## Amendment 2026-11-14 (UTC instants)
 
 Accepted with [utc-instants](../fixes/utc-instants.md). R10 prices for the UTC date of `bookedAt`; the `IFxRate` call in R12 uses the same date. R18 follows posting R24. The item example shows the UTC form.
+
+---
+
+## Amendment 2026-11-24 (in-kind transfers) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rules R36–R38 and R48 live there; this section records what changes here.
+
+- R8: on a Custodial account a `StockIn` or `StockOut` is written only by an in-kind transfer, when the custodian's movement confirms it: one security leg, `+quantity` with the transfer's cost for a `StockIn`, `−quantity` at the holding's average cost for a `StockOut` (R11, R15), no cash leg, source `InKindTransfer`, memo `Transfer in` / `Transfer out`, and an in-kind transfer detail. The hand entry stays refused, with the message of in-kind-transfers R48.
+- External accounts are unchanged.

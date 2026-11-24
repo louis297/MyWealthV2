@@ -31,6 +31,7 @@ related:
   - ../database-design.md
   - ../api-design.md
   - ../glossary.md
+  - in-kind-transfers.md
 ---
 
 # Rebalance through orders
@@ -563,3 +564,11 @@ Do not put a consent record, a bulk confirm route, a scheduled rebalance or orde
 ### Docs amended when this spec was accepted
 
 [portfolios.md](portfolios.md) (the summary; R8, R9, R11–R13, R15, R18, R22–R25; §8 answers and the `lastRebalance…` fields; the failure codes of §11), [orders.md](orders.md) (R8, R15, R16, R18, R19 the sixth step, R49; §2 Out and §11 points 4 and 16 answered), [transaction-source.md](transaction-source.md) (R5, R9: no longer written; R12: `Rebalance` not hand-reversible), [custody-modes.md](custody-modes.md) (R15, R17 and the reverse row of the matrix), [trade-fees.md](trade-fees.md) (R24–R29: the planner's fees are estimates; a rebalance order is charged as any order), [trade-settlement.md](trade-settlement.md) (R5, R23 and "still open": rebalance orders settle like any order), [bank-reconciliation.md](bank-reconciliation.md) (R10: `Trades` keeps only rebalance trades from before this slice), [withdrawals.md](withdrawals.md) (R36: a rebalance lowers cash only through its orders), [account-closure.md](account-closure.md) (a note: R5 already refuses an assigned account), [corporate-actions.md](corporate-actions.md) (a note: a cancelled rebalance order ends its rebalance), [adjustments.md](adjustments.md) (R16: the next rebalance sees the adjusted holding, unchanged), [bff-adviser-portal.md](bff-adviser-portal.md) (prefix `/rebalances`), [api-design.md](../api-design.md) (§3.1 two permission rows, §4.2 five codes, §6 resource row, §7.6 and §7.12 notes, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [architecture.md](../architecture.md) (the sixth step of `broker-sync:{connection}`), [adviser-portal-portfolios.md](../adviser-portal/adviser-portal-portfolios.md) (P14–P20; P7, P8 and the confirmation copy), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D79; D27), [customer-portal.md](../customer-portal/customer-portal.md) (C37), [glossary.md](../glossary.md) (the review terms become accepted; Portfolio, AccountPortfolioAssignment, Order, Manual entry matrix, Transaction source and Hand-reversible source change), [function-plan.md](../function-plan.md) §5, [features/README.md](README.md) row status, [future-plans.md](../future-plans.md) §9, and the roadmap §8 O3, §11 S2, §12 D15, §13 and §14. The roadmap §2 matrix (the `Buy` / `Sell` and Reverse rows) changes when the slice lands.
+
+---
+
+## Amendment 2026-11-24 (in-kind transfers) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rule R24 lives there; this section records what changes here.
+
+- On an assigned account only its rebalance changes holdings: an in-kind transfer is refused on it, and an account with an open transfer cannot be assigned. A rebalance therefore never meets a transfer out's reserved quantity.

@@ -22,6 +22,7 @@ related:
   - posting.md
   - custody-modes.md
   - migration-batches.md
+  - in-kind-transfers.md
 ---
 
 # Holdings
@@ -308,3 +309,13 @@ Status of this amendment: `accepted` (2026-11-24), together with [migration-batc
 
 - R8, R11: on a Custodial account an `OpeningHoldings` is written only by a migration batch (`Transaction.PostMigratedHoldings`, source `Migration`, a migration detail), on an empty account, with the cost the batch carries in the instrument's quote currency. The hand `OpeningHoldings` stays refused, with the message of migration-batches R26.
 - A migrated holding's instrument must be quoted in the Account's currency (issue `InstrumentCurrencyMismatch`) and be active (`InstrumentInactive`). The projection is updated in the post's transaction (R14).
+
+---
+
+## Amendment 2026-11-24 (in-kind transfers) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rules R37, R43 and R44 live there; this section records what changes here.
+
+- The item of `GET /accounts/{id}/holdings` gains `unsettledQuantity` (the quantity of the Account's `Posted` buy fills in the Instrument that are not settled and not broken) and `transferableQuantity` (available quantity minus unsettled quantity, never below 0). On an External account they are `0` and the holding's quantity.
+- `reservedQuantity` now also counts the quantity of the Account's open in-kind transfers `Out` in the Instrument; `availableQuantity` is still quantity minus reserved quantity.
+- The type table: on a Custodial account a `StockIn` or `StockOut` is written by an in-kind transfer (source `InKindTransfer`); the projection is updated in the same Account-locked transaction (R14), and it counts as security activity for R15.

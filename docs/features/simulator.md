@@ -26,6 +26,7 @@ related:
   - bank-reconciliation.md
   - interest-run.md
   - trade-settlement.md
+  - in-kind-transfers.md
 ---
 
 # Simulator
@@ -528,3 +529,18 @@ Status of this amendment: `accepted` (2026-11-23), together with [trade-settleme
 - Configuration `Simulator:Broker:BankAccounts` (`Currency`, `AccountNumber`, `Name`); a bad entry stops start-up.
 - Control log actions `BrokerSettlementModeChanged`, `BrokerSettlementPaid`, `BrokerFillBroken`.
 - Reset (R24) also empties the broker settlements and sets the settlement mode to `Pay`.
+
+---
+
+## Amendment 2026-11-24 (S3 custodian) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rules R60–R72 live there; this section records what changes here.
+
+- Party port: `POST /party/custodian/accounts/{accountNumber}/transfers` (idempotent on the instruction id and the body) and `GET /party/custodian/accounts/{accountNumber}/movements?after=&limit=` with `positions` on every page. `POST /party/broker/orders` takes an optional `safekeepingAccount`.
+- Control port: `GET /control/custodian`, `GET|POST /control/custodian/accounts`, `GET /control/custodian/accounts/{accountNumber}/movements`, `GET /control/custodian/transfers`, `POST /control/custodian/transfer-mode`, `POST /control/custodian/transfers/{transferId}/execute`, `POST /control/custodian/movements`, `POST /control/custodian/rounding-mode`.
+- Configuration `Simulator:Custodian:StandingAccounts` (`AccountNumber`, `Currency`, `Name`, optional `Positions` of `Symbol`, `Quantity`); a bad entry stops start-up.
+- Ids `{WorldId:N}-T{n}` (transfers) and `{WorldId:N}-M{n}` (movements).
+- Control log actions `CustodianAccountOpened`, `CustodianTransferModeChanged`, `CustodianTransferExecuted`, `CustodianMovementAdded`, `CustodianRoundingModeChanged`.
+- A settled fill of an order with a safekeeping account adds a `Trade` movement; an effective corporate action settles open fills in the symbol first and adds a `CorporateAction` movement per account with a position.
+- Reset (R24) also empties the custodian's accounts, movements and transfers, opens the standing accounts with their positions again, and sets the transfer mode to `Execute` and the rounding mode to `Fractional`.
+- Script `database/simulator/0012_custodian.sql`.

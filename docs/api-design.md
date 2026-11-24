@@ -154,6 +154,11 @@ The fifth role `SimulatorOperator` ([ADR 0013](adr/0013-roles-authorization-sing
 | `rebalances.read` | | ✓ | ✓ | | [rebalances](features/rebalances.md) (accepted 2026-11-23) |
 | `rebalances.confirm` | | ✓ | ✓ | | [rebalances](features/rebalances.md) (accepted 2026-11-23) |
 | `migration-batches.manage` | | ✓ | | | [migration-batches](features/migration-batches.md) (accepted 2026-11-24) |
+| `in-kind-transfers.read` | | ✓ | ✓ | ✓ | [in-kind-transfers](features/in-kind-transfers.md) (accepted 2026-11-24) |
+| `in-kind-transfers.request` | | ✓ | ✓ | | [in-kind-transfers](features/in-kind-transfers.md) (accepted 2026-11-24) |
+| `in-kind-transfers.approve` | | ✓ | | | [in-kind-transfers](features/in-kind-transfers.md) (accepted 2026-11-24) |
+| `custody-movements.manage` | | ✓ | | | [in-kind-transfers](features/in-kind-transfers.md) (accepted 2026-11-24) |
+| `custodian-reconciliations.manage` | | ✓ | | | [in-kind-transfers](features/in-kind-transfers.md) (accepted 2026-11-24) |
 | `portfolios.read` | ✓ | ✓ | ✓ | | [portfolios](features/portfolios.md) |
 | `portfolios.manage` | ✓ | ✓ | ✓ | | [portfolios](features/portfolios.md) |
 | `reports.customer.read` | | ✓ | ✓ | ✓ | [reports](features/reports.md) |
@@ -345,6 +350,9 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Trade settlements | `/trade-settlements` | list / get; pay again / set aside. No create: the `worker` creates them from the broker's `Settlement` report. See features/trade-settlement.md | `trade-settlements.manage` |
 | Rebalances | `/rebalances` | list / get; confirm / cancel. No create: `POST /accounts/{id}/rebalance`, assign and the rebalance job propose. See features/rebalances.md | `rebalances.read` / `rebalances.confirm` |
 | Migration batches | `/migration-batches` | list / get / create / replace (PUT); submit / return / cancel / post. Funding is `POST /statement-lines/{id}/match` with `migrationBatchId`. See features/migration-batches.md | `migration-batches.manage` |
+| In-kind transfers | `/in-kind-transfers` | list / get / request; approve / reject / cancel / set aside. See features/in-kind-transfers.md | `in-kind-transfers.read`, `.request`, `.approve` |
+| Custody movements | `/custody-movements` | list / get; ignore / reopen. See features/in-kind-transfers.md | `custody-movements.manage` |
+| Custodian reconciliations | `/custodian-reconciliations` | overview / list / get / run now. See features/in-kind-transfers.md | `custodian-reconciliations.manage` |
 | Reports | `/reports` | list / request / schedules / executions / download | `reports.customer.read` / `reports.customer.create` / `reports.book.read` / `reports.book.create` / `reports.tenant.read` / `reports.tenant.create` |
 
 Path `{id}` is always PublicId.
@@ -411,6 +419,7 @@ Lookup: `GET /tenants/by-code/{code}` uses `tenants.read` (SystemAdmin, TenantAd
 - Amendment 2026-11-20 (client money accounts, accepted; field rules in [features/client-money-accounts.md](features/client-money-accounts.md)): sub-resource `/tenants/{tenantId}/client-money-accounts` with list, get, create (201 `{ id }`), `POST …/{id}/disable` and `POST …/{id}/enable` (`rowVersion`), all `tenants.manage`. No PUT. One active row per currency and an account number active on one row only, else 400 `errors.Currency` / `errors.AccountNumber`. The tenant item on list, get and by-code carries `clientMoneyCurrencies`. No new policy or problem code.
 - Amendment 2026-11-20 (bank feed and deposit matching, accepted; field rules in [features/deposit-matching.md](features/deposit-matching.md)): creating a client money account requires `bankConnection`, a name from configuration (else 400 `errors.BankConnection`); the item carries `bankConnection` and `bankFeed` (`{ lastSucceededAt, lastFailedAt, lastFailure }` or `null`). `GET /bank-connections` (`tenants.manage`) lists the configured connections without secrets.
 - Amendment 2026-11-23 (orders and settlement, accepted; field rules in [features/orders.md](features/orders.md) R3, R4): POST and PUT bodies take an optional `brokerConnection`, a name from configuration (else 400 `errors.BrokerConnection`); omitted or `null` on PUT leaves it unchanged. The item carries `brokerConnection` (`null` when none). `GET /broker-connections` (`tenants.manage`) lists the configured names with the state of each execution report feed, and `GET /execution-reports` (`tenants.manage`) lists the stored reports.
+- Amendment 2026-11-24 (in-kind transfers, accepted; field rules in [features/in-kind-transfers.md](features/in-kind-transfers.md) R2–R7): sub-resource `/tenants/{tenantId}/safekeeping-accounts` with list, get, create, disable and enable (no PUT), one active per currency; `GET /custodian-connections` lists the configured custodian connections. Both `tenants.manage`.
 
 ### 7.4 People (TenantAdmin / Adviser / Customer)
 
@@ -532,6 +541,7 @@ Field rules: [features/posting.md](features/posting.md) for cash types, [feature
 - Amendment 2026-11-22 (interest run, accepted; field rules in [features/interest-run.md](features/interest-run.md) R23–R27, R34, R39): source kind `InterestRun` marks an interest posting; it is not hand-reversible. A cash leg's `role` may be `Tax`; every cash leg gains `tax` (`{ kind, ratePercent, basisAmount, amount, currency }` on a `Tax` leg, `null` otherwise) and the item gains `interest` (`{ periodFrom, periodTo, days, accruedAmount, grossAmount }` on an interest posting and its Reversal, `null` otherwise). A hand `Interest` on a Custodial account stays refused. The statement line item gains `kind` (`Transfer`, `Interest`), and `GET /statement-lines` an optional `kind` filter (else 400 `errors.Kind`).
 - Amendment 2026-11-23 (orders and settlement, accepted; field rules in [features/orders.md](features/orders.md) R32, R35, R37, R38, R45, R48): on a Custodial account `POST /transactions` refuses `Buy` and `Sell` (400 `errors.Type`, `Trades on a Custodial account go through the broker. Place an order.`); the caller places an order (§7.12). Source kind `OrderFill` marks the `Buy` or `Sell` the platform posts for a fill, with the order's PublicId as source id; it is not hand-reversible. The item gains `execution` `{ orderId, fillId, price, tradeDate, settlementDate, brokerReference, settledAt }` on a fill and its Reversal, `null` otherwise. `POST /transactions/transfer`, `POST /transactions/fx` and the FX quote from a Custodial account refuse an amount that would take out cash from sales that have not settled (400).
 - Amendment 2026-11-24 (migration batches, accepted; field rules in [features/migration-batches.md](features/migration-batches.md) R25–R27, R31): source kind `Migration` marks an `Opening` or `OpeningHoldings` written by a migration batch, with the batch's PublicId as source id; it is not hand-reversible. The item gains `migration` (`{ asOfDate, previousProvider }` on such a Transaction, `null` otherwise). On a Custodial account a hand `Opening` or `OpeningHoldings` stays refused (400 `errors.Type`) with the message `Opening balances on a Custodial account come from a migration batch.`
+- Amendment 2026-11-24 (in-kind transfers, accepted; field rules in [features/in-kind-transfers.md](features/in-kind-transfers.md) R37–R42, R48): source kind `InKindTransfer` marks a `StockIn` or `StockOut` written by an in-kind transfer, with the transfer's PublicId as source id; it is not hand-reversible. The item gains `inKindTransfer` (`{ transferId, direction, counterpartyName, counterpartyAccount, changesBeneficialOwner, acquiredOn, settlementDate, custodianReference }`, `null` on every other Transaction). The hand `StockIn` / `StockOut` on a Custodial account is refused with the message of R48. The holdings item gains `unsettledQuantity` and `transferableQuantity`; `reservedQuantity` counts open transfers out.
 
 **Type-specific create routes.** When a type's create body differs from the common shape (one top-level `accountId`), that type gets its own `POST /transactions/{action}`. Each type has exactly one create route: a type with its own route is rejected by `POST /transactions` (400). Read (`GET /transactions`, `GET /transactions/{id}`) and reverse (`POST /transactions/{id}/reverse`) stay shared by every type. Every new type gets its own `POST /transactions/{action}` route, whatever its body shape (decided 2026-11-10). Existing types keep `POST /transactions` until each is moved in its own spec amendment ([future-plans.md](future-plans.md) §4).
 
@@ -681,6 +691,27 @@ Amendment 2026-11-24 (migration batches, accepted; field rules in [features/migr
 
 An id in the body that is not in the Tenant → 400 at its place in the body. Submit and post of a batch with an issue → 400 `migration_batch_not_valid`. Post by the person who submitted → 400 `errors.Status`. Writes take `rowVersion` (409 `stale_row_version`) and no `Idempotency-Key`. `POST /statement-lines/{id}/match` takes `migrationBatchId` in place of `accountId`; the statement line item gains `migrationBatchId` and method `Migration`; the bank reconciliation item gains the kind `MigrationNotPosted`.
 
+### 7.14 In-kind transfers, custody movements and custodian reconciliations
+
+Amendment 2026-11-24 (in-kind transfers, accepted; field rules in [features/in-kind-transfers.md](features/in-kind-transfers.md)):
+
+| Method | Route | Policy | Success |
+| --- | --- | --- | --- |
+| GET | `/in-kind-transfers` | `in-kind-transfers.read` | 200 envelope (filters `accountId`, `customerId`, `instrumentId`, `direction`, `status`) |
+| GET | `/in-kind-transfers/{id}` | `in-kind-transfers.read` | 200 item |
+| POST | `/in-kind-transfers` | `in-kind-transfers.request` | 201 `{ id }` (requires `Idempotency-Key`) |
+| POST | `/in-kind-transfers/{id}/approve`, `…/reject`, `…/set-aside` | `in-kind-transfers.approve` | 204 |
+| POST | `/in-kind-transfers/{id}/cancel` | `in-kind-transfers.request` | 204 |
+| GET | `/custody-movements` | `custody-movements.manage` | 200 envelope (filters `status`, `direction`, `kind`, `instrumentId`, `safekeepingAccountId`) |
+| GET | `/custody-movements/{id}` | `custody-movements.manage` | 200 item |
+| POST | `/custody-movements/{id}/ignore`, `…/reopen` | `custody-movements.manage` | 204 |
+| GET | `/custodian-reconciliations/overview` | `custodian-reconciliations.manage` | 200 envelope |
+| GET | `/custodian-reconciliations` | `custodian-reconciliations.manage` | 200 envelope (filters `safekeepingAccountId`, `status`, `from`, `to`) |
+| GET | `/custodian-reconciliations/{id}` | `custodian-reconciliations.manage` | 200 item with every line |
+| POST | `/custodian-reconciliations` | `custodian-reconciliations.manage` | 201 `{ id }` |
+
+Approve or reject by the requester → 400 `errors.Status`. Actions take `rowVersion` (409 `stale_row_version`) and no `Idempotency-Key`. No new problem code. Cross-tenant or wrong-collection id → 404.
+
 ---
 
 ## 8. Explicitly out (until a later phase promotes them)
@@ -768,3 +799,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-23 | §3.1, §6, §7.12: trade settlement and broken trades accepted. Permission `trade-settlements.manage`; resource `/trade-settlements` (list, get, pay, set aside); `POST /orders/{id}/fills/{fillId}/resolve-break` (`transactions.adjust`); fill `break`, transaction `execution.brokenAt`, statement line `tradeSettlementId`, reconciliation `openSettlements` and four item kinds, connection `settlementCurrencies`. No new problem code. |
 | 2026-11-23 | §3.1, §4.2, §6, §7.6, §7.12: rebalance through orders accepted. Permissions `rebalances.read` and `rebalances.confirm`; resource `/rebalances` (list, get, confirm, cancel); problem codes `stale_price`, `instrument_inactive`, `currency_mismatch`, `no_broker_connection`, `rebalance_in_progress`; propose and assign answer `{ status, rebalanceId }`; assignment item `rebalance` replaces the three `lastRebalance…` fields; order item `rebalanceId` and filter; `Rebalance` no longer hand-reversible on a Custodial account. |
 | 2026-11-24 | §3.1, §4.2, §6, §7.7, §7.13: migration batches accepted. Permission `migration-batches.manage`; resource `/migration-batches` (list, get, create, replace, submit, return, cancel, post); problem code `migration_batch_not_valid`; source kind `Migration`; transaction item `migration`; statement line `migrationBatchId` and match method `Migration`; reconciliation item kind `MigrationNotPosted`. |
+| 2026-11-24 | §3.1, §6, §7.3, §7.7, §7.14: in-kind transfers accepted. Permissions `in-kind-transfers.read`, `.request`, `.approve`, `custody-movements.manage`, `custodian-reconciliations.manage`; resources `/in-kind-transfers`, `/custody-movements`, `/custodian-reconciliations`, `/tenants/{tenantId}/safekeeping-accounts`, `GET /custodian-connections`; source kind `InKindTransfer`; transaction item `inKindTransfer`; holding item `unsettledQuantity`, `transferableQuantity`. |

@@ -25,6 +25,7 @@ related:
   - trade-settlement.md
   - rebalances.md
   - migration-batches.md
+  - in-kind-transfers.md
 ---
 
 # Transaction source
@@ -446,3 +447,14 @@ Status of this amendment: `accepted` (2026-11-24), together with [migration-batc
 - R5: source kind `Migration = 9`, with the migration batch's PublicId as source id (required). Every Transaction of one batch has the same source id.
 - R12, R13: `Migration` is not hand-reversible; `POST /transactions/{id}/reverse` of a Transaction a batch wrote → 400 with the message of R13. No flow reverses it; an adjustment corrects it.
 - `0054` widens `CK_Transactions_SourceKind` to 0–9 and requires a `SourcePublicId` for kinds 2–9.
+
+---
+
+## Amendment 2026-11-24 (in-kind transfers) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rules R37, R41 and R49 live there; this section records what changes here.
+
+- R5: source kind `InKindTransfer = 10`, with the in-kind transfer's PublicId as source id (required).
+- R12, R13: `InKindTransfer` is not hand-reversible; `POST /transactions/{id}/reverse` of a Transaction a transfer wrote → 400 with the message of R13. No flow reverses it; a new transfer or an adjustment corrects it.
+- `0055` widens `CK_Transactions_SourceKind` to 0–10 and requires a `SourcePublicId` for kinds 2–10.
+- The transaction item gains `inKindTransfer` (in-kind-transfers R42).

@@ -30,6 +30,7 @@ related:
   - withdrawals.md
   - account-closure.md
   - rebalances.md
+  - in-kind-transfers.md
 ---
 
 # Portfolios
@@ -498,3 +499,12 @@ Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md]
 - §8: assign and `POST /accounts/{id}/rebalance` answer 200 `{ "status", "rebalanceId" }` with `status` `Proposed` or `NoChange`; a failed plan → 400 with its code, and the `Failed` rebalance is stored (rebalances R10). `GET /accounts/{id}/portfolio` loses `lastRebalanceAt`, `lastRebalanceStatus` and `lastRebalanceMessage` and gains `rebalance` (rebalances R25).
 - §11 failure codes: `stale_price`, `instrument_inactive`, `currency_mismatch`, `no_broker_connection` and `rebalance_in_progress` are added (rebalances §8.2). `concurrent_modification` is not used: a stale `rowVersion` on confirm or cancel is 409 `stale_row_version`.
 - The amendment 2026-11-23 (orders and settlement) points "R8, R9: rebalance is unchanged until roadmap O3" and "R8 `V`, R11" are replaced by the points above. Available cash still includes cash from sales that have not settled, so the buys use unsettled sale proceeds.
+
+---
+
+## Amendment 2026-11-24 (in-kind transfers) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rule R24 lives there; this section records what changes here.
+
+- Assigning a portfolio to an account with an open in-kind transfer → 400 `account_not_eligible` with the message `Complete or cancel the account's open transfers of securities before assigning a portfolio.`
+- An account with an Active assignment takes no in-kind transfer request, in either direction.

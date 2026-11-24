@@ -1,6 +1,6 @@
 ---
 title: In-kind transfers and custodian reconciliation
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -56,7 +56,7 @@ Today the securities on a Custodial account exist only in the platform's ledger.
 
 New: permissions `in-kind-transfers.read`, `in-kind-transfers.request`, `in-kind-transfers.approve`, `custody-movements.manage` and `custodian-reconciliations.manage`; routes under `/in-kind-transfers`, `/custody-movements`, `/custodian-reconciliations` and `/tenants/{tenantId}/safekeeping-accounts`, and `GET /custodian-connections`; ports `ICustodianFeed` and `ICustodianTransfers` with adapters `SimulatorCustodianFeed` and `SimulatorCustodianTransfers`; custodian connections in configuration; source kind `InKindTransfer`; the in-kind transfer detail on the Transaction; `worker` jobs `custodian-sync:{connection}` and `custodian-reconciliation` on the new queue `custodian`; item fields `unsettledQuantity` and `transferableQuantity` (holding) and `inKindTransfer` (transaction); `safekeepingAccount` on the broker's order call. Scripts `0055_custodian.sql` and `0056_custodian_reconciliations.sql`; simulator script `database/simulator/0012_custodian.sql`. No new `TransactionType`, problem code or domain event.
 
-**Status is `review` (2026-11-24).** It is not a build contract. The twenty-four points of §11 each carry a recommendation and wait for confirmation, except point 2, which was decided in discussion on 2026-11-24. The amendments to accepted docs listed in §12 are made when this spec is accepted.
+**Status is `accepted` (2026-11-24).** The twenty-four points of §11 were confirmed on 2026-11-24, every one as recommended (point 2 was decided in discussion the same day), and are written into the rules. The amendments to accepted docs listed in §12 were made when it was accepted. It is a build contract.
 
 ---
 
@@ -259,7 +259,7 @@ The rule that distinguishes this slice: a security moves into or out of a Custod
 
 ### 4.7 The transfer on the ledger
 
-Amendment to [buy-sell.md](buy-sell.md), [holdings.md](holdings.md), [posting.md](posting.md) and [transaction-source.md](transaction-source.md).
+Amends [buy-sell.md](buy-sell.md), [holdings.md](holdings.md), [posting.md](posting.md) and [transaction-source.md](transaction-source.md).
 
 | ID | Rule |
 | --- | --- |
@@ -273,7 +273,7 @@ Amendment to [buy-sell.md](buy-sell.md), [holdings.md](holdings.md), [posting.md
 
 ### 4.8 Reserved, unsettled and transferable quantity
 
-Amendment to [orders.md](orders.md) R40 and R41, [holdings.md](holdings.md), [adjustments.md](adjustments.md) and [account-closure.md](account-closure.md) R5, R6 and R12.
+Amends [orders.md](orders.md) R40 and R41, [holdings.md](holdings.md), [adjustments.md](adjustments.md) and [account-closure.md](account-closure.md) R5, R6 and R12.
 
 | ID | Rule |
 | --- | --- |
@@ -283,7 +283,7 @@ Amendment to [orders.md](orders.md) R40 and R41, [holdings.md](holdings.md), [ad
 
 ### 4.9 Orders deliver through the safekeeping account
 
-Amendment to [orders.md](orders.md) R20 and R53 and [trade-settlement.md](trade-settlement.md) R35.
+Amends [orders.md](orders.md) R20 and R53 and [trade-settlement.md](trade-settlement.md) R35.
 
 | ID | Rule |
 | --- | --- |
@@ -292,7 +292,7 @@ Amendment to [orders.md](orders.md) R20 and R53 and [trade-settlement.md](trade-
 
 ### 4.10 The manual entry matrix and the source
 
-Amendment to [custody-modes.md](custody-modes.md) R5.
+Amends [custody-modes.md](custody-modes.md) R5.
 
 | ID | Rule |
 | --- | --- |
@@ -327,7 +327,7 @@ Amendment to [custody-modes.md](custody-modes.md) R5.
 
 ### 4.12 The simulator custodian (S3)
 
-Amendment to [simulator.md](simulator.md), [orders.md](orders.md) §4.10, [trade-settlement.md](trade-settlement.md) §4.8 and [corporate-actions.md](corporate-actions.md) §4.8. The party routes add under `/party/custodian/…` (simulator R32), the control routes under `/control/custodian/…`.
+Amends [simulator.md](simulator.md), [orders.md](orders.md) §4.10, [trade-settlement.md](trade-settlement.md) §4.8 and [corporate-actions.md](corporate-actions.md) §4.8. The party routes add under `/party/custodian/…` (simulator R32), the control routes under `/control/custodian/…`.
 
 | ID | Rule |
 | --- | --- |
@@ -418,7 +418,7 @@ Invariants:
 
 Domain events: none new. A transfer's posting raises `TransactionPosted` as every Transaction does.
 
-To be recorded in [domain-model.md](../domain-model.md) §8.5 (holding quantities), §8.6 (source kind, in-kind transfer detail), §8.16 (the order's safekeeping account) and a new §8.20 (safekeeping accounts, custody movements, in-kind transfers, custodian reconciliations) when this spec is accepted.
+Recorded in [domain-model.md](../domain-model.md) §8.5 (holding quantities), §8.6 (source kind, in-kind transfer detail), §8.16 (the order's safekeeping account) and §8.20 (safekeeping accounts, custody movements, in-kind transfers, custodian reconciliations).
 
 ---
 
@@ -527,7 +527,7 @@ No back-fill. No Tenant has a safekeeping account, and no order, movement or Tra
 
 A reset deletes the rows of the first three tables and sets the settings to their defaults (R71).
 
-To be recorded in [database-design.md](../database-design.md) §9, §11.4, §11.16, a new §11.20 and §15 when this spec is accepted.
+Recorded in [database-design.md](../database-design.md) §9, §11.4, §11.16, §11.20 and §15.
 
 ---
 
@@ -758,7 +758,7 @@ No new problem code. Cross-tenant or wrong-collection id → **404**, not 403. K
 
 ## 9. UI
 
-Page contracts to amend when this spec is accepted: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D86–D93), [customer-portal.md](../customer-portal/customer-portal.md) (C39–C41) and [back-office.md](../backoffice/back-office.md) (BO30–BO32). The Adviser Portal BFF gains the prefixes `/in-kind-transfers`, `/custody-movements` and `/custodian-reconciliations` ([bff-adviser-portal.md](bff-adviser-portal.md) R20); the Customer Portal BFF gains `/in-kind-transfers` ([bff-customer-portal.md](bff-customer-portal.md) R20).
+Page contracts amended when this spec was accepted: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D86–D93), [customer-portal.md](../customer-portal/customer-portal.md) (C39–C41) and [back-office.md](../backoffice/back-office.md) (BO30–BO32). The Adviser Portal BFF gains the prefixes `/in-kind-transfers`, `/custody-movements` and `/custodian-reconciliations` ([bff-adviser-portal.md](bff-adviser-portal.md) R20); the Customer Portal BFF gains `/in-kind-transfers` ([bff-customer-portal.md](bff-customer-portal.md) R20).
 
 **Adviser Portal**
 
@@ -839,9 +839,9 @@ No new ADR. The slice follows [ADR 0021](../adr/0021-outside-parties-behind-port
 | Permissions | `in-kind-transfers.read` / `.request` / `.approve`, `custody-movements.manage`, `custodian-reconciliations.manage`; SystemAdmin none |
 | Events, `TransactionType`, problem codes | None added |
 
-### Points to confirm
+### Points confirmed
 
-Each point states the recommendation, written into the rules above, and the alternative.
+Each point states the recommendation, written into the rules above, and the alternative. All twenty-four were confirmed as recommended on 2026-11-24.
 
 1. **One spec for T1, T3 and S3.** Recommended: the roadmap puts them in one step, and each needs the others: a transfer is confirmed by the custodian's movement, the reconciliation needs the custodian's positions, and both need the simulator custodian. Alternative: two specs, as step 11 and 11b were: first the safekeeping account, the feed and the transfers, then the reconciliation.
 2. **A Tenant may have several safekeeping accounts, at most one active per currency; each is pooled** (R3–R5). Decided in discussion on 2026-11-24, in place of the first draft's "at most one active per Tenant". A safekeeping account is the securities twin of the client money account (client-money-accounts §11): a row under the Tenant, set by SystemAdmin, never edited, holding Customers' assets only, with its own feed cursor and its own reconciliation. The currency is the quote currency of the Instruments held there, so every holding belongs to exactly one safekeeping account whatever the currency of its Custodial account, and a firm can keep the securities of one market at one custodian and those of another market elsewhere. Pooling is not a result of the number of accounts: a client money account pools every Customer's cash in the same way, and the ledger and the daily reconciliation are the control. Alternatives: one active per Tenant (too tight for a firm with two markets); several with no key (a holding could then not be placed, so nothing could be reconciled); a safekeeping account chosen per Custodial account or per Customer, which is real segregation and stays out: it changes how an account is opened, and the tables here do not have to change to add it later.
@@ -918,6 +918,6 @@ The repository should build after each commit. Agents split each behaviour into 
 
 Do not put a register of counterparty accounts, a hand match of a movement, a reversal of a transfer, a PDF report or a tolerance in these commits.
 
-### Docs to amend when this spec is accepted
+### Docs amended when this spec was accepted
 
 [custody-modes.md](custody-modes.md) (R5 matrix: the "written by" of `StockIn` / `StockOut`; §4.2.1 the message), [buy-sell.md](buy-sell.md) (R8: on a Custodial account a `StockIn` or `StockOut` is written only by an in-kind transfer), [holdings.md](holdings.md) (the holding item: `unsettledQuantity`, `transferableQuantity`; reserved quantity counts transfers out), [posting.md](posting.md) (§1: the in-kind transfer is now one of the instructions), [transaction-source.md](transaction-source.md) (kind `InKindTransfer` = 10, not hand-reversible, the checks widened), [orders.md](orders.md) (R20: `safekeepingAccount` on the place call; R40, R41: reserved quantity; R52, R53: the broker delivers through the custodian; the "Out" and "still open" lines on the custodian), [trade-settlement.md](trade-settlement.md) (R35, R36: the order body, and settlement brought forward by a corporate action in the simulator; "still open" on custodian positions), [corporate-actions.md](corporate-actions.md) (R28 and the open point on custodian rounding: answered by R17, R53 and R68; R42: the simulator settles open trades and changes the custodian's positions), [migration-batches.md](migration-batches.md) (§11 point 9 and "still open": the custodian's proof of migrated holdings, point 14 here), [bank-reconciliation.md](bank-reconciliation.md) (§2 Out and "still open": the position reconciliation is this spec), [account-closure.md](account-closure.md) (R5 the new refusal, R6 the message, R12 the list), [adjustments.md](adjustments.md) (a note: the reserved quantity message, and an adjustment as the correction after a movement in suspense), [portfolios.md](portfolios.md) and [rebalances.md](rebalances.md) (assign is refused with an open transfer; a transfer is refused on an assigned account), [internal-transfers.md](internal-transfers.md) and [leg-accounts.md](leg-accounts.md) (the open item "in-kind transfer" now means only a transfer between two Accounts of the firm), [tenants.md](tenants.md) (safekeeping accounts under the Tenant), [simulator.md](simulator.md) (an amendment for S3: the custodian), [bff-adviser-portal.md](bff-adviser-portal.md) and [bff-customer-portal.md](bff-customer-portal.md) (the prefixes), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D86–D93; D18, D26, D27), [customer-portal.md](../customer-portal/customer-portal.md) (C39–C41), [back-office.md](../backoffice/back-office.md) (BO30–BO32), [api-design.md](../api-design.md) (§3.1 five permission rows, §6 resource rows, a new §7.14, §7.3 the safekeeping accounts, §7.7 the `inKindTransfer` field, change log), [domain-model.md](../domain-model.md) and [database-design.md](../database-design.md) (the sections named in §5 and §6), [architecture.md](../architecture.md) (the ports, the jobs and the queue), [deployment.md](../deployment.md) (the `.env` keys), [adr/0021](../adr/0021-outside-parties-behind-ports.md) (links only: the custodian ports), [glossary.md](../glossary.md) (the review terms become accepted; Reserved quantity, Available quantity, Transaction source, Manual entry matrix, Simulator broker and Bank reconciliation gain this spec), [function-plan.md](../function-plan.md) §5, [features/README.md](README.md) row status, [known-issues/custodial-account-gaps.md](../known-issues/custodial-account-gaps.md) (the row "Existing positions cannot be moved in" notes this spec and is removed when the slice lands), and the roadmap §2 matrix, §9 T1 and T3, §11 S3, §13 status and §14.

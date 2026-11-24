@@ -28,6 +28,7 @@ related:
   - trade-settlement.md
   - rebalances.md
   - migration-batches.md
+  - in-kind-transfers.md
 ---
 
 # Bank reconciliation
@@ -610,3 +611,11 @@ Status of this amendment: `accepted` (2026-11-24), together with [migration-batc
 - R9: a line `Matched` with method `Migration` to a batch that is not `Posted` is an item of the new kind `MigrationNotPosted` (Timing) with the line's amount. A line matched to a `Posted` batch is not an item.
 - R10: the cash legs of a Transaction with source `Migration` are explained by the funding lines of its batch: no item for the part funded through the run's client money account, one `OtherClientMoneyAccount` item per other client money account for the rest. They no longer count in `OtherLedgerCash`.
 - §5: `ReconciliationItemKind` gains `MigrationNotPosted = 19` (Timing), an item with a line. `0054` widens `CK_BankReconciliationItems_Kind` to 0–19 and adds 19 to `CK_BankReconciliationItems_Line`.
+
+---
+
+## Amendment 2026-11-24 (in-kind transfers) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rules R50–R59 live there; this section records what changes here.
+
+- §2 Out and "still open": the position (custodian) reconciliation is [in-kind-transfers.md](in-kind-transfers.md) §4.11. It reuses `ReconciliationTrigger`, the SNAPSHOT read of R6 and the date filters of R20, and runs daily at 17:10 UTC, after this run.

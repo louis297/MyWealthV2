@@ -27,6 +27,7 @@ related:
   - account-closure.md
   - interest-run.md
   - migration-batches.md
+  - in-kind-transfers.md
 ---
 
 # Posting
@@ -510,3 +511,12 @@ Status of this amendment: `accepted` (2026-11-24), together with [migration-batc
 - R19 and the §5 type table: on a Custodial account an `Opening` is written only by a migration batch (`Transaction.PostMigratedCash`, source `Migration`, one `Principal` leg, memo `Opening balance`, a migration detail). The hand `Opening` stays refused for every caller, with the message `Opening balances on a Custodial account come from a migration batch.` External accounts are unchanged.
 - R19: the account must still be empty: a batch entry is refused (issue `AccountNotEmpty`) when any Transaction has a leg on the Account, reversed ones included.
 - R20: a migrated `Opening` is booked at the posting time of its batch; the previous provider's date is in its migration detail (`asOfDate`).
+
+---
+
+## Amendment 2026-11-24 (in-kind transfers) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rules R20–R40 live there; this section records what changes here.
+
+- §1: the in-kind transfer is now one of the instructions. It is not a Transaction; the custody movement that confirms it posts a `StockIn` or `StockOut` with source `InKindTransfer`, `bookedAt` the processing time and an in-kind transfer detail.
+- `POST /in-kind-transfers` requires `Idempotency-Key` (R21, ADR 0015).

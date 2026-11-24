@@ -22,6 +22,7 @@ related:
   - custody-modes.md
   - withdrawals.md
   - account-closure.md
+  - in-kind-transfers.md
 ---
 
 # Internal transfers
@@ -322,3 +323,11 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders.md](ord
 
 - On `POST /transactions/transfer` from a Custodial account, the cash that leaves must come from the account's withdrawable cash: after the transfer, available cash must not be below unsettled cash. Otherwise 400 under the key the transfer uses for withdrawals R37, with the message `Cash from sales that have not settled cannot leave the account: 500.00 USD settles later.` (orders R45). Without it, unsettled cash could move to another account of the Customer and be withdrawn there.
 - External accounts, the to side and the reverse of a transfer are unchanged.
+
+---
+
+## Amendment 2026-11-24 (in-kind transfers) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md).
+
+- The open item "in-kind transfer" now means only a transfer of securities between two Accounts of the firm (security legs on two Accounts). A transfer between a Custodial account and another broker or registry is [in-kind-transfers.md](in-kind-transfers.md).

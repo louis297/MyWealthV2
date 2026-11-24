@@ -31,6 +31,7 @@ related:
   - ../glossary.md
   - rebalances.md
   - migration-batches.md
+  - in-kind-transfers.md
 ---
 
 # Trade settlement cash and broken trades
@@ -574,3 +575,13 @@ Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md]
 Status of this amendment: `accepted` (2026-11-24), together with [migration-batches.md](migration-batches.md). Rule R16 lives there; this section records what changes here.
 
 - R21: a `Matched` line now has an Account and a Transaction, or a related line, or a trade settlement, or a migration batch. `0054` replaces `CK_BankStatementLines_Match` with the four arms.
+
+---
+
+## Amendment 2026-11-24 (in-kind transfers) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rules R47, R67 and R68 live there; this section records what changes here.
+
+- R35: the order body sent to the broker gains the optional `safekeepingAccount`; it is part of the idempotency comparison only when it is sent.
+- R36 (simulator): when a corporate action of a simulated instrument becomes effective, every fill in that symbol that has not settled settles at once, with the effective day as its settled date and its place in a broker settlement, before the custodian applies the action.
+- "Still open" on custodian positions: answered by the custodian reconciliation of [in-kind-transfers.md](in-kind-transfers.md).
