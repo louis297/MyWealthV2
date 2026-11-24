@@ -314,7 +314,40 @@ public sealed class PayDividendInCashCommand : IRequest
     public string? Note { get; init; }
 }
 
-public class PayDividendInCashCommandHandler : IRequestHandler<PayDividendInCashCommand>
+public class PayDividendInCashCommandValidator : AbstractValidator<PayDividendInCashCommand>
 {
-    public Task Handle(PayDividendInCashCommand request, CancellationToken cancellationToken) => throw new NotImplementedException();
+    public PayDividendInCashCommandValidator()
+    {
+        RuleFor(command => command.RowVersion).NotEmpty();
+        RuleFor(command => command.Note)
+            .Must(note => note?.Trim().Length is >= 1 and <= CorporateAction.NoteMaxLength)
+            .WithMessage("Note must be 1 to 200 characters.");
+    }
+}
+
+public class PayDividendInCashCommandHandler(IApplicationDbContext db, ICurrentUser currentUser, TimeProvider time)
+    : IRequestHandler<PayDividendInCashCommand>
+{
+    public async Task Handle(PayDividendInCashCommand request, CancellationToken cancellationToken)
+    {
+        var action = await CorporateActionReader.FindAsync(db, currentUser, request.Id, cancellationToken);
+        if (!action.WaitsForShares)
+        {
+            throw CorporateActionReader.Error(nameof(CorporateAction.Status), CorporateAction.DoesNotWaitForSharesMessage);
+        }
+
+        if (!string.Equals(Convert.ToBase64String(action.RowVersion ?? []), request.RowVersion, StringComparison.Ordinal))
+        {
+            throw new ConcurrencyException();
+        }
+
+        var actor = currentUser.Person?.Id ?? throw new ForbiddenAccessException();
+        var now = time.GetUtcNow();
+        await db.ExecuteInTransactionAsync(async token =>
+        {
+            action.ReleaseElection(actor, request.Note!, now);
+            await PayDividend.TryAsync(db, action, now, token);
+            await CorporateActionReader.SaveAsync(db, token);
+        }, cancellationToken);
+    }
 }

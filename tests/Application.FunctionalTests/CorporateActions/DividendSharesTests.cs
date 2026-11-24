@@ -113,7 +113,7 @@ public class DividendSharesTests : TestBase
         await DeliverAsync(plan, 2.68m);
         await dividend.ReceiveAsync(Cash);
 
-        await RunApplyAsync();
+        (await RunApplyAsync()).Posted.ShouldBe(2);
 
         (await HoldingAsync(dividend, dividend.Holders.Ned)).GetProperty("quantity").GetDecimal().ShouldBe(2.68m);
     }

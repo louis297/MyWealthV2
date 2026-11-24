@@ -83,10 +83,52 @@ public class CorporateAction : BaseAuditableEntity
     public string? ReleaseNote { get; private set; }
 
     /// <summary>Dividends R28: the custodian delivered the new shares.</summary>
-    public void TakeShares(int movementId, decimal quantity) => throw new NotImplementedException();
+    public void TakeShares(int movementId, decimal quantity)
+    {
+        EnsureElection(ReinvestmentElectionStatus.Accepted);
+        if (SharesReceived is not null)
+        {
+            throw new DomainException("This dividend already has its shares.");
+        }
+
+        if (quantity <= 0m)
+        {
+            throw new DomainException("The shares of a reinvestment are above 0.");
+        }
+
+        SharesMovementId = movementId;
+        SharesReceived = quantity;
+    }
 
     /// <summary>Dividends R31: a person releases an accepted election whose shares did not arrive.</summary>
-    public void ReleaseElection(int byUserId, string note, DateTimeOffset at) => throw new NotImplementedException();
+    public void ReleaseElection(int byUserId, string note, DateTimeOffset at)
+    {
+        EnsureDividend();
+        if (Status != CorporateActionStatus.Effective || ReceiptLineId is null
+            || ElectionStatus != ReinvestmentElectionStatus.Accepted || SharesReceived is not null)
+        {
+            throw new DomainException(DoesNotWaitForSharesMessage);
+        }
+
+        var trimmed = note?.Trim() ?? string.Empty;
+        if (trimmed.Length is 0 or > NoteMaxLength)
+        {
+            throw new DomainException($"A note is 1 to {NoteMaxLength} characters.");
+        }
+
+        ElectionStatus = ReinvestmentElectionStatus.Lapsed;
+        ReleasedByUserId = byUserId;
+        ReleasedAt = at.ToUniversalTime();
+        ReleaseNote = trimmed;
+    }
+
+    /// <summary>Dividends R31: the message when pay in cash is refused.</summary>
+    public const string DoesNotWaitForSharesMessage = "This dividend does not wait for shares.";
+
+    /// <summary>Dividends R31: the dividend waits only for the shares of an accepted election.</summary>
+    public bool WaitsForShares =>
+        Kind == CorporateActionKind.Dividend && Status == CorporateActionStatus.Effective && ReceiptLineId is not null
+        && ElectionStatus == ReinvestmentElectionStatus.Accepted && SharesReceived is null;
 
     public DateOnly ExDate { get; private set; }
 

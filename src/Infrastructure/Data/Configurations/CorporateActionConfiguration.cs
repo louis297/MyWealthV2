@@ -28,6 +28,8 @@ public class CorporateActionConfiguration : IEntityTypeConfiguration<CorporateAc
         builder.Property(action => action.PartyActionId).HasMaxLength(CorporateAction.PartyActionIdMaxLength);
         builder.Property(action => action.Memo).HasMaxLength(CorporateAction.MemoMaxLength);
         builder.Property(action => action.CancelNote).HasMaxLength(CorporateAction.NoteMaxLength);
+        builder.Property(action => action.ReleaseNote).HasMaxLength(CorporateAction.NoteMaxLength);
+        builder.Ignore(action => action.WaitsForShares);
         builder.Property(action => action.CreatedBy).HasMaxLength(450).IsRequired();
         builder.Property(action => action.RowVersion).IsRowVersion();
         builder.HasIndex(action => action.PublicId).IsUnique();

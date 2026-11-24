@@ -82,7 +82,7 @@ public sealed class SendReinvestmentElections(
         if (action.ReceiptLineId is not null || !safekeeping.IsActive)
         {
             action.LapseElection();
-            PayDividend.Try(action, now);
+            await PayDividend.TryAsync(db, action, now, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             return null;
         }
@@ -101,7 +101,7 @@ public sealed class SendReinvestmentElections(
         var result = await elections.SubmitAsync(request, cancellationToken);
         try
         {
-            Apply(action, result);
+            await ApplyAsync(action, result, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
         }
         catch (DbUpdateConcurrencyException)
@@ -111,7 +111,7 @@ public sealed class SendReinvestmentElections(
             var current = await db.CorporateActions.IgnoreQueryFilters().SingleAsync(row => row.Id == id, cancellationToken);
             if (current.ElectionStatus == ReinvestmentElectionStatus.Pending)
             {
-                Apply(current, result);
+                await ApplyAsync(current, result, cancellationToken);
                 await db.SaveChangesAsync(cancellationToken);
             }
         }
@@ -119,7 +119,7 @@ public sealed class SendReinvestmentElections(
         return result;
     }
 
-    private void Apply(CorporateAction action, CustodianElectionResult result)
+    private async Task ApplyAsync(CorporateAction action, CustodianElectionResult result, CancellationToken cancellationToken)
     {
         if (result.IsAccepted)
         {
@@ -128,7 +128,7 @@ public sealed class SendReinvestmentElections(
         else if (result.RejectReason is { } reason)
         {
             action.RejectElection(reason);
-            PayDividend.Try(action, time.GetUtcNow());
+            await PayDividend.TryAsync(db, action, time.GetUtcNow(), cancellationToken);
         }
     }
 }

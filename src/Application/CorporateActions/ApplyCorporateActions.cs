@@ -296,7 +296,8 @@ public sealed class ApplyCorporateActions(
             await db.SaveChangesAsync(token);
             if (posting.SecurityLegs.Count > 0)
             {
-                await HoldingProjection.SyncAsync(db, action.TenantId, accountId, [action.InstrumentId], token);
+                // R40: a holding sold since the ex-date is created again, by the platform.
+                await HoldingProjection.SyncAsync(db, action.TenantId, accountId, [action.InstrumentId], token, SystemActor.Name);
             }
 
             var net = posting.CashLegs.Where(leg => leg.Role != CashLegRole.Reinvestment).Sum(leg => leg.Amount);

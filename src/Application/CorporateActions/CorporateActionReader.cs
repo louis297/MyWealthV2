@@ -78,7 +78,7 @@ internal static class CorporateActionReader
             .Where(row => instrumentIds.Contains(row.Id))
             .ToDictionaryAsync(row => row.Id, row => new { Dto = new CorporateActionInstrumentDto(row.PublicId, row.Symbol, row.Name), row.QuoteCurrency }, cancellationToken);
 
-        var userIds = rows.SelectMany(row => new[] { row.EffectiveByUserId, row.CancelledByUserId })
+        var userIds = rows.SelectMany(row => new[] { row.EffectiveByUserId, row.CancelledByUserId, row.ReleasedByUserId })
             .OfType<int>()
             .Distinct()
             .ToList();
@@ -151,7 +151,8 @@ internal static class CorporateActionReader
                     : null,
                 Election = row.Kind == CorporateActionKind.Dividend && row.ReinvestmentPrice is not null && row.ElectionStatus is { } election
                     ? new CorporateActionElectionDto(election.ToString(), row.ElectionQuantity, row.ElectionAttempts,
-                        row.ElectionReason?.ToString(), row.SharesReceived, null, row.ReleasedAt, null)
+                        row.ElectionReason?.ToString(), row.SharesReceived,
+                        row.ReleasedByUserId is int releasedBy ? users.GetValueOrDefault(releasedBy) : null, row.ReleasedAt, row.ReleaseNote)
                     : null,
                 Dividend = row.Terms is { } terms
                     ? new CorporateActionDividendDto(

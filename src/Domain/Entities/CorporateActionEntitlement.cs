@@ -169,7 +169,21 @@ public class CorporateActionEntitlement
     }
 
     /// <summary>Dividends R30: this entitlement's share of the delivered shares.</summary>
-    public void SetReinvestedQuantity(decimal quantity) => throw new NotImplementedException();
+    public void SetReinvestedQuantity(decimal quantity)
+    {
+        EnsurePending();
+        if (!Reinvests || ReinvestedQuantity is not null)
+        {
+            throw new DomainException("Only a reinvesting entitlement takes its share of the new shares, once.");
+        }
+
+        if (quantity <= 0m)
+        {
+            throw new DomainException("A reinvested quantity is above 0.");
+        }
+
+        ReinvestedQuantity = quantity;
+    }
 
     /// <summary>R25: nothing was posted, for <paramref name="reason"/>.</summary>
     public void MarkNotApplied(EntitlementReason reason, DateTimeOffset at)
