@@ -46,6 +46,9 @@ public static class CustodyRules
     private const string CorporateActionMessage = "Corporate actions cannot be entered by hand on a Custodial account.";
     private const string DividendMessage = "Dividend is reserved and cannot be entered.";
 
+    /// <summary>Dividends R43: on a Custodial account a <c>Dividend</c> is written by corporate actions only.</summary>
+    public const string CustodialDividendMessage = "Dividends are paid by the platform from the company's announcement.";
+
     /// <summary>Adjustments R5: the <c>errors.AccountId</c> message for an adjustment on an External account.</summary>
     public const string AdjustmentMessage = "An adjustment can be entered only on a Custodial account.";
 
@@ -68,9 +71,10 @@ public static class CustodyRules
     /// <summary>The <c>errors.Type</c> message for a type the matrix refuses (§4.2.1), or null when it is allowed.</summary>
     public static string? RefusalMessage(CustodyMode custodyMode, TransactionType type)
     {
+        // Dividends R43: refused by hand on both modes; on an External account not accepted until income events add it.
         if (type == TransactionType.Dividend)
         {
-            return DividendMessage;
+            return custodyMode == CustodyMode.Custodial ? CustodialDividendMessage : DividendMessage;
         }
 
         if (custodyMode == CustodyMode.External)
