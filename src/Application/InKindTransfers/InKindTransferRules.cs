@@ -41,6 +41,14 @@ internal static class InKindTransferRules
         }
     }
 
+    /// <summary>R24, R45: true when the account has an open in-kind transfer, in either direction.</summary>
+    public static Task<bool> HasOpenTransferAsync(IApplicationDbContext db, int accountId, CancellationToken cancellationToken) =>
+        db.InKindTransfers.IgnoreQueryFilters().AnyAsync(
+            row => row.AccountId == accountId
+                   && (row.Status == InKindTransferStatus.Requested || row.Status == InKindTransferStatus.Approved
+                       || row.Status == InKindTransferStatus.Sent),
+            cancellationToken);
+
     /// <summary>R24: true when the account has an Active portfolio assignment.</summary>
     public static Task<bool> IsAssignedAsync(IApplicationDbContext db, int accountId, CancellationToken cancellationToken) =>
         db.AccountPortfolioAssignments.AnyAsync(row => row.AccountId == accountId && row.Status == AssignmentStatus.Active, cancellationToken);
