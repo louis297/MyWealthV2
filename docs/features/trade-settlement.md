@@ -32,6 +32,7 @@ related:
   - rebalances.md
   - migration-batches.md
   - in-kind-transfers.md
+  - dividends.md
 ---
 
 # Trade settlement cash and broken trades
@@ -585,3 +586,12 @@ Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transf
 - R35: the order body sent to the broker gains the optional `safekeepingAccount`; it is part of the idempotency comparison only when it is sent.
 - R36 (simulator): when a corporate action of a simulated instrument becomes effective, every fill in that symbol that has not settled settles at once, with the effective day as its settled date and its place in a broker settlement, before the custodian applies the action.
 - "Still open" on custodian positions: answered by the custodian reconciliation of [in-kind-transfers.md](in-kind-transfers.md).
+
+---
+
+## Amendment 2026-11-24 (dividends) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rule R24 lives there; this section records what changes here.
+
+- R19: the dividend receipt rule (dividends R24) runs next, after the settlement rule and before deposit matching.
+- R21: a `Matched` line has exactly one target: an Account with its Transaction, a related line, a trade settlement, a migration batch, or a corporate action (a dividend).

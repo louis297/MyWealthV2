@@ -23,6 +23,7 @@ related:
   - custody-modes.md
   - migration-batches.md
   - in-kind-transfers.md
+  - dividends.md
 ---
 
 # Holdings
@@ -319,3 +320,12 @@ Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transf
 - The item of `GET /accounts/{id}/holdings` gains `unsettledQuantity` (the quantity of the Account's `Posted` buy fills in the Instrument that are not settled and not broken) and `transferableQuantity` (available quantity minus unsettled quantity, never below 0). On an External account they are `0` and the holding's quantity.
 - `reservedQuantity` now also counts the quantity of the Account's open in-kind transfers `Out` in the Instrument; `availableQuantity` is still quantity minus reserved quantity.
 - The type table: on a Custodial account a `StockIn` or `StockOut` is written by an in-kind transfer (source `InKindTransfer`); the projection is updated in the same Account-locked transaction (R14), and it counts as security activity for R15.
+
+---
+
+## Amendment 2026-11-24 (dividends) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rule R40 lives there; this section records what changes here.
+
+- A `Dividend` may carry one security leg with a cost: the new shares of a reinvestment add to the holding like a `Buy` with no fee (quantity up by the reinvested quantity, total cost up by the reinvested amount), and a holding sold since the ex-date is created again.
+- "Dividend is ordinary cash" no longer holds for a reinvested dividend. A `Dividend` with no reinvestment still does not touch a holding.

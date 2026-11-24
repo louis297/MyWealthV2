@@ -35,6 +35,7 @@ related:
   - ../api-design.md
   - ../glossary.md
   - migration-batches.md
+  - dividends.md
 ---
 
 # Interest run
@@ -743,3 +744,14 @@ Do not put dividends, a tax statement, an Inland Revenue filing or an interest r
 Status of this amendment: `accepted` (2026-11-24), together with [migration-batches.md](migration-batches.md). Rule R24 lives there; this section records what changes here.
 
 - §4.4: migrated cash accrues interest from the closing balance of the UTC day its batch was posted, not from the batch's `asOfDate`.
+
+---
+
+## Amendment 2026-11-24 (dividends) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rules R33, R38 and R45 live there; this section records what changes here.
+
+- R25: `TaxKind` gains `ForeignWithholding` (2). A `Tax` leg is allowed on `Interest` (kinds `Rwt`, `Nrwt`) and on `Dividend` (all three kinds) and on no other type.
+- R41: `TaxWithheld` also counts the `Rwt` and `Nrwt` legs of every `Dividend` on the Tenant's Custodial accounts in the currency.
+- `WithholdingRates` gains the dividend rates: RWT 33 % for every New Zealand Customer, NRWT 30 % for an overseas Customer on a New Zealand company's dividend. The rates of interest are unchanged.
+- §2 Out: dividends on Custodial accounts are no longer out; dividends on External accounts still are.

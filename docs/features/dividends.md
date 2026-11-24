@@ -1,6 +1,6 @@
 ---
 title: Dividends and dividend reinvestment
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -52,7 +52,7 @@ Today a Custodial account that holds a share gets nothing when the company pays 
 
 New: corporate action kind `Dividend`; the active `TransactionType` `Dividend` (6); tax kind `ForeignWithholding`; cash leg role `Reinvestment`; a dividend detail on the Transaction; port `ICustodianElections` with adapter `SimulatorCustodianElections`; statement line match method `Dividend` and unmatched reason `DividendMismatch`; two reconciliation item kinds; `corporateActionId` on `POST /statement-lines/{id}/match`; routes `POST /corporate-actions/{id}/pay-in-cash` and `PUT /accounts/{accountId}/dividend-reinvestment`; item fields on the corporate action, the entitlement, the account and the transaction. Script `0057_dividends.sql`; simulator script `database/simulator/0014_dividends.sql`. No new permission, source kind, job, queue, problem code or domain event.
 
-**Status is `review` (2026-11-24).** It is not a build contract. The twenty-four points of §11 each carry a recommendation and wait for confirmation. The amendments to accepted docs listed in §12 are made when this spec is accepted.
+**Status is `accepted` (2026-11-24).** The twenty-four points of §11 were confirmed on 2026-11-24, every one as recommended, and are written into the rules. The amendments to accepted docs listed in §12 were made when it was accepted. It is a build contract.
 
 Tax figures in this spec were checked against Inland Revenue's guides on 2026-11-24 (roadmap C2, [future-plans.md](../future-plans.md) §1). R33 names them.
 
@@ -166,7 +166,7 @@ Worked examples, used by the tests (R33, R34):
 
 ### 4.2 A dividend (C2)
 
-Amendment to [corporate-actions.md](corporate-actions.md) R2–R6.
+Amends [corporate-actions.md](corporate-actions.md) R2–R6.
 
 | ID | Rule |
 | --- | --- |
@@ -179,7 +179,7 @@ Amendment to [corporate-actions.md](corporate-actions.md) R2–R6.
 
 ### 4.3 Dividends on the corporate action feed (C2, S4)
 
-Amendment to [corporate-actions.md](corporate-actions.md) R7, R9, R11, R12 and R14.
+Amends [corporate-actions.md](corporate-actions.md) R7, R9, R11, R12 and R14.
 
 | ID | Rule |
 | --- | --- |
@@ -189,7 +189,7 @@ Amendment to [corporate-actions.md](corporate-actions.md) R7, R9, R11, R12 and R
 
 ### 4.4 Entering a dividend by hand (C2)
 
-Amendment to [corporate-actions.md](corporate-actions.md) R15–R21.
+Amends [corporate-actions.md](corporate-actions.md) R15–R21.
 
 | ID | Rule |
 | --- | --- |
@@ -198,7 +198,7 @@ Amendment to [corporate-actions.md](corporate-actions.md) R15–R21.
 
 ### 4.5 Going ex: the entitlements (C2)
 
-Amendment to [corporate-actions.md](corporate-actions.md) R22 and R24, and to its amendment of 2026-11-23 (orders).
+Amends [corporate-actions.md](corporate-actions.md) R22 and R24, and to its amendment of 2026-11-23 (orders).
 
 | ID | Rule |
 | --- | --- |
@@ -209,7 +209,7 @@ Amendment to [corporate-actions.md](corporate-actions.md) R22 and R24, and to it
 
 ### 4.6 The reinvestment election (C3)
 
-Amendment to [accounts.md](accounts.md) and [in-kind-transfers.md](in-kind-transfers.md) R9 and R34.
+Amends [accounts.md](accounts.md) and [in-kind-transfers.md](in-kind-transfers.md) R9 and R34.
 
 | ID | Rule |
 | --- | --- |
@@ -223,7 +223,7 @@ Amendment to [accounts.md](accounts.md) and [in-kind-transfers.md](in-kind-trans
 
 ### 4.7 The custodian's payment
 
-Amendment to [deposit-matching.md](deposit-matching.md) R13 and R23–R25, [trade-settlement.md](trade-settlement.md) R19 and R21, [migration-batches.md](migration-batches.md) R13 and [in-kind-transfers.md](in-kind-transfers.md) R17.
+Amends [deposit-matching.md](deposit-matching.md) R13 and R23–R25, [trade-settlement.md](trade-settlement.md) R19 and R21, [migration-batches.md](migration-batches.md) R13 and [in-kind-transfers.md](in-kind-transfers.md) R17.
 
 | ID | Rule |
 | --- | --- |
@@ -238,7 +238,7 @@ Amendment to [deposit-matching.md](deposit-matching.md) R13 and R23–R25, [trad
 
 ### 4.8 The posting (C2, C3)
 
-Amendment to [corporate-actions.md](corporate-actions.md) R24–R27 and R33, [interest-run.md](interest-run.md) R25, [posting.md](posting.md), [holdings.md](holdings.md), [trade-fees.md](trade-fees.md) (cash leg role), [custody-modes.md](custody-modes.md) and [transaction-source.md](transaction-source.md).
+Amends [corporate-actions.md](corporate-actions.md) R24–R27 and R33, [interest-run.md](interest-run.md) R25, [posting.md](posting.md), [holdings.md](holdings.md), [trade-fees.md](trade-fees.md) (cash leg role), [custody-modes.md](custody-modes.md) and [transaction-source.md](transaction-source.md).
 
 | ID | Rule |
 | --- | --- |
@@ -262,11 +262,11 @@ Amendment to [corporate-actions.md](corporate-actions.md) R24–R27 and R33, [in
 | R40 | **`Reinvestment` leg and the holding.** `CashLegRole` gains `Reinvestment = 3`: the part of a dividend taken in new shares, always negative, only on a `Dividend`, at most one, and only together with the one security leg. The security leg adds to the holding like a `Buy` with no fee (buy-sell R11): the quantity rises by `n`, the total cost by `reinvested`, and a holding that was sold since the ex-date is created again. The Instrument may be disabled. A `Dividend` with no reinvestment has no security leg and does not touch a holding. |
 | R41 | **Cash, lock and later activity.** A dividend never lowers cash: its legs add up to `net − reinvested ≥ 0`, so available cash only rises (withdrawals R36) and the cash is withdrawable at once. The portfolio trade lock does not apply; no rebalance is enqueued (as a deposit, deposit-matching R19); an Account that follows a portfolio never reinvests (R18). A `Dividend` with a security leg is a security activity on its holding ([ledger-write-guards](../fixes/ledger-write-guards.md) Decision 1); one without is not. A dividend is posted whatever the state of the Tenant or the Customer (corporate-actions R13). |
 | R42 | **No reversal by hand, none by the flow.** `CorporateAction` is not a hand-reversible source (transaction-source R12, R13). No flow of this slice reverses a paid dividend. `Transaction.Reverse` copies the `Tax` legs with their details, the `Reinvestment` leg with its role and the dividend detail, so a later flow can undo its own posting. One account is corrected with an adjustment with reason `CorporateAction` ([adjustments.md](adjustments.md)). |
-| R43 | **Matrix.** `Dividend` / Custodial: **refused** by hand for every caller, written by corporate actions; the message of custody-modes §4.2.1 for it is `Dividends are paid by the platform from the company's announcement.` `Dividend` / External: still not accepted (400 `errors.Type`, as today), until income events add it. `Scrip` / Custodial stays **refused** and nothing writes it: a dividend taken in shares is a `Dividend` with a reinvestment (§11 point 15). External accounts keep hand `Scrip`. `CustodyRules` does not change. |
+| R43 | **Matrix.** `Dividend` / Custodial: **refused** by hand for every caller, written by corporate actions; the message of custody-modes §4.2.1 for it is `Dividends are paid by the platform from the company's announcement.` `Dividend` / External: still not accepted (400 `errors.Type`, as today), until income events add it. `Scrip` / Custodial stays **refused** and nothing writes it: a dividend taken in shares is a `Dividend` with a reinvestment (§11 point 15). External accounts keep hand `Scrip`. What `CustodyRules` allows does not change; only its Custodial message for `Dividend` does. |
 
 ### 4.9 Bank reconciliation
 
-Amendment to [bank-reconciliation.md](bank-reconciliation.md) R9–R11 and [interest-run.md](interest-run.md) R41.
+Amends [bank-reconciliation.md](bank-reconciliation.md) R9–R11 and [interest-run.md](interest-run.md) R41.
 
 | ID | Rule |
 | --- | --- |
@@ -275,7 +275,7 @@ Amendment to [bank-reconciliation.md](bank-reconciliation.md) R9–R11 and [inte
 
 ### 4.10 Other flows
 
-Amendment to [account-closure.md](account-closure.md) R5 and [in-kind-transfers.md](in-kind-transfers.md) R53.
+Amends [account-closure.md](account-closure.md) R5 and [in-kind-transfers.md](in-kind-transfers.md) R53.
 
 | ID | Rule |
 | --- | --- |
@@ -295,7 +295,7 @@ Amendment to [account-closure.md](account-closure.md) R5 and [in-kind-transfers.
 
 ### 4.12 The simulator: issuer and custodian (S4, S3)
 
-Amendment to [corporate-actions.md](corporate-actions.md) R39–R47, [in-kind-transfers.md](in-kind-transfers.md) R60, R61, R68, R70 and R71, and [simulator.md](simulator.md).
+Amends [corporate-actions.md](corporate-actions.md) R39–R47, [in-kind-transfers.md](in-kind-transfers.md) R60, R61, R68, R70 and R71, and [simulator.md](simulator.md).
 
 | ID | Rule |
 | --- | --- |
@@ -346,7 +346,7 @@ Policies: none new. Grants: unchanged.
 | `StatementLineMatchMethod`, `UnmatchedReason` | Enums (existing) | Add `Dividend = 7`; add `DividendMismatch = 14` |
 | `BankStatementLine` | Aggregate (existing) | `CorporateActionId?`. `MarkDividendReceipt(corporateActionId, method, at, by?, note?)`, `MarkDividendMismatch()` |
 | `ReconciliationItemKind` | Enum (existing) | Add `DividendsNotPosted = 20` (Timing), `DividendDifference = 21` (Known). `ReconciliationInputs` gains, per dividend with a receipt on the account, the received and credited sums and whether an entitlement is `Pending`, and the dividend tax sums |
-| `CustodyRules` | Static (existing) | Unchanged: `Dividend` and `Scrip` stay refused by hand on a Custodial account, `Dividend` on an External one too |
+| `CustodyRules` | Static (existing) | What is allowed does not change: `Dividend` and `Scrip` stay refused by hand on a Custodial account, `Dividend` on an External one too. `RefusalMessage` gives the message of R43 for `Dividend` on a Custodial account; an External account keeps today's message |
 
 ```text
 A dividend
@@ -384,7 +384,7 @@ Invariants:
 
 Domain events: none new. A dividend posting raises `TransactionPosted` as every Transaction does.
 
-Recorded in [domain-model.md](../domain-model.md) §8.6 and §8.15 when accepted.
+Recorded in [domain-model.md](../domain-model.md) §8.6 and §8.15.
 
 ---
 
@@ -398,7 +398,7 @@ Forward only. Do not add EF migrations.
 | --- | --- | --- |
 | `CorporateActions` | `RatioNew`, `RatioHeld` become nullable. Add `AmountPerShare decimal(18,8) NULL`, `TaxSource int NULL`, `ImputationCreditPerShare decimal(18,8) NULL`, `ForeignTaxRatePercent decimal(5,2) NULL`, `ReinvestmentPrice decimal(18,8) NULL`, `ReceiptLineId int NULL`, `ReceivedAmount decimal(18,4) NULL`, `PaidAt datetimeoffset NULL`, `ElectionStatus int NULL`, `ElectionQuantity decimal(18,8) NULL`, `SafekeepingAccountId int NULL`, `ElectionAttempts int NOT NULL DEFAULT 0`, `ElectionLastAttemptAt datetimeoffset NULL`, `ElectionReason int NULL` (CHECK 0–4, only with `ElectionStatus = 3`), `SharesMovementId int NULL`, `SharesReceived decimal(18,8) NULL`, `ReleasedByUserId int NULL`, `ReleasedAt datetimeoffset NULL`, `ReleaseNote nvarchar(200) NULL` | Widen the `Kind` CHECK to 0–3. CHECK: `Kind = 3` has `AmountPerShare > 0`, `TaxSource` 0–1 and no ratio; any other kind has both ratio numbers 1–10000 and none of the new columns. CHECK: the receipt columns, `PaidAt` and the election columns only with `Kind = 3`; `PaidAt` needs `ReceiptLineId`; `ElectionStatus` 0–4; `SharesReceived > 0`. FK `(TenantId, ReceiptLineId)` → `BankStatementLines`, `(TenantId, SafekeepingAccountId)` → `SafekeepingAccounts`, `(TenantId, SharesMovementId)` → `CustodyMovements`, `(TenantId, ReleasedByUserId)` → `Users`, all RESTRICT. Filtered UQ `(ReceiptLineId) WHERE ReceiptLineId IS NOT NULL`. Filtered index `(ElectionStatus) WHERE ElectionStatus = 1` |
 | `CorporateActionAnnouncements` | `RatioNew`, `RatioHeld` become nullable. Add the five term columns as above | Widen the `Kind` CHECK to 0–3. CHECK: `Kind = 3` has `AmountPerShare` and `TaxSource` and no ratio; `Kind` 0–2 has both ratio numbers `≥ 1`; `Kind IS NULL` has no rule |
-| `CorporateActionEntitlements` | Add `EntitledQuantity decimal(18,8) NULL`, `GrossAmount decimal(18,4) NULL`, `ImputationCredit decimal(18,4) NULL`, `ForeignTax decimal(18,4) NULL`, `Reinvests bit NOT NULL DEFAULT 0`, `ParticipatingQuantity decimal(18,8) NULL`, `ReinvestedQuantity decimal(18,8) NULL`, `NetAmount decimal(18,4) NULL`, `NetCurrency char(3) NULL` | Widen the `Reason` CHECK to 0–2. CHECK `EntitledQuantity > 0`; `Reinvests = 1` needs `ParticipatingQuantity > 0`. FK `NetCurrency` → `Currencies` |
+| `CorporateActionEntitlements` | Add `EntitledQuantity decimal(18,8) NULL`, `GrossAmount decimal(18,4) NULL`, `ImputationCredit decimal(18,4) NULL`, `ForeignTax decimal(18,4) NULL`, `Reinvests bit NOT NULL DEFAULT 0`, `ParticipatingQuantity decimal(18,8) NULL`, `ReinvestedQuantity decimal(18,8) NULL`, `NetAmount decimal(18,4) NULL`, `NetCurrency char(3) NULL` | Widen the `Reason` CHECK to 0–2. CHECK `EntitledQuantity > 0`; `Reinvests = 1` needs `ParticipatingQuantity > 0`. Replace `CK_CorporateActionEntitlements_Posted`: a `Posted` row has `TransactionId` and `PostedAt`, and either both quantities (a ratio kind) or `EntitledQuantity`, `NetAmount` and `NetCurrency` (a dividend). FK `NetCurrency` → `Currencies` |
 | `TransactionDividendDetails` | Add: `TransactionId` (PK), `TenantId`, `InstrumentId int`, `Quantity decimal(18,8)`, `AmountPerShare decimal(18,8)`, `Currency char(3)`, `TaxSource int`, `ImputationCredit decimal(18,4)`, `ReinvestedQuantity decimal(18,8) NULL`, `ReinvestmentPrice decimal(18,8) NULL`, `ExDate date`, `RecordDate date NULL`, `PaymentDate date NULL` | FK `(TenantId, TransactionId)` → `Transactions`, `(TenantId, InstrumentId)` → `Instruments`, `Currency` → `Currencies`; CHECK `Quantity > 0`, `AmountPerShare > 0`, `TaxSource` 0–1, `ImputationCredit ≥ 0`; the two reinvestment columns set together. No `PublicId`, no `RowVersion` (part of an immutable Transaction) |
 | `TransactionCashLegs` | Drop and re-add the `Role` CHECK as 0–3 | none |
 | `TransactionTaxDetails` | Drop and re-add the `Kind` CHECK as 0–2 | none |
@@ -418,7 +418,7 @@ Forward only. Do not add EF migrations.
 | `CustodianRejectedElections` | `Id int` identity PK, `AccountId`, `InstructionId nvarchar(100)`, `Body nvarchar(max)`, `Reason nvarchar(50)`; unique `(AccountId, InstructionId)`. Keeps the first answer of a rejected election for R58 |
 | `CustodianSettings` | Add `IncomeMode int NOT NULL DEFAULT 0` |
 
-Recorded in [database-design.md](../database-design.md) §9, §11.4, §11.15 and §15 when accepted.
+Recorded in [database-design.md](../database-design.md) §9, §11.4, §11.15 and §15.
 
 ---
 
@@ -618,7 +618,7 @@ Cross-tenant or wrong-collection id → **404**, not 403. Keep the resource cata
 
 ## 9. UI
 
-Page contracts: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D94–D101), [customer-portal.md](../customer-portal/customer-portal.md) (C42–C44) and [back-office.md](../backoffice/back-office.md) (BO33), amended when this spec is accepted. Neither BFF gains a prefix: `/corporate-actions`, `/accounts` and `/statement-lines` are already allowed.
+Page contracts: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D94–D101), [customer-portal.md](../customer-portal/customer-portal.md) (C42–C44) and [back-office.md](../backoffice/back-office.md) (BO33), amended when this spec was accepted. Neither BFF gains a prefix: `/corporate-actions`, `/accounts` and `/statement-lines` are already allowed.
 
 **Adviser Portal**
 
@@ -697,9 +697,9 @@ No new ADR. ADR 0021 applies as written: rule 1 (port `ICustodianElections`), 4 
 | Scripts | `0057_dividends.sql`; simulator `0014_dividends.sql` |
 | Permissions, source kinds, jobs, problem codes, events | None added |
 
-### Points to confirm
+### Points confirmed
 
-Each point states the recommendation, written into the rules above, and the alternative.
+Each point states the recommendation, written into the rules above, and the alternative. All twenty-four were confirmed as recommended on 2026-11-24.
 
 1. **One spec for C2, C3 and the rest of S4.** Recommended: the roadmap puts them in one step, the reinvestment is a branch of the dividend's payment and posting, and both need the same simulator changes. Alternative: two specs, as step 10 was: cash dividends first, then the reinvestment (§4.6, R28, R30, R31, R35, R40 and the election parts of §4.12).
 2. **A dividend is a fourth kind of corporate action** (R2). Recommended: corporate-actions §5 and its point 14 left room for it: one feed, one announcement, one entitlement per account, one source, one page. Alternative: its own aggregate and routes (`/dividends`), which would repeat the feed, hand entry and entitlement rules.
@@ -774,6 +774,6 @@ The repository should build after each commit. Agents split each behaviour into 
 
 Do not put External account dividends, taxable bonus issues, treaty rates, a reversal of a dividend or an income report in these commits.
 
-### Docs to amend when this spec is accepted
+### Docs amended when this spec was accepted
 
 [corporate-actions.md](corporate-actions.md) (R2–R6: the fourth kind and the nullable ratio; R9, R11, R12, R14: dividend announcements; R15–R20: hand entry and what "apply" means for a dividend; R22 and its orders amendment: entitled quantities, no order cancel; R24–R27: the posting of a paid dividend; R35, R36: the item fields; R39–R45: the simulator; "Out" and "still open": answered here), [interest-run.md](interest-run.md) (R25: the third tax kind and the `Tax` leg on `Dividend`; R41: `TaxWithheld` counts dividends; §2 Out), [posting.md](posting.md) (the type table: `Dividend` written by corporate actions on a Custodial account; R16), [holdings.md](holdings.md) (a `Dividend` may carry one security leg with a cost; "Dividend is ordinary cash" no longer holds for a reinvestment), [split.md](split.md) (§13: `Scrip` is not written on a Custodial account; a dividend in shares is a reinvestment), [trade-fees.md](trade-fees.md) (cash leg role `Reinvestment`), [custody-modes.md](custody-modes.md) (R5 matrix rows `Dividend` and `Scrip`, §4.2.1 the message), [transaction-source.md](transaction-source.md) (kind `CorporateAction` also marks a `Dividend`), [accounts.md](accounts.md) (the election, the two item fields), [account-closure.md](account-closure.md) (R5 the new refusal), [deposit-matching.md](deposit-matching.md) (R13 the order of the receipt rules; R23–R25 the third match target; method and reason), [trade-settlement.md](trade-settlement.md) (R19, R21: the next rule and the Matched targets), [migration-batches.md](migration-batches.md) (R13: one of three), [bank-reconciliation.md](bank-reconciliation.md) (R9–R11 and §5: the two kinds), [in-kind-transfers.md](in-kind-transfers.md) (R9, R34: the election step; R17: the shares of a dividend; R53: the note of R48; R60, R61, R68, R70, R71: the simulator custodian), [orders.md](orders.md) (R50, R62: not for a dividend), [portfolios.md](portfolios.md) (R18: a dividend is not locked and an assigned account does not reinvest), [adjustments.md](adjustments.md) (a note: reason `CorporateAction` corrects a dividend), [reports.md](reports.md) (the dividend row of the Customer Transactions Report), [customers.md](customers.md) (the tax profile also decides dividend withholding), [simulator.md](simulator.md) (the routes, script `0014`, the log actions), [api-design.md](../api-design.md) (§6 resource rows, §7.7 and §7.11, the statement line and account notes, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [architecture.md](../architecture.md) (port `ICustodianElections`, the election step), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D94–D101), [customer-portal.md](../customer-portal/customer-portal.md) (C42–C44), [back-office.md](../backoffice/back-office.md) (BO33), [glossary.md](../glossary.md) (the review terms become accepted; Corporate action, Entitlement, Tax detail, Withholding tax and TransactionType gain the dividend), [function-plan.md](../function-plan.md) §5 (the roadmap step; dividends on a Custodial account), [features/README.md](README.md) row status, [future-plans.md](../future-plans.md) §1 step 2 and §9, and the roadmap §2 matrix, §7 C2 and C3, §11 S3 and S4, §12 D13, §13 status and §14.

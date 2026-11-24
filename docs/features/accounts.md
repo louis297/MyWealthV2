@@ -28,6 +28,7 @@ related:
   - withdrawals.md
   - account-closure.md
   - interest-run.md
+  - dividends.md
 ---
 
 # Accounts
@@ -500,3 +501,12 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders.md](ord
 - The account item on list and get, and `GET /accounts/{id}/cash-balance`, gain `unsettledCash` (the net cash of the account's posted sell fills that are not settled) and `withdrawableCash` (available cash minus unsettled cash, never below 0). On an External account they are `0` and the cash balance.
 - `reservedCash` now also counts the reserved cash of the account's live buy orders; `availableCash` follows.
 - Closing a Custodial account stays with the account closure, which now also waits for open orders and unsettled fills (account-closure R5 as amended).
+
+---
+
+## Amendment 2026-11-24 (dividends) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rules R17 and R52 live there; this section records what changes here.
+
+- A Custodial account gains `reinvestDividends` (`false` when opened and on every existing account), with who last changed it and when. It is set by `PUT /accounts/{accountId}/dividend-reinvestment` (`accounts.manage`) with `{ reinvest, rowVersion }`; an External account → 400 `errors.AccountId`. `PUT /accounts/{id}` does not take it.
+- The account item gains `reinvestDividends` and `pendingDividends` (the number of `Pending` dividend entitlements); `false` and `0` on an External account.

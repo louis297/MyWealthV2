@@ -34,6 +34,7 @@ related:
   - ../glossary.md
   - rebalances.md
   - in-kind-transfers.md
+  - dividends.md
 ---
 
 # Corporate actions
@@ -758,3 +759,19 @@ Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transf
 
 - R28 and its open point on custodian rounding: answered. The custodian applies the event to its pooled position by its own rule and reports a `CorporateAction` custody movement, matched to the platform's `Feed` corporate action by its party action id (R17). A difference between the custodian's change and the sum of the entitlements is `unexplained` in the custodian reconciliation (R53).
 - R42 (simulator): when an action becomes effective, the simulator first settles every open fill in the symbol, then changes each custodian position in it by the factor, rounded by the custodian's rounding mode (`Fractional` or `WholeShares`).
+
+---
+
+## Amendment 2026-11-24 (dividends) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rules R2–R31 and R54–R66 live there; this section records what changes here.
+
+- R2, R3: a fourth kind, `Dividend` (3). It has no ratio (`ratioNew` and `ratioHeld` are `null`); it has dividend terms per share instead (amount, tax source, imputation credit, foreign tax rate, an optional reinvestment price), paid in the Instrument's quote currency.
+- R6: for a dividend `Effective` means it has gone ex; its entitlements are posted only once it is paid (the custodian's receipt is matched, dividends R29). A dividend with no entitled account becomes `Applied` when it goes ex.
+- R9, R11, R12, R14: a feed announcement of kind `Dividend` carries the terms in place of a ratio; terms that break dividends R3 are `Invalid`; a version after the dividend went ex, a cancellation included, is `AlreadyEffective`. The announcement item gains the five term fields.
+- R15–R20: hand entry takes kind `Dividend` with its terms; `reinvestmentPrice` is refused by hand. For a dividend "apply" fixes the entitlements and pays nothing.
+- R22 and its orders amendment: a dividend stores each entitlement's entitled quantity and source amounts and, with a plan, whether it reinvests; it requests no cancel of open orders.
+- R24–R27: the apply step posts the `Pending` entitlements of a paid dividend as `Dividend` Transactions (dividends R36, R37). `NoHolding` and `TooSmall` do not apply; the new reason `NothingToPay` does.
+- R35, R36: the corporate action item gains `dividend`, `payment` and `election`; the list gains the `kind` filter; the entitlement item gains the dividend fields.
+- R39–R45: the simulator market announces dividends with or without a plan; its custodian pays them (dividends §4.12).
+- "Out" and "still open": dividends and reinvestment are answered by [dividends.md](dividends.md).

@@ -31,6 +31,7 @@ related:
   - account-closure.md
   - rebalances.md
   - in-kind-transfers.md
+  - dividends.md
 ---
 
 # Portfolios
@@ -508,3 +509,11 @@ Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transf
 
 - Assigning a portfolio to an account with an open in-kind transfer → 400 `account_not_eligible` with the message `Complete or cancel the account's open transfers of securities before assigning a portfolio.`
 - An account with an Active assignment takes no in-kind transfer request, in either direction.
+
+---
+
+## Amendment 2026-11-24 (dividends) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rules R18 and R41 live there; this section records what changes here.
+
+- R18: a dividend posting is not held by the portfolio trade lock and enqueues no rebalance. An account with an Active assignment never reinvests a dividend: the portfolio decides what its cash buys.

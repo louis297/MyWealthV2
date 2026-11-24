@@ -20,6 +20,7 @@ related:
   - holdings.md
   - buy-sell.md
   - custody-modes.md
+  - dividends.md
 ---
 
 # Split / Bonus / Scrip
@@ -295,3 +296,11 @@ Status of this amendment: `accepted` (2026-11-22), together with [corporate-acti
 - R8 and §13: on a Custodial account `Split` and `Bonus` are written by **corporate actions** from a ratio (`Transaction.PostCorporateAction`, source `CorporateAction`): one security leg of `quantityAfter − quantityBefore` with cost `0`, no cash leg, and a corporate action detail (corporate-actions R26, R27). A consolidation is posted as `Split`. A hand `Split`, `Bonus` or `Scrip` on a Custodial account is still refused (400 `errors.Type`).
 - External accounts are unchanged: the hand entry sends the new total quantity (R9), keeps source `Manual` and has no corporate action detail. `Scrip` stays a hand entry of External accounts until roadmap C3.
 - R12 and R13 hold for an entitlement posting too: the holding's total cost is unchanged and average cost becomes total cost / `quantityAfter` (corporate-actions R29).
+
+---
+
+## Amendment 2026-11-24 (dividends) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rules R40 and R43 live there; this section records what changes here.
+
+- §13: `Scrip` is not written on a Custodial account. A dividend taken in shares is a `Dividend` with a reinvestment (a `Reinvestment` cash leg and a security leg with a cost), not a `Scrip`. External accounts keep hand `Scrip`.

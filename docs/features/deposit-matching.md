@@ -34,6 +34,7 @@ related:
   - interest-run.md
   - trade-settlement.md
   - migration-batches.md
+  - dividends.md
 ---
 
 # Bank feed and deposit matching
@@ -801,3 +802,13 @@ Status of this amendment: `accepted` (2026-11-24), together with [migration-batc
 - R26: an undo of a line matched to a batch posts nothing; it is allowed only while the batch is `Draft` (else 400 `errors.Status`). The line keeps its `unmatchedReason`.
 - R30: a bulk transfer that was matched as a deposit is undone before it can fund a batch. The platform never matches a line to a batch by itself.
 - The statement line item gains `migrationBatchId` (`null` unless the line funds a batch), and `method` may be `Migration`.
+
+---
+
+## Amendment 2026-11-24 (dividends) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rules R24–R27 and R53 live there; this section records what changes here.
+
+- R13: after the settlement rule (trade-settlement R19) and before deposit matching, a credit `Transfer` line whose reference equals the party action id of a `Feed` dividend of the Tenant in the line's currency is a dividend receipt and never a deposit.
+- R23–R25: `POST /statement-lines/{id}/match` takes `corporateActionId` as a third target, exactly one of `accountId`, `migrationBatchId` and `corporateActionId` (400 `errors.AccountId`, `Give an account, a migration batch or a dividend.`); a dividend also needs `corporate-actions.manage`.
+- Match method gains `Dividend` (7); unmatched reason gains `DividendMismatch` (14). A line matched to a dividend takes no unmatch, ignore or request return. The statement line item gains `corporateActionId`.

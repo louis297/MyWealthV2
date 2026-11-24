@@ -38,6 +38,7 @@ related:
   - rebalances.md
   - migration-batches.md
   - in-kind-transfers.md
+  - dividends.md
 ---
 
 # Custody modes
@@ -648,3 +649,13 @@ Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transf
 - R9: a `StockIn` or `StockOut` can now exist on a Custodial account with source `InKindTransfer`.
 - R5, the reverse row: `InKindTransfer` is not hand-reversible (`CustodyRules.AllowsHandReverse(Custodial, InKindTransfer)` is `false`).
 - External accounts are unchanged: they keep hand `StockIn` and `StockOut`.
+
+---
+
+## Amendment 2026-11-24 (dividends) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rule R43 lives there; this section records what changes here.
+
+- R5 matrix: `Dividend` / Custodial stays refused by hand for every caller; it is written by corporate actions (`Transaction.PostDividend`, source `CorporateAction`). `Dividend` / External stays not accepted (400 `errors.Type`) until income events add it.
+- §4.2.1: the refusal message of `Dividend` on a Custodial account becomes `Dividends are paid by the platform from the company's announcement.` An External account keeps today's message.
+- `Scrip` / Custodial stays refused and nothing writes it. What `CustodyRules` allows does not change.

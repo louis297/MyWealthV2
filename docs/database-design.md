@@ -10,6 +10,7 @@ related:
   - function-plan.md
   - domain-model.md
   - adr/0014-openiddict-authorization-code-pkce.md
+  - features/dividends.md
 ---
 
 # Database design
@@ -381,6 +382,7 @@ Beyond PK / unique constraints already listed:
 0054_migration_batches.sql                  -- MigrationBatches, MigrationBatchControlTotals, MigrationBatchEntries, MigrationBatchHoldings, TransactionMigrationDetails; BankStatementLines.MigrationBatchId; source kind 9, match method 6, reconciliation item kind 19
 0055_custodian.sql                          -- SafekeepingAccounts, CustodianFeedCursors, CustodianPositions, CustodyMovements, InKindTransfers, TransactionInKindTransferDetails; Orders safekeeping account columns; UQ_OrderFills_TenantId_Id; source kind 10
 0056_custodian_reconciliations.sql          -- CustodianReconciliations, CustodianReconciliationLines
+0057_dividends.sql                          -- dividend terms, receipt, payment and election on CorporateActions and the terms on CorporateActionAnnouncements (ratio nullable, kind 3); dividend fields on CorporateActionEntitlements; TransactionDividendDetails; cash leg role 3, tax kind 2; Accounts.ReinvestDividends; BankStatementLines.CorporateActionId, match method 7, unmatched reason 14; reconciliation item kinds 20–21
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -613,6 +615,8 @@ Feature spec: [features/corporate-actions.md](features/corporate-actions.md) (ac
 
 No back-fill: no corporate action exists before `0050`.
 
+Amendment 2026-11-24 (dividends, accepted; [features/dividends.md](features/dividends.md) §6.1, script `0057_dividends.sql`): `CorporateActions` and `CorporateActionAnnouncements` get nullable ratios, `Kind` 0–3 and the five term columns (`AmountPerShare`, `TaxSource`, `ImputationCreditPerShare`, `ForeignTaxRatePercent`, `ReinvestmentPrice`); a dividend has terms and no ratio, any other kind a ratio and no terms. `CorporateActions` also gets the receipt (`ReceiptLineId`, filtered unique; `ReceivedAmount`), `PaidAt` and the election columns (status, quantity, safekeeping account, attempts, reason, shares movement and quantity, release). `CorporateActionEntitlements` gets `EntitledQuantity`, `GrossAmount`, `ImputationCredit`, `ForeignTax`, `Reinvests`, `ParticipatingQuantity`, `ReinvestedQuantity`, `NetAmount`, `NetCurrency`, reason 0–2, and a `Posted` CHECK that takes either both quantities or the dividend's net. New `TransactionDividendDetails` (§11.4). `Accounts.ReinvestDividends` (Custodial only) with who and when. `BankStatementLines.CorporateActionId` as a fifth match target.
+
 ### 11.16 Orders and execution reports (accepted)
 
 Feature spec: [features/orders.md](features/orders.md) (accepted 2026-11-23) §6.1. Script `0051_orders.sql`:
@@ -749,6 +753,7 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-23 | Trade settlement and broken trades accepted (`0052`, not written yet): `TradeSettlements` (§11.17); columns on `Orders`, `OrderFills`, `ExecutionReports` (§11.16), `OutgoingPayments` (§11.11), `BankStatementLines` (§11.9) and `BankReconciliations` (§11.12); simulator `0011_broker_settlement.sql` (§15). |
 | 2026-11-23 | Rebalance through orders accepted (`0053`, not written yet): `Rebalances`, `RebalanceTargets`, `RebalanceLines` (§11.18); `Orders.RebalanceId` (§11.16); the three `LastRebalance…` columns of `AccountPortfolioAssignments` dropped and `UQ_AccountPortfolioAssignments_TenantId_Id` added (§11.6). No simulator script. §9 lists `0053`. |
 | 2026-11-24 | In-kind transfers accepted (`0055`, `0056`, not written yet): `SafekeepingAccounts`, `CustodianFeedCursors`, `CustodianPositions`, `CustodyMovements`, `InKindTransfers`, `CustodianReconciliations`, `CustodianReconciliationLines` (§11.20); `TransactionInKindTransferDetails` and `CK_Transactions_SourceKind` 0–10 (§11.4); `Orders` safekeeping account columns (§11.16); simulator `0012_custodian.sql` (§15). §9 lists `0055` and `0056`. |
+| 2026-11-24 | Dividends accepted (`0057`): dividend terms, receipt, payment and election on `CorporateActions`; terms on `CorporateActionAnnouncements`; dividend fields on `CorporateActionEntitlements`; `TransactionDividendDetails`; cash leg role `Reinvestment` (3), tax kind `ForeignWithholding` (2); `Accounts.ReinvestDividends`; `BankStatementLines.CorporateActionId`, match method 7, unmatched reason 14; reconciliation item kinds 20–21 (§9, §11.4, §11.15). Simulator `0014_dividends.sql` (§15) |
 
 ---
 
@@ -870,5 +875,6 @@ Owner: [features/simulator.md](features/simulator.md) §6.2, [ADR 0021](adr/0021
 - S2 broker ([features/orders.md](features/orders.md) §6.2, accepted 2026-11-23; `0010_broker.sql`): `BrokerSettings` (one row: order mode, fill percent, reject reason, slippage percent, settlement days), `BrokerOrders` (`Number` unique, the `n` of the broker order id; `ClientOrderId` unique; body hash; symbol, currency, side, quantity, price limit, reference price; `Status` CHECK 0–4; filled quantity; accepted day), `BrokerFills` (`Number` unique, the `n` of the contract note; FK the order; quantity, price, trade date, settlement date, settled flag) and `BrokerReports` (`Id bigint` identity, the place in the feed; kind; FK the order and the fill). A reset empties the three and restores the settings.
 - S2 broker settlements and broken trades ([features/trade-settlement.md](features/trade-settlement.md) §6.2, accepted 2026-11-23; `0011_broker_settlement.sql`): `BrokerSettings.SettlementMode` (CHECK 0–1, default `Pay`), `BrokerOrders.SettlementAccount`, `BrokerSettlements` (`Number` unique, the `n` of the settlement id; settlement account, currency, settlement date, net, fill count, paid amount), `BrokerFills.Broken` and `SettlementId`, `BrokerReports.SettlementId`, and the `Kind` CHECK widened to the two new kinds.
 - S3 custodian ([features/in-kind-transfers.md](features/in-kind-transfers.md) §6.3, accepted 2026-11-24; `0012_custodian.sql`): `CustodianAccounts` (account number unique), `CustodianMovements` (`Number`, its place in the account's feed, `OmitFromFeed`), `CustodianTransfers` (`InstructionId` unique with the account, the body and its hash, status, mode at receipt), `CustodianSettings` (one row: transfer mode, reject reason, rounding mode); `BrokerOrders.SafekeepingAccount nvarchar(34) NULL`.
+- S3 and S4 dividends ([features/dividends.md](features/dividends.md) §6.2, accepted 2026-11-24; `0014_dividends.sql`): `MarketCorporateActions` and `MarketCorporateActionVersions` get nullable ratios, `Kind` 0–3 and the five term columns, and `MarketCorporateActions.PaidOn`; `CustodianAccounts.IncomeAccountNumber`; `CustodianDividendPayments` (one per dividend and custodian account: entitled position, election, shares, cash, status `Due`, `Held`, `Paid`, the bank line and movement); `CustodianRejectedElections`; `CustodianSettings.IncomeMode`.
 - Development: Aspire creates the database. VPS: created by hand once, like `MyWealthDbV2` ([deployment.md](deployment.md) §15).
 

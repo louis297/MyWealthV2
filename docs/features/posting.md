@@ -28,6 +28,7 @@ related:
   - interest-run.md
   - migration-batches.md
   - in-kind-transfers.md
+  - dividends.md
 ---
 
 # Posting
@@ -520,3 +521,12 @@ Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transf
 
 - §1: the in-kind transfer is now one of the instructions. It is not a Transaction; the custody movement that confirms it posts a `StockIn` or `StockOut` with source `InKindTransfer`, `bookedAt` the processing time and an in-kind transfer detail.
 - `POST /in-kind-transfers` requires `Idempotency-Key` (R21, ADR 0015).
+
+---
+
+## Amendment 2026-11-24 (dividends) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rules R37–R43 live there; this section records what changes here.
+
+- The type table: `Dividend` (6) is active. On a Custodial account it is written only by corporate actions (`Transaction.PostDividend`, source `CorporateAction`); it is still not accepted by hand on any account.
+- R16: a `Dividend` has one `Principal` leg of the gross, `Tax` legs, and with a reinvestment one `Reinvestment` leg (`CashLegRole` 3) and one security leg. Its legs add up to the net less the reinvested amount, never below 0.

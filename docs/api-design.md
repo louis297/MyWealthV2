@@ -12,6 +12,7 @@ related:
   - domain-model.md
   - database-design.md
   - adr/0014-openiddict-authorization-code-pkce.md
+  - features/dividends.md
 ---
 
 # API design
@@ -624,16 +625,19 @@ A corporate action is an event of one Instrument of the caller's Tenant. Its ent
 
 | Method | Route | Policy | Success |
 | --- | --- | --- | --- |
-| GET | `/corporate-actions` | `corporate-actions.read` | 200 envelope (filters `status`, `instrumentId`, `origin`) |
+| GET | `/corporate-actions` | `corporate-actions.read` | 200 envelope (filters `status`, `instrumentId`, `origin`, `kind`) |
 | GET | `/corporate-actions/{id}` | `corporate-actions.read` | 200 item |
 | GET | `/corporate-actions/{id}/entitlements` | `corporate-actions.read` | 200 envelope (filter `status`; an Adviser sees assigned Customers' accounts only) |
 | POST | `/corporate-actions` | `corporate-actions.manage` | 201 `{ id }` |
 | PUT | `/corporate-actions/{id}` | `corporate-actions.manage` | 204 |
 | POST | `/corporate-actions/{id}/cancel` | `corporate-actions.manage` | 204 |
 | POST | `/corporate-actions/{id}/apply` | `corporate-actions.manage` | 204 |
+| POST | `/corporate-actions/{id}/pay-in-cash` | `corporate-actions.manage` | 204 (a dividend waiting for shares) |
 | GET | `/corporate-action-announcements` | `tenants.manage` | 200 envelope (filters `connection`, `status`) |
 
 Field rules: [features/corporate-actions.md](features/corporate-actions.md). No `Idempotency-Key`: the status and `rowVersion` make a repeat a 400 or a 409 `stale_row_version`. A served instrument takes no hand entry (400 `errors.InstrumentId`); a `Feed` action cannot be changed by hand (400 `errors.Origin`). No new problem code.
+
+Amendment 2026-11-24 (dividends, accepted; field rules in [features/dividends.md](features/dividends.md) §8): kind `Dividend` with its terms in place of a ratio on create and update; `reinvestmentPrice` only from the feed. The item gains `dividend`, `payment` and `election`; the entitlement item the dividend fields. `POST /corporate-actions/{id}/pay-in-cash` releases an accepted election whose shares did not arrive. A dividend's entitlements are posted as `Dividend` Transactions (§7.7) once its receipt is matched: `POST /statement-lines/{id}/match` takes `corporateActionId` (also needs `corporate-actions.manage`), and a receipt matched to a dividend cannot be unmatched. `PUT /accounts/{accountId}/dividend-reinvestment` (`accounts.manage`) sets the account's election; the account item gains `reinvestDividends` and `pendingDividends`. Closure of an account with a pending dividend → 400 `errors.AccountId`.
 
 ### 7.12 Orders
 
@@ -800,3 +804,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-23 | §3.1, §4.2, §6, §7.6, §7.12: rebalance through orders accepted. Permissions `rebalances.read` and `rebalances.confirm`; resource `/rebalances` (list, get, confirm, cancel); problem codes `stale_price`, `instrument_inactive`, `currency_mismatch`, `no_broker_connection`, `rebalance_in_progress`; propose and assign answer `{ status, rebalanceId }`; assignment item `rebalance` replaces the three `lastRebalance…` fields; order item `rebalanceId` and filter; `Rebalance` no longer hand-reversible on a Custodial account. |
 | 2026-11-24 | §3.1, §4.2, §6, §7.7, §7.13: migration batches accepted. Permission `migration-batches.manage`; resource `/migration-batches` (list, get, create, replace, submit, return, cancel, post); problem code `migration_batch_not_valid`; source kind `Migration`; transaction item `migration`; statement line `migrationBatchId` and match method `Migration`; reconciliation item kind `MigrationNotPosted`. |
 | 2026-11-24 | §3.1, §6, §7.3, §7.7, §7.14: in-kind transfers accepted. Permissions `in-kind-transfers.read`, `.request`, `.approve`, `custody-movements.manage`, `custodian-reconciliations.manage`; resources `/in-kind-transfers`, `/custody-movements`, `/custodian-reconciliations`, `/tenants/{tenantId}/safekeeping-accounts`, `GET /custodian-connections`; source kind `InKindTransfer`; transaction item `inKindTransfer`; holding item `unsettledQuantity`, `transferableQuantity`. |
+| 2026-11-24 | §6, §7.6, §7.7, §7.11: dividends accepted. Kind `Dividend` on `/corporate-actions` with `dividend`, `payment`, `election` on the item and the `kind` filter; `POST /corporate-actions/{id}/pay-in-cash`; `corporateActionId` on `POST /statement-lines/{id}/match` and the statement line item; `PUT /accounts/{accountId}/dividend-reinvestment`, `reinvestDividends` and `pendingDividends` on the account item; transaction item `dividend`, cash leg role `Reinvestment`, tax kind `ForeignWithholding`; reconciliation item kinds `DividendsNotPosted`, `DividendDifference`. No new permission or problem code |

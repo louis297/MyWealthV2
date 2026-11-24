@@ -26,6 +26,7 @@ related:
   - interest-run.md
   - trade-settlement.md
   - rebalances.md
+  - dividends.md
 ---
 
 # Trade fees
@@ -498,3 +499,11 @@ Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md]
 - R24: the trade lock stays; on an assigned Account only its rebalance places orders (rebalances R24).
 - R25–R29: the planner's fees are **estimates**, used for the proposal's `estimatedFee` and for sizing the buys. A rebalance order is charged as any order (orders R11, R33): the fee of the schedule fixed when the order is placed, charged across its fills.
 - R27, R28: for a buy wave each buy is costed at its reservation, the most it can cost at its price limit with the schedule's fee on that gross, and the bisection and the drop below the minimum trade run on that cost (rebalances R16).
+
+---
+
+## Amendment 2026-11-24 (dividends) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rule R40 lives there; this section records what changes here.
+
+- `CashLegRole` gains `Reinvestment` (3): the part of a dividend taken in new shares, always negative, only on a `Dividend`, at most one, and only together with its security leg.
