@@ -426,6 +426,62 @@ public class BffApiTests
     }
 
     [Test]
+    public async Task Session_ProxiesInKindTransfersCustodyMovementsAndCustodianReconciliations()
+    {
+        // in-kind-transfers §9 (bff-adviser-portal R20): the three prefixes are on the allow-list.
+        var id = Guid.NewGuid();
+        var empty = """{"items":[],"page":1,"pageSize":20,"totalCount":0}""";
+        _api.Scripts["/in-kind-transfers"] = (HttpStatusCode.OK, empty);
+        _api.Scripts[$"/in-kind-transfers/{id}"] = (HttpStatusCode.OK, "{}");
+        foreach (var action in new[] { "approve", "reject", "cancel", "set-aside" })
+        {
+            _api.Scripts[$"/in-kind-transfers/{id}/{action}"] = (HttpStatusCode.NoContent, "");
+        }
+
+        _api.Scripts["/custody-movements"] = (HttpStatusCode.OK, empty);
+        _api.Scripts[$"/custody-movements/{id}/ignore"] = (HttpStatusCode.NoContent, "");
+        _api.Scripts[$"/custody-movements/{id}/reopen"] = (HttpStatusCode.NoContent, "");
+        _api.Scripts["/custodian-reconciliations/overview"] = (HttpStatusCode.OK, empty);
+        _api.Scripts["/custodian-reconciliations"] = (HttpStatusCode.OK, empty);
+        _api.Scripts[$"/custodian-reconciliations/{id}"] = (HttpStatusCode.OK, "{}");
+
+        foreach (var (method, path) in new[]
+                 {
+                     (HttpMethod.Get, "/api/in-kind-transfers?status=Requested,Approved,Sent"),
+                     (HttpMethod.Get, $"/api/in-kind-transfers/{id}"),
+                     (HttpMethod.Post, "/api/in-kind-transfers"),
+                     (HttpMethod.Post, $"/api/in-kind-transfers/{id}/approve"),
+                     (HttpMethod.Post, $"/api/in-kind-transfers/{id}/reject"),
+                     (HttpMethod.Post, $"/api/in-kind-transfers/{id}/cancel"),
+                     (HttpMethod.Post, $"/api/in-kind-transfers/{id}/set-aside"),
+                     (HttpMethod.Get, "/api/custody-movements?status=Unmatched"),
+                     (HttpMethod.Post, $"/api/custody-movements/{id}/ignore"),
+                     (HttpMethod.Post, $"/api/custody-movements/{id}/reopen"),
+                     (HttpMethod.Get, "/api/custodian-reconciliations/overview"),
+                     (HttpMethod.Get, "/api/custodian-reconciliations"),
+                     (HttpMethod.Get, $"/api/custodian-reconciliations/{id}"),
+                     (HttpMethod.Post, "/api/custodian-reconciliations")
+                 })
+        {
+            using var request = new HttpRequestMessage(method, path);
+            request.Headers.TryAddWithoutValidation("Cookie", _sessionCookie);
+            if (method != HttpMethod.Get)
+            {
+                request.Headers.TryAddWithoutValidation(RequestHeader, "1");
+                request.Content = new StringContent("""{"rowVersion":"AAAA"}""", System.Text.Encoding.UTF8, "application/json");
+            }
+
+            var response = await _bff.SendAsync(request);
+            response.StatusCode.ShouldNotBe(HttpStatusCode.NotFound, path);
+        }
+
+        _api.Calls.ShouldContain(call => call.Path == "/in-kind-transfers");
+        _api.Calls.ShouldContain(call => call.Path == $"/in-kind-transfers/{id}/set-aside");
+        _api.Calls.ShouldContain(call => call.Path == $"/custody-movements/{id}/ignore");
+        _api.Calls.ShouldContain(call => call.Path == "/custodian-reconciliations/overview");
+    }
+
+    [Test]
     public async Task Session_ProxiesRebalances_ReadsConfirmAndCancel()
     {
         // bff-adviser-portal amendment 2026-11-23 (rebalances): /rebalances is on the prefix allow-list.
