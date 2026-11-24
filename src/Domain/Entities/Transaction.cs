@@ -77,6 +77,34 @@ public class Transaction : BaseAuditableEntity
     /// Reversal; null on every other Transaction.</summary>
     public TransactionInKindTransferDetail? InKindTransferDetail { get; private set; }
 
+    /// <summary>Dividends R39: the dividend behind a <c>Dividend</c>, on the Transaction and its Reversal; null on every
+    /// other Transaction.</summary>
+    public TransactionDividendDetail? DividendDetail { get; private set; }
+
+    /// <summary>
+    /// Dividends R32–R40: the <c>Dividend</c> of one entitlement. Not implemented yet.
+    /// </summary>
+    public static Transaction PostDividend(
+        int tenantId,
+        int accountId,
+        string accountCurrency,
+        int decimalPlaces,
+        int instrumentId,
+        string symbol,
+        string quoteCurrency,
+        CorporateActions.DividendTerms terms,
+        DateOnly exDate,
+        DateOnly? recordDate,
+        DateOnly? paymentDate,
+        decimal entitledQuantity,
+        CorporateActions.DividendSourceAmounts amounts,
+        CorporateActions.DividendTax? withholding,
+        decimal? reinvestedQuantity,
+        AppliedFxRate? fxRate,
+        DateTimeOffset bookedAt,
+        TransactionSource source) =>
+        throw new NotImplementedException();
+
     /// <summary>In-kind-transfers R37: the memo of a transfer in.</summary>
     public const string TransferInMemo = "Transfer in";
 
