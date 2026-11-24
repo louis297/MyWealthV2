@@ -142,7 +142,8 @@ public class CustodianDeliveryTests
 
     private static string Order(string side, decimal quantity, string? safekeepingAccount)
     {
-        var body = JsonSerializer.Deserialize<Dictionary<string, object?>>(BrokerHttp.Order(symbol: "ACME.SIM", side: side, quantity: quantity))!;
+        var body = JsonSerializer.Deserialize<Dictionary<string, object?>>(BrokerHttp.Order(symbol: "ACME.SIM", side: side, quantity: quantity,
+            priceLimit: side == "Sell" ? 95m : 105m))!;
         if (safekeepingAccount is not null)
         {
             body["safekeepingAccount"] = safekeepingAccount;

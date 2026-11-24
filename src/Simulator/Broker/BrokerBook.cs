@@ -42,7 +42,9 @@ public static class BrokerBook
         var due = await db.BrokerOrders.AsNoTracking()
                       .AnyAsync(order => order.Status == BrokerOrderStatus.Working && order.AcceptedDay < today, cancellationToken)
                   || await db.BrokerFills.AsNoTracking()
-                      .AnyAsync(fill => !fill.Settled && fill.SettlementDate <= today, cancellationToken);
+                      .AnyAsync(fill => !fill.Settled && fill.SettlementDate <= today, cancellationToken)
+                  || await db.MarketCorporateActions.AsNoTracking()
+                      .AnyAsync(action => action.Status == MarketCorporateActionStatus.Effective && !action.CustodianApplied, cancellationToken);
         if (!due)
         {
             return;
@@ -53,6 +55,32 @@ public static class BrokerBook
             db.ChangeTracker.Clear();
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
             await LockAsync(db, cancellationToken);
+            await Custodian.CustodianBook.LockAsync(db, cancellationToken);
+
+            // In-kind-transfers R68: an action that became effective first settles every open fill in its symbol on the
+            // effective day, then changes the custodian's positions in it.
+            var effective = await (
+                    from action in db.MarketCorporateActions
+                    join instrument in db.MarketInstruments on action.InstrumentId equals instrument.Id
+                    where action.Status == MarketCorporateActionStatus.Effective && !action.CustodianApplied
+                    orderby action.ExDate, action.Number
+                    select new { action, instrument.Symbol })
+                .ToListAsync(cancellationToken);
+            foreach (var item in effective)
+            {
+                var open = await (
+                        from fill in db.BrokerFills
+                        join order in db.BrokerOrders on fill.OrderId equals order.Id
+                        where !fill.Settled && !fill.Broken && order.Symbol == item.Symbol
+                        orderby fill.Number
+                        select new SettlingFill(fill, order))
+                    .ToListAsync(cancellationToken);
+                await SettleDayAsync(db, time, accounts, item.action.ExDate, open, cancellationToken);
+                await Custodian.CustodianCorporateActions.ApplyAsync(db, item.action, item.Symbol, cancellationToken);
+                item.action.MarkCustodianApplied();
+                await db.SaveChangesAsync(cancellationToken);
+            }
+
             var stale = await db.BrokerOrders
                 .Where(order => order.Status == BrokerOrderStatus.Working && order.AcceptedDay < today)
                 .OrderBy(order => order.Number)
@@ -92,45 +120,62 @@ public static class BrokerBook
                     join order in db.BrokerOrders on fill.OrderId equals order.Id
                     where !fill.Settled && !fill.Broken && fill.SettlementDate <= today
                     orderby fill.SettlementDate, fill.Number
-                    select new { fill, order })
+                    select new SettlingFill(fill, order))
                 .ToListAsync(cancellationToken);
-            foreach (var day in settling.GroupBy(item => item.fill.SettlementDate))
+            foreach (var day in settling.GroupBy(item => item.Fill.SettlementDate))
             {
-                foreach (var item in day.Where(item => item.order.SettlementAccount is null))
-                {
-                    item.fill.Settle();
-                    db.BrokerReports.Add(BrokerReport.OfSettlement(item.order, item.fill));
-                    await db.SaveChangesAsync(cancellationToken);
-                }
-
-                foreach (var batch in day.Where(item => item.order.SettlementAccount is not null)
-                             .GroupBy(item => (Account: item.order.SettlementAccount!.ToUpperInvariant(), Currency: item.order.Currency.Trim())))
-                {
-                    var number = (await db.BrokerSettlements.MaxAsync(row => (int?)row.Number, cancellationToken) ?? 0) + 1;
-                    var settlement = BrokerSettlement.Open(number, batch.First().order.SettlementAccount!, batch.Key.Currency, day.Key);
-                    foreach (var item in batch)
-                    {
-                        settlement.Add(item.order, item.fill);
-                    }
-
-                    db.BrokerSettlements.Add(settlement);
-                    await db.SaveChangesAsync(cancellationToken);
-                    foreach (var item in batch)
-                    {
-                        item.fill.Settle(settlement.Id);
-                        db.BrokerReports.Add(BrokerReport.OfSettlement(item.order, item.fill, settlement));
-                        await db.SaveChangesAsync(cancellationToken);
-                    }
-
-                    db.BrokerReports.Add(BrokerReport.OfSettlementClosed(settlement));
-                    await db.SaveChangesAsync(cancellationToken);
-                    await AfterSettlementAsync(db, time, accounts, settlement, cancellationToken);
-                }
+                await SettleDayAsync(db, time, accounts, day.Key, day.ToList(), cancellationToken);
             }
 
             await transaction.CommitAsync(cancellationToken);
         });
         db.ChangeTracker.Clear();
+    }
+
+    private sealed record SettlingFill(BrokerFill Fill, BrokerOrder Order);
+
+    /// <summary>
+    /// R61: the fills settle on <paramref name="day"/>. Trade-settlement R36: the fills of orders with a settlement
+    /// account are netted per account and currency into one broker settlement, whose Settlement report follows their
+    /// Settled reports. In-kind-transfers R67: each settled fill of an order with a safekeeping account is delivered
+    /// through the custodian.
+    /// </summary>
+    private static async Task SettleDayAsync(
+        SimulatorDbContext db, TimeProvider time, BrokerBankAccounts accounts, DateOnly day, IReadOnlyList<SettlingFill> fills,
+        CancellationToken cancellationToken)
+    {
+        foreach (var item in fills.Where(item => item.Order.SettlementAccount is null))
+        {
+            item.Fill.Settle();
+            db.BrokerReports.Add(BrokerReport.OfSettlement(item.Order, item.Fill, settledDate: day));
+            await db.SaveChangesAsync(cancellationToken);
+            await Custodian.CustodianDeliveries.DeliverAsync(db, item.Order, item.Fill, day, cancellationToken);
+        }
+
+        foreach (var batch in fills.Where(item => item.Order.SettlementAccount is not null)
+                     .GroupBy(item => (Account: item.Order.SettlementAccount!.ToUpperInvariant(), Currency: item.Order.Currency.Trim())))
+        {
+            var number = (await db.BrokerSettlements.MaxAsync(row => (int?)row.Number, cancellationToken) ?? 0) + 1;
+            var settlement = BrokerSettlement.Open(number, batch.First().Order.SettlementAccount!, batch.Key.Currency, day);
+            foreach (var item in batch)
+            {
+                settlement.Add(item.Order, item.Fill);
+            }
+
+            db.BrokerSettlements.Add(settlement);
+            await db.SaveChangesAsync(cancellationToken);
+            foreach (var item in batch)
+            {
+                item.Fill.Settle(settlement.Id);
+                db.BrokerReports.Add(BrokerReport.OfSettlement(item.Order, item.Fill, settlement, day));
+                await db.SaveChangesAsync(cancellationToken);
+                await Custodian.CustodianDeliveries.DeliverAsync(db, item.Order, item.Fill, day, cancellationToken);
+            }
+
+            db.BrokerReports.Add(BrokerReport.OfSettlementClosed(settlement));
+            await db.SaveChangesAsync(cancellationToken);
+            await AfterSettlementAsync(db, time, accounts, settlement, cancellationToken);
+        }
     }
 
     /// <summary>Trade-settlement R37, R38: in mode <c>Pay</c> the broker pays a net above 0 at once.</summary>

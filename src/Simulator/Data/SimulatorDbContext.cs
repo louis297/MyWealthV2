@@ -203,6 +203,7 @@ public sealed class SimulatorDbContext(DbContextOptions<SimulatorDbContext> opti
             order.Property(row => row.Symbol).HasMaxLength(BrokerRules.SymbolMaxLength);
             order.Property(row => row.Currency).HasColumnType("char(3)").IsFixedLength();
             order.Property(row => row.Quantity).HasColumnType("decimal(18,8)");
+            order.Property(row => row.SafekeepingAccount).HasMaxLength(34);
             order.Property(row => row.PriceLimit).HasColumnType("decimal(18,8)");
             order.Property(row => row.ReferencePrice).HasColumnType("decimal(18,8)");
             order.Property(row => row.FilledQuantity).HasColumnType("decimal(18,8)");
