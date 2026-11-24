@@ -83,4 +83,10 @@ public static class ControlActions
     public const string CustodianMovementAdded = "CustodianMovementAdded";
 
     public const string CustodianRoundingModeChanged = "CustodianRoundingModeChanged";
+
+    public const string CustodianIncomeAccountChanged = "CustodianIncomeAccountChanged";
+
+    public const string CustodianIncomeModeChanged = "CustodianIncomeModeChanged";
+
+    public const string CustodianDividendPaid = "CustodianDividendPaid";
 }

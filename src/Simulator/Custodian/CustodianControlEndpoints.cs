@@ -24,6 +24,10 @@ public static class CustodianControlEndpoints
         custodian.MapPost("/transfers/{transferId}/execute", ExecuteAsync);
         custodian.MapPost("/movements", AddMovementAsync);
         custodian.MapPost("/rounding-mode", SetRoundingModeAsync);
+        custodian.MapPost("/accounts/{accountNumber}/income-account", SetIncomeAccountAsync);
+        custodian.MapPost("/income-mode", SetIncomeModeAsync);
+        custodian.MapGet("/dividend-payments", GetDividendPaymentsAsync);
+        custodian.MapPost("/dividend-payments/{id}/pay", PayDividendAsync);
         return control;
     }
 
@@ -32,8 +36,11 @@ public static class CustodianControlEndpoints
     {
         await BrokerBook.UpToDateAsync(db, time, brokerAccounts, cancellationToken);
         var settings = await db.CustodianSettings.AsNoTracking().SingleAsync(cancellationToken);
-        return Results.Ok(new CustodianSettingsItem(settings.TransferMode.ToString(), settings.RejectReason, settings.RoundingMode.ToString()));
+        return Results.Ok(Settings(settings));
     }
+
+    private static CustodianSettingsItem Settings(CustodianSettings settings) => new(
+        settings.TransferMode.ToString(), settings.RejectReason, settings.RoundingMode.ToString(), settings.IncomeMode.ToString());
 
     private static async Task<IResult> GetAccountsAsync(SimulatorDbContext db, TimeProvider time, BrokerBankAccounts brokerAccounts,
         CancellationToken cancellationToken)
@@ -45,7 +52,8 @@ public static class CustodianControlEndpoints
         {
             var positions = await CustodianBook.PositionsAsync(db, account.AccountNumber, null, cancellationToken);
             items.Add(new CustodianAccountItem(account.AccountNumber, account.Currency.Trim(), account.Name,
-                positions.Select(position => new CustodianPositionItem(position.Symbol, account.Currency.Trim(), position.Quantity)).ToList()));
+                positions.Select(position => new CustodianPositionItem(position.Symbol, account.Currency.Trim(), position.Quantity)).ToList(),
+                account.IncomeAccountNumber));
         }
 
         return Results.Ok(new CustodianAccountList(items));
@@ -69,6 +77,11 @@ public static class CustodianControlEndpoints
             return ControlEndpoints.Refused("Name", "name must be 1 to 140 characters.");
         }
 
+        if (body.IncomeAccountNumber is not null && !CustodianRules.IsAccountNumber(body.IncomeAccountNumber))
+        {
+            return ControlEndpoints.Refused("IncomeAccountNumber", IncomeAccountMessage);
+        }
+
         var number = body.AccountNumber!.Trim();
         if (await db.CustodianAccounts.AnyAsync(row => row.AccountNumber == number, http.RequestAborted))
         {
@@ -77,12 +90,12 @@ public static class CustodianControlEndpoints
 
         var world = await db.Worlds.AsNoTracking().SingleAsync(http.RequestAborted);
         var realNow = time.GetUtcNow();
-        var account = CustodianAccount.Open(number, body.Currency!, body.Name!.Trim(), world.Now(realNow));
+        var account = CustodianAccount.Open(number, body.Currency!, body.Name!.Trim(), world.Now(realNow), body.IncomeAccountNumber?.Trim());
         db.CustodianAccounts.Add(account);
         Log(db, http, world, realNow, ControlActions.CustodianAccountOpened, body);
         await db.SaveChangesAsync(http.RequestAborted);
         return Results.Created($"/control/custodian/accounts/{Uri.EscapeDataString(account.AccountNumber)}",
-            new CustodianAccountItem(account.AccountNumber, account.Currency.Trim(), account.Name, []));
+            new CustodianAccountItem(account.AccountNumber, account.Currency.Trim(), account.Name, [], account.IncomeAccountNumber));
     }
 
     private static async Task<IResult> GetMovementsAsync(
@@ -143,7 +156,7 @@ public static class CustodianControlEndpoints
         var world = await db.Worlds.AsNoTracking().SingleAsync(http.RequestAborted);
         Log(db, http, world, time.GetUtcNow(), ControlActions.CustodianTransferModeChanged, body);
         await db.SaveChangesAsync(http.RequestAborted);
-        return Results.Ok(new CustodianSettingsItem(settings.TransferMode.ToString(), settings.RejectReason, settings.RoundingMode.ToString()));
+        return Results.Ok(Settings(settings));
     }
 
     /// <summary>R65: executes a held transfer, with the instructed quantity or a typed one.</summary>
@@ -259,7 +272,148 @@ public static class CustodianControlEndpoints
         var world = await db.Worlds.AsNoTracking().SingleAsync(http.RequestAborted);
         Log(db, http, world, time.GetUtcNow(), ControlActions.CustodianRoundingModeChanged, body);
         await db.SaveChangesAsync(http.RequestAborted);
-        return Results.Ok(new CustodianSettingsItem(settings.TransferMode.ToString(), settings.RejectReason, settings.RoundingMode.ToString()));
+        return Results.Ok(Settings(settings));
+    }
+
+    private const string IncomeAccountMessage =
+        "incomeAccountNumber must be 1 to 34 letters, digits, spaces and hyphens, with no two spaces in a row.";
+
+    /// <summary>Dividends R57: sets or clears the bank account an account's income is paid into.</summary>
+    private static async Task<IResult> SetIncomeAccountAsync(
+        string accountNumber, IncomeAccountRequest body, HttpContext http, SimulatorDbContext db, TimeProvider time)
+    {
+        var account = await db.CustodianAccounts.SingleOrDefaultAsync(row => row.AccountNumber == accountNumber, http.RequestAborted);
+        if (account is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (body.IncomeAccountNumber is not null && !CustodianRules.IsAccountNumber(body.IncomeAccountNumber))
+        {
+            return ControlEndpoints.Refused("IncomeAccountNumber", IncomeAccountMessage);
+        }
+
+        account.SetIncomeAccount(body.IncomeAccountNumber?.Trim());
+        var world = await db.Worlds.AsNoTracking().SingleAsync(http.RequestAborted);
+        Log(db, http, world, time.GetUtcNow(), ControlActions.CustodianIncomeAccountChanged, new { accountNumber, body.IncomeAccountNumber });
+        await db.SaveChangesAsync(http.RequestAborted);
+        var positions = await CustodianBook.PositionsAsync(db, account.AccountNumber, null, http.RequestAborted);
+        return Results.Ok(new CustodianAccountItem(account.AccountNumber, account.Currency.Trim(), account.Name,
+            positions.Select(position => new CustodianPositionItem(position.Symbol, account.Currency.Trim(), position.Quantity)).ToList(),
+            account.IncomeAccountNumber));
+    }
+
+    /// <summary>Dividends R60: <c>Pay</c> or <c>Hold</c>.</summary>
+    private static async Task<IResult> SetIncomeModeAsync(IncomeModeRequest body, HttpContext http, SimulatorDbContext db, TimeProvider time)
+    {
+        if (!Enum.TryParse<CustodianIncomeMode>(body.Mode, ignoreCase: false, out var mode) || !Enum.IsDefined(mode)
+            || body.Mode!.All(char.IsAsciiDigit))
+        {
+            return ControlEndpoints.Refused("Mode", "mode must be Pay or Hold.");
+        }
+
+        var settings = await db.CustodianSettings.SingleAsync(http.RequestAborted);
+        settings.SetIncomeMode(mode);
+        var world = await db.Worlds.AsNoTracking().SingleAsync(http.RequestAborted);
+        Log(db, http, world, time.GetUtcNow(), ControlActions.CustodianIncomeModeChanged, body);
+        await db.SaveChangesAsync(http.RequestAborted);
+        return Results.Ok(Settings(settings));
+    }
+
+    /// <summary>Dividends R62: the dividend payments, newest first, with an optional status and account.</summary>
+    private static async Task<IResult> GetDividendPaymentsAsync(
+        string? status, string? accountNumber, int? page, int? pageSize, SimulatorDbContext db, TimeProvider time,
+        BrokerBankAccounts brokerAccounts, CancellationToken cancellationToken)
+    {
+        var world = await BrokerBook.UpToDateAsync(db, time, brokerAccounts, cancellationToken);
+        CustodianDividendPaymentStatus? wanted = null;
+        if (status is not null)
+        {
+            if (!Enum.TryParse<CustodianDividendPaymentStatus>(status, ignoreCase: false, out var parsed) || !Enum.IsDefined(parsed)
+                || status.All(char.IsAsciiDigit))
+            {
+                return ControlEndpoints.Refused("Status", "status must be Due, Held or Paid.");
+            }
+
+            wanted = parsed;
+        }
+
+        var size = Math.Clamp(pageSize ?? ControlEndpoints.DefaultPageSize, 1, ControlEndpoints.MaxPageSize);
+        var number = Math.Max(page ?? 1, 1);
+        var query =
+            from payment in db.CustodianDividendPayments.AsNoTracking()
+            join account in db.CustodianAccounts.AsNoTracking() on payment.AccountId equals account.Id
+            join action in db.MarketCorporateActions.AsNoTracking() on payment.ActionId equals action.Id
+            join line in db.BankLines.AsNoTracking() on payment.BankLineId equals (long?)line.Id into lines
+            from line in lines.DefaultIfEmpty()
+            join movement in db.CustodianMovements.AsNoTracking() on payment.MovementId equals (int?)movement.Id into movements
+            from movement in movements.DefaultIfEmpty()
+            where (wanted == null || payment.Status == wanted) && (accountNumber == null || account.AccountNumber == accountNumber)
+            select new
+            {
+                payment,
+                account.AccountNumber,
+                account.IncomeAccountNumber,
+                action.Number,
+                LineId = line == null ? null : line.OutsideId,
+                MovementNumber = movement == null ? (int?)null : movement.Number
+            };
+        var total = await query.CountAsync(cancellationToken);
+        var rows = await query.OrderByDescending(row => row.payment.Id).Skip((number - 1) * size).Take(size).ToListAsync(cancellationToken);
+        var items = rows.Select(row => new CustodianDividendPaymentItem(
+            row.payment.Id.ToString(CultureInfo.InvariantCulture),
+            MarketCorporateAction.ActionId(world.WorldId, row.Number),
+            row.AccountNumber,
+            row.payment.EntitledPosition,
+            row.payment.ElectedQuantity,
+            row.payment.Shares,
+            row.payment.Cash,
+            row.payment.BankLineId is null ? null : row.IncomeAccountNumber,
+            row.payment.Status.ToString(),
+            row.LineId,
+            row.MovementNumber is int movementNumber ? CustodianMovement.MovementId(world.WorldId, movementNumber) : null)).ToList();
+        return Results.Ok(new CustodianDividendPaymentPage(items, number, size, total));
+    }
+
+    /// <summary>Dividends R60: pays a <c>Held</c> payment, with another cash amount when given.</summary>
+    private static async Task<IResult> PayDividendAsync(
+        string id, PayDividendRequest body, HttpContext http, SimulatorDbContext db, TimeProvider time, BrokerBankAccounts brokerAccounts)
+    {
+        await BrokerBook.UpToDateAsync(db, time, brokerAccounts, http.RequestAborted);
+        if (!int.TryParse(id, NumberStyles.None, CultureInfo.InvariantCulture, out var paymentId))
+        {
+            return Results.NotFound();
+        }
+
+        if (body.Amount is { } amount && (amount <= 0m || decimal.Round(amount, 2) != amount))
+        {
+            return ControlEndpoints.Refused("Amount", "amount must be above 0, with at most 2 decimal places.");
+        }
+
+        return await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            db.ChangeTracker.Clear();
+            await using var transaction = await db.Database.BeginTransactionAsync(http.RequestAborted);
+            await CustodianBook.LockAsync(db, http.RequestAborted);
+            var payment = await db.CustodianDividendPayments.SingleOrDefaultAsync(row => row.Id == paymentId, http.RequestAborted);
+            if (payment is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (payment.Status != CustodianDividendPaymentStatus.Held)
+            {
+                return ControlEndpoints.Refused("Status", $"The dividend payment is {payment.Status} and cannot be paid by hand.");
+            }
+
+            var dividend = await db.MarketCorporateActions.SingleAsync(row => row.Id == payment.ActionId, http.RequestAborted);
+            await CustodianDividends.PayAsync(db, time, dividend, payment, body.Amount, http.RequestAborted);
+            var world = await db.Worlds.AsNoTracking().SingleAsync(http.RequestAborted);
+            Log(db, http, world, time.GetUtcNow(), ControlActions.CustodianDividendPaid, new { id, body.Amount });
+            await db.SaveChangesAsync(http.RequestAborted);
+            await transaction.CommitAsync(http.RequestAborted);
+            return Results.Ok(new { id, status = payment.Status.ToString(), cash = payment.Cash });
+        });
     }
 
     private static void Log(SimulatorDbContext db, HttpContext http, World world, DateTimeOffset realNow, string action, object body) =>
@@ -268,9 +422,22 @@ public static class CustodianControlEndpoints
             JsonSerializer.Serialize(body, body.GetType(), ControlEndpoints.DetailJson)));
 }
 
-public sealed record CustodianSettingsItem(string TransferMode, string? RejectReason, string RoundingMode);
+public sealed record CustodianSettingsItem(string TransferMode, string? RejectReason, string RoundingMode, string IncomeMode);
 
-public sealed record CustodianAccountItem(string AccountNumber, string Currency, string Name, IReadOnlyList<CustodianPositionItem> Positions);
+public sealed record CustodianAccountItem(
+    string AccountNumber, string Currency, string Name, IReadOnlyList<CustodianPositionItem> Positions, string? IncomeAccountNumber = null);
+
+public sealed record IncomeAccountRequest(string? IncomeAccountNumber);
+
+public sealed record IncomeModeRequest(string? Mode);
+
+public sealed record PayDividendRequest(decimal? Amount);
+
+public sealed record CustodianDividendPaymentItem(
+    string Id, string CorporateActionId, string AccountNumber, decimal EntitledPosition, decimal? ElectedQuantity, decimal? Shares,
+    decimal? Cash, string? IncomeAccountNumber, string Status, string? BankLineId, string? MovementId);
+
+public sealed record CustodianDividendPaymentPage(IReadOnlyList<CustodianDividendPaymentItem> Items, int Page, int PageSize, int TotalCount);
 
 public sealed record CustodianAccountList(IReadOnlyList<CustodianAccountItem> Items);
 
@@ -287,7 +454,7 @@ public sealed record CustodianTransferItem(
 
 public sealed record CustodianTransferPage(IReadOnlyList<CustodianTransferItem> Items, int Page, int PageSize, int TotalCount);
 
-public sealed record OpenCustodianAccountRequest(string? AccountNumber, string? Currency, string? Name);
+public sealed record OpenCustodianAccountRequest(string? AccountNumber, string? Currency, string? Name, string? IncomeAccountNumber = null);
 
 public sealed record TransferModeRequest(string? Mode, string? Reason);
 

@@ -43,7 +43,7 @@ public sealed class CustodianDividendPayment
 
     public CustodianDividendPaymentStatus Status { get; private set; }
 
-    public int? BankLineId { get; private set; }
+    public long? BankLineId { get; private set; }
 
     public int? MovementId { get; private set; }
 
@@ -56,11 +56,101 @@ public sealed class CustodianDividendPayment
         EntitledPosition = entitledPosition,
         Status = CustodianDividendPaymentStatus.Due
     };
+
+    /// <summary>R60: held for the operator in <c>Hold</c> mode.</summary>
+    public void Hold() => Status = CustodianDividendPaymentStatus.Held;
+
+    /// <summary>R59: paid, with the shares delivered and the cash, and the bank line and movement they made.</summary>
+    public void Pay(decimal? shares, decimal cash, long? bankLineId, int? movementId)
+    {
+        Shares = shares;
+        Cash = cash;
+        BankLineId = bankLineId;
+        MovementId = movementId;
+        Status = CustodianDividendPaymentStatus.Paid;
+    }
 }
 
-/// <summary>Dividends R56: a dividend that went ex at the custodian.</summary>
+/// <summary>Dividends R56, R59, R60: a dividend at the custodian, when it goes ex and when it is paid.</summary>
 public static class CustodianDividends
 {
+    /// <summary>
+    /// R59, R60: on or after the payment date of an <c>Effective</c> dividend, each <c>Due</c> payment is paid, or
+    /// held in <c>Hold</c> mode; the dividend is then marked paid on the simulator day. The caller holds the
+    /// custodian's lock and commits.
+    /// </summary>
+    public static async Task PayDueAsync(SimulatorDbContext db, TimeProvider time, DateOnly today, CancellationToken cancellationToken)
+    {
+        var dividends = await db.MarketCorporateActions
+            .Where(action => action.Kind == MarketCorporateActionKind.Dividend
+                             && action.Status == MarketCorporateActionStatus.Effective
+                             && action.CustodianApplied
+                             && action.PaidOn == null
+                             && action.PaymentDate <= today)
+            .OrderBy(action => action.PaymentDate)
+            .ThenBy(action => action.Number)
+            .ToListAsync(cancellationToken);
+        var settings = await db.CustodianSettings.AsNoTracking().SingleAsync(cancellationToken);
+        foreach (var dividend in dividends)
+        {
+            var payments = await db.CustodianDividendPayments
+                .Where(row => row.ActionId == dividend.Id && row.Status == CustodianDividendPaymentStatus.Due)
+                .OrderBy(row => row.Id)
+                .ToListAsync(cancellationToken);
+            foreach (var payment in payments)
+            {
+                if (settings.IncomeMode == CustodianIncomeMode.Hold)
+                {
+                    payment.Hold();
+                }
+                else
+                {
+                    await PayAsync(db, time, dividend, payment, null, cancellationToken);
+                }
+            }
+
+            dividend.MarkPaid(today);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// R59, R60: pays one payment: <c>cash = Round(entitledPosition × netPerShare, 2)</c>, or <paramref name="amount"/>
+    /// in place of it. With cash above 0 and an income account open at the simulator bank, one credit line there with
+    /// the account's name as payer and the party action id as reference. Saves.
+    /// </summary>
+    public static async Task PayAsync(
+        SimulatorDbContext db,
+        TimeProvider time,
+        MarketCorporateAction dividend,
+        CustodianDividendPayment payment,
+        decimal? amount,
+        CancellationToken cancellationToken)
+    {
+        var terms = dividend.Terms!;
+        var account = await db.CustodianAccounts.AsNoTracking().SingleAsync(row => row.Id == payment.AccountId, cancellationToken);
+        var world = await db.Worlds.SingleAsync(cancellationToken);
+        var cash = amount ?? decimal.Round(payment.EntitledPosition * terms.NetPerShare, 2, MidpointRounding.AwayFromZero);
+        Bank.BankLine? line = null;
+        var currency = account.Currency.Trim();
+        var income = account.IncomeAccountNumber is null
+            ? null
+            : await db.BankAccounts.AsNoTracking()
+                .SingleOrDefaultAsync(row => row.AccountNumber == account.IncomeAccountNumber && row.Currency == currency, cancellationToken);
+        if (cash > 0m && income is not null)
+        {
+            var simulatorNow = world.Now(time.GetUtcNow());
+            line = Bank.BankLine.Receipt(
+                world.TakeLineOutsideId(), income.Id, cash, Market.MarketPricePath.Day(simulatorNow), account.Name, account.AccountNumber,
+                MarketCorporateAction.ActionId(world.WorldId, dividend.Number), simulatorNow, simulatorNow, deliverTwice: false);
+            db.BankLines.Add(line);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        payment.Pay(null, cash, line?.Id, null);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
     /// <summary>One <c>Due</c> payment per account whose position in <paramref name="symbol"/> is above 0, with that
     /// position. No movement: a dividend changes no position.</summary>
     public static async Task GoExAsync(SimulatorDbContext db, MarketCorporateAction action, string symbol, CancellationToken cancellationToken)

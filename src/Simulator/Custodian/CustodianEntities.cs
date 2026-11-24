@@ -45,13 +45,20 @@ public sealed class CustodianAccount
 
     public DateTimeOffset OpenedAt { get; private set; }
 
-    public static CustodianAccount Open(string accountNumber, string currency, string name, DateTimeOffset simulatorNow) => new()
+    /// <summary>Dividends R57: the bank account the custodian pays this account's income into, as text.</summary>
+    public string? IncomeAccountNumber { get; private set; }
+
+    public static CustodianAccount Open(
+        string accountNumber, string currency, string name, DateTimeOffset simulatorNow, string? incomeAccountNumber = null) => new()
     {
         AccountNumber = accountNumber,
         Currency = currency,
         Name = name,
-        OpenedAt = simulatorNow
+        OpenedAt = simulatorNow,
+        IncomeAccountNumber = incomeAccountNumber
     };
+
+    public void SetIncomeAccount(string? incomeAccountNumber) => IncomeAccountNumber = incomeAccountNumber;
 }
 
 /// <summary>One change of a custodian account's position in one symbol (R60, R65–R68).</summary>
@@ -200,6 +207,13 @@ public sealed class CustodianTransfer
     }
 }
 
+/// <summary>Dividends R60: <c>Pay</c> pays a dividend when it falls due; <c>Hold</c> holds it for the operator.</summary>
+public enum CustodianIncomeMode
+{
+    Pay = 0,
+    Hold = 1
+}
+
 /// <summary>The custodian's one row of settings (R64, R68).</summary>
 public sealed class CustodianSettings
 {
@@ -217,7 +231,12 @@ public sealed class CustodianSettings
 
     public CustodianRoundingMode RoundingMode { get; private set; }
 
+    /// <summary>Dividends R60: whether a dividend payment that falls due is paid or held.</summary>
+    public CustodianIncomeMode IncomeMode { get; private set; }
+
     public byte[] RowVersion { get; private set; } = null!;
+
+    public void SetIncomeMode(CustodianIncomeMode mode) => IncomeMode = mode;
 
     public void SetTransferMode(CustodianTransferMode mode, string? reason)
     {

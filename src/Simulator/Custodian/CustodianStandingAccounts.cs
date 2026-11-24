@@ -7,7 +7,8 @@ namespace MyWealthV2.Simulator.Custodian;
 
 public sealed record StandingPosition(string Symbol, decimal Quantity);
 
-public sealed record StandingCustodianAccount(string AccountNumber, string Currency, string Name, IReadOnlyList<StandingPosition> Positions);
+public sealed record StandingCustodianAccount(
+    string AccountNumber, string Currency, string Name, IReadOnlyList<StandingPosition> Positions, string? IncomeAccountNumber = null);
 
 /// <summary>
 /// In-kind-transfers R61: accounts the simulator custodian opens when the world is created and after every reset, from
@@ -50,7 +51,16 @@ public sealed class CustodianStandingAccounts(IReadOnlyList<StandingCustodianAcc
                 positions.Add(new StandingPosition(symbol!.Trim(), quantity));
             }
 
-            var account = new StandingCustodianAccount(number!.Trim(), currency!, name!.Trim(), positions);
+            // Dividends R57: the bank account its dividends are paid into, optional.
+            var income = entry["IncomeAccountNumber"];
+            if (!string.IsNullOrWhiteSpace(income) && !CustodianRules.IsAccountNumber(income))
+            {
+                throw new InvalidOperationException(
+                    $"{SectionName}:{entry.Key}:IncomeAccountNumber must be 1 to 34 letters, digits, spaces and hyphens.");
+            }
+
+            var account = new StandingCustodianAccount(number!.Trim(), currency!, name!.Trim(), positions,
+                string.IsNullOrWhiteSpace(income) ? null : income.Trim());
             if (accounts.Any(other => string.Equals(other.AccountNumber, account.AccountNumber, StringComparison.OrdinalIgnoreCase)))
             {
                 throw new InvalidOperationException($"{SectionName} lists {account.AccountNumber} twice.");
@@ -69,7 +79,8 @@ public sealed class CustodianStandingAccounts(IReadOnlyList<StandingCustodianAcc
         var open = await db.CustodianAccounts.Select(account => account.AccountNumber).ToListAsync(cancellationToken);
         foreach (var account in Accounts.Where(account => !open.Contains(account.AccountNumber, StringComparer.OrdinalIgnoreCase)))
         {
-            db.CustodianAccounts.Add(CustodianAccount.Open(account.AccountNumber, account.Currency, account.Name, simulatorNow));
+            db.CustodianAccounts.Add(CustodianAccount.Open(
+                account.AccountNumber, account.Currency, account.Name, simulatorNow, account.IncomeAccountNumber));
             await db.SaveChangesAsync(cancellationToken);
             foreach (var position in account.Positions)
             {

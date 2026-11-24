@@ -16,7 +16,9 @@ internal static class CustodianHttp
                    IF OBJECT_ID(N''dbo.CustodianRejectedElections'', N''U'') IS NOT NULL
                        DELETE FROM [CustodianRejectedElections];
                    DELETE FROM [CustodianTransfers]; DELETE FROM [CustodianMovements]; DELETE FROM [CustodianAccounts];
-                   UPDATE [CustodianSettings] SET [TransferMode] = 0, [RejectReason] = NULL, [RoundingMode] = 0;');
+                   UPDATE [CustodianSettings] SET [TransferMode] = 0, [RejectReason] = NULL, [RoundingMode] = 0;
+                   IF COL_LENGTH(N''dbo.CustodianSettings'', N''IncomeMode'') IS NOT NULL
+                       EXEC(N''UPDATE [CustodianSettings] SET [IncomeMode] = 0'');');
         """;
 
     public static Task<HttpResponseMessage> OpenAsync(HttpClient control, string accountNumber, string currency = "USD", string name = "Nominees") =>

@@ -58,7 +58,7 @@ CREATE TABLE [CustodianDividendPayments] (
     [Cash] decimal(18, 2) NULL,
     -- Due, Held, Paid.
     [Status] int NOT NULL,
-    [BankLineId] int NULL,
+    [BankLineId] bigint NULL,
     [MovementId] int NULL,
     [RowVersion] rowversion NOT NULL,
     CONSTRAINT [PK_CustodianDividendPayments] PRIMARY KEY ([Id]),

@@ -44,7 +44,12 @@ public static class BrokerBook
                   || await db.BrokerFills.AsNoTracking()
                       .AnyAsync(fill => !fill.Settled && fill.SettlementDate <= today, cancellationToken)
                   || await db.MarketCorporateActions.AsNoTracking()
-                      .AnyAsync(action => action.Status == MarketCorporateActionStatus.Effective && !action.CustodianApplied, cancellationToken);
+                      .AnyAsync(action => action.Status == MarketCorporateActionStatus.Effective && !action.CustodianApplied, cancellationToken)
+                  // Dividends R59: a dividend whose payment date has come is paid.
+                  || await db.MarketCorporateActions.AsNoTracking()
+                      .AnyAsync(action => action.Kind == MarketCorporateActionKind.Dividend
+                                          && action.Status == MarketCorporateActionStatus.Effective
+                                          && action.PaidOn == null && action.PaymentDate <= today, cancellationToken);
         if (!due)
         {
             return;
@@ -89,6 +94,8 @@ public static class BrokerBook
                 item.action.MarkCustodianApplied();
                 await db.SaveChangesAsync(cancellationToken);
             }
+
+            await Custodian.CustodianDividends.PayDueAsync(db, time, today, cancellationToken);
 
             var stale = await db.BrokerOrders
                 .Where(order => order.Status == BrokerOrderStatus.Working && order.AcceptedDay < today)
