@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-24
-last_updated: 2026-11-24
+last_updated: 2026-11-25
 related:
   - ../custodial-roadmap.md
   - ../future-plans.md
@@ -52,7 +52,20 @@ Today a Custodial account that holds a share gets nothing when the company pays 
 
 New: corporate action kind `Dividend`; the active `TransactionType` `Dividend` (6); tax kind `ForeignWithholding`; cash leg role `Reinvestment`; a dividend detail on the Transaction; port `ICustodianElections` with adapter `SimulatorCustodianElections`; statement line match method `Dividend` and unmatched reason `DividendMismatch`; two reconciliation item kinds; `corporateActionId` on `POST /statement-lines/{id}/match`; routes `POST /corporate-actions/{id}/pay-in-cash` and `PUT /accounts/{accountId}/dividend-reinvestment`; item fields on the corporate action, the entitlement, the account and the transaction. Script `0057_dividends.sql`; simulator script `database/simulator/0014_dividends.sql`. No new permission, source kind, job, queue, problem code or domain event.
 
-**Status is `accepted` (2026-11-24).** The twenty-four points of §11 were confirmed on 2026-11-24, every one as recommended, and are written into the rules. The amendments to accepted docs listed in §12 were made when it was accepted. It is a build contract.
+**Status is `accepted` (2026-11-24), landed 2026-11-25.** The twenty-four points of §11 were confirmed on 2026-11-24, every one as recommended, and are written into the rules. The amendments to accepted docs listed in §12 were made when it was accepted. It is a build contract.
+
+Notes from landing:
+
+- R43: a hand `Dividend` passes the type check of the create command and is refused by the manual entry matrix. A Custodial account gets the R43 message; an External account gets `Dividend is reserved and cannot be entered.`, still a 400 on `errors.Type`.
+- R29, R40: when a reinvestment gives an account a holding it did not have, the holding is created by the platform, so its creator is the system actor.
+- §6.2: `CustodianDividendPayments.BankLineId` is `bigint`, the type of the simulator bank's line id. `MovementId` is `int`.
+- R59: the simulator custodian pays a due dividend when a broker or custodian route brings its books up to date, as it applies corporate actions (in-kind-transfers R68). Advancing the clock alone pays nothing until the next such call.
+- D94: the kind filter is a select (All, Split, Consolidation, Bonus issue, Dividend). The list also reads `?kind=` from the address, so the links of D101 open it filtered.
+- D95, D97: the payment and the reinvestment are sections of the detail page. "Pay in cash" is offered to a TenantAdmin on an `Effective` dividend whose receipt is matched and whose accepted election has no shares yet. The dialog asks for the note with the R48 sentence.
+- D98: the match page has a fourth mode, "To a dividend". It lists the `Effective` dividends in the receipt's currency with no receipt yet, as "<symbol> · owed <expected amount> · ex <ex-date>". A receipt that differs from the expected amount shows "The custodian paid <amount> and the customers are owed <expected amount>. Matching pays the customers in full."
+- D99: the switch is in a "Dividends" section of the account page, shown on every Custodial account and disabled unless the account is Open.
+- D100: the dividend block on `/transactions/:id` is titled with the instrument's name, because the badge already reads "Dividend <symbol>".
+- BO33: a plan price follows the amount as "1.00 USD per share, plan 25.00".
 
 Tax figures in this spec were checked against Inland Revenue's guides on 2026-11-24 (roadmap C2, [future-plans.md](../future-plans.md) §1). R33 names them.
 
