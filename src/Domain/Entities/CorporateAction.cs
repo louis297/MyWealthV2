@@ -27,9 +27,21 @@ public class CorporateAction : BaseAuditableEntity
 
     public CorporateActionKind Kind { get; private set; }
 
-    public int RatioNew { get; private set; }
+    /// <summary>The ratio; <c>null</c> on a dividend (dividends R2).</summary>
+    public int? RatioNew { get; private set; }
 
-    public int RatioHeld { get; private set; }
+    public int? RatioHeld { get; private set; }
+
+    /// <summary>Dividends R3: the terms of a dividend, each <c>null</c> on another kind.</summary>
+    public decimal? AmountPerShare { get; private set; }
+
+    public DividendTaxSource? TaxSource { get; private set; }
+
+    public decimal? ImputationCreditPerShare { get; private set; }
+
+    public decimal? ForeignTaxRatePercent { get; private set; }
+
+    public decimal? ReinvestmentPrice { get; private set; }
 
     public DateOnly ExDate { get; private set; }
 
@@ -66,7 +78,42 @@ public class CorporateAction : BaseAuditableEntity
 
     public byte[] RowVersion { get; private set; } = null!;
 
-    public CorporateActionRatio Ratio => new(RatioNew, RatioHeld);
+    public CorporateActionRatio Ratio => new(RatioNew!.Value, RatioHeld!.Value);
+
+    /// <summary>The terms of a dividend; <c>null</c> on another kind.</summary>
+    public DividendTerms? Terms => throw new NotImplementedException();
+
+    /// <summary>Dividends R11: a <c>Manual</c> dividend, <c>Announced</c>. A plan comes only from the feed (R7).</summary>
+    public static CorporateAction EnterDividend(
+        int tenantId,
+        int instrumentId,
+        DividendTerms terms,
+        DateOnly exDate,
+        DateOnly? recordDate,
+        DateOnly? paymentDate,
+        string? memo) =>
+        throw new NotImplementedException();
+
+    /// <summary>Dividends R9: a <c>Feed</c> dividend from version <paramref name="version"/> of the party's action.</summary>
+    public static CorporateAction AnnounceDividend(
+        int tenantId,
+        int instrumentId,
+        string connection,
+        string partyActionId,
+        int version,
+        DividendTerms terms,
+        DateOnly exDate,
+        DateOnly? recordDate,
+        DateOnly? paymentDate) =>
+        throw new NotImplementedException();
+
+    /// <summary>Dividends R11: a person changes a <c>Manual</c> dividend that is still <c>Announced</c>.</summary>
+    public void ChangeDividend(DividendTerms terms, DateOnly exDate, DateOnly? recordDate, DateOnly? paymentDate, string? memo) =>
+        throw new NotImplementedException();
+
+    /// <summary>Dividends R9: a later version replaces the terms and dates of an <c>Announced</c> feed dividend.</summary>
+    public bool AmendDividend(int version, DividendTerms terms, DateOnly exDate, DateOnly? recordDate, DateOnly? paymentDate) =>
+        throw new NotImplementedException();
 
     /// <summary>R15: a <c>Manual</c> corporate action, <c>Announced</c>.</summary>
     public static CorporateAction Enter(

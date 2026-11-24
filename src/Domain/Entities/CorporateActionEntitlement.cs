@@ -27,6 +27,32 @@ public class CorporateActionEntitlement
 
     public decimal? QuantityAfter { get; private set; }
 
+    /// <summary>Dividends R13: the holding's quantity when the dividend went ex; <c>null</c> on another kind.</summary>
+    public decimal? EntitledQuantity { get; private set; }
+
+    /// <summary>Dividends R14: the source amounts in the quote currency, fixed when the dividend went ex.</summary>
+    public decimal? GrossAmount { get; private set; }
+
+    public decimal? ImputationCredit { get; private set; }
+
+    public decimal? ForeignTax { get; private set; }
+
+    /// <summary>Dividends R18: the entitlement is reinvested under the dividend's plan.</summary>
+    public bool Reinvests { get; private set; }
+
+    /// <summary>Dividends R19: the part of the entitled quantity that takes part in the plan.</summary>
+    public decimal? ParticipatingQuantity { get; private set; }
+
+    /// <summary>Dividends R30: the new shares this account gets.</summary>
+    public decimal? ReinvestedQuantity { get; private set; }
+
+    /// <summary>Dividends R36: the net cash of the posting, in the Account's currency.</summary>
+    public decimal? NetAmount { get; private set; }
+
+    public string? NetCurrency { get; private set; }
+
+    public bool IsDividend => throw new NotImplementedException();
+
     public int? TransactionId { get; private set; }
 
     /// <summary>When it left <c>Pending</c>.</summary>
@@ -42,6 +68,19 @@ public class CorporateActionEntitlement
             AccountId = accountId,
             Status = EntitlementStatus.Pending
         };
+
+    /// <summary>Dividends R13, R14, R18, R19: the entitlement of a dividend that went ex, with its entitled quantity and
+    /// source amounts. A gross of 0 is <c>NotApplied</c> with <c>NothingToPay</c>.</summary>
+    public static CorporateActionEntitlement CreateDividend(
+        int tenantId,
+        int corporateActionId,
+        int accountId,
+        decimal entitledQuantity,
+        CorporateActions.DividendSourceAmounts amounts,
+        bool reinvests,
+        decimal? participatingQuantity,
+        DateTimeOffset at) =>
+        throw new NotImplementedException();
 
     /// <summary>R25: posted as <paramref name="transactionId"/>, from <paramref name="quantityBefore"/> to
     /// <paramref name="quantityAfter"/>.</summary>

@@ -11,9 +11,9 @@ public sealed class CorporateActionDto
 
     public required string Kind { get; init; }
 
-    public required int RatioNew { get; init; }
+    public required int? RatioNew { get; init; }
 
-    public required int RatioHeld { get; init; }
+    public required int? RatioHeld { get; init; }
 
     public required DateOnly ExDate { get; init; }
 

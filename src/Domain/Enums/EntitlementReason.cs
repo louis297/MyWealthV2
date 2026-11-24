@@ -7,5 +7,8 @@ public enum EntitlementReason
     NoHolding = 0,
 
     /// <summary>The quantity after would be 0 or the same as before.</summary>
-    TooSmall = 1
+    TooSmall = 1,
+
+    /// <summary>A dividend entitlement whose gross rounds to 0 (dividends R14).</summary>
+    NothingToPay = 2
 }

@@ -36,9 +36,21 @@ public class CorporateActionAnnouncement
     /// <summary>The kind; <c>null</c> for a kind the adapter did not know (R9).</summary>
     public CorporateActionKind? Kind { get; private set; }
 
-    public int RatioNew { get; private set; }
+    /// <summary>The ratio; <c>null</c> on a dividend (dividends R8).</summary>
+    public int? RatioNew { get; private set; }
 
-    public int RatioHeld { get; private set; }
+    public int? RatioHeld { get; private set; }
+
+    /// <summary>Dividends R8: the terms of a dividend, each <c>null</c> on another kind.</summary>
+    public decimal? AmountPerShare { get; private set; }
+
+    public DividendTaxSource? TaxSource { get; private set; }
+
+    public decimal? ImputationCreditPerShare { get; private set; }
+
+    public decimal? ForeignTaxRatePercent { get; private set; }
+
+    public decimal? ReinvestmentPrice { get; private set; }
 
     public DateOnly ExDate { get; private set; }
 
@@ -66,7 +78,10 @@ public class CorporateActionAnnouncement
         string? currency,
         int? ratioNew,
         int? ratioHeld,
-        DateOnly? exDate) =>
+        DateOnly? exDate,
+        CorporateActionKind? kind = null,
+        decimal? amountPerShare = null,
+        DividendTaxSource? taxSource = null) =>
         outsideId is { Length: >= 1 and <= IdMaxLength }
         && partyActionId is { Length: >= 1 and <= IdMaxLength }
         && version >= 1
@@ -87,12 +102,17 @@ public class CorporateActionAnnouncement
         string symbol,
         string currency,
         CorporateActionKind? kind,
-        int ratioNew,
-        int ratioHeld,
+        int? ratioNew,
+        int? ratioHeld,
         DateOnly exDate,
         DateOnly? recordDate,
         DateOnly? paymentDate,
-        DateTimeOffset receivedAt)
+        DateTimeOffset receivedAt,
+        decimal? amountPerShare = null,
+        DividendTaxSource? taxSource = null,
+        decimal? imputationCreditPerShare = null,
+        decimal? foreignTaxRatePercent = null,
+        decimal? reinvestmentPrice = null)
     {
         if (!IsStorable(outsideId, partyActionId, version, partyStatus, symbol, currency, ratioNew, ratioHeld, exDate)
             || string.IsNullOrWhiteSpace(connection) || connection.Length > ConnectionMaxLength)

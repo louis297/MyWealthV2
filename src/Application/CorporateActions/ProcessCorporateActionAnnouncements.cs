@@ -100,7 +100,7 @@ public sealed class ProcessCorporateActionAnnouncements(
             return AnnouncementSkipReason.UnsupportedKind;
         }
 
-        var ratio = new CorporateActionRatio(announcement.RatioNew, announcement.RatioHeld);
+        var ratio = new CorporateActionRatio(announcement.RatioNew ?? 0, announcement.RatioHeld ?? 0);
         if (!ratio.IsValidFor(kind) || !served.Serves(announcement.Symbol))
         {
             return AnnouncementSkipReason.Invalid;
