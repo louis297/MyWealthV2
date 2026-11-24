@@ -21,6 +21,8 @@ import {
   ScaleIcon,
   PercentIcon,
   SplitIcon,
+  PackageIcon,
+  PackageSearchIcon,
 } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router";
 import { useAppSelector } from "@/app/hooks";
@@ -63,7 +65,13 @@ import {
   canCheckBankAccounts,
   canManageBankReconciliations,
   canManageStatementLines,
+  canAccessInKindTransfers,
+  canApproveInKindTransfers,
+  canManageCustodyMovements,
+  canManageCustodianReconciliations,
 } from "@/features/session/roles";
+import { useGetCustodyMovementsQuery } from "@/features/custodyMovements/custodyMovementsApi";
+import { useGetInKindTransfersQuery } from "@/features/inKindTransfers/inKindTransfersApi";
 import { ModeToggle } from '@/components/mode-toggle';
 
 type ShellNavItem = {
@@ -71,6 +79,8 @@ type ShellNavItem = {
   label: string;
   icon: LucideIcon;
   visible: boolean;
+  /** in-kind-transfers D88, D90: a count shown beside the label when above 0. */
+  count?: number;
 };
 
 export function ShellLayout({ children }: { children?: ReactNode }) {
@@ -79,6 +89,9 @@ export function ShellLayout({ children }: { children?: ReactNode }) {
   const firmName = tenant?.name;
   const { pathname } = useLocation();
   const role = me?.role;
+  // D88: a TenantAdmin sees the transfers waiting for approval; D90: the custody movements in suspense.
+  const waiting = useGetInKindTransfersQuery({ status: "Requested", pageSize: 1 }, { skip: !canApproveInKindTransfers(role) });
+  const suspense = useGetCustodyMovementsQuery({ status: "Unmatched", pageSize: 1 }, { skip: !canManageCustodyMovements(role) });
 
   const nav: ShellNavItem[] = [
     {
@@ -171,6 +184,29 @@ export function ShellLayout({ children }: { children?: ReactNode }) {
       visible: canManageMigrationBatches(role),
     },
     {
+      // in-kind-transfers D88.
+      to: "/transfers",
+      label: "Transfers",
+      icon: PackageIcon,
+      visible: canAccessInKindTransfers(role),
+      count: waiting.data?.totalCount,
+    },
+    {
+      // in-kind-transfers D90.
+      to: "/custody-movements",
+      label: "Custody movements",
+      icon: PackageSearchIcon,
+      visible: canManageCustodyMovements(role),
+      count: suspense.data?.totalCount,
+    },
+    {
+      // in-kind-transfers D91.
+      to: "/custodian-reconciliations",
+      label: "Custodian reconciliation",
+      icon: ScaleIcon,
+      visible: canManageCustodianReconciliations(role),
+    },
+    {
       to: "/withdrawals",
       label: "Withdrawals",
       icon: BanknoteArrowUpIcon,
@@ -233,6 +269,11 @@ export function ShellLayout({ children }: { children?: ReactNode }) {
                         >
                           <Icon />
                           <span>{item.label}</span>
+                          {item.count ? (
+                            <Badge variant="secondary" className="ml-auto group-data-[collapsible=icon]:hidden">
+                              {item.count}
+                            </Badge>
+                          ) : null}
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     );

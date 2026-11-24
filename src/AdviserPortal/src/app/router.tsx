@@ -55,6 +55,13 @@ import { WithdrawalDetailPage } from "@/features/withdrawals/WithdrawalDetailPag
 import { WithdrawalsListPage } from "@/features/withdrawals/WithdrawalsListPage";
 import { CloseAccountPage } from "@/features/accountClosures/CloseAccountPage";
 import { WithdrawPage } from "@/features/withdrawals/WithdrawPage";
+import { TransferDetailPage } from "@/features/inKindTransfers/TransferDetailPage";
+import { TransferSecuritiesPage } from "@/features/inKindTransfers/TransferSecuritiesPage";
+import { TransfersListPage } from "@/features/inKindTransfers/TransfersListPage";
+import { CustodyMovementsPage } from "@/features/custodyMovements/CustodyMovementsPage";
+import { CustodianReconciliationDetailPage } from "@/features/custodianReconciliations/CustodianReconciliationDetailPage";
+import { CustodianReconciliationHistoryPage } from "@/features/custodianReconciliations/CustodianReconciliationHistoryPage";
+import { CustodianReconciliationOverviewPage } from "@/features/custodianReconciliations/CustodianReconciliationOverviewPage";
 import { MatchStatementLinePage } from "@/features/statementLines/MatchStatementLinePage";
 import { BankReconciliationDetailPage } from "@/features/bankReconciliations/BankReconciliationDetailPage";
 import { BankReconciliationHistoryPage } from "@/features/bankReconciliations/BankReconciliationHistoryPage";
@@ -157,6 +164,7 @@ export const appRoutes: RouteObject[] = [
               { path: ":id/transfer", element: <CreateInternalTransferPage /> },
               { path: ":id/convert", element: <CreateFxConversionPage /> },
               { path: ":id/withdraw", element: <WithdrawPage /> },
+              { path: ":id/transfer-securities", element: <TransferSecuritiesPage /> },
               { path: ":id/order", element: <PlaceOrderPage /> },
               { path: ":id/close", element: <CloseAccountPage /> },
               {
@@ -228,6 +236,31 @@ export const appRoutes: RouteObject[] = [
               { path: "new", element: <MigrationBatchEditPage /> },
               { path: ":id", element: <MigrationBatchDetailPage /> },
               { path: ":id/edit", element: <MigrationBatchEditPage /> },
+            ],
+          },
+          {
+            // in-kind-transfers D88, D89.
+            path: "/transfers",
+            element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
+            children: [
+              { index: true, element: <TransfersListPage /> },
+              { path: ":id", element: <TransferDetailPage /> },
+            ],
+          },
+          {
+            // in-kind-transfers D90: an Adviser who opens the route gets the firm administrator sentence from the 403.
+            path: "/custody-movements",
+            element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
+            children: [{ index: true, element: <CustodyMovementsPage /> }],
+          },
+          {
+            // in-kind-transfers D91, D92.
+            path: "/custodian-reconciliations",
+            element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
+            children: [
+              { index: true, element: <CustodianReconciliationOverviewPage /> },
+              { path: "history", element: <CustodianReconciliationHistoryPage /> },
+              { path: ":id", element: <CustodianReconciliationDetailPage /> },
             ],
           },
           {

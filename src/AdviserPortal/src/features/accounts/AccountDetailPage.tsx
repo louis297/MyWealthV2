@@ -31,6 +31,7 @@ import {
 import { allowsManualEntry, isCustodial } from "@/features/accounts/custodyRules";
 import { AccountOrdersSection } from "@/features/orders/AccountOrdersSection";
 import { AccountWithdrawalsSection } from "@/features/withdrawals/AccountWithdrawalsSection";
+import { AccountTransfersSection } from "@/features/inKindTransfers/AccountTransfersSection";
 import { withdrawalStatusLabel } from "@/features/withdrawals/withdrawalLabels";
 import { useGetWithdrawalQuery } from "@/features/withdrawals/withdrawalsApi";
 import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
@@ -257,6 +258,7 @@ export function AccountDetailPage() {
       name: item.name,
       quantity: String(item.quantity),
       reserved: item.reservedQuantity ?? 0,
+      unsettled: item.unsettledQuantity ?? 0,
       cost: String(item.cost),
       costCurrency: item.costCurrency,
       target: weights.has(item.instrumentId) ? String(weights.get(item.instrumentId)) : "—",
@@ -271,6 +273,7 @@ export function AccountDetailPage() {
           name: instrument?.name ?? "—",
           quantity: "—",
           reserved: 0,
+          unsettled: 0,
           cost: "—",
           costCurrency: "—",
           target: String(line.targetWeight),
@@ -341,6 +344,21 @@ export function AccountDetailPage() {
             ) : (
               <Link to={`/accounts/${data.id}/order`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
                 Place order
+              </Link>
+            )
+          ) : null}
+          {withdrawable ? (
+            // in-kind-transfers D86: securities move in or out by an in-kind transfer.
+            locked ? (
+              <span className="flex items-center gap-2">
+                <Button type="button" variant="outline" size="sm" disabled>
+                  Transfer securities
+                </Button>
+                <span className="text-muted-foreground text-sm">This account follows a portfolio.</span>
+              </span>
+            ) : (
+              <Link to={`/accounts/${data.id}/transfer-securities`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                Transfer securities
               </Link>
             )
           ) : null}
@@ -512,6 +530,7 @@ export function AccountDetailPage() {
                     name: item.name,
                     quantity: String(item.quantity),
                     reserved: item.reservedQuantity ?? 0,
+                    unsettled: item.unsettledQuantity ?? 0,
                     cost: String(item.cost),
                     costCurrency: item.costCurrency,
                     target: "",
@@ -523,6 +542,8 @@ export function AccountDetailPage() {
                         {item.quantity}
                         {/* D69: the part live sell orders reserve. */}
                         {item.reserved > 0 ? <p className="text-muted-foreground text-xs">{`${item.reserved} reserved`}</p> : null}
+                        {/* in-kind-transfers D86: bought and not settled yet. */}
+                        {item.unsettled > 0 ? <p className="text-muted-foreground text-xs">{`${item.unsettled} not settled`}</p> : null}
                       </TableCell>
                       <TableCell>{item.cost}</TableCell>
                       <TableCell>{item.costCurrency}</TableCell>
@@ -536,6 +557,7 @@ export function AccountDetailPage() {
         )}
       </Section>
       {isCustodial(data) ? <AccountOrdersSection accountId={data.id} /> : null}
+      {isCustodial(data) ? <AccountTransfersSection accountId={data.id} /> : null}
       {isCustodial(data) ? <AccountWithdrawalsSection accountId={data.id} /> : null}
       <Section title="Activity">
         {(transactions.data?.items.length ?? 0) === 0 ? <Muted>No activity.</Muted> : (

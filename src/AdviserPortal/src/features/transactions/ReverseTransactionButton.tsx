@@ -77,6 +77,8 @@ export function sourceLabel(kind: string | undefined) {
       return "Interest run";
     case "CorporateAction":
       return "Corporate action";
+    case "InKindTransfer":
+      return "In-kind transfer";
     case "OrderFill":
       return "Order";
     case "Migration":

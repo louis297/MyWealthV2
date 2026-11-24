@@ -127,3 +127,23 @@ export function canAccessCorporateActions(role: string | null | undefined) {
 export function canManageCorporateActions(role: string | null | undefined) {
   return role === roles.tenantAdmin;
 }
+
+/** in-kind-transfers.read and .request: the Transfers pages (in-kind-transfers D88). */
+export function canAccessInKindTransfers(role: string | null | undefined) {
+  return role === roles.tenantAdmin || role === roles.adviser;
+}
+
+/** in-kind-transfers.approve: approve, reject and set aside, and the count waiting for approval (D88, D89). */
+export function canApproveInKindTransfers(role: string | null | undefined) {
+  return role === roles.tenantAdmin;
+}
+
+/** custody-movements.manage: the Custody movements page (in-kind-transfers D90). */
+export function canManageCustodyMovements(role: string | null | undefined) {
+  return role === roles.tenantAdmin;
+}
+
+/** custodian-reconciliations.manage: the Custodian reconciliation pages (in-kind-transfers D91, D92). */
+export function canManageCustodianReconciliations(role: string | null | undefined) {
+  return role === roles.tenantAdmin;
+}

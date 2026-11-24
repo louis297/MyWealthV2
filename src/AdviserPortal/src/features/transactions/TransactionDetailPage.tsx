@@ -52,6 +52,23 @@ export function TransactionDetailPage() {
                 Migration batch
               </Link>
             ) : null}
+            {data.source?.kind === "InKindTransfer" && data.source.id ? (
+              // in-kind-transfers D93.
+              <Link to={`/transfers/${data.source.id}`} className={recordLinkClass}>
+                In-kind transfer
+              </Link>
+            ) : null}
+            {data.inKindTransfer ? (
+              <Section title="Transfer">
+                <DetailGrid>
+                  <DetailItem label="Counterparty">{`${data.inKindTransfer.counterpartyName} ${data.inKindTransfer.counterpartyAccount}`}</DetailItem>
+                  <DetailItem label="Owner">{`Owner changes: ${data.inKindTransfer.changesBeneficialOwner ? "yes" : "no"}`}</DetailItem>
+                  <DetailItem label="Acquired on">{data.inKindTransfer.acquiredOn ?? "—"}</DetailItem>
+                  <DetailItem label="Settlement date">{data.inKindTransfer.settlementDate}</DetailItem>
+                  <DetailItem label="Custodian's reference">{data.inKindTransfer.custodianReference ?? "—"}</DetailItem>
+                </DetailGrid>
+              </Section>
+            ) : null}
             {data.migration ? (
               <p className="text-sm">{`From ${data.migration.previousProvider}, balances as at ${data.migration.asOfDate}`}</p>
             ) : null}

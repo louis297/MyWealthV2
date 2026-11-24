@@ -7,7 +7,7 @@ import { TransfersListPage } from "@/features/inKindTransfers/TransfersListPage"
 import { CreateTransactionPage } from "@/features/transactions/CreateTransactionPage";
 import { TransactionDetailPage } from "@/features/transactions/TransactionDetailPage";
 import { ShellLayout } from "@/layouts/ShellLayout";
-import { chooseOption, openSelect } from "@/test/chooseOption";
+import { chooseOption, openSelect, pickOption } from "@/test/chooseOption";
 import { adviser, feeUser, json, problem, renderFees, requestsTo, stubBrowser } from "@/test/fees";
 
 const accountId = "aaaaaaaa-0000-0000-0000-000000000001";
@@ -164,7 +164,7 @@ describe("TransferSecuritiesPage (in-kind-transfers D87)", () => {
     await chooseOption("Direction", "In");
     await openSelect("Instrument");
     expect(screen.getByRole("option", { name: "KIWI.SIM Kiwi Simulated (Quoted in NZD)" })).toHaveAttribute("aria-disabled", "true");
-    await chooseOption("Instrument", "ACME.SIM Acme Simulated");
+    await pickOption("ACME.SIM Acme Simulated");
     fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "100" } });
     expect(screen.getByText("What the customer paid for these shares in total, in USD")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Cost"), { target: { value: "9500" } });

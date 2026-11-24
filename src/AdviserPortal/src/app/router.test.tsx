@@ -42,6 +42,20 @@ function user(overrides: Partial<CurrentUser> = {}): CurrentUser {
   };
 }
 
+const routedAccount = {
+  id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+  tenantId: "22222222-2222-2222-2222-222222222222",
+  customerId: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+  name: "Everyday spending",
+  type: "Brokerage",
+  custodyMode: "External",
+  currency: "NZD",
+  status: "Open",
+  isActive: true,
+  cashBalance: 0,
+  rowVersion: "AAAA",
+};
+
 function renderApp(me: CurrentUser, path: string) {
   const store = configureStore({
     reducer: {
@@ -61,6 +75,13 @@ function renderApp(me: CurrentUser, path: string) {
     }
     if (url.includes("/tenants/by-code/")) {
       return new Response(JSON.stringify(tenant), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    // The account the form routes open: a 404 would replace the page heading with "Not found" and race the assertion.
+    if (url.endsWith("/accounts/eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")) {
+      return new Response(JSON.stringify(routedAccount), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
@@ -241,7 +262,7 @@ describe("app routes", () => {
   });
 
   it("lets TenantAdmin open a new transaction form", async () => {
-    renderApp(user(), "/accounts/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/transactions/new");
+    renderApp(user(), "/accounts/eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee/transactions/new");
 
     expect(await screen.findByRole("heading", { name: "New transaction" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Forbidden" })).not.toBeInTheDocument();
@@ -251,7 +272,7 @@ describe("app routes", () => {
   it("lets an Adviser open a new transaction form", async () => {
     renderApp(
       user({ role: "adviser", name: "Sam Reed" }),
-      "/accounts/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/transactions/new",
+      "/accounts/eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee/transactions/new",
     );
 
     expect(await screen.findByRole("heading", { name: "New transaction" })).toBeInTheDocument();
@@ -284,7 +305,7 @@ describe("app routes", () => {
         tenantId: null,
         tenantCode: null,
       }),
-      "/accounts/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/transactions/new",
+      "/accounts/eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee/transactions/new",
     );
 
     expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
@@ -338,7 +359,7 @@ describe("app routes", () => {
   it("sends a Customer on a new transaction form to /forbidden", async () => {
     renderApp(
       user({ role: "customer", name: "Jordan Lee" }),
-      "/accounts/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/transactions/new",
+      "/accounts/eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee/transactions/new",
     );
 
     expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
@@ -432,7 +453,7 @@ describe("app routes", () => {
   it("sends a Customer opening TransferIn to /forbidden", async () => {
     renderApp(
       user({ role: "customer", name: "Jordan Lee" }),
-      "/accounts/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/transactions/new?type=TransferIn",
+      "/accounts/eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee/transactions/new?type=TransferIn",
     );
 
     expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeInTheDocument();
