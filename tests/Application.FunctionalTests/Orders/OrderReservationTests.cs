@@ -132,7 +132,7 @@ public class OrderReservationTests : TestBase
             AdjustmentWorld.Body(world.AccountId, security: AdjustmentWorld.Holding(world.InstrumentId, -60m, -1500m)),
             AdjustmentWorld.Path);
 
-        (await CustodialHttp.ErrorsAsync(refused))["Security"].ShouldBe(["40 ACME is reserved for sell orders."]);
+        (await CustodialHttp.ErrorsAsync(refused))["Security"].ShouldBe(["40 ACME is reserved for sell orders and transfers out."]);
         allowed.StatusCode.ShouldBe(HttpStatusCode.Created, await allowed.Content.ReadAsStringAsync());
         var holding = (await ReadAsync(world.TenantAdmin, $"/accounts/{world.AccountId}/holdings")).GetProperty("items").EnumerateArray().Single();
         holding.GetProperty("quantity").GetDecimal().ShouldBe(40m);
