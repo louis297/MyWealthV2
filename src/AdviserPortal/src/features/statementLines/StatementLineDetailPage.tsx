@@ -37,7 +37,8 @@ const dialogs: Record<NoteAction, string> = {
 export const adjustSentence = "Correct the account with an adjustment, then ignore this line.";
 
 /** D50: a match the platform made for a payment, a returned payment or a recall is undone only by its flow. */
-const platformMethods = ["Payment", "PaymentReturn", "Recall", "Settlement"];
+// dividends D98: a receipt matched to a dividend offers no action either.
+const platformMethods = ["Payment", "PaymentReturn", "Recall", "Settlement", "Dividend"];
 
 /** D35, D50: one bank statement line with its match, its last action and the actions its status allows (R23,
  * bank-returns R9). */
@@ -189,6 +190,12 @@ export function StatementLineDetailPage() {
               // migration-batches D83.
               <DetailItem label="Migration batch">
                 <Link to={`/migration-batches/${line.migrationBatchId}`} className={recordLinkClass}>Migration batch</Link>
+              </DetailItem>
+            ) : null}
+            {line.corporateActionId ? (
+              // dividends D98.
+              <DetailItem label="Dividend">
+                <Link to={`/corporate-actions/${line.corporateActionId}`} className={recordLinkClass}>Dividend</Link>
               </DetailItem>
             ) : null}
             {line.tradeSettlementId ? (

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { FilterBar, Page, PageHeading, recordLinkClass, SelectField } from "@/components/portal";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,19 +7,30 @@ import { SelectItem } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAppSelector } from "@/app/hooks";
 import { useGetCorporateActionsQuery } from "@/features/corporateActions/corporateActionsApi";
-import { kindLabel, originLabel, ratioText, statusLabel } from "@/features/corporateActions/corporateActionText";
+import { dividendStatusLabel, kindLabel, originLabel, ratioText, statusLabel } from "@/features/corporateActions/corporateActionText";
 import { canManageCorporateActions } from "@/features/session/roles";
 import { Pager } from "@/shared/components/Pager";
 import { cn } from "cn";
 
 const statuses = ["Announced", "Effective", "Applied", "Cancelled"];
+const kinds = ["Split", "Consolidation", "Bonus", "Dividend"];
 
 /** D64: the firm's corporate actions, latest ex-date first, with a status filter. */
 export function CorporateActionsPage() {
   const role = useAppSelector((state) => state.session.currentUser?.role);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("All");
-  const { data } = useGetCorporateActionsQuery({ page, status: status === "All" ? undefined : status });
+  // dividends D101: the bank reconciliation links here with ?kind=Dividend.
+  const [searchParams] = useSearchParams();
+  const [kind, setKind] = useState(() => {
+    const initial = searchParams.get("kind");
+    return initial && kinds.includes(initial) ? initial : "All";
+  });
+  const { data } = useGetCorporateActionsQuery({
+    page,
+    status: status === "All" ? undefined : status,
+    kind: kind === "All" ? undefined : kind,
+  });
 
   return (
     <Page>
@@ -34,6 +45,12 @@ export function CorporateActionsPage() {
           onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
           <SelectItem value="All">All</SelectItem>
           {statuses.map((item) => <SelectItem key={item} value={item}>{statusLabel(item)}</SelectItem>)}
+        </SelectField>
+        {/* dividends D94: a kind filter. */}
+        <SelectField id="corporate-action-kind" label="Kind" value={kind}
+          onChange={(event) => { setKind(event.target.value); setPage(1); }}>
+          <SelectItem value="All">All</SelectItem>
+          {kinds.map((item) => <SelectItem key={item} value={item}>{kindLabel(item)}</SelectItem>)}
         </SelectField>
       </FilterBar>
       <Card className="gap-0 py-0">
@@ -61,7 +78,9 @@ export function CorporateActionsPage() {
                   <TableCell>{ratioText(item)}</TableCell>
                   <TableCell>{item.exDate}</TableCell>
                   <TableCell>{originLabel(item.origin)}</TableCell>
-                  <TableCell>{statusLabel(item.status)}</TableCell>
+                  <TableCell>
+                    {item.kind === "Dividend" ? dividendStatusLabel(item.status, item.payment?.paidAt) : statusLabel(item.status)}
+                  </TableCell>
                   <TableCell>
                     <p>{`${item.entitlements.posted} of ${item.entitlements.total}`}</p>
                     {item.entitlements.notApplied > 0 ? (

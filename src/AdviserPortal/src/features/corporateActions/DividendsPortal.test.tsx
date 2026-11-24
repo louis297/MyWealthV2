@@ -282,6 +282,9 @@ describe("Dividends (dividends D94–D101)", () => {
           if (path(request) === `/api/accounts/${accountId}` && request.method === "GET") {
             return json(custodial);
           }
+          if (path(request) === `/api/accounts/${accountId}/holdings`) {
+            return json({ items: [] });
+          }
           if (path(request) === `/api/accounts/${accountId}/dividend-reinvestment`) {
             return new Response(null, { status: 204 });
           }

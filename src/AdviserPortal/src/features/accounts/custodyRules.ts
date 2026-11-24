@@ -21,6 +21,8 @@ const refusedOnCustodial: ReadonlySet<string> = new Set([
   "Split",
   "Bonus",
   "Scrip",
+  // dividends D100 (R43): a dividend is paid by the platform from the company's announcement.
+  "Dividend",
 ]);
 
 export function isCustodial(account: { custodyMode: string } | undefined | null): boolean {

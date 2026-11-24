@@ -8,6 +8,8 @@ export function taxKindLabel(kind: string) {
       return "RWT";
     case "Nrwt":
       return "NRWT";
+    case "ForeignWithholding":
+      return "Foreign tax";
     default:
       return kind;
   }

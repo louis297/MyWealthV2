@@ -41,6 +41,8 @@ export function reasonLabel(reason: string | null | undefined) {
       return "Account being closed";
     case "SettlementMismatch":
       return "Does not match the trade settlement";
+    case "DividendMismatch":
+      return "Names a dividend but does not fit it";
     default:
       return reason ?? "";
   }
@@ -102,6 +104,8 @@ export function methodLabel(method: string) {
       return "Trade settlement";
     case "Migration":
       return "Migration batch";
+    case "Dividend":
+      return "Dividend";
     default:
       return "Matched by reference";
   }

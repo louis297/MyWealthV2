@@ -97,6 +97,10 @@ export function BankReconciliationDetailPage() {
                     // trade-settlement D78.
                     <Link to="/trade-settlements?open=true" className={recordLinkClass}>Open trade settlements</Link>
                   ) : null}
+                  {item.kind === "DividendsNotPosted" || item.kind === "DividendDifference" ? (
+                    // dividends D101.
+                    <Link to="/corporate-actions?kind=Dividend" className={recordLinkClass}>Dividends</Link>
+                  ) : null}
                 </CardContent>
               </Card>
             ))}

@@ -103,6 +103,8 @@ export type Transaction = {
   execution?: TransactionExecution | null;
   /** migration-batches R31: where a migrated opening balance came from. */
   migration?: { asOfDate: string; previousProvider: string } | null;
+  /** dividends R39: on a Dividend and its Reversal; otherwise null. */
+  dividend?: TransactionDividend | null;
   /** in-kind-transfers R38: on a posting of an in-kind transfer and its Reversal; otherwise null. */
   inKindTransfer?: TransactionInKindTransfer | null;
 };
@@ -130,6 +132,22 @@ export type TransactionExecution = {
   settledAt: string | null;
   /** trade-settlement R34: when the broker took the fill back. */
   brokenAt?: string | null;
+};
+
+/** dividends R39: the dividend a Dividend pays. Amounts are in `currency`, the dividend's currency. */
+export type TransactionDividend = {
+  corporateActionId: string;
+  instrument: { id: string; symbol: string; name: string };
+  quantity: number;
+  amountPerShare: number;
+  currency: string;
+  taxSource: string;
+  imputationCredit: number;
+  reinvestedQuantity: number | null;
+  reinvestmentPrice: number | null;
+  exDate: string;
+  recordDate: string | null;
+  paymentDate: string | null;
 };
 
 /** corporate-actions R37: the event behind an entitlement posting. */

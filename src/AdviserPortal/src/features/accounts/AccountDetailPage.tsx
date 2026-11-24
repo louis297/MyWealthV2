@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAppSelector } from "@/app/hooks";
-import { roles } from "@/features/session/roles";
+import { canAccessAccounts, roles } from "@/features/session/roles";
+import { DividendReinvestmentSection } from "@/features/accounts/DividendReinvestmentSection";
 import { Link, useNavigate, useParams } from "react-router";
 import { AssignmentRebalanceLine } from "@/features/rebalances/AssignmentRebalanceLine";
 import { noChangeSentence } from "@/features/rebalances/rebalanceLabels";
@@ -444,6 +445,13 @@ export function AccountDetailPage() {
           </DetailGrid>
         </CardContent>
       </Card>
+      {isCustodial(data) ? (
+        <DividendReinvestmentSection
+          account={data}
+          canManage={canAccessAccounts(role)}
+          followsPortfolio={assignment.data?.status === "Active"}
+        />
+      ) : null}
       {eligible ? (
         <Section title="Deposit instructions">
           {depositInstructions.data ? (

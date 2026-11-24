@@ -51,7 +51,12 @@ export function transactionTypeLabel(item: {
   type: string;
   source?: { kind: string } | null;
   corporateAction?: { kind: string; ratioNew: number; ratioHeld: number } | null;
+  dividend?: { instrument: { symbol: string } } | null;
 }) {
+  // dividends D100: "Dividend <symbol>".
+  if (item.dividend) {
+    return `Dividend ${item.dividend.instrument.symbol}`;
+  }
   if (item.corporateAction) {
     return `${kindLabel(item.corporateAction.kind)} ${ratioText(item.corporateAction)}`;
   }
