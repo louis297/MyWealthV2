@@ -21,6 +21,14 @@ public class Account : BaseAuditableEntity
     /// <summary>Interest-run R19: the last UTC day this account was accrued through; null before the first time.</summary>
     public DateOnly? InterestAccruedThrough { get; private set; }
 
+    /// <summary>Dividends R17: the standing election to reinvest dividends under a plan; only on a Custodial account.</summary>
+    public bool ReinvestDividends { get; private set; }
+
+    /// <summary>Dividends R17: who last changed the election, and when.</summary>
+    public int? ReinvestDividendsChangedByUserId { get; private set; }
+
+    public DateTimeOffset? ReinvestDividendsChangedAt { get; private set; }
+
     public CustodyMode CustodyMode { get; private set; }
 
     public AccountStatus Status { get; private set; }

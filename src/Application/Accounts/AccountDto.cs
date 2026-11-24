@@ -53,6 +53,12 @@ public sealed class AccountDto
     /// <summary>The last UTC day the account was accrued through, or null (interest-run R35).</summary>
     public DateOnly? InterestAccruedThrough { get; init; }
 
+    /// <summary>Dividends R17, R52: the standing reinvestment election; <c>false</c> on an External account.</summary>
+    public bool ReinvestDividends { get; init; }
+
+    /// <summary>Dividends R52: the number of <c>Pending</c> dividend entitlements of the account.</summary>
+    public int PendingDividends { get; init; }
+
     public static AccountDto From(
         Account account,
         Tenant tenant,
