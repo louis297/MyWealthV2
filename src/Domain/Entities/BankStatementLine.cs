@@ -188,6 +188,12 @@ public class BankStatementLine : BaseAuditableEntity
             throw new StatementLineStatusException("This line returned a payment and cannot be unmatched.");
         }
 
+        if (MatchMethod == StatementLineMatchMethod.Dividend)
+        {
+            // Dividends R27: a receipt matched to a dividend stays; a wrong match is corrected with adjustments.
+            throw new StatementLineStatusException("A receipt matched to a dividend cannot be taken out of it.");
+        }
+
         if (MatchMethod == StatementLineMatchMethod.Settlement)
         {
             // Trade-settlement R21: a settlement line accepts no action; only a returned payment undoes it.
@@ -368,6 +374,23 @@ public class BankStatementLine : BaseAuditableEntity
         var trimmed = OptionalNote(note);
         SetMatch(null, null, StatementLineMatchMethod.Migration, at);
         MigrationBatchId = migrationBatchId;
+        Record(StatementLineAction.Matched, trimmed, byUserId, at);
+    }
+
+    /// <summary>Dividends R26: a TenantAdmin accepts this receipt as the payment of a dividend, with a note. No Account
+    /// and no Transaction.</summary>
+    public void MatchToDividend(int corporateActionId, string note, int byUserId, DateTimeOffset at)
+    {
+        EnsureCredit("matched");
+        EnsureStatus("matched", BankStatementLineStatus.Unmatched);
+        var trimmed = note?.Trim() ?? string.Empty;
+        if (trimmed.Length is 0 or > NoteMaxLength)
+        {
+            throw new DomainException($"A note is 1 to {NoteMaxLength} characters.");
+        }
+
+        SetMatch(null, null, StatementLineMatchMethod.Dividend, at);
+        CorporateActionId = corporateActionId;
         Record(StatementLineAction.Matched, trimmed, byUserId, at);
     }
 
