@@ -109,6 +109,10 @@ public class Account : BaseAuditableEntity
         InterestAccruedThrough = through;
     }
 
+    /// <summary>Dividends R17: the standing reinvestment election, set by <paramref name="byUserId"/>.</summary>
+    public void SetDividendReinvestment(bool reinvest, int byUserId, DateTimeOffset at) =>
+        throw new NotImplementedException();
+
     public void Rename(string name)
     {
         Name = NormaliseName(name);

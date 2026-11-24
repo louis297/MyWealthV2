@@ -3,6 +3,7 @@ using MyWealthV2.Application.Accounts;
 using MyWealthV2.Application.Accounts.Commands.CloseAccount;
 using MyWealthV2.Application.Accounts.Commands.CreateAccount;
 using MyWealthV2.Application.Accounts.Commands.ReopenAccount;
+using MyWealthV2.Application.Accounts.Commands.SetDividendReinvestment;
 using MyWealthV2.Application.Accounts.Commands.UpdateAccount;
 using MyWealthV2.Application.Accounts.Queries.GetAccountById;
 using MyWealthV2.Application.Accounts.Queries.GetAccountCashBalance;
@@ -35,6 +36,7 @@ public class Accounts : IEndpointGroup
         groupBuilder.MapGet(GetAccount, "{id}").RequireAuthorization(Policies.AccountsRead);
         groupBuilder.MapPost(CreateAccount).RequireAuthorization(Policies.AccountsCreate);
         groupBuilder.MapPut(UpdateAccount, "{id}").RequireAuthorization(Policies.AccountsManage);
+        groupBuilder.MapPut(SetDividendReinvestment, "{accountId:guid}/dividend-reinvestment").RequireAuthorization(Policies.AccountsManage);
         groupBuilder.MapPost(CloseAccount, "{id}/close").RequireAuthorization(Policies.AccountsManage);
         groupBuilder.MapPost(ReopenAccount, "{id}/reopen").RequireAuthorization(Policies.AccountsManage);
         groupBuilder.MapGet(GetHoldings, "{id}/holdings").RequireAuthorization(Policies.AccountsRead);
@@ -121,6 +123,18 @@ public class Accounts : IEndpointGroup
     public static async Task<NoContent> UpdateAccount(ISender sender, Guid id, UpdateAccountCommand command)
     {
         command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Set the dividend reinvestment election")]
+    [EndpointDescription("Sets whether a Custodial account reinvests dividends that offer a reinvestment plan.")]
+    public static async Task<NoContent> SetDividendReinvestment(
+        ISender sender,
+        Guid accountId,
+        SetAccountDividendReinvestmentCommand command)
+    {
+        command.AccountId = accountId;
         await sender.Send(command);
         return TypedResults.NoContent();
     }

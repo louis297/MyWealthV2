@@ -30,6 +30,9 @@ public class UpdateAccountCommand : IRequest
 
     /// <summary>Refused when present (client-money-accounts R16).</summary>
     public string? DepositReference { get; init; }
+
+    /// <summary>Refused when present: the election has its own route (dividends R17).</summary>
+    public bool? ReinvestDividends { get; init; }
 }
 
 public class UpdateAccountCommandValidator : AbstractValidator<UpdateAccountCommand>
