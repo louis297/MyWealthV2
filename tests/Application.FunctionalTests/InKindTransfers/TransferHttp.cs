@@ -97,6 +97,16 @@ internal static class TransferHttp
         return await db.InKindTransfers.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.PublicId == id);
     }
 
+    /// <summary>Records a send attempt on the transfer straight in the database, as the send step does first (R34).</summary>
+    public static async Task RecordAttemptAsync(Guid id)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var transfer = await db.InKindTransfers.IgnoreQueryFilters().SingleAsync(row => row.PublicId == id);
+        transfer.RecordAttempt(DateTimeOffset.UtcNow);
+        await db.SaveChangesAsync();
+    }
+
     /// <summary>The number of Transactions on the account.</summary>
     public static async Task<int> TransactionCountAsync(Guid accountPublicId)
     {
