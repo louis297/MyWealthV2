@@ -74,7 +74,7 @@ internal static class CorporateActionReader
         var instrumentIds = rows.Select(row => row.InstrumentId).Distinct().ToList();
         var instruments = await db.Instruments.AsNoTracking()
             .Where(row => instrumentIds.Contains(row.Id))
-            .ToDictionaryAsync(row => row.Id, row => new CorporateActionInstrumentDto(row.PublicId, row.Symbol, row.Name), cancellationToken);
+            .ToDictionaryAsync(row => row.Id, row => new { Dto = new CorporateActionInstrumentDto(row.PublicId, row.Symbol, row.Name), row.QuoteCurrency }, cancellationToken);
 
         var userIds = rows.SelectMany(row => new[] { row.EffectiveByUserId, row.CancelledByUserId })
             .OfType<int>()
@@ -109,7 +109,7 @@ internal static class CorporateActionReader
             return new CorporateActionDto
             {
                 Id = row.PublicId,
-                Instrument = instruments[row.InstrumentId],
+                Instrument = instruments[row.InstrumentId].Dto,
                 Kind = row.Kind.ToString(),
                 RatioNew = row.RatioNew,
                 RatioHeld = row.RatioHeld,
@@ -127,6 +127,11 @@ internal static class CorporateActionReader
                 CancelledAt = row.CancelledAt,
                 CancelledBy = row.CancelledByUserId is int cancelledBy ? users.GetValueOrDefault(cancelledBy) : null,
                 CancelNote = row.CancelNote,
+                Dividend = row.Terms is { } terms
+                    ? new CorporateActionDividendDto(
+                        terms.AmountPerShare, instruments[row.InstrumentId].QuoteCurrency.Trim(), terms.TaxSource.ToString(),
+                        terms.ImputationCreditPerShare, terms.ForeignTaxRatePercent, terms.ReinvestmentPrice)
+                    : null,
                 Entitlements = new CorporateActionEntitlementCountsDto(posted + pending + notApplied, posted, pending, notApplied),
                 RowVersion = Convert.ToBase64String(row.RowVersion ?? [])
             };

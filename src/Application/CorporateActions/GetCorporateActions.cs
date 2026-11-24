@@ -30,6 +30,7 @@ public class GetCorporateActionsQueryValidator : AbstractValidator<GetCorporateA
 {
     private static readonly string[] Statuses = Enum.GetNames<CorporateActionStatus>();
     private static readonly string[] Origins = Enum.GetNames<CorporateActionOrigin>();
+    private static readonly string[] Kinds = Enum.GetNames<CorporateActionKind>();
 
     public GetCorporateActionsQueryValidator()
     {
@@ -41,6 +42,10 @@ public class GetCorporateActionsQueryValidator : AbstractValidator<GetCorporateA
         RuleFor(query => query.Status)
             .Must(status => GetCorporateActionsQuery.Names(status).All(name => Statuses.Contains(name, StringComparer.OrdinalIgnoreCase)))
             .WithMessage($"Status must be one or more of {string.Join(", ", Statuses)}, comma-separated.");
+        // Dividends R49: one or more kinds, comma-separated.
+        RuleFor(query => query.Kind)
+            .Must(kind => GetCorporateActionsQuery.Names(kind).All(name => Kinds.Contains(name, StringComparer.OrdinalIgnoreCase)))
+            .WithMessage($"Kind must be one or more of {string.Join(", ", Kinds)}, comma-separated.");
         RuleFor(query => query.Origin)
             .Must(origin => origin is null || Origins.Contains(origin.Trim(), StringComparer.OrdinalIgnoreCase))
             .WithMessage($"Origin must be one of {string.Join(", ", Origins)}.");
@@ -66,6 +71,15 @@ public class GetCorporateActionsQueryHandler(IApplicationDbContext db, ICurrentU
         {
             query = query.Where(action => db.Instruments.Any(instrument =>
                 instrument.Id == action.InstrumentId && instrument.PublicId == instrumentId));
+        }
+
+        var kinds = GetCorporateActionsQuery.Names(request.Kind)
+            .Select(name => Enum.Parse<CorporateActionKind>(name, ignoreCase: true))
+            .Distinct()
+            .ToList();
+        if (kinds.Count > 0)
+        {
+            query = query.Where(action => kinds.Contains(action.Kind));
         }
 
         if (request.Origin is not null)
