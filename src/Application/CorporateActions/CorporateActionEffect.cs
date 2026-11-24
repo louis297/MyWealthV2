@@ -98,21 +98,57 @@ internal static class CorporateActionEffect
                       && holding.Quantity > 0
                       && account.CustodyMode == CustodyMode.Custodial
                 orderby account.Id
-                select new { AccountId = account.Id, holding.Quantity })
+                select new
+                {
+                    AccountId = account.Id,
+                    holding.Quantity,
+                    account.ReinvestDividends,
+                    AccountCurrency = account.Currency,
+                    account.CustomerId,
+                    Assigned = db.AccountPortfolioAssignments.IgnoreQueryFilters()
+                        .Any(row => row.AccountId == account.Id && row.Status == AssignmentStatus.Active),
+                    Residency = db.CustomerTaxProfiles.IgnoreQueryFilters()
+                        .Where(row => row.UserId == account.CustomerId)
+                        .Select(row => (TaxResidency?)row.TaxResidency)
+                        .FirstOrDefault()
+                })
             .ToListAsync(cancellationToken);
 
+        // Dividends R18: with a plan, an entitlement reinvests only through the Tenant's safekeeping account in the
+        // quote currency.
+        var safekeeping = terms.ReinvestmentPrice is null
+            ? null
+            : await Custodian.OrderSafekeeping.ActiveAsync(db, action.TenantId, quoteCurrency, cancellationToken);
         var pending = 0;
+        var electionQuantity = 0m;
         foreach (var holding in holdings)
         {
+            var amounts = terms.SourceAmounts(holding.Quantity, places);
+            decimal? participating = null;
+            if (safekeeping is not null
+                && holding.ReinvestDividends
+                && string.Equals(holding.AccountCurrency.Trim(), quoteCurrency, StringComparison.Ordinal)
+                && !holding.Assigned
+                && amounts.Gross > 0m)
+            {
+                // R19: the New Zealand tax of the Customer's residency now stays in cash.
+                var tax = DividendWithholding.For(holding.Residency ?? CustomerTaxProfile.NotProvided.TaxResidency, terms.TaxSource);
+                var part = DividendWithholding.ParticipatingQuantity(holding.Quantity, terms, tax);
+                participating = part > 0m ? part : null;
+            }
+
             var entitlement = CorporateActionEntitlement.CreateDividend(
-                action.TenantId, action.Id, holding.AccountId, holding.Quantity, terms.SourceAmounts(holding.Quantity, places),
-                false, null, at);
+                action.TenantId, action.Id, holding.AccountId, holding.Quantity, amounts, participating is not null, participating, at);
             db.CorporateActionEntitlements.Add(entitlement);
+            electionQuantity += participating ?? 0m;
             if (entitlement.Status == EntitlementStatus.Pending)
             {
                 pending++;
             }
         }
+
+        // R20: the election of the dividend, in the same transaction.
+        action.SetElection(electionQuantity > 0m ? electionQuantity : null, electionQuantity > 0m ? safekeeping?.Id : null);
 
         if (pending == 0)
         {

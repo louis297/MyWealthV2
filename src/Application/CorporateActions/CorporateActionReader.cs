@@ -147,6 +147,10 @@ internal static class CorporateActionReader
                         instruments[row.InstrumentId].QuoteCurrency.Trim(),
                         row.ReceiptLineId is int lineId ? receipts.GetValueOrDefault(lineId) : null)
                     : null,
+                Election = row.Kind == CorporateActionKind.Dividend && row.ReinvestmentPrice is not null && row.ElectionStatus is { } election
+                    ? new CorporateActionElectionDto(election.ToString(), row.ElectionQuantity, 0, null, row.SharesReceived, null,
+                        row.ReleasedAt, null)
+                    : null,
                 Dividend = row.Terms is { } terms
                     ? new CorporateActionDividendDto(
                         terms.AmountPerShare, instruments[row.InstrumentId].QuoteCurrency.Trim(), terms.TaxSource.ToString(),

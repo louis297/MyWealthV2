@@ -61,6 +61,12 @@ public class CorporateAction : BaseAuditableEntity
 
     public int? SafekeepingAccountId { get; private set; }
 
+    /// <summary>Dividends R28, R30: the new shares the custodian delivered under an accepted election.</summary>
+    public decimal? SharesReceived { get; private set; }
+
+    /// <summary>Dividends R31: when a person released an accepted election whose shares did not arrive.</summary>
+    public DateTimeOffset? ReleasedAt { get; private set; }
+
     public DateOnly ExDate { get; private set; }
 
     public DateOnly? RecordDate { get; private set; }
@@ -173,6 +179,35 @@ public class CorporateAction : BaseAuditableEntity
         return true;
     }
 
+    /// <summary>Dividends R20: when the dividend goes ex, its election is <c>Pending</c> for the
+    /// <paramref name="quantity"/> of the firm's shares that take part, held in <paramref name="safekeepingAccountId"/>;
+    /// or <c>None</c> when nothing reinvests.</summary>
+    public void SetElection(decimal? quantity, int? safekeepingAccountId)
+    {
+        EnsureDividend();
+        if (Status != CorporateActionStatus.Effective && Status != CorporateActionStatus.Applied)
+        {
+            throw new DomainException("The election of a dividend is set when it goes ex.");
+        }
+
+        if (quantity is > 0m && safekeepingAccountId is not null)
+        {
+            if (ReinvestmentPrice is null)
+            {
+                throw new DomainException("Only a dividend with a reinvestment plan has an election.");
+            }
+
+            ElectionStatus = ReinvestmentElectionStatus.Pending;
+            ElectionQuantity = quantity;
+            SafekeepingAccountId = safekeepingAccountId;
+            return;
+        }
+
+        ElectionStatus = ReinvestmentElectionStatus.None;
+        ElectionQuantity = null;
+        SafekeepingAccountId = null;
+    }
+
     /// <summary>Dividends R24, R26: the dividend takes its one receipt, the statement line
     /// <paramref name="lineId"/> of <paramref name="amount"/>. Only while it waits for its payment.</summary>
     public void TakeReceipt(int lineId, decimal amount)
@@ -197,7 +232,13 @@ public class CorporateAction : BaseAuditableEntity
     public bool TryPay(DateTimeOffset at)
     {
         if (Kind != CorporateActionKind.Dividend || Status != CorporateActionStatus.Effective || PaidAt is not null
-            || ReceiptLineId is null)
+            || ReceiptLineId is null || ElectionStatus == ReinvestmentElectionStatus.Pending)
+        {
+            return false;
+        }
+
+        // R29: under an accepted election the custodian delivers shares in place of part of the cash.
+        if (ElectionStatus == ReinvestmentElectionStatus.Accepted && SharesReceived is null && ReleasedAt is null)
         {
             return false;
         }
