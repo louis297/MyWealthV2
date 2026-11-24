@@ -58,7 +58,22 @@ public sealed class TransactionDto
     /// <summary>Where a migrated opening balance came from, on a Transaction a migration batch wrote; otherwise null
     /// (migration-batches R31).</summary>
     public TransactionMigrationDto? Migration { get; init; }
+
+    /// <summary>The transfer behind a <c>StockIn</c> or <c>StockOut</c> an in-kind transfer wrote, and its Reversal;
+    /// otherwise null (in-kind-transfers R42).</summary>
+    public TransactionInKindTransferDto? InKindTransfer { get; init; }
 }
+
+/// <summary>In-kind-transfers R42: the transfer, the counterparty with the account masked, and the custodian's side.</summary>
+public sealed record TransactionInKindTransferDto(
+    Guid TransferId,
+    string Direction,
+    string CounterpartyName,
+    string CounterpartyAccount,
+    bool ChangesBeneficialOwner,
+    string? AcquiredOn,
+    string SettlementDate,
+    string CustodianReference);
 
 /// <summary>Migration-batches R31: the date the previous provider's statement was taken and the provider.</summary>
 public sealed record TransactionMigrationDto(string AsOfDate, string PreviousProvider);

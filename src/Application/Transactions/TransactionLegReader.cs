@@ -64,6 +64,20 @@ internal static class TransactionLegReader
                 transaction.MigrationDetail.PreviousProvider
             }).ToListAsync(cancellationToken);
 
+        var inKindRows = await (
+                from transaction in db.Transactions.AsNoTracking()
+                where transactionIds.Contains(transaction.Id) && transaction.InKindTransferDetail != null
+                join transfer in db.InKindTransfers.AsNoTracking()
+                    on transaction.InKindTransferDetail!.TransferPublicId equals transfer.PublicId into transfers
+                from transfer in transfers.DefaultIfEmpty()
+                select new
+                {
+                    transaction.Id,
+                    Detail = transaction.InKindTransferDetail!,
+                    Direction = transfer == null ? (MyWealthV2.Domain.Enums.TransferDirection?)null : transfer.Direction
+                })
+            .ToListAsync(cancellationToken);
+
         var interestRows = await db.TransactionInterestDetails.AsNoTracking()
             .Where(detail => transactionIds.Contains(detail.TransactionId))
             .ToListAsync(cancellationToken);
@@ -263,7 +277,18 @@ internal static class TransactionLegReader
                 }),
             migrationRows.ToDictionary(
                 row => row.Id,
-                row => new TransactionMigrationDto(row.AsOfDate.ToString("yyyy-MM-dd"), row.PreviousProvider)));
+                row => new TransactionMigrationDto(row.AsOfDate.ToString("yyyy-MM-dd"), row.PreviousProvider)),
+            inKindRows.ToDictionary(
+                row => row.Id,
+                row => new TransactionInKindTransferDto(
+                    row.Detail.TransferPublicId,
+                    (row.Direction ?? MyWealthV2.Domain.Enums.TransferDirection.In).ToString(),
+                    row.Detail.CounterpartyName,
+                    row.Detail.CounterpartyAccountMasked,
+                    row.Detail.ChangesBeneficialOwner,
+                    row.Detail.AcquiredOn?.ToString("yyyy-MM-dd"),
+                    row.Detail.SettlementDate.ToString("yyyy-MM-dd"),
+                    row.Detail.CustodianReference)));
     }
 }
 
@@ -277,4 +302,5 @@ internal sealed record TransactionLegs(
     IReadOnlyDictionary<int, TransactionInterestDto> Interest,
     IReadOnlyDictionary<int, TransactionCorporateActionDto> CorporateAction,
     IReadOnlyDictionary<int, TransactionExecutionDto> Execution,
-    IReadOnlyDictionary<int, TransactionMigrationDto> Migration);
+    IReadOnlyDictionary<int, TransactionMigrationDto> Migration,
+    IReadOnlyDictionary<int, TransactionInKindTransferDto> InKindTransfer);
