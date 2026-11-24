@@ -22,6 +22,7 @@ public class CorporateActions : IEndpointGroup
         groupBuilder.MapPut(UpdateCorporateAction, "{id:guid}").RequireAuthorization(Policies.CorporateActionsManage);
         groupBuilder.MapPost(CancelCorporateAction, "{id:guid}/cancel").RequireAuthorization(Policies.CorporateActionsManage);
         groupBuilder.MapPost(ApplyCorporateAction, "{id:guid}/apply").RequireAuthorization(Policies.CorporateActionsManage);
+        groupBuilder.MapPost(PayDividendInCash, "{id:guid}/pay-in-cash").RequireAuthorization(Policies.CorporateActionsManage);
     }
 
     [EndpointSummary("List corporate actions")]
@@ -72,6 +73,15 @@ public class CorporateActions : IEndpointGroup
     [EndpointSummary("Cancel a corporate action")]
     [EndpointDescription("Cancels a hand-entered corporate action that is still Announced, with a note.")]
     public static async Task<NoContent> CancelCorporateAction(ISender sender, Guid id, CancelCorporateActionCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Pay a dividend in cash")]
+    [EndpointDescription("Releases the accepted reinvestment election of a dividend whose shares did not arrive; every customer is paid in cash.")]
+    public static async Task<NoContent> PayDividendInCash(ISender sender, Guid id, PayDividendInCashCommand command)
     {
         command.Id = id;
         await sender.Send(command);

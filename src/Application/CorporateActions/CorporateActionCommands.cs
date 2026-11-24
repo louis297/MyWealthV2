@@ -300,3 +300,21 @@ public class ApplyCorporateActionCommandHandler(
         }, cancellationToken);
     }
 }
+
+/// <summary>Dividends R31: a TenantAdmin pays in cash a dividend whose accepted election delivered no shares.</summary>
+[Authorize(Policy = Policies.CorporateActionsManage)]
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed class PayDividendInCashCommand : IRequest
+{
+    [JsonIgnore]
+    public Guid Id { get; set; }
+
+    public string? RowVersion { get; init; }
+
+    public string? Note { get; init; }
+}
+
+public class PayDividendInCashCommandHandler : IRequestHandler<PayDividendInCashCommand>
+{
+    public Task Handle(PayDividendInCashCommand request, CancellationToken cancellationToken) => throw new NotImplementedException();
+}

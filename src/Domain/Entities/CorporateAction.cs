@@ -72,8 +72,21 @@ public class CorporateAction : BaseAuditableEntity
     /// <summary>Dividends R28, R30: the new shares the custodian delivered under an accepted election.</summary>
     public decimal? SharesReceived { get; private set; }
 
+    /// <summary>Dividends R28: the custody movement that delivered the new shares.</summary>
+    public int? SharesMovementId { get; private set; }
+
     /// <summary>Dividends R31: when a person released an accepted election whose shares did not arrive.</summary>
     public DateTimeOffset? ReleasedAt { get; private set; }
+
+    public int? ReleasedByUserId { get; private set; }
+
+    public string? ReleaseNote { get; private set; }
+
+    /// <summary>Dividends R28: the custodian delivered the new shares.</summary>
+    public void TakeShares(int movementId, decimal quantity) => throw new NotImplementedException();
+
+    /// <summary>Dividends R31: a person releases an accepted election whose shares did not arrive.</summary>
+    public void ReleaseElection(int byUserId, string note, DateTimeOffset at) => throw new NotImplementedException();
 
     public DateOnly ExDate { get; private set; }
 

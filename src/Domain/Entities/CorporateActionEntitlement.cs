@@ -168,6 +168,9 @@ public class CorporateActionEntitlement
         PostedAt = at.ToUniversalTime();
     }
 
+    /// <summary>Dividends R30: this entitlement's share of the delivered shares.</summary>
+    public void SetReinvestedQuantity(decimal quantity) => throw new NotImplementedException();
+
     /// <summary>R25: nothing was posted, for <paramref name="reason"/>.</summary>
     public void MarkNotApplied(EntitlementReason reason, DateTimeOffset at)
     {
