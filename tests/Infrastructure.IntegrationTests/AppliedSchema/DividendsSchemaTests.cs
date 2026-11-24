@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Domain.CorporateActions;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
+using MyWealthV2.Domain.ValueObjects;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Schema;
 using NUnit.Framework;
@@ -382,6 +383,52 @@ public class DividendsSchemaTests
                     entitlement.ForeignTax, entitlement.Reinvests, entitlement.ParticipatingQuantity)
                 .ShouldBe((EntitlementStatus.Pending, (decimal?)100m, (decimal?)100m, (decimal?)0m, (decimal?)15m, true,
                     (decimal?)78.82352941m));
+        }
+    }
+
+    [Test]
+    public async Task ADividendTransaction_WithItsTaxDetailsReinvestmentAndDetail_RoundTripsThroughEf()
+    {
+        await using var db = await ScratchSchemaDatabase.CreateAsync("dividendposting");
+        await db.ApplyAllAsync();
+        var row = (await db.ReadAsync($"""
+            {ScratchSchemaDatabase.TenantRows("a", Guid.NewGuid().ToString("N")[..12])}
+            SELECT @a_tenant, @a_instrument, @a_bank;
+            """)).Single();
+        var (tenantId, instrumentId, accountId) = (Convert.ToInt32(row[0]), Convert.ToInt32(row[1]), Convert.ToInt32(row[2]));
+        var terms = DividendTerms.Create(1.00m, DividendTaxSource.Foreign, null, 15m, 25m);
+        var posting = Transaction.PostDividend(
+            tenantId, accountId, "USD", 2, instrumentId, "VTI", "USD", terms, new DateOnly(2026, 11, 26), null,
+            new DateOnly(2026, 11, 30), 100m, terms.SourceAmounts(100m, 2), new DividendTax(TaxKind.Rwt, 33m), 2.68m, null,
+            new DateTimeOffset(2026, 11, 24, 4, 10, 31, TimeSpan.Zero), TransactionSource.CorporateAction(Guid.NewGuid()));
+        posting.CreatedBy = "test";
+        posting.CashLegs.ForEach(leg => leg.CreatedBy = "test");
+        posting.SecurityLegs.ForEach(leg => leg.CreatedBy = "test");
+        await using (var context = OpenDb(db.ConnectionString))
+        {
+            context.Set<Transaction>().Add(posting);
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = OpenDb(db.ConnectionString))
+        {
+            var stored = await context.Set<Transaction>().AsNoTracking()
+                .Include(transaction => transaction.CashLegs).ThenInclude(leg => leg.TaxDetail)
+                .Include(transaction => transaction.SecurityLegs)
+                .Include(transaction => transaction.DividendDetail)
+                .SingleAsync(transaction => transaction.Id == posting.Id);
+            stored.Type.ShouldBe(TransactionType.Dividend);
+            stored.CashLegs.Select(leg => (leg.Role, leg.Amount, leg.TaxDetail?.Kind)).ShouldBe(
+            [
+                (CashLegRole.Principal, 100m, null),
+                (CashLegRole.Tax, -15m, TaxKind.ForeignWithholding),
+                (CashLegRole.Tax, -18m, TaxKind.Rwt),
+                (CashLegRole.Reinvestment, -67m, null)
+            ], ignoreOrder: true);
+            stored.SecurityLegs.Single().Quantity.ShouldBe(2.68m);
+            (stored.DividendDetail!.Quantity, stored.DividendDetail.AmountPerShare, stored.DividendDetail.Currency,
+                    stored.DividendDetail.TaxSource, stored.DividendDetail.ReinvestedQuantity, stored.DividendDetail.ReinvestmentPrice)
+                .ShouldBe((100m, 1.00m, "USD", DividendTaxSource.Foreign, (decimal?)2.68m, (decimal?)25m));
         }
     }
 

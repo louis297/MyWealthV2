@@ -100,6 +100,8 @@ public interface IApplicationDbContext
 
     DbSet<TransactionCorporateActionDetail> TransactionCorporateActionDetails { get; }
 
+    DbSet<TransactionDividendDetail> TransactionDividendDetails { get; }
+
     DbSet<TransactionExecutionDetail> TransactionExecutionDetails { get; }
 
     DbSet<IdempotencyRecord> IdempotencyRecords { get; }

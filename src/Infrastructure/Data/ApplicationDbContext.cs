@@ -146,6 +146,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<TransactionCorporateActionDetail> TransactionCorporateActionDetails => Set<TransactionCorporateActionDetail>();
 
+    public DbSet<TransactionDividendDetail> TransactionDividendDetails => Set<TransactionDividendDetail>();
+
     public DbSet<TransactionExecutionDetail> TransactionExecutionDetails => Set<TransactionExecutionDetail>();
 
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();

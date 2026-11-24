@@ -37,4 +37,50 @@ public class TransactionDividendDetail
     public DateOnly? RecordDate { get; private set; }
 
     public DateOnly? PaymentDate { get; private set; }
+
+    internal static TransactionDividendDetail Create(
+        int tenantId,
+        int instrumentId,
+        decimal quantity,
+        decimal amountPerShare,
+        string currency,
+        DividendTaxSource taxSource,
+        decimal imputationCredit,
+        decimal? reinvestedQuantity,
+        decimal? reinvestmentPrice,
+        DateOnly exDate,
+        DateOnly? recordDate,
+        DateOnly? paymentDate)
+    {
+        if (quantity <= 0m || amountPerShare <= 0m || imputationCredit < 0m)
+        {
+            throw new DomainException("A dividend detail has a quantity and an amount per share above 0 and a credit of 0 or more.");
+        }
+
+        if ((reinvestedQuantity is null) != (reinvestmentPrice is null))
+        {
+            throw new DomainException("A dividend detail has the reinvested quantity and the plan price together.");
+        }
+
+        return new TransactionDividendDetail
+        {
+            TenantId = tenantId,
+            InstrumentId = instrumentId,
+            Quantity = quantity,
+            AmountPerShare = amountPerShare,
+            Currency = currency,
+            TaxSource = taxSource,
+            ImputationCredit = imputationCredit,
+            ReinvestedQuantity = reinvestedQuantity,
+            ReinvestmentPrice = reinvestmentPrice,
+            ExDate = exDate,
+            RecordDate = recordDate,
+            PaymentDate = paymentDate
+        };
+    }
+
+    /// <summary>A new row with the same values, for the Reversal (R39, R42).</summary>
+    internal TransactionDividendDetail Copy() =>
+        Create(TenantId, InstrumentId, Quantity, AmountPerShare, Currency, TaxSource, ImputationCredit, ReinvestedQuantity,
+            ReinvestmentPrice, ExDate, RecordDate, PaymentDate);
 }
