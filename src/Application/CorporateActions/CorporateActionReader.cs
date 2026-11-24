@@ -96,6 +96,12 @@ internal static class CorporateActionReader
 
         // Dividends R15: the expected amount counts every entitlement of the dividend, whoever the caller is.
         var dividendIds = rows.Where(row => row.Kind == CorporateActionKind.Dividend).Select(row => row.Id).ToList();
+        var receiptIds = rows.Where(row => row.ReceiptLineId is not null).Select(row => row.ReceiptLineId!.Value).ToList();
+        var receipts = receiptIds.Count == 0 || currentUser.Role != UserRole.TenantAdmin
+            ? new Dictionary<int, Guid>()
+            : await db.BankStatementLines.AsNoTracking()
+                .Where(row => receiptIds.Contains(row.Id))
+                .ToDictionaryAsync(row => row.Id, row => row.PublicId, cancellationToken);
         var dividendEntitlements = dividendIds.Count == 0
             ? []
             : await db.CorporateActionEntitlements.AsNoTracking()
@@ -137,9 +143,9 @@ internal static class CorporateActionReader
                 CancelledBy = row.CancelledByUserId is int cancelledBy ? users.GetValueOrDefault(cancelledBy) : null,
                 CancelNote = row.CancelNote,
                 Payment = row.Kind == CorporateActionKind.Dividend && row.EffectiveAt is not null
-                    ? new CorporateActionPaymentDto(
-                        DividendPayment.ExpectedAmount(dividendEntitlements.Where(item => item.CorporateActionId == row.Id), 0m),
-                        null, null, instruments[row.InstrumentId].QuoteCurrency.Trim(), null, null)
+                    ? Payment(row, DividendPayment.ExpectedAmount(dividendEntitlements.Where(item => item.CorporateActionId == row.Id), 0m),
+                        instruments[row.InstrumentId].QuoteCurrency.Trim(),
+                        row.ReceiptLineId is int lineId ? receipts.GetValueOrDefault(lineId) : null)
                     : null,
                 Dividend = row.Terms is { } terms
                     ? new CorporateActionDividendDto(
@@ -151,4 +157,9 @@ internal static class CorporateActionReader
             };
         }).ToList();
     }
+
+    /// <summary>Dividends R49: the payment block; the statement line only for a TenantAdmin.</summary>
+    private static CorporateActionPaymentDto Payment(CorporateAction row, decimal expected, string currency, Guid? statementLineId) =>
+        new(expected, row.ReceivedAmount, row.ReceivedAmount - expected, currency,
+            statementLineId == Guid.Empty ? null : statementLineId, null);
 }

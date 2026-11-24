@@ -162,6 +162,25 @@ public class CorporateAction : BaseAuditableEntity
         return true;
     }
 
+    /// <summary>Dividends R24, R26: the dividend takes its one receipt, the statement line
+    /// <paramref name="lineId"/> of <paramref name="amount"/>. Only while it waits for its payment.</summary>
+    public void TakeReceipt(int lineId, decimal amount)
+    {
+        EnsureDividend();
+        if (Status != CorporateActionStatus.Effective || ReceiptLineId is not null)
+        {
+            throw new DomainException("Only a dividend that waits for its payment can take a receipt.");
+        }
+
+        if (amount <= 0m)
+        {
+            throw new DomainException("A dividend receipt is above 0.");
+        }
+
+        ReceiptLineId = lineId;
+        ReceivedAmount = amount;
+    }
+
     /// <summary>R15: a <c>Manual</c> corporate action, <c>Announced</c>.</summary>
     public static CorporateAction Enter(
         int tenantId,

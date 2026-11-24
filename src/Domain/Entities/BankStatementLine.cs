@@ -254,6 +254,19 @@ public class BankStatementLine : BaseAuditableEntity
         UnmatchedReason = Enums.UnmatchedReason.PaymentMismatch;
     }
 
+    /// <summary>Dividends R24: the custodian's payment of a dividend, matched by its reference. No Account and no
+    /// Transaction: the dividend's entitlements are posted when it is paid.</summary>
+    public void MarkDividendReceipt(int corporateActionId, DateTimeOffset at)
+    {
+        EnsureCredit("matched");
+        EnsureStatus("matched", BankStatementLineStatus.Received);
+        SetMatch(null, null, StatementLineMatchMethod.Dividend, at);
+        CorporateActionId = corporateActionId;
+    }
+
+    /// <summary>Dividends R24: the line names a dividend but does not fit it.</summary>
+    public void MarkDividendMismatch() => MarkUnmatched(Enums.UnmatchedReason.DividendMismatch);
+
     /// <summary>The platform could not place it (R18).</summary>
     public void MarkUnmatched(UnmatchedReason reason)
     {
@@ -425,6 +438,7 @@ public class BankStatementLine : BaseAuditableEntity
         MatchMethod = null;
         MatchedAt = null;
         MigrationBatchId = null;
+        CorporateActionId = null;
     }
 
     private void SetMatch(int? accountId, int? transactionId, StatementLineMatchMethod method, DateTimeOffset at)
