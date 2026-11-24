@@ -1,0 +1,53 @@
+@page "/custodian"
+@inject IPlatformApi Api
+
+<PageTitle>Custodian</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">Custodian</MudText>
+<MudText Typo="Typo.body1" Class="mb-4">Configured custodian connections. A safekeeping account on a tenant names the connection its feed and transfers use.</MudText>
+
+@if (error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="my-4">@error</MudAlert>
+}
+else if (connections is not null)
+{
+    @if (connections.Count == 0)
+    {
+        <MudText Class="mt-4">No custodian connection is configured. No firm can hold a safekeeping account.</MudText>
+    }
+    else
+    {
+        <MudSimpleTable Hover="true" Dense="true" Bordered="true" Class="mt-4">
+            <thead>
+                <tr><th>Name</th><th>Adapter</th></tr>
+            </thead>
+            <tbody>
+            @foreach (var connection in connections)
+            {
+                <tr>
+                    <td>@connection.Name</td>
+                    <td>@connection.Adapter</td>
+                </tr>
+            }
+            </tbody>
+        </MudSimpleTable>
+    }
+}
+
+@code {
+    private IReadOnlyList<CustodianConnectionItem>? connections;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            connections = await Api.ListCustodianConnectionsAsync();
+        }
+        catch (PlatformApiException exception)
+        {
+            error = exception.Message;
+        }
+    }
+}

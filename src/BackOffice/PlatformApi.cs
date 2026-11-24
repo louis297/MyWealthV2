@@ -294,27 +294,45 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         return page.Items;
     }
 
-    public Task<IReadOnlyList<SafekeepingAccountItem>> ListSafekeepingAccountsAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<SafekeepingAccountItem>>([]);
+    public async Task<IReadOnlyList<SafekeepingAccountItem>> ListSafekeepingAccountsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        var page = await ReadAsync<SafekeepingAccountPage>(
+            HttpMethod.Get, $"{SafekeepingAccountsPath(tenantId)}?pageSize=100", json: null, cancellationToken);
+        return page.Items;
+    }
 
-    public Task<Guid> CreateSafekeepingAccountAsync(
+    public async Task<Guid> CreateSafekeepingAccountAsync(
         Guid tenantId,
         string currency,
         string custodianName,
         string accountName,
         string accountNumber,
         string custodianConnection,
-        CancellationToken cancellationToken = default) =>
-        Task.FromResult(Guid.Empty);
+        CancellationToken cancellationToken = default)
+    {
+        var created = await ReadAsync<Created>(
+            HttpMethod.Post,
+            SafekeepingAccountsPath(tenantId),
+            JsonSerializer.Serialize(new { currency, custodianName, accountName, accountNumber, custodianConnection }, Json),
+            cancellationToken);
+        return created.Id;
+    }
 
     public Task DisableSafekeepingAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
-        Task.CompletedTask;
+        SendExpectingSuccessAsync(HttpMethod.Post, $"{SafekeepingAccountsPath(tenantId)}/{id}/disable", RowVersion(rowVersion), cancellationToken);
 
     public Task EnableSafekeepingAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
-        Task.CompletedTask;
+        SendExpectingSuccessAsync(HttpMethod.Post, $"{SafekeepingAccountsPath(tenantId)}/{id}/enable", RowVersion(rowVersion), cancellationToken);
 
-    public Task<IReadOnlyList<CustodianConnectionItem>> ListCustodianConnectionsAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<CustodianConnectionItem>>([]);
+    public async Task<IReadOnlyList<CustodianConnectionItem>> ListCustodianConnectionsAsync(CancellationToken cancellationToken = default)
+    {
+        var page = await ReadAsync<CustodianConnectionPage>(HttpMethod.Get, "/custodian-connections", json: null, cancellationToken);
+        return page.Items;
+    }
+
+    private static string SafekeepingAccountsPath(Guid tenantId) => $"/tenants/{tenantId}/safekeeping-accounts";
 
     private static string ClientMoneyAccountsPath(Guid tenantId) => $"/tenants/{tenantId}/client-money-accounts";
 

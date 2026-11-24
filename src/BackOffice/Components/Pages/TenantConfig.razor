@@ -125,6 +125,85 @@ else
     </EditForm>
 </MudPaper>
 
+<MudText Typo="Typo.h5" Class="mt-8 mb-2">Safekeeping accounts</MudText>
+
+@if (safekeepingAccounts.Count == 0)
+{
+    <MudText>No safekeeping accounts. Holdings of this firm are not checked against a custodian.</MudText>
+}
+else
+{
+    <MudSimpleTable Hover="true" Dense="true" Bordered="true" Class="mt-2">
+        <thead>
+            <tr><th>Currency</th><th>Custodian</th><th>Account name</th><th>Account number</th><th>Connection</th><th>Feed</th><th>Positions as at</th><th>Active</th><th></th></tr>
+        </thead>
+        <tbody>
+        @foreach (var row in safekeepingAccounts)
+        {
+            <tr>
+                <td>@row.Currency</td>
+                <td>@row.CustodianName</td>
+                <td>@row.AccountName</td>
+                <td>@row.AccountNumber</td>
+                <td>@row.CustodianConnection</td>
+                <td>@CustodianText.Feed(row.CustodianFeed)</td>
+                <td>@CustodianText.PositionsAt(row.CustodianFeed)</td>
+                <td>@(row.IsActive ? "Yes" : "No")</td>
+                <td>
+                    @if (row.IsActive)
+                    {
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Error" data-safekeeping-account="@row.Id" OnClick="() => DisableSafekeepingAccount(row)">Disable</MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Success" data-safekeeping-account="@row.Id" OnClick="() => EnableSafekeepingAccount(row)">Enable</MudButton>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </MudSimpleTable>
+}
+
+<MudText Typo="Typo.h6" Class="mt-6 mb-2">Add safekeeping account</MudText>
+<MudPaper Class="pa-4" Outlined="true">
+    <EditForm Model="newSafekeeping" OnValidSubmit="AddSafekeepingAccount" FormName="new-safekeeping-account">
+        <MudStack Spacing="3" Style="max-width: 28rem;">
+            <MudSelect T="string" @bind-Value="newSafekeeping.Currency" Label="Currency" Variant="Variant.Outlined"
+                       Error="@HasSafekeepingError("Currency")" ErrorText="@SafekeepingError("Currency")">
+                @foreach (var currency in currencies)
+                {
+                    <MudSelectItem T="string" Value="@currency.Code">@currency.Code</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField @bind-Value="newSafekeeping.CustodianName" Label="Custodian name" Variant="Variant.Outlined"
+                          Error="@HasSafekeepingError("CustodianName")" ErrorText="@SafekeepingError("CustodianName")" />
+            <MudTextField @bind-Value="newSafekeeping.AccountName" Label="Account name" Variant="Variant.Outlined"
+                          Error="@HasSafekeepingError("AccountName")" ErrorText="@SafekeepingError("AccountName")" />
+            <MudTextField @bind-Value="newSafekeeping.AccountNumber" Label="Account number" Variant="Variant.Outlined"
+                          Error="@HasSafekeepingError("AccountNumber")" ErrorText="@SafekeepingError("AccountNumber")" />
+            @if (custodianConnections.Count == 0)
+            {
+                <MudText Color="Color.Warning">No custodian connection is configured.</MudText>
+            }
+            else
+            {
+                <MudSelect T="string" @bind-Value="newSafekeeping.CustodianConnection" Label="Custodian connection" Variant="Variant.Outlined"
+                           Error="@HasSafekeepingError("CustodianConnection")" ErrorText="@SafekeepingError("CustodianConnection")">
+                    @foreach (var connection in custodianConnections)
+                    {
+                        <MudSelectItem T="string" Value="@connection.Name">@connection.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+            <MudStack Row="true" Spacing="2">
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                           Disabled="@(custodianConnections.Count == 0)">Add safekeeping account</MudButton>
+            </MudStack>
+        </MudStack>
+    </EditForm>
+</MudPaper>
+
 <MudText Typo="Typo.h5" Class="mt-8 mb-2">Interest runs</MudText>
 
 @if (interestRuns.Count == 0)
@@ -179,6 +258,10 @@ else
     private IReadOnlyDictionary<string, string> fieldErrors = new Dictionary<string, string>();
     private readonly ClientMoneyAccountForm newAccount = new();
     private IReadOnlyList<InterestRunItem> interestRuns = [];
+    private IReadOnlyList<SafekeepingAccountItem> safekeepingAccounts = [];
+    private IReadOnlyList<CustodianConnectionItem> custodianConnections = [];
+    private IReadOnlyDictionary<string, string> safekeepingErrors = new Dictionary<string, string>();
+    private readonly SafekeepingAccountForm newSafekeeping = new();
     private readonly InterestRunForm runForm = new();
     private string? error;
 
@@ -191,6 +274,9 @@ else
             newAccount.Currency = currencies.FirstOrDefault()?.Code ?? "";
             bankConnections = await Api.ListBankConnectionsAsync();
             newAccount.BankConnection = bankConnections.Count == 1 ? bankConnections[0].Name : "";
+            newSafekeeping.Currency = newAccount.Currency;
+            custodianConnections = await Api.ListCustodianConnectionsAsync();
+            newSafekeeping.CustodianConnection = custodianConnections.Count == 1 ? custodianConnections[0].Name : "";
         }
         catch (PlatformApiException exception)
         {
@@ -205,6 +291,7 @@ else
             reports = await Api.ListReportGrantsAsync(TenantId);
             clientMoneyAccounts = await Api.ListClientMoneyAccountsAsync(TenantId);
             interestRuns = await Api.ListInterestRunsAsync(TenantId);
+            safekeepingAccounts = await Api.ListSafekeepingAccountsAsync(TenantId);
             error = null;
         }
         catch (PlatformApiException exception)
@@ -288,6 +375,57 @@ else
         }
     }
 
+    private bool HasSafekeepingError(string field) => safekeepingErrors.ContainsKey(field);
+
+    private string? SafekeepingError(string field) => safekeepingErrors.GetValueOrDefault(field);
+
+    /// <summary>In-kind transfers BO30: a 400 (a second active account in the currency, a number in use) is shown at its field.</summary>
+    private async Task AddSafekeepingAccount()
+    {
+        try
+        {
+            await Api.CreateSafekeepingAccountAsync(
+                TenantId, newSafekeeping.Currency, newSafekeeping.CustodianName, newSafekeeping.AccountName, newSafekeeping.AccountNumber,
+                newSafekeeping.CustodianConnection);
+            safekeepingErrors = new Dictionary<string, string>();
+            newSafekeeping.CustodianName = "";
+            newSafekeeping.AccountName = "";
+            newSafekeeping.AccountNumber = "";
+            await Load();
+        }
+        catch (PlatformApiException exception)
+        {
+            safekeepingErrors = ValidationErrors.From(exception);
+            error = safekeepingErrors.Count == 0 ? exception.Message : null;
+        }
+    }
+
+    private async Task DisableSafekeepingAccount(SafekeepingAccountItem row)
+    {
+        try
+        {
+            await Api.DisableSafekeepingAccountAsync(TenantId, row.Id, row.RowVersion);
+            await Load();
+        }
+        catch (PlatformApiException exception)
+        {
+            error = ValidationErrors.From(exception).Values.FirstOrDefault() ?? exception.Message;
+        }
+    }
+
+    private async Task EnableSafekeepingAccount(SafekeepingAccountItem row)
+    {
+        try
+        {
+            await Api.EnableSafekeepingAccountAsync(TenantId, row.Id, row.RowVersion);
+            await Load();
+        }
+        catch (PlatformApiException exception)
+        {
+            error = ValidationErrors.From(exception).Values.FirstOrDefault() ?? exception.Message;
+        }
+    }
+
     /// <summary>BO21: runs interest for the as-of date at once; a 400 at AsOfDate is shown at the date.</summary>
     private async Task StartInterestRun()
     {
@@ -326,6 +464,15 @@ else
     private sealed class InterestRunForm
     {
         public string AsOfDate { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1).ToString("yyyy-MM-dd");
+    }
+
+    private sealed class SafekeepingAccountForm
+    {
+        public string Currency { get; set; } = "";
+        public string CustodianName { get; set; } = "";
+        public string AccountName { get; set; } = "";
+        public string AccountNumber { get; set; } = "";
+        public string CustodianConnection { get; set; } = "";
     }
 
     private sealed class ClientMoneyAccountForm
