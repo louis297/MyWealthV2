@@ -86,7 +86,9 @@ public class GetCorporateActionAnnouncementsQueryHandler(IApplicationDbContext d
             Items = rows.Select(row => new CorporateActionAnnouncementDto(
                 row.PublicId, row.Connection, row.OutsideId, row.PartyActionId, row.Version, row.PartyStatus.ToString(), row.Symbol,
                 row.Currency.Trim(), row.Kind?.ToString(), row.RatioNew, row.RatioHeld, row.ExDate, row.RecordDate, row.PaymentDate,
-                row.ReceivedAt, row.Status.ToString(), row.SkipReason?.ToString(), row.ProcessedAt)).ToList(),
+                row.ReceivedAt, row.Status.ToString(), row.SkipReason?.ToString(), row.ProcessedAt,
+                row.AmountPerShare, row.TaxSource?.ToString(), row.ImputationCreditPerShare, row.ForeignTaxRatePercent,
+                row.ReinvestmentPrice)).ToList(),
             Page = request.Page,
             PageSize = request.PageSize,
             TotalCount = totalCount

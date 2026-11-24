@@ -72,7 +72,8 @@ public sealed class PullCorporateActions(
         }
 
         return page.Items.All(item => CorporateActionAnnouncement.IsStorable(
-            item.Id, item.ActionId, item.Version, item.Status, item.Symbol, item.Currency, item.RatioNew, item.RatioHeld, item.ExDate))
+            item.Id, item.ActionId, item.Version, item.Status, item.Symbol, item.Currency, item.RatioNew, item.RatioHeld, item.ExDate,
+            item.Kind, item.AmountPerShare, item.TaxSource))
             ? null
             : MarketDataFailure.InvalidItem;
     }
@@ -107,7 +108,9 @@ public sealed class PullCorporateActions(
 
                 db.CorporateActionAnnouncements.Add(CorporateActionAnnouncement.Receive(
                     connection, item.Id!, item.ActionId!, item.Version!.Value, item.Status!.Value, item.Symbol!, item.Currency!,
-                    item.Kind, item.RatioNew!.Value, item.RatioHeld!.Value, item.ExDate!.Value, item.RecordDate, item.PaymentDate, now));
+                    item.Kind, item.RatioNew, item.RatioHeld, item.ExDate!.Value, item.RecordDate, item.PaymentDate, now,
+                    item.AmountPerShare, item.TaxSource, item.ImputationCreditPerShare, item.ForeignTaxRatePercent,
+                    item.ReinvestmentPrice));
                 added++;
             }
 
