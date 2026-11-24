@@ -8,6 +8,7 @@ using MyWealthV2.Application.FunctionalTests.Instruments;
 using MyWealthV2.Application.FunctionalTests.Orders;
 using MyWealthV2.Application.FunctionalTests.Transactions;
 using MyWealthV2.Domain.Entities;
+using MyWealthV2.Domain.Enums;
 using MyWealthV2.Infrastructure.Data;
 
 namespace MyWealthV2.Application.FunctionalTests.InKindTransfers;
@@ -106,6 +107,34 @@ internal static class TransferHttp
         return await scope.ServiceProvider.GetRequiredService<MyWealthV2.Application.Custodian.SendInKindTransfers>().RunAsync(connection);
     }
 
+    public static InMemoryCustodianFeed Feed => FunctionalTestSetup.WebApiServices.GetRequiredService<InMemoryCustodianFeed>();
+
+    /// <summary>Runs the pull step of <c>custodian-sync:simulator</c> (R10).</summary>
+    public static async Task<MyWealthV2.Application.Custodian.CustodianPullOutcome> PullAsync(string connection = SafekeepingHttp.Connection)
+    {
+        await using var scope = FunctionalTestSetup.WebApiServices.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<MyWealthV2.Application.Custodian.PullCustodyMovements>().RunAsync(connection);
+    }
+
+    public static async Task<List<CustodyMovement>> MovementsAsync(int safekeepingAccountId)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await db.CustodyMovements.IgnoreQueryFilters().AsNoTracking()
+            .Where(row => row.SafekeepingAccountId == safekeepingAccountId).OrderBy(row => row.Id).ToListAsync();
+    }
+
+    public static async Task<(CustodianFeedCursor? Cursor, List<CustodianPosition> Positions)> FeedStateAsync(int safekeepingAccountId)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var cursor = await db.CustodianFeedCursors.IgnoreQueryFilters().AsNoTracking()
+            .SingleOrDefaultAsync(row => row.SafekeepingAccountId == safekeepingAccountId);
+        var positions = await db.CustodianPositions.IgnoreQueryFilters().AsNoTracking()
+            .Where(row => row.SafekeepingAccountId == safekeepingAccountId).OrderBy(row => row.Symbol).ToListAsync();
+        return (cursor, positions);
+    }
+
     /// <summary>Records a send attempt on the transfer straight in the database, as the send step does first (R34).</summary>
     public static async Task RecordAttemptAsync(Guid id)
     {
@@ -193,6 +222,23 @@ internal sealed record TransferWorld(OrderWorld Orders, SafekeepingAccount Safek
     /// <summary>Requests a transfer as the Adviser.</summary>
     public Task<Guid> RequestAsync(string direction = "In", decimal quantity = 100m) =>
         TransferHttp.RequestAsync(Adviser, Body(direction, quantity));
+
+    /// <summary>Requests, approves and sends a transfer; the fake custodian accepts it.</summary>
+    public async Task<Guid> SentAsync(string direction = "In", decimal quantity = 100m)
+    {
+        var id = await ApprovedAsync(direction, quantity);
+        await TransferHttp.SendAsync();
+        return id;
+    }
+
+    /// <summary>The custodian's movement that confirms <paramref name="transferId"/>, added to the fake feed.</summary>
+    public string AddConfirmation(Guid transferId, string direction = "In", decimal quantity = 100m, string symbol = "ACME")
+    {
+        var movement = TransferHttp.Feed.AddMovement(Safekeeping.AccountNumber,
+            direction == "In" ? CustodyMovementDirection.In : CustodyMovementDirection.Out, symbol, quantity,
+            instructionId: transferId.ToString());
+        return movement.Id!;
+    }
 
     /// <summary>Requests as the Adviser and approves as Tess.</summary>
     public async Task<Guid> ApprovedAsync(string direction = "In", decimal quantity = 100m)

@@ -220,6 +220,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<MyWealthV2.Application.Custodian.ICustodianFeed, MyWealthV2.Infrastructure.Custodian.CustodianFeedDispatcher>();
         builder.Services.AddScoped<MyWealthV2.Application.Custodian.ICustodianTransfers, MyWealthV2.Infrastructure.Custodian.CustodianTransfersDispatcher>();
         builder.Services.AddScoped<MyWealthV2.Application.Custodian.SendInKindTransfers>();
+        builder.Services.AddScoped<MyWealthV2.Application.Custodian.PullCustodyMovements>();
     }
 
     /// <summary>

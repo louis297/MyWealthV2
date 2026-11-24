@@ -72,6 +72,9 @@ public class WebApiFactory(
             services.RemoveAll<MyWealthV2.Application.Custodian.ICustodianTransfers>();
             services.AddSingleton<InKindTransfers.InMemoryCustodianTransfers>();
             services.AddSingleton<MyWealthV2.Application.Custodian.ICustodianTransfers>(sp => sp.GetRequiredService<InKindTransfers.InMemoryCustodianTransfers>());
+            services.RemoveAll<MyWealthV2.Application.Custodian.ICustodianFeed>();
+            services.AddSingleton<InKindTransfers.InMemoryCustodianFeed>();
+            services.AddSingleton<MyWealthV2.Application.Custodian.ICustodianFeed>(sp => sp.GetRequiredService<InKindTransfers.InMemoryCustodianFeed>());
             services.RemoveAll<MyWealthV2.Application.Broker.IBrokerConnections>();
             services.AddSingleton<Broker.FakeBrokerConnections>();
             services.AddSingleton<MyWealthV2.Application.Broker.IBrokerConnections>(sp => sp.GetRequiredService<Broker.FakeBrokerConnections>());
