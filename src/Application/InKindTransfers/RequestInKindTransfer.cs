@@ -232,6 +232,28 @@ public class RequestInKindTransferCommandHandler(
 
         await InKindTransferRules.SafekeepingAccountAsync(db, connections, tenantId, quote, instrument.Symbol, cancellationToken);
 
+        // R26: a transfer out takes only the transferable quantity, read under the Account lock.
+        if (direction == TransferDirection.Out)
+        {
+            var held = await db.Holdings.AsNoTracking()
+                .Where(row => row.AccountId == account.Id && row.InstrumentId == instrument.Id)
+                .Select(row => (decimal?)row.Quantity)
+                .SingleOrDefaultAsync(cancellationToken) ?? 0m;
+            var reserved = await Orders.OrderReservations.ReservedQuantityAsync(db, account.Id, instrument.Id, cancellationToken);
+            var unsettled = await Orders.OrderReservations.UnsettledQuantityAsync(db, account.Id, instrument.Id, cancellationToken);
+            var transferable = Domain.Custody.TransferableQuantity.Of(held, reserved, unsettled);
+            if (!Domain.Custody.TransferableQuantity.Allows(request.Quantity!.Value, transferable))
+            {
+                var message = $"The account has {Orders.OrderChecks.Units(transferable)} {instrument.Symbol} available to transfer.";
+                if (unsettled > 0m)
+                {
+                    message += $" {Orders.OrderChecks.Units(unsettled)} is from purchases that have not settled.";
+                }
+
+                throw InKindTransferRules.Error(nameof(RequestInKindTransferCommand.Quantity), message);
+            }
+        }
+
         var transfer = InKindTransfer.Request(
             tenantId, account.Id, instrument.Id, direction, request.Quantity!.Value, quote,
             direction == TransferDirection.In ? request.Cost : null, request.AcquiredOn, request.ChangesBeneficialOwner!.Value,

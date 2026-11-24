@@ -40,7 +40,7 @@ public class GetAccountHoldingsTests : TestBase
         var bndItem = items[0];
         bndItem.EnumerateObject().Select(property => property.Name).ShouldBe([
             "id", "accountId", "instrumentId", "symbol", "name", "quantity", "cost", "costCurrency", "reservedQuantity",
-            "availableQuantity"
+            "availableQuantity", "unsettledQuantity", "transferableQuantity"
         ]);
         bndItem.GetProperty("id").GetGuid().ShouldBe(await HoldingPublicIdAsync(accountId, bnd));
         bndItem.GetProperty("accountId").GetGuid().ShouldBe(accountId);

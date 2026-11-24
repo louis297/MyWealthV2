@@ -49,11 +49,32 @@ public class GetAccountHoldingsQueryHandler(IApplicationDbContext db, ICurrentUs
             .Select(group => new { InstrumentId = group.Key, Quantity = group.Sum(order => order.ReservedQuantity) })
             .ToDictionaryAsync(row => row.InstrumentId, row => row.Quantity, cancellationToken);
 
+        // In-kind-transfers R43: the open transfers out reserve too.
+        var transfersOut = await db.InKindTransfers.AsNoTracking()
+            .Where(row => row.AccountId == accountRow.Id && row.Direction == TransferDirection.Out
+                          && (row.Status == InKindTransferStatus.Requested || row.Status == InKindTransferStatus.Approved
+                              || row.Status == InKindTransferStatus.Sent))
+            .GroupBy(row => row.InstrumentId)
+            .Select(group => new { InstrumentId = group.Key, Quantity = group.Sum(row => row.Quantity) })
+            .ToDictionaryAsync(row => row.InstrumentId, row => row.Quantity, cancellationToken);
+
+        // In-kind-transfers R44: the posted buy fills that have not settled.
+        var unsettled = await (
+                from fill in db.OrderFills.AsNoTracking()
+                join order in db.Orders.AsNoTracking() on fill.OrderId equals order.Id
+                where order.AccountId == accountRow.Id && order.Side == OrderSide.Buy
+                      && fill.Status == OrderFillStatus.Posted && fill.SettledAt == null
+                group fill by order.InstrumentId into grouped
+                select new { InstrumentId = grouped.Key, Quantity = grouped.Sum(fill => fill.Quantity) })
+            .ToDictionaryAsync(row => row.InstrumentId, row => row.Quantity, cancellationToken);
+
         return new AccountHoldingsDto
         {
             Items = rows
                 .Select(row => AccountHoldingDto.From(
-                    accountRow, row.holding, row.instrument, reserved.GetValueOrDefault(row.instrument.Id)))
+                    accountRow, row.holding, row.instrument,
+                    reserved.GetValueOrDefault(row.instrument.Id) + transfersOut.GetValueOrDefault(row.instrument.Id),
+                    unsettled.GetValueOrDefault(row.instrument.Id)))
                 .ToList()
         };
     }

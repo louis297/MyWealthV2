@@ -189,19 +189,57 @@ internal static class OrderChecks
         new([new ValidationFailure(property, message)]);
 }
 
-/// <summary>Orders R40: the quantity an Account's live sell orders reserve in an Instrument, and what is left.</summary>
+/// <summary>
+/// Orders R40, in-kind-transfers R43, R44: the quantity an Account's live sell orders and open transfers out reserve in
+/// an Instrument, the quantity of its buy fills that have not settled, and what is left. The one read of these
+/// quantities, used by the sell order check, the adjustment, the transfer out and the holdings item.
+/// </summary>
 internal static class OrderReservations
 {
-    /// <summary>The sum of the reserved quantity of the Account's sell orders in the Instrument. An order that is not
-    /// live reserves 0, so this is a plain sum.</summary>
+    /// <summary>The reserved quantity of the Account's sell orders in the Instrument (an order that is not live reserves
+    /// 0) plus the quantity of its open transfers out in it (in-kind-transfers R43).</summary>
     public static async Task<decimal> ReservedQuantityAsync(
         IApplicationDbContext db,
         int accountId,
         int instrumentId,
-        CancellationToken cancellationToken) =>
-        await db.Orders.IgnoreQueryFilters()
+        CancellationToken cancellationToken)
+    {
+        var orders = await db.Orders.IgnoreQueryFilters()
             .Where(row => row.AccountId == accountId && row.InstrumentId == instrumentId && row.Side == OrderSide.Sell)
             .SumAsync(row => (decimal?)row.ReservedQuantity, cancellationToken) ?? 0m;
+        return orders + await TransfersOutAsync(db, accountId, instrumentId, cancellationToken);
+    }
+
+    /// <summary>In-kind-transfers R43: the quantity of the Account's open transfers out in the Instrument.</summary>
+    public static async Task<decimal> TransfersOutAsync(
+        IApplicationDbContext db, int accountId, int instrumentId, CancellationToken cancellationToken) =>
+        await db.InKindTransfers.IgnoreQueryFilters()
+            .Where(row => row.AccountId == accountId && row.InstrumentId == instrumentId && row.Direction == TransferDirection.Out
+                          && (row.Status == InKindTransferStatus.Requested || row.Status == InKindTransferStatus.Approved
+                              || row.Status == InKindTransferStatus.Sent))
+            .SumAsync(row => (decimal?)row.Quantity, cancellationToken) ?? 0m;
+
+    /// <summary>In-kind-transfers R44: the quantity of the Account's posted buy fills in the Instrument that are not settled
+    /// and not broken.</summary>
+    public static async Task<decimal> UnsettledQuantityAsync(
+        IApplicationDbContext db, int accountId, int instrumentId, CancellationToken cancellationToken) =>
+        await UnsettledFills(db, accountId).Where(row => row.InstrumentId == instrumentId)
+            .SumAsync(row => (decimal?)row.Quantity, cancellationToken) ?? 0m;
+
+    /// <summary>In-kind-transfers R44: the posted buy fills of an Account that are not settled, with their Instrument.</summary>
+    public static IQueryable<UnsettledFill> UnsettledFills(IApplicationDbContext db, int accountId) =>
+        from fill in db.OrderFills.IgnoreQueryFilters()
+        join order in db.Orders.IgnoreQueryFilters() on fill.OrderId equals order.Id
+        where order.AccountId == accountId && order.Side == OrderSide.Buy
+              && fill.Status == OrderFillStatus.Posted && fill.SettledAt == null
+        select new UnsettledFill { InstrumentId = order.InstrumentId, Quantity = fill.Quantity };
+
+    internal sealed class UnsettledFill
+    {
+        public int InstrumentId { get; init; }
+
+        public decimal Quantity { get; init; }
+    }
 
     /// <summary>Orders R14: true when the Account has a live order: an open one, or one with a fill that is not
     /// posted yet.</summary>

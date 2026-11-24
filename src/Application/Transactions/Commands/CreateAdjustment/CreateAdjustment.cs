@@ -254,7 +254,7 @@ public class CreateAdjustmentCommandHandler(
                 throw new ValidationException([
                     new ValidationFailure(
                         nameof(CreateAdjustmentCommand.Security),
-                        $"{Orders.OrderChecks.Units(reserved)} {symbol} is reserved for sell orders.")
+                        $"{Orders.OrderChecks.Units(reserved)} {symbol} is reserved for sell orders and transfers out.")
                 ]);
             }
         }

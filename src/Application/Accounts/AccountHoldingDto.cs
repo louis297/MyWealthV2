@@ -20,7 +20,14 @@ public sealed class AccountHoldingDto
     /// <summary>The quantity minus the reserved quantity (orders R40).</summary>
     public required decimal AvailableQuantity { get; init; }
 
-    public static AccountHoldingDto From(Account account, Holding holding, Instrument instrument, decimal reservedQuantity) => new()
+    /// <summary>The quantity of posted buy fills that have not settled; 0 on an External account (in-kind-transfers R44).</summary>
+    public required decimal UnsettledQuantity { get; init; }
+
+    /// <summary>The available quantity minus the unsettled quantity, never below 0 (in-kind-transfers R44).</summary>
+    public required decimal TransferableQuantity { get; init; }
+
+    public static AccountHoldingDto From(
+        Account account, Holding holding, Instrument instrument, decimal reservedQuantity, decimal unsettledQuantity) => new()
     {
         Id = holding.PublicId,
         AccountId = account.PublicId,
@@ -32,5 +39,7 @@ public sealed class AccountHoldingDto
         CostCurrency = holding.CostCurrency,
         ReservedQuantity = reservedQuantity,
         AvailableQuantity = Domain.Custody.AvailableQuantity.Of(holding.Quantity, reservedQuantity),
+        UnsettledQuantity = unsettledQuantity,
+        TransferableQuantity = Domain.Custody.TransferableQuantity.Of(holding.Quantity, reservedQuantity, unsettledQuantity),
     };
 }
