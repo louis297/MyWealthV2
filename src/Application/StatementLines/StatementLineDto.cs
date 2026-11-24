@@ -48,6 +48,9 @@ public sealed class StatementLineDto
     /// <summary>Migration-batches R30: the batch the line funds, else null.</summary>
     public Guid? MigrationBatchId { get; init; }
 
+    /// <summary>Dividends R53: the dividend the line is the receipt of, else null.</summary>
+    public Guid? CorporateActionId { get; init; }
+
     /// <summary>The newest return payment of a receipt marked for return, else null (bank-returns R11).</summary>
     public StatementLineReturnPaymentDto? ReturnPayment { get; init; }
 

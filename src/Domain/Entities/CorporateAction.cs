@@ -44,6 +44,12 @@ public class CorporateAction : BaseAuditableEntity
 
     public decimal? ReinvestmentPrice { get; private set; }
 
+    /// <summary>Dividends R24, R26: the statement line that paid the dividend into the client money account, and its
+    /// amount; at most one, never undone.</summary>
+    public int? ReceiptLineId { get; private set; }
+
+    public decimal? ReceivedAmount { get; private set; }
+
     public DateOnly ExDate { get; private set; }
 
     public DateOnly? RecordDate { get; private set; }

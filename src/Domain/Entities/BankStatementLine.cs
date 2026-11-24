@@ -90,6 +90,9 @@ public class BankStatementLine : BaseAuditableEntity
     /// <summary>Migration-batches R13: the migration batch this receipt funds, while it is matched to one.</summary>
     public int? MigrationBatchId { get; private set; }
 
+    /// <summary>Dividends R24, R26: the dividend this line is the receipt of.</summary>
+    public int? CorporateActionId { get; private set; }
+
     public byte[] RowVersion { get; private set; } = null!;
 
     /// <summary>A line as the bank sent it, in status <c>Received</c> (R10–R12). Payer name and reference are

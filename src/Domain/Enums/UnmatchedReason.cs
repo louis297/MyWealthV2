@@ -31,5 +31,8 @@ public enum UnmatchedReason
     AccountClosing = 12,
 
     /// <summary>A receipt that names a trade settlement it does not match (trade-settlement R19).</summary>
-    SettlementMismatch = 13
+    SettlementMismatch = 13,
+
+    /// <summary>A receipt that names a dividend it does not fit (dividends R24).</summary>
+    DividendMismatch = 14
 }
