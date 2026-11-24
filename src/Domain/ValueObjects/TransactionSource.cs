@@ -111,7 +111,15 @@ public sealed class TransactionSource : ValueObject
     }
 
     /// <summary>An in-kind transfer's posting: the PublicId of the transfer (in-kind-transfers R37, R49).</summary>
-    public static TransactionSource InKindTransfer(Guid transferPublicId) => throw new NotImplementedException();
+    public static TransactionSource InKindTransfer(Guid transferPublicId)
+    {
+        if (transferPublicId == Guid.Empty)
+        {
+            throw new DomainException("An in-kind transfer source needs the transfer's PublicId.");
+        }
+
+        return new TransactionSource(TransactionSourceKind.InKindTransfer, transferPublicId);
+    }
 
     /// <summary>The source as stored on a Transaction row.</summary>
     internal static TransactionSource FromStored(TransactionSourceKind kind, Guid? publicId) =>
@@ -127,7 +135,7 @@ public sealed class TransactionSource : ValueObject
             TransactionSourceKind.CorporateAction => CorporateAction(publicId ?? Guid.Empty),
             TransactionSourceKind.OrderFill => OrderFill(publicId ?? Guid.Empty),
             TransactionSourceKind.Migration => Migration(publicId ?? Guid.Empty),
-            TransactionSourceKind.InKindTransfer => new TransactionSource(kind, publicId),
+            TransactionSourceKind.InKindTransfer => InKindTransfer(publicId ?? Guid.Empty),
             _ => new TransactionSource(kind, publicId)
         };
 

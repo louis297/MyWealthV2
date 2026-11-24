@@ -7,8 +7,9 @@ namespace MyWealthV2.Domain.Custody;
 public static class TransferableQuantity
 {
     /// <summary><c>Max(0, quantity − reserved − unsettled)</c>.</summary>
-    public static decimal Of(decimal quantity, decimal reserved, decimal unsettled) => throw new NotImplementedException();
+    public static decimal Of(decimal quantity, decimal reserved, decimal unsettled) =>
+        Math.Max(0m, quantity - reserved - unsettled);
 
     /// <summary>True when a transfer out of <paramref name="quantity"/> fits in <paramref name="transferable"/>.</summary>
-    public static bool Allows(decimal quantity, decimal transferable) => throw new NotImplementedException();
+    public static bool Allows(decimal quantity, decimal transferable) => quantity > 0 && quantity <= transferable;
 }

@@ -43,10 +43,55 @@ public class SafekeepingAccount : BaseAuditableEntity
         string accountName,
         string accountNumber,
         string custodianConnection,
-        Guid? publicId = null) =>
-        throw new NotImplementedException();
+        Guid? publicId = null)
+    {
+        if (currency is null || string.IsNullOrWhiteSpace(currency.Code))
+        {
+            throw new DomainException("Currency is required.");
+        }
 
-    public void Disable() => throw new NotImplementedException();
+        if (!currency.IsActive)
+        {
+            throw new DomainException("Currency must be enabled.");
+        }
 
-    public void Enable() => throw new NotImplementedException();
+        if (!BankConnectionName.IsValid(custodianConnection))
+        {
+            throw new DomainException(
+                $"Custodian connection must be 1 to {BankConnectionName.MaxLength} characters: a lower-case letter, then lower-case letters, digits and hyphens.");
+        }
+
+        if (!ClientMoneyAccount.IsValidAccountNumber(accountNumber))
+        {
+            throw new DomainException(
+                $"Account number must be 1 to {AccountNumberMaxLength} letters, digits, spaces and hyphens, with no two spaces in a row.");
+        }
+
+        return new SafekeepingAccount
+        {
+            TenantId = tenantId,
+            Currency = currency.Code.ToUpperInvariant(),
+            CustodianName = Text(custodianName, CustodianNameMaxLength, "Custodian name"),
+            AccountName = Text(accountName, AccountNameMaxLength, "Account name"),
+            AccountNumber = accountNumber.Trim(),
+            CustodianConnection = custodianConnection,
+            PublicId = publicId ?? Guid.NewGuid(),
+            IsActive = true
+        };
+    }
+
+    public void Disable() => IsActive = false;
+
+    public void Enable() => IsActive = true;
+
+    private static string Text(string value, int maxLength, string label)
+    {
+        var trimmed = value?.Trim() ?? string.Empty;
+        if (trimmed.Length < 1 || trimmed.Length > maxLength)
+        {
+            throw new DomainException($"{label} must be 1 to {maxLength} characters.");
+        }
+
+        return trimmed;
+    }
 }

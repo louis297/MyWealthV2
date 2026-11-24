@@ -89,7 +89,7 @@ public class CustodyMovement : BaseAuditableEntity
     public byte[] RowVersion { get; private set; } = null!;
 
     /// <summary><c>In</c> plus, <c>Out</c> minus.</summary>
-    public decimal SignedQuantity => throw new NotImplementedException();
+    public decimal SignedQuantity => Direction == CustodyMovementDirection.In ? Quantity : -Quantity;
 
     /// <summary>R11, R13: a new movement, <c>Received</c>. Free text is trimmed and cut to its length.</summary>
     public static CustodyMovement Receive(
@@ -111,24 +111,158 @@ public class CustodyMovement : BaseAuditableEntity
         string? counterpartyAccount,
         string? reference,
         DateTimeOffset receivedAt,
-        Guid? publicId = null) =>
-        throw new NotImplementedException();
+        Guid? publicId = null)
+    {
+        if (quantity <= 0)
+        {
+            throw new DomainException("A custody movement's quantity must be greater than 0.");
+        }
+
+        var trimmedOutsideId = outsideId?.Trim() ?? string.Empty;
+        if (trimmedOutsideId.Length is 0 or > OutsideIdMaxLength)
+        {
+            throw new DomainException($"A custody movement's outside id must be 1 to {OutsideIdMaxLength} characters.");
+        }
+
+        var trimmedSymbol = symbol?.Trim() ?? string.Empty;
+        if (trimmedSymbol.Length is 0 or > SymbolMaxLength)
+        {
+            throw new DomainException($"A custody movement's symbol must be 1 to {SymbolMaxLength} characters.");
+        }
+
+        if (string.IsNullOrWhiteSpace(currency) || currency.Trim().Length != 3)
+        {
+            throw new DomainException("A custody movement's currency is required.");
+        }
+
+        return new CustodyMovement
+        {
+            TenantId = tenantId,
+            SafekeepingAccountId = safekeepingAccountId,
+            Connection = connection,
+            OutsideId = trimmedOutsideId,
+            Direction = direction,
+            Kind = kind,
+            Symbol = trimmedSymbol,
+            Currency = currency.Trim().ToUpperInvariant(),
+            InstrumentId = instrumentId,
+            Quantity = quantity,
+            SettlementDate = settlementDate,
+            InstructionId = Cut(instructionId, ReferenceIdMaxLength),
+            TradeReference = Cut(tradeReference, ReferenceIdMaxLength),
+            CorporateActionReference = Cut(corporateActionReference, ReferenceIdMaxLength),
+            CounterpartyName = Cut(counterpartyName, CounterpartyNameMaxLength),
+            CounterpartyAccount = Cut(counterpartyAccount, CounterpartyAccountMaxLength),
+            Reference = Cut(reference, ReferenceMaxLength),
+            ReceivedAt = receivedAt,
+            Status = CustodyMovementStatus.Received,
+            PublicId = publicId ?? Guid.NewGuid()
+        };
+    }
 
     /// <summary>R36: the movement confirmed its transfer and posted its Transaction.</summary>
-    public void MatchToTransfer(int accountId, int transactionId, int inKindTransferId) => throw new NotImplementedException();
+    public void MatchToTransfer(int accountId, int transactionId, int inKindTransferId)
+    {
+        EnsureReceived();
+        Status = CustodyMovementStatus.Matched;
+        MatchMethod = CustodyMatchMethod.Transfer;
+        AccountId = accountId;
+        TransactionId = transactionId;
+        InKindTransferId = inKindTransferId;
+    }
 
     /// <summary>R16: the movement is the delivery of a fill.</summary>
-    public void MatchToFill(long orderFillId) => throw new NotImplementedException();
+    public void MatchToFill(long orderFillId)
+    {
+        EnsureReceived();
+        Status = CustodyMovementStatus.Matched;
+        MatchMethod = CustodyMatchMethod.Trade;
+        OrderFillId = orderFillId;
+    }
 
     /// <summary>R17: the movement is the custodian's side of a corporate action.</summary>
-    public void MatchToCorporateAction(int corporateActionId) => throw new NotImplementedException();
+    public void MatchToCorporateAction(int corporateActionId)
+    {
+        EnsureReceived();
+        Status = CustodyMovementStatus.Matched;
+        MatchMethod = CustodyMatchMethod.CorporateAction;
+        CorporateActionId = corporateActionId;
+    }
 
     /// <summary>R15: the movement waits in suspense with <paramref name="reason"/>.</summary>
-    public void Leave(CustodyUnmatchedReason reason) => throw new NotImplementedException();
+    public void Leave(CustodyUnmatchedReason reason)
+    {
+        EnsureReceived();
+        Status = CustodyMovementStatus.Unmatched;
+        UnmatchedReason = reason;
+    }
 
     /// <summary>R18: a person has dealt with a movement in suspense. It keeps its reason.</summary>
-    public void Ignore(int byUserId, DateTimeOffset at, string note) => throw new NotImplementedException();
+    public void Ignore(int byUserId, DateTimeOffset at, string note)
+    {
+        EnsureStatus(CustodyMovementStatus.Unmatched, "ignored");
+        var trimmed = Note(note) ?? throw new DomainException("Note is required.");
+        Status = CustodyMovementStatus.Ignored;
+        Record(CustodyMovementAction.Ignore, byUserId, at, trimmed);
+    }
 
     /// <summary>R18: an ignored movement is in suspense again.</summary>
-    public void Reopen(int byUserId, DateTimeOffset at, string? note) => throw new NotImplementedException();
+    public void Reopen(int byUserId, DateTimeOffset at, string? note)
+    {
+        EnsureStatus(CustodyMovementStatus.Ignored, "reopened");
+        var trimmed = Note(note);
+        Status = CustodyMovementStatus.Unmatched;
+        Record(CustodyMovementAction.Reopen, byUserId, at, trimmed);
+    }
+
+    private void Record(CustodyMovementAction action, int byUserId, DateTimeOffset at, string? note)
+    {
+        LastAction = action;
+        LastActionByUserId = byUserId;
+        LastActionAt = at;
+        LastActionNote = note;
+    }
+
+    private void EnsureReceived()
+    {
+        if (Status != CustodyMovementStatus.Received)
+        {
+            throw new CustodyMovementStatusException($"This movement is {Status} and has already been processed.");
+        }
+    }
+
+    private void EnsureStatus(CustodyMovementStatus from, string action)
+    {
+        if (Status != from)
+        {
+            throw new CustodyMovementStatusException($"This movement is {Status} and cannot be {action}.");
+        }
+    }
+
+    private static string? Note(string? note)
+    {
+        var trimmed = note?.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return null;
+        }
+
+        if (trimmed.Length > NoteMaxLength)
+        {
+            throw new DomainException($"Note must be at most {NoteMaxLength} characters.");
+        }
+
+        return trimmed;
+    }
+
+    private static string? Cut(string? value, int maxLength)
+    {
+        var trimmed = value?.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return null;
+        }
+
+        return trimmed.Length > maxLength ? trimmed[..maxLength].TrimEnd() : trimmed;
+    }
 }

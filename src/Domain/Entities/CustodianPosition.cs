@@ -20,6 +20,20 @@ public class CustodianPosition
 
     public decimal Quantity { get; private set; }
 
-    public static CustodianPosition Create(int tenantId, int safekeepingAccountId, string symbol, decimal quantity) =>
-        throw new NotImplementedException();
+    public static CustodianPosition Create(int tenantId, int safekeepingAccountId, string symbol, decimal quantity)
+    {
+        var trimmed = symbol?.Trim() ?? string.Empty;
+        if (trimmed.Length is 0 or > SymbolMaxLength)
+        {
+            throw new DomainException($"A position symbol must be 1 to {SymbolMaxLength} characters.");
+        }
+
+        return new CustodianPosition
+        {
+            TenantId = tenantId,
+            SafekeepingAccountId = safekeepingAccountId,
+            Symbol = trimmed,
+            Quantity = quantity
+        };
+    }
 }

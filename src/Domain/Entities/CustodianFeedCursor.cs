@@ -30,11 +30,26 @@ public class CustodianFeedCursor
     public byte[] RowVersion { get; private set; } = null!;
 
     /// <summary>A cursor before the first read: no cursor, nothing tried yet.</summary>
-    public static CustodianFeedCursor Start(int tenantId, int safekeepingAccountId) => throw new NotImplementedException();
+    public static CustodianFeedCursor Start(int tenantId, int safekeepingAccountId) =>
+        new() { TenantId = tenantId, SafekeepingAccountId = safekeepingAccountId };
 
     /// <summary>R10, R12: a page and its positions were stored at <paramref name="at"/>.</summary>
-    public void StorePage(string? cursor, DateTimeOffset at) => throw new NotImplementedException();
+    public void StorePage(string? cursor, DateTimeOffset at)
+    {
+        if (cursor is { Length: > CursorMaxLength })
+        {
+            throw new DomainException($"A custodian feed cursor is at most {CursorMaxLength} characters.");
+        }
+
+        Cursor = cursor;
+        LastSucceededAt = at;
+        PositionsAt = at;
+    }
 
     /// <summary>R10: a read failed; the cursor and the positions stay.</summary>
-    public void RecordFailure(CustodianFailure failure, DateTimeOffset at) => throw new NotImplementedException();
+    public void RecordFailure(CustodianFailure failure, DateTimeOffset at)
+    {
+        LastFailure = failure;
+        LastFailedAt = at;
+    }
 }

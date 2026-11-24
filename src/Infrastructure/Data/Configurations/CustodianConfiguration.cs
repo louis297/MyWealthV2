@@ -128,6 +128,7 @@ public class InKindTransferConfiguration : IEntityTypeConfiguration<InKindTransf
         builder.ToTable("InKindTransfers");
         builder.Ignore(row => row.IsOpen);
         builder.Ignore(row => row.ReservedQuantity);
+        builder.Ignore(row => row.WasAsked);
         builder.Property(row => row.PublicId).IsRequired();
         builder.Property(row => row.Quantity).HasColumnType("decimal(18,8)");
         builder.Property(row => row.Currency).HasColumnType("char(3)").IsFixedLength().IsRequired();

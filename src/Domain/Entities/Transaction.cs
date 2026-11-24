@@ -98,8 +98,14 @@ public class Transaction : BaseAuditableEntity
         string quoteCurrency,
         DateTimeOffset bookedAt,
         TransactionSource source,
-        Custody.InKindTransferOrigin origin) =>
-        throw new NotImplementedException();
+        Custody.InKindTransferOrigin origin)
+    {
+        EnsureInKindTransfer(source);
+        var transaction = PostStockIn(tenantId, accountId, accountType, instrumentId, quantity, cost, quoteCurrency, bookedAt,
+            TransferInMemo, null, source);
+        transaction.InKindTransferDetail = TransactionInKindTransferDetail.Create(tenantId, origin);
+        return transaction;
+    }
 
     /// <summary>
     /// In-kind-transfers R37: the <c>StockOut</c> of a transfer out. One security leg of <c>−quantity</c> releasing cost
@@ -117,8 +123,22 @@ public class Transaction : BaseAuditableEntity
         TransactionSource source,
         Custody.InKindTransferOrigin origin,
         decimal currentQuantity,
-        decimal currentCost) =>
-        throw new NotImplementedException();
+        decimal currentCost)
+    {
+        EnsureInKindTransfer(source);
+        var transaction = PostStockOut(tenantId, accountId, accountType, instrumentId, quantity, quoteCurrency, bookedAt,
+            TransferOutMemo, null, source, currentQuantity, currentCost);
+        transaction.InKindTransferDetail = TransactionInKindTransferDetail.Create(tenantId, origin);
+        return transaction;
+    }
+
+    private static void EnsureInKindTransfer(TransactionSource source)
+    {
+        if (source.Kind != TransactionSourceKind.InKindTransfer)
+        {
+            throw new DomainException("A transfer of securities in kind comes from an in-kind transfer.");
+        }
+    }
 
     /// <summary>Migration-batches R22: the memo of every Transaction a migration batch writes.</summary>
     public const string OpeningBalanceMemo = "Opening balance";

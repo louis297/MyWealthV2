@@ -315,8 +315,11 @@ public class CustodianSchemaTests
         }
     }
 
-    /// <summary>A tenant (<c>@a_*</c>).</summary>
-    private static string World() => ScratchSchemaDatabase.TenantRows("a", Guid.NewGuid().ToString("N")[..12]);
+    /// <summary>A tenant (<c>@a_*</c>) and <c>#sk</c>, the safekeeping accounts inserted.</summary>
+    private static string World() => ScratchSchemaDatabase.TenantRows("a", Guid.NewGuid().ToString("N")[..12]) + """
+
+        CREATE TABLE #sk ([Id] int);
+        """;
 
     /// <summary>The first safekeeping account <see cref="Safekeeping"/> inserted.</summary>
     private const string Sk = "(SELECT MIN([Id]) FROM #sk)";
@@ -326,7 +329,6 @@ public class CustodianSchemaTests
             ([PublicId], [TenantId], [Currency], [CustodianName], [AccountName], [AccountNumber], [CustodianConnection], [IsActive], [Created], [CreatedBy])
         VALUES (NEWID(), @{tenant}_tenant, '{currency}', N'Simulator Custody', N'Nominees',
                 {number ?? $"N'SK-{Guid.NewGuid().ToString("N")[..12]}'"}, N'simulator', {(active ? 1 : 0)}, SYSDATETIMEOFFSET(), N'test');
-        IF OBJECT_ID('tempdb..#sk') IS NULL CREATE TABLE #sk ([Id] int);
         INSERT INTO #sk VALUES (SCOPE_IDENTITY());
         """;
 
