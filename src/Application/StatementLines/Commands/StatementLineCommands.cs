@@ -26,6 +26,9 @@ public sealed class MatchStatementLineCommand : IRequest
     /// <summary>Migration-batches R13: the batch this receipt funds, in place of an account.</summary>
     public Guid? MigrationBatchId { get; init; }
 
+    /// <summary>Dividends R26: the dividend this receipt pays, in place of an account or a migration batch.</summary>
+    public Guid? CorporateActionId { get; init; }
+
     public string? RowVersion { get; init; }
 
     public string? Note { get; init; }
