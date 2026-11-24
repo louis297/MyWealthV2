@@ -1,0 +1,134 @@
+namespace MyWealthV2.Domain.Entities;
+
+/// <summary>
+/// The custodian's inbound record of one change of its position in one instrument of a safekeeping account
+/// (docs/features/in-kind-transfers.md R8–R19; ADR 0021 rule 7). Stored once per (connection, outside id), then
+/// processed once: <c>Matched</c> to a transfer, a fill or a corporate action, or <c>Unmatched</c> with a reason.
+/// A person can only ignore or reopen it.
+/// </summary>
+public class CustodyMovement : BaseAuditableEntity
+{
+    public const int OutsideIdMaxLength = 100;
+    public const int SymbolMaxLength = 32;
+    public const int ReferenceIdMaxLength = 100;
+    public const int CounterpartyNameMaxLength = 140;
+    public const int CounterpartyAccountMaxLength = 34;
+    public const int ReferenceMaxLength = 140;
+    public const int NoteMaxLength = 200;
+
+    private CustodyMovement()
+    {
+    }
+
+    public Guid PublicId { get; private set; }
+
+    public int TenantId { get; private set; }
+
+    public int SafekeepingAccountId { get; private set; }
+
+    /// <summary>The safekeeping account's connection when the movement was read (R10).</summary>
+    public string Connection { get; private set; } = string.Empty;
+
+    public string OutsideId { get; private set; } = string.Empty;
+
+    public CustodyMovementDirection Direction { get; private set; }
+
+    /// <summary>Null for a kind the adapter did not know (R11).</summary>
+    public CustodyMovementKind? Kind { get; private set; }
+
+    public string Symbol { get; private set; } = string.Empty;
+
+    public string Currency { get; private set; } = string.Empty;
+
+    /// <summary>R13: the Tenant's Instrument with this symbol and quote currency when the movement was stored.</summary>
+    public int? InstrumentId { get; private set; }
+
+    public decimal Quantity { get; private set; }
+
+    public DateOnly SettlementDate { get; private set; }
+
+    public string? InstructionId { get; private set; }
+
+    public string? TradeReference { get; private set; }
+
+    /// <summary>The issuer's id of the event, as the custodian sent it in <c>corporateActionId</c> (R11, R17).</summary>
+    public string? CorporateActionReference { get; private set; }
+
+    public string? CounterpartyName { get; private set; }
+
+    public string? CounterpartyAccount { get; private set; }
+
+    public string? Reference { get; private set; }
+
+    public DateTimeOffset ReceivedAt { get; private set; }
+
+    public CustodyMovementStatus Status { get; private set; }
+
+    public CustodyMatchMethod? MatchMethod { get; private set; }
+
+    public CustodyUnmatchedReason? UnmatchedReason { get; private set; }
+
+    public int? AccountId { get; private set; }
+
+    public int? TransactionId { get; private set; }
+
+    public int? InKindTransferId { get; private set; }
+
+    public long? OrderFillId { get; private set; }
+
+    public int? CorporateActionId { get; private set; }
+
+    public CustodyMovementAction? LastAction { get; private set; }
+
+    public int? LastActionByUserId { get; private set; }
+
+    public DateTimeOffset? LastActionAt { get; private set; }
+
+    public string? LastActionNote { get; private set; }
+
+    public byte[] RowVersion { get; private set; } = null!;
+
+    /// <summary><c>In</c> plus, <c>Out</c> minus.</summary>
+    public decimal SignedQuantity => throw new NotImplementedException();
+
+    /// <summary>R11, R13: a new movement, <c>Received</c>. Free text is trimmed and cut to its length.</summary>
+    public static CustodyMovement Receive(
+        int tenantId,
+        int safekeepingAccountId,
+        string connection,
+        string outsideId,
+        CustodyMovementDirection direction,
+        CustodyMovementKind? kind,
+        string symbol,
+        string currency,
+        int? instrumentId,
+        decimal quantity,
+        DateOnly settlementDate,
+        string? instructionId,
+        string? tradeReference,
+        string? corporateActionReference,
+        string? counterpartyName,
+        string? counterpartyAccount,
+        string? reference,
+        DateTimeOffset receivedAt,
+        Guid? publicId = null) =>
+        throw new NotImplementedException();
+
+    /// <summary>R36: the movement confirmed its transfer and posted its Transaction.</summary>
+    public void MatchToTransfer(int accountId, int transactionId, int inKindTransferId) => throw new NotImplementedException();
+
+    /// <summary>R16: the movement is the delivery of a fill.</summary>
+    public void MatchToFill(long orderFillId) => throw new NotImplementedException();
+
+    /// <summary>R17: the movement is the custodian's side of a corporate action.</summary>
+    public void MatchToCorporateAction(int corporateActionId) => throw new NotImplementedException();
+
+    /// <summary>R15: the movement waits in suspense with <paramref name="reason"/>.</summary>
+    public void Leave(CustodyUnmatchedReason reason) => throw new NotImplementedException();
+
+    /// <summary>R18: a person has dealt with a movement in suspense. It keeps its reason.</summary>
+    public void Ignore(int byUserId, DateTimeOffset at, string note) => throw new NotImplementedException();
+
+    /// <summary>R18: an ignored movement is in suspense again.</summary>
+    public void Reopen(int byUserId, DateTimeOffset at, string? note) => throw new NotImplementedException();
+}

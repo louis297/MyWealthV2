@@ -36,5 +36,9 @@ public enum TransactionSourceKind
     OrderFill = 8,
 
     /// <summary>A migration batch's opening balance; the source id is the batch's PublicId (migration-batches R27).</summary>
-    Migration = 9
+    Migration = 9,
+
+    /// <summary>An in-kind transfer's <c>StockIn</c> or <c>StockOut</c>; the source id is the transfer's PublicId
+    /// (in-kind-transfers R37, R49).</summary>
+    InKindTransfer = 10
 }
