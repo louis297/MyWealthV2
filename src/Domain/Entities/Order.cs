@@ -136,6 +136,13 @@ public class Order : BaseAuditableEntity
     /// <summary>Trade-settlement R3, R4: the trust account number sent to the broker with the order.</summary>
     public string? SettlementAccountNumber { get; private set; }
 
+    /// <summary>In-kind-transfers R46: the Tenant's active safekeeping account in the order's quote currency when it
+    /// was placed, with <see cref="SafekeepingAccountNumber"/>; both or neither, never changed.</summary>
+    public int? SafekeepingAccountId { get; private set; }
+
+    /// <summary>In-kind-transfers R47: the safekeeping account number sent to the broker with the order.</summary>
+    public string? SafekeepingAccountNumber { get; private set; }
+
     /// <summary>Rebalances R15, R27: the rebalance that placed the order; null on a person's order.</summary>
     public int? RebalanceId { get; private set; }
 
@@ -177,7 +184,8 @@ public class Order : BaseAuditableEntity
         DateTimeOffset placedAt,
         Guid? publicId = null,
         ClientMoneyAccount? settlementAccount = null,
-        int? rebalanceId = null)
+        int? rebalanceId = null,
+        SafekeepingAccount? safekeepingAccount = null)
     {
         if (quantity <= 0m || decimal.Round(quantity, QuantityDecimals) != quantity)
         {
