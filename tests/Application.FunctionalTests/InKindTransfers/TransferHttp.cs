@@ -97,6 +97,15 @@ internal static class TransferHttp
         return await db.InKindTransfers.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.PublicId == id);
     }
 
+    public static InMemoryCustodianTransfers Custodian => FunctionalTestSetup.WebApiServices.GetRequiredService<InMemoryCustodianTransfers>();
+
+    /// <summary>Runs the send step of <c>custodian-sync:simulator</c> (R34).</summary>
+    public static async Task<MyWealthV2.Application.Custodian.CustodianSendOutcome> SendAsync(string connection = SafekeepingHttp.Connection)
+    {
+        await using var scope = FunctionalTestSetup.WebApiServices.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<MyWealthV2.Application.Custodian.SendInKindTransfers>().RunAsync(connection);
+    }
+
     /// <summary>Records a send attempt on the transfer straight in the database, as the send step does first (R34).</summary>
     public static async Task RecordAttemptAsync(Guid id)
     {

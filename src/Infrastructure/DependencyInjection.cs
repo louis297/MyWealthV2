@@ -216,6 +216,10 @@ public static class DependencyInjection
             MyWealthV2.Infrastructure.Custodian.CustodianConnectionsConfiguration.Read(builder.Configuration, host));
         builder.Services.AddSingleton(connections);
         builder.Services.AddSingleton<MyWealthV2.Application.Custodian.ICustodianConnections>(connections);
+        // ADR 0021 rule 3: each port is dispatched to the adapter its connection names.
+        builder.Services.AddScoped<MyWealthV2.Application.Custodian.ICustodianFeed, MyWealthV2.Infrastructure.Custodian.CustodianFeedDispatcher>();
+        builder.Services.AddScoped<MyWealthV2.Application.Custodian.ICustodianTransfers, MyWealthV2.Infrastructure.Custodian.CustodianTransfersDispatcher>();
+        builder.Services.AddScoped<MyWealthV2.Application.Custodian.SendInKindTransfers>();
     }
 
     /// <summary>
