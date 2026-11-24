@@ -18,6 +18,12 @@ public static class WithholdingRates
     /// <summary>NRWT on interest where no double tax agreement applies.</summary>
     public const decimal NonResident = 15m;
 
+    /// <summary>Dividends R33: RWT on a dividend, one rate for every New Zealand Customer.</summary>
+    public const decimal DividendRwt = 0m;
+
+    /// <summary>Dividends R33: NRWT on a New Zealand company's dividend where no double tax agreement applies.</summary>
+    public const decimal DividendNrwt = 0m;
+
     public static bool IsElective(decimal ratePercent) => Elective.Contains(ratePercent);
 
     /// <summary>R4 for the three attributes of a tax profile.</summary>
