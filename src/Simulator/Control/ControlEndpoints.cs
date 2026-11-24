@@ -146,6 +146,8 @@ public static class ControlEndpoints
 
             // Simulated instruments R23, corporate-actions R47: the market and its corporate actions are emptied and its
             // standing instruments added again, priced on the first day of the new world (its clock starts at real now).
+            // Dividends R63: the custodian's dividend payments point at the market's dividends and its accounts.
+            await db.CustodianDividendPayments.ExecuteDeleteAsync(http.RequestAborted);
             await db.MarketCorporateActionVersions.ExecuteDeleteAsync(http.RequestAborted);
             await db.MarketCorporateActions.ExecuteDeleteAsync(http.RequestAborted);
             await db.MarketPrices.ExecuteDeleteAsync(http.RequestAborted);

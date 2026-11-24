@@ -7,7 +7,29 @@ public enum MarketCorporateActionKind
 {
     Split = 0,
     Consolidation = 1,
-    Bonus = 2
+    Bonus = 2,
+
+    /// <summary>Cash per share held, with terms in place of a ratio (dividends R54).</summary>
+    Dividend = 3
+}
+
+/// <summary>Whether the issuer of a dividend is resident in New Zealand (dividends R3, R54).</summary>
+public enum MarketDividendTaxSource
+{
+    NewZealand = 0,
+    Foreign = 1
+}
+
+/// <summary>The terms of a simulated dividend, per share (dividends R54).</summary>
+public sealed record MarketDividendTerms(
+    decimal AmountPerShare,
+    MarketDividendTaxSource TaxSource,
+    decimal ImputationCreditPerShare,
+    decimal ForeignTaxRatePercent,
+    decimal? ReinvestmentPrice)
+{
+    /// <summary>R59: the dividend per share net of the foreign tax the custodian keeps.</summary>
+    public decimal NetPerShare => AmountPerShare * (1m - ForeignTaxRatePercent / 100m);
 }
 
 /// <summary>The issuer's status of a simulated corporate action (R39–R42).</summary>
@@ -36,9 +58,28 @@ public sealed class MarketCorporateAction
 
     public MarketCorporateActionKind Kind { get; private set; }
 
-    public int RatioNew { get; private set; }
+    public int? RatioNew { get; private set; }
 
-    public int RatioHeld { get; private set; }
+    public int? RatioHeld { get; private set; }
+
+    /// <summary>Dividends R54: the terms of a dividend, each <c>null</c> on another kind.</summary>
+    public decimal? AmountPerShare { get; private set; }
+
+    public MarketDividendTaxSource? TaxSource { get; private set; }
+
+    public decimal? ImputationCreditPerShare { get; private set; }
+
+    public decimal? ForeignTaxRatePercent { get; private set; }
+
+    public decimal? ReinvestmentPrice { get; private set; }
+
+    /// <summary>Dividends R59: the simulator day the custodian paid the dividend.</summary>
+    public DateOnly? PaidOn { get; private set; }
+
+    public MarketDividendTerms? Terms => Kind == MarketCorporateActionKind.Dividend
+        ? new MarketDividendTerms(AmountPerShare!.Value, TaxSource!.Value, ImputationCreditPerShare ?? 0m, ForeignTaxRatePercent ?? 0m,
+            ReinvestmentPrice)
+        : null;
 
     public DateOnly ExDate { get; private set; }
 
@@ -104,6 +145,50 @@ public sealed class MarketCorporateAction
         return action;
     }
 
+    /// <summary>Dividends R54: a dividend, <c>Announced</c>, version 1.</summary>
+    public static MarketCorporateAction AnnounceDividend(
+        int number,
+        int instrumentId,
+        MarketDividendTerms terms,
+        DateOnly exDate,
+        DateOnly? recordDate,
+        DateOnly paymentDate)
+    {
+        var action = new MarketCorporateAction
+        {
+            Number = number,
+            InstrumentId = instrumentId,
+            Kind = MarketCorporateActionKind.Dividend,
+            Status = MarketCorporateActionStatus.Announced
+        };
+        action.SetDividend(terms, exDate, recordDate, paymentDate);
+        action.AppendVersion();
+        return action;
+    }
+
+    /// <summary>Dividends R55: new terms and dates while <c>Announced</c>.</summary>
+    public void AmendDividend(MarketDividendTerms terms, DateOnly exDate, DateOnly? recordDate, DateOnly paymentDate)
+    {
+        EnsureAnnounced();
+        SetDividend(terms, exDate, recordDate, paymentDate);
+        AppendVersion();
+    }
+
+    /// <summary>Dividends R59: the custodian paid the dividend on <paramref name="day"/>.</summary>
+    public void MarkPaid(DateOnly day) => PaidOn = day;
+
+    private void SetDividend(MarketDividendTerms terms, DateOnly exDate, DateOnly? recordDate, DateOnly paymentDate)
+    {
+        AmountPerShare = terms.AmountPerShare;
+        TaxSource = terms.TaxSource;
+        ImputationCreditPerShare = terms.ImputationCreditPerShare;
+        ForeignTaxRatePercent = terms.ForeignTaxRatePercent;
+        ReinvestmentPrice = terms.ReinvestmentPrice;
+        ExDate = exDate;
+        RecordDate = recordDate;
+        PaymentDate = paymentDate;
+    }
+
     /// <summary>R40: new terms while <c>Announced</c>; the kind and the instrument stay.</summary>
     public void Amend(int ratioNew, int ratioHeld, DateOnly exDate, DateOnly? recordDate, DateOnly? paymentDate)
     {
@@ -131,8 +216,8 @@ public sealed class MarketCorporateAction
 
     /// <summary>In-kind-transfers R68: the factor of corporate-actions R3 a holding is multiplied by.</summary>
     public decimal Factor => Kind == MarketCorporateActionKind.Bonus
-        ? (decimal)(RatioHeld + RatioNew) / RatioHeld
-        : (decimal)RatioNew / RatioHeld;
+        ? (decimal)(RatioHeld!.Value + RatioNew!.Value) / RatioHeld.Value
+        : (decimal)RatioNew!.Value / RatioHeld!.Value;
 
     /// <summary>R42: the clock reached the ex-date.</summary>
     public void MakeEffective()
@@ -143,10 +228,13 @@ public sealed class MarketCorporateAction
     }
 
     /// <summary>R42: the price of the day before, on the new basis (before that day's move).</summary>
-    public decimal Rebase(decimal previous) =>
-        Kind == MarketCorporateActionKind.Bonus
-            ? previous * RatioHeld / (RatioHeld + RatioNew)
-            : previous * RatioHeld / RatioNew;
+    public decimal Rebase(decimal previous) => Kind switch
+    {
+        // Dividends R56: a dividend leaves the price as it is.
+        MarketCorporateActionKind.Dividend => previous,
+        MarketCorporateActionKind.Bonus => previous * RatioHeld!.Value / (RatioHeld.Value + RatioNew!.Value),
+        _ => previous * RatioHeld!.Value / RatioNew!.Value
+    };
 
     private void EnsureAnnounced()
     {
@@ -159,7 +247,14 @@ public sealed class MarketCorporateAction
     private void AppendVersion()
     {
         Version++;
-        Versions.Add(new MarketCorporateActionVersion(Version, Status, RatioNew, RatioHeld, ExDate, RecordDate, PaymentDate));
+        Versions.Add(new MarketCorporateActionVersion(Version, Status, RatioNew, RatioHeld, ExDate, RecordDate, PaymentDate)
+        {
+            AmountPerShare = AmountPerShare,
+            TaxSource = TaxSource,
+            ImputationCreditPerShare = ImputationCreditPerShare,
+            ForeignTaxRatePercent = ForeignTaxRatePercent,
+            ReinvestmentPrice = ReinvestmentPrice
+        });
     }
 }
 
@@ -173,8 +268,8 @@ public sealed class MarketCorporateActionVersion
     public MarketCorporateActionVersion(
         int version,
         MarketCorporateActionStatus status,
-        int ratioNew,
-        int ratioHeld,
+        int? ratioNew,
+        int? ratioHeld,
         DateOnly exDate,
         DateOnly? recordDate,
         DateOnly? paymentDate)
@@ -196,13 +291,24 @@ public sealed class MarketCorporateActionVersion
 
     public MarketCorporateActionStatus Status { get; private set; }
 
-    public int RatioNew { get; private set; }
+    public int? RatioNew { get; private set; }
 
-    public int RatioHeld { get; private set; }
+    public int? RatioHeld { get; private set; }
 
     public DateOnly ExDate { get; private set; }
 
     public DateOnly? RecordDate { get; private set; }
 
     public DateOnly? PaymentDate { get; private set; }
+
+    /// <summary>Dividends R61: the terms of a dividend's version, each <c>null</c> on another kind.</summary>
+    public decimal? AmountPerShare { get; init; }
+
+    public MarketDividendTaxSource? TaxSource { get; init; }
+
+    public decimal? ImputationCreditPerShare { get; init; }
+
+    public decimal? ForeignTaxRatePercent { get; init; }
+
+    public decimal? ReinvestmentPrice { get; init; }
 }

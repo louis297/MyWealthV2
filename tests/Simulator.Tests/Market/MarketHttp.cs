@@ -65,6 +65,7 @@ internal static class MarketHttp
 
     // The market tables exist from script 0008 and its corporate actions from 0009; until then the reset leaves them alone.
     public const string ResetMarket = """
+        IF OBJECT_ID(N'dbo.CustodianDividendPayments', N'U') IS NOT NULL EXEC(N'DELETE FROM [CustodianDividendPayments]');
         IF OBJECT_ID(N'dbo.MarketCorporateActionVersions', N'U') IS NOT NULL EXEC(N'DELETE FROM [MarketCorporateActionVersions]');
         IF OBJECT_ID(N'dbo.MarketCorporateActions', N'U') IS NOT NULL EXEC(N'DELETE FROM [MarketCorporateActions]');
         IF OBJECT_ID(N'dbo.MarketPrices', N'U') IS NOT NULL EXEC(N'DELETE FROM [MarketPrices]');

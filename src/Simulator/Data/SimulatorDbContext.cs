@@ -51,6 +51,8 @@ public sealed class SimulatorDbContext(DbContextOptions<SimulatorDbContext> opti
 
     public DbSet<CustodianSettings> CustodianSettings => Set<CustodianSettings>();
 
+    public DbSet<CustodianDividendPayment> CustodianDividendPayments => Set<CustodianDividendPayment>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<CustodianAccount>(account =>
@@ -80,6 +82,18 @@ public sealed class SimulatorDbContext(DbContextOptions<SimulatorDbContext> opti
             transfer.Property(row => row.AccountNumber).HasMaxLength(34);
             transfer.Property(row => row.InstructionId).HasMaxLength(100);
             transfer.Property(row => row.RejectReason).HasMaxLength(40);
+        });
+
+        modelBuilder.Entity<CustodianDividendPayment>(payment =>
+        {
+            payment.ToTable("CustodianDividendPayments");
+            payment.HasKey(row => row.Id);
+            payment.Property(row => row.EntitledPosition).HasColumnType("decimal(18,8)");
+            payment.Property(row => row.ElectedQuantity).HasColumnType("decimal(18,8)");
+            payment.Property(row => row.Shares).HasColumnType("decimal(18,8)");
+            payment.Property(row => row.Cash).HasColumnType("decimal(18,2)");
+            payment.Property(row => row.ElectionInstructionId).HasMaxLength(100);
+            payment.Property(row => row.RowVersion).IsRowVersion();
         });
 
         modelBuilder.Entity<CustodianSettings>(settings =>
@@ -172,6 +186,12 @@ public sealed class SimulatorDbContext(DbContextOptions<SimulatorDbContext> opti
             action.Property(row => row.ExDate).HasColumnType("date");
             action.Property(row => row.RecordDate).HasColumnType("date");
             action.Property(row => row.PaymentDate).HasColumnType("date");
+            action.Property(row => row.PaidOn).HasColumnType("date");
+            action.Property(row => row.AmountPerShare).HasColumnType("decimal(18,8)");
+            action.Property(row => row.ImputationCreditPerShare).HasColumnType("decimal(18,8)");
+            action.Property(row => row.ForeignTaxRatePercent).HasColumnType("decimal(5,2)");
+            action.Property(row => row.ReinvestmentPrice).HasColumnType("decimal(18,8)");
+            action.Ignore(row => row.Terms);
             action.Property(row => row.RowVersion).IsRowVersion();
             action.HasMany(row => row.Versions).WithOne().HasForeignKey(version => version.ActionId);
         });
@@ -183,6 +203,10 @@ public sealed class SimulatorDbContext(DbContextOptions<SimulatorDbContext> opti
             version.Property(row => row.ExDate).HasColumnType("date");
             version.Property(row => row.RecordDate).HasColumnType("date");
             version.Property(row => row.PaymentDate).HasColumnType("date");
+            version.Property(row => row.AmountPerShare).HasColumnType("decimal(18,8)");
+            version.Property(row => row.ImputationCreditPerShare).HasColumnType("decimal(18,8)");
+            version.Property(row => row.ForeignTaxRatePercent).HasColumnType("decimal(5,2)");
+            version.Property(row => row.ReinvestmentPrice).HasColumnType("decimal(18,8)");
         });
 
         modelBuilder.Entity<BrokerSettings>(settings =>

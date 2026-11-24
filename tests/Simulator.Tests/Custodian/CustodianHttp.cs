@@ -11,7 +11,11 @@ internal static class CustodianHttp
 
     public const string ResetCustodian = """
         IF OBJECT_ID(N'dbo.CustodianTransfers', N'U') IS NOT NULL
-            EXEC(N'DELETE FROM [CustodianTransfers]; DELETE FROM [CustodianMovements]; DELETE FROM [CustodianAccounts];
+            EXEC(N'IF OBJECT_ID(N''dbo.CustodianDividendPayments'', N''U'') IS NOT NULL
+                       DELETE FROM [CustodianDividendPayments];
+                   IF OBJECT_ID(N''dbo.CustodianRejectedElections'', N''U'') IS NOT NULL
+                       DELETE FROM [CustodianRejectedElections];
+                   DELETE FROM [CustodianTransfers]; DELETE FROM [CustodianMovements]; DELETE FROM [CustodianAccounts];
                    UPDATE [CustodianSettings] SET [TransferMode] = 0, [RejectReason] = NULL, [RoundingMode] = 0;');
         """;
 

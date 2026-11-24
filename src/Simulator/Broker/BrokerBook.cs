@@ -76,7 +76,16 @@ public static class BrokerBook
                         select new SettlingFill(fill, order))
                     .ToListAsync(cancellationToken);
                 await SettleDayAsync(db, time, accounts, item.action.ExDate, open, cancellationToken);
-                await Custodian.CustodianCorporateActions.ApplyAsync(db, item.action, item.Symbol, cancellationToken);
+                // Dividends R56: a dividend changes no position; the custodian stores what it owes each account.
+                if (item.action.Kind == MarketCorporateActionKind.Dividend)
+                {
+                    await Custodian.CustodianDividends.GoExAsync(db, item.action, item.Symbol, cancellationToken);
+                }
+                else
+                {
+                    await Custodian.CustodianCorporateActions.ApplyAsync(db, item.action, item.Symbol, cancellationToken);
+                }
+
                 item.action.MarkCustodianApplied();
                 await db.SaveChangesAsync(cancellationToken);
             }

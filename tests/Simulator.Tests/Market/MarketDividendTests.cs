@@ -150,13 +150,14 @@ public class MarketDividendTests
         await MarketHttp.AdvanceAsync(_control, "P2D");
 
         (await MarketHttp.CorporateActionAsync(_control, id)).GetProperty("status").GetString().ShouldBe("Effective");
+        // The custodian brings its books up to date on its own routes.
+        (await CustodianHttp.FeedAsync(_party)).Items.ShouldNotContain(item => item.GetProperty("kind").GetString() == "CorporateAction");
         var payments = await Sql.ReadAsync(SimulatorTestSetup.ConnectionString, """
             SELECT a.[AccountNumber], p.[EntitledPosition], p.[Status]
             FROM [CustodianDividendPayments] p JOIN [CustodianAccounts] a ON a.[Id] = p.[AccountId]
             """);
         payments.Select(row => ((string)row[0], (decimal)row[1], (int)row[2])).ShouldBe([(CustodianHttp.Account, 110m, 0)]);
         (await MarketHttp.PricesAsync(_control, "ACME.SIM")).ShouldAllBe(price => price.Price == 100m);
-        (await CustodianHttp.FeedAsync(_party)).Items.ShouldNotContain(item => item.GetProperty("kind").GetString() == "CorporateAction");
     }
 
     private static string Order(string side, decimal quantity)
