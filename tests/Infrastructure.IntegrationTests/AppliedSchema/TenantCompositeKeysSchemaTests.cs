@@ -726,6 +726,24 @@ public class TenantCompositeKeysSchemaTests
         ("FK_Orders_SafekeepingAccounts_TenantId_SafekeepingAccountId", "SafekeepingAccounts", SafekeepingRow("{p}") + OrderRow() + """
             UPDATE [Orders] SET [SafekeepingAccountId] = @{p}_safekeeping, [SafekeepingAccountNumber] = N'SK-1' WHERE [Id] = SCOPE_IDENTITY();
             """),
+        ("FK_CustodianReconciliations_SafekeepingAccounts_TenantId_SafekeepingAccountId", "SafekeepingAccounts",
+            SafekeepingRow("{p}") + CustodianRunRow(safekeeping: "@{p}_safekeeping")),
+        ("FK_CustodianReconciliations_Users_TenantId_RanByUserId", "Users",
+            SafekeepingRow("a") + CustodianRunRow(ranBy: "@{p}_adviser")),
+        ("FK_CustodianReconciliationLines_CustodianReconciliations_TenantId_ReconciliationId", "CustodianReconciliations",
+            SafekeepingRow("{p}") + CustodianRunRow(tenant: "@{p}_tenant", safekeeping: "@{p}_safekeeping") + """
+            INSERT INTO [CustodianReconciliationLines]
+                ([TenantId], [ReconciliationId], [Position], [Symbol], [CustodianQuantity], [PlatformQuantity], [Difference],
+                 [NotProcessed], [UnsettledTrades], [Suspense], [UnbookedFills], [Unexplained], [Class])
+            VALUES (@a_tenant, @crun, 1, N'VTI', 0, 0, 0, 0, 0, 0, 0, 0, 2);
+            """),
+        ("FK_CustodianReconciliationLines_Instruments_TenantId_InstrumentId", "Instruments",
+            SafekeepingRow("a") + CustodianRunRow() + """
+            INSERT INTO [CustodianReconciliationLines]
+                ([TenantId], [ReconciliationId], [Position], [Symbol], [InstrumentId], [CustodianQuantity], [PlatformQuantity], [Difference],
+                 [NotProcessed], [UnsettledTrades], [Suspense], [UnbookedFills], [Unexplained], [Class])
+            VALUES (@a_tenant, @crun, 1, N'VTI', @{p}_instrument, 0, 0, 0, 0, 0, 0, 0, 0, 2);
+            """),
         ("FK_ReportExecutions_ReportSchedules_TenantId_ScheduleId", "ReportSchedules", """
             INSERT INTO [ReportExecutions] ([PublicId], [ReportId], [ScheduleId], [TenantId], [TriggerKind], [Status], [ParametersJson], [Created], [CreatedBy])
             VALUES (NEWID(), @report, @{p}_schedule, @a_tenant, N'Scheduled', N'Queued', N'{}', SYSDATETIMEOFFSET(), N'test');
@@ -759,7 +777,7 @@ public class TenantCompositeKeysSchemaTests
     ];
 
     private static readonly string[] Parents =
-        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines", "BankReconciliations", "InterestRateSchedules", "CorporateActions", "Orders", "ClientMoneyAccounts", "TradeSettlements", "AccountPortfolioAssignments", "Rebalances", "MigrationBatches", "MigrationBatchEntries", "SafekeepingAccounts", "OrderFills", "InKindTransfers", "CustodyMovements"];
+        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines", "BankReconciliations", "InterestRateSchedules", "CorporateActions", "Orders", "ClientMoneyAccounts", "TradeSettlements", "AccountPortfolioAssignments", "Rebalances", "MigrationBatches", "MigrationBatchEntries", "SafekeepingAccounts", "OrderFills", "InKindTransfers", "CustodyMovements", "CustodianReconciliations"];
 
     /// <summary>A safekeeping account of tenant <paramref name="prefix"/> in <c>@{prefix}_safekeeping</c> (script 0055).</summary>
     private static string SafekeepingRow(string prefix) => $"""
@@ -840,6 +858,18 @@ public class TenantCompositeKeysSchemaTests
 
             """;
     }
+
+    /// <summary>A Manual custodian reconciliation run in <c>@crun</c> (script 0056).</summary>
+    private static string CustodianRunRow(
+        string tenant = "@a_tenant", string safekeeping = "@a_safekeeping", string ranBy = "@a_adviser") => $"""
+        INSERT INTO [CustodianReconciliations]
+            ([PublicId], [TenantId], [SafekeepingAccountId], [Currency], [Trigger], [RanAt], [RanByUserId], [Status], [PositionsAt],
+             [BreakCount], [TimingCount], [AgreedCount], [TransfersInFlight], [FillsNotDelivered], [Created], [CreatedBy])
+        VALUES (NEWID(), {tenant}, {safekeeping}, 'USD', 1, SYSDATETIMEOFFSET(), {ranBy}, 0, SYSDATETIMEOFFSET(), 0, 0, 1, 0, 0,
+                SYSDATETIMEOFFSET(), N'test');
+        DECLARE @crun int = SCOPE_IDENTITY();
+
+        """;
 
     /// <summary>An order of tenant <c>a</c> (script 0051); one argument names a row of the other tenant.</summary>
     private static string OrderRow(
