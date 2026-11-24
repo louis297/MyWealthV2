@@ -274,7 +274,11 @@ public class CancelCorporateActionCommandHandler(IApplicationDbContext db, ICurr
     }
 }
 
-public class ApplyCorporateActionCommandHandler(IApplicationDbContext db, ICurrentUser currentUser, TimeProvider time)
+public class ApplyCorporateActionCommandHandler(
+    IApplicationDbContext db,
+    ICurrentUser currentUser,
+    ICurrencyCatalog currencies,
+    TimeProvider time)
     : IRequestHandler<ApplyCorporateActionCommand>
 {
     public async Task Handle(ApplyCorporateActionCommand request, CancellationToken cancellationToken)
@@ -291,7 +295,7 @@ public class ApplyCorporateActionCommandHandler(IApplicationDbContext db, ICurre
         var actor = currentUser.Person?.Id ?? throw new ForbiddenAccessException();
         await db.ExecuteInTransactionAsync(async token =>
         {
-            await CorporateActionEffect.MakeEffectiveAsync(db, action, now, actor, token);
+            await CorporateActionEffect.MakeEffectiveAsync(db, currencies, action, now, actor, token);
             await CorporateActionReader.SaveAsync(db, token);
         }, cancellationToken);
     }

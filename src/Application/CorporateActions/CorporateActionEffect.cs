@@ -1,4 +1,5 @@
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Domain.CorporateActions;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 
@@ -16,12 +17,19 @@ internal static class CorporateActionEffect
     /// </summary>
     public static async Task MakeEffectiveAsync(
         IApplicationDbContext db,
+        ICurrencyCatalog currencies,
         CorporateAction action,
         DateTimeOffset at,
         int? byUserId,
         CancellationToken cancellationToken)
     {
         action.MakeEffective(at, byUserId);
+        if (action.Terms is { } terms)
+        {
+            await GoExAsync(db, currencies, action, terms, at, cancellationToken);
+            return;
+        }
+
         var accountIds = await (
                 from holding in db.Holdings.IgnoreQueryFilters()
                 join account in db.Accounts.IgnoreQueryFilters() on holding.AccountId equals account.Id
@@ -59,6 +67,56 @@ internal static class CorporateActionEffect
             {
                 order.RequestCancel(null, Order.CorporateActionNote, at);
             }
+        }
+    }
+
+    /// <summary>
+    /// Dividends R6, R13, R14, R16: a dividend goes ex. One entitlement per Custodial account of the Tenant that holds
+    /// the instrument now, with the holding's whole quantity as its entitled quantity and the source amounts in the
+    /// quote currency; nothing is posted and no order is cancelled. A dividend with no entitlement left
+    /// <c>Pending</c> is <c>Applied</c> at once and expects no payment.
+    /// </summary>
+    private static async Task GoExAsync(
+        IApplicationDbContext db,
+        ICurrencyCatalog currencies,
+        CorporateAction action,
+        DividendTerms terms,
+        DateTimeOffset at,
+        CancellationToken cancellationToken)
+    {
+        var quoteCurrency = (await db.Instruments.IgnoreQueryFilters().AsNoTracking()
+            .Where(row => row.Id == action.InstrumentId)
+            .Select(row => row.QuoteCurrency)
+            .SingleAsync(cancellationToken)).Trim();
+        var places = currencies.TryGet(quoteCurrency)?.DecimalPlaces
+                     ?? throw new InvalidOperationException($"Currency {quoteCurrency} is not in the catalog.");
+        var holdings = await (
+                from holding in db.Holdings.IgnoreQueryFilters()
+                join account in db.Accounts.IgnoreQueryFilters() on holding.AccountId equals account.Id
+                where holding.TenantId == action.TenantId
+                      && holding.InstrumentId == action.InstrumentId
+                      && holding.Quantity > 0
+                      && account.CustodyMode == CustodyMode.Custodial
+                orderby account.Id
+                select new { AccountId = account.Id, holding.Quantity })
+            .ToListAsync(cancellationToken);
+
+        var pending = 0;
+        foreach (var holding in holdings)
+        {
+            var entitlement = CorporateActionEntitlement.CreateDividend(
+                action.TenantId, action.Id, holding.AccountId, holding.Quantity, terms.SourceAmounts(holding.Quantity, places),
+                false, null, at);
+            db.CorporateActionEntitlements.Add(entitlement);
+            if (entitlement.Status == EntitlementStatus.Pending)
+            {
+                pending++;
+            }
+        }
+
+        if (pending == 0)
+        {
+            action.MarkApplied(at);
         }
     }
 }

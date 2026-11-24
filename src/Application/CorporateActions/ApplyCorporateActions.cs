@@ -26,6 +26,7 @@ public sealed class ApplyCorporateActions(
     IApplicationDbContext db,
     IInstrumentPriceStore prices,
     MarketDataConnections connections,
+    ICurrencyCatalog currencies,
     TimeProvider time,
     ILogger<ApplyCorporateActions> logger)
 {
@@ -77,7 +78,7 @@ public sealed class ApplyCorporateActions(
                         return;
                     }
 
-                    await CorporateActionEffect.MakeEffectiveAsync(db, action, time.GetUtcNow(), null, token);
+                    await CorporateActionEffect.MakeEffectiveAsync(db, currencies, action, time.GetUtcNow(), null, token);
                     await db.SaveChangesAsync(token);
                 }, cancellationToken);
             }
@@ -109,6 +110,13 @@ public sealed class ApplyCorporateActions(
         foreach (var row in effective.Where(item => served is null || served.Serves(item.Symbol)))
         {
             var action = row.Action;
+
+            // Dividends R36: a dividend's entitlements are posted only once it is paid.
+            if (action.Kind == CorporateActionKind.Dividend)
+            {
+                continue;
+            }
+
             var pending = await db.CorporateActionEntitlements.IgnoreQueryFilters().AsNoTracking()
                 .Where(entitlement => entitlement.CorporateActionId == action.Id && entitlement.Status == EntitlementStatus.Pending)
                 .OrderBy(entitlement => entitlement.AccountId)

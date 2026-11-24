@@ -20,6 +20,7 @@ public sealed record AnnouncementProcessingOutcome(int Processed, int Skipped, i
 public sealed class ProcessCorporateActionAnnouncements(
     IApplicationDbContext db,
     MarketDataConnections connections,
+    ICurrencyCatalog currencies,
     TimeProvider time,
     ILogger<ProcessCorporateActionAnnouncements> logger)
 {
@@ -167,7 +168,7 @@ public sealed class ProcessCorporateActionAnnouncements(
                 await db.SaveChangesAsync(cancellationToken);
                 if (announcement.PartyStatus == PartyActionStatus.Effective)
                 {
-                    await CorporateActionEffect.MakeEffectiveAsync(db, action, now, null, cancellationToken);
+                    await CorporateActionEffect.MakeEffectiveAsync(db, currencies, action, now, null, cancellationToken);
                 }
 
                 changed = true;
@@ -198,7 +199,7 @@ public sealed class ProcessCorporateActionAnnouncements(
                     break;
                 case PartyActionStatus.Effective:
                     Amend(action, announcement, ratio, terms);
-                    await CorporateActionEffect.MakeEffectiveAsync(db, action, now, null, cancellationToken);
+                    await CorporateActionEffect.MakeEffectiveAsync(db, currencies, action, now, null, cancellationToken);
                     break;
                 case PartyActionStatus.Cancelled:
                     action.CancelFromFeed(announcement.Version, now);

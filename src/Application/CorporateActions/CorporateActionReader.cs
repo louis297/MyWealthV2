@@ -3,6 +3,7 @@ using MyWealthV2.Application.Accounts;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Models;
+using MyWealthV2.Domain.CorporateActions;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
@@ -92,6 +93,14 @@ internal static class CorporateActionReader
             .ToDictionaryAsync(row => row.IdentityUserId, row => new PersonRefDto(row.PublicId, row.Name), cancellationToken);
 
         var actionIds = rows.Select(row => row.Id).ToList();
+
+        // Dividends R15: the expected amount counts every entitlement of the dividend, whoever the caller is.
+        var dividendIds = rows.Where(row => row.Kind == CorporateActionKind.Dividend).Select(row => row.Id).ToList();
+        var dividendEntitlements = dividendIds.Count == 0
+            ? []
+            : await db.CorporateActionEntitlements.AsNoTracking()
+                .Where(row => dividendIds.Contains(row.CorporateActionId))
+                .ToListAsync(cancellationToken);
         var visibleAccounts = AccountScope.ManagedAccounts(db, currentUser);
         var counts = await db.CorporateActionEntitlements.AsNoTracking()
             .Where(row => actionIds.Contains(row.CorporateActionId) && visibleAccounts.Any(account => account.Id == row.AccountId))
@@ -127,6 +136,11 @@ internal static class CorporateActionReader
                 CancelledAt = row.CancelledAt,
                 CancelledBy = row.CancelledByUserId is int cancelledBy ? users.GetValueOrDefault(cancelledBy) : null,
                 CancelNote = row.CancelNote,
+                Payment = row.Kind == CorporateActionKind.Dividend && row.EffectiveAt is not null
+                    ? new CorporateActionPaymentDto(
+                        DividendPayment.ExpectedAmount(dividendEntitlements.Where(item => item.CorporateActionId == row.Id), 0m),
+                        null, null, instruments[row.InstrumentId].QuoteCurrency.Trim(), null, null)
+                    : null,
                 Dividend = row.Terms is { } terms
                     ? new CorporateActionDividendDto(
                         terms.AmountPerShare, instruments[row.InstrumentId].QuoteCurrency.Trim(), terms.TaxSource.ToString(),
