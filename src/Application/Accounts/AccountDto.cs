@@ -67,7 +67,8 @@ public sealed class AccountDto
         decimal reservedCash,
         AccountClosureSummaryDto? closure = null,
         decimal accruedInterest = 0m,
-        decimal unsettledCash = 0m) => new()
+        decimal unsettledCash = 0m,
+        int pendingDividends = 0) => new()
     {
         Id = account.PublicId,
         TenantId = tenant.PublicId,
@@ -89,6 +90,8 @@ public sealed class AccountDto
         RowVersion = Convert.ToBase64String(account.RowVersion ?? []),
         Closure = closure,
         AccruedInterest = accruedInterest,
-        InterestAccruedThrough = account.InterestAccruedThrough
+        InterestAccruedThrough = account.InterestAccruedThrough,
+        ReinvestDividends = account.ReinvestDividends,
+        PendingDividends = pendingDividends
     };
 }

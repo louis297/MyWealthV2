@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using FluentValidation.Results;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.CorporateActions;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Interest.Accruals;
 using MyWealthV2.Application.Transactions;
@@ -79,6 +80,9 @@ public class RequestAccountClosureCommandHandler(
         "Open withdrawals must be paid, rejected or cancelled before the account can be closed.";
     public const string AssignmentMessage = "Unassign the portfolio before closing the account.";
     public const string HoldingMessage = "Sell or transfer out every holding before closing the account.";
+
+    /// <summary>Dividends R46: an account is not closed while it is owed a dividend.</summary>
+    public const string PendingDividendMessage = "A dividend is still to be paid on this account. Close it after the payment.";
 
     /// <summary>In-kind-transfers R45: an open transfer of securities keeps the account open.</summary>
     public const string OpenTransferMessage =
@@ -188,6 +192,12 @@ public class RequestAccountClosureCommandHandler(
         if (await InKindTransfers.InKindTransferRules.HasOpenTransferAsync(db, account.Id, cancellationToken))
         {
             throw Error(nameof(RequestAccountClosureCommand.AccountId), OpenTransferMessage);
+        }
+
+        // Dividends R46: a Pending dividend entitlement keeps the account open until it is posted.
+        if (await PendingDividends.AnyAsync(db, account.Id, cancellationToken))
+        {
+            throw Error(nameof(RequestAccountClosureCommand.AccountId), PendingDividendMessage);
         }
 
         // Orders R47: a live order (open, or with a fill not posted yet) and a fill that has not settled both wait.
