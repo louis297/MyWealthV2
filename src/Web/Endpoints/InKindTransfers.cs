@@ -16,6 +16,10 @@ public class InKindTransfers : IEndpointGroup
         groupBuilder.MapGet(GetInKindTransfers).RequireAuthorization(Policies.InKindTransfersRead);
         groupBuilder.MapGet(GetInKindTransfer, "{id}").RequireAuthorization(Policies.InKindTransfersRead);
         groupBuilder.MapPost(RequestInKindTransfer).RequireAuthorization(Policies.InKindTransfersRequest);
+        groupBuilder.MapPost(ApproveInKindTransfer, "{id}/approve").RequireAuthorization(Policies.InKindTransfersApprove);
+        groupBuilder.MapPost(RejectInKindTransfer, "{id}/reject").RequireAuthorization(Policies.InKindTransfersApprove);
+        groupBuilder.MapPost(CancelInKindTransfer, "{id}/cancel").RequireAuthorization(Policies.InKindTransfersRequest);
+        groupBuilder.MapPost(SetAsideInKindTransfer, "{id}/set-aside").RequireAuthorization(Policies.InKindTransfersApprove);
     }
 
     [EndpointSummary("List in-kind transfers")]
@@ -53,5 +57,33 @@ public class InKindTransfers : IEndpointGroup
         }
 
         return Results.Content(result.Body, "application/json", statusCode: result.StatusCode);
+    }
+
+    [EndpointSummary("Approve an in-kind transfer")]
+    [EndpointDescription("A TenantAdmin other than the requester approves it; the worker sends it to the custodian (R31).")]
+    public static Task<NoContent> ApproveInKindTransfer(ISender sender, Guid id, ApproveInKindTransferCommand command) =>
+        Act(sender, id, command);
+
+    [EndpointSummary("Reject an in-kind transfer")]
+    [EndpointDescription("A TenantAdmin other than the requester refuses it, with a note (R31).")]
+    public static Task<NoContent> RejectInKindTransfer(ISender sender, Guid id, RejectInKindTransferCommand command) =>
+        Act(sender, id, command);
+
+    [EndpointSummary("Cancel an in-kind transfer")]
+    [EndpointDescription("Withdraws a transfer before the custodian was asked to make it (R32).")]
+    public static Task<NoContent> CancelInKindTransfer(ISender sender, Guid id, CancelInKindTransferCommand command) =>
+        Act(sender, id, command);
+
+    [EndpointSummary("Set an in-kind transfer aside")]
+    [EndpointDescription("Ends a transfer the custodian was asked to make, with a note; books nothing (R33).")]
+    public static Task<NoContent> SetAsideInKindTransfer(ISender sender, Guid id, SetAsideInKindTransferCommand command) =>
+        Act(sender, id, command);
+
+    private static async Task<NoContent> Act(ISender sender, Guid id, InKindTransferActionCommand command)
+    {
+        command.Id = id;
+        // The runtime type picks the handler.
+        await sender.Send((object)command);
+        return TypedResults.NoContent();
     }
 }
