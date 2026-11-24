@@ -39,6 +39,7 @@ related:
   - features/rebalances.md
   - features/migration-batches.md
   - features/in-kind-transfers.md
+  - features/dividends.md
 ---
 
 # Custodial accounts roadmap
@@ -305,11 +306,13 @@ The event belongs to the instrument, not to an account. The platform computes ea
 - **What:** a dividend event (amount per share, currency, imputation credit, foreign tax) posted as `Dividend` (the reserved value becomes active) with an income detail and withholding legs.
 - **Open:** a dividend in a currency other than the account's (D13).
 - **Depends on:** C1, I1, roadmap step 2 (income events). This is where the two threads meet.
+- **Spec:** C2, C3 and the rest of S4 are one spec, step 15, [dividends.md](features/dividends.md) (`review`, 2026-11-24). Its §11 proposes: a dividend is a fourth kind of corporate action, `Dividend`, on the same aggregate, feed, hand entry and entitlement, with terms per share (amount, a tax source `NewZealand` or `Foreign`, imputation credit, foreign tax as a rate, an optional plan price) and no ratio; it is paid in the Instrument's quote currency; going ex, by the corporate action's existing signals, fixes the entitled accounts and their quantities on the platform's own holdings and posts nothing (this refines "income detail and withholding legs" into two moments); the Customers are paid only when the custodian's payment is on the client money account, found by the issuer's event id in the reference or matched by a TenantAdmin, within a rounding allowance of 2 minor units per entitlement unless a person accepts the difference; each account gets one `Dividend` Transaction (the reserved value becomes active) with source `CorporateAction`, the gross as `Principal`, a `Tax` leg of the new kind `ForeignWithholding`, a `Tax` leg of RWT at 33 % by Inland Revenue's formula (imputation credits and foreign tax taken off) or NRWT at 30 % for an overseas Customer on a New Zealand dividend, decided from the tax residency when it is posted, and a dividend detail that holds the imputation credit; rates checked against IR284 (October 2025) and IR291 (March 2026) on 2026-11-24; for D13, an account in another currency is converted at the reference rate when the dividend is posted (this refines "on the payment date"); `Dividend` stays refused by hand on both modes, and an External account's dividends stay with roadmap step 2; an account cannot be closed while a dividend is to be paid on it; the bank reconciliation gains the timing difference `DividendsNotPosted` and the known difference `DividendDifference`, and `TaxWithheld` counts dividend tax; no new permission, source kind or job.
 
 ### C3. Dividend reinvestment and taxable bonus issues
 
 - **What:** reinvest a dividend into new shares at the plan price, with the cost of the new shares equal to the reinvested amount. Replaces the `Scrip` name.
 - **Depends on:** C2.
+- **Spec:** [dividends.md](features/dividends.md) (`review`, 2026-11-24), with C2. Its §11 proposes: a standing reinvestment election per Custodial account, recorded by the Adviser (D6); a plan is a price on a feed dividend, and a hand-entered dividend, an account that follows a portfolio and an account in another currency (D20) do not reinvest; when the dividend goes ex the platform works out a participating quantity per electing account that leaves the New Zealand tax in cash, and the `worker` sends one election per dividend to the custodian through a new port `ICustodianElections`, with the corporate action's PublicId as the key; the custodian delivers the new shares as a custody movement, and the platform shares exactly that quantity out by largest remainder; the reinvestment is part of the `Dividend` Transaction, a cash leg with the new role `Reinvestment` and a security leg whose cost is the reinvested amount, and `Scrip` is never written on a Custodial account (this refines "Replaces the `Scrip` name" and the §2 matrix: a dividend in shares is a `Dividend`, and the name stays for External hand entry until the type route moves); a TenantAdmin can pay a dividend in cash when no shares arrive; taxable bonus issues and other non-cash dividends are left out (this refines the title above).
 
 ---
 
@@ -432,6 +435,8 @@ Announce a split, consolidation, bonus issue, dividend or reinvestment plan with
 
 The party is the **simulator market**. Its data vendor half is in [simulated-instruments.md](features/simulated-instruments.md) (accepted and landed 2026-11-22) §4.3: simulated instruments ending in `.SIM`, one price per simulator day by a seeded step or set by the operator, standing instruments from configuration, and a price route the platform reads on a market data connection. Its issuer half for splits, consolidations and bonus issues is in [corporate-actions.md](features/corporate-actions.md) (accepted and landed 2026-11-22) §4.8: announce, amend and cancel before the ex-date, effective when the simulator clock reaches the ex-date with the price rebased, and every version on a feed. Dividends and reinvestment plans come with C2 and C3. Neither spec adds a scenario library.
 
+Dividends are in [dividends.md](features/dividends.md) (`review`, 2026-11-24) §4.12: the market announces a dividend with its terms, an optional plan price and a required payment date on the existing routes and feed, and makes it effective when the clock reaches the ex-date, with no price change and no cancelled order. The simulator custodian (S3) changes with it: an income account per safekeeping account (the firm's client money account), a dividend payment per account with the position entitled at the ex-date, an election route idempotent on the platform's instruction id, and on the payment date a credit line at the simulator bank with the event id as its reference, plus a `CorporateAction` movement for plan shares; an income mode (pay, hold) lets the operator pay another amount. The simulator bank (S1) does not change. It adds no scenario library.
+
 ---
 
 ## 12. Decisions
@@ -487,7 +492,7 @@ Each step depends only on earlier steps. "Closes" names the matrix cell or known
 | 12 | O3 rebalance through orders | S2 (no change) | Hand reverse of a rebalance trade (D15); the known difference `Trades` of B7, for rebalance trades | [rebalances](features/rebalances.md) | accepted 2026-11-23, landed 2026-11-23 |
 | 13 | T2 migration batch | S1 (no change) | "No opening balance" | [migration-batches](features/migration-batches.md) | accepted 2026-11-24, landed 2026-11-24 |
 | 14 | T1 in-kind transfer, T3 custodian reconciliation | S3; S2 and S4 (deliveries and corporate actions at the custodian) | "Existing positions cannot be moved in" | [in-kind-transfers](features/in-kind-transfers.md) | accepted 2026-11-24, landed 2026-11-24 |
-| 15 | C2 dividends, C3 reinvestment | S4 | `Dividend` reserved | — | not started (with roadmap step 2) |
+| 15 | C2 dividends, C3 reinvestment | S4 issuer dividends; S3 (dividend payments and elections) | `Dividend` reserved | [dividends](features/dividends.md) | review 2026-11-24 (with roadmap step 2, for Custodial accounts) |
 | later | X1 adjustment review, O4, O5, X2, X3 | — | — | — | not planned |
 
 Steps 9, 10 (10a, then 10b) and 13 do not depend on each other or on the bank stage beyond steps 1–3; they can move earlier if a demo needs them. Step 10 is the one to move first if a seeded instrument announces a split (see the known issue).
