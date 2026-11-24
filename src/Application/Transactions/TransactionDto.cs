@@ -62,7 +62,28 @@ public sealed class TransactionDto
     /// <summary>The transfer behind a <c>StockIn</c> or <c>StockOut</c> an in-kind transfer wrote, and its Reversal;
     /// otherwise null (in-kind-transfers R42).</summary>
     public TransactionInKindTransferDto? InKindTransfer { get; init; }
+
+    /// <summary>Dividends R50: the dividend behind a <c>Dividend</c> and its Reversal; otherwise null.</summary>
+    public TransactionDividendDto? Dividend { get; init; }
 }
+
+/// <summary>Dividends R50: the corporate action, the instrument, the entitled quantity and the terms of a dividend,
+/// with its reinvestment when there was one.</summary>
+public sealed record TransactionDividendDto(
+    Guid CorporateActionId,
+    TransactionDividendInstrumentDto Instrument,
+    decimal Quantity,
+    decimal AmountPerShare,
+    string Currency,
+    string TaxSource,
+    decimal ImputationCredit,
+    decimal? ReinvestedQuantity,
+    decimal? ReinvestmentPrice,
+    string ExDate,
+    string? RecordDate,
+    string? PaymentDate);
+
+public sealed record TransactionDividendInstrumentDto(Guid Id, string Symbol, string Name);
 
 /// <summary>In-kind-transfers R42: the transfer, the counterparty with the account masked, and the custodian's side.</summary>
 public sealed record TransactionInKindTransferDto(

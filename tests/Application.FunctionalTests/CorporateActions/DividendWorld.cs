@@ -33,7 +33,8 @@ internal sealed record DividendWorld(
         new($"{actionId}-V{version}", actionId, version, status, "ACME.SIM", "USD", CorporateActionKind.Dividend,
             null, null, Today, null, Today.AddDays(4), amount, taxSource, credit, rate, price);
 
-    /// <summary>The world, with the dividend announced and gone ex unless <paramref name="goEx"/> is false.</summary>
+    /// <summary>The world, with the dividend announced and gone ex unless <paramref name="goEx"/> is false.
+    /// <paramref name="setUp"/> runs before the dividend is announced.</summary>
     public static async Task<DividendWorld> CreateAsync(
         decimal amount = 1.00m,
         DividendTaxSource taxSource = DividendTaxSource.Foreign,
@@ -41,11 +42,16 @@ internal sealed record DividendWorld(
         decimal rate = 15m,
         decimal? price = null,
         bool goEx = true,
-        NominatedWorld? world = null)
+        Func<NominatedWorld, Holders, Task>? setUp = null)
     {
-        world ??= await NominatedWorld.CreateAsync();
+        var world = await NominatedWorld.CreateAsync();
         var holders = await HoldersAsync(world, "ACME.SIM");
         var clientMoney = await BankFeedHttp.ClientMoneyAccountAsync(world.Tenant.Id);
+        if (setUp is not null)
+        {
+            await setUp(world, holders);
+        }
+
         await DeliverAsync(Item(amount: amount, taxSource: taxSource, credit: credit, rate: rate, price: price));
         if (goEx)
         {

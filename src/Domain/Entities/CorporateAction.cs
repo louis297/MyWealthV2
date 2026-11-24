@@ -50,6 +50,9 @@ public class CorporateAction : BaseAuditableEntity
 
     public decimal? ReceivedAmount { get; private set; }
 
+    /// <summary>Dividends R29: when the dividend became paid; from then its entitlements are posted.</summary>
+    public DateTimeOffset? PaidAt { get; private set; }
+
     public DateOnly ExDate { get; private set; }
 
     public DateOnly? RecordDate { get; private set; }
