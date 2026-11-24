@@ -19,6 +19,7 @@ public static class CustodianPartyEndpoints
     public static RouteGroupBuilder MapCustodianPartyEndpoints(this RouteGroupBuilder party)
     {
         party.MapPost("/custodian/accounts/{accountNumber}/transfers", TransferAsync);
+        party.MapPost("/custodian/accounts/{accountNumber}/elections", ElectAsync);
         party.MapGet("/custodian/accounts/{accountNumber}/movements", GetMovementsAsync);
         return party;
     }
@@ -95,6 +96,103 @@ public static class CustodianPartyEndpoints
                 .SingleOrDefaultAsync(row => row.AccountNumber == account.AccountNumber && row.InstructionId == instructionId, cancellationToken);
             return winner is null ? Results.StatusCode(StatusCodes.Status409Conflict) : Replay(winner, hash, world.WorldId);
         }
+    }
+
+    /// <summary>
+    /// Dividends R58: one reinvestment election for a dividend of the simulator market. Unknown account → 404; a body
+    /// outside the rules → 400; the same instruction id and body again → the first answer; another body → 409.
+    /// Otherwise <c>Accepted</c>, stored on the account's dividend payment, or <c>Rejected</c> with the first reason
+    /// that applies.
+    /// </summary>
+    private static async Task<IResult> ElectAsync(
+        string accountNumber,
+        ElectionRequest body,
+        SimulatorDbContext db,
+        TimeProvider time,
+        BrokerBankAccounts brokerAccounts,
+        CancellationToken cancellationToken)
+    {
+        var world = await BrokerBook.UpToDateAsync(db, time, brokerAccounts, cancellationToken);
+        var account = await db.CustodianAccounts.AsNoTracking().SingleOrDefaultAsync(row => row.AccountNumber == accountNumber, cancellationToken);
+        if (account is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (body.InstructionId?.Length is not (>= 1 and <= CustodianRules.InstructionIdMaxLength)
+            || body.CorporateActionId?.Trim().Length is not (>= 1 and <= 100)
+            || !CustodianRules.IsSymbol(body.Symbol)
+            || !string.Equals(body.Currency, account.Currency.Trim(), StringComparison.Ordinal)
+            || !CustodianRules.IsQuantity(body.Quantity))
+        {
+            return Results.BadRequest();
+        }
+
+        var instructionId = body.InstructionId!;
+        var text = JsonSerializer.Serialize(new object?[]
+        {
+            body.InstructionId, body.CorporateActionId, body.Symbol, body.Currency,
+            body.Quantity!.Value.ToString("0.########", CultureInfo.InvariantCulture)
+        });
+        return await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            db.ChangeTracker.Clear();
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+            await CustodianBook.LockAsync(db, cancellationToken);
+
+            var accepted = await db.CustodianDividendPayments.AsNoTracking()
+                .SingleOrDefaultAsync(row => row.AccountId == account.Id && row.ElectionInstructionId == instructionId, cancellationToken);
+            if (accepted is not null)
+            {
+                return accepted.ElectionBody == text
+                    ? Results.Ok(new ElectionAnswer("Accepted", null))
+                    : Results.StatusCode(StatusCodes.Status409Conflict);
+            }
+
+            var rejected = await db.CustodianRejectedElections.AsNoTracking()
+                .SingleOrDefaultAsync(row => row.AccountId == account.Id && row.InstructionId == instructionId, cancellationToken);
+            if (rejected is not null)
+            {
+                return rejected.Body == text
+                    ? Results.Ok(new ElectionAnswer("Rejected", rejected.Reason))
+                    : Results.StatusCode(StatusCodes.Status409Conflict);
+            }
+
+            var dividend = MarketCorporateAction.TryReadNumber(body.CorporateActionId!.Trim(), world.WorldId, out var number)
+                ? await (
+                        from action in db.MarketCorporateActions.AsNoTracking()
+                        join instrument in db.MarketInstruments.AsNoTracking() on action.InstrumentId equals instrument.Id
+                        where action.Number == number && action.Kind == MarketCorporateActionKind.Dividend && instrument.Symbol == body.Symbol
+                        select action)
+                    .SingleOrDefaultAsync(cancellationToken)
+                : null;
+            var payment = dividend is null
+                ? null
+                : await db.CustodianDividendPayments.SingleOrDefaultAsync(
+                    row => row.ActionId == dividend.Id && row.AccountId == account.Id, cancellationToken);
+            string? reason = dividend switch
+            {
+                null => "UnknownCorporateAction",
+                { ReinvestmentPrice: null } => "NoPlan",
+                _ when dividend.Status != MarketCorporateActionStatus.Effective || payment is null
+                       || body.Quantity!.Value > payment.EntitledPosition => "NotEntitled",
+                _ when payment!.Status == CustodianDividendPaymentStatus.Paid => "TooLate",
+                _ => null
+            };
+
+            if (reason is null)
+            {
+                payment!.Elect(instructionId, text, body.Quantity!.Value);
+            }
+            else
+            {
+                db.CustodianRejectedElections.Add(CustodianRejectedElection.Create(account.Id, instructionId, text, reason));
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return Results.Ok(new ElectionAnswer(reason is null ? "Accepted" : "Rejected", reason));
+        });
     }
 
     /// <summary>R65: an executed transfer adds one movement of kind <c>Transfer</c> to the account, in the feed at once.</summary>
@@ -208,6 +306,15 @@ public sealed record TransferRequest(
     TransferCounterparty? Counterparty);
 
 public sealed record TransferCounterparty(string? Name, string? Account, string? HolderName);
+
+/// <summary>Dividends R58: the election the platform sends for one dividend.</summary>
+public sealed record ElectionRequest(string? InstructionId, string? CorporateActionId, string? Symbol, string? Currency, decimal? Quantity);
+
+/// <summary>Dividends R58: <c>Accepted</c>, or <c>Rejected</c> with its reason.</summary>
+public sealed record ElectionAnswer(
+    string Status,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    string? Reason);
 
 /// <summary>R63: the custodian's answer to an instruction; a held transfer is accepted.</summary>
 public sealed record TransferAnswer(

@@ -47,6 +47,7 @@ related:
   - trade-settlement.md
   - rebalances.md
   - in-kind-transfers.md
+  - dividends.md
 ---
 
 # Orders and settlement
@@ -959,3 +960,11 @@ Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transf
 - R43: the unsettled quantity of a holding is read from the `Posted` buy fills that are not settled and not broken; a transfer out may not take it (in-kind-transfers R44).
 - R52, R53 (simulator): the broker instructs the simulator custodian to receive or deliver the shares of each fill of an order with a safekeeping account when the fill settles; the custodian's `Trade` movement names the fill by the outside id of its `Fill` report.
 - "Out" and "still open": the custodian side of a fill is now in [in-kind-transfers.md](in-kind-transfers.md).
+
+---
+
+## Amendment 2026-11-24 (dividends) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rule R16 lives there; this section records what changes here.
+
+- R50 and R62: a dividend that goes ex cancels no open order, on the platform or at the simulator broker. The cancel applies to `Split`, `Consolidation` and `Bonus` only.

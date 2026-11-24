@@ -61,7 +61,12 @@ public static class MarketPartyEndpoints
                 row.version.RatioHeld,
                 row.version.ExDate,
                 row.version.RecordDate,
-                row.version.PaymentDate);
+                row.version.PaymentDate,
+                row.version.AmountPerShare,
+                row.version.TaxSource?.ToString(),
+                row.version.ImputationCreditPerShare,
+                row.version.ForeignTaxRatePercent,
+                row.version.ReinvestmentPrice);
         }).ToList();
         return Results.Ok(new MarketCorporateActionFeed(items, BankFeedCursor.Format(world.WorldId, last), rows.Count > take));
     }
@@ -95,8 +100,13 @@ public sealed record MarketCorporateActionFeedItem(
     string Symbol,
     string Currency,
     string Kind,
-    int RatioNew,
-    int RatioHeld,
+    int? RatioNew,
+    int? RatioHeld,
     DateOnly ExDate,
     DateOnly? RecordDate,
-    DateOnly? PaymentDate);
+    DateOnly? PaymentDate,
+    decimal? AmountPerShare,
+    string? TaxSource,
+    decimal? ImputationCreditPerShare,
+    decimal? ForeignTaxRatePercent,
+    decimal? ReinvestmentPrice);

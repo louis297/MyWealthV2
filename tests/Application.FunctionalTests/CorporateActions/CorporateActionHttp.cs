@@ -42,6 +42,32 @@ internal static class CorporateActionHttp
         ["memo"] = memo
     };
 
+    /// <summary>A hand-entered dividend (dividends §8.1).</summary>
+    public static Dictionary<string, object?> DividendBody(
+        Guid instrumentId,
+        decimal amount = 0.26m,
+        string? taxSource = "Foreign",
+        decimal? credit = 0m,
+        decimal? rate = 15m,
+        DateOnly? exDate = null,
+        string? memo = "Quarterly dividend")
+    {
+        var date = exDate ?? Today.AddDays(9);
+        return new Dictionary<string, object?>
+        {
+            ["instrumentId"] = instrumentId,
+            ["kind"] = "Dividend",
+            ["amountPerShare"] = amount,
+            ["taxSource"] = taxSource,
+            ["imputationCreditPerShare"] = credit,
+            ["foreignTaxRatePercent"] = rate,
+            ["exDate"] = date.ToString("yyyy-MM-dd"),
+            ["recordDate"] = date.ToString("yyyy-MM-dd"),
+            ["paymentDate"] = date.AddDays(7).ToString("yyyy-MM-dd"),
+            ["memo"] = memo
+        };
+    }
+
     public static Dictionary<string, object?> UpdateBody(
         string? rowVersion,
         string kind = "Split",

@@ -41,6 +41,10 @@ export type Account = {
   accruedInterest?: number;
   /** interest-run R35: the last UTC day accrued through, or null. */
   interestAccruedThrough?: string | null;
+  /** dividends R17: the account's reinvestment election; false on an External account. */
+  reinvestDividends?: boolean;
+  /** dividends R52: dividends that went ex with an entitlement of this account and are not paid yet. */
+  pendingDividends?: number;
 };
 
 export type AccountListArgs = {
@@ -141,6 +145,14 @@ export const accountsApi = api.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, arg) => [{ type: "Account", id: arg.id }, "Account"],
     }),
+    setDividendReinvestment: builder.mutation<void, { id: string; reinvest: boolean; rowVersion: string }>({
+      query: ({ id, reinvest, rowVersion }) => ({
+        url: `/accounts/${id}/dividend-reinvestment`,
+        method: "PUT",
+        body: { reinvest, rowVersion },
+      }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Account", id: arg.id }, "Account"],
+    }),
     reopenAccount: builder.mutation<void, { id: string; rowVersion: string }>({
       query: ({ id, rowVersion }) => ({
         url: `/accounts/${id}/reopen`,
@@ -160,4 +172,5 @@ export const {
   useCreateAccountMutation,
   useCloseAccountMutation,
   useReopenAccountMutation,
+  useSetDividendReinvestmentMutation,
 } = accountsApi;

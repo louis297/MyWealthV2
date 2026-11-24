@@ -20,8 +20,19 @@ public static class AnnouncementText
 
     public static string Kind(string? kind) => kind ?? "Unknown";
 
-    public static string Ratio(CorporateActionAnnouncementItem item) =>
-        string.Create(CultureInfo.InvariantCulture, $"{item.RatioNew} for {item.RatioHeld}");
+    /// <summary>BO25: "2 for 1"; dividends BO33: "0.72 USD per share", with ", plan 25.00" when it offers a plan.</summary>
+    public static string Ratio(CorporateActionAnnouncementItem item)
+    {
+        if (item.AmountPerShare is not { } amount)
+        {
+            return string.Create(CultureInfo.InvariantCulture, $"{item.RatioNew} for {item.RatioHeld}");
+        }
+
+        var text = $"{PerShare(amount)} {item.Currency} per share";
+        return item.ReinvestmentPrice is { } price ? $"{text}, plan {PerShare(price)}" : text;
+    }
+
+    private static string PerShare(decimal value) => value.ToString("0.00######", CultureInfo.InvariantCulture);
 
     public static string Instant(DateTimeOffset at) =>
         at.ToUniversalTime().ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture);

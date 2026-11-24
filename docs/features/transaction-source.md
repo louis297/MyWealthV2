@@ -26,6 +26,7 @@ related:
   - rebalances.md
   - migration-batches.md
   - in-kind-transfers.md
+  - dividends.md
 ---
 
 # Transaction source
@@ -458,3 +459,12 @@ Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transf
 - R12, R13: `InKindTransfer` is not hand-reversible; `POST /transactions/{id}/reverse` of a Transaction a transfer wrote → 400 with the message of R13. No flow reverses it; a new transfer or an adjustment corrects it.
 - `0055` widens `CK_Transactions_SourceKind` to 0–10 and requires a `SourcePublicId` for kinds 2–10.
 - The transaction item gains `inKindTransfer` (in-kind-transfers R42).
+
+---
+
+## Amendment 2026-11-24 (dividends) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rules R37 and R42 live there; this section records what changes here.
+
+- Kind `CorporateAction` (7) also marks a `Dividend`, with the corporate action's PublicId as its id. It stays not hand-reversible.
+- The transaction item gains `dividend` (dividends R50).

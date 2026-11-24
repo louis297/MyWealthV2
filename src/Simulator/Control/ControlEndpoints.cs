@@ -146,6 +146,8 @@ public static class ControlEndpoints
 
             // Simulated instruments R23, corporate-actions R47: the market and its corporate actions are emptied and its
             // standing instruments added again, priced on the first day of the new world (its clock starts at real now).
+            // Dividends R63: the custodian's dividend payments point at the market's dividends and its accounts.
+            await db.CustodianDividendPayments.ExecuteDeleteAsync(http.RequestAborted);
             await db.MarketCorporateActionVersions.ExecuteDeleteAsync(http.RequestAborted);
             await db.MarketCorporateActions.ExecuteDeleteAsync(http.RequestAborted);
             await db.MarketPrices.ExecuteDeleteAsync(http.RequestAborted);
@@ -153,6 +155,7 @@ public static class ControlEndpoints
             await standingInstruments.AddMissingAsync(db, MarketPricePath.Day(time.GetUtcNow()), http.RequestAborted);
             // In-kind-transfers R71: the custodian's books are emptied, its settings set back, and its standing accounts
             // opened again with their positions.
+            await db.CustodianRejectedElections.ExecuteDeleteAsync(http.RequestAborted);
             await db.CustodianTransfers.ExecuteDeleteAsync(http.RequestAborted);
             await db.CustodianMovements.ExecuteDeleteAsync(http.RequestAborted);
             await db.CustodianAccounts.ExecuteDeleteAsync(http.RequestAborted);
@@ -160,7 +163,8 @@ public static class ControlEndpoints
                 setters => setters
                     .SetProperty(settings => settings.TransferMode, CustodianTransferMode.Execute)
                     .SetProperty(settings => settings.RejectReason, (string?)null)
-                    .SetProperty(settings => settings.RoundingMode, CustodianRoundingMode.Fractional),
+                    .SetProperty(settings => settings.RoundingMode, CustodianRoundingMode.Fractional)
+                    .SetProperty(settings => settings.IncomeMode, CustodianIncomeMode.Pay),
                 http.RequestAborted);
             await standingCustody.OpenMissingAsync(db, time.GetUtcNow(), http.RequestAborted);
             var result = await WriteAsync(http, db, time, ControlActions.WorldReset, body, (world, now) =>

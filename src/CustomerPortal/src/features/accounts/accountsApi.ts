@@ -14,6 +14,8 @@ export type Account = {
   /** interest-run R35: unposted daily accruals, 8 decimals; 0 on an External account. */
   accruedInterest?: number;
   interestAccruedThrough?: string | null;
+  /** dividends R17: whether dividends with a reinvestment plan are paid in shares; false on an External account. */
+  reinvestDividends?: boolean;
   /** account-closure R27: the Account's latest account closure, or null. */
   closure?: {
     id: string;
@@ -112,6 +114,19 @@ export type Activity = {
   migration?: { asOfDate: string; previousProvider: string } | null;
   /** in-kind-transfers R38: the transfer behind a StockIn or StockOut; otherwise null. */
   inKindTransfer?: { transferId: string; direction: string; counterpartyName: string } | null;
+  /** dividends R39: the dividend a Dividend pays; otherwise null. */
+  dividend?: {
+    corporateActionId: string;
+    instrument: { id: string; symbol: string; name: string };
+    quantity: number;
+    amountPerShare: number;
+    currency: string;
+    imputationCredit: number;
+    reinvestedQuantity: number | null;
+    reinvestmentPrice: number | null;
+    exDate: string;
+    paymentDate: string | null;
+  } | null;
   /** corporate-actions R37: the event behind an entitlement posting; otherwise null. */
   corporateAction?: {
     id: string;

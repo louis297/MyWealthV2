@@ -104,6 +104,12 @@ public sealed class ProcessStatementLines(
             return;
         }
 
+        // Dividends R24: the custodian's dividend receipt is checked next, before deposit matching.
+        if (await new BankDividends(db, catalog, time).ProcessReceiptAsync(line, cancellationToken))
+        {
+            return;
+        }
+
         var (account, reason) = await ChooseAsync(line, cancellationToken);
         if (account is null)
         {

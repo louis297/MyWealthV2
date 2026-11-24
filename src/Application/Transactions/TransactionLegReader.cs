@@ -96,6 +96,23 @@ internal static class TransactionLegReader
                     : original == null ? null : original.SourcePublicId
             }).ToListAsync(cancellationToken);
 
+        // Dividends R50: the dividend of a Dividend, and of the Transaction a Reversal undoes.
+        var dividendRows = await (
+            from detail in db.TransactionDividendDetails.AsNoTracking()
+            join transaction in db.Transactions.AsNoTracking() on detail.TransactionId equals transaction.Id
+            join original in db.Transactions.AsNoTracking() on transaction.OriginalTransactionId equals original.Id into originals
+            from original in originals.DefaultIfEmpty()
+            join instrument in db.Instruments.AsNoTracking() on detail.InstrumentId equals instrument.Id
+            where transactionIds.Contains(detail.TransactionId)
+            select new
+            {
+                detail,
+                ActionId = transaction.SourceKind == Domain.Enums.TransactionSourceKind.CorporateAction
+                    ? transaction.SourcePublicId
+                    : original == null ? null : original.SourcePublicId,
+                Instrument = new TransactionDividendInstrumentDto(instrument.PublicId, instrument.Symbol, instrument.Name)
+            }).ToListAsync(cancellationToken);
+
         // Orders R38: the execution of a fill; the order is the source of the fill or of the Transaction a Reversal
         // undoes, and whether it settled is on the fill.
         var executionRows = await (
@@ -288,7 +305,22 @@ internal static class TransactionLegReader
                     row.Detail.ChangesBeneficialOwner,
                     row.Detail.AcquiredOn?.ToString("yyyy-MM-dd"),
                     row.Detail.SettlementDate.ToString("yyyy-MM-dd"),
-                    row.Detail.CustodianReference)));
+                    row.Detail.CustodianReference)),
+            dividendRows.ToDictionary(
+                row => row.detail.TransactionId,
+                row => new TransactionDividendDto(
+                    row.ActionId ?? Guid.Empty,
+                    row.Instrument,
+                    row.detail.Quantity,
+                    row.detail.AmountPerShare,
+                    row.detail.Currency.Trim(),
+                    row.detail.TaxSource.ToString(),
+                    row.detail.ImputationCredit,
+                    row.detail.ReinvestedQuantity,
+                    row.detail.ReinvestmentPrice,
+                    row.detail.ExDate.ToString("yyyy-MM-dd"),
+                    row.detail.RecordDate?.ToString("yyyy-MM-dd"),
+                    row.detail.PaymentDate?.ToString("yyyy-MM-dd"))));
     }
 }
 
@@ -303,4 +335,5 @@ internal sealed record TransactionLegs(
     IReadOnlyDictionary<int, TransactionCorporateActionDto> CorporateAction,
     IReadOnlyDictionary<int, TransactionExecutionDto> Execution,
     IReadOnlyDictionary<int, TransactionMigrationDto> Migration,
-    IReadOnlyDictionary<int, TransactionInKindTransferDto> InKindTransfer);
+    IReadOnlyDictionary<int, TransactionInKindTransferDto> InKindTransfer,
+    IReadOnlyDictionary<int, TransactionDividendDto> Dividend);

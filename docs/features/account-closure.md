@@ -34,6 +34,7 @@ related:
   - trade-settlement.md
   - rebalances.md
   - in-kind-transfers.md
+  - dividends.md
 ---
 
 # Account closure
@@ -581,3 +582,11 @@ Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transf
 - R5: a new refusal, 400 `errors.AccountId`: an open in-kind transfer → `Open transfers of securities must be completed, rejected, cancelled or set aside before the account can be closed.`
 - R6: the message becomes `Sell or transfer out every holding before closing the account.`
 - R12: `POST /in-kind-transfers` joins the routes a closing account refuses.
+
+---
+
+## Amendment 2026-11-24 (dividends) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rule R46 lives there; this section records what changes here.
+
+- R5 gains a refusal, 400 `errors.AccountId`: a `Pending` entitlement of a dividend on the Account → `A dividend is still to be paid on this account. Close it after the payment.`

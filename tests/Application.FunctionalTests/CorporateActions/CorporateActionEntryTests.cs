@@ -174,7 +174,7 @@ public class CorporateActionEntryTests : TestBase
         var world = await NominatedWorld.CreateAsync();
         var instrumentId = await CustodialHttp.CreateInstrumentAsync(world.TenantAdmin.AccessToken, "AAPL");
 
-        (await ErrorsAsync(await Send(HttpMethod.Post, Root, world.TenantAdmin.AccessToken, CreateBody(instrumentId, "Dividend"))))
+        (await ErrorsAsync(await Send(HttpMethod.Post, Root, world.TenantAdmin.AccessToken, CreateBody(instrumentId, "Rights"))))
             .ShouldContainKey("Kind");
     }
 

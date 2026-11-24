@@ -104,8 +104,9 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
                 .Null()
                 .WithMessage("FxRate can only be set on a buy or sell.");
         });
+        // Dividends R43: a Dividend passes on to the manual entry matrix, which refuses it with its own message.
         RuleFor(command => command.Type)
-            .Must(type => type is not null && AllowedTypes.Contains(type))
+            .Must(type => type is not null && (AllowedTypes.Contains(type) || type == nameof(TransactionType.Dividend)))
             .WithMessage("Type must be TransferIn, TransferOut, Interest, CloseOut, Opening, OpeningHoldings, Buy, Sell, StockIn, StockOut, Split, Bonus, or Scrip.");
         RuleFor(command => command.BookedAt).NotInTheFuture(time);
         RuleFor(command => command.Memo)

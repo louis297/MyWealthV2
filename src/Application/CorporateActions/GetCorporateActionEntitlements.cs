@@ -28,6 +28,25 @@ public sealed class CorporateActionEntitlementDto
     public Guid? TransactionId { get; init; }
 
     public DateTimeOffset? PostedAt { get; init; }
+
+    /// <summary>Dividends R51: the dividend fields, each <c>null</c> on an entitlement of another kind.</summary>
+    public decimal? EntitledQuantity { get; init; }
+
+    public decimal? GrossAmount { get; init; }
+
+    public decimal? ForeignTax { get; init; }
+
+    public string? Currency { get; init; }
+
+    public bool? Reinvests { get; init; }
+
+    public decimal? ParticipatingQuantity { get; init; }
+
+    public decimal? ReinvestedQuantity { get; init; }
+
+    public decimal? NetAmount { get; init; }
+
+    public string? NetCurrency { get; init; }
 }
 
 /// <summary>Corporate-actions R36: the entitlements of one corporate action the caller can see, account order.</summary>
@@ -91,7 +110,10 @@ public class GetCorporateActionEntitlementsQueryHandler(IApplicationDbContext db
                     AccountName = account.Name,
                     CustomerId = customer.PublicId,
                     CustomerName = customer.Name,
-                    TransactionId = transaction == null ? (Guid?)null : transaction.PublicId
+                    TransactionId = transaction == null ? (Guid?)null : transaction.PublicId,
+                    QuoteCurrency = db.CorporateActions.Where(action => action.Id == entitlement.CorporateActionId)
+                        .Join(db.Instruments, action => action.InstrumentId, instrument => instrument.Id, (action, instrument) => instrument.QuoteCurrency)
+                        .FirstOrDefault()
                 })
             .Skip((request.Page - 1) * request.PageSize)
             .Take(request.PageSize)
@@ -110,7 +132,16 @@ public class GetCorporateActionEntitlementsQueryHandler(IApplicationDbContext db
                 QuantityBefore = row.entitlement.QuantityBefore,
                 QuantityAfter = row.entitlement.QuantityAfter,
                 TransactionId = row.TransactionId,
-                PostedAt = row.entitlement.PostedAt
+                PostedAt = row.entitlement.PostedAt,
+                EntitledQuantity = row.entitlement.EntitledQuantity,
+                GrossAmount = row.entitlement.GrossAmount,
+                ForeignTax = row.entitlement.ForeignTax,
+                Currency = row.entitlement.IsDividend ? row.QuoteCurrency?.Trim() : null,
+                Reinvests = row.entitlement.IsDividend ? row.entitlement.Reinvests : null,
+                ParticipatingQuantity = row.entitlement.ParticipatingQuantity,
+                ReinvestedQuantity = row.entitlement.ReinvestedQuantity,
+                NetAmount = row.entitlement.NetAmount,
+                NetCurrency = row.entitlement.NetCurrency?.Trim()
             }).ToList(),
             Page = request.Page,
             PageSize = request.PageSize,

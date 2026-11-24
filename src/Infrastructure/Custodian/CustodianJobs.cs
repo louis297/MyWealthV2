@@ -22,6 +22,7 @@ public sealed class CustodianSyncFailedException(string connection, string detai
 /// </summary>
 public sealed class CustodianSyncJob(
     SendInKindTransfers send,
+    SendReinvestmentElections elections,
     PullCustodyMovements pull,
     ProcessCustodyMovements process,
     SqlRunLock runLock,
@@ -42,6 +43,8 @@ public sealed class CustodianSyncJob(
         // R9: a failed step is recorded and the run goes on with what is already stored.
         var failures = new List<string>();
         await StepAsync("send", () => send.RunAsync(connection, cancellationToken), failures);
+        // Dividends R22: the reinvestment elections are sent after the in-kind transfers.
+        await StepAsync("elections", () => elections.RunAsync(connection, cancellationToken), failures);
         CustodianPullOutcome? outcome = null;
         await StepAsync("pull", async () => outcome = await pull.RunAsync(connection, cancellationToken), failures);
         await StepAsync("process", () => process.RunAsync(connection, cancellationToken), failures);

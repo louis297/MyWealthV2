@@ -30,6 +30,11 @@ const corporateActionKinds: Record<string, string> = {
 };
 
 function typeLabel(row: Activity) {
+  // C42: a dividend reads as the dividend of its instrument.
+  if (row.dividend) {
+    return `Dividend ${row.dividend.instrument.symbol}`;
+  }
+
   // C31: an entitlement posting reads as its corporate action; a hand Split on an External account keeps its label.
   if (row.corporateAction) {
     const { kind, ratioNew, ratioHeld } = row.corporateAction;
@@ -183,6 +188,36 @@ function InterestLines({ row }: { row: Activity }) {
   );
 }
 
+/** An amount per share or a price with at least two decimals: "1.00", "0.2575". */
+function perShare(value: number) {
+  return new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8, useGrouping: false }).format(value);
+}
+
+function taxLabel(kind: string) {
+  return kind === "ForeignWithholding" ? "Foreign tax" : kind === "Nrwt" ? "NRWT" : "RWT";
+}
+
+/** C42: the gross, each tax and the imputation credit of a dividend; the amount above is the net cash. */
+function DividendLines({ row }: { row: Activity }) {
+  const dividend = row.dividend!;
+  const principal = row.cash.find((leg) => leg.role === "Principal");
+  const currency = principal?.currency ?? dividend.currency;
+  const taxes = row.cash.filter((leg) => leg.role === "Tax" && leg.tax);
+  return (
+    <>
+      {principal ? <p className="text-muted-foreground text-xs">{`Gross ${formatPayout(principal.amount, currency)}`}</p> : null}
+      {taxes.map((leg) => (
+        <p key={leg.tax!.kind} className="text-muted-foreground text-xs">
+          {`${taxLabel(leg.tax!.kind)} ${leg.tax!.ratePercent} % ${formatPayout(leg.tax!.amount, currency)}`}
+        </p>
+      ))}
+      {dividend.imputationCredit > 0 ? (
+        <p className="text-muted-foreground text-xs">{`Imputation credit ${formatPayout(dividend.imputationCredit, dividend.currency)}`}</p>
+      ) : null}
+    </>
+  );
+}
+
 function isNotFound(error: unknown) {
   return typeof error === "object" && error !== null && "status" in error && error.status === 404;
 }
@@ -308,6 +343,13 @@ export function AccountDetailPage() {
               <DetailItem label="Interest">
                 {`Interest earned so far this period: ${formatDown(account.data.accruedInterest ?? 0, account.data.currency)}`}
                 <span className="mt-1 block text-xs text-muted-foreground">Paid after the end of the month.</span>
+              </DetailItem>
+            ) : null}
+            {custodial ? (
+              // C44: the account's reinvestment election, read only.
+              <DetailItem label="Dividends">
+                {account.data.reinvestDividends ? "Dividends are reinvested" : "Dividends are paid in cash"}
+                <span className="mt-1 block text-xs text-muted-foreground">Ask your adviser to change this.</span>
               </DetailItem>
             ) : null}
           </DetailGrid>
@@ -503,6 +545,19 @@ export function AccountDetailPage() {
                         {row.interest ? (
                           <p className="text-muted-foreground text-xs">{`${row.interest.periodFrom} to ${row.interest.periodTo}`}</p>
                         ) : null}
+                        {row.dividend ? (
+                          <>
+                            <p className="text-muted-foreground text-xs">
+                              {`${row.dividend.quantity} shares × ${perShare(row.dividend.amountPerShare)}`}
+                            </p>
+                            {row.dividend.reinvestedQuantity != null && row.dividend.reinvestmentPrice != null ? (
+                              // C43.
+                              <p className="text-muted-foreground text-xs">
+                                {`Reinvested in ${row.dividend.reinvestedQuantity} shares at ${perShare(row.dividend.reinvestmentPrice)}`}
+                              </p>
+                            ) : null}
+                          </>
+                        ) : null}
                         {row.corporateAction ? (
                           <>
                             <p className="text-muted-foreground text-xs">
@@ -518,7 +573,7 @@ export function AccountDetailPage() {
                       </TableCell>
                       <TableCell>{formatInstant(row.bookedAt)}</TableCell>
                       <TableCell>
-                        {row.interest
+                        {row.interest || row.dividend
                           ? formatPayout(
                             (row.cash ?? []).filter((leg) => leg.accountId === id)
                               .reduce((sum, leg) => sum + Math.round(leg.amount * 10000), 0) / 10000,
@@ -528,6 +583,7 @@ export function AccountDetailPage() {
                             .map((leg) => `${leg.amount} ${leg.currency}`)
                             .join(", ")}
                         {row.interest ? <InterestLines row={row} /> : null}
+                        {row.dividend ? <DividendLines row={row} /> : null}
                         {row.fx ? (
                           <p className="text-muted-foreground text-xs">
                             {`1 ${row.fx.baseCurrency} = ${Number(row.fx.rate)} ${row.fx.quoteCurrency} (as of ${row.fx.rateAsOfDate})`}

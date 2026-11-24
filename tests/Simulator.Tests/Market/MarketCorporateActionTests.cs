@@ -74,7 +74,7 @@ public class MarketCorporateActionTests
     }
 
     [TestCase("NOPE.SIM", "Split", 2, 1, 2, "Symbol")]
-    [TestCase("ACME.SIM", "Dividend", 2, 1, 2, "Kind")]
+    [TestCase("ACME.SIM", "Rights", 2, 1, 2, "Kind")]
     [TestCase("ACME.SIM", "Split", 1, 2, 2, "RatioNew")]
     [TestCase("ACME.SIM", "Consolidation", 2, 1, 2, "RatioNew")]
     [TestCase("ACME.SIM", "Bonus", 0, 1, 2, "RatioNew")]

@@ -54,6 +54,10 @@ export function kindLabel(kind: string) {
       return "Settled trades not booked yet";
     case "TradeFees":
       return "Trade fees held in the trust account";
+    case "DividendsNotPosted":
+      return "Dividends received, not paid to customers yet";
+    case "DividendDifference":
+      return "Dividends: difference between the custodian's payment and the customers' credits";
     default:
       return kind;
   }

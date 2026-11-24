@@ -29,6 +29,7 @@ related:
   - rebalances.md
   - migration-batches.md
   - in-kind-transfers.md
+  - dividends.md
 ---
 
 # Bank reconciliation
@@ -619,3 +620,12 @@ Status of this amendment: `accepted` (2026-11-24), together with [migration-batc
 Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rules R50–R59 live there; this section records what changes here.
 
 - §2 Out and "still open": the position (custodian) reconciliation is [in-kind-transfers.md](in-kind-transfers.md) §4.11. It reuses `ReconciliationTrigger`, the SNAPSHOT read of R6 and the date filters of R20, and runs daily at 17:10 UTC, after this run.
+
+---
+
+## Amendment 2026-11-24 (dividends) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rules R44 and R45 live there; this section records what changes here.
+
+- R9–R11 and §5: two item kinds. `DividendsNotPosted` (20, Timing): the dividends received on the account with an entitlement still `Pending`. `DividendDifference` (21, Known): for every other dividend received on the account, the received amount less the `Principal`, `Reinvestment` and `ForeignWithholding` legs of its Transactions on accounts in the currency. These legs no longer count in `OtherLedgerCash`.
+- The `Rwt` and `Nrwt` legs of a `Dividend` count in `TaxWithheld`. The legs of a dividend paid in another currency stay in `OtherLedgerCash`, apart from their tax legs.

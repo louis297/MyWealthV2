@@ -77,6 +77,24 @@ public class TransactionCashLeg : BaseAuditableEntity
             TaxDetail = detail
         };
 
+    /// <summary>A <see cref="CashLegRole.Reinvestment"/> leg: the part of a dividend taken in new shares (dividends R40).</summary>
+    internal static TransactionCashLeg CreateReinvestment(int tenantId, int accountId, decimal amount, string currency)
+    {
+        if (amount >= 0m)
+        {
+            throw new DomainException("A reinvestment leg is negative.");
+        }
+
+        return new TransactionCashLeg
+        {
+            TenantId = tenantId,
+            AccountId = accountId,
+            Role = CashLegRole.Reinvestment,
+            Amount = amount,
+            Currency = currency
+        };
+    }
+
     /// <summary>A <see cref="CashLegRole.Fee"/> leg with its fee detail (trade-fees R18).</summary>
     internal static TransactionCashLeg CreateFee(
         int tenantId,

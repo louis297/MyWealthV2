@@ -30,6 +30,7 @@ related:
   - ../features/rebalances.md
   - ../features/migration-batches.md
   - ../features/in-kind-transfers.md
+  - ../features/dividends.md
 ---
 
 # Customer Portal
@@ -375,3 +376,15 @@ Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transf
 | C39 | A Customer with an in-kind transfer | Account page | A "Transfers" block from `GET /in-kind-transfers?accountId=` lists open transfers and those that ended in the last 30 days: "100 ACME.SIM from Harbour Brokers" or "… to Harbour Brokers", the status in the Customer's words (Requested "Being checked", Approved and Sent "On its way", Completed "Done", Rejected "Not accepted", Cancelled "Cancelled", Failed and SetAside "Not completed") and the requested date. No action. |
 | C40 | A Customer with a Transaction that has `inKindTransfer` | Account page activity | A `StockIn` row is labelled "Shares transferred in" and a `StockOut` row "Shares transferred out", each with "100 ACME.SIM, Harbour Brokers" under it. A Transaction without `inKindTransfer` keeps today's labels. |
 | C41 | A holding with a reserved or unsettled quantity | Holdings | "<n> reserved" under the quantity now also covers a transfer out ("reserved for a sale or a transfer"); "<n> not settled yet" when the unsettled quantity is above 0. |
+
+---
+
+## Amendment 2026-11-24 (dividends) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [dividends](../features/dividends.md). Field rules live there. No new BFF prefix: `dividend` on the transaction item and `reinvestDividends` on the account item come with the existing reads.
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| C42 | A Customer with a `Dividend` | Account page activity | The row is labelled "Dividend <symbol>", with "<quantity> shares × <amountPerShare>", the gross, one line per tax leg, "Imputation credit <amount>" when above 0, and the net cash amount. |
+| C43 | A reinvested dividend | Account page activity | The row also shows "Reinvested in <reinvestedQuantity> shares at <reinvestmentPrice>", and the holding shows the new quantity. |
+| C44 | A Custodial account | Account page | "Dividends are reinvested" or "Dividends are paid in cash", read only, with "Ask your adviser to change this." |

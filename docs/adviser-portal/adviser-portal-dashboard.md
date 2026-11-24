@@ -37,6 +37,7 @@ related:
   - ../features/rebalances.md
   - ../features/migration-batches.md
   - ../features/in-kind-transfers.md
+  - ../features/dividends.md
 ---
 
 # Adviser Portal — Dashboard and ledger pages
@@ -437,3 +438,23 @@ Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transf
 
 - D18: the refusal text for `StockIn` and `StockOut` on a Custodial account in the portal's copy of the matrix becomes the message of in-kind-transfers R48.
 - D26, D27: the Source line names "In-kind transfer"; Reverse is not offered on a Transaction a transfer wrote (`InKindTransfer` is not hand-reversible).
+
+---
+
+## Amendment 2026-11-24 (dividends) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [dividends](../features/dividends.md). Field rules live there. Calls: the existing `/corporate-actions`, `/accounts`, `/statement-lines`, `/transactions` and `/bank-reconciliations` prefixes; no new BFF prefix.
+
+| ID | Behaviour |
+| --- | --- |
+| D94 | The Corporate actions list (D64) shows a dividend with Kind "Dividend" and, in the Ratio column, "<amountPerShare> <currency> per share". A kind filter is added (default All). The status of a dividend reads: Announced "Announced"; Effective and not paid "Waiting for payment"; Effective and paid "Being paid"; Applied "Paid"; Cancelled "Cancelled". |
+| D95 | The page of a dividend (D65) shows the terms, the dates, a Payment block ("Customers are owed <expectedAmount>", "The custodian paid <receivedAmount>" or "Not received yet", the difference in amber when it is not 0), the election with its status and the shares received, and the entitlements with Shares, Gross, Foreign tax, Net and "<reinvestedQuantity> new shares". |
+| D96 | The new corporate action form (D66) offers Kind "Dividend" with Amount per share, Company ("New Zealand" / "Foreign"), Imputation credit per share, Foreign tax rate, the dates and Memo, and no ratio. |
+| D97 | "Apply now" on a Manual dividend reads "Fix the entitlements now". A dividend that waits for shares offers "Pay in cash" to a TenantAdmin, with a required note. |
+| D98 | The Suspense page offers "Match to a dividend" on a credit line; a `DividendMismatch` line is labelled "Names a dividend but does not fit it"; a line matched to a dividend links to it and offers no action. |
+| D99 | The page of a Custodial account shows "Reinvest dividends" with a switch for a caller with `accounts.manage`, "Not used while the account follows a portfolio." on an assigned account, and "<n> dividend(s) to be paid". |
+| D100 | `/transactions/:id` of a `Dividend` shows the dividend, each tax leg, the imputation credit, the reinvestment and the net, with a link to the corporate action; the Source line shows "Corporate action"; Reverse is not offered. |
+| D101 | The bank reconciliation page labels `DividendsNotPosted` and `DividendDifference`. |
+
+The full wording is [dividends.md](../features/dividends.md) §9.
+- D18: the portal's copy of the matrix gives `Dividend` on a Custodial account the message of dividends R43.

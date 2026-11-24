@@ -67,8 +67,8 @@ public class MigrationBatchFundingTests : TestBase
             new() { ["accountId"] = world.AccountId, ["migrationBatchId"] = id });
         var neither = await StatementLineHttp.ActAsync(world.TenantAdmin, line.PublicId, "match", new());
 
-        (await CustodialHttp.ErrorsAsync(both))["AccountId"].ShouldBe(["Give an account or a migration batch."]);
-        (await CustodialHttp.ErrorsAsync(neither))["AccountId"].ShouldBe(["Give an account or a migration batch."]);
+        (await CustodialHttp.ErrorsAsync(both))["AccountId"].ShouldBe(["Give an account, a migration batch or a dividend."]);
+        (await CustodialHttp.ErrorsAsync(neither))["AccountId"].ShouldBe(["Give an account, a migration batch or a dividend."]);
         (await BankFeedHttp.LineAsync(line.OutsideId)).Status.ShouldBe(BankStatementLineStatus.Unmatched);
     }
 

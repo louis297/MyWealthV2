@@ -22,6 +22,15 @@ public interface ICustodianTransfersAdapter
         CustodianConnectionSettings connection, CustodianTransferRequest request, CancellationToken cancellationToken);
 }
 
+/// <summary>One adapter of the custodian elections port, chosen by a connection's <c>Adapter</c> (dividends R65).</summary>
+public interface ICustodianElectionsAdapter
+{
+    string Adapter { get; }
+
+    Task<CustodianElectionResult> SubmitAsync(
+        CustodianConnectionSettings connection, CustodianElectionRequest request, CancellationToken cancellationToken);
+}
+
 /// <summary>
 /// <see cref="ICustodianFeed"/> for the hosts: reads each page through the adapter its connection names (ADR 0021
 /// rule 3). A connection that is not configured on this host, or names no registered adapter, is unreachable.
@@ -62,5 +71,25 @@ public sealed class CustodianTransfersDispatcher(
         }
 
         return adapter.SendAsync(settings, request, cancellationToken);
+    }
+}
+
+/// <summary><see cref="ICustodianElections"/> for the hosts, dispatched as <see cref="CustodianFeedDispatcher"/>.</summary>
+public sealed class CustodianElectionsDispatcher(
+    ConfiguredCustodianConnections connections,
+    IEnumerable<ICustodianElectionsAdapter> adapters,
+    ILogger<CustodianElectionsDispatcher> logger) : ICustodianElections
+{
+    public Task<CustodianElectionResult> SubmitAsync(CustodianElectionRequest request, CancellationToken cancellationToken)
+    {
+        var settings = connections.Find(request.Connection);
+        var adapter = settings is null ? null : adapters.SingleOrDefault(entry => entry.Adapter == settings.Adapter);
+        if (settings is null || adapter is null)
+        {
+            logger.LogWarning("Custodian connection {Connection} has no elections adapter on this host.", request.Connection);
+            return Task.FromResult(CustodianElectionResult.Failed(CustodianFailure.Unreachable));
+        }
+
+        return adapter.SubmitAsync(settings, request, cancellationToken);
     }
 }

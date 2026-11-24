@@ -32,6 +32,7 @@ related:
   - ../api-design.md
   - ../glossary.md
   - in-kind-transfers.md
+  - dividends.md
 ---
 
 # Migration batches
@@ -641,3 +642,11 @@ Do not put an in-kind transfer, a custodian statement, a server-side file upload
 Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rule R18 and §11 point 14 live there; this section records what changes here.
 
 - §11 point 9 and "still open" (no outside proof of migrated holdings): a migrated holding shows as `unexplained` in the custodian reconciliation until the previous provider delivers it to the safekeeping account. The bulk delivery arrives as a custody movement with no instruction (`NoInstruction`), which a TenantAdmin ignores with a note; the batch already posted the holdings. The batch does not change.
+
+---
+
+## Amendment 2026-11-24 (dividends) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rule R26 lives there; this section records what changes here.
+
+- R13: `migrationBatchId` is one of three match targets with `accountId` and `corporateActionId`; the message for none or more than one becomes `Give an account, a migration batch or a dividend.`

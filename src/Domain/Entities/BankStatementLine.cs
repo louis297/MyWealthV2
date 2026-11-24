@@ -90,6 +90,9 @@ public class BankStatementLine : BaseAuditableEntity
     /// <summary>Migration-batches R13: the migration batch this receipt funds, while it is matched to one.</summary>
     public int? MigrationBatchId { get; private set; }
 
+    /// <summary>Dividends R24, R26: the dividend this line is the receipt of.</summary>
+    public int? CorporateActionId { get; private set; }
+
     public byte[] RowVersion { get; private set; } = null!;
 
     /// <summary>A line as the bank sent it, in status <c>Received</c> (R10–R12). Payer name and reference are
@@ -185,6 +188,12 @@ public class BankStatementLine : BaseAuditableEntity
             throw new StatementLineStatusException("This line returned a payment and cannot be unmatched.");
         }
 
+        if (MatchMethod == StatementLineMatchMethod.Dividend)
+        {
+            // Dividends R27: a receipt matched to a dividend stays; a wrong match is corrected with adjustments.
+            throw new StatementLineStatusException("A receipt matched to a dividend cannot be taken out of it.");
+        }
+
         if (MatchMethod == StatementLineMatchMethod.Settlement)
         {
             // Trade-settlement R21: a settlement line accepts no action; only a returned payment undoes it.
@@ -250,6 +259,19 @@ public class BankStatementLine : BaseAuditableEntity
         Status = BankStatementLineStatus.Unmatched;
         UnmatchedReason = Enums.UnmatchedReason.PaymentMismatch;
     }
+
+    /// <summary>Dividends R24: the custodian's payment of a dividend, matched by its reference. No Account and no
+    /// Transaction: the dividend's entitlements are posted when it is paid.</summary>
+    public void MarkDividendReceipt(int corporateActionId, DateTimeOffset at)
+    {
+        EnsureCredit("matched");
+        EnsureStatus("matched", BankStatementLineStatus.Received);
+        SetMatch(null, null, StatementLineMatchMethod.Dividend, at);
+        CorporateActionId = corporateActionId;
+    }
+
+    /// <summary>Dividends R24: the line names a dividend but does not fit it.</summary>
+    public void MarkDividendMismatch() => MarkUnmatched(Enums.UnmatchedReason.DividendMismatch);
 
     /// <summary>The platform could not place it (R18).</summary>
     public void MarkUnmatched(UnmatchedReason reason)
@@ -355,6 +377,23 @@ public class BankStatementLine : BaseAuditableEntity
         Record(StatementLineAction.Matched, trimmed, byUserId, at);
     }
 
+    /// <summary>Dividends R26: a TenantAdmin accepts this receipt as the payment of a dividend, with a note. No Account
+    /// and no Transaction.</summary>
+    public void MatchToDividend(int corporateActionId, string note, int byUserId, DateTimeOffset at)
+    {
+        EnsureCredit("matched");
+        EnsureStatus("matched", BankStatementLineStatus.Unmatched);
+        var trimmed = note?.Trim() ?? string.Empty;
+        if (trimmed.Length is 0 or > NoteMaxLength)
+        {
+            throw new DomainException($"A note is 1 to {NoteMaxLength} characters.");
+        }
+
+        SetMatch(null, null, StatementLineMatchMethod.Dividend, at);
+        CorporateActionId = corporateActionId;
+        Record(StatementLineAction.Matched, trimmed, byUserId, at);
+    }
+
     /// <summary>Not a Customer's money (R27); on a debit line, a debit that is not a Customer's (bank-returns R9).</summary>
     public void Ignore(string note, int byUserId, DateTimeOffset at)
     {
@@ -422,6 +461,7 @@ public class BankStatementLine : BaseAuditableEntity
         MatchMethod = null;
         MatchedAt = null;
         MigrationBatchId = null;
+        CorporateActionId = null;
     }
 
     private void SetMatch(int? accountId, int? transactionId, StatementLineMatchMethod method, DateTimeOffset at)

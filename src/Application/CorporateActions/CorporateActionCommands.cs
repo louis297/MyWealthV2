@@ -4,6 +4,7 @@ using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Domain.Entities;
+using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.MarketData;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 
@@ -12,7 +13,7 @@ namespace MyWealthV2.Application.CorporateActions;
 /// <summary>Corporate-actions R15–R17: a TenantAdmin enters a corporate action of an instrument no connection serves.</summary>
 [Authorize(Policy = Policies.CorporateActionsManage)]
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed class CreateCorporateActionCommand : IRequest<Guid>
+public sealed class CreateCorporateActionCommand : IRequest<Guid>, ICorporateActionTermsBody
 {
     public Guid? InstrumentId { get; init; }
 
@@ -21,6 +22,18 @@ public sealed class CreateCorporateActionCommand : IRequest<Guid>
     public int? RatioNew { get; init; }
 
     public int? RatioHeld { get; init; }
+
+    /// <summary>Dividends R3, R11: the terms of a dividend, in place of the ratio.</summary>
+    public decimal? AmountPerShare { get; init; }
+
+    public string? TaxSource { get; init; }
+
+    public decimal? ImputationCreditPerShare { get; init; }
+
+    public decimal? ForeignTaxRatePercent { get; init; }
+
+    /// <summary>Dividends R7: refused by hand; a plan comes only from the feed.</summary>
+    public decimal? ReinvestmentPrice { get; init; }
 
     public DateOnly? ExDate { get; init; }
 
@@ -36,7 +49,7 @@ public sealed class CreateCorporateActionCommand : IRequest<Guid>
 /// <summary>Corporate-actions R18: a TenantAdmin changes a <c>Manual</c> action that is still <c>Announced</c>.</summary>
 [Authorize(Policy = Policies.CorporateActionsManage)]
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed class UpdateCorporateActionCommand : IRequest
+public sealed class UpdateCorporateActionCommand : IRequest, ICorporateActionTermsBody
 {
     [JsonIgnore]
     public Guid Id { get; set; }
@@ -46,6 +59,18 @@ public sealed class UpdateCorporateActionCommand : IRequest
     public int? RatioNew { get; init; }
 
     public int? RatioHeld { get; init; }
+
+    /// <summary>Dividends R3, R11: the terms of a dividend, in place of the ratio.</summary>
+    public decimal? AmountPerShare { get; init; }
+
+    public string? TaxSource { get; init; }
+
+    public decimal? ImputationCreditPerShare { get; init; }
+
+    public decimal? ForeignTaxRatePercent { get; init; }
+
+    /// <summary>Dividends R7: refused by hand; a plan comes only from the feed.</summary>
+    public decimal? ReinvestmentPrice { get; init; }
 
     public DateOnly? ExDate { get; init; }
 
@@ -106,8 +131,7 @@ public class CreateCorporateActionCommandValidator : AbstractValidator<CreateCor
     {
         RuleFor(command => command.InstrumentId).NotNull();
         RuleFor(command => command.Kind).Must(CorporateActionTerms.IsKind).WithMessage(CorporateActionTerms.KindMessage);
-        RuleFor(command => command.RatioNew).NotNull();
-        RuleFor(command => command.RatioHeld).NotNull().WithName("RatioNew").OverridePropertyName("RatioNew");
+        Include(new CorporateActionTermsValidator());
         RuleFor(command => command.ExDate).NotNull();
         RuleFor(command => command.Memo).Must(CorporateActionTerms.IsMemo).WithMessage(CorporateActionTerms.MemoMessage);
         RuleFor(command => command.TenantId)
@@ -120,9 +144,11 @@ public class UpdateCorporateActionCommandValidator : AbstractValidator<UpdateCor
 {
     public UpdateCorporateActionCommandValidator()
     {
-        RuleFor(command => command.Kind).Must(CorporateActionTerms.IsKind).WithMessage(CorporateActionTerms.KindMessage);
-        RuleFor(command => command.RatioNew).NotNull();
-        RuleFor(command => command.RatioHeld).NotNull().WithName("RatioNew").OverridePropertyName("RatioNew");
+        // Dividends R11: the update of a dividend may leave the kind out; the kind never changes.
+        RuleFor(command => command.Kind)
+            .Must(kind => kind is null || CorporateActionTerms.IsKind(kind))
+            .WithMessage(CorporateActionTerms.KindMessage);
+        Include(new CorporateActionTermsValidator());
         RuleFor(command => command.ExDate).NotNull();
         RuleFor(command => command.Memo).Must(CorporateActionTerms.IsMemo).WithMessage(CorporateActionTerms.MemoMessage);
         RuleFor(command => command.RowVersion).NotEmpty();
@@ -170,12 +196,25 @@ public class CreateCorporateActionCommandHandler(
         }
 
         var kind = CorporateActionTerms.ParseKind(request.Kind!);
-        var ratio = CorporateActionTerms.Ratio(kind, request.RatioNew!.Value, request.RatioHeld!.Value);
         var exDate = request.ExDate!.Value;
-        CorporateActionTerms.EnsureExDate(exDate, time);
-        await CorporateActionTerms.EnsureNoDuplicateAsync(db, instrument, kind, exDate, null, cancellationToken);
+        CorporateAction action;
+        if (kind == CorporateActionKind.Dividend)
+        {
+            // Dividends R11: the terms in place of the ratio; a plan comes only from the feed (R7).
+            var terms = CorporateActionTerms.Dividend(request);
+            CorporateActionTerms.EnsureExDate(exDate, time);
+            await CorporateActionTerms.EnsureNoDuplicateAsync(db, instrument, kind, exDate, null, cancellationToken);
+            action = CorporateAction.EnterDividend(
+                tenantId, instrument.Id, terms, exDate, request.RecordDate, request.PaymentDate, request.Memo);
+        }
+        else
+        {
+            var ratio = CorporateActionTerms.Ratio(kind, request.RatioNew!.Value, request.RatioHeld!.Value);
+            CorporateActionTerms.EnsureExDate(exDate, time);
+            await CorporateActionTerms.EnsureNoDuplicateAsync(db, instrument, kind, exDate, null, cancellationToken);
+            action = CorporateAction.Enter(tenantId, instrument.Id, kind, ratio, exDate, request.RecordDate, request.PaymentDate, request.Memo);
+        }
 
-        var action = CorporateAction.Enter(tenantId, instrument.Id, kind, ratio, exDate, request.RecordDate, request.PaymentDate, request.Memo);
         db.CorporateActions.Add(action);
         await db.SaveChangesAsync(cancellationToken);
         return action.PublicId;
@@ -191,9 +230,28 @@ public class UpdateCorporateActionCommandHandler(IApplicationDbContext db, ICurr
         CorporateActionReader.EnsureChangeable(action, request.RowVersion, "changed");
         var instrument = await db.Instruments.AsNoTracking().SingleAsync(row => row.Id == action.InstrumentId, cancellationToken);
 
-        var kind = CorporateActionTerms.ParseKind(request.Kind!);
-        var ratio = CorporateActionTerms.Ratio(kind, request.RatioNew!.Value, request.RatioHeld!.Value);
         var exDate = request.ExDate!.Value;
+        var isDividend = action.Kind == CorporateActionKind.Dividend;
+        if (CorporateActionTerms.IsDividendBody(request) != isDividend)
+        {
+            // Dividends R11: the kind of a corporate action never changes to or from a dividend.
+            throw CorporateActionReader.Error(
+                nameof(UpdateCorporateActionCommand.Kind),
+                isDividend ? "The kind of a dividend never changes." : "A corporate action does not become a dividend.");
+        }
+
+        if (isDividend)
+        {
+            var terms = CorporateActionTerms.Dividend(request);
+            CorporateActionTerms.EnsureExDate(exDate, time);
+            await CorporateActionTerms.EnsureNoDuplicateAsync(db, instrument, action.Kind, exDate, action.Id, cancellationToken);
+            action.ChangeDividend(terms, exDate, request.RecordDate, request.PaymentDate, request.Memo);
+            await CorporateActionReader.SaveAsync(db, cancellationToken);
+            return;
+        }
+
+        var kind = request.Kind is null ? action.Kind : CorporateActionTerms.ParseKind(request.Kind);
+        var ratio = CorporateActionTerms.Ratio(kind, request.RatioNew!.Value, request.RatioHeld!.Value);
         CorporateActionTerms.EnsureExDate(exDate, time);
         await CorporateActionTerms.EnsureNoDuplicateAsync(db, instrument, kind, exDate, action.Id, cancellationToken);
 
@@ -216,7 +274,11 @@ public class CancelCorporateActionCommandHandler(IApplicationDbContext db, ICurr
     }
 }
 
-public class ApplyCorporateActionCommandHandler(IApplicationDbContext db, ICurrentUser currentUser, TimeProvider time)
+public class ApplyCorporateActionCommandHandler(
+    IApplicationDbContext db,
+    ICurrentUser currentUser,
+    ICurrencyCatalog currencies,
+    TimeProvider time)
     : IRequestHandler<ApplyCorporateActionCommand>
 {
     public async Task Handle(ApplyCorporateActionCommand request, CancellationToken cancellationToken)
@@ -233,7 +295,58 @@ public class ApplyCorporateActionCommandHandler(IApplicationDbContext db, ICurre
         var actor = currentUser.Person?.Id ?? throw new ForbiddenAccessException();
         await db.ExecuteInTransactionAsync(async token =>
         {
-            await CorporateActionEffect.MakeEffectiveAsync(db, action, now, actor, token);
+            await CorporateActionEffect.MakeEffectiveAsync(db, currencies, action, now, actor, token);
+            await CorporateActionReader.SaveAsync(db, token);
+        }, cancellationToken);
+    }
+}
+
+/// <summary>Dividends R31: a TenantAdmin pays in cash a dividend whose accepted election delivered no shares.</summary>
+[Authorize(Policy = Policies.CorporateActionsManage)]
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed class PayDividendInCashCommand : IRequest
+{
+    [JsonIgnore]
+    public Guid Id { get; set; }
+
+    public string? RowVersion { get; init; }
+
+    public string? Note { get; init; }
+}
+
+public class PayDividendInCashCommandValidator : AbstractValidator<PayDividendInCashCommand>
+{
+    public PayDividendInCashCommandValidator()
+    {
+        RuleFor(command => command.RowVersion).NotEmpty();
+        RuleFor(command => command.Note)
+            .Must(note => note?.Trim().Length is >= 1 and <= CorporateAction.NoteMaxLength)
+            .WithMessage("Note must be 1 to 200 characters.");
+    }
+}
+
+public class PayDividendInCashCommandHandler(IApplicationDbContext db, ICurrentUser currentUser, TimeProvider time)
+    : IRequestHandler<PayDividendInCashCommand>
+{
+    public async Task Handle(PayDividendInCashCommand request, CancellationToken cancellationToken)
+    {
+        var action = await CorporateActionReader.FindAsync(db, currentUser, request.Id, cancellationToken);
+        if (!action.WaitsForShares)
+        {
+            throw CorporateActionReader.Error(nameof(CorporateAction.Status), CorporateAction.DoesNotWaitForSharesMessage);
+        }
+
+        if (!string.Equals(Convert.ToBase64String(action.RowVersion ?? []), request.RowVersion, StringComparison.Ordinal))
+        {
+            throw new ConcurrencyException();
+        }
+
+        var actor = currentUser.Person?.Id ?? throw new ForbiddenAccessException();
+        var now = time.GetUtcNow();
+        await db.ExecuteInTransactionAsync(async token =>
+        {
+            action.ReleaseElection(actor, request.Note!, now);
+            await PayDividend.TryAsync(db, action, now, token);
             await CorporateActionReader.SaveAsync(db, token);
         }, cancellationToken);
     }

@@ -4,7 +4,8 @@ namespace MyWealthV2.Domain.Entities;
 
 /// <summary>
 /// A corporate action of one Instrument of one Tenant (docs/features/corporate-actions.md §4.2, §5): a split, a
-/// consolidation or a bonus issue with a ratio and its dates. Origin <c>Manual</c> (entered by a TenantAdmin) or
+/// consolidation or a bonus issue with a ratio and its dates, or a dividend with its terms per share and no ratio
+/// (docs/features/dividends.md §4.2). Origin <c>Manual</c> (entered by a TenantAdmin) or
 /// <c>Feed</c> (created from an announcement). <c>Announced</c> → <c>Effective</c> → <c>Applied</c>, or
 /// <c>Announced</c> → <c>Cancelled</c>; no status goes back (R6). The Instrument and the kind never change (R12, R18).
 /// </summary>
@@ -27,9 +28,107 @@ public class CorporateAction : BaseAuditableEntity
 
     public CorporateActionKind Kind { get; private set; }
 
-    public int RatioNew { get; private set; }
+    /// <summary>The ratio; <c>null</c> on a dividend (dividends R2).</summary>
+    public int? RatioNew { get; private set; }
 
-    public int RatioHeld { get; private set; }
+    public int? RatioHeld { get; private set; }
+
+    /// <summary>Dividends R3: the terms of a dividend, each <c>null</c> on another kind.</summary>
+    public decimal? AmountPerShare { get; private set; }
+
+    public DividendTaxSource? TaxSource { get; private set; }
+
+    public decimal? ImputationCreditPerShare { get; private set; }
+
+    public decimal? ForeignTaxRatePercent { get; private set; }
+
+    public decimal? ReinvestmentPrice { get; private set; }
+
+    /// <summary>Dividends R24, R26: the statement line that paid the dividend into the client money account, and its
+    /// amount; at most one, never undone.</summary>
+    public int? ReceiptLineId { get; private set; }
+
+    public decimal? ReceivedAmount { get; private set; }
+
+    /// <summary>Dividends R29: when the dividend became paid; from then its entitlements are posted.</summary>
+    public DateTimeOffset? PaidAt { get; private set; }
+
+    /// <summary>Dividends R20: the election of a dividend: <c>None</c>, or the quantity of the firm's shares that take
+    /// part and the safekeeping account they are held in; <c>null</c> on another kind.</summary>
+    public ReinvestmentElectionStatus? ElectionStatus { get; private set; }
+
+    public decimal? ElectionQuantity { get; private set; }
+
+    public int? SafekeepingAccountId { get; private set; }
+
+    /// <summary>Dividends R22: the attempts to send the election, the last one, and the custodian's reason when it
+    /// rejected it.</summary>
+    public int ElectionAttempts { get; private set; }
+
+    public DateTimeOffset? ElectionLastAttemptAt { get; private set; }
+
+    public ElectionRejectReason? ElectionReason { get; private set; }
+
+    /// <summary>Dividends R28, R30: the new shares the custodian delivered under an accepted election.</summary>
+    public decimal? SharesReceived { get; private set; }
+
+    /// <summary>Dividends R28: the custody movement that delivered the new shares.</summary>
+    public int? SharesMovementId { get; private set; }
+
+    /// <summary>Dividends R31: when a person released an accepted election whose shares did not arrive.</summary>
+    public DateTimeOffset? ReleasedAt { get; private set; }
+
+    public int? ReleasedByUserId { get; private set; }
+
+    public string? ReleaseNote { get; private set; }
+
+    /// <summary>Dividends R28: the custodian delivered the new shares.</summary>
+    public void TakeShares(int movementId, decimal quantity)
+    {
+        EnsureElection(ReinvestmentElectionStatus.Accepted);
+        if (SharesReceived is not null)
+        {
+            throw new DomainException("This dividend already has its shares.");
+        }
+
+        if (quantity <= 0m)
+        {
+            throw new DomainException("The shares of a reinvestment are above 0.");
+        }
+
+        SharesMovementId = movementId;
+        SharesReceived = quantity;
+    }
+
+    /// <summary>Dividends R31: a person releases an accepted election whose shares did not arrive.</summary>
+    public void ReleaseElection(int byUserId, string note, DateTimeOffset at)
+    {
+        EnsureDividend();
+        if (Status != CorporateActionStatus.Effective || ReceiptLineId is null
+            || ElectionStatus != ReinvestmentElectionStatus.Accepted || SharesReceived is not null)
+        {
+            throw new DomainException(DoesNotWaitForSharesMessage);
+        }
+
+        var trimmed = note?.Trim() ?? string.Empty;
+        if (trimmed.Length is 0 or > NoteMaxLength)
+        {
+            throw new DomainException($"A note is 1 to {NoteMaxLength} characters.");
+        }
+
+        ElectionStatus = ReinvestmentElectionStatus.Lapsed;
+        ReleasedByUserId = byUserId;
+        ReleasedAt = at.ToUniversalTime();
+        ReleaseNote = trimmed;
+    }
+
+    /// <summary>Dividends R31: the message when pay in cash is refused.</summary>
+    public const string DoesNotWaitForSharesMessage = "This dividend does not wait for shares.";
+
+    /// <summary>Dividends R31: the dividend waits only for the shares of an accepted election.</summary>
+    public bool WaitsForShares =>
+        Kind == CorporateActionKind.Dividend && Status == CorporateActionStatus.Effective && ReceiptLineId is not null
+        && ElectionStatus == ReinvestmentElectionStatus.Accepted && SharesReceived is null;
 
     public DateOnly ExDate { get; private set; }
 
@@ -66,7 +165,202 @@ public class CorporateAction : BaseAuditableEntity
 
     public byte[] RowVersion { get; private set; } = null!;
 
-    public CorporateActionRatio Ratio => new(RatioNew, RatioHeld);
+    /// <summary>The ratio of a split, a consolidation or a bonus issue. A dividend has none (dividends R2).</summary>
+    public CorporateActionRatio Ratio => Kind == CorporateActionKind.Dividend || RatioNew is null || RatioHeld is null
+        ? throw new DomainException("A dividend has no ratio.")
+        : new(RatioNew.Value, RatioHeld.Value);
+
+    /// <summary>The terms of a dividend; <c>null</c> on another kind.</summary>
+    public DividendTerms? Terms => Kind == CorporateActionKind.Dividend
+        ? new DividendTerms(AmountPerShare!.Value, TaxSource!.Value, ImputationCreditPerShare!.Value,
+            ForeignTaxRatePercent!.Value, ReinvestmentPrice)
+        : null;
+
+    /// <summary>Dividends R11: a <c>Manual</c> dividend, <c>Announced</c>. A plan comes only from the feed (R7).</summary>
+    public static CorporateAction EnterDividend(
+        int tenantId,
+        int instrumentId,
+        DividendTerms terms,
+        DateOnly exDate,
+        DateOnly? recordDate,
+        DateOnly? paymentDate,
+        string? memo)
+    {
+        EnsureNoPlan(terms);
+        var action = New(tenantId, instrumentId, CorporateActionKind.Dividend, CorporateActionOrigin.Manual);
+        action.SetDividendTerms(terms, exDate, recordDate, paymentDate);
+        action.Memo = TrimMemo(memo);
+        return action;
+    }
+
+    /// <summary>Dividends R9: a <c>Feed</c> dividend from version <paramref name="version"/> of the party's action
+    /// <paramref name="partyActionId"/> on <paramref name="connection"/>, <c>Announced</c>.</summary>
+    public static CorporateAction AnnounceDividend(
+        int tenantId,
+        int instrumentId,
+        string connection,
+        string partyActionId,
+        int version,
+        DividendTerms terms,
+        DateOnly exDate,
+        DateOnly? recordDate,
+        DateOnly? paymentDate)
+    {
+        var action = NewFeed(tenantId, instrumentId, connection, partyActionId, version, CorporateActionKind.Dividend);
+        action.SetDividendTerms(terms, exDate, recordDate, paymentDate);
+        return action;
+    }
+
+    /// <summary>Dividends R11: a person changes a <c>Manual</c> dividend that is still <c>Announced</c>. The kind and
+    /// the Instrument stay.</summary>
+    public void ChangeDividend(DividendTerms terms, DateOnly exDate, DateOnly? recordDate, DateOnly? paymentDate, string? memo)
+    {
+        EnsureManual();
+        EnsureAnnounced();
+        EnsureDividend();
+        EnsureNoPlan(terms);
+        var trimmed = TrimMemo(memo);
+        SetDividendTerms(terms, exDate, recordDate, paymentDate);
+        Memo = trimmed;
+    }
+
+    /// <summary>Dividends R9: a later version of the party's action replaces the terms and the dates of a <c>Feed</c>
+    /// dividend that is still <c>Announced</c>. A version not above <see cref="FeedVersion"/> changes nothing and
+    /// returns <c>false</c>.</summary>
+    public bool AmendDividend(int version, DividendTerms terms, DateOnly exDate, DateOnly? recordDate, DateOnly? paymentDate)
+    {
+        EnsureFeed();
+        EnsureAnnounced();
+        EnsureDividend();
+        if (version <= FeedVersion)
+        {
+            return false;
+        }
+
+        SetDividendTerms(terms, exDate, recordDate, paymentDate);
+        FeedVersion = version;
+        return true;
+    }
+
+    /// <summary>Dividends R20: when the dividend goes ex, its election is <c>Pending</c> for the
+    /// <paramref name="quantity"/> of the firm's shares that take part, held in <paramref name="safekeepingAccountId"/>;
+    /// or <c>None</c> when nothing reinvests.</summary>
+    public void SetElection(decimal? quantity, int? safekeepingAccountId)
+    {
+        EnsureDividend();
+        if (Status != CorporateActionStatus.Effective && Status != CorporateActionStatus.Applied)
+        {
+            throw new DomainException("The election of a dividend is set when it goes ex.");
+        }
+
+        if (quantity is > 0m && safekeepingAccountId is not null)
+        {
+            if (ReinvestmentPrice is null)
+            {
+                throw new DomainException("Only a dividend with a reinvestment plan has an election.");
+            }
+
+            ElectionStatus = ReinvestmentElectionStatus.Pending;
+            ElectionQuantity = quantity;
+            SafekeepingAccountId = safekeepingAccountId;
+            return;
+        }
+
+        ElectionStatus = ReinvestmentElectionStatus.None;
+        ElectionQuantity = null;
+        SafekeepingAccountId = null;
+    }
+
+    /// <summary>Dividends R22: an attempt to send the election is recorded and committed before the call.</summary>
+    public void RecordElectionAttempt(DateTimeOffset at)
+    {
+        EnsureElection(ReinvestmentElectionStatus.Pending);
+        ElectionAttempts++;
+        ElectionLastAttemptAt = at.ToUniversalTime();
+    }
+
+    /// <summary>Dividends R22: the custodian accepted; it reinvests the elected quantity.</summary>
+    public void AcceptElection()
+    {
+        EnsureElection(ReinvestmentElectionStatus.Pending);
+        ElectionStatus = ReinvestmentElectionStatus.Accepted;
+    }
+
+    /// <summary>Dividends R22: the custodian rejected, for <paramref name="reason"/>; the dividend is paid in cash.</summary>
+    public void RejectElection(ElectionRejectReason reason)
+    {
+        EnsureElection(ReinvestmentElectionStatus.Pending);
+        if (!Enum.IsDefined(reason))
+        {
+            throw new DomainException("Unknown election reject reason.");
+        }
+
+        ElectionStatus = ReinvestmentElectionStatus.Rejected;
+        ElectionReason = reason;
+    }
+
+    /// <summary>Dividends R22: the election is not sent, because the receipt came first or the safekeeping account is
+    /// no longer active; the dividend is paid in cash.</summary>
+    public void LapseElection()
+    {
+        EnsureElection(ReinvestmentElectionStatus.Pending);
+        ElectionStatus = ReinvestmentElectionStatus.Lapsed;
+    }
+
+    /// <summary>Dividends R15, R22: what the custodian reinvests under an accepted election, net of foreign tax,
+    /// rounded to <paramref name="decimalPlaces"/>; 0 otherwise.</summary>
+    public decimal ReinvestedByCustodian(int decimalPlaces) =>
+        ElectionStatus == ReinvestmentElectionStatus.Accepted && ElectionQuantity is { } quantity && Terms is { } terms
+            ? decimal.Round(quantity * terms.NetPerShare, decimalPlaces, MidpointRounding.AwayFromZero)
+            : 0m;
+
+    private void EnsureElection(ReinvestmentElectionStatus status)
+    {
+        EnsureDividend();
+        if (ElectionStatus != status)
+        {
+            throw new DomainException($"The election of this dividend is {ElectionStatus}.");
+        }
+    }
+
+    /// <summary>Dividends R24, R26: the dividend takes its one receipt, the statement line
+    /// <paramref name="lineId"/> of <paramref name="amount"/>. Only while it waits for its payment.</summary>
+    public void TakeReceipt(int lineId, decimal amount)
+    {
+        EnsureDividend();
+        if (Status != CorporateActionStatus.Effective || ReceiptLineId is not null)
+        {
+            throw new DomainException("Only a dividend that waits for its payment can take a receipt.");
+        }
+
+        if (amount <= 0m)
+        {
+            throw new DomainException("A dividend receipt is above 0.");
+        }
+
+        ReceiptLineId = lineId;
+        ReceivedAmount = amount;
+    }
+
+    /// <summary>Dividends R29: the dividend becomes paid at <paramref name="at"/> when it is <c>Effective</c> and has
+    /// its receipt. True when this call made it paid; false when it is not ready or was already paid.</summary>
+    public bool TryPay(DateTimeOffset at)
+    {
+        if (Kind != CorporateActionKind.Dividend || Status != CorporateActionStatus.Effective || PaidAt is not null
+            || ReceiptLineId is null || ElectionStatus == ReinvestmentElectionStatus.Pending)
+        {
+            return false;
+        }
+
+        // R29: under an accepted election the custodian delivers shares in place of part of the cash.
+        if (ElectionStatus == ReinvestmentElectionStatus.Accepted && SharesReceived is null && ReleasedAt is null)
+        {
+            return false;
+        }
+
+        PaidAt = at.ToUniversalTime();
+        return true;
+    }
 
     /// <summary>R15: a <c>Manual</c> corporate action, <c>Announced</c>.</summary>
     public static CorporateAction Enter(
@@ -99,26 +393,8 @@ public class CorporateAction : BaseAuditableEntity
         DateOnly? recordDate,
         DateOnly? paymentDate)
     {
-        if (string.IsNullOrWhiteSpace(connection) || connection.Length > ConnectionMaxLength)
-        {
-            throw new DomainException("A feed corporate action needs its connection.");
-        }
-
-        if (string.IsNullOrWhiteSpace(partyActionId) || partyActionId.Length > PartyActionIdMaxLength)
-        {
-            throw new DomainException("A feed corporate action needs the party's action id.");
-        }
-
-        if (version < 1)
-        {
-            throw new DomainException("A feed version is 1 or more.");
-        }
-
-        var action = New(tenantId, instrumentId, kind, CorporateActionOrigin.Feed);
+        var action = NewFeed(tenantId, instrumentId, connection, partyActionId, version, kind);
         action.SetTerms(ratio, exDate, recordDate, paymentDate);
-        action.Connection = connection;
-        action.PartyActionId = partyActionId;
-        action.FeedVersion = version;
         return action;
     }
 
@@ -136,6 +412,11 @@ public class CorporateAction : BaseAuditableEntity
         if (!Enum.IsDefined(kind))
         {
             throw new DomainException("Unknown corporate action kind.");
+        }
+
+        if (Kind == CorporateActionKind.Dividend || kind == CorporateActionKind.Dividend)
+        {
+            throw new DomainException("The kind of a dividend never changes, and a dividend has no ratio.");
         }
 
         var kindBefore = Kind;
@@ -246,6 +527,65 @@ public class CorporateAction : BaseAuditableEntity
             Origin = origin,
             Status = CorporateActionStatus.Announced
         };
+    }
+
+    private static CorporateAction NewFeed(
+        int tenantId, int instrumentId, string connection, string partyActionId, int version, CorporateActionKind kind)
+    {
+        if (string.IsNullOrWhiteSpace(connection) || connection.Length > ConnectionMaxLength)
+        {
+            throw new DomainException("A feed corporate action needs its connection.");
+        }
+
+        if (string.IsNullOrWhiteSpace(partyActionId) || partyActionId.Length > PartyActionIdMaxLength)
+        {
+            throw new DomainException("A feed corporate action needs the party's action id.");
+        }
+
+        if (version < 1)
+        {
+            throw new DomainException("A feed version is 1 or more.");
+        }
+
+        var action = New(tenantId, instrumentId, kind, CorporateActionOrigin.Feed);
+        action.Connection = connection;
+        action.PartyActionId = partyActionId;
+        action.FeedVersion = version;
+        return action;
+    }
+
+    private void SetDividendTerms(DividendTerms terms, DateOnly exDate, DateOnly? recordDate, DateOnly? paymentDate)
+    {
+        if (DividendTerms.RefusalOf(terms.AmountPerShare, terms.TaxSource, terms.ImputationCreditPerShare,
+                terms.ForeignTaxRatePercent, terms.ReinvestmentPrice) is { } refusal)
+        {
+            throw new DomainException(refusal.Message);
+        }
+
+        AmountPerShare = terms.AmountPerShare;
+        TaxSource = terms.TaxSource;
+        ImputationCreditPerShare = terms.ImputationCreditPerShare;
+        ForeignTaxRatePercent = terms.ForeignTaxRatePercent;
+        ReinvestmentPrice = terms.ReinvestmentPrice;
+        ExDate = exDate;
+        RecordDate = recordDate;
+        PaymentDate = paymentDate;
+    }
+
+    private static void EnsureNoPlan(DividendTerms terms)
+    {
+        if (terms.ReinvestmentPrice is not null)
+        {
+            throw new DomainException("Reinvestment is available only for dividends that come from a market data connection.");
+        }
+    }
+
+    private void EnsureDividend()
+    {
+        if (Kind != CorporateActionKind.Dividend)
+        {
+            throw new DomainException("Only a dividend has dividend terms.");
+        }
     }
 
     private void SetTerms(CorporateActionRatio ratio, DateOnly exDate, DateOnly? recordDate, DateOnly? paymentDate)

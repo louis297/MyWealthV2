@@ -156,6 +156,7 @@ public class GetAccountsQueryHandler(IApplicationDbContext db, ICurrentUser curr
         var unsettled = await AccountCash.UnsettledAsync(db, accountIds, cancellationToken);
         var closures = await AccountClosureReader.LatestAsync(db, accountIds, cancellationToken);
         var accrued = await Interest.Accruals.AccruedInterest.UnpostedAsync(db, accountIds, cancellationToken);
+        var dividends = await CorporateActions.PendingDividends.CountAsync(db, accountIds, cancellationToken);
 
         return new PagedList<AccountDto>
         {
@@ -167,7 +168,8 @@ public class GetAccountsQueryHandler(IApplicationDbContext db, ICurrentUser curr
                 reserved.GetValueOrDefault(row.account.Id),
                 closures.GetValueOrDefault(row.account.Id),
                 accrued.GetValueOrDefault(row.account.Id),
-                unsettled.GetValueOrDefault(row.account.Id))).ToList(),
+                unsettled.GetValueOrDefault(row.account.Id),
+                dividends.GetValueOrDefault(row.account.Id))).ToList(),
             Page = request.Page,
             PageSize = request.PageSize,
             TotalCount = totalCount

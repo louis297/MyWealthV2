@@ -130,7 +130,7 @@ public class InterestSchemaTests
     }
 
     [Test]
-    public async Task ACashLegOfRoleTax_IsAllowed_AndRole3Violates()
+    public async Task ACashLegOfRoleTax_IsAllowed_AndRole4Violates()
     {
         (await RunAsync($"""
             {World()}
@@ -140,7 +140,7 @@ public class InterestSchemaTests
 
         var exception = await Should.ThrowAsync<SqlException>(() => RunAsync($"""
             {World()}
-            {InsertLeg(3)}
+            {InsertLeg(4)}
             """));
         exception.Number.ShouldBe(547);
         exception.Message.ShouldContain("CK_TransactionCashLegs_Role");
@@ -162,7 +162,7 @@ public class InterestSchemaTests
         exception.Message.ShouldContain("UQ_TransactionTaxDetails_TransactionId_Kind");
     }
 
-    [TestCase("2", "17.5", "2.16", "CK_TransactionTaxDetails_Kind")]
+    [TestCase("3", "17.5", "2.16", "CK_TransactionTaxDetails_Kind")]
     [TestCase("0", "0", "2.16", "CK_TransactionTaxDetails_RatePercent")]
     [TestCase("0", "17.5", "0", "CK_TransactionTaxDetails_TaxAmount")]
     public async Task ATaxDetailOutsideTheChecks_Violates(string kind, string rate, string tax, string constraint)
@@ -260,7 +260,7 @@ public class InterestSchemaTests
     }
 
     [TestCase(12, "CK_BankReconciliationItems_Line")]
-    [TestCase(20, "CK_BankReconciliationItems_Kind")]
+    [TestCase(22, "CK_BankReconciliationItems_Kind")]
     public async Task AnItemOutsideTheChecks_Violates(int kind, string constraint)
     {
         var exception = await Should.ThrowAsync<SqlException>(() => RunAsync($"""

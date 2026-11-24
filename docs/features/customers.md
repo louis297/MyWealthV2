@@ -20,6 +20,7 @@ related:
   - advisers.md
   - withdrawals.md
   - interest-run.md
+  - dividends.md
 ---
 
 # Customers
@@ -380,3 +381,11 @@ Status of this amendment: `accepted` (2026-11-22), together with [interest-run.m
 - New sub-resource `GET` / `PUT /users/customers/{customerId}/tax-profile`, with the policies and scope of every `/users/customers` route (TenantAdmin: the tenant; Adviser: assigned Customers; else 404; a Customer → 403). `PUT` takes all three attributes and `rowVersion` (`null` for the first write) and answers 204; stale → 409 `stale_row_version` (interest-run R3, R6).
 - New `GET /users/me/tax-profile` (`users.me`): the caller's own profile when the caller is a Customer, without `updatedBy`; any other role → 404 (interest-run R5, R8).
 - Creating, updating, disabling and enabling a Customer are unchanged. A Disabled Customer's profile may be changed. No domain event.
+
+---
+
+## Amendment 2026-11-24 (dividends) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rule R33 lives there; this section records what changes here.
+
+- The tax profile's `taxResidency` also decides the withholding on a dividend when it is posted: RWT 33 % for a New Zealand Customer, NRWT 30 % for an overseas Customer on a New Zealand company's dividend. `irdNumberHeld` and `rwtRatePercent` are not used for dividends.

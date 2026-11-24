@@ -31,7 +31,8 @@ public class CorporateActionAnnouncementReadTests : TestBase
         var skipped = items[0];
         skipped.EnumerateObject().Select(property => property.Name).ShouldBe([
             "id", "connection", "outsideId", "partyActionId", "version", "partyStatus", "symbol", "currency", "kind", "ratioNew",
-            "ratioHeld", "exDate", "recordDate", "paymentDate", "receivedAt", "status", "skipReason", "processedAt"
+            "ratioHeld", "exDate", "recordDate", "paymentDate", "receivedAt", "status", "skipReason", "processedAt",
+            "amountPerShare", "taxSource", "imputationCreditPerShare", "foreignTaxRatePercent", "reinvestmentPrice"
         ], ignoreOrder: true);
         skipped.GetProperty("kind").ValueKind.ShouldBe(JsonValueKind.Null);
         skipped.GetProperty("status").GetString().ShouldBe("Skipped");

@@ -206,6 +206,61 @@ public class SimulatorCustodianAdaptersTests
         }
     }
 
+    [Test]
+    public async Task AnElection_IsPostedWithItsBody_AndAcceptedMapsToAccepted()
+    {
+        var handler = new StubHandler(HttpStatusCode.OK, """{ "status": "Accepted" }""");
+        var instruction = Guid.Parse("6b1f0c2e-0000-4000-8000-000000000003");
+
+        var result = await Elections(handler).SubmitAsync(Connection, new CustodianElectionRequest(
+            "simulator", "SIM-DEMO-CUSTODY-USD", instruction, "0f8f-CA3", "ACME.SIM", "USD", 78.82352941m), CancellationToken.None);
+
+        (result.IsAccepted, result.RejectReason, result.Failure).ShouldBe((true, (ElectionRejectReason?)null, (CustodianFailure?)null));
+        var sent = handler.Requests.ShouldHaveSingleItem();
+        sent.Method.ShouldBe(HttpMethod.Post);
+        sent.Uri.ShouldBe("http://simulator:8082/party/custodian/accounts/SIM-DEMO-CUSTODY-USD/elections");
+        sent.ApiKey.ShouldBe(Key);
+        using var body = JsonDocument.Parse(sent.Body!);
+        body.RootElement.GetProperty("instructionId").GetString().ShouldBe(instruction.ToString());
+        body.RootElement.GetProperty("corporateActionId").GetString().ShouldBe("0f8f-CA3");
+        body.RootElement.GetProperty("symbol").GetString().ShouldBe("ACME.SIM");
+        body.RootElement.GetProperty("currency").GetString().ShouldBe("USD");
+        body.RootElement.GetProperty("quantity").GetDecimal().ShouldBe(78.82352941m);
+        body.RootElement.EnumerateObject().Select(property => property.Name)
+            .ShouldBe(["instructionId", "corporateActionId", "symbol", "currency", "quantity"], ignoreOrder: true);
+    }
+
+    [TestCase("UnknownCorporateAction", ElectionRejectReason.UnknownCorporateAction)]
+    [TestCase("NoPlan", ElectionRejectReason.NoPlan)]
+    [TestCase("NotEntitled", ElectionRejectReason.NotEntitled)]
+    [TestCase("TooLate", ElectionRejectReason.TooLate)]
+    [TestCase("Something", ElectionRejectReason.Other)]
+    public async Task ARejectedElection_MapsTheReason_AndAnUnknownOneIsOther(string reason, ElectionRejectReason expected) =>
+        (await Elections(new StubHandler(HttpStatusCode.OK, $$"""{ "status": "Rejected", "reason": "{{reason}}" }"""))
+            .SubmitAsync(Connection, Election(), CancellationToken.None)).RejectReason.ShouldBe(expected);
+
+    [TestCase(HttpStatusCode.NotFound, CustodianFailure.UnknownAccount)]
+    [TestCase(HttpStatusCode.Conflict, CustodianFailure.BadResponse)]
+    [TestCase(HttpStatusCode.Unauthorized, CustodianFailure.Unauthorized)]
+    [TestCase(HttpStatusCode.ServiceUnavailable, CustodianFailure.Unavailable)]
+    public async Task AnElectionStatus_MapsToItsFailure(HttpStatusCode status, CustodianFailure failure) =>
+        (await Elections(new StubHandler(status, "{}")).SubmitAsync(Connection, Election(), CancellationToken.None)).Failure.ShouldBe(failure);
+
+    [Test]
+    public async Task AnElection_ThatIsSlowOrUnreadable_Fails()
+    {
+        (await Elections(new StubHandler(HttpStatusCode.OK, "{}", TimeSpan.FromSeconds(5))).SubmitAsync(Connection, Election(),
+            CancellationToken.None)).Failure.ShouldBe(CustodianFailure.Timeout);
+        (await Elections(new StubHandler(HttpStatusCode.OK, "not json")).SubmitAsync(Connection, Election(), CancellationToken.None))
+            .Failure.ShouldBe(CustodianFailure.BadResponse);
+        (await Elections(new ThrowingHandler()).SubmitAsync(Connection, Election(), CancellationToken.None))
+            .Failure.ShouldBe(CustodianFailure.Unreachable);
+    }
+
+    private static CustodianElectionRequest Election() => new("simulator", "S", Guid.NewGuid(), "W-CA1", "A", "USD", 1m);
+
+    private static SimulatorCustodianElections Elections(HttpMessageHandler handler) => new(new Clients(handler));
+
     private static CustodianTransferRequest Request() =>
         new("simulator", "S", Guid.NewGuid(), TransferDirection.In, "A", "USD", 1m, new CustodianCounterparty("H", "1", "J"));
 

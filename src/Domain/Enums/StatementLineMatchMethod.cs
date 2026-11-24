@@ -16,5 +16,8 @@ public enum StatementLineMatchMethod
     Settlement = 5,
 
     /// <summary>A TenantAdmin matched a receipt to a migration batch as its funding (migration-batches R13).</summary>
-    Migration = 6
+    Migration = 6,
+
+    /// <summary>The custodian's payment of a dividend for the firm's whole position (dividends R24, R26).</summary>
+    Dividend = 7
 }

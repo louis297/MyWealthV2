@@ -10,9 +10,10 @@ import { changedSentence } from "@/features/statementLines/StatementLineDetailPa
 import { problemMessages, problemStatus } from "@/features/statementLines/statementLineLabels";
 import { useGetStatementLineQuery, useMatchStatementLineMutation } from "@/features/statementLines/statementLinesApi";
 import { type MigrationBatchSummary, useGetMigrationBatchesQuery } from "@/features/migrationBatches/migrationBatchesApi";
+import { type CorporateAction, useGetCorporateActionsQuery } from "@/features/corporateActions/corporateActionsApi";
 import { formatMoney } from "@/shared/format/money";
 
-type Mode = "reference" | "customer" | "batch";
+type Mode = "reference" | "customer" | "batch" | "dividend";
 
 /**
  * D36: match an unmatched receipt by hand. The account is found by its deposit reference, or by a Customer and
@@ -31,6 +32,7 @@ export function MatchStatementLinePage() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [selected, setSelected] = useState<Account | null>(null);
   const [selectedBatch, setSelectedBatch] = useState<MigrationBatchSummary | null>(null);
+  const [selectedDividend, setSelectedDividend] = useState<CorporateAction | null>(null);
   const [note, setNote] = useState("");
   const [messages, setMessages] = useState<string[]>([]);
   const [accountError, setAccountError] = useState<string[]>([]);
@@ -44,6 +46,8 @@ export function MatchStatementLinePage() {
   );
   // migration-batches D83: a receipt can fund one of the firm's Draft migration batches.
   const batches = useGetMigrationBatchesQuery({ status: "Draft" }, { skip: mode !== "batch" });
+  // dividends D98: a receipt can be the custodian's payment of a dividend that waits for it.
+  const dividends = useGetCorporateActionsQuery({ kind: "Dividend", status: "Effective", pageSize: 100 }, { skip: mode !== "dividend" });
   const selectedCustomer = useGetCustomerQuery(selected?.customerId ?? "", { skip: !selected || selected.customerId === customer?.id });
 
   if (!line.data) {
@@ -61,16 +65,22 @@ export function MatchStatementLinePage() {
     setMode(next);
     setSelected(null);
     setSelectedBatch(null);
+    setSelectedDividend(null);
     setAccountError([]);
   }
 
+  const waiting = (dividends.data?.items ?? []).filter((item) =>
+    item.dividend?.currency === receipt.currency && item.payment != null && item.payment.receivedAmount == null);
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!selected && !selectedBatch) {
+    if (!selected && !selectedBatch && !selectedDividend) {
       return;
     }
     try {
-      const target = selectedBatch ? { migrationBatchId: selectedBatch.id } : { accountId: selected!.id };
+      const target = selectedDividend
+        ? { corporateActionId: selectedDividend.id }
+        : selectedBatch ? { migrationBatchId: selectedBatch.id } : { accountId: selected!.id };
       await match({
         id: receipt.id,
         ...target,
@@ -105,10 +115,28 @@ export function MatchStatementLinePage() {
         <Button size="sm" variant={mode === "batch" ? "default" : "outline"} onClick={() => choose("batch")}>
           To a migration batch
         </Button>
+        <Button size="sm" variant={mode === "dividend" ? "default" : "outline"} onClick={() => choose("dividend")}>
+          To a dividend
+        </Button>
       </div>
       <Card>
         <CardContent className="flex flex-col gap-4">
-          {mode === "batch" ? (
+          {mode === "dividend" ? (
+            <div className="flex flex-col items-start gap-1">
+              {dividends.isSuccess && waiting.length === 0 ? <Muted>{`No dividend in ${receipt.currency} waits for its payment.`}</Muted> : null}
+              {waiting.map((item) => (
+                <Button
+                  key={item.id}
+                  type="button"
+                  size="sm"
+                  variant={selectedDividend?.id === item.id ? "default" : "outline"}
+                  onClick={() => { setSelectedDividend(item); setAccountError([]); }}
+                >
+                  {`${item.instrument.symbol} · owed ${formatMoney(item.payment!.expectedAmount, receipt.currency, places)} · ex ${item.exDate}`}
+                </Button>
+              ))}
+            </div>
+          ) : mode === "batch" ? (
             <div className="flex flex-col items-start gap-1">
               {batches.isSuccess && (batches.data?.items ?? []).length === 0 ? <Muted>No migration batch is a draft.</Muted> : null}
               {(batches.data?.items ?? []).map((item) => (
@@ -181,11 +209,19 @@ export function MatchStatementLinePage() {
             ))}
           </div>
           {accountError.length > 0 ? <p className="text-sm text-destructive">{accountError.join(" ")}</p> : null}
-          {selected || selectedBatch ? (
+          {selected || selectedBatch || selectedDividend ? (
             <form className="flex flex-col gap-4" onSubmit={(event) => void onSubmit(event)}>
               <TextField id="match-note" label="Note" value={note} maxLength={200} onChange={(event) => setNote(event.target.value)} />
+              {selectedDividend && selectedDividend.payment!.expectedAmount !== receipt.amount ? (
+                <p className="text-sm text-amber-600">
+                  {`The custodian paid ${formatMoney(receipt.amount, receipt.currency, places)} and the customers are owed ${
+                    formatMoney(selectedDividend.payment!.expectedAmount, receipt.currency, places)}. Matching pays the customers in full.`}
+                </p>
+              ) : null}
               <p className="text-sm font-medium">
-                {selectedBatch
+                {selectedDividend
+                  ? `Pay the dividend of ${selectedDividend.instrument.symbol} with ${formatMoney(receipt.amount, receipt.currency, places)}.`
+                  : selectedBatch
                   ? `Add ${formatMoney(receipt.amount, receipt.currency, places)} to ${selectedBatch.name} as its funding.`
                   : `Credit ${formatMoney(receipt.amount, receipt.currency, places)} to ${selected!.name} of ${ownerName ?? "…"}.`}
               </p>

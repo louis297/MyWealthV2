@@ -16,15 +16,20 @@ public sealed record CorporateActionAnnouncementDto(
     string Symbol,
     string Currency,
     string? Kind,
-    int RatioNew,
-    int RatioHeld,
+    int? RatioNew,
+    int? RatioHeld,
     DateOnly ExDate,
     DateOnly? RecordDate,
     DateOnly? PaymentDate,
     DateTimeOffset ReceivedAt,
     string Status,
     string? SkipReason,
-    DateTimeOffset? ProcessedAt);
+    DateTimeOffset? ProcessedAt,
+    decimal? AmountPerShare = null,
+    string? TaxSource = null,
+    decimal? ImputationCreditPerShare = null,
+    decimal? ForeignTaxRatePercent = null,
+    decimal? ReinvestmentPrice = null);
 
 /// <summary>Corporate-actions R14: the stored announcements, newest first. Platform data for a SystemAdmin.</summary>
 [Authorize(Policy = Policies.TenantsManage)]
@@ -81,7 +86,9 @@ public class GetCorporateActionAnnouncementsQueryHandler(IApplicationDbContext d
             Items = rows.Select(row => new CorporateActionAnnouncementDto(
                 row.PublicId, row.Connection, row.OutsideId, row.PartyActionId, row.Version, row.PartyStatus.ToString(), row.Symbol,
                 row.Currency.Trim(), row.Kind?.ToString(), row.RatioNew, row.RatioHeld, row.ExDate, row.RecordDate, row.PaymentDate,
-                row.ReceivedAt, row.Status.ToString(), row.SkipReason?.ToString(), row.ProcessedAt)).ToList(),
+                row.ReceivedAt, row.Status.ToString(), row.SkipReason?.ToString(), row.ProcessedAt,
+                row.AmountPerShare, row.TaxSource?.ToString(), row.ImputationCreditPerShare, row.ForeignTaxRatePercent,
+                row.ReinvestmentPrice)).ToList(),
             Page = request.Page,
             PageSize = request.PageSize,
             TotalCount = totalCount

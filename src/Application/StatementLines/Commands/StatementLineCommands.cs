@@ -21,10 +21,13 @@ public sealed class MatchStatementLineCommand : IRequest
 
     public Guid? AccountId { get; init; }
 
-    public const string TargetMessage = "Give an account or a migration batch.";
+    public const string TargetMessage = "Give an account, a migration batch or a dividend.";
 
     /// <summary>Migration-batches R13: the batch this receipt funds, in place of an account.</summary>
     public Guid? MigrationBatchId { get; init; }
+
+    /// <summary>Dividends R26: the dividend this receipt pays, in place of an account or a migration batch.</summary>
+    public Guid? CorporateActionId { get; init; }
 
     public string? RowVersion { get; init; }
 
@@ -81,12 +84,17 @@ public class MatchStatementLineCommandValidator : AbstractValidator<MatchStateme
 {
     public MatchStatementLineCommandValidator()
     {
-        // Migration-batches R13: exactly one of an account and a migration batch.
+        // Migration-batches R13, dividends R26: exactly one of an account, a migration batch and a dividend.
         RuleFor(command => command.AccountId)
-            .Must((command, accountId) => IsGiven(accountId) != IsGiven(command.MigrationBatchId))
+            .Must((command, accountId) =>
+                new[] { IsGiven(accountId), IsGiven(command.MigrationBatchId), IsGiven(command.CorporateActionId) }.Count(given => given) == 1)
             .WithMessage(MatchStatementLineCommand.TargetMessage);
         RuleFor(command => command.RowVersion).NotEmpty();
-        RuleFor(command => command.Note).Must(StatementLineActions.IsOptionalNote).WithMessage(StatementLineActions.NoteMessage);
+        RuleFor(command => command.Note)
+            .Must((command, note) => IsGiven(command.CorporateActionId)
+                ? StatementLineActions.IsRequiredNote(note)
+                : StatementLineActions.IsOptionalNote(note))
+            .WithMessage(StatementLineActions.NoteMessage);
         RuleFor(command => command.TenantId).Null().WithMessage("TenantId cannot be set.");
     }
 
@@ -131,6 +139,13 @@ public class MatchStatementLineCommandHandler(
 {
     public async Task Handle(MatchStatementLineCommand request, CancellationToken cancellationToken)
     {
+        if (request.CorporateActionId is Guid corporateActionId)
+        {
+            await DividendReceipt.MatchAsync(db, currentUser, time, request.Id, corporateActionId, request.RowVersion,
+                request.Note!, cancellationToken);
+            return;
+        }
+
         if (request.MigrationBatchId is Guid migrationBatchId)
         {
             await MigrationBatchFunding.MatchAsync(db, currentUser, time, request.Id, migrationBatchId, request.RowVersion,

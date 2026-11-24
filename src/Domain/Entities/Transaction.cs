@@ -77,6 +77,160 @@ public class Transaction : BaseAuditableEntity
     /// Reversal; null on every other Transaction.</summary>
     public TransactionInKindTransferDetail? InKindTransferDetail { get; private set; }
 
+    /// <summary>Dividends R39: the dividend behind a <c>Dividend</c>, on the Transaction and its Reversal; null on every
+    /// other Transaction.</summary>
+    public TransactionDividendDetail? DividendDetail { get; private set; }
+
+    /// <summary>
+    /// Dividends R32–R40: the <c>Dividend</c> of one entitlement, on the Account in its currency. One <c>Principal</c>
+    /// leg of the gross; a <c>Tax</c> leg of kind <c>ForeignWithholding</c> when the foreign tax is above 0; a <c>Tax</c>
+    /// leg of the New Zealand tax of <paramref name="withholding"/> when it is above 0; with
+    /// <paramref name="reinvestedQuantity"/> a <c>Reinvestment</c> leg of the reinvested amount (at most the net) and one
+    /// security leg with that cost in the quote currency. <paramref name="amounts"/> are in the quote currency; with
+    /// <paramref name="fxRate"/> (quote currency → Account currency) each is converted and rounded, and the rate is
+    /// stored. Source <c>CorporateAction</c>; a dividend detail. Built without the manual entry matrix (custody-modes R7).
+    /// </summary>
+    public static Transaction PostDividend(
+        int tenantId,
+        int accountId,
+        string accountCurrency,
+        int decimalPlaces,
+        int instrumentId,
+        string symbol,
+        string quoteCurrency,
+        CorporateActions.DividendTerms terms,
+        DateOnly exDate,
+        DateOnly? recordDate,
+        DateOnly? paymentDate,
+        decimal entitledQuantity,
+        CorporateActions.DividendSourceAmounts amounts,
+        CorporateActions.DividendTax? withholding,
+        decimal? reinvestedQuantity,
+        AppliedFxRate? fxRate,
+        DateTimeOffset bookedAt,
+        TransactionSource source)
+    {
+        if (source.Kind != TransactionSourceKind.CorporateAction)
+        {
+            throw new DomainException("A dividend posting comes from a corporate action.");
+        }
+
+        if (entitledQuantity <= 0m)
+        {
+            throw new DomainException("A dividend is paid on an entitled quantity above 0.");
+        }
+
+        if (withholding is { Kind: TaxKind.ForeignWithholding })
+        {
+            throw new DomainException("The New Zealand tax on a dividend is RWT or NRWT.");
+        }
+
+        var currency = Money.Create(0m, accountCurrency).Currency;
+        var quote = Money.Create(0m, quoteCurrency).Currency;
+        var converted = !string.Equals(currency, quote, StringComparison.Ordinal);
+        if (converted && fxRate is null)
+        {
+            throw new DomainException("A dividend in another currency than the Account's needs the rate it is converted at.");
+        }
+
+        if (fxRate is not null && (!converted
+            || !string.Equals(fxRate.BaseCurrency, quote, StringComparison.Ordinal)
+            || !string.Equals(fxRate.QuoteCurrency, currency, StringComparison.Ordinal)))
+        {
+            throw new DomainException("The rate must be for the quote currency to the Account's currency.");
+        }
+
+        decimal Convert(decimal amount) => fxRate is null
+            ? amount
+            : decimal.Round(amount * fxRate.Rate, decimalPlaces, MidpointRounding.AwayFromZero);
+
+        var gross = Convert(amounts.Gross);
+        var credit = Convert(amounts.ImputationCredit);
+        var foreignTax = Convert(amounts.ForeignTax);
+        if (gross <= 0m)
+        {
+            throw new DomainException("A dividend posting needs a gross amount above 0.");
+        }
+
+        var cashLegs = new List<TransactionCashLeg> { TransactionCashLeg.Create(tenantId, accountId, gross, currency) };
+        var taxDetails = new List<TransactionTaxDetail>();
+        if (foreignTax > 0m)
+        {
+            var detail = TransactionTaxDetail.Create(
+                tenantId, TaxKind.ForeignWithholding, terms.ForeignTaxRatePercent, gross, foreignTax, currency);
+            cashLegs.Add(TransactionCashLeg.CreateTax(tenantId, accountId, -foreignTax, currency, detail));
+            taxDetails.Add(detail);
+        }
+
+        var newZealandTax = 0m;
+        if (withholding is not null)
+        {
+            newZealandTax = CorporateActions.DividendWithholding.Amount(withholding, gross, credit, foreignTax, decimalPlaces);
+            if (newZealandTax > 0m)
+            {
+                var detail = TransactionTaxDetail.Create(
+                    tenantId, withholding.Kind, withholding.RatePercent,
+                    CorporateActions.DividendWithholding.Basis(withholding, gross, credit), newZealandTax, currency);
+                cashLegs.Add(TransactionCashLeg.CreateTax(tenantId, accountId, -newZealandTax, currency, detail));
+                taxDetails.Add(detail);
+            }
+        }
+
+        var net = Math.Max(0m, gross - foreignTax - newZealandTax);
+        var securityLegs = new List<TransactionSecurityLeg>();
+        if (reinvestedQuantity is { } quantity)
+        {
+            if (quantity <= 0m)
+            {
+                throw new DomainException("A reinvested quantity is above 0.");
+            }
+
+            if (terms.ReinvestmentPrice is not { } price)
+            {
+                throw new DomainException("Only a dividend with a reinvestment plan is reinvested.");
+            }
+
+            if (converted)
+            {
+                throw new DomainException("A dividend is reinvested only on an Account in the Instrument's quote currency.");
+            }
+
+            var reinvested = Math.Min(
+                decimal.Round(quantity * price, decimalPlaces, MidpointRounding.AwayFromZero), net);
+            if (reinvested > 0m)
+            {
+                cashLegs.Add(TransactionCashLeg.CreateReinvestment(tenantId, accountId, -reinvested, currency));
+            }
+
+            securityLegs.Add(TransactionSecurityLeg.Create(tenantId, accountId, instrumentId, quantity, reinvested, quote));
+        }
+
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            Type = TransactionType.Dividend,
+            BookedAt = bookedAt.ToUniversalTime(),
+            Memo = DividendMemo(symbol, terms.AmountPerShare),
+            Reference = null,
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
+            PublicId = Guid.NewGuid(),
+            CashLegs = cashLegs,
+            SecurityLegs = securityLegs,
+            TaxDetails = taxDetails,
+            FxDetail = fxRate is null ? null : TransactionFxDetail.Create(tenantId, fxRate),
+            DividendDetail = TransactionDividendDetail.Create(
+                tenantId, instrumentId, entitledQuantity, terms.AmountPerShare, quote, terms.TaxSource, credit,
+                reinvestedQuantity, reinvestedQuantity is null ? null : terms.ReinvestmentPrice, exDate, recordDate, paymentDate)
+        };
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
+    }
+
+    /// <summary>R37: <c>Dividend ACME.SIM 0.72 per share</c>, the amount with at least two decimals.</summary>
+    private static string DividendMemo(string symbol, decimal amountPerShare) =>
+        string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Dividend {symbol} {amountPerShare:0.00######} per share");
+
     /// <summary>In-kind-transfers R37: the memo of a transfer in.</summary>
     public const string TransferInMemo = "Transfer in";
 
@@ -240,6 +394,11 @@ public class Transaction : BaseAuditableEntity
         if (source.Kind != TransactionSourceKind.InterestRun)
         {
             throw new DomainException("An interest posting comes from an interest run.");
+        }
+
+        if (withholding.Kind is not (TaxKind.Rwt or TaxKind.Nrwt))
+        {
+            throw new DomainException("Interest is taxed with RWT or NRWT only.");
         }
 
         var gross = decimal.Round(accrued, decimalPlaces, MidpointRounding.AwayFromZero);
@@ -1293,7 +1452,8 @@ public class Transaction : BaseAuditableEntity
             CorporateActionDetail = CorporateActionDetail?.Copy(),
             ExecutionDetail = ExecutionDetail?.Copy(),
             MigrationDetail = MigrationDetail?.Copy(),
-            InKindTransferDetail = InKindTransferDetail?.Copy()
+            InKindTransferDetail = InKindTransferDetail?.Copy(),
+            DividendDetail = DividendDetail?.Copy()
         };
         ReversedBy = reversal;
         reversal.AddDomainEvent(new TransactionReversed(reversal));

@@ -27,6 +27,7 @@ related:
   - interest-run.md
   - trade-settlement.md
   - in-kind-transfers.md
+  - dividends.md
 ---
 
 # Simulator
@@ -544,3 +545,14 @@ Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transf
 - A settled fill of an order with a safekeeping account adds a `Trade` movement; an effective corporate action settles open fills in the symbol first and adds a `CorporateAction` movement per account with a position.
 - Reset (R24) also empties the custodian's accounts, movements and transfers, opens the standing accounts with their positions again, and sets the transfer mode to `Execute` and the rounding mode to `Fractional`.
 - Script `database/simulator/0012_custodian.sql`.
+
+---
+
+## Amendment 2026-11-24 (dividends) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rules R54–R64 live there; this section records what changes here.
+
+- Control port: `POST /control/market/corporate-actions` and its amend take kind `Dividend`; `POST /control/custodian/accounts/{accountNumber}/income-account`, `POST /control/custodian/income-mode`, `GET /control/custodian/dividend-payments` and `POST /control/custodian/dividend-payments/{id}/pay`.
+- Party port: `POST /party/custodian/accounts/{accountNumber}/elections`; the market's corporate action feed may carry dividends.
+- Log actions `CustodianIncomeAccountChanged`, `CustodianIncomeModeChanged`, `CustodianDividendPaid`.
+- Script `database/simulator/0014_dividends.sql`.

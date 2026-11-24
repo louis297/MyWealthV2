@@ -85,7 +85,23 @@ public sealed class SimulatorCorporateActionFeed(IHttpClientFactory httpClients)
             return CorporateActionFeedResult.Failed(MarketDataFailure.BadResponse);
         }
 
-        var items = page.Items.Select(item => new CorporateActionFeedItem(
+        var items = page.Items.Select(Item).ToList();
+        return CorporateActionFeedResult.Succeeded(new CorporateActionFeedPage(items, page.Cursor, page.HasMore ?? false));
+    }
+
+    /// <summary>R48 and dividends R66: one wire item. A dividend whose terms cannot be read comes through with no
+    /// amount, so the pull refuses the page.</summary>
+    private static CorporateActionFeedItem Item(WireItem item)
+    {
+        var terms = new[] { item.AmountPerShare, item.ImputationCreditPerShare, item.ForeignTaxRatePercent, item.ReinvestmentPrice };
+        var readable = terms.All(value => value is null or { ValueKind: JsonValueKind.Null or JsonValueKind.Number });
+        DividendTaxSource? taxSource = item.TaxSource switch
+        {
+            "NewZealand" => DividendTaxSource.NewZealand,
+            "Foreign" => DividendTaxSource.Foreign,
+            _ => null
+        };
+        return new CorporateActionFeedItem(
             item.Id,
             item.ActionId,
             WholeNumber(item.Version),
@@ -99,15 +115,24 @@ public sealed class SimulatorCorporateActionFeed(IHttpClientFactory httpClients)
                 "Split" => CorporateActionKind.Split,
                 "Consolidation" => CorporateActionKind.Consolidation,
                 "Bonus" => CorporateActionKind.Bonus,
+                "Dividend" => CorporateActionKind.Dividend,
                 _ => null
             },
             WholeNumber(item.RatioNew),
             WholeNumber(item.RatioHeld),
             Date(item.ExDate),
             Date(item.RecordDate),
-            Date(item.PaymentDate))).ToList();
-        return CorporateActionFeedResult.Succeeded(new CorporateActionFeedPage(items, page.Cursor, page.HasMore ?? false));
+            Date(item.PaymentDate),
+            readable ? Number(item.AmountPerShare) : null,
+            taxSource,
+            readable ? Number(item.ImputationCreditPerShare) : null,
+            readable ? Number(item.ForeignTaxRatePercent) : null,
+            readable ? Number(item.ReinvestmentPrice) : null);
     }
+
+    /// <summary>Dividends R66: a term that is not a JSON number comes through empty.</summary>
+    private static decimal? Number(JsonElement? value) =>
+        value is { ValueKind: JsonValueKind.Number } number && number.TryGetDecimal(out var amount) ? amount : null;
 
     private static bool IsNumeric(string? value) => value is not null && value.Length > 0 && value.All(char.IsAsciiDigit);
 
@@ -135,6 +160,11 @@ public sealed class SimulatorCorporateActionFeed(IHttpClientFactory httpClients)
         [property: JsonPropertyName("kind")] string? Kind,
         [property: JsonPropertyName("ratioNew")] JsonElement? RatioNew,
         [property: JsonPropertyName("ratioHeld")] JsonElement? RatioHeld,
+        [property: JsonPropertyName("amountPerShare")] JsonElement? AmountPerShare,
+        [property: JsonPropertyName("taxSource")] string? TaxSource,
+        [property: JsonPropertyName("imputationCreditPerShare")] JsonElement? ImputationCreditPerShare,
+        [property: JsonPropertyName("foreignTaxRatePercent")] JsonElement? ForeignTaxRatePercent,
+        [property: JsonPropertyName("reinvestmentPrice")] JsonElement? ReinvestmentPrice,
         [property: JsonPropertyName("exDate")] string? ExDate,
         [property: JsonPropertyName("recordDate")] string? RecordDate,
         [property: JsonPropertyName("paymentDate")] string? PaymentDate);

@@ -20,6 +20,7 @@ public sealed record AnnouncementProcessingOutcome(int Processed, int Skipped, i
 public sealed class ProcessCorporateActionAnnouncements(
     IApplicationDbContext db,
     MarketDataConnections connections,
+    ICurrencyCatalog currencies,
     TimeProvider time,
     ILogger<ProcessCorporateActionAnnouncements> logger)
 {
@@ -100,8 +101,23 @@ public sealed class ProcessCorporateActionAnnouncements(
             return AnnouncementSkipReason.UnsupportedKind;
         }
 
-        var ratio = new CorporateActionRatio(announcement.RatioNew, announcement.RatioHeld);
-        if (!ratio.IsValidFor(kind) || !served.Serves(announcement.Symbol))
+        // Dividends R9: a dividend's terms break R3 → Invalid; another kind needs a ratio that fits it.
+        var isDividend = kind == CorporateActionKind.Dividend;
+        var ratio = new CorporateActionRatio(announcement.RatioNew ?? 0, announcement.RatioHeld ?? 0);
+        DividendTerms? terms = null;
+        if (isDividend)
+        {
+            if (DividendTerms.RefusalOf(announcement.AmountPerShare, announcement.TaxSource, announcement.ImputationCreditPerShare,
+                    announcement.ForeignTaxRatePercent, announcement.ReinvestmentPrice) is not null)
+            {
+                return AnnouncementSkipReason.Invalid;
+            }
+
+            terms = DividendTerms.Create(announcement.AmountPerShare!.Value, announcement.TaxSource!.Value,
+                announcement.ImputationCreditPerShare, announcement.ForeignTaxRatePercent, announcement.ReinvestmentPrice);
+        }
+
+        if ((!isDividend && !ratio.IsValidFor(kind)) || !served.Serves(announcement.Symbol))
         {
             return AnnouncementSkipReason.Invalid;
         }
@@ -140,15 +156,19 @@ public sealed class ProcessCorporateActionAnnouncements(
                     continue;
                 }
 
-                action = CorporateAction.Announce(
-                    instrument.TenantId, instrument.Id, announcement.Connection, announcement.PartyActionId, announcement.Version,
-                    kind, ratio, announcement.ExDate, announcement.RecordDate, announcement.PaymentDate);
+                action = terms is not null
+                    ? CorporateAction.AnnounceDividend(
+                        instrument.TenantId, instrument.Id, announcement.Connection, announcement.PartyActionId, announcement.Version,
+                        terms, announcement.ExDate, announcement.RecordDate, announcement.PaymentDate)
+                    : CorporateAction.Announce(
+                        instrument.TenantId, instrument.Id, announcement.Connection, announcement.PartyActionId, announcement.Version,
+                        kind, ratio, announcement.ExDate, announcement.RecordDate, announcement.PaymentDate);
                 action.CreatedBy = SystemActor.Name;
                 db.CorporateActions.Add(action);
                 await db.SaveChangesAsync(cancellationToken);
                 if (announcement.PartyStatus == PartyActionStatus.Effective)
                 {
-                    await CorporateActionEffect.MakeEffectiveAsync(db, action, now, null, cancellationToken);
+                    await CorporateActionEffect.MakeEffectiveAsync(db, currencies, action, now, null, cancellationToken);
                 }
 
                 changed = true;
@@ -175,11 +195,11 @@ public sealed class ProcessCorporateActionAnnouncements(
             switch (announcement.PartyStatus)
             {
                 case PartyActionStatus.Announced:
-                    action.Amend(announcement.Version, ratio, announcement.ExDate, announcement.RecordDate, announcement.PaymentDate);
+                    Amend(action, announcement, ratio, terms);
                     break;
                 case PartyActionStatus.Effective:
-                    action.Amend(announcement.Version, ratio, announcement.ExDate, announcement.RecordDate, announcement.PaymentDate);
-                    await CorporateActionEffect.MakeEffectiveAsync(db, action, now, null, cancellationToken);
+                    Amend(action, announcement, ratio, terms);
+                    await CorporateActionEffect.MakeEffectiveAsync(db, currencies, action, now, null, cancellationToken);
                     break;
                 case PartyActionStatus.Cancelled:
                     action.CancelFromFeed(announcement.Version, now);
@@ -195,5 +215,19 @@ public sealed class ProcessCorporateActionAnnouncements(
         }
 
         return alreadyEffective ? AnnouncementSkipReason.AlreadyEffective : AnnouncementSkipReason.Superseded;
+    }
+
+    /// <summary>R12 and dividends R9: a later version replaces the ratio or the terms, and the dates.</summary>
+    private static void Amend(
+        CorporateAction action, CorporateActionAnnouncement announcement, CorporateActionRatio ratio, DividendTerms? terms)
+    {
+        if (terms is not null)
+        {
+            action.AmendDividend(announcement.Version, terms, announcement.ExDate, announcement.RecordDate, announcement.PaymentDate);
+        }
+        else
+        {
+            action.Amend(announcement.Version, ratio, announcement.ExDate, announcement.RecordDate, announcement.PaymentDate);
+        }
     }
 }

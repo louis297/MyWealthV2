@@ -613,6 +613,35 @@ public class BackOfficePageTests
     public void AnnouncementReason_LabelsEveryReason(string reason, string label) =>
         BackOfficeHost::MyWealthV2.BackOffice.Components.Pages.AnnouncementText.Reason(reason).ShouldBe(label);
 
+    [Test]
+    public void AnnouncementRatio_OfADividend_IsTheAmountPerShare_WithThePlanPrice()
+    {
+        var plain = Announcement("o-div1", "Dividend", "Processed", null, DateTimeOffset.UtcNow) with { AmountPerShare = 0.72m };
+        var plan = plain with { AmountPerShare = 1m, ReinvestmentPrice = 25m };
+
+        BackOfficeHost::MyWealthV2.BackOffice.Components.Pages.AnnouncementText.Ratio(plain).ShouldBe("0.72 USD per share");
+        BackOfficeHost::MyWealthV2.BackOffice.Components.Pages.AnnouncementText.Ratio(plan).ShouldBe("1.00 USD per share, plan 25.00");
+        BackOfficeHost::MyWealthV2.BackOffice.Components.Pages.AnnouncementText.Ratio(Announcement("o-split", "Split", "Processed", null,
+            DateTimeOffset.UtcNow)).ShouldBe("2 for 1");
+    }
+
+    [Test]
+    public void AnnouncementItem_OfADividend_IsReadWithNoRatio()
+    {
+        const string json = """
+            {"id":"6b1f0c2e-0000-4000-8000-000000000001","connection":"simulator","outsideId":"o-1","partyActionId":"p-1","version":1,
+             "partyStatus":"Announced","symbol":"ACME.SIM","currency":"USD","kind":"Dividend","ratioNew":null,"ratioHeld":null,
+             "exDate":"2026-11-26","recordDate":null,"paymentDate":"2026-11-30","receivedAt":"2026-11-24T03:15:02Z","status":"Processed",
+             "skipReason":null,"processedAt":"2026-11-24T03:15:02Z","amountPerShare":1.0,"taxSource":"Foreign",
+             "imputationCreditPerShare":0,"foreignTaxRatePercent":15,"reinvestmentPrice":25.0}
+            """;
+
+        var item = Should.NotThrow(() => System.Text.Json.JsonSerializer.Deserialize<CorporateActionAnnouncementItem>(json,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)));
+
+        item!.AmountPerShare.ShouldBe(1.0m);
+    }
+
     private static CorporateActionAnnouncementItem Announcement(
         string outsideId,
         string? kind,

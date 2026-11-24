@@ -132,6 +132,14 @@ public class BankReconciliation : BaseAuditableEntity
         AddUnlessZero(items, inputs.TenantId, ReconciliationItemKind.InterestCredited, -inputs.InterestCredited,
             inputs.InterestCreditedCount);
         AddUnlessZero(items, inputs.TenantId, ReconciliationItemKind.TaxWithheld, -inputs.TaxWithheld, inputs.TaxWithheldCount);
+        // Dividends R44: what the custodian paid in less what the dividend's postings credited in this currency.
+        var notPosted = inputs.Dividends.Where(dividend => dividend.HasPending).ToList();
+        AddUnlessZero(items, inputs.TenantId, ReconciliationItemKind.DividendsNotPosted,
+            notPosted.Sum(dividend => dividend.Received - dividend.Credited), notPosted.Count);
+        var paid = inputs.Dividends.Where(dividend => !dividend.HasPending).ToList();
+        AddUnlessZero(items, inputs.TenantId, ReconciliationItemKind.DividendDifference,
+            paid.Sum(dividend => dividend.Received - dividend.Credited),
+            paid.Count(dividend => dividend.Received != dividend.Credited));
         // Trade-settlement R23, R24: order fills that settle through this account.
         AddUnlessZero(items, inputs.TenantId, ReconciliationItemKind.UnsettledTrades, -inputs.UnsettledTrades,
             inputs.UnsettledTradesCount);

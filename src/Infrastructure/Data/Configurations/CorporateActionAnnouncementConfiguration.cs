@@ -19,6 +19,10 @@ public class CorporateActionAnnouncementConfiguration : IEntityTypeConfiguration
         builder.Property(row => row.ExDate).HasColumnType("date").IsRequired();
         builder.Property(row => row.RecordDate).HasColumnType("date");
         builder.Property(row => row.PaymentDate).HasColumnType("date");
+        builder.Property(row => row.AmountPerShare).HasColumnType("decimal(18,8)");
+        builder.Property(row => row.ImputationCreditPerShare).HasColumnType("decimal(18,8)");
+        builder.Property(row => row.ForeignTaxRatePercent).HasColumnType("decimal(5,2)");
+        builder.Property(row => row.ReinvestmentPrice).HasColumnType("decimal(18,8)");
         builder.Property(row => row.RowVersion).IsRowVersion();
         builder.HasIndex(row => row.PublicId).IsUnique();
         builder.HasIndex(row => new { row.Connection, row.OutsideId }).IsUnique();

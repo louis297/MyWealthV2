@@ -50,10 +50,10 @@ public class CorporateActionsSchemaTests
             """)).ShouldBe(1);
     }
 
-    [TestCase("kind: 3", "CK_CorporateActionAnnouncements_Kind")]
+    [TestCase("kind: 4", "CK_CorporateActionAnnouncements_Kind")]
     [TestCase("partyStatus: 3", "CK_CorporateActionAnnouncements_PartyStatus")]
     [TestCase("version: 0", "CK_CorporateActionAnnouncements_Version")]
-    [TestCase("ratioHeld: 0", "CK_CorporateActionAnnouncements_Ratio")]
+    [TestCase("ratioHeld: 0", "CK_CorporateActionAnnouncements_Terms")]
     [TestCase("status: 3", "CK_CorporateActionAnnouncements_Status")]
     [TestCase("status: 2", "CK_CorporateActionAnnouncements_Skipped")]
     [TestCase("skipReason: 1", "CK_CorporateActionAnnouncements_Skipped")]
@@ -113,9 +113,9 @@ public class CorporateActionsSchemaTests
             """)).ShouldBe(3);
     }
 
-    [TestCase("kind: 3", "CK_CorporateActions_Kind")]
-    [TestCase("ratioNew: 10001", "CK_CorporateActions_Ratio")]
-    [TestCase("ratioHeld: 0", "CK_CorporateActions_Ratio")]
+    [TestCase("kind: 4", "CK_CorporateActions_Kind")]
+    [TestCase("ratioNew: 10001", "CK_CorporateActions_Terms")]
+    [TestCase("ratioHeld: 0", "CK_CorporateActions_Terms")]
     [TestCase("origin: 2", "CK_CorporateActions_Origin")]
     [TestCase("origin: 1", "CK_CorporateActions_Feed")]
     [TestCase("status: 4", "CK_CorporateActions_Status")]
@@ -180,7 +180,7 @@ public class CorporateActionsSchemaTests
     [TestCase("status: 3", "CK_CorporateActionEntitlements_Status")]
     [TestCase("status: 2, postedAt: 1", "CK_CorporateActionEntitlements_NotApplied")]
     [TestCase("reason: 0", "CK_CorporateActionEntitlements_NotApplied")]
-    [TestCase("status: 2, reason: 2, postedAt: 1", "CK_CorporateActionEntitlements_Reason")]
+    [TestCase("status: 2, reason: 3, postedAt: 1", "CK_CorporateActionEntitlements_Reason")]
     [TestCase("status: 1, postedAt: 1", "CK_CorporateActionEntitlements_Posted")]
     [TestCase("quantities: 1", "CK_CorporateActionEntitlements_Posted")]
     [TestCase("transaction: 1", "CK_CorporateActionEntitlements_Posted")]

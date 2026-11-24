@@ -7,5 +7,8 @@ public enum TaxKind
     Rwt = 0,
 
     /// <summary>Non-resident withholding tax.</summary>
-    Nrwt = 1
+    Nrwt = 1,
+
+    /// <summary>Tax the company's country took from a dividend before it reached the custodian (dividends R38).</summary>
+    ForeignWithholding = 2
 }

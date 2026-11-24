@@ -3,6 +3,7 @@ using MyWealthV2.Application.Accounts;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Models;
+using MyWealthV2.Domain.CorporateActions;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
@@ -68,15 +69,16 @@ internal static class CorporateActionReader
     public static async Task<List<CorporateActionDto>> ToDtosAsync(
         IApplicationDbContext db,
         ICurrentUser currentUser,
+        ICurrencyCatalog currencies,
         IReadOnlyList<CorporateAction> rows,
         CancellationToken cancellationToken)
     {
         var instrumentIds = rows.Select(row => row.InstrumentId).Distinct().ToList();
         var instruments = await db.Instruments.AsNoTracking()
             .Where(row => instrumentIds.Contains(row.Id))
-            .ToDictionaryAsync(row => row.Id, row => new CorporateActionInstrumentDto(row.PublicId, row.Symbol, row.Name), cancellationToken);
+            .ToDictionaryAsync(row => row.Id, row => new { Dto = new CorporateActionInstrumentDto(row.PublicId, row.Symbol, row.Name), row.QuoteCurrency }, cancellationToken);
 
-        var userIds = rows.SelectMany(row => new[] { row.EffectiveByUserId, row.CancelledByUserId })
+        var userIds = rows.SelectMany(row => new[] { row.EffectiveByUserId, row.CancelledByUserId, row.ReleasedByUserId })
             .OfType<int>()
             .Distinct()
             .ToList();
@@ -92,6 +94,20 @@ internal static class CorporateActionReader
             .ToDictionaryAsync(row => row.IdentityUserId, row => new PersonRefDto(row.PublicId, row.Name), cancellationToken);
 
         var actionIds = rows.Select(row => row.Id).ToList();
+
+        // Dividends R15: the expected amount counts every entitlement of the dividend, whoever the caller is.
+        var dividendIds = rows.Where(row => row.Kind == CorporateActionKind.Dividend).Select(row => row.Id).ToList();
+        var receiptIds = rows.Where(row => row.ReceiptLineId is not null).Select(row => row.ReceiptLineId!.Value).ToList();
+        var receipts = receiptIds.Count == 0 || currentUser.Role != UserRole.TenantAdmin
+            ? new Dictionary<int, Guid>()
+            : await db.BankStatementLines.AsNoTracking()
+                .Where(row => receiptIds.Contains(row.Id))
+                .ToDictionaryAsync(row => row.Id, row => row.PublicId, cancellationToken);
+        var dividendEntitlements = dividendIds.Count == 0
+            ? []
+            : await db.CorporateActionEntitlements.AsNoTracking()
+                .Where(row => dividendIds.Contains(row.CorporateActionId))
+                .ToListAsync(cancellationToken);
         var visibleAccounts = AccountScope.ManagedAccounts(db, currentUser);
         var counts = await db.CorporateActionEntitlements.AsNoTracking()
             .Where(row => actionIds.Contains(row.CorporateActionId) && visibleAccounts.Any(account => account.Id == row.AccountId))
@@ -109,7 +125,7 @@ internal static class CorporateActionReader
             return new CorporateActionDto
             {
                 Id = row.PublicId,
-                Instrument = instruments[row.InstrumentId],
+                Instrument = instruments[row.InstrumentId].Dto,
                 Kind = row.Kind.ToString(),
                 RatioNew = row.RatioNew,
                 RatioHeld = row.RatioHeld,
@@ -127,9 +143,30 @@ internal static class CorporateActionReader
                 CancelledAt = row.CancelledAt,
                 CancelledBy = row.CancelledByUserId is int cancelledBy ? users.GetValueOrDefault(cancelledBy) : null,
                 CancelNote = row.CancelNote,
+                Payment = row.Kind == CorporateActionKind.Dividend && row.EffectiveAt is not null
+                    ? Payment(row, DividendPayment.ExpectedAmount(dividendEntitlements.Where(item => item.CorporateActionId == row.Id),
+                            row.ReinvestedByCustodian(currencies.TryGet(instruments[row.InstrumentId].QuoteCurrency.Trim())?.DecimalPlaces ?? 2)),
+                        instruments[row.InstrumentId].QuoteCurrency.Trim(),
+                        row.ReceiptLineId is int lineId ? receipts.GetValueOrDefault(lineId) : null)
+                    : null,
+                Election = row.Kind == CorporateActionKind.Dividend && row.ReinvestmentPrice is not null && row.ElectionStatus is { } election
+                    ? new CorporateActionElectionDto(election.ToString(), row.ElectionQuantity, row.ElectionAttempts,
+                        row.ElectionReason?.ToString(), row.SharesReceived,
+                        row.ReleasedByUserId is int releasedBy ? users.GetValueOrDefault(releasedBy) : null, row.ReleasedAt, row.ReleaseNote)
+                    : null,
+                Dividend = row.Terms is { } terms
+                    ? new CorporateActionDividendDto(
+                        terms.AmountPerShare, instruments[row.InstrumentId].QuoteCurrency.Trim(), terms.TaxSource.ToString(),
+                        terms.ImputationCreditPerShare, terms.ForeignTaxRatePercent, terms.ReinvestmentPrice)
+                    : null,
                 Entitlements = new CorporateActionEntitlementCountsDto(posted + pending + notApplied, posted, pending, notApplied),
                 RowVersion = Convert.ToBase64String(row.RowVersion ?? [])
             };
         }).ToList();
     }
+
+    /// <summary>Dividends R49: the payment block; the statement line only for a TenantAdmin.</summary>
+    private static CorporateActionPaymentDto Payment(CorporateAction row, decimal expected, string currency, Guid? statementLineId) =>
+        new(expected, row.ReceivedAmount, row.ReceivedAmount - expected, currency,
+            statementLineId == Guid.Empty ? null : statementLineId, row.PaidAt);
 }

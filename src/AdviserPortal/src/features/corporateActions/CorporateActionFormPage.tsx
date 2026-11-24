@@ -12,6 +12,7 @@ import {
 } from "@/features/corporateActions/corporateActionsApi";
 import {
   conflictMessage,
+  dividendExDateHelp,
   exDateHelp,
   fromMarketData,
   kindLabel,
@@ -21,7 +22,7 @@ import {
 } from "@/features/corporateActions/corporateActionText";
 import { problemMessages, problemStatus } from "@/features/statementLines/statementLineLabels";
 
-const kinds = ["Split", "Consolidation", "Bonus"];
+const kinds = ["Split", "Consolidation", "Bonus", "Dividend"];
 
 function FieldError({ messages }: { messages?: string[] }) {
   return messages?.length ? <p className="text-destructive text-sm">{messages.join(" ")}</p> : null;
@@ -44,6 +45,11 @@ export function CorporateActionFormPage() {
   const [recordDate, setRecordDate] = useState("");
   const [paymentDate, setPaymentDate] = useState("");
   const [memo, setMemo] = useState("");
+  // dividends D96: the terms of a dividend, in place of the ratio.
+  const [amountPerShare, setAmountPerShare] = useState("");
+  const [taxSource, setTaxSource] = useState("NewZealand");
+  const [credit, setCredit] = useState("");
+  const [foreignRate, setForeignRate] = useState("");
   const [messages, setMessages] = useState<string[]>([]);
   const [fields, setFields] = useState<Record<string, string[]>>({});
   const loaded = useRef(false);
@@ -53,8 +59,14 @@ export function CorporateActionFormPage() {
       loaded.current = true;
       setInstrumentId(existing.data.instrument.id);
       setKind(existing.data.kind);
-      setRatioNew(String(existing.data.ratioNew));
-      setRatioHeld(String(existing.data.ratioHeld));
+      setRatioNew(existing.data.ratioNew == null ? "" : String(existing.data.ratioNew));
+      setRatioHeld(existing.data.ratioHeld == null ? "" : String(existing.data.ratioHeld));
+      if (existing.data.dividend) {
+        setAmountPerShare(String(existing.data.dividend.amountPerShare));
+        setTaxSource(existing.data.dividend.taxSource);
+        setCredit(String(existing.data.dividend.imputationCreditPerShare));
+        setForeignRate(String(existing.data.dividend.foreignTaxRatePercent));
+      }
       setExDate(existing.data.exDate);
       setRecordDate(existing.data.recordDate ?? "");
       setPaymentDate(existing.data.paymentDate ?? "");
@@ -67,14 +79,24 @@ export function CorporateActionFormPage() {
     .filter((item) => term.length > 0 && (item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term)))
     .slice(0, 10);
   const chosen = catalog.data?.items.find((item) => item.id === instrumentId);
-  const preview = Number(ratioNew) > 0 && Number(ratioHeld) > 0 ? ratioSentence(kind, Number(ratioNew), Number(ratioHeld)) : null;
+  const isDividend = kind === "Dividend";
+  const preview = !isDividend && Number(ratioNew) > 0 && Number(ratioHeld) > 0
+    ? ratioSentence(kind, Number(ratioNew), Number(ratioHeld))
+    : null;
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
+    const terms = isDividend
+      ? {
+        amountPerShare: Number(amountPerShare),
+        taxSource,
+        imputationCreditPerShare: taxSource === "NewZealand" && credit ? Number(credit) : 0,
+        foreignTaxRatePercent: taxSource === "Foreign" && foreignRate ? Number(foreignRate) : 0,
+      }
+      : { ratioNew: Number(ratioNew), ratioHeld: Number(ratioHeld) };
     const body = {
       kind,
-      ratioNew: Number(ratioNew),
-      ratioHeld: Number(ratioHeld),
+      ...terms,
       exDate,
       recordDate: recordDate || null,
       paymentDate: paymentDate || null,
@@ -134,17 +156,41 @@ export function CorporateActionFormPage() {
               {kinds.map((item) => <SelectItem key={item} value={item}>{kindLabel(item)}</SelectItem>)}
             </SelectField>
             <FieldError messages={fields.kind} />
-            <div className="flex items-end gap-2">
-              <TextField id="corporate-action-ratio-new" label="New shares" value={ratioNew}
-                inputMode="numeric" onChange={(event) => setRatioNew(event.target.value)} />
-              <TextField id="corporate-action-ratio-held" label="For every held" value={ratioHeld}
-                inputMode="numeric" onChange={(event) => setRatioHeld(event.target.value)} />
-            </div>
-            {preview ? <p className="text-sm">{preview}</p> : null}
-            <FieldError messages={fields.rationew} />
+            {isDividend ? (
+              <>
+                <TextField id="corporate-action-amount" label="Amount per share" value={amountPerShare}
+                  inputMode="decimal" onChange={(event) => setAmountPerShare(event.target.value)} />
+                <FieldError messages={fields.amountpershare} />
+                <SelectField id="corporate-action-company" label="Company" value={taxSource}
+                  onChange={(event) => setTaxSource(event.target.value)}>
+                  <SelectItem value="NewZealand">New Zealand</SelectItem>
+                  <SelectItem value="Foreign">Foreign</SelectItem>
+                </SelectField>
+                <FieldError messages={fields.taxsource} />
+                {taxSource === "NewZealand" ? (
+                  <TextField id="corporate-action-credit" label="Imputation credit per share" value={credit}
+                    inputMode="decimal" onChange={(event) => setCredit(event.target.value)} />
+                ) : (
+                  <TextField id="corporate-action-foreign-rate" label="Foreign tax rate" value={foreignRate}
+                    inputMode="decimal" onChange={(event) => setForeignRate(event.target.value)} />
+                )}
+                <FieldError messages={fields.imputationcreditpershare ?? fields.foreigntaxratepercent} />
+              </>
+            ) : (
+              <>
+                <div className="flex items-end gap-2">
+                  <TextField id="corporate-action-ratio-new" label="New shares" value={ratioNew}
+                    inputMode="numeric" onChange={(event) => setRatioNew(event.target.value)} />
+                  <TextField id="corporate-action-ratio-held" label="For every held" value={ratioHeld}
+                    inputMode="numeric" onChange={(event) => setRatioHeld(event.target.value)} />
+                </div>
+                {preview ? <p className="text-sm">{preview}</p> : null}
+                <FieldError messages={fields.rationew} />
+              </>
+            )}
             <TextField id="corporate-action-ex-date" label="Ex-date" type="date" value={exDate}
               onChange={(event) => setExDate(event.target.value)} />
-            <p className="text-muted-foreground text-sm">{exDateHelp}</p>
+            <p className="text-muted-foreground text-sm">{isDividend ? dividendExDateHelp : exDateHelp}</p>
             {exDate && exDate < utcToday() ? <p className="text-sm text-amber-600">{pastExDateWarning}</p> : null}
             <FieldError messages={fields.exdate} />
             <TextField id="corporate-action-record-date" label="Record date" type="date" value={recordDate}

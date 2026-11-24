@@ -56,7 +56,8 @@ public class MarketCorporateActionFeedTests
         items.Count.ShouldBe(2);
         var first = items[0];
         first.EnumerateObject().Select(property => property.Name).ShouldBe([
-            "id", "actionId", "version", "status", "symbol", "currency", "kind", "ratioNew", "ratioHeld", "exDate", "recordDate", "paymentDate"
+            "id", "actionId", "version", "status", "symbol", "currency", "kind", "ratioNew", "ratioHeld", "exDate", "recordDate", "paymentDate",
+            "amountPerShare", "taxSource", "imputationCreditPerShare", "foreignTaxRatePercent", "reinvestmentPrice"
         ]);
         first.GetProperty("id").GetString().ShouldBe($"{world:N}-CA1-V1");
         first.GetProperty("actionId").GetString().ShouldBe(id);

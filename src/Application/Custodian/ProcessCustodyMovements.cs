@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.CorporateActions;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Transactions;
 using MyWealthV2.Domain.Custody;
@@ -148,6 +149,17 @@ public sealed class ProcessCustodyMovements(
         }
 
         movement.MatchToCorporateAction(actionId.Value);
+
+        // Dividends R28: the new shares of an accepted reinvestment election; any other movement is matched and not used.
+        var action = await db.CorporateActions.IgnoreQueryFilters().SingleAsync(row => row.Id == actionId.Value, cancellationToken);
+        if (action.Kind == CorporateActionKind.Dividend
+            && action.ElectionStatus == ReinvestmentElectionStatus.Accepted
+            && action.SharesReceived is null
+            && movement.Direction == CustodyMovementDirection.In)
+        {
+            action.TakeShares(movement.Id, movement.Quantity);
+            await PayDividend.TryAsync(db, action, time.GetUtcNow(), cancellationToken);
+        }
     }
 
     /// <summary>R36–R40: the movement confirms its transfer and posts its Transaction, or waits in suspense.</summary>

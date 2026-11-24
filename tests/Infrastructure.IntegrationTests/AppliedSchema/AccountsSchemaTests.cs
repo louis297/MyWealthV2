@@ -35,7 +35,8 @@ public class AccountsSchemaTests
 
         columns.Select(column => column.Name).ShouldBe([
             "Id", "PublicId", "TenantId", "CustomerId", "Name", "Type", "Status", "Currency", "IsActive",
-            "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion", "CustodyMode", "DepositReference", "InterestAccruedThrough"
+            "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion", "CustodyMode", "DepositReference", "InterestAccruedThrough",
+            "ReinvestDividends", "ReinvestDividendsChangedByUserId", "ReinvestDividendsChangedAt"
         ]);
 
         Column(columns, "Id").ShouldSatisfyAllConditions(
@@ -156,7 +157,9 @@ public class AccountsSchemaTests
             ("FK_Accounts_Currencies_Currency", "Currencies", "Code", 0),
             ("FK_Accounts_Tenants_TenantId", "Tenants", "Id", 0),
             ("FK_Accounts_Users_TenantId_CustomerId", "Users", "TenantId", 0),
-            ("FK_Accounts_Users_TenantId_CustomerId", "Users", "Id", 0)
+            ("FK_Accounts_Users_TenantId_CustomerId", "Users", "Id", 0),
+            ("FK_Accounts_Users_TenantId_ReinvestDividendsChangedByUserId", "Users", "TenantId", 0),
+            ("FK_Accounts_Users_TenantId_ReinvestDividendsChangedByUserId", "Users", "Id", 0)
         ]);
     }
 

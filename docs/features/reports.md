@@ -20,6 +20,7 @@ related:
   - custody-mode-grouping.md
   - bank-reconciliation.md
   - interest-run.md
+  - dividends.md
 ---
 
 # Reports
@@ -566,3 +567,11 @@ Accepted with [demo-tenant-seed.md](demo-tenant-seed.md). Narrows the seed parag
 ## Amendment 2026-11-14 (UTC instants)
 
 Accepted with [utc-instants](../fixes/utc-instants.md). Report days are UTC days; the open timezone item is closed. Instants in responses use `Z`.
+
+---
+
+## Amendment 2026-11-24 (dividends) — accepted
+
+Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rule R53 lives there; this section records what changes here.
+
+- Customer Transactions Report: a `Dividend` row shows the net in the cash amount column and the sum of its `Tax` legs in the Tax column; a reinvested dividend also shows its quantity.

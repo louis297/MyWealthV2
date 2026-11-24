@@ -11,9 +11,9 @@ public sealed class CorporateActionDto
 
     public required string Kind { get; init; }
 
-    public required int RatioNew { get; init; }
+    public required int? RatioNew { get; init; }
 
-    public required int RatioHeld { get; init; }
+    public required int? RatioHeld { get; init; }
 
     public required DateOnly ExDate { get; init; }
 
@@ -44,12 +44,52 @@ public sealed class CorporateActionDto
 
     public string? CancelNote { get; init; }
 
+    /// <summary>Dividends R49: the terms of a dividend; <c>null</c> on another kind.</summary>
+    public CorporateActionDividendDto? Dividend { get; init; }
+
+    /// <summary>Dividends R49: what the Customers are owed and what the custodian paid; <c>null</c> until the dividend
+    /// goes ex, and on another kind.</summary>
+    public CorporateActionPaymentDto? Payment { get; init; }
+
+    /// <summary>Dividends R49: the reinvestment election; <c>null</c> on a dividend with no plan and on another kind.</summary>
+    public CorporateActionElectionDto? Election { get; init; }
+
     public required CorporateActionEntitlementCountsDto Entitlements { get; init; }
 
     public required string RowVersion { get; init; }
 }
 
 public sealed record CorporateActionInstrumentDto(Guid Id, string Symbol, string Name);
+
+/// <summary>Dividends R49: the terms of a dividend, in the Instrument's quote currency.</summary>
+public sealed record CorporateActionDividendDto(
+    decimal AmountPerShare,
+    string Currency,
+    string TaxSource,
+    decimal ImputationCreditPerShare,
+    decimal ForeignTaxRatePercent,
+    decimal? ReinvestmentPrice);
+
+/// <summary>Dividends R15, R49: the payment of a dividend. The received amount, the difference and the statement line
+/// are <c>null</c> until the receipt; the statement line is <c>null</c> for an Adviser.</summary>
+public sealed record CorporateActionPaymentDto(
+    decimal ExpectedAmount,
+    decimal? ReceivedAmount,
+    decimal? Difference,
+    string Currency,
+    Guid? StatementLineId,
+    DateTimeOffset? PaidAt);
+
+/// <summary>Dividends R49: the election of a dividend with the custodian.</summary>
+public sealed record CorporateActionElectionDto(
+    string Status,
+    decimal? Quantity,
+    int Attempts,
+    string? Reason,
+    decimal? SharesReceived,
+    PersonRefDto? ReleasedBy,
+    DateTimeOffset? ReleasedAt,
+    string? Note);
 
 /// <summary>R35: the entitlements the caller can see, by status; all 0 before the action is effective.</summary>
 public sealed record CorporateActionEntitlementCountsDto(int Total, int Posted, int Pending, int NotApplied);

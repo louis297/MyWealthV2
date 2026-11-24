@@ -50,6 +50,14 @@ internal static class StatementLineReader
                 .Where(row => settlementIds.Contains(row.Id))
                 .ToDictionaryAsync(row => row.Id, row => row.PublicId, cancellationToken);
 
+        var dividendIds = lines.Where(line => line.CorporateActionId is not null)
+            .Select(line => line.CorporateActionId!.Value).Distinct().ToList();
+        var dividends = dividendIds.Count == 0
+            ? []
+            : await db.CorporateActions.IgnoreQueryFilters().AsNoTracking()
+                .Where(row => dividendIds.Contains(row.Id))
+                .ToDictionaryAsync(row => row.Id, row => row.PublicId, cancellationToken);
+
         var clientMoney = await db.ClientMoneyAccounts.AsNoTracking()
             .Where(row => clientMoneyIds.Contains(row.Id))
             .ToDictionaryAsync(row => row.Id, row => row.PublicId, cancellationToken);
@@ -119,6 +127,7 @@ internal static class StatementLineReader
             ReturnReason = line.ReturnReason,
             TradeSettlementId = line.TradeSettlementId is int settlementId ? settlements[settlementId] : null,
             MigrationBatchId = line.MigrationBatchId is int batchId ? batches[batchId] : null,
+            CorporateActionId = line.CorporateActionId is int dividendId ? dividends[dividendId] : null,
             ReturnPayment = returnPayments.TryGetValue(line.Id, out var payment)
                 ? new StatementLineReturnPaymentDto
                 {

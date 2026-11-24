@@ -43,5 +43,13 @@ public enum ReconciliationItemKind
 
     /// <summary>A receipt matched to a migration batch that is not posted yet: money in the trust account that is not
     /// in the ledger yet (migration-batches R32), Timing.</summary>
-    MigrationNotPosted = 19
+    MigrationNotPosted = 19,
+
+    /// <summary>Dividends received on the account with an entitlement still <c>Pending</c>: money in the trust account
+    /// not on the Customers' accounts yet (dividends R44), Timing.</summary>
+    DividendsNotPosted = 20,
+
+    /// <summary>The rest of the other dividends received on the account: the custodian's rounding, a difference a
+    /// person accepted, and dividends credited in another currency (dividends R44, R45), Known.</summary>
+    DividendDifference = 21
 }
