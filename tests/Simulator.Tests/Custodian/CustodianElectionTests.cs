@@ -136,7 +136,7 @@ public class CustodianElectionTests
 
         (await AnswerAsync(Election("not-a-dividend", instructionId: "a"))).ShouldBe(("Rejected", "UnknownCorporateAction"));
         (await AnswerAsync(Election(plan, symbol: "BETA.SIM", instructionId: "b"))).ShouldBe(("Rejected", "UnknownCorporateAction"));
-        (await AnswerAsync(Election(cash, instructionId: "c"))).ShouldBe(("Rejected", "NoPlan"));
+        (await AnswerAsync(Election(cash, symbol: "CASH.SIM", instructionId: "c"))).ShouldBe(("Rejected", "NoPlan"));
         (await AnswerAsync(Election(plan, quantity: 100.00000001m, instructionId: "d"))).ShouldBe(("Rejected", "NotEntitled"));
 
         await PayAsync();

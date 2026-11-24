@@ -53,6 +53,8 @@ public sealed class SimulatorDbContext(DbContextOptions<SimulatorDbContext> opti
 
     public DbSet<CustodianDividendPayment> CustodianDividendPayments => Set<CustodianDividendPayment>();
 
+    public DbSet<CustodianRejectedElection> CustodianRejectedElections => Set<CustodianRejectedElection>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<CustodianAccount>(account =>
@@ -94,6 +96,14 @@ public sealed class SimulatorDbContext(DbContextOptions<SimulatorDbContext> opti
             payment.Property(row => row.Cash).HasColumnType("decimal(18,2)");
             payment.Property(row => row.ElectionInstructionId).HasMaxLength(100);
             payment.Property(row => row.RowVersion).IsRowVersion();
+        });
+
+        modelBuilder.Entity<CustodianRejectedElection>(rejected =>
+        {
+            rejected.ToTable("CustodianRejectedElections");
+            rejected.HasKey(row => row.Id);
+            rejected.Property(row => row.InstructionId).HasMaxLength(100);
+            rejected.Property(row => row.Reason).HasMaxLength(50);
         });
 
         modelBuilder.Entity<CustodianSettings>(settings =>

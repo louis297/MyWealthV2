@@ -57,6 +57,14 @@ public sealed class CustodianDividendPayment
         Status = CustodianDividendPaymentStatus.Due
     };
 
+    /// <summary>R58: an accepted election, stored with its instruction id and body.</summary>
+    public void Elect(string instructionId, string body, decimal quantity)
+    {
+        ElectionInstructionId = instructionId;
+        ElectionBody = body;
+        ElectedQuantity = quantity;
+    }
+
     /// <summary>R60: held for the operator in <c>Hold</c> mode.</summary>
     public void Hold() => Status = CustodianDividendPaymentStatus.Held;
 
@@ -115,8 +123,10 @@ public static class CustodianDividends
     }
 
     /// <summary>
-    /// R59, R60: pays one payment: <c>cash = Round(entitledPosition × netPerShare, 2)</c>, or <paramref name="amount"/>
-    /// in place of it. With cash above 0 and an income account open at the simulator bank, one credit line there with
+    /// R59, R60: pays one payment. Under an accepted election the custodian reinvests
+    /// <c>Round(electedQuantity × netPerShare, 2)</c> in shares at the plan price, rounded by its rounding mode, and adds
+    /// one <c>CorporateAction</c> movement in; the cash is <c>Round(entitledPosition × netPerShare, 2)</c> less the
+    /// shares' value, or <paramref name="amount"/> in place of it. With cash above 0 and an income account open at the simulator bank, one credit line there with
     /// the account's name as payer and the party action id as reference. Saves.
     /// </summary>
     public static async Task PayAsync(
@@ -130,7 +140,32 @@ public static class CustodianDividends
         var terms = dividend.Terms!;
         var account = await db.CustodianAccounts.AsNoTracking().SingleAsync(row => row.Id == payment.AccountId, cancellationToken);
         var world = await db.Worlds.SingleAsync(cancellationToken);
-        var cash = amount ?? decimal.Round(payment.EntitledPosition * terms.NetPerShare, 2, MidpointRounding.AwayFromZero);
+        var settings = await db.CustodianSettings.AsNoTracking().SingleAsync(cancellationToken);
+        var shares = 0m;
+        if (payment.ElectedQuantity is { } elected && terms.ReinvestmentPrice is { } price)
+        {
+            var reinvest = decimal.Round(elected * terms.NetPerShare, 2, MidpointRounding.AwayFromZero);
+            var exact = reinvest / price;
+            shares = settings.RoundingMode == CustodianRoundingMode.WholeShares
+                ? decimal.Truncate(exact)
+                : decimal.Truncate(exact * 100_000_000m) / 100_000_000m;
+        }
+
+        var sharesValue = decimal.Round(shares * (terms.ReinvestmentPrice ?? 0m), 2, MidpointRounding.AwayFromZero);
+        var cash = amount ?? decimal.Round(payment.EntitledPosition * terms.NetPerShare, 2, MidpointRounding.AwayFromZero) - sharesValue;
+        var day = Market.MarketPricePath.Day(world.Now(time.GetUtcNow()));
+        CustodianMovement? movement = null;
+        var symbol = await db.MarketInstruments.AsNoTracking()
+            .Where(row => row.Id == dividend.InstrumentId)
+            .Select(row => row.Symbol)
+            .SingleAsync(cancellationToken);
+        if (shares > 0m)
+        {
+            movement = await CustodianBook.AddAsync(db, account.AccountNumber, CustodianMovement.InDirection,
+                CustodianMovementKind.CorporateAction, symbol, account.Currency.Trim(), shares, day, DateTimeOffset.UtcNow,
+                corporateActionId: MarketCorporateAction.ActionId(world.WorldId, dividend.Number), cancellationToken: cancellationToken);
+        }
+
         Bank.BankLine? line = null;
         var currency = account.Currency.Trim();
         var income = account.IncomeAccountNumber is null
@@ -147,7 +182,7 @@ public static class CustodianDividends
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        payment.Pay(null, cash, line?.Id, null);
+        payment.Pay(shares > 0m ? shares : null, cash, line?.Id, movement?.Id);
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -167,4 +202,30 @@ public static class CustodianDividends
             }
         }
     }
+}
+
+/// <summary>Dividends R58: the first answer of a rejected election, kept so the same instruction gets it again.</summary>
+public sealed class CustodianRejectedElection
+{
+    private CustodianRejectedElection()
+    {
+    }
+
+    public int Id { get; private set; }
+
+    public int AccountId { get; private set; }
+
+    public string InstructionId { get; private set; } = "";
+
+    public string Body { get; private set; } = "";
+
+    public string Reason { get; private set; } = "";
+
+    public static CustodianRejectedElection Create(int accountId, string instructionId, string body, string reason) => new()
+    {
+        AccountId = accountId,
+        InstructionId = instructionId,
+        Body = body,
+        Reason = reason
+    };
 }

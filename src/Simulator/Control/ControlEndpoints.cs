@@ -155,7 +155,7 @@ public static class ControlEndpoints
             await standingInstruments.AddMissingAsync(db, MarketPricePath.Day(time.GetUtcNow()), http.RequestAborted);
             // In-kind-transfers R71: the custodian's books are emptied, its settings set back, and its standing accounts
             // opened again with their positions.
-            await db.Database.ExecuteSqlRawAsync("DELETE FROM [CustodianRejectedElections]", http.RequestAborted);
+            await db.CustodianRejectedElections.ExecuteDeleteAsync(http.RequestAborted);
             await db.CustodianTransfers.ExecuteDeleteAsync(http.RequestAborted);
             await db.CustodianMovements.ExecuteDeleteAsync(http.RequestAborted);
             await db.CustodianAccounts.ExecuteDeleteAsync(http.RequestAborted);
