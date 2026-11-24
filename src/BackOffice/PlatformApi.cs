@@ -294,6 +294,28 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         return page.Items;
     }
 
+    public Task<IReadOnlyList<SafekeepingAccountItem>> ListSafekeepingAccountsAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<SafekeepingAccountItem>>([]);
+
+    public Task<Guid> CreateSafekeepingAccountAsync(
+        Guid tenantId,
+        string currency,
+        string custodianName,
+        string accountName,
+        string accountNumber,
+        string custodianConnection,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Guid.Empty);
+
+    public Task DisableSafekeepingAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
+    public Task EnableSafekeepingAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
+    public Task<IReadOnlyList<CustodianConnectionItem>> ListCustodianConnectionsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<CustodianConnectionItem>>([]);
+
     private static string ClientMoneyAccountsPath(Guid tenantId) => $"/tenants/{tenantId}/client-money-accounts";
 
     public Task<IReadOnlyList<CurrencyItem>> ListCurrenciesAsync(CancellationToken cancellationToken = default) =>
