@@ -174,6 +174,7 @@ public static class TestSeed
         await EnsureReportGrantsAsync(db, tenant.Id, cancellationToken);
         await EnsureCatalogAsync(db, tenant.Id, cancellationToken);
         await EnsureClientMoneyAccountsAsync(db, tenant, cancellationToken);
+        await EnsureSafekeepingAccountsAsync(db, tenant, cancellationToken);
 
         if (services is not null)
         {
@@ -292,6 +293,9 @@ public static class TestSeed
     /// <summary>The bank connection the seeded client money accounts are read through (deposit-matching §9.1).</summary>
     public const string SimulatorBankConnection = "simulator";
 
+    /// <summary>In-kind transfers §9.1: the custodian connection of the seeded safekeeping accounts.</summary>
+    public const string SimulatorCustodianConnection = "simulator";
+
     /// <summary>
     /// An active client money account in USD and in NZD (client-money-accounts §9.1), so the Custodial demo
     /// account has deposit instructions and new Custodial accounts open in those currencies. Idempotent on
@@ -322,6 +326,40 @@ public static class TestSeed
             row.Created = TimeProvider.System.GetUtcNow();
             row.CreatedBy = CreatedBy;
             db.ClientMoneyAccounts.Add(row);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// In-kind transfers §9.1: for each client money currency an active safekeeping account on connection
+    /// <c>simulator</c>, the standing custodian accounts the AppHost opens in the simulator. Idempotent on
+    /// (tenant, currency, active).
+    /// </summary>
+    private static async Task EnsureSafekeepingAccountsAsync(
+        ApplicationDbContext db,
+        Tenant tenant,
+        CancellationToken cancellationToken)
+    {
+        foreach (var code in ClientMoneyCurrencies)
+        {
+            var exists = await db.SafekeepingAccounts.AnyAsync(
+                row => row.TenantId == tenant.Id && row.Currency == code && row.IsActive, cancellationToken);
+            if (exists)
+            {
+                continue;
+            }
+
+            var currency = await db.Set<Currency>().AsNoTracking().SingleAsync(row => row.Code == code, cancellationToken);
+            var row = SafekeepingAccount.Create(
+                tenant.Id,
+                currency,
+                "Simulator Custody",
+                $"{tenant.Name} Nominees",
+                $"SIM-{tenant.Code.ToUpperInvariant()}-CUSTODY-{code}",
+                SimulatorCustodianConnection);
+            row.Created = TimeProvider.System.GetUtcNow();
+            row.CreatedBy = CreatedBy;
+            db.SafekeepingAccounts.Add(row);
             await db.SaveChangesAsync(cancellationToken);
         }
     }
