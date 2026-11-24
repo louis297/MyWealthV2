@@ -61,6 +61,14 @@ public class CorporateAction : BaseAuditableEntity
 
     public int? SafekeepingAccountId { get; private set; }
 
+    /// <summary>Dividends R22: the attempts to send the election, the last one, and the custodian's reason when it
+    /// rejected it.</summary>
+    public int ElectionAttempts { get; private set; }
+
+    public DateTimeOffset? ElectionLastAttemptAt { get; private set; }
+
+    public ElectionRejectReason? ElectionReason { get; private set; }
+
     /// <summary>Dividends R28, R30: the new shares the custodian delivered under an accepted election.</summary>
     public decimal? SharesReceived { get; private set; }
 

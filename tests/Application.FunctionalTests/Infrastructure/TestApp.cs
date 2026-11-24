@@ -86,6 +86,7 @@ public static class TestApp
         FunctionalTestSetup.WebApiServices.GetRequiredService<InKindTransfers.FakeCustodianConnections>().Reset();
         FunctionalTestSetup.WebApiServices.GetRequiredService<InKindTransfers.InMemoryCustodianTransfers>().Reset();
         FunctionalTestSetup.WebApiServices.GetRequiredService<InKindTransfers.InMemoryCustodianFeed>().Reset();
+        FunctionalTestSetup.WebApiServices.GetRequiredService<CorporateActions.InMemoryCustodianElections>().Reset();
         FunctionalTestSetup.WebApiServices.GetRequiredService<InMemoryMarketPrices>().Reset();
         FunctionalTestSetup.WebApiServices.GetRequiredService<CorporateActions.InMemoryCorporateActionFeed>().Reset();
         _userId = null;

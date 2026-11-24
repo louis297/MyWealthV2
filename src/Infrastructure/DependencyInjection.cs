@@ -224,6 +224,10 @@ public static class DependencyInjection
         builder.Services.AddSingleton<MyWealthV2.Infrastructure.Custodian.ICustodianTransfersAdapter, MyWealthV2.Infrastructure.Custodian.SimulatorCustodianTransfers>();
         builder.Services.AddScoped<MyWealthV2.Application.Custodian.ICustodianFeed, MyWealthV2.Infrastructure.Custodian.CustodianFeedDispatcher>();
         builder.Services.AddScoped<MyWealthV2.Application.Custodian.ICustodianTransfers, MyWealthV2.Infrastructure.Custodian.CustodianTransfersDispatcher>();
+        builder.Services.AddHttpClient(MyWealthV2.Infrastructure.Custodian.SimulatorCustodianElections.HttpClientName);
+        builder.Services.AddSingleton<MyWealthV2.Infrastructure.Custodian.ICustodianElectionsAdapter, MyWealthV2.Infrastructure.Custodian.SimulatorCustodianElections>();
+        builder.Services.AddScoped<MyWealthV2.Application.Custodian.ICustodianElections, MyWealthV2.Infrastructure.Custodian.CustodianElectionsDispatcher>();
+        builder.Services.AddScoped<MyWealthV2.Application.Custodian.SendReinvestmentElections>();
         builder.Services.AddScoped<MyWealthV2.Application.Custodian.SendInKindTransfers>();
         builder.Services.AddScoped<MyWealthV2.Application.Custodian.PullCustodyMovements>();
         builder.Services.AddScoped<MyWealthV2.Application.Custodian.ProcessCustodyMovements>();
