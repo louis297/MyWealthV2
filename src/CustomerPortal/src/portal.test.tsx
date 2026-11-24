@@ -1250,6 +1250,93 @@ describe("Customer Portal corporate actions (corporate-actions C31)", () => {
   });
 });
 
+describe("Customer Portal dividends (dividends C42–C44)", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal("location", {
+      origin: "http://localhost:3000",
+      pathname: "/accounts/account-1",
+      search: "",
+      href: "http://localhost:3000/accounts/account-1",
+      assign: vi.fn(),
+    });
+  });
+
+  const custodialUsd = { type: "Brokerage", currency: "USD", depositReference: "K7M3Q9PXB" };
+  const usdCash = { currency: "USD", cashBalance: 0, reservedCash: 0, availableCash: 0 };
+
+  function dividendPosting(reinvested: boolean) {
+    const leg = (role: string, amount: number, tax: unknown = null) =>
+      ({ accountId: "account-1", customerId: me.id, role, amount, currency: "USD", fee: null, tax });
+    return {
+      id: reinvested ? "75555555-5555-5555-5555-555555555555" : "76666666-6666-6666-6666-666666666666",
+      tenantId: "22222222-2222-2222-2222-222222222222",
+      type: "Dividend",
+      bookedAt: "2026-11-24T04:10:31Z",
+      memo: "Dividend ACME.SIM 1.00 per share",
+      reference: null,
+      originalTransactionId: null,
+      reversedByTransactionId: null,
+      rowVersion: "AAAA",
+      source: { kind: "CorporateAction", id: "ca-1" },
+      corporateAction: null,
+      dividend: {
+        corporateActionId: "ca-1", instrument: { id: "i-1", symbol: "ACME.SIM", name: "Acme" }, quantity: 100, amountPerShare: 1,
+        currency: "USD", taxSource: "NewZealand", imputationCredit: 2.5,
+        reinvestedQuantity: reinvested ? 2.68 : null, reinvestmentPrice: reinvested ? 25 : null,
+        exDate: "2026-11-26", recordDate: null, paymentDate: "2026-11-30",
+      },
+      cash: [
+        leg("Principal", 100),
+        leg("Tax", -15, { kind: "ForeignWithholding", ratePercent: 15, basisAmount: 100, amount: 15, currency: "USD" }),
+        leg("Tax", -18, { kind: "Rwt", ratePercent: 33, basisAmount: 100, amount: 18, currency: "USD" }),
+        ...(reinvested ? [leg("Reinvestment", -67)] : []),
+      ],
+      security: reinvested ? [{ accountId: "account-1", customerId: me.id, instrumentId: "i-1", quantity: 2.68, cost: 67, costCurrency: "USD" }] : [],
+      bankReceipt: null,
+      payment: null,
+      interest: null,
+    };
+  }
+
+  it("labels a dividend with its shares, gross, taxes, credit and net (C42)", async () => {
+    renderAt("/accounts/account-1", me, [dividendPosting(false)], "Custodial", { account: custodialUsd, cash: usdCash });
+
+    const row = await screen.findByRole("row", { name: /Dividend ACME.SIM/ });
+    expect(row).toHaveTextContent("100 shares × 1.00");
+    expect(row).toHaveTextContent("Gross 100.00 USD");
+    expect(row).toHaveTextContent("Foreign tax 15 % 15.00 USD");
+    expect(row).toHaveTextContent("RWT 33 % 18.00 USD");
+    expect(row).toHaveTextContent("Imputation credit 2.50 USD");
+    expect(row).toHaveTextContent("67.00 USD");
+    expect(row).not.toHaveTextContent("Reinvested");
+  });
+
+  it("shows the reinvestment of a reinvested dividend and a net of zero (C43)", async () => {
+    renderAt("/accounts/account-1", me, [dividendPosting(true)], "Custodial", { account: custodialUsd, cash: usdCash });
+
+    const row = await screen.findByRole("row", { name: /Dividend ACME.SIM/ });
+    expect(row).toHaveTextContent("Reinvested in 2.68 shares at 25.00");
+    expect(row).toHaveTextContent("0.00 USD");
+  });
+
+  it("says whether dividends are reinvested, read only (C44)", async () => {
+    renderAt("/accounts/account-1", me, [], "Custodial", {
+      account: { ...custodialUsd, reinvestDividends: true }, cash: usdCash,
+    });
+
+    expect(await screen.findByText("Dividends are reinvested")).toBeInTheDocument();
+    expect(screen.getByText("Ask your adviser to change this.")).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: /Reinvest/ })).not.toBeInTheDocument();
+  });
+
+  it("says dividends are paid in cash (C44)", async () => {
+    renderAt("/accounts/account-1", me, [], "Custodial", { account: { ...custodialUsd, reinvestDividends: false }, cash: usdCash });
+    expect(await screen.findByText("Dividends are paid in cash")).toBeInTheDocument();
+  });
+});
+
 describe("Customer Portal in-kind transfers (in-kind-transfers C39–C41)", () => {
   beforeEach(() => {
     sessionStorage.clear();
