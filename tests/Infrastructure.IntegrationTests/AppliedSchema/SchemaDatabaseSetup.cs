@@ -10,7 +10,7 @@ public class SchemaDatabaseSetup
 
     private static SchemaDatabasePool? _pool;
 
-    /// <summary>The applied schema database of the current fixture (see <see cref="SchemaDatabasePool"/>).</summary>
+    /// <summary>The applied schema database of the current fixture (one per test worker, see <see cref="SchemaDatabasePool"/>).</summary>
     internal static string ConnectionString => Pool.Current.ConnectionString;
 
     internal static int TransactionsAfterApply => Pool.Current.TransactionsAfterApply;
@@ -26,9 +26,6 @@ public class SchemaDatabaseSetup
 
     private static SchemaDatabasePool Pool =>
         _pool ?? throw new InvalidOperationException("The schema test database is not set up.");
-
-    /// <summary>Called when a fixture ends, so another fixture can use its database.</summary>
-    internal static void ReturnDatabase(NUnit.Framework.Internal.Test fixture) => _pool?.Return(fixture);
 
     [OneTimeSetUp]
     public async Task OneTimeSetUp()
@@ -59,7 +56,7 @@ public class SchemaDatabaseSetup
 
         ServerConnectionString = (await _app.GetConnectionStringAsync(Services.SchemaTestDatabase, cancellationToken))!;
         var pool = new SchemaDatabasePool(ServerConnectionString);
-        await pool.InitializeAsync(cancellationToken);
+        await pool.DropLeftoverDatabasesAsync(cancellationToken);
         _pool = pool;
     }
 

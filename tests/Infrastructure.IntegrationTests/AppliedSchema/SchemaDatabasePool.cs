@@ -9,94 +9,73 @@ using NUnit.Framework.Internal;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>
-/// Applied schema databases for the fixtures in this namespace. A fixture leases one the first time it
-/// reads <see cref="SchemaDatabaseSetup.ConnectionString"/> and gives it back when the fixture ends, so
-/// fixtures that run at the same time never share a database. A database is reused by later fixtures
-/// without a reset, as the single shared database was before: tests insert their own rows and tolerate
-/// rows from earlier fixtures. The first database is the default one; the others are named after it
-/// with a "-pN" suffix and are created the first time no database is free.
+/// Applied schema databases for the fixtures in this namespace, one per NUnit test worker. A worker runs one
+/// fixture at a time, and the test cases of a fixture run on the worker that runs the fixture, so fixtures that
+/// run at the same time never share a database. A database is reused by the later fixtures of its worker
+/// without a reset, as the single shared database was before: tests insert their own rows and tolerate rows
+/// from earlier fixtures. The first database is the default one; the others are named after it with a "-pN"
+/// suffix and are created the first time a worker needs one.
 /// </summary>
 internal sealed class SchemaDatabasePool(string defaultConnectionString)
 {
-    private readonly SemaphoreSlim _gate = new(1, 1);
-    private readonly Stack<AppliedSchemaDatabase> _free = new();
-    private readonly ConcurrentDictionary<Test, Task<AppliedSchemaDatabase>> _leases =
-        new(ReferenceEqualityComparer.Instance);
+    /// <summary>Key for code that runs outside a test worker, as when NUnit runs without parallel workers.</summary>
+    private static readonly object NoWorker = new();
+
+    private readonly ConcurrentDictionary<object, Lazy<Task<AppliedSchemaDatabase>>> _databases = new();
     private int _created;
 
-    /// <summary>The database leased to the fixture that is running the current code.</summary>
+    /// <summary>The database of the test worker that is running the current code.</summary>
     public AppliedSchemaDatabase Current
     {
         get
         {
-            var fixture = CurrentFixture()
-                ?? throw new InvalidOperationException(
-                    "The applied schema database is read outside a test fixture.");
-            return _leases.GetOrAdd(fixture, _ => LeaseAsync()).GetAwaiter().GetResult();
+            var worker = (object?)TestExecutionContext.CurrentContext.TestWorker ?? NoWorker;
+            return _databases.GetOrAdd(worker, _ => new Lazy<Task<AppliedSchemaDatabase>>(CreateAsync))
+                .Value.GetAwaiter().GetResult();
         }
     }
 
-    /// <summary>Creates and applies the default database, the first one handed out.</summary>
-    public async Task InitializeAsync(CancellationToken cancellationToken)
+    /// <summary>Drops the "-pN" databases that earlier runs left on the persistent test server.</summary>
+    public async Task DropLeftoverDatabasesAsync(CancellationToken cancellationToken)
     {
-        _free.Push(await AppliedSchemaDatabase.CreateAsync(defaultConnectionString, cancellationToken));
-        _created = 1;
-    }
-
-    /// <summary>Gives the fixture's database back to the pool, if it leased one.</summary>
-    public void Return(Test fixture)
-    {
-        if (!_leases.TryRemove(fixture, out var lease) || !lease.IsCompletedSuccessfully)
-        {
-            return;
-        }
-
-        _gate.Wait();
-        try
-        {
-            _free.Push(lease.Result);
-        }
-        finally
-        {
-            _gate.Release();
-        }
-    }
-
-    private async Task<AppliedSchemaDatabase> LeaseAsync()
-    {
-        int number;
-        await _gate.WaitAsync();
-        try
-        {
-            if (_free.TryPop(out var free))
-            {
-                return free;
-            }
-
-            number = _created++;
-        }
-        finally
-        {
-            _gate.Release();
-        }
-
         var builder = new SqlConnectionStringBuilder(defaultConnectionString);
-        builder.InitialCatalog += "-p" + number;
+        var pattern = builder.InitialCatalog.Replace("[", "[[]").Replace("_", "[_]").Replace("%", "[%]") + "-p%";
+        builder.InitialCatalog = "master";
+
+        await using var connection = new SqlConnection(builder.ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+        var names = new List<string>();
+        await using (var list = connection.CreateCommand())
+        {
+            list.CommandText = "SELECT [name] FROM sys.databases WHERE [name] LIKE @pattern";
+            list.Parameters.AddWithValue("@pattern", pattern);
+            await using var reader = await list.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                names.Add(reader.GetString(0));
+            }
+        }
+
+        foreach (var name in names)
+        {
+            var quoted = "[" + name.Replace("]", "]]") + "]";
+            await using var drop = connection.CreateCommand();
+            drop.CommandText = $"ALTER DATABASE {quoted} SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE {quoted};";
+            await drop.ExecuteNonQueryAsync(cancellationToken);
+        }
+    }
+
+    private async Task<AppliedSchemaDatabase> CreateAsync()
+    {
+        var number = Interlocked.Increment(ref _created) - 1;
+        var builder = new SqlConnectionStringBuilder(defaultConnectionString);
+        if (number > 0)
+        {
+            builder.InitialCatalog += "-p" + number;
+        }
+
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
         return await AppliedSchemaDatabase.CreateAsync(builder.ConnectionString, cts.Token);
-    }
-
-    private static Test? CurrentFixture()
-    {
-        for (var test = TestExecutionContext.CurrentContext.CurrentTest; test is not null; test = test.Parent as Test)
-        {
-            if (test is TestFixture)
-            {
-                return test;
-            }
-        }
-
-        return null;
     }
 }
 
