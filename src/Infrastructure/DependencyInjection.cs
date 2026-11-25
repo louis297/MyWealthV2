@@ -135,6 +135,16 @@ public static class DependencyInjection
     }
 
     /// <summary>
+    /// Reads the history floor date and <c>Eodhd:HistoryDays</c> (market-data-history R1, R3) and registers them.
+    /// Throws on a bad value, so call it before <c>Build()</c>.
+    /// </summary>
+    public static void AddMarketDataHistory(this IHostApplicationBuilder builder)
+    {
+        var today = DateOnly.FromDateTime(TimeProvider.System.GetUtcNow().UtcDateTime);
+        builder.Services.AddSingleton(MarketDataHistoryConfiguration.Read(builder.Configuration, today));
+    }
+
+    /// <summary>
     /// Reads <c>MarketDataConnections</c> for <paramref name="host"/> and registers the configured connections
     /// (simulated-instruments R1–R3). Throws on a bad entry, so call it before <c>Build()</c>.
     /// </summary>
