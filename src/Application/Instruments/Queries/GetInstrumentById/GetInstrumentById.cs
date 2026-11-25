@@ -1,6 +1,5 @@
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
-using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.MarketData;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 
@@ -15,15 +14,10 @@ public class GetInstrumentByIdQueryHandler(IApplicationDbContext db, ICurrentUse
     public async Task<InstrumentDto> Handle(GetInstrumentByIdQuery request, CancellationToken cancellationToken)
     {
         var query =
-            from instrument in db.Instruments.AsNoTracking()
+            from instrument in InstrumentVisibility.Readable(db, currentUser)
             join tenant in db.Tenants.AsNoTracking() on instrument.TenantId equals tenant.Id
             where instrument.PublicId == request.Id
             select new { instrument, tenant };
-
-        if (currentUser.Role != UserRole.SystemAdmin)
-        {
-            query = query.Where(row => row.instrument.TenantId == currentUser.TenantId);
-        }
 
         var row = await query.SingleOrDefaultAsync(cancellationToken)
                   ?? throw new NotFoundException("Instrument", request.Id);
