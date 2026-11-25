@@ -320,6 +320,8 @@ var worker = builder.AddProject<Projects.Worker>(Services.Worker)
     .WithAspNetCoreEnvironment()
     .WithEnvironment("Reports__StorageRoot", reportsPath)
     .WithEnvironment("Eodhd__ApiKey", eodhdApiKey)
+    // Market data history R1, §9.1: prices and rates are stored for every date from the floor date.
+    .WithEnvironment("MarketDataHistory__FloorDate", "2026-01-01")
     //.WithVolume("reports", "/data/reports", env: "Reports__StorageRoot")
     .WithUrlForEndpoint("http", url =>
     {

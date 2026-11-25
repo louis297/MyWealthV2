@@ -48,6 +48,7 @@ The platform currency catalog is small and stable (seed: NZD, AUD, USD, EUR, GBP
 - Weekends and holidays store the as-of date the source returns (previous working day).
 - Growing the currency catalog later requires the job to include the new code (or a config list).
 - Production still uses the same source; no separate “dev” rate provider.
+- Amendment 2026-11-25 ([features/market-data-history.md](../features/market-data-history.md), accepted): the table holds a rate for every day from the history floor date (`MarketDataHistory:FloorDate` on `worker`). A second daily job, `fx-rate-history-sync`, asks Frankfurter for the range from the floor date to yesterday. A row two or more days old is final and never updated. `GET /fx-rates` reads the table. The decision is unchanged: Frankfurter, a local table, and a read path that never calls the source.
 
 ## Links
 

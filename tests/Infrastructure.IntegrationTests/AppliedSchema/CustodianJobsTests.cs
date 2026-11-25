@@ -163,7 +163,7 @@ public class CustodianJobsTests
 
     private static IHost HangfireHost()
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
         builder.Services.AddHangfire(configuration => configuration.UseInMemoryStorage());
         return builder.Build();
     }
@@ -177,7 +177,7 @@ public class CustodianJobsTests
 
     private static async Task<IHost> WorkerHostAsync(string connectionString, ScriptedFeed feed, ScriptedTransfers transfers)
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
         builder.Configuration[$"ConnectionStrings:{Services.Database}"] = connectionString;
         builder.AddInfrastructureServices();
         builder.AddBankConnections(BankConnectionHost.Worker);

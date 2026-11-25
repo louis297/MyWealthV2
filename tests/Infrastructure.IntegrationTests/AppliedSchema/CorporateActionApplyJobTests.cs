@@ -21,7 +21,7 @@ public class CorporateActionApplyJobTests
     [Test]
     public void Register_AddsTheJobEveryMinute_InUtc_OnQueueMarket()
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
         builder.Services.AddHangfire(configuration => configuration.UseInMemoryStorage());
         using var host = builder.Build();
 
@@ -90,7 +90,7 @@ public class CorporateActionApplyJobTests
 
     private static async Task<IHost> WorkerHostAsync(string connectionString)
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
         builder.Configuration[$"ConnectionStrings:{Services.Database}"] = connectionString;
         builder.AddInfrastructureServices();
         builder.AddMarketDataConnections(MarketDataHost.Worker);

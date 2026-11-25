@@ -31,7 +31,7 @@ public class HangfireRebalanceSchedulerTests
 
     private static IHost BuildHost()
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
         builder.Services.AddHangfire(configuration => configuration.UseInMemoryStorage());
         builder.Services.AddSingleton<IRebalanceScheduler, HangfireRebalanceScheduler>();
         return builder.Build();

@@ -16,7 +16,7 @@ public class BankConnectionsConfigurationTests
     [Test]
     public void NoConnections_IsValid_AndRegistersNone()
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
 
         builder.AddBankConnections(BankConnectionHost.Worker);
 
@@ -167,7 +167,7 @@ public class BankConnectionsConfigurationTests
 
     private static HostApplicationBuilder Builder(Dictionary<string, string?> values)
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
         builder.Configuration.AddInMemoryCollection(values);
         return builder;
     }

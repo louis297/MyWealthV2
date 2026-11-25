@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.MarketData;
+using MyWealthV2.Domain.MarketData;
 using MyWealthV2.Domain.ValueObjects;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Entities;
@@ -11,7 +13,10 @@ public sealed class InstrumentPriceStore(ApplicationDbContext db, TimeProvider t
 {
     public const string SourceName = "EODHD";
 
-    public Money? TryGetPrice(int instrumentId, DateTimeOffset? asOf = null)
+    public Money? TryGetPrice(int instrumentId, DateTimeOffset? asOf = null) =>
+        TryGetPriceDetail(instrumentId, asOf)?.Price;
+
+    public InstrumentPriceReading? TryGetPriceDetail(int instrumentId, DateTimeOffset? asOf = null)
     {
         var date = asOf is null
             ? DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime)
@@ -19,7 +24,7 @@ public sealed class InstrumentPriceStore(ApplicationDbContext db, TimeProvider t
         var row = db.InstrumentPrices.AsNoTracking()
             .Where(price => price.InstrumentId == instrumentId && price.AsOfDate <= date)
             .OrderByDescending(price => price.AsOfDate)
-            .Select(price => (decimal?)price.Price)
+            .Select(price => new { price.Price, price.AsOfDate, price.Source })
             .FirstOrDefault();
         if (row is null)
         {
@@ -35,7 +40,36 @@ public sealed class InstrumentPriceStore(ApplicationDbContext db, TimeProvider t
             return null;
         }
 
-        return Money.Create(row.Value, quote);
+        return new InstrumentPriceReading(Money.Create(row.Price, quote), row.AsOfDate, row.Source);
+    }
+
+    public async Task<PagedList<StoredInstrumentPrice>> ListPricesAsync(
+        int instrumentId,
+        DateOnly? from,
+        DateOnly? to,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var query = db.InstrumentPrices.AsNoTracking().Where(row => row.InstrumentId == instrumentId);
+        if (from is { } first)
+        {
+            query = query.Where(row => row.AsOfDate >= first);
+        }
+
+        if (to is { } last)
+        {
+            query = query.Where(row => row.AsOfDate <= last);
+        }
+
+        var total = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderByDescending(row => row.AsOfDate)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(row => new StoredInstrumentPrice(row.AsOfDate, row.Price, row.Source, row.FetchedAt))
+            .ToListAsync(cancellationToken);
+        return new PagedList<StoredInstrumentPrice> { Items = items, Page = page, PageSize = pageSize, TotalCount = total };
     }
 
     public Task UpsertAsync(
@@ -59,6 +93,14 @@ public sealed class InstrumentPriceStore(ApplicationDbContext db, TimeProvider t
         var existing = await db.InstrumentPrices
             .Where(row => ids.Contains(row.InstrumentId))
             .ToListAsync(cancellationToken);
+
+        // Market data history R4–R6: a final row is never updated; a missing one may still be inserted.
+        var today = DateOnly.FromDateTime(fetchedAt.UtcDateTime);
+        var stored = existing.Select(row => (row.InstrumentId, row.AsOfDate)).ToHashSet();
+        quotes = quotes
+            .Where(quote => !stored.Contains((quote.InstrumentId, quote.AsOfDate))
+                            || !MarketDataRow.IsFinal(quote.AsOfDate, today))
+            .ToList();
         var rows = existing
             .Select(row => new InstrumentPriceRow(row.InstrumentId, row.Price, row.AsOfDate, row.FetchedAt))
             .ToList();

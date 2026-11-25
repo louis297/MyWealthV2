@@ -28,14 +28,18 @@ builder.AddBankConnections(BankConnectionHost.Worker);
 builder.AddBrokerConnections(BrokerConnectionHost.Worker);
 builder.AddCustodianConnections(MyWealthV2.Infrastructure.Custodian.CustodianConnectionHost.Worker);
 builder.AddMarketDataConnections(MarketDataHost.Worker);
+builder.AddMarketDataHistory();
 builder.Services.AddScoped<IUser, SystemUser>();
 builder.Services.AddScoped<OutboxProcessor>();
 builder.Services.AddScoped<FxRateSyncJob>();
+builder.Services.AddScoped<FxRateHistorySyncJob>();
+builder.Services.AddScoped<FxRateHistoryHangfireJob>();
 builder.Services.AddScoped(sp => new InstrumentPriceSyncJob(
     sp.GetRequiredService<IActiveInstrumentCatalog>(),
     sp.GetRequiredService<IInstrumentPriceSource>(),
     sp.GetRequiredService<IInstrumentPriceStore>(),
     sp.GetRequiredService<MarketDataConnections>(),
+    sp.GetRequiredService<MarketDataHistorySettings>(),
     sp.GetRequiredService<TimeProvider>(),
     TimeSpan.FromSeconds(8),
     sp.GetRequiredService<ILogger<InstrumentPriceSyncJob>>()));
@@ -57,6 +61,7 @@ await using (var scope = app.Services.CreateAsyncScope())
 
 OutboxRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 FxRateRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
+FxRateHistoryRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 BankReconciliationRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 MyWealthV2.Infrastructure.Custodian.CustodianReconciliationRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 MyWealthV2.Infrastructure.Custodian.CustodianSyncRecurringJob.Register(

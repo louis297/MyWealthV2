@@ -232,14 +232,14 @@ public class BrokerSyncJobTests
 
     private static IHost HangfireHost()
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
         builder.Services.AddHangfire(configuration => configuration.UseInMemoryStorage());
         return builder.Build();
     }
 
     private static async Task<IHost> WorkerHostAsync(ScriptedBroker broker, string connection)
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
         builder.Configuration[$"ConnectionStrings:{Services.Database}"] = _database.ConnectionString;
         builder.AddInfrastructureServices();
         builder.AddBrokerConnections(BrokerConnectionHost.Worker);

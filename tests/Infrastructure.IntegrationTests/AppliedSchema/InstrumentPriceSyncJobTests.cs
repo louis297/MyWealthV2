@@ -258,7 +258,7 @@ public class InstrumentPriceSyncJobTests
         IInstrumentPriceSource source,
         TimeProvider time,
         MarketDataConnections? connections = null) =>
-        new(catalog, source, new InstrumentPriceStore(db, time), connections ?? MarketDataConnections.None, time, TimeSpan.Zero, new SilentLogger());
+        new(catalog, source, new InstrumentPriceStore(db, time), connections ?? MarketDataConnections.None, MarketDataHistorySettings.None, time, TimeSpan.Zero, new SilentLogger());
 
     private static readonly MarketDataConnections Simulator =
         new([new MarketDataConnection("simulator", "Simulator", ".SIM")]);
@@ -326,13 +326,14 @@ public class InstrumentPriceSyncJobTests
     {
         public List<(string Symbol, string QuoteCurrency)> Calls { get; } = [];
 
-        public Task<SourcedInstrumentPrice?> GetLatestAsync(
+        public Task<SourcedInstrumentBars?> GetBarsAsync(
             string symbol,
             string quoteCurrency,
+            DateOnly? from = null,
             CancellationToken cancellationToken = default)
         {
             Calls.Add((symbol, quoteCurrency));
-            return Task.FromResult<SourcedInstrumentPrice?>(new SourcedInstrumentPrice(price, asOf, currency));
+            return Task.FromResult<SourcedInstrumentBars?>(new SourcedInstrumentBars(currency, [new SourcedPriceBar(asOf, price)]));
         }
     }
 
@@ -340,31 +341,33 @@ public class InstrumentPriceSyncJobTests
     {
         public List<(string Symbol, string QuoteCurrency)> Calls { get; } = [];
 
-        public Task<SourcedInstrumentPrice?> GetLatestAsync(
+        public Task<SourcedInstrumentBars?> GetBarsAsync(
             string symbol,
             string quoteCurrency,
+            DateOnly? from = null,
             CancellationToken cancellationToken = default)
         {
             Calls.Add((symbol, quoteCurrency));
             if (symbol == "AAPL")
             {
-                return Task.FromResult<SourcedInstrumentPrice?>(null);
+                return Task.FromResult<SourcedInstrumentBars?>(null);
             }
 
             if (symbol == "MSFT")
             {
-                return Task.FromResult<SourcedInstrumentPrice?>(new SourcedInstrumentPrice(400m, asOf, "EUR"));
+                return Task.FromResult<SourcedInstrumentBars?>(new SourcedInstrumentBars("EUR", [new SourcedPriceBar(asOf, 400m)]));
             }
 
-            return Task.FromResult<SourcedInstrumentPrice?>(new SourcedInstrumentPrice(250m, asOf, quoteCurrency));
+            return Task.FromResult<SourcedInstrumentBars?>(new SourcedInstrumentBars(quoteCurrency, [new SourcedPriceBar(asOf, 250m)]));
         }
     }
 
     private sealed class ThrowingSource : IInstrumentPriceSource
     {
-        public Task<SourcedInstrumentPrice?> GetLatestAsync(
+        public Task<SourcedInstrumentBars?> GetBarsAsync(
             string symbol,
             string quoteCurrency,
+            DateOnly? from = null,
             CancellationToken cancellationToken = default) =>
             throw new HttpRequestException("Twelve Data is down.");
     }

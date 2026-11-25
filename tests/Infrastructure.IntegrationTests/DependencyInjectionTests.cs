@@ -74,7 +74,7 @@ public class DependencyInjectionTests
 
     private static HostApplicationBuilder CreateBuilder()
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
         builder.Configuration[$"ConnectionStrings:{Services.Database}"] =
             "Server=localhost;Database=unused;TrustServerCertificate=True";
         return builder;

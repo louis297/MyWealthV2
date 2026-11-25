@@ -179,14 +179,14 @@ public class MarketDataSyncJobTests
 
     private static IHost HangfireHost()
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
         builder.Services.AddHangfire(configuration => configuration.UseInMemoryStorage());
         return builder.Build();
     }
 
     private static async Task<IHost> WorkerHostAsync(IMarketPrices prices, ICorporateActionFeed? feed = null)
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
         builder.Configuration[$"ConnectionStrings:{Services.Database}"] = SchemaDatabaseSetup.ConnectionString;
         builder.AddInfrastructureServices();
         builder.AddMarketDataConnections(MarketDataHost.Worker);

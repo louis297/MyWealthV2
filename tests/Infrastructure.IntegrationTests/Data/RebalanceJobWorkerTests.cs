@@ -1,3 +1,4 @@
+using MyWealthV2.Application.Common.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -53,7 +54,7 @@ public class RebalanceJobWorkerTests
 
     private static IHost WorkerHost(int pricedInstrumentId)
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
         builder.Configuration[$"ConnectionStrings:{Services.Database}"] = SchemaDatabaseSetup.ConnectionString;
         builder.AddInfrastructureServices();
         builder.AddBrokerConnections(BrokerConnectionHost.Worker);
@@ -119,6 +120,12 @@ public class RebalanceJobWorkerTests
 
     private sealed class FixedPrice(int instrumentId) : IMarketData
     {
+        public InstrumentPriceReading? TryGetPriceDetail(int instrumentId, DateTimeOffset? asOf = null) =>
+            throw new InvalidOperationException("Not used.");
+
+        public Task<PagedList<StoredInstrumentPrice>> ListPricesAsync(int instrumentId, DateOnly? from, DateOnly? to, int page, int pageSize, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Not used.");
+
         public Money? TryGetPrice(int id, DateTimeOffset? asOf = null) =>
             id == instrumentId ? Money.Create(Price, "NZD") : null;
     }

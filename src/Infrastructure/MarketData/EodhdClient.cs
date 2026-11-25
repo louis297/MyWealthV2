@@ -6,11 +6,17 @@ using MyWealthV2.Application.MarketData;
 
 namespace MyWealthV2.Infrastructure.MarketData;
 
+/// <summary>
+/// The EODHD end-of-day source (docs/features/instrument-prices.md, market-data-history.md R7, R8). One call per
+/// symbol. With <c>from</c> it returns every bar of the answer; without it, the latest bar only. The price is the
+/// unadjusted <c>close</c>; <c>adjusted_close</c> is never read.
+/// </summary>
 public sealed class EodhdClient(HttpClient http, IConfiguration configuration) : IInstrumentPriceSource
 {
-    public async Task<SourcedInstrumentPrice?> GetLatestAsync(
+    public async Task<SourcedInstrumentBars?> GetBarsAsync(
         string symbol,
         string quoteCurrency,
+        DateOnly? from = null,
         CancellationToken cancellationToken = default)
     {
         var apiKey = configuration["Eodhd:ApiKey"];
@@ -23,6 +29,11 @@ public sealed class EodhdClient(HttpClient http, IConfiguration configuration) :
         // A request path that starts with '/' replaces BaseAddress's path, so /api must be in the path.
         var path =
             $"/api/eod/{Uri.EscapeDataString(providerSymbol)}?api_token={Uri.EscapeDataString(apiKey)}&fmt=json";
+        if (from is { } first)
+        {
+            path += $"&from={first.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}";
+        }
+
         using var response = await http.GetAsync(path, cancellationToken);
         if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Forbidden)
         {
@@ -49,29 +60,25 @@ public sealed class EodhdClient(HttpClient http, IConfiguration configuration) :
                 return null;
             }
 
-            JsonElement? latest = null;
-            var latestDate = default(DateOnly);
-            foreach (var bar in root.EnumerateArray())
+            var bars = new List<(SourcedPriceBar Bar, JsonElement Element)>();
+            foreach (var element in root.EnumerateArray())
             {
-                if (!TryReadDate(bar, out var asOf))
+                if (!TryReadDate(element, out var asOf))
                 {
                     continue;
                 }
 
-                if (latest is null || asOf > latestDate)
-                {
-                    latest = bar;
-                    latestDate = asOf;
-                }
+                bars.Add((new SourcedPriceBar(asOf, TryReadClose(element, out var close) ? close : null), element));
             }
 
-            if (latest is null || !TryReadClose(latest.Value, out var price))
+            if (bars.Count == 0)
             {
                 return null;
             }
 
+            var latest = bars.MaxBy(entry => entry.Bar.AsOfDate);
             var currency = quoteCurrency;
-            if (latest.Value.TryGetProperty("currency", out var currencyElement)
+            if (latest.Element.TryGetProperty("currency", out var currencyElement)
                 && currencyElement.ValueKind == JsonValueKind.String
                 && currencyElement.GetString() is { } code
                 && !string.IsNullOrWhiteSpace(code))
@@ -79,7 +86,10 @@ public sealed class EodhdClient(HttpClient http, IConfiguration configuration) :
                 currency = code;
             }
 
-            return new SourcedInstrumentPrice(price, latestDate, currency);
+            var result = from is null
+                ? [latest.Bar]
+                : bars.Select(entry => entry.Bar).OrderBy(bar => bar.AsOfDate).ToList();
+            return new SourcedInstrumentBars(currency, result);
         }
     }
 

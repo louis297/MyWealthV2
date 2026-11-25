@@ -1,3 +1,4 @@
+using MyWealthV2.Application.Common.Models;
 using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
@@ -89,6 +90,12 @@ public class RebalanceJobTenantScopeTests
 
     private sealed class NoMarketData : IMarketData
     {
+        public InstrumentPriceReading? TryGetPriceDetail(int instrumentId, DateTimeOffset? asOf = null) =>
+            throw new InvalidOperationException("Not used.");
+
+        public Task<PagedList<StoredInstrumentPrice>> ListPricesAsync(int instrumentId, DateOnly? from, DateOnly? to, int page, int pageSize, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Not used.");
+
         public Money? TryGetPrice(int instrumentId, DateTimeOffset? asOf = null) => null;
     }
 
@@ -112,6 +119,9 @@ public class RebalanceJobTenantScopeTests
 
     private sealed class NoFxRate : IFxRate
     {
+        public Task<PagedList<StoredFxRate>> ListRatesAsync(string baseCurrency, string quoteCurrency, DateOnly? from, DateOnly? to, int page, int pageSize, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Not used.");
+
         public Task<decimal> GetRateAsync(string from, string to, DateTimeOffset? asOf = null, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("Not used.");
 

@@ -12,7 +12,7 @@ public class FxRateRecurringJobTests
     [Test]
     public void Register_AddsTheHourlyUtcJob()
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
         builder.Services.AddHangfire(configuration => configuration.UseInMemoryStorage());
         using var host = builder.Build();
 

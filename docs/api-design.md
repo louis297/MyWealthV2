@@ -329,6 +329,7 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Advisers | `/users/advisers` | same | `advisers.manage` |
 | Customers | `/users/customers` | same; sub-resource `…/{customerId}/tax-profile` GET / PUT (features/interest-run.md) | `customers.manage` or `customers.manage-own` |
 | Currencies | `/currencies` | GET | Authenticated |
+| FX rates | `/fx-rates` | GET (the stored rates of one directed pair; platform data). See features/market-data-history.md | Authenticated |
 | Tenants | `/tenants` | list / get / create / update / disable / enable | `tenants.manage` |
 | Client money accounts | `/tenants/{tenantId}/client-money-accounts` | list / get / create / disable / enable. See features/client-money-accounts.md; `bankConnection`, `bankFeed` in features/deposit-matching.md | `tenants.manage` |
 | Bank connections | `/bank-connections` | list (names and adapters from configuration). See features/deposit-matching.md | `tenants.manage` |
@@ -340,7 +341,7 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Nominated bank accounts | `/nominated-bank-accounts` | list / get / create; verify / reject / remove. No PUT. See features/withdrawals.md | `nominated-bank-accounts.read` / `.manage` / `.verify` |
 | Withdrawals | `/withdrawals` | list / get / create (`Idempotency-Key`); approve / reject / cancel. See features/withdrawals.md | `withdrawals.read` / `.request` / `.approve` |
 | Bank reconciliations | `/bank-reconciliations` | overview / list / get / create (run now). No PUT or DELETE: a run never changes. See features/bank-reconciliation.md | `bank-reconciliations.manage` |
-| Instruments | `/instruments` | list / get / create / update / disable / enable | `instruments.read` / `instruments.create` / `instruments.manage` |
+| Instruments | `/instruments` | list / get / create / update / disable / enable; `GET …/prices` (features/market-data-history.md) | `instruments.read` / `instruments.create` / `instruments.manage` |
 | Accounts | `/accounts` | list / get / create / update / close / reopen; `GET …/cash-balance`; `GET …/deposit-instructions` (features/client-money-accounts.md); sub-resource `…/closures`: request (`Idempotency-Key`) / list / get (features/account-closure.md); `GET …/interest-accruals` (features/interest-run.md) | `accounts.read` / `accounts.create` / `accounts.manage`; closures `account-closures.read` / `.request` |
 | Transactions | `/transactions` | list / get / create / reverse | `transactions.read` / `transactions.create` |
 | Net worth | `/net-worth`, `/users/customers/{id}/net-worth` | GET. See features/net-worth.md; `breakdowns.byCustodyMode` in features/custody-mode-grouping.md | `accounts.read` |
@@ -482,6 +483,7 @@ Field rules: [features/instruments.md](features/instruments.md).
 - Item includes `id`, `tenantId`, `symbol`, `name`, `quoteCurrency`, `isActive`, `rowVersion`. No price.
 - Amendment 2026-11-22 (simulated instruments, accepted; field rules in [features/simulated-instruments.md](features/simulated-instruments.md) R6): the item gains `marketDataConnection`, the name of the market data connection whose symbol suffix the symbol ends with, or `null`. Worked out from the symbol and the configuration; no filter on it. Still no price.
 - Create on a disabled tenant → §4.1 `target=tenant`.
+- Amendment 2026-11-25 (market data history, accepted; field rules in [features/market-data-history.md](features/market-data-history.md) R19, R21–R23): `GET /instruments/{id}/prices` (`instruments.read`) → 200 envelope of `{ date, price, currency, source, fetchedAt }`, newest first. Optional `from` and `to` (`yyyy-MM-dd`, inclusive) and paging. The instrument is found as `GET /instruments/{id}` finds it (other Tenant or missing → 404; SystemAdmin any Tenant). An inactive instrument is readable. `?to={date}&pageSize=1` answers the row a price read as of that date chooses. The instrument item still carries no price.
 
 ### 7.6 Accounts
 
@@ -732,6 +734,16 @@ Amendment 2026-11-25 (adjustment review, accepted; field rules in [features/adju
 
 The request body is the body `POST /transactions/adjustment` took. Approve posts the `Adjustment` in the same database transaction and may answer any 400 of the adjustment itself; the request then stays `Requested`. Approve or reject by the requester → 400 `errors.Status`. Actions take `rowVersion` (409 `stale_row_version`) and no `Idempotency-Key`. No new problem code. Cross-tenant or wrong-collection id → 404.
 
+### 7.16 FX rates
+
+Amendment 2026-11-25 (market data history, accepted; field rules in [features/market-data-history.md](features/market-data-history.md) R20–R22):
+
+| Method | Route | Policy | Success |
+| --- | --- | --- | --- |
+| GET | `/fx-rates?base={code}&quote={code}` | Authenticated | 200 envelope of `{ date, base, quote, rate, source, fetchedAt }`, newest first |
+
+Rates are platform reference data with no Tenant, read by any authenticated caller as `GET /currencies`. `base` and `quote` are required catalog codes (active or not), compared without regard to case; otherwise 400 `errors.Base` / `errors.Quote`; the same code twice → 400 `errors.Quote`. The directed pair only: the inverse pair is not used. Optional `from` and `to` (`yyyy-MM-dd`, inclusive; not a date or `from` after `to` → 400 `errors.From` / `errors.To`) and paging. No rows is an empty page. No write route.
+
 ---
 
 ## 8. Explicitly out (until a later phase promotes them)
@@ -822,3 +834,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-24 | §3.1, §6, §7.3, §7.7, §7.14: in-kind transfers accepted. Permissions `in-kind-transfers.read`, `.request`, `.approve`, `custody-movements.manage`, `custodian-reconciliations.manage`; resources `/in-kind-transfers`, `/custody-movements`, `/custodian-reconciliations`, `/tenants/{tenantId}/safekeeping-accounts`, `GET /custodian-connections`; source kind `InKindTransfer`; transaction item `inKindTransfer`; holding item `unsettledQuantity`, `transferableQuantity`. |
 | 2026-11-24 | §6, §7.6, §7.7, §7.11: dividends accepted. Kind `Dividend` on `/corporate-actions` with `dividend`, `payment`, `election` on the item and the `kind` filter; `POST /corporate-actions/{id}/pay-in-cash`; `corporateActionId` on `POST /statement-lines/{id}/match` and the statement line item; `PUT /accounts/{accountId}/dividend-reinvestment`, `reinvestDividends` and `pendingDividends` on the account item; transaction item `dividend`, cash leg role `Reinvestment`, tax kind `ForeignWithholding`; reconciliation item kinds `DividendsNotPosted`, `DividendDifference`. No new permission or problem code |
 | 2026-11-25 | §3.1, §6, §7.7, §7.15: adjustment review accepted. Resource `/adjustment-requests` (list, get, request, approve, reject, cancel) with `transactions.adjust`; `POST /transactions/adjustment` removed; source kind `AdjustmentRequest`; reverse of an `Adjustment` → 400 for every caller. No new permission or problem code. |
+| 2026-11-25 | §6, §7.5, §7.16: market data history accepted. `GET /instruments/{id}/prices` (`instruments.read`) and `GET /fx-rates` (authenticated): stored rows newest first, with `from`, `to` and paging. No new permission or problem code. |

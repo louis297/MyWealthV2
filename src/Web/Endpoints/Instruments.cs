@@ -6,6 +6,7 @@ using MyWealthV2.Application.Instruments.Commands.DisableInstrument;
 using MyWealthV2.Application.Instruments.Commands.EnableInstrument;
 using MyWealthV2.Application.Instruments.Commands.UpdateInstrument;
 using MyWealthV2.Application.Instruments.Queries.GetInstrumentById;
+using MyWealthV2.Application.Instruments.Queries.GetInstrumentPrices;
 using MyWealthV2.Application.Instruments.Queries.GetInstruments;
 using Microsoft.AspNetCore.Http.HttpResults;
 
@@ -19,6 +20,7 @@ public class Instruments : IEndpointGroup
     {
         groupBuilder.MapGet(GetInstruments).RequireAuthorization(Policies.InstrumentsRead);
         groupBuilder.MapGet(GetInstrument, "{id}").RequireAuthorization(Policies.InstrumentsRead);
+        groupBuilder.MapGet(GetInstrumentPrices, "{id}/prices").RequireAuthorization(Policies.InstrumentsRead);
         groupBuilder.MapPost(CreateInstrument).RequireAuthorization(Policies.InstrumentsCreate);
         groupBuilder.MapPut(UpdateInstrument, "{id}").RequireAuthorization(Policies.InstrumentsManage);
         groupBuilder.MapPost(DisableInstrument, "{id}/disable").RequireAuthorization(Policies.InstrumentsManage);
@@ -46,6 +48,17 @@ public class Instruments : IEndpointGroup
         var item = await sender.Send(new GetInstrumentByIdQuery(id));
         return TypedResults.Ok(item);
     }
+
+    [EndpointSummary("List the prices of an instrument")]
+    [EndpointDescription("The stored prices of one instrument, newest first. Optional from and to (yyyy-MM-dd, inclusive); to with pageSize=1 answers the price a read as of that date chooses.")]
+    public static async Task<Ok<PagedList<InstrumentPriceDto>>> GetInstrumentPrices(
+        ISender sender,
+        Guid id,
+        string? from = null,
+        string? to = null,
+        int page = 1,
+        int pageSize = 20) =>
+        TypedResults.Ok(await sender.Send(new GetInstrumentPricesQuery(id, from, to, page, pageSize)));
 
     [EndpointSummary("Create an instrument")]
     [EndpointDescription("Creates an instrument in the current tenant, or in a chosen tenant for SystemAdmin.")]

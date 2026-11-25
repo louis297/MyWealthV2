@@ -1,6 +1,6 @@
 ---
 title: Market data history
-status: review
+status: accepted
 phase: 3
 language: en
 owner: ""
@@ -33,7 +33,16 @@ Step 1 of [valuation-roadmap.md](../valuation-roadmap.md) §8. It covers roadmap
 
 New: configuration `MarketDataHistory:FloorDate` and `Eodhd:HistoryDays` on `worker`; a range read on each source port; `worker` job `fx-rate-history-sync`; the Domain rule `MarketDataRow.IsFinal`; read ports `IMarketData.TryGetPriceDetail` / `ListPricesAsync` and `IFxRate.ListRatesAsync`; routes `GET /instruments/{id}/prices` and `GET /fx-rates`. No script, table, permission, problem code, domain event or `TransactionType`. No simulator change.
 
-**Status is `review` (2026-11-25).** It is not a build contract. The ten points of §11 are recommendations that wait for an answer.
+**Status is `accepted` (2026-11-25), landed 2026-11-25.** The ten points of §11 were confirmed as recommended.
+
+Notes from landing:
+
+- R4–R6: the stores take "today" from the UTC date of the write's `fetchedAt`. Every job passes the current time. `FxRateStore` reads only the rows of the batch's bases and dates, not the whole table.
+- R7, R8: `IInstrumentPriceSource.GetBarsAsync` replaces `GetLatestAsync`. `EodhdClient` returns every dated bar when asked with `from`, and the latest one without it. A bar without a readable `close` comes back with no close, and the job skips it.
+- R9, R11: a source failure still ends the run and is logged (instrument-prices R8). The symbol groups written before it stay, because each group is its own write.
+- R12, R15: `FxRateHistorySyncJob` (Application) throws `FxRateHistorySyncFailedException` naming the failed bases. Hangfire runs it through `FxRateHistoryHangfireJob` (Infrastructure), which carries the no-retry attribute.
+- R19: `InstrumentVisibility.Readable` is the one lookup that both `GET /instruments/{id}` and the prices route use.
+- R21: `from` and `to` bind as text and the validator parses them as `yyyy-MM-dd`, so a bad date answers `errors.From` / `errors.To` rather than a binding error.
 
 ---
 
@@ -220,7 +229,7 @@ Update [database-design.md](../database-design.md) when this spec is accepted (a
 | --- | --- | --- |
 | Port | `IInstrumentPriceSource` | `GetBarsAsync(symbol, quoteCurrency, from?)` → the bars with their dates, or the rejection of today. Replaces `GetLatestAsync`; with no `from` it returns the latest bar only |
 | Port | `IFxRateSource` | Adds `GetRangeAsync(base, quotes, from, to)` |
-| Port | `IInstrumentPriceStore`, `IFxRateStore` | The write takes today's date and applies R4 and R5 |
+| Port | `IInstrumentPriceStore`, `IFxRateStore` | The write applies R4 and R5 against the UTC date of its `fetchedAt`, the time of the write: every job passes the current time, so that date is today |
 | Port | `IMarketData` | Adds `TryGetPriceDetail` and `ListPricesAsync` (R17, R18) |
 | Port | `IFxRate` | Adds `ListRatesAsync` (R18) |
 | Job | `InstrumentPriceSyncJob` (existing) | R8–R11 |
@@ -321,8 +330,8 @@ None in this slice. No Adviser Portal, Customer Portal or Back Office page shows
 | Project | Assert |
 | --- | --- |
 | Domain.UnitTests | `MarketDataRow.IsFinal`: today and yesterday are not final; two days ago is. `MarketDataHistoryWindow`: the later of the floor date and today minus the days; no days → the floor date; `Contains` at both edges |
-| Application.UnitTests | `InstrumentPriceSyncJob` with a fake source and store: with a floor date it asks from the window's first date and passes every bar on or after it; a bar before the window is dropped; a bar with no close or a close of 0 is skipped; with no floor date it asks for the latest bar as today; a served instrument is never asked; the same symbol in two Tenants gets every bar in both. `FxRateHistorySyncJob`: one range call per active base, from the floor date to yesterday; the records of R14 are skipped; a failed base stores nothing and the others are stored; no floor date → no call. The selection of `TryGetPriceDetail` (latest on or before, with its date and source; none → empty) |
-| Infrastructure.IntegrationTests | The two stores against the database: a missing past date is inserted; a final row keeps its `Price` / `Rate`, `Source` and `FetchedAt` when the source sends another value; yesterday's and today's rows are updated. `EodhdClient` against the stored answer of §1.1: `from` is in the query string; every bar is returned with `close`, never `adjusted_close` (499.23 and 129.04 across the split); an empty array and a 404 are a rejection. `FrankfurterClient` against the stored answer of §1.1: `from` and `to` in the query string; the weekend dates are returned. Start-up check: a floor date that is not a date or is in the future, and `HistoryDays` of 0 or 36501, stop the host; no floor date starts. `fx-rate-history-sync` is registered on queue `fx` with cron `30 11 * * *`. `ListPricesAsync` and `ListRatesAsync`: range, order, paging, the directed pair only |
+| Application.UnitTests | `InstrumentPriceSyncJob` with a fake source and store: with a floor date it asks from the window's first date and passes every bar on or after it; a bar before the window is dropped; a bar with no close or a close of 0 is skipped; with no floor date it asks for the latest bar as today; a served instrument is never asked; the same symbol in two Tenants gets every bar in both. `FxRateHistorySyncJob`: one range call per active base, from the floor date to yesterday; the records of R14 are skipped; a failed base stores nothing and the others are stored; no floor date → no call |
+| Infrastructure.IntegrationTests | The two stores against the database: a missing past date is inserted; a final row keeps its `Price` / `Rate`, `Source` and `FetchedAt` when the source sends another value; yesterday's and today's rows are updated. `EodhdClient` against the stored answer of §1.1: `from` is in the query string; every bar is returned with `close`, never `adjusted_close` (499.23 and 129.04 across the split); an empty array and a 404 are a rejection. `FrankfurterClient` against the stored answer of §1.1: `from` and `to` in the query string; the weekend dates are returned. Start-up check: a floor date that is not a date or is in the future, and `HistoryDays` of 0 or 36501, stop the host; no floor date starts. `fx-rate-history-sync` is registered on queue `fx` with cron `30 11 * * *`. The selection of `TryGetPriceDetail` (latest on or before, with its date and source; none → empty; a SQL query of the store, so tested against the database). `ListPricesAsync` and `ListRatesAsync`: range, order, paging, the directed pair only |
 | Application.FunctionalTests | `GET /instruments/{id}/prices`: no Bearer → 401 not 302; Customer → 403; TenantAdmin and Adviser read their instrument, newest first; `from`, `to` and both; `to` with `pageSize=1` answers the row of the latest date on or before it (the weekend and holiday of §1.1); a date before the first row → empty page; an inactive instrument is readable; each 400 of R21; SystemAdmin reads an instrument of any Tenant. `GET /fx-rates`: no Bearer → 401; TenantAdmin, Adviser, Customer and SystemAdmin → 200; the pair is directed (NZD → USD does not answer USD → NZD rows); each 400 of R20 and R21 |
 | Application.FunctionalTests — isolation | Two-tenant fixture: a TenantAdmin and an Adviser of Tenant A with the id of Tenant B's instrument → 404, also when both Tenants list the same symbol |
 
@@ -348,7 +357,7 @@ No new ADR. ADR 0019 keeps its decision (Frankfurter, a local table, the read pa
 
 ### Points to confirm
 
-Each point states the recommendation, written into the rules above, and the alternative.
+Each point was confirmed as recommended (2026-11-25) and is written into the rules above as stated here. The alternatives are kept for the record.
 
 1. **The floor date is a setting on `worker`, and no setting means no history** (R1). Recommended: a deployment chooses its own date, tests and the TestAppHost keep today's behaviour unless they opt in, and the date can move. Development and the VPS use 2026-01-01, the seed's date. Alternative: a required setting; a date fixed in code.
 2. **No marker of what is already stored; every daily run asks for the whole window and inserts what is missing** (R8, R10, R13). Recommended: no table, a missed day repairs itself, and a new instrument or currency needs no special step. The cost is a larger answer each day: about 250 bars per symbol and 365 records per pair for each year since the floor date. Alternative: a stored mark per instrument and per pair of the dates already covered, which keeps each request small and adds two tables.

@@ -17,7 +17,7 @@ public class MarketDataConnectionsConfigurationTests
     [TestCase(MarketDataHost.Worker)]
     public void NoConnections_IsValid_AndServesNothing(MarketDataHost host)
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
 
         builder.AddMarketDataConnections(host);
 
@@ -207,7 +207,7 @@ public class MarketDataConnectionsConfigurationTests
 
     private static HostApplicationBuilder Builder(Dictionary<string, string?> values)
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
         builder.Configuration.AddInMemoryCollection(values);
         return builder;
     }

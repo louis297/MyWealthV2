@@ -232,3 +232,13 @@ The repository should build after each commit. Agents split each line into red t
 ## Amendment 2026-11-14 (UTC instants)
 
 Accepted with [utc-instants](../fixes/utc-instants.md). `GetRate` and `GetRateDetail` read the UTC date of `asOf`, not the date in its own offset.
+
+## Amendment 2026-11-25 (market data history) — accepted
+
+Status of this amendment: `accepted` (2026-11-25), together with [market-data-history.md](market-data-history.md). Rules R1, R2, R4–R6, R12–R16, R18 and R20–R22 live there; this section records what changes here.
+
+- **§2 Out, "Historical back-fill".** Replaced. A second `worker` job, `fx-rate-history-sync` on queue `fx`, daily at 11:30 UTC with no automatic retries, asks Frankfurter once per active base for the range from `MarketDataHistory:FloorDate` to yesterday (`/v2/rates?base=X&quotes=…&from=…&to=…`) and stores every record. Frankfurter answers a rate for every calendar day, so weekends have rows of their own. With no floor date set the job ends at once.
+- **R5.** A row whose `AsOfDate` is two or more days before the platform's UTC date is **final**: it is never updated or deleted, and a missing one may still be inserted. A row dated today or yesterday is updated as R5 said. This holds for `fx-rate-sync` and `fx-rate-history-sync`.
+- **R14.** Replaced. `GET /fx-rates?base=&quote=` (any authenticated caller) lists the stored rates of one directed pair, newest first, with `from`, `to` and paging.
+- **§5, `IFxRate`.** Adds `ListRatesAsync(base, quote, from?, to?, page, pageSize)`: the stored rows of the directed pair, newest first, with the total count. It does not use the inverse pair.
+- The hourly `fx-rate-sync` keeps its schedule, its skip rule and its request.
