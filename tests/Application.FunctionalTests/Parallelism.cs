@@ -9,4 +9,4 @@
 // Each worker can hold one extra database and pair of test hosts. On a 36-core developer machine
 // the full suite took 3m14s with 4 workers, 2m00s with 8 and 1m45s with 12, after which the longest
 // fixture sets the pace. Pass `-- NUnit.NumberOfTestWorkers=12` to dotnet test to use more locally.
-[assembly: LevelOfParallelism(12)]
+[assembly: LevelOfParallelism(16)]
