@@ -10,6 +10,7 @@ namespace MyWealthV2.Application.FunctionalTests.Rebalances;
 
 /// <summary>Rebalances R19, R20, R24 (docs/features/rebalances.md §10, cancel): a person cancels a rebalance; what is
 /// not filled is cancelled and what was filled stays. A rebalance order is not cancelled by itself.</summary>
+[Parallelizable]
 public class CancelRebalanceTests : TestBase
 {
     [Test]

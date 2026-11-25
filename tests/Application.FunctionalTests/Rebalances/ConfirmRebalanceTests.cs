@@ -10,6 +10,7 @@ namespace MyWealthV2.Application.FunctionalTests.Rebalances;
 
 /// <summary>Rebalances R13–R15 (docs/features/rebalances.md §10, confirm): a person confirms a proposal and the
 /// first wave of ordinary orders is placed, the sells first.</summary>
+[Parallelizable]
 public class ConfirmRebalanceTests : TestBase
 {
     [Test]

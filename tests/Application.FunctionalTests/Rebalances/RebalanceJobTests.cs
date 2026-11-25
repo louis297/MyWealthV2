@@ -11,6 +11,7 @@ namespace MyWealthV2.Application.FunctionalTests.Rebalances;
 
 /// <summary>Rebalances R12 (docs/features/rebalances.md §10, the job): a weight change and a bulk request propose per
 /// account, with the handle as the rebalance's id; a rebalance in progress gets a follow-up when it ends.</summary>
+[Parallelizable]
 public class RebalanceJobTests : TestBase
 {
     [Test]

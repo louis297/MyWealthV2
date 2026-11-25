@@ -9,6 +9,7 @@ namespace MyWealthV2.Application.FunctionalTests.Rebalances;
 /// <summary>Rebalances R26 (docs/features/rebalances.md §10, reconciliation): a rebalance order gets a settlement
 /// account like any order, so its fills settle through the trust account and leave the known difference
 /// <c>Trades</c>.</summary>
+[Parallelizable]
 public class RebalanceReconciliationTests : TestBase
 {
     [Test]

@@ -6,6 +6,7 @@ namespace MyWealthV2.Application.FunctionalTests.Rebalances;
 
 /// <summary>Rebalances R27 (docs/features/rebalances.md §10): the order item carries its rebalance, and the list
 /// filters by it.</summary>
+[Parallelizable]
 public class OrderRebalanceIdTests : TestBase
 {
     [Test]

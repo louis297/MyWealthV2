@@ -10,6 +10,7 @@ namespace MyWealthV2.Application.FunctionalTests.Rebalances;
 /// <summary>Rebalances R10, R22–R25 (docs/features/rebalances.md §10, assignment): assign proposes; unassign,
 /// disable and assigning another portfolio deal with the open rebalance; the assignment item shows the newest
 /// rebalance.</summary>
+[Parallelizable]
 public class AssignmentRebalanceTests : TestBase
 {
     [Test]

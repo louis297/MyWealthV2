@@ -15,6 +15,7 @@ namespace MyWealthV2.Application.FunctionalTests.Rebalances;
 
 /// <summary>Rebalances R14–R18, R21, R26 (docs/features/rebalances.md §10, waves): the advance step of the broker
 /// job places the buys when the sells are in the ledger, one top-up, and ends the rebalance.</summary>
+[Parallelizable]
 public class AdvanceRebalanceTests : TestBase
 {
     [Test]
