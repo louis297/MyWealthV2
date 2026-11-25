@@ -36,7 +36,7 @@ How to use this document:
 
 - It is a `note`, not a build contract. Each item in §5 needs its own discussion and Feature Spec before any work starts. Do not create tables, routes or handlers from this file.
 - Names in this file are working names. They become glossary terms only when a spec adopts them.
-- Every decision in §7 is open. Each has a recommendation; none was confirmed in discussion.
+- The decisions in §7 were confirmed in discussion on 2026-11-25, every one as recommended. The first spec that needs one writes it as a rule.
 - The order in §8 is a recommendation. Change it here when a decision changes it. When an item gets a spec, or lands, update its row in §8.
 
 ---
@@ -117,7 +117,7 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 - **Why first:** every later item reads a price as of a past day. Today that read returns nothing for a day before the first job run, and the price of the wrong day after a missed run.
 - **Changes:** the EODHD source returns every bar from the floor date instead of the latest one (the response already holds them, so no extra call is spent); the price job stores them and so repairs a missed day; the Frankfurter source gets a call for a date range; a new instrument or currency is back-filled on its first run; a back-fill never replaces a row written by another source; a price read that also returns the row's date, as `GetRateDetail` does for a rate; `GET` routes for stored prices and rates, which the worked examples need.
 - **Depends on:** nothing.
-- **Also decide:** the floor date (Q3); whether the unadjusted `close` is what EODHD sends (H4; check a real response across a known split); how far back the EODHD plan in use goes; whether a served (simulated) instrument gets any back-fill (recommended: no, its history is what the seed and the polls wrote, because the simulator's day is not the platform's day); who may call the read routes.
+- **Also decide:** the value of the floor date (Q3); whether the unadjusted `close` is what EODHD sends (H4; check a real response across a known split); how far back the EODHD plan in use goes; whether a served (simulated) instrument gets any back-fill (recommended: no, its history is what the seed and the polls wrote, because the simulator's day is not the platform's day); who may call the read routes.
 - **Amends:** instrument-prices (Out, R5, R12, §11), fx-rates (Out, R14), ADR 0019 (consequences).
 - **Worked example:** one US instrument across a real split, one instrument over a weekend and a market holiday, one currency pair over the same days.
 
@@ -167,9 +167,9 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 
 ## 7. Decisions
 
-All open. The recommendation is what the items in §5 assume.
+Every question is **decided** (2026-11-25), as recommended. The answer is what the items in §5 assume; the first spec that needs one writes it as a rule and may refine it.
 
-| # | Question | Recommendation | First needed by |
+| # | Question | Answer | First needed by |
 | --- | --- | --- | --- |
 | Q1 | Is a valuation day a UTC date or the Tenant's local date? | UTC date (H2). A price row is already dated by its market, so only the cut of the position depends on this | V2 |
 | Q2 | Which price values a holding? | The unadjusted close of the latest source date on or before the day (H4) | V1 |
