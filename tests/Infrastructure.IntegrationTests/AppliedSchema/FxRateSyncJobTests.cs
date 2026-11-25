@@ -127,6 +127,14 @@ public class FxRateSyncJobTests
 
     private sealed class CountingSource : IFxRateSource
     {
+        public Task<IReadOnlyList<FxRateQuote>> GetRangeAsync(
+            string baseCurrency,
+            IReadOnlyList<string> quotes,
+            DateOnly from,
+            DateOnly to,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("The hourly job never asks for a range.");
+
         public List<(string Base, IReadOnlyList<string> Quotes)> Calls { get; } = [];
 
         public Task<IReadOnlyList<FxRateQuote>> GetLatestAsync(
@@ -152,6 +160,14 @@ public class FxRateSyncJobTests
 
     private sealed class RecordingSource(DateOnly asOf) : IFxRateSource
     {
+        public Task<IReadOnlyList<FxRateQuote>> GetRangeAsync(
+            string baseCurrency,
+            IReadOnlyList<string> quotes,
+            DateOnly from,
+            DateOnly to,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("The hourly job never asks for a range.");
+
         public List<(string Base, IReadOnlyList<string> Quotes)> Calls { get; } = [];
 
         public Task<IReadOnlyList<FxRateQuote>> GetLatestAsync(
@@ -178,6 +194,14 @@ public class FxRateSyncJobTests
 
     private sealed class ThrowingSource : IFxRateSource
     {
+        public Task<IReadOnlyList<FxRateQuote>> GetRangeAsync(
+            string baseCurrency,
+            IReadOnlyList<string> quotes,
+            DateOnly from,
+            DateOnly to,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("The hourly job never asks for a range.");
+
         public Task<IReadOnlyList<FxRateQuote>> GetLatestAsync(
             string baseCurrency,
             IReadOnlyList<string> quotes,

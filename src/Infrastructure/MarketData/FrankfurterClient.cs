@@ -22,6 +22,14 @@ public sealed class FrankfurterClient(HttpClient http) : IFxRateSource
             .ToList();
     }
 
+    public Task<IReadOnlyList<FxRateQuote>> GetRangeAsync(
+        string baseCurrency,
+        IReadOnlyList<string> quotes,
+        DateOnly from,
+        DateOnly to,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<FxRateQuote>>([]);
+
     private sealed record FrankfurterRate(
         [property: JsonPropertyName("date")] DateOnly Date,
         [property: JsonPropertyName("base")] string Base,
