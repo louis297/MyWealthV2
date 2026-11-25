@@ -183,7 +183,7 @@ public class CustodianSchemaTests
     }
 
     [Test]
-    public async Task SourceKind10_NeedsASourcePublicId_And11Violates()
+    public async Task SourceKind10_NeedsASourcePublicId_And12Violates()
     {
         (await RunAsync($"""
             {World()}
@@ -198,12 +198,12 @@ public class CustodianSchemaTests
         noId.Number.ShouldBe(547);
         noId.Message.ShouldContain("CK_Transactions_SourcePublicId");
 
-        var eleven = await Should.ThrowAsync<SqlException>(() => RunAsync($"""
+        var twelve = await Should.ThrowAsync<SqlException>(() => RunAsync($"""
             {World()}
-            {InsertTransaction(11, "NEWID()")}
+            {InsertTransaction(12, "NEWID()")}
             """));
-        eleven.Number.ShouldBe(547);
-        eleven.Message.ShouldContain("CK_Transactions_SourceKind");
+        twelve.Number.ShouldBe(547);
+        twelve.Message.ShouldContain("CK_Transactions_SourceKind");
     }
 
     [Test]

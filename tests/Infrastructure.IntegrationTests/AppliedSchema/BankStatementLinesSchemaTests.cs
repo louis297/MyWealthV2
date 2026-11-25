@@ -101,7 +101,7 @@ public class BankStatementLinesSchemaTests
     }
 
     [Test]
-    public async Task Transaction_SourceKind3_NeedsASourcePublicId_AndKind11IsRejected()
+    public async Task Transaction_SourceKind3_NeedsASourcePublicId_AndKind12IsRejected()
     {
         (await RunAsync($"""
             {World()}
@@ -116,10 +116,10 @@ public class BankStatementLinesSchemaTests
         withoutId.Number.ShouldBe(547);
         withoutId.Message.ShouldContain("CK_Transactions_SourcePublicId");
 
-        // In-kind transfers widened the check to InKindTransfer (10); 11 is still outside it.
+        // Adjustment review widened the check to AdjustmentRequest (11); 12 is still outside it.
         var kind9 = await Should.ThrowAsync<SqlException>(() => RunAsync($"""
             {World()}
-            {InsertTransaction(11, "NEWID()")}
+            {InsertTransaction(12, "NEWID()")}
             """));
         kind9.Number.ShouldBe(547);
         kind9.Message.ShouldContain("CK_Transactions_SourceKind");

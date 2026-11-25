@@ -121,6 +121,9 @@ public sealed class TransactionSource : ValueObject
         return new TransactionSource(TransactionSourceKind.InKindTransfer, transferPublicId);
     }
 
+    /// <summary>An adjustment's posting: the PublicId of the approved adjustment request (adjustment-review R13).</summary>
+    public static TransactionSource AdjustmentRequest(Guid requestPublicId) => throw new NotImplementedException();
+
     /// <summary>The source as stored on a Transaction row.</summary>
     internal static TransactionSource FromStored(TransactionSourceKind kind, Guid? publicId) =>
         kind switch

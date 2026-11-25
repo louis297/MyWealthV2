@@ -40,5 +40,9 @@ public enum TransactionSourceKind
 
     /// <summary>An in-kind transfer's <c>StockIn</c> or <c>StockOut</c>; the source id is the transfer's PublicId
     /// (in-kind-transfers R37, R49).</summary>
-    InKindTransfer = 10
+    InKindTransfer = 10,
+
+    /// <summary>An <c>Adjustment</c> posted by the approval of an adjustment request; the source id is the request's
+    /// PublicId (adjustment-review R13).</summary>
+    AdjustmentRequest = 11
 }
