@@ -81,10 +81,10 @@ public class OrderReservationTests : TestBase
         var world = await OrderWorld.CreateAsync(funding: 2000.00m);
         await world.PlaceAsync("Buy", 10m);
 
-        var refused = await CustodialHttp.PostAsync(
-            world.TenantAdmin, AdjustmentWorld.Body(world.AccountId, amount: -944.76m), AdjustmentWorld.Path);
-        var allowed = await CustodialHttp.PostAsync(
-            world.TenantAdmin, AdjustmentWorld.Body(world.AccountId, amount: -944.75m), AdjustmentWorld.Path);
+        var refused = await AdjustmentWorld.PostAsync(
+            world.TenantAdmin, AdjustmentWorld.Body(world.AccountId, amount: -944.76m));
+        var allowed = await AdjustmentWorld.PostAsync(
+            world.TenantAdmin, AdjustmentWorld.Body(world.AccountId, amount: -944.75m));
 
         (await CustodialHttp.ErrorsAsync(refused))[""]
             .ShouldBe(["Available cash cannot become negative: 1055.25 USD is reserved for withdrawals and orders."]);
@@ -123,14 +123,12 @@ public class OrderReservationTests : TestBase
         await OrderHttp.InsertHoldingAsync(world.AccountId, world.InstrumentId, 100m);
         await world.PlaceAsync("Sell", 40m);
 
-        var refused = await CustodialHttp.PostAsync(
+        var refused = await AdjustmentWorld.PostAsync(
             world.TenantAdmin,
-            AdjustmentWorld.Body(world.AccountId, security: AdjustmentWorld.Holding(world.InstrumentId, -60.5m, -1512.5m)),
-            AdjustmentWorld.Path);
-        var allowed = await CustodialHttp.PostAsync(
+            AdjustmentWorld.Body(world.AccountId, security: AdjustmentWorld.Holding(world.InstrumentId, -60.5m, -1512.5m)));
+        var allowed = await AdjustmentWorld.PostAsync(
             world.TenantAdmin,
-            AdjustmentWorld.Body(world.AccountId, security: AdjustmentWorld.Holding(world.InstrumentId, -60m, -1500m)),
-            AdjustmentWorld.Path);
+            AdjustmentWorld.Body(world.AccountId, security: AdjustmentWorld.Holding(world.InstrumentId, -60m, -1500m)));
 
         (await CustodialHttp.ErrorsAsync(refused))["Security"].ShouldBe(["40 ACME is reserved for sell orders and transfers out."]);
         allowed.StatusCode.ShouldBe(HttpStatusCode.Created, await allowed.Content.ReadAsStringAsync());

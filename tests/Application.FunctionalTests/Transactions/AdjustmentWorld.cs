@@ -24,7 +24,8 @@ internal sealed record AdjustmentWorld(
     Guid ExternalAccountId,
     Guid InstrumentId)
 {
-    public const string Path = "/transactions/adjustment";
+    /// <summary>The route that takes an adjustment: a request, which a second person approves (adjustment-review R14).</summary>
+    public const string Path = "/adjustment-requests";
 
     public static async Task<AdjustmentWorld> CreateAsync(string code = "adjust-firm")
     {
@@ -79,11 +80,13 @@ internal sealed record AdjustmentWorld(
     public static object Holding(Guid instrumentId, decimal quantityChange, decimal costChange) =>
         new { instrumentId, quantityChange, costChange };
 
+    /// <summary>Requests the adjustment as <paramref name="accessToken"/> and has a second TenantAdmin approve it
+    /// (<see cref="AdjustmentRequests.AdjustmentRequestHttp.AdjustAsync"/>).</summary>
     public static Task<HttpResponseMessage> PostAsync(
         string accessToken,
         Dictionary<string, object?> body,
         Guid? idempotencyKey = null) =>
-        Custody.CustodialHttp.PostAsync(accessToken, body, Path, idempotencyKey);
+        AdjustmentRequests.AdjustmentRequestHttp.AdjustAsync(accessToken, body, idempotencyKey);
 
     public Task<HttpResponseMessage> AdjustAsync(Dictionary<string, object?> body, Guid? idempotencyKey = null) =>
         PostAsync(Admin, body, idempotencyKey);

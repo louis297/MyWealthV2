@@ -197,31 +197,24 @@ public class AdjustmentTests
     }
 
     [Test]
-    public void Reverse_OfAnAdjustment_HasOppositeLegsAndACopyOfTheDetail()
+    public void Reverse_OfAnAdjustment_Throws_WhateverItsSource()
     {
-        var original = Adjust(
-            amount: -0.60m,
-            currentCashSum: 10m,
-            reason: AdjustmentReason.ReconciliationBreak,
-            security: Holding(quantityChange: 2m, costChange: 0.60m, currentQuantity: 10m, currentCost: 251m));
-        original.Id = 9;
+        // Adjustment review R15: an adjustment is corrected by a request for the opposite change, never reversed.
+        foreach (var source in new[] { TestSources.Manual, TransactionSource.AdjustmentRequest(Guid.NewGuid()) })
+        {
+            var original = Transaction.PostAdjustment(
+                TenantId, AccountId, AccountType.Brokerage, "USD", AdjustmentReason.ReconciliationBreak, "Memo", null,
+                BookedAt, source, -0.60m, 10m,
+                Holding(quantityChange: 2m, costChange: 0.60m, currentQuantity: 10m, currentCost: 251m));
+            original.Id = 9;
 
-        var reversal = original.Reverse(
-            TestSources.Manual,
-            BookedAt.AddHours(1),
-            new Dictionary<int, decimal> { [AccountId] = 9.40m },
-            new Dictionary<(int AccountId, int InstrumentId), decimal> { [(AccountId, InstrumentId)] = 12m });
-
-        reversal.Type.ShouldBe(TransactionType.Reversal);
-        reversal.OriginalTransactionId.ShouldBe(9);
-        reversal.CashLegs.ShouldHaveSingleItem().Amount.ShouldBe(0.60m);
-        var leg = reversal.SecurityLegs.ShouldHaveSingleItem();
-        leg.Quantity.ShouldBe(-2m);
-        leg.CostAmount.ShouldBe(-0.60m);
-        reversal.AdjustmentDetail.ShouldNotBeNull();
-        reversal.AdjustmentDetail.Reason.ShouldBe(AdjustmentReason.ReconciliationBreak);
-        reversal.AdjustmentDetail.TenantId.ShouldBe(TenantId);
-        reversal.AdjustmentDetail.ShouldNotBeSameAs(original.AdjustmentDetail);
+            Should.Throw<DomainException>(() => original.Reverse(
+                    TestSources.Manual,
+                    BookedAt.AddHours(1),
+                    new Dictionary<int, decimal> { [AccountId] = 9.40m },
+                    new Dictionary<(int AccountId, int InstrumentId), decimal> { [(AccountId, InstrumentId)] = 12m }))
+                .Message.ShouldBe(Transaction.AdjustmentReverseMessage);
+        }
     }
 
     [Test]

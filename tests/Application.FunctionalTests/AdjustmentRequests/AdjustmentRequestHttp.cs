@@ -63,6 +63,58 @@ internal static class AdjustmentRequestHttp
         return await Send(HttpMethod.Post, $"{Path}/{id}/{action}", accessToken, body);
     }
 
+    /// <summary>
+    /// Posts an adjustment the only way there is (adjustment-review R14): <paramref name="requesterToken"/> requests it,
+    /// and a second TenantAdmin of the Account's tenant (added when there is none) approves it. A refusal of the request
+    /// or the approval is answered as it came; otherwise the answer is 201 with the posted Transaction's id and
+    /// <c>Location: /transactions/{id}</c>, as the old create route answered.
+    /// </summary>
+    public static async Task<HttpResponseMessage> AdjustAsync(string requesterToken, Dictionary<string, object?> body, Guid? key = null)
+    {
+        var requested = await PostAsync(requesterToken, body, key);
+        if (requested.StatusCode != HttpStatusCode.Created)
+        {
+            return requested;
+        }
+
+        var id = await CustodialHttp.ReadIdAsync(requested);
+        var approver = await ApproverTokenAsync(id);
+        var approved = await ActAsync(approver, id, "approve");
+        if (approved.StatusCode != HttpStatusCode.NoContent)
+        {
+            return approved;
+        }
+
+        var transactionId = (await GetAsync(approver, id)).GetProperty("transactionId").GetGuid();
+        var response = new HttpResponseMessage(HttpStatusCode.Created)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(new { id = transactionId }), System.Text.Encoding.UTF8, "application/json")
+        };
+        response.Headers.Location = new Uri($"/transactions/{transactionId}", UriKind.Relative);
+        return response;
+    }
+
+    /// <summary>Requests and approves an adjustment; answers the posted Transaction's id.</summary>
+    public static async Task<Guid> PostApprovedAsync(string requesterToken, Dictionary<string, object?> body)
+    {
+        var response = await AdjustAsync(requesterToken, body);
+        response.StatusCode.ShouldBe(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
+        return await CustodialHttp.ReadIdAsync(response);
+    }
+
+    /// <summary>A TenantAdmin of the request's tenant who did not request it, added when there is none.</summary>
+    private static async Task<string> ApproverTokenAsync(Guid requestId)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var request = await db.AdjustmentRequests.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.PublicId == requestId);
+        var email = $"ava-approver-{request.TenantId}@adjustments.example";
+        var approver = await db.DomainUsers.IgnoreQueryFilters().AsNoTracking()
+                           .SingleOrDefaultAsync(row => row.Email == email && row.TenantId == request.TenantId)
+                       ?? await TestApp.CreatePersonAsync(UserRole.TenantAdmin, "Ava Approver", email, "Password1!", request.TenantId);
+        return (await TestApp.IssueAccessTokenAsync(approver)).AccessToken;
+    }
+
     public static async Task<int> CountAsync(Guid accountId)
     {
         using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();

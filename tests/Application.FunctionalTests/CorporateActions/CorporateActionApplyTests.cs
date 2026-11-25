@@ -132,8 +132,8 @@ public class CorporateActionApplyTests : TestBase
     {
         var world = await NominatedWorld.CreateAsync();
         var holders = await HoldersAsync(world);
-        var adjust = await TransactionHttp.Send(HttpMethod.Post, AdjustmentWorld.Path, world.TenantAdmin.AccessToken,
-            AdjustmentWorld.Body(holders.Empty, security: AdjustmentWorld.Holding(holders.InstrumentId, 0.00005m, 0.01m)), Guid.NewGuid());
+        var adjust = await AdjustmentWorld.PostAsync(world.TenantAdmin.AccessToken,
+            AdjustmentWorld.Body(holders.Empty, security: AdjustmentWorld.Holding(holders.InstrumentId, 0.00005m, 0.01m)));
         adjust.StatusCode.ShouldBe(HttpStatusCode.Created, await adjust.Content.ReadAsStringAsync());
         var id = await ApplyNowAsync(world, CreateBody(holders.InstrumentId, "Consolidation", 1, 10000, Today));
 

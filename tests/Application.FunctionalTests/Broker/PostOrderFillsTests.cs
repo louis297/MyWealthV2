@@ -325,10 +325,9 @@ public class PostOrderFillsTests : TestBase
             .ShouldBe((OrderFillStatus.Pending, (FillHoldReason?)FillHoldReason.InsufficientHolding));
         waiting.ReservedQuantity.ShouldBe(30m);
 
-        var adjustment = await CustodialHttp.PostAsync(
+        var adjustment = await AdjustmentWorld.PostAsync(
             world.TenantAdmin,
-            AdjustmentWorld.Body(world.AccountId, security: AdjustmentWorld.Holding(world.InstrumentId, 10m, 250m), reason: "ReconciliationBreak"),
-            AdjustmentWorld.Path);
+            AdjustmentWorld.Body(world.AccountId, security: AdjustmentWorld.Holding(world.InstrumentId, 10m, 250m), reason: "ReconciliationBreak"));
         adjustment.StatusCode.ShouldBe(HttpStatusCode.Created, await adjustment.Content.ReadAsStringAsync());
 
         (await BrokerHttp.PostFillsAsync()).ShouldBe(new FillPostingOutcome(1, 0, 0));

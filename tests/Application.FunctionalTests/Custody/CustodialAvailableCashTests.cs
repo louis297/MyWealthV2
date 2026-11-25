@@ -46,9 +46,9 @@ public class CustodialAvailableCashTests : TestBase
     {
         var world = await ReservedWorldAsync();
 
-        (await ErrorsAsync(await PostAsync(world.TenantAdmin, Adjustment(world.AccountId, -700.01m), "/transactions/adjustment")))
+        (await ErrorsAsync(await Transactions.AdjustmentWorld.PostAsync(world.TenantAdmin, Adjustment(world.AccountId, -700.01m))))
             .Values.SelectMany(messages => messages).ShouldContain(Refusal);
-        (await PostAsync(world.TenantAdmin, Adjustment(world.AccountId, -700m), "/transactions/adjustment"))
+        (await Transactions.AdjustmentWorld.PostAsync(world.TenantAdmin, Adjustment(world.AccountId, -700m)))
             .StatusCode.ShouldBe(HttpStatusCode.Created);
     }
 

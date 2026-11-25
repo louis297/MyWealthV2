@@ -1263,6 +1263,10 @@ public class Transaction : BaseAuditableEntity
     public const string AdjustmentHoldingMessage =
         "The holding cannot have a negative quantity or cost, or a cost without a quantity.";
 
+    /// <summary>Adjustment review R15: an <c>Adjustment</c> is never reversed; the opposite request corrects it.</summary>
+    public const string AdjustmentReverseMessage =
+        "An adjustment cannot be reversed. Request a new adjustment that corrects it.";
+
     /// <summary>
     /// Builds an <c>Adjustment</c> on one Account (adjustments §5): an optional signed cash leg, an optional signed
     /// security leg stored as entered, at least one of them, and the adjustment detail.
