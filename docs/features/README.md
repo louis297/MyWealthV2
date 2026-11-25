@@ -157,6 +157,16 @@ Roadmap in [future-plans.md](../future-plans.md) §1. Each step amends the ledge
 
 ---
 
+## Business domain — historical valuation (opened 2026-11-25)
+
+Step 3 of the roadmap in [future-plans.md](../future-plans.md) §1. Its own plan is [valuation-roadmap.md](../valuation-roadmap.md) (`note`): four items, V1 to V4.
+
+| Spec | Status | Who | Ships | Why it stays its own slice |
+| --- | --- | --- | --- | --- |
+| [market-data-history](market-data-history.md) | review (2026-11-25) | Platform (`worker` jobs); TenantAdmin, Adviser and SystemAdmin (`instruments.read`: the prices of an instrument); any authenticated caller (rates) | Valuation roadmap step 1 (V1). `InstrumentPrices` and `FxRates` hold a row for every source date from a configured history floor date (`MarketDataHistory:FloorDate` on `worker`): the daily EODHD call per symbol stores every bar it gets, and a new daily job `fx-rate-history-sync` reads the rate range from Frankfurter. A row two or more days old is final and is never updated. The price is the unadjusted close. Read ports `IMarketData.TryGetPriceDetail`, `ListPricesAsync` and `IFxRate.ListRatesAsync`; routes `GET /instruments/{id}/prices` and `GET /fx-rates`. No script, permission or simulator change | Platform data with no Tenant, written by jobs from outside sources. Every later item of the roadmap reads it, and its rules (the floor date, final rows) can be checked against the sources before any valuation rule is written |
+
+---
+
 ## Ledger — custody modes (opened 2026-11-17)
 
 Decision in [ADR 0020](../adr/0020-account-custody-mode.md) (accepted 2026-11-17): every Account is `External` or `Custodial`. The work is cut into slices; the list is in [future-plans.md](../future-plans.md) §9. All five slices have a spec.
