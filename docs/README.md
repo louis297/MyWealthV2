@@ -3,7 +3,7 @@ title: Documentation
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # MyWealthV2 documentation
@@ -118,6 +118,21 @@ Use the same `status` on every doc front matter:
 | `accepted` | Agreed. Implementation follows this. |
 | `deprecated` | Superseded. Leave in place and link to the replacement. |
 | `note` | Discussion only. Not a slice contract. |
+
+---
+
+## Current design, not history
+
+A doc states the design as it is today. A reader must not have to merge a body with later sections to know what a rule is. History lives in git.
+
+- **Edit in place.** When a slice changes a rule that another doc owns, change that doc's body, in the change that sets the slice's spec to `accepted`. Do not append an "Amendment" section.
+- **Ids stay.** Rule ids (`R12`, `D17`) and section numbers do not move, because other docs cite them. An id is not reused. A rule that is gone keeps its row: `Removed 2026-11-25 (adjustment-review R15).`
+- **The slice names what it changed.** A Feature Spec that changes other docs lists them with the rules it touched ("Changes to other docs"). While the spec is `draft` or `review` that list is the plan; the other docs change when it is accepted. A reviewer reads the git diff.
+- **History table.** A doc that other slices change ends with a `History` section: one row per change, with the date, the spec that caused it and the rules touched. The row does not repeat the rule.
+- **When a slice lands.** Its spec loses the suggested commits. Its test section shrinks to where the tests live; the tests are the executable form of the rules. "Locked in this spec" keeps the decisions still in force and what is still open.
+- **Docs not folded yet.** Some docs still end with "Amendment" sections. For those, read the body and every amendment in date order. Folding one is a docs refactor: it changes no rule, and a disagreement with the code found on the way is reported, not fixed. The tag `docs-pre-consolidation` is the last commit before folding began.
+
+[features/custody-modes.md](features/custody-modes.md) is the example of a folded spec.
 
 ---
 

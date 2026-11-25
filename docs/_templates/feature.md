@@ -158,6 +158,8 @@ Still open, not this slice:
 
 ## 12. Suggested commits
 
+<!-- Removed when the slice lands. See "Current design, not history" in ../README.md. -->
+
 The repository should build after each commit. Agents split each line into red then green.
 
 1. 
