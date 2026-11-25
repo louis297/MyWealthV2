@@ -1367,6 +1367,11 @@ public class Transaction : BaseAuditableEntity
             throw new DomainException("A reversal cannot be reversed.");
         }
 
+        if (Type == TransactionType.Adjustment)
+        {
+            throw new DomainException(AdjustmentReverseMessage);
+        }
+
         if (ReversedByTransactionId is not null || ReversedBy is not null)
         {
             throw new DomainException("This transaction has already been reversed.");
@@ -1447,7 +1452,6 @@ public class Transaction : BaseAuditableEntity
             CashLegs = cashLegs,
             SecurityLegs = reversalLegs ?? [],
             FxDetail = FxDetail?.Copy(),
-            AdjustmentDetail = AdjustmentDetail?.Copy(),
             BankReceiptDetail = BankReceiptDetail?.Copy(),
             PaymentDetail = PaymentDetail?.Copy(),
             FeeDetails = cashLegs.Select(leg => leg.FeeDetail).OfType<TransactionFeeDetail>().ToList(),
