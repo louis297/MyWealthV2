@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Fx;
+using MyWealthV2.Domain.MarketData;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Entities;
 
@@ -53,25 +54,48 @@ public sealed class FxRateStore(ApplicationDbContext db, TimeProvider time) : IF
         DateTimeOffset fetchedAt,
         CancellationToken cancellationToken = default)
     {
-        var existing = await db.FxRates.ToListAsync(cancellationToken);
-        foreach (var quote in quotes)
+        if (quotes.Count == 0)
         {
-            var baseCurrency = quote.BaseCurrency.Trim().ToUpperInvariant();
-            var quoteCurrency = quote.QuoteCurrency.Trim().ToUpperInvariant();
-            var row = existing.SingleOrDefault(candidate =>
-                candidate.BaseCurrency.Trim() == baseCurrency
-                && candidate.QuoteCurrency.Trim() == quoteCurrency
-                && candidate.AsOfDate == quote.AsOfDate);
-            if (row is null)
+            return;
+        }
+
+        var normalized = quotes
+            .Select(quote => quote with
+            {
+                BaseCurrency = quote.BaseCurrency.Trim().ToUpperInvariant(),
+                QuoteCurrency = quote.QuoteCurrency.Trim().ToUpperInvariant()
+            })
+            .ToList();
+        var bases = normalized.Select(quote => quote.BaseCurrency).Distinct().ToList();
+        var first = normalized.Min(quote => quote.AsOfDate);
+        var last = normalized.Max(quote => quote.AsOfDate);
+        var existing = (await db.FxRates
+                .Where(row => bases.Contains(row.BaseCurrency) && row.AsOfDate >= first && row.AsOfDate <= last)
+                .ToListAsync(cancellationToken))
+            .ToDictionary(row => (row.BaseCurrency.Trim(), row.QuoteCurrency.Trim(), row.AsOfDate));
+
+        // Market data history R4–R6: a final row is never updated; a missing one may still be inserted.
+        var today = DateOnly.FromDateTime(fetchedAt.UtcDateTime);
+        foreach (var quote in normalized)
+        {
+            var key = (quote.BaseCurrency, quote.QuoteCurrency, quote.AsOfDate);
+            if (existing.TryGetValue(key, out var row))
+            {
+                if (MarketDataRow.IsFinal(quote.AsOfDate, today))
+                {
+                    continue;
+                }
+            }
+            else
             {
                 row = new FxRate
                 {
-                    BaseCurrency = baseCurrency,
-                    QuoteCurrency = quoteCurrency,
+                    BaseCurrency = quote.BaseCurrency,
+                    QuoteCurrency = quote.QuoteCurrency,
                     AsOfDate = quote.AsOfDate
                 };
                 db.FxRates.Add(row);
-                existing.Add(row);
+                existing.Add(key, row);
             }
 
             row.Rate = quote.Rate;

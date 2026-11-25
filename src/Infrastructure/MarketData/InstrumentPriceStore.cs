@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.MarketData;
+using MyWealthV2.Domain.MarketData;
 using MyWealthV2.Domain.ValueObjects;
 using MyWealthV2.Infrastructure.Data;
 using MyWealthV2.Infrastructure.Data.Entities;
@@ -59,6 +60,14 @@ public sealed class InstrumentPriceStore(ApplicationDbContext db, TimeProvider t
         var existing = await db.InstrumentPrices
             .Where(row => ids.Contains(row.InstrumentId))
             .ToListAsync(cancellationToken);
+
+        // Market data history R4–R6: a final row is never updated; a missing one may still be inserted.
+        var today = DateOnly.FromDateTime(fetchedAt.UtcDateTime);
+        var stored = existing.Select(row => (row.InstrumentId, row.AsOfDate)).ToHashSet();
+        quotes = quotes
+            .Where(quote => !stored.Contains((quote.InstrumentId, quote.AsOfDate))
+                            || !MarketDataRow.IsFinal(quote.AsOfDate, today))
+            .ToList();
         var rows = existing
             .Select(row => new InstrumentPriceRow(row.InstrumentId, row.Price, row.AsOfDate, row.FetchedAt))
             .ToList();
