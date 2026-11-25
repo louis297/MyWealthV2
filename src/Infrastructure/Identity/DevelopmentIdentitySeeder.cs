@@ -115,6 +115,20 @@ public static class DevelopmentIdentitySeeder
                 AdviserPassword,
                 tenant.Id,
                 cancellationToken);
+
+            // Adjustment review §9.1: a second TenantAdmin approves the adjustments the first one requests.
+            if (firm.SecondTenantAdminEmail is { } secondEmail)
+            {
+                await EnsurePersonAsync(
+                    db,
+                    userManager,
+                    UserRole.TenantAdmin,
+                    firm.SecondTenantAdminName!,
+                    secondEmail,
+                    TenantAdminPassword,
+                    tenant.Id,
+                    cancellationToken);
+            }
         }
     }
 
@@ -124,11 +138,14 @@ public static class DevelopmentIdentitySeeder
         string TenantAdminEmail,
         string TenantAdminName,
         string AdviserEmail,
-        string AdviserName);
+        string AdviserName,
+        string? SecondTenantAdminEmail = null,
+        string? SecondTenantAdminName = null);
 
     private static readonly DevelopmentFirm[] Firms =
     [
-        new(DemoTenantCode, DemoTenantName, TenantAdminEmail, "Tenant Admin", AdviserEmail, "Demo Adviser"),
+        new(DemoTenantCode, DemoTenantName, TenantAdminEmail, "Tenant Admin", AdviserEmail, "Demo Adviser",
+            DemoSecondTenantAdminEmail, "Tenant Admin B"),
         new(SecondTenantCode, SecondTenantName, SecondTenantAdminEmail, "Tenant Admin 2", SecondAdviserEmail, "Demo Adviser 2"),
     ];
 
