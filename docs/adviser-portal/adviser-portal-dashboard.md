@@ -4,7 +4,7 @@ status: accepted
 phase: 2
 language: en
 created: 2026-10-12
-updated: 2026-11-23
+updated: 2026-11-25
 related:
   - ../features/client-money-accounts.md
   - README.md
@@ -38,6 +38,7 @@ related:
   - ../features/migration-batches.md
   - ../features/in-kind-transfers.md
   - ../features/dividends.md
+  - ../features/adjustment-review.md
 ---
 
 # Adviser Portal — Dashboard and ledger pages
@@ -458,3 +459,21 @@ Status of this amendment: `accepted` (2026-11-24), together with [dividends](../
 
 The full wording is [dividends.md](../features/dividends.md) §9.
 - D18: the portal's copy of the matrix gives `Dividend` on a Custodial account the message of dividends R43.
+
+---
+
+## Amendment 2026-11-25 (adjustment review) — accepted
+
+Status of this amendment: `accepted` (2026-11-25), together with [adjustment-review](../features/adjustment-review.md). Field rules live there. Calls: `/adjustment-requests` (a new BFF prefix, bff-adviser-portal R20) and the existing `/transactions` and `/accounts` prefixes.
+
+| ID | Behaviour |
+| --- | --- |
+| D102 | The Adjust form (D29) posts `POST /adjustment-requests` in place of `POST /transactions/adjustment`, with one `Idempotency-Key` per form open. Review adds "Another firm administrator must approve this adjustment before it is posted." Confirm opens `/adjustments/:id`. Field 400s are shown as today. |
+| D103 | A TenantAdmin sees a nav item "Adjustments" (`/adjustments`), with the number of requests waiting for approval beside it. The page lists `GET /adjustment-requests`: Requested, Customer, Account, Reason, Cash, Holding ("AAPL quantity +10, cost +250.00 USD"), Status, Requested by. Status filter, default "Waiting for approval" (Requested); options Waiting for approval, Approved, Rejected, Cancelled, All. An Adviser gets "Only a firm administrator can see adjustments." |
+| D104 | `/adjustments/:id` shows every field, the memo with "The customer sees this memo", the decision with its note, and a link to the Transaction once approved. Actions on a `Requested` request: Approve and Reject, disabled for the requester with "Someone else must approve this adjustment."; Cancel. Reject asks for a note. A 400 from approve shows its sentence and leaves the request as it is; a 409 reloads with "This adjustment has changed." |
+| D105 | `/accounts/:id` of a Custodial account shows a TenantAdmin the account's open requests above the activity, each linking to `/adjustments/:id`. The Close account page (D54) shows the refusal of adjustment-review R17 with its other blockers. |
+| D106 | `/transactions/:id` of an `Adjustment` posted from a request: the Source line (D26) shows "Adjustment request", for a TenantAdmin with a link to the request. Reverse is never offered on an `Adjustment`. |
+
+- D26, D27: the Source line names "Adjustment request"; Reverse is not offered on any `Adjustment`, also one with source `Manual`.
+- D29: the form is unchanged except for what D102 says.
+- D31: removed. Nobody reverses an adjustment.

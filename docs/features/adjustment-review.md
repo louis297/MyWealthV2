@@ -1,6 +1,6 @@
 ---
 title: Adjustment review
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -32,7 +32,7 @@ A second person approves every adjustment on `webapi`. It is step 17 of [custodi
 
 One new record (the **adjustment request**, `/adjustment-requests`), one new source kind (`AdjustmentRequest`), one script (`0058_adjustment_requests.sql`). The route `POST /transactions/adjustment` goes away, and an `Adjustment` can no longer be reversed by hand. No new permission, `TransactionType`, problem code, job or event. No simulator change.
 
-**Status is `review` (2026-11-25).** It is not a build contract. The nine points of §11 are recommendations that wait for an answer.
+**Status is `accepted` (2026-11-25).** The nine points of §11 were confirmed as recommended. Not landed yet.
 
 ---
 
@@ -166,7 +166,7 @@ The checks on the cash balance and the holding stay in `PostAdjustment`. `Reques
 
 Domain events: none new. `TransactionPosted` is raised by the approval, as it was by the create route.
 
-Update [domain-model.md](../domain-model.md) when this spec is accepted.
+[domain-model.md](../domain-model.md) §8.6 and §8.21 were updated when this spec was accepted.
 
 ---
 
@@ -192,7 +192,7 @@ Checks on the row:
 
 Existing data: none changes. No back-fill (R13).
 
-Update [database-design.md](../database-design.md) when this spec is accepted.
+[database-design.md](../database-design.md) §9, §11.4 and §11.21 were updated when this spec was accepted.
 
 ---
 
@@ -299,7 +299,7 @@ No new problem code. Keep the resource catalog in [api-design.md](../api-design.
 
 ## 9. UI
 
-Page contract: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md), amended when this spec is accepted. The reason labels of adjustments §9 are unchanged.
+Page contract: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md), amended in the same change that accepted this spec. The reason labels of adjustments §9 are unchanged.
 
 **Adviser Portal**
 
@@ -356,19 +356,19 @@ No new ADR. Roadmap X1, target 2, principle P7 and decisions D3 and D5 gave the 
 | Reservation | None |
 | Script | `0058_adjustment_requests.sql`, forward only |
 
-### Points to confirm
+### Confirmed when this spec was accepted (2026-11-25)
 
-Each point has a recommendation, written into the rules above, and the alternative.
+Each point was confirmed as recommended and is written into the rules above as stated here. The alternatives are kept for the record.
 
-1. **The review is on a request, not a status on the Transaction** (R2, R9). Recommended: a record of its own, approved before anything is posted. Every balance, holding, reservation, report and reconciliation reads the ledger as "every row counts", and a pending row would have to be left out in each of them. Three flows already put the second person on their own record (withdrawals, migration batches, in-kind transfers). This amends posting §1 ("future maker-checker is a status on this same row … not a second resource") and roadmap D3 and X1. Alternative: the status on the row as posting §1 planned, which shows a pending adjustment in the account's activity and costs a change to every read of the ledger.
-2. **One permission** (R1, R8). Recommended: `transactions.adjust` for request and approval, with the rule that the approver is not the requester, as `migration-batches.manage` does. Both sides are TenantAdmin only (D5), so two permissions would have the same grants. Alternative: a second permission `adjustment-requests.approve` now, ready for an operations role.
-3. **Only a TenantAdmin requests** (R1). Recommended: as adjustments §11 point 2. A firm with one TenantAdmin keeps a second TenantAdmin login, as for a migration batch. Alternative: an Adviser may request and a TenantAdmin approves, as for a withdrawal, which gives a small firm its second person but lets an Adviser propose numbers on a Custodial account.
-4. **The source is `AdjustmentRequest` with the request's id** (R13). Recommended: every other record that posts has its own kind and id (`Migration`, `InKindTransfer`, `AccountClosure`), and the id is how a reader gets from the Transaction to who asked and who approved. This takes back adjustments §11 point 4 for new adjustments. Alternative: keep `Manual` and add the request to the adjustment detail.
-5. **No reservation** (R5). Recommended: a request is a correction, not money or shares on their way out, and the approval checks again under the lock. A request that can no longer be posted stays open until a person decides. Alternative: reserve a negative cash amount or quantity from the request on (roadmap P8), which keeps the approval from failing and holds a Customer's cash for a correction that may be rejected.
-6. **An adjustment is never reversed** (R15). Recommended: otherwise one person undoes what two approved. The opposite request corrects it, as an adjustment corrects every flow that has no reverse. Rows posted before this slice are covered too, so there is one rule. Alternative: a reverse that itself needs a second person (a request of a second kind), or keep the hand reverse with `transactions.adjust`.
-7. **Reject by a second person, cancel by anyone** (R8, R11). Recommended: as withdrawals and in-kind transfers. Alternative: one "decline" action for every holder.
-8. **Account closure waits for open requests** (R17). Recommended: an open request says the balance may be wrong, and the closure pays the balance out. Alternative: no rule; a request left on a closed account can only be rejected or cancelled.
-9. **A second TenantAdmin in the Development seed** (§9.1). Recommended: an adjustment is the fix for every break, so it is used often when the flows are tried by hand with the simulator, and each use now needs two people. Alternative: no seed change; a second TenantAdmin is added by hand in each Development database, as for a migration batch today.
+1. **The review is on a request, not a status on the Transaction** (R2, R9). Decided: a record of its own, approved before anything is posted. Every balance, holding, reservation, report and reconciliation reads the ledger as "every row counts", and a pending row would have to be left out in each of them. Three flows already put the second person on their own record (withdrawals, migration batches, in-kind transfers). This amends posting §1 ("future maker-checker is a status on this same row … not a second resource") and roadmap D3 and X1. Alternative: the status on the row as posting §1 planned, which shows a pending adjustment in the account's activity and costs a change to every read of the ledger.
+2. **One permission** (R1, R8). Decided: `transactions.adjust` for request and approval, with the rule that the approver is not the requester, as `migration-batches.manage` does. Both sides are TenantAdmin only (D5), so two permissions would have the same grants. Alternative: a second permission `adjustment-requests.approve` now, ready for an operations role.
+3. **Only a TenantAdmin requests** (R1). Decided: as adjustments §11 point 2. A firm with one TenantAdmin keeps a second TenantAdmin login, as for a migration batch. Alternative: an Adviser may request and a TenantAdmin approves, as for a withdrawal, which gives a small firm its second person but lets an Adviser propose numbers on a Custodial account.
+4. **The source is `AdjustmentRequest` with the request's id** (R13). Decided: every other record that posts has its own kind and id (`Migration`, `InKindTransfer`, `AccountClosure`), and the id is how a reader gets from the Transaction to who asked and who approved. This takes back adjustments §11 point 4 for new adjustments. Alternative: keep `Manual` and add the request to the adjustment detail.
+5. **No reservation** (R5). Decided: a request is a correction, not money or shares on their way out, and the approval checks again under the lock. A request that can no longer be posted stays open until a person decides. Alternative: reserve a negative cash amount or quantity from the request on (roadmap P8), which keeps the approval from failing and holds a Customer's cash for a correction that may be rejected.
+6. **An adjustment is never reversed** (R15). Decided: otherwise one person undoes what two approved. The opposite request corrects it, as an adjustment corrects every flow that has no reverse. Rows posted before this slice are covered too, so there is one rule. Alternative: a reverse that itself needs a second person (a request of a second kind), or keep the hand reverse with `transactions.adjust`.
+7. **Reject by a second person, cancel by anyone** (R8, R11). Decided: as withdrawals and in-kind transfers. Alternative: one "decline" action for every holder.
+8. **Account closure waits for open requests** (R17). Decided: an open request says the balance may be wrong, and the closure pays the balance out. Alternative: no rule; a request left on a closed account can only be rejected or cancelled.
+9. **A second TenantAdmin in the Development seed** (§9.1). Decided: an adjustment is the fix for every break, so it is used often when the flows are tried by hand with the simulator, and each use now needs two people. Alternative: no seed change; a second TenantAdmin is added by hand in each Development database, as for a migration batch today.
 
 Still open, not this slice:
 
@@ -394,6 +394,8 @@ The repository should build after each commit. Agents split each behaviour into 
 
 Do not put a Transaction status, a new permission, a reservation or a request by an Adviser in these commits.
 
-### Docs amended when this spec is accepted
+### Docs amended when this spec was accepted
 
-[adjustments.md](adjustments.md) (amendment note: R2, R4, R17, R18, R20, §8, D29, D31), [posting.md](posting.md) (§1 and an amendment note), [transaction-source.md](transaction-source.md) (kind 11), [custody-modes.md](custody-modes.md) (matrix rows `Adjustment` and Reverse), [account-closure.md](account-closure.md) (R5), [trade-settlement.md](trade-settlement.md), [orders.md](orders.md), [migration-batches.md](migration-batches.md), [in-kind-transfers.md](in-kind-transfers.md) and [dividends.md](dividends.md) (a note where each says "corrected with an adjustment": it is now requested and approved), [bff-adviser-portal.md](bff-adviser-portal.md) (prefix), [api-design.md](../api-design.md) (§3.1, §7.7, the resource catalog, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D102–D106, D29, D31), [glossary.md](../glossary.md) (Adjustment, Adjustment request), [function-plan.md](../function-plan.md), [features/README.md](README.md) row status, the roadmap (§2 matrix, §10 X1, §12 D3, §13).
+[adjustments.md](adjustments.md) (amendment note: R2, R4, R17, R18, R20, §8, §9, §11), [posting.md](posting.md) (§1 and an amendment note), [transaction-source.md](transaction-source.md) (kind 11, the reverse of an `Adjustment`), [custody-modes.md](custody-modes.md) (matrix rows `Adjustment` and Reverse), [account-closure.md](account-closure.md) (R5, R12, D54), [withdrawals.md](withdrawals.md), [orders.md](orders.md) and [in-kind-transfers.md](in-kind-transfers.md) (where the available cash and reserved quantity checks of an adjustment run), [bff-adviser-portal.md](bff-adviser-portal.md) (prefix), [api-design.md](../api-design.md) (§3.1, §6, §7.7, §7.15, change log), [domain-model.md](../domain-model.md) (§8.6, §8.21), [database-design.md](../database-design.md) (§9, §11.4, §11.21), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D102–D106, D26, D27, D31), [glossary.md](../glossary.md) (Adjustment, Adjustment request), [function-plan.md](../function-plan.md) §9 item, [features/README.md](README.md) row status, the roadmap (§2 matrix, §4 F3, §10 X1, §12 D3, §13, §14).
+
+Not amended, because what they say stays true: [trade-settlement.md](trade-settlement.md), [migration-batches.md](migration-batches.md), [dividends.md](dividends.md), [corporate-actions.md](corporate-actions.md), [bank-reconciliation.md](bank-reconciliation.md) and [reports.md](reports.md). Where they say a break is corrected with an adjustment, that adjustment is now requested and approved.

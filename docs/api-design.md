@@ -3,7 +3,7 @@ title: API design
 status: accepted
 language: en
 created: 2026-09-11
-updated: 2026-11-23
+updated: 2026-11-25
 related:
   - README.md
   - glossary.md
@@ -13,6 +13,7 @@ related:
   - database-design.md
   - adr/0014-openiddict-authorization-code-pkce.md
   - features/dividends.md
+  - features/adjustment-review.md
 ---
 
 # API design
@@ -132,7 +133,7 @@ The fifth role `SimulatorOperator` ([ADR 0013](adr/0013-roles-authorization-sing
 | `accounts.manage` | ✓ | ✓ | ✓ | | [accounts](features/accounts.md) |
 | `transactions.read` | ✓ | ✓ | ✓ | ✓ | [posting](features/posting.md); Customer: Customer Portal amendment 2026-11-02 |
 | `transactions.create` | ✓ | ✓ | ✓ | | [posting](features/posting.md) |
-| `transactions.adjust` | | ✓ | | | [adjustments](features/adjustments.md) (accepted 2026-11-19) |
+| `transactions.adjust` | | ✓ | | | [adjustments](features/adjustments.md) (accepted 2026-11-19); every `/adjustment-requests` route since [adjustment-review](features/adjustment-review.md) (accepted 2026-11-25) |
 | `statement-lines.manage` | | ✓ | | | [deposit-matching](features/deposit-matching.md) (accepted 2026-11-20) |
 | `nominated-bank-accounts.read` | | ✓ | ✓ | ✓ | [withdrawals](features/withdrawals.md) (accepted 2026-11-20) |
 | `nominated-bank-accounts.manage` | | ✓ | ✓ | | [withdrawals](features/withdrawals.md) (accepted 2026-11-20) |
@@ -354,6 +355,7 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | In-kind transfers | `/in-kind-transfers` | list / get / request; approve / reject / cancel / set aside. See features/in-kind-transfers.md | `in-kind-transfers.read`, `.request`, `.approve` |
 | Custody movements | `/custody-movements` | list / get; ignore / reopen. See features/in-kind-transfers.md | `custody-movements.manage` |
 | Custodian reconciliations | `/custodian-reconciliations` | overview / list / get / run now. See features/in-kind-transfers.md | `custodian-reconciliations.manage` |
+| Adjustment requests | `/adjustment-requests` | list / get / request (`Idempotency-Key`); approve / reject / cancel. No PUT: a request never changes. See features/adjustment-review.md | `transactions.adjust` |
 | Reports | `/reports` | list / request / schedules / executions / download | `reports.customer.read` / `reports.customer.create` / `reports.book.read` / `reports.book.create` / `reports.tenant.read` / `reports.tenant.create` |
 
 Path `{id}` is always PublicId.
@@ -524,7 +526,7 @@ Field rules: [features/posting.md](features/posting.md) for cash types, [feature
 | POST | `/transactions/transfer` | `transactions.create` | 201 `{ id }` |
 | POST | `/transactions/fx` | `transactions.create` | 201 `{ id }` |
 | POST | `/transactions/fx/quote` | `transactions.create` | 200 quote |
-| POST | `/transactions/adjustment` | `transactions.adjust` | 201 `{ id }` |
+| POST | `/transactions/adjustment` | — | removed 2026-11-25; see §7.15 |
 | POST | `/transactions/{id}/reverse` | `transactions.create` | 201 `{ id }` |
 
 - Create and reverse require `Idempotency-Key` ([ADR 0015](adr/0015-idempotency-keys.md)).
@@ -543,10 +545,11 @@ Field rules: [features/posting.md](features/posting.md) for cash types, [feature
 - Amendment 2026-11-23 (orders and settlement, accepted; field rules in [features/orders.md](features/orders.md) R32, R35, R37, R38, R45, R48): on a Custodial account `POST /transactions` refuses `Buy` and `Sell` (400 `errors.Type`, `Trades on a Custodial account go through the broker. Place an order.`); the caller places an order (§7.12). Source kind `OrderFill` marks the `Buy` or `Sell` the platform posts for a fill, with the order's PublicId as source id; it is not hand-reversible. The item gains `execution` `{ orderId, fillId, price, tradeDate, settlementDate, brokerReference, settledAt }` on a fill and its Reversal, `null` otherwise. `POST /transactions/transfer`, `POST /transactions/fx` and the FX quote from a Custodial account refuse an amount that would take out cash from sales that have not settled (400).
 - Amendment 2026-11-24 (migration batches, accepted; field rules in [features/migration-batches.md](features/migration-batches.md) R25–R27, R31): source kind `Migration` marks an `Opening` or `OpeningHoldings` written by a migration batch, with the batch's PublicId as source id; it is not hand-reversible. The item gains `migration` (`{ asOfDate, previousProvider }` on such a Transaction, `null` otherwise). On a Custodial account a hand `Opening` or `OpeningHoldings` stays refused (400 `errors.Type`) with the message `Opening balances on a Custodial account come from a migration batch.`
 - Amendment 2026-11-24 (in-kind transfers, accepted; field rules in [features/in-kind-transfers.md](features/in-kind-transfers.md) R37–R42, R48): source kind `InKindTransfer` marks a `StockIn` or `StockOut` written by an in-kind transfer, with the transfer's PublicId as source id; it is not hand-reversible. The item gains `inKindTransfer` (`{ transferId, direction, counterpartyName, counterpartyAccount, changesBeneficialOwner, acquiredOn, settlementDate, custodianReference }`, `null` on every other Transaction). The hand `StockIn` / `StockOut` on a Custodial account is refused with the message of R48. The holdings item gains `unsettledQuantity` and `transferableQuantity`; `reservedQuantity` counts open transfers out.
+- Amendment 2026-11-25 (adjustment review, accepted; field rules in [features/adjustment-review.md](features/adjustment-review.md) R13–R15, R21): `POST /transactions/adjustment` is removed; an `Adjustment` is posted only by the approval of an adjustment request (§7.15). Source kind `AdjustmentRequest` marks it, with the request's PublicId as its id; it is not hand-reversible. Reverse of any `Adjustment` → 400, for every caller, in place of the 403 without `transactions.adjust`.
 
 **Type-specific create routes.** When a type's create body differs from the common shape (one top-level `accountId`), that type gets its own `POST /transactions/{action}`. Each type has exactly one create route: a type with its own route is rejected by `POST /transactions` (400). Read (`GET /transactions`, `GET /transactions/{id}`) and reverse (`POST /transactions/{id}/reverse`) stay shared by every type. Every new type gets its own `POST /transactions/{action}` route, whatever its body shape (decided 2026-11-10). Existing types keep `POST /transactions` until each is moved in its own spec amendment ([future-plans.md](future-plans.md) §4).
 
-Type-specific routes: `POST /transactions/transfer` for `InternalTransfer` ([features/internal-transfers.md](features/internal-transfers.md)); `POST /transactions/fx` for `FxConversion` and the read-only `POST /transactions/fx/quote` ([features/fx-conversions.md](features/fx-conversions.md)); `POST /transactions/adjustment` for `Adjustment` ([features/adjustments.md](features/adjustments.md)). The quote is a `POST` because it takes the create body and the same validation; it writes nothing, takes no `Idempotency-Key` and holds no rate. Create confirms the quoted rate with `expectedRate`; a different stored rate → 409 with `expectedRate` in `errors`.
+Type-specific routes: `POST /transactions/transfer` for `InternalTransfer` ([features/internal-transfers.md](features/internal-transfers.md)); `POST /transactions/fx` for `FxConversion` and the read-only `POST /transactions/fx/quote` ([features/fx-conversions.md](features/fx-conversions.md)); `Adjustment` has no create route under `/transactions` since 2026-11-25: it is requested and approved under `/adjustment-requests` ([features/adjustment-review.md](features/adjustment-review.md)). The quote is a `POST` because it takes the create body and the same validation; it writes nothing, takes no `Idempotency-Key` and holds no rate. Create confirms the quoted rate with `expectedRate`; a different stored rate → 409 with `expectedRate` in `errors`.
 
 ---
 
@@ -716,6 +719,19 @@ Amendment 2026-11-24 (in-kind transfers, accepted; field rules in [features/in-k
 
 Approve or reject by the requester → 400 `errors.Status`. Actions take `rowVersion` (409 `stale_row_version`) and no `Idempotency-Key`. No new problem code. Cross-tenant or wrong-collection id → 404.
 
+### 7.15 Adjustment requests
+
+Amendment 2026-11-25 (adjustment review, accepted; field rules in [features/adjustment-review.md](features/adjustment-review.md)):
+
+| Method | Route | Policy | Success |
+| --- | --- | --- | --- |
+| GET | `/adjustment-requests` | `transactions.adjust` | 200 envelope (filters `status`, `accountId`, `customerId`) |
+| GET | `/adjustment-requests/{id}` | `transactions.adjust` | 200 item |
+| POST | `/adjustment-requests` | `transactions.adjust` | 201 `{ id }` (requires `Idempotency-Key`) |
+| POST | `/adjustment-requests/{id}/approve`, `…/reject`, `…/cancel` | `transactions.adjust` | 204 |
+
+The request body is the body `POST /transactions/adjustment` took. Approve posts the `Adjustment` in the same database transaction and may answer any 400 of the adjustment itself; the request then stays `Requested`. Approve or reject by the requester → 400 `errors.Status`. Actions take `rowVersion` (409 `stale_row_version`) and no `Idempotency-Key`. No new problem code. Cross-tenant or wrong-collection id → 404.
+
 ---
 
 ## 8. Explicitly out (until a later phase promotes them)
@@ -805,3 +821,4 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 | 2026-11-24 | §3.1, §4.2, §6, §7.7, §7.13: migration batches accepted. Permission `migration-batches.manage`; resource `/migration-batches` (list, get, create, replace, submit, return, cancel, post); problem code `migration_batch_not_valid`; source kind `Migration`; transaction item `migration`; statement line `migrationBatchId` and match method `Migration`; reconciliation item kind `MigrationNotPosted`. |
 | 2026-11-24 | §3.1, §6, §7.3, §7.7, §7.14: in-kind transfers accepted. Permissions `in-kind-transfers.read`, `.request`, `.approve`, `custody-movements.manage`, `custodian-reconciliations.manage`; resources `/in-kind-transfers`, `/custody-movements`, `/custodian-reconciliations`, `/tenants/{tenantId}/safekeeping-accounts`, `GET /custodian-connections`; source kind `InKindTransfer`; transaction item `inKindTransfer`; holding item `unsettledQuantity`, `transferableQuantity`. |
 | 2026-11-24 | §6, §7.6, §7.7, §7.11: dividends accepted. Kind `Dividend` on `/corporate-actions` with `dividend`, `payment`, `election` on the item and the `kind` filter; `POST /corporate-actions/{id}/pay-in-cash`; `corporateActionId` on `POST /statement-lines/{id}/match` and the statement line item; `PUT /accounts/{accountId}/dividend-reinvestment`, `reinvestDividends` and `pendingDividends` on the account item; transaction item `dividend`, cash leg role `Reinvestment`, tax kind `ForeignWithholding`; reconciliation item kinds `DividendsNotPosted`, `DividendDifference`. No new permission or problem code |
+| 2026-11-25 | §3.1, §6, §7.7, §7.15: adjustment review accepted. Resource `/adjustment-requests` (list, get, request, approve, reject, cancel) with `transactions.adjust`; `POST /transactions/adjustment` removed; source kind `AdjustmentRequest`; reverse of an `Adjustment` → 400 for every caller. No new permission or problem code. |

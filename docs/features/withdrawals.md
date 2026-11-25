@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-20
-last_updated: 2026-11-23
+last_updated: 2026-11-25
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -38,6 +38,7 @@ related:
   - trade-settlement.md
   - rebalances.md
   - migration-batches.md
+  - adjustment-review.md
 ---
 
 # Nominated bank accounts and withdrawals
@@ -853,3 +854,12 @@ Status of this amendment: `accepted` (2026-11-24), together with [migration-batc
 
 - R35, R36: migrated cash (an `Opening` with source `Migration`) is available and withdrawable at once: it is neither reserved nor unsettled, and it is already in the trust account through the batch's funding.
 - R28: the posting of a migration batch follows the same four-eyes rule: the person who posts is not the person who submitted.
+
+---
+
+## Amendment 2026-11-25 (adjustment review) — accepted
+
+Status of this amendment: `accepted` (2026-11-25), together with [adjustment-review.md](adjustment-review.md). Rules R4, R5 and R9 live there; this section records what changes here.
+
+- R36, R37: for an adjustment the available cash check runs when it is requested and again when it is approved, under the Account lock. An open adjustment request reserves no cash.
+- R28: an adjustment follows the same four-eyes rule: the person who approves or rejects a request is not the person who made it.

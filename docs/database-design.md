@@ -3,7 +3,7 @@ title: Database design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-11-23
+updated: 2026-11-25
 related:
   - README.md
   - glossary.md
@@ -11,6 +11,7 @@ related:
   - domain-model.md
   - adr/0014-openiddict-authorization-code-pkce.md
   - features/dividends.md
+  - features/adjustment-review.md
 ---
 
 # Database design
@@ -383,6 +384,7 @@ Beyond PK / unique constraints already listed:
 0055_custodian.sql                          -- SafekeepingAccounts, CustodianFeedCursors, CustodianPositions, CustodyMovements, InKindTransfers, TransactionInKindTransferDetails; Orders safekeeping account columns; UQ_OrderFills_TenantId_Id; source kind 10
 0056_custodian_reconciliations.sql          -- CustodianReconciliations, CustodianReconciliationLines
 0057_dividends.sql                          -- dividend terms, receipt, payment and election on CorporateActions and the terms on CorporateActionAnnouncements (ratio nullable, kind 3); dividend fields on CorporateActionEntitlements; TransactionDividendDetails; cash leg role 3, tax kind 2; Accounts.ReinvestDividends; BankStatementLines.CorporateActionId, match method 7, unmatched reason 14; reconciliation item kinds 20–21
+0058_adjustment_requests.sql                -- AdjustmentRequests; source kind 11 (AdjustmentRequest)
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -480,6 +482,8 @@ Amendment 2026-11-23 (orders and settlement, accepted; [features/orders.md](feat
 Amendment 2026-11-24 (migration batches, accepted; [features/migration-batches.md](features/migration-batches.md) §6): script `0054_migration_batches.sql` widens `CK_Transactions_SourceKind` to 0–9 (`Migration`) and requires a `SourcePublicId` for kinds 2–9, and adds `TransactionMigrationDetails`: `TransactionId` (PK; at most one row per Transaction), `TenantId`, `AsOfDate date`, `PreviousProvider nvarchar(100)`; FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)` RESTRICT. No `PublicId` or `RowVersion`. No back-fill.
 
 Amendment 2026-11-24 (in-kind transfers, accepted; [features/in-kind-transfers.md](features/in-kind-transfers.md) §6.1): script `0055_custodian.sql` widens `CK_Transactions_SourceKind` to 0–10 (`InKindTransfer`) and requires a `SourcePublicId` for kinds 2–10, and adds `TransactionInKindTransferDetails`: `TransactionId` (PK), `TenantId`, `TransferPublicId`, `CounterpartyName nvarchar(100)`, `CounterpartyAccountMasked nvarchar(34)`, `ChangesBeneficialOwner bit`, `AcquiredOn date NULL`, `SettlementDate date`, `CustodianReference nvarchar(100)`; FK `(TenantId, TransactionId)` → `Transactions` RESTRICT; no `PublicId`, `RowVersion` or audit columns.
+
+Amendment 2026-11-25 (adjustment review, accepted; [features/adjustment-review.md](features/adjustment-review.md) §6): script `0058_adjustment_requests.sql` (not written yet) widens `CK_Transactions_SourceKind` to 0–11 (`AdjustmentRequest`) and requires a `SourcePublicId` for kinds 2–11. `TransactionAdjustmentDetails` does not change. No back-fill: adjustments posted before keep `SourceKind` 0.
 
 ### 11.5 Holdings (accepted, landed)
 
@@ -681,6 +685,14 @@ Script `0056_custodian_reconciliations.sql`:
 
 No back-fill.
 
+### 11.21 Adjustment requests (accepted)
+
+Feature spec: [features/adjustment-review.md](features/adjustment-review.md) (accepted 2026-11-25) §6. Script `0058_adjustment_requests.sql`:
+
+- `AdjustmentRequests` — `Id`, `PublicId` (unique), `TenantId`, `AccountId`, `Reason` (CHECK 0–3), `Memo nvarchar(200)`, `Reference nvarchar(100) NULL`, `CashAmount decimal(18,4) NULL`, `InstrumentId NULL`, `QuantityChange decimal(18,8) NULL`, `CostChange decimal(18,4) NULL`, `Status` (CHECK 0–3), `RequestedByUserId`, `RequestedAt`, `DecisionAction NULL` (CHECK 1–3), `DecisionByUserId NULL`, `DecisionAt NULL`, `DecisionNote nvarchar(200) NULL`, `TransactionId NULL`, audit, `RowVersion`. Unique `(TenantId, Id)`. FKs with `TenantId` to `Accounts`, `Instruments`, `Transactions` and `Users` (twice), RESTRICT. CHECKs: a cash amount or an instrument, the amount not 0; the instrument and its two changes all null or all set, not both changes 0; a decision exactly when `Status` is not 0, with `DecisionAction = Status`; a Transaction exactly when `Status = 1`; the decision maker is not the requester on an approve or reject. Index `(TenantId, RequestedAt DESC)`; index `(AccountId, Status)`; filtered unique `(TransactionId) WHERE TransactionId IS NOT NULL`.
+
+No back-fill.
+
 ## 12. Still not a schema decision
 
 These stay open in the function plan and do not change tables:
@@ -754,6 +766,7 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 | 2026-11-23 | Rebalance through orders accepted (`0053`, not written yet): `Rebalances`, `RebalanceTargets`, `RebalanceLines` (§11.18); `Orders.RebalanceId` (§11.16); the three `LastRebalance…` columns of `AccountPortfolioAssignments` dropped and `UQ_AccountPortfolioAssignments_TenantId_Id` added (§11.6). No simulator script. §9 lists `0053`. |
 | 2026-11-24 | In-kind transfers accepted (`0055`, `0056`, not written yet): `SafekeepingAccounts`, `CustodianFeedCursors`, `CustodianPositions`, `CustodyMovements`, `InKindTransfers`, `CustodianReconciliations`, `CustodianReconciliationLines` (§11.20); `TransactionInKindTransferDetails` and `CK_Transactions_SourceKind` 0–10 (§11.4); `Orders` safekeeping account columns (§11.16); simulator `0012_custodian.sql` (§15). §9 lists `0055` and `0056`. |
 | 2026-11-24 | Dividends accepted (`0057`): dividend terms, receipt, payment and election on `CorporateActions`; terms on `CorporateActionAnnouncements`; dividend fields on `CorporateActionEntitlements`; `TransactionDividendDetails`; cash leg role `Reinvestment` (3), tax kind `ForeignWithholding` (2); `Accounts.ReinvestDividends`; `BankStatementLines.CorporateActionId`, match method 7, unmatched reason 14; reconciliation item kinds 20–21 (§9, §11.4, §11.15). Simulator `0014_dividends.sql` (§15) |
+| 2026-11-25 | Adjustment review accepted (`0058`, not written yet): `AdjustmentRequests` (§11.21); `CK_Transactions_SourceKind` widened to 0–11 (§9, §11.4) |
 
 ---
 

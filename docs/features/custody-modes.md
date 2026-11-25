@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-17
-last_updated: 2026-11-23
+last_updated: 2026-11-25
 related:
   - account-custody-mode.md
   - accounts.md
@@ -39,6 +39,7 @@ related:
   - migration-batches.md
   - in-kind-transfers.md
   - dividends.md
+  - adjustment-review.md
 ---
 
 # Custody modes
@@ -659,3 +660,13 @@ Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](
 - R5 matrix: `Dividend` / Custodial stays refused by hand for every caller; it is written by corporate actions (`Transaction.PostDividend`, source `CorporateAction`). `Dividend` / External stays not accepted (400 `errors.Type`) until income events add it.
 - §4.2.1: the refusal message of `Dividend` on a Custodial account becomes `Dividends are paid by the platform from the company's announcement.` An External account keeps today's message.
 - `Scrip` / Custodial stays refused and nothing writes it. What `CustodyRules` allows does not change.
+
+---
+
+## Amendment 2026-11-25 (adjustment review) — accepted
+
+Status of this amendment: `accepted` (2026-11-25), together with [adjustment-review.md](adjustment-review.md). Rules R15 and R16 live there; this section records what changes here.
+
+- R5 matrix, `Adjustment` / Custodial: **allowed through an adjustment request that a second person approves, with `transactions.adjust`**. The route `POST /transactions/adjustment` is removed. `Adjustment` / External stays refused, now on `POST /adjustment-requests`, with the same message.
+- R5 matrix, Reverse / Custodial: allowed only for a hand-reversible source, and never for an `Adjustment`.
+- After this slice a person enters on a Custodial account only `InternalTransfer`, `FxConversion`, their reverse, and a request for an adjustment. What `CustodyRules` allows does not change.

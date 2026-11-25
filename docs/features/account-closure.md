@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-22
-last_updated: 2026-11-23
+last_updated: 2026-11-25
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -35,6 +35,7 @@ related:
   - rebalances.md
   - in-kind-transfers.md
   - dividends.md
+  - adjustment-review.md
 ---
 
 # Account closure
@@ -590,3 +591,13 @@ Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transf
 Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rule R46 lives there; this section records what changes here.
 
 - R5 gains a refusal, 400 `errors.AccountId`: a `Pending` entitlement of a dividend on the Account → `A dividend is still to be paid on this account. Close it after the payment.`
+
+---
+
+## Amendment 2026-11-25 (adjustment review) — accepted
+
+Status of this amendment: `accepted` (2026-11-25), together with [adjustment-review.md](adjustment-review.md). Rule R17 live there; this section records what changes here.
+
+- R5 gains a refusal, 400 `errors.AccountId`: an open adjustment request on the Account → `Open adjustment requests must be approved, rejected or cancelled before the account can be closed.`
+- R12: `POST /adjustment-requests` for the account takes the place of `POST /transactions/adjustment` in the list of routes a closing account refuses. The approval of a request checks the same, but no open request can be left on a closing account.
+- D54: the checklist gains "No open adjustment requests".

@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-23
-last_updated: 2026-11-23
+last_updated: 2026-11-25
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -48,6 +48,7 @@ related:
   - rebalances.md
   - in-kind-transfers.md
   - dividends.md
+  - adjustment-review.md
 ---
 
 # Orders and settlement
@@ -968,3 +969,12 @@ Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transf
 Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rule R16 lives there; this section records what changes here.
 
 - R50 and R62: a dividend that goes ex cancels no open order, on the platform or at the simulator broker. The cancel applies to `Split`, `Consolidation` and `Bonus` only.
+
+---
+
+## Amendment 2026-11-25 (adjustment review) — accepted
+
+Status of this amendment: `accepted` (2026-11-25), together with [adjustment-review.md](adjustment-review.md). Rules R4, R5 and R9 live there; this section records what changes here.
+
+- R40: for an adjustment the available quantity check runs when it is requested and again when it is approved. An open adjustment request reserves no quantity.
+- R36, R37: the adjustment that removes the cause of a waiting fill is now requested by one TenantAdmin and approved by another; the next run posts the fill after the approval.

@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-24
-last_updated: 2026-11-24
+last_updated: 2026-11-25
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -47,6 +47,7 @@ related:
   - ../api-design.md
   - ../glossary.md
   - dividends.md
+  - adjustment-review.md
 ---
 
 # In-kind transfers and custodian reconciliation
@@ -945,3 +946,11 @@ Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](
 - R17: a `CorporateAction` custody movement `In` matched to a dividend with an `Accepted` election records the new shares on the dividend.
 - R53: new shares are an `unexplained` difference from the time their movement is processed until the dividend's entitlements are posted (dividends R48).
 - R60, R61, R68, R70, R71: the simulator custodian gains an income account per safekeeping account, the dividend payments with their entitled positions, the election route, the income mode and the dividend payments list; its reset empties them and sets the income mode to `Pay`.
+
+---
+
+## Amendment 2026-11-25 (adjustment review) — accepted
+
+Status of this amendment: `accepted` (2026-11-25), together with [adjustment-review.md](adjustment-review.md). Rules R4, R5 and R9 live there; this section records what changes here.
+
+- R43: the refusal of an adjustment that lowers a holding below its reserved quantity is given when the adjustment is requested and again when it is approved; the route is `POST /adjustment-requests` and its approve action, in place of `POST /transactions/adjustment` (§8).

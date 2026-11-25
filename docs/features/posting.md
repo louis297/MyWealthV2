@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-25
-last_updated: 2026-11-23
+last_updated: 2026-11-25
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -29,6 +29,7 @@ related:
   - migration-batches.md
   - in-kind-transfers.md
   - dividends.md
+  - adjustment-review.md
 ---
 
 # Posting
@@ -70,7 +71,7 @@ POST /transactions
 
 The header is the business event (`type`, `bookedAt`, `memo`, which Account). The cash leg is the accounting line that the cash `SUM` reads. Application code picks the legs from `type`. This increment always builds exactly one cash leg. Later Buy / Sell add a security leg on the **same** header. Split / Bonus / Scrip are the same model with a security leg only (no cash, total cost unchanged): [split.md](split.md).
 
-Write = posted. No `Created` status. No event handler that “approves” or copies into another table. Future maker-checker is a status on this same row plus an approve command — not a second resource and not a swapped subscriber.
+Write = posted. No `Created` status. No event handler that “approves” or copies into another table. A Transaction has no status: where a second person must approve a write, the approval is on a record of its own and comes before the Transaction is posted (amendment 2026-11-25, adjustment review). It is not a swapped subscriber.
 
 Cash-book currency is `Account.Currency`. Balance is not stored on `Account`; it is the sum of posted cash legs.
 
@@ -530,3 +531,13 @@ Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](
 
 - The type table: `Dividend` (6) is active. On a Custodial account it is written only by corporate actions (`Transaction.PostDividend`, source `CorporateAction`); it is still not accepted by hand on any account.
 - R16: a `Dividend` has one `Principal` leg of the gross, `Tax` legs, and with a reinvestment one `Reinvestment` leg (`CashLegRole` 3) and one security leg. Its legs add up to the net less the reinvested amount, never below 0.
+
+---
+
+## Amendment 2026-11-25 (adjustment review) — accepted
+
+Status of this amendment: `accepted` (2026-11-25), together with [adjustment-review.md](adjustment-review.md). Rules R9, R13–R15 live there; this section records what changes here.
+
+- §1: the sentence "future maker-checker is a status on this same row plus an approve command — not a second resource" is replaced, and with it the first bullet of the amendment of 2026-11-20 (withdrawals) where it kept that plan for roadmap X1. The review of an adjustment is on an **adjustment request**, approved before anything is posted, as a migration batch is. Write = posted stays true for every Transaction, and no read of the ledger has to leave a row out.
+- R16 and the type table: an `Adjustment` is written only by the approval of an adjustment request (`Transaction.PostAdjustment`, source `AdjustmentRequest`). `POST /transactions/adjustment` is removed.
+- R11: an `Adjustment` is never reversed by hand (400). The permission check for reversing one is gone.

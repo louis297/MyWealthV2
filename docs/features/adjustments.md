@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-19
-last_updated: 2026-11-23
+last_updated: 2026-11-25
 related:
   - ../custodial-roadmap.md
   - transaction-source.md
@@ -28,6 +28,7 @@ related:
   - migration-batches.md
   - in-kind-transfers.md
   - dividends.md
+  - adjustment-review.md
 ---
 
 # Adjustments
@@ -471,3 +472,17 @@ Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transf
 Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rule R42 lives there; this section records what changes here.
 
 - A note: a dividend paid to one account in error is corrected with an adjustment with reason `CorporateAction`. No flow reverses a paid dividend.
+
+---
+
+## Amendment 2026-11-25 (adjustment review) — accepted
+
+Status of this amendment: `accepted` (2026-11-25), together with [adjustment-review.md](adjustment-review.md). Rules R1–R21 live there; this section records what changes here.
+
+- §1, R2, R20 and §8: a TenantAdmin no longer posts an adjustment. `POST /transactions/adjustment` and `CreateAdjustment` are removed. An adjustment is requested with `POST /adjustment-requests` (the same body, `transactions.adjust`, `Idempotency-Key`), and a TenantAdmin other than the requester approves it. The approval posts the `Adjustment`.
+- R3 and R5–R16 are unchanged and are checked twice: when the adjustment is requested and again, under the Account lock, when it is approved. `bookedAt` is the time of the approval.
+- R4: an `Adjustment` posted from a request has source `AdjustmentRequest` (11) with the request's PublicId. `CreatedBy` is the approver. Adjustments posted before keep `Manual`. This takes back §11 point 4 for new adjustments.
+- R17, R18: replaced. An `Adjustment` is never reversed by hand, by any caller, whatever its source: 400 with `An adjustment cannot be reversed. Request a new adjustment that corrects it.` The 403 of R17 is gone. No new Reversal carries an adjustment detail; existing ones keep theirs.
+- R21–R24 are unchanged.
+- §9: D29 posts the request and D31 is removed (adjustment-review D102–D106).
+- §11 "Review: none in this version" and the first "Still open" item are answered by [adjustment-review.md](adjustment-review.md): the review is on the request, and a Transaction gets no status.

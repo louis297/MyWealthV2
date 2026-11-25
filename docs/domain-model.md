@@ -3,13 +3,14 @@ title: Domain model
 status: accepted
 language: en
 created: 2026-09-11
-updated: 2026-11-23
+updated: 2026-11-25
 related:
   - README.md
   - glossary.md
   - function-plan.md
   - adr/0014-openiddict-authorization-code-pkce.md
   - features/dividends.md
+  - features/adjustment-review.md
 ---
 
 # Domain model
@@ -377,6 +378,7 @@ Invariants:
 - (Migration batches) Source kind `Migration` (9) has the migration batch's PublicId as its id and is not hand-reversible. `PostMigratedCash` builds an `Opening` with one `Principal` cash leg of `+amount` (`> 0`); `PostMigratedHoldings` builds an `OpeningHoldings` with the legs of `PostOpeningHoldings`. Both need source `Migration`, set the memo `Opening balance` and carry a migration detail (`TransactionMigrationDetail`: as-of date, previous provider; 0..1 per Transaction, copied by `Reverse`). They are built outside the manual entry matrix; on a Custodial account a hand `Opening` or `OpeningHoldings` stays refused ([features/migration-batches.md](features/migration-batches.md)).
 - (In-kind transfers) Source kind `InKindTransfer` (10) has the in-kind transfer's PublicId as its id and is not hand-reversible. `PostTransferIn` builds a `StockIn` with one security leg of `+quantity` and the transfer's cost; `PostTransferOut` a `StockOut` with one leg of `−quantity` at the holding's average cost. Both need source kind `InKindTransfer` and a `TransactionInKindTransferDetail` (transfer PublicId, counterparty name, masked counterparty account, `changesBeneficialOwner`, `acquiredOn`, settlement date, custodian reference); `Reverse` copies the detail. On a Custodial account a `StockIn` or `StockOut` is written only by this flow ([features/in-kind-transfers.md](features/in-kind-transfers.md) R37, R38, R41).
 - (Dividends) `Dividend` (6) is active, written only by `PostDividend` with source `CorporateAction`: one `Principal` leg of the gross; `Tax` legs of kind `ForeignWithholding` (new, 2), `Rwt` or `Nrwt`, each with its tax detail; with a reinvestment one `Reinvestment` leg (`CashLegRole` 3, new) and one security leg whose cost equals it; a `TransactionDividendDetail` (Instrument, entitled quantity, amount per share and currency, tax source, imputation credit, the dates, the reinvested quantity and price). The legs add up to the net less the reinvested amount, never below 0. `Reverse` copies the detail ([features/dividends.md](features/dividends.md)).
+- (Adjustment review) Source kind `AdjustmentRequest` (11) has the adjustment request's PublicId as its id and is not hand-reversible. `PostAdjustment` is unchanged and is called only by the approval of a request. `Reverse` refuses an `Adjustment`, whatever its source, and no new Reversal carries an adjustment detail ([features/adjustment-review.md](features/adjustment-review.md)).
 
 Field rules: [features/posting.md](features/posting.md), [features/holdings.md](features/holdings.md), [features/buy-sell.md](features/buy-sell.md), [features/split.md](features/split.md), [features/leg-accounts.md](features/leg-accounts.md), and [features/adjustments.md](features/adjustments.md).
 
@@ -582,6 +584,15 @@ Invariants: a batch is posted only from `Submitted`, by a person other than its 
 
 Invariants: a transfer is approved or rejected by a person other than its requester; it is `Completed` if and only if it has a Transaction with source `InKindTransfer` and an in-kind transfer detail, written in the database transaction that matched a custody movement to it; a fill has at most one movement matched to it; the five components of a reconciliation line add up to its difference, and a run never changes. No domain event is added. Field rules: [features/in-kind-transfers.md](features/in-kind-transfers.md).
 
+### 8.21 Adjustment requests (accepted — adjustment-review slice)
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `AdjustmentRequest` | Aggregate | One adjustment a TenantAdmin asks for on a Custodial account: reason, memo, reference, an optional cash amount, an optional holding change (Instrument, quantity change, cost change), status, requested (by, at), decision (action, by, at, note) and the Transaction once approved. `Request`, `Approve`, `Reject`, `Cancel`. Its fields never change after it is stored |
+| `AdjustmentRequestStatus` | Enum | `Requested`, `Approved`, `Rejected`, `Cancelled` |
+
+Invariants: a request has a cash part, a holding part or both; it is approved or rejected by a person other than its requester, and only from `Requested`; it is `Approved` if and only if it has a Transaction of type `Adjustment` with source `AdjustmentRequest`, written in the database transaction that approved it; an open request reserves nothing. Field rules: [features/adjustment-review.md](features/adjustment-review.md).
+
 
 ## 9. Value objects (Domain assembly; may exist in Phase 1)
 
@@ -645,6 +656,7 @@ Phase-1 currency field: `Tenant.ReportingCurrency`. Phase-2 currency field on In
 | 2026-11-23 | Rebalance through orders accepted: `Rebalance`, `RebalanceTarget`, `RebalanceLine`, its enums and `RebalanceRules` (§8.18); `Order.RebalanceId`; the assignment loses its last-rebalance fields; `Rebalance` is no longer hand-reversible on a Custodial account. [features/rebalances.md](features/rebalances.md). |
 | 2026-11-24 | In-kind transfers accepted: `SafekeepingAccount`, `CustodianFeedCursor`, `CustodianPosition`, `CustodyMovement`, `InKindTransfer`, `CustodianReconciliation` and their enums, `TransferableQuantity` (§8.20); source kind `InKindTransfer`, `PostTransferIn` / `PostTransferOut` and `TransactionInKindTransferDetail` (§8.6); reserved, unsettled and transferable quantity (§8.5); `Order.SafekeepingAccountId` (§8.16). [features/in-kind-transfers.md](features/in-kind-transfers.md) |
 | 2026-11-24 | Dividends accepted: `CorporateActionKind.Dividend`, `DividendTerms`, `DividendTaxSource`, `DividendWithholding`, the receipt, payment and election of a dividend, the dividend fields of the entitlement (§8.15); `Dividend` active with `PostDividend`, `TaxKind.ForeignWithholding`, `CashLegRole.Reinvestment`, `TransactionDividendDetail` (§8.6); `Account.ReinvestDividends`; statement line method `Dividend` and reason `DividendMismatch`; reconciliation kinds `DividendsNotPosted`, `DividendDifference` |
+| 2026-11-25 | Adjustment review accepted: `AdjustmentRequest` and `AdjustmentRequestStatus` (§8.21); source kind `AdjustmentRequest`; `Reverse` refuses an `Adjustment` (§8.6). [features/adjustment-review.md](features/adjustment-review.md) |
 
 ---
 
