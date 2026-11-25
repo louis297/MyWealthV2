@@ -32,7 +32,19 @@ A second person approves every adjustment on `webapi`. It is step 17 of [custodi
 
 One new record (the **adjustment request**, `/adjustment-requests`), one new source kind (`AdjustmentRequest`), one script (`0058_adjustment_requests.sql`). The route `POST /transactions/adjustment` goes away, and an `Adjustment` can no longer be reversed by hand. No new permission, `TransactionType`, problem code, job or event. No simulator change.
 
-**Status is `accepted` (2026-11-25).** The nine points of §11 were confirmed as recommended. Not landed yet.
+**Status is `accepted` (2026-11-25), landed 2026-11-25.** The nine points of §11 were confirmed as recommended.
+
+Notes from landing:
+
+- §5: the one shared rule is `AdjustmentPosting` in the Application layer. The request builds the `Adjustment` the approval would post, so that `Transaction.PostAdjustment` runs its own checks, and stores the request instead of the Transaction. Its available cash check reads the cash `SUM` plus the request's amount.
+- R7–R9: approve locks the Account and reads the clock, then checks the status and the second person before the Account, its Customer and the Instrument. Reject and cancel take no Account lock (R12).
+- R15: the refusal runs after the leg locks and the closing-account check, directly before transaction-source R13. An Adviser who reverses an `Adjustment` now gets this 400 in place of the 403 of adjustments R17.
+- §5: `TransactionAdjustmentDetail` no longer has a copy for a Reversal. The Reversal of an adjustment posted before this slice keeps its detail and reads as before. The Customer Transactions Report test no longer reverses an adjustment, because none can be reversed now.
+- §9.1: the second TenantAdmin is an optional pair of fields on the Development firm entry, set for the demo firm only.
+- D103: the nav item "Adjustments" sits before "Custody movements". The table shows the cash as "−0.60 USD" and "—" for a part the request does not have.
+- D104: the actions share one optional note field; Cancel is "Cancel adjustment", and Reject opens the note dialog.
+- D105: the account page section is "Adjustments waiting for approval", under the open withdrawals and above the activity. The Close account page adds the check "No open adjustment requests" with "View the adjustment" for a TenantAdmin. An Adviser cannot read the requests and sees the server's refusal.
+- D106: the link on `/transactions/:id` reads "Adjustment request".
 
 ---
 
