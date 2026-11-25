@@ -786,8 +786,35 @@ public class TenantCompositeKeysSchemaTests
         ("FK_ReportExecutions_Users_TenantId_TriggeredByUserId", "Users", """
             INSERT INTO [ReportExecutions] ([PublicId], [ReportId], [TenantId], [TriggerKind], [Status], [ParametersJson], [TriggeredByUserId], [Created], [CreatedBy])
             VALUES (NEWID(), @report, @a_tenant, N'Manual', N'Queued', N'{}', @{p}_adviser, SYSDATETIMEOFFSET(), N'test');
-            """)
+            """),
+        ("FK_AdjustmentRequests_Accounts_TenantId_AccountId", "Accounts", AdjustmentRequestRow(account: "@{p}_brokerage")),
+        ("FK_AdjustmentRequests_Instruments_TenantId_InstrumentId", "Instruments",
+            AdjustmentRequestRow(instrument: "@{p}_instrument")),
+        ("FK_AdjustmentRequests_Transactions_TenantId_TransactionId", "Transactions",
+            AdjustmentRequestRow(status: "1", decidedBy: "@a_customer", transaction: "@{p}_buy")),
+        ("FK_AdjustmentRequests_Users_TenantId_RequestedByUserId", "Users", AdjustmentRequestRow(requestedBy: "@{p}_adviser")),
+        ("FK_AdjustmentRequests_Users_TenantId_DecisionByUserId", "Users",
+            AdjustmentRequestRow(status: "2", decidedBy: "@{p}_customer"))
     ];
+
+    /// <summary>An adjustment request of tenant <c>a</c> (script 0058); one argument names a row of the other tenant.</summary>
+    private static string AdjustmentRequestRow(
+        string account = "@a_brokerage",
+        string instrument = "NULL",
+        string status = "0",
+        string requestedBy = "@a_adviser",
+        string decidedBy = "NULL",
+        string transaction = "NULL") => $"""
+        INSERT INTO [AdjustmentRequests]
+            ([PublicId], [TenantId], [AccountId], [Reason], [Memo], [CashAmount], [InstrumentId], [QuantityChange], [CostChange],
+             [Status], [RequestedByUserId], [RequestedAt], [DecisionAction], [DecisionByUserId], [DecisionAt], [TransactionId],
+             [Created], [CreatedBy])
+        VALUES (NEWID(), @a_tenant, {account}, 0, N'Correction', -5, {instrument},
+                {(instrument == "NULL" ? "NULL" : "1")}, {(instrument == "NULL" ? "NULL" : "0")},
+                {status}, {requestedBy}, SYSDATETIMEOFFSET(), {(status == "0" ? "NULL" : status)}, {decidedBy},
+                {(decidedBy == "NULL" ? "NULL" : "SYSDATETIMEOFFSET()")}, {transaction}, SYSDATETIMEOFFSET(), N'test');
+
+        """;
 
     private static readonly string[] ReplacedForeignKeys =
     [
@@ -812,7 +839,7 @@ public class TenantCompositeKeysSchemaTests
     ];
 
     private static readonly string[] Parents =
-        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines", "BankReconciliations", "InterestRateSchedules", "CorporateActions", "Orders", "ClientMoneyAccounts", "TradeSettlements", "AccountPortfolioAssignments", "Rebalances", "MigrationBatches", "MigrationBatchEntries", "SafekeepingAccounts", "OrderFills", "InKindTransfers", "CustodyMovements", "CustodianReconciliations"];
+        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines", "BankReconciliations", "InterestRateSchedules", "CorporateActions", "Orders", "ClientMoneyAccounts", "TradeSettlements", "AccountPortfolioAssignments", "Rebalances", "MigrationBatches", "MigrationBatchEntries", "SafekeepingAccounts", "OrderFills", "InKindTransfers", "CustodyMovements", "CustodianReconciliations", "AdjustmentRequests"];
 
     /// <summary>A safekeeping account of tenant <paramref name="prefix"/> in <c>@{prefix}_safekeeping</c> (script 0055).</summary>
     /// <summary>An effective Manual dividend; the optional columns point at the parent under test.</summary>

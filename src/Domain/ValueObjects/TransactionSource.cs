@@ -122,7 +122,15 @@ public sealed class TransactionSource : ValueObject
     }
 
     /// <summary>An adjustment's posting: the PublicId of the approved adjustment request (adjustment-review R13).</summary>
-    public static TransactionSource AdjustmentRequest(Guid requestPublicId) => throw new NotImplementedException();
+    public static TransactionSource AdjustmentRequest(Guid requestPublicId)
+    {
+        if (requestPublicId == Guid.Empty)
+        {
+            throw new DomainException("An adjustment request source needs the request's PublicId.");
+        }
+
+        return new TransactionSource(TransactionSourceKind.AdjustmentRequest, requestPublicId);
+    }
 
     /// <summary>The source as stored on a Transaction row.</summary>
     internal static TransactionSource FromStored(TransactionSourceKind kind, Guid? publicId) =>
@@ -139,6 +147,7 @@ public sealed class TransactionSource : ValueObject
             TransactionSourceKind.OrderFill => OrderFill(publicId ?? Guid.Empty),
             TransactionSourceKind.Migration => Migration(publicId ?? Guid.Empty),
             TransactionSourceKind.InKindTransfer => InKindTransfer(publicId ?? Guid.Empty),
+            TransactionSourceKind.AdjustmentRequest => AdjustmentRequest(publicId ?? Guid.Empty),
             _ => new TransactionSource(kind, publicId)
         };
 
