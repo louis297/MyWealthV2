@@ -33,7 +33,16 @@ Step 1 of [valuation-roadmap.md](../valuation-roadmap.md) §8. It covers roadmap
 
 New: configuration `MarketDataHistory:FloorDate` and `Eodhd:HistoryDays` on `worker`; a range read on each source port; `worker` job `fx-rate-history-sync`; the Domain rule `MarketDataRow.IsFinal`; read ports `IMarketData.TryGetPriceDetail` / `ListPricesAsync` and `IFxRate.ListRatesAsync`; routes `GET /instruments/{id}/prices` and `GET /fx-rates`. No script, table, permission, problem code, domain event or `TransactionType`. No simulator change.
 
-**Status is `accepted` (2026-11-25).** The ten points of §11 were confirmed as recommended.
+**Status is `accepted` (2026-11-25), landed 2026-11-25.** The ten points of §11 were confirmed as recommended.
+
+Notes from landing:
+
+- R4–R6: the stores take "today" from the UTC date of the write's `fetchedAt`. Every job passes the current time. `FxRateStore` reads only the rows of the batch's bases and dates, not the whole table.
+- R7, R8: `IInstrumentPriceSource.GetBarsAsync` replaces `GetLatestAsync`. `EodhdClient` returns every dated bar when asked with `from`, and the latest one without it. A bar without a readable `close` comes back with no close, and the job skips it.
+- R9, R11: a source failure still ends the run and is logged (instrument-prices R8). The symbol groups written before it stay, because each group is its own write.
+- R12, R15: `FxRateHistorySyncJob` (Application) throws `FxRateHistorySyncFailedException` naming the failed bases. Hangfire runs it through `FxRateHistoryHangfireJob` (Infrastructure), which carries the no-retry attribute.
+- R19: `InstrumentVisibility.Readable` is the one lookup that both `GET /instruments/{id}` and the prices route use.
+- R21: `from` and `to` bind as text and the validator parses them as `yyyy-MM-dd`, so a bad date answers `errors.From` / `errors.To` rather than a binding error.
 
 ---
 
