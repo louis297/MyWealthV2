@@ -11,6 +11,7 @@ related:
   - adr/0014-openiddict-authorization-code-pkce.md
   - features/dividends.md
   - features/adjustment-review.md
+  - valuation-roadmap.md
 ---
 
 # Function plan
@@ -206,7 +207,7 @@ Session edge is [features/bff-adviser-portal.md](features/bff-adviser-portal.md)
 
 ### 5.4 Not locked (do not invent tables from this list)
 
-Transaction header + cash-leg shape: [features/posting.md](features/posting.md) (accepted, landed). Holdings Opening: [features/holdings.md](features/holdings.md) (accepted, landed 2026-10-11 `676e77a`). Buy / Sell / StockIn / StockOut: [features/buy-sell.md](features/buy-sell.md) (accepted, landed 2026-10-12 `821c715`, `0016_transaction_type_stock_in_out.sql`). Split / Bonus / Scrip: [features/split.md](features/split.md) (accepted 2026-10-12; new total quantity, total cost unchanged, no ratio on this write, `0017_transaction_type_split.sql`). Net-worth read model: [features/net-worth.md](features/net-worth.md) (accepted and landed 2026-10-12 `af422c2`; current point-in-time, per-currency arrays, no script). Adviser Portal Dashboard and ledger pages accepted: [adviser-portal/adviser-portal-dashboard.md](adviser-portal/adviser-portal-dashboard.md). Still open: daily snapshots. Close requires cash zero and no holdings.
+Transaction header + cash-leg shape: [features/posting.md](features/posting.md) (accepted, landed). Holdings Opening: [features/holdings.md](features/holdings.md) (accepted, landed 2026-10-11 `676e77a`). Buy / Sell / StockIn / StockOut: [features/buy-sell.md](features/buy-sell.md) (accepted, landed 2026-10-12 `821c715`, `0016_transaction_type_stock_in_out.sql`). Split / Bonus / Scrip: [features/split.md](features/split.md) (accepted 2026-10-12; new total quantity, total cost unchanged, no ratio on this write, `0017_transaction_type_split.sql`). Net-worth read model: [features/net-worth.md](features/net-worth.md) (accepted and landed 2026-10-12 `af422c2`; current point-in-time, per-currency arrays, no script). Adviser Portal Dashboard and ledger pages accepted: [adviser-portal/adviser-portal-dashboard.md](adviser-portal/adviser-portal-dashboard.md). Still open: daily snapshots, planned as item V3 of [valuation-roadmap.md](valuation-roadmap.md) (`note`). Close requires cash zero and no holdings.
 
 ### 5.5 Out of Phase 2
 
