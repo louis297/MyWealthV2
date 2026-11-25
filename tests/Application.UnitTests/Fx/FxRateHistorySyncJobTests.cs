@@ -50,6 +50,7 @@ public class FxRateHistorySyncJobTests
             new FxRateQuote("USD", "NZD", -1m, Floor.AddDays(2)),
             new FxRateQuote("USD", "NZD", 1.7350m, Yesterday)
         ]);
+        source.Answer("NZD", []);
         var store = new FakeStore();
         var job = Job(source, store, new MarketDataHistorySettings(Floor), "USD", "NZD");
 

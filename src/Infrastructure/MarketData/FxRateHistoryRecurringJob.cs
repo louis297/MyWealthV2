@@ -17,5 +17,11 @@ public static class FxRateHistoryRecurringJob
 
     public static void Register(IRecurringJobManager recurring)
     {
+        recurring.AddOrUpdate<FxRateHistoryHangfireJob>(
+            JobId,
+            "fx",
+            job => job.Run(CancellationToken.None),
+            "30 11 * * *",
+            new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
     }
 }
