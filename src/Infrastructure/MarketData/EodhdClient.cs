@@ -8,9 +8,10 @@ namespace MyWealthV2.Infrastructure.MarketData;
 
 public sealed class EodhdClient(HttpClient http, IConfiguration configuration) : IInstrumentPriceSource
 {
-    public async Task<SourcedInstrumentPrice?> GetLatestAsync(
+    public async Task<SourcedInstrumentBars?> GetBarsAsync(
         string symbol,
         string quoteCurrency,
+        DateOnly? from = null,
         CancellationToken cancellationToken = default)
     {
         var apiKey = configuration["Eodhd:ApiKey"];
@@ -65,7 +66,7 @@ public sealed class EodhdClient(HttpClient http, IConfiguration configuration) :
                 }
             }
 
-            if (latest is null || !TryReadClose(latest.Value, out var price))
+            if (latest is null)
             {
                 return null;
             }
@@ -79,7 +80,9 @@ public sealed class EodhdClient(HttpClient http, IConfiguration configuration) :
                 currency = code;
             }
 
-            return new SourcedInstrumentPrice(price, latestDate, currency);
+            return new SourcedInstrumentBars(
+                currency,
+                [new SourcedPriceBar(latestDate, TryReadClose(latest.Value, out var price) ? price : null)]);
         }
     }
 

@@ -8,6 +8,7 @@ public sealed class InstrumentPriceSyncJob(
     IInstrumentPriceSource source,
     IInstrumentPriceStore store,
     MarketDataConnections connections,
+    MarketDataHistorySettings history,
     TimeProvider time,
     TimeSpan requestSpacing,
     ILogger<InstrumentPriceSyncJob> logger)
@@ -21,6 +22,7 @@ public sealed class InstrumentPriceSyncJob(
                 .Where(instrument => connections.For(instrument.Symbol) is null)
                 .ToList();
             var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
+            _ = history;
             if (await store.HasAsOfDateForEveryActiveInstrumentAsync(
                     active.Select(instrument => instrument.Id).ToList(),
                     today,
@@ -46,7 +48,7 @@ public sealed class InstrumentPriceSyncJob(
                 }
 
                 var group = groups[index];
-                var sourced = await source.GetLatestAsync(group.Key.Symbol, group.Key.Quote, cancellationToken);
+                var sourced = await source.GetBarsAsync(group.Key.Symbol, group.Key.Quote, null, cancellationToken);
                 if (sourced is null)
                 {
                     logger.LogWarning(
@@ -56,19 +58,25 @@ public sealed class InstrumentPriceSyncJob(
                     continue;
                 }
 
-                if (!string.Equals(sourced.Value.Currency.Trim(), group.Key.Quote, StringComparison.OrdinalIgnoreCase))
+                if (!string.Equals(sourced.Currency.Trim(), group.Key.Quote, StringComparison.OrdinalIgnoreCase))
                 {
                     logger.LogWarning(
                         "Instrument price currency {Currency} does not match {QuoteCurrency} for {Symbol}.",
-                        sourced.Value.Currency,
+                        sourced.Currency,
                         group.Key.Quote,
                         group.Key.Symbol);
                     continue;
                 }
 
+                var latest = sourced.Bars.OrderByDescending(bar => bar.AsOfDate).FirstOrDefault();
+                if (latest.Close is not { } close)
+                {
+                    continue;
+                }
+
                 foreach (var instrument in group)
                 {
-                    collected.Add(new InstrumentPriceQuote(instrument.Id, sourced.Value.Price, sourced.Value.AsOfDate));
+                    collected.Add(new InstrumentPriceQuote(instrument.Id, close, latest.AsOfDate));
                 }
             }
 

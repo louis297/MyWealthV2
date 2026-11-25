@@ -37,6 +37,7 @@ builder.Services.AddScoped(sp => new InstrumentPriceSyncJob(
     sp.GetRequiredService<IInstrumentPriceSource>(),
     sp.GetRequiredService<IInstrumentPriceStore>(),
     sp.GetRequiredService<MarketDataConnections>(),
+    sp.GetRequiredService<MarketDataHistorySettings>(),
     sp.GetRequiredService<TimeProvider>(),
     TimeSpan.FromSeconds(8),
     sp.GetRequiredService<ILogger<InstrumentPriceSyncJob>>()));
