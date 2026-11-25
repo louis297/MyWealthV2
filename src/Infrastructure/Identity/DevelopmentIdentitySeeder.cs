@@ -27,6 +27,9 @@ public static class DevelopmentIdentitySeeder
     public const string AdviserEmail = "adviser@localhost";
     public const string AdviserPassword = SystemAdminPassword;
 
+    /// <summary>Adjustment review §9.1: a second TenantAdmin of the demo firm, so that an adjustment can be approved.</summary>
+    public const string DemoSecondTenantAdminEmail = "tenant-admin-b@localhost";
+
     public const string SecondTenantCode = "demo2";
     public const string SecondTenantName = "Demo Advisory 2";
 
