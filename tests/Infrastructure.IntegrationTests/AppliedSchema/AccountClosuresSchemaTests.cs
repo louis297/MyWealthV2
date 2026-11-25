@@ -166,7 +166,7 @@ public class AccountClosuresSchemaTests
     }
 
     [Test]
-    public async Task Transaction_SourceKind5_NeedsASourcePublicId_AndKind11IsRejected()
+    public async Task Transaction_SourceKind5_NeedsASourcePublicId_AndKind12IsRejected()
     {
         (await RunAsync($"""
             {World()}
@@ -183,7 +183,7 @@ public class AccountClosuresSchemaTests
 
         var kind9 = await Should.ThrowAsync<SqlException>(() => RunAsync($"""
             {World()}
-            {InsertTransaction(11, "NEWID()")}
+            {InsertTransaction(12, "NEWID()")}
             """));
         kind9.Number.ShouldBe(547);
         kind9.Message.ShouldContain("CK_Transactions_SourceKind");

@@ -5,7 +5,8 @@ using static MyWealthV2.Application.FunctionalTests.Custody.CustodialHttp;
 
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
-/// <summary>Adjustments §8.2: every refusal of <c>POST /transactions/adjustment</c>, idempotency and isolation.</summary>
+/// <summary>Adjustments §8.2: every refusal of an adjustment, on <c>POST /adjustment-requests</c> (adjustment-review R4),
+/// idempotency and isolation.</summary>
 [Parallelizable]
 public class AdjustmentRulesTests : TestBase
 {
@@ -265,21 +266,6 @@ public class AdjustmentRulesTests : TestBase
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         (await TransactionCountAsync(world.AccountId)).ShouldBe(0);
-    }
-
-    [Test]
-    public async Task SameKeyAndBody_ReplaysTheOriginalId_AndWritesOnce()
-    {
-        var world = await AdjustmentWorld.CreateAsync();
-        var key = Guid.NewGuid();
-        var body = AdjustmentWorld.Body(world.AccountId, amount: 5m);
-
-        var first = await ReadIdAsync(await world.AdjustAsync(body, key));
-        var replay = await ReadIdAsync(await world.AdjustAsync(body, key));
-
-        replay.ShouldBe(first);
-        (await TransactionCountAsync(world.AccountId)).ShouldBe(1);
-        (await world.CashAsync()).ShouldBe(5m);
     }
 
     [Test]

@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-01
-last_updated: 2026-11-23
+last_updated: 2026-11-25
 related:
   - ../function-plan.md
   - ../architecture.md
@@ -25,6 +25,7 @@ related:
   - rebalances.md
   - migration-batches.md
   - in-kind-transfers.md
+  - adjustment-review.md
 ---
 
 # Adviser Portal BFF
@@ -560,3 +561,13 @@ Add `/in-kind-transfers`, `/custody-movements` and `/custodian-reconciliations` 
 - Prefixes: `/in-kind-transfers`, `/custody-movements`, `/custodian-reconciliations`
 - Methods: GET, POST
 - Who: TenantAdmin and Adviser for `/in-kind-transfers`; TenantAdmin for the other two. `webapi` checks the policies; the BFF does not filter by role, so an Adviser gets the 403 from `webapi`.
+
+---
+
+## Amendment 2026-11-25 (adjustment requests prefix) — accepted
+
+Add `/adjustment-requests` to the BFF prefix allow-list (R20) so the Adviser Portal can call the routes of [adjustment-review.md](adjustment-review.md) through `/api`.
+
+- Prefix: `/adjustment-requests`
+- Methods: GET, POST
+- Who: TenantAdmin. `webapi` checks the policy; the BFF does not filter by role, so an Adviser gets the 403 from `webapi`.

@@ -53,6 +53,12 @@ export function TransactionDetailPage() {
                 Migration batch
               </Link>
             ) : null}
+            {data.source?.kind === "AdjustmentRequest" && data.source.id && role === roles.tenantAdmin ? (
+              // adjustment-review D106.
+              <Link to={`/adjustments/${data.source.id}`} className={recordLinkClass}>
+                Adjustment request
+              </Link>
+            ) : null}
             {data.source?.kind === "InKindTransfer" && data.source.id ? (
               // in-kind-transfers D93.
               <Link to={`/transfers/${data.source.id}`} className={recordLinkClass}>
@@ -132,7 +138,7 @@ export function TransactionDetailPage() {
             {data.adjustment ? (
               <p className="text-muted-foreground text-sm">{`Reason: ${adjustmentReasonLabel(data.adjustment.reason)}`}</p>
             ) : null}
-            {canReverse(data, role) ? <ReverseTransactionButton id={data.id} /> : null}
+            {canReverse(data) ? <ReverseTransactionButton id={data.id} /> : null}
             {data.cash.length > 0 ? (
               <Table aria-label="Cash legs">
                 <TableHeader>

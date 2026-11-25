@@ -109,6 +109,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<InKindTransfer> InKindTransfers => Set<InKindTransfer>();
 
+    public DbSet<AdjustmentRequest> AdjustmentRequests => Set<AdjustmentRequest>();
+
     public DbSet<CustodianReconciliation> CustodianReconciliations => Set<CustodianReconciliation>();
 
     public DbSet<TradeSettlement> TradeSettlements => Set<TradeSettlement>();

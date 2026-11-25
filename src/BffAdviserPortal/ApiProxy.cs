@@ -36,7 +36,8 @@ public static class ApiProxy
         "/migration-batches",
         "/in-kind-transfers",
         "/custody-movements",
-        "/custodian-reconciliations"
+        "/custodian-reconciliations",
+        "/adjustment-requests"
     ];
 
     public static WebApplication MapBffApi(this WebApplication app)

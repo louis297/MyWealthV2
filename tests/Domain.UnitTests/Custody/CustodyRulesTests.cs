@@ -134,6 +134,8 @@ public class CustodyRulesTests
     [TestCase(CustodyMode.Custodial, TransactionSourceKind.Migration, false)]
     // In-kind transfers R41, R49: InKindTransfer is not hand-reversible.
     [TestCase(CustodyMode.Custodial, TransactionSourceKind.InKindTransfer, false)]
+    // Adjustment review R13: AdjustmentRequest is not hand-reversible.
+    [TestCase(CustodyMode.Custodial, TransactionSourceKind.AdjustmentRequest, false)]
     public void AllowsHandReverse_MatchesTransactionSourceR12ToR15(
         CustodyMode custodyMode,
         TransactionSourceKind sourceKind,

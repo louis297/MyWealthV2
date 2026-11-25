@@ -49,12 +49,6 @@ public class ReverseTransactionCommandHandler(
     {
         var loaded = await LoadAsync(request.Id, cancellationToken);
 
-        // Adjustments R17: after the Transaction is found and visible (404 first), before every other reverse rule.
-        if (loaded.Transaction.Type == TransactionType.Adjustment
-            && (currentUser.Role is not { } role || !RolePermissions.Has(role, Policies.TransactionsAdjust)))
-        {
-            throw new ForbiddenAccessException();
-        }
         var key = Guid.Parse(request.IdempotencyKey!);
         var hash = TransactionRequestHash.Compute(
             request.RequestMethod ?? "POST",
@@ -121,6 +115,15 @@ public class ReverseTransactionCommandHandler(
         // Account closure R12: no reverse with a leg on a closing account, checked under the locks.
         await AccountClosing.EnsureNotClosingAsync(
             db, loaded.LegAccounts.Select(leg => leg.Account.Id).ToList(), cancellationToken);
+
+        // Adjustment review R15: an Adjustment is never reversed, whatever its source and whoever asks. Runs where
+        // transaction-source R13 runs and before it, so every adjustment gets this message.
+        if (loaded.Transaction.Type == TransactionType.Adjustment)
+        {
+            throw new ValidationException([
+                new ValidationFailure(string.Empty, Domain.Entities.Transaction.AdjustmentReverseMessage)
+            ]);
+        }
 
         // Transaction source R13, R14: every leg account has the same custody mode (custody-modes R9), so the
         // first one decides. Runs before the portfolio trade lock and the already-reversed check.

@@ -62,6 +62,8 @@ public interface IApplicationDbContext
 
     DbSet<InKindTransfer> InKindTransfers { get; }
 
+    DbSet<AdjustmentRequest> AdjustmentRequests { get; }
+
     DbSet<CustodianReconciliation> CustodianReconciliations { get; }
 
     DbSet<TradeSettlement> TradeSettlements { get; }

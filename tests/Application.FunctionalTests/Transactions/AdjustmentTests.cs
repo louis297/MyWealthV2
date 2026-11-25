@@ -7,7 +7,8 @@ using static MyWealthV2.Application.FunctionalTests.Custody.CustodialHttp;
 
 namespace MyWealthV2.Application.FunctionalTests.Transactions;
 
-/// <summary>Adjustments R1, R2, R4, R6, R9–R11, R13, R14, R16: who may adjust, and what an adjustment books.</summary>
+/// <summary>Adjustments R1, R2, R4, R6, R9–R11, R13, R14, R16: who may adjust, and what an adjustment books. Each
+/// adjustment is requested and approved by a second TenantAdmin (adjustment-review R14).</summary>
 [Parallelizable]
 public class AdjustmentTests : TestBase
 {
@@ -65,8 +66,9 @@ public class AdjustmentTests : TestBase
         using var item = await GetTransactionAsync(world.Admin, id);
         var root = item.RootElement;
         root.GetProperty("type").GetString().ShouldBe("Adjustment");
-        root.GetProperty("source").GetProperty("kind").GetString().ShouldBe("Manual");
-        root.GetProperty("source").GetProperty("id").ValueKind.ShouldBe(JsonValueKind.Null);
+        // Adjustment review R13: the approval posts it with the request as its source.
+        root.GetProperty("source").GetProperty("kind").GetString().ShouldBe("AdjustmentRequest");
+        root.GetProperty("source").GetProperty("id").ValueKind.ShouldBe(JsonValueKind.String);
         root.GetProperty("memo").GetString().ShouldBe("Correction after the broker statement");
         var bookedAt = root.GetProperty("bookedAt").GetDateTimeOffset();
         bookedAt.ShouldBeGreaterThanOrEqualTo(before.AddSeconds(-1));

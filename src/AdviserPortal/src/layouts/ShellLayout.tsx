@@ -22,6 +22,7 @@ import {
   PercentIcon,
   SplitIcon,
   PackageIcon,
+  PencilLineIcon,
   PackageSearchIcon,
 } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router";
@@ -67,10 +68,12 @@ import {
   canManageStatementLines,
   canAccessInKindTransfers,
   canApproveInKindTransfers,
+  canManageAdjustments,
   canManageCustodyMovements,
   canManageCustodianReconciliations,
 } from "@/features/session/roles";
 import { useGetCustodyMovementsQuery } from "@/features/custodyMovements/custodyMovementsApi";
+import { useGetAdjustmentRequestsQuery } from "@/features/adjustmentRequests/adjustmentRequestsApi";
 import { useGetInKindTransfersQuery } from "@/features/inKindTransfers/inKindTransfersApi";
 import { ModeToggle } from '@/components/mode-toggle';
 
@@ -92,6 +95,8 @@ export function ShellLayout({ children }: { children?: ReactNode }) {
   // D88: a TenantAdmin sees the transfers waiting for approval; D90: the custody movements in suspense.
   const waiting = useGetInKindTransfersQuery({ status: "Requested", pageSize: 1 }, { skip: !canApproveInKindTransfers(role) });
   const suspense = useGetCustodyMovementsQuery({ status: "Unmatched", pageSize: 1 }, { skip: !canManageCustodyMovements(role) });
+  // adjustment-review D103: a TenantAdmin sees the adjustments waiting for approval.
+  const adjustments = useGetAdjustmentRequestsQuery({ status: "Requested", pageSize: 1 }, { skip: !canManageAdjustments(role) });
 
   const nav: ShellNavItem[] = [
     {
@@ -190,6 +195,14 @@ export function ShellLayout({ children }: { children?: ReactNode }) {
       icon: PackageIcon,
       visible: canAccessInKindTransfers(role),
       count: waiting.data?.totalCount,
+    },
+    {
+      // adjustment-review D103.
+      to: "/adjustments",
+      label: "Adjustments",
+      icon: PencilLineIcon,
+      visible: canManageAdjustments(role),
+      count: adjustments.data?.totalCount,
     },
     {
       // in-kind-transfers D90.

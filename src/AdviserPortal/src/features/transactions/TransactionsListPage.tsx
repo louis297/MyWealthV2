@@ -1,5 +1,4 @@
 import { Link, useSearchParams } from "react-router";
-import { useAppSelector } from "@/app/hooks";
 import { FilterBar, Muted, Page, PageHeading, recordLinkClass, TextField } from "@/components/portal";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -44,7 +43,6 @@ function legOwners(item: Transaction) {
 
 export function TransactionsListPage() {
   const [params, setParams] = useSearchParams();
-  const role = useAppSelector((state) => state.session.currentUser?.role);
   const page = Number(params.get("page") || "1") || 1;
   const accountId = params.get("accountId") ?? "";
   const customerId = params.get("customerId") ?? "";
@@ -142,7 +140,7 @@ export function TransactionsListPage() {
                       <TableCell>{securityText(item.security)}</TableCell>
                       <TableCell>{item.memo ?? ""}</TableCell>
                       <TableCell className="whitespace-normal">
-                        {canReverse(item, role) ? <ReverseTransactionButton id={item.id} /> : null}
+                        {canReverse(item) ? <ReverseTransactionButton id={item.id} /> : null}
                       </TableCell>
                     </TableRow>
                   );

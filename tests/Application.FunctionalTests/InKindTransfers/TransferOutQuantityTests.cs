@@ -101,10 +101,9 @@ public class TransferOutQuantityTests : TestBase
         await world.RequestAsync("Out", 40m);
 
         var sell = await world.Orders.TryPlaceAsync("Sell", 61m);
-        var adjustment = await CustodialHttp.PostAsync(
+        var adjustment = await AdjustmentWorld.PostAsync(
             world.TenantAdmin,
-            AdjustmentWorld.Body(world.AccountId, security: AdjustmentWorld.Holding(world.InstrumentId, -61m, -1525m)),
-            AdjustmentWorld.Path);
+            AdjustmentWorld.Body(world.AccountId, security: AdjustmentWorld.Holding(world.InstrumentId, -61m, -1525m)));
 
         (await CustodialHttp.ErrorsAsync(sell))["Quantity"].ShouldBe(["The account has 60 ACME available to sell."]);
         (await CustodialHttp.ErrorsAsync(adjustment))["Security"].ShouldBe(["40 ACME is reserved for sell orders and transfers out."]);

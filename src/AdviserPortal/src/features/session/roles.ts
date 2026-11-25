@@ -138,6 +138,12 @@ export function canApproveInKindTransfers(role: string | null | undefined) {
   return role === roles.tenantAdmin;
 }
 
+/** transactions.adjust: the Adjustments pages, their count, and the open requests on an account (adjustment-review
+ * D103–D105). */
+export function canManageAdjustments(role: string | null | undefined) {
+  return role === roles.tenantAdmin;
+}
+
 /** custody-movements.manage: the Custody movements page (in-kind-transfers D90). */
 export function canManageCustodyMovements(role: string | null | undefined) {
   return role === roles.tenantAdmin;

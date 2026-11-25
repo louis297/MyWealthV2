@@ -2,14 +2,13 @@ import { useState } from "react";
 import { Messages } from "@/components/portal";
 import { Button } from "@/components/ui/button";
 import { kindLabel, ratioText } from "@/features/corporateActions/corporateActionText";
-import { roles } from "@/features/session/roles";
 import { useReverseTransactionMutation } from "@/features/transactions/transactionsApi";
 
 /**
  * D27: Reverse is offered on a posted item that is not a Reversal, is not reversed, and has a hand-reversible
  * source (`Manual`; rebalances R28 took `Rebalance` out). The portal does not read the custody mode for it
  * (transaction-source §9).
- * D31: an `Adjustment` is reversed only by a TenantAdmin (adjustments R17).
+ * adjustment-review D106: Reverse is never offered on an `Adjustment`, also one with source `Manual`.
  */
 export function canReverse(
   item: {
@@ -17,13 +16,9 @@ export function canReverse(
     reversedByTransactionId?: string | null;
     source?: { kind: string } | null;
   },
-  role: string | null | undefined,
 ) {
   const handReversible = item.source?.kind === "Manual";
-  if (item.type === "Adjustment" && role !== roles.tenantAdmin) {
-    return false;
-  }
-  return handReversible && item.type !== "Reversal" && !item.reversedByTransactionId;
+  return handReversible && item.type !== "Reversal" && item.type !== "Adjustment" && !item.reversedByTransactionId;
 }
 
 /** Adjustments §9: the label of an adjustment reason. */
@@ -41,9 +36,6 @@ export function adjustmentReasonLabel(reason: string) {
       return reason;
   }
 }
-
-/** D31: the sentence for a 403 from reverse, which only an adjustment returns. */
-export const adjustmentReverseForbidden = "Only a firm administrator can reverse an adjustment.";
 
 /** D57: the type of a transaction; the remainder write-off of an account closure reads as rounding. D68: an
  * entitlement posting reads as its corporate action, for example "Share split 2 for 1". */
@@ -88,15 +80,14 @@ export function sourceLabel(kind: string | undefined) {
       return "Order";
     case "Migration":
       return "Migration batch";
+    case "AdjustmentRequest":
+      return "Adjustment request";
     default:
       return kind;
   }
 }
 
 function problemMessages(error: unknown): string[] {
-  if (typeof error === "object" && error !== null && "status" in error && error.status === 403) {
-    return [adjustmentReverseForbidden];
-  }
   if (typeof error !== "object" || error === null || !("data" in error)) {
     return [];
   }

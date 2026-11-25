@@ -88,6 +88,10 @@ public class RequestAccountClosureCommandHandler(
     public const string OpenTransferMessage =
         "Open transfers of securities must be completed, rejected, cancelled or set aside before the account can be closed.";
 
+    /// <summary>Adjustment review R17: an open adjustment request says the balance may be wrong.</summary>
+    public const string OpenAdjustmentRequestMessage =
+        "Open adjustment requests must be approved, rejected or cancelled before the account can be closed.";
+
     public async Task<IdempotentResult> Handle(RequestAccountClosureCommand request, CancellationToken cancellationToken)
     {
         var tenantId = currentUser.TenantId ?? throw new ForbiddenAccessException();
@@ -192,6 +196,14 @@ public class RequestAccountClosureCommandHandler(
         if (await InKindTransfers.InKindTransferRules.HasOpenTransferAsync(db, account.Id, cancellationToken))
         {
             throw Error(nameof(RequestAccountClosureCommand.AccountId), OpenTransferMessage);
+        }
+
+        // Adjustment review R17: an open adjustment request waits for its decision.
+        if (await db.AdjustmentRequests.AnyAsync(
+                row => row.AccountId == account.Id && row.Status == AdjustmentRequestStatus.Requested,
+                cancellationToken))
+        {
+            throw Error(nameof(RequestAccountClosureCommand.AccountId), OpenAdjustmentRequestMessage);
         }
 
         // Dividends R46: a Pending dividend entitlement keeps the account open until it is posted.

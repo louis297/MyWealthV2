@@ -43,12 +43,13 @@ function instrument(id: string, symbol: string, name: string) {
 const routes = [
   { path: "/accounts/:id/adjust", element: <CreateAdjustmentPage /> },
   { path: "/accounts/:id", element: <p>account page</p> },
+  { path: "/adjustments/:id", element: <p>adjustment page</p> },
 ];
 
 function serve(onCreate: (body: Record<string, unknown>) => Response = () => json({ id: createdId }, 201)): Handler {
   return async (request) => {
     const url = new URL(request.url);
-    if (request.method === "POST" && url.pathname === "/api/transactions/adjustment") {
+    if (request.method === "POST" && url.pathname === "/api/adjustment-requests") {
       return onCreate(JSON.parse(await request.clone().text()) as Record<string, unknown>);
     }
     if (request.method !== "GET") {
@@ -81,7 +82,7 @@ async function fillCashAndCost() {
   fireEvent.change(await screen.findByLabelText("Cost change (USD)"), { target: { value: "0.60" } });
 }
 
-describe("CreateAdjustmentPage (adviser-portal-dashboard D29)", () => {
+describe("CreateAdjustmentPage (adviser-portal-dashboard D29, adjustment-review D102)", () => {
   beforeEach(() => {
     stubBrowser(path);
     vi.spyOn(crypto, "randomUUID").mockReturnValue(idempotencyKey);
@@ -107,20 +108,21 @@ describe("CreateAdjustmentPage (adviser-portal-dashboard D29)", () => {
     expect(within(listbox).getByRole("option", { name: "VTI Vanguard" })).toBeInTheDocument();
   });
 
-  it("reviews the changes as entered and posts the body with one key and no bookedAt", async () => {
+  it("reviews the changes as entered, says a second person approves, requests with one key and opens the request", async () => {
     const { requests, router } = renderFees(feeUser(), routes, path, serve());
     await fillCashAndCost();
 
     fireEvent.click(screen.getByRole("button", { name: "Review adjustment" }));
 
     expect(await screen.findByText("Cash −0.60 USD; AAPL quantity 0, cost +0.60 USD")).toBeInTheDocument();
-    expect(requestsTo(requests, "POST", "/transactions/adjustment")).toHaveLength(0);
+    expect(screen.getByText("Another firm administrator must approve this adjustment before it is posted.")).toBeInTheDocument();
+    expect(requestsTo(requests, "POST", "/adjustment-requests")).toHaveLength(0);
 
     fireEvent.click(screen.getByRole("button", { name: "Confirm adjustment" }));
 
-    expect(await screen.findByText("account page")).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe(`/accounts/${accountId}`);
-    const [post] = requestsTo(requests, "POST", "/transactions/adjustment");
+    expect(await screen.findByText("adjustment page")).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/adjustments/${createdId}`);
+    const [post] = requestsTo(requests, "POST", "/adjustment-requests");
     expect(post.headers.get("Idempotency-Key")).toBe(idempotencyKey);
     expect(JSON.parse(await post.clone().text())).toEqual({
       accountId,
@@ -142,8 +144,8 @@ describe("CreateAdjustmentPage (adviser-portal-dashboard D29)", () => {
     expect(await screen.findByText("Cash +12.50 USD")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Confirm adjustment" }));
 
-    expect(await screen.findByText("account page")).toBeInTheDocument();
-    const [post] = requestsTo(requests, "POST", "/transactions/adjustment");
+    expect(await screen.findByText("adjustment page")).toBeInTheDocument();
+    const [post] = requestsTo(requests, "POST", "/adjustment-requests");
     expect(JSON.parse(await post.clone().text())).toEqual({
       accountId,
       reason: "ReconciliationBreak",
@@ -181,7 +183,7 @@ describe("CreateAdjustmentPage (adviser-portal-dashboard D29)", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Confirm adjustment" }));
 
     expect(await screen.findByText("Cash balance cannot become negative.")).toBeInTheDocument();
-    const posts = requestsTo(requests, "POST", "/transactions/adjustment");
+    const posts = requestsTo(requests, "POST", "/adjustment-requests");
     expect(posts).toHaveLength(2);
     expect(posts.map((post) => post.headers.get("Idempotency-Key"))).toEqual([idempotencyKey, idempotencyKey]);
   });

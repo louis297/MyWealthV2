@@ -500,7 +500,7 @@ describe("TransactionDetailPage cash legs (adviser-portal-fees F13)", () => {
   });
 });
 
-describe("TransactionDetailPage adjustment (adviser-portal-dashboard D30, D31)", () => {
+describe("TransactionDetailPage adjustment (adviser-portal-dashboard D30, adjustment-review D106)", () => {
   const path = `/transactions/${originalId}`;
   const routes = [{ path: "/transactions/:id", element: <TransactionDetailPage /> }];
   const adjustment = {
@@ -558,25 +558,14 @@ describe("TransactionDetailPage adjustment (adviser-portal-dashboard D30, D31)",
     expect(screen.queryByText(/^Reason:/)).not.toBeInTheDocument();
   });
 
-  it("offers Reverse on an adjustment to a TenantAdmin", async () => {
-    renderFees(feeUser(), routes, path, serve(adjustment));
-
-    expect(await screen.findByRole("button", { name: "Reverse" })).toBeInTheDocument();
-  });
-
-  it("hides Reverse on an adjustment from an Adviser", async () => {
-    renderFees(adviser(), routes, path, serve(adjustment));
+  it.each([
+    ["TenantAdmin", feeUser()],
+    ["Adviser", adviser()],
+  ])("never offers Reverse on an adjustment with source Manual to a %s (adjustment-review D106)", async (_role, who) => {
+    renderFees(who, routes, path, serve(adjustment));
 
     expect(await screen.findByText("Reason: Entry error")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
-  });
-
-  it("shows the firm administrator sentence on a 403 from reverse", async () => {
-    renderFees(feeUser(), routes, path, serve(adjustment, () => new Response("", { status: 403 })));
-
-    fireEvent.click(await screen.findByRole("button", { name: "Reverse" }));
-
-    expect(await screen.findByText("Only a firm administrator can reverse an adjustment.")).toBeInTheDocument();
   });
 });
 

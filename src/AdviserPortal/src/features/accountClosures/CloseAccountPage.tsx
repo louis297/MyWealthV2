@@ -15,14 +15,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { SelectItem } from "@/components/ui/select";
+import { useAppSelector } from "@/app/hooks";
 import { useRequestAccountClosureMutation } from "@/features/accountClosures/accountClosuresApi";
 import { useGetAccountHoldingsQuery, useGetAccountQuery } from "@/features/accounts/accountsApi";
+import { useGetAdjustmentRequestsQuery } from "@/features/adjustmentRequests/adjustmentRequestsApi";
 import { closureAmounts, isCustodial } from "@/features/accounts/custodyRules";
 import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
 import { useGetNominatedBankAccountsQuery } from "@/features/nominatedBankAccounts/nominatedBankAccountsApi";
 import { orderFilters } from "@/features/orders/orderLabels";
 import { useGetOrdersQuery } from "@/features/orders/ordersApi";
 import { useGetAccountPortfolioQuery } from "@/features/portfolios/portfoliosApi";
+import { canManageAdjustments } from "@/features/session/roles";
 import { problemMessages } from "@/features/statementLines/statementLineLabels";
 import { maskAccountNumber } from "@/features/withdrawals/WithdrawPage";
 import { useGetWithdrawalsQuery } from "@/features/withdrawals/withdrawalsApi";
@@ -34,6 +37,9 @@ export const openOrderSentence = "Open orders must be filled, cancelled or expir
 export const unsettledSentence = "Trades must settle before the account can be closed.";
 export const portfolioSentence = "Unassign the portfolio before closing the account.";
 export const openWithdrawalSentence = "Open withdrawals must be paid, rejected or cancelled before the account can be closed.";
+/** Adjustment review R17. */
+export const openAdjustmentSentence =
+  "Open adjustment requests must be approved, rejected or cancelled before the account can be closed.";
 
 function FieldError({ messages }: { messages?: string[] }) {
   return messages?.length ? <p className="text-sm text-destructive">{messages.join(" ")}</p> : null;
@@ -68,6 +74,12 @@ export function CloseAccountPage() {
   const assignment = useGetAccountPortfolioQuery(accountId, { skip: !accountId });
   const open = useGetWithdrawalsQuery({ accountId, status: "Requested,Approved,Sent" }, { skip: !accountId });
   const orders = useGetOrdersQuery({ accountId, status: orderFilters.Open.status }, { skip: !accountId });
+  // adjustment-review D105: a TenantAdmin sees the open adjustment requests; an Adviser gets the server's refusal.
+  const role = useAppSelector((state) => state.session.currentUser?.role);
+  const adjustments = useGetAdjustmentRequestsQuery(
+    { accountId, status: "Requested", pageSize: 1 },
+    { skip: !accountId || !canManageAdjustments(role) },
+  );
   const currencies = useGetCurrenciesQuery();
   const places = currencies.data?.find((item) => item.code === account.data?.currency)?.decimalPlaces;
   const amounts = account.data ? closureAmounts(account.data.cashBalance, places) : { payout: 0, remainder: 0 };
@@ -96,7 +108,9 @@ export function CloseAccountPage() {
   // D75 (orders R47): a live order and a trade that has not settled block the closure.
   const openOrder = orders.data?.items[0];
   const unsettled = (data.unsettledCash ?? 0) > 0;
-  const checksPass = holdings.data.items.length === 0 && !activeAssignment && !openWithdrawal && !openOrder && !unsettled;
+  const openAdjustment = adjustments.data?.items[0];
+  const checksPass = holdings.data.items.length === 0 && !activeAssignment && !openWithdrawal && !openOrder && !unsettled
+    && !openAdjustment;
   const withPayout = amounts.payout > 0;
   const choices = payees.data?.items ?? [];
   const payee = choices.find((item) => item.id === payeeId);
@@ -159,6 +173,14 @@ export function CloseAccountPage() {
               <Link to={`/withdrawals/${openWithdrawal.id}`} className={recordLinkClass}>View the withdrawal</Link>
             ) : null}
           </Check>
+          {canManageAdjustments(role) ? (
+            <Check label="No open adjustment requests" passed={!openAdjustment}>
+              {openAdjustmentSentence}{" "}
+              {openAdjustment ? (
+                <Link to={`/adjustments/${openAdjustment.id}`} className={recordLinkClass}>View the adjustment</Link>
+              ) : null}
+            </Check>
+          ) : null}
         </ul>
       </Section>
       <Card>

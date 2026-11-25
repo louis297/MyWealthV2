@@ -178,8 +178,8 @@ public class BankReconciliationRunTests : TestBase
         Items(broken).ShouldBe([("Suspense", "Break", -100m, 1)]);
         broken.GetProperty("items")[0].GetProperty("statementLine").GetProperty("direction").GetString().ShouldBe("Debit");
 
-        (await CustodialHttp.PostAsync(world.TenantAdmin.AccessToken,
-                AdjustmentWorld.Body(world.AccountId, amount: -30m, reason: "ReconciliationBreak"), AdjustmentWorld.Path))
+        (await AdjustmentWorld.PostAsync(world.TenantAdmin.AccessToken,
+                AdjustmentWorld.Body(world.AccountId, amount: -30m, reason: "ReconciliationBreak")))
             .StatusCode.ShouldBe(HttpStatusCode.Created);
         (await StatementLineHttp.ActAsync(world.TenantAdmin.AccessToken, recall.PublicId, "ignore",
             new() { ["note"] = "Recalled after the cash was paid out" })).StatusCode.ShouldBe(HttpStatusCode.NoContent);

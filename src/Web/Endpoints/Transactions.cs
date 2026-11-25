@@ -1,7 +1,6 @@
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Transactions;
 using System.Text.Json;
-using MyWealthV2.Application.Transactions.Commands.CreateAdjustment;
 using MyWealthV2.Application.Transactions.Commands.CreateFxConversion;
 using MyWealthV2.Application.Transactions.Commands.CreateInternalTransfer;
 using MyWealthV2.Application.Transactions.Commands.CreateTransaction;
@@ -26,7 +25,6 @@ public class Transactions : IEndpointGroup
         groupBuilder.MapPost(CreateInternalTransfer, "transfer").RequireAuthorization(Policies.TransactionsCreate);
         groupBuilder.MapPost(CreateFxConversion, "fx").RequireAuthorization(Policies.TransactionsCreate);
         groupBuilder.MapPost(GetFxConversionQuote, "fx/quote").RequireAuthorization(Policies.TransactionsCreate);
-        groupBuilder.MapPost(CreateAdjustment, "adjustment").RequireAuthorization(Policies.TransactionsAdjust);
         groupBuilder.MapPost(ReverseTransaction, "{id}/reverse").RequireAuthorization(Policies.TransactionsCreate);
     }
 
@@ -101,28 +99,6 @@ public class Transactions : IEndpointGroup
         command.IdempotencyKey = string.IsNullOrWhiteSpace(key) ? null : key;
         command.RequestMethod = httpRequest.Method;
         command.RequestPath = httpRequest.Path.Value ?? "/transactions/fx";
-        var result = await sender.Send(command);
-        if (result.StatusCode == StatusCodes.Status201Created)
-        {
-            using var body = JsonDocument.Parse(result.Body);
-            httpRequest.HttpContext.Response.Headers.Location =
-                $"/transactions/{body.RootElement.GetProperty("id").GetGuid()}";
-        }
-
-        return Results.Content(result.Body, "application/json", statusCode: result.StatusCode);
-    }
-
-    [EndpointSummary("Create an adjustment")]
-    [EndpointDescription("Corrects the cash, one holding, or both on an Open Custodial account, with a required reason and memo. TenantAdmin only. Requires Idempotency-Key.")]
-    public static async Task<IResult> CreateAdjustment(
-        ISender sender,
-        HttpRequest httpRequest,
-        CreateAdjustmentCommand command)
-    {
-        var key = httpRequest.Headers["Idempotency-Key"].ToString();
-        command.IdempotencyKey = string.IsNullOrWhiteSpace(key) ? null : key;
-        command.RequestMethod = httpRequest.Method;
-        command.RequestPath = httpRequest.Path.Value ?? "/transactions/adjustment";
         var result = await sender.Send(command);
         if (result.StatusCode == StatusCodes.Status201Created)
         {

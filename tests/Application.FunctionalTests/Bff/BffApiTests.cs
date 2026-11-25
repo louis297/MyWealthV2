@@ -482,6 +482,45 @@ public class BffApiTests
     }
 
     [Test]
+    public async Task Session_ProxiesAdjustmentRequests()
+    {
+        // adjustment-review §8 (bff-adviser-portal): /adjustment-requests is on the prefix allow-list.
+        var id = Guid.NewGuid();
+        _api.Scripts["/adjustment-requests"] = (HttpStatusCode.OK, """{"items":[],"page":1,"pageSize":20,"totalCount":0}""");
+        _api.Scripts[$"/adjustment-requests/{id}"] = (HttpStatusCode.OK, "{}");
+        foreach (var action in new[] { "approve", "reject", "cancel" })
+        {
+            _api.Scripts[$"/adjustment-requests/{id}/{action}"] = (HttpStatusCode.NoContent, "");
+        }
+
+        foreach (var (method, path) in new[]
+                 {
+                     (HttpMethod.Get, "/api/adjustment-requests?status=Requested"),
+                     (HttpMethod.Get, $"/api/adjustment-requests/{id}"),
+                     (HttpMethod.Post, "/api/adjustment-requests"),
+                     (HttpMethod.Post, $"/api/adjustment-requests/{id}/approve"),
+                     (HttpMethod.Post, $"/api/adjustment-requests/{id}/reject"),
+                     (HttpMethod.Post, $"/api/adjustment-requests/{id}/cancel")
+                 })
+        {
+            using var request = new HttpRequestMessage(method, path);
+            request.Headers.TryAddWithoutValidation("Cookie", _sessionCookie);
+            if (method != HttpMethod.Get)
+            {
+                request.Headers.TryAddWithoutValidation(RequestHeader, "1");
+                request.Content = new StringContent("""{"rowVersion":"AAAA"}""", System.Text.Encoding.UTF8, "application/json");
+            }
+
+            var response = await _bff.SendAsync(request);
+            response.StatusCode.ShouldNotBe(HttpStatusCode.NotFound, path);
+        }
+
+        _api.Calls.ShouldContain(call => call.Path == "/adjustment-requests");
+        _api.Calls.ShouldContain(call => call.Path == $"/adjustment-requests/{id}");
+        _api.Calls.ShouldContain(call => call.Path == $"/adjustment-requests/{id}/approve");
+    }
+
+    [Test]
     public async Task Session_ProxiesRebalances_ReadsConfirmAndCancel()
     {
         // bff-adviser-portal amendment 2026-11-23 (rebalances): /rebalances is on the prefix allow-list.

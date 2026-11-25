@@ -71,8 +71,8 @@ public class WithdrawableCashTests : TestBase
         // 45 at the limit of 105.00 is 4 725.00, plus a fee of 23.63: more than the 4 000.00 that is withdrawable.
         var order = await world.TryPlaceAsync("Buy", 45m);
         order.StatusCode.ShouldBe(HttpStatusCode.Created, await order.Content.ReadAsStringAsync());
-        var adjustment = await CustodialHttp.PostAsync(
-            world.TenantAdmin, AdjustmentWorld.Body(world.AccountId, amount: -200m), AdjustmentWorld.Path);
+        var adjustment = await AdjustmentWorld.PostAsync(
+            world.TenantAdmin, AdjustmentWorld.Body(world.AccountId, amount: -200m));
         adjustment.StatusCode.ShouldBe(HttpStatusCode.Created, await adjustment.Content.ReadAsStringAsync());
 
         (await world.CashAsync()).ShouldBe((4785.00m, 4748.63m, 36.37m));

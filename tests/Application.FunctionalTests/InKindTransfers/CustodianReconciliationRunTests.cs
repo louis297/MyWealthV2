@@ -118,9 +118,8 @@ public class CustodianReconciliationRunTests : TestBase
         await TransferHttp.PullAndProcessAsync();
 
         var suspense = Line(await RunAsync(world));
-        var adjustment = await CustodialHttp.PostAsync(world.TenantAdmin,
-            AdjustmentWorld.Body(world.AccountId, reason: "ReconciliationBreak", security: AdjustmentWorld.Holding(world.InstrumentId, 50m, 1250m)),
-            AdjustmentWorld.Path);
+        var adjustment = await AdjustmentWorld.PostAsync(world.TenantAdmin,
+            AdjustmentWorld.Body(world.AccountId, reason: "ReconciliationBreak", security: AdjustmentWorld.Holding(world.InstrumentId, 50m, 1250m)));
         adjustment.StatusCode.ShouldBe(HttpStatusCode.Created, await adjustment.Content.ReadAsStringAsync());
         var adjusted = Line(await RunAsync(world));
         var movement = await TransferHttp.MovementAsync(outsideId);

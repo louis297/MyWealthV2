@@ -239,7 +239,7 @@ public class GenerateCustomerTransactionsTests : TestBase
     }
 
     [Test]
-    public async Task Execute_ShowsTheReasonOnAnAdjustmentRow_AndReversalOnItsReversal()
+    public async Task Execute_ShowsTheReasonOnAnAdjustmentRow()
     {
         var tenant = await TestApp.CreateTenantAsync("Firm Adjust Rows", "firm-adjust-rows");
         await TestApp.CreatePersonAsync(
@@ -253,10 +253,9 @@ public class GenerateCustomerTransactionsTests : TestBase
             "tess@firm-adjust-rows", "Password1!", "firm-adjust-rows");
         var managed = await CustodialHttp.OpenCustodialAsync(admin.AccessToken, customer.PublicId, "Managed");
         (await CustodialHttp.FundAsync(admin.AccessToken, managed, 40m)).StatusCode.ShouldBe(HttpStatusCode.Created);
-        var adjustment = await CustodialHttp.ReadIdAsync(await AdjustmentWorld.PostAsync(
+        await CustodialHttp.ReadIdAsync(await AdjustmentWorld.PostAsync(
             admin.AccessToken,
             AdjustmentWorld.Body(managed, amount: -5m, reason: "EntryError", memo: "Wrong deposit amount")));
-        (await CustodialHttp.ReverseAsync(admin.AccessToken, adjustment)).StatusCode.ShouldBe(HttpStatusCode.Created);
 
         var created = await TenantHttp.Send(
             HttpMethod.Post,
@@ -278,7 +277,6 @@ public class GenerateCustomerTransactionsTests : TestBase
         // The type column is narrow, so a cell can wrap; compare without whitespace.
         var text = string.Concat(ReadPdf(await File.ReadAllBytesAsync(path)).Where(ch => !char.IsWhiteSpace(ch)));
         text.ShouldContain("Adjustment(Entryerror)");
-        text.ShouldContain("Reversal");
         text.ShouldContain("Wrongdepositamount");
         text.IndexOf("Adjustment(", StringComparison.Ordinal)
             .ShouldBe(text.LastIndexOf("Adjustment(", StringComparison.Ordinal));

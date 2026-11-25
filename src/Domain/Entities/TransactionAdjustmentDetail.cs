@@ -1,6 +1,7 @@
 namespace MyWealthV2.Domain.Entities;
 
-/// <summary>Why an adjustment was entered. One per <c>Adjustment</c> and per its Reversal; immutable (adjustments §5).</summary>
+/// <summary>Why an adjustment was entered. One per <c>Adjustment</c>, and one per Reversal of an adjustment posted
+/// before adjustment review; immutable (adjustments §5). An adjustment is no longer reversed (adjustment-review R15).</summary>
 public class TransactionAdjustmentDetail
 {
     private TransactionAdjustmentDetail()
@@ -22,7 +23,4 @@ public class TransactionAdjustmentDetail
 
         return new TransactionAdjustmentDetail { TenantId = tenantId, Reason = reason };
     }
-
-    /// <summary>A new row with the same reason, for the Reversal (adjustments R18).</summary>
-    internal TransactionAdjustmentDetail Copy() => new() { TenantId = TenantId, Reason = Reason };
 }

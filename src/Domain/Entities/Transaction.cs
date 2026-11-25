@@ -1263,6 +1263,10 @@ public class Transaction : BaseAuditableEntity
     public const string AdjustmentHoldingMessage =
         "The holding cannot have a negative quantity or cost, or a cost without a quantity.";
 
+    /// <summary>Adjustment review R15: an <c>Adjustment</c> is never reversed; the opposite request corrects it.</summary>
+    public const string AdjustmentReverseMessage =
+        "An adjustment cannot be reversed. Request a new adjustment that corrects it.";
+
     /// <summary>
     /// Builds an <c>Adjustment</c> on one Account (adjustments §5): an optional signed cash leg, an optional signed
     /// security leg stored as entered, at least one of them, and the adjustment detail.
@@ -1363,6 +1367,11 @@ public class Transaction : BaseAuditableEntity
             throw new DomainException("A reversal cannot be reversed.");
         }
 
+        if (Type == TransactionType.Adjustment)
+        {
+            throw new DomainException(AdjustmentReverseMessage);
+        }
+
         if (ReversedByTransactionId is not null || ReversedBy is not null)
         {
             throw new DomainException("This transaction has already been reversed.");
@@ -1443,7 +1452,6 @@ public class Transaction : BaseAuditableEntity
             CashLegs = cashLegs,
             SecurityLegs = reversalLegs ?? [],
             FxDetail = FxDetail?.Copy(),
-            AdjustmentDetail = AdjustmentDetail?.Copy(),
             BankReceiptDetail = BankReceiptDetail?.Copy(),
             PaymentDetail = PaymentDetail?.Copy(),
             FeeDetails = cashLegs.Select(leg => leg.FeeDetail).OfType<TransactionFeeDetail>().ToList(),

@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-19
-last_updated: 2026-11-23
+last_updated: 2026-11-25
 related:
   - ../custodial-roadmap.md
   - posting.md
@@ -27,6 +27,7 @@ related:
   - migration-batches.md
   - in-kind-transfers.md
   - dividends.md
+  - adjustment-review.md
 ---
 
 # Transaction source
@@ -468,3 +469,14 @@ Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](
 
 - Kind `CorporateAction` (7) also marks a `Dividend`, with the corporate action's PublicId as its id. It stays not hand-reversible.
 - The transaction item gains `dividend` (dividends R50).
+
+---
+
+## Amendment 2026-11-25 (adjustment review) — accepted
+
+Status of this amendment: `accepted` (2026-11-25), together with [adjustment-review.md](adjustment-review.md). Rules R13, R15 and R21 live there; this section records what changes here.
+
+- New kind `AdjustmentRequest` (11), with the adjustment request's PublicId as its id. It marks an `Adjustment` posted by the approval of a request. It is not hand-reversible (R12).
+- R4: an adjustment is no longer a `Manual` write. Adjustments posted before 2026-11-25 keep `Manual`.
+- R13, R14: a hand reverse of a Transaction of type `Adjustment` is refused by its type, before R13 and with its own message (adjustment-review R15), also when its source is `Manual`.
+- `0058` widens `CK_Transactions_SourceKind` to 0–11 and requires a `SourcePublicId` for kinds 2–11.
