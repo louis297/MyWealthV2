@@ -16,7 +16,7 @@ public class BrokerConnectionsConfigurationTests
     [Test]
     public void NoConnections_IsValid_AndRegistersNone()
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
 
         builder.AddBrokerConnections(BrokerConnectionHost.Worker);
 
@@ -240,7 +240,7 @@ public class BrokerConnectionsConfigurationTests
 
     private static HostApplicationBuilder Builder(Dictionary<string, string?> values)
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
         builder.Configuration.AddInMemoryCollection(values);
         return builder;
     }

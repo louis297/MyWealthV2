@@ -24,7 +24,7 @@ public class BrokerServicesTests
     [TestCase(BrokerConnectionHost.Worker)]
     public void AHost_WithItsBrokerConnections_ResolvesTheBrokerPortsAndTheServicesThatUseThem(BrokerConnectionHost kind)
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
         // Building the host connects to nothing.
         builder.Configuration[$"ConnectionStrings:{Services.Database}"] = "Server=localhost;Database=unused;TrustServerCertificate=True";
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>

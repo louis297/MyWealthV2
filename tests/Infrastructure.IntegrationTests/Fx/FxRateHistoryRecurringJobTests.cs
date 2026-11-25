@@ -13,7 +13,7 @@ public class FxRateHistoryRecurringJobTests
     [Test]
     public void Register_AddsTheDailyUtcJobOnQueueFx()
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
         builder.Services.AddHangfire(configuration => configuration.UseInMemoryStorage());
         using var host = builder.Build();
 

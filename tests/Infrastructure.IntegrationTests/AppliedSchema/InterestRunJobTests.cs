@@ -133,14 +133,14 @@ public class InterestRunJobTests
 
     private static IHost HangfireHost()
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
         builder.Services.AddHangfire(configuration => configuration.UseInMemoryStorage());
         return builder.Build();
     }
 
     private static IHost WorkerHost(int? failTenant = null, int? accountFailureTenant = null)
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
         builder.Configuration[$"ConnectionStrings:{Services.Database}"] = SchemaDatabaseSetup.ConnectionString;
         builder.AddInfrastructureServices();
         builder.Services.AddScoped<IUser, SystemUser>();

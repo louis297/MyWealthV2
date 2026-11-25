@@ -12,7 +12,7 @@ public class InstrumentPriceRecurringJobTests
     [Test]
     public void Register_AddsTheDailyNoonUtcJob()
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
         builder.Services.AddHangfire(configuration => configuration.UseInMemoryStorage());
         using var host = builder.Build();
 

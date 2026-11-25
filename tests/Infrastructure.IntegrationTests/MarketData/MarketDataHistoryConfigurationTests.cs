@@ -14,7 +14,7 @@ public class MarketDataHistoryConfigurationTests
     [Test]
     public void NotSet_Starts_WithNoFloorDateAndTheDefaultDays()
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
 
         builder.AddMarketDataHistory();
 
@@ -100,7 +100,7 @@ public class MarketDataHistoryConfigurationTests
 
     private static HostApplicationBuilder Builder(params (string Key, string Value)[] values)
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
         builder.Configuration.AddInMemoryCollection(values.Select(pair => new KeyValuePair<string, string?>(pair.Key, pair.Value)));
         return builder;
     }

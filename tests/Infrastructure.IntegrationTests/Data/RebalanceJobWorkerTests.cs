@@ -54,7 +54,7 @@ public class RebalanceJobWorkerTests
 
     private static IHost WorkerHost(int pricedInstrumentId)
     {
-        var builder = Host.CreateApplicationBuilder();
+        var builder = TestHost.CreateBuilder();
         builder.Configuration[$"ConnectionStrings:{Services.Database}"] = SchemaDatabaseSetup.ConnectionString;
         builder.AddInfrastructureServices();
         builder.AddBrokerConnections(BrokerConnectionHost.Worker);
