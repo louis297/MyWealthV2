@@ -7,5 +7,5 @@ namespace MyWealthV2.Domain.MarketData;
 /// </summary>
 public static class MarketDataRow
 {
-    public static bool IsFinal(DateOnly asOfDate, DateOnly today) => false;
+    public static bool IsFinal(DateOnly asOfDate, DateOnly today) => asOfDate <= today.AddDays(-2);
 }

@@ -8,6 +8,8 @@ public sealed record MarketDataHistoryWindow
 {
     public MarketDataHistoryWindow(DateOnly floorDate, DateOnly today, int? days = null)
     {
+        var reach = days is { } count ? today.AddDays(-count) : floorDate;
+        From = reach > floorDate ? reach : floorDate;
         Today = today;
     }
 
@@ -16,5 +18,5 @@ public sealed record MarketDataHistoryWindow
 
     public DateOnly Today { get; }
 
-    public bool Contains(DateOnly date) => false;
+    public bool Contains(DateOnly date) => date >= From && date <= Today;
 }
