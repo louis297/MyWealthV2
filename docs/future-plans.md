@@ -3,7 +3,7 @@ title: Future plans
 status: note
 language: en
 created: 2026-11-10
-updated: 2026-11-23
+updated: 2026-11-25
 related:
   - README.md
   - function-plan.md
@@ -230,6 +230,8 @@ After slice 2, some writes on a Custodial account are still entered by hand or a
 - A controlled manual adjustment as the only hand-entered write.
 - A simulator of the outside parties (a bank first, then a broker) to drive these flows without real connections.
 - Rebuilding an account's position by replaying its transactions in order. Deferred until after the items above are under way.
+
+Status on 2026-11-25: every flow in the list has landed. The roadmap has two steps left (an end-to-end run with the scenario library, and the review of an adjustment by a second person). Replay and period close are moved out of it: they open when §1 needs them, at the latest with step 6. After those two steps, work returns to §1 at what is left of step 2, then step 3 ([custodial-roadmap.md](custodial-roadmap.md) §13.1).
 
 Related: the advisory fee (§1 step 4) and platform billing (§8) can then use Custodial accounts as their base.
 

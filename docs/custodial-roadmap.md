@@ -3,7 +3,7 @@ title: Custodial accounts roadmap
 status: note
 language: en
 created: 2026-11-19
-updated: 2026-11-24
+updated: 2026-11-25
 related:
   - future-plans.md
   - adr/0020-account-custody-mode.md
@@ -40,13 +40,16 @@ related:
   - features/migration-batches.md
   - features/in-kind-transfers.md
   - features/dividends.md
+  - features/demo-tenant-seed.md
 ---
 
 # Custodial accounts roadmap
 
-The five custody mode slices of [future-plans.md](future-plans.md) §9 have landed. A Custodial account can be opened, the manual entry matrix refuses the hand-entered types that write a position or a balance, the server sets `bookedAt`, and the read side shows funds under management. A Custodial account is still a hand-entered account, only with fewer types: deposits and withdrawals are typed in, trades are filled at once at the server's price, and some writes do not exist yet.
+**Status on 2026-11-25:** steps 0 to 15 of §13 have landed. The target of §2 holds, except the second person's approval of an adjustment (X1). What comes next, and where each remaining item goes, is in §13.1.
 
-This document plans the next part. The goal is that a Custodial account works like an account in a real wealth platform's books: its numbers come from platform-side flows driven by signals from outside parties (a bank, a broker, a custodian, an issuer), not from a person typing them. A separate simulator project plays those outside parties, so the flows can be tested by hand and shown in a demo.
+When this plan was written (2026-11-19), the five custody mode slices of [future-plans.md](future-plans.md) §9 had landed. A Custodial account could be opened, the manual entry matrix refused the hand-entered types that write a position or a balance, the server set `bookedAt`, and the read side showed funds under management. A Custodial account was still a hand-entered account, only with fewer types: deposits and withdrawals were typed in, trades were filled at once at the server's price, and some writes did not exist yet.
+
+This document plans the part after that. The goal is that a Custodial account works like an account in a real wealth platform's books: its numbers come from platform-side flows driven by signals from outside parties (a bank, a broker, a custodian, an issuer), not from a person typing them. A separate simulator project plays those outside parties, so the flows can be tested by hand and shown in a demo.
 
 How to use this document:
 
@@ -57,9 +60,11 @@ How to use this document:
 
 ---
 
-## 1. Where we are (2026-11-19)
+## 1. Where we started (2026-11-19)
 
-| Area | Today on a Custodial account | Where |
+This section is the starting point of the plan and is not kept up to date. The state today is the matrix in §2 and the table in §13.
+
+| Area | On a Custodial account on 2026-11-19 | Where |
 | --- | --- | --- |
 | Opening | `Brokerage` only, one cash currency, immutable custody mode. The tenant may limit which modes can be opened | custody-modes R3, tenant-custody-modes |
 | Hand entry | `TransferIn`, `TransferOut`, `CloseOut`, `Buy`, `Sell`, `InternalTransfer`, `FxConversion` and reverse are allowed. `Interest`, `Opening`, `OpeningHoldings`, `StockIn`, `StockOut`, `Split`, `Bonus`, `Scrip` are refused | `CustodyRules` in `src/Domain/Custody/CustodyRules.cs`, custody-modes R5 |
@@ -381,7 +386,7 @@ A Custodial `FxConversion` priced by an FX provider with a spread, instead of th
 | Item | What | Note |
 | --- | --- | --- |
 | X1 | Review of an adjustment by a second person | The first status on a Transaction, as [posting.md](features/posting.md) §1 describes. Balances, holdings and reports must ignore an unapproved row. Large; do after the flows. |
-| X2 | Cancel and rebook, replay | Rebuilding positions by replaying Transactions in order. Deferred (future-plans §9). Needed for tax lots and backdating. |
+| X2 | Cancel and rebook, replay | Rebuilding positions by replaying Transactions in order. Deferred (future-plans §9). Needed for tax lots and backdating. Moved to the business roadmap (§13.1). |
 | X3 | Period close | A date per Tenant before which nothing may be written. After X2. |
 | X4 | Third-party payments | See D14. |
 
@@ -493,9 +498,29 @@ Each step depends only on earlier steps. "Closes" names the matrix cell or known
 | 13 | T2 migration batch | S1 (no change) | "No opening balance" | [migration-batches](features/migration-batches.md) | accepted 2026-11-24, landed 2026-11-24 |
 | 14 | T1 in-kind transfer, T3 custodian reconciliation | S3; S2 and S4 (deliveries and corporate actions at the custodian) | "Existing positions cannot be moved in" | [in-kind-transfers](features/in-kind-transfers.md) | accepted 2026-11-24, landed 2026-11-24 |
 | 15 | C2 dividends, C3 reinvestment | S4 issuer dividends; S3 (dividend payments and elections) | `Dividend` reserved | [dividends](features/dividends.md) | accepted 2026-11-24, landed 2026-11-25 (with roadmap step 2, for Custodial accounts) |
-| later | X1 adjustment review, O4, O5, X2, X3 | — | — | — | not planned |
+| 16 | An end-to-end run across all parties; the scenario library of S0 | every party | — | — | next; not specified |
+| 17 | X1 adjustment review | — | The second person's approval of target 2 | — | next; not specified |
+| parked | O4 order aggregation, O5 FX through an outside party | S2 | — | — | not planned (§13.1) |
+| moved | X2 replay, X3 period close | — | "History cannot be entered" (X2) | — | with [future-plans.md](future-plans.md) §1 (§13.1) |
 
 Steps 9, 10 (10a, then 10b) and 13 do not depend on each other or on the bank stage beyond steps 1–3; they can move earlier if a demo needs them. Step 10 is the one to move first if a seeded instrument announces a split (see the known issue).
+
+### 13.1 After step 15 (2026-11-25)
+
+Every flow of the plan has landed. Of the five conditions of §2, four hold. The second sentence of condition 2, the second person's approval of an adjustment, is the only part left. The items that were listed as "later" are not one stage, so each gets its own answer here.
+
+| Item | Answer | Why |
+| --- | --- | --- |
+| Step 16: an end-to-end run and the scenario library | Next, before any new flow | Each step was tested with in-memory fakes of the ports (P9). The paths that cross steps through the simulator process are the least tested: a deposit, an order, its settlement, a dividend, interest, a withdrawal and a closure on one account, ending with a bank reconciliation and a custodian reconciliation that both agree. Every spec from S0 on put the scenario library off (§11); a named scenario now has steps across four parties to combine, which is the condition [simulator.md](features/simulator.md) §11 point 7 set for it. The demo tenant also has no client money account and no safekeeping account ([demo-tenant-seed.md](features/demo-tenant-seed.md)), so the showcase cannot open a Custodial account until SystemAdmin adds them. |
+| Step 17: X1 adjustment review | Next | It completes condition 2. §10 calls it large because it adds the first status on a Transaction, which balances, holdings and reports must then ignore. Since §10 was written, three flows have put a second person's approval on a record of their own, before any Transaction exists: withdrawals, migration batches and in-kind transfers. The spec decides whether an adjustment follows that pattern, which would amend [posting.md](features/posting.md) §1 and D3. |
+| O4 order aggregation and allocation | Parked | Nothing depends on it. It changes orders, trade settlement and the custodian reconciliation together. Open it only as a topic of its own. |
+| O5 FX through an outside party | Parked | Nothing depends on it, and §8 already calls it low priority. A Custodial `FxConversion` stays a hand entry at the reference rate, and the known difference `FxConversions` of B7. |
+| X2 replay, X3 period close | Moved out of this plan | They are not about Custodial accounts only. Replay is what booking at an outside date (D2), backdating and tax lots need, so it opens when the business roadmap needs it ([future-plans.md](future-plans.md) §1, at the latest step 6, the FIF report). X3 follows X2. |
+| X4 third-party payments | Unchanged | Refused (D14). No plan. |
+
+After steps 16 and 17 this plan is complete, and work returns to the business roadmap of [future-plans.md](future-plans.md) §1: what is left of step 2 (dividends and withholding on External accounts), then step 3, historical valuation.
+
+One row of the known issue stays open: history cannot be entered on a Custodial account. The simulator's clock does not close it, because the platform keeps the real clock (D9) and books at processing time (D2). X2 is what closes it.
 
 ---
 
