@@ -32,6 +32,7 @@ import {
 import { allowsManualEntry, isCustodial } from "@/features/accounts/custodyRules";
 import { AccountOrdersSection } from "@/features/orders/AccountOrdersSection";
 import { AccountWithdrawalsSection } from "@/features/withdrawals/AccountWithdrawalsSection";
+import { AccountAdjustmentRequestsSection } from "@/features/adjustmentRequests/AccountAdjustmentRequestsSection";
 import { AccountTransfersSection } from "@/features/inKindTransfers/AccountTransfersSection";
 import { withdrawalStatusLabel } from "@/features/withdrawals/withdrawalLabels";
 import { useGetWithdrawalQuery } from "@/features/withdrawals/withdrawalsApi";
@@ -567,6 +568,8 @@ export function AccountDetailPage() {
       {isCustodial(data) ? <AccountOrdersSection accountId={data.id} /> : null}
       {isCustodial(data) ? <AccountTransfersSection accountId={data.id} /> : null}
       {isCustodial(data) ? <AccountWithdrawalsSection accountId={data.id} /> : null}
+      {/* adjustment-review D105: the account's open adjustment requests, above the activity. */}
+      {isCustodial(data) && role === roles.tenantAdmin ? <AccountAdjustmentRequestsSection accountId={data.id} /> : null}
       <Section title="Activity">
         {(transactions.data?.items.length ?? 0) === 0 ? <Muted>No activity.</Muted> : (
           <Card className="gap-0 py-0">
@@ -604,7 +607,7 @@ export function AccountDetailPage() {
                           <p className="text-muted-foreground text-xs">{`Settles ${shortDay(item.execution.settlementDate)}`}</p>
                         ) : null}
                       </TableCell>
-                      <TableCell>{canReverse(item, role) && !closing ? <ReverseTransactionButton id={item.id} /> : null}</TableCell>
+                      <TableCell>{canReverse(item) && !closing ? <ReverseTransactionButton id={item.id} /> : null}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

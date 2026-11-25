@@ -7,8 +7,9 @@ import { SelectItem } from "@/components/ui/select";
 import { useGetAccountHoldingsQuery, useGetAccountQuery } from "@/features/accounts/accountsApi";
 import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
 import { useGetInstrumentsQuery } from "@/features/instruments/instrumentsApi";
+import { approvalSentence } from "@/features/adjustmentRequests/adjustmentRequestLabels";
+import { type RequestAdjustmentBody, useRequestAdjustmentMutation } from "@/features/adjustmentRequests/adjustmentRequestsApi";
 import { adjustmentReasonLabel } from "@/features/transactions/ReverseTransactionButton";
-import { type CreateAdjustmentBody, useCreateAdjustmentMutation } from "@/features/transactions/transactionsApi";
 
 const reasons = ["EntryError", "CorporateAction", "ReconciliationBreak", "Other"] as const;
 
@@ -86,7 +87,8 @@ function signed(value: number, places?: number) {
   return text;
 }
 
-/** D29: `/accounts/:id/adjust`, a TenantAdmin's correction of the cash, one holding, or both. */
+/** D29: `/accounts/:id/adjust`, a TenantAdmin's correction of the cash, one holding, or both. adjustment-review D102:
+ * Confirm requests it, and a second firm administrator approves it on `/adjustments/:id`. */
 export function CreateAdjustmentPage() {
   const { id: accountId } = useParams();
   const navigate = useNavigate();
@@ -95,7 +97,7 @@ export function CreateAdjustmentPage() {
   const holdings = useGetAccountHoldingsQuery(accountId ?? "", { skip: !accountId });
   const instruments = useGetInstrumentsQuery();
   const currencies = useGetCurrenciesQuery();
-  const [createAdjustment, { isLoading }] = useCreateAdjustmentMutation();
+  const [requestAdjustment, { isLoading }] = useRequestAdjustmentMutation();
   const [reason, setReason] = useState("");
   const [memo, setMemo] = useState("");
   const [cash, setCash] = useState("");
@@ -127,7 +129,7 @@ export function CreateAdjustmentPage() {
     };
   }
 
-  function draft(): { body: CreateAdjustmentBody; review: string } | { problems: string[] } {
+  function draft(): { body: RequestAdjustmentBody; review: string } | { problems: string[] } {
     const problems: string[] = [];
     const cashValue = parse(cash);
     const quantityValue = quantity.trim() === "" ? 0 : parse(quantity);
@@ -152,7 +154,7 @@ export function CreateAdjustmentPage() {
     }
 
     const parts: string[] = [];
-    const body: CreateAdjustmentBody = { accountId, reason, memo: memo.trim(), reference: null };
+    const body: RequestAdjustmentBody = { accountId, reason, memo: memo.trim(), reference: null };
     if (cashValue !== null) {
       body.amount = cashValue;
       parts.push(`Cash ${signed(cashValue, places(account.data.currency))} ${account.data.currency}`);
@@ -186,8 +188,8 @@ export function CreateAdjustmentPage() {
     }
     setFieldErrors({});
     try {
-      await createAdjustment({ body: result.body, idempotencyKey }).unwrap();
-      void navigate(`/accounts/${accountId}`);
+      const created = await requestAdjustment({ body: result.body, idempotencyKey }).unwrap();
+      void navigate(`/adjustments/${created.id}`);
     } catch (error: unknown) {
       const parsed = problem(error);
       setMessages(parsed.messages);
@@ -279,6 +281,7 @@ export function CreateAdjustmentPage() {
               {review ? (
                 <div className="flex flex-col gap-2">
                   <p className="text-sm">{review}</p>
+                  <p className="text-muted-foreground text-sm">{approvalSentence}</p>
                   <div className="flex gap-2">
                     <Button type="button" disabled={isLoading} onClick={() => void onConfirm()}>
                       Confirm adjustment

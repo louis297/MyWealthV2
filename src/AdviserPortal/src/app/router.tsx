@@ -55,6 +55,8 @@ import { WithdrawalDetailPage } from "@/features/withdrawals/WithdrawalDetailPag
 import { WithdrawalsListPage } from "@/features/withdrawals/WithdrawalsListPage";
 import { CloseAccountPage } from "@/features/accountClosures/CloseAccountPage";
 import { WithdrawPage } from "@/features/withdrawals/WithdrawPage";
+import { AdjustmentDetailPage } from "@/features/adjustmentRequests/AdjustmentDetailPage";
+import { AdjustmentsListPage } from "@/features/adjustmentRequests/AdjustmentsListPage";
 import { TransferDetailPage } from "@/features/inKindTransfers/TransferDetailPage";
 import { TransferSecuritiesPage } from "@/features/inKindTransfers/TransferSecuritiesPage";
 import { TransfersListPage } from "@/features/inKindTransfers/TransfersListPage";
@@ -245,6 +247,15 @@ export const appRoutes: RouteObject[] = [
             children: [
               { index: true, element: <TransfersListPage /> },
               { path: ":id", element: <TransferDetailPage /> },
+            ],
+          },
+          {
+            // adjustment-review D103, D104: an Adviser who opens the route gets the firm administrator sentence from the 403.
+            path: "/adjustments",
+            element: <RoleGate allow={[roles.tenantAdmin, roles.adviser]} />,
+            children: [
+              { index: true, element: <AdjustmentsListPage /> },
+              { path: ":id", element: <AdjustmentDetailPage /> },
             ],
           },
           {
