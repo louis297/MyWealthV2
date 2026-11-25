@@ -134,6 +134,8 @@ services:
       ConnectionStrings__MyWealthDbV2: *connection-string
       Reports__StorageRoot: /reports
       Eodhd__ApiKey: ${EODHD_API_KEY:?}
+      # History floor date (market-data-history R1, §9.1): prices and rates are stored for every date from it.
+      MarketDataHistory__FloorDate: ${MARKET_DATA_HISTORY_FLOOR_DATE:-2026-01-01}
       # Bank connection `simulator` (deposit-matching R1, R6). Worker does not depend on the simulator: with its
       # profile off, each run of the bank statement job fails with Unreachable and keeps its cursor.
       BankConnections__simulator__Adapter: Simulator
