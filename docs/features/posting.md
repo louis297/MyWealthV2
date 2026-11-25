@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-25
-last_updated: 2026-11-25
+last_updated: 2026-11-26
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -17,111 +17,117 @@ related:
   - ../adr/0011-ledger-cash-holdings-reversal.md
   - ../adr/0013-roles-authorization-single-user-table.md
   - ../adr/0015-idempotency-keys.md
+  - ../fixes/ledger-write-guards.md
+  - ../fixes/utc-instants.md
   - accounts.md
   - instruments.md
   - customers.md
+  - leg-accounts.md
+  - holdings.md
+  - buy-sell.md
+  - split.md
+  - internal-transfers.md
+  - fx-conversions.md
+  - trade-fees.md
   - custody-modes.md
   - transaction-source.md
+  - adjustments.md
+  - adjustment-review.md
   - deposit-matching.md
   - withdrawals.md
   - account-closure.md
   - interest-run.md
+  - corporate-actions.md
+  - orders.md
   - migration-batches.md
   - in-kind-transfers.md
   - dividends.md
-  - adjustment-review.md
 ---
 
 # Posting
 
-Write model for booked activity on `webapi`. Public name is **Transaction** (business event). Accounting is **legs** on that same aggregate, assembled in the same command. First increment: cash legs only. Also: reverse a booked transaction, read cash balance as `SUM`, amend Account close so a book may close only at cash zero.
+Write model for booked activity on `webapi`. The public name is **Transaction** (a business event). Accounting is **legs** on that same aggregate, assembled in the same command. This spec owns the aggregate, the `/transactions` routes, the cash types and their rules, reverse, the cash balance as a `SUM`, and the rule that an Account closes only at cash zero.
 
-There is **no separate cash-ledger Feature Spec.** Cash legs live here. There is **no capture `Transactions` row that is later copied into a `Journals` table.** Security legs, holdings, and Opening-of-quantity stay out of this increment. If this file becomes too large, split holdings / securities into their own spec; do not split cash back out.
+There is **no separate cash-ledger Feature Spec**: cash legs live here. There is **no capture `Transactions` row that is later copied into a `Journals` table.** Other specs add legs, types and details to the same aggregate; §5 names the spec that owns each type.
 
-**Status is `accepted`.** Implementation follows this file. Landed in the repo (`79129eb`). Script `0013_transactions.sql`, routes `/transactions`, policies `transactions.read` / `transactions.create`. Amends [accounts.md](accounts.md) R16 (close requires cash `SUM = 0`) and account JSON (`cashBalance`). Expand [ADR 0011](../adr/0011-ledger-cash-holdings-reversal.md). Idempotency: [ADR 0015](../adr/0015-idempotency-keys.md).
+This file states the rules as they are today. §14 lists what changed here, by date.
 
-**Amendment 2026-10-13:** bidirectional reverse link. Keep `OriginalTransactionId` on the Reversal. Add `ReversedByTransactionId` on the original (script `0018_transaction_reversed_by.sql`, forward ALTER only; do not edit `0013`). One limited write of that column when the Reversal is created; after that write the original is immutable again. Economic legs are never updated. Already-reversed is `ReversedByTransactionId IS NOT NULL` — no self-join on list / get.
-
-**Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md) supersedes every rule here that reads "the transaction's Account": the header has no `AccountId`; each cash leg has its own `AccountId` (script `0024`). R5 (one Account), R6–R9, R11 ("same account"), R19, R22 and the §5 / §6 header `AccountId` apply per leg account as restated in leg-accounts R2–R14. The create body still takes top-level `accountId`. The item in §8.1 is replaced by leg-accounts §8.1 (shown below).
-
-**Amendment 2026-11-15 (trade fees, accepted):** [trade-fees.md](trade-fees.md). Every cash leg has a role, `Principal` or `Fee` (script `0030`); existing legs are `Principal`. The cash types in this file build only `Principal` legs. The cash `SUM` and every balance rule still add all cash legs. Every cash leg in the item carries `role` and `fee` (`fee: null` on a `Principal` leg).
-
-**Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R8: the caller's `amount` must fit the Account currency's `DecimalPlaces`; `CloseOut` is exempt. R11: a Transaction with a security leg can be reversed only while it is the latest security activity on each of its holdings. R24: a `bookedAt` in the future is refused.
-
-**Amendment 2026-11-17 (custody modes, accepted, landed):** [custody-modes.md](custody-modes.md). R16 and the §5 type table: on a Custodial account `POST /transactions` refuses `Interest` and cash `Opening` (400 with `errors.Type`); `TransferIn`, `TransferOut` and `CloseOut` stay allowed. R24: on a Custodial account the server sets `bookedAt` from its clock, and a body that sends `bookedAt` → 400 with `errors.BookedAt`; on an External account `bookedAt` stays required and the rest of R24 is unchanged. Reverse (R11) is allowed on both custody modes. Nothing else changes for an External account.
-
-**Amendment 2026-11-19 (transaction source, accepted):** [transaction-source.md](transaction-source.md). Every Transaction has a source (kind `Manual`, `Seed` or `Rebalance`, and an optional source id), set when it is built and never sent by a caller. The four create and reverse routes write `Manual`; a Reversal has its own source, not the original's. The item gains `source: { kind, id }`. R10: script `0035` back-fills the source on existing rows and clears the `reference` of existing rebalance trades, a one-time data write like `0029`. R11: on a Custodial account a hand reverse of a Transaction whose source is not hand-reversible (`Manual` or `Rebalance`) → 400. External accounts reverse as today.
-
-**Amendment 2026-11-19 (adjustments, accepted):** [adjustments.md](adjustments.md). New type `Adjustment` (17) on its own route `POST /transactions/adjustment`, permission `transactions.adjust` (TenantAdmin only): one Custodial account, an optional signed cash `amount` (R8 decimal places, R9 `SUM ≥ 0`), an optional one-instrument holding change, a required reason and memo, server `bookedAt`, source `Manual`. R16: `POST /transactions` refuses `Adjustment` (400 `errors.Type`). R11: reversing an `Adjustment` also needs `transactions.adjust` (403 otherwise); the Reversal copies the adjustment detail. The item gains `adjustment: { reason }` (`null` on other Transactions).
+**Status is `accepted` and landed.** Script `0013_transactions.sql`, routes `/transactions`, policies `transactions.read` / `transactions.create`. Idempotency: [ADR 0015](../adr/0015-idempotency-keys.md). Direction: [ADR 0011](../adr/0011-ledger-cash-holdings-reversal.md).
 
 ---
 
 ## 1. Summary
 
-A TenantAdmin or Adviser records a **Transaction** against one **Open** Account of an assigned / same-tenant Customer. SystemAdmin does the same for a chosen tenant. The header is append-only for economic data; the only later write is the single `ReversedByTransactionId` on reverse.
+A TenantAdmin or Adviser records a **Transaction** against an **Open** Account of an assigned / same-tenant Customer. SystemAdmin does the same for a chosen tenant. The header is append-only for economic data; the only later write is the single `ReversedByTransactionId` on reverse.
 
 Two **layers**, one **step**:
 
 ```text
 POST /transactions
-  → insert Transaction (Posted) + cash leg
-  → same transaction: lock Account, SUM ≥ 0, Opening / CloseOut rules
+  → insert Transaction (Posted) + its legs
+  → same transaction: lock every leg account, SUM ≥ 0, Opening / CloseOut rules
   → raise TransactionPosted (no handler required)
 ```
 
-The header is the business event (`type`, `bookedAt`, `memo`, which Account). The cash leg is the accounting line that the cash `SUM` reads. Application code picks the legs from `type`. This increment always builds exactly one cash leg. Later Buy / Sell add a security leg on the **same** header. Split / Bonus / Scrip are the same model with a security leg only (no cash, total cost unchanged): [split.md](split.md).
+The header is the business event (`type`, `bookedAt`, `memo`, source). It has no Account: each leg carries the Account it books into ([leg-accounts.md](leg-accounts.md)). A cash leg is the accounting line that the cash `SUM` reads. Application code picks the legs from `type`. The cash types of this spec build exactly one cash leg. `Buy` / `Sell` add a security leg on the **same** header; `Split` / `Bonus` / `Scrip` are the same model with a security leg only.
 
-Write = posted. No `Created` status. No event handler that “approves” or copies into another table. A Transaction has no status: where a second person must approve a write, the approval is on a record of its own and comes before the Transaction is posted (amendment 2026-11-25, adjustment review). It is not a swapped subscriber.
+Write = posted. A Transaction has no status, and no read of the ledger has to leave a row out. Two things come before a Transaction and are not Transactions:
 
-Cash-book currency is `Account.Currency`. Balance is not stored on `Account`; it is the sum of posted cash legs.
+- An **instruction** to an outside party (a withdrawal, an order, an in-kind transfer) is an aggregate of its own with its own lifecycle. The Transaction it leads to is posted in one step, when the outside party confirms.
+- Where a second person must approve a write, the approval is on a record of its own (an adjustment request, a migration batch) and comes before the Transaction is posted.
 
-Close remains `POST /accounts/{id}/close`. This spec **amends** [accounts.md](accounts.md) R16: close is rejected while cash `SUM ≠ 0`. `CloseOut` brings the book to zero (counterparty off-books). Closed accounts reject every new transaction, including reversals — reopen first.
+No event handler "approves" a Transaction or copies it into another table.
 
-Customer receives 403. No Adviser Portal activity page in this increment.
+The cash-book currency is `Account.Currency`. The balance is not stored on `Account`; it is the sum of posted cash legs.
+
+An External account closes with `POST /accounts/{id}/close`, which is refused while cash `SUM ≠ 0` or a holding remains (accounts R16). `CloseOut` brings the book to zero (counterparty off-books). A Closed account refuses every new transaction, including reversals: reopen first. A Custodial account closes through an account closure ([account-closure.md](account-closure.md)).
+
+Which types a person may enter by hand depends on the custody mode of the Account: the manual entry matrix, [custody-modes.md](custody-modes.md) §4.2. On a Custodial account the platform writes the cash types of this spec from its flows.
 
 ---
 
 ## 2. Scope
 
-**In (first increment)**
+**In**
 
-- Domain: `Transaction` aggregate (header) + `TransactionCashLeg`; `TransactionType` enum (full name list reserved; this increment accepts a cash subset)
-- Application: `CreateTransaction`, `ReverseTransaction`, list / get, `GetAccountCashBalance`; amend `CloseAccount` with a cash-zero guard
-- Script `database/schema/0013_transactions.sql` + EF mapping
+- Domain: `Transaction` aggregate (header) + `TransactionCashLeg`; `TransactionType` enum
+- Application: `CreateTransaction`, `ReverseTransaction`, list / get, `GetAccountCashBalance`; the cash-zero guard in `CloseAccount`
+- Script `database/schema/0013_transactions.sql` + EF mapping; script `0018_transaction_reversed_by.sql`
 - Policies `transactions.read` / `transactions.create` (no update / delete policy)
 - `webapi` `/transactions` (root, not under `/users`)
-- `GET /accounts/{id}` and `GET /accounts` gain computed `cashBalance` + `currency`; `GET /accounts/{id}/cash-balance` returns the same `SUM`
+- `GET /accounts/{id}` and `GET /accounts` carry the computed `cashBalance` + `currency`; `GET /accounts/{id}/cash-balance` returns the same `SUM`
 - List envelope + isolation tests
-- `Idempotency-Key` on create and reverse ([ADR 0015](../adr/0015-idempotency-keys.md), proposed)
+- `Idempotency-Key` on create and reverse ([ADR 0015](../adr/0015-idempotency-keys.md))
 - Development / TestAppHost `TestSeed` rows (not the schema script, not Production)
 
-**Out**
+**Out — owned by another spec**
+
+- The Account on each leg, and visibility by leg account: [leg-accounts.md](leg-accounts.md)
+- Security legs and the holdings projection: [holdings.md](holdings.md), [buy-sell.md](buy-sell.md), [split.md](split.md)
+- Cross-account transfer and conversion: [internal-transfers.md](internal-transfers.md), [fx-conversions.md](fx-conversions.md)
+- Cash leg roles other than `Principal`: [trade-fees.md](trade-fees.md) (`Fee`), [interest-run.md](interest-run.md) (`Tax`), [dividends.md](dividends.md) (`Reinvestment`)
+- The source of a Transaction, and who may reverse by source: [transaction-source.md](transaction-source.md)
+- What a person may enter by custody mode, and who sets `bookedAt`: [custody-modes.md](custody-modes.md)
+- Each flow that writes on a Custodial account, with the detail it adds to the item: the specs named in §5 and §8.1
+- Net worth, the reports and the portal pages
+
+**Out — not in the model**
 
 - A second capture table whose approve step writes this aggregate
-- `Created` / `PendingApproval` status; event-handler auto-approve
-- Security / holding legs, Holdings table, quantity and cost edits
-- Opening of holdings (quantity + cost). Cash `Opening` is in this increment
-- Buy / Sell / StockIn / StockOut ([buy-sell.md](buy-sell.md)). Split / Bonus / Scrip ([split.md](split.md)). Same aggregate, not this increment
-- Cross-account transfer — deferred on purpose; see §13
-- Live FX / cross-currency legs (same currency = 1; never treat a cross pair as 1)
-- Net-worth read model, daily snapshots, Dashboard
-- Adviser Portal Accounts / activity / holdings pages
-- Property / Credit selectable; Credit negative-cash exception is written only, not built
+- A `Created` / `PendingApproval` status; an event handler that approves
 - Draft / unposted rows
-- `UPDATE` / `DELETE` of a posted transaction, except the single `ReversedByTransactionId` write on reverse (amendment 2026-10-13)
-- Customer ledger-write; Customer Portal
-
-**Amendment for Customer Portal (accepted 2026-11-02).** Supersedes the Customer 403 sentences for reads. Grant Customer `transactions.read`. List / get for the caller’s own accounts only. Other customer’s transaction or account id → 404. No `transactions.create`.
-- SystemAdmin ledger screens on `adviser-portal`
-- Empty holdings tables “for later”
-- Seeding from the SQL script or in Production
+- `UPDATE` / `DELETE` of a posted transaction, except the single `ReversedByTransactionId` write on reverse
+- Customer ledger-write
 - Debit/credit columns; a wide row that is both cash and security
+- A stored balance; a `Journals` table
+- Property / Credit selectable. The Credit negative-cash exception is written only, not built
+- Seeding from the SQL script or in Production
 
 ---
 
 ## 3. Stories
 
-1. As an Adviser I record an external deposit or withdrawal on an assigned Customer’s Bank account so the cash book is no longer empty.
+1. As an Adviser I record an external deposit or withdrawal on an assigned Customer's External Bank account so the cash book is no longer empty.
 2. As an Adviser I record interest on that book in the account currency (either sign).
 3. As an Adviser I record a cash `Opening` as the initial inbound (`amount > 0`), at most once, and only while the book still has no other transaction.
 4. As an Adviser I record a `CloseOut` equal to the current balance so I can close the account.
@@ -130,8 +136,7 @@ Customer receives 403. No Adviser Portal activity page in this increment.
 7. As an Adviser I reverse a posted transaction with a new opposite transaction. The new row points at the original (`originalTransactionId`). The original receives a single write of `reversedByTransactionId`. After that write I do not edit the original again.
 8. As a TenantAdmin I do the same for any Customer in my firm.
 9. As a SystemAdmin I do the same on Scalar for a chosen tenant.
-10. As a Customer I receive 403 on every `/transactions` verb.
-11. As a later increment I add a security leg to the same `Transaction`. Bank / Cash still refuse holdings. Scrip is that increment, not a new write model.
+10. As a Customer I read the transactions of my own accounts. I cannot create or reverse one (403).
 
 ---
 
@@ -139,37 +144,35 @@ Customer receives 403. No Adviser Portal activity page in this increment.
 
 | ID | Rule |
 | --- | --- |
-| R1 | Missing / dead Bearer → 401, never 302. Policy fail → 403. TenantAdmin / Adviser: other-tenant, unassigned Customer, missing id → 404. SystemAdmin: missing id → 404; another tenant’s transaction id is allowed. |
+| R1 | Missing / dead Bearer → 401, never 302. Policy fail → 403. TenantAdmin / Adviser: other-tenant, unassigned Customer, missing id → 404. SystemAdmin: missing id → 404; another tenant's transaction id is allowed. |
 | R2 | Path `{id}` and JSON `id` are `PublicId`. Internal ints never appear. Create / reverse return `201 { "id" }` only. |
 | R3 | Routes live at `/transactions`. Not under `/users`. Not nested under `/accounts/{id}` as the collection root (account filter is a query). |
 | R4 | TenantAdmin / Adviser: tenant = token `TenantId`. Create / list must **omit** `tenantId` (400 if present). Missing current tenant → 404. Current tenant disabled → 403 on every verb, reads included (identity-auth amendment 2026-11-13). SystemAdmin naming a disabled tenant on **create** → 400 `disabled` / `target=tenant`. |
 | R4a | SystemAdmin: create and list **require** `tenantId` (tenant PublicId). Omitted → 400. Unknown tenant → 404. Get / reverse use transaction PublicId only and may cross tenants. |
-| R5 | A transaction belongs to one Account in the same tenant. `accountId` is Account PublicId. Missing / other-tenant / Adviser-unassigned Customer of that account → 404. |
-| R6 | Create or reverse while the Account is **Closed** → 400 ordinary `errors`. Reopen the account first. Close / reopen stay on `/accounts`. |
-| R7 | Create or reverse while the Customer is Disabled → 400 `disabled` / `target=user`. List / get of existing rows still work. |
-| R8 | Cash amount is a signed book amount in `Account.Currency` only. Body must not send a different currency. Store `decimal(18,4)` + `char(3)`. Application uses Domain `Money` for currency equality; direction lives on the signed decimal, not inside `Money`. The caller's `amount` has no more decimal places than the Account currency's `DecimalPlaces`, else 400 `errors.Amount`; `CloseOut` is exempt, because its amount must equal the current `SUM` ([ledger-write-guards](../fixes/ledger-write-guards.md)). |
-| R9 | After insert, cash `SUM` for that account must be `≥ 0`. Phase 2 opens no Credit accounts. Violation → 400. Compute in the same command (lock the Account row or equivalent). No persisted balance column. |
-| R10 | Posted header and legs are not `UPDATE`d or `DELETE`d, **except** a single write of `ReversedByTransactionId` on the original when a Reversal is created. After that write the original is immutable again. Economic legs are never updated. Correction is a new transaction with `Type = Reversal` and `originalTransactionId` set. |
-| R11 | Reversal must target a posted transaction in the same account. Already reversed (`ReversedByTransactionId` is not null) → 400. One reversal per original. Reversal of a Reversal is out (`ReversedByTransactionId` on a Reversal stays null). A Transaction with a security leg can be reversed only while it is the latest security activity on each of its holdings, else 400 ([ledger-write-guards](../fixes/ledger-write-guards.md)). |
-| R12 | `CloseAccount`: if cash `SUM ≠ 0` → 400 ordinary `errors`. `SUM = 0` (including never booked) may close. Amends accounts R16. Do not bulk-insert on close. Do not write cash inside `Account.Close()`. |
-| R13 | Closed accounts stay readable. Net worth (later) excludes them. Balance APIs still return the `SUM` (expected 0 after a successful close). |
-| R14 | List envelope `{ items, page, pageSize, totalCount }`; page default 1, size default 20, max 100. Optional `accountId`, optional `customerId`. Neither set → tenant scope (Adviser = assigned Customers). Sort `bookedAt` then id. |
-| R15 | Customer has no transaction policy → 403 on every verb. |
-| R16 | Type on create: only the increment’s allowed cash set (§5). `Buy` / `Sell` / `StockIn` / `StockOut` / `Split` / `Bonus` / `Scrip` / `Dividend` / unknown → 400 here even though later specs accept some of them. |
-| R17 | `CloseOut`: cash leaves to an off-books counterparty. Signed amount must be `< 0` and equal in magnitude to the current `SUM`, so after this row `SUM = 0`. Not a cross-account transfer. Not a holdings liquidation. Amount `0` not allowed; already zero → just `Close`. |
-| R18 | Do not treat a pair of unlinked `TransferOut` + `TransferIn` on two accounts as a transfer. Cross-account transfer is out (§13). |
-| R19 | Cash `Opening`: `amount > 0`. At most one per account. Allowed only while the account has **no** other transaction. After any non-Opening row exists, `Opening` → 400. Create Account does not insert a row; a new book’s `SUM` is already 0. |
-| R20 | `TransferIn` / cash `Opening` → `amount > 0`. `TransferOut` / `CloseOut` → `amount < 0`. `Interest` either sign. `Reversal` = arithmetic opposite of the original cash amount. |
+| R5 | A Transaction belongs to the Accounts its legs book into, all in the header's tenant. The header has no `AccountId`; every leg has its own (leg-accounts R2, R3). On `POST /transactions` the body's `accountId` (Account PublicId) is the Account of every leg (leg-accounts R5). Missing / other-tenant / Adviser-unassigned Customer of a leg account → 404 for the whole command (leg-accounts R6). |
+| R6 | Create or reverse while a leg account is **Closed** → 400 ordinary `errors` (leg-accounts R8). Reopen the account first. Close / reopen stay on `/accounts`. Directly after this check, a leg account that is **closing** (an account closure `InProgress`) → 400 with `This account is being closed and accepts no new activity.` under the empty `errors` key (account-closure R12). No idempotency record is written. |
+| R7 | Create or reverse while the Customer of a leg account is Disabled → 400 `disabled` / `target=user` (leg-accounts R8). List / get of existing rows still work. |
+| R8 | A cash amount is a signed book amount in the currency of the leg's Account only (leg-accounts R9). The body must not send a different currency. Store `decimal(18,4)` + `char(3)`. Application uses Domain `Money` for currency equality; direction lives on the signed decimal, not inside `Money`. The caller's `amount` has no more decimal places than the Account currency's `DecimalPlaces`, else 400 `errors.Amount`; `CloseOut` is exempt, because its amount must equal the current `SUM` ([ledger-write-guards](../fixes/ledger-write-guards.md)). |
+| R9 | After insert, the cash `SUM` of every leg account the command touched must be `≥ 0` (leg-accounts R10). No Credit account is opened. Violation → 400. Compute in the same command, with every leg account row locked (R22). No persisted balance column. On a Custodial account the test is stricter: every write that lowers cash must leave **available cash** `≥ 0`, the cash `SUM` minus the cash reserved for open withdrawals and live buy orders (withdrawals R36, R37; orders R39). The payout of a withdrawal is the one exception: it releases its own reservation. |
+| R10 | Posted header and legs are not `UPDATE`d or `DELETE`d, **except** a single write of `ReversedByTransactionId` on the original when a Reversal is created. After that write the original is immutable again. Economic legs are never updated. Correction is a new transaction with `Type = Reversal` and `originalTransactionId` set. Schema scripts that back-fill a new column on existing rows (`0029`, `0035`) are one-time data writes, not corrections. |
+| R11 | A Reversal targets a posted transaction. It has one opposite leg per original leg, each on that leg's Account; R6–R9 apply to every leg account, and there is no partial reverse (leg-accounts R12). Already reversed (`ReversedByTransactionId` is not null) → 400. One reversal per original. Reversal of a Reversal is out (`ReversedByTransactionId` on a Reversal stays null). A Transaction with a security leg can be reversed only while it is the latest security activity on each of its holdings, else 400 ([ledger-write-guards](../fixes/ledger-write-guards.md)). By hand, on a Custodial account only a Transaction with source `Manual` can be reversed (transaction-source R13, rebalances R28), and an `Adjustment` is never reversed on either custody mode (adjustment-review R15); each → 400. A flow reverses its own write through the Domain, not through this route. A Reversal has its own source, not the original's. |
+| R12 | `CloseAccount`: if cash `SUM ≠ 0` → 400 ordinary `errors`. `SUM = 0` (including never booked) may close. This is accounts R16, which also requires that no holding remains. Do not bulk-insert on close. Do not write cash inside `Account.Close()`. On an Open Custodial account `POST /accounts/{id}/close` → 400 (account-closure R22); inside the closure flow the same two conditions hold before `Account.Close()`. |
+| R13 | Closed accounts stay readable. Net worth excludes them (net-worth R5). Balance APIs still return the `SUM` (expected 0 after a successful close). |
+| R14 | List envelope `{ items, page, pageSize, totalCount }`; page default 1, size default 20, max 100. Optional `accountId`, optional `customerId`; each matches a Transaction with at least one leg there (leg-accounts R18). Neither set → tenant scope (Adviser = assigned Customers; Customer = own accounts). A Transaction is returned when the caller can see at least one leg account, with only the legs the caller can see (leg-accounts R7). Sort `bookedAt` then id. |
+| R15 | A Customer has `transactions.read`: list and get for the caller's own accounts only; another Customer's transaction or account id → 404. A Customer has no `transactions.create` → 403 on create and reverse. |
+| R16 | Type on `POST /transactions`: one of `TransferIn`, `TransferOut`, `Interest`, `CloseOut`, `Opening`, `OpeningHoldings`, `Buy`, `Sell`, `StockIn`, `StockOut`, `Split`, `Bonus`, `Scrip`. `InternalTransfer`, `FxConversion`, `Adjustment`, `Reversal` and an unknown name → 400 `errors.Type`: the first four are not entered on this route (§5). `Dividend` passes the shape check and is refused by the manual entry matrix on both custody modes (dividends R43). The matrix then decides by the Account's custody mode (custody-modes R5, R6): on a Custodial account it refuses every type of this route. |
+| R17 | `CloseOut`: cash leaves to an off-books counterparty. Signed amount must be `< 0` and equal in magnitude to the current `SUM`, so after this row `SUM = 0`. Not a cross-account transfer. Not a holdings liquidation. Amount `0` not allowed; already zero → just `Close`. On a Custodial account the only `CloseOut` is the remainder write-off that an account closure posts (account-closure R18); this rule holds for it too. |
+| R18 | Do not treat a pair of unlinked `TransferOut` + `TransferIn` on two accounts as a transfer. A transfer is one Transaction (§13). |
+| R19 | Cash `Opening`: `amount > 0`. At most one per account. Allowed only while no leg of any other Transaction books into the Account (leg-accounts R13). After that, `Opening` → 400. Create Account does not insert a row; a new book's `SUM` is already 0. On a Custodial account an `Opening` is written only by a migration batch, on an account with no Transaction at all, reversed ones included (migration-batches R10, R22). |
+| R20 | `TransferIn` / cash `Opening` → `amount > 0`. `TransferOut` / `CloseOut` → `amount < 0`. A hand `Interest` either sign; the posting of an interest run has a `Principal` leg `> 0` and, with withholding tax, a `Tax` leg `< 0` (interest-run R28). `Reversal` = arithmetic opposite of each original leg. |
 | R21 | `POST /transactions` and `POST /transactions/{id}/reverse` require `Idempotency-Key` (ADR 0015). Missing → 400. Replay same hash → original `201 { id }`. Same key different hash → 409. |
-| R22 | Create / reverse do not take Account `rowVersion` from the client. Reverse does **not** take the original transaction `rowVersion`. Server locks the Account row while inserting and summing. |
-| R23 | Optional `memo`: trim; if present, 1–200. Optional `reference`: stored nullable, no uniqueness in this increment. |
-| R24 | `bookedAt` is a required instant with `Z` or an offset. No offset → 400 `errors.BookedAt`. Stored and returned in UTC (`Z`); the request offset is not kept ([utc-instants](../fixes/utc-instants.md)). Later than the server clock plus 5 minutes → 400 `errors.BookedAt` ([ledger-write-guards](../fixes/ledger-write-guards.md)). Audit `Created` is separate. |
+| R22 | Create / reverse do not take Account `rowVersion` from the client. Reverse does **not** take the original transaction `rowVersion`. The server locks every leg account row, in ascending `Accounts.Id` order, while inserting and summing (leg-accounts R11). A flow that posts a Transaction locks the same way. |
+| R23 | Optional `memo`: trim; if present, 1–200. Optional `reference`: stored nullable, not unique. |
+| R24 | `bookedAt` is an instant with `Z` or an offset. No offset → 400 `errors.BookedAt`. Stored and returned in UTC (`Z`); the request offset is not kept ([utc-instants](../fixes/utc-instants.md)). Later than the server clock plus 5 minutes → 400 `errors.BookedAt` ([ledger-write-guards](../fixes/ledger-write-guards.md)). On an External account the caller must send it. On a Custodial account the server sets it, and a body that sends it → 400 `errors.BookedAt` (custody-modes R10–R12). Audit `Created` is separate. |
 
-Policies (register when accepted; map in `RolePermissions`):
+Policies: `transactions.read`, `transactions.create`. Grants per role are in the role permission table, [api-design.md](../api-design.md) §3.1.
 
-`transactions.read`, `transactions.create`. Grants per role are in the role permission table, [api-design.md](../api-design.md) §3.1 (moved there 2026-11-15).
-
-Adviser scope is **assigned Customers** of the transaction’s Account (404 if not). Same width as `accounts.*`. Reverse uses `transactions.create`.
+Adviser scope is **assigned Customers** of the leg accounts (404 if not). Same width as `accounts.*`. Reverse uses `transactions.create`.
 
 `GET /accounts/{id}/cash-balance` uses `accounts.read` (same row the caller can already get).
 
@@ -179,85 +182,88 @@ Adviser scope is **assigned Customers** of the transaction’s Account (404 if n
 
 | Type | Kind | Notes |
 | --- | --- | --- |
-| `Transaction` | Aggregate | Business-event header. Not an Account. Not a balance. Not a second “journal” copy. |
-| `TransactionCashLeg` | Entity | Accounting line on the cash book. One per transaction in this increment. |
-| `TransactionType` | Enum | Full list reserved. HTTP accepts a subset now. |
-| `TransactionPosted` / `TransactionReversed` | Event | Raise even with no subscriber. Must **not** be the approve / copy path. |
+| `Transaction` | Aggregate | Business-event header. Not an Account. Not a balance. Not a second "journal" copy. Has a source: a kind and an optional id, set when it is built and never sent by a caller ([transaction-source.md](transaction-source.md)). |
+| `TransactionCashLeg` | Entity | Accounting line on the cash book of its Account. Has a role: `Principal`, `Fee`, `Tax` or `Reinvestment`. The cash types of this spec build one `Principal` leg. The cash `SUM` and every balance rule add all cash legs, whatever their role. |
+| `TransactionType` | Enum | The table below. |
+| `TransactionPosted` / `TransactionReversed` | Event | Raised even with no subscriber. Must **not** be the approve / copy path. |
 
-`TransactionType`:
+`TransactionType`. "By hand" is the route a person uses where the manual entry matrix allows it (custody-modes §4.2, which also names the flow that writes each type on a Custodial account):
 
-| Name | This increment | Legs now | Notes |
+| Name (value) | By hand | Legs | Rules |
 | --- | --- | --- | --- |
-| `TransferIn` | yes | cash + | External deposit onto this account |
-| `TransferOut` | yes | cash − | External withdrawal from this account |
-| `Interest` | yes | cash + or − | Only extra rule is `SUM ≥ 0` after insert |
-| `CloseOut` | yes | cash − equal to current `SUM` | Off-books empty before close |
-| `Opening` | yes (cash only) | cash + | Initial inbound. See R19. Not holdings |
-| `OpeningHoldings` | no | security | Accepted in [holdings.md](holdings.md). Not this increment's cash set |
-| `Reversal` | yes | opposite cash leg | `POST /transactions/{id}/reverse` |
-| `Dividend` | no | cash | Wait until an instrument is in scope |
-| `Buy` / `Sell` | no | cash + security | Accepted in [buy-sell.md](buy-sell.md). Not this increment's cash set |
-| `StockIn` / `StockOut` | no | security | Accepted in [buy-sell.md](buy-sell.md). No cash leg |
-| `Split` / `Bonus` / `Scrip` | no | security only | Accepted in [split.md](split.md). No cash. Total cost unchanged. Client sends the new total quantity. Not `StockIn` / `StockOut`. |
+| `TransferIn` (0) | `POST /transactions` | cash + | Here. External deposit onto the account. On a Custodial account a deposit: [deposit-matching.md](deposit-matching.md) |
+| `TransferOut` (1) | `POST /transactions` | cash − | Here. External withdrawal from the account. On a Custodial account a payout: [withdrawals.md](withdrawals.md) |
+| `Interest` (2) | `POST /transactions` | cash + or − | Here. On a Custodial account: [interest-run.md](interest-run.md), which may add a `Tax` leg |
+| `CloseOut` (3) | `POST /transactions` | cash − equal to the current `SUM` | Here (R17). Off-books empty before close |
+| `Opening` (4) | `POST /transactions` | cash + | Here (R19). Initial inbound. Not holdings |
+| `Reversal` (5) | `POST /transactions/{id}/reverse` | the opposite of each original leg | Here (R11) |
+| `Dividend` (6) | none | cash `Principal`, `Tax` and, with a reinvestment, `Reinvestment` + one security leg | [dividends.md](dividends.md) |
+| `Buy` (7) / `Sell` (8) | `POST /transactions` | cash + security; may have a `Fee` leg | [buy-sell.md](buy-sell.md), [trade-fees.md](trade-fees.md). On a Custodial account an order fill: [orders.md](orders.md) |
+| `OpeningHoldings` (9) | `POST /transactions` | security | [holdings.md](holdings.md) |
+| `StockIn` (10) / `StockOut` (11) | `POST /transactions` | security | [buy-sell.md](buy-sell.md). On a Custodial account: [in-kind-transfers.md](in-kind-transfers.md) |
+| `Split` (12) / `Bonus` (13) / `Scrip` (14) | `POST /transactions` | security only | [split.md](split.md). On a Custodial account: [corporate-actions.md](corporate-actions.md) |
+| `InternalTransfer` (15) | `POST /transactions/transfer` | two cash legs on two Accounts | [internal-transfers.md](internal-transfers.md) |
+| `FxConversion` (16) | `POST /transactions/fx` | two cash legs in two currencies | [fx-conversions.md](fx-conversions.md) |
+| `Adjustment` (17) | none; the approval of an adjustment request posts it | optional cash, optional security | [adjustments.md](adjustments.md), [adjustment-review.md](adjustment-review.md) |
 
 Invariants:
 
-- `TenantId` and `AccountId` required. Tenant matches the Account row (application dual check).
-- Insert lands **Posted**. No draft / created status in this increment.
-- Header is the aggregate root. Cash `SUM` is not stored on the header.
-- Cash-leg currency equals `Account.Currency` (denormalised).
-- Original transaction is immutable after insert (audit columns aside), **except** the single `ReversedByTransactionId` write on reverse. After that write it is immutable again.
+- `TenantId` is required on the header, and an `AccountId` on every leg. Every leg account is in the header's tenant (application dual check). A Transaction has at least one leg.
+- Insert lands **Posted**. There is no status.
+- The header is the aggregate root. The cash `SUM` is not stored.
+- A cash leg's currency equals the currency of its Account (denormalised).
+- The original transaction is immutable after insert (audit columns aside), **except** the single `ReversedByTransactionId` write on reverse. After that write it is immutable again.
 - `Account.Close()` stays a status flip. Zero-cash is an application guard.
-- One cash leg per header in this increment (`PostingId`-style unique on `TransactionId`).
+- At most one `Principal` cash leg per `(Transaction, Account)`.
 
 ```text
-Create(accountId, type, cashAmount, bookedAt, memo?, reference?)
+Create(accountId, type, cashAmount, bookedAt, memo?, reference?, source)
   account Open (application)
-  type in allowed cash set
+  type in the cash set
   Opening / CloseOut / sign rules
   cash currency = account currency
-  insert header + cash leg
+  insert header + cash leg on the account
   SUM(account) >= 0
   raise TransactionPosted
 
-Reverse(original)
-  original in same account
+Reverse(original, source)
   original.ReversedByTransactionId is null
   original.Type is not Reversal
-  account Open
+  every leg account Open
   insert new type = Reversal, originalTransactionId = original
   set original.ReversedByTransactionId = new
-  cash leg = opposite of original cash leg
-  SUM(account) >= 0
+  one opposite leg per original leg, on that leg's account
+  SUM(each leg account) >= 0
   raise TransactionReversed
 ```
 
-Keep [domain-model.md](../domain-model.md) in the same change **when this spec is accepted**.
+Keep [domain-model.md](../domain-model.md) in the same change as this file.
 
 ---
 
 ## 6. Database
 
-Script (when accepted): `database/schema/0013_transactions.sql`.
+Do not add EF migrations. The current columns of every table are in [database-design.md](../database-design.md).
 
-Last applied schema in the repo at Accounts landing is `0012`. Do not back-fill. Do not add EF migrations.
+Scripts of this spec:
 
-Idempotency **rules** are [ADR 0015](../adr/0015-idempotency-keys.md) (`proposed`). ADR 0013 / 0014 are roles and OpenIddict — not schema files. Next *schema* script after `0012_accounts.sql` is `0013_transactions.sql`. Create the idempotency table **in that same `0013` script** so this slice cannot boot without it. Do not invent an ADR 0013/0014 for the table.
+| Script | What it does |
+| --- | --- |
+| `0013_transactions.sql` | Creates `Transactions`, `TransactionCashLegs` and the idempotency table of [ADR 0015](../adr/0015-idempotency-keys.md), so this slice cannot boot without it |
+| `0018_transaction_reversed_by.sql` | Adds `Transactions.ReversedByTransactionId`: nullable FK → `Transactions` RESTRICT, unique filtered index `WHERE ReversedByTransactionId IS NOT NULL`. No back-fill |
 
-| Table | Change | Index / FK |
+| Table | Shape | Index / FK |
 | --- | --- | --- |
-| `Transactions` | add | PK `Id`. Unique `PublicId`. FK `TenantId` → `Tenants` RESTRICT. FK `AccountId` → `Accounts` RESTRICT. Optional FK `OriginalTransactionId` → `Transactions` RESTRICT. Optional FK `ReversedByTransactionId` → `Transactions` RESTRICT (script `0018`; unique filtered index `WHERE ReversedByTransactionId IS NOT NULL`). Index `(TenantId, AccountId, BookedAt)`. |
-| `TransactionCashLegs` | add | PK `Id`. Unique `(TransactionId)` this increment. FK `TransactionId` → `Transactions` RESTRICT. Amount `decimal(18,4)`. Currency `char(3)` FK `Currencies.Code` RESTRICT. Audit + `RowVersion` same as header. |
+| `Transactions` | The header | PK `Id`. Unique `PublicId`. FK `TenantId` → `Tenants` RESTRICT. Optional FK `OriginalTransactionId` → `Transactions` RESTRICT. Optional FK `ReversedByTransactionId` → `Transactions` RESTRICT. Index `(TenantId, BookedAt)`. |
+| `TransactionCashLegs` | One row per cash leg | PK `Id`. FK `TransactionId` → `Transactions` RESTRICT. `AccountId`. `Role`. Amount `decimal(18,4)`. Currency `char(3)` FK `Currencies.Code` RESTRICT. Unique filtered `(TransactionId, AccountId)` for `Principal` legs. |
 
-Header **and** cash-leg rows use the same audit + concurrency pair as `Accounts` / `Instruments`: `Created`, `CreatedBy`, `LastModified`, `LastModifiedBy`, `RowVersion`. `AuditableEntityInterceptor` fills the four audit fields on both. Posted rows are not updated, so `LastModified*` stay null, **except** the single `ReversedByTransactionId` write, which fills `LastModified` / `LastModifiedBy` and bumps `RowVersion`. Reverse still does **not** take a client `rowVersion` (server locks the Account).
+Later scripts of other specs changed the two tables: `0024` moved `AccountId` from the header to the legs ([leg-accounts.md](leg-accounts.md)); `0030` added the cash leg `Role` ([trade-fees.md](trade-fees.md)); `0035` added the source columns on the header ([transaction-source.md](transaction-source.md)). Each detail of §8.1 is a table of the spec that owns it.
 
-Amendment 2026-10-13: script `0018_transaction_reversed_by.sql` adds `ReversedByTransactionId` (nullable FK → `Transactions` RESTRICT, unique filtered index). Do not edit `0013_transactions.sql`. Do not back-fill.
+Header **and** cash-leg rows use the same audit + concurrency pair as `Accounts` / `Instruments`: `Created`, `CreatedBy`, `LastModified`, `LastModifiedBy`, `RowVersion`. `AuditableEntityInterceptor` fills the four audit fields on both. Posted rows are not updated, so `LastModified*` stay null, **except** the single `ReversedByTransactionId` write, which fills `LastModified` / `LastModifiedBy` and bumps `RowVersion`. Reverse still does **not** take a client `rowVersion` (the server locks the Accounts).
 
-Cash-leg columns: `Id`, `TransactionId`, `Amount`, `Currency`, plus the four audit columns and `RowVersion`. HTTP still addresses the header `PublicId` only; the leg `RowVersion` is not a client token in this increment.
+HTTP addresses the header `PublicId` only; the leg `RowVersion` is not a client token.
 
-No `Accounts.Balance`. No Holdings table. No `Journals` table. No capture table beside `Transactions`.
-
-When accepted, update [database-design.md](../database-design.md) in the same change.
+No `Accounts.Balance`. No `Journals` table. No capture table beside `Transactions`.
 
 ---
 
@@ -267,7 +273,7 @@ When accepted, update [database-design.md](../database-design.md) in the same ch
 | --- | --- | --- | --- |
 | Command | `CreateTransaction` | new PublicId | R1–R10, R16–R24 |
 | Command | `ReverseTransaction` | new PublicId | R10–R11, R6–R9, R21–R22 |
-| Command | `CloseAccount` (existing) | 204 | **add** cash `SUM = 0` |
+| Command | `CloseAccount` (accounts) | 204 | R12: cash `SUM = 0` |
 | Query | `GetTransactions` | list envelope | tenant / assignment / R14 |
 | Query | `GetTransactionById` | item | 404 rules |
 | Query | `GetAccountCashBalance` | `{ accountId, currency, cashBalance }` | `accounts.read` scope |
@@ -286,11 +292,11 @@ When accepted, update [database-design.md](../database-design.md) in the same ch
 | POST | `/transactions/{id}/reverse` | `transactions.create` | 201 `{ "id" }` | 400 / 401 / 403 / 404 / 409 |
 | GET | `/accounts/{id}/cash-balance` | `accounts.read` | 200 | 401 / 403 / 404 |
 
-Create and reverse require `Idempotency-Key`.
+Create and reverse require `Idempotency-Key`. `POST /transactions/transfer` and `POST /transactions/fx` belong to [internal-transfers.md](internal-transfers.md) and [fx-conversions.md](fx-conversions.md).
 
 ### 8.1 Bodies
 
-Create:
+Create, on an External account:
 
 ```json
 {
@@ -312,12 +318,16 @@ Item:
   "id": "<transaction publicId>",
   "tenantId": "<tenant publicId>",
   "type": "TransferIn",
+  "source": { "kind": "Manual", "id": null },
   "cash": [
     {
       "accountId": "<account publicId>",
       "customerId": "<customer publicId>",
+      "role": "Principal",
       "amount": 100.00,
-      "currency": "NZD"
+      "currency": "NZD",
+      "fee": null,
+      "tax": null
     }
   ],
   "security": [],
@@ -326,15 +336,44 @@ Item:
   "reference": null,
   "originalTransactionId": null,
   "reversedByTransactionId": null,
-  "rowVersion": "<base64>"
+  "rowVersion": "<base64>",
+  "fx": null,
+  "adjustment": null,
+  "bankReceipt": null,
+  "payment": null,
+  "interest": null,
+  "corporateAction": null,
+  "execution": null,
+  "migration": null,
+  "inKindTransfer": null,
+  "dividend": null
 }
 ```
 
-The transaction item has `cash` and `security` arrays, each leg with its own `accountId` / `customerId` ([leg-accounts.md](leg-accounts.md) §8.1). Security-only types return `cash: []`; cash-only types return `security: []`. Do not keep a parallel flat `amount` on the item.
+The item has `cash` and `security` arrays, each leg with its own `accountId` / `customerId` ([leg-accounts.md](leg-accounts.md) §8.1). Security-only types return `cash: []`; cash-only types return `security: []`. There is no flat `amount` on the item.
 
 `originalTransactionId` is set on a Reversal (points at the original). `reversedByTransactionId` is set on the original after reverse (points at the Reversal). Both are null on an unreversed original. Both are returned on list and get. Hide the Reverse button when `reversedByTransactionId` is not null or `type` is `Reversal`.
 
-Account item and account list (amendment when accepted):
+The other fields are `null` except on the Transactions of the spec that owns them:
+
+| Field | On | Owner |
+| --- | --- | --- |
+| `source` | Every Transaction | [transaction-source.md](transaction-source.md) |
+| `cash[].fee` | A `Fee` leg | [trade-fees.md](trade-fees.md) §8.1 |
+| `cash[].tax` | A `Tax` leg | [interest-run.md](interest-run.md), [dividends.md](dividends.md) |
+| `security[]` | A security leg | [holdings.md](holdings.md), [buy-sell.md](buy-sell.md), [split.md](split.md) |
+| `fx` | A Transaction with an FX detail | [fx-conversions.md](fx-conversions.md) R22 |
+| `adjustment` | An `Adjustment` | [adjustments.md](adjustments.md) |
+| `bankReceipt` | A deposit and its Reversal | [deposit-matching.md](deposit-matching.md) |
+| `payment` | A payout and its Reversal | [withdrawals.md](withdrawals.md) |
+| `interest` | The posting of an interest run | [interest-run.md](interest-run.md) |
+| `corporateAction` | An entitlement posting | [corporate-actions.md](corporate-actions.md) |
+| `execution` | An order fill | [orders.md](orders.md) |
+| `migration` | A migrated `Opening` or `OpeningHoldings` | [migration-batches.md](migration-batches.md) |
+| `inKindTransfer` | The `StockIn` / `StockOut` of an in-kind transfer | [in-kind-transfers.md](in-kind-transfers.md) |
+| `dividend` | A `Dividend` | [dividends.md](dividends.md) |
+
+Account item and account list:
 
 ```json
 {
@@ -355,189 +394,82 @@ Cross-tenant or wrong-collection id → **404**, not 403.
 
 ## 9. UI
 
-None in this increment. Pages live in [docs/adviser-portal/](../adviser-portal/). Scalar is enough for SystemAdmin and for local smoke.
+None here. The activity pages are in [docs/adviser-portal/](../adviser-portal/) and [docs/customer-portal/](../customer-portal/). Scalar is enough for SystemAdmin and for local smoke.
 
 ---
 
 ## 10. Tests
 
-| Project | Assert |
-| --- | --- |
-| Domain.UnitTests | Create / reverse invariants; SUM sign; cannot mutate posted header except the single `ReversedByTransactionId` write; Opening / CloseOut rules if placed on the entity |
-| Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403; happy TransferIn/Out/Interest/Opening/CloseOut; Opening rejected after another type; second Opening rejected; close rejected while SUM ≠ 0; create rejected while Closed; reverse new id, original economic legs untouched, original `reversedByTransactionId` set; already reversed → 400; idempotent replay; hash mismatch 409; missing key 400; account JSON includes `cashBalance` |
-| Infrastructure.IntegrationTests | Other tenant’s id → 404; Adviser unassigned Customer → 404; no `Accounts.Balance`; no `Journals` table |
+The tests are the executable form of §4. Where they live:
 
-TestSeed (Development / TestAppHost only): one `TransferIn` on “Demo everyday bank” so Scalar shows a non-zero `SUM`. Functional tests still create their own rows. Do not seed a fake two-account transfer.
+| Project | Where |
+| --- | --- |
+| Domain.UnitTests | `Entities/TransactionTests.cs`, `Entities/TransactionBookedAtUtcTests.cs` |
+| Application.FunctionalTests | Folder `Transactions/`: `CreateTransactionTests`, `TransactionRulesTests`, `ReverseTransactionTests`, `CloseAccountCashTests`, `CashAmountDecimalPlacesTests`, `BookedAtOffsetTests`, `FutureBookedAtTests`. The other files of the folder belong to the specs of §5 |
+| Infrastructure.IntegrationTests | `AppliedSchema/TransactionsSchemaTests.cs` |
+
+TestSeed (Development / TestAppHost only): one `TransferIn` on "Demo everyday bank" so Scalar shows a non-zero `SUM`. Functional tests create their own rows.
 
 ---
 
-## 11. Locked in this spec (discussion, 2026-09-25)
+## 11. Locked in this spec
 
-Idempotency: [ADR 0015](../adr/0015-idempotency-keys.md) (`proposed`). Expand [ADR 0011](../adr/0011-ledger-cash-holdings-reversal.md) when this file becomes `accepted`.
+Idempotency: [ADR 0015](../adr/0015-idempotency-keys.md). Direction: [ADR 0011](../adr/0011-ledger-cash-holdings-reversal.md).
 
 | Item | Lock |
 | --- | --- |
-| Slice packaging | No standalone cash Feature Spec. Cash legs belong here. Holdings / securities may split later. |
+| Slice packaging | No standalone cash Feature Spec. Cash legs belong here. |
 | Public model | **Transaction** = business-event header. **Leg** = accounting line. Two layers, one HTTP write. |
 | Not in model | Capture table + approve copy into Journal. `Created` + event-handler auto-approve. Two POST collections (`/journals` and `/transactions`). |
 | Events | `TransactionPosted` / `TransactionReversed` are side effects. They must not write the books. |
-| Future review | Same row, new status + approve command. Not a swapped handler. |
-| Later scrip / buy | Same `Transaction` + more legs. Not a new write model. |
-| Public route | `/transactions`, policies `transactions.*`, script `0013_transactions.sql`. |
+| Review | A Transaction has no status. Approval is on a record of its own and comes before the Transaction is posted. |
+| More legs | A trade, a scrip issue, a transfer: the same `Transaction` with more legs. Not a new write model. |
 | Balance storage | `SUM` of posted cash legs. No `Account.Balance`. No projection table. |
-| Account HTTP | Item + list include computed `cashBalance` + `currency`. Also `GET /accounts/{id}/cash-balance`. |
 | Close | Reject if cash `SUM ≠ 0`. Closed forbids new transactions including reversal. `CloseOut` zeroes the book. `Account.Close()` does not write cash. |
-| Transfer | Cross-account transfer out (§13). |
-| Legs | Header + `TransactionCashLegs` (one cash leg now). Not cash columns on the header. Header **and** cash-leg rows have Created/CreatedBy/LastModified/LastModifiedBy + `RowVersion`. Reverse does not require any `rowVersion`. |
-| Mutation | No `UPDATE`/`DELETE` of posted transactions, **except** the single `ReversedByTransactionId` write on reverse (script `0018`). After that write the original is immutable again. Economic legs are never updated. |
+| Legs | Header + `TransactionCashLegs`. Not cash columns on the header. Header **and** cash-leg rows have Created/CreatedBy/LastModified/LastModifiedBy + `RowVersion`. Reverse does not require any `rowVersion`. |
+| Mutation | No `UPDATE`/`DELETE` of posted transactions, **except** the single `ReversedByTransactionId` write on reverse. Economic legs are never updated. |
 | Line sign | Glossary **Signed book amount**. |
-| `bookedAt` | Required instant with `Z` or an offset (R24). Returned in UTC. |
-| Opening / types / memo / reference / idempotency / concurrency | R19–R24 and the type table in §5. |
-| Customer | No ledger-write policy. |
-| SystemAdmin | `tenantId` on list/create. |
-| Portal | No activity page in this increment. |
-
-Still out of **Phase 2 product**, unchanged: live FX, Customer Portal, Property / Credit selectable.
 
 ---
 
-## 12. Still open (does not block `review`)
+## 12. Still open
 
-None that block review. Audit + `RowVersion` on header **and** cash leg, idempotency table in `0013_transactions.sql`, and reverse without `rowVersion` are locked in §4 / §6. Nothing in this section reopens the Transaction-vs-Journal two-step design.
-
----
-
-## 13. Deferred on purpose — cross-account transfer
-
-Not in this increment. Keep this section after accept:
-
-- A transfer is two cash legs on two accounts and must commit atomically. That is already a two-legged transaction, even with no security.
-- Counterparty account may be Closed, different currency, or (if ever allowed) a different Customer.
-- Phase 2 has no live FX. Cross-currency transfer is not “amount in = amount out” and must not use rate 1.
-- Two unlinked transactions are not a transfer.
-
-When a later increment opens it: same Customer, same currency first; one header or an explicit pair id; both accounts Open; both SUMs valid after the pair; still no Customer writer.
-
-Do not implement a silent shortcut in TestSeed that looks like a transfer.
-
-The same-tenant, same-currency, cash-only transfer is drafted in [internal-transfers.md](internal-transfers.md) (`InternalTransfer`).
+None.
 
 ---
 
-## 14. Suggested commits
+## 13. Cross-account transfer
 
-Only after `accepted`. Tree must build after each commit. Split each line red then green.
+A transfer is one Transaction with two cash legs on two Accounts, committed atomically: [internal-transfers.md](internal-transfers.md) for one currency (`InternalTransfer`), [fx-conversions.md](fx-conversions.md) for two (`FxConversion`). A cross-currency transfer is never "amount in = amount out" and never uses rate 1.
 
-1. `0013_transactions.sql` (+ idempotency table if not `0014`) + EF mapping + integration test that header + cash-leg exist and `Accounts` still has no balance column.
-2. Domain `Transaction` + cash leg + unit tests.
-3. `CreateTransaction` / `GetTransactions` / `GetTransactionById` + policies + `Idempotency-Key` + functional tests (401 / 403 / 404 / currency / Closed).
-4. Cash-zero guard on `CloseAccount` + `CloseOut` / `Opening` rules + tests.
-5. `ReverseTransaction` + tests.
-6. Account `cashBalance` fields + `/cash-balance` + TestSeed + repo docs (this file `accepted`, ADR 0011 / 0015, domain-model, database-design, api-design, accounts R16 + item JSON).
-
-## Amendment 2026-11-14 (UTC instants)
-
-Accepted with [utc-instants](../fixes/utc-instants.md). R24 no longer stores the request offset: `bookedAt` must carry `Z` or an offset, is converted to UTC, and is returned with `Z`. The item example shows the UTC form.
+Two unlinked transactions are not a transfer (R18). Do not seed a pair in TestSeed that looks like one.
 
 ---
 
-## Amendment 2026-11-20 (bank feed and deposit matching) — accepted
+## 14. History
 
-Accepted with [deposit-matching.md](deposit-matching.md).
+What changed in this file after it landed. The text of each change is in git (`git log -p -- docs/features/posting.md`).
 
-- A `TransferIn` may be a **deposit**: posted by the deposit flow from a matched bank statement line, with source `BankFeed`, server `bookedAt`, memo `Bank deposit`, no `reference`, and a bank receipt detail (`TransactionBankReceiptDetails`: value date, reference text, payer name, masked payer account). The item carries `bankReceipt` on a deposit and its Reversal, `null` otherwise.
-- R9 holds for the flow: an undo match whose Reversal would make the cash `SUM` negative is refused (deposit-matching R30).
-- R11: a deposit's Reversal is written by the flow (an undo match), not by `POST /transactions/{id}/reverse`, which refuses it on a Custodial account (transaction-source R13). The Reversal copies the bank receipt detail.
-- R16: `TransferIn` on a Custodial account is refused on `POST /transactions` (custody-modes R5 amendment 2026-11-20). External accounts unchanged.
-
----
-
-## Amendment 2026-11-20 (nominated bank accounts and withdrawals) — accepted
-
-Accepted with [withdrawals.md](withdrawals.md).
-
-- §1 and roadmap D3: "maker-checker is a status on this same row" stays the rule for reviewing a ledger entry itself (roadmap X1). An **instruction** to an outside party (a withdrawal, later an order or an in-kind transfer) is a separate aggregate with its own lifecycle; the Transaction it leads to is still posted in one step, when the outside party confirms.
-- A `TransferOut` may be a **payout**: posted by the withdrawal flow from the bank's debit line, with source `Payment` (the withdrawal's PublicId), server `bookedAt`, memo `Withdrawal`, no `reference`, and a payment detail (`TransactionPaymentDetails`: value date, reference sent, payee name, masked payee account). The item carries `payment` on a payout and its Reversal, `null` otherwise. A payout is reversed only by its flow (a returned payout).
-- R9 on a Custodial account: every write that lowers cash must keep **available cash** (cash `SUM` minus the open withdrawals' reserved cash) `≥ 0`, checked under the Account lock (withdrawals R36, R37). The payout is the one exception: it releases its own reservation. External accounts keep R9 as it is.
-- R16: on a Custodial account `TransferOut` is refused on `POST /transactions` for every caller, and `CloseOut` is allowed only when `0 < SUM <` one minor unit of the currency (custody-modes amendment 2026-11-20, withdrawals R45, R46). External accounts unchanged.
-
----
-
-## Amendment 2026-11-22 (account closure) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [account-closure.md](account-closure.md).
-
-- R16, R17: on a Custodial account `POST /transactions` refuses `CloseOut` for every amount and every caller → 400 `errors.Type` with `The remainder of a Custodial account is written off by its account closure. Request an account closure.` (account-closure R23). This replaces the remainder rule of the withdrawals amendment. External accounts unchanged.
-- R17: the only `CloseOut` on a Custodial account from now on is the **remainder write-off** an account closure posts (source `AccountClosure`, `Transaction.PostRemainderWriteOff`, account-closure R18). R17 (amount equal to minus the `SUM`) holds for it, and it is exempt from R8 like every `CloseOut`.
-- R12: `CloseAccount` refuses an Open Custodial account (account-closure R22); inside the closure flow the cash `SUM = 0` and no-holdings rules still hold before `Account.Close()`.
-- R6: on a **closing** account (an account closure `InProgress`), `POST /transactions` and `POST /transactions/{id}/reverse` of a Transaction with a leg on it → 400 with `This account is being closed and accepts no new activity.` under the empty `errors` key, directly after the Closed-account check (account-closure R12). No idempotency record is written.
-
----
-
-## Amendment 2026-11-22 (interest run) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rules R16–R29 live there; this section records what changes here.
-
-- R16 and the §5 type table: on a Custodial account `Interest` is still refused on `POST /transactions` for every caller; it is written only by the **interest run** (`Transaction.PostInterest`, source `InterestRun`), with a `Principal` cash leg of the gross and, when the withholding tax is above 0, a `Tax` cash leg of minus the tax (interest-run R23–R25). External accounts unchanged: a hand `Interest` there has one `Principal` leg and no `Tax` leg.
-- R20: an interest posting's `Principal` leg is always `> 0` and its `Tax` leg always `< 0`; the net is never negative (interest-run R28). The hand `Interest` of an External account keeps "either sign".
-- The interest posting's `bookedAt` is the platform time of the posting; the days it pays are in its interest detail (interest-run R23, R26). Its Reversal copies the `Tax` leg with its tax detail and the interest detail; no flow reverses one in this slice, and a hand reverse → 400 (interest-run R27).
-
----
-
-## Amendment 2026-11-22 (corporate actions) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions.md](corporate-actions.md). Rules R24–R33 live there; this section records what changes here.
-
-- The §5 type table: on a Custodial account `Split` and `Bonus` are still refused on `POST /transactions` for every caller; they are written only by the platform from a corporate action (`Transaction.PostCorporateAction`, source `CorporateAction`), one security leg of the quantity difference with cost `0`, no cash leg (corporate-actions R26). External accounts unchanged.
-- R20: an entitlement posting has no cash leg. Its `bookedAt` is the platform time of the posting; the party's dates are in its corporate action detail (corporate-actions R26, R27).
-- R22: each entitlement is posted in its own database transaction with the Account row locked (corporate-actions R25).
-
----
-
-## Amendment 2026-11-23 (orders and settlement) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R31, R32, R39 and R48 live there; this section records what changes here.
-
-- The §5 type table: on a Custodial account `Buy` and `Sell` are refused on `POST /transactions` for every caller (400 `errors.Type`). They are written by the platform from the fill of an order (`Transaction.PostBuy` / `PostSell` with source `OrderFill` and an execution detail) and, until roadmap O3, by a rebalance. External accounts unchanged.
-- §1: an order is an instruction with its own lifecycle, like a withdrawal (roadmap D3). It is not a Transaction; a Transaction is posted for each fill the broker reports.
-- R9: on a Custodial account available cash is the cash `SUM` minus reserved cash, and reserved cash now also counts the live buy orders (orders R39). Cash from a sale that has not settled is in the `SUM` (orders R44).
-- R20: a fill's `bookedAt` is the platform time of the posting; the broker's trade date and settlement date are in its execution detail (orders R32, R35).
-- R22: placing an order locks the Account row, and each fill is posted in its own database transaction with the Account row locked (orders R12, R31).
-
----
-
-## Amendment 2026-11-24 (migration batches) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [migration-batches.md](migration-batches.md). Rules R22 and R26 live there; this section records what changes here.
-
-- R19 and the §5 type table: on a Custodial account an `Opening` is written only by a migration batch (`Transaction.PostMigratedCash`, source `Migration`, one `Principal` leg, memo `Opening balance`, a migration detail). The hand `Opening` stays refused for every caller, with the message `Opening balances on a Custodial account come from a migration batch.` External accounts are unchanged.
-- R19: the account must still be empty: a batch entry is refused (issue `AccountNotEmpty`) when any Transaction has a leg on the Account, reversed ones included.
-- R20: a migrated `Opening` is booked at the posting time of its batch; the previous provider's date is in its migration detail (`asOfDate`).
-
----
-
-## Amendment 2026-11-24 (in-kind transfers) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rules R20–R40 live there; this section records what changes here.
-
-- §1: the in-kind transfer is now one of the instructions. It is not a Transaction; the custody movement that confirms it posts a `StockIn` or `StockOut` with source `InKindTransfer`, `bookedAt` the processing time and an in-kind transfer detail.
-- `POST /in-kind-transfers` requires `Idempotency-Key` (R21, ADR 0015).
-
----
-
-## Amendment 2026-11-24 (dividends) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rules R37–R43 live there; this section records what changes here.
-
-- The type table: `Dividend` (6) is active. On a Custodial account it is written only by corporate actions (`Transaction.PostDividend`, source `CorporateAction`); it is still not accepted by hand on any account.
-- R16: a `Dividend` has one `Principal` leg of the gross, `Tax` legs, and with a reinvestment one `Reinvestment` leg (`CashLegRole` 3) and one security leg. Its legs add up to the net less the reinvested amount, never below 0.
-
----
-
-## Amendment 2026-11-25 (adjustment review) — accepted
-
-Status of this amendment: `accepted` (2026-11-25), together with [adjustment-review.md](adjustment-review.md). Rules R9, R13–R15 live there; this section records what changes here.
-
-- §1: the sentence "future maker-checker is a status on this same row plus an approve command — not a second resource" is replaced, and with it the first bullet of the amendment of 2026-11-20 (withdrawals) where it kept that plan for roadmap X1. The review of an adjustment is on an **adjustment request**, approved before anything is posted, as a migration batch is. Write = posted stays true for every Transaction, and no read of the ledger has to leave a row out.
-- R16 and the type table: an `Adjustment` is written only by the approval of an adjustment request (`Transaction.PostAdjustment`, source `AdjustmentRequest`). `POST /transactions/adjustment` is removed.
-- R11: an `Adjustment` is never reversed by hand (400). The permission check for reversing one is gone.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-10-05 | [holdings.md](holdings.md) | R12: close also needs no holding (accounts R16) |
+| 2026-10-13 | — | R10, R11, §6: the reverse link in both directions, script `0018` |
+| 2026-11-02 | [customer-portal.md](../customer-portal/customer-portal.md) | R15: a Customer reads the transactions of their own accounts |
+| 2026-11-10 | [leg-accounts.md](leg-accounts.md) | R5–R9, R11, R14, R19, R22, §5, §6, §8.1: the Account is on each leg |
+| 2026-11-14 | [utc-instants](../fixes/utc-instants.md) | R24: `bookedAt` is stored and returned in UTC |
+| 2026-11-15 | [trade-fees.md](trade-fees.md) | §5, §8.1: every cash leg has a role. Role grants moved to api-design §3.1 |
+| 2026-11-16 | [ledger-write-guards](../fixes/ledger-write-guards.md) | R8 decimal places, R11 latest security activity, R24 no future `bookedAt` |
+| 2026-11-17 | [custody-modes.md](custody-modes.md) | R16: the manual entry matrix. R24: the server sets `bookedAt` on a Custodial account |
+| 2026-11-19 | [transaction-source.md](transaction-source.md) | §5, §8.1: the source. R11: hand reverse by source on a Custodial account |
+| 2026-11-19 | [adjustments.md](adjustments.md) | §5: the type `Adjustment`; `adjustment` on the item |
+| 2026-11-20 | [deposit-matching.md](deposit-matching.md) | §5: a `TransferIn` as a deposit; `bankReceipt` on the item |
+| 2026-11-20 | [withdrawals.md](withdrawals.md) | §1: instructions. §5: a `TransferOut` as a payout; `payment` on the item. R9: available cash |
+| 2026-11-22 | [account-closure.md](account-closure.md) | R6: a closing account. R12, R17: close and `CloseOut` on a Custodial account |
+| 2026-11-22 | [interest-run.md](interest-run.md) | §5, R20: `Interest` on a Custodial account, with a `Tax` leg |
+| 2026-11-22 | [corporate-actions.md](corporate-actions.md) | §5: `Split` and `Bonus` on a Custodial account |
+| 2026-11-23 | [orders.md](orders.md) | §1: an order is an instruction. §5: `Buy` / `Sell` on a Custodial account. R9: reserved cash counts buy orders |
+| 2026-11-24 | [migration-batches.md](migration-batches.md) | R19: `Opening` on a Custodial account |
+| 2026-11-24 | [in-kind-transfers.md](in-kind-transfers.md) | §1: an in-kind transfer is an instruction. §5: `StockIn` / `StockOut` on a Custodial account |
+| 2026-11-24 | [dividends.md](dividends.md) | §5: `Dividend` is active; the `Reinvestment` leg |
+| 2026-11-25 | [adjustment-review.md](adjustment-review.md) | §1: no status on a Transaction. R11: an `Adjustment` is never reversed. `POST /transactions/adjustment` removed |
+| 2026-11-26 | — | The amendments above were folded into §1–§13. No rule changed |
