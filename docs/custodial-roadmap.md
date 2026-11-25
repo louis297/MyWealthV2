@@ -41,6 +41,7 @@ related:
   - features/in-kind-transfers.md
   - features/dividends.md
   - features/demo-tenant-seed.md
+  - features/adjustment-review.md
 ---
 
 # Custodial accounts roadmap
@@ -385,7 +386,7 @@ A Custodial `FxConversion` priced by an FX provider with a spread, instead of th
 
 | Item | What | Note |
 | --- | --- | --- |
-| X1 | Review of an adjustment by a second person | The first status on a Transaction, as [posting.md](features/posting.md) §1 describes. Balances, holdings and reports must ignore an unapproved row. Large; do after the flows. |
+| X1 | Review of an adjustment by a second person | The first status on a Transaction, as [posting.md](features/posting.md) §1 describes. Balances, holdings and reports must ignore an unapproved row. Large; do after the flows. In review: [adjustment-review.md](features/adjustment-review.md) (2026-11-25) proposes an adjustment request that a second person approves before the Transaction is posted, with no status on the Transaction. |
 | X2 | Cancel and rebook, replay | Rebuilding positions by replaying Transactions in order. Deferred (future-plans §9). Needed for tax lots and backdating. Moved to the business roadmap (§13.1). |
 | X3 | Period close | A date per Tenant before which nothing may be written. After X2. |
 | X4 | Third-party payments | See D14. |
@@ -499,7 +500,7 @@ Each step depends only on earlier steps. "Closes" names the matrix cell or known
 | 14 | T1 in-kind transfer, T3 custodian reconciliation | S3; S2 and S4 (deliveries and corporate actions at the custodian) | "Existing positions cannot be moved in" | [in-kind-transfers](features/in-kind-transfers.md) | accepted 2026-11-24, landed 2026-11-24 |
 | 15 | C2 dividends, C3 reinvestment | S4 issuer dividends; S3 (dividend payments and elections) | `Dividend` reserved | [dividends](features/dividends.md) | accepted 2026-11-24, landed 2026-11-25 (with roadmap step 2, for Custodial accounts) |
 | 16 | An end-to-end run across all parties; the scenario library of S0 | every party | — | — | next; not specified |
-| 17 | X1 adjustment review | — | The second person's approval of target 2 | — | next; not specified |
+| 17 | X1 adjustment review | — | The second person's approval of target 2 | [adjustment-review](features/adjustment-review.md) | review 2026-11-25 |
 | parked | O4 order aggregation, O5 FX through an outside party | S2 | — | — | not planned (§13.1) |
 | moved | X2 replay, X3 period close | — | "History cannot be entered" (X2) | — | with [future-plans.md](future-plans.md) §1 (§13.1) |
 
