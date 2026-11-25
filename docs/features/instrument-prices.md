@@ -271,3 +271,16 @@ Status of this amendment: `accepted` (2026-11-22), together with [simulated-inst
 - **R14.** `InstrumentPriceSyncJob` leaves out every served instrument: from the instruments it fetches and from its test whether every active instrument has today's date. No EODHD call is spent on a served symbol.
 - **R15.** A connection's run also writes one price to every active instrument, in any Tenant, with the item's symbol and with `QuoteCurrency` equal to the item's currency.
 - R6, R8, R9 and R12 are unchanged: `IMarketData` reads the table as before, a failed read keeps the old rows, the read path never calls a party, and there is still no price read route on `webapi`.
+
+## Amendment 2026-11-25 (market data history) — accepted
+
+Status of this amendment: `accepted` (2026-11-25), together with [market-data-history.md](market-data-history.md). Rules R1–R11, R17–R19 and R21–R23 live there; this section records what changes here.
+
+- **§2 Out, "Historical back-fill".** Replaced. With `MarketDataHistory:FloorDate` set on `worker`, the daily call per symbol asks EODHD with `from` = the later of the floor date and today minus `Eodhd:HistoryDays` (default 360), and the job stores every bar of the answer on or after that date. It is still one call per symbol. Without the setting the job asks for the latest bar, as before.
+- **R5.** A row whose `AsOfDate` is two or more days before the platform's UTC date is **final**: it is never updated or deleted, and a missing one may still be inserted. A row dated today or yesterday is updated as R5 said. This holds for `instrument-price-sync` and for `market-data-sync:{connection}`. `TestSeed` and `webapi --seed-demo` are not bound by it.
+- **`Price`** is the unadjusted `close` of the EODHD bar. `adjusted_close` is never read. A bar without a date or a `close`, or with a `close` that is not `> 0`, is skipped.
+- **The rows of one symbol group** are stored in one transaction; a failure at one symbol leaves the symbols already stored in place.
+- **R6.** `IMarketData.TryGetPriceDetail(instrumentId, asOf)` returns the row `TryGetPrice` reads, with its `AsOfDate` and `Source`. `IMarketData.ListPricesAsync` lists the stored rows of one instrument, newest first.
+- **R12.** Replaced. `GET /instruments/{id}/prices` (`instruments.read`) lists the stored prices of an instrument the caller may read, newest first, with `from`, `to` and paging.
+- **R14.** Unchanged: the job calls the source only when some active instrument has no row for today.
+- **§11.** "One call returns full history for one symbol. The job takes the latest bar" now reads: one call per symbol with `from`; the job stores every bar from that date.

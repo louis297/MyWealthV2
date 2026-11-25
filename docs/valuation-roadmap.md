@@ -121,7 +121,7 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 - **Also decide:** the value of the floor date (Q3); whether the unadjusted `close` is what EODHD sends (H4; check a real response across a known split); how far back the EODHD plan in use goes; whether a served (simulated) instrument gets any back-fill (recommended: no, its history is what the seed and the polls wrote, because the simulator's day is not the platform's day); who may call the read routes.
 - **Amends:** instrument-prices (Out, R5, R12, §11), fx-rates (Out, R14), ADR 0019 (consequences).
 - **Worked example:** one US instrument across a real split, one instrument over a weekend and a market holiday, one currency pair over the same days.
-- **Spec:** [market-data-history.md](features/market-data-history.md) (in review, 2026-11-25). It proposes, as points to confirm: the floor date as a `worker` setting, with no setting meaning no history; no marker of what is stored, so that every daily run asks for the whole window and inserts what is missing; a row that is final from the second day on; a limit on how far back EODHD is asked, because the free plan serves one year; a daily job of its own for the rate history; `GET /instruments/{id}/prices` and `GET /fx-rates`; no script. Its worked example confirms that EODHD's `close` is the unadjusted close.
+- **Spec:** [market-data-history.md](features/market-data-history.md) (accepted 2026-11-25; the ten points of its §11 confirmed as recommended). It locks: the floor date as a `worker` setting, with no setting meaning no history; no marker of what is stored, so that every daily run asks for the whole window and inserts what is missing; a row that is final from the second day on; a limit on how far back EODHD is asked, because the free plan serves one year; a daily job of its own for the rate history; `GET /instruments/{id}/prices` and `GET /fx-rates`; no script. Its worked example confirms that EODHD's `close` is the unadjusted close.
 
 ### V2. Valuation as of a date
 
@@ -192,7 +192,7 @@ Each step depends only on earlier steps.
 
 | Step | Item | Closes | Spec | Status |
 | --- | --- | --- | --- | --- |
-| 1 | V1 price and rate history | "Historical back-fill" and the deferred read routes of instrument-prices and fx-rates | [market-data-history](features/market-data-history.md) | review 2026-11-25 |
+| 1 | V1 price and rate history | "Historical back-fill" and the deferred read routes of instrument-prices and fx-rates | [market-data-history](features/market-data-history.md) | accepted 2026-11-25 |
 | 2 | V2 valuation as of a date | — | — | not specified |
 | 3 | V3 daily valuation run and stored valuations | "Still open: daily snapshots" (function-plan §5.4) | — | not specified |
 | 4 | V4 net worth history and reports as of a date | "Daily snapshots, historical series" and "FX fold" (net-worth Out) | — | not specified; optional for the business roadmap |
