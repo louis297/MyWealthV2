@@ -47,17 +47,27 @@ Create a git commit after every discrete step of work. Do not leave completed st
 - If a step produced no file changes, skip the commit.
 - Do not amend, rebase, or rewrite history unless the user explicitly asks.
 
-A Feature Spec §12 lists **behaviour** commits. Split each behaviour into a red commit and a green commit, plus a refactor commit if the refactor changed files. The tree must **compile** after every commit. A red commit has failing tests on purpose; every green or refactor commit must pass the test suite.
+A Feature Spec §12 lists **behaviour** commits. Split each behaviour into a red commit and a green commit, plus a refactor commit if the refactor changed files. The tree must **compile** after every commit. A red commit has failing tests on purpose; every green or refactor commit must pass the partition tests below, and the last commit of a slice must pass the full suite.
 
 ## Use agentic-friendly TDD for development work
 
 For production code, work test-first. Tests are the executable spec; do not start by writing implementation.
 
 1. **Red**: Write the failing tests for one behaviour from the accepted spec. Run them and confirm they fail **on an assertion**, for the reason you expect. A compile error is not a valid red.
-2. **Green**: Write the minimum production code that makes those tests pass. Run the focused tests until they pass, then run the full test projects the change touches once, just before you commit. Do not add behaviour the tests do not require.
+2. **Green**: Write the minimum production code that makes those tests pass. Run the focused tests until they pass, then run the partition tests once, just before you commit. Do not add behaviour the tests do not require.
 
-**Focused runs only while iterating.** In the red and green steps, run only the tests for the behaviour you are working on, with a filter. For example: `dotnet test tests/Application.FunctionalTests --no-build --filter "FullyQualifiedName~Reports"`. Do not run a whole test project on every edit. The full functional suite takes minutes. Run the full projects once before the commit, or start that run in the background and keep working.
+**Focused runs only while iterating.** In the red and green steps, run only the tests for the behaviour you are working on, with a filter. For example: `dotnet test tests/Application.FunctionalTests --no-build --filter "FullyQualifiedName~Reports"`. Do not run a whole test project on every edit.
+
 3. **Refactor** (optional): Clean up only while the tests are green. Add no new behaviour. Skip the step if nothing needs cleaning.
+
+**Partition tests before each commit, the full suite once per slice.** A full run takes minutes and the suite keeps growing, so each commit is checked by partition:
+
+- **Before each green or refactor commit**, run the partition tests: all of `Domain.UnitTests` and `Application.UnitTests` (seconds), plus the database-backed tests of each feature the change touches. A feature's partition is named after its folder under `src/Application/` (for example `AdjustmentRequests`): run `--filter "FullyQualifiedName~<Feature>"` on `Application.FunctionalTests` (folder `<Feature>/`) and, when the change touches `src/Infrastructure/`, on `Infrastructure.IntegrationTests` (classes `AppliedSchema/<Feature>*Tests`). Some features have no test folder of their own (`Custodian`, `CustodianReconciliations`, `CustodyMovements`, `SafekeepingAccounts`, `Fx`); their tests sit under `Custody/`, `InKindTransfers/`, `CorporateActions/` or `Transactions/`, so search `tests/` for the feature's types and run those folders.
+- When the change touches `database/schema/`, run all of `Infrastructure.IntegrationTests`: schema tests such as the tenant composite keys cover every table. When it touches `src/Simulator/`, run all of `Simulator.Tests`.
+- When the change touches shared code that other features call (`Common`, entities, the ledger, hosting, auth), add those features' partitions too; find them with a search for the changed types under `tests/`.
+- **Before the last commit of a slice** (the landing commit), and before a push, run every test project in full. If the full run fails, fix it in its own commit before landing.
+- Functional and integration may run at the same time. If a concurrent run fails on SQL timeouts, rerun the failing project on its own before treating the failure as real.
+- CI runs the full suite on pull requests and pushes to `master`.
 
 Rules:
 
