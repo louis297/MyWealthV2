@@ -3,6 +3,11 @@ using MyWealthV2.Domain.MarketData;
 
 namespace MyWealthV2.Application.MarketData;
 
+/// <summary>
+/// The daily EODHD job <c>instrument-price-sync</c> (docs/features/instrument-prices.md, market-data-history.md
+/// R7–R11). One call per symbol group. With a history floor date it asks from the first date of the window and stores
+/// every bar on or after it; without one it stores the latest bar. The rows of one group are written together.
+/// </summary>
 public sealed class InstrumentPriceSyncJob(
     IActiveInstrumentCatalog catalog,
     IInstrumentPriceSource source,
@@ -22,7 +27,6 @@ public sealed class InstrumentPriceSyncJob(
                 .Where(instrument => connections.For(instrument.Symbol) is null)
                 .ToList();
             var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
-            _ = history;
             if (await store.HasAsOfDateForEveryActiveInstrumentAsync(
                     active.Select(instrument => instrument.Id).ToList(),
                     today,
@@ -30,6 +34,11 @@ public sealed class InstrumentPriceSyncJob(
             {
                 return;
             }
+
+            // Market data history R3: EODHD is asked from the later of the floor date and today minus the days.
+            var window = history.FloorDate is { } floor
+                ? new MarketDataHistoryWindow(floor, today, history.HistoryDays)
+                : null;
 
             var groups = active
                 .GroupBy(instrument => (
@@ -39,7 +48,6 @@ public sealed class InstrumentPriceSyncJob(
                 .ThenBy(group => group.Key.Quote, StringComparer.Ordinal)
                 .ToList();
 
-            var collected = new List<InstrumentPriceQuote>();
             for (var index = 0; index < groups.Count; index++)
             {
                 if (index > 0 && requestSpacing > TimeSpan.Zero)
@@ -48,7 +56,7 @@ public sealed class InstrumentPriceSyncJob(
                 }
 
                 var group = groups[index];
-                var sourced = await source.GetBarsAsync(group.Key.Symbol, group.Key.Quote, null, cancellationToken);
+                var sourced = await source.GetBarsAsync(group.Key.Symbol, group.Key.Quote, window?.From, cancellationToken);
                 if (sourced is null)
                 {
                     logger.LogWarning(
@@ -68,21 +76,20 @@ public sealed class InstrumentPriceSyncJob(
                     continue;
                 }
 
-                var latest = sourced.Bars.OrderByDescending(bar => bar.AsOfDate).FirstOrDefault();
-                if (latest.Close is not { } close)
-                {
-                    continue;
-                }
+                // R7: a bar without a close, or with a close that is not above zero, is skipped. R8: with a window,
+                // only the bars inside it.
+                var bars = sourced.Bars
+                    .Where(bar => bar.Close is > 0m && (window is null || window.Contains(bar.AsOfDate)))
+                    .ToList();
+                var quotes = group
+                    .SelectMany(instrument => bars.Select(bar => new InstrumentPriceQuote(instrument.Id, bar.Close!.Value, bar.AsOfDate)))
+                    .ToList();
 
-                foreach (var instrument in group)
+                // R11: the rows of one symbol group in one write.
+                if (quotes.Count > 0)
                 {
-                    collected.Add(new InstrumentPriceQuote(instrument.Id, close, latest.AsOfDate));
+                    await store.UpsertAsync(quotes, time.GetUtcNow(), cancellationToken);
                 }
-            }
-
-            if (collected.Count > 0)
-            {
-                await store.UpsertAsync(collected, time.GetUtcNow(), cancellationToken);
             }
         }
         catch (Exception exception)
