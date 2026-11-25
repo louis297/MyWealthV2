@@ -13,7 +13,10 @@ public sealed class InstrumentPriceStore(ApplicationDbContext db, TimeProvider t
 {
     public const string SourceName = "EODHD";
 
-    public Money? TryGetPrice(int instrumentId, DateTimeOffset? asOf = null)
+    public Money? TryGetPrice(int instrumentId, DateTimeOffset? asOf = null) =>
+        TryGetPriceDetail(instrumentId, asOf)?.Price;
+
+    public InstrumentPriceReading? TryGetPriceDetail(int instrumentId, DateTimeOffset? asOf = null)
     {
         var date = asOf is null
             ? DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime)
@@ -21,7 +24,7 @@ public sealed class InstrumentPriceStore(ApplicationDbContext db, TimeProvider t
         var row = db.InstrumentPrices.AsNoTracking()
             .Where(price => price.InstrumentId == instrumentId && price.AsOfDate <= date)
             .OrderByDescending(price => price.AsOfDate)
-            .Select(price => (decimal?)price.Price)
+            .Select(price => new { price.Price, price.AsOfDate, price.Source })
             .FirstOrDefault();
         if (row is null)
         {
@@ -37,19 +40,37 @@ public sealed class InstrumentPriceStore(ApplicationDbContext db, TimeProvider t
             return null;
         }
 
-        return Money.Create(row.Value, quote);
+        return new InstrumentPriceReading(Money.Create(row.Price, quote), row.AsOfDate, row.Source);
     }
 
-    public InstrumentPriceReading? TryGetPriceDetail(int instrumentId, DateTimeOffset? asOf = null) => null;
-
-    public Task<PagedList<StoredInstrumentPrice>> ListPricesAsync(
+    public async Task<PagedList<StoredInstrumentPrice>> ListPricesAsync(
         int instrumentId,
         DateOnly? from,
         DateOnly? to,
         int page,
         int pageSize,
-        CancellationToken cancellationToken = default) =>
-        Task.FromResult(new PagedList<StoredInstrumentPrice> { Items = [], Page = page, PageSize = pageSize, TotalCount = 0 });
+        CancellationToken cancellationToken = default)
+    {
+        var query = db.InstrumentPrices.AsNoTracking().Where(row => row.InstrumentId == instrumentId);
+        if (from is { } first)
+        {
+            query = query.Where(row => row.AsOfDate >= first);
+        }
+
+        if (to is { } last)
+        {
+            query = query.Where(row => row.AsOfDate <= last);
+        }
+
+        var total = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderByDescending(row => row.AsOfDate)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(row => new StoredInstrumentPrice(row.AsOfDate, row.Price, row.Source, row.FetchedAt))
+            .ToListAsync(cancellationToken);
+        return new PagedList<StoredInstrumentPrice> { Items = items, Page = page, PageSize = pageSize, TotalCount = total };
+    }
 
     public Task UpsertAsync(
         IReadOnlyList<InstrumentPriceQuote> quotes,

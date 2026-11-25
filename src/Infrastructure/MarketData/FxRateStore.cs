@@ -50,15 +50,45 @@ public sealed class FxRateStore(ApplicationDbContext db, TimeProvider time) : IF
         return row ?? throw new FxRateNotFoundException(source, target, date);
     }
 
-    public Task<PagedList<StoredFxRate>> ListRatesAsync(
+    public async Task<PagedList<StoredFxRate>> ListRatesAsync(
         string baseCurrency,
         string quoteCurrency,
         DateOnly? from,
         DateOnly? to,
         int page,
         int pageSize,
-        CancellationToken cancellationToken = default) =>
-        Task.FromResult(new PagedList<StoredFxRate> { Items = [], Page = page, PageSize = pageSize, TotalCount = 0 });
+        CancellationToken cancellationToken = default)
+    {
+        var source = baseCurrency.Trim().ToUpperInvariant();
+        var target = quoteCurrency.Trim().ToUpperInvariant();
+        if (source == target)
+        {
+            return new PagedList<StoredFxRate> { Items = [], Page = page, PageSize = pageSize, TotalCount = 0 };
+        }
+
+        var query = db.FxRates.AsNoTracking().Where(row => row.BaseCurrency == source && row.QuoteCurrency == target);
+        if (from is { } first)
+        {
+            query = query.Where(row => row.AsOfDate >= first);
+        }
+
+        if (to is { } last)
+        {
+            query = query.Where(row => row.AsOfDate <= last);
+        }
+
+        var total = await query.CountAsync(cancellationToken);
+        var rows = await query
+            .OrderByDescending(row => row.AsOfDate)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(row => new { row.AsOfDate, row.BaseCurrency, row.QuoteCurrency, row.Rate, row.Source, row.FetchedAt })
+            .ToListAsync(cancellationToken);
+        var items = rows
+            .Select(row => new StoredFxRate(row.AsOfDate, row.BaseCurrency.Trim(), row.QuoteCurrency.Trim(), row.Rate, row.Source, row.FetchedAt))
+            .ToList();
+        return new PagedList<StoredFxRate> { Items = items, Page = page, PageSize = pageSize, TotalCount = total };
+    }
 
     public async Task UpsertAsync(
         IReadOnlyList<FxRateQuote> quotes,
