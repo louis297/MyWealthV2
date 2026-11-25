@@ -138,14 +138,38 @@ public class ApproveAdjustmentRequestCommandHandler(
     }
 }
 
-public class RejectAdjustmentRequestCommandHandler : IRequestHandler<RejectAdjustmentRequestCommand>
+public class RejectAdjustmentRequestCommandValidator : AbstractValidator<RejectAdjustmentRequestCommand>
 {
-    public Task Handle(RejectAdjustmentRequestCommand request, CancellationToken cancellationToken) =>
-        throw new NotImplementedException();
+    public RejectAdjustmentRequestCommandValidator() => AdjustmentRequestActionRules.Rules(this, noteRequired: true);
 }
 
-public class CancelAdjustmentRequestCommandHandler : IRequestHandler<CancelAdjustmentRequestCommand>
+public class CancelAdjustmentRequestCommandValidator : AbstractValidator<CancelAdjustmentRequestCommand>
 {
-    public Task Handle(CancelAdjustmentRequestCommand request, CancellationToken cancellationToken) =>
-        throw new NotImplementedException();
+    public CancelAdjustmentRequestCommandValidator() => AdjustmentRequestActionRules.Rules(this, noteRequired: false);
+}
+
+/// <summary>R10, R12: no Account check, so that a request can always be ended.</summary>
+public class RejectAdjustmentRequestCommandHandler(IApplicationDbContext db, ICurrentUser currentUser, TimeProvider time)
+    : IRequestHandler<RejectAdjustmentRequestCommand>
+{
+    public async Task Handle(RejectAdjustmentRequestCommand request, CancellationToken cancellationToken)
+    {
+        var adjustmentRequest = await AdjustmentRequestChange.FindAsync(db, currentUser, request.Id, request.RowVersion, cancellationToken);
+        var actor = AdjustmentRequestChange.ActorId(currentUser);
+        AdjustmentRequestChange.Guard(() => adjustmentRequest.Reject(actor, time.GetUtcNow(), request.Note!));
+        await AdjustmentRequestChange.SaveAsync(db, cancellationToken);
+    }
+}
+
+/// <summary>R11, R12: any holder of the permission, the requester included; no Account check.</summary>
+public class CancelAdjustmentRequestCommandHandler(IApplicationDbContext db, ICurrentUser currentUser, TimeProvider time)
+    : IRequestHandler<CancelAdjustmentRequestCommand>
+{
+    public async Task Handle(CancelAdjustmentRequestCommand request, CancellationToken cancellationToken)
+    {
+        var adjustmentRequest = await AdjustmentRequestChange.FindAsync(db, currentUser, request.Id, request.RowVersion, cancellationToken);
+        var actor = AdjustmentRequestChange.ActorId(currentUser);
+        AdjustmentRequestChange.Guard(() => adjustmentRequest.Cancel(actor, time.GetUtcNow(), request.Note));
+        await AdjustmentRequestChange.SaveAsync(db, cancellationToken);
+    }
 }
