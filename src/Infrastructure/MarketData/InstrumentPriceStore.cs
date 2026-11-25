@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.MarketData;
 using MyWealthV2.Domain.MarketData;
 using MyWealthV2.Domain.ValueObjects;
@@ -38,6 +39,17 @@ public sealed class InstrumentPriceStore(ApplicationDbContext db, TimeProvider t
 
         return Money.Create(row.Value, quote);
     }
+
+    public InstrumentPriceReading? TryGetPriceDetail(int instrumentId, DateTimeOffset? asOf = null) => null;
+
+    public Task<PagedList<StoredInstrumentPrice>> ListPricesAsync(
+        int instrumentId,
+        DateOnly? from,
+        DateOnly? to,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(new PagedList<StoredInstrumentPrice> { Items = [], Page = page, PageSize = pageSize, TotalCount = 0 });
 
     public Task UpsertAsync(
         IReadOnlyList<InstrumentPriceQuote> quotes,

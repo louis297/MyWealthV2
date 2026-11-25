@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Fx;
 using MyWealthV2.Domain.MarketData;
 using MyWealthV2.Infrastructure.Data;
@@ -48,6 +49,16 @@ public sealed class FxRateStore(ApplicationDbContext db, TimeProvider time) : IF
 
         return row ?? throw new FxRateNotFoundException(source, target, date);
     }
+
+    public Task<PagedList<StoredFxRate>> ListRatesAsync(
+        string baseCurrency,
+        string quoteCurrency,
+        DateOnly? from,
+        DateOnly? to,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(new PagedList<StoredFxRate> { Items = [], Page = page, PageSize = pageSize, TotalCount = 0 });
 
     public async Task UpsertAsync(
         IReadOnlyList<FxRateQuote> quotes,
