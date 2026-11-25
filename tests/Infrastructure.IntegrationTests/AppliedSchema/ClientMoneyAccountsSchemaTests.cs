@@ -9,6 +9,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Client money accounts §6.1: the <c>ClientMoneyAccounts</c> table (script 0038).</summary>
+[Parallelizable]
 public class ClientMoneyAccountsSchemaTests
 {
     private const string ClientMoneyAccountsScript = "0038_client_money_accounts.sql";

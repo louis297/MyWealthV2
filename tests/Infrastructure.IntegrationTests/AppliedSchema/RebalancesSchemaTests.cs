@@ -13,6 +13,7 @@ namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Rebalances §6: <c>Rebalances</c>, <c>RebalanceTargets</c>, <c>RebalanceLines</c> and the rebalance of an
 /// order (script 0053).</summary>
+[Parallelizable]
 public class RebalancesSchemaTests
 {
     private const string Script = "0053_rebalances.sql";

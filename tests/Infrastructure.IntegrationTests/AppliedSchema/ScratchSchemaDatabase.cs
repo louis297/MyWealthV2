@@ -24,7 +24,7 @@ internal sealed class ScratchSchemaDatabase : IAsyncDisposable
     public static async Task<ScratchSchemaDatabase> CreateAsync(string prefix)
     {
         var name = $"{prefix}_{Guid.NewGuid():N}";
-        var connectionString = new SqlConnectionStringBuilder(SchemaDatabaseSetup.ConnectionString)
+        var connectionString = new SqlConnectionStringBuilder(SchemaDatabaseSetup.ServerConnectionString)
         {
             InitialCatalog = name
         }.ConnectionString;
@@ -194,7 +194,7 @@ internal sealed class ScratchSchemaDatabase : IAsyncDisposable
 
     private static async Task ExecuteOnMasterAsync(string sql)
     {
-        var master = new SqlConnectionStringBuilder(SchemaDatabaseSetup.ConnectionString)
+        var master = new SqlConnectionStringBuilder(SchemaDatabaseSetup.ServerConnectionString)
         {
             InitialCatalog = "master"
         }.ConnectionString;

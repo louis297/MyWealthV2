@@ -16,6 +16,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Tenant composite keys B3: RebalanceJob engages the tenant filter with the Account's tenant.</summary>
+[Parallelizable]
 public class RebalanceJobTenantScopeTests
 {
     [Test]

@@ -13,6 +13,7 @@ namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Migration batches §6: the batch tables, the migration detail of a Transaction, the batch arm of a matched
 /// statement line, source kind 9, match method 6 and reconciliation item kind 19 (script 0054).</summary>
+[Parallelizable]
 public class MigrationBatchesSchemaTests
 {
     private const string Script = "0054_migration_batches.sql";

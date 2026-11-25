@@ -7,6 +7,7 @@ using Shouldly;
 
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
+[Parallelizable]
 public class LegAccountsSchemaTests
 {
     private const string LegAccountsScript = "0024_leg_accounts.sql";

@@ -10,6 +10,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Interest run §6.1: the <c>CustomerTaxProfiles</c> table (script 0047).</summary>
+[Parallelizable]
 public class CustomerTaxProfilesSchemaTests
 {
     private const string Script = "0047_customer_tax_profiles.sql";

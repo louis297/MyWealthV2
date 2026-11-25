@@ -12,6 +12,7 @@ namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Corporate actions §6.1: the announcements, corporate actions, entitlements and the widened checks
 /// (script 0050).</summary>
+[Parallelizable]
 public class CorporateActionsSchemaTests
 {
     private const string Script = "0050_corporate_actions.sql";

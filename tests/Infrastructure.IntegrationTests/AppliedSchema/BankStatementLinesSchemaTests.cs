@@ -10,6 +10,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Deposit matching §6.2: <c>BankFeedCursors</c>, <c>BankStatementLines</c>, source kind 3 (script 0041).</summary>
+[Parallelizable]
 public class BankStatementLinesSchemaTests
 {
     private const string Script = "0041_bank_statement_lines.sql";

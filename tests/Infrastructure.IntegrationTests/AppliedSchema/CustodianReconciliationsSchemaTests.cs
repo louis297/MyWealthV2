@@ -11,6 +11,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>In-kind transfers §6.2: custodian reconciliation runs and their lines (script 0056).</summary>
+[Parallelizable]
 public class CustodianReconciliationsSchemaTests
 {
     [Test]

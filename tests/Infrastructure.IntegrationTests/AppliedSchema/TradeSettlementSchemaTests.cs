@@ -13,6 +13,7 @@ namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 /// <summary>Trade-settlement §6.1: <c>TradeSettlements</c>, the settlement account of an order, the settlement and
 /// break columns of a fill, the settlement fields of a report, the trade settlement arm of a payment and of a matched
 /// statement line, and the open settlements of a reconciliation run (script 0052).</summary>
+[Parallelizable]
 public class TradeSettlementSchemaTests
 {
     private const string Script = "0052_trade_settlement.sql";

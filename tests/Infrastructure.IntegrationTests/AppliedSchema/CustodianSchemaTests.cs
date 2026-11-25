@@ -13,6 +13,7 @@ namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>In-kind transfers §6.1: safekeeping accounts, the custodian feed, custody movements, in-kind transfers,
 /// the in-kind transfer detail, the order's safekeeping account and source kind 10 (script 0055).</summary>
+[Parallelizable]
 public class CustodianSchemaTests
 {
     private const string Script = "0055_custodian.sql";

@@ -11,6 +11,7 @@ namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Withdrawals §6.2: <c>Withdrawals</c>, <c>OutgoingPayments</c>, <c>TransactionPaymentDetails</c>, the
 /// payout columns of <c>BankStatementLines</c> and source kind 4 (script 0043).</summary>
+[Parallelizable]
 public class WithdrawalsSchemaTests
 {
     private const string Script = "0043_withdrawals.sql";

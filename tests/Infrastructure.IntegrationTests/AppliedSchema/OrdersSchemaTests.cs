@@ -12,6 +12,7 @@ namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Orders §6.1: the broker connection of a Tenant, orders, fills, execution reports, the broker feed state,
 /// the execution detail and the widened source checks (script 0051).</summary>
+[Parallelizable]
 public class OrdersSchemaTests
 {
     private const string Script = "0051_orders.sql";

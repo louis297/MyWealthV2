@@ -18,6 +18,7 @@ namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 // demo-tenant-seed R4–R12. Each test owns a scratch database with every schema script applied,
 // so the demo tenant does not exist until the test creates it.
+[Parallelizable]
 public class DemoTenantSeedTests
 {
     private ScratchSchemaDatabase _database = null!;

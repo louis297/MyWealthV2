@@ -7,6 +7,7 @@ using Shouldly;
 
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
+[Parallelizable]
 public class TestSeedInstrumentsTests
 {
     private static readonly (string Symbol, string Name, string Quote, bool Active, decimal? Price)[] Catalog =

@@ -9,6 +9,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Trade fees §6: cash leg roles, trade fee schedules and bands, and fee details (script 0030).</summary>
+[Parallelizable]
 public class TradeFeesSchemaTests
 {
     private const string TradeFeesScript = "0030_trade_fees.sql";

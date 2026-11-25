@@ -10,6 +10,7 @@ namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Bank-reconciliation §6.1: snapshot isolation, the balance of a feed cursor, the stored runs and their
 /// items, and the report scope <c>Tenant</c> (script 0045).</summary>
+[Parallelizable]
 public class BankReconciliationsSchemaTests
 {
     private const string Script = "0045_bank_reconciliations.sql";

@@ -5,6 +5,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Tenant composite keys B2: the database rejects a reference to another tenant's row (script 0028).</summary>
+[Parallelizable]
 public class TenantCompositeKeysSchemaTests
 {
     private const string TenantCompositeKeysScript = "0028_tenant_composite_keys.sql";

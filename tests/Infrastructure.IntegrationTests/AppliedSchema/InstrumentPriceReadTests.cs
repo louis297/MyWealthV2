@@ -7,6 +7,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 // fixes/utc-instants.md B4: TryGetPrice reads the UTC date of asOf, not the date in its own offset.
+[Parallelizable]
 public class InstrumentPriceReadTests
 {
     [Test]

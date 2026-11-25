@@ -10,6 +10,7 @@ namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Interest run §9.1: TestSeed gives the demo tenant a USD and an NZD interest rate schedule after the cut-off
 /// date, and the demo Customer a tax profile (IRD number held, 17.5 %).</summary>
+[Parallelizable]
 public class TestSeedInterestTests
 {
     [Test]

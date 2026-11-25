@@ -7,6 +7,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Account custody mode §6: <c>Accounts.CustodyMode</c> (script 0031).</summary>
+[Parallelizable]
 public class CustodyModeSchemaTests
 {
     private const string CustodyModeScript = "0031_accounts_custody_mode.sql";

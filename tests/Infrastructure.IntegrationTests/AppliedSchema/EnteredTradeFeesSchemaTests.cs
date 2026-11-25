@@ -12,6 +12,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>External caller numbers §6: a <c>Brokerage</c> fee detail may have no schedule (script 0034).</summary>
+[Parallelizable]
 public class EnteredTradeFeesSchemaTests
 {
     private const string EnteredTradeFeesScript = "0034_entered_trade_fees.sql";

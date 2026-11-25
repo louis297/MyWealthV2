@@ -4,6 +4,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Custody modes §6, R16: script 0032 removes every Active assignment on an External account.</summary>
+[Parallelizable]
 public class RemoveExternalPortfolioAssignmentsSchemaTests
 {
     private const string Script = "0032_remove_external_portfolio_assignments.sql";

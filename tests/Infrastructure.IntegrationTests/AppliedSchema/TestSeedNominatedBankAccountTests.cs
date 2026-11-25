@@ -10,6 +10,7 @@ namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Withdrawals §9.1: TestSeed gives the demo Customer one Verified USD nominated bank account, added by the
 /// demo Adviser and verified by the demo TenantAdmin, so a withdrawal can be requested without a check.</summary>
+[Parallelizable]
 public class TestSeedNominatedBankAccountTests
 {
     [Test]

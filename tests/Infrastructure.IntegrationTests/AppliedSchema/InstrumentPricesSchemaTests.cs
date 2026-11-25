@@ -6,6 +6,7 @@ using Shouldly;
 
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
+[Parallelizable]
 public class InstrumentPricesSchemaTests
 {
     [Test]

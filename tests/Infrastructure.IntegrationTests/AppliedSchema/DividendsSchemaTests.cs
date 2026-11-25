@@ -12,6 +12,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Dividends §6.1: the dividend columns and checks of script 0057.</summary>
+[Parallelizable]
 public class DividendsSchemaTests
 {
     private const string Script = "0057_dividends.sql";

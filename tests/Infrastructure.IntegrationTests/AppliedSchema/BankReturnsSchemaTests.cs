@@ -11,6 +11,7 @@ namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Bank-returns §6.1: the kind and the returned line of <c>OutgoingPayments</c>, and the widened checks and
 /// the new Matched CHECK of <c>BankStatementLines</c> (script 0044).</summary>
+[Parallelizable]
 public class BankReturnsSchemaTests
 {
     private const string Script = "0044_bank_returns.sql";

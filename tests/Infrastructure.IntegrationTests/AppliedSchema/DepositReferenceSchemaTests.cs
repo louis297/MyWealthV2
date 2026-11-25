@@ -11,6 +11,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Client money accounts §6.2: <c>Accounts.DepositReference</c> (script 0039).</summary>
+[Parallelizable]
 public class DepositReferenceSchemaTests
 {
     private const string DepositReferenceScript = "0039_accounts_deposit_reference.sql";

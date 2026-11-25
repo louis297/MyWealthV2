@@ -8,6 +8,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Client money accounts §9.1: TestSeed gives each seeded firm an active USD and NZD client money account.</summary>
+[Parallelizable]
 public class TestSeedClientMoneyAccountsTests
 {
     [TestCase(DevelopmentIdentitySeeder.DemoTenantCode, DevelopmentIdentitySeeder.DemoTenantName)]

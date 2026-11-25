@@ -6,6 +6,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Simulator spec §6.1: <c>CK_Users_RoleShape</c> lets Role 4 (SimulatorOperator) have no tenant and no adviser (script 0036).</summary>
+[Parallelizable]
 public class UsersRoleSimulatorOperatorSchemaTests
 {
     private const string Script = "0036_users_role_simulator_operator.sql";

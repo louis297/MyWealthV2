@@ -5,6 +5,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Adjustment review §6: <c>AdjustmentRequests</c> and Transaction source kind 11 (script 0058).</summary>
+[Parallelizable]
 public class AdjustmentRequestsSchemaTests
 {
     private const string Script = "0058_adjustment_requests.sql";

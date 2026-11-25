@@ -13,6 +13,7 @@ using Shouldly;
 
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
+[Parallelizable]
 public class OutboxProcessorTests
 {
     [Test]

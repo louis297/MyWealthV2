@@ -4,6 +4,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>fixes/utc-instants.md B5: script 0029 moves every stored BookedAt to offset +00:00, instant unchanged.</summary>
+[Parallelizable]
 public class UtcBookedAtSchemaTests
 {
     private const string UtcBookedAtScript = "0029_transactions_booked_at_utc.sql";

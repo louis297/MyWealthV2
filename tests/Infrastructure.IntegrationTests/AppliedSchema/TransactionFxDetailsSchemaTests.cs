@@ -8,6 +8,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>FX conversions §6: TransactionFxDetails shape and constraints.</summary>
+[Parallelizable]
 public class TransactionFxDetailsSchemaTests
 {
     [Test]

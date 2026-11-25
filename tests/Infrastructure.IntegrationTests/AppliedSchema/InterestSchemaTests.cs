@@ -10,6 +10,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Interest run §6.2: the interest tables and the widened checks (script 0048).</summary>
+[Parallelizable]
 public class InterestSchemaTests
 {
     private const string Script = "0048_interest.sql";

@@ -10,6 +10,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Simulated instruments §6.1: <c>MarketDataFeeds</c>, one row per connection and feed kind (script 0049).</summary>
+[Parallelizable]
 public class MarketDataFeedsSchemaTests
 {
     private const string Script = "0049_market_data_feeds.sql";

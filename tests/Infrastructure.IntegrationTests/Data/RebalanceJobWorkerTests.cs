@@ -23,6 +23,7 @@ namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 /// <see cref="IUser"/>. It proposes a rebalance whose id is the handle, with the system name in <c>CreatedBy</c>
 /// (database-design §3), and writes no Transaction (rebalances R12, R26).
 /// </summary>
+[Parallelizable]
 public class RebalanceJobWorkerTests
 {
     private const decimal Price = 10m;

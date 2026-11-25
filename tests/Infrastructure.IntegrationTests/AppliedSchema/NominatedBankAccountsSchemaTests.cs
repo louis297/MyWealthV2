@@ -10,6 +10,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Withdrawals §6.1: the <c>NominatedBankAccounts</c> table (script 0042).</summary>
+[Parallelizable]
 public class NominatedBankAccountsSchemaTests
 {
     private const string Script = "0042_nominated_bank_accounts.sql";

@@ -11,6 +11,7 @@ namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Account closure §6: the <c>AccountClosures</c> table and the widened source kind and unmatched reason
 /// checks (script 0046).</summary>
+[Parallelizable]
 public class AccountClosuresSchemaTests
 {
     private const string Script = "0046_account_closures.sql";

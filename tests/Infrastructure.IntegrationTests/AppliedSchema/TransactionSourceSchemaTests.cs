@@ -5,6 +5,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Transaction source §6: <c>Transactions.SourceKind</c> and <c>SourcePublicId</c> (script 0035).</summary>
+[Parallelizable]
 public class TransactionSourceSchemaTests
 {
     private const string TransactionSourceScript = "0035_transaction_source.sql";

@@ -7,6 +7,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Tenant composite keys B1: TenantId on the child tables (script 0027).</summary>
+[Parallelizable]
 public class ChildTenantIdsSchemaTests
 {
     private const string ChildTenantIdsScript = "0027_child_tenant_ids.sql";

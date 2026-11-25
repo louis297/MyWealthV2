@@ -10,6 +10,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Tenant custody modes §6: <c>Tenants.AllowsExternalAccounts</c> and <c>AllowsCustodialAccounts</c> (script 0033).</summary>
+[Parallelizable]
 public class TenantsAllowedCustodyModesSchemaTests
 {
     private const string AllowedCustodyModesScript = "0033_tenants_allowed_custody_modes.sql";

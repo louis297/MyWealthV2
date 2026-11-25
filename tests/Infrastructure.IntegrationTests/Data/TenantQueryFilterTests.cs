@@ -12,6 +12,7 @@ using Shouldly;
 
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
+[Parallelizable]
 public class TenantQueryFilterTests
 {
     private static readonly Type[] FilteredTypes =

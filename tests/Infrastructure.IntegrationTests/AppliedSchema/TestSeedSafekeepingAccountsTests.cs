@@ -9,6 +9,7 @@ namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>In-kind transfers §9.1: TestSeed gives each seeded firm an active USD and NZD safekeeping account on the
 /// simulator connection.</summary>
+[Parallelizable]
 public class TestSeedSafekeepingAccountsTests
 {
     [TestCase(DevelopmentIdentitySeeder.DemoTenantCode, DevelopmentIdentitySeeder.DemoTenantName)]

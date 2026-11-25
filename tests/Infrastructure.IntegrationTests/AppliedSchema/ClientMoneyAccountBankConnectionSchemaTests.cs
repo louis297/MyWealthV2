@@ -6,6 +6,7 @@ using Shouldly;
 namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 
 /// <summary>Deposit matching §6.1: <c>ClientMoneyAccounts.BankConnection</c> (script 0040).</summary>
+[Parallelizable]
 public class ClientMoneyAccountBankConnectionSchemaTests
 {
     private const string Script = "0040_client_money_accounts_bank_connection.sql";
