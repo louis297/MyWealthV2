@@ -1636,7 +1636,7 @@ describe("AccountDetailPage activity Reverse (adviser-portal-dashboard D27)", ()
     });
   });
 
-  describe("Reverse on an adjustment row (D31)", () => {
+  describe("No Reverse on an adjustment row (adjustment-review D106)", () => {
     const adjustmentId = "76666666-6666-6666-6666-666666666666";
 
     function serveAdjustment(me: CurrentUser) {
@@ -1675,11 +1675,12 @@ describe("AccountDetailPage activity Reverse (adviser-portal-dashboard D27)", ()
       }, me);
     }
 
-    it("offers Reverse on an adjustment to a TenantAdmin", async () => {
+    it("never offers Reverse on an adjustment to a TenantAdmin", async () => {
       serveAdjustment(user());
 
       const table = await screen.findByRole("table", { name: "Activity" });
-      expect(within(table).getByRole("button", { name: "Reverse" })).toBeInTheDocument();
+      expect(within(table).getByRole("link", { name: adjustmentId })).toBeInTheDocument();
+      expect(within(table).queryByRole("button", { name: "Reverse" })).not.toBeInTheDocument();
     });
 
     it("hides Reverse on an adjustment from an Adviser", async () => {

@@ -315,9 +315,9 @@ describe("TransactionsListPage", () => {
   });
 
   it.each([
-    ["tenantAdmin", true],
+    ["tenantAdmin", false],
     ["adviser", false],
-  ])("shows an adjustment as Adjustment and offers its Reverse to a %s: %s (D30, D31)", async (role, offered) => {
+  ])("shows an adjustment as Adjustment and never offers its Reverse, to a %s: %s (D30, adjustment-review D106)", async (role, offered) => {
     renderList(user({ role }), "/transactions", 200, [
       {
         ...transaction,
