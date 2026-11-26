@@ -85,6 +85,10 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<InterestRun> InterestRuns => Set<InterestRun>();
 
+    public DbSet<ValuationRun> ValuationRuns => Set<ValuationRun>();
+
+    public DbSet<MyWealthV2.Domain.Valuations.StoredValuation> StoredValuations => Set<MyWealthV2.Domain.Valuations.StoredValuation>();
+
     public DbSet<CorporateAction> CorporateActions => Set<CorporateAction>();
 
     public DbSet<CorporateActionEntitlement> CorporateActionEntitlements => Set<CorporateActionEntitlement>();

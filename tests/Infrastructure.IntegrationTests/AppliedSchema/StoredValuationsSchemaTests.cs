@@ -258,9 +258,9 @@ public class StoredValuationsSchemaTests
     private static string InsertRun(int trigger, bool ranBy, string counts = "0, 0, 0, 0") => $"""
         INSERT INTO [ValuationRuns]
             ([PublicId], [TenantId], [ThroughDate], [Trigger], [RanByUserId], [StartedAt], [AccountsProcessed], [AccountsFailed],
-             [DaysValued], [DaysIncomplete], [Created], [CreatedBy])
+             [DaysValued], [DaysIncomplete], [Created], [CreatedBy], [LastModified])
         VALUES (NEWID(), @a_tenant, '2026-11-24', {trigger}, {(ranBy ? "@a_adviser" : "NULL")}, SYSDATETIMEOFFSET(), {counts},
-                SYSDATETIMEOFFSET(), N'test');
+                SYSDATETIMEOFFSET(), N'test', SYSDATETIMEOFFSET());
         """;
 
     /// <summary>A stored valuation <c>@valuation</c> of <c>@custodial</c> stored by <c>@run</c>.</summary>

@@ -38,6 +38,10 @@ public interface IApplicationDbContext
 
     DbSet<InterestRun> InterestRuns { get; }
 
+    DbSet<ValuationRun> ValuationRuns { get; }
+
+    DbSet<MyWealthV2.Domain.Valuations.StoredValuation> StoredValuations { get; }
+
     DbSet<CorporateAction> CorporateActions { get; }
 
     DbSet<CorporateActionEntitlement> CorporateActionEntitlements { get; }

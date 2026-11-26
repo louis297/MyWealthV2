@@ -21,6 +21,10 @@ public class Account : BaseAuditableEntity
     /// <summary>Interest-run R19: the last UTC day this account was accrued through; null before the first time.</summary>
     public DateOnly? InterestAccruedThrough { get; private set; }
 
+    /// <summary>Valuation-run R5: the last UTC day a stored valuation exists for; null before the first and on an
+    /// External account.</summary>
+    public DateOnly? ValuedThrough { get; private set; }
+
     /// <summary>Dividends R17: the standing election to reinvest dividends under a plan; only on a Custodial account.</summary>
     public bool ReinvestDividends { get; private set; }
 
