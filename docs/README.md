@@ -130,9 +130,10 @@ A doc states the design as it is today. A reader must not have to merge a body w
 - **The slice names what it changed.** A Feature Spec that changes other docs lists them with the rules it touched ("Changes to other docs"). While the spec is `draft` or `review` that list is the plan; the other docs change when it is accepted. A reviewer reads the git diff.
 - **History table.** A doc that other slices change ends with a `History` section: one row per change, with the date, the spec that caused it and the rules touched. The row does not repeat the rule.
 - **When a slice lands.** Its spec loses the suggested commits. Its test section shrinks to where the tests live; the tests are the executable form of the rules. "Locked in this spec" keeps the decisions still in force and what is still open.
-- **Docs not folded yet.** Some docs still end with "Amendment" sections. For those, read the body and every amendment in date order. Folding one is a docs refactor: it changes no rule, and a disagreement with the code found on the way is reported, not fixed. The tag `docs-pre-consolidation` is the last commit before folding began.
+- **ADRs are the exception.** An ADR records a decision at a date. A later decision that changes it is a dated amendment at the end of that ADR, or a new ADR; the body is not rewritten.
+- **Folding.** Every other doc was folded on 2026-11-26. Folding is a docs refactor: it changes no rule, and a disagreement with the code found on the way is reported, not fixed. The tag `docs-pre-consolidation` is the last commit of the amendment form.
 
-[features/custody-modes.md](features/custody-modes.md) is the example of a folded spec.
+Examples: [features/custody-modes.md](features/custody-modes.md) for a Feature Spec, [adviser-portal/adviser-portal-dashboard.md](adviser-portal/adviser-portal-dashboard.md) for a page contract, where each change is a section named after its topic.
 
 ---
 
