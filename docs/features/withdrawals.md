@@ -129,8 +129,7 @@ The rule that distinguishes this slice: money leaves a Custodial account only as
 - A Customer acting in the Customer Portal: adding a bank account, requesting a withdrawal (roadmap D6). The Customer Portal stays read-only
 - Bank reconciliation, closing balances, break lists (B7). The simulator keeps its own balance for B7 to read later
 - The account closure flow (B8). `CloseOut` is limited, not replaced (R46)
-- Settled versus unsettled cash (O2). All cash in the balance is available
-- Buy orders and their reservations (O1). This slice ships the reservation mechanism and its only user, the withdrawal
+- Settled versus unsettled cash, and buy orders with their reservations: [orders.md](orders.md) R39–R46. This spec ships the reservation mechanism and its first user, the withdrawal
 - Third-party payments: a withdrawal to an account that is not the Customer's own (roadmap X4)
 - A withdrawal in another currency than the account's, or FX at payout (roadmap D20)
 - A payment status feed: a rejection that the bank reports after it accepted a payment. In this slice a bank rejects synchronously or returns the money later (R33, §11 point 12)
