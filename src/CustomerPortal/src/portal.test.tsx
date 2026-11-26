@@ -2,7 +2,7 @@ import { configureStore } from "@reduxjs/toolkit";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { appRoutes } from "@/app/router";
 import { sessionSlice } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
@@ -88,6 +88,8 @@ function renderAt(
     holdings?: unknown[];
     nominated?: unknown[];
     taxProfile?: unknown;
+    series?: unknown;
+    valuations?: unknown;
   } = {},
 ) {
   const accounts = options.accounts ?? [
@@ -115,6 +117,12 @@ function renderAt(
     }
     if (url.endsWith("/users/me")) {
       return json(person);
+    }
+    if (url.includes("/net-worth/funds-under-management")) {
+      return options.series ? json(options.series) : new Response("", { status: 404 });
+    }
+    if (url.includes("/accounts/account-1/valuations")) {
+      return options.valuations ? json(options.valuations) : new Response("", { status: 404 });
     }
     if (url.includes(`/users/customers/${person.id}/net-worth`)) {
       return json(options.netWorth ?? netWorth);
@@ -1444,5 +1452,170 @@ describe("Customer Portal in-kind transfers (in-kind-transfers C39–C41)", () =
     });
 
     expect(await screen.findByText("10 not settled yet")).toBeInTheDocument();
+  });
+});
+
+describe("Customer Portal valuation history (C45–C47)", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-03-13T10:00:00Z"));
+    vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal("location", {
+      origin: "http://localhost:3000",
+      pathname: "/",
+      search: "",
+      href: "http://localhost:3000/",
+      assign: vi.fn(),
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function day(date: string, total: number, accounts: number, complete = true) {
+    return {
+      date,
+      currencies: accounts > 0 ? [{ currency: "USD", total: total / 1.728, status: "Folded", fx: { rate: 1.728, date, source: "Frankfurter" }, value: total }] : [],
+      total,
+      complete,
+      accounts,
+      incompleteAccounts: complete ? 0 : 1,
+      missingAccounts: 0,
+    };
+  }
+
+  const series = {
+    reportingCurrency: "NZD",
+    from: "2026-03-08",
+    to: "2026-03-11",
+    days: [day("2026-03-08", 0, 0), day("2026-03-09", 12975.43, 1), day("2026-03-10", 12960.43, 1), day("2026-03-11", 12982.93, 1, false)],
+  };
+
+  function folded(complete: boolean) {
+    return {
+      currency: "NZD",
+      total: complete ? 9885.6 : 8500,
+      complete,
+      currencies: [
+        ...(complete ? [] : [{ currency: "GBP", total: 50, status: "NoRate", fx: null, value: null }]),
+        { currency: "NZD", total: 8500, status: "Folded", fx: null, value: 8500 },
+        { currency: "USD", total: 800, status: "Folded", fx: { rate: 1.732, date: "2026-03-13", source: "Frankfurter" }, value: 1385.6 },
+      ],
+    };
+  }
+
+  function seriesUrls(fetchMock: ReturnType<typeof vi.mocked<typeof fetch>>) {
+    return urls(fetchMock).filter((url) => url.includes("/net-worth/funds-under-management"));
+  }
+
+  it("charts what the platform holds over 90 days, or a year when chosen, under the custody section (C45)", async () => {
+    const { fetchMock } = renderAt("/dashboard", me, [], "External", { series });
+
+    const section = (await screen.findByRole("heading", { name: "Held on platform over time" })).closest("section")!;
+    expect(seriesUrls(fetchMock)).toEqual(["http://localhost:3000/api/net-worth/funds-under-management?from=2025-12-12"]);
+    expect(
+      within(section).getByText("In NZD, at each day's exchange rate. The latest two days are added once their prices are final."),
+    ).toBeInTheDocument();
+    const points = within(section).getAllByRole("button", { name: /^2026-03-/ });
+    expect(points.map((point) => point.getAttribute("aria-label"))).toEqual([
+      "2026-03-09: 12,975.43 NZD",
+      "2026-03-10: 12,960.43 NZD",
+      "2026-03-11: 12,982.93 NZD. Some holdings could not be valued on this day.",
+    ]);
+    expect(points[2]).toHaveAttribute("fill", "none");
+    const custody = screen.getByRole("heading", { name: "Held on platform and elsewhere" });
+    const byType = screen.getByRole("heading", { name: "By account type" });
+    const chart = screen.getByRole("heading", { name: "Held on platform over time" });
+    expect(custody.compareDocumentPosition(chart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(chart.compareDocumentPosition(byType) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "30 days" })).not.toBeInTheDocument();
+
+    fireEvent.click(within(section).getByRole("button", { name: "1 year" }));
+    await waitFor(() =>
+      expect(seriesUrls(fetchMock)).toContain("http://localhost:3000/api/net-worth/funds-under-management?from=2025-03-12"),
+    );
+  });
+
+  it("shows no chart without a Custodial account in the range (C45)", async () => {
+    renderAt("/dashboard", me, [], "External", {
+      series: { ...series, days: series.days.map((item) => ({ ...item, accounts: 0, currencies: [], total: 0, complete: true })) },
+    });
+
+    expect(await screen.findByRole("heading", { name: "Held on platform and elsewhere" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText(/^In NZD, at each day/)).not.toBeInTheDocument());
+    expect(screen.queryByRole("heading", { name: "Held on platform over time" })).not.toBeInTheDocument();
+  });
+
+  it("shows the total in the reporting currency under the per-currency totals and what it leaves out (C46)", async () => {
+    renderAt("/dashboard", me, [], "External", { netWorth: { ...netWorth, folded: folded(false) }, series });
+
+    expect(await screen.findByText("Total in NZD: 8,500 at today's exchange rates")).toBeInTheDocument();
+    expect(screen.getByText("Not counted: GBP (no exchange rate)")).toBeInTheDocument();
+    const totals = screen.getByRole("table", { name: "Per currency" });
+    const line = screen.getByText(/^Total in NZD/);
+    expect(totals.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("hides the total when the only currency is the reporting currency (C46)", async () => {
+    renderAt("/dashboard", me, [], "External", {
+      netWorth: {
+        ...netWorth,
+        folded: { currency: "NZD", total: 140, complete: true, currencies: [{ currency: "NZD", total: 140, status: "Folded", fx: null, value: 140 }] },
+      },
+      series,
+    });
+
+    expect(await screen.findByRole("table", { name: "Per currency" })).toBeInTheDocument();
+    expect(screen.queryByText(/^Total in NZD/)).not.toBeInTheDocument();
+  });
+
+  const valuations = {
+    items: [
+      { date: "2026-03-11", currency: "NZD", cash: 14356.6, holdingsValue: 20394.12, total: 34750.72, complete: false, unvaluedCount: 1 },
+      { date: "2026-03-10", currency: "NZD", cash: 14356.6, holdingsValue: 28573.49, total: 42930.09, complete: true, unvaluedCount: 0 },
+    ],
+    page: 1,
+    pageSize: 100,
+    totalCount: 2,
+  };
+
+  function valuationUrls(fetchMock: ReturnType<typeof vi.mocked<typeof fetch>>) {
+    return urls(fetchMock).filter((url) => url.includes("/valuations"));
+  }
+
+  it("charts the value of a Custodial account over its last 90 stored days (C47)", async () => {
+    const { fetchMock } = renderAt("/accounts/account-1", me, [], "Custodial", {
+      account: { valuedThrough: "2026-03-11" },
+      valuations,
+    });
+
+    const section = (await screen.findByRole("heading", { name: "Value over the last 90 days" })).closest("section")!;
+    const points = await within(section).findAllByRole("button", { name: /^2026-03-1/ });
+    expect(points.map((point) => point.getAttribute("aria-label"))).toEqual([
+      "2026-03-10: 42,930.09 NZD",
+      "2026-03-11: 34,750.72 NZD. Some holdings could not be valued on this day.",
+    ]);
+    expect(valuationUrls(fetchMock)).toEqual([
+      "http://localhost:3000/api/accounts/account-1/valuations?from=2025-12-12&to=2026-03-11&pageSize=100",
+    ]);
+  });
+
+  it("says when a Custodial account is not valued yet (C47)", async () => {
+    const { fetchMock } = renderAt("/accounts/account-1", me, [], "Custodial", { account: { valuedThrough: null }, valuations });
+
+    expect(
+      await screen.findByText("Not valued yet. The first value appears two days after the account was opened."),
+    ).toBeInTheDocument();
+    expect(valuationUrls(fetchMock)).toEqual([]);
+  });
+
+  it("shows no chart on an External account (C47)", async () => {
+    const { fetchMock } = renderAt("/accounts/account-1", me, [], "External", { valuations });
+
+    expect(await screen.findByRole("heading", { name: "Activity" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Value over the last 90 days" })).not.toBeInTheDocument();
+    expect(valuationUrls(fetchMock)).toEqual([]);
   });
 });
