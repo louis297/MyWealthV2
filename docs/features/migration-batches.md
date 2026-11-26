@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-24
-last_updated: 2026-11-24
+last_updated: 2026-11-26
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -200,7 +200,7 @@ Amends [deposit-matching.md](deposit-matching.md) R23, R26 and R30, [bank-return
 | ID | Rule |
 | --- | --- |
 | R12 | **What funding is.** The cash of a batch is Customers' money that the previous provider pays into the Tenant's trust account, as one or more bulk transfers. A statement line matched to the batch is a **funding line**. A batch is valid only when, for each currency, its funding lines add up exactly to the cash of its entries (R9 `FundingMismatch`), so no Customer is credited with cash the trust account does not hold. A batch with holdings only needs no funding. |
-| R13 | **Match a receipt to a batch.** `POST /statement-lines/{id}/match` takes `migrationBatchId` in place of `accountId`: exactly one of the two, else 400 `errors.AccountId` (`Give an account or a migration batch.`). The caller also needs `migration-batches.manage` (else 403). The line is a credit line in `Unmatched`, with `rowVersion` and an optional `note`, as deposit-matching R23–R25. The batch must be one of the Tenant's (else 404) and `Draft` (else 400 `errors.MigrationBatchId`, `Only a draft migration batch can be funded.`). The line becomes `Matched` with the new method `Migration` and the batch, with no Account and no Transaction. Nothing is posted. The line's currency need not have cash in the batch yet; a difference is an issue (R9). The batch row is updated in the same database transaction, so its `rowVersion` changes and a submit that read the batch before fails with 409. |
+| R13 | **Match a receipt to a batch.** `POST /statement-lines/{id}/match` takes `migrationBatchId` in place of `accountId`: exactly one of the two, else 400 `errors.AccountId` (`Give an account or a migration batch.`). The caller also needs `migration-batches.manage` (else 403). The line is a credit line in `Unmatched`, with `rowVersion` and an optional `note`, as deposit-matching R23–R25. The batch must be one of the Tenant's (else 404) and `Draft` (else 400 `errors.MigrationBatchId`, `Only a draft migration batch can be funded.`). The line becomes `Matched` with the new method `Migration` and the batch, with no Account and no Transaction. Nothing is posted. The line's currency need not have cash in the batch yet; a difference is an issue (R9). The batch row is updated in the same database transaction, so its `rowVersion` changes and a submit that read the batch before fails with 409. `migrationBatchId` is one of three match targets, with `accountId` and `corporateActionId`; the message for none or more than one is `Give an account, a migration batch or a dividend.` (dividends R26). |
 | R14 | **Undo.** `POST /statement-lines/{id}/unmatch` of a line matched with method `Migration` (note required, deposit-matching R25): while the batch is `Draft` the line becomes `Unmatched` again and keeps its `unmatchedReason`; nothing is posted and the batch row is updated as in R13. While the batch is `Submitted` → 400 `errors.Status`, `Return the migration batch to draft first.` Once it is `Posted` → 400 `errors.Status`, `The migration batch is posted, so this receipt cannot be taken out of it.` A funding line accepts no other action. |
 | R15 | **Recall of a funding line.** Bank-returns R3 gains a case: the recalled credit line is `Matched` with method `Migration`. While its batch is not `Posted`: the credit line becomes `Returned` and loses its match, and the debit line becomes `Matched` with method `Recall`, with no Account and no Transaction, as for a receipt that was never credited. The batch itself does not change; its funding no longer agrees, so it cannot be submitted or posted (R9). When the batch is `Posted`: nothing is posted, the debit line becomes `Unmatched` with reason `RecallNotCovered`, and the credit line stays matched; a TenantAdmin corrects the accounts with adjustments and then ignores the line. |
 | R16 | **Automatic processing: unchanged.** The platform never matches a line to a batch by itself. A bulk transfer quotes no deposit reference, so deposit matching leaves it `Unmatched` with `NoReference` (deposit-matching R15–R18), and a TenantAdmin matches it by R13. A bulk transfer that happens to quote one Customer's deposit reference is credited to that account as a deposit; the TenantAdmin undoes that match (deposit-matching R30) before the line can fund a batch. A `Matched` line now has an Account and a Transaction, or a related line, or a trade settlement, or a migration batch. |
@@ -543,18 +543,13 @@ Page contracts amended when this spec was accepted: [adviser-portal-dashboard.md
 
 ## 10. Tests
 
-| Project | Assert |
-| --- | --- |
-| Domain.UnitTests | `MigrationBatch`: `Create` → Draft; an entry with neither cash nor a holding, a repeated Account, a repeated Instrument in an entry, `cash` 0, `quantity` 0, `cost` below 0, 501 entries and 5 001 holdings each throw; `Replace` only in Draft; `Submit` only from Draft; `Return` and `Cancel` need a note and the right status; `MarkPosted` only from Submitted and not by the submitter. `MigrationBatchValidation.Compute`: one case per issue code; computed totals per currency and instrument; a control total missing, extra above 0, extra at 0 (no issue) and different; funding equal, short, over, and in a currency with no cash; a valid batch has no issue. `Transaction.PostMigratedCash`: one `Opening` `Principal` leg, memo `Opening balance`, the detail; amount 0 or a source other than `Migration` throws. `PostMigratedHoldings`: the legs and the detail; no leg throws. `TransactionSource.Migration(Guid.Empty)` throws. `CustodyRules`: `Opening` and `OpeningHoldings` refused on Custodial with the R26 message, allowed on External; `AllowsHandReverse(Custodial, Migration)` false. `BankReconciliation.Compute`: a funding line of a Draft batch → `MigrationNotPosted`; of a Posted batch → no item and no `OtherLedgerCash`; funding from another client money account → `OtherClientMoneyAccount`; the items add up |
-| Application.FunctionalTests — batch | No Bearer → 401; Adviser, Customer and SystemAdmin → 403 on all eight routes. Create → 201 Draft; an empty batch → 201 with the issue `NoEntries`; replace → 204 and the item shows the new body; stale `rowVersion` → 409; replace of a Submitted batch → 400. An unknown and another Tenant's `accountId` or `instrumentId` → 400 at its place in the body. `asOfDate` tomorrow → 400. The item shows computed totals, funding totals and one issue per cause: an External account, a Closed account, a Disabled Customer, an account with a deposit, `cash` of 0.001 USD, a disabled instrument, an instrument in another currency, each control total wrong, no funding. The list filters by status. Two-tenant: tenant B's batch id → 404 on every route with an id |
-| Application.FunctionalTests — funding | With the fake `IBankFeed`: a credit line with no reference → Unmatched; match with `migrationBatchId` → line Matched, method `Migration`, `migrationBatchId` set, no Transaction, the batch's `rowVersion` changed; match with both `accountId` and `migrationBatchId`, or neither → 400; to a Submitted batch → 400; to tenant B's batch → 404. Undo on a Draft → Unmatched with its reason kept; on a Submitted batch → 400; on a Posted batch → 400. Cancel of a batch with a funding line → line Unmatched. A recall of a funding line of a Draft batch → credit line Returned, debit line Matched `Recall`, the batch shows `FundingMismatch`; of a Posted batch → debit line Unmatched `RecallNotCovered`, nothing posted |
-| Application.FunctionalTests — submit and post | Submit with an issue → 400 `migration_batch_not_valid`, still Draft; valid → Submitted. Return without a note → 400; with one → Draft with `returned`. Post by the submitter → 400; by a second TenantAdmin → 204: per entry one `Opening` and one `OpeningHoldings` with source `Migration`, the same source id and `bookedAt`, memo, reference, `migration`, `CreatedBy` the poster; cash balance, available cash, holdings and cost as entered; entries carry the Transaction ids; batch Posted. An entry with cash only writes one Transaction; with holdings only, one. A deposit that reaches one account after submit → post 400 `migration_batch_not_valid`, no Transaction on any account, batch still Submitted. A second post with the new `rowVersion` → 400. A hand reverse of a migrated `Opening` → 400. `POST /transactions` `Opening` and `OpeningHoldings` on a Custodial account → 400 with the R26 message; on External → 201. An account with an Active assignment is posted and no rebalance is proposed. The Adviser and the Customer read the Transactions with `migration`; both get 403 on the batch |
-| Application.FunctionalTests — reconciliation | A funding line of a Draft batch → the run has `MigrationNotPosted` (Timing) with the line's amount and stays `Agreed` when nothing else differs. After the post → no migration item, `difference` unchanged by the batch, status `Agreed` |
-| Infrastructure.IntegrationTests | `0054`: the status and control total CHECKs; a posted batch with the same poster and submitter violates; two entries of one Account in a batch violate; two holdings of one Instrument in an entry violate; a Matched line with a batch and an Account violates, with a batch only is allowed; `MatchMethod = 6` allowed, `7` violates; `SourceKind = 9` needs a `SourcePublicId`, `10` violates; reconciliation item kind 19 allowed, 20 violates. EF round-trip of the batch with its children and of `TransactionMigrationDetails` |
-| Adviser Portal | D80 the nav item by role and the list; D81 the CSV import (rows merged per account, an unknown reference or symbol shown with its line number and not sent, control totals never filled in); D82 the totals table, the issues, the actions by status, Post disabled for the submitter, the confirm text; D83 the funding section, the Match dialog choice, the method label; D84 the kind label; D85 the source line, the provider line, no Reverse |
-| Customer Portal | C38 |
+The tests are the executable form of §4. Where they live:
 
-Fan-out in the tests: `CustodyRulesTests` and `CustodialManualEntryTests` assert the old refusal message for `Opening` and `OpeningHoldings` (`A Custodial account starts empty. Fund it with TransferIn.`) and change to the message of R26. No existing test posts an `Opening` on a Custodial account through a route, and the seeds do not change.
+| Project | Where |
+| --- | --- |
+| Domain.UnitTests | Folder `Migrations/` |
+| Application.FunctionalTests | Folder `MigrationBatches/` |
+| Infrastructure.IntegrationTests | `AppliedSchema/MigrationBatchesSchemaTests.cs` |
 
 ---
 
@@ -612,41 +607,20 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
+Outside proof of migrated holdings (point 9 above): a migrated holding shows as `unexplained` in the custodian reconciliation until the previous provider delivers it to the safekeeping account. The bulk delivery arrives as a custody movement with no instruction (`NoInstruction`), which a TenantAdmin ignores with a note; the batch already posted the holdings ([in-kind-transfers.md](in-kind-transfers.md) R18, §11 point 14).
 
-The repository should build after each commit. Agents split each behaviour into red then green.
-
-1. Script `0054`, `MigrationBatch` with its children, enums and transitions (R3–R6, R17–R20 as Domain rules), source kind `Migration`, the migration detail, the two factories, the EF mappings + Domain unit tests and the `0054` integration tests.
-2. `MigrationBatchValidation.Compute` (R8, R9) + Domain unit tests.
-3. The permission; create, replace, list and get with validation on the item (R1–R11, R28, R29) + functional tests, two-tenant.
-4. Funding: match a line to a batch, undo, `migrationBatchId` on the line item (R12–R14, R16, R30) + functional tests.
-5. Submit, return and cancel, with the release of funding lines (R17–R19) + functional tests.
-6. Post (R20–R24), `migration` on the transaction item (R31), not hand-reversible (R25, R27) + functional tests.
-7. Recall of a funding line (R15) + functional tests.
-8. The matrix message (R26) + Domain unit and functional tests.
-9. Bank reconciliation: `MigrationNotPosted` and the migration cash legs (R32) + Domain unit and functional tests.
-10. BFF prefix, Adviser Portal D80–D85 + frontend tests.
-11. Customer Portal C38 + frontend tests.
-12. Repo docs: mark this file landed; roadmap §13 step 13 and the §2 matrix; the known-issue rows.
-
-Do not put an in-kind transfer, a custodian statement, a server-side file upload or a reversal of a batch in these commits.
-
-### Docs amended when this spec was accepted
+## 12. Docs changed when this spec was accepted
 
 [posting.md](posting.md) (R19: on a Custodial account an `Opening` is written only by a migration batch), [holdings.md](holdings.md) (R8, R11: the same for `OpeningHoldings`), [custody-modes.md](custody-modes.md) (R5 matrix: the "written by" of `Opening` / `OpeningHoldings`; §4.2.1 the message; R9: a Transaction of a refused type can now exist on a Custodial account, with a flow's source), [transaction-source.md](transaction-source.md) (kind `Migration` = 9, not hand-reversible, the checks widened), [deposit-matching.md](deposit-matching.md) (R23, R26, R30: match to a batch and its undo; `migrationBatchId` and method `Migration` on the item), [bank-returns.md](bank-returns.md) (R3: the recall of a funding line), [trade-settlement.md](trade-settlement.md) (R21: what a `Matched` line has), [bank-reconciliation.md](bank-reconciliation.md) (R9, R10, §5: kind 19 and the migration cash legs), [adjustments.md](adjustments.md) (a note: an adjustment corrects a posted entry), [withdrawals.md](withdrawals.md) and [interest-run.md](interest-run.md) (notes: migrated cash is available at once and accrues from the day it is posted), [bff-adviser-portal.md](bff-adviser-portal.md) (the prefix), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D80–D85; D34, D35, D51, D26, D27), [customer-portal.md](../customer-portal/customer-portal.md) (C38), [api-design.md](../api-design.md) (§3.1 one permission row, §4.2 one problem code, §6 resource row, a new §7.13, §7.7 the `migration` field, change log), [domain-model.md](../domain-model.md) and [database-design.md](../database-design.md) (the sections named in §5 and §6), [glossary.md](../glossary.md) (the review terms become accepted; Transaction source gains `Migration`), [function-plan.md](../function-plan.md) §5, [features/README.md](README.md) row status, [known-issues/custodial-account-gaps.md](../known-issues/custodial-account-gaps.md) (the row "No opening balance" notes this spec and is removed when the slice lands; the row "Existing positions cannot be moved in" then names the in-kind transfer of one Customer's shares only), and the roadmap §2 matrix, §9 T2, §13 status and the sentence under the §13 table (step 13 then builds on the bank stage, steps 5 and 7).
 
 ---
 
-## Amendment 2026-11-24 (in-kind transfers) — accepted
+## 13. History
 
-Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rule R18 and §11 point 14 live there; this section records what changes here.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/migration-batches.md`).
 
-- §11 point 9 and "still open" (no outside proof of migrated holdings): a migrated holding shows as `unexplained` in the custodian reconciliation until the previous provider delivers it to the safekeeping account. The bulk delivery arrives as a custody movement with no instruction (`NoInstruction`), which a TenantAdmin ignores with a note; the batch already posted the holdings. The batch does not change.
-
----
-
-## Amendment 2026-11-24 (dividends) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rule R26 lives there; this section records what changes here.
-
-- R13: `migrationBatchId` is one of three match targets with `accountId` and `corporateActionId`; the message for none or more than one becomes `Give an account, a migration batch or a dividend.`
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-24 | [in-kind-transfers.md](in-kind-transfers.md) | §11: how a migrated holding shows in the custodian reconciliation |
+| 2026-11-24 | [dividends.md](dividends.md) | R13: three match targets |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
