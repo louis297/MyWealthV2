@@ -30,7 +30,7 @@ Depends on [fx-conversions.md](fx-conversions.md): the table, the item `fx` obje
 - On an External account a `Buy` or `Sell` in another currency is allowed with the caller's `fxRate` and stores an FX detail with source `Caller`; `StockIn` and `OpeningHoldings` keep their behaviour; R8 (staleness) and R9 (cash rounding) do not apply there ([external-caller-numbers.md](external-caller-numbers.md) R23). Every rule of this draft therefore applies to Custodial accounts only.
 - On a Custodial account a hand `Buy` or `Sell` no longer exists, so R2 and R3 have no hand trade left to rule on. Orders decide the same points: a buy order must be in the Account's currency, and a sell order in another currency is allowed and converted at the reference rate when its fill is posted ([orders.md](orders.md) R9, R34, R48).
 
-What is left of this draft is the cash rounding of a converted trade (R9) and the FX detail and staleness limit of a fill across currencies.
+For Custodial accounts the orders spec left this draft the rebalance (the FX detail, the staleness limit, cash rounding). Since then a rebalance buys only instruments quoted in the Account's currency ([rebalances.md](rebalances.md) R8). Check what is left before this draft goes to review.
 
 ---
 
