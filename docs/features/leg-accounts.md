@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-10
-last_updated: 2026-11-17
+last_updated: 2026-11-26
 related:
   - posting.md
   - holdings.md
@@ -31,10 +31,6 @@ Structural amendment to the Transaction aggregate on `webapi`. The Transaction h
 This is groundwork for cross-account transfer ([posting.md](posting.md) §13), which is the **next** increment and is not specified here. No new `TransactionType`, no new route, no new policy. Every existing type keeps its leg composition, and in this increment every leg of one Transaction still books into the same Account. The transaction item JSON changes shape now (per-leg `accountId`) so the portals change once, not twice.
 
 **Status is `accepted` (2026-11-10) and landed** on branch `feature/leg-accounts`. Script `0024_leg_accounts.sql`. The amendments to [posting.md](posting.md), [holdings.md](holdings.md), [buy-sell.md](buy-sell.md), [split.md](split.md), [net-worth.md](net-worth.md), [portfolios.md](portfolios.md), [reports.md](reports.md), the portal specs, ADR 0011, domain-model, database-design, api-design and the glossary landed with the implementation.
-
-**Amendment 2026-11-15 (trade fees, accepted):** [trade-fees.md](trade-fees.md). Cash legs gain a role. The rule "at most one cash leg per `(Transaction, Account)`" now applies to `Principal` legs; a `Buy` / `Sell` may also have one `Fee` leg on the same Account (script `0030` replaces the unique key with a filtered one). Transfers still have no fee leg.
-
-**Amendment 2026-11-17 (custody modes, accepted, landed):** [custody-modes.md](custody-modes.md). New invariant: every leg account of one Transaction has the same custody mode (custody-modes R8, R9). It is checked where a Transaction can have two leg accounts, on `InternalTransfer` and `FxConversion`; a Reversal copies each leg's Account and keeps it. R21: `bookedAt` is set by the server when the leg accounts are Custodial. R17 (portfolio trade lock) is unchanged.
 
 ---
 
@@ -100,9 +96,9 @@ Visibility and authority are derived from leg accounts:
 | ID | Rule |
 | --- | --- |
 | R1 | Unchanged from posting R1–R4a: 401 / 403 / 404, PublicId only, `/transactions` root, `tenantId` rules for TenantAdmin / Adviser / SystemAdmin. |
-| R2 | The header has `TenantId` and no `AccountId` and no `CustomerId`. Every cash leg and every security leg has a required `AccountId`. |
+| R2 | The header has `TenantId` and no `AccountId` and no `CustomerId`. Every cash leg and every security leg has a required `AccountId`. At most one `Principal` cash leg per `(Transaction, Account)`; a `Buy` / `Sell` may also have one `Fee` leg on the same Account (trade-fees; script `0030` replaced the unique key with a filtered one). Every leg account of one Transaction has the same custody mode (custody-modes R8, R9). |
 | R3 | A Transaction has at least one leg. Every leg account is in the header's tenant (application dual check, as posting R5 does today for the single Account). |
-| R4 | **Leg accounts in this increment.** Every existing type builds its legs on the single `accountId` from the create body. A Reversal builds each opposite leg on the same Account as the original leg. No type in this increment produces legs on two Accounts. |
+| R4 | **Leg accounts in this increment.** Every existing type builds its legs on the single `accountId` from the create body. A Reversal builds each opposite leg on the same Account as the original leg. No type in this increment produces legs on two Accounts. Since [internal-transfers.md](internal-transfers.md) and [fx-conversions.md](fx-conversions.md), `InternalTransfer` and `FxConversion` build legs on two Accounts; every other type still builds its legs on one. |
 | R5 | **Create.** The body keeps top-level `accountId` for every existing type. Application builds the legs from `type` (unchanged) and stamps that Account on each leg. Clients never send a legs array. |
 | R6 | **Write authority.** Create and reverse require the caller to see every leg account (TenantAdmin: same tenant; Adviser: assigned Customer; SystemAdmin: any). One leg account outside scope → 404 for the whole command. Nothing is written. |
 | R7 | **Read visibility.** Get and list return a Transaction if the caller can see at least one leg account. Otherwise get → 404 and list omits it. The item's `cash` and `security` arrays contain only legs on Accounts the caller can see. Legs on other Accounts are omitted; the response gives no count, account id, customer id or name for them. Customer = own accounts only (Customer Portal amendment). |
@@ -119,7 +115,7 @@ Visibility and authority are derived from leg accounts:
 | R18 | **List filters.** `accountId` matches a Transaction with at least one leg on that Account. `customerId` matches a Transaction with at least one leg on an Account of that Customer. Filters are applied after the R7 visibility scope. `totalCount` counts Transactions, not legs. Sort `bookedAt`, then id (unchanged). |
 | R19 | **Net worth.** Cash per Account from R10. Holdings from the projection (R15). Unchanged aggregation otherwise. |
 | R20 | **Customer Transactions report.** One row per leg account of the Customer: a transaction appears in the account it books into. The closed-account filter is evaluated per leg account. In this increment this produces the same rows as today. |
-| R21 | Idempotency (ADR 0015), immutability (posting R10), `bookedAt`, memo, reference: unchanged. |
+| R21 | Idempotency (ADR 0015), immutability (posting R10), `bookedAt`, memo, reference: unchanged. `bookedAt` is set by the server when the leg accounts are Custodial (custody-modes R10). |
 
 ---
 
@@ -245,12 +241,13 @@ Amend [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.m
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | Every factory stamps the given Account on each leg it builds; Reverse copies each leg's Account; a Transaction with no leg cannot be built |
-| Application.FunctionalTests | Every existing type still creates and reverses as before; item has per-leg `accountId` / `customerId`, `cash` is an array, no top-level `accountId`; list `accountId` / `customerId` filters still return the same rows; cash balance, holdings, net worth unchanged for the seed data; Adviser unassigned leg account → 404 on get, create and reverse |
-| Infrastructure.IntegrationTests | Other tenant's transaction id → 404 (two-tenant fixture); `Transactions` has no `AccountId` column; both leg tables have `AccountId NOT NULL` with FK; `0024` back-fills an existing leg from its header |
-| Leg filtering (R7) | Cannot be exercised end to end until a type writes legs on two Accounts. Cover it at the query layer with a hand-inserted two-Account Transaction in the integration fixture: a caller who sees only Account A gets only A's legs and no reference to B; a caller who sees neither gets 404 |
+| Domain.UnitTests | `Entities/LegAccountTests.cs` |
+| Application.FunctionalTests | `Transactions/LegAccountsReadTests.cs`, `Transactions/LegAccountsReverseTests.cs` (fixture `LegAccountsFixture`) |
+| Infrastructure.IntegrationTests | `AppliedSchema/LegAccountsSchemaTests.cs` |
 
 ---
 
@@ -274,11 +271,11 @@ Amend [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.m
 ## 12. Still open (next increment, not this spec)
 
 - Name and create body of the cross-account transfer type. Recommendation from discussion: do not reuse `TransferIn` / `TransferOut`, because one header has one `Type` and a linked transfer is both directions.
-- Cross-currency transfer.
-- In-kind transfer (security legs on two Accounts).
+- Cross-currency transfer: landed as `FxConversion` ([fx-conversions.md](fx-conversions.md)).
+- A transfer of securities between two Accounts of the firm (security legs on two Accounts). A transfer in or out of one Custodial account is [in-kind-transfers.md](in-kind-transfers.md): one security leg, on one Account.
 - Fees on transfers — none; see [trade-fees.md](trade-fees.md) §2 Out.
 
-The transfer increment is drafted in [internal-transfers.md](internal-transfers.md): type `InternalTransfer`, route `POST /transactions/transfer`, cash only, same currency. Cross-currency and in-kind transfer stay open.
+The transfer increment landed in [internal-transfers.md](internal-transfers.md): type `InternalTransfer`, route `POST /transactions/transfer`, cash only, same currency.
 
 ---
 
@@ -294,21 +291,14 @@ Recorded here so the next spec does not reopen them:
 
 ---
 
-## 14. Suggested commits
+## 14. History
 
-Only after `accepted`. Tree must build after each commit. Split each behaviour into red then green.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/leg-accounts.md`).
 
-1. `0024_leg_accounts.sql` + EF mapping (leg `AccountId`, header without `AccountId`) + integration tests for columns, FKs and back-fill. Domain and application move to leg accounts in the same commit so the tree builds; existing functional tests stay green.
-2. Write authority on every leg account (R6) + reverse per leg (R12) + lock order (R11) + tests.
-3. Read visibility and leg filtering (R7, R18) + integration tests with a hand-inserted two-Account Transaction.
-4. Item JSON per-leg shape (§8.1) + functional tests.
-5. Adviser Portal and Customer Portal consume the new item shape + frontend tests.
-6. Repo docs: this file `accepted`; amend posting, holdings, buy-sell, split, net-worth, portfolios, reports, customer-portal, adviser-portal-dashboard, ADR 0011, domain-model, database-design, api-design, glossary (Transaction, Leg).
-
----
-
-## Amendment 2026-11-24 (in-kind transfers) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md).
-
-- The open item "in-kind transfer" now means only a transfer of securities between two Accounts of the firm. A transfer in or out of one Custodial account is [in-kind-transfers.md](in-kind-transfers.md): one security leg, on one Account.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-10 – 11-11 | [internal-transfers.md](internal-transfers.md), [fx-conversions.md](fx-conversions.md) | R4: two types build legs on two Accounts |
+| 2026-11-15 | [trade-fees.md](trade-fees.md) | R2: cash legs have a role; one `Principal` leg per Account |
+| 2026-11-17 | [custody-modes.md](custody-modes.md) | R2: one custody mode per Transaction. R21: server `bookedAt` on Custodial accounts |
+| 2026-11-24 | [in-kind-transfers.md](in-kind-transfers.md) | §12: what "in-kind transfer" still leaves open |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
