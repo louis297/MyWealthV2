@@ -93,8 +93,8 @@ Redirect URI and post-logout follow the same pattern as the Adviser Portal BFF (
 | `/instruments` | SystemAdmin | Tenant instrument catalog. Requires tenant selection. See [back-office-instruments.md](back-office-instruments.md) |
 | `/instruments/new` | SystemAdmin | Create instrument for the chosen tenant |
 | `/instruments/{id}` | SystemAdmin | Detail + rename / disable / enable |
-| `/market-data` | SystemAdmin | Market data connections and the state of each price feed. `GET /market-data-connections`. See the amendment of 2026-11-22 (simulated instruments); the corporate action feed and the newest announcements in the amendment of 2026-11-22 (corporate actions) |
-| `/broker` | SystemAdmin | Broker connections, the state of each execution report feed and the newest execution reports. `GET /broker-connections`, `GET /execution-reports`. See the amendment of 2026-11-23 (orders and settlement) |
+| `/market-data` | SystemAdmin | Market data connections and the state of each price feed. `GET /market-data-connections`. See "Simulated instruments" below (BO22, BO23); the corporate action feed and the newest announcements are in "Corporate actions" (BO24, BO25) |
+| `/broker` | SystemAdmin | Broker connections, the state of each execution report feed and the newest execution reports. `GET /broker-connections`, `GET /execution-reports`. See "Orders and settlement" below (BO26–BO28) |
 | `/tenant-admins` | SystemAdmin | List (filter by tenant, search); links to create / detail |
 | `/tenant-admins/new` | SystemAdmin | Create (tenant, name, email, password) |
 | `/tenant-admins/{id}` | SystemAdmin | Detail + rename / disable / enable |
