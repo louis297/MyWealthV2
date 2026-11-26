@@ -26,6 +26,7 @@ related:
   - known-issues/eodhd-nz-jp-coverage.md
   - features/market-data-history.md
   - features/account-valuation.md
+  - features/valuation-run.md
 ---
 
 # Historical valuation roadmap
@@ -142,6 +143,7 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 - **Depends on:** V2.
 - **Also decide:** when a day is final (Q5); whether an incomplete day is stored with its mark or waits (recommended: stored with its mark, so that the fee step can see it and decide); External accounts (Q6); what is stored for a day with no cash and no holding; funds under management per day as a sum of the rows, not a second table.
 - **After it:** step 4 of the business roadmap can open.
+- **Spec:** [valuation-run.md](features/valuation-run.md) (in review since 2026-11-26; twelve points in its §11 wait for an answer). It recommends: a day is stored once it is the day before yesterday, when its prices and rates are final, which would refine Q5; every day is stored, an empty or incomplete day too, and never changed; Custodial accounts of any status, a Closed one through the day its closure completed; one database transaction per account and day under the Account lock, with `Accounts.ValuedThrough` as the marker; a daily job at 13:00 UTC and a SystemAdmin run through a date (`/valuation-runs`); `GET /accounts/{id}/valuations[/{date}]` with `accounts.read`; funds under management of a past day as a sum of the rows, with no route; a fixed `TestSeed` history from 2026-01-02 to 2026-03-31; a Back Office section. Script `0059`.
 
 ### V4. Net worth history and reports as of a date
 
@@ -196,7 +198,7 @@ Each step depends only on earlier steps.
 | --- | --- | --- | --- | --- |
 | 1 | V1 price and rate history | "Historical back-fill" and the deferred read routes of instrument-prices and fx-rates | [market-data-history](features/market-data-history.md) | landed 2026-11-25 |
 | 2 | V2 valuation as of a date | — | [account-valuation](features/account-valuation.md) | landed 2026-11-26 |
-| 3 | V3 daily valuation run and stored valuations | "Still open: daily snapshots" (function-plan §5.4) | — | not specified |
+| 3 | V3 daily valuation run and stored valuations | "Still open: daily snapshots" (function-plan §5.4) | [valuation-run](features/valuation-run.md) | review 2026-11-26 |
 | 4 | V4 net worth history and reports as of a date | "Daily snapshots, historical series" and "FX fold" (net-worth Out) | — | not specified; optional for the business roadmap |
 
 Steps 1 to 3 are step 3 of the business roadmap. When step 3 here has landed, step 4 of [future-plans.md](future-plans.md) §1 (the advisory fee) can open. Step 4 here can run beside it.
