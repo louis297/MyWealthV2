@@ -4,7 +4,7 @@ status: accepted
 phase: 3
 language: en
 created: 2026-11-02
-updated: 2026-11-23
+updated: 2026-11-26
 related:
   - README.md
   - ../adviser-portal/frontend-conventions.md
@@ -43,15 +43,15 @@ Function is intentionally smaller than the Adviser Portal: a Customer signs in, 
 
 ---
 
-## Backend prerequisites (amendments to existing accepted specs)
+## Backend prerequisites
 
-These amendments land with the Customer Portal slice. Do not rebuild the resource API; extend RolePermissions and self-scope checks.
+These grants landed with the Customer Portal slice; each is now a rule of the spec named. Do not rebuild the resource API.
 
-| Spec | Amendment |
+| Spec | What the Customer Portal needs from it |
 | --- | --- |
-| [identity-auth](../features/identity-auth.md) | Register confidential client `customer-portal`. Allow-list: Customer only. Per-client cookie scheme `customer-portal` (same pattern as the 2026-10-27 amendment). TenantAdmin / Adviser / SystemAdmin receive no code. |
+| [identity-auth](../features/identity-auth.md) | Register confidential client `customer-portal`. Allow-list: Customer only. Per-client cookie scheme `customer-portal` (identity-auth §4.3). TenantAdmin / Adviser / SystemAdmin receive no code. |
 | [accounts](../features/accounts.md) | Grant Customer `accounts.read`. List / get / cash-balance / holdings reads for the caller’s own accounts only. Other customer’s account id → 404. No `accounts.create` / `accounts.manage`. |
-| [posting](../features/posting.md) | Grant Customer `transactions.read`. List / get for the caller’s own accounts only. Other customer’s transaction or account id → 404. No `transactions.create`. Amended 2026-11-10 by [leg-accounts](../features/leg-accounts.md) R7: a transaction is visible when any leg books into an own account, and the item lists only the legs on own accounts. |
+| [posting](../features/posting.md) | Grant Customer `transactions.read`. List / get for the caller’s own accounts only. Other customer’s transaction or account id → 404. No `transactions.create`. A transaction is visible when any leg books into an own account, and the item lists only the legs on own accounts. |
 | [net-worth](../features/net-worth.md) | Customer may call `GET /users/customers/{ownPublicId}/net-worth` (and `GET /net-worth`, which for Customer returns the same self scope). Other customer id → 404. Reuse `accounts.read`. |
 | [reports](../features/reports.md) | Customer already has `reports.customer.read`. Grant `reports.customer.create` for **request only**. `POST /reports/request` succeeds only when `parameters.customerId` is the caller (else 404). `POST /reports/schedules` and schedule verbs stay 403 for Customer. Book-scoped routes stay 403. |
 
@@ -170,7 +170,7 @@ Empty, loading, error, and success states for the list, the form, and the histor
 
 ## Acceptance
 
-Requires the BFF and the backend amendments above. Do not re-test Adviser Portal cuts here.
+Requires the BFF and the backend prerequisites above. Do not re-test Adviser Portal cuts here.
 
 | Id | Given | When | Then |
 | --- | --- | --- | --- |
@@ -189,15 +189,14 @@ Requires the BFF and the backend amendments above. Do not re-test Adviser Portal
 
 ---
 
-## Amendment 2026-11-17 (account custody mode) — accepted, landed
+### Account custody mode
 
-Status of this amendment: `accepted` (2026-11-17), together with [account-custody-mode](../features/account-custody-mode.md).
+Field rules: [account-custody-mode](../features/account-custody-mode.md).
 
 The account item from `GET /accounts` and `GET /accounts/{id}` gains `custodyMode` (`External` / `Custodial`). The Customer already receives it with `accounts.read`; no backend grant changes.
 
 - `/accounts` and `/accounts/:id`: show "Custody" next to "Type".
 - The text is a label, not the enum name: `External` → "Held elsewhere", `Custodial` → "Held on platform". A value the portal does not know is shown as received.
-- No grouping of accounts by custody mode and no explanatory sentence yet. Both belong to a later read-model slice. (Superseded by the amendment 2026-11-18 below.)
 
 | Id | Given | When | Then |
 | --- | --- | --- | --- |
@@ -205,9 +204,9 @@ The account item from `GET /accounts` and `GET /accounts/{id}` gains `custodyMod
 
 ---
 
-## Amendment 2026-11-18 (grouping by custody mode) — accepted, landed
+### Grouping by custody mode
 
-Status of this amendment: `accepted` (2026-11-18), together with [custody-mode-grouping](../features/custody-mode-grouping.md). It closes the last item of the 2026-11-17 amendment ("No grouping of accounts by custody mode and no explanatory sentence yet"). No backend grant changes and the BFF does not change: `GET /accounts` already takes `custodyMode`, and the net-worth reads gain `breakdowns.byCustodyMode`.
+Field rules: [custody-mode-grouping](../features/custody-mode-grouping.md). No backend grant changes and the BFF does not change: `GET /accounts` already takes `custodyMode`, and the net-worth reads gain `breakdowns.byCustodyMode`.
 
 The note, used word for word wherever it appears (the same sentence is in the Customer Transactions PDF, custody-mode-grouping R15):
 
@@ -225,12 +224,11 @@ The note, used word for word wherever it appears (the same sentence is in the Cu
 | C16 | Customer | Accounts list | Two groups, "Held on platform" first, then "Held elsewhere", from the two filtered requests. A group with no accounts is not shown; both empty → "No accounts.". The note is under the "Held elsewhere" heading. The table columns are unchanged (C13). |
 | C17 | Customer | Account page | An External account shows the note under the "Custody" field. A Custodial account shows no note. |
 
-
 ---
 
-## Amendment 2026-11-19 (adjustments) — accepted
+### Adjustments
 
-Status of this amendment: `accepted` (2026-11-19), together with [adjustments](../features/adjustments.md). No new call; the BFF does not change.
+Field rules: [adjustments](../features/adjustments.md). No new call; the BFF does not change.
 
 | Id | Given | When | Then |
 | --- | --- | --- | --- |
@@ -238,9 +236,9 @@ Status of this amendment: `accepted` (2026-11-19), together with [adjustments](.
 
 ---
 
-## Amendment 2026-11-20 (deposit instructions) — accepted
+### Deposit instructions
 
-Status of this amendment: `accepted` (2026-11-20), together with [client-money-accounts](../features/client-money-accounts.md). No backend grant changes: the Customer reads deposit instructions with `accounts.read`, own accounts only. The BFF does not change: the route is under `/accounts`.
+Field rules: [client-money-accounts](../features/client-money-accounts.md). No backend grant changes: the Customer reads deposit instructions with `accounts.read`, own accounts only. The BFF does not change: the route is under `/accounts`.
 
 | Call | When | Notes |
 | --- | --- | --- |
@@ -253,13 +251,126 @@ Status of this amendment: `accepted` (2026-11-20), together with [client-money-a
 
 ---
 
-## Amendment 2026-11-20 (deposits) — accepted
+### Deposits
 
-Status of this amendment: `accepted` (2026-11-20), together with [deposit-matching](../features/deposit-matching.md). No new call and no grant change: the deposit is a `TransferIn` on the existing transaction reads, with `bankReceipt` on the item. The BFF does not change.
+Field rules: [deposit-matching](../features/deposit-matching.md). No new call and no grant change: the deposit is a `TransferIn` on the existing transaction reads, with `bankReceipt` on the item. The BFF does not change.
 
 | Id | Given | When | Then |
 | --- | --- | --- | --- |
 | C21 | Customer with a deposit (a `TransferIn` with `bankReceipt`) on a Custodial account | Account page activity | The row is labelled "Deposit" instead of the `TransferIn` label and shows "Value date <date>" on a line under it. Payer details are not shown. Its Reversal stays "Reversal". A `TransferIn` without `bankReceipt` keeps today's label. |
+---
+
+### Bank accounts, available cash and withdrawals
+
+Field rules: [withdrawals](../features/withdrawals.md). New calls: `GET /nominated-bank-accounts` and `GET /withdrawals?accountId=`, both read-only for a Customer (roadmap D6). The BFF gains the two prefixes ([bff-customer-portal.md](../features/bff-customer-portal.md) R20). The account item carries `reservedCash` and `availableCash`; a payout carries `payment`.
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| C22 | Customer with nominated bank accounts | Profile page | A "Bank accounts" section lists Pending and Verified rows: Bank, Account name, Account number, Currency, and "Verified" or "Being checked". No add or remove control. "To change your bank accounts, contact your adviser." |
+| C23 | Customer with a Custodial account | Account page | Under the cash balance: "Available to withdraw" with `availableCash`, and when `reservedCash` is not 0, "Withdrawals in progress" with it. |
+| C24 | Customer with withdrawals on a Custodial account | Account page | A "Withdrawals" section lists open withdrawals and those of the last 90 days: Requested, Amount, To (****8900), Status ("Waiting for approval", "Approved", "Sent to bank", "Paid", "Rejected", "Cancelled", "Bank refused", "Returned by bank"). No action. No memo or note. |
+| C25 | Customer with a payout on a Custodial account | Account page activity | The row is labelled "Withdrawal" instead of the `TransferOut` label and shows "Value date <date>" under it. Its Reversal stays "Reversal". A `TransferOut` without `payment` keeps today's label. |
+
+---
+
+### Account closure
+
+Field rules: [account-closure](../features/account-closure.md). The Customer Portal reads the account item's `closure` and the withdrawals it already reads; it calls no closure route and the BFF does not change. The Customer requests no closure (roadmap D6).
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| C26 | Customer with a closing Custodial account | Account page | A note above the balance: "This account is being closed. 300.00 USD is being paid to your bank account ****8900." (amount from `closure.payoutAmount`, the number from the withdrawal). A Closed account whose latest closure is `Completed` shows "Closed on <date>." |
+| C27 | Customer with a write-off on a Custodial account | Account page activity | The row is labelled "Rounding write-off" instead of the `CloseOut` label. A `CloseOut` with another source keeps today's label. |
+
+---
+
+### Interest run
+
+Field rules: [interest-run](../features/interest-run.md). The Customer Portal reads `GET /users/me/tax-profile`, the account item's `accruedInterest` and `interestAccruedThrough`, and the transaction item's `interest` and leg `tax`. The Customer Portal BFF does not change: it already proxies `/users`, `/accounts` and `/transactions`.
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| C28 | A Customer | Profile page | A "Tax details" section from `GET /users/me/tax-profile`: Tax residency, IRD number ("On file" / "Not on file"), RWT rate, and "Tax taken from your interest: <rate> %". Under it: "To change these details, contact your adviser." No form. |
+| C29 | A Customer with a Custodial account whose `accruedInterest` is above 0 | Account page | "Interest earned so far this period: <amount>" (the currency's minor unit, rounded down) under the balance, with "Paid after the end of the month." |
+| C30 | A Customer with an interest posting | Account page activity | The row is labelled "Interest" with its period, and shows Gross, "Tax withheld (<kind label> <rate> %)" and the net amount. A hand-entered `Interest` on an External account keeps today's row. |
+
+---
+
+### Corporate actions
+
+Field rules: [corporate-actions](../features/corporate-actions.md). The Customer Portal reads the transaction item's `corporateAction`. The Customer Portal BFF does not change: it already proxies `/transactions`.
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| C31 | A Customer with an entitlement posting | Account page activity | The row is labelled "Share split 2 for 1", "Share consolidation 1 for 10" or "Bonus issue 1 for 5", with "<quantityBefore> → <quantityAfter> shares" and "Ex-date <exDate>". No cash amount. A hand-entered `Split` on an External account keeps today's row. |
+
+---
+
+### Orders and settlement
+
+Field rules: [orders](../features/orders.md). The Customer Portal reads the Customer's own orders, the transaction item's `execution`, the account item's `unsettledCash` and `withdrawableCash`, and the holding item's `reservedQuantity`. It stays read-only: a Customer places and cancels no order (roadmap D6). The Customer Portal BFF gains the prefix `/orders` ([bff-customer-portal.md](../features/bff-customer-portal.md) R20).
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| C32 | A Customer with an open order | Account page | An "Orders" block from `GET /orders?accountId=` lists open orders and those that ended in the last 30 days: "Buy 10 ACME.SIM", the status label of D71 in the Customer's words (Placed and Working "With the broker", PartlyFilled "Partly filled (4 of 10)", Filled "Done", Cancelled "Cancelled", Rejected "Not accepted", Expired "Expired") and the placed date. No action. |
+| C33 | A Custodial account with unsettled or reserved cash | Account page cash block | "Cash", "Reserved" (when not 0), "From sales, not settled yet" (when not 0) and "Available to withdraw" from `withdrawableCash`. |
+| C34 | A Customer with a fill | Account page activity | The row is labelled "Bought 4 ACME.SIM at 100.12" or "Sold …", with the trade date, "Settles 25 Nov" or "Settled", and the contract note. A trade that is not a fill keeps today's row. |
+| C35 | A holding with a reserved quantity | Holdings | "<n> reserved for a sell order" under the quantity. |
+
+---
+
+### Trade settlement and broken trades
+
+Field rules: [trade-settlement](../features/trade-settlement.md).
+
+| ID | Behaviour |
+| --- | --- |
+| C36 | Customer Portal, account activity: the Reversal of a fill is labelled "Trade cancelled by the broker: Bought 4 ACME.SIM at 100.12", and the fill's own row shows "Cancelled" in place of the settlement text. A broken fill that was never booked shows nothing. |
+
+---
+
+### Rebalance through orders
+
+Field rules: [rebalances](../features/rebalances.md). The Customer Portal BFF does not change: `rebalanceId` comes on the order item under `/orders`.
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| C37 | A Customer with an order that has a `rebalanceId` | Account page, Orders block (C32) | The row shows "Rebalance" under the order. No link and no action. The fill rows of C34 are unchanged. |
+
+---
+
+### Migration batches
+
+Field rules: [migration-batches](../features/migration-batches.md). The Customer Portal BFF does not change: `migration` comes on the transaction item it already reads.
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| C38 | Customer with a Transaction that has `migration` | Account page activity | An `Opening` row is labelled "Opening balance" and an `OpeningHoldings` row "Holdings transferred in", each with "From <previousProvider>, as at <asOfDate>" under it. A Transaction without `migration` keeps today's labels. |
+
+---
+
+### In-kind transfers
+
+Field rules: [in-kind-transfers](../features/in-kind-transfers.md). The Customer Portal BFF gains the prefix `/in-kind-transfers` (bff-customer-portal R20); `inKindTransfer` comes on the transaction item and the holding fields on the holdings item it already reads.
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| C39 | A Customer with an in-kind transfer | Account page | A "Transfers" block from `GET /in-kind-transfers?accountId=` lists open transfers and those that ended in the last 30 days: "100 ACME.SIM from Harbour Brokers" or "… to Harbour Brokers", the status in the Customer's words (Requested "Being checked", Approved and Sent "On its way", Completed "Done", Rejected "Not accepted", Cancelled "Cancelled", Failed and SetAside "Not completed") and the requested date. No action. |
+| C40 | A Customer with a Transaction that has `inKindTransfer` | Account page activity | A `StockIn` row is labelled "Shares transferred in" and a `StockOut` row "Shares transferred out", each with "100 ACME.SIM, Harbour Brokers" under it. A Transaction without `inKindTransfer` keeps today's labels. |
+| C41 | A holding with a reserved or unsettled quantity | Holdings | "<n> reserved" under the quantity now also covers a transfer out ("reserved for a sale or a transfer"); "<n> not settled yet" when the unsettled quantity is above 0. |
+
+---
+
+### Dividends
+
+Field rules: [dividends](../features/dividends.md). No new BFF prefix: `dividend` on the transaction item and `reinvestDividends` on the account item come with the existing reads.
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| C42 | A Customer with a `Dividend` | Account page activity | The row is labelled "Dividend <symbol>", with "<quantity> shares × <amountPerShare>", the gross, one line per tax leg, "Imputation credit <amount>" when above 0, and the net cash amount. |
+| C43 | A reinvested dividend | Account page activity | The row also shows "Reinvested in <reinvestedQuantity> shares at <reinvestmentPrice>", and the holding shows the new quantity. |
+| C44 | A Custodial account | Account page | "Dividends are reinvested" or "Dividends are paid in cash", read only, with "Ask your adviser to change this." |
+
 ---
 
 ## Tests
@@ -278,113 +389,25 @@ Portal tests assert routes, role visibility (Customer only), and API-client shap
 
 ---
 
-## Amendment 2026-11-20 (bank accounts, available cash and withdrawals) — accepted
+## History
 
-Status of this amendment: `accepted` (2026-11-20), together with [withdrawals](../features/withdrawals.md). New calls: `GET /nominated-bank-accounts` and `GET /withdrawals?accountId=`, both read-only for a Customer (roadmap D6). The BFF gains the two prefixes ([bff-customer-portal.md](../features/bff-customer-portal.md) amendment 2026-11-20). The account item carries `reservedCash` and `availableCash`; a payout carries `payment`.
+What changed in this file after it was accepted. Each row is a section above. The text of each change is in git (`git log -p -- docs/customer-portal/customer-portal.md`).
 
-| ID | Given | When | Then |
-| --- | --- | --- | --- |
-| C22 | Customer with nominated bank accounts | Profile page | A "Bank accounts" section lists Pending and Verified rows: Bank, Account name, Account number, Currency, and "Verified" or "Being checked". No add or remove control. "To change your bank accounts, contact your adviser." |
-| C23 | Customer with a Custodial account | Account page | Under the cash balance: "Available to withdraw" with `availableCash`, and when `reservedCash` is not 0, "Withdrawals in progress" with it. |
-| C24 | Customer with withdrawals on a Custodial account | Account page | A "Withdrawals" section lists open withdrawals and those of the last 90 days: Requested, Amount, To (****8900), Status ("Waiting for approval", "Approved", "Sent to bank", "Paid", "Rejected", "Cancelled", "Bank refused", "Returned by bank"). No action. No memo or note. |
-| C25 | Customer with a payout on a Custodial account | Account page activity | The row is labelled "Withdrawal" instead of the `TransferOut` label and shows "Value date <date>" under it. Its Reversal stays "Reversal". A `TransferOut` without `payment` keeps today's label. |
-
----
-
-## Amendment 2026-11-22 (account closure) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [account-closure](../features/account-closure.md). The Customer Portal reads the account item's `closure` and the withdrawals it already reads; it calls no closure route and the BFF does not change. The Customer requests no closure (roadmap D6).
-
-| ID | Given | When | Then |
-| --- | --- | --- | --- |
-| C26 | Customer with a closing Custodial account | Account page | A note above the balance: "This account is being closed. 300.00 USD is being paid to your bank account ****8900." (amount from `closure.payoutAmount`, the number from the withdrawal). A Closed account whose latest closure is `Completed` shows "Closed on <date>." |
-| C27 | Customer with a write-off on a Custodial account | Account page activity | The row is labelled "Rounding write-off" instead of the `CloseOut` label. A `CloseOut` with another source keeps today's label. |
-
----
-
-## Amendment 2026-11-22 (interest run) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [interest-run](../features/interest-run.md). The Customer Portal reads `GET /users/me/tax-profile`, the account item's `accruedInterest` and `interestAccruedThrough`, and the transaction item's `interest` and leg `tax`. The Customer Portal BFF does not change: it already proxies `/users`, `/accounts` and `/transactions`.
-
-| ID | Given | When | Then |
-| --- | --- | --- | --- |
-| C28 | A Customer | Profile page | A "Tax details" section from `GET /users/me/tax-profile`: Tax residency, IRD number ("On file" / "Not on file"), RWT rate, and "Tax taken from your interest: <rate> %". Under it: "To change these details, contact your adviser." No form. |
-| C29 | A Customer with a Custodial account whose `accruedInterest` is above 0 | Account page | "Interest earned so far this period: <amount>" (the currency's minor unit, rounded down) under the balance, with "Paid after the end of the month." |
-| C30 | A Customer with an interest posting | Account page activity | The row is labelled "Interest" with its period, and shows Gross, "Tax withheld (<kind label> <rate> %)" and the net amount. A hand-entered `Interest` on an External account keeps today's row. |
-
----
-
-## Amendment 2026-11-22 (corporate actions) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions](../features/corporate-actions.md). The Customer Portal reads the transaction item's `corporateAction`. The Customer Portal BFF does not change: it already proxies `/transactions`.
-
-| ID | Given | When | Then |
-| --- | --- | --- | --- |
-| C31 | A Customer with an entitlement posting | Account page activity | The row is labelled "Share split 2 for 1", "Share consolidation 1 for 10" or "Bonus issue 1 for 5", with "<quantityBefore> → <quantityAfter> shares" and "Ex-date <exDate>". No cash amount. A hand-entered `Split` on an External account keeps today's row. |
-
----
-
-## Amendment 2026-11-23 (orders and settlement) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [orders](../features/orders.md). The Customer Portal reads the Customer's own orders, the transaction item's `execution`, the account item's `unsettledCash` and `withdrawableCash`, and the holding item's `reservedQuantity`. It stays read-only: a Customer places and cancels no order (roadmap D6). The Customer Portal BFF gains the prefix `/orders` ([bff-customer-portal](../features/bff-customer-portal.md) amendment 2026-11-23).
-
-| ID | Given | When | Then |
-| --- | --- | --- | --- |
-| C32 | A Customer with an open order | Account page | An "Orders" block from `GET /orders?accountId=` lists open orders and those that ended in the last 30 days: "Buy 10 ACME.SIM", the status label of D71 in the Customer's words (Placed and Working "With the broker", PartlyFilled "Partly filled (4 of 10)", Filled "Done", Cancelled "Cancelled", Rejected "Not accepted", Expired "Expired") and the placed date. No action. |
-| C33 | A Custodial account with unsettled or reserved cash | Account page cash block | "Cash", "Reserved" (when not 0), "From sales, not settled yet" (when not 0) and "Available to withdraw" from `withdrawableCash`. |
-| C34 | A Customer with a fill | Account page activity | The row is labelled "Bought 4 ACME.SIM at 100.12" or "Sold …", with the trade date, "Settles 25 Nov" or "Settled", and the contract note. A trade that is not a fill keeps today's row. |
-| C35 | A holding with a reserved quantity | Holdings | "<n> reserved for a sell order" under the quantity. |
-
----
-
-## Amendment 2026-11-23 (trade settlement and broken trades) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [trade-settlement](../features/trade-settlement.md). Field rules live there.
-
-| ID | Behaviour |
-| --- | --- |
-| C36 | Customer Portal, account activity: the Reversal of a fill is labelled "Trade cancelled by the broker: Bought 4 ACME.SIM at 100.12", and the fill's own row shows "Cancelled" in place of the settlement text. A broken fill that was never booked shows nothing. |
-
----
-
-## Amendment 2026-11-23 (rebalance through orders) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [rebalances](../features/rebalances.md). Field rules live there. The Customer Portal BFF does not change: `rebalanceId` comes on the order item under `/orders`.
-
-| ID | Given | When | Then |
-| --- | --- | --- | --- |
-| C37 | A Customer with an order that has a `rebalanceId` | Account page, Orders block (C32) | The row shows "Rebalance" under the order. No link and no action. The fill rows of C34 are unchanged. |
-
----
-
-## Amendment 2026-11-24 (migration batches) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [migration-batches](../features/migration-batches.md). Field rules live there. The Customer Portal BFF does not change: `migration` comes on the transaction item it already reads.
-
-| ID | Given | When | Then |
-| --- | --- | --- | --- |
-| C38 | Customer with a Transaction that has `migration` | Account page activity | An `Opening` row is labelled "Opening balance" and an `OpeningHoldings` row "Holdings transferred in", each with "From <previousProvider>, as at <asOfDate>" under it. A Transaction without `migration` keeps today's labels. |
-
----
-
-## Amendment 2026-11-24 (in-kind transfers) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers](../features/in-kind-transfers.md). Field rules live there. The Customer Portal BFF gains the prefix `/in-kind-transfers` (bff-customer-portal R20); `inKindTransfer` comes on the transaction item and the holding fields on the holdings item it already reads.
-
-| ID | Given | When | Then |
-| --- | --- | --- | --- |
-| C39 | A Customer with an in-kind transfer | Account page | A "Transfers" block from `GET /in-kind-transfers?accountId=` lists open transfers and those that ended in the last 30 days: "100 ACME.SIM from Harbour Brokers" or "… to Harbour Brokers", the status in the Customer's words (Requested "Being checked", Approved and Sent "On its way", Completed "Done", Rejected "Not accepted", Cancelled "Cancelled", Failed and SetAside "Not completed") and the requested date. No action. |
-| C40 | A Customer with a Transaction that has `inKindTransfer` | Account page activity | A `StockIn` row is labelled "Shares transferred in" and a `StockOut` row "Shares transferred out", each with "100 ACME.SIM, Harbour Brokers" under it. A Transaction without `inKindTransfer` keeps today's labels. |
-| C41 | A holding with a reserved or unsettled quantity | Holdings | "<n> reserved" under the quantity now also covers a transfer out ("reserved for a sale or a transfer"); "<n> not settled yet" when the unsettled quantity is above 0. |
-
----
-
-## Amendment 2026-11-24 (dividends) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [dividends](../features/dividends.md). Field rules live there. No new BFF prefix: `dividend` on the transaction item and `reinvestDividends` on the account item come with the existing reads.
-
-| ID | Given | When | Then |
-| --- | --- | --- | --- |
-| C42 | A Customer with a `Dividend` | Account page activity | The row is labelled "Dividend <symbol>", with "<quantity> shares × <amountPerShare>", the gross, one line per tax leg, "Imputation credit <amount>" when above 0, and the net cash amount. |
-| C43 | A reinvested dividend | Account page activity | The row also shows "Reinvested in <reinvestedQuantity> shares at <reinvestmentPrice>", and the holding shows the new quantity. |
-| C44 | A Custodial account | Account page | "Dividends are reinvested" or "Dividends are paid in cash", read only, with "Ask your adviser to change this." |
+| Date | With | Section |
+| --- | --- | --- |
+| 2026-11-17 | [account-custody-mode](../features/account-custody-mode.md) | Account custody mode |
+| 2026-11-18 | [custody-mode-grouping](../features/custody-mode-grouping.md) | Grouping by custody mode |
+| 2026-11-19 | [adjustments](../features/adjustments.md) | Adjustments |
+| 2026-11-20 | [client-money-accounts](../features/client-money-accounts.md) | Deposit instructions |
+| 2026-11-20 | [deposit-matching](../features/deposit-matching.md) | Deposits |
+| 2026-11-20 | [withdrawals](../features/withdrawals.md) | Bank accounts, available cash and withdrawals |
+| 2026-11-22 | [account-closure](../features/account-closure.md) | Account closure |
+| 2026-11-22 | [interest-run](../features/interest-run.md) | Interest run |
+| 2026-11-22 | [corporate-actions](../features/corporate-actions.md) | Corporate actions |
+| 2026-11-23 | [orders](../features/orders.md) | Orders and settlement |
+| 2026-11-23 | [trade-settlement](../features/trade-settlement.md) | Trade settlement and broken trades |
+| 2026-11-23 | [rebalances](../features/rebalances.md) | Rebalance through orders |
+| 2026-11-24 | [migration-batches](../features/migration-batches.md) | Migration batches |
+| 2026-11-24 | [in-kind-transfers](../features/in-kind-transfers.md) | In-kind transfers |
+| 2026-11-24 | [dividends](../features/dividends.md) | Dividends |
+| 2026-11-26 | — | The amendments became the sections above. No behaviour changed |
