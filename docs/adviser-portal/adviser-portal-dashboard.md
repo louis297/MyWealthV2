@@ -4,7 +4,7 @@ status: accepted
 phase: 2
 language: en
 created: 2026-10-12
-updated: 2026-11-25
+updated: 2026-11-26
 related:
   - ../features/client-money-accounts.md
   - README.md
@@ -43,7 +43,9 @@ related:
 
 # Adviser Portal — Dashboard and ledger pages
 
-Phase 2 portal cut. Consumes the landed net-worth read model and the existing ledger write + read endpoints (posting, buy-sell, split, reverse). Backend contracts live in Feature Specs. This file owns routes, page scope, and acceptance for the Dashboard, ledger pages, and the first write forms.
+Adviser Portal page contract for the Dashboard, the ledger pages and every page of the Custodial flows. Backend contracts live in Feature Specs. This file owns routes, page scope, and acceptance.
+
+This file states the page contract as it is today. "History" at the end lists what changed here, by date.
 
 **Status is `accepted`.** Implementation follows this file. Construction detail lives in [frontend-implementation-notes.md](frontend-implementation-notes.md).
 
@@ -69,11 +71,7 @@ Session remains the BFF cookie. All API calls go through `/api`. Do not re-intro
 - Holdings list on an account (`GET /accounts/{id}/holdings`).
 - Activity / transactions list (filter by account or customer; reuse existing posting reads).
 - Instrument picker on write forms (calls existing `GET /instruments?enabledOnly=true`, optionally with the existing `search` query). Simple select or basic list. No typeahead, no min-character trigger, no dedicated search endpoint.
-- Write forms on an Open Brokerage / Other account:
-  - Buy / Sell (server price via `IMarketData`; cash + security legs).
-  - StockIn / StockOut (client quantity + cost; no cash).
-  - Split / Bonus / Scrip (new total quantity; security-only; total cost unchanged).
-  - Cash types already accepted (Opening, TransferIn/Out, Interest, CloseOut, etc.) where the account type allows.
+- Write forms that follow the account's custody mode (D18). On an External account: Buy / Sell with the caller's price (D22), StockIn / StockOut, Split / Bonus / Scrip, the cash types, transfer and conversion. On a Custodial account: transfer, conversion, and the request pages of each flow (withdrawal, order, transfer of securities, adjustment, account closure).
 - Reverse on a posted transaction (`POST /transactions/{id}/reverse`). Original stays (economic legs); opposite legs posted. The original receives `reversedByTransactionId`. One reverse per original. Idempotency-Key required. Hide the Reverse button when `reversedByTransactionId` is not null or `type` is `Reversal`.
 - Account open / close (reuse existing account endpoints; close still requires cash zero and no holdings).
 
@@ -86,7 +84,7 @@ Session remains the BFF cookie. All API calls go through `/api`. Do not re-intro
 - SystemAdmin ledger screens (Scalar remains the back-office surface).
 - Customer Portal.
 - Daily snapshots.
-- Lots, realized-gain reports, fees, multi-instrument tickets, cross-account transfer.
+- Lots, realized-gain reports, multi-instrument tickets.
 - Hand-edited holding quantity or cost outside the accepted write types.
 
 ---
@@ -109,6 +107,30 @@ Session remains the BFF cookie. All API calls go through `/api`. Do not re-intro
 | `/transactions/:id` | Same | Read-only detail. Reverse button is hidden when `reversedByTransactionId` is not null or `type` is `Reversal`. |
 | `/profile` | Unchanged | |
 | `/customers`, `/advisers` | Unchanged | Still available; no longer the default home. |
+
+Routes added by the Custodial flows. Each is described by its acceptance rows:
+
+| Path | Who | Acceptance |
+| --- | --- | --- |
+| `/accounts/:id/adjust` | TenantAdmin | D28, D29, D102 |
+| `/adjustments`, `/adjustments/:id` | TenantAdmin | D103, D104 |
+| `/statement-lines`, `/statement-lines/:id` | TenantAdmin | D34–D37, D49, D50, D63, D78, D83, D98 |
+| `/nominated-bank-accounts` | TenantAdmin | D42 |
+| `/accounts/:id/withdraw` | TenantAdmin, Adviser | D45, D75 |
+| `/withdrawals`, `/withdrawals/:id` | TenantAdmin, Adviser | D46, D47, D56 |
+| `/bank-reconciliations`, run page | TenantAdmin | D51, D63, D78, D84, D101 |
+| `/accounts/:id/close` | TenantAdmin, Adviser | D53, D54, D62, D75, D93, D105 |
+| `/interest/rates`, `/interest/runs` | TenantAdmin, Adviser; runs TenantAdmin | D59, D60 |
+| `/corporate-actions`, `/corporate-actions/:id`, `/corporate-actions/new` | TenantAdmin, Adviser; writes TenantAdmin | D64–D67, D94–D97 |
+| `/accounts/:id/order` | TenantAdmin, Adviser | D69, D70 |
+| `/orders`, `/orders/:id` | TenantAdmin, Adviser | D71–D73, D77, D79 |
+| `/trade-settlements`, `/trade-settlements/:id` | TenantAdmin | D76 |
+| `/migration-batches`, `/migration-batches/new`, `/migration-batches/:id`, `/migration-batches/:id/edit` | TenantAdmin | D80–D83 |
+| `/accounts/:id/transfer-securities` | TenantAdmin, Adviser | D86, D87 |
+| `/transfers`, `/transfers/:id` | TenantAdmin, Adviser | D88, D89 |
+| `/custody-movements` | TenantAdmin | D90 |
+| `/custodian-reconciliations`, `/custodian-reconciliations/:id` | TenantAdmin | D91, D92 |
+| `/rebalances`, `/rebalances/:id` | TenantAdmin, Adviser | [adviser-portal-portfolios.md](adviser-portal-portfolios.md) P14–P20 |
 
 TransferIn and TransferOut reuse `/accounts/:id/transactions/new`. The route set does not change for external cash in and cash out. An internal transfer has its own page because its body names two Accounts.
 
@@ -133,7 +155,7 @@ Unchanged from the BFF cut. Probe is still `GET /api/users/me`. 401 does not ref
 | D7 | `/transactions` shows activity; filters by account or customer work with existing endpoints. |
 | D8 | No React password page. All calls go through the BFF `/api` prefix. Customer still receives no session. |
 | D9 | Missing / dead session → authorize flow. Wrong-role leftover → `/forbidden`. |
-| D10 | Adviser posts a Buy on an Open Brokerage account. Server prices the security leg; cash and quantity update. Missing price → form shows the 400. |
+| D10 | Adviser posts a Buy on an Open External Brokerage account with the price it was executed at (D22); cash and quantity update. A 400 is shown on the form. On a Custodial account a trade is an order (D69). |
 | D11 | Adviser posts a Sell that would take quantity or cash negative → 400; original stays. Successful Sell reduces quantity at average cost and increases cash. |
 | D12 | Adviser posts StockIn / StockOut (no cash) and Split / Bonus / Scrip (new total quantity, cost unchanged). Wrong body fields → 400. |
 | D13 | Adviser reverses a posted Buy / Sell / Split. Original remains; new reverse transaction appears. The Reverse button is hidden when `reversedByTransactionId` is not null or `type` is `Reversal`. Already reversed → 400. A security transaction that is not the latest security activity on its holding → 400; the page shows the sentence the same way ([ledger-write-guards](../fixes/ledger-write-guards.md)). Idempotency-Key required; replay returns the same id. |
@@ -141,9 +163,9 @@ Unchanged from the BFF cut. Probe is still `GET /api/users/me`. 401 does not ref
 
 ---
 
-## Amendment 2026-11-17 (account custody mode) — accepted, landed
+### Account custody mode
 
-Status of this amendment: `accepted` (2026-11-17), together with [account-custody-mode](../features/account-custody-mode.md).
+Field rules: [account-custody-mode](../features/account-custody-mode.md).
 
 Every account has a custody mode, `External` or `Custodial`. Only `External` can be opened in that slice, and no page behaviour depends on the value.
 
@@ -153,31 +175,31 @@ Every account has a custody mode, `External` or `Custodial`. Only `External` can
 
 | ID | Behaviour |
 | --- | --- |
-| D15 | The New account form posts `custodyMode: "External"` together with `customerId`, name, type and currency. The form shows no custody control. |
+| D15 | Removed 2026-11-17: the New account form sent `External` with no custody control. Replaced by D17. |
 | D16 | The accounts list, the accounts table on the customer page and the account page show each account's custody mode next to its type. |
 
 ---
 
-## Amendment 2026-11-17 (custody modes) — accepted, landed
+### Custody modes
 
-Status of this amendment: `accepted` (2026-11-17), together with [custody-modes](../features/custody-modes.md).
+Field rules: [custody-modes](../features/custody-modes.md).
 
 A Custodial account can be opened, and the write forms follow the account's custody mode. Backend rules: custody-modes §4. D17 replaces D15. D18–D20 extend D10–D14 and the transfer and convert rows of the route table. D16 is unchanged.
 
 | ID | Behaviour |
 | --- | --- |
 | D17 | The New account form (`/customers/:id/accounts/new`) has a required "Custody" choice with two options: "External — held elsewhere" and "Custodial — held on the platform". Nothing is preselected, and the form cannot be submitted until one is chosen. Choosing Custodial sets Type to Brokerage and disables the Type control; choosing External enables it again. `POST /accounts` carries the chosen `custodyMode`. |
-| D18 | The action buttons on `/accounts/:id` and the type selector on `/accounts/:id/transactions/new` offer only the types the manual entry matrix allows for the account's custody mode (custody-modes R5). On a Custodial account: TransferIn, TransferOut, CloseOut, Transfer, Convert, Buy, Sell, Reverse and Close. StockIn, StockOut, Split, Bonus, Scrip, Opening, OpeningHoldings and Interest are not offered. An External account offers what it offers today. The portal keeps its own copy of the list; when the server still refuses a type, the form shows the sentence of the 400. |
+| D18 | The action buttons on `/accounts/:id` and the type selector on `/accounts/:id/transactions/new` offer only what the manual entry matrix allows for the account's custody mode (custody-modes §4.2). An External account offers every hand type. A Custodial account offers none of them: its actions are Transfer and Convert (D19, D20), Withdraw (D44), Place order (D69), Transfer securities (D86), Adjust for a TenantAdmin (D28) and Close (D53). The portal keeps its own copy of the matrix with the refusal messages of custody-modes §4.2.1; when the server still refuses a type, the form shows the sentence of the 400. |
 | D19 | On a Custodial account the transaction form, the transfer form and the convert form have no "Booked at" input and send no `bookedAt`. The quote request of the convert form sends none either. The forms show "Booked when posted." where the input was. On an External account the input stays and is required. |
 | D20 | On `/accounts/:id/transfer` and `/accounts/:id/convert`, an Account whose custody mode differs from the source Account's stays listed, greyed out, with the reason "Different custody mode", like the existing Closed and currency reasons. |
 
-Portfolio controls on the account page: [adviser-portal-portfolios](adviser-portal-portfolios.md) amendment 2026-11-17 (P13).
+Portfolio controls on the account page: [adviser-portal-portfolios](adviser-portal-portfolios.md) P13.
 
 ---
 
-## Amendment 2026-11-18 (tenant custody modes) — accepted, landed
+### Tenant custody modes
 
-Status of this amendment: `accepted` (2026-11-18), together with [tenant-custody-modes](../features/tenant-custody-modes.md). D21 narrows D17 to the custody modes the firm allows. The BFF does not change.
+Field rules: [tenant-custody-modes](../features/tenant-custody-modes.md). D21 narrows D17 to the custody modes the firm allows. The BFF does not change.
 
 | ID | Behaviour |
 | --- | --- |
@@ -185,9 +207,9 @@ Status of this amendment: `accepted` (2026-11-18), together with [tenant-custody
 
 ---
 
-## Amendment 2026-11-18 (External caller numbers) — accepted, landed
+### External caller numbers
 
-Status of this amendment: `accepted` (2026-11-18), together with [external-caller-numbers](../features/external-caller-numbers.md). D22 replaces "Server prices the security leg" in D10 on External accounts; D23 replaces the convert row for External accounts. On a Custodial account both stay as written. The BFF does not change.
+Field rules: [external-caller-numbers](../features/external-caller-numbers.md). D22 replaces "Server prices the security leg" in D10 on External accounts; D23 replaces the convert row for External accounts. On a Custodial account both stay as written. The BFF does not change.
 
 | ID | Behaviour |
 | --- | --- |
@@ -198,9 +220,9 @@ The rate line under the amount on `/accounts/:id` already appears for any item w
 
 ---
 
-## Amendment 2026-11-18 (grouping by custody mode) — accepted, landed
+### Grouping by custody mode
 
-Status of this amendment: `accepted` (2026-11-18), together with [custody-mode-grouping](../features/custody-mode-grouping.md). D24 and D25 extend D2 and D3; the other sections of the Dashboard do not change. The BFF does not change.
+Field rules: [custody-mode-grouping](../features/custody-mode-grouping.md). D24 and D25 extend D2 and D3; the other sections of the Dashboard do not change. The BFF does not change.
 
 | ID | Behaviour |
 | --- | --- |
@@ -211,36 +233,35 @@ The Reports page does not change. The Adviser Balances and Customer Transactions
 
 ---
 
-## Amendment 2026-11-19 (transaction source) — accepted
+### Transaction source
 
-Status of this amendment: `accepted` (2026-11-19), together with [transaction-source](../features/transaction-source.md). D27 narrows the Reverse conditions of the `/transactions` and `/transactions/:id` rows, D13 and D18. The BFF does not change.
+Field rules: [transaction-source](../features/transaction-source.md). D27 narrows the Reverse conditions of the `/transactions` and `/transactions/:id` rows, D13 and D18. The BFF does not change.
 
 | ID | Behaviour |
 | --- | --- |
-| D26 | `/transactions/:id` shows a "Source" line under the type, from the item's `source.kind`: "Entered by hand" for `Manual`, "Rebalance" for `Rebalance`, "Test seed" for `Seed`. The source id is not shown. No other page shows the source. |
-| D27 | Reverse is offered on `/transactions`, `/transactions/:id` and the recent activity of `/accounts/:id` only when the item is not a `Reversal`, has no `reversedByTransactionId`, and its `source.kind` is `Manual` or `Rebalance`. The portal does not read the custody mode for this rule, so it also hides Reverse on a `Seed` Transaction of an External account (Development data only), which the server would accept. A 400 from reverse shows its sentence as today. |
-
+| D26 | `/transactions/:id` shows a "Source" line under the type, from the item's `source.kind`: "Entered by hand" for `Manual`, "Rebalance" for `Rebalance`, "Test seed" for `Seed`. The source id is not shown. No other page shows the source. Labels of the kinds added later: `BankFeed` "Bank feed" (D38), `Payment` "Withdrawal" (D48), `AccountClosure` "Account closure" (D57), `InterestRun` "Interest run" (D61), `CorporateAction` "Corporate action" (D68, D100), `OrderFill` "Order" (D74), `Migration` "Migration batch" (D85), `InKindTransfer` "In-kind transfer" (D93), `AdjustmentRequest` "Adjustment request" (D106). |
+| D27 | Reverse is offered on `/transactions`, `/transactions/:id` and the recent activity of `/accounts/:id` only when the item is not a `Reversal`, has no `reversedByTransactionId`, its `source.kind` is `Manual`, and its type is not `Adjustment`. The portal does not read the custody mode for this rule, so it also hides Reverse on a `Seed` or `Rebalance` Transaction of an External account, which the server would accept. A 400 from reverse shows its sentence. |
 
 ---
 
-## Amendment 2026-11-19 (adjustments) — accepted
+### Adjustments
 
-Status of this amendment: `accepted` (2026-11-19), together with [adjustments](../features/adjustments.md). It adds the route `/accounts/:id/adjust`, and D31 narrows the Reverse conditions of D27 for an `Adjustment`. The BFF does not change: the write is under `/transactions`.
+Field rules: [adjustments](../features/adjustments.md). It adds the route `/accounts/:id/adjust`, and D31 narrows the Reverse conditions of D27 for an `Adjustment`. The BFF does not change: the write is under `/transactions`.
 
 Reason labels: `EntryError` "Entry error", `CorporateAction` "Corporate action", `ReconciliationBreak` "Reconciliation", `Other` "Other".
 
 | ID | Behaviour |
 | --- | --- |
 | D28 | `/accounts/:id` shows an "Adjust" action only to a TenantAdmin, only on an Open Custodial account. It opens `/accounts/:id/adjust`. An Adviser never sees it. |
-| D29 | `/accounts/:id/adjust`: Reason (select, required), Memo (required, with the hint "The customer sees this memo"), an optional cash change (signed, in the Account currency), and an optional holding change (instrument picker from the Account's holdings plus `GET /instruments?enabledOnly=true`, signed quantity change, signed cost change in the quote currency). No booked-at input. Review lists the changes as entered ("Cash −0.60 USD; AAPL quantity 0, cost +0.60 USD"); the form does no balance arithmetic. Confirm posts `POST /transactions/adjustment` with one `Idempotency-Key` per form open. A 400 is shown at its field, or as the sentence when it has none. |
+| D29 | `/accounts/:id/adjust`: Reason (select, required), Memo (required, with the hint "The customer sees this memo"), an optional cash change (signed, in the Account currency), and an optional holding change (instrument picker from the Account's holdings plus `GET /instruments?enabledOnly=true`, signed quantity change, signed cost change in the quote currency). No booked-at input. Review lists the changes as entered ("Cash −0.60 USD; AAPL quantity 0, cost +0.60 USD"); the form does no balance arithmetic. Confirm posts `POST /transactions/adjustment` with one `Idempotency-Key` per form open. A 400 is shown at its field, or as the sentence when it has none. The form posts an adjustment request (D102). |
 | D30 | `/transactions/:id` of an `Adjustment` or its Reversal shows a "Reason" line with the label, under the Source line (D26). `/transactions` shows the type as "Adjustment" like any other type name. |
-| D31 | Reverse on an `Adjustment` (D27 conditions plus this one) is offered only to a TenantAdmin. A 403 from reverse shows "Only a firm administrator can reverse an adjustment." |
+| D31 | Removed 2026-11-25: nobody reverses an adjustment (D27, D106). |
 
 ---
 
-## Amendment 2026-11-20 (client money accounts and deposit references) — accepted
+### Client money accounts and deposit references
 
-Status of this amendment: `accepted` (2026-11-20), together with [client-money-accounts](../features/client-money-accounts.md). D32 adds deposit instructions to `/accounts/:id`; D33 narrows the currency picker of D17 and D21 for a Custodial account. The BFF does not change: `GET /accounts/{id}/deposit-instructions` is under `/accounts`, and `clientMoneyCurrencies` comes on the tenant item from `GET /tenants/by-code/{code}`.
+Field rules: [client-money-accounts](../features/client-money-accounts.md). D32 adds deposit instructions to `/accounts/:id`; D33 narrows the currency picker of D17 and D21 for a Custodial account. The BFF does not change: `GET /accounts/{id}/deposit-instructions` is under `/accounts`, and `clientMoneyCurrencies` comes on the tenant item from `GET /tenants/by-code/{code}`.
 
 | ID | Behaviour |
 | --- | --- |
@@ -249,9 +270,9 @@ Status of this amendment: `accepted` (2026-11-20), together with [client-money-a
 
 ---
 
-## Amendment 2026-11-20 (bank receipts and deposits) — accepted
+### Bank receipts and deposits
 
-Status of this amendment: `accepted` (2026-11-20), together with [deposit-matching](../features/deposit-matching.md). D34–D37 add the Bank receipts pages for a TenantAdmin; D38 adds the bank receipt to the transaction page; D39 changes D18 and D32. The BFF gains the prefix `/statement-lines` ([bff-adviser-portal.md](../features/bff-adviser-portal.md) amendment 2026-11-20). Calls: `GET /statement-lines`, `GET /statement-lines/{id}`, `POST /statement-lines/{id}/match|ignore|request-return|reopen|unmatch`, `GET /accounts?depositReference=`.
+Field rules: [deposit-matching](../features/deposit-matching.md). D34–D37 add the Bank receipts pages for a TenantAdmin; D38 adds the bank receipt to the transaction page; D39 changes D18 and D32. The BFF gains the prefix `/statement-lines` ([bff-adviser-portal.md](../features/bff-adviser-portal.md) §8.3). Calls: `GET /statement-lines`, `GET /statement-lines/{id}`, `POST /statement-lines/{id}/match|ignore|request-return|reopen|unmatch`, `GET /accounts?depositReference=`.
 
 | ID | Behaviour |
 | --- | --- |
@@ -260,30 +281,12 @@ Status of this amendment: `accepted` (2026-11-20), together with [deposit-matchi
 | D36 | Match opens a form with two ways to pick the account: "Deposit reference" (calls `GET /accounts?depositReference=`) or a Customer picker followed by the Customer's Open Custodial accounts in the line's currency (`GET /accounts?customerId=&custodyMode=Custodial`). An optional note. Review: "Credit 500.00 USD to <account name> of <customer name>." A 400 is shown at its field; a 409 reloads the line with "This receipt changed. Check it and try again." |
 | D37 | Ignore, Return to payer and Undo match ask for a required note in a dialog. Undo match warns "This posts a reversal of the deposit on <account name>." Reopen asks for confirmation only. The R30 400 message is shown as returned. |
 | D38 | `/transactions/:id` of a deposit or its Reversal shows a "Bank receipt" section: Value date, Reference, Payer, Payer account. The Source line (D26) shows "Bank feed" for `BankFeed`; a TenantAdmin also sees a link "Statement line" to `/statement-lines/:source.id`. Reverse is not offered (D27 already hides it for every source other than `Manual` and `Rebalance`). |
-| D39 | D18 changes: on a Custodial account the action buttons and the type selector no longer offer TransferIn. The deposit instructions panel (D32) gains the line "Deposits are credited from the bank statement when the customer pays in with this reference." External accounts unchanged. |
+| D39 | On a Custodial account TransferIn is not offered (D18). The deposit instructions panel (D32) has the line "Deposits are credited from the bank statement when the customer pays in with this reference." External accounts unchanged. |
 ---
 
-## Tests
+### Bank accounts and withdrawals
 
-Portal tests assert routes, role visibility, and that the Dashboard consumes the net-worth shape. Do not re-prove backend isolation or net-worth aggregation rules here.
-
----
-
-## Still open
-
-- Exact widget layout and empty states.
-- Top-N limits on breakdowns (sort is locked in the Feature Spec; limit is not).
-- Daily snapshots and historical charts.
-- Multi-instrument tickets, fees, lots, realized-gain views.
-- Cross-account transfer UI.
-- Instruments management UI (Back Office / Scalar only; not this portal).
-- Instrument typeahead search (later independent small feature; existing list `search` is enough for a simple picker now).
-
----
-
-## Amendment 2026-11-20 (bank accounts and withdrawals) — accepted
-
-Status of this amendment: `accepted` (2026-11-20), together with [withdrawals](../features/withdrawals.md). D40–D43 add nominated bank accounts on the Customer page and the TenantAdmin's checks; D44–D47 add withdrawals and change D18, D19 and D39 on a Custodial account; D48 adds the payment to the transaction page; D49 changes the Bank receipts pages (D34, D35). The BFF gains the prefixes `/nominated-bank-accounts` and `/withdrawals` ([bff-adviser-portal.md](../features/bff-adviser-portal.md) amendment 2026-11-20). Calls: `GET /nominated-bank-accounts`, `POST /nominated-bank-accounts`, `POST /nominated-bank-accounts/{id}/verify` / `reject` / `remove`, `GET /withdrawals`, `GET /withdrawals/{id}`, `POST /withdrawals`, `POST /withdrawals/{id}/approve` / `reject` / `cancel`, and the existing account, transaction and statement line reads.
+Field rules: [withdrawals](../features/withdrawals.md). D40–D43 add nominated bank accounts on the Customer page and the TenantAdmin's checks; D44–D47 add withdrawals and change D18, D19 and D39 on a Custodial account; D48 adds the payment to the transaction page; D49 changes the Bank receipts pages (D34, D35). The BFF gains the prefixes `/nominated-bank-accounts` and `/withdrawals` ([bff-adviser-portal.md](../features/bff-adviser-portal.md) §8.3). Calls: `GET /nominated-bank-accounts`, `POST /nominated-bank-accounts`, `POST /nominated-bank-accounts/{id}/verify` / `reject` / `remove`, `GET /withdrawals`, `GET /withdrawals/{id}`, `POST /withdrawals`, `POST /withdrawals/{id}/approve` / `reject` / `cancel`, and the existing account, transaction and statement line reads.
 
 | ID | Behaviour |
 | --- | --- |
@@ -291,7 +294,7 @@ Status of this amendment: `accepted` (2026-11-20), together with [withdrawals](.
 | D41 | Add form: Bank, Account name, Account number, Currency (enabled currencies). A sentence above it: "Add only an account in the customer's own name. A firm administrator checks it before money can be paid to it." A 400 is shown at its field. Success returns to the Customer page. |
 | D42 | A TenantAdmin sees a nav item "Bank account checks" (`/nominated-bank-accounts`), listing Pending rows of the firm: Customer, Bank, Account name, Account number, Currency, Added by, Added. A row opens a dialog with every field and Verify and Reject, each with a required note ("What did you check?" / "Why is it rejected?"). On a row the TenantAdmin added, both buttons are disabled with "Added by you. Another administrator must check it." An Adviser does not see the nav item; a 403 on the route shows "Only a firm administrator can check bank accounts." A 409 reloads with "This bank account changed. Check it and try again." |
 | D43 | Remove asks for a required note in a dialog: "Remove this bank account? Withdrawals already approved to it are still paid." |
-| D44 | D18 and D39 change: on a Custodial account the action buttons and the type selector no longer offer TransferOut, and offer CloseOut only when `0 < cashBalance <` the minor unit. A "Withdraw" button opens `/accounts/:id/withdraw` on an Open Custodial account. The account header shows "Cash", "Reserved for withdrawals" (only when not 0) and "Available". Open withdrawals of the account are listed under the holdings (D46 columns). On the transfer form (D19), a Custodial account of another Customer stays listed, greyed out, with the reason "Another customer". External accounts unchanged. |
+| D44 | On a Custodial account TransferOut and CloseOut are not offered (D18, D53). A "Withdraw" button opens `/accounts/:id/withdraw` on an Open Custodial account. The account header shows "Cash", "Reserved for withdrawals" (only when not 0) and "Available". Open withdrawals of the account are listed under the holdings (D46 columns). On the transfer form (D19), a Custodial account of another Customer stays listed, greyed out, with the reason "Another customer". External accounts unchanged. |
 | D45 | `/accounts/:id/withdraw`: To (the Customer's Verified bank accounts in the account's currency; none → "No verified bank account in USD. Add one on the customer page." with a link), Amount (shows "Available 700.00 USD"), Reference (placeholder: the deposit reference), Memo. Review: "Withdraw 300.00 USD from <account> to <bank> <accountName> ****8900. A firm administrator must approve it." Confirm posts `POST /withdrawals` with one `Idempotency-Key` per form open and opens `/withdrawals/:id`. A 400 is shown at its field. |
 | D46 | Nav item "Withdrawals" (`/withdrawals`) for TenantAdmin and Adviser: Requested, Customer, Account, Amount, Currency, To, Status, Requested by. Status filter, default "Waiting for approval" (Requested); options Requested, Approved, Sent, Paid, Rejected, Cancelled, Failed, Returned, All. Status labels: Requested "Waiting for approval", Approved "Approved, sending", Sent "Sent to bank", Paid "Paid", Rejected "Rejected", Cancelled "Cancelled", Failed "Bank refused", Returned "Returned by bank". |
 | D47 | `/withdrawals/:id` shows every field, the decision, the payment (attempts, last failure label as BO18), the failure or return reason, and links to the payout and the return Reversal (`/transactions/:id`). Actions: a TenantAdmin who did not request it sees Approve (optional note) and Reject (required note) on a Requested one; the requester sees "Waiting for another administrator to approve." in their place; an Adviser sees neither. Cancel (optional note) is offered on Requested, and on Approved while `payment.attempts` is 0. A 400 shows its sentence; a 409 reloads with "This withdrawal changed. Check it and try again." |
@@ -300,9 +303,9 @@ Status of this amendment: `accepted` (2026-11-20), together with [withdrawals](.
 
 ---
 
-## Amendment 2026-11-21 (receipt returns, recalls and other debit lines) — accepted
+### Receipt returns, recalls and other debit lines
 
-Status of this amendment: `accepted` (2026-11-21), together with [bank-returns](../features/bank-returns.md). D50 changes the Bank receipts pages (D34, D35, D49). The BFF does not change. Calls: the existing statement line reads and actions (`POST /statement-lines/{id}/ignore`, `/reopen` on a debit line too).
+Field rules: [bank-returns](../features/bank-returns.md). D50 changes the Bank receipts pages (D34, D35, D49). The BFF does not change. Calls: the existing statement line reads and actions (`POST /statement-lines/{id}/ignore`, `/reopen` on a debit line too).
 
 | ID | Behaviour |
 | --- | --- |
@@ -310,9 +313,9 @@ Status of this amendment: `accepted` (2026-11-21), together with [bank-returns](
 
 ---
 
-## Amendment 2026-11-21 (bank reconciliation) — accepted
+### Bank reconciliation
 
-Status of this amendment: `accepted` (2026-11-21), together with [bank-reconciliation](../features/bank-reconciliation.md). D51 adds the Bank reconciliation pages for a TenantAdmin. The BFF gains the prefix `/bank-reconciliations` ([bff-adviser-portal.md](../features/bff-adviser-portal.md) amendment 2026-11-21). Calls: `GET /bank-reconciliations/overview`, `GET /bank-reconciliations`, `GET /bank-reconciliations/{id}`, `POST /bank-reconciliations`, and the existing statement line reads. The PDF is on the Reports tab ([adviser-portal-reports.md](adviser-portal-reports.md) D52).
+Field rules: [bank-reconciliation](../features/bank-reconciliation.md). D51 adds the Bank reconciliation pages for a TenantAdmin. The BFF gains the prefix `/bank-reconciliations` ([bff-adviser-portal.md](../features/bff-adviser-portal.md) §8.3). Calls: `GET /bank-reconciliations/overview`, `GET /bank-reconciliations`, `GET /bank-reconciliations/{id}`, `POST /bank-reconciliations`, and the existing statement line reads. The PDF is on the Reports tab ([adviser-portal-reports.md](adviser-portal-reports.md) D52).
 
 | ID | Behaviour |
 | --- | --- |
@@ -320,13 +323,13 @@ Status of this amendment: `accepted` (2026-11-21), together with [bank-reconcili
 
 ---
 
-## Amendment 2026-11-22 (account closure) — accepted
+### Account closure
 
-Status of this amendment: `accepted` (2026-11-22), together with [account-closure](../features/account-closure.md). D53–D57 replace the plain Close action on a Custodial account with the Close account page and show a closing account. Calls: `POST /accounts/{id}/closures`, the existing account, holdings, portfolio and withdrawal reads. The routes sit under `/accounts`, so the BFF does not change. D18 and D39: the type selector no longer offers CloseOut on a Custodial account.
+Field rules: [account-closure](../features/account-closure.md). D53–D57 replace the plain Close action on a Custodial account with the Close account page and show a closing account. Calls: `POST /accounts/{id}/closures`, the existing account, holdings, portfolio and withdrawal reads. The routes sit under `/accounts`, so the BFF does not change. D18 and D39: the type selector no longer offers CloseOut on a Custodial account.
 
 | ID | Behaviour |
 | --- | --- |
-| D53 | On an Open Custodial account the Close action opens `/accounts/:id/close` instead of calling `POST /accounts/{id}/close`. External accounts unchanged. The type selector (D18, D39) no longer offers CloseOut on a Custodial account. |
+| D53 | On an Open Custodial account the Close action opens `/accounts/:id/close` instead of calling `POST /accounts/{id}/close`. External accounts unchanged. The type selector does not offer CloseOut on a Custodial account (D18). |
 | D54 | `/accounts/:id/close`: a checklist from the account, its holdings, its assignment and `GET /withdrawals?accountId=&status=Requested,Approved,Sent`: "No holdings", "No portfolio", "No open withdrawals", each ticked or with its account-closure R5 / R6 sentence and a link (holdings, the portfolio, the withdrawal). Then "Cash balance", "To pay out" and, when not 0, "Written off" (the remainder). With a payout: To (the Customer's Verified bank accounts in the currency; none → "No verified bank account in USD. Add one on the customer page." with a link). Memo (required). Review: with a payout, "Pay 300.00 USD to ANZ J Smith ****8900 and close the account when the bank has paid. A firm administrator must approve the payment. Until then the account accepts no new activity."; without, "Close the account now." with "0.004 USD is written off." when there is a remainder. Confirm posts `POST /accounts/{id}/closures` with one `Idempotency-Key` per form open and returns to the account page. Confirm is disabled while a check fails. A 400 is shown at its field. |
 | D55 | The account page of a closing account (`closure.status` `InProgress`) shows a banner: "Being closed. 300.00 USD is being paid out (<withdrawal status label, D46>). The account accepts no new activity." with a link to `/withdrawals/:closure.withdrawalId`. Every action button is hidden, Withdraw included. A Closed account whose latest closure is `Completed` shows "Closed by account closure on <date>". A `Cancelled` closure shows nothing on the account. |
 | D56 | On the withdrawals list (D46) a closure's withdrawal (`accountClosureId` set) shows "Account closure" under To. `/withdrawals/:id` of one (D47) shows "This withdrawal pays out an account closure." Reject and Cancel on it ask in their dialog: "This also stops the account closure. The account stays open." |
@@ -334,9 +337,9 @@ Status of this amendment: `accepted` (2026-11-22), together with [account-closur
 
 ---
 
-## Amendment 2026-11-22 (interest run) — accepted
+### Interest run
 
-Status of this amendment: `accepted` (2026-11-22), together with [interest-run](../features/interest-run.md). Field rules live there. D58 adds the tax details to the customer page; D59 and D60 add the Interest rates and Interest runs pages under the new BFF prefix `/interest` ([bff-adviser-portal](../features/bff-adviser-portal.md) amendment 2026-11-22); D61–D63 show interest postings, accrued interest, the bank's interest line and the new reconciliation kinds. Calls: `GET` / `PUT /users/customers/{id}/tax-profile`, `/interest/rate-schedules` (list, get, create, update, delete), `GET /interest/runs[/{id}]`, `GET /accounts/{id}/interest-accruals`, and the existing account, transaction and statement line reads.
+Field rules: [interest-run](../features/interest-run.md). D58 adds the tax details to the customer page; D59 and D60 add the Interest rates and Interest runs pages under the new BFF prefix `/interest` ([bff-adviser-portal.md](../features/bff-adviser-portal.md) §8.3); D61–D63 show interest postings, accrued interest, the bank's interest line and the new reconciliation kinds. Calls: `GET` / `PUT /users/customers/{id}/tax-profile`, `/interest/rate-schedules` (list, get, create, update, delete), `GET /interest/runs[/{id}]`, `GET /accounts/{id}/interest-accruals`, and the existing account, transaction and statement line reads.
 
 | ID | Behaviour |
 | --- | --- |
@@ -349,9 +352,9 @@ Status of this amendment: `accepted` (2026-11-22), together with [interest-run](
 
 ---
 
-## Amendment 2026-11-22 (corporate actions) — accepted
+### Corporate actions
 
-Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions](../features/corporate-actions.md). Field rules live there. D64–D67 add the Corporate actions pages under the new BFF prefix `/corporate-actions` ([bff-adviser-portal](../features/bff-adviser-portal.md) amendment 2026-11-22); D68 shows an entitlement posting on the transaction pages. Calls: `GET /corporate-actions[/{id}]`, `GET /corporate-actions/{id}/entitlements`, `POST /corporate-actions`, `PUT /corporate-actions/{id}`, `POST /corporate-actions/{id}/cancel`, `POST /corporate-actions/{id}/apply`, `GET /instruments`, and the existing transaction reads.
+Field rules: [corporate-actions](../features/corporate-actions.md). D64–D67 add the Corporate actions pages under the new BFF prefix `/corporate-actions` ([bff-adviser-portal.md](../features/bff-adviser-portal.md) §8.3); D68 shows an entitlement posting on the transaction pages. Calls: `GET /corporate-actions[/{id}]`, `GET /corporate-actions/{id}/entitlements`, `POST /corporate-actions`, `PUT /corporate-actions/{id}`, `POST /corporate-actions/{id}/cancel`, `POST /corporate-actions/{id}/apply`, `GET /instruments`, and the existing transaction reads.
 
 | ID | Behaviour |
 | --- | --- |
@@ -363,13 +366,13 @@ Status of this amendment: `accepted` (2026-11-22), together with [corporate-acti
 
 ---
 
-## Amendment 2026-11-23 (orders and settlement) — accepted
+### Orders and settlement
 
-Status of this amendment: `accepted` (2026-11-23), together with [orders](../features/orders.md). Field rules live there. D69 and D70 replace the Buy and Sell entry of a Custodial account (D18, D39) with Place order; D71–D73 add the Orders pages under the new BFF prefix `/orders` ([bff-adviser-portal](../features/bff-adviser-portal.md) amendment 2026-11-23); D74 shows a fill on the transaction pages; D75 changes the Withdraw, transfer, conversion, Close account and Assign controls (D19, D45). Calls: `GET /orders[/{id}]`, `POST /orders`, `POST /orders/preview`, `POST /orders/{id}/cancel`, `GET /instruments`, and the existing account, holding and transaction reads with their new fields.
+Field rules: [orders](../features/orders.md). D69 and D70 replace the Buy and Sell entry of a Custodial account (D18, D39) with Place order; D71–D73 add the Orders pages under the new BFF prefix `/orders` ([bff-adviser-portal.md](../features/bff-adviser-portal.md) §8.3); D74 shows a fill on the transaction pages; D75 changes the Withdraw, transfer, conversion, Close account and Assign controls (D19, D45). Calls: `GET /orders[/{id}]`, `POST /orders`, `POST /orders/preview`, `POST /orders/{id}/cancel`, `GET /instruments`, and the existing account, holding and transaction reads with their new fields.
 
 | ID | Behaviour |
 | --- | --- |
-| D69 | `/accounts/:id` of an Open Custodial account: the Buy and Sell actions and the `Buy` / `Sell` types of the new transaction form are gone (D18, D39 change), and a "Place order" button opens `/accounts/:id/order`. On an assigned account the button is disabled with "This account follows a portfolio." The header shows "Cash", "Reserved" (withdrawals and orders; only when not 0), "Available", "Not settled" (only when not 0) and "Available to withdraw". The holdings table shows "<n> reserved" under a quantity with a reserved part. The account's open orders are listed under the holdings (D71 columns). An External account is unchanged. |
+| D69 | `/accounts/:id` of an Open Custodial account: the Buy and Sell actions and the `Buy` / `Sell` types of the new transaction form are not offered (D18), and a "Place order" button opens `/accounts/:id/order`. On an assigned account the button is disabled with "This account follows a portfolio." The header shows "Cash", "Reserved" (withdrawals and orders; only when not 0), "Available", "Not settled" (only when not 0) and "Available to withdraw". The holdings table shows "<n> reserved" under a quantity with a reserved part. The account's open orders are listed under the holdings (D71 columns). An External account is unchanged. |
 | D70 | `/accounts/:id/order`: Side (Buy, Sell), Instrument (Buy: a search over `GET /instruments?enabledOnly=true`, an instrument quoted in another currency listed as disabled with "Quoted in NZD"; Sell: the account's holdings with their available quantity), Quantity, Memo. With a valid instrument and quantity the form calls `POST /orders/preview` (debounced ~300 ms) and shows, for a buy, "About 1,000.00 USD at the last price 100.00 (23 Nov), plus about 5.00 USD in fees. At most 1,055.25 USD is reserved until the order is filled. Available 5,000.00 USD." and for a sell "About 1,000.00 USD before fees. 60 available to sell." A preview 400 is shown at its field and blocks Review. Review repeats the sentence with "The broker fills at the market price, not above 105.00." Confirm posts `POST /orders` with one `Idempotency-Key` per form open and opens `/orders/:id`. No price and no booked-at input. |
 | D71 | Nav item "Orders" (`/orders`) for TenantAdmin and Adviser: Placed, Customer, Account, Side, Instrument, Quantity, Filled, Status, Placed by. Status filter, default "Open" (Placed, Working, PartlyFilled); options Open, Filled, Cancelled, Rejected, Expired, All. Labels: Placed "Sending to the broker", Working "At the broker", PartlyFilled "Partly filled", Filled "Filled", Cancelled "Cancelled", Rejected "Refused by the broker", Expired "Expired". An order with a cancel request shows "Cancelling" beside its status. An order with a fill not posted shows "Needs attention" in amber; a "Needs attention" filter reads `pendingFill=true`. |
 | D72 | `/orders/:id` shows every field: the price limit as "The broker may buy up to 105.00" or "may sell down to 95.00"; what the order reserves now; the send attempts with the last failure (labels as BO18) for a TenantAdmin and Adviser; the reject reason (UnknownInstrument "The broker does not trade this instrument", InvalidOrder "The broker could not read the order", MarketClosed "The market is closed", Refused "Refused"); the cancel request ("by <name>", or "by the platform" for `null`); and the fills table: Trade date, Quantity, Price, Settlement ("Settles 25 Nov", "Settled 25 Nov"), Contract note, Status (Posted "Booked" with a link to the Transaction; Pending "Waiting" with the reason: InsufficientCash "Not enough cash", InsufficientHolding "Not enough shares", AccountClosed "The account is closed", NoFxRate "No exchange rate"). A pending fill shows to a TenantAdmin: "Correct the account with an adjustment. The platform books the fill on its next run." |
@@ -379,9 +382,9 @@ Status of this amendment: `accepted` (2026-11-23), together with [orders](../fea
 
 ---
 
-## Amendment 2026-11-23 (trade settlement and broken trades) — accepted
+### Trade settlement and broken trades
 
-Status of this amendment: `accepted` (2026-11-23), together with [trade-settlement](../features/trade-settlement.md). Field rules live there.
+Field rules: [trade-settlement](../features/trade-settlement.md).
 
 | ID | Behaviour |
 | --- | --- |
@@ -391,21 +394,19 @@ Status of this amendment: `accepted` (2026-11-23), together with [trade-settleme
 
 ---
 
-## Amendment 2026-11-23 (rebalance through orders) — accepted
+### Rebalance through orders
 
-Status of this amendment: `accepted` (2026-11-23), together with [rebalances](../features/rebalances.md). Field rules live there. The Rebalances pages are in [adviser-portal-portfolios.md](adviser-portal-portfolios.md) (P14–P20). Calls: the existing order and transaction reads, with `rebalanceId` on the order item.
+Field rules: [rebalances](../features/rebalances.md). The Rebalances pages are in [adviser-portal-portfolios.md](adviser-portal-portfolios.md) (P14–P20). Calls: the existing order and transaction reads, with `rebalanceId` on the order item.
 
 | ID | Behaviour |
 | --- | --- |
-| D79 | Orders pages (D71–D73): an order with `rebalanceId` shows "Rebalance" with a link to `/rebalances/:id`, and Cancel is not offered on it; the detail page says "This order belongs to a rebalance. Cancel the rebalance to cancel it." The Source line of D26 keeps "Rebalance" for existing Transactions, and Reverse (D27) is offered only for `Manual`. |
-
-- D27: Reverse is offered only when `source.kind` is `Manual`; a `Rebalance` source is no longer hand-reversible on a Custodial account (rebalances R28). The portal still does not read the custody mode, so it also hides Reverse on a `Rebalance` Transaction of an External account, which the server would accept, as it does for `Seed`.
+| D79 | Orders pages (D71–D73): an order with `rebalanceId` shows "Rebalance" with a link to `/rebalances/:id`, and Cancel is not offered on it; the detail page says "This order belongs to a rebalance. Cancel the rebalance to cancel it." The Source line of D26 keeps "Rebalance" for existing Transactions. |
 
 ---
 
-## Amendment 2026-11-24 (migration batches) — accepted
+### Migration batches
 
-Status of this amendment: `accepted` (2026-11-24), together with [migration-batches](../features/migration-batches.md). Field rules live there. Calls: `/migration-batches` (BFF prefix, bff-adviser-portal R20), `POST /statement-lines/{id}/match` with `migrationBatchId`, and the existing reads of statement lines, bank reconciliations and transactions.
+Field rules: [migration-batches](../features/migration-batches.md). Calls: `/migration-batches` (BFF prefix, bff-adviser-portal R20), `POST /statement-lines/{id}/match` with `migrationBatchId`, and the existing reads of statement lines, bank reconciliations and transactions.
 
 | ID | Behaviour |
 | --- | --- |
@@ -416,15 +417,11 @@ Status of this amendment: `accepted` (2026-11-24), together with [migration-batc
 | D84 | Bank reconciliation (D51): kind label MigrationNotPosted "Received for a migration batch not posted yet", linking to the batch through the line. |
 | D85 | `/transactions/:id` of a Transaction a batch wrote: the Source line (D26) shows "Migration batch", with a link to the batch for a TenantAdmin; a line "From <previousProvider>, balances as at <asOfDate>"; Reverse is not offered (D27). The refusal text for `Opening` and `OpeningHoldings` on a Custodial account in the portal's copy of the matrix becomes the message of R26. |
 
-- D26, D27: the Source line names "Migration batch"; Reverse is not offered on a Transaction a batch wrote (`Migration` is not hand-reversible).
-- D34, D35: the Match page offers "To an account" or "To a migration batch"; method label Migration "Migration batch".
-- D51: kind label MigrationNotPosted.
-
 ---
 
-## Amendment 2026-11-24 (in-kind transfers) — accepted
+### In-kind transfers
 
-Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers](../features/in-kind-transfers.md). Field rules live there. Calls: `/in-kind-transfers`, `/custody-movements` and `/custodian-reconciliations` (BFF prefixes, bff-adviser-portal R20), and the existing reads of accounts, holdings, instruments, orders, corporate actions and transactions.
+Field rules: [in-kind-transfers](../features/in-kind-transfers.md). Calls: `/in-kind-transfers`, `/custody-movements` and `/custodian-reconciliations` (BFF prefixes, bff-adviser-portal R20), and the existing reads of accounts, holdings, instruments, orders, corporate actions and transactions.
 
 | ID | Behaviour |
 | --- | --- |
@@ -437,14 +434,11 @@ Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transf
 | D92 | `/custodian-reconciliations/:id`: the run header, the information of R55, and the lines grouped under "Breaks", "Timing" and "Agreed" (the last collapsed): Instrument, At the custodian, On the platform, Difference, and the components that are not 0 as sentences: notProcessed "<n> arrived and not processed yet", unsettledTrades "<n> from trades not settled yet", suspense "<n> in movements waiting for a decision" (linking to the movements of that instrument), unbookedFills "<n> delivered for trades not booked" (linking to the orders with a pending fill), unexplained "<n> not explained". A line with no instrument shows "Not in your catalog". History is `/custodian-reconciliations/history?safekeepingAccountId=`. |
 | D93 | `/transactions/:id` of a Transaction a transfer wrote: the Source line (D26) shows "In-kind transfer" with a link to the transfer; a "Transfer" section shows the counterparty, the masked account, "Owner changes: yes / no", Acquired on, the settlement date and the custodian's reference; Reverse is not offered (D27). The Close account page shows the new refusal of R45 as its other blockers, and the Assign control the 400 of R24 as its sentence. The adjustment form shows the reserved quantity message of R43. |
 
-- D18: the refusal text for `StockIn` and `StockOut` on a Custodial account in the portal's copy of the matrix becomes the message of in-kind-transfers R48.
-- D26, D27: the Source line names "In-kind transfer"; Reverse is not offered on a Transaction a transfer wrote (`InKindTransfer` is not hand-reversible).
-
 ---
 
-## Amendment 2026-11-24 (dividends) — accepted
+### Dividends
 
-Status of this amendment: `accepted` (2026-11-24), together with [dividends](../features/dividends.md). Field rules live there. Calls: the existing `/corporate-actions`, `/accounts`, `/statement-lines`, `/transactions` and `/bank-reconciliations` prefixes; no new BFF prefix.
+Field rules: [dividends](../features/dividends.md). Calls: the existing `/corporate-actions`, `/accounts`, `/statement-lines`, `/transactions` and `/bank-reconciliations` prefixes; no new BFF prefix.
 
 | ID | Behaviour |
 | --- | --- |
@@ -458,13 +452,12 @@ Status of this amendment: `accepted` (2026-11-24), together with [dividends](../
 | D101 | The bank reconciliation page labels `DividendsNotPosted` and `DividendDifference`. |
 
 The full wording is [dividends.md](../features/dividends.md) §9.
-- D18: the portal's copy of the matrix gives `Dividend` on a Custodial account the message of dividends R43.
 
 ---
 
-## Amendment 2026-11-25 (adjustment review) — accepted
+### Adjustment review
 
-Status of this amendment: `accepted` (2026-11-25), together with [adjustment-review](../features/adjustment-review.md). Field rules live there. Calls: `/adjustment-requests` (a new BFF prefix, bff-adviser-portal R20) and the existing `/transactions` and `/accounts` prefixes.
+Field rules: [adjustment-review](../features/adjustment-review.md). Calls: `/adjustment-requests` (a new BFF prefix, bff-adviser-portal R20) and the existing `/transactions` and `/accounts` prefixes.
 
 | ID | Behaviour |
 | --- | --- |
@@ -474,6 +467,51 @@ Status of this amendment: `accepted` (2026-11-25), together with [adjustment-rev
 | D105 | `/accounts/:id` of a Custodial account shows a TenantAdmin the account's open requests above the activity, each linking to `/adjustments/:id`. The Close account page (D54) shows the refusal of adjustment-review R17 with its other blockers. |
 | D106 | `/transactions/:id` of an `Adjustment` posted from a request: the Source line (D26) shows "Adjustment request", for a TenantAdmin with a link to the request. Reverse is never offered on an `Adjustment`. |
 
-- D26, D27: the Source line names "Adjustment request"; Reverse is not offered on any `Adjustment`, also one with source `Manual`.
-- D29: the form is unchanged except for what D102 says.
-- D31: removed. Nobody reverses an adjustment.
+---
+
+## Tests
+
+Portal tests assert routes, role visibility, and that the Dashboard consumes the net-worth shape. Do not re-prove backend isolation or net-worth aggregation rules here.
+
+---
+
+## Still open
+
+- Exact widget layout and empty states.
+- Top-N limits on breakdowns (sort is locked in the Feature Spec; limit is not).
+- Daily snapshots and historical charts.
+- Multi-instrument tickets, lots, realized-gain views.
+- Instruments management UI (Back Office / Scalar only; not this portal).
+- Instrument typeahead search (later independent small feature; existing list `search` is enough for a simple picker now).
+
+---
+
+## History
+
+What changed in this file after it was accepted. Each row is a subsection of "Acceptance (D)" above. The text of each change is in git (`git log -p -- docs/adviser-portal/adviser-portal-dashboard.md`).
+
+| Date | With | Section |
+| --- | --- | --- |
+| 2026-11-17 | [account-custody-mode](../features/account-custody-mode.md) | Account custody mode |
+| 2026-11-17 | [custody-modes](../features/custody-modes.md) | Custody modes |
+| 2026-11-18 | [tenant-custody-modes](../features/tenant-custody-modes.md) | Tenant custody modes |
+| 2026-11-18 | [external-caller-numbers](../features/external-caller-numbers.md) | External caller numbers |
+| 2026-11-18 | [custody-mode-grouping](../features/custody-mode-grouping.md) | Grouping by custody mode |
+| 2026-11-19 | [transaction-source](../features/transaction-source.md) | Transaction source |
+| 2026-11-19 | [adjustments](../features/adjustments.md) | Adjustments |
+| 2026-11-20 | [client-money-accounts](../features/client-money-accounts.md) | Client money accounts and deposit references |
+| 2026-11-20 | [deposit-matching](../features/deposit-matching.md) | Bank receipts and deposits |
+| 2026-11-20 | [withdrawals](../features/withdrawals.md) | Bank accounts and withdrawals |
+| 2026-11-21 | [bank-returns](../features/bank-returns.md) | Receipt returns, recalls and other debit lines |
+| 2026-11-21 | [bank-reconciliation](../features/bank-reconciliation.md) | Bank reconciliation |
+| 2026-11-22 | [account-closure](../features/account-closure.md) | Account closure |
+| 2026-11-22 | [interest-run](../features/interest-run.md) | Interest run |
+| 2026-11-22 | [corporate-actions](../features/corporate-actions.md) | Corporate actions |
+| 2026-11-23 | [orders](../features/orders.md) | Orders and settlement |
+| 2026-11-23 | [trade-settlement](../features/trade-settlement.md) | Trade settlement and broken trades |
+| 2026-11-23 | [rebalances](../features/rebalances.md) | Rebalance through orders |
+| 2026-11-24 | [migration-batches](../features/migration-batches.md) | Migration batches |
+| 2026-11-24 | [in-kind-transfers](../features/in-kind-transfers.md) | In-kind transfers |
+| 2026-11-24 | [dividends](../features/dividends.md) | Dividends |
+| 2026-11-25 | [adjustment-review](../features/adjustment-review.md) | Adjustment review |
+| 2026-11-26 | — | The amendments became the subsections above, and the rows they changed (D10, D15, D18, D26, D27, D29, D31, D39, D44, D53, D69) now state the current behaviour. No behaviour changed |
