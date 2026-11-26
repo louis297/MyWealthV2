@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-11-12
-last_updated: 2026-11-14
+last_updated: 2026-11-26
 related:
   - ../deployment.md
   - ../architecture.md
@@ -147,23 +147,12 @@ None.
 
 ## 10. Tests
 
-Functional tests start hosts with `UseEnvironment("Production")` and supply the required keys of §8.1. Test certificates are generated in the test (self-signed, with the key usages of deployment §6) and written to a temporary folder; no PFX is committed.
+The tests are the executable form of §4. Where they live:
 
-| Project | Assert |
+| Project | Where |
 | --- | --- |
-| Application.FunctionalTests | `identity` in Production with valid certificate files: discovery `issuer` equals `Identity:Issuer`; JWKS contains the key of the signing PFX (same `kid` / modulus) — R1, R3 |
-| Application.FunctionalTests | `identity` in Production: each of the three certificate keys missing, a missing file, a wrong password, and a missing or `http` `Identity:Issuer` → host fails to start; the message names the key or path and does not contain the password — R2, R3 |
-| Application.FunctionalTests | `identity` in Production: a request from a trusted network with `X-Forwarded-Proto: https` to discovery is served with `https` endpoint URLs; the same request from outside the trusted network is rejected by the transport security requirement — R4, R6, R7 |
-| Application.FunctionalTests | `bff-adviser-portal` in Production: `X-Forwarded-Proto: https` from a trusted network → `/bff/login` challenge has an `https://…/signin-oidc` `redirect_uri` and the correlation cookie is `Secure`; from an untrusted address → the scheme is not changed — R6, R7 |
-| Application.FunctionalTests | Each public host in Production with an empty or invalid `ForwardedHeaders:KnownNetworks` or no `DataProtection:KeysPath` → fails to start — R7, R10 |
-| Application.FunctionalTests | `bff-adviser-portal` in Production with `DataProtection:KeysPath`: a key file appears in that folder; a cookie issued by one factory instance is accepted by a second instance using the same folder — R9, R10 |
-| Application.FunctionalTests | `identity` and `webapi` in Production: a plain `http` request is not redirected (no 307/308); `webapi` response has no `Strict-Transport-Security` header — R11 |
-| Application.FunctionalTests | `webapi` in Production: `GET /health` that arrives on local port `8081` → 200 `Healthy`; on local port `8080` → not the health response (404 or the host's fallback); `/alive` the same. The port is the connection's local port, not the `Host` header, because the proxy passes the client's `Host` through — R12, R14 |
-| Application.FunctionalTests | `webapi` in Development: `GET /health` on the default port → 200, as today — R13 |
-| Application.FunctionalTests | `webapi` in Production with a recording trace processor: `GET /health` and `GET /alive` on the health port record no server trace; a request to another path on the traffic port records one — R17 |
-| Application.UnitTests (or a ServiceDefaults test project) | Health check client: 200 → exit 0; 503 → exit 1; connection refused → exit 1; no answer within the timeout → exit 1 — R15 |
-
-The `--healthcheck` argument branch in each `Program` is wiring. It is proven by building the images and running the compose health checks on the rehearsal VPS (deployment §12).
+| Application.UnitTests | Folder `Hosting/` |
+| Application.FunctionalTests | Folder `Hosting/`; `Identity/ProductionCredentialsTests.cs`, `Identity/OpenIddictPortalOriginTests.cs` |
 
 ---
 
@@ -186,16 +175,3 @@ Still open, not this slice:
 - Certificate rotation with two signing keys loaded at once
 - Data Protection key encryption at rest
 - Readiness checks for SQL and `identity` in `/health`
-
----
-
-## 12. Suggested commits
-
-The repository should build after each commit. Agents split each line into red then green.
-
-1. `identity` certificates and issuer from configuration outside Development (R1–R5)
-2. Forwarded headers for the public hosts outside Development; no HTTPS redirection on `identity` and `webapi`; no HSTS on `webapi` (R6–R8, R11)
-3. Data Protection application name and key folder for the public hosts (R9, R10)
-4. Health endpoints on the health port outside Development (R12–R14)
-5. `--healthcheck` self-check in every host (R15)
-6. No traces for health endpoint requests (R17)

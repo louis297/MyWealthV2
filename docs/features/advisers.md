@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-14
-last_updated: 2026-11-13
+last_updated: 2026-11-26
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -245,13 +245,12 @@ None in this slice. The Adviser Portal Advisers list / form belongs to the later
 
 ## 10. Tests
 
-| Project | Assert |
-| --- | --- |
-| Domain.UnitTests | `DisableAdviser(false)` on an Active Adviser flips Status and raises `UserDisabled` once; `DisableAdviser(true)` throws, Status unchanged, no event; non-Adviser `DisableAdviser` throws; `Disable()` on a TenantAdmin is unchanged |
-| Application.FunctionalTests | No Bearer → 401 not 302; SystemAdmin / Adviser / Customer → 403 on every verb; TenantAdmin create → 201, get `status=active`, hosted login (that tenant code + email + password) succeeds; duplicate email in the same tenant → 400; same email in two tenants → 201; `tenantId` in body → 400; get / PUT / create / disable / enable after current tenant disabled → 403; PUT with `email` → 400; GET this collection with a TenantAdmin or Customer PublicId → 404; TenantAdmin of A GET/PUT/disable of B’s Adviser → 404; disable while an assigned Customer is Active → 400 and the Adviser stays Active; after those Customers are Disabled, disable → 204 and refresh fails; enable → 204; last Adviser with no customers may be disabled; stale `rowVersion` → 409; default paging; omitted `enabledOnly` includes disabled; `enabledOnly=true` is Active only |
-| Infrastructure.IntegrationTests | No new script. Two-tenant fixture: one Adviser in A and one in B; A’s list does not include B; A requesting B’s id → 404 |
+The tests are the executable form of §4. Where they live:
 
-Post-create login uses hosted login on `identity`. Do not invent a token endpoint on `webapi`.
+| Project | Where |
+| --- | --- |
+| Domain.UnitTests | `Entities/UserDisableAdviserTests.cs` |
+| Application.FunctionalTests | Folder `Users/Advisers/` |
 
 ---
 
@@ -279,18 +278,3 @@ Locked 2026-09-14:
 
 1. Assigned-customer guard lives on `User.DisableAdviser(bool)`. Application only counts. `Disable()` stays for other roles.
 2. That 400 does **not** share §4.1 `disabled`. `target=user` waits for the customers slice.
-
----
-
-## 12. Suggested commits
-
-The repository should build after each commit.
-
-1. `User.DisableAdviser(bool)` + Domain.UnitTests
-2. `CreateAdviser` + dual-write + disabled-tenant 400 + uniqueness + 401/403
-3. `GetAdvisers` / `GetAdviserById` + paging + `enabledOnly` + cross-tenant 404 + wrong-collection 404
-4. `UpdateAdviser` + PUT 204 / extra body fields 400 / 409
-5. `DisableAdviser` / `EnableAdviser` + assigned-customer 400 + HTTP idempotent + refresh fails
-6. Hosted-login smoke after create
-
-Do not put `/users/customers` HTTP in these commits.

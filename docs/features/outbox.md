@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-11-01
-last_updated: 2026-11-01
+last_updated: 2026-11-26
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -153,11 +153,12 @@ None.
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | None required. Aggregates still raise the same events. |
-| Application.FunctionalTests | A command that raises an event commits the business row and an `OutboxMessages` row together. No handler runs on the request path. |
-| Infrastructure.IntegrationTests | Worker processes a `Pending` row to `Processed`. A failing handler moves the row to `Failed` and then `DeadLettered` at 5. Tenant-scoped row sets tenant context before publish. A `Processing` row older than 5 minutes is claimable again. |
+| Application.FunctionalTests | Folder `Outbox/` |
+| Infrastructure.IntegrationTests | Folder `Outbox/`; `AppliedSchema/OutboxProcessorTests.cs`, `RevokeTokensIdempotencyTests.cs` |
 
 ---
 
@@ -195,14 +196,3 @@ Still open, not this slice:
 - Manual replay API.
 - `CorrelationId` once a request log exists.
 - Concrete Reports event bindings.
-
----
-
-## 12. Suggested commits
-
-The repository should build after each commit. Agents split each line into red then green.
-
-1. Script `0020_outbox.sql` and EF mapping for `OutboxMessages`. No behaviour change.
-2. Capture domain events into the outbox in the same transaction. Remove immediate MediatR dispatch. Functional test: business row and outbox row commit together; handler does not run on the request.
-3. Worker recurring job: claim, publish, status transitions, stuck-`Processing` recovery, dead-letter at the limit. Integration tests for Processed / Failed / DeadLettered.
-4. Make token-revocation handlers idempotent. Test repeat delivery.

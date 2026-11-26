@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-24
-last_updated: 2026-11-25
+last_updated: 2026-11-26
 related:
   - ../custodial-roadmap.md
   - ../future-plans.md
@@ -670,24 +670,14 @@ Page contracts: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-d
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | `DividendTerms`: every refusal of R3; `SourceAmounts` for the five cases of §1. `DividendWithholding`: the five cases of §1, the IR284 example (2 000.00 with credit 200.00 → 526.00), a foreign tax above 33 % → no RWT, never below 0; `PerShare` and the participating quantity 78.82352941 of §8.1. `CorporateAction`: a dividend with a ratio and a split with terms throw; `TryPay` in every combination of receipt, election status, shares and release; `Allocate` gives 2.68 to one entitlement, and shares 1.00000001 over three equal entitlements as 0.33333334, 0.33333334 and 0.33333333, the two left-over units to the two lowest account ids, sum exact. `CorporateActionEntitlement`: dividend fields set once. `Transaction.PostDividend`: the legs, roles and details of each case; a reinvestment adds the `Reinvestment` leg and the security leg with cost equal to it; reinvested capped at net; a reinvestment across currencies, a source other than `CorporateAction`, gross 0 → throws; a `Tax` leg of kind `ForeignWithholding` on `Interest` → throws. `Reverse` copies the dividend detail, the tax details and the roles. `Account.SetDividendReinvestment` on External or Closed → throws. `CustodyRules.AllowsManualEntry(_, Dividend)` false for both modes |
-| Application.FunctionalTests — entering and going ex | TenantAdmin creates, updates and cancels a `Manual` dividend; each R3 refusal; `reinvestmentPrice` by hand → 400; a ratio on a dividend → 400. Adviser reads, writes → 403; Customer → 403. Going ex by a price from the ex-date and by apply: two Custodial accounts and one External account hold the instrument; the two get `Pending` entitlements with their entitled quantity and source amounts; nothing is posted; `payment.expectedAmount` is their sum. A buy after the ex → no entitlement; a sell after it → the entitlement stays. An open order in the instrument is not cancelled. A dividend with no holder → `Applied` at once. Two-tenant: tenant B's dividend id → 404 on every route |
-| Application.FunctionalTests — payment and posting | With fakes of the feeds. A receipt whose reference is the party action id and whose amount is expected → `Matched` with method `Dividend`, the dividend is paid, the apply run posts one `Dividend` per account with source `CorporateAction`, the legs of §1 for a New Zealand and an overseas Customer and both tax sources, and the dividend is `Applied`. A second run posts nothing. The receipt 1 minor unit off with one entitlement → matched; outside the allowance → `Unmatched` `DividendMismatch`; a receipt for an `Announced` dividend or a second receipt → `DividendMismatch`. Hand match: of a `Manual` dividend; of a `DividendMismatch` line with another amount; without `corporate-actions.manage` → 403; to a split, a paid dividend or another currency → 400; unmatch → 400. No entitlement is posted before the receipt, whatever the payment date. The tax follows the profile at posting. An account in another currency is converted and has an FX detail; with no rate it stays `Pending` and is posted by a later run. One account made to fail → the others are posted. A Disabled Customer and a disabled Tenant are paid. Hand `Dividend` → 400 on both modes; hand reverse of the posting → 400. Closure of an account with a `Pending` entitlement → 400, and allowed after the payment |
-| Application.FunctionalTests — reinvestment | The election route: Adviser and TenantAdmin set it; External → 400; Customer → 403; stale → 409. A dividend with a plan goes ex: the electing account reinvests with the participating quantity of §8.1; an account that follows a portfolio, one in another currency, a Tenant with no safekeeping account → no reinvestment; a dividend with no plan → election `None`. The election step sends once with the corporate action's PublicId and sets `Accepted`; `Rejected` and a lapsed election pay everything in cash; a failed call retries with the same body. With `Accepted`: the receipt alone does not pay; the share movement alone does not; both do, in either order. The posting has the `Reinvestment` leg and the security leg, cash net 0, the holding's quantity and cost rise, and a holding sold since is created again. Two reinvesting accounts get quantities that add up to the movement's. Pay in cash: only while waiting for shares; then every account is paid in cash. A change of the Account's election after the ex does not change the entitlement |
-| Application.FunctionalTests — reconciliation and reads | A received dividend with a `Pending` entitlement → `DividendsNotPosted` with the amount not credited; after posting, no item when the amounts agree and `DividendDifference` with the rest when they do not; the `Rwt` and `Nrwt` legs are in `TaxWithheld`; the foreign tax leg is in no item; the legs of a dividend converted from another currency are in `OtherLedgerCash`; the items add up to the difference. The corporate action, entitlement, account, statement line and transaction items of R49–R53, the `kind` filter, and what an Adviser and a Customer see. The Customer Transactions Report row |
-| Infrastructure.IntegrationTests | `0057`: a dividend row with a ratio and a split row without one violate; the term CHECKs; `PaidAt` without a receipt violates; one line as the receipt of two dividends violates; `Role = 3` allowed and `4` violates; tax `Kind = 2` allowed and `3` violates; `ReinvestDividends = 1` on an External account violates; `MatchMethod = 7`, `UnmatchedReason = 14` and item `Kind = 21` allowed, the next values violate; a `Matched` line with a corporate action and an Account violates. EF round-trips. `SimulatorCustodianElections` against canned responses: accepted, each reject reason, an unknown reason → `Other`, 409, 401, 503, timeout. `SimulatorCorporateActionFeed`: a dividend item; a dividend with no `amountPerShare` → `InvalidItem`. The election step runs in `custodian-sync` after the transfers |
-| Simulator.Tests | `0014` applies. Announce a dividend → version 1 with the terms; each R54 refusal. Amend replaces the terms; amend after the ex-date → 400. Advancing to the ex-date settles the open fills of the symbol, stores a dividend payment per account with a position, makes the dividend `Effective`, leaves the price path and the working orders alone. The election route: accepted; each reject reason; the same instruction twice → the same answer; another body → 409. Advancing to the payment date: cash only → one credit line on the income account with the party action id as reference; with an election → the movement and the reduced cash, for `Fractional` and `WholeShares`; no income account → no line. Income mode `Hold` and pay with another amount. The lists, the log rows and the reset |
-| Adviser Portal | D94–D101 |
-| Customer Portal | C42–C44 |
-| Back Office | BO33 |
-
-Fan-out in the tests:
-
-- Tests that read `TransactionType`, cash leg roles, tax kinds, match methods, unmatched reasons, reconciliation item kinds or corporate action kinds as closed lists gain the new values.
-- Tests that build a corporate action or an announcement pass a ratio that is now optional.
-- The Adviser Portal and Customer Portal `Transaction`, `Account` and `CorporateAction` types gain the new fields.
+| Domain.UnitTests | Folder `CorporateActions/` |
+| Application.FunctionalTests | Folder `CorporateActions/` |
+| Infrastructure.IntegrationTests | `AppliedSchema/DividendsSchemaTests.cs`, `CorporateActionApplyJobTests.cs` |
+| Simulator.Tests | The simulator market and custodian: dividends |
 
 ---
 
@@ -757,36 +747,6 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
-
-The repository should build after each commit. Agents split each behaviour into red then green.
-
-1. `DividendTerms`, `DividendTaxSource`, `DividendWithholding` and the rates (R3, R14, R19, R33, R34) + Domain unit tests.
-2. Script `0057`; kind `Dividend`, the nullable ratio and the terms on `CorporateAction` and `CorporateActionAnnouncement`; the entitlement fields; `EntitlementReason.NothingToPay` + Domain unit tests and the `0057` integration tests.
-3. `TransactionType.Dividend`, `TaxKind.ForeignWithholding`, `CashLegRole.Reinvestment`, the dividend detail, `Transaction.PostDividend`, `Reverse` copies (R37–R40, R42) + Domain unit tests.
-4. Hand entry and the reads of a dividend (R7, R11, R49 without payment and election) + functional tests, two-tenant.
-5. The feed: dividend announcements, their processing and `SimulatorCorporateActionFeed` (R8–R10, R66) + functional and integration tests.
-6. Going ex: entitled quantities, source amounts, the expected amount, no order cancel, `Applied` with no holder (R6, R12–R16, R51) + functional tests.
-7. The dividend receipt on the statement line: the automatic match, the rounding allowance, `DividendMismatch` (R24, R25, R53) + functional tests.
-8. The hand match and the refusals on a matched receipt (R26, R27) + functional tests.
-9. `PayDividend` and the posting of cash dividends: tax by residency and source, the transaction item (R29, R32–R36, R41, R50) + functional tests.
-10. The matrix message and the hand refusals (R43) + Domain unit and functional tests.
-11. Account closure and the account item (R46, R52) + functional tests.
-12. Bank reconciliation items (R44, R45) + Domain unit and functional tests.
-13. The reinvestment election of an Account (R17) + functional tests.
-14. Reinvesting entitlements, the participating quantity and the election of a dividend (R18–R20) + functional tests.
-15. Port `ICustodianElections`, `SendReinvestmentElections` in the custodian job, `SimulatorCustodianElections` (R21–R23, R65) + functional and integration tests.
-16. The new shares, the allocation, the reinvested posting and pay in cash (R28, R30, R31, R35, R40, R48) + functional tests.
-17. Simulator: script `0014`, dividends on the market routes and feed, going ex with the entitled position (R54–R56, R61) + `Simulator.Tests`.
-18. Simulator: income accounts, the payment in cash, the income mode and the lists (R57, R59 without shares, R60, R62–R64) + `Simulator.Tests`.
-19. Simulator: the election route and the payment in shares (R58, R59) + `Simulator.Tests`.
-20. Adviser Portal D94–D101 + frontend tests.
-21. Customer Portal C42–C44 + frontend tests.
-22. Back Office BO33 + tests; AppHost, compose and env example (§9.1).
-23. Repo docs: mark this file landed; roadmap §13 step 15, the §2 matrix and §14.
-
-Do not put External account dividends, taxable bonus issues, treaty rates, a reversal of a dividend or an income report in these commits.
-
-### Docs amended when this spec was accepted
+## 12. Docs changed when this spec was accepted
 
 [corporate-actions.md](corporate-actions.md) (R2–R6: the fourth kind and the nullable ratio; R9, R11, R12, R14: dividend announcements; R15–R20: hand entry and what "apply" means for a dividend; R22 and its orders amendment: entitled quantities, no order cancel; R24–R27: the posting of a paid dividend; R35, R36: the item fields; R39–R45: the simulator; "Out" and "still open": answered here), [interest-run.md](interest-run.md) (R25: the third tax kind and the `Tax` leg on `Dividend`; R41: `TaxWithheld` counts dividends; §2 Out), [posting.md](posting.md) (the type table: `Dividend` written by corporate actions on a Custodial account; R16), [holdings.md](holdings.md) (a `Dividend` may carry one security leg with a cost; "Dividend is ordinary cash" no longer holds for a reinvestment), [split.md](split.md) (§13: `Scrip` is not written on a Custodial account; a dividend in shares is a reinvestment), [trade-fees.md](trade-fees.md) (cash leg role `Reinvestment`), [custody-modes.md](custody-modes.md) (R5 matrix rows `Dividend` and `Scrip`, §4.2.1 the message), [transaction-source.md](transaction-source.md) (kind `CorporateAction` also marks a `Dividend`), [accounts.md](accounts.md) (the election, the two item fields), [account-closure.md](account-closure.md) (R5 the new refusal), [deposit-matching.md](deposit-matching.md) (R13 the order of the receipt rules; R23–R25 the third match target; method and reason), [trade-settlement.md](trade-settlement.md) (R19, R21: the next rule and the Matched targets), [migration-batches.md](migration-batches.md) (R13: one of three), [bank-reconciliation.md](bank-reconciliation.md) (R9–R11 and §5: the two kinds), [in-kind-transfers.md](in-kind-transfers.md) (R9, R34: the election step; R17: the shares of a dividend; R53: the note of R48; R60, R61, R68, R70, R71: the simulator custodian), [orders.md](orders.md) (R50, R62: not for a dividend), [portfolios.md](portfolios.md) (R18: a dividend is not locked and an assigned account does not reinvest), [adjustments.md](adjustments.md) (a note: reason `CorporateAction` corrects a dividend), [reports.md](reports.md) (the dividend row of the Customer Transactions Report), [customers.md](customers.md) (the tax profile also decides dividend withholding), [simulator.md](simulator.md) (the routes, script `0014`, the log actions), [api-design.md](../api-design.md) (§6 resource rows, §7.7 and §7.11, the statement line and account notes, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [architecture.md](../architecture.md) (port `ICustodianElections`, the election step), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D94–D101), [customer-portal.md](../customer-portal/customer-portal.md) (C42–C44), [back-office.md](../backoffice/back-office.md) (BO33), [glossary.md](../glossary.md) (the review terms become accepted; Corporate action, Entitlement, Tax detail, Withholding tax and TransactionType gain the dividend), [function-plan.md](../function-plan.md) §5 (the roadmap step; dividends on a Custodial account), [features/README.md](README.md) row status, [future-plans.md](../future-plans.md) §1 step 2 and §9, and the roadmap §2 matrix, §7 C2 and C3, §11 S3 and S4, §12 D13, §13 status and §14.

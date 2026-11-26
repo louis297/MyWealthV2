@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-18
-last_updated: 2026-11-19
+last_updated: 2026-11-26
 related:
   - account-custody-mode.md
   - custody-modes.md
@@ -254,18 +254,11 @@ No change. `TestSeed` already has an External account ("Demo brokerage") and a C
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Application.UnitTests | Adviser Balances row builder: every cash and holding line carries its account's custody mode; mode subtotals per currency for the §4.2 accounts (Custodial NZD cash `1,000.00` / market value `5,000.00`; External NZD `2,500.00` / `0`, USD `0` / `800.00`); the "All accounts" subtotals equal today's; a mode with no lines has no block; a zero-cash External account with no holdings adds no line and no block. Adviser Balances PDF: "Custody" column header and cell text, the subtotal block headings and their order. Customer Transactions PDF: "Custody" column with "Held on platform" / "Held elsewhere"; the R15 note present with one External row and absent with none and on an empty range |
-| Application.FunctionalTests — net worth | Firm read with one Custodial and one External account → two entries, `Custodial` first, values of each account; the §4.2 example → the §8.1 `byCustodyMode` and the partition of R6; External accounts only → one `External` entry; an Open account with no legs → an entry with zeros; a Closed Custodial account → no `Custodial` entry from it; Adviser scope → only assigned Customers' accounts in the entries; Customer route and Customer self read → own accounts only; no accounts → empty array. `TestSeedSmokeTests`: the demo tenant has both entries |
-| Application.FunctionalTests — two tenants | Another tenant's Custodial account adds nothing to any entry; another tenant's Customer id on the Customer route → 404 (existing) |
-| Application.FunctionalTests — reports | Adviser Balances generated for a Custodial and an External account: the PDF has the Custody column and the `Custodial`, `External` and "All accounts" blocks in that order. Customer Transactions generated for the same: each row shows "Held on platform" or "Held elsewhere" and the note is present |
-| Adviser Portal | Dashboard renders "Funds under management" and "External assets" from `byCustodyMode`, per currency `assets.total`; a missing entry → "None."; the other sections are unchanged |
-| Customer Portal | Dashboard renders the two rows and the note under "Held elsewhere"; a missing entry is not shown. Accounts list sends the two filtered requests and renders two groups in order with the note under "Held elsewhere"; an empty group is not shown; both empty → "No accounts.". Account page shows the note for an External account only |
-
-Where the two-tenant tests live: net worth is a read with no new rule of scope, so the existing net-worth isolation fixture gains the one case above.
-
-No assertion of an existing test is replaced. The existing Adviser Balances subtotal assertions hold for the "All accounts" block.
+| Application.FunctionalTests | `NetWorth/NetWorthByCustodyModeTests.cs`; the report generation tests in `Reports/` |
 
 ---
 
@@ -300,18 +293,3 @@ Still open, not this slice:
 - An FX fold of funds under management into a reporting currency
 - A history of funds under management
 - The advisory fee and platform billing base
-
----
-
-## 12. Suggested commits
-
-Only after `accepted`. The repository should build after each commit. Agents split each behaviour into red then green.
-
-1. Net worth `byCustodyMode` (R4–R9) + functional tests, including the two-tenant case and `TestSeedSmokeTests`.
-2. Adviser Balances Report: custody on each line and subtotals per mode (R10–R13) + unit tests of the row builder and the PDF.
-3. Customer Transactions Report: custody on each row and the note (R14–R16) + unit tests of the row builder and the PDF.
-4. Adviser Portal: the two Dashboard figures (D24, D25) + frontend tests.
-5. Customer Portal: Dashboard rows, grouped accounts list, account page note (C14–C17) + frontend tests.
-6. Repo docs: mark this file landed.
-
-Do not put a write rule, a new parameter, an FX fold or a custody split of the other breakdowns in these commits.

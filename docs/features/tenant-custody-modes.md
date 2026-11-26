@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-18
-last_updated: 2026-11-18
+last_updated: 2026-11-26
 related:
   - tenants.md
   - account-custody-mode.md
@@ -288,25 +288,13 @@ No seed code changes. Every seeded Tenant allows both (R6):
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | `Tenant.Create` allows both and `AllowedCustodyModes` is `[External, Custodial]`; `SetAllowedCustodyModes([Custodial])` → `Allows(External)` false, `Allows(Custodial)` true; `[Custodial, External]` → both, list in enum order; `[External, External]` → External only; empty → `DomainException`, setting unchanged; raises no domain event |
-| Application.FunctionalTests — tenants | POST with `["External"]` → 201, get-by-id returns `["External"]`; with `["Custodial", "External"]` → 201, item returns `["External", "Custodial"]`; missing, `null`, `[]`, `["Other"]`, `["custodial"]`, `["External", "External"]` → 400 `errors.AllowedCustodyModes` and no tenant row; PUT without the field leaves the setting; PUT with `["Custodial"]` → 204 and the item shows it; PUT with `[]` → 400 and the setting is unchanged; PUT with a stale `rowVersion` → 409; the list and `GET /tenants/by-code/{code}` (TenantAdmin and Adviser, own code) carry the field; TenantAdmin / Adviser / Customer → 403 on POST and PUT (existing) |
-| Application.FunctionalTests — open | Tenant with `["External"]`: TenantAdmin and Adviser open External → 201; Custodial Brokerage → 400 `errors.CustodyMode` with the message of R7 and no account row. Tenant with `["Custodial"]`: External Bank → 400 `errors.CustodyMode`; Custodial Brokerage → 201. Custodial Bank on a tenant with `["External"]` → 400 `errors.Type` (validator first, R8). SystemAdmin with `tenantId` follows the target tenant's setting. Two-tenant: tenant A `["External"]`, tenant B both; an Adviser of B opens a Custodial account → 201; an Adviser of A naming B's Customer → 404, not 400 |
-| Application.FunctionalTests — narrowing | Open a Custodial account, assign a portfolio, then PUT the tenant to `["External"]`: `TransferIn`, `Buy`, a transfer between two existing Custodial accounts, rebalance → succeed; close after `CloseOut` → 204; reopen → 204; `GET /accounts?custodyMode=Custodial` still returns it; a new Custodial open → 400 |
-| Infrastructure.IntegrationTests | Script `0033` on a scratch database (as for `0031`): an existing Tenant row gets 1 in both columns; an insert that names neither column gets 1 in both; an insert or update that sets both to 0 fails on `CK_Tenants_AllowedCustodyModes`. EF round-trip: a Tenant saved with `[Custodial]` reloads with `[Custodial]`. The demo seed integration test: a new `demo` tenant allows both; an existing one with `[External]` keeps it |
-| Back Office (`BackOfficePageTests`) | New tenant: both boxes checked on open; Create disabled with none checked; the POST carries the checked values. Detail: boxes set from the item; Save sends `allowedCustodyModes` with name, reporting currency and `rowVersion`; Save disabled with none checked |
-| Adviser Portal | New account form with `["External", "Custodial"]`: D17 unchanged. With `["External"]`: one option, selected, the POST carries `custodyMode: "External"`, Type enabled. With `["Custodial"]`: one option, selected, Type fixed to Brokerage. Tenant not loaded: no option, submit disabled. A 400 `errors.CustodyMode` is shown at the Custody choice |
-
-Where the two-tenant tests live: R7 runs in the `CreateAccount` handler after the Tenant and Customer lookups, so the cross-tenant cases are proved over HTTP in Application.FunctionalTests, next to the existing account-open isolation tests.
-
-Fan-out in the tests:
-
-- The `POST /tenants` bodies in `CreateTenantTests` (9), `GetTenantByCodeTests` (1) and `BackOfficeApiTests` (1) add `allowedCustodyModes`. The first ten change in §12 commit 2, in the same commit as the required field. `BackOfficeApiTests` drives the Back Office `PlatformApi` against a scripted handler, so its body changes in commit 4 with the `IPlatformApi` signature.
-- `TestApp.CreateTenantAsync` keeps building through `Tenant.Create`, so its callers allow both and do not change. It gains an optional parameter for the allowed custody modes, used by the new open and narrowing tests.
-- The Back Office `IPlatformApi` `CreateTenantAsync` and `UpdateTenantAsync` gain the setting; the fake in `BackOfficePageTests` follows.
-- The Adviser Portal `Tenant` type gains `allowedCustodyModes`.
-- The raw-SQL `Tenants` inserts in Infrastructure.IntegrationTests do not change (§6, defaults stay).
+| Domain.UnitTests | `Entities/TenantTests.cs` |
+| Application.FunctionalTests | `Tenants/TenantAllowedCustodyModesTests.cs`, `Custody/TenantCustodyModesNarrowingTests.cs` |
+| Infrastructure.IntegrationTests | `AppliedSchema/TenantsAllowedCustodyModesSchemaTests.cs`, `DemoTenantSeedTests.cs` |
 
 ---
 
@@ -339,18 +327,3 @@ Still open, not this slice:
 - Caller-supplied numbers on External accounts (custody modes slice 4)
 - Read-model and report grouping by custody mode (slice 5)
 - Any further per-tenant feature flags
-
----
-
-## 12. Suggested commits
-
-The repository should build after each commit. Agents split each behaviour into red then green.
-
-1. Script `0033`, the EF mapping of the two columns, `Tenant.SetAllowedCustodyModes`, `Allows` and `AllowedCustodyModes` (R2, R6) + Domain unit tests and the `0033` integration tests.
-2. `allowedCustodyModes` on `POST /tenants`, `PUT /tenants/{id}` and the tenant item (R3–R5) + functional tests. The eleven existing `POST /tenants` bodies add the field here.
-3. `POST /accounts` checks the Tenant's setting (R7–R10) + functional tests, including two-tenant and narrowing. `TestApp.CreateTenantAsync` gains the optional parameter.
-4. Back Office: the setting on the New tenant form and the tenant detail page (BO14, BO15) + page tests.
-5. Adviser Portal: the New account form offers the firm's allowed custody modes (D21) + frontend tests.
-6. Repo docs: mark this file landed (done 2026-11-18). (This file and the amendments in tenants, accounts, demo-tenant-seed, the two portal page contracts, domain-model, database-design, api-design and the glossary were accepted on 2026-11-18, before commit 1.)
-
-Do not put caller-supplied prices, read-model grouping, or any other tenant flag in these commits.

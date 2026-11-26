@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-11-25
-last_updated: 2026-11-25
+last_updated: 2026-11-26
 related:
   - ../valuation-roadmap.md
   - ../future-plans.md
@@ -327,15 +327,14 @@ None in this slice. No Adviser Portal, Customer Portal or Back Office page shows
 
 ## 10. Tests
 
-| Project | Assert |
-| --- | --- |
-| Domain.UnitTests | `MarketDataRow.IsFinal`: today and yesterday are not final; two days ago is. `MarketDataHistoryWindow`: the later of the floor date and today minus the days; no days → the floor date; `Contains` at both edges |
-| Application.UnitTests | `InstrumentPriceSyncJob` with a fake source and store: with a floor date it asks from the window's first date and passes every bar on or after it; a bar before the window is dropped; a bar with no close or a close of 0 is skipped; with no floor date it asks for the latest bar as today; a served instrument is never asked; the same symbol in two Tenants gets every bar in both. `FxRateHistorySyncJob`: one range call per active base, from the floor date to yesterday; the records of R14 are skipped; a failed base stores nothing and the others are stored; no floor date → no call |
-| Infrastructure.IntegrationTests | The two stores against the database: a missing past date is inserted; a final row keeps its `Price` / `Rate`, `Source` and `FetchedAt` when the source sends another value; yesterday's and today's rows are updated. `EodhdClient` against the stored answer of §1.1: `from` is in the query string; every bar is returned with `close`, never `adjusted_close` (499.23 and 129.04 across the split); an empty array and a 404 are a rejection. `FrankfurterClient` against the stored answer of §1.1: `from` and `to` in the query string; the weekend dates are returned. Start-up check: a floor date that is not a date or is in the future, and `HistoryDays` of 0 or 36501, stop the host; no floor date starts. `fx-rate-history-sync` is registered on queue `fx` with cron `30 11 * * *`. The selection of `TryGetPriceDetail` (latest on or before, with its date and source; none → empty; a SQL query of the store, so tested against the database). `ListPricesAsync` and `ListRatesAsync`: range, order, paging, the directed pair only |
-| Application.FunctionalTests | `GET /instruments/{id}/prices`: no Bearer → 401 not 302; Customer → 403; TenantAdmin and Adviser read their instrument, newest first; `from`, `to` and both; `to` with `pageSize=1` answers the row of the latest date on or before it (the weekend and holiday of §1.1); a date before the first row → empty page; an inactive instrument is readable; each 400 of R21; SystemAdmin reads an instrument of any Tenant. `GET /fx-rates`: no Bearer → 401; TenantAdmin, Adviser, Customer and SystemAdmin → 200; the pair is directed (NZD → USD does not answer USD → NZD rows); each 400 of R20 and R21 |
-| Application.FunctionalTests — isolation | Two-tenant fixture: a TenantAdmin and an Adviser of Tenant A with the id of Tenant B's instrument → 404, also when both Tenants list the same symbol |
+The tests are the executable form of §4. Where they live:
 
-No isolation test on `/fx-rates` (platform data, fx-rates §10).
+| Project | Where |
+| --- | --- |
+| Domain.UnitTests | Folder `MarketData/` |
+| Application.UnitTests | Folders `MarketData/` and `Fx/` |
+| Application.FunctionalTests | `Fx/GetFxRatesTests.cs`, `Instruments/GetInstrumentPricesTests.cs` |
+| Infrastructure.IntegrationTests | Folders `MarketData/` and `Fx/`; `AppliedSchema/FxRate*Tests.cs`, `InstrumentPrice*Tests.cs` |
 
 ---
 
@@ -381,26 +380,3 @@ Still open, not this slice:
 - A larger EODHD plan, for history older than a year
 - Which rates Inland Revenue accepts for the FIF conversions (roadmap §6, step 6)
 - A price history page in a portal
-
----
-
-## 12. Suggested commits
-
-The repository should build after each commit. Agents split each behaviour into red then green.
-
-1. `MarketDataRow.IsFinal` and `MarketDataHistoryWindow` (R3, R4) + Domain unit tests.
-2. The two stores write by the final rule (R4–R6, R16) + integration tests.
-3. The configuration reader and the `worker` start-up check (R1, R3) + integration tests.
-4. `IInstrumentPriceSource.GetBarsAsync`, `EodhdClient` with `from`, `InstrumentPriceSyncJob` stores every bar (R7–R11) + unit and integration tests.
-5. `IFxRateSource.GetRangeAsync`, `FrankfurterClient` range, `FxRateHistorySyncJob` and its recurring job (R12–R15) + unit and integration tests.
-6. `TryGetPriceDetail`, `ListPricesAsync`, `ListRatesAsync` (R17, R18) + unit and integration tests.
-7. `GET /instruments/{id}/prices` (R19, R21–R23) + functional and isolation tests.
-8. `GET /fx-rates` (R20, R21) + functional tests.
-9. AppHost and deploy entries (§9.1).
-10. Repo docs: mark this file landed; valuation roadmap §8 step 1.
-
-Do not put a valuation, an age limit or a seeded history in these commits.
-
-### Docs to amend when this spec is accepted
-
-[instrument-prices.md](instrument-prices.md) (R5, §2 Out "Historical back-fill", R12, §11: every bar from the floor date, final rows, the read route), [fx-rates.md](fx-rates.md) (R5, §2 Out, R14, §5 port: the history job, final rows, the read route), [ADR 0019](../adr/0019-fx-rate-source-and-refresh.md) (Consequences), [api-design.md](../api-design.md) (§6 resource rows, §7.5 note, a rates note, change log), [architecture.md](../architecture.md) (the two ports, the job `fx-rate-history-sync`), [domain-model.md](../domain-model.md) (port notes), [database-design.md](../database-design.md) (the note on the two tables), [deployment.md](../deployment.md) (the `worker` setting), [glossary.md](../glossary.md) (the review terms become accepted; `IMarketData` and `IFxRate` rows), [features/README.md](README.md) row status, and [valuation-roadmap.md](../valuation-roadmap.md) §5 V1 and §8.

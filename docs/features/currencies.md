@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-13
-last_updated: 2026-09-21
+last_updated: 2026-11-26
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -250,13 +250,13 @@ The Adviser Portal current slice has already landed (session probe). Do not add 
 
 ## 10. Tests
 
-| Project | Assert |
-| --- | --- |
-| Domain.UnitTests | `Money` same-currency add/subtract, cross-currency fails, equality; `Tenant.Create` rejects an empty code; `SetReportingCurrency` rejects a disabled code and accepts an enabled code |
-| Application.FunctionalTests | No Bearer → 401 and not 302; 200 for each of the four roles; default list contains the six seed rows and every item has `isActive`; `enabledOnly=true` omits a disabled row (test inserts one via SQL and Reloads); `enabledOnly=false` matches omit and includes the disabled row; illegal value → 400; sort by `code` |
-| Infrastructure.IntegrationTests | After 0008/0009: table exists, six seed rows, `Tenants.ReportingCurrency` exists, FK exists, no `0002` file |
+The tests are the executable form of §4. Where they live:
 
-No cross-tenant isolation tests (platform table, no TenantId). Isolation starts at the tenants slice.
+| Project | Where |
+| --- | --- |
+| Domain.UnitTests | `Entities/CurrencyTests.cs` |
+| Application.FunctionalTests | Folder `Currencies/` |
+| Infrastructure.IntegrationTests | `AppliedSchema/CurrenciesSchemaTests.cs`, `CurrencyCatalogTests.cs`, `TenantsReportingCurrencySchemaTests.cs` |
 
 ---
 
@@ -281,17 +281,3 @@ Still open, not this slice:
 
 - `/tenants` reporting-currency copy and PUT contract → tenants
 - FX port shape → Phase 2
-
----
-
-## 12. Suggested commits
-
-The repository should build after each commit.
-
-1. `0008_currencies.sql` + EF `Currency` mapping + integration test “table + six seed rows”
-2. `0009_tenants_reporting_currency.sql` + `Tenant.ReportingCurrency` mapping + `Create` signature change
-3. `Money` VO + Domain.UnitTests
-4. `ICurrencyCatalog` + Infrastructure startup load / Reload
-5. `GetCurrencies` + `GET /currencies` + 401 / four-role 200 functional tests
-
-Do not put tenants HTTP in these commits.

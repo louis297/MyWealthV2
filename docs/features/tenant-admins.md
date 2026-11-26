@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-13
-last_updated: 2026-11-13
+last_updated: 2026-11-26
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -278,15 +278,11 @@ Do not add a TenantAdmin page to the Adviser Portal. SystemAdmin is not a portal
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | `UserCreated` fires once after the factory or application wrapper; `Create(TenantAdmin)` shape: TenantId set, AdviserId empty, password path → Active + `UserActivated`; `ChangeName` rejects blank; a second `Disable()` on an already Disabled user still throws (idempotency lives in Application) |
-| Application.FunctionalTests | No Bearer → 401 not 302; TenantAdmin / Adviser / Customer → 403 on every verb; SystemAdmin create → 201 `{ id }`, get has `status=active` and matching name / email / tenantId, hosted login with that tenantCode + email succeeds; duplicate email in the same tenant (different case) → 400; same email in two tenants → two 201s; unknown `tenantId` → 404; create on a disabled tenant → 400 with `code=disabled`, `target=tenant`, `targetId` = that tenant PublicId; GET / PUT / disable / enable of an existing TenantAdmin on that disabled tenant still 200/204; PUT with `email` → 400; GET this collection with an Adviser PublicId → 404; disable → `status=disabled`, that subject’s refresh fails, GET still returns the row; enable → 204; disable when they are the only TenantAdmin → 204; bad / stale `rowVersion` → 409; unknown person PublicId → 404; default paging; `tenantId` filter returns only that tenant; omitted `enabledOnly` includes disabled; `enabledOnly=true` is Active only; `search` hits name and email |
-| Infrastructure.IntegrationTests | No new script. Reuse the two-tenant fixture: one TenantAdmin in A and one in B; unfiltered list sees both; `tenantId=A` sees only A |
-
-Login-gate and password-change revocation stay identity-auth. This slice asserts a real HTTP disable still raises `UserDisabled` (refresh fails).
-
-Post-create login uses hosted login on `identity` (tenantCode + email + password). Do not invent a token endpoint on `webapi`.
+| Application.FunctionalTests | Folder `Users/TenantAdmins/` |
 
 ---
 
@@ -321,18 +317,3 @@ Locked 2026-09-13:
 
 1. List matches currencies: item includes `status`; query uses `enabledOnly`. No disabled-only query.
 2. Disabled-target writes use api-design §4.1: `code=disabled` + `target` (this slice: `tenant`). `user` / `account` share the shape; this slice does not implement those call sites.
-
----
-
-## 12. Suggested commits
-
-The repository should build after each commit.
-
-1. `UserCreated` + Domain.UnitTests (do not change `Disable` / `Enable` throws)
-2. `TargetDisabled` exception + Web mapping + dual-write port + `CreateTenantAdmin` + POST 201 / uniqueness / unknown tenant 404 / disabled tenant 400 `disabled`/`tenant` / same email across tenants
-3. `GetTenantAdmins` / `GetTenantAdminById` + GET 401 / 403 / 200 / wrong-collection 404 / paging and `enabledOnly`
-4. `UpdateTenantAdmin` + PUT 204 / email in body 400 / 409
-5. `DisableTenantAdmin` / `EnableTenantAdmin` + last-admin allowed + refresh fails + HTTP idempotent
-6. Hosted-login smoke after create (tenantCode + email + password completes authorize)
-
-Do not put `/users/advisers` or `/users/customers` in these commits.

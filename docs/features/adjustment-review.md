@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-25
-last_updated: 2026-11-25
+last_updated: 2026-11-26
 related:
   - ../custodial-roadmap.md
   - adjustments.md
@@ -341,14 +341,13 @@ The Development seed has one TenantAdmin per firm today, so nobody could approve
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | `AdjustmentRequest.Request`: cash only, holding only, both; neither → throws; blank memo → throws. `Approve`, `Reject`, `Cancel` from `Requested`; each from an end status → throws; `Approve` and `Reject` by the requester → throws; `Cancel` by the requester → allowed; `Approve` stores the Transaction. `Transaction.Reverse` of an `Adjustment` → throws. `TransactionSourceKind.AdjustmentRequest` needs a source id and is not hand-reversible |
-| Application.FunctionalTests — request | No Bearer → 401 not 302; Adviser, Customer, SystemAdmin → 403 on every route (403, not 404, for an unknown id). TenantAdmin requests → 201, status `Requested`, item fields; cash balance, holdings, available cash and available quantity unchanged; no Transaction written. Each 400 of adjustments §8.2 on the request, nothing stored. External account → 400. Closing account → 400. Idempotency: missing key 400, replay same id, different hash 409. List filters; unknown `status` → 400. Cross-tenant: tenant B's request → 404 on get and on each action; tenant B's Account in the body → 404 |
-| Application.FunctionalTests — decisions | A second TenantAdmin approves → 204; one `Adjustment` with the request's numbers, source `{ AdjustmentRequest, <request id> }`, `bookedAt` at the approval, `CreatedBy` the approver; cash balance and holding projection changed; request `Approved` with `transactionId`. Approve by the requester → 400 `errors.Status`, nothing written. Approve after the cash was spent → 400 with the available cash message, request still `Requested`, then approved after a deposit. Approve on an account that began closing cannot happen (R17): closure request with an open request → 400 `errors.AccountId`. Reject by the requester → 400; by another without a note → 400 `errors.Note`; with one → `Rejected`, no Transaction. Cancel by the requester → `Cancelled`. Any action on an end status → 400 `errors.Status`; stale `rowVersion` → 409. Account with an Active portfolio assignment → approved, assignment unchanged, no rebalance proposed |
-| Application.FunctionalTests — ledger | `POST /transactions/adjustment` no longer posts: no 2xx and nothing written. `POST /transactions` with `Adjustment` → 400 (unchanged). Reverse of an `Adjustment` posted from a request → 400 with the R15 message, for a TenantAdmin and an Adviser; reverse of an `Adjustment` with source `Manual` (inserted as before this slice) → the same 400. A correction: a second request with the opposite change, approved → balances back. The Customer reads the posted adjustment and its source on their own account. Bank reconciliation: the adjustment's cash is still the item `Adjustments` |
-| Infrastructure.IntegrationTests | Script `0058` on a scratch database: a Transaction with `SourceKind = 11` and an id inserts; without an id violates the check; `SourceKind = 12` violates the check. Each row check of §6 with one violating insert: no part, a holding part with one column null, a decision on a `Requested` row, an `Approved` row with no Transaction, a decision by the requester. A request whose `TenantId` differs from its Account's violates the composite FK. Existing rows unchanged |
-| Adviser Portal | The Adjust form posts to `/adjustment-requests` and opens the request; the nav item and its count for a TenantAdmin only; the list and its default filter; Approve and Reject disabled for the requester; Reject needs a note; a 400 from approve shown; open requests on the account page; no Reverse on an `Adjustment` |
+| Domain.UnitTests | Folder `AdjustmentRequests/` |
+| Application.FunctionalTests | Folder `AdjustmentRequests/` |
+| Infrastructure.IntegrationTests | `AppliedSchema/AdjustmentRequestsSchemaTests.cs` |
 
 ---
 
@@ -390,23 +389,7 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
-
-The repository should build after each commit. Agents split each behaviour into red then green.
-
-1. Store a request (R2, R6, R13): `AdjustmentRequest`, `AdjustmentRequestStatus`, `TransactionSourceKind.AdjustmentRequest`, EF mapping, script `0058`. Domain unit tests and the script integration test. The script and the mapping land together.
-2. Request and read (R1, R3–R5, R19, R20): `RequestAdjustment`, the two reads, `POST` and `GET /adjustment-requests` + functional tests.
-3. Approve posts the adjustment (R7–R9, R21) + functional tests.
-4. Reject and cancel (R10–R12) + functional tests.
-5. One way in and no reverse (R14, R15): remove `POST /transactions/adjustment` and `CreateAdjustment`, move their functional tests to the request and approval, `Reverse` refuses an `Adjustment` + tests.
-6. Account closure waits for open requests (R17) + functional tests.
-7. Development seed: the second TenantAdmin of the demo firm (§9.1) + the seed test.
-8. Adviser Portal: the form requests, the Adjustments pages, open requests on the account page, no Reverse (D102–D106), BFF prefix + frontend tests.
-9. Repo docs: mark this file landed; update roadmap §13 step 17 and the §2 matrix.
-
-Do not put a Transaction status, a new permission, a reservation or a request by an Adviser in these commits.
-
-### Docs amended when this spec was accepted
+## 12. Docs changed when this spec was accepted
 
 [adjustments.md](adjustments.md) (amendment note: R2, R4, R17, R18, R20, §8, §9, §11), [posting.md](posting.md) (§1 and an amendment note), [transaction-source.md](transaction-source.md) (kind 11, the reverse of an `Adjustment`), [custody-modes.md](custody-modes.md) (matrix rows `Adjustment` and Reverse), [account-closure.md](account-closure.md) (R5, R12, D54), [withdrawals.md](withdrawals.md), [orders.md](orders.md) and [in-kind-transfers.md](in-kind-transfers.md) (where the available cash and reserved quantity checks of an adjustment run), [bff-adviser-portal.md](bff-adviser-portal.md) (prefix), [api-design.md](../api-design.md) (§3.1, §6, §7.7, §7.15, change log), [domain-model.md](../domain-model.md) (§8.6, §8.21), [database-design.md](../database-design.md) (§9, §11.4, §11.21), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D102–D106, D26, D27, D31), [glossary.md](../glossary.md) (Adjustment, Adjustment request), [function-plan.md](../function-plan.md) §9 item, [features/README.md](README.md) row status, the roadmap (§2 matrix, §4 F3, §10 X1, §12 D3, §13, §14).
 

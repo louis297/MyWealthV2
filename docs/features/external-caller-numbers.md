@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-18
-last_updated: 2026-11-18
+last_updated: 2026-11-26
 related:
   - account-custody-mode.md
   - custody-modes.md
@@ -374,26 +374,13 @@ No seed code changes. The `TestSeed` `Buy` on "Demo brokerage" (External) is bui
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | `PostBuy` / `PostSell` with an entered fee: the §4.3 numbers (cost = gross + fee, Fee leg in the Account currency, fee detail with no schedule); entered fee 0 → no Fee leg; a fee that converts to 0 → no Fee leg; entered fee `< 0` → throws; a schedule and an entered fee → throws. With an `AppliedFxRate`: FX detail attached; a rate whose base is not the price currency, whose quote is not the Account currency, or whose rate differs from `fxRate` → throws. `PostFxConversionWithAmounts`: legs equal the amounts; rate `0.59119824` for §4.4; `0.00612400` for the JPY example; FX detail as-of date is the UTC date of `bookedAt` and source `Caller`; same currency, same Account, different custody modes, amount `≤ 0`, from `SUM < 0` → throws. `Reverse` copies a fee detail with no schedule and a `Caller` FX detail |
-| Application.UnitTests | `ApplicableTradeFeeSchedule.DateOf` is the UTC date of the instant (it replaces the functional case `TradeFeeTradeTests.TheScheduleForTheTradesUtcDateApplies`, which needs a chosen booking instant that a Custodial account cannot have) |
-| Application.FunctionalTests — External trades | Same-currency `Buy` with `price` and `fee` → 201 with the §4.3 legs, `fee.scheduleId: null` and `fx: null`; with no `InstrumentPrices` row for the instrument → still 201; with a tenant schedule that applies today and no `fee` → 201 and no Fee leg; `Sell` with `price` → 201, released cost by the average-cost rule; without `price` → 400 `errors["Security[0].Price"]` and nothing written; `price` 0 and with 9 decimals → 400; `fee` with 3 decimals on NZD → 400 `errors.Fee`; `fee` `−1` → 400. Two currencies: `Buy` without `fxRate` → 400 `errors.FxRate`; with `fxRate` → 201, §4.3 legs and cost, item `fx` USD / NZD / `1.69147` / the `bookedAt` date; with no `FxRates` row → still 201; same currency with `fxRate` → 400 `errors.FxRate`. Oversell and cash below 0 → 400 (existing rules). Reverse of each → 201, opposite legs, fee and FX details copied. Replay with the same body → same id; same key with another `price` → 409 |
-| Application.FunctionalTests — Custodial trades | `price`, `fee` and `fxRate` on a Custodial `Buy` / `Sell` → 400 on their field and nothing written; a Custodial `Buy` still gets the server price and the schedule's fee |
-| Application.FunctionalTests — External conversions | Both amounts → 201, legs equal the amounts, item `fx` rate `0.59119824`, `rateAsOfDate` the `bookedAt` date; no `FxRates` row for the pair → still 201; one amount → 400 on the missing field; `expectedRate` → 400; too many decimals on either amount → 400; insufficient cash → 400; reverse → 201 with the original amounts and FX detail. Quote between two External Accounts → 400 `errors.FromAccountId`; between External and Custodial → 400 `errors.ToAccountId` (existing). Between two Custodial Accounts: both amounts → 400 and no `expectedRate` → 400 (existing messages), the quote → 200 |
-| Application.FunctionalTests — two tenants | Another tenant's External account or instrument on an External `Buy` with `price` → 404, not 400; another tenant's External Account on a two-amount conversion → 404 |
-| Infrastructure.IntegrationTests | Script `0034` on a scratch database (as for `0031`): an insert into `TransactionFeeDetails` with kind 0 and `TradeFeeScheduleId` NULL is refused before the script and succeeds after it; existing rows are unchanged. The case `Insert_FeeDetail_BrokerageWithoutSchedule_IsRejected` of `TradeFeesSchemaTests` (run on the fully migrated database) becomes an insert that succeeds. EF round-trip: an External `Buy` with an entered fee and a rate reloads with a fee detail without schedule and a `Caller` FX detail |
-| Adviser Portal | External account: Buy / Sell form shows Price and Fee after an instrument is picked, and FX rate only when currencies differ; the POST carries `price`, `fee` only when filled, and `fxRate`; a 400 on `Security[0].Price`, `Fee` or `FxRate` is shown at its input. Custodial account: no such inputs and none in the POST. Convert form on an External account: two amount inputs, no toggle, no quote request, implied rate text, the POST carries both amounts and no `expectedRate`. Convert form on a Custodial account: unchanged. Fees pages show the line of §9; the Buy / Sell help text only on a Custodial account |
-
-Where the two-tenant tests live: every new rule runs in a handler after the Account lookup, so the cross-tenant cases are proved over HTTP in Application.FunctionalTests, next to the existing isolation tests of each route.
-
-Assertions this spec replaces (the spec changed; the tests are not weakened): on an External account, "`price` on a `Buy` body → 400", "`fee` on a `Buy` body → 400", "missing price → 400", "missing FX pair → 400", "the schedule for the trade's date gives a Fee leg", and every reference-rate, `expectedRate`, staleness and quote assertion. Each still holds on a Custodial account, where the suite proves it (below). Also replaced: the schema case "a `Brokerage` fee detail without a schedule is rejected" (script `0034` drops that CHECK), "a quote between External Accounts without `bookedAt` → 200" in `FutureBookedAtTests` (now 400 `errors.FromAccountId`, R19), and the boundary-instant case of `TradeFeeTradeTests` (moved to Application.UnitTests).
-
-Fan-out in the functional tests:
-
-- **Moved to Custodial accounts, test-only (§12 commit 1).** The tests that prove server pricing, trade fee schedules and reference-rate conversions open Custodial accounts and stop sending `bookedAt`: the server-priced cases of `BuySellTests` (table price used, missing price, missing FX pair, `price` and `fee` refused), `TradeFeeTradeTests`, `TradeFeeReaderTests` (and the `FeeHttp.TradingAccountAsync` / `FeeHttp.PostTradeAsync` helpers), `FxConversionTests`, `FxConversionExpectedRateTests`, `FxConversionQuoteTests`, `FxConversionReadTests`, `FxConversionReverseTests` and `FxConversionIsolationTests`. A Custodial account is a `Brokerage` account, so the FX world of these suites opens Custodial `Brokerage` accounts in place of the shared External `Bank` accounts of `LegAccountsFixture`. Tests that relied on a chosen `bookedAt` (the rate as of a date, staleness, the schedule for a date) insert their `FxRates`, `InstrumentPrices` and schedule rows relative to today instead; the rate of the FX world is stored as of today, since a rate four days older than the server's date is stale. A Custodial account follows today's rules, so this commit passes before any production change.
-- **Stay External, body changes with the rule (§12 commits 3 and 4).** `BuySellTests` (the remaining cases), `TransactionRulesTests`, `ReverseOrderTests` and any other External `Buy` / `Sell` add `price` (and `fxRate` when the currencies differ); the trades are posted by the private `PostSecurityAsync` helpers of `BuySellTests` and `ReverseOrderTests`, which gain a `price` parameter. `FxConversionRulesTests` stays External (a Custodial account refuses the `Opening` it posts) and sends both amounts. `BookedAtOffsetTests` and `FutureBookedAtTests` keep their External conversions and send both amounts with no `expectedRate`; the quote case "without `bookedAt` → 200" of `FutureBookedAtTests` becomes "→ 400 `errors.FromAccountId`" (R19), and its future-`bookedAt` quote case still gets `errors.BookedAt`.
-- Unchanged: the Custody suites (they already use Custodial accounts for trades and conversions), the portfolio suites, Domain and integration tests that call the factories directly, and `TestSeed`.
+| Domain.UnitTests | `Entities/EnteredTradeNumbersTests.cs`, `Entities/FxConversionWithAmountsTests.cs` |
+| Application.FunctionalTests | `Transactions/ExternalTradeTests.cs`, `Transactions/ExternalFxConversionTests.cs` |
+| Infrastructure.IntegrationTests | `AppliedSchema/EnteredTradeFeesSchemaTests.cs` |
 
 ---
 
@@ -428,19 +415,3 @@ Still open, not this slice:
 - A rate line on `Buy` / `Sell` in the Customer Portal
 - The rest of [cross-currency-trades.md](cross-currency-trades.md) for Custodial accounts
 - Fees in the Account currency, or several fee kinds, on an External trade
-
----
-
-## 12. Suggested commits
-
-Only after `accepted`. The repository should build after each commit. Agents split each behaviour into red then green.
-
-1. Test-only: the server-pricing, trade fee and reference-rate conversion suites move to Custodial accounts (§10 fan-out), with the `ApplicableTradeFeeSchedule.DateOf` unit test that replaces the boundary-instant case. No production change. Passes on its own.
-2. Script `0034` with its integration test; Domain: entered fee and `AppliedFxRate` on `PostBuy` / `PostSell`, `PostFxConversionWithAmounts` (§5) + unit tests.
-3. External `Buy` / `Sell` take `price`, `fee` and `fxRate` (R4–R14, R22) + functional tests, including two-tenant. The External `Buy` / `Sell` bodies in the other suites add `price` here.
-4. External conversions take both amounts; the quote refuses External Accounts (R15–R20) + functional tests, including two-tenant. `BookedAtOffsetTests` and `FutureBookedAtTests` change body here.
-5. Adviser Portal: Buy / Sell inputs on External accounts (D22) + frontend tests.
-6. Adviser Portal: the External convert form (D23) and the fees pages (F20, F21) + frontend tests.
-7. Repo docs: mark this file landed (done 2026-11-18). (This file and the amendments in buy-sell, trade-fees, fx-conversions, cross-currency-trades, custody-modes, the two portal page contracts, domain-model, database-design, api-design and the glossary were accepted on 2026-11-18, before commit 1.)
-
-Do not put read-model grouping, the rest of cross-currency-trades, or any change to Custodial accounts in these commits.
