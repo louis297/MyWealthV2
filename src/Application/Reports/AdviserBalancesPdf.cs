@@ -25,6 +25,37 @@ public sealed record AdviserBalancesPdfHoldingRow(
 
 public sealed record AdviserBalancesPdfSubtotal(string Currency, string Cash, string MarketValue);
 
+/// <summary>A holding line of a past day (valuation-history R18): no cost, the price with its date and a status.</summary>
+public sealed record AdviserBalancesPdfPastHoldingRow(
+    string Customer,
+    string Account,
+    string Custody,
+    string Instrument,
+    string Quantity,
+    string Price,
+    string MarketValue,
+    string Status) : AdviserBalancesPdfRow;
+
+/// <summary>A Custodial account with no stored valuation of the day (valuation-history R17).</summary>
+public sealed record AdviserBalancesPdfNotValuedRow(
+    string Customer,
+    string Account,
+    string AccountType,
+    string Custody) : AdviserBalancesPdfRow;
+
+/// <summary>The Adviser Balances Report for the end of a past day (valuation-history R17–R19).</summary>
+public sealed record AdviserBalancesPastPdfModel(
+    string TenantName,
+    string AdviserName,
+    DateOnly Date,
+    DateTimeOffset AsOf,
+    DateTimeOffset GeneratedAt,
+    IReadOnlyList<AdviserBalancesPdfRow> Rows,
+    IReadOnlyList<AdviserBalancesPdfSubtotal> Subtotals,
+    IReadOnlyList<AdviserBalancesPdfSubtotalBlock> ModeSubtotals,
+    int HoldingsNotValued,
+    int AccountsNotValuedYet);
+
 /// <summary>A titled block of subtotals: one custody mode (custody-mode-grouping R12).</summary>
 public sealed record AdviserBalancesPdfSubtotalBlock(string Title, IReadOnlyList<AdviserBalancesPdfSubtotal> Subtotals);
 
@@ -140,6 +171,9 @@ public static class AdviserBalancesPdf
             });
         }).GeneratePdf();
     }
+
+    public static byte[] RenderPast(AdviserBalancesPastPdfModel model) =>
+        Render(new AdviserBalancesPdfModel(model.TenantName, model.AdviserName, model.AsOf, model.GeneratedAt, false, [], [], []));
 
     private static void SubtotalBlock(
         ColumnDescriptor column,
