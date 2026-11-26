@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-21
-last_updated: 2026-11-23
+last_updated: 2026-11-26
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -35,43 +35,11 @@ related:
 
 Account container on `webapi`: list / get / open / rename / close / reopen. Second Phase-2 ledger slice. Adds script `0012_accounts.sql`, policies `accounts.read` / `accounts.create` / `accounts.manage`, aggregate `Account`, and the Disable-Customer open-account guard.
 
-This slice does not persist a balance column. [posting.md](posting.md) (accepted 2026-09-25) computes `cashBalance` on list/get and adds `GET /accounts/{id}/cash-balance`. Close is now rejected while that `SUM ≠ 0` (R16 amended). Holdings, Opening of quantity, and net worth stay out.
+No balance column is stored. [posting.md](posting.md) computes `cashBalance` on list/get and adds `GET /accounts/{id}/cash-balance`. Every Account has a custody mode, `External` or `Custodial` ([account-custody-mode.md](account-custody-mode.md)); what a Custodial account accepts (transaction types, `bookedAt`, transfers, portfolios) is in [custody-modes.md](custody-modes.md) §4, not in this file.
 
-**Status is `accepted`.** Implementation follows this file. Container storage landed in GitHub master `3e8b8f3`. Close-zero and `cashBalance` wait on posting implementation.
+**Status is `accepted` and landed.** This file states the rules as they are today. §12 lists what changed here, by date.
 
 Landed in GitHub `louis297/MyWealthV2` master 2026-09-21, last slice commit `3e8b8f3`. Slice commits `1b7f4af` … `3e8b8f3` (`0012_accounts.sql`, `/accounts`, Disable-Customer guard, TestSeed). Depends on accepted [instruments](instruments.md) (landed `9ea2f2a`) and the IsActive rename (`bbd0f26`, `0011`) only as prior slices. Accounts do not reference `InstrumentId`.
-
-**Amendment 2026-11-17 (account custody mode, accepted, landed):** [account-custody-mode.md](account-custody-mode.md), [ADR 0020](../adr/0020-account-custody-mode.md). Every Account gains a custody mode, `External` or `Custodial`, set on create and immutable like `Type` and `Currency` (script `0031`).
-
-- R8 / R9 / R14: `POST /accounts` requires `custodyMode`. Only `External` can be selected; `Custodial` is reserved and returns 400, like `Property` and `Credit`. A PUT body that includes `custodyMode` → 400.
-- R17 and §8.1: every list and get item includes `custodyMode`. `GET /accounts` takes an optional `custodyMode` filter.
-- §5: `Account.Create` takes the custody mode. The capability matrix does not change; custody mode is a separate attribute and no rule combines it with `Type` yet.
-- §9.1: the four demo accounts are `External`. Existing accounts become `External`.
-- No behaviour depends on the custody mode. Close, reopen, the Disable-Customer guard and every rule in this file are unchanged.
-
-**Amendment 2026-11-17 (custody modes, accepted, landed):** [custody-modes.md](custody-modes.md). It is the increment that lets a Custodial account be opened.
-
-- R8: `Custodial` can be selected on `POST /accounts`. A Custodial account has type `Brokerage`; `Custodial` with `Bank`, `Cash` or `Other` → 400 with `errors.Type`. `Property` and `Credit` stay reserved.
-- §5: `Account.Create` refuses `Custodial` with a type other than `Brokerage`. The capability matrix gains a second dimension: an External account may be Bank, Cash, Brokerage or Other; a Custodial account is Brokerage only.
-- R16, close and reopen: unchanged for both custody modes. A Custodial account still closes only with cash `SUM = 0` and no holdings.
-- §9.1: a fifth demo account, "Demo custodial brokerage" (Brokerage, Custodial, USD), on every TestSeed firm like the other four. The four existing demo accounts stay External.
-- What a Custodial account accepts (transaction types, `bookedAt`, transfers, portfolios) is in custody-modes §4, not in this file.
-
-**Amendment 2026-11-18 (tenant custody modes, accepted, landed):** [tenant-custody-modes.md](tenant-custody-modes.md).
-
-- R8: `POST /accounts` with a `custodyMode` the account's Tenant does not allow → 400 with `errors.CustodyMode`. The check runs in the handler after the Tenant, the Customer and the currency checks; the validator rules on `type` and `custodyMode` still run first.
-- Close, reopen, rename and every other rule in this file do not read the Tenant's setting. A Tenant that stops allowing a custody mode keeps its existing accounts of that mode, and they may still be reopened.
-
-**Amendment 2026-11-20 (client money accounts and deposit references, accepted):** [client-money-accounts.md](client-money-accounts.md).
-
-- R8: `POST /accounts` with `custodyMode: "Custodial"` in a currency where the account's Tenant has no active client money account → 400 `errors.Currency`. The check runs in the handler directly after the allowed custody modes check. External accounts are not checked. Reopen is not checked.
-- R14 and §8.1: every Custodial account has a server-generated `depositReference` (nine characters, unique on the platform, never changed); an External account has `null`. A POST or PUT body that carries `depositReference` → 400. Script `0039` adds the column and gives existing Custodial accounts one.
-- §8: new read `GET /accounts/{id}/deposit-instructions` (`accounts.read`, same visibility as get): the account's reference and the active client money account in its currency; 404 for an External or Closed account or when the currency has none.
-- §2 Out "Institution name, account number" still holds for the Account itself: the bank details live on the Tenant's client money account, not on `Accounts`.
-
-**Amendment 2026-11-20 (bank feed and deposit matching, accepted):** [deposit-matching.md](deposit-matching.md).
-
-- R17 (list): `GET /accounts` takes an optional `depositReference`, matched exactly after trim and upper-casing, with the visibility of the list. It returns at most one Account; an invalid value returns an empty list, not a 400. Used by the TenantAdmin's manual match of a bank receipt.
 
 ---
 
@@ -112,7 +80,6 @@ Confirmed 2026-09-21: (1) Adviser may read / open / rename / close / reopen acco
 - Physical delete
 - Customer Portal or ledger-write for Customer
 
-**Amendment for Customer Portal (accepted 2026-11-02).** Supersedes the Customer 403 sentences for reads. Grant Customer `accounts.read`. List / get / cash-balance / holdings reads for the caller’s own accounts only. Other customer’s account id → 404. No `accounts.create` / `accounts.manage`. Story 7 and R18 stay for writes.
 - Adviser Portal Accounts page (portal cut later)
 - SystemAdmin ledger screens on `adviser-portal`
 - Empty Holding / Journal / CashLedger tables “for later”
@@ -147,20 +114,38 @@ Confirmed 2026-09-21: (1) Adviser may read / open / rename / close / reopen acco
 | R5 | An account belongs to one Customer in the same tenant. `customerId` is the Customer PublicId. Target must exist, Role = Customer, same tenant; else 404. Adviser: that Customer must be assigned to the caller; else 404. |
 | R6 | Create or reopen while the Customer is Disabled → 400 `disabled` / `target=user` (api-design §4.1). Close / rename / get / list of existing rows still work. |
 | R7 | `Name` is the display name. Required, 1–200, trim, preserve caller casing. Duplicate names under one Customer are allowed. |
-| R8 | `Type` required on create. Phase 2 allowed: `Bank`, `Cash`, `Brokerage`, `Other`. `Property` or `Credit` → 400. Unknown value → 400. Immutable after create. Body on PUT that includes `type` → 400. |
+| R8 | `Type` required on create. Phase 2 allowed: `Bank`, `Cash`, `Brokerage`, `Other`. `Property` or `Credit` → 400. Unknown value → 400. Immutable after create. Body on PUT that includes `type` → 400. `custodyMode` is required too (R22). |
 | R9 | `Currency` required on create. Must exist in `ICurrencyCatalog` and be **enabled**. Stored upper-case `char(3)`. Immutable after create. Body on PUT that includes `currency` → 400. This is the cash-book currency, not instrument quote currency. |
 | R10 | A later disable of that catalog currency does not rewrite `Currency`. New opens still require an enabled code. |
 | R11 | Account has **both** `Status` and `IsActive`. `Status` is the machine: `Open` / `Closed`. `IsActive` is derived: `Open` → 1, `Closed` → 0. Close / reopen are `POST …/close` and `POST …/reopen`. Not fields on PUT. Create lands `Open` / `IsActive = 1`. HTTP never accepts `status` or `isActive` as a writable body field. |
 | R12 | HTTP idempotent: already closed + close, or already open + reopen → 204, no second event. |
 | R13 | PUT / close / reopen require `rowVersion`. Conflict 409. Missing 400. Same encoding as people / instruments. |
-| R14 | PUT updates `name` only. Other fields in the body → 400. |
+| R14 | PUT updates `name` only. Other fields in the body → 400. A body that carries `custodyMode`, `depositReference` or `reinvestDividends` → 400. |
 | R15 | No physical delete. Close is the only way to take a row out of “open” pickers. |
-| R16 | **Amended 2026-10-05 by [holdings.md](holdings.md).** `CloseAccount` rejects while cash `SUM ≠ 0` or any holdings quantity remains (400 ordinary `errors`). Both flat (including never booked) may close. Do not write cash or holdings inside `Account.Close()`. |
-| R17 | List is one tenant. TenantAdmin: current tenant, every Customer. Adviser: current tenant, assigned Customers only. SystemAdmin: `tenantId` query. Every item includes `status`, `isActive`, `tenantId`, `customerId`, `type`, `currency`. `enabledOnly` omitted/`false` = all; `true` = `IsActive` only; any other value 400. Optional `customerId` (Customer PublicId). Optional `type` (exact enum name). `page` default 1, `pageSize` default 20 max 100. Optional `search`: Name contains (CI) or PublicId exact. Sort name then type. |
-| R18 | Customer has no account policy → 403 on every verb. SystemAdmin has all three account policies. Adviser Portal does not add SystemAdmin ledger nav. |
+| R16 | **Close.** `CloseAccount` rejects while cash `SUM ≠ 0` or any holdings quantity remains (400 ordinary `errors`; [posting.md](posting.md) R12, [holdings.md](holdings.md) R16). Both flat (including never booked) may close. Do not write cash or holdings inside `Account.Close()`. An Open **Custodial** account is closed only through an account closure, which pays out the balance as a withdrawal, writes off a remainder below the minor unit and closes the Account (account-closure R7–R9, R17): `POST /accounts/{id}/close` on it → 400 with the message `A Custodial account is closed with an account closure.` under the empty `errors` key, for every caller, SystemAdmin included (account-closure R22). An already Closed Custodial account → 204 (R12). While a closure is `InProgress` the Account is **closing**: it is Open but accepts no hand write (account-closure R11–R13). Reopen, rename and the Disable-Customer guard do not change; a Closed account keeps its closures, and a later closure is a new row. |
+| R17 | List is one tenant. TenantAdmin: current tenant, every Customer. Adviser: current tenant, assigned Customers only. SystemAdmin: `tenantId` query. Every item includes `status`, `isActive`, `tenantId`, `customerId`, `type`, `currency`. `enabledOnly` omitted/`false` = all; `true` = `IsActive` only; any other value 400. Optional `customerId` (Customer PublicId). Optional `type` (exact enum name). `page` default 1, `pageSize` default 20 max 100. Optional `search`: Name contains (CI) or PublicId exact. Sort name then type. Every item also includes `custodyMode` and the computed fields of R23. Optional `custodyMode` filter. Optional `depositReference`, matched exactly after trim and upper-casing, with the visibility of the list: it returns at most one Account, and an invalid value returns an empty list, not a 400 (used by the TenantAdmin's manual match of a bank receipt). |
+| R18 | A Customer has `accounts.read`: list, get, cash-balance and holdings reads for the caller's own accounts only; another Customer's account id → 404. A Customer has no `accounts.create` or `accounts.manage` → 403 on every write. SystemAdmin has all three account policies. Adviser Portal does not add SystemAdmin ledger nav. |
 | R19 | Disable Customer (existing people route): if any Account for that Customer has `IsActive = true` → 400 ordinary `errors` (not §4.1). Closed-only Customers may be disabled. Do not bulk-close on disable. |
 | R20 | Bank / Cash (and reserved Credit) must not hold instruments **when holdings exist**. This slice does not create holdings and does not need a holdings guard. Brokerage / Other (and reserved Property) may hold later. |
 | R21 | Type is a capability gate, not a product module. Do not use Other as a stand-in for Property or Credit. |
+
+| R22 | **Custody mode.** `custodyMode` is required on create: `External` or `Custodial`, matched by exact enum name, no default. It is immutable like `Type` and `Currency` (script `0031`; existing accounts became `External`). A Custodial account has type `Brokerage`; `Custodial` with `Bank`, `Cash` or `Other` → 400 `errors.Type` (custody-modes R3). These two are validator rules. Then, in the handler after the Tenant, the Customer and the currency checks: a `custodyMode` the account's Tenant does not allow → 400 `errors.CustodyMode` (tenant-custody-modes R7, R8); directly after it, `Custodial` in a currency where the Tenant has no active client money account → 400 `errors.Currency` (client-money-accounts R11, R12). Close, reopen and rename do not read the Tenant's setting or its client money accounts: a Tenant that stops allowing a custody mode keeps its accounts of that mode, and they may still be reopened. `Account.Create` takes the custody mode and holds the Brokerage rule. |
+| R23 | **Computed and server-set fields.** The item on list and get carries the fields of the table below. None is a body field. |
+
+| Field | On a Custodial account | On an External account | Field rules |
+| --- | --- | --- | --- |
+| `depositReference` | Server-generated when opened: nine characters, unique on the platform, never changed (script `0039`) | `null` | client-money-accounts R14 |
+| `reservedCash` | The sum of the Account's open withdrawals (`Requested`, `Approved`, `Sent`) plus the reserved cash of its live buy orders | `0` | withdrawals R35, orders R39 |
+| `availableCash` | Cash balance minus reserved cash | The cash balance | withdrawals R35 |
+| `unsettledCash` | The net cash of the account's posted sell fills that are not settled | `0` | orders R44 |
+| `withdrawableCash` | Available cash minus unsettled cash, never below 0 | The cash balance | orders R44 |
+| `closure` | The latest account closure as `{ id, status, payoutAmount, withdrawalId, requestedAt, completedAt }`, or `null` | `null` | account-closure §4.6 |
+| `accruedInterest` | The sum of the account's daily accrual rows not yet posted, 8 decimals | `0` | interest-run R35 |
+| `interestAccruedThrough` | The last UTC day its daily accrual was worked out for; `null` before the first time. It only moves forward | `null` | interest-run R19 |
+| `reinvestDividends` | `false` when opened; set by `PUT /accounts/{accountId}/dividend-reinvestment`, with who last changed it and when | `false` | dividends R17 |
+| `pendingDividends` | The number of `Pending` dividend entitlements | `0` | dividends R52 |
+
+`GET /accounts/{id}/cash-balance` carries the four cash fields too.
 
 Policies (register now; map in `RolePermissions`):
 
@@ -295,6 +280,15 @@ Do not add `IMarketData` / `IFxRate` callers. Those ports already shipped with i
 
 List envelope: `{ items, page, pageSize, totalCount }`.
 
+Sub-resources and reads added by other specs:
+
+| Method | Route | Policy | Notes |
+| --- | --- | --- | --- |
+| GET | `/accounts/{id}/deposit-instructions` | `accounts.read` | The account's reference and the active client money account in its currency. 404 for an External or Closed account, or when the currency has none ([client-money-accounts.md](client-money-accounts.md)) |
+| POST / GET | `/accounts/{accountId}/closures`, `GET …/{id}` | `account-closures.request` / `account-closures.read` | Request (`Idempotency-Key`), list, get ([account-closure.md](account-closure.md) §4.2, §4.6) |
+| GET | `/accounts/{accountId}/interest-accruals` | `accounts.read` | The daily accrual rows, newest day first; filters `from`, `to`, `transactionId`, `posted`. An External account → an empty list ([interest-run.md](interest-run.md) R36) |
+| PUT | `/accounts/{accountId}/dividend-reinvestment` | `accounts.manage` | `{ reinvest, rowVersion }`. An External account → 400 `errors.AccountId` ([dividends.md](dividends.md) R17) |
+
 ### 8.1 Bodies
 
 Create (TenantAdmin / Adviser):
@@ -410,13 +404,13 @@ Functional tests do **not** rely on these rows for isolation; they create their 
 
 ## 10. Tests
 
-| Project | Assert |
-| --- | --- |
-| Domain.UnitTests | Create stores type and currency; type / currency cannot change; close / reopen idempotent; events only on actual change; name trim |
-| Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403; Adviser POST 201 and GET 200 for assigned Customer; Adviser other Adviser’s Customer → 404; TenantAdmin PUT / close 204; SystemAdmin list/create without `tenantId` → 400; SystemAdmin with tenant PublicId POST 201 and PUT 204 on another tenant’s id; TenantAdmin other-tenant id → 404; Property / Credit 400; disabled currency 400; `enabledOnly=true` omits closed; list envelope paging; `rowVersion` 409; Disable Customer with open account → 400; Disable Customer with only closed accounts → 204; reopen on Disabled Customer → 400 `disabled`/`user` |
-| Infrastructure.IntegrationTests | Two-tenant fixture: TenantAdmin other tenant’s PublicId → 404. Same type name allowed in tenant B. TestSeed idempotent on second run when demo tenant exists. Table + unique PublicId + FKs exist. `IsActive` computed from `Status` |
+The tests are the executable form of §4. Where they live:
 
-No cash or holdings fixture in this slice.
+| Project | Where |
+| --- | --- |
+| Domain.UnitTests | `Entities/AccountTests.cs` |
+| Application.FunctionalTests | Folder `Accounts/` |
+| Infrastructure.IntegrationTests | `AppliedSchema/AccountsSchemaTests.cs`, `CustodyModeSchemaTests.cs`, `DepositReferenceSchemaTests.cs`, `TestSeedAccountsTests.cs` |
 
 ---
 
@@ -448,65 +442,19 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
+## 12. History
 
-The repository should build after each commit. Agents split each line into red then green.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/accounts.md`).
 
-1. `0012_accounts.sql` + EF mapping + integration test “table exists”
-2. `Account` aggregate + `AccountType` + `AccountStatus` + Domain.UnitTests
-3. Policies registered in `RolePermissions`
-4. Create / get / list handlers + functional tests (401 / 403 / isolation / assigned scope / reserved type)
-5. Update / close / reopen + `rowVersion` 409
-6. Disable Customer open-account guard + functional tests
-7. `TestSeed` demo Customer (if missing) + four accounts + idempotent integration test
-
-Do not put cash, holdings, Opening, or portal pages in these commits.
-
----
-
-## Amendment 2026-11-20 (reserved and available cash) — accepted
-
-Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md](withdrawals.md).
-
-- The item on list and get, and `GET /accounts/{id}/cash-balance`, gain `reservedCash` (the sum of the Account's open withdrawals: `Requested`, `Approved`, `Sent`) and `availableCash` (cash balance minus reserved cash). On an External account `reservedCash` is always 0 and `availableCash` equals the cash balance. Neither is a body field.
-
----
-
-## Amendment 2026-11-22 (account closure) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [account-closure.md](account-closure.md). Rules R2–R9, R17–R22 and R27 live there; this section records what changes here.
-
-- R16 and close: an Open Custodial account is closed only through an account closure, which pays out the balance as a withdrawal, writes off a remainder below the minor unit and closes the Account (account-closure R7–R9, R17). `POST /accounts/{id}/close` on an Open Custodial account → 400 with the message `A Custodial account is closed with an account closure.` under the empty `errors` key, for every caller, SystemAdmin included (account-closure R22). An already Closed Custodial account → 204 (R12). External accounts unchanged.
-- §8: new sub-resource `/accounts/{accountId}/closures` (`account-closures.read`, `account-closures.request`): `POST` (request, `Idempotency-Key`), `GET` (the Account's closures) and `GET …/{id}`. Field rules in account-closure §4.2 and §4.6.
-- R17 and §8.1: the item on list and get gains `closure`, the Account's latest closure as `{ id, status, payoutAmount, withdrawalId, requestedAt, completedAt }`, or `null`; always `null` on an External account.
-- While a closure is `InProgress` the Account is **closing**: it is Open but accepts no hand write (account-closure R11–R13). Reopen, rename and the Disable-Customer guard are unchanged; a Closed account keeps its closures, and a later closure is a new row.
-
----
-
-## Amendment 2026-11-22 (interest run) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rules R16–R20, R35 and R36 live there; this section records what changes here.
-
-- Every Custodial account has `interestAccruedThrough`: the last UTC day its daily accrual was worked out for, `null` before the first time. It only moves forward and is set by the interest run under the Account lock (interest-run R19).
-- R17 and §8.1: the item on list and get gains `accruedInterest` (the sum of the account's daily accrual rows not yet posted, 8 decimals) and `interestAccruedThrough` (a date or `null`). On an External account `0` and `null`. Neither is a body field.
-- §8: new route `GET /accounts/{accountId}/interest-accruals` (`accounts.read`, the Account's scope): the daily accrual rows, newest day first, with filters `from`, `to`, `transactionId` and `posted` (interest-run R36). An External account → an empty list.
-- Closing, reopening and renaming are unchanged. A Closed or closing account is not accrued; a reopened account earns nothing for the days it had no cash (interest-run R20).
-
----
-
-## Amendment 2026-11-23 (orders and settlement) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R39, R41 and R44 live there; this section records what changes here.
-
-- The account item on list and get, and `GET /accounts/{id}/cash-balance`, gain `unsettledCash` (the net cash of the account's posted sell fills that are not settled) and `withdrawableCash` (available cash minus unsettled cash, never below 0). On an External account they are `0` and the cash balance.
-- `reservedCash` now also counts the reserved cash of the account's live buy orders; `availableCash` follows.
-- Closing a Custodial account stays with the account closure, which now also waits for open orders and unsettled fills (account-closure R5 as amended).
-
----
-
-## Amendment 2026-11-24 (dividends) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rules R17 and R52 live there; this section records what changes here.
-
-- A Custodial account gains `reinvestDividends` (`false` when opened and on every existing account), with who last changed it and when. It is set by `PUT /accounts/{accountId}/dividend-reinvestment` (`accounts.manage`) with `{ reinvest, rowVersion }`; an External account → 400 `errors.AccountId`. `PUT /accounts/{id}` does not take it.
-- The account item gains `reinvestDividends` and `pendingDividends` (the number of `Pending` dividend entitlements); `false` and `0` on an External account.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-09-25 | [posting.md](posting.md) | `cashBalance`; R16: close needs cash `SUM = 0` |
+| 2026-10-05 | [holdings.md](holdings.md) | R16: close also needs no holding |
+| 2026-11-02 | [customer-portal.md](../customer-portal/customer-portal.md) | R18: a Customer reads their own accounts |
+| 2026-11-17 | [account-custody-mode.md](account-custody-mode.md), [custody-modes.md](custody-modes.md) | R22: the custody mode; a Custodial account can be opened. §9.1: a fifth demo account |
+| 2026-11-18 | [tenant-custody-modes.md](tenant-custody-modes.md) | R22: the Tenant must allow the custody mode |
+| 2026-11-20 | [client-money-accounts.md](client-money-accounts.md), [deposit-matching.md](deposit-matching.md), [withdrawals.md](withdrawals.md) | R22: a client money account in the currency. R23: `depositReference`, reserved and available cash. R17: the `depositReference` filter. §8: deposit instructions |
+| 2026-11-22 | [account-closure.md](account-closure.md), [interest-run.md](interest-run.md) | R16: a Custodial account closes through an account closure. R23: `closure`, accrued interest. §8: closures, interest accruals |
+| 2026-11-23 | [orders.md](orders.md) | R23: unsettled and withdrawable cash; reserved cash counts buy orders |
+| 2026-11-24 | [dividends.md](dividends.md) | R23: `reinvestDividends`, `pendingDividends`. §8: dividend reinvestment |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
