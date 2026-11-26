@@ -196,7 +196,7 @@ The fifth role `SimulatorOperator` ([ADR 0013](adr/0013-roles-authorization-sing
 | State conflict: stale `rowVersion`, reused `Idempotency-Key`, changed FX rate, … | 409 with a problem `code` (§4.2) | `webapi` |
 | Unhandled | 500 | Either host |
 
-Whether login failures distinguish Disabled from bad credentials is **still open** (§9). Until locked, treat them as a uniform failure and do not enumerate the reason. A disabled tenant or Disabled person at **hosted login** is not §4.1: that is a uniform failure on `identity`, not this JSON.
+Login failures do not distinguish Disabled from bad credentials: every failure at hosted login shows the same copy, `Invalid login.`, and does not enumerate the reason (identity-auth R3, §4.4; locked in §9). A disabled tenant or Disabled person at **hosted login** is not §4.1: that is a uniform failure on `identity`, not this JSON.
 
 ### 4.1 Target is disabled (shared error)
 
@@ -894,4 +894,4 @@ One row per change. The text of each change is in git (`git log -p -- docs/api-d
 | 2026-11-26 | Account valuation (§6, §7.6): `GET /accounts/{id}/valuation?date=` with `accounts.read`. No new permission or problem code |
 | 2026-11-26 | Valuation run (§3.1, §6, §7.6, §7.18): `valuation-runs.read` and `valuation-runs.start`; `/valuation-runs`; `GET /accounts/{id}/valuations[/{date}]`; `valuedThrough` on the account item. No problem code |
 | 2026-11-26 | Valuation history (§6, §7.18): `GET /net-worth/funds-under-management`; `folded` on the net-worth reads; `date` of the Adviser Balances Report. No permission or problem code |
-| 2026-11-27 | Docs caught up with the code: §1 diagram shows the BFF between the browser and `webapi`; §2 CORS is none on `webapi` |
+| 2026-11-27 | Docs caught up with the code: §1 diagram shows the BFF between the browser and `webapi`; §2 CORS is none on `webapi`; §4 login failures are uniform (`Invalid login.`), no longer open |
