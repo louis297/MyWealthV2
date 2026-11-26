@@ -45,7 +45,7 @@ builder.Services.AddScoped(sp => new InstrumentPriceSyncJob(
     sp.GetRequiredService<ILogger<InstrumentPriceSyncJob>>()));
 builder.Services.AddHangfireServer(options =>
 {
-    options.Queues = ["reports", "rebalance", "outbox", "fx", "prices", BankStatementRecurringJob.Queue, InterestRunJob.Queue, MarketDataRecurringJob.Queue, BrokerSyncRecurringJob.Queue, MyWealthV2.Infrastructure.Custodian.CustodianSyncRecurringJob.Queue];
+    options.Queues = ["reports", "rebalance", "outbox", "fx", "prices", BankStatementRecurringJob.Queue, InterestRunJob.Queue, MyWealthV2.Infrastructure.Valuations.ValuationRunJob.Queue, MarketDataRecurringJob.Queue, BrokerSyncRecurringJob.Queue, MyWealthV2.Infrastructure.Custodian.CustodianSyncRecurringJob.Queue];
 });
 
 var app = builder.Build();
@@ -69,6 +69,7 @@ MyWealthV2.Infrastructure.Custodian.CustodianSyncRecurringJob.Register(
     app.Services.GetRequiredService<JobStorage>(),
     app.Services.GetRequiredService<MyWealthV2.Infrastructure.Custodian.ConfiguredCustodianConnections>());
 InterestRunRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
+MyWealthV2.Infrastructure.Valuations.ValuationRunRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 InstrumentPriceRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 CorporateActionApplyRecurringJob.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 BankStatementRecurringJob.Register(
