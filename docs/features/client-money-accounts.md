@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-19
-last_updated: 2026-11-20
+last_updated: 2026-11-26
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -111,15 +111,15 @@ The rule that distinguishes this slice: from now on a Custodial account can exis
 | ID | Rule |
 | --- | --- |
 | R1 | **Access.** Every client money account route requires `tenants.manage` (SystemAdmin only). TenantAdmin, Adviser and Customer → 403. Missing / dead Bearer → 401, never 302. Path `{tenantId}` and `{id}` are PublicIds. Unknown tenant → 404. An `{id}` that is not a client money account of `{tenantId}` → 404, also when it belongs to another tenant. |
-| R2 | **Fields.** A client money account has `currency`, `bankName`, `accountName`, `accountNumber` and `isActive`. `currency`: required, an **enabled** catalog code ([currencies.md](currencies.md)), stored upper-case. `bankName`: required, trimmed, 1–100 characters. `accountName` (the name the bank account is held in, for example "North Advisory Ltd Client Funds Trust Account"): required, trimmed, 1–140. `accountNumber`: required, trimmed, 1–34 characters of letters, digits, spaces and hyphens, with no two spaces in a row; it holds whatever the bank publishes (an NZ account number, a BSB and account number, an IBAN). Each field outside its rule → 400 `errors.<Field>`. |
+| R2 | **Fields.** A client money account has `currency`, `bankName`, `accountName`, `accountNumber` and `isActive`. `currency`: required, an **enabled** catalog code ([currencies.md](currencies.md)), stored upper-case. `bankName`: required, trimmed, 1–100 characters. `accountName` (the name the bank account is held in, for example "North Advisory Ltd Client Funds Trust Account"): required, trimmed, 1–140. `accountNumber`: required, trimmed, 1–34 characters of letters, digits, spaces and hyphens, with no two spaces in a row; it holds whatever the bank publishes (an NZ account number, a BSB and account number, an IBAN). Each field outside its rule → 400 `errors.<Field>`. Create also requires `bankConnection`, the name of a bank connection in configuration; unknown → 400 `errors.BankConnection` (deposit-matching R1, R2). `GET /bank-connections` (`tenants.manage`) lists the configured ones. |
 | R3 | **Full account number.** The account number is stored and returned in full, not masked. Customers need the whole number to pay in, and it is not a Customer's personal data. |
 | R4 | **One active per currency.** A Tenant has at most one active client money account per currency. Create in a currency that already has an active one → 400 `errors.Currency` with the message `The tenant already has an active client money account in USD.` (with the code). Enable when another active one exists in the same currency → 400 with the same message. Inactive rows in that currency do not count. |
 | R5 | **Account number unique among active rows.** No two active client money accounts on the platform have the same `accountNumber` (compared without regard to case). Create or enable that would break it → 400 `errors.AccountNumber` with the message `This account number is already in use by an active client money account.` The message does not say which tenant has it. Inactive rows do not count, so a corrected row can reuse the number of the row it replaces. |
 | R6 | **Create.** `POST /tenants/{tenantId}/client-money-accounts` with the R2 fields → 201 `{ "id" }`, `Location` on the item route. The new row is active. A disabled tenant → 400 `disabled` / `target=tenant` (api-design §4.1). The body must not carry `isActive`, `tenantId` or `id` (400). |
-| R7 | **No edit.** There is no PUT. `currency`, `bankName`, `accountName` and `accountNumber` never change after create. A wrong detail is corrected by disabling the row and creating a new one. Deposit instructions a Customer has seen therefore always belong to one stored row. |
+| R7 | **No edit.** There is no PUT. `currency`, `bankName`, `accountName` and `accountNumber` never change after create. A wrong detail is corrected by disabling the row and creating a new one. Deposit instructions a Customer has seen therefore always belong to one stored row. `bankConnection` never changes either. Script `0040` set `simulator` on every row that existed before it. |
 | R8 | **Disable and enable.** `POST …/{id}/disable` and `POST …/{id}/enable` with `rowVersion` → 204. Missing `rowVersion` → 400; stale → 409 `stale_row_version`. Already in the target state → 204, nothing written (idempotent like accounts R12). Enable checks R4 and R5. Disable is always allowed, also while Custodial accounts in that currency exist (R13). |
 | R9 | **Read.** `GET /tenants/{tenantId}/client-money-accounts` → list envelope, sorted by currency, then active before inactive, then newest first. Optional `enabledOnly` (omitted / `false` = all, `true` = active only; any other value → 400). `page` and `pageSize` as everywhere. `GET …/{id}` → the item. |
-| R10 | **No other effect.** Creating, disabling or enabling a client money account changes no Account, Transaction or deposit reference. It raises no domain event and writes no outbox row. A disabled Tenant keeps its client money accounts. |
+| R10 | **No other effect.** Creating, disabling or enabling a client money account changes no Account, Transaction or deposit reference. It raises no domain event and writes no outbox row. A disabled Tenant keeps its client money accounts. An active client money account is read by the bank statement job of its connection (deposit-matching R5); an inactive one is not, and keeps its cursor. |
 
 ### 4.2 Opening a Custodial account
 
@@ -322,6 +322,8 @@ Client money account item:
   "bankName": "Simulator Bank",
   "accountName": "North Advisory Ltd Client Funds Trust Account",
   "accountNumber": "02-0100-0123456-00",
+  "bankConnection": "simulator",
+  "bankFeed": { "lastSucceededAt": null, "lastFailedAt": null, "lastFailure": null },
   "isActive": true,
   "rowVersion": "<base64>",
   "created": "2026-11-19T03:00:00Z"
@@ -429,24 +431,13 @@ Page contracts: [back-office.md](../backoffice/back-office.md) (BO16, BO17), [ad
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | `ClientMoneyAccount.Create`: active; each field at its limits; a blank, too long or bad-character field → `DomainException`; two spaces in a row → throws. `Disable` / `Enable` idempotent. `DepositReference`: `Generate` with scripted symbols gives the expected value; 1 000 generated values are valid, first character a letter; `IsValid` true for `K7M3Q9PXB`, false for one changed character, for two neighbours swapped, for 8 or 10 characters, for `I`, `L`, `O`, `U`, lower case, and a first digit. `Account.Create`: Custodial without a reference → throws; External with one → throws; the reference is kept on close and reopen |
-| Application.FunctionalTests — client money accounts | No Bearer → 401 not 302; TenantAdmin, Adviser, Customer → 403 on every route. SystemAdmin: create → 201 and get returns the fields; list sorted per R9, `enabledOnly`; each R2 400 with its field; `isActive` in the body → 400; second active in the currency → 400 `errors.Currency`; second after the first is disabled → 201; enable the first again → 400 `errors.Currency`; the same account number active in another tenant → 400 `errors.AccountNumber` without the tenant name in the message; reuse after disable → 201; disable / enable idempotent; stale `rowVersion` → 409 `stale_row_version`; disabled tenant → 400 `disabled` / `target=tenant`. Two-tenant: tenant B's row id under tenant A's path → 404 on get, disable and enable. Tenant item: `clientMoneyCurrencies` sorted, `[]` without rows, a disabled row not listed; TenantAdmin and Adviser see it on by-code |
-| Application.FunctionalTests — open | Tenant with an active USD client money account: TenantAdmin and Adviser open Custodial USD → 201 with a valid `depositReference`; Custodial NZD → 400 `errors.Currency` with the R11 message, no account row; External NZD → 201 with `depositReference: null`. Tenant that does not allow Custodial and has no client money account → the tenant-custody-modes message (R12 order). SystemAdmin with `tenantId` follows the target tenant's rows. `depositReference` in the POST or PUT body → 400. Disable the USD row: the existing Custodial account takes a `TransferIn`, closes and **reopens**; a new Custodial USD open → 400. Redraw before save (R17 a): a replaced `IDepositReferenceSource` that returns an existing reference first, then a new one → 201 with the second. Redraw after save (R17 b): a test save interceptor inserts another account with the drawn reference just before the first save of the open → 201 with the next drawn reference, one account written by the request, no 500. Five used draws → 500 and no account row. A save that fails on another constraint is not retried (the source is called once). Two accounts opened in two tenants get different references. Two-tenant: an Adviser of tenant A naming tenant B's Customer → 404, not 400 |
-| Application.FunctionalTests — deposit instructions | Open Custodial USD with an active USD row → 200 with the R22 body, for TenantAdmin, the assigned Adviser, the Customer (own) and SystemAdmin. External → 404; Closed → 404; the USD row disabled → 404; then a new USD row → 200 with its details. Unassigned Adviser, another Customer, another tenant's TenantAdmin → 404. No Bearer → 401 |
-| Infrastructure.IntegrationTests | `0038` on a scratch database: a second active row in one (tenant, currency) violates `UX_ClientMoneyAccounts_TenantId_Currency_Active`; a second inactive one inserts; the same account number active twice violates the account number index, once active and once inactive inserts. `0039` on a scratch database with External and Custodial accounts: every Custodial row gets a value that passes `DepositReference.IsValid`, all distinct; External rows stay `NULL`; a Custodial insert without a reference and an External insert with one violate `CK_Accounts_DepositReference`; a duplicate reference violates `UX_Accounts_DepositReference`. EF round-trip of both. `TestSeed` twice: one USD and one NZD row per firm |
-| Back Office (`BackOfficePageTests`) | BO16: the table from the list; the add form posts the four fields; a 400 is shown at its field; Disable / Enable send `rowVersion`. BO17: no edit control, the sentence is shown |
-| Adviser Portal | D32: reference shown on a Custodial account, Open and Closed; panel from the route on an Open one; the 404 sentence; nothing on External. D33: with Custodial, only `clientMoneyCurrencies`; empty list → sentence and no submit; 400 `errors.Currency` at the picker; External offers every enabled currency |
-| Customer Portal | C19, C20 |
-
-Fan-out in the tests:
-
-- Every functional test that opens a Custodial account needs an active client money account in its currency. `AccountHttp.OpenAccountAsync` (and through it `CustodialHttp.OpenCustodialAsync`, about 20 files) ensures one, with `custodyMode: "Custodial"`, for the Customer's tenant in the database before it posts. The tests that post a Custodial body themselves (`AccountCustodyModeCreateTests`, `TenantCustodyModesNarrowingTests`, `TenantCustodyModesOpenTests`) call the same helper in their arrange step. The new R11 tests post without it.
-- The callers of `Account.Create` with `CustodyMode.Custodial` (`TestSeed`, `AccountTests`, `RebalanceJobWorkerTests`, `RebalanceJobTenantScopeTests`) pass `DepositReference.Generate(...)`.
-- Raw-SQL `INSERT INTO [Accounts]` with `CustodyMode = 1` on a database at `0039` or later adds a valid `DepositReference` (`CustodyModeSchemaTests`, `RemoveExternalPortfolioAssignmentsSchemaTests`, `TenantCompositeKeysSchemaTests`, `ScratchSchemaDatabase` where they insert Custodial rows). Inserts on a scratch database stopped before `0039` do not change.
-- `TenantDto` and the Adviser Portal `Tenant` type gain `clientMoneyCurrencies`; the Adviser Portal `Account` type gains `depositReference`; the Customer Portal `Account` type too.
-- The Back Office `IPlatformApi` gains the five client money account calls; the fake in `BackOfficePageTests` follows.
+| Domain.UnitTests | `Entities/ClientMoneyAccountTests.cs` |
+| Application.FunctionalTests | Folder `ClientMoneyAccounts/`; `Tenants/TenantClientMoneyCurrenciesTests.cs` |
+| Infrastructure.IntegrationTests | `AppliedSchema/ClientMoneyAccountsSchemaTests.cs`, `ClientMoneyAccountBankConnectionSchemaTests.cs`, `DepositReferenceSchemaTests.cs`, `TestSeedClientMoneyAccountsTests.cs` |
 
 ---
 
@@ -483,44 +474,21 @@ Each point was confirmed as recommended and is written into the rules above as s
 
 Still open, not this slice:
 
-- The bank connection of a client money account, and whether an inactive one is still read by the feed (roadmap B3)
-- How a reference is found in a statement line's text, and how a mistyped one is normalised (`O` → `0`, `I` and `L` → `1`) before the check (roadmap B4)
-- Search by deposit reference for the operator's manual match (roadmap B4)
-- What the simulator bank does with the platform's client money accounts across a simulator reset (roadmap S1)
-- Interest paid by the bank on the trust account (roadmap B7, I2)
+- None. The points left open here were answered by [deposit-matching.md](deposit-matching.md) (the bank connection, R1, R2, R5; how a reference is found and normalised, R15; search by deposit reference, R37; the simulator bank's standing accounts, R39) and by [interest-run.md](interest-run.md) (interest the bank pays on the trust account).
 
 ---
 
-## 12. Suggested commits
-
-The repository should build after each commit. Agents split each behaviour into red then green.
-
-1. Store client money accounts (R2, R10): `ClientMoneyAccount`, script `0038`, EF mapping + Domain unit tests and the `0038` integration tests.
-2. The client money account routes (R1, R4–R9) + functional tests, including two-tenant.
-3. `clientMoneyCurrencies` on the tenant item (R23) + functional tests.
-4. `POST /accounts` needs a client money account for a Custodial account (R11–R13) + functional tests. The test helpers of §10 fan-out change here.
-5. Store the deposit reference (R14, R15, R18, R19): `DepositReference`, `Account.Create` takes it, script `0039` with the back-fill, EF mapping, `TestSeed` + Domain unit tests and the `0039` integration tests. The `Account.Create` callers and raw inserts of §10 fan-out change here.
-6. The server draws the reference on open (R16, R17 a and b, `DepositReferenceTakenException`) and the account item carries it + functional tests.
-7. `GET /accounts/{id}/deposit-instructions` (R20–R22) + functional tests.
-8. `TestSeed` client money accounts (§9.1) + the seed integration test.
-9. Back Office: client money accounts on the configuration page (BO16, BO17) + page tests.
-10. Adviser Portal (D32, D33) and Customer Portal (C19, C20) + frontend tests.
-11. Repo docs: mark this file landed; roadmap §13 step 4; the deployment note that the showcase needs client money accounts before a new Custodial account opens.
-
-Do not put a bank feed, a connection, matching, suspense, nominated bank accounts or withdrawals in these commits.
-
-### Docs amended when this spec was accepted
+## 12. Docs changed when this spec was accepted
 
 [tenants.md](tenants.md) (amendment: `clientMoneyCurrencies` on the item; the client money account routes), [accounts.md](accounts.md) (amendment: R8 open rule, `depositReference` on the item, refused on POST and PUT, the deposit instructions route), [custody-modes.md](custody-modes.md) (a Custodial account opens only in a covered currency), [demo-tenant-seed.md](demo-tenant-seed.md) (no client money accounts), [api-design.md](../api-design.md) (§7.3 and §7.6 rows, change log), [domain-model.md](../domain-model.md) §8.5 and the new aggregate, [database-design.md](../database-design.md) §9, §11.3 and the new table, [back-office.md](../backoffice/back-office.md) (BO16, BO17), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D32, D33), [customer-portal.md](../customer-portal/customer-portal.md) (C19, C20), [function-plan.md](../function-plan.md) §5 item 9, [features/README.md](README.md) row status, the roadmap §5 B1 / B2 and §13 status.
 
 ---
 
-## Amendment 2026-11-20 (bank feed and deposit matching) — accepted
+## 13. History
 
-Status of this amendment: `accepted` (2026-11-20), together with [deposit-matching.md](deposit-matching.md).
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/client-money-accounts.md`).
 
-- R2 and R6: create requires `bankConnection`, the name of a bank connection in configuration; unknown → 400 `errors.BankConnection`. R7: it never changes, like the other details. Script `0040` sets `simulator` on every existing row (roadmap D19).
-- §8.1: the item gains `bankConnection` and `bankFeed` (`{ lastSucceededAt, lastFailedAt, lastFailure }`, `null` until the first read).
-- R10 no longer holds in full: an active client money account is read by the bank statement job of its connection (deposit-matching R5); an inactive one is not, and keeps its cursor.
-- New read `GET /bank-connections` (`tenants.manage`).
-- §11 "Still open" answered: the bank connection (point 1, deposit-matching R1, R2); an inactive row is not read (R5); how a reference is found and normalised (R15); search by deposit reference (`GET /accounts?depositReference=`, R37); the simulator bank keeps the trust accounts across a reset through standing accounts (R39). Interest on the trust account stays open (B7, I2).
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-20 | [deposit-matching.md](deposit-matching.md) | R2, R7, R10, §8.1, §11: the bank connection and the bank feed status of a client money account |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
