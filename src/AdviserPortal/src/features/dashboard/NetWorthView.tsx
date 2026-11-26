@@ -3,9 +3,12 @@ import { Link } from "react-router";
 import { Muted, Section } from "@/components/portal";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { NetWorth } from "@/features/dashboard/dashboardApi";
+import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
+import type { FoldedTotal, NetWorth } from "@/features/dashboard/dashboardApi";
+import { notFoldedReason } from "@/features/dashboard/valuationText";
+import { formatAmount } from "@/shared/format/money";
 
-export function NetWorthView({ data }: { data: NetWorth }) {
+export function NetWorthView({ data, chart }: { data: NetWorth; chart?: ReactNode }) {
   const currencies = data.currencies;
   const byCustomer = data.breakdowns.byCustomer;
   const byAccountType = data.breakdowns.byAccountType;
@@ -15,6 +18,7 @@ export function NetWorthView({ data }: { data: NetWorth }) {
   return (
     <div className="flex flex-col gap-6">
       {currencies.length === 0 ? <Muted>No balances.</Muted> : <CurrencyTable currencies={currencies} />}
+      {data.folded ? <FoldedLine folded={data.folded} /> : null}
       <div className="grid gap-6 md:grid-cols-2">
         <CustodyFigure
           title="Funds under management"
@@ -25,6 +29,7 @@ export function NetWorthView({ data }: { data: NetWorth }) {
           entry={byCustodyMode.find((row) => row.custodyMode === "External")}
         />
       </div>
+      {chart}
       <Section title="By customer">
         {byCustomer.length === 0 ? <Muted>None.</Muted> : (
           <TableCard>
@@ -105,6 +110,29 @@ export function NetWorthView({ data }: { data: NetWorth }) {
           </TableCard>
         )}
       </Section>
+    </div>
+  );
+}
+
+/**
+ * D108: the per-currency net in the reporting currency at today's rates, with the currencies it leaves out. Not shown
+ * when the only currency is the reporting currency.
+ */
+function FoldedLine({ folded }: { folded: FoldedTotal }) {
+  const currencies = useGetCurrenciesQuery();
+  const lines = folded.currencies;
+  if (lines.length === 0 || (lines.length === 1 && lines[0].currency === folded.currency)) {
+    return null;
+  }
+
+  const places = currencies.data?.find((currency) => currency.code === folded.currency)?.decimalPlaces;
+  const left = lines.filter((line) => line.status !== "Folded");
+  return (
+    <div className="flex flex-col gap-1 text-sm">
+      <p>{`Total in ${folded.currency}: ${formatAmount(folded.total, places)} at today's exchange rates`}</p>
+      {folded.complete || left.length === 0 ? null : (
+        <Muted>{`Not counted: ${left.map((line) => `${line.currency} (${notFoldedReason(line)})`).join(", ")}`}</Muted>
+      )}
     </div>
   );
 }

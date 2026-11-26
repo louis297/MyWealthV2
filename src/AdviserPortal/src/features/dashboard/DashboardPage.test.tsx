@@ -400,7 +400,7 @@ describe("DashboardPage valuation history", () => {
 
     const chart = (await screen.findByRole("heading", { name: "Funds under management over time" })).closest("section")!;
     expect(
-      within(chart).getByText("In NZD, at each day's exchange rate. Up to 2026-03-11; a day is added once its prices are final."),
+      await within(chart).findByText("In NZD, at each day's exchange rate. Up to 2026-03-11; a day is added once its prices are final."),
     ).toBeInTheDocument();
     const points = within(chart).getAllByRole("button", { name: /^2026-03-/ });
     expect(points.map((point) => point.getAttribute("aria-label"))).toEqual([
