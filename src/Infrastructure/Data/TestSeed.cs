@@ -88,6 +88,99 @@ public static class TestSeed
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        await EnsureFxRateHistoryAsync(db, cancellationToken);
+    }
+
+    /// <summary>Valuation run §9.1: the first day of the seeded price and rate history.</summary>
+    /// <summary>The date of the seeded opening prices and rates.</summary>
+    private static readonly DateOnly OpeningPriceDate = new(2026, 1, 1);
+
+    private static readonly DateOnly HistoryFrom = new(2026, 1, 2);
+
+    /// <summary>Valuation run §9.1: the last day of the seeded history, on which every row equals its 2026-01-01 row.</summary>
+    private static readonly DateOnly HistoryTo = new(2026, 3, 31);
+
+    private static readonly int[] HistoryPattern = [0, 1, 2, 1, 0, -1, -2, -1];
+
+    /// <summary>Valuation run §9.1: the fixed daily pattern of the history, a factor within 2 % of 1 that is 1 on
+    /// <see cref="HistoryTo"/>, so two seeds write the same rows and the latest row is the opening price again.</summary>
+    private static decimal HistoryFactor(DateOnly day) =>
+        1m + 0.01m * HistoryPattern[(HistoryTo.DayNumber - day.DayNumber) % HistoryPattern.Length];
+
+    private static IEnumerable<DateOnly> HistoryDays()
+    {
+        for (var day = HistoryFrom; day <= HistoryTo; day = day.AddDays(1))
+        {
+            yield return day;
+        }
+    }
+
+    /// <summary>Valuation run §9.1: one rate per calendar day of the history for each pair seeded on 2026-01-01,
+    /// written only where no row of that pair and date exists. A pair into USD moves the other way.</summary>
+    private static async Task EnsureFxRateHistoryAsync(ApplicationDbContext db, CancellationToken cancellationToken)
+    {
+        var existing = await db.FxRates
+            .Where(row => row.AsOfDate >= HistoryFrom && row.AsOfDate <= HistoryTo)
+            .Select(row => new { row.BaseCurrency, row.QuoteCurrency, row.AsOfDate })
+            .ToListAsync(cancellationToken);
+        var known = existing
+            .Select(row => $"{row.BaseCurrency.Trim()}|{row.QuoteCurrency.Trim()}|{row.AsOfDate:yyyy-MM-dd}")
+            .ToHashSet(StringComparer.Ordinal);
+        foreach (var pair in SeedRates)
+        {
+            foreach (var day in HistoryDays())
+            {
+                if (!known.Add($"{pair.BaseCurrency}|{pair.QuoteCurrency}|{day:yyyy-MM-dd}"))
+                {
+                    continue;
+                }
+
+                var rate = pair.QuoteCurrency == "USD" ? pair.Rate / HistoryFactor(day) : pair.Rate * HistoryFactor(day);
+                db.FxRates.Add(new FxRate
+                {
+                    BaseCurrency = pair.BaseCurrency,
+                    QuoteCurrency = pair.QuoteCurrency,
+                    Rate = decimal.Round(rate, 8, MidpointRounding.AwayFromZero),
+                    AsOfDate = day,
+                    Source = "Frankfurter",
+                    FetchedAt = new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero)
+                });
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>Valuation run §9.1: one price per weekday of the history for an instrument with a seeded price that
+    /// no market data connection serves, written only where no row of that instrument and date exists, so real bars
+    /// the price job already stored stay.</summary>
+    private static async Task EnsurePriceHistoryAsync(
+        ApplicationDbContext db,
+        int instrumentId,
+        decimal openingPrice,
+        CancellationToken cancellationToken)
+    {
+        var known = (await db.InstrumentPrices
+                .Where(row => row.InstrumentId == instrumentId && row.AsOfDate >= HistoryFrom && row.AsOfDate <= HistoryTo)
+                .Select(row => row.AsOfDate)
+                .ToListAsync(cancellationToken))
+            .ToHashSet();
+        foreach (var day in HistoryDays().Where(day => day.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday))
+        {
+            if (known.Contains(day))
+            {
+                continue;
+            }
+
+            db.InstrumentPrices.Add(new InstrumentPrice
+            {
+                InstrumentId = instrumentId,
+                Price = decimal.Round(openingPrice * HistoryFactor(day), 2, MidpointRounding.AwayFromZero),
+                AsOfDate = day,
+                Source = "EODHD",
+                FetchedAt = new DateTimeOffset(day.AddDays(1).ToDateTime(new TimeOnly(12, 0)), TimeSpan.Zero)
+            });
+        }
     }
 
     private readonly record struct SeedFirm(
@@ -414,6 +507,11 @@ public static class TestSeed
                 continue;
             }
 
+            if (!item.Symbol.EndsWith(SimulatedSuffix, StringComparison.Ordinal))
+            {
+                await EnsurePriceHistoryAsync(db, instrument.Id, price, cancellationToken);
+            }
+
             var stored = await db.InstrumentPrices.AnyAsync(
                 row => row.InstrumentId == instrument.Id && row.AsOfDate == asOf,
                 cancellationToken);
@@ -596,6 +694,8 @@ public static class TestSeed
     private const string DemoCustodialFundingReference = "TestSeed-DemoCustodial-Funding";
     private const string DemoCustodialBuyVtiReference = "TestSeed-DemoCustodial-BuyVti";
     private const string DemoCustodialBuyAaplReference = "TestSeed-DemoCustodial-BuyAapl";
+    private const string DemoCustodialSellVtiReference = "TestSeed-DemoCustodial-SellVti";
+    private const string DemoCustodialTransferInReference = "TestSeed-DemoCustodial-TransferIn";
 
     /// <summary>
     /// Custody modes §9.1: the Custodial demo account is funded with one TransferIn and buys VTI and AAPL at the
@@ -614,6 +714,15 @@ public static class TestSeed
         }
 
         var nzdt = TimeSpan.FromHours(13);
+        var fundedAt = new DateTimeOffset(2026, 1, 20, 10, 0, 0, nzdt);
+
+        // Valuation run §9.1: opened on the UTC day of its funding, so a valuation run values it from then.
+        if (account.Created != fundedAt)
+        {
+            account.Created = fundedAt;
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
         if (!await ReferenceExistsAsync(db, account.Id, DemoCustodialFundingReference, cancellationToken))
         {
             var funding = Transaction.Post(
@@ -622,7 +731,7 @@ public static class TestSeed
                 TransactionType.TransferIn,
                 20000m,
                 account.Currency,
-                new DateTimeOffset(2026, 1, 20, 10, 0, 0, nzdt),
+                fundedAt,
                 "Demo custodial funding",
                 DemoCustodialFundingReference,
                 TransactionSource.Seed,
@@ -639,8 +748,96 @@ public static class TestSeed
         await EnsureDemoCustodialBuyAsync(
             db, tenantId, account, "AAPL", 20m, new DateTimeOffset(2026, 1, 20, 11, 0, 0, nzdt),
             DemoCustodialBuyAaplReference, cancellationToken);
+        await EnsureDemoCustodialSellAsync(
+            db, tenantId, account, "VTI", 10m, new DateTimeOffset(2026, 2, 17, 10, 0, 0, nzdt),
+            DemoCustodialSellVtiReference, cancellationToken);
+        if (!await ReferenceExistsAsync(db, account.Id, DemoCustodialTransferInReference, cancellationToken))
+        {
+            var transfer = Transaction.Post(
+                tenantId,
+                account.Id,
+                TransactionType.TransferIn,
+                5000m,
+                account.Currency,
+                new DateTimeOffset(2026, 3, 3, 10, 0, 0, nzdt),
+                "Demo custodial top-up",
+                DemoCustodialTransferInReference,
+                TransactionSource.Seed,
+                currentCashSum: await CashSumAsync(db, account.Id, cancellationToken),
+                existingTransactionCount: 1);
+            Stamp(transfer, transfer.CashLegs.Single());
+            db.Transactions.Add(transfer);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
         await SyncHoldingAsync(db, tenantId, account, "VTI", cancellationToken);
         await SyncHoldingAsync(db, tenantId, account, "AAPL", cancellationToken);
+    }
+
+    /// <summary>Valuation run §9.1: a Sell at the stored price of its UTC day, so the history has a trade to value
+    /// around. Idempotent on its reference.</summary>
+    private static async Task EnsureDemoCustodialSellAsync(
+        ApplicationDbContext db,
+        int tenantId,
+        Account account,
+        string symbol,
+        decimal quantity,
+        DateTimeOffset bookedAt,
+        string reference,
+        CancellationToken cancellationToken)
+    {
+        if (await ReferenceExistsAsync(db, account.Id, reference, cancellationToken))
+        {
+            return;
+        }
+
+        var instrument = await db.Instruments.SingleOrDefaultAsync(
+            row => row.TenantId == tenantId && row.Symbol == symbol, cancellationToken);
+        if (instrument is null
+            || !string.Equals(instrument.QuoteCurrency.Trim(), account.Currency.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var asOf = DateOnly.FromDateTime(bookedAt.UtcDateTime);
+        var stored = await db.InstrumentPrices.AsNoTracking()
+            .Where(row => row.InstrumentId == instrument.Id && row.AsOfDate <= asOf)
+            .OrderByDescending(row => row.AsOfDate)
+            .FirstOrDefaultAsync(cancellationToken);
+        var legs = await db.TransactionSecurityLegs
+            .Where(leg => leg.AccountId == account.Id && leg.InstrumentId == instrument.Id)
+            .Select(leg => new { leg.Quantity, leg.CostAmount })
+            .ToListAsync(cancellationToken);
+        var held = legs.Sum(leg => leg.Quantity);
+        if (stored is null || held < quantity)
+        {
+            return;
+        }
+
+        var transaction = Transaction.PostSell(
+            tenantId,
+            account.Id,
+            account.Type,
+            account.Currency,
+            instrument.Id,
+            quantity,
+            Money.Create(stored.Price, instrument.QuoteCurrency.Trim()),
+            fxRate: 1m,
+            bookedAt,
+            memo: "Demo custodial sell",
+            reference: reference,
+            TransactionSource.Seed,
+            currentCashSum: await CashSumAsync(db, account.Id, cancellationToken),
+            currentQuantity: held,
+            currentCost: legs.Sum(leg => leg.CostAmount));
+        Stamp(transaction, transaction.CashLegs.Single());
+        foreach (var leg in transaction.SecurityLegs)
+        {
+            Stamp(leg);
+        }
+
+        db.Transactions.Add(transaction);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private static async Task EnsureDemoCustodialBuyAsync(
@@ -660,11 +857,12 @@ public static class TestSeed
 
         var instrument = await db.Instruments.SingleOrDefaultAsync(
             row => row.TenantId == tenantId && row.Symbol == symbol, cancellationToken);
-        var asOf = DateOnly.FromDateTime(bookedAt.UtcDateTime);
+        // At the seeded price of 2026-01-01, not the history of valuation run §9.1, so the buy is the same however
+        // many history rows a database already holds.
         var stored = instrument is null
             ? null
             : await db.InstrumentPrices.AsNoTracking()
-                .Where(row => row.InstrumentId == instrument.Id && row.AsOfDate <= asOf)
+                .Where(row => row.InstrumentId == instrument.Id && row.AsOfDate <= OpeningPriceDate)
                 .OrderByDescending(row => row.AsOfDate)
                 .FirstOrDefaultAsync(cancellationToken);
         if (instrument is null || stored is null
@@ -860,11 +1058,10 @@ public static class TestSeed
         var vti = await db.Instruments.SingleOrDefaultAsync(
             row => row.TenantId == tenantId && row.Symbol == "VTI", cancellationToken);
         var bookedAt = new DateTimeOffset(2026, 1, 15, 10, 30, 0, TimeSpan.FromHours(13));
-        var asOf = DateOnly.FromDateTime(bookedAt.UtcDateTime);
         var stored = vti is null
             ? null
             : await db.InstrumentPrices.AsNoTracking()
-                .Where(row => row.InstrumentId == vti.Id && row.AsOfDate <= asOf)
+                .Where(row => row.InstrumentId == vti.Id && row.AsOfDate <= OpeningPriceDate)
                 .OrderByDescending(row => row.AsOfDate)
                 .FirstOrDefaultAsync(cancellationToken);
         if (vti is null || stored is null)

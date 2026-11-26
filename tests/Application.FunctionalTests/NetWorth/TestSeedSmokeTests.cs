@@ -42,8 +42,9 @@ public class TestSeedSmokeTests : TestBase
         var currencies = root.GetProperty("currencies").EnumerateArray().ToList();
         currencies.Select(row => row.GetProperty("currency").GetString()).ShouldBe(["NZD", "USD"]);
         AssertCurrency(currencies[0], "NZD", cash: 100m, holdings: 0m);
-        // USD: "Demo brokerage" 500 cash + VTI 8,000; "Demo custodial brokerage" 6,400 cash + VTI 10,000 + AAPL 3,600.
-        AssertCurrency(currencies[1], "USD", cash: 6900m, holdings: 21600m);
+        // USD: "Demo brokerage" 500 cash + VTI 8,000; "Demo custodial brokerage" 13,925 cash + VTI 7,500 + AAPL 3,600
+        // (valuation run §9.1: it sold 10 VTI at 252.50 and received 5,000.00; the latest VTI price is 250 again).
+        AssertCurrency(currencies[1], "USD", cash: 14425m, holdings: 19100m);
 
         var byCustomer = root.GetProperty("breakdowns").GetProperty("byCustomer").EnumerateArray().ToList();
         byCustomer.Select(row => row.GetProperty("name").GetString()).ShouldBe(["Demo Customer"]);
@@ -56,7 +57,7 @@ public class TestSeedSmokeTests : TestBase
         byMode.Select(row => row.GetProperty("custodyMode").GetString()).ShouldBe(["Custodial", "External"]);
         var custodial = byMode[0].GetProperty("currencies").EnumerateArray().ToList();
         custodial.Count.ShouldBe(1);
-        AssertCurrency(custodial[0], "USD", cash: 6400m, holdings: 13600m);
+        AssertCurrency(custodial[0], "USD", cash: 13925m, holdings: 11100m);
         var external = byMode[1].GetProperty("currencies").EnumerateArray().ToList();
         external.Select(row => row.GetProperty("currency").GetString()).ShouldBe(["NZD", "USD"]);
         AssertCurrency(external[0], "NZD", cash: 100m, holdings: 0m);
@@ -64,8 +65,8 @@ public class TestSeedSmokeTests : TestBase
 
         var top = root.GetProperty("breakdowns").GetProperty("topHoldings").EnumerateArray().ToList();
         top.Select(row => row.GetProperty("symbol").GetString()).ShouldBe(["VTI", "AAPL"]);
-        top[0].GetProperty("quantity").GetDecimal().ShouldBe(72m);
-        top[0].GetProperty("marketValue").GetDecimal().ShouldBe(18000m);
+        top[0].GetProperty("quantity").GetDecimal().ShouldBe(62m);
+        top[0].GetProperty("marketValue").GetDecimal().ShouldBe(15500m);
         top[0].GetProperty("currency").GetString().ShouldBe("USD");
         top[1].GetProperty("quantity").GetDecimal().ShouldBe(20m);
         top[1].GetProperty("marketValue").GetDecimal().ShouldBe(3600m);

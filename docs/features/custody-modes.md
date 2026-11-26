@@ -386,8 +386,11 @@ Nothing from this spec. The account pages show "Held on platform" for a Custodia
 | 2026-01-20 10:00 +13:00 | `TransferIn` | `USD 20,000.00` | `TestSeed-DemoCustodial-Funding` |
 | 2026-01-20 10:30 +13:00 | `Buy` | `VTI` × 40 at 250 = `USD 10,000.00` | `TestSeed-DemoCustodial-BuyVti` |
 | 2026-01-20 11:00 +13:00 | `Buy` | `AAPL` × 20 at 180 = `USD 3,600.00` | `TestSeed-DemoCustodial-BuyAapl` |
+| 2026-02-17 10:00 +13:00 | `Sell` | `VTI` × 10 at the seeded price of 2026-02-16 (252.50) = `USD 2,525.00` | `TestSeed-DemoCustodial-SellVti` |
+| 2026-03-03 10:00 +13:00 | `TransferIn` | `USD 5,000.00` | `TestSeed-DemoCustodial-TransferIn` |
 
-- The cash balance after the seed is `USD 6,400.00`. No seeded trade carries a fee. The `Holdings` rows for `VTI` and `AAPL` are synced like those of "Demo brokerage".
+- The last two rows, the account's open date (the UTC day of its funding, 2026-01-19) and the seeded price and rate history they are priced from come from [valuation-run.md](valuation-run.md) §9.1. The two buys stay at the 2026-01-01 prices.
+- The cash balance after the seed is `USD 13,925.00`. No seeded trade carries a fee. The `Holdings` rows for `VTI` and `AAPL` are synced like those of "Demo brokerage".
 - The `Demo Growth` assignment is on this account. The seed starts no rebalance. `AAPL` is not in `Demo Growth`, so the first rebalance in a demo has something to sell.
 - "Demo brokerage" stays External and keeps its hand-entered demo data (`OpeningHoldings`, `StockIn`, `Split`). It has no assignment.
 - The Development smoke seed (`Smoke Cash`) and the demo seed ([demo-tenant-seed.md](demo-tenant-seed.md)) create no Custodial account.
@@ -449,3 +452,4 @@ What changed in this file after it landed. The text of each change is in git (`g
 | 2026-11-24 | [dividends.md](dividends.md) | R5: `Dividend` is written by corporate actions |
 | 2026-11-25 | [adjustment-review.md](adjustment-review.md) | R5: an adjustment goes through a request; an `Adjustment` is never reversed |
 | 2026-11-26 | — | The amendments above were folded into §1–§11. No rule changed |
+| 2026-11-26 | [valuation-run.md](valuation-run.md) | §9.1: the demo Custodial account gains a Sell and a TransferIn and is opened on the day of its funding |
