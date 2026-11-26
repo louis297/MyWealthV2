@@ -115,7 +115,20 @@ public class Account : BaseAuditableEntity
 
     /// <summary>Valuation-run R5: a stored valuation of <paramref name="day"/> was written. Only on a Custodial account,
     /// and only to the day after <see cref="ValuedThrough"/>; the first day is checked by the caller, which knows it.</summary>
-    public void MarkValued(DateOnly day) => throw new NotImplementedException();
+    public void MarkValued(DateOnly day)
+    {
+        if (CustodyMode != CustodyMode.Custodial)
+        {
+            throw new DomainException("Only a Custodial account has stored valuations.");
+        }
+
+        if (ValuedThrough is { } current && day != current.AddDays(1))
+        {
+            throw new DomainException("An account is valued one day at a time, the day after the last one stored.");
+        }
+
+        ValuedThrough = day;
+    }
 
     /// <summary>Dividends R17: the standing reinvestment election, set by <paramref name="byUserId"/>.</summary>
     public void SetDividendReinvestment(bool reinvest, int byUserId, DateTimeOffset at)

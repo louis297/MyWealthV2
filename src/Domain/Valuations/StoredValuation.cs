@@ -41,8 +41,38 @@ public class StoredValuation
 
     /// <summary>R8: copies <paramref name="valuation"/> of the Account <paramref name="accountId"/>, stored by the run
     /// <paramref name="runId"/> at <paramref name="at"/>. The only way to build one.</summary>
-    public static StoredValuation From(int tenantId, int accountId, AccountValuation valuation, int runId, DateTimeOffset at) =>
-        throw new NotImplementedException();
+    public static StoredValuation From(int tenantId, int accountId, AccountValuation valuation, int runId, DateTimeOffset at)
+    {
+        ArgumentNullException.ThrowIfNull(valuation);
+        var values = valuation.Lines.Where(line => line.Status == ValuationLineStatus.Valued).Sum(line => line.Value ?? 0m);
+        if (valuation.HoldingsValue != values || valuation.Total != valuation.Cash + valuation.HoldingsValue)
+        {
+            throw new DomainException("A stored valuation's total is its cash plus the value of every Valued line.");
+        }
+
+        var unvalued = valuation.Lines.Count(line => line.Status != ValuationLineStatus.Valued);
+        if (valuation.UnvaluedCount != unvalued || valuation.Complete != (unvalued == 0))
+        {
+            throw new DomainException("A stored valuation is complete only when every line is Valued.");
+        }
+
+        var stored = new StoredValuation
+        {
+            TenantId = tenantId,
+            AccountId = accountId,
+            Date = valuation.Day,
+            Currency = valuation.Currency,
+            Cash = valuation.Cash,
+            HoldingsValue = valuation.HoldingsValue,
+            Total = valuation.Total,
+            Complete = valuation.Complete,
+            UnvaluedCount = valuation.UnvaluedCount,
+            ValuationRunId = runId,
+            ValuedAt = at
+        };
+        stored._lines.AddRange(valuation.Lines.Select(line => StoredValuationLine.From(tenantId, line)));
+        return stored;
+    }
 }
 
 /// <summary>One line of a stored valuation: a <see cref="ValuationLine"/> with the price row and the rate row it
@@ -84,4 +114,30 @@ public class StoredValuationLine
     public string? FxSource { get; private set; }
 
     public decimal? Value { get; private set; }
+
+    internal static StoredValuationLine From(int tenantId, ValuationLine line)
+    {
+        if ((line.Status == ValuationLineStatus.Valued) != (line.Value is not null))
+        {
+            throw new DomainException("A line has a value if and only if it is Valued.");
+        }
+
+        return new StoredValuationLine
+        {
+            TenantId = tenantId,
+            InstrumentId = line.InstrumentId,
+            Quantity = line.Quantity,
+            LedgerQuantity = line.LedgerQuantity,
+            Status = line.Status,
+            PriceAmount = line.Price?.Amount,
+            PriceCurrency = line.Price?.Currency,
+            PriceDate = line.Price?.AsOfDate,
+            PriceSource = line.Price?.Source,
+            MarketValue = line.MarketValue,
+            FxRate = line.Fx?.Rate,
+            FxDate = line.Fx?.AsOfDate,
+            FxSource = line.Fx?.Source,
+            Value = line.Value
+        };
+    }
 }

@@ -39,10 +39,47 @@ public class ValuationRun : BaseAuditableEntity
         ValuationRunTrigger trigger,
         int? ranByUserId,
         DateTimeOffset startedAt,
-        Guid? publicId = null) =>
-        throw new NotImplementedException();
+        Guid? publicId = null)
+    {
+        if (!Enum.IsDefined(trigger))
+        {
+            throw new DomainException("Unknown valuation run trigger.");
+        }
+
+        if ((trigger == ValuationRunTrigger.Scheduled) != (ranByUserId is null))
+        {
+            throw new DomainException("A scheduled run has no person; a manual run names the person who started it.");
+        }
+
+        return new ValuationRun
+        {
+            PublicId = publicId ?? Guid.NewGuid(),
+            TenantId = tenantId,
+            ThroughDate = throughDate,
+            Trigger = trigger,
+            RanByUserId = ranByUserId,
+            StartedAt = startedAt
+        };
+    }
 
     /// <summary>R13: the run ended with these counts; once.</summary>
-    public void Complete(int accountsProcessed, int accountsFailed, int daysValued, int daysIncomplete, DateTimeOffset completedAt) =>
-        throw new NotImplementedException();
+    public void Complete(int accountsProcessed, int accountsFailed, int daysValued, int daysIncomplete, DateTimeOffset completedAt)
+    {
+        if (CompletedAt is not null)
+        {
+            throw new DomainException("A valuation run ends once.");
+        }
+
+        if (accountsProcessed < 0 || accountsFailed < 0 || daysValued < 0 || daysIncomplete < 0
+            || accountsFailed > accountsProcessed || daysIncomplete > daysValued)
+        {
+            throw new DomainException("The counts of a valuation run are not valid.");
+        }
+
+        AccountsProcessed = accountsProcessed;
+        AccountsFailed = accountsFailed;
+        DaysValued = daysValued;
+        DaysIncomplete = daysIncomplete;
+        CompletedAt = completedAt;
+    }
 }
