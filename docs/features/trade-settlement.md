@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-23
-last_updated: 2026-11-23
+last_updated: 2026-11-26
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -159,7 +159,7 @@ Amendment to [orders.md](orders.md) R2, R4, R6, R20 and R53.
 | R2 | **The broker's bank accounts.** A broker connection (orders R2) gains optional entries `BrokerConnections:{name}:BankAccounts:{currency}:AccountNumber` (the shape of deposit-matching R38) and `:AccountName` (1–140 characters), on `webapi` and `worker`: the broker's own bank account that the firm pays settlement cash to, per currency. They are standing instructions, never taken from the feed. A currency that is not a three-letter code, or an entry without both values, fails start-up before the host listens. `GET /broker-connections` gains `settlementCurrencies`: the currencies with an entry, sorted. |
 | R3 | **The settlement account of an order.** When an order is placed, it gets a **settlement account** if all three hold: the Instrument's quote currency equals the Account's currency; the Tenant has an active client money account in that currency; and the order's broker connection has the broker's bank account for that currency (R2). The settlement account is that client money account, stored on the order with its account number, and it never changes. Otherwise the order has none. Having none never refuses an order. Orders placed before this slice have none. |
 | R4 | **Sent with the order.** The send step (orders R20) adds `settlementAccount`, the trust account number, to the place call of an order that has one, and leaves the field out for an order that has none, so an order sent before this slice is sent again with the same body. |
-| R5 | **What does not settle through the bank.** The fills of an order with no settlement account settle as in orders R43, with no cash at the bank, and their cash legs stay in the known difference `Trades` (R23). So do rebalance trades, trades typed before orders, and every sell in another currency than its account's. |
+| R5 | **What does not settle through the bank.** The fills of an order with no settlement account settle as in orders R43, with no cash at the bank, and their cash legs stay in the known difference `Trades` (R23). So do rebalance trades, trades typed before orders, and every sell in another currency than its account's. A rebalance order gets a settlement account like any order, so its fills settle through the client money account (rebalances R26). |
 
 ### 4.3 The broker's settlement on the feed
 
@@ -204,9 +204,9 @@ Amendment to [withdrawals.md](withdrawals.md) R31–R33, [bank-returns.md](bank-
 | --- | --- |
 | R17 | **Sending.** The send step (withdrawals R32) sends `TradeSettlement` payments too, with the same rules for order, attempts, disabled Tenants and inactive client money accounts. `Accepted` → the payment is `Accepted`; the settlement does not change. `Rejected` → the payment is `Rejected` and the settlement `PaymentFailed` with failure `PaymentRejected` and the reason's name. A failure of the call leaves the payment `Pending` for the next run. |
 | R18 | **Settlement paid.** A debit line whose `endToEndId` is the instruction id of a `TradeSettlement` payment of the line's Tenant and client money account, `Pending` with an attempt or `Accepted`, with the same amount: in one database transaction the line becomes `Matched` with the new method `Settlement` (no Account, no Transaction, the trade settlement), the payment `Paid` and the settlement `Completed`. A different amount, or a payment in any other state → `Unmatched` with `PaymentMismatch`. This case joins the classification of bank-returns R2 next to the receipt return. |
-| R19 | **Settlement received.** A credit line with no `returnOf` and kind `Transfer`, whose reference text, trimmed and compared without regard to case, equals the broker settlement id of a trade settlement of the line's Tenant and client money account, is settlement cash and is never matched as a deposit. When that settlement is `AwaitingReceipt` and the amount equals its `netAmount`: the line becomes `Matched` with method `Settlement` and the settlement `Completed`. Otherwise (another amount, or a settlement in any other status) the line becomes `Unmatched` with the new reason `SettlementMismatch`, and the settlement does not change. A TenantAdmin handles that line like any receipt, normally with request return (bank-returns R5); the broker then pays the right amount. This check runs after the `Interest` rule (interest-run R40) and before deposit matching. |
+| R19 | **Settlement received.** A credit line with no `returnOf` and kind `Transfer`, whose reference text, trimmed and compared without regard to case, equals the broker settlement id of a trade settlement of the line's Tenant and client money account, is settlement cash and is never matched as a deposit. When that settlement is `AwaitingReceipt` and the amount equals its `netAmount`: the line becomes `Matched` with method `Settlement` and the settlement `Completed`. Otherwise (another amount, or a settlement in any other status) the line becomes `Unmatched` with the new reason `SettlementMismatch`, and the settlement does not change. A TenantAdmin handles that line like any receipt, normally with request return (bank-returns R5); the broker then pays the right amount. This check runs after the `Interest` rule (interest-run R40) and before deposit matching. The dividend receipt rule (dividends R24) runs next, after this rule and before deposit matching. |
 | R20 | **Settlement payment returned.** A credit line whose `returnOf` is the debit line of a `Paid` settlement payment, with the same amount: the line becomes `Matched` with method `PaymentReturn` (no Account, no Transaction, the trade settlement), the payment `Returned`, and the settlement `PaymentFailed` with failure `PaymentReturned` and the line's `returnReason`. A different amount → `Unmatched` with `PaymentMismatch`. |
-| R21 | **Statement line additions.** Match method `Settlement = 5`; unmatched reason `SettlementMismatch = 13`. A `Matched` line has an Account and a Transaction, or a related line (bank-returns R10), or a trade settlement. The statement line item gains `tradeSettlementId`. A line matched to a trade settlement accepts no action: only R20 undoes it. |
+| R21 | **Statement line additions.** Match method `Settlement = 5`; unmatched reason `SettlementMismatch = 13`. A `Matched` line has an Account and a Transaction, or a related line (bank-returns R10), or a trade settlement. The statement line item gains `tradeSettlementId`. A line matched to a trade settlement accepts no action: only R20 undoes it. Since migration batches and dividends a `Matched` line has exactly one target: an Account with its Transaction, a related line, a trade settlement, a migration batch, or a corporate action (a dividend); `CK_BankStatementLines_Match` has the five arms. |
 
 ### 4.6 Bank reconciliation
 
@@ -215,7 +215,7 @@ Amendment to [bank-reconciliation.md](bank-reconciliation.md) R9, R10, R13 and R
 | ID | Rule |
 | --- | --- |
 | R22 | **Settlement lines.** A line `Matched` to a trade settlement is not an item, like every matched line: its amount equals the principal legs of the settlement's fills. A `SettlementMismatch` line is a `Suspense` break like any unmatched line. |
-| R23 | **The cash legs of order fills.** For a run of client money account A, the cash legs of a Transaction with source `OrderFill`, and of the Reversal of one, are split by the fill's order. An order with no settlement account, and a fill in a `SetAside` trade settlement or whose break was resolved by hand (R31): every leg stays in `Trades` (Known), as today. An order whose settlement account is another client money account: `OtherClientMoneyAccount`, as bank-reconciliation R10. An order whose settlement account is A: its `Fee` legs make the new item `TradeFees` (Known), and its `Principal` legs follow the fill's state in the table below. |
+| R23 | **The cash legs of order fills.** For a run of client money account A, the cash legs of a Transaction with source `OrderFill`, and of the Reversal of one, are split by the fill's order. An order with no settlement account, and a fill in a `SetAside` trade settlement or whose break was resolved by hand (R31): every leg stays in `Trades` (Known), as today. An order whose settlement account is another client money account: `OtherClientMoneyAccount`, as bank-reconciliation R10. An order whose settlement account is A: its `Fee` legs make the new item `TradeFees` (Known), and its `Principal` legs follow the fill's state in the table below. The fills of a rebalance order leave the known difference `Trades` like any order's; `Trades` keeps the rebalance trades posted before rebalances went through orders (source `Rebalance`). |
 
 | The fill | Item kind for its `Principal` legs | Class |
 | --- | --- | --- |
@@ -250,8 +250,8 @@ Amendment to [orders.md](orders.md) R53, R61, R63–R65 and [simulator.md](simul
 
 | ID | Rule |
 | --- | --- |
-| R35 | **Settlement account on an order.** `POST /party/broker/orders` takes an optional `settlementAccount` (the shape of deposit-matching R38). It is part of the body the idempotency check compares only when it is sent. The broker stores it as text and does not read the platform (simulator R33). |
-| R36 | **Broker settlements.** When fills settle (orders R61), the fills of orders with a settlement account are grouped by settlement account, currency and settlement date into one **broker settlement** each. Its id is the first 8 hexadecimal digits of the world id, `-S` and `n`, `n` counting the settlements of the world from 1, so it fits a bank reference of 18 characters. Each fill's `Settled` report carries it, and one `Settlement` report follows them with `netAmount` = the sum of `Round(quantity × price, 4)`, plus for a sell and minus for a buy, and `fillCount`. A fill of an order without a settlement account settles as before, with no settlement id and no `Settlement` report. |
+| R35 | **Settlement account on an order.** `POST /party/broker/orders` takes an optional `settlementAccount` (the shape of deposit-matching R38). It is part of the body the idempotency check compares only when it is sent. The broker stores it as text and does not read the platform (simulator R33). The order body sent to the broker may also carry `safekeepingAccount`; it is part of the idempotency comparison only when it is sent (in-kind-transfers R47). |
+| R36 | **Broker settlements.** When fills settle (orders R61), the fills of orders with a settlement account are grouped by settlement account, currency and settlement date into one **broker settlement** each. Its id is the first 8 hexadecimal digits of the world id, `-S` and `n`, `n` counting the settlements of the world from 1, so it fits a bank reference of 18 characters. Each fill's `Settled` report carries it, and one `Settlement` report follows them with `netAmount` = the sum of `Round(quantity × price, 4)`, plus for a sell and minus for a buy, and `fillCount`. A fill of an order without a settlement account settles as before, with no settlement id and no `Settlement` report. When a corporate action of a simulated instrument becomes effective, every fill in that symbol that has not settled settles at once, with the effective day as its settled date and its place in a broker settlement, before the custodian applies the action (in-kind-transfers R68). |
 | R37 | **The broker pays.** Configuration `Simulator:Broker:BankAccounts` lists the broker's own bank accounts (`Currency`, `AccountNumber`, `Name`); a bad entry stops start-up. With `netAmount > 0` and settlement mode `Pay`, the broker pays at once: a credit line on the trust account at the simulator bank, amount = the net, reference = the settlement id, payer = the broker's account for the currency (name `Simulator Broker` and no account when none is configured), entering the feed at once. When the settlement account is not an open account of the simulator bank in that currency, no line is added and the settlement shows `paid: false`. |
 | R38 | **Settlement mode.** `POST /control/broker/settlement-mode` `{ "mode": "Pay" | "Hold" }` (default `Pay`; log action `BrokerSettlementModeChanged`). With `Hold` the broker settles and reports but pays nothing until `POST /control/broker/settlements/{settlementId}/pay` `{ "amount"? }`: `amount` defaults to the net and must be `> 0` with at most 4 decimal places (400 `errors.Amount`), so the operator can pay a wrong amount and then the right one. Only a settlement with `netAmount > 0` (400 `errors.Status`); unknown → 404; an unknown trust account → 400 `errors.SettlementAccount`. Log action `BrokerSettlementPaid`. |
 | R39 | **Its own books.** `GET /control/broker/settlements` lists the settlements newest first (envelope as simulator R28): id, settlement account, currency, settlement date, `netAmount`, `fillCount`, `paid` and `paidAmount` (for a net above 0, what the broker paid; for a net below 0, the executed and not returned payments of the simulator bank from that trust account whose reference is the settlement id). `GET /control/broker` shows the settlement mode. |
@@ -468,16 +468,14 @@ Page contracts amended when this spec was accepted: [adviser-portal-dashboard.md
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | `TradeSettlement.Create`: equal figures and a net below 0, above 0 and of 0 give `AwaitingPayment`, `AwaitingReceipt`, `Completed`; another count, net, account or currency gives `Disputed`; no broker account gives `PaymentFailed`. Every move of R10 and each refused one; set aside twice throws. `OrderFill.Break` once, not on a settled fill; `ResolveBreak` only from `NotApplied`. `Order.BreakFill`: an open order takes the quantity back and its reservation grows; a `Filled` order becomes `Cancelled`; a `Cancelled` order stays; posted gross and charged fee fall only with `Reversed`. The fee of a later fill is never below 0. `OutgoingPayment.ForTradeSettlement`. `BankStatementLine.MarkSettlement`. `BankReconciliation.Compute`: each row of the R23 table, `TradeFees`, `UnbookedFills`, a reversed fill adds nothing, the items add up to the difference |
-| Application.FunctionalTests — settlement account | An order in the account's currency with an active client money account and a configured broker account has a settlement account and sends it; each of the three conditions missing gives none and still places; a sell in another currency has none. Two-tenant: tenant B's client money account is never used |
-| Application.FunctionalTests — trade settlements | With fakes for `IBrokerFeed`, `IBankPayments` and `IBankFeed`. `Settled` reports with an id then a `Settlement` report create one trade settlement with the platform's net; a `Pending` fill counts. Net below 0: a `TradeSettlement` payment with its own instruction id, the configured payee and the reference; `Accepted` leaves `AwaitingPayment`; the debit line → line `Matched` (`Settlement`), payment `Paid`, settlement `Completed`; a different amount → `PaymentMismatch`; `Rejected` → `PaymentFailed`; pay again → a second payment with a new instruction id; a returned payment → `PaymentFailed`. Net above 0: the credit line with the settlement id → `Completed`; another amount → `SettlementMismatch` and the settlement unchanged; a second line → `SettlementMismatch`; the line is never matched to an account that has the same text as deposit reference. Net 0 → `Completed`. Other figures → `Disputed`, nothing paid. A `Settlement` report with no fills → `UnknownSettlement`; twice → `Repeated`. Set aside from each allowed status, refused after a send attempt; the unsent payment is `Cancelled`. Reads and filters. Adviser, Customer, SystemAdmin → 403; no token → 401; tenant B's settlement id → 404 on every route. Withdrawable cash rises at the `Settled` report, before the bank line |
-| Application.FunctionalTests — reconciliation | A posted buy and sell with a settlement account: `UnsettledTrades` and `TradeFees`; after the settlement completes: only `TradeFees`, run `Agreed`. `PaymentFailed` and `Disputed` → `TradesNeedingAction`, run `Breaks`. Set aside → `Trades`. A `Pending` fill in a completed settlement → `UnbookedFills`. An order without a settlement account, a rebalance trade → `Trades`. A reversed broken fill adds nothing; a `NotApplied` one → `TradesNeedingAction`; resolved → `Trades`. `openSettlements` on the run. Every run's items add up to the difference |
-| Application.FunctionalTests — broken trades | A `Broken` report for a posted buy: one Reversal with source `OrderFill`, the order's id and the execution detail; cash, holding and the fee are back; the fill is `Broken` / `Reversed`. For a `Pending` fill: `NotPosted`, nothing posted, never tried again. With a later fill on the holding → `NotApplied` / `LaterActivity`; a broken sell whose proceeds were spent → `InsufficientCash`; a Closed account → `AccountClosed`; nothing posted, and a second run posts nothing. Resolve: 204 for a TenantAdmin, 403 for an Adviser, 400 with no waiting break. An open order takes the quantity back and can be filled again without `Overfill`; a `Filled` order becomes `Cancelled`. A `Broken` report twice → `Repeated`; for a settled fill → `FillSettled`; `Settled` for a broken fill → `FillBroken`. A broken sell with `NotApplied` stays in `unsettledCash`; account closure → 400. Hand reverse of the Reversal → 400. `pendingFill=true` returns the order. The Customer reads `break` without the note |
-| Infrastructure.IntegrationTests | `0052`: the unique indexes (one trade settlement per connection, id and account; one open payment per settlement; one fill per break report); the status and "set iff" CHECKs; the three arms of the payment target CHECK and of the Matched CHECK; `Kind = 6` on a report violates; existing rows unchanged. EF round-trips. `SimulatorBrokerFeed`: a good `Settlement` and `Broken` item; a `netAmount` that is not a number → `InvalidItem` on the pull. `SimulatorBrokerOrders`: `settlementAccount` in the body, left out when none. Start-up fails on a bad broker bank account entry |
-| Simulator.Tests | `0011` applies. An order with a settlement account: on the settlement date its fills get one settlement id per account, currency and date, one `Settlement` report follows the `Settled` reports, the net and the count are right; an order without one settles as before. Net above 0 in mode `Pay` → a credit line on the trust account with the id as reference; an unknown trust account → no line, `paid: false`. Mode `Hold` → no line; pay with an amount and again. `paidAmount` of a net below 0 follows an executed and a returned bank payment. Break: a `Broken` report; a working order takes the quantity back; a `Filled` order is `Cancelled`; a settled or broken fill → 400; a broken fill never settles and is in no settlement. The same order body without `settlementAccount` replays its first answer. Reset. The control log rows |
-| Adviser Portal, Customer Portal, Back Office | D76–D78; C36; BO29 |
+| Domain.UnitTests | `Entities/BankReconciliationTradeSettlementTests.cs`; folder `Orders/` |
+| Application.FunctionalTests | Folder `TradeSettlements/` |
+| Infrastructure.IntegrationTests | `AppliedSchema/TradeSettlementSchemaTests.cs` |
+| Simulator.Tests | The simulator broker: settlements and broken trades |
 
 ---
 
@@ -531,67 +529,19 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
-
-The repository should build after each commit. Agents split each behaviour into red then green.
-
-1. Script `0052`, the new enums and enum values, `TradeSettlement` and its moves (R9–R15) + Domain unit tests and the `0052` integration tests.
-2. The broker's bank accounts in configuration and `settlementCurrencies` (R2) + functional and start-up tests.
-3. The settlement account on an order, sent with it (R3–R5, R43) + functional and adapter tests, two-tenant.
-4. `Settled` with a settlement id and the `Settlement` report: pull, the trade settlement, agreed or disputed, a net of 0 (R6–R11, R13) + functional tests.
-5. The settlement payment: created, sent, paid from the debit line (R12, R17, R18, R21, R44) + functional tests.
-6. The broker's receipt and the mismatch (R19) + functional tests.
-7. A returned settlement payment and pay again (R14, R20) + functional tests.
-8. Set aside, the reads and the permission (R1, R15, R16) + functional tests, two-tenant.
-9. Bank reconciliation: the four kinds and the open settlements (R22–R25) + Domain unit and functional tests.
-10. The `Broken` report: a fill that was not posted, the Reversal by the flow, the order after a break (R26–R29, R32) + Domain unit and functional tests.
-11. A break that cannot be reversed, resolve by hand, unsettled cash and account closure (R30, R31, R33, R34) + functional tests.
-12. Simulator: script `0011`, the settlement account on an order, broker settlements and the `Settlement` report (R35, R36, R41) + `Simulator.Tests`.
-13. Simulator: the broker's payment, the settlement mode, its own books, reset (R37–R39, R42) + `Simulator.Tests`.
-14. Simulator: break a fill (R40) + `Simulator.Tests`.
-15. AppHost and compose configuration (§9.1).
-16. BFF prefix, Adviser Portal D76–D78 + frontend tests.
-17. Customer Portal C36 and Back Office BO29 + tests.
-18. Repo docs: mark this file landed; roadmap §13 step 11b.
-
-Do not put rebalance through orders, a fee sweep or a break after settlement in these commits.
-
-### Docs amended when this spec was accepted
+## 12. Docs changed when this spec was accepted
 
 [orders.md](orders.md) (R2, R4, R20, R53: the settlement account; R23–R25: the two kinds, their fields and skip reasons; R28, R33, R36–R38, R44, R47: the broken fill; §2 Out and §11 points 1 and 12 answered), [bank-reconciliation.md](bank-reconciliation.md) (R9, R10, R13, R14, §5 kinds, §11 point 6), [withdrawals.md](withdrawals.md) (R31 kinds, R32, R33), [bank-returns.md](bank-returns.md) (R2 classification, R8, R10), [deposit-matching.md](deposit-matching.md) (R13: settlement receipts before deposit matching; the line item), [transaction-source.md](transaction-source.md) (R7: a broken trade is reversed by its flow; `OrderFill` stays not hand-reversible), [account-closure.md](account-closure.md) (R5), [trade-fees.md](trade-fees.md) (a fill's fee is never below 0), [simulator.md](simulator.md) (R35–R42, script `0011`, the routes and log actions), [bff-adviser-portal.md](bff-adviser-portal.md) (prefix `/trade-settlements`), [api-design.md](../api-design.md) (§3.1 one permission row, §6 resource row, §7.12 notes, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [architecture.md](../architecture.md) (broker connection configuration), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D76–D78), [customer-portal.md](../customer-portal/customer-portal.md) (C36), [back-office.md](../backoffice/back-office.md) (BO29), [glossary.md](../glossary.md) (the review terms become accepted; Fill, Settled, Unsettled cash, Outgoing payment, Known difference, Timing difference, Break, Hand-reversible source and Broker connection change), [function-plan.md](../function-plan.md) §5, [features/README.md](README.md) row status, [future-plans.md](../future-plans.md) §9, and the roadmap §8 O1 and O2, §11 S1 and S2, §13 and §14.
 
 ---
 
-## Amendment 2026-11-23 (rebalance through orders) — accepted
+## 13. History
 
-Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md](rebalances.md). Rule R26 lives there; this section records what changes here.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/trade-settlement.md`).
 
-- R5, R23: a rebalance order gets a settlement account like any order, so its fills settle through the client money account and leave the known difference `Trades`. `Trades` keeps the rebalance trades posted before this slice (source `Rebalance`).
-- "Still open": rebalance orders are no longer open; they settle like any order.
-
----
-
-## Amendment 2026-11-24 (migration batches) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [migration-batches.md](migration-batches.md). Rule R16 lives there; this section records what changes here.
-
-- R21: a `Matched` line now has an Account and a Transaction, or a related line, or a trade settlement, or a migration batch. `0054` replaces `CK_BankStatementLines_Match` with the four arms.
-
----
-
-## Amendment 2026-11-24 (in-kind transfers) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rules R47, R67 and R68 live there; this section records what changes here.
-
-- R35: the order body sent to the broker gains the optional `safekeepingAccount`; it is part of the idempotency comparison only when it is sent.
-- R36 (simulator): when a corporate action of a simulated instrument becomes effective, every fill in that symbol that has not settled settles at once, with the effective day as its settled date and its place in a broker settlement, before the custodian applies the action.
-- "Still open" on custodian positions: answered by the custodian reconciliation of [in-kind-transfers.md](in-kind-transfers.md).
-
----
-
-## Amendment 2026-11-24 (dividends) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rule R24 lives there; this section records what changes here.
-
-- R19: the dividend receipt rule (dividends R24) runs next, after the settlement rule and before deposit matching.
-- R21: a `Matched` line has exactly one target: an Account with its Transaction, a related line, a trade settlement, a migration batch, or a corporate action (a dividend).
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-23 | [rebalances.md](rebalances.md) | R5, R23: rebalance orders settle like any order |
+| 2026-11-24 | [migration-batches.md](migration-batches.md), [dividends.md](dividends.md) | R19, R21: the targets of a matched line; the dividend receipt rule |
+| 2026-11-24 | [in-kind-transfers.md](in-kind-transfers.md) | R35, R36: the safekeeping account on the order; fills settle before a corporate action |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
