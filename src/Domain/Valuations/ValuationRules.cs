@@ -9,5 +9,5 @@ public static class ValuationRules
 
     /// <summary>True when <paramref name="day"/> minus <paramref name="asOfDate"/> is at most
     /// <see cref="MaxAgeDays"/>.</summary>
-    public static bool IsFresh(DateOnly asOfDate, DateOnly day) => false;
+    public static bool IsFresh(DateOnly asOfDate, DateOnly day) => day.DayNumber - asOfDate.DayNumber <= MaxAgeDays;
 }

@@ -30,7 +30,7 @@ public sealed record AccountValuation(
     {
         var currency = Code(accountCurrency);
         var lines = position.Lines
-            .Select(line => Value(line, currency, decimalPlaces, prices, rates))
+            .Select(line => Value(position.Day, line, currency, decimalPlaces, prices, rates))
             .ToList();
 
         // R16: the totals add the Valued lines only; a line that is not valued is never counted as 0.
@@ -40,7 +40,10 @@ public sealed record AccountValuation(
             position.Day, currency, position.Cash, lines, holdingsValue, position.Cash + holdingsValue, unvalued == 0, unvalued);
     }
 
+    /// <summary>R14: the first status of the table that applies, in this order: <c>NegativeQuantity</c>,
+    /// <c>NoPrice</c>, <c>StalePrice</c>, <c>NoRate</c>, <c>StaleRate</c>, <c>Valued</c>.</summary>
     private static ValuationLine Value(
+        DateOnly day,
         PositionLine line,
         string accountCurrency,
         IReadOnlyDictionary<string, int> decimalPlaces,
@@ -48,10 +51,23 @@ public sealed record AccountValuation(
         IReadOnlyDictionary<string, StoredRate> rates)
     {
         var quantity = line.LedgerQuantity;
-        var price = prices[line.InstrumentId];
-        var quote = Code(price.Currency);
+        if (quantity < 0m)
+        {
+            return NotValued(line, quantity, ValuationLineStatus.NegativeQuantity);
+        }
+
+        if (!prices.TryGetValue(line.InstrumentId, out var price))
+        {
+            return NotValued(line, quantity, ValuationLineStatus.NoPrice);
+        }
+
+        if (!ValuationRules.IsFresh(price.AsOfDate, day))
+        {
+            return NotValued(line, quantity, ValuationLineStatus.StalePrice, price);
+        }
 
         // R15: the market value is rounded to the quote currency; the value is worked out from the rounded figure.
+        var quote = Code(price.Currency);
         var marketValue = Round(quantity * price.Amount, Places(decimalPlaces, quote));
         if (quote == accountCurrency)
         {
@@ -59,11 +75,29 @@ public sealed record AccountValuation(
                 line.InstrumentId, quantity, line.LedgerQuantity, ValuationLineStatus.Valued, price, marketValue, null, marketValue);
         }
 
-        var rate = rates[quote];
+        if (!rates.TryGetValue(quote, out var rate))
+        {
+            return NotValued(line, quantity, ValuationLineStatus.NoRate, price, marketValue);
+        }
+
+        if (!ValuationRules.IsFresh(rate.AsOfDate, day))
+        {
+            return NotValued(line, quantity, ValuationLineStatus.StaleRate, price, marketValue, rate);
+        }
+
         var value = Round(marketValue * rate.Rate, Places(decimalPlaces, accountCurrency));
         return new ValuationLine(
             line.InstrumentId, quantity, line.LedgerQuantity, ValuationLineStatus.Valued, price, marketValue, rate, value);
     }
+
+    private static ValuationLine NotValued(
+        PositionLine line,
+        decimal quantity,
+        ValuationLineStatus status,
+        StoredPrice? price = null,
+        decimal? marketValue = null,
+        StoredRate? rate = null) =>
+        new(line.InstrumentId, quantity, line.LedgerQuantity, status, price, marketValue, rate, null);
 
     private static decimal Round(decimal amount, int places) => decimal.Round(amount, places, MidpointRounding.AwayFromZero);
 
