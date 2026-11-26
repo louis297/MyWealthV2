@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-12
-last_updated: 2026-11-19
+last_updated: 2026-11-26
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -29,16 +29,13 @@ Read model of current net worth on `webapi`. No new table. No write path. Aggreg
 
 **Status is `accepted` and landed (2026-10-12, `af422c2`).** Implementation follows this file. No script. Reads reuse `accounts.read`. Current point-in-time only. BFF allow-list adds `/net-worth`.
 
-
-**Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md) R19. Cash per Account is the `SUM` of cash legs whose `AccountId` is that Account. Holdings still come from the projection. Aggregation is otherwise unchanged.
-
-**Amendment 2026-11-18 (grouping by custody mode, accepted, landed):** [custody-mode-grouping.md](custody-mode-grouping.md) R4–R9. Both reads gain `breakdowns.byCustodyMode`: one entry `{ custodyMode, currencies }` per custody mode that has an Open account in scope, `Custodial` then `External`, with the currency shape of §8.1. Per currency, the entries add up to the top-level values. The `Custodial` entry is the scope's funds under management. Values, the other breakdowns, the routes and the policy do not change.
-
 ---
 
 ## 1. Summary
 
-A TenantAdmin or Adviser reads current net worth for the customers they can already see. SystemAdmin does the same on Scalar for a chosen tenant. Customer receives 403.
+A TenantAdmin or Adviser reads current net worth for the customers they can already see. SystemAdmin does the same on Scalar for a chosen tenant. A Customer reads their own: `GET /users/customers/{ownPublicId}/net-worth`, and `GET /net-worth`, which for a Customer returns the same self scope; another Customer's id → 404. All reuse `accounts.read`.
+
+Cash per Account is the `SUM` of the cash legs whose `AccountId` is that Account (leg-accounts R19); holdings come from the projection. Both reads carry `breakdowns.byCustodyMode`: one entry `{ custodyMode, currencies }` per custody mode that has an Open account in scope, `Custodial` then `External`, with the currency shape of §8.1. Per currency, the entries add up to the top-level values, and the `Custodial` entry is the scope's funds under management ([custody-mode-grouping.md](custody-mode-grouping.md) R4–R9).
 
 Cash is the existing computed `SUM` of posted cash legs. Holding market value is current quantity × the `IMarketData` price in the instrument quote currency. Results are grouped by currency. There is no FX fold into a single number. Closed accounts are excluded. Phase 2 has no Credit, so liabilities are empty.
 
@@ -70,8 +67,6 @@ Two endpoints: a firm / adviser list and a single-Customer read. Both return the
 - Lots, realized gain, performance attribution
 - Customer ledger-write
 
-**Amendment for Customer Portal (accepted 2026-11-02).** Supersedes the Customer 403 sentence. Customer may call `GET /users/customers/{ownPublicId}/net-worth` (and `GET /net-worth`, which for Customer returns the same self scope). Other customer id → 404. Reuse `accounts.read`.
-
 ---
 
 ## 3. Stories
@@ -81,7 +76,7 @@ Two endpoints: a firm / adviser list and a single-Customer read. Both return the
 3. As an Adviser I open one customer and see that customer’s current net worth and the same breakdowns.
 4. As an Adviser I see cash, holding market value, and net by currency; Closed accounts do not appear.
 5. As an Adviser I see breakdowns by customer, by account type, and top holdings by market value.
-6. As a Customer I receive 403.
+6. As a Customer I read my own net worth.
 7. As an Adviser I cannot see another adviser’s customer (404).
 
 ---
@@ -187,10 +182,12 @@ No portal page in this slice. Pages live in [adviser-portal/](../adviser-portal/
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Application.FunctionalTests | No Bearer → 401; wrong role → 403; happy path firm and customer; Closed accounts excluded; Adviser cannot see unassigned Customer → 404; SystemAdmin with `tenantId` |
-| Infrastructure.IntegrationTests | Two-tenant fixture: other tenant’s customer id → 404 |
+| Application.FunctionalTests | Folder `NetWorth/` |
+| Infrastructure.IntegrationTests | Two-tenant fixture: other tenant's customer id → 404 |
 
 ---
 
@@ -215,11 +212,13 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
+## 12. History
 
-The repository should build after each commit. Agents split each line into red then green.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/net-worth.md`).
 
-1. Failing functional tests for `GET /net-worth` and `GET /users/customers/{id}/net-worth` (401 / 403 / happy path / isolation).
-2. Query handlers + endpoint wiring + `IMarketData` price call.
-3. TestSeed verification that existing demo holdings appear in market value.
-4. Accept change: status, companion edits to api-design / function-plan / glossary / features README.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-02 | [customer-portal.md](../customer-portal/customer-portal.md) | A Customer reads their own net worth |
+| 2026-11-10 | [leg-accounts.md](leg-accounts.md) | Cash per Account from the legs on that Account |
+| 2026-11-18 | [custody-mode-grouping.md](custody-mode-grouping.md) | `breakdowns.byCustodyMode` |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
