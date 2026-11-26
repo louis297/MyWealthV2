@@ -3,7 +3,7 @@ title: API design
 status: accepted
 language: en
 created: 2026-09-11
-updated: 2026-11-26
+updated: 2026-11-27
 related:
   - README.md
   - glossary.md
@@ -32,8 +32,10 @@ Two processes, two HTTP surfaces. Do not add a custom `POST /auth/login` on `web
 
 ```text
 Browser
-  ├── redirect / callback / token / revocation / logout  →  identity (src/IdentityHost)
-  └── Bearer resource calls                              →  webapi (src/Web)
+  ├── authorize redirect / hosted login                  →  identity (src/IdentityHost)
+  └── same-origin calls with the session cookie          →  portal BFF
+        ├── token / refresh / revocation / logout        →  identity
+        └── Bearer resource calls                        →  webapi (src/Web)
 ```
 
 | Host | Aspire name | Role |
@@ -63,7 +65,7 @@ Minimal API, TypedResults, endpoints dispatch MediatR only. Paths are kebab-case
 | Concurrency | Writes to Tenant / User accept `rowVersion`; conflict → 409 |
 | Customer | May complete the authorization-server flow; management routes → 403 |
 | Authorization | Named policies on endpoints; `RolePermissions` mapped in code; assignment scope in the handler (ADR 0013) |
-| CORS | Loose in Development; tighten in production without blocking Phase 1 |
+| CORS | None. `webapi` registers no CORS policy: a portal's browser calls only its BFF, on the BFF's origin, and Scalar is served from the `webapi` origin ([features/bff-adviser-portal.md](features/bff-adviser-portal.md) R15, [architecture.md](architecture.md)) |
 | Docs | `[EndpointSummary]` / `[EndpointDescription]` on every action |
 | People paths | `/users` is a **namespace prefix**, not a parent resource. People collections hang under it. Do not nest advisers / customers under `/users/{id}`. Tenants, currencies, and ledger routes stay outside this prefix |
 | Fee paths | `/fees` is a namespace prefix for fee configuration and calculation, like `/users`; it is not a resource. Fee transactions stay under `/transactions` (§7.9) |
@@ -892,3 +894,4 @@ One row per change. The text of each change is in git (`git log -p -- docs/api-d
 | 2026-11-26 | Account valuation (§6, §7.6): `GET /accounts/{id}/valuation?date=` with `accounts.read`. No new permission or problem code |
 | 2026-11-26 | Valuation run (§3.1, §6, §7.6, §7.18): `valuation-runs.read` and `valuation-runs.start`; `/valuation-runs`; `GET /accounts/{id}/valuations[/{date}]`; `valuedThrough` on the account item. No problem code |
 | 2026-11-26 | Valuation history (§6, §7.18): `GET /net-worth/funds-under-management`; `folded` on the net-worth reads; `date` of the Adviser Balances Report. No permission or problem code |
+| 2026-11-27 | Docs caught up with the code: §1 diagram shows the BFF between the browser and `webapi`; §2 CORS is none on `webapi` |
