@@ -210,7 +210,7 @@ Invariants:
 
 - `TenantId` is required on the header, and an `AccountId` on every leg. Every leg account is in the header's tenant (application dual check). A Transaction has at least one leg.
 - Insert lands **Posted**. There is no status.
-- The header is the aggregate root. The cash `SUM` is not stored.
+- The header is the aggregate root. The cash `SUM` is not stored. The cash of a past day is the same `SUM` over the Transactions with `bookedAt` before that day ended, each counted from its own `bookedAt`, a Reversal too ([account-valuation](account-valuation.md) R3, R5).
 - A cash leg's currency equals the currency of its Account (denormalised).
 - The original transaction is immutable after insert (audit columns aside), **except** the single `ReversedByTransactionId` write on reverse. After that write it is immutable again.
 - `Account.Close()` stays a status flip. Zero-cash is an application guard.
@@ -473,3 +473,4 @@ What changed in this file after it landed. The text of each change is in git (`g
 | 2026-11-24 | [dividends.md](dividends.md) | §5: `Dividend` is active; the `Reinvestment` leg |
 | 2026-11-25 | [adjustment-review.md](adjustment-review.md) | §1: no status on a Transaction. R11: an `Adjustment` is never reversed. `POST /transactions/adjustment` removed |
 | 2026-11-26 | — | The amendments above were folded into §1–§13. No rule changed |
+| 2026-11-26 | [account-valuation.md](account-valuation.md) | §5: the cash of a past day is read by `bookedAt` |

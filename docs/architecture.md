@@ -326,6 +326,8 @@ Each Phase-2 slice adds Development / TestAppHost `TestSeed` rows. Not schema sc
 
 The ledger is one domain with internal slices. Instruments, Accounts, and Transaction + cash-leg storage are locked in their Feature Specs. Holdings / security legs wait. There is no separate Journal / CashLedger table. Tendencies: [domain-model.md](domain-model.md) §8 and [function-plan.md](function-plan.md) §5.
 
+A valuation of a past day is a read of the ledger and the stored prices and rates, worked out each time ([features/account-valuation.md](features/account-valuation.md)). Two Application services hold it: `AccountPositions` (the cash and the quantities of an Account at the end of a UTC day) and `ValueAccount` (the position, the prices, the rates and the Domain function `AccountValuation.Compute`). Both name the Account and its Tenant themselves and do not depend on the tenant query filter, so that a later `worker` run can call them. No port, job or queue is added.
+
 If the identity **database** splits later, replace the revocation / login-principal port implementation. Do not change the protocol or the Aspire resource name `identity`.
 
 ---
@@ -414,3 +416,4 @@ Locked conclusions follow function-plan §0 and these ADRs. The `docs/adr/` fold
 | 2026-11-24 | In-kind transfers accepted: ports `ICustodianFeed` and `ICustodianTransfers` (§6); queue `custodian` with jobs `custodian-sync:{connection}` and `custodian-reconciliation` (§10). |
 | 2026-11-24 | Dividends accepted: port `ICustodianElections` (§6); `custodian-sync:{connection}` also sends reinvestment elections (§10). |
 | 2026-11-25 | [features/market-data-history.md](features/market-data-history.md) accepted. §6: `IMarketData` gains `TryGetPriceDetail` and `ListPricesAsync`, `IFxRate` gains `ListRatesAsync`; §10 gains the job `fx-rate-history-sync` on queue `fx`. `worker` reads `MarketDataHistory:FloorDate` and `Eodhd:HistoryDays` at start-up. |
+| 2026-11-26 | [features/account-valuation.md](features/account-valuation.md) accepted. §9: the Application services `AccountPositions` and `ValueAccount`. No port, job or queue. |

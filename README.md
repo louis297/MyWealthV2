@@ -18,6 +18,7 @@ The design source of truth lives in [`docs/`](docs/). Every behaviour is specifi
   - **Adjustments:** a TenantAdmin corrects cash or a holding with a reason. The change is a request that another TenantAdmin approves before it posts.
 - **Fees.** Tenant trade fee schedules per quote currency (marginal bands, minimum, cap, effective dates). Every `Buy` / `Sell` carries a `Fee` leg, and rebalances take fees into account.
 - **Holdings and net worth.** An average-cost holdings projection and a point-in-time net-worth read model, in each currency, with breakdowns by customer, account type, top holdings and custody mode.
+- **Valuation of a past day.** `GET /accounts/{id}/valuation?date=` values one account at the end of a UTC day from the ledger and the stored prices and rates: each holding in its quote currency and in the account's currency. A price or rate older than 4 days, or none, leaves the holding not valued and the valuation incomplete; nothing is counted as 0.
 - **Model portfolios.** Target weights and a base currency, assigned to Custodial accounts and rebalanced through orders.
 - **Reports.** A platform catalog granted per tenant. Customer, Book and Tenant reports as PDF, generated on request or on a schedule.
 - **Market data.** End-of-day instrument prices (EODHD) and FX rates (Frankfurter), stored by the worker for every date from a configured history floor date, with a final rule: a row two or more days old never changes. `GET /instruments/{id}/prices` and `GET /fx-rates` read the history. Instruments with the `.SIM` suffix are priced by the simulator market instead.
@@ -37,7 +38,7 @@ The design source of truth lives in [`docs/`](docs/). Every behaviour is specifi
 
 **Custodial roadmap.** Steps 1–15 and 17 landed: transaction source, the simulator, adjustments, client money accounts, deposit matching, withdrawals, bank returns, bank reconciliation, account closure, the interest run, simulated instruments, corporate actions, orders, trade settlement, rebalances through orders, migration batches, in-kind transfers, dividends, and adjustment review. Step 16, an end-to-end run across all parties, is next and not yet specified. See [`docs/custodial-roadmap.md`](docs/custodial-roadmap.md).
 
-**Business roadmap.** New Zealand rules, one step at a time ([`docs/future-plans.md`](docs/future-plans.md) §1). Step 1, trade fees, landed. Step 3, historical valuation, has its own plan in [`docs/valuation-roadmap.md`](docs/valuation-roadmap.md): V1, price and rate history, landed. Next is V2, valuation as of a date, then the daily valuation run (V3) and net worth history (V4). The advisory fee, performance report (TWR / MWR) and FIF tax report follow.
+**Business roadmap.** New Zealand rules, one step at a time ([`docs/future-plans.md`](docs/future-plans.md) §1). Step 1, trade fees, landed. Step 3, historical valuation, has its own plan in [`docs/valuation-roadmap.md`](docs/valuation-roadmap.md): V1, price and rate history, and V2, valuation as of a date, landed. Next is the daily valuation run (V3), then net worth history (V4). The advisory fee, performance report (TWR / MWR) and FIF tax report follow.
 
 **Later.** Cross-currency trades are in draft. KYC, households, advice documents, and invitation and activation follow one domain at a time.
 

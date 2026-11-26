@@ -3,6 +3,7 @@ using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Interest;
+using MyWealthV2.Domain.Valuations;
 using MyWealthV2.Domain.ValueObjects;
 
 namespace MyWealthV2.Application.Interest.Accruals;
@@ -53,7 +54,7 @@ public class AccountInterest(IApplicationDbContext db, ICurrencyCatalog currenci
         {
             // R11: a day before the first schedule earns nothing, so the walk starts at the later of the two.
             var first = schedules[0].EffectiveFrom > start ? schedules[0].EffectiveFrom : start;
-            var end = StartOf(asOfDate.AddDays(1));
+            var end = LedgerDay.End(asOfDate);
             var legs = await (
                     from leg in db.TransactionCashLegs.IgnoreQueryFilters()
                     join transaction in db.Transactions.IgnoreQueryFilters() on leg.TransactionId equals transaction.Id
@@ -67,7 +68,7 @@ public class AccountInterest(IApplicationDbContext db, ICurrencyCatalog currenci
             for (var day = first; day <= asOfDate; day = day.AddDays(1))
             {
                 // R16: the closing balance of the day, every role, booked before the next day starts.
-                var next = StartOf(day.AddDays(1));
+                var next = LedgerDay.End(day);
                 while (index < legs.Count && legs[index].BookedAt < next)
                 {
                     balance += legs[index].Amount;
@@ -147,6 +148,4 @@ public class AccountInterest(IApplicationDbContext db, ICurrencyCatalog currenci
         await db.SaveChangesAsync(cancellationToken);
         return posting;
     }
-
-    private static DateTimeOffset StartOf(DateOnly day) => new(day.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
 }

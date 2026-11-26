@@ -3,9 +3,10 @@ title: "Known issue — EODHD does not cover NZX or Tokyo"
 status: open
 language: en
 created: 2026-11-08
-updated: 2026-11-08
+updated: 2026-11-26
 related:
   - ../features/instrument-prices.md
+  - ../features/account-valuation.md
   - ../adr/0010-instrument-catalog.md
 ---
 
@@ -53,4 +54,4 @@ Instruments stay tenant-scoped. No schema change. No new exchange column in this
 - We pick a different source that covers those markets, or
 - The demo set is changed to instruments EODHD already covers.
 
-Until then, NZD and JPY seed instruments have no real EOD price. Valuation and Buy/Sell for those instruments continue to see empty from `IMarketData` unless a TestSeed row is present.
+Until then, NZD and JPY seed instruments have no real EOD price. Valuation and Buy/Sell for those instruments continue to see empty from `IMarketData` unless a TestSeed row is present. A valuation of a past day ([features/account-valuation.md](../features/account-valuation.md)) lists such a holding as `NoPrice`, with no value, and marks the valuation incomplete (`complete` `false`); it is never valued at 0.

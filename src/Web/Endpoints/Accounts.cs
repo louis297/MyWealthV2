@@ -22,6 +22,8 @@ using MyWealthV2.Application.Portfolios.Queries.GetAccountPortfolio;
 using MyWealthV2.Web.Infrastructure;
 
 using MyWealthV2.Application.Rebalances;
+using MyWealthV2.Application.Valuations;
+using MyWealthV2.Application.Valuations.Queries.GetAccountValuation;
 
 namespace MyWealthV2.Web.Endpoints;
 
@@ -40,6 +42,7 @@ public class Accounts : IEndpointGroup
         groupBuilder.MapPost(CloseAccount, "{id}/close").RequireAuthorization(Policies.AccountsManage);
         groupBuilder.MapPost(ReopenAccount, "{id}/reopen").RequireAuthorization(Policies.AccountsManage);
         groupBuilder.MapGet(GetHoldings, "{id}/holdings").RequireAuthorization(Policies.AccountsRead);
+        groupBuilder.MapGet(GetValuation, "{id}/valuation").RequireAuthorization(Policies.AccountsRead);
         groupBuilder.MapGet(GetAccountPortfolio, "{id}/portfolio").RequireAuthorization(ReadPortfolio);
         groupBuilder.MapGet(GetDepositInstructions, "{id}/deposit-instructions").RequireAuthorization(Policies.AccountsRead);
         groupBuilder.MapGet(GetInterestAccruals, "{id:guid}/interest-accruals").RequireAuthorization(Policies.AccountsRead);
@@ -164,6 +167,11 @@ public class Accounts : IEndpointGroup
         var result = await sender.Send(new GetAccountHoldingsQuery(id));
         return TypedResults.Ok(result);
     }
+
+    [EndpointSummary("Get the valuation of an account for a day")]
+    [EndpointDescription("What the account was worth at the end of one UTC day (date=yyyy-MM-dd, required, not after today): the cash and each holding of that day at the stored price and FX rate as of the day. A holding that cannot be valued has a status and no value, and complete is false.")]
+    public static async Task<Ok<AccountValuationDto>> GetValuation(ISender sender, Guid id, string? date = null) =>
+        TypedResults.Ok(await sender.Send(new GetAccountValuationQuery(id, date)));
 
     [EndpointSummary("Get the account portfolio")]
     [EndpointDescription("Returns the active portfolio assignment and the last rebalance status.")]
