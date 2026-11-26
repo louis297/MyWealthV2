@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-14
-last_updated: 2026-11-22
+last_updated: 2026-11-26
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -108,6 +108,11 @@ A Customer may complete authorization-server login (tests / reserved). There is 
 | R17 | **Scope.** TenantAdmin: current tenant, Role=Customer. Adviser: current tenant, Role=Customer, and `AdviserId` = self. Cross-tenant, same-tenant but not assigned, same-tenant but Role is not Customer → GET/PUT/disable/enable 404. Two-tenant fixture required. |
 | R18 | List is current tenant, `Role=Customer` only. Every item includes `status`, `isActive`, and `adviserId`. `enabledOnly` omitted/`false` = every Status; `true` = `IsActive = 1`; any other value 400. `page` default 1, `pageSize` default 20 max 100. Optional `search`: Name / Email contains (CI) or person PublicId exact. Sort name then email. No `tenantId=` or `status=` query. Optional `adviserId=` (Adviser PublicId): TenantAdmin filters by that Adviser; unknown / other-tenant adviser → empty list (do not 404; this is a filter). Adviser with `adviserId=`: equal to self → ignore (already scoped); any other value → 400. |
 | R19 | Do not seed a demo Customer. Tests create people. |
+
+What belongs to a Customer besides the person. Creating, updating, disabling and enabling a Customer do not touch either:
+
+- **Nominated bank accounts** (`/nominated-bank-accounts`): the Customer's own bank accounts that withdrawals may be paid to. They belong to the Customer, not to an Account, and do not need a Custodial account. An Adviser or TenantAdmin adds them; a TenantAdmin other than the adder verifies or rejects them. The Customer reads their own and cannot change them. Disabling a Customer does not change them; adding one for a Disabled Customer, or verifying one, → 400 `disabled` / `target=user` ([withdrawals.md](withdrawals.md)).
+- **Tax profile**: every Customer has one (interest-run R2): `taxResidency` (`NewZealand` or `Overseas`), `irdNumberHeld` and `rwtRatePercent` (10.5, 17.5, 30, 33, 39, or `null`). A Customer whose profile was never saved reads as `NewZealand`, `false`, `null` ("not provided"). The IRD number itself is never stored. Tax residency is the first attribute that tells a New Zealand Customer from an overseas one. It decides the withholding tax on interest (interest-run R1–R8) and on a dividend when it is posted: RWT 33 % for a New Zealand Customer, NRWT 30 % for an overseas Customer on a New Zealand company's dividend; `irdNumberHeld` and `rwtRatePercent` are not used for dividends (dividends R33). Sub-resource `GET` / `PUT /users/customers/{customerId}/tax-profile`, with the policies and scope of every `/users/customers` route (TenantAdmin: the tenant; Adviser: assigned Customers; else 404; a Customer → 403); `PUT` takes all three attributes and `rowVersion` (`null` for the first write) and answers 204; stale → 409 `stale_row_version`. `GET /users/me/tax-profile` (`users.me`) is the caller's own profile when the caller is a Customer, without `updatedBy`; any other role → 404. A Disabled Customer's profile may be changed. No domain event.
 
 ---
 
@@ -305,13 +310,15 @@ None in this slice. The Adviser Portal Customers list / form belongs to the late
 
 ## 10. Tests
 
-| Project | Assert |
-| --- | --- |
-| Domain.UnitTests | `Create(Customer)` sets TenantId and AdviserId, password path → Active + `UserActivated` + `UserCreated`, and does **not** raise `CustomerAdviserReassigned`; `ReassignAdviser` writes the new id and raises the event once (customer + tenant + previous + new); same id → no event; non-Customer `ReassignAdviser` throws; `Disable()` on a Customer matches TenantAdmin |
-| Application.FunctionalTests | No Bearer → 401 not 302; SystemAdmin / Customer → 403 on every verb; TenantAdmin create → 201, get `status=active` and the expected `adviserId`; hosted login against client `adviser-portal` with that tenant code + email + password **fails** (allow-list; Identity `CheckPassword` still succeeds); Adviser omit `adviserId` → 201 assigned to self; Adviser passes another `adviserId` → 400; duplicate email in the same tenant → 400; same email in two tenants → 201; `tenantId` in body → 400; get / PUT / create / disable / enable after current tenant disabled → 403; target Adviser Disabled → 400 `disabled`/`user`; unknown `adviserId` → 404; PUT with `email` → 400; Adviser PUT with `adviserId` → 400; TenantAdmin reassign to another Active Adviser in the tenant → 204; reassign to a Disabled Adviser → 400 `disabled`/`user`; GET this collection with an Adviser or TenantAdmin PublicId → 404; TenantAdmin of A GET/PUT/disable of B’s Customer → 404; Adviser B GET of Adviser A’s Customer → 404; disable → 204 and that subject’s refresh fails; enable → 204; stale `rowVersion` → 409; default paging; omitted `enabledOnly` includes disabled; `enabledOnly=true` is Active only; TenantAdmin `adviserId=` filters; Adviser `adviserId=` of someone else → 400 |
-| Infrastructure.IntegrationTests | No new script. Two-tenant fixture: A and B each have an Adviser + Customer; A’s list does not include B; A requesting B’s Customer id → 404; two Advisers in one tenant, A does not see B’s assigned row |
+The tests are the executable form of §4. Where they live:
 
-Post-create password is verified with Identity `CheckPassword` (or equivalent). Do not invent a token endpoint on `webapi`. Hosted login on client `adviser-portal` for that Customer must **not** issue a code. `/users/me` as that Customer is not asserted on this client. Amendment 2026-09-14 (identity-auth R4 / R20).
+| Project | Where |
+| --- | --- |
+| Domain.UnitTests | `Entities/User*Tests.cs` |
+| Application.FunctionalTests | Folder `Users/Customers/`; `Interest/TaxProfileTests.cs`; folder `NominatedBankAccounts/` |
+| Infrastructure.IntegrationTests | No script of its own; the two-tenant cases are proved over HTTP |
+
+Post-create password is verified with Identity `CheckPassword` (or equivalent). Do not invent a token endpoint on `webapi`.
 
 ---
 
@@ -349,43 +356,13 @@ Locked 2026-09-14:
 
 ---
 
-## 12. Suggested commits
+## 12. History
 
-The repository should build after each commit.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/customers.md`).
 
-1. `User.ReassignAdviser` + `CustomerAdviserReassigned` + Domain.UnitTests
-2. `CreateCustomer` + dual-write + disabled-tenant 400 + disabled-adviser 400 `disabled`/`user` + uniqueness + Adviser self-only + 401/403
-3. `GetCustomers` / `GetCustomerById` + paging + `enabledOnly` + `adviserId=` + cross-tenant 404 + assigned 404 + wrong-collection 404
-4. `UpdateCustomer` + PUT 204 / TenantAdmin reassign / Adviser `adviserId` 400 / 409
-5. `DisableCustomer` / `EnableCustomer` + HTTP idempotent + refresh fails (no account guard)
-6. Hosted-login smoke after create; that Customer gets 403 on this collection and 200 on `/users/me`
-
-Do not put portal pages or ledger tables in these commits.
-
----
-
-## Amendment 2026-11-20 (nominated bank accounts) — accepted
-
-Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md](withdrawals.md).
-
-- A Customer may have **nominated bank accounts** (`/nominated-bank-accounts`): their own bank accounts that withdrawals may be paid to. They belong to the Customer, not to an Account, and do not need a Custodial account. An Adviser or TenantAdmin adds them; a TenantAdmin other than the adder verifies or rejects them. The Customer reads their own and cannot change them (roadmap D6).
-- Disabling a Customer does not change their nominated bank accounts. Adding one for a Disabled Customer, or verifying one, → 400 `disabled` / `target=user`.
-
----
-
-## Amendment 2026-11-22 (interest run) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rules R1–R8 live there; this section records what changes here.
-
-- Every Customer has one **tax profile** (interest-run R2): `taxResidency` (`NewZealand` or `Overseas`), `irdNumberHeld` and `rwtRatePercent` (10.5, 17.5, 30, 33, 39, or `null`). A Customer whose profile was never saved reads as `NewZealand`, `false`, `null` ("not provided"). The IRD number itself is never stored. Tax residency is the first attribute that tells a New Zealand Customer from an overseas one; it decides the withholding tax on interest and nothing else.
-- New sub-resource `GET` / `PUT /users/customers/{customerId}/tax-profile`, with the policies and scope of every `/users/customers` route (TenantAdmin: the tenant; Adviser: assigned Customers; else 404; a Customer → 403). `PUT` takes all three attributes and `rowVersion` (`null` for the first write) and answers 204; stale → 409 `stale_row_version` (interest-run R3, R6).
-- New `GET /users/me/tax-profile` (`users.me`): the caller's own profile when the caller is a Customer, without `updatedBy`; any other role → 404 (interest-run R5, R8).
-- Creating, updating, disabling and enabling a Customer are unchanged. A Disabled Customer's profile may be changed. No domain event.
-
----
-
-## Amendment 2026-11-24 (dividends) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rule R33 lives there; this section records what changes here.
-
-- The tax profile's `taxResidency` also decides the withholding on a dividend when it is posted: RWT 33 % for a New Zealand Customer, NRWT 30 % for an overseas Customer on a New Zealand company's dividend. `irdNumberHeld` and `rwtRatePercent` are not used for dividends.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-20 | [withdrawals.md](withdrawals.md) | Nominated bank accounts of a Customer |
+| 2026-11-22 | [interest-run.md](interest-run.md) | The tax profile |
+| 2026-11-24 | [dividends.md](dividends.md) | The tax profile decides the withholding on a dividend |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
