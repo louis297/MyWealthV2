@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-19
-last_updated: 2026-11-25
+last_updated: 2026-11-26
 related:
   - ../custodial-roadmap.md
   - posting.md
@@ -37,8 +37,6 @@ Amendment to the ledger on `webapi`: [posting.md](posting.md), [portfolios.md](p
 No new route, no new policy, no new `TransactionType`, no problem code. Script `0035_transaction_source.sql` adds two columns to `Transactions` and back-fills them.
 
 **Status is `accepted` (2026-11-19), landed 2026-11-19.** The eight points of §11 were confirmed as recommended.
-
-The §10 case "`POST /portfolios/{id}/rebalance` → every trade of an account has the `handle` of that account in the 202 body" is proved at the infrastructure layer. The functional host has no Worker, and the job runs there under `SystemUser`, so `RebalanceJobWorkerTests` runs `RebalanceJob` with the Worker's services and asserts that its trades have source `(Rebalance, handle)` and `CreatedBy` `system`. Before 2026-11-19 the Worker's `SystemUser` had no id, so the job could not post a trade (`Transactions.CreatedBy` is NOT NULL). It now writes the system name, as [database-design.md](../database-design.md) allows ("the actor's Identity id or a system name").
 
 ---
 
@@ -107,28 +105,45 @@ The rule that distinguishes this slice: the source is set once, when the Transac
 | ID | Rule |
 | --- | --- |
 | R1 | Unchanged access rules: posting R1–R4a, R15, leg-accounts R6–R8. 401 / 403 / 404, PublicId only, `tenantId` rules, Customer read scope. |
-| R2 | **Every Transaction has a source.** A source kind and an optional source id. Both are set when the Transaction is built and never change (posting R10). Kinds in this slice: `Manual` (0), `Seed` (1), `Rebalance` (2). A later spec that adds a kind adds the next value and widens the check in its own script. |
-| R3 | **Source id.** `Manual` and `Seed` have no source id. `Rebalance` has one: the rebalance handle (R5). A later kind states in its spec whether it has an id; when it has one, it is the PublicId of the instruction, event or run that wrote the Transaction. The id has no foreign key. |
-| R4 | **Hand-written Transactions are `Manual`.** `POST /transactions`, `POST /transactions/transfer`, `POST /transactions/fx` and `POST /transactions/{id}/reverse` write `Manual` for every caller, SystemAdmin included. The person is in the audit columns (`CreatedBy`), not in the source. |
-| R5 | **Rebalance trades are `Rebalance`.** Every `Buy` / `Sell` that `AccountRebalancer` posts (assign, `POST /accounts/{id}/rebalance`, the rebalance job) has kind `Rebalance` and the rebalance handle as its source id. All trades of one run share the id. For an asynchronous rebalance it is the `handle` in the 202 body (portfolios R23); a synchronous call does not return its handle. |
+| R2 | **Every Transaction has a source.** A source kind and an optional source id. Both are set when the Transaction is built and never change (posting R10). The kinds are in the table below. A spec that adds a kind adds the next value and widens the check in its own script. |
+| R3 | **Source id.** `Manual` and `Seed` have no source id. Every other kind has one: the PublicId of the instruction, event or run that wrote the Transaction (the table below). The id has no foreign key. |
+| R4 | **Hand-written Transactions are `Manual`.** `POST /transactions`, `POST /transactions/transfer`, `POST /transactions/fx` and `POST /transactions/{id}/reverse` write `Manual` for every caller, SystemAdmin included. The person is in the audit columns (`CreatedBy`), not in the source. An adjustment is not a hand write: it is posted by the approval of an adjustment request, with kind `AdjustmentRequest`. Adjustments posted before 2026-11-25 keep `Manual`. |
+| R5 | **Rebalance.** No Transaction gets source `Rebalance` any more: a rebalance trade is the fill of a rebalance order, with source `OrderFill` and the order's PublicId (rebalances R26). The kind stays for the rows that have it — the `Buy` / `Sell` that `AccountRebalancer` posted before 2026-11-23, with the rebalance handle as source id, all trades of one run sharing it — and `TransactionSource.Rebalance(handle)` is kept for reading them. |
 | R6 | **Seeded Transactions are `Seed`.** Every Transaction that `TestSeed` and `DevelopmentSmokeSeeder` build has kind `Seed`. Both run in Development and in the TestAppHost only. The demo tenant seed writes no Transaction ([demo-tenant-seed.md](demo-tenant-seed.md) R9). |
-| R7 | **A Reversal has its own source.** The source of a Reversal is the process that reversed, not a copy of the original's source. A hand reverse writes `Manual` with no id, whatever the original's source. A later flow that undoes its own write passes its own source. |
+| R7 | **A Reversal has its own source.** The source of a Reversal is the process that reversed, not a copy of the original's source. A hand reverse writes `Manual` with no id, whatever the original's source. A later flow that undoes its own write passes its own source. So an undo match writes `BankFeed`, a returned payout `Payment`, and the Reversal of a broken trade `OrderFill`, each with its flow's id. |
 | R8 | **Not a request field.** No create or reverse body has a source. A `source` field in a body is ignored like any other unknown field. Factories have no default source, so every writer states one. |
-| R9 | **Rebalance writes no `reference`.** A rebalance trade has `reference: null` and memo `Rebalance` (unchanged). The string `rb:{handle}:{B|S}:{InstrumentId}` is no longer stored. Rebalance idempotency (the key derived from account, handle, instrument and side, and its request hash) is unchanged; the hash input may keep that string, because it is never stored as a reference or returned. |
+| R9 | **Rebalance writes no `reference`.** A rebalance trade has `reference: null` and memo `Rebalance` (unchanged). The string `rb:{handle}:{B|S}:{InstrumentId}` is no longer stored. Rebalance idempotency (the key derived from account, handle, instrument and side, and its request hash) is unchanged; the hash input may keep that string, because it is never stored as a reference or returned. The idempotency records a rebalance wrote per trade are no longer written (rebalances R26). |
+
+The source kinds. Each has a factory on `TransactionSource`; a factory that takes an id refuses an empty one (`DomainException`). The id has no foreign key.
+
+| Kind | Source id | Marks | Undone by |
+| --- | --- | --- | --- |
+| `Manual` (0) | none | What a person wrote through a create or reverse route | A hand reverse |
+| `Seed` (1) | none | Seed data (R6) | — |
+| `Rebalance` (2) | The rebalance handle | A rebalance trade posted before 2026-11-23 (R5). Nothing writes it now | An adjustment |
+| `BankFeed` (3) | The bank statement line. A deposit and the Reversal of its undo share it; a line matched again after an undo gives a second deposit with the same id | A deposit | An undo match (deposit-matching R30, R33) |
+| `Payment` (4) | The withdrawal. A payout and the Reversal of a returned payout share it | A payout | The bank returning the payout ([withdrawals.md](withdrawals.md)) |
+| `AccountClosure` (5) | The account closure | The remainder write-off, a `CloseOut` (account-closure R18) | — |
+| `InterestRun` (6) | The interest run | An interest posting (interest-run R23, R27) | — |
+| `CorporateAction` (7) | The corporate action | An entitlement posting (corporate-actions R26, R27, R32); a `Dividend` (dividends R37, R42) | — |
+| `OrderFill` (8) | The **order**. Every fill of one order has the same id; the fill itself is named in the item's `execution` (orders R38) | The `Buy` or `Sell` of a fill, a rebalance order's fills included | The flow of a broken trade; its Reversal keeps `OrderFill` and the order's id (trade-settlement R29) |
+| `Migration` (9) | The migration batch. Every Transaction of one batch has the same id | A migrated `Opening` or `OpeningHoldings` (migration-batches R25, R27) | An adjustment |
+| `InKindTransfer` (10) | The in-kind transfer | Its `StockIn` or `StockOut` (in-kind-transfers R37, R41, R49) | A new transfer or an adjustment |
+| `AdjustmentRequest` (11) | The adjustment request | An `Adjustment` posted by the approval of a request (adjustment-review R13) | A request for the opposite change |
 
 ### 4.2 Reads
 
 | ID | Rule |
 | --- | --- |
-| R10 | **Item.** The transaction item on `GET /transactions` and `GET /transactions/{id}` has `source: { "kind": "<enum name>", "id": <PublicId or null> }`. `kind` is the enum name (`Manual`, `Seed`, `Rebalance`). Every caller who can read the Transaction sees it, the Customer included. Nothing else on the item changes. |
+| R10 | **Item.** The transaction item on `GET /transactions` and `GET /transactions/{id}` has `source: { "kind": "<enum name>", "id": <PublicId or null> }`. `kind` is the enum name (`Manual`, `Seed`, `Rebalance`). Every caller who can read the Transaction sees it, the Customer included. Nothing else on the item changes. `kind` may be any of the twelve names of §4.1. |
 | R11 | **No filter.** `GET /transactions` has no `source` query parameter in this slice. An unknown query parameter is ignored, as today. |
 
 ### 4.3 Reverse by source
 
 | ID | Rule |
 | --- | --- |
-| R12 | **Hand-reversible sources.** `Manual` and `Rebalance` are hand-reversible. `Seed` is not. Every later kind is not, unless its spec says otherwise. `Rebalance` counts as hand-reversible because an Adviser started it (roadmap D15); this ends when rebalance goes through orders (roadmap O3). |
-| R13 | **Custodial: only a hand-reversible source.** `POST /transactions/{id}/reverse` of a Transaction whose leg accounts are Custodial and whose source is not hand-reversible → 400, ordinary `errors` like the other reverse refusals (posting R11), with the message `This transaction was written by the platform and cannot be reversed by hand.` No Reversal and no idempotency record is written. Every leg account of a Transaction has the same custody mode (custody-modes R9), so the first leg account decides. |
+| R12 | **Hand-reversible sources.** Only `Manual` is hand-reversible. `Seed` is not, and no kind written by a platform flow is: each flow undoes its own write (the table in §4.1). `Rebalance` was hand-reversible until rebalances went through orders (roadmap D15, rebalances R28); such a trade is now corrected with an adjustment. |
+| R13 | **Custodial: only a hand-reversible source.** `POST /transactions/{id}/reverse` of a Transaction whose leg accounts are Custodial and whose source is not hand-reversible → 400, ordinary `errors` like the other reverse refusals (posting R11), with the message `This transaction was written by the platform and cannot be reversed by hand.` No Reversal and no idempotency record is written. Every leg account of a Transaction has the same custody mode (custody-modes R9), so the first leg account decides. A hand reverse of a Transaction of type `Adjustment` is refused by its type, before this rule and with its own message, also when its source is `Manual` (adjustment-review R15). |
 | R14 | **Order.** R13 runs in the reverse handler after the idempotency replay check, the Closed-account and Disabled-Customer checks (posting R6, R7) and the Account locks. It runs before the portfolio trade lock (portfolios R18) and before the already-reversed check, the same place as the manual entry matrix on create (custody-modes R6). A Transaction the caller cannot see is still 404. An idempotent replay still returns the original response. |
 | R15 | **External: unchanged.** On an External account every source can be reversed by hand, as today. The manual entry matrix (custody-modes R5) row "Reversal" becomes: External allowed; Custodial allowed for a hand-reversible source only. |
 | R16 | **Where the rule lives.** `CustodyRules.AllowsHandReverse(custodyMode, sourceKind)` in Domain holds R12, R13 and R15. Application calls it once, in `ReverseTransaction`. `Transaction.Reverse` does not call it, so a later flow can reverse its own write. |
@@ -148,15 +163,15 @@ Policies: none added.
 
 | Type | Kind | Change |
 | --- | --- | --- |
-| `TransactionSourceKind` | Enum (new) | `Manual = 0`, `Seed = 1`, `Rebalance = 2`. |
+| `TransactionSourceKind` | Enum | The twelve kinds of §4.1, `Manual = 0` to `AdjustmentRequest = 11`. |
 | `TransactionSource` | Value object (new) | `Kind` and `PublicId` (`Guid?`). Built by `TransactionSource.Manual`, `TransactionSource.Seed` and `TransactionSource.Rebalance(Guid handle)`. `Manual` and `Seed` have no id; `Rebalance` needs a non-empty id (`DomainException` otherwise). |
 | `Transaction` | Aggregate (existing) | New `Source` (stored as two columns). Every factory (`Post`, `PostInternalTransfer`, `PostFxConversion`, `PostFxConversionWithAmounts`, `PostOpeningHoldings`, `PostBuy`, `PostSell`, `PostStockIn`, `PostStockOut`, `PostSplit`) and `Reverse` take a `TransactionSource` as a required parameter with no default. No factory reads the custody mode for it. |
-| `CustodyRules` | Static rules (existing) | New `AllowsHandReverse(CustodyMode, TransactionSourceKind)`: `true` on External; on Custodial `true` for `Manual` and `Rebalance`, `false` otherwise. |
+| `CustodyRules` | Static rules (existing) | `AllowsHandReverse(CustodyMode, TransactionSourceKind)`: `true` on External; on Custodial `true` for `Manual` only. |
 
 Invariants:
 
 - Every Transaction has a source. It is set by the factory or by `Reverse` and never changes.
-- A source of kind `Manual` or `Seed` has no id. A source of kind `Rebalance` has an id.
+- A source of kind `Manual` or `Seed` has no id. A source of every other kind has one.
 - A Reversal's source is the one passed to `Reverse`, not the original's.
 - On a Custodial account a person reverses only a Transaction with a hand-reversible source. Held in Application through `CustodyRules.AllowsHandReverse`, like the manual entry matrix.
 
@@ -167,7 +182,7 @@ TransactionSource.Rebalance(handle) -> (Rebalance, handle); handle not empty
 
 CustodyRules.AllowsHandReverse(custodyMode, sourceKind) -> bool
   External:  true
-  Custodial: sourceKind in { Manual, Rebalance }
+  Custodial: sourceKind = Manual
 ```
 
 Update [domain-model.md](../domain-model.md) §8.6 when this spec is accepted.
@@ -175,6 +190,8 @@ Update [domain-model.md](../domain-model.md) §8.6 when this spec is accepted.
 ---
 
 ## 6. Database
+
+`CK_Transactions_SourceKind` is 0–11 today, and a `SourcePublicId` is required for kinds 2–11: the script of each later kind widened both ([database-design.md](../database-design.md) §11.4). The rest of this section is script `0035`.
 
 Script: `database/schema/0035_transaction_source.sql`. Forward only. Do not add EF migrations.
 
@@ -287,20 +304,13 @@ None. The item gains a field the pages do not read.
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | `TransactionSource`: `Manual` and `Seed` have no id; `Rebalance(Guid.Empty)` throws; `Rebalance(handle)` keeps the handle. Each factory stores the source it was given. `Reverse` stores the source it was given, not the original's (a `Rebalance` original reversed with `Manual` → Reversal `Manual`). `CustodyRules.AllowsHandReverse`: one case per `(custody mode, source kind)` pair, equal to R12, R13 and R15 |
-| Application.FunctionalTests — source on writes | `POST /transactions` (a cash type and a `Buy`), `/transactions/transfer`, `/transactions/fx` and reverse → item `source` `{ Manual, null }`, for an Adviser, a TenantAdmin and a SystemAdmin. A body with `"source": { "kind": "Seed" }` → 201 and `Manual`. Assign and `POST /accounts/{id}/rebalance` → every trade has `{ Rebalance, <id> }`, one id per run, and `reference: null`. `POST /portfolios/{id}/rebalance` → every trade of an account has the `handle` of that account in the 202 body. The Customer reads `source` on their own Transactions. Cross-tenant: tenant B's Transaction id → 404 |
-| Application.FunctionalTests — reverse by source | On a Custodial account: reverse of a `Manual` `TransferIn` → 201; reverse of a `Rebalance` trade after unassign → 201; reverse of a `Seed` Transaction (built by the test with the factory and saved directly, as in `CashAmountDecimalPlacesTests`) → 400 with the R13 message, no Reversal, no idempotency record, and a retry with the same key → 400 again. On an External account: reverse of a `Seed` Transaction → 201. Closed account or Disabled Customer with a `Seed` Transaction → the existing 400 (R14 order). A `Seed` Transaction on an assigned Custodial account → the R13 message, not the trade lock. Another tenant's Transaction → 404, not 400 |
-| Infrastructure.IntegrationTests | Script `0035` on a scratch database (as for `0024`, `0031`, `0032`): a `Buy` and a `Sell` with an `rb:` reference become `Rebalance` with the handle as GUID and a null reference; a row with each listed seed reference becomes `Seed` with its reference kept; a hand row, a Reversal, and a row with reference `TestSeed-Other` stay `Manual`; leg counts and amounts are unchanged; an `rb:` row of type `TransferIn` stops the script with nothing changed; after the script an insert without `SourceKind` fails, and `(Rebalance, NULL)` and `(Manual, <guid>)` violate the check. `TestSeed`: every seeded Transaction is `Seed`; a second run adds nothing |
-| Adviser Portal | Detail page shows the Source line for each of the three kinds. Reverse is absent on a `Seed` row and present on a `Manual` and a `Rebalance` row, on the list, the detail and the account page; a 400 from reverse shows the sentence |
-
-Fan-out in the existing tests:
-
-- Every Domain unit test that calls a factory or `Reverse` passes a source (about twelve files in `tests/Domain.UnitTests/Entities`). Use a test helper that returns `TransactionSource.Manual`. Mechanical; in the same commit as the parameter (§12 commit 1).
-- Functional and integration tests that build Transactions directly (`FeeHttp`, `CashAmountDecimalPlacesTests`, `GetReportExecutionsTests`, `TenantQueryFilterTests`, `EnteredTradeFeesSchemaTests`) pass a source the same way.
-- `TestSeedSmokeTests` and the seed integration tests gain the `Seed` assertion.
-- No existing test asserts the `rb:` reference.
+| Domain.UnitTests | `Entities/TransactionSourceTests.cs` |
+| Application.FunctionalTests | `Transactions/TransactionSourceTests.cs`, `Transactions/ReverseBySourceTests.cs`, `Transactions/ReverseOrderTests.cs` |
+| Infrastructure.IntegrationTests | `AppliedSchema/TransactionSourceSchemaTests.cs` |
 
 ---
 
@@ -341,142 +351,16 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
+## 12. History
 
-The repository should build after each commit. Agents split each behaviour into red then green.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/transaction-source.md`).
 
-1. Store the source (R2–R8, R17, R18): `TransactionSourceKind`, `TransactionSource`, the parameter on every factory and `Reverse`, EF mapping, script `0035`, every writer passes its source (handlers `Manual`, seeds `Seed`, rebalance `Rebalance` with the handle). Domain unit tests, the script and seed integration tests. The test fan-out of §10 lands here. The script and the mapping must land together: after the script an insert without `SourceKind` fails.
-2. Rebalance writes no `reference` (R9) + functional tests.
-3. `source` on the transaction item (R10, R11) + functional tests.
-4. Reverse by source (R12–R16): `CustodyRules.AllowsHandReverse` with unit tests; `ReverseTransaction`; functional tests.
-5. Adviser Portal: Source line and Reverse by source (D26, D27) + frontend tests.
-6. Repo docs: mark this file landed; update roadmap §13 step 1.
-
-Do not put an adjustment, a new flow's source kind, or a list filter in these commits.
-
----
-
-## Amendment 2026-11-20 (bank feed and deposit matching) — accepted
-
-Status of this amendment: `accepted` (2026-11-20), together with [deposit-matching.md](deposit-matching.md).
-
-- R2: new kind `BankFeed` (3), written by the deposit flow. Script `0041` widens `CK_Transactions_SourceKind` to 0–3 and requires a `SourcePublicId` for kinds 2 and 3.
-- R3: the source id of `BankFeed` is the PublicId of the bank statement line the deposit came from. A deposit and the Reversal of its undo share it; a line matched again after an undo gives a second deposit with the same id.
-- R10: `kind` may be `BankFeed`.
-- R12: `BankFeed` is not hand-reversible. On a Custodial account a hand reverse of a deposit → 400 (R13). The deposit flow undoes its own write by an undo match (deposit-matching R30, R33).
-- §5: `TransactionSource.BankFeed(Guid statementLinePublicId)`; an empty id → `DomainException`.
-
----
-
-## Amendment 2026-11-20 (nominated bank accounts and withdrawals) — accepted
-
-Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md](withdrawals.md).
-
-- R2: new kind `Payment` (4), written by the withdrawal flow. Script `0043` widens `CK_Transactions_SourceKind` to 0–4 and requires a `SourcePublicId` for kinds 2, 3 and 4.
-- R3: the source id of `Payment` is the PublicId of the withdrawal. A payout and the Reversal of a returned payout share it.
-- R10: `kind` may be `Payment`.
-- R12: `Payment` is not hand-reversible. On a Custodial account a hand reverse of a payout or its Reversal → 400 (R13). The withdrawal flow undoes its own write when the bank returns the payout.
-- §5: `TransactionSource.Payment(Guid withdrawalPublicId)`; an empty id → `DomainException`.
-
----
-
-## Amendment 2026-11-22 (account closure) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [account-closure.md](account-closure.md).
-
-- R2, R4: new source kind `AccountClosure = 5`, with the account closure's PublicId as source id (required). It marks the remainder write-off (a `CloseOut`, account-closure R18). `TransactionSource.AccountClosure(Guid closurePublicId)`; an empty id → `DomainException`.
-- R12, R13: `AccountClosure` is not hand-reversible. `POST /transactions/{id}/reverse` of a write-off → 400 with the R13 message.
-- §6: script `0046_account_closures.sql` widens `CK_Transactions_SourceKind` to 0–5 and requires a `SourcePublicId` for kinds 2–5.
-- R18 (item): `source.kind` may be `AccountClosure`, with `id` the closure's PublicId.
-
----
-
-## Amendment 2026-11-22 (interest run) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rules R23 and R27 live there; this section records what changes here.
-
-- R2, R4: new source kind `InterestRun = 6`, with the interest run's PublicId as source id (required). `TransactionSource.InterestRun(Guid runPublicId)` refuses an empty id.
-- R12, R13: `InterestRun` is not hand-reversible. `POST /transactions/{id}/reverse` of an interest posting → 400 by R13.
-- §6: script `0048_interest.sql` widens `CK_Transactions_SourceKind` to 0–6 and requires a `SourcePublicId` for kinds 2–6.
-- R18 (item): `source.kind` may be `InterestRun`, with `id` the run's PublicId.
-
----
-
-## Amendment 2026-11-22 (corporate actions) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions.md](corporate-actions.md). Rules R26, R27 and R32 live there; this section records what changes here.
-
-- R2, R4: new source kind `CorporateAction = 7`, with the corporate action's PublicId as source id (required). `TransactionSource.CorporateAction(Guid corporateActionPublicId)` refuses an empty id.
-- R12, R13: `CorporateAction` is not hand-reversible. `POST /transactions/{id}/reverse` of an entitlement posting → 400 by R13.
-- §6: script `0050_corporate_actions.sql` widens `CK_Transactions_SourceKind` to 0–7 and requires a `SourcePublicId` for kinds 2–7.
-- R18 (item): `source.kind` may be `CorporateAction`, with `id` the corporate action's PublicId.
-
----
-
-## Amendment 2026-11-23 (orders and settlement) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R32, R35 and R37 live there; this section records what changes here.
-
-- R2, R3: new source kind `OrderFill = 8`, with the **order's** PublicId as source id (required). Every fill of one order has the same source id, as every trade of one rebalance has the same handle. `TransactionSource.OrderFill(Guid orderPublicId)` refuses an empty id.
-- R12, R13: `OrderFill` is not hand-reversible. `POST /transactions/{id}/reverse` of a fill → 400 by R13. `Rebalance` stays hand-reversible until roadmap O3 (orders R49).
-- §6: script `0051_orders.sql` widens `CK_Transactions_SourceKind` to 0–8 and requires a `SourcePublicId` for kinds 2–8.
-- R10 (item): `source.kind` may be `OrderFill`, with `id` the order's PublicId; the fill itself is named in the item's `execution` (orders R38).
-
----
-
-## Amendment 2026-11-23 (trade settlement and broken trades) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [trade-settlement.md](trade-settlement.md). Rule R29 lives there; this section records what changes here.
-
-- R7: a broken trade is reversed by its own flow. The Reversal keeps source `OrderFill` and the order's PublicId as source id. `OrderFill` stays not hand-reversible, for the fill and for its Reversal.
-
----
-
-## Amendment 2026-11-23 (rebalance through orders) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md](rebalances.md). Rules R26 and R28 live there; this section records what changes here.
-
-- R5: from this slice no Transaction gets source `Rebalance`. A rebalance trade is the fill of a rebalance order, with source `OrderFill` and the order's PublicId. The kind `Rebalance` stays for the rows that have it; `TransactionSource.Rebalance(handle)` is kept for reading them.
-- R9: the idempotency records a rebalance wrote per trade are no longer written.
-- R12, R13: `Rebalance` is no longer hand-reversible (roadmap D15 ends). On a Custodial account `POST /transactions/{id}/reverse` of a Transaction with source `Rebalance` → 400 with the message of R13; it is corrected with an adjustment. On an External account the reverse is unchanged. After this slice the only source a person reverses on a Custodial account is `Manual`.
-
----
-
-## Amendment 2026-11-24 (migration batches) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [migration-batches.md](migration-batches.md). Rules R25 and R27 live there; this section records what changes here.
-
-- R5: source kind `Migration = 9`, with the migration batch's PublicId as source id (required). Every Transaction of one batch has the same source id.
-- R12, R13: `Migration` is not hand-reversible; `POST /transactions/{id}/reverse` of a Transaction a batch wrote → 400 with the message of R13. No flow reverses it; an adjustment corrects it.
-- `0054` widens `CK_Transactions_SourceKind` to 0–9 and requires a `SourcePublicId` for kinds 2–9.
-
----
-
-## Amendment 2026-11-24 (in-kind transfers) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rules R37, R41 and R49 live there; this section records what changes here.
-
-- R5: source kind `InKindTransfer = 10`, with the in-kind transfer's PublicId as source id (required).
-- R12, R13: `InKindTransfer` is not hand-reversible; `POST /transactions/{id}/reverse` of a Transaction a transfer wrote → 400 with the message of R13. No flow reverses it; a new transfer or an adjustment corrects it.
-- `0055` widens `CK_Transactions_SourceKind` to 0–10 and requires a `SourcePublicId` for kinds 2–10.
-- The transaction item gains `inKindTransfer` (in-kind-transfers R42).
-
----
-
-## Amendment 2026-11-24 (dividends) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rules R37 and R42 live there; this section records what changes here.
-
-- Kind `CorporateAction` (7) also marks a `Dividend`, with the corporate action's PublicId as its id. It stays not hand-reversible.
-- The transaction item gains `dividend` (dividends R50).
-
----
-
-## Amendment 2026-11-25 (adjustment review) — accepted
-
-Status of this amendment: `accepted` (2026-11-25), together with [adjustment-review.md](adjustment-review.md). Rules R13, R15 and R21 live there; this section records what changes here.
-
-- New kind `AdjustmentRequest` (11), with the adjustment request's PublicId as its id. It marks an `Adjustment` posted by the approval of a request. It is not hand-reversible (R12).
-- R4: an adjustment is no longer a `Manual` write. Adjustments posted before 2026-11-25 keep `Manual`.
-- R13, R14: a hand reverse of a Transaction of type `Adjustment` is refused by its type, before R13 and with its own message (adjustment-review R15), also when its source is `Manual`.
-- `0058` widens `CK_Transactions_SourceKind` to 0–11 and requires a `SourcePublicId` for kinds 2–11.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-20 | [deposit-matching.md](deposit-matching.md), [withdrawals.md](withdrawals.md) | Kinds `BankFeed` (3) and `Payment` (4) |
+| 2026-11-22 | [account-closure.md](account-closure.md), [interest-run.md](interest-run.md), [corporate-actions.md](corporate-actions.md) | Kinds `AccountClosure` (5), `InterestRun` (6) and `CorporateAction` (7) |
+| 2026-11-23 | [orders.md](orders.md), [trade-settlement.md](trade-settlement.md) | Kind `OrderFill` (8). R7: the Reversal of a broken trade |
+| 2026-11-23 | [rebalances.md](rebalances.md) | R5, R9, R12: nothing writes `Rebalance`; it is no longer hand-reversible |
+| 2026-11-24 | [migration-batches.md](migration-batches.md), [in-kind-transfers.md](in-kind-transfers.md), [dividends.md](dividends.md) | Kinds `Migration` (9) and `InKindTransfer` (10); `CorporateAction` also marks a `Dividend` |
+| 2026-11-25 | [adjustment-review.md](adjustment-review.md) | Kind `AdjustmentRequest` (11). R4, R13: an adjustment |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
