@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-10
-last_updated: 2026-11-23
+last_updated: 2026-11-26
 related:
   - internal-transfers.md
   - leg-accounts.md
@@ -35,12 +35,6 @@ Cash conversion from one currency to another between two Accounts in the same te
 This slice adds one `TransactionType`, a create route `POST /transactions/fx`, a read-only quote route `POST /transactions/fx/quote`, and script `0026`. No new policy. Read and reverse reuse the existing `/transactions` routes. An Account still has one cash currency (ADR 0011 §6); this slice does not change the Account model ([future-plans.md](../future-plans.md) §5).
 
 `TransactionFxDetails` is designed so that Buy / Sell with automatic FX can store their rate too. That use is a separate amendment to [buy-sell.md](buy-sell.md) and [portfolios.md](portfolios.md): [cross-currency-trades.md](cross-currency-trades.md). This slice does not change Buy / Sell.
-
-**Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R3 and R20: a `bookedAt` later than the server clock plus 5 minutes → 400 `errors.BookedAt`, on create and on the quote. R11 is unchanged; the same decimal place rule now also covers the other cash types.
-
-**Amendment 2026-11-17 (custody modes, accepted, landed):** [custody-modes.md](custody-modes.md). R8 gains a condition: both Accounts have the same custody mode, else 400 with `errors.ToAccountId`, on create and on the quote. R3 and R20: when both Accounts are Custodial the server sets `bookedAt`; a create or quote body that sends it → 400. R9 and R10 then read the rate and check its staleness for the server's instant. §5: the factory takes both custody modes and refuses different ones. §9: the account picker greys out an Account with a different custody mode. The reference rate and `expectedRate` are unchanged on both custody modes.
-
-**Amendment 2026-11-18 (External caller numbers, accepted, landed):** [external-caller-numbers.md](external-caller-numbers.md). Between two External Accounts: R3 — both `sellAmount` and `buyAmount` are required and `expectedRate` → 400; R9, R10, R12 do not apply: the rate is `Round(buyAmount ÷ sellAmount, 8, AwayFromZero)` and no `FxRates` row is read; R11 — each amount within its currency's `DecimalPlaces`, nothing computed; R14 — the FX detail has that rate, the UTC date of `bookedAt` as `RateAsOfDate` and source `Caller`; R20 — the quote → 400 `errors.FromAccountId`. Between two Custodial Accounts nothing changes. §9: the convert form on an External account takes two amounts and calls no quote.
 
 ---
 
@@ -95,24 +89,24 @@ A TenantAdmin or Adviser converts cash from an Open Account in one currency to a
 | --- | --- |
 | R1 | Unchanged from posting R1–R4a and leg-accounts R1: 401 / 403 / 404, PublicId only, `tenantId` rules for TenantAdmin / Adviser (omit) and SystemAdmin (required on create and quote). Customer → 403. TenantAdmin / Adviser of a disabled tenant → 403 (identity-auth amendment 2026-11-13). SystemAdmin naming a disabled tenant on create or quote → 400 `disabled` / `target=tenant`. |
 | R2 | **Route.** `POST /transactions/fx` creates an `FxConversion`. `POST /transactions` with `type = FxConversion` → 400. One create route per type (api-design §7.7). |
-| R3 | **Body.** `fromAccountId` and `toAccountId` (Account PublicIds) are required. Exactly one of `sellAmount` and `buyAmount` is present and `> 0`; both or neither → 400. `expectedRate` is required on create. `bookedAt`, `memo`, `reference` follow posting. The body has no `type`, `accountId`, `currency`, `amount`, `rate` or legs array; any of those present → 400. |
+| R3 | **Body.** `fromAccountId` and `toAccountId` (Account PublicIds) are required. Between two **Custodial** Accounts: exactly one of `sellAmount` and `buyAmount` is present and `> 0` (both or neither → 400); `expectedRate` is required on create; the server sets `bookedAt`, and a create or quote body that sends it → 400 (custody-modes R10). Between two **External** Accounts: both `sellAmount` and `buyAmount` are required, `expectedRate` → 400 (external-caller-numbers R15, R16), and `bookedAt` is required, with `Z` or an offset and not later than the server clock plus 5 minutes (400 `errors.BookedAt`). `memo`, `reference` follow posting. The body has no `type`, `accountId`, `currency`, `amount`, `rate` or legs array; any of those present → 400. |
 | R4 | **Currencies.** The sell currency is `fromAccount.Currency`. The buy currency is `toAccount.Currency`. They must differ (else 400; same-currency moves use `POST /transactions/transfer`). |
 | R5 | **Different Accounts.** `fromAccountId = toAccountId` → 400. (Implied by R4, still checked and reported on its own.) |
 | R6 | **Same tenant and scope.** Both Accounts are in the command's tenant; another tenant's Account, a missing Account, or (Adviser) an Account of an unassigned Customer → 404 for the whole command. Nothing is written. |
 | R7 | **Same Customer.** Both Accounts belong to the same Customer. Two different Customers → 400, checked after R6 (an Account the caller cannot see is still 404). The Customer must not be Disabled (else 400 `disabled` / `target=user`). |
-| R8 | **Account types and state.** Any Phase-2 type (Bank, Cash, Brokerage, Other) on either side. Both Accounts must be Open (else 400). Same rule on reverse. |
-| R9 | **Rate.** The server reads `IFxRate.GetRateDetail(sellCurrency, buyCurrency, bookedAt)` ([fx-rates.md](fx-rates.md) port, which also returns the as-of date and source): the latest `FxRates` row for that directed pair with `AsOfDate ≤` the UTC date of `bookedAt` ([utc-instants](../fixes/utc-instants.md)), the same date rule as buy-sell R10. The rate is "buy currency per 1 sell currency". The directed pair is read as stored; the inverse pair is not used. No row → 400. The caller never sends a rate to use. |
+| R8 | **Account types and state.** Any Phase-2 type (Bank, Cash, Brokerage, Other) on either side. Both Accounts must be Open (else 400). Same rule on reverse. Both Accounts have the same custody mode, else 400 `errors.ToAccountId`, on create and on the quote (custody-modes R8); the factory takes both custody modes and refuses different ones. A closing account (an account closure `InProgress`) on either side, and the reverse of one with a leg on a closing account, → 400 with `This account is being closed and accepts no new activity.` under the empty `errors` key, directly after the Closed-account check (account-closure R12). From a Custodial account the sell amount must come from its withdrawable cash, on create and on the quote: after the conversion, available cash must not be below unsettled cash, else 400 with the message `Cash from sales that have not settled cannot leave the account: 500.00 USD settles later.` (orders R45). |
+| R9 | **Rate.** The server reads `IFxRate.GetRateDetail(sellCurrency, buyCurrency, bookedAt)` ([fx-rates.md](fx-rates.md) port, which also returns the as-of date and source): the latest `FxRates` row for that directed pair with `AsOfDate ≤` the UTC date of `bookedAt` ([utc-instants](../fixes/utc-instants.md)), the same date rule as buy-sell R10. The rate is "buy currency per 1 sell currency". The directed pair is read as stored; the inverse pair is not used. No row → 400. The caller never sends a rate to use. Between two Custodial Accounts the instant is the server's (custody-modes R12). Between two External Accounts this rule, R10 and R12 do not apply: the rate is `Round(buyAmount ÷ sellAmount, 8, AwayFromZero)` and no `FxRates` row is read (external-caller-numbers R17). |
 | R10 | **Staleness.** If the UTC date of `bookedAt` minus the rate's `AsOfDate` is more than 4 calendar days → 400. The same limit applies to the quote. |
-| R11 | **Amounts.** The caller's amount must have no more decimal places than its currency's `DecimalPlaces` (sell currency for `sellAmount`, buy currency for `buyAmount`); else 400. Fixed sell: `buy = Round(sellAmount × rate, buyDecimalPlaces, AwayFromZero)`. Fixed buy: `sell = Round(buyAmount ÷ rate, sellDecimalPlaces, AwayFromZero)`. A computed amount of 0 → 400. |
+| R11 | **Amounts.** The caller's amount must have no more decimal places than its currency's `DecimalPlaces` (sell currency for `sellAmount`, buy currency for `buyAmount`); else 400. Fixed sell: `buy = Round(sellAmount × rate, buyDecimalPlaces, AwayFromZero)`. Fixed buy: `sell = Round(buyAmount ÷ rate, sellDecimalPlaces, AwayFromZero)`. A computed amount of 0 → 400. Between two External Accounts each amount is within its currency's `DecimalPlaces` and nothing is computed (external-caller-numbers R15, R18). |
 | R12 | **Expected rate.** `expectedRate` must equal the rate of R9 exactly (`decimal(18,8)`). Different → 409 with the field in `errors`; nothing is written. The client gets a new quote and asks the caller to confirm again. The rate can change between quote and create when the hourly job stores a new row (fx-rates R16). |
 | R13 | **Legs.** Application builds exactly two cash legs: `−sell` in the sell currency on the from Account and `+buy` in the buy currency on the to Account. No security leg. Each leg's currency equals its Account's currency (leg-accounts R9). |
-| R14 | **FX detail.** Every `FxConversion` has exactly one `TransactionFxDetails` row: `BaseCurrency` = sell currency, `QuoteCurrency` = buy currency, `Rate`, `RateAsOfDate`, `RateSource` (the `FxRates.Source` of the row used). Written in the same unit of work as the header and legs. |
+| R14 | **FX detail.** Every `FxConversion` has exactly one `TransactionFxDetails` row: `BaseCurrency` = sell currency, `QuoteCurrency` = buy currency, `Rate`, `RateAsOfDate`, `RateSource` (the `FxRates.Source` of the row used). Written in the same unit of work as the header and legs. Between two External Accounts the detail has the derived rate, the UTC date of `bookedAt` as `RateAsOfDate` and source `Caller` (external-caller-numbers R18). |
 | R15 | **Cash `SUM`.** After insert, the from Account's `SUM ≥ 0` (else 400). Both Account rows are locked in ascending `Accounts.Id` order before the rate is read and the sums are checked (leg-accounts R10, R11). |
 | R16 | **Opening.** An `FxConversion` leg counts as another transaction on both Accounts. After it, cash `Opening` on either Account → 400 (internal-transfers R11). |
 | R17 | **Reverse.** `POST /transactions/{id}/reverse` on an `FxConversion` creates one `Reversal` with `+sell` on the from Account and `−buy` on the to Account: the original amounts, so the original rate. The current rate is not read and its staleness is not checked. The Reversal gets a copy of the original's FX detail row (same base, quote, rate, as-of date, source). R6, R7, R8 and the `SUM` check apply to both Accounts; if the to Account's `SUM` would go below 0 (the cash was spent), the whole reverse → 400. No partial reverse. |
 | R18 | **Converting back.** Converting back at today's rate is a new `FxConversion` in the other direction, not a reverse. |
 | R19 | **Idempotency.** `Idempotency-Key` is required on `POST /transactions/fx` (ADR 0015). Missing → 400. Replay with the same hash → original `201 { id }`; same key with a different hash → 409. The request path is part of the hash. A replay returns the original id even if the rate has since changed. |
-| R20 | **Quote.** `POST /transactions/fx/quote` takes the create body without `expectedRate`, `memo`, `reference` (present → 400); `bookedAt` is optional and defaults to now. It runs R1, R3–R11 and returns the rate, its as-of date and both amounts. It does not check the cash `SUM`, does not lock, does not write, and takes no `Idempotency-Key`. A quote is not stored and does not hold the rate. |
+| R20 | **Quote.** `POST /transactions/fx/quote` takes the create body without `expectedRate`, `memo`, `reference` (present → 400); `bookedAt` is optional and defaults to now. It runs R1, R3–R11 and returns the rate, its as-of date and both amounts. It does not check the cash `SUM`, does not lock, does not write, and takes no `Idempotency-Key`. A quote is not stored and does not hold the rate. A `bookedAt` with no offset, or later than the server clock plus 5 minutes → 400. Between two External Accounts the quote → 400 `errors.FromAccountId` (external-caller-numbers R19). |
 | R21 | **Read.** Get and list follow leg-accounts R7. Both Accounts belong to one Customer, so a caller who can see the conversion sees both legs. The item carries `fx` (R22). |
 | R22 | **Item `fx`.** The transaction item has an optional `fx` object `{ baseCurrency, quoteCurrency, rate, rateAsOfDate }` when the Transaction has an FX detail row; otherwise `fx` is `null`. `RateSource` is not on the wire. |
 | R23 | **List `type` filter.** `type=FxConversion` works with the existing filter (internal-transfers R15). |
@@ -299,14 +293,13 @@ Customer Portal: read only, no new page. A conversion shows as "Currency exchang
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | Factory: fixed sell and fixed buy amounts and rounding of §4.1 (including JPY, 0 decimal places); legs and FX detail of R13–R14; rejects same Account, same currency, amount `≤ 0`, computed amount 0, non-positive rate; Reverse produces the opposite legs and copies the FX detail |
-| Application.UnitTests | Staleness limit at 4 and 5 days (R10); decimal places check (R11) |
-| Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403; happy path fixed sell and fixed buy (TenantAdmin, assigned Adviser); FX detail and item `fx` match the rate row; Adviser unassigned → 404 and nothing written; two Accounts of two different Customers → 400 and nothing written (also when the Adviser is assigned to both); same Account → 400; same currency → 400; both / neither amount → 400; missing rate → 400; stale rate → 400; `expectedRate` differs → 409 and nothing written; Closed from or to → 400; Disabled Customer → 400 `disabled` / `target=user`; insufficient cash → 400; forbidden body fields → 400; `POST /transactions` with `FxConversion` → 400; missing `Idempotency-Key` → 400, replay → same id, different hash → 409; balances of both Accounts after create and after reverse; reverse uses the original amounts after the rate row changed; reverse after the to Account spent the cash → 400 and nothing written; Opening on either Account after a conversion → 400; allowed on an Account with an Active portfolio assignment and no rebalance enqueued; quote returns the same amounts as create and writes nothing; quote with `memo` → 400; Customer Portal read of the Customer's own conversion shows both legs and `fx`; list `type=FxConversion` |
-| Infrastructure.IntegrationTests | `CK_Transactions_Type` accepts 16 and rejects 17; `TransactionFxDetails` rejects equal currencies, `Rate ≤ 0`, unknown currency, a second row for one Transaction |
-| Application.FunctionalTests (two tenants) | From or to Account in the other tenant → 404 on create and quote, nothing written (TenantAdmin and SystemAdmin); other tenant's conversion id on get / reverse → 404 (`FxConversionIsolationTests`) |
-| Frontend | Picker greys out same-currency Accounts; sell / buy toggle; quote debounced and shown; quote error blocks submit; 409 re-quotes and asks to confirm; destination list is the source Customer's Accounts only |
+| Domain.UnitTests | `Entities/FxConversionTests.cs`, `Entities/FxConversionWithAmountsTests.cs` |
+| Application.FunctionalTests | `Transactions/FxConversion*Tests.cs`, `Transactions/ExternalFxConversionTests.cs`; `Custody/CustodialSameModeTests.cs`; `Portfolios/FxConversionPortfolioTests.cs` |
+| Infrastructure.IntegrationTests | `AppliedSchema/TransactionFxDetailsSchemaTests.cs` |
 
 ---
 
@@ -338,40 +331,16 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
+## 12. History
 
-Only after `accepted`. The tree must build after each commit. Split each behaviour into red then green.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/fx-conversions.md`).
 
-1. `0026_fx_conversions.sql` + `TransactionType.FxConversion` + integration tests for the type check and `TransactionFxDetails` constraints.
-2. Domain `AppliedFxRate`, factory, FX detail, rounding and invariants + unit tests; Reverse copies the FX detail.
-3. `CreateFxConversion` + `POST /transactions/fx` happy path (fixed sell, fixed buy), idempotency, validation (R3–R5, R7–R11, R15) + functional tests.
-4. `expectedRate` check (R12) + tests.
-5. Authority and tenant isolation (R6) + functional two-tenant tests.
-6. Quote route (R20) + tests.
-7. `POST /transactions` rejects `FxConversion` (R2); Opening after a conversion (R16) + tests.
-8. Reverse of a conversion (R17) + tests.
-9. Item `fx` (R21, R22) and list filter (R23) + tests.
-10. Portfolio interaction (R24) + tests.
-11. Adviser Portal Convert form and quote + frontend tests. Customer Portal label.
-12. Repo docs: this file `accepted`; amend domain-model, database-design, api-design §7.7 and change log, portfolios R18, adviser-portal-dashboard, customer-portal, features README status.
-
-## Amendment 2026-11-14 (UTC instants)
-
-Accepted with [utc-instants](../fixes/utc-instants.md). R9 and R10 use the UTC date of `bookedAt`. A quote or create `bookedAt` with no offset → 400. The item example shows the UTC form.
-
----
-
-## Amendment 2026-11-22 (account closure) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [account-closure.md](account-closure.md).
-
-- `POST /transactions/fx` and `POST /transactions/fx/quote` with a closing account (an account closure `InProgress`) on either side, and the reverse of a conversion with a leg on one, → 400 with `This account is being closed and accepts no new activity.` under the empty `errors` key, directly after the Closed-account check (account-closure R12).
-
----
-
-## Amendment 2026-11-23 (orders and settlement) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rule R45 lives there; this section records what changes here.
-
-- On `POST /transactions/fx` and `POST /transactions/fx/quote` from a Custodial account, the sell amount must come from the account's withdrawable cash: after the conversion, available cash must not be below unsettled cash. Otherwise 400 under the key the conversion uses for withdrawals R37, with the message `Cash from sales that have not settled cannot leave the account: 500.00 USD settles later.` (orders R45).
-- External accounts, the to side and the reverse of a conversion are unchanged.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-14 | [utc-instants](../fixes/utc-instants.md) | R9, R10: the UTC date of `bookedAt` |
+| 2026-11-16 | [ledger-write-guards](../fixes/ledger-write-guards.md) | R3, R20: no future `bookedAt` |
+| 2026-11-17 | [custody-modes.md](custody-modes.md) | R3, R8, R20: the same custody mode; server `bookedAt` between Custodial accounts |
+| 2026-11-18 | [external-caller-numbers.md](external-caller-numbers.md) | R3, R9–R12, R14, R20: both amounts and a derived rate between External accounts |
+| 2026-11-22 | [account-closure.md](account-closure.md) | R8: a closing account |
+| 2026-11-23 | [orders.md](orders.md) | R8: withdrawable cash |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
