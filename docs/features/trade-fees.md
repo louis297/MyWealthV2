@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-15
-last_updated: 2026-11-23
+last_updated: 2026-11-26
 related:
   - ../future-plans.md
   - ../glossary.md
@@ -36,12 +36,6 @@ Amendment to [buy-sell.md](buy-sell.md), [posting.md](posting.md), [holdings.md]
 This is step 1 of the business domain roadmap ([future-plans.md](../future-plans.md) §1). Decisions from discussion on 2026-11-15.
 
 **Status is `accepted` (2026-11-15).** Backend landed 2026-11-15 on `webapi` (script `0030`, `/fees/trade-schedules`, the fee preview, the fee leg, reverse, readers, rebalance, TestSeed) together with the Adviser Portal BFF `/fees` prefix. The Adviser Portal pages ([adviser-portal-fees.md](../adviser-portal/adviser-portal-fees.md)) landed 2026-11-15. The amendments to buy-sell, posting, holdings, leg-accounts, portfolios, reports, api-design, database-design, domain-model, the glossary and the portal page contracts are written in those files in the same change.
-
-**Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). A `Buy` / `Sell` can no longer be booked in the future. R9 is unchanged: the latest trade date can still be after today inside the 5 minute allowance around UTC midnight, and for rows posted before that fix. A schedule created over HTTP starts tomorrow at the earliest (R10), so it applies to trades from tomorrow on. The Fees functional tests that dated a trade in the future to get a fee change with that fix (its B3).
-
-**Amendment 2026-11-17 (custody modes, accepted, landed):** [custody-modes.md](custody-modes.md). No rule in this file changes. A trade fee is charged on `Buy` / `Sell` on both custody modes; limiting schedules to Custodial accounts is a later slice. On a Custodial account the trade is booked at the server clock, so R7 picks the schedule for today's UTC date. A schedule created over HTTP starts tomorrow at the earliest (R10) and applies to Custodial trades from then on.
-
-**Amendment 2026-11-18 (External caller numbers, accepted, landed):** [external-caller-numbers.md](external-caller-numbers.md). R7 and R14 apply to `Buy` / `Sell` on Custodial accounts only. On an External account the schedule is not read: the caller may send `fee` (the outside broker's brokerage, in the quote currency, `≥ 0`, within its `DecimalPlaces`), and R14's "a `fee` field → 400" holds on Custodial accounts only. An entered fee above 0 gets a `Fee` leg by R15 and R16 and a fee detail by R18 with **no schedule** (`fee.scheduleId: null`); script `0034` drops `CK_TransactionFeeDetails_BrokerageSchedule`. R9 (cut-off date) still counts every `Buy` / `Sell`; R12 still holds for the schedules that posted trades used. R19 copies a fee detail without a schedule like any other.
 
 ---
 
@@ -111,9 +105,9 @@ A TenantAdmin sets, per quote currency, a trade fee schedule: marginal bands of 
 | --- | --- |
 | R5 | **Shape.** `quoteCurrency`: an enabled catalog code. `effectiveFrom`: a date (no time). `minimum` `≥ 0`. `cap`: null, or `> 0` and `≥ minimum`. `bands`: 1 to 10 rows of `{ from, ratePercent }`; the first `from` is `0`; `from` strictly ascending; the last band has no upper end. `ratePercent` `≥ 0` and `≤ 100`, at most 4 decimals (`0.5` means 0.5 %). `minimum`, `cap` and every `from` have at most the quote currency's `DecimalPlaces` decimals ([currencies.md](currencies.md) R3). Violations → 400 `errors`. |
 | R6 | At most one row per `(tenant, quoteCurrency, effectiveFrom)`. Duplicate → 400 `errors.EffectiveFrom`. |
-| R7 | **Applicable schedule.** For a trade on an instrument with quote currency `Q` and instant `bookedAt`, the applicable schedule is the tenant's row for `Q` with the latest `effectiveFrom` on or before the UTC date of `bookedAt` ([utc-instants](../fixes/utc-instants.md)). No such row → the trade has no fee. |
+| R7 | **Applicable schedule.** For a trade on an instrument with quote currency `Q` and instant `bookedAt`, the applicable schedule is the tenant's row for `Q` with the latest `effectiveFrom` on or before the UTC date of `bookedAt` ([utc-instants](../fixes/utc-instants.md)). No such row → the trade has no fee. For the fill of an order, the schedule is the one that applied on the UTC date the order was **placed**, stored on the order, not the one for the UTC date of the fill's `bookedAt` (orders R11): it is in effect and can no longer change, so no schedule write changes the fee of a later fill. On an External account no schedule is read (R14). |
 | R8 | **Fee.** `gross` = `Round(quantity × price, 4, AwayFromZero)` in the quote currency. Banded amount = sum over bands of `ratePercent / 100 × (min(gross, next band's from) − from)`, counting only bands whose `from` is below `gross`; the last band has no upper end. `fee = Round(min(max(banded, minimum), cap ?? ∞), dp, AwayFromZero)`, where `dp` is the quote currency's `DecimalPlaces`. `fee` is non-decreasing in `gross`. |
-| R9 | **Cut-off date.** For `(tenant, Q)`, the cut-off date is the later of today (UTC) and the latest UTC date of `bookedAt` of any `Buy` / `Sell` in the tenant on an instrument quoted in `Q`. Reversals do not count. A row is **in effect** when its `effectiveFrom` is on or before the cut-off date; otherwise it is **pending**. |
+| R9 | **Cut-off date.** For `(tenant, Q)`, the cut-off date is the later of today (UTC) and the latest UTC date of `bookedAt` of any `Buy` / `Sell` in the tenant on an instrument quoted in `Q`. Reversals do not count. A row is **in effect** when its `effectiveFrom` is on or before the cut-off date; otherwise it is **pending**. A `Buy` / `Sell` cannot be booked in the future ([ledger-write-guards](../fixes/ledger-write-guards.md)); the latest trade date can still be after today inside the 5 minute allowance around UTC midnight, and for rows posted before that fix. This rule counts every `Buy` / `Sell`, on both custody modes. |
 | R10 | **Create.** `effectiveFrom` must be after the cut-off date. Otherwise → 400 `errors.EffectiveFrom`. |
 | R11 | **Update and delete.** Only a pending row may be updated (`PUT` with `rowVersion`) or deleted. A row in effect → 409 `fee_schedule_in_effect`. An update's new `effectiveFrom` must also be after the cut-off date (R10). `quoteCurrency` is immutable; to change it, delete and create. Update replaces the whole band set. |
 | R12 | **Invariant.** No schedule write changes which row applies to a posted `Buy` / `Sell`, or the values of that row. R9–R11 exist to hold this. |
@@ -123,13 +117,13 @@ A TenantAdmin sets, per quote currency, a trade fee schedule: marginal bands of 
 
 | ID | Rule |
 | --- | --- |
-| R14 | Every `Buy` / `Sell`, from `POST /transactions` or from rebalance, looks up the applicable schedule (R7). When one exists and `fee > 0`, the Transaction gets one cash leg with role `Fee` on the same Account as the principal cash leg, with a fee detail of kind `Brokerage` (R18). When there is no schedule or `fee = 0`, it gets neither. At most one `Brokerage` fee per Transaction. The create body does not change; a `fee` field in it → 400. |
+| R14 | **Where a fee comes from.** On a Custodial account a `Buy` / `Sell` is the fill of an order, and it gets the fee of its order's schedule (R7). When `fee > 0`, the Transaction gets one cash leg with role `Fee` on the same Account as the principal cash leg, with a fee detail of kind `Brokerage` (R18); when there is no schedule or `fee = 0`, it gets neither. At most one `Brokerage` fee per Transaction. The fee is charged on the order, across its fills: the fee of a fill is the schedule's fee on the order's posted gross including that fill, minus the fee already charged on the order's earlier fills, and never below 0 (orders R33). An order filled in parts pays the fee of one fill of the same gross; a minimum is charged once, a cap holds for the order. After a broken fill was reversed, the order's charged fee falls by that fill's fee, and the fees of the order's other fills are not worked out again (trade-settlement R29). On an External account the schedule is not read: the caller may send `fee` (the outside broker's brokerage, in the quote currency, `≥ 0`, within its `DecimalPlaces`), and an entered fee above 0 gets a `Fee` leg by R15 and R16 and a fee detail with no schedule (external-caller-numbers §4.2). A `fee` field on a Custodial body → 400. |
 | R15 | The principal cash leg keeps role `Principal` and today's amount ([buy-sell.md](buy-sell.md) R12). The fee cash leg is `−Round(fee × rate)` in the Account currency, with the same rate and the same rounding as the principal leg: 4 decimals today, the Account currency's `DecimalPlaces` once [cross-currency-trades.md](cross-currency-trades.md) R9 is accepted. Same currency → rate 1. The fee leg is negative on both `Buy` and `Sell`. |
 | R16 | **Cost.** `Buy` security-leg cost = `gross + fee` in the quote currency. `Sell` release is unchanged ([buy-sell.md](buy-sell.md) R15); the fee only reduces cash. |
 | R17 | **Cash check.** Cash `SUM` after all legs `≥ 0` ([buy-sell.md](buy-sell.md) R13). A `Sell` whose fee exceeds its principal is allowed when the check holds. |
-| R18 | **Fee detail.** Every `Fee` cash leg has exactly one `TransactionFeeDetails` row, and no other leg has one: fee kind, the schedule used, the basis amount (`gross` for `Brokerage`), `fee` and the quote currency. At most one fee per `(Transaction, kind)`. A `Principal` leg stays at most one per `(Transaction, Account)`. Written in the same unit of work. Never updated. A Transaction may carry several `Fee` legs of different kinds; this slice only creates `Brokerage`. |
-| R19 | **Reverse.** Reverse of a `Buy` / `Sell` copies every cash leg with its role and the opposite amount, and copies each `Fee` leg's fee detail onto the matching new leg. The schedule is not read again; the fee is refunded in full. A broker charge for cancelling a trade is a standalone fee (out of scope). |
-| R20 | **Other types** never have a `Fee` leg. The Domain refuses it. |
+| R18 | **Fee detail.** Every `Fee` cash leg has exactly one `TransactionFeeDetails` row, and no other leg has one: fee kind, the schedule used, the basis amount (`gross` for `Brokerage`), `fee` and the quote currency. At most one fee per `(Transaction, kind)`. A `Principal` leg stays at most one per `(Transaction, Account)`. Written in the same unit of work. Never updated. A Transaction may carry several `Fee` legs of different kinds; this slice only creates `Brokerage`. The fee detail of a fill names the order's schedule and has the fill's own gross as basis amount; its fee is the increment of R14, so it can be lower than the schedule's fee on that basis amount, and a later fill whose fee is `0` gets no `Fee` leg. The detail of an entered fee has no schedule (`fee.scheduleId: null`; script `0034` dropped `CK_TransactionFeeDetails_BrokerageSchedule`). |
+| R19 | **Reverse.** Reverse of a `Buy` / `Sell` copies every cash leg with its role and the opposite amount, and copies each `Fee` leg's fee detail onto the matching new leg. The schedule is not read again; the fee is refunded in full. A broker charge for cancelling a trade is a standalone fee (out of scope). A fee detail without a schedule is copied like any other. A fill is not reversed by hand (orders R37); the flow that reverses a broken fill gives its fee back (trade-settlement R33). |
+| R20 | **Other types** never have a `Fee` leg, and every type other than an interest posting and a `Dividend` never has a `Tax` leg. The Domain refuses both. The cash leg roles are `Principal` (0), `Fee` (1), `Tax` (2: an amount withheld from the Transaction's income and owed to a tax authority, always negative, with exactly one tax detail; interest-run R25) and `Reinvestment` (3: the part of a dividend taken in new shares, always negative, only on a `Dividend`, at most one, and only together with its security leg; dividends R40). `FeeBands` is reused unchanged, and not renamed, for the bands of an interest rate schedule (interest-run R9). |
 | R21 | **Existing rows.** Posted cash legs become role `Principal`. Posted `Buy` / `Sell` have no `Fee` leg. No back-fill of fees. |
 
 ### 4.4 Readers
@@ -141,6 +135,8 @@ A TenantAdmin sets, per quote currency, a trade fee schedule: marginal bands of 
 
 ### 4.5 Rebalance
 
+A rebalance trades through orders ([rebalances.md](rebalances.md)), so the fees the planner computes by the rules below are **estimates**: they give the proposal's `estimatedFee` and size the buys. A rebalance order is charged as any order (R7, R14). For a buy wave each buy is costed at its reservation, the most it can cost at its price limit with the schedule's fee on that gross, and the bisection of R27 and the drop of R28 run on that cost (rebalances R16). On an assigned Account only its rebalance places orders (rebalances R24).
+
 | ID | Rule |
 | --- | --- |
 | R24 | The portfolio trade lock ([portfolios.md](portfolios.md) R18) is unchanged. |
@@ -149,6 +145,61 @@ A TenantAdmin sets, per quote currency, a trade fee schedule: marginal bands of 
 | R27 | **Buy scaling.** If planned cash `< 0`, every planned buy quantity is scaled by one factor `k`: `quantity(k) = Round(k × quantity, 8, AwayFromZero)`, fees recomputed. `k` is the largest value in `[0, 1)` with planned cash `≥ 0`, found by bisection: start with `lo = 0`, `hi = 1`, run 40 steps, keep `lo`. Bisection is valid because planned cash is non-increasing in `k` (R8 and every rounding step are non-decreasing). |
 | R28 | After scaling, a buy whose quantity is 0 or whose base-currency value is below the minimum trade size is dropped. Dropping only raises planned cash. |
 | R29 | If planned cash is `< 0` even at `k = 0` (sell fees larger than cash plus sell principals), the rebalance fails with `insufficient_cash` ([portfolios.md](portfolios.md) R11). If no trade remains, the result is Success (NoChange). |
+
+### 4.6 Fee preview
+
+A read-only route that computes trade fees for a schedule that is not saved, so the Adviser Portal form can show the fee without repeating R8 in TypeScript ([adviser-portal-fees.md](../adviser-portal/adviser-portal-fees.md)). Same pattern as `POST /transactions/fx/quote`: a POST that computes and writes nothing.
+
+| ID | Rule |
+| --- | --- |
+| R30 | `POST /fees/trade-schedules/preview`, policy `fees.read` (TenantAdmin, Adviser, SystemAdmin). Customer → 403. Current tenant disabled → 403 (R4). The body has no `tenantId` for any caller (400 if present): the route reads no tenant data. No `Idempotency-Key`. 200 on success. |
+| R31 | Body: `quoteCurrency`, `minimum`, `cap`, `bands` with the R5 shape and the same `errors` field names, plus `amounts`: 1 to 5 values, each `> 0` with at most 4 decimals. `effectiveFrom` is not part of the body. Violations → 400 `errors`. |
+| R32 | For each amount, the response uses the same Domain calculation as a posted trade (R8, `TradeFeeSchedule.FeeFor`), not a second implementation. Per amount: `amount`, `bands` (only bands whose `from` is below the amount: `from`, `ratePercent`, `slice` = the part of the amount inside the band, `fee` = `ratePercent / 100 × slice`), `banded` (sum of the band fees), `limitApplied` (`"minimum"`, `"cap"` or `null`) and `fee`. `slice`, band `fee` and `banded` are exact, not rounded; only `fee` is rounded (R8). |
+| R33 | The route writes nothing, reads no schedule row and no trade, and does not look at the cut-off date. Its result is not a quote for any trade. |
+
+Domain: `FeeFor` returns a `FeeCalculation` value object (band slices, banded amount, limit applied, fee). Posted trades keep only the fee and the basis amount (R18); the preview returns the whole object.
+
+Routing: `{id}` routes under `/fees/trade-schedules` take a GUID only, so `preview` is never read as an id.
+
+Request and response:
+
+```json
+{
+  "quoteCurrency": "NZD",
+  "minimum": 10.00,
+  "cap": null,
+  "bands": [
+    { "from": 0, "ratePercent": 0.5 },
+    { "from": 10000.00, "ratePercent": 0.3 }
+  ],
+  "amounts": [1000.00, 15000.00]
+}
+```
+
+```json
+{
+  "currency": "NZD",
+  "items": [
+    {
+      "amount": 1000.00,
+      "bands": [{ "from": 0, "ratePercent": 0.5, "slice": 1000.00, "fee": 5.00 }],
+      "banded": 5.00,
+      "limitApplied": "minimum",
+      "fee": 10.00
+    },
+    {
+      "amount": 15000.00,
+      "bands": [
+        { "from": 0, "ratePercent": 0.5, "slice": 10000.00, "fee": 50.00 },
+        { "from": 10000.00, "ratePercent": 0.3, "slice": 5000.00, "fee": 15.00 }
+      ],
+      "banded": 65.00,
+      "limitApplied": null,
+      "fee": 65.00
+    }
+  ]
+}
+```
 
 ---
 
@@ -333,13 +384,14 @@ None in this slice.
 
 ## 10. Tests
 
-| Project | Assert |
-| --- | --- |
-| Domain.UnitTests | R8 worked examples: single band; two bands with `gross` below, on and above the edge; minimum binds; cap binds; rounding for `DecimalPlaces` 2 and 0; fee non-decreasing across a band edge. R5 shape refusals. `Buy` cost = gross + fee; `Sell` release unchanged; fee leg negative on both; cash check includes the fee; no fee leg when fee is 0 or no schedule. Reverse copies roles and fee detail. Other types refuse a `Fee` leg. Pending vs in effect for update / delete. Buy scaling: largest feasible `k`; dropped buys below minimum trade; `insufficient_cash` at `k = 0`; no scaling and no change when fees fit in the residual. |
-| Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403 on every verb; Adviser write → 403, read 200; TenantAdmin create / update / delete pending; update or delete in effect → 409 `fee_schedule_in_effect`; `effectiveFrom` not after the cut-off date → 400 (today, and after a future-dated `Buy`); duplicate date → 400; stale `rowVersion` → 409 `stale_row_version`; SystemAdmin without `tenantId` → 400. `Buy` / `Sell` with a schedule show the `Fee` leg with its `fee` object and the cost; the schedule that applies is the one for the trade's UTC date; reverse refunds the fee; `fee` field on a create body → 400; a cross-currency `Sell` converts the fee with the principal's rate. Rebalance with fees succeeds where the plain plan would go negative. Customer Transactions Report shows the net cash and the Fee column. |
-| Infrastructure.IntegrationTests | Two-tenant fixture: other tenant's schedule id → 404 on get / update / delete; a trade uses only its own tenant's schedules. Script: existing cash legs read as `Principal`; a second `Principal` leg on the same `(Transaction, Account)` is refused; a `Principal` and a `Fee` leg on the same Account are allowed; a second fee of the same kind on one Transaction is refused. TestSeed idempotent. |
+The tests are the executable form of §4. Where they live:
 
-TestSeed (Development / TestAppHost only): one schedule for the demo brokerage instruments' quote currency, effective the day after the cut-off date at seed time (so it obeys R10), with a minimum and two bands.
+| Project | Where |
+| --- | --- |
+| Domain.UnitTests | `Entities/TradeFeeScheduleTests.cs`, `Entities/TradeFeeTests.cs`, `Entities/EnteredTradeNumbersTests.cs` |
+| Application.UnitTests | Folder `Fees/` |
+| Application.FunctionalTests | Folder `Fees/`; the fee of a fill in `Orders/` and `Broker/` |
+| Infrastructure.IntegrationTests | `AppliedSchema/TradeFeesSchemaTests.cs`, `AppliedSchema/EnteredTradeFeesSchemaTests.cs` |
 
 ---
 
@@ -380,130 +432,17 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
+## 12. History
 
-The repository should build after each commit. Agents split each line into red then green.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/trade-fees.md`).
 
-1. Domain: `FeeBands` and `TradeFeeSchedule.FeeFor` (R5, R8) with unit tests.
-2. Script `0030_trade_fees.sql`; schedule commands and queries; policies; pending vs in effect and the cut-off date (R3–R13); isolation tests.
-3. `Buy` / `Sell` fee leg, cost, fee detail and cash check (R14–R18, R20, R21).
-4. Reverse copies roles and fee detail (R19).
-5. Item `role` and `fee`; Customer Transactions Report Fee column (R22, R23).
-6. Fee-aware rebalance and buy scaling (R24–R29).
-7. TestSeed schedule. Amend buy-sell, posting, holdings, leg-accounts, portfolios, reports, api-design, database-design and domain-model in the change that accepts this file.
-
----
-
-## Amendment 2026-11-15 (fee preview) — accepted
-
-The rest of this file stays accepted. It adds a read-only route that computes trade fees for a schedule that is not saved, so the Adviser Portal form can show the fee without repeating R8 in TypeScript ([adviser-portal-fees.md](../adviser-portal/adviser-portal-fees.md)). Same pattern as `POST /transactions/fx/quote`: a POST that computes and writes nothing.
-
-| ID | Rule |
-| --- | --- |
-| R30 | `POST /fees/trade-schedules/preview`, policy `fees.read` (TenantAdmin, Adviser, SystemAdmin). Customer → 403. Current tenant disabled → 403 (R4). The body has no `tenantId` for any caller (400 if present): the route reads no tenant data. No `Idempotency-Key`. 200 on success. |
-| R31 | Body: `quoteCurrency`, `minimum`, `cap`, `bands` with the R5 shape and the same `errors` field names, plus `amounts`: 1 to 5 values, each `> 0` with at most 4 decimals. `effectiveFrom` is not part of the body. Violations → 400 `errors`. |
-| R32 | For each amount, the response uses the same Domain calculation as a posted trade (R8, `TradeFeeSchedule.FeeFor`), not a second implementation. Per amount: `amount`, `bands` (only bands whose `from` is below the amount: `from`, `ratePercent`, `slice` = the part of the amount inside the band, `fee` = `ratePercent / 100 × slice`), `banded` (sum of the band fees), `limitApplied` (`"minimum"`, `"cap"` or `null`) and `fee`. `slice`, band `fee` and `banded` are exact, not rounded; only `fee` is rounded (R8). |
-| R33 | The route writes nothing, reads no schedule row and no trade, and does not look at the cut-off date. Its result is not a quote for any trade. |
-
-Domain: `FeeFor` returns a `FeeCalculation` value object (band slices, banded amount, limit applied, fee). Posted trades keep only the fee and the basis amount (R18); the preview returns the whole object.
-
-Routing: `{id}` routes under `/fees/trade-schedules` take a GUID only, so `preview` is never read as an id.
-
-Request and response:
-
-```json
-{
-  "quoteCurrency": "NZD",
-  "minimum": 10.00,
-  "cap": null,
-  "bands": [
-    { "from": 0, "ratePercent": 0.5 },
-    { "from": 10000.00, "ratePercent": 0.3 }
-  ],
-  "amounts": [1000.00, 15000.00]
-}
-```
-
-```json
-{
-  "currency": "NZD",
-  "items": [
-    {
-      "amount": 1000.00,
-      "bands": [{ "from": 0, "ratePercent": 0.5, "slice": 1000.00, "fee": 5.00 }],
-      "banded": 5.00,
-      "limitApplied": "minimum",
-      "fee": 10.00
-    },
-    {
-      "amount": 15000.00,
-      "bands": [
-        { "from": 0, "ratePercent": 0.5, "slice": 10000.00, "fee": 50.00 },
-        { "from": 10000.00, "ratePercent": 0.3, "slice": 5000.00, "fee": 15.00 }
-      ],
-      "banded": 65.00,
-      "limitApplied": null,
-      "fee": 65.00
-    }
-  ]
-}
-```
-
-Tests:
-
-| Project | Assert |
-| --- | --- |
-| Domain.UnitTests | `FeeCalculation` for the R8 worked examples: band slices sum to the amount; band fees sum to `banded`; `limitApplied` for minimum, cap and neither; `fee` equals the fee a posted trade gets for the same gross. |
-| Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403; Adviser and TenantAdmin → 200; `tenantId` in the body → 400; R5 shape errors → 400 with the same field names as create; `amounts` empty, more than 5, `≤ 0` or with 5 decimals → 400; no row is written. |
-
-Suggested commit: `FeeCalculation` and the preview query with tests (R30–R33), after commit 1 of §12. [api-design.md](../api-design.md) §7.9 lists the route.
-
----
-
-## Amendment 2026-11-22 (interest run) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rules R23–R27 live there; this section records what changes here.
-
-- Cash leg role: `CashLegRole` gains `Tax = 2` (the next role named in §11): an amount withheld from the Transaction's income and owed to a tax authority, always negative, with exactly one tax detail (`TransactionTaxDetails`). In this slice it appears only on an `Interest` posted by an interest run and on its Reversal (interest-run R25).
-- R20: other types never have a `Fee` leg, and every type other than an interest posting never has a `Tax` leg. The Domain refuses both.
-- `FeeBands` is reused unchanged, and not renamed, for the bands of an interest rate schedule (interest-run R9, §5).
-
----
-
-## Amendment 2026-11-23 (orders and settlement) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R11 and R33 live there; this section records what changes here.
-
-- R7, R14: for the fill of an order, the schedule is the one that applied to the instrument's quote currency on the UTC date the order was **placed**, stored on the order, not the one for the UTC date of the fill's `bookedAt` (orders R11). A rebalance trade keeps R7 and R14 as written. A hand `Buy` / `Sell` on a Custodial account no longer exists (orders R48).
-- R8, R14: the fee is charged on the order, across its fills. The fee of a fill is the schedule's fee on the order's posted gross including that fill, minus the fee already charged on the order's earlier fills (orders R33). An order filled in parts pays the fee of one fill of the same gross; a minimum is charged once, a cap holds for the order.
-- R18: the fee detail of a fill names the order's schedule and has the fill's own gross as basis amount. Its fee is the increment above, so it can be lower than the schedule's fee on that basis amount, and `0` on a later fill gets no `Fee` leg.
-- R9, R11, R12: unchanged. An order's schedule applies on the day it is placed, so it is in effect and can no longer change; no schedule write changes the fee of a later fill.
-- R19: no flow reverses a fill, and a fill is not hand-reversible (orders R37).
-- R24–R29: rebalance is unchanged until roadmap O3.
-
----
-
-## Amendment 2026-11-23 (trade settlement and broken trades) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [trade-settlement.md](trade-settlement.md). Rules R29 and R33 live there; this section records what changes here.
-
-- R8, R14: the fee of a fill (orders R33) is never below 0. After a broken fill was reversed, the order's charged fee falls by that fill's fee; the fees of the order's other fills are not worked out again.
-- R19: a flow reverses a broken fill, and the Reversal gives its fee back. A fill is still not hand-reversible.
-
----
-
-## Amendment 2026-11-23 (rebalance through orders) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md](rebalances.md). Rules R7, R16 and R26 live there; this section records what changes here.
-
-- R24: the trade lock stays; on an assigned Account only its rebalance places orders (rebalances R24).
-- R25–R29: the planner's fees are **estimates**, used for the proposal's `estimatedFee` and for sizing the buys. A rebalance order is charged as any order (orders R11, R33): the fee of the schedule fixed when the order is placed, charged across its fills.
-- R27, R28: for a buy wave each buy is costed at its reservation, the most it can cost at its price limit with the schedule's fee on that gross, and the bisection and the drop below the minimum trade run on that cost (rebalances R16).
-
----
-
-## Amendment 2026-11-24 (dividends) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rule R40 lives there; this section records what changes here.
-
-- `CashLegRole` gains `Reinvestment` (3): the part of a dividend taken in new shares, always negative, only on a `Dividend`, at most one, and only together with its security leg.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-15 | [adviser-portal-fees.md](../adviser-portal/adviser-portal-fees.md) | §4.6: the fee preview (R30–R33) |
+| 2026-11-16 | [ledger-write-guards](../fixes/ledger-write-guards.md) | R9: no trade is booked in the future |
+| 2026-11-18 | [external-caller-numbers.md](external-caller-numbers.md) | R14, R18: an entered fee on an External account, with no schedule |
+| 2026-11-22 | [interest-run.md](interest-run.md) | R20: cash leg role `Tax`; `FeeBands` reused |
+| 2026-11-23 | [orders.md](orders.md), [trade-settlement.md](trade-settlement.md) | R7, R14, R18, R19: the fee is charged on the order, across its fills; a broken fill |
+| 2026-11-23 | [rebalances.md](rebalances.md) | §4.5: the planner's fees are estimates |
+| 2026-11-24 | [dividends.md](dividends.md) | R20: cash leg role `Reinvestment` |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
