@@ -1,6 +1,8 @@
+using MyWealthV2.Application.Accounts;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.MarketData;
+using MyWealthV2.Application.Valuations;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Valuations;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
@@ -65,20 +67,83 @@ public class GetFundsUnderManagementQueryValidator : AbstractValidator<GetFundsU
 public class GetFundsUnderManagementQueryHandler(
     IApplicationDbContext db,
     ICurrentUser currentUser,
+    ICurrencyCatalog currencies,
     TimeProvider time) : IRequestHandler<GetFundsUnderManagementQuery, FundsUnderManagementDto>
 {
     public async Task<FundsUnderManagementDto> Handle(GetFundsUnderManagementQuery request, CancellationToken cancellationToken)
     {
         var tenant = await TenantAsync(request, cancellationToken);
-        var (from, to) = FundsUnderManagementRange.Resolve(request.From, request.To, FundsUnderManagementRange.LastFinalDay(time));
+        var tenantId = tenant.Id;
+        var reportingCurrency = tenant.ReportingCurrency.Trim();
+        var decimalPlaces = currencies.TryGet(reportingCurrency)?.DecimalPlaces
+                            ?? throw new InvalidOperationException($"Currency {reportingCurrency} is not in the catalog.");
+        var (start, end) = FundsUnderManagementRange.Resolve(request.From, request.To, FundsUnderManagementRange.LastFinalDay(time));
 
+        // R4: the Custodial accounts of the Customers in scope now, whatever their status.
+        var assignedAdviserId = AccountScope.AssignedAdviserInternalId(currentUser);
+        var selfCustomerId = AccountScope.SelfCustomerId(currentUser);
+        var scope =
+            from account in db.Accounts.IgnoreQueryFilters()
+            join customer in db.Users.IgnoreQueryFilters() on account.CustomerId equals customer.Id
+            where account.TenantId == tenantId
+                  && account.CustodyMode == CustodyMode.Custodial
+                  && (assignedAdviserId == null || customer.AdviserId == assignedAdviserId)
+                  && (selfCustomerId == null || account.CustomerId == selfCustomerId)
+            select account;
+
+        // R6: the days each account is expected on.
+        var accounts = await scope.AsNoTracking()
+            .Select(account => new { account.Id, account.Created, account.Status })
+            .ToListAsync(cancellationToken);
+        var closedIds = accounts.Where(account => account.Status == AccountStatus.Closed).Select(account => account.Id).ToList();
+        var closures = await ValuationDays.LastClosuresAsync(db, tenantId, closedIds, cancellationToken);
+        var spans = accounts
+            .Select(account => (
+                First: ValuationDays.FirstDay(account.Created),
+                Last: ValuationDays.LastDay(account.Status, closures.GetValueOrDefault(account.Id))))
+            .ToList();
+
+        // R5: per day and currency, the sum of the stored totals, with the number stored and incomplete.
+        var sums = await (
+            from row in db.StoredValuations.IgnoreQueryFilters().AsNoTracking()
+            join account in scope on row.AccountId equals account.Id
+            where row.TenantId == tenantId && row.Date >= start && row.Date <= end
+            group row by new { row.Date, row.Currency }
+            into grouped
+            select new
+            {
+                grouped.Key.Date,
+                grouped.Key.Currency,
+                Total = grouped.Sum(row => row.Total),
+                Stored = grouped.Count(),
+                Incomplete = grouped.Count(row => !row.Complete)
+            }).ToListAsync(cancellationToken);
+        var byDay = sums.ToLookup(row => row.Date);
+
+        var rates = new Dictionary<string, StoredRate>();
         var days = new List<FundsUnderManagementDayDto>();
-        for (var day = from; day <= to; day = day.AddDays(1))
+        for (var day = start; day <= end; day = day.AddDays(1))
         {
-            days.Add(new FundsUnderManagementDayDto(day, [], 0m, true, 0, 0, 0));
+            var rows = byDay[day].ToList();
+            var expected = spans.Count(span => ValuationDays.IsExpected(day, span.First, span.Last));
+            var stored = rows.Sum(row => row.Stored);
+            var incomplete = rows.Sum(row => row.Incomplete);
+            var missing = Math.Max(0, expected - stored);
+            var totals = rows
+                .GroupBy(row => row.Currency.Trim())
+                .ToDictionary(group => group.Key, group => group.Sum(row => row.Total));
+            var folded = FxFold.Compute(totals, reportingCurrency, decimalPlaces, rates, day);
+            days.Add(new FundsUnderManagementDayDto(
+                day,
+                folded.Lines.Select(FoldLineDto.From).ToList(),
+                folded.Total,
+                missing == 0 && incomplete == 0 && folded.Complete,
+                expected,
+                incomplete,
+                missing));
         }
 
-        return new FundsUnderManagementDto(tenant.ReportingCurrency.Trim(), from, to, days);
+        return new FundsUnderManagementDto(reportingCurrency, start, end, days);
     }
 
     private async Task<Domain.Entities.Tenant> TenantAsync(GetFundsUnderManagementQuery request, CancellationToken cancellationToken)
